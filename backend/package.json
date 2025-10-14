@@ -14,7 +14,8 @@
     "db:init": "bun src/db/init.ts",
     "db:seed": "bun src/db/init.ts --seed",
     "test": "bun test",
-    "test:repositories": "bun src/test/run-tests.ts"
+    "test:repositories": "bun src/test/run-tests.ts",
+    "test:auth": "bun src/test/run-auth-tests.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.0",

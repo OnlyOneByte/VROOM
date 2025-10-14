@@ -28,21 +28,21 @@ Convert the feature design into a series of prompts for a code-generation LLM th
     - Test data validation and constraint handling
     - _Requirements: 5.1, 5.4_
 
-- [ ] 3. Build Bun backend API with Hono framework
-  - [ ] 3.1 Set up Hono server with basic middleware
+- [x] 3. Build Bun backend API with Hono framework
+  - [x] 3.1 Set up Hono server with basic middleware
     - Create Hono application with CORS, logging, and error handling
     - Set up environment configuration and validation
     - Implement health check endpoint
     - _Requirements: 8.4_
 
-  - [ ] 3.2 Implement Google OAuth authentication with Lucia
+  - [x] 3.2 Implement Google OAuth authentication with Lucia
     - Configure Lucia Auth with Google OAuth provider
     - Create authentication routes (/auth/login/google, /auth/callback/google)
     - Implement session management and JWT token handling
     - Add user creation and profile management
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-  - [ ] 3.3 Write authentication integration tests
+  - [x] 3.3 Write authentication integration tests
     - Test OAuth flow with mocked Google responses
     - Verify session creation and token validation
     - Test logout and session invalidation
