@@ -9,28 +9,30 @@
     "build": "bun build src/index.ts --outdir ./dist --target bun",
     "start": "bun dist/index.js",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "test": "bun test"
+    "db:init": "bun src/db/init.ts",
+    "db:seed": "bun src/db/init.ts --seed",
+    "test": "bun test",
+    "test:repositories": "bun src/test/run-tests.ts"
   },
   "dependencies": {
-    "hono": "^4.9.0",
     "@hono/node-server": "^1.19.0",
-    "drizzle-orm": "^0.29.3",
-    "better-sqlite3": "^9.2.2",
-    "lucia": "^3.2.0",
     "@lucia-auth/adapter-drizzle": "^1.1.0",
+    "@paralleldrive/cuid2": "^2.2.2",
     "arctic": "^1.9.0",
-    "oslo": "^1.1.2",
-    "zod": "^3.22.4",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "drizzle-orm": "^0.44.6",
+    "hono": "^4.9.0",
+    "lucia": "^3.2.0",
+    "oslo": "^1.1.2",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.8",
     "@types/cors": "^2.8.17",
-    "drizzle-kit": "^0.20.9",
-    "typescript": "^5.3.3",
-    "bun-types": "^1.0.25"
+    "bun-types": "^1.0.25",
+    "drizzle-kit": "^0.31.5",
+    "typescript": "^5.3.3"
   }
 }

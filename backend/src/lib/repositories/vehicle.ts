@@ -1,0 +1,76 @@
+import { eq, and } from 'drizzle-orm';
+import { db } from '../../db/connection.js';
+import { vehicles } from '../../db/schema.js';
+import type { Vehicle, NewVehicle } from '../../db/schema.js';
+import type { IVehicleRepository } from './interfaces.js';
+import { BaseRepository } from './base.js';
+
+export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> implements IVehicleRepository {
+  constructor() {
+    super(vehicles);
+  }
+
+  async findByUserId(userId: string): Promise<Vehicle[]> {
+    try {
+      const result = await db
+        .select()
+        .from(vehicles)
+        .where(eq(vehicles.userId, userId))
+        .orderBy(vehicles.createdAt);
+      return result;
+    } catch (error) {
+      console.error(`Error finding vehicles for user ${userId}:`, error);
+      throw new Error('Failed to find vehicles for user');
+    }
+  }
+
+  async findByUserIdAndId(userId: string, vehicleId: string): Promise<Vehicle | null> {
+    try {
+      const result = await db
+        .select()
+        .from(vehicles)
+        .where(and(eq(vehicles.userId, userId), eq(vehicles.id, vehicleId)))
+        .limit(1);
+      return result[0] || null;
+    } catch (error) {
+      console.error(`Error finding vehicle ${vehicleId} for user ${userId}:`, error);
+      throw new Error('Failed to find vehicle for user');
+    }
+  }
+
+  async findByLicensePlate(licensePlate: string): Promise<Vehicle | null> {
+    try {
+      const result = await db
+        .select()
+        .from(vehicles)
+        .where(eq(vehicles.licensePlate, licensePlate))
+        .limit(1);
+      return result[0] || null;
+    } catch (error) {
+      console.error(`Error finding vehicle by license plate ${licensePlate}:`, error);
+      throw new Error('Failed to find vehicle by license plate');
+    }
+  }
+
+  async updateMileage(id: string, mileage: number): Promise<Vehicle> {
+    try {
+      const result = await db
+        .update(vehicles)
+        .set({ 
+          initialMileage: mileage,
+          updatedAt: new Date()
+        })
+        .where(eq(vehicles.id, id))
+        .returning();
+      
+      if (result.length === 0) {
+        throw new Error(`Vehicle with id ${id} not found`);
+      }
+      
+      return result[0];
+    } catch (error) {
+      console.error(`Error updating mileage for vehicle ${id}:`, error);
+      throw new Error('Failed to update vehicle mileage');
+    }
+  }
+}

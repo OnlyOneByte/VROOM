@@ -9,20 +9,20 @@ Convert the feature design into a series of prompts for a code-generation LLM th
   - Create core data model interfaces (User, Vehicle, Expense, VehicleLoan, InsurancePolicy)
   - _Requirements: 8.3, 8.4_
 
-- [ ] 2. Implement SQLite database foundation with Drizzle ORM
-  - [ ] 2.1 Set up Drizzle ORM configuration and SQLite connection
+- [x] 2. Implement SQLite database foundation with Drizzle ORM
+  - [x] 2.1 Set up Drizzle ORM configuration and SQLite connection
     - Configure Drizzle with SQLite adapter
     - Create database schema files for all core entities
     - Set up database migrations and seeding
     - _Requirements: 5.1, 5.3_
 
-  - [ ] 2.2 Create repository pattern for data access
+  - [x] 2.2 Create repository pattern for data access
     - Implement abstract repository interfaces
     - Create SQLite repository implementations for User, Vehicle, Expense entities
     - Add database connection utilities and error handling
     - _Requirements: 5.1, 5.4_
 
-  - [ ] 2.3 Write unit tests for repository operations
+  - [x] 2.3 Write unit tests for repository operations
     - Create test database setup and teardown utilities
     - Write unit tests for CRUD operations on all repositories
     - Test data validation and constraint handling

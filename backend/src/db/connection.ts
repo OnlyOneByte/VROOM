@@ -1,0 +1,64 @@
+import { Database } from 'bun:sqlite';
+import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
+import * as schema from './schema.js';
+import { existsSync, mkdirSync } from 'fs';
+import { dirname } from 'path';
+
+// Database configuration
+const DATABASE_URL = process.env.DATABASE_URL || './data/vroom.db';
+
+// Ensure data directory exists
+const dbDir = dirname(DATABASE_URL);
+if (!existsSync(dbDir)) {
+  mkdirSync(dbDir, { recursive: true });
+}
+
+// Create SQLite connection
+const sqlite = new Database(DATABASE_URL);
+
+// Enable WAL mode for better performance
+sqlite.exec('PRAGMA journal_mode = WAL');
+sqlite.exec('PRAGMA synchronous = NORMAL');
+sqlite.exec('PRAGMA cache_size = 1000000');
+sqlite.exec('PRAGMA foreign_keys = ON');
+sqlite.exec('PRAGMA temp_store = MEMORY');
+
+// Create Drizzle instance
+export const db = drizzle(sqlite, { schema });
+
+// Migration function
+export async function runMigrations() {
+  try {
+    console.log('Running database migrations...');
+    migrate(db, { migrationsFolder: './drizzle' });
+    console.log('Database migrations completed successfully');
+  } catch (error) {
+    console.error('Migration failed:', error);
+    throw error;
+  }
+}
+
+// Database health check
+export function checkDatabaseHealth(): boolean {
+  try {
+    const result = sqlite.query('SELECT 1 as health').get();
+    return result && (result as any).health === 1;
+  } catch (error) {
+    console.error('Database health check failed:', error);
+    return false;
+  }
+}
+
+// Graceful shutdown
+export function closeDatabaseConnection() {
+  try {
+    sqlite.close();
+    console.log('Database connection closed');
+  } catch (error) {
+    console.error('Error closing database connection:', error);
+  }
+}
+
+// Export the sqlite instance for direct access if needed
+export { sqlite };
