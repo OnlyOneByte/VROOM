@@ -2,7 +2,7 @@
 
 Convert the feature design into a series of prompts for a code-generation LLM that will implement each step in a test-driven manner. Prioritize best practices, incremental progress, and early testing, ensuring no big jumps in complexity at any stage. Make sure that each prompt builds on the previous prompts, and ends with wiring things together. There should be no hanging or orphaned code that isn't integrated into a previous step. Focus ONLY on tasks that involve writing, modifying, or testing code.
 
-- [-] 1. Set up project structure and core interfaces
+- [x] 1. Set up project structure and core interfaces
   - Create directory structure for SvelteKit frontend and Bun backend
   - Initialize package.json files with hip stack dependencies (SvelteKit, Bun, Hono, Drizzle, Lucia Auth)
   - Set up TypeScript configuration for both frontend and backend
