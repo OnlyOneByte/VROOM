@@ -12,7 +12,10 @@ import { loans } from './routes/loans';
 import { expenses } from './routes/expenses';
 import { insurance } from './routes/insurance';
 import { analytics } from './routes/analytics';
+import { drive } from './routes/drive';
+import { sheets } from './routes/sheets';
 import { requireAuth, optionalAuth } from './lib/middleware/auth';
+import { activityTrackerMiddleware } from './lib/middleware/activity-tracker';
 
 const app = new Hono();
 
@@ -38,6 +41,9 @@ if (config.env === 'development') {
   app.use('*', prettyJSON());
 }
 
+// Activity tracking middleware (after auth middleware)
+app.use('*', activityTrackerMiddleware);
+
 // Health check endpoint with detailed status
 app.get('/health', (c) => {
   return c.json({ 
@@ -62,6 +68,8 @@ app.route('/api/loans', loans);
 app.route('/api/expenses', expenses);
 app.route('/api/insurance', insurance);
 app.route('/api/analytics', analytics);
+app.route('/api/drive', drive);
+app.route('/api/sheets', sheets);
 
 // API info endpoint
 app.get('/api', optionalAuth, (c) => {
@@ -89,7 +97,9 @@ app.get('/api', optionalAuth, (c) => {
       vehicles: '/api/vehicles',
       loans: '/api/loans',
       expenses: '/api/expenses',
-      analytics: '/api/analytics'
+      analytics: '/api/analytics',
+      drive: '/api/drive',
+      sheets: '/api/sheets'
     }
   });
 });
