@@ -50,7 +50,7 @@ export interface ILoanPaymentRepository extends IBaseRepository<LoanPayment, New
 export interface IInsurancePolicyRepository extends IBaseRepository<InsurancePolicy, NewInsurancePolicy> {
   findByVehicleId(vehicleId: string): Promise<InsurancePolicy[]>;
   findActiveByVehicleId(vehicleId: string): Promise<InsurancePolicy | null>;
-  findExpiringPolicies(daysFromNow: number): Promise<InsurancePolicy[]>;
+  findExpiringPolicies(userId: string, daysFromNow: number): Promise<InsurancePolicy[]>;
   markAsInactive(id: string): Promise<InsurancePolicy>;
 }
 

@@ -9,6 +9,8 @@ import { rateLimiter } from './lib/middleware/rate-limiter';
 import { auth } from './routes/auth';
 import { vehicles } from './routes/vehicles';
 import { loans } from './routes/loans';
+import { expenses } from './routes/expenses';
+import { insurance } from './routes/insurance';
 import { requireAuth, optionalAuth } from './lib/middleware/auth';
 
 const app = new Hono();
@@ -56,6 +58,8 @@ app.route('/auth', auth);
 // Mount API routes
 app.route('/api/vehicles', vehicles);
 app.route('/api/loans', loans);
+app.route('/api/expenses', expenses);
+app.route('/api/insurance', insurance);
 
 // API info endpoint
 app.get('/api', optionalAuth, (c) => {

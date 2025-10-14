@@ -1,0 +1,22 @@
+{
+  "enabled": true,
+  "name": "Task Completion Commit",
+  "description": "Automatically creates a commit with spec name and task number when a task is completed, stages relevant files and commits (but does not push) the code",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "backend/src/**/*.ts",
+      "frontend/src/**/*.ts",
+      "frontend/src/**/*.svelte",
+      "backend/src/**/*.js",
+      "frontend/src/**/*.js",
+      "*.md",
+      "*.json"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A task has been completed. Please create a commit message beginning with the spec name, followed by the task number (format: \"spec-name: task-X - brief description\"). Stage all relevant changed files and commit the code (but do not push). Make sure to include any new files, modified source code, documentation updates, and configuration changes that are part of this completed task."
+  }
+}

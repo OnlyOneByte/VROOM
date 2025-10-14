@@ -69,28 +69,28 @@ Convert the feature design into a series of prompts for a code-generation LLM th
     - Test data validation and error responses
     - _Requirements: 2.1, 2.2, 2.4_
 
-- [ ] 5. Implement expense tracking system
-  - [ ] 5.1 Create expense management endpoints
+- [x] 5. Implement expense tracking system
+  - [x] 5.1 Create expense management endpoints
     - Implement POST /api/vehicles/:id/expenses for adding expenses
     - Create GET /api/vehicles/:id/expenses for retrieving vehicle expenses
     - Add PUT /api/expenses/:id and DELETE /api/expenses/:id endpoints
     - Include comprehensive expense categorization (operating, maintenance, financial, regulatory, enhancement, convenience)
     - _Requirements: 1.3, 1.4, 2.4_
 
-  - [ ] 5.2 Add fuel efficiency tracking
+  - [x] 5.2 Add fuel efficiency tracking
     - Implement MPG calculation for fuel expenses (gallons and mileage data)
     - Create fuel efficiency trend analysis endpoints
     - Add efficiency alerts for significant MPG drops
     - Calculate cost per mile metrics
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-  - [ ] 5.3 Implement insurance policy management
+  - [x] 5.3 Implement insurance policy management
     - Create insurance policy endpoints with term-based cost calculation
     - Add automatic monthly cost proration (6-month policy → monthly breakdown)
     - Implement policy renewal tracking and expiration alerts
     - _Requirements: 1.3, 1.4_
 
-  - [ ]* 5.4 Write expense system integration tests
+  - [x] 5.4 Write expense system integration tests
     - Test expense CRUD operations with proper categorization
     - Verify fuel efficiency calculations and MPG tracking
     - Test insurance cost proration and policy management

@@ -1,6 +1,6 @@
 import { eq, and, lte, sql } from 'drizzle-orm';
 import { db } from '../../db/connection.js';
-import { insurancePolicies } from '../../db/schema.js';
+import { insurancePolicies, vehicles } from '../../db/schema.js';
 import type { InsurancePolicy, NewInsurancePolicy } from '../../db/schema.js';
 import type { IInsurancePolicyRepository } from './interfaces.js';
 import { BaseRepository } from './base.js';
@@ -43,16 +43,31 @@ export class InsurancePolicyRepository extends BaseRepository<InsurancePolicy, N
     }
   }
 
-  async findExpiringPolicies(daysFromNow: number): Promise<InsurancePolicy[]> {
+  async findExpiringPolicies(userId: string, daysFromNow: number): Promise<InsurancePolicy[]> {
     try {
       const expirationDate = new Date();
       expirationDate.setDate(expirationDate.getDate() + daysFromNow);
       
       const result = await db
-        .select()
+        .select({
+          id: insurancePolicies.id,
+          vehicleId: insurancePolicies.vehicleId,
+          company: insurancePolicies.company,
+          policyNumber: insurancePolicies.policyNumber,
+          totalCost: insurancePolicies.totalCost,
+          termLengthMonths: insurancePolicies.termLengthMonths,
+          startDate: insurancePolicies.startDate,
+          endDate: insurancePolicies.endDate,
+          monthlyCost: insurancePolicies.monthlyCost,
+          isActive: insurancePolicies.isActive,
+          createdAt: insurancePolicies.createdAt,
+          updatedAt: insurancePolicies.updatedAt,
+        })
         .from(insurancePolicies)
+        .innerJoin(vehicles, eq(insurancePolicies.vehicleId, vehicles.id))
         .where(
           and(
+            eq(vehicles.userId, userId),
             eq(insurancePolicies.isActive, true),
             lte(insurancePolicies.endDate, expirationDate)
           )
