@@ -5,6 +5,7 @@
       "name": "vroom-backend",
       "dependencies": {
         "@hono/node-server": "^1.19.0",
+        "@hono/zod-validator": "^0.7.4",
         "@lucia-auth/adapter-drizzle": "^1.1.0",
         "@paralleldrive/cuid2": "^2.2.2",
         "arctic": "^1.9.0",
@@ -14,7 +15,7 @@
         "hono": "^4.9.0",
         "lucia": "^3.2.0",
         "oslo": "^1.1.2",
-        "zod": "^3.22.4",
+        "zod": "^4.1.12",
       },
       "devDependencies": {
         "@types/cors": "^2.8.17",
@@ -84,6 +85,8 @@
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.10", "", { "os": "win32", "cpu": "x64" }, "sha512-9KpxSVFCu0iK1owoez6aC/s/EdUQLDN3adTxGCqxMVhrPDj6bt5dbrHDXUuq+Bs2vATFBBrQS5vdQ/Ed2P+nbw=="],
 
     "@hono/node-server": ["@hono/node-server@1.19.5", "", { "peerDependencies": { "hono": "^4" } }, ""],
+
+    "@hono/zod-validator": ["@hono/zod-validator@0.7.4", "", { "peerDependencies": { "hono": ">=3.9.0", "zod": "^3.25.0 || ^4.0.0" } }, "sha512-biKGn3BRJVaftZlIPMyK+HCe/UHAjJ6sH0UyXe3+v0OcgVr9xfImDROTJFLtn9e3XEEAHGZIM9U6evu85abm8Q=="],
 
     "@lucia-auth/adapter-drizzle": ["@lucia-auth/adapter-drizzle@1.1.0", "", { "peerDependencies": { "drizzle-orm": ">= 0.29 <1", "lucia": "3.x" } }, ""],
 
@@ -159,7 +162,7 @@
 
     "vary": ["vary@1.1.2", "", {}, ""],
 
-    "zod": ["zod@3.25.76", "", {}, ""],
+    "zod": ["zod@4.1.12", "", {}, "sha512-JInaHOamG8pt5+Ey8kGmdcAcg3OL9reK8ltczgHTAwNhMys/6ThXHityHxVV2p3fkw/c+MAvBHFVYHFZDmjMCQ=="],
 
     "@esbuild-kit/core-utils/esbuild": ["esbuild@0.18.20", "", { "optionalDependencies": { "@esbuild/darwin-arm64": "0.18.20" }, "bin": "bin/esbuild" }, ""],
 

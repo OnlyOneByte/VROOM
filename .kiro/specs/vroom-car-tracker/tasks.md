@@ -48,22 +48,22 @@ Convert the feature design into a series of prompts for a code-generation LLM th
     - Test logout and session invalidation
     - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 4. Create vehicle management API endpoints
-  - [ ] 4.1 Implement vehicle CRUD operations
+- [x] 4. Create vehicle management API endpoints
+  - [x] 4.1 Implement vehicle CRUD operations
     - Create POST /api/vehicles endpoint for adding vehicles
     - Implement GET /api/vehicles for listing user's vehicles
     - Add PUT /api/vehicles/:id and DELETE /api/vehicles/:id endpoints
     - Include validation for required vehicle information (make, model, year)
     - _Requirements: 2.1, 2.2, 2.4_
 
-  - [ ] 4.2 Add loan management to vehicle endpoints
+  - [x] 4.2 Add loan management to vehicle endpoints
     - Extend vehicle model to include containerized loan information
     - Create loan-specific endpoints (POST /api/loans/:loanId/payment, GET /api/loans/:loanId/schedule)
     - Implement loan amortization calculation utilities
     - Add loan payment tracking and balance updates
     - _Requirements: 2.2, 2.4_
 
-  - [ ] 4.3 Write API integration tests for vehicle management
+  - [x] 4.3 Write API integration tests for vehicle management
     - Test vehicle CRUD operations with authentication
     - Verify loan calculation accuracy and payment tracking
     - Test data validation and error responses

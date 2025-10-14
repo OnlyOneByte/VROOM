@@ -7,6 +7,8 @@ import { config } from './lib/config';
 import { errorHandler } from './lib/middleware/error-handler';
 import { rateLimiter } from './lib/middleware/rate-limiter';
 import { auth } from './routes/auth';
+import { vehicles } from './routes/vehicles';
+import { loans } from './routes/loans';
 import { requireAuth, optionalAuth } from './lib/middleware/auth';
 
 const app = new Hono();
@@ -51,6 +53,10 @@ app.get('/health', (c) => {
 // Mount auth routes
 app.route('/auth', auth);
 
+// Mount API routes
+app.route('/api/vehicles', vehicles);
+app.route('/api/loans', loans);
+
 // API info endpoint
 app.get('/api', optionalAuth, (c) => {
   const user = c.get('user');
@@ -75,6 +81,7 @@ app.get('/api', optionalAuth, (c) => {
         refresh: '/auth/refresh'
       },
       vehicles: '/api/vehicles',
+      loans: '/api/loans',
       expenses: '/api/expenses'
     }
   });
