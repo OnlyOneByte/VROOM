@@ -43,10 +43,10 @@
 	});
 
 	// Determine if we should show the navigation
-	$: showNavigation = authState.isAuthenticated && !authState.isLoading;
+	let showNavigation = $derived(authState.isAuthenticated && !authState.isLoading);
 	
 	// Determine if we should show the main layout
-	$: isAuthPage = currentPath.startsWith('/auth');
+	let isAuthPage = $derived(currentPath.startsWith('/auth'));
 </script>
 
 <svelte:head>

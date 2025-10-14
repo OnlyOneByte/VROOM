@@ -402,10 +402,11 @@
 					{:else}
 						<div class="space-y-3">
 							{#each expenses.slice(0, 5) as expense}
+								{@const IconComponent = getCategoryIcon(expense.category)}
 								<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
 									<div class="flex items-center gap-3">
 										<div class="p-2 rounded-lg {getCategoryColor(expense.category)}">
-											<svelte:component this={getCategoryIcon(expense.category)} class="h-4 w-4" />
+											<IconComponent class="h-4 w-4" />
 										</div>
 										<div>
 											<p class="font-medium text-gray-900">{expense.description || expense.type}</p>

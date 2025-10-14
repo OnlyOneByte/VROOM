@@ -19,6 +19,9 @@
 		info: Info
 	};
 
+	// Get the icon component for the current notification type
+	let IconComponent = $derived(icons[notification.type]);
+
 	const colors = {
 		success: 'bg-green-50 border-green-200 text-green-800',
 		error: 'bg-red-50 border-red-200 text-red-800',
@@ -55,8 +58,7 @@
 	<div class="p-4">
 		<div class="flex items-start">
 			<div class="flex-shrink-0">
-				<svelte:component 
-					this={icons[notification.type]} 
+				<IconComponent 
 					class="h-5 w-5 {iconColors[notification.type]}" 
 				/>
 			</div>

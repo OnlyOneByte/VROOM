@@ -1,6 +1,13 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss/theme" reference;
+@import "tailwindcss/utilities" reference;
+
+@theme {
+  --color-primary-50: #f0f9ff;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-900: #1e3a8a;
+}
 
 @layer base {
   html {
@@ -109,7 +116,7 @@
   
   /* Mobile-optimized search */
   .search-input {
-    @apply form-input pl-10 pr-4;
+    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 pl-10 pr-4;
   }
   
   /* Responsive text utilities */

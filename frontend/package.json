@@ -33,6 +33,7 @@
 	},
 	"dependencies": {
 		"@tailwindcss/forms": "^0.5.10",
+		"@tailwindcss/postcss": "^4.1.14",
 		"d3": "^7.9.0",
 		"lucide-svelte": "^0.545.0",
 		"superforms": "^0.0.1",

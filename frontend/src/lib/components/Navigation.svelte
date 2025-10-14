@@ -18,20 +18,26 @@
 	let appState = $state({ isMobileMenuOpen: false });
 	let currentPath = $state('');
 
-	// Subscribe to stores
-	$: {
-		authStore.subscribe((state) => {
+	// Subscribe to stores using $effect
+	$effect(() => {
+		const unsubscribeAuth = authStore.subscribe((state) => {
 			authState = state;
 		});
 		
-		appStore.subscribe((state) => {
+		const unsubscribeApp = appStore.subscribe((state) => {
 			appState = state;
 		});
 		
-		page.subscribe(($page) => {
+		const unsubscribePage = page.subscribe(($page) => {
 			currentPath = $page.url.pathname;
 		});
-	}
+
+		return () => {
+			unsubscribeAuth();
+			unsubscribeApp();
+			unsubscribePage();
+		};
+	});
 
 	const navigation = [
 		{ name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -88,7 +94,11 @@
 {#if appState.isMobileMenuOpen}
 	<div 
 		class="lg:hidden fixed inset-0 z-30 bg-gray-600 bg-opacity-75"
+		role="button"
+		tabindex="0"
 		onclick={closeMobileMenu}
+		onkeydown={(e) => e.key === 'Escape' && closeMobileMenu()}
+		aria-label="Close mobile menu"
 	></div>
 {/if}
 
@@ -104,6 +114,7 @@
 		<!-- Navigation -->
 		<nav class="mt-8 flex-1 px-3 space-y-1">
 			{#each navigation as item}
+				{@const IconComponent = item.icon}
 				<a
 					href={item.href}
 					class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200"
@@ -112,11 +123,8 @@
 					class:text-gray-700={!isActive(item.href)}
 					class:hover:bg-gray-100={!isActive(item.href)}
 				>
-					<svelte:component 
-						this={item.icon} 
-						class="mr-3 h-5 w-5 flex-shrink-0"
-						class:text-primary-600={isActive(item.href)}
-						class:text-gray-500={!isActive(item.href)}
+					<IconComponent 
+						class="mr-3 h-5 w-5 flex-shrink-0 {isActive(item.href) ? 'text-primary-600' : 'text-gray-500'}"
 					/>
 					{item.name}
 				</a>
@@ -161,6 +169,7 @@
 		<!-- Mobile Navigation -->
 		<nav class="flex-1 px-3 space-y-1">
 			{#each navigation as item}
+				{@const IconComponent = item.icon}
 				<a
 					href={item.href}
 					class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200"
@@ -170,11 +179,8 @@
 					class:hover:bg-gray-100={!isActive(item.href)}
 					onclick={closeMobileMenu}
 				>
-					<svelte:component 
-						this={item.icon} 
-						class="mr-3 h-5 w-5 flex-shrink-0"
-						class:text-primary-600={isActive(item.href)}
-						class:text-gray-500={!isActive(item.href)}
+					<IconComponent 
+						class="mr-3 h-5 w-5 flex-shrink-0 {isActive(item.href) ? 'text-primary-600' : 'text-gray-500'}"
 					/>
 					{item.name}
 				</a>

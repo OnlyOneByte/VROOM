@@ -391,7 +391,7 @@
 			</div>
 		{/if}
 
-		<form onsubmit|preventDefault={handleSubmit} class="space-y-8">
+		<form onsubmit={handleSubmit} class="space-y-8">
 			<!-- Vehicle Information -->
 			<div class="card">
 				<div class="flex items-center gap-2 mb-6">
