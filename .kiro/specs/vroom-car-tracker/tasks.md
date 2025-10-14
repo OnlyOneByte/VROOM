@@ -96,15 +96,15 @@ Convert the feature design into a series of prompts for a code-generation LLM th
     - Test insurance cost proration and policy management
     - _Requirements: 1.3, 1.4, 7.1, 7.2_
 
-- [ ] 6. Build SvelteKit frontend foundation
-  - [ ] 6.1 Set up SvelteKit project structure
+- [x] 6. Build SvelteKit frontend foundation
+  - [x] 6.1 Set up SvelteKit project structure
     - Initialize SvelteKit with TypeScript and Tailwind CSS
     - Configure routing structure for main application pages
     - Set up Svelte stores for authentication and application state
     - Create responsive layout component with mobile-first design
     - _Requirements: 1.1, 1.2, 8.3_
 
-  - [ ] 6.2 Implement authentication UI components
+  - [x] 6.2 Implement authentication UI components
     - Create login page with Google OAuth integration
     - Build authentication store with session management
     - Implement protected route guards and redirects
