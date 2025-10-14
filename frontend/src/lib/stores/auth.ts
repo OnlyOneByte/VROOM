@@ -6,13 +6,15 @@ interface AuthState {
 	isAuthenticated: boolean;
 	isLoading: boolean;
 	error: string | null;
+	token: string | null;
 }
 
 const initialState: AuthState = {
 	user: null,
 	isAuthenticated: false,
 	isLoading: true,
-	error: null
+	error: null,
+	token: null
 };
 
 function createAuthStore() {
@@ -22,13 +24,14 @@ function createAuthStore() {
 		subscribe,
 		
 		// Set user after successful authentication
-		setUser: (user: User) => {
+		setUser: (user: User, token?: string) => {
 			update(state => ({
 				...state,
 				user,
 				isAuthenticated: true,
 				isLoading: false,
-				error: null
+				error: null,
+				token: token || state.token
 			}));
 		},
 		
@@ -39,7 +42,8 @@ function createAuthStore() {
 				user: null,
 				isAuthenticated: false,
 				isLoading: false,
-				error: null
+				error: null,
+				token: null
 			}));
 		},
 		
@@ -103,6 +107,37 @@ function createAuthStore() {
 			window.location.href = '/api/auth/login/google';
 		},
 		
+		// Refresh token
+		refreshToken: async () => {
+			try {
+				const response = await fetch('/api/auth/refresh', {
+					method: 'POST',
+					credentials: 'include'
+				});
+				
+				if (response.ok) {
+					const data = await response.json();
+					update(state => ({
+						...state,
+						token: data.token,
+						error: null
+					}));
+					return data.token;
+				} else {
+					throw new Error('Token refresh failed');
+				}
+			} catch (error) {
+				update(state => ({
+					...state,
+					user: null,
+					isAuthenticated: false,
+					token: null,
+					error: error instanceof Error ? error.message : 'Token refresh failed'
+				}));
+				throw error;
+			}
+		},
+		
 		// Logout
 		logout: async () => {
 			try {
@@ -116,7 +151,8 @@ function createAuthStore() {
 					user: null,
 					isAuthenticated: false,
 					isLoading: false,
-					error: null
+					error: null,
+					token: null
 				}));
 			} catch (error) {
 				update(state => ({

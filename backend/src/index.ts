@@ -11,6 +11,7 @@ import { vehicles } from './routes/vehicles';
 import { loans } from './routes/loans';
 import { expenses } from './routes/expenses';
 import { insurance } from './routes/insurance';
+import { analytics } from './routes/analytics';
 import { requireAuth, optionalAuth } from './lib/middleware/auth';
 
 const app = new Hono();
@@ -60,6 +61,7 @@ app.route('/api/vehicles', vehicles);
 app.route('/api/loans', loans);
 app.route('/api/expenses', expenses);
 app.route('/api/insurance', insurance);
+app.route('/api/analytics', analytics);
 
 // API info endpoint
 app.get('/api', optionalAuth, (c) => {
@@ -86,7 +88,8 @@ app.get('/api', optionalAuth, (c) => {
       },
       vehicles: '/api/vehicles',
       loans: '/api/loans',
-      expenses: '/api/expenses'
+      expenses: '/api/expenses',
+      analytics: '/api/analytics'
     }
   });
 });
