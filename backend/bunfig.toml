@@ -1,0 +1,4 @@
+[test]
+# Run tests sequentially to avoid database conflicts
+concurrency = 1
+timeout = 30000

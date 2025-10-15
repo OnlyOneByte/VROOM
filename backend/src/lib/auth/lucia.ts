@@ -1,10 +1,10 @@
-import { Lucia } from 'lucia';
 import { DrizzleSQLiteAdapter } from '@lucia-auth/adapter-drizzle';
 import { Google } from 'arctic';
-import { databaseService } from '../database';
+import { Lucia } from 'lucia';
+import type { User } from '../../db/schema';
 import { sessions, users } from '../../db/schema';
 import { config } from '../config';
-import type { User } from '../../db/schema';
+import { databaseService } from '../database';
 
 // Initialize Drizzle adapter for Lucia
 const db = databaseService.getDatabase();
@@ -16,7 +16,6 @@ export const lucia = new Lucia(adapter, {
     attributes: {
       secure: config.env === 'production',
       sameSite: 'lax',
-      httpOnly: true,
     },
   },
   getUserAttributes: (attributes) => {
@@ -43,6 +42,17 @@ declare module 'lucia' {
   interface Register {
     Lucia: typeof lucia;
     DatabaseUserAttributes: DatabaseUserAttributes;
+  }
+
+  interface User {
+    id: string;
+    email: string;
+    displayName: string;
+    provider: string;
+    providerId: string;
+    googleRefreshToken: string | null;
+    createdAt: Date | null;
+    updatedAt: Date | null;
   }
 }
 

@@ -15,7 +15,11 @@ export function isPublicRoute(pathname: string): boolean {
 	return publicRoutes.some(route => pathname.startsWith(route));
 }
 
-export function handleRouteProtection(pathname: string, isAuthenticated: boolean, isLoading: boolean) {
+export function handleRouteProtection(
+	pathname: string,
+	isAuthenticated: boolean,
+	isLoading: boolean
+) {
 	// Skip route protection while auth is loading
 	if (isLoading) return;
 
@@ -38,7 +42,7 @@ export function handleRouteProtection(pathname: string, isAuthenticated: boolean
 }
 
 export function requireAuth(): Promise<boolean> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		const unsubscribe = authStore.subscribe(({ isAuthenticated, isLoading }) => {
 			if (!isLoading) {
 				unsubscribe();

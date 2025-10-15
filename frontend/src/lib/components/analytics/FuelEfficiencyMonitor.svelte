@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { AlertTriangle, TrendingDown, TrendingUp, Fuel } from 'lucide-svelte';
-	import { getFuelEfficiency, type VehicleAnalytics } from '$lib/utils/analytics-api';
+	import { getFuelEfficiency } from '$lib/utils/analytics-api';
 	import FuelEfficiencyChart from '$lib/components/charts/FuelEfficiencyChart.svelte';
 
 	interface Props {
@@ -18,55 +18,58 @@
 	// Efficiency alerts
 	let efficiencyAlerts = $derived.by(() => {
 		if (!fuelData || !fuelData.trend || fuelData.trend.length < 3) return [];
-		
+
 		const alerts = [];
 		const trend = fuelData.trend;
 		const averageMPG = fuelData.averageMPG;
-		
+
 		// Get recent readings (last 3)
 		const recentReadings = trend.slice(-3);
-		const recentAverage = recentReadings.reduce((sum: number, d: any) => sum + d.mpg, 0) / recentReadings.length;
-		
+		const recentAverage =
+			recentReadings.reduce((sum: number, d: any) => sum + d.mpg, 0) / recentReadings.length;
+
 		// Check for significant efficiency drop
 		if (recentAverage < averageMPG * 0.85) {
-			const dropPercentage = ((averageMPG - recentAverage) / averageMPG * 100);
+			const dropPercentage = ((averageMPG - recentAverage) / averageMPG) * 100;
 			alerts.push({
 				type: 'efficiency_drop',
 				severity: recentAverage < averageMPG * 0.7 ? 'high' : 'medium',
 				message: `Fuel efficiency dropped ${dropPercentage.toFixed(1)}% below average`,
 				currentMPG: recentAverage.toFixed(1),
 				averageMPG: averageMPG.toFixed(1),
-				recommendation: dropPercentage > 25 
-					? 'Consider scheduling a maintenance check - this could indicate engine issues'
-					: 'Monitor driving habits and consider checking tire pressure'
+				recommendation:
+					dropPercentage > 25
+						? 'Consider scheduling a maintenance check - this could indicate engine issues'
+						: 'Monitor driving habits and consider checking tire pressure'
 			});
 		}
-		
+
 		// Check for consistent improvement
 		if (recentReadings.length >= 3) {
-			const isImproving = recentReadings.every((reading: any, index: number) => 
-				index === 0 || reading.mpg >= recentReadings[index - 1].mpg
+			const isImproving = recentReadings.every(
+				(reading: any, index: number) => index === 0 || reading.mpg >= recentReadings[index - 1].mpg
 			);
-			
+
 			if (isImproving && recentAverage > averageMPG * 1.1) {
 				alerts.push({
 					type: 'efficiency_improvement',
 					severity: 'positive',
-					message: `Fuel efficiency improved by ${((recentAverage - averageMPG) / averageMPG * 100).toFixed(1)}%`,
+					message: `Fuel efficiency improved by ${(((recentAverage - averageMPG) / averageMPG) * 100).toFixed(1)}%`,
 					currentMPG: recentAverage.toFixed(1),
 					averageMPG: averageMPG.toFixed(1),
 					recommendation: 'Great job! Keep up the efficient driving habits'
 				});
 			}
 		}
-		
+
 		// Check for erratic efficiency (high variance)
 		if (trend.length >= 5) {
 			const last5 = trend.slice(-5);
 			const variance = calculateVariance(last5.map((d: any) => d.mpg));
 			const stdDev = Math.sqrt(variance);
-			
-			if (stdDev > averageMPG * 0.15) { // 15% standard deviation
+
+			if (stdDev > averageMPG * 0.15) {
+				// 15% standard deviation
 				alerts.push({
 					type: 'erratic_efficiency',
 					severity: 'medium',
@@ -75,25 +78,25 @@
 				});
 			}
 		}
-		
+
 		return alerts;
 	});
 
 	// Efficiency trend analysis
 	let trendAnalysis = $derived.by(() => {
 		if (!fuelData || !fuelData.trend || fuelData.trend.length < 2) return null;
-		
+
 		const trend = fuelData.trend;
 		const recent = trend.slice(-3);
 		const older = trend.slice(-6, -3);
-		
+
 		if (recent.length === 0 || older.length === 0) return null;
-		
+
 		const recentAvg = recent.reduce((sum: number, d: any) => sum + d.mpg, 0) / recent.length;
 		const olderAvg = older.reduce((sum: number, d: any) => sum + d.mpg, 0) / older.length;
-		
+
 		const change = ((recentAvg - olderAvg) / olderAvg) * 100;
-		
+
 		return {
 			change: change.toFixed(1),
 			direction: change > 0 ? 'improving' : 'declining',
@@ -110,7 +113,7 @@
 		try {
 			isLoading = true;
 			error = null;
-			
+
 			const data = await getFuelEfficiency(vehicleId);
 			fuelData = data;
 		} catch (err) {
@@ -160,7 +163,7 @@
 			<h2 class="text-xl font-semibold text-gray-900">Fuel Efficiency Monitor</h2>
 			<p class="text-gray-600">{vehicleName}</p>
 		</div>
-		
+
 		<button
 			onclick={loadFuelEfficiencyData}
 			disabled={isLoading}
@@ -192,7 +195,9 @@
 		<div class="text-center py-8">
 			<Fuel class="h-12 w-12 text-gray-400 mx-auto mb-4" />
 			<h3 class="text-lg font-medium text-gray-900 mb-2">No Fuel Data Available</h3>
-			<p class="text-gray-600">Add fuel expenses with mileage data to start monitoring efficiency.</p>
+			<p class="text-gray-600">
+				Add fuel expenses with mileage data to start monitoring efficiency.
+			</p>
 		</div>
 	{:else}
 		<!-- Efficiency Alerts -->
@@ -244,12 +249,12 @@
 							<span class="font-medium">Declining</span>
 						</div>
 					{/if}
-					
+
 					<div class="text-sm text-gray-600">
 						{Math.abs(parseFloat(trendAnalysis.change))}% change over recent periods
 					</div>
 				</div>
-				
+
 				<div class="mt-3 grid grid-cols-2 gap-4 text-sm">
 					<div>
 						<span class="text-gray-600">Recent Average:</span>
@@ -269,27 +274,29 @@
 				<div class="text-2xl font-bold text-blue-600">{fuelData.averageMPG.toFixed(1)}</div>
 				<div class="text-sm text-gray-600">Average MPG</div>
 			</div>
-			
+
 			<div class="bg-white p-4 rounded-lg shadow border text-center">
 				<div class="text-2xl font-bold text-green-600">{fuelData.totalGallons.toFixed(1)}</div>
 				<div class="text-sm text-gray-600">Total Gallons</div>
 			</div>
-			
+
 			<div class="bg-white p-4 rounded-lg shadow border text-center">
 				<div class="text-2xl font-bold text-purple-600">{fuelData.totalMiles.toLocaleString()}</div>
 				<div class="text-sm text-gray-600">Total Miles</div>
 			</div>
-			
+
 			<div class="bg-white p-4 rounded-lg shadow border text-center">
 				<div class="text-2xl font-bold text-orange-600">
-					{fuelData.trend.length > 0 ? fuelData.trend[fuelData.trend.length - 1].mpg.toFixed(1) : '0.0'}
+					{fuelData.trend.length > 0
+						? fuelData.trend[fuelData.trend.length - 1].mpg.toFixed(1)
+						: '0.0'}
 				</div>
 				<div class="text-sm text-gray-600">Latest MPG</div>
 			</div>
 		</div>
 
 		<!-- Fuel Efficiency Chart -->
-		<FuelEfficiencyChart 
+		<FuelEfficiencyChart
 			data={fuelData.trend}
 			title="Fuel Efficiency Trends"
 			averageMPG={fuelData.averageMPG}
@@ -302,25 +309,29 @@
 			{@const halfPoint = Math.floor(fuelData.trend.length / 2)}
 			{@const firstHalf = fuelData.trend.slice(0, halfPoint)}
 			{@const secondHalf = fuelData.trend.slice(halfPoint)}
-			{@const firstHalfAvg = firstHalf.reduce((sum, d) => sum + d.mpg, 0) / firstHalf.length}
-			{@const secondHalfAvg = secondHalf.reduce((sum, d) => sum + d.mpg, 0) / secondHalf.length}
+			{@const firstHalfAvg =
+				firstHalf.reduce((sum: number, d: any) => sum + d.mpg, 0) / firstHalf.length}
+			{@const secondHalfAvg =
+				secondHalf.reduce((sum: number, d: any) => sum + d.mpg, 0) / secondHalf.length}
 			{@const improvement = ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100}
 			<div class="bg-white p-4 rounded-lg shadow border">
 				<h3 class="text-lg font-medium text-gray-900 mb-4">Period Comparison</h3>
-				
+
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 					<div class="text-center">
 						<div class="text-lg font-semibold text-gray-900">{firstHalfAvg.toFixed(1)} MPG</div>
 						<div class="text-sm text-gray-600">Earlier Period</div>
 					</div>
-					
+
 					<div class="text-center">
-						<div class="text-lg font-semibold {improvement >= 0 ? 'text-green-600' : 'text-red-600'}">
+						<div
+							class="text-lg font-semibold {improvement >= 0 ? 'text-green-600' : 'text-red-600'}"
+						>
 							{improvement >= 0 ? '+' : ''}{improvement.toFixed(1)}%
 						</div>
 						<div class="text-sm text-gray-600">Change</div>
 					</div>
-					
+
 					<div class="text-center">
 						<div class="text-lg font-semibold text-gray-900">{secondHalfAvg.toFixed(1)} MPG</div>
 						<div class="text-sm text-gray-600">Recent Period</div>

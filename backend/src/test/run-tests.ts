@@ -15,23 +15,22 @@ async function runTests() {
 
     for (const testFile of testFiles) {
       console.log(`Running ${testFile}...`);
-      
+
       const proc = spawn(['bun', 'test', testFile], {
         stdio: ['inherit', 'inherit', 'inherit'],
       });
-      
+
       const exitCode = await proc.exited;
-      
+
       if (exitCode !== 0) {
         console.error(`❌ Tests failed in ${testFile}`);
         process.exit(1);
       }
-      
+
       console.log(`✅ Tests passed in ${testFile}\n`);
     }
 
     console.log('🎉 All repository tests passed!');
-
   } catch (error) {
     console.error('❌ Test execution failed:', error);
     process.exit(1);

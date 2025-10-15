@@ -3,14 +3,14 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { appStore } from '$lib/stores/app.js';
-	import { 
-		ArrowLeft, 
-		Car, 
-		Edit, 
-		Plus, 
-		DollarSign, 
-		Calendar, 
-		Gauge, 
+	import {
+		ArrowLeft,
+		Car,
+		Edit,
+		Plus,
+		DollarSign,
+		Calendar,
+		Gauge,
 		TrendingUp,
 		CreditCard,
 		Fuel,
@@ -53,7 +53,7 @@
 				});
 				goto('/vehicles');
 			}
-		} catch (error) {
+		} catch {
 			appStore.addNotification({
 				type: 'error',
 				message: 'Error loading vehicle'
@@ -82,16 +82,19 @@
 	function calculateStats() {
 		const thirtyDaysAgo = new Date();
 		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-		
+
 		const recentExpenses = expenses.filter(e => new Date(e.date) > thirtyDaysAgo);
 		const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
 		const recentAmount = recentExpenses.reduce((sum, e) => sum + e.amount, 0);
-		
+
 		// Calculate expenses by category
-		const expensesByCategory = expenses.reduce((acc, expense) => {
-			acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
-			return acc;
-		}, {} as Record<string, number>);
+		const expensesByCategory = expenses.reduce(
+			(acc, expense) => {
+				acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+				return acc;
+			},
+			{} as Record<string, number>
+		);
 
 		// Calculate fuel efficiency
 		const fuelExpenses = expenses.filter(e => e.type === 'fuel' && e.gallons && e.mileage);
@@ -101,7 +104,7 @@
 			for (let i = 1; i < fuelExpenses.length; i++) {
 				const current = fuelExpenses[i];
 				const previous = fuelExpenses[i - 1];
-				if (current.mileage && previous.mileage && current.gallons) {
+				if (current?.mileage && previous?.mileage && current?.gallons) {
 					const miles = current.mileage - previous.mileage;
 					const mpg = miles / current.gallons;
 					if (mpg > 0 && mpg < 100) {
@@ -109,7 +112,8 @@
 					}
 				}
 			}
-			avgMpg = mpgValues.length > 0 ? mpgValues.reduce((sum, mpg) => sum + mpg, 0) / mpgValues.length : 0;
+			avgMpg =
+				mpgValues.length > 0 ? mpgValues.reduce((sum, mpg) => sum + mpg, 0) / mpgValues.length : 0;
 		}
 
 		vehicleStats = {
@@ -117,7 +121,10 @@
 			recentExpenses: recentAmount,
 			expenseCount: expenses.length,
 			avgMpg: Math.round(avgMpg * 10) / 10,
-			lastExpenseDate: expenses.length > 0 ? new Date(Math.max(...expenses.map(e => new Date(e.date).getTime()))) : null,
+			lastExpenseDate:
+				expenses.length > 0
+					? new Date(Math.max(...expenses.map(e => new Date(e.date).getTime())))
+					: null,
 			expensesByCategory
 		};
 	}
@@ -144,22 +151,33 @@
 
 	function getCategoryIcon(category: string) {
 		switch (category) {
-			case 'operating': return Fuel;
-			case 'maintenance': return Wrench;
-			case 'financial': return CreditCard;
-			default: return DollarSign;
+			case 'operating':
+				return Fuel;
+			case 'maintenance':
+				return Wrench;
+			case 'financial':
+				return CreditCard;
+			default:
+				return DollarSign;
 		}
 	}
 
 	function getCategoryColor(category: string): string {
 		switch (category) {
-			case 'operating': return 'text-blue-600 bg-blue-100';
-			case 'maintenance': return 'text-orange-600 bg-orange-100';
-			case 'financial': return 'text-green-600 bg-green-100';
-			case 'regulatory': return 'text-purple-600 bg-purple-100';
-			case 'enhancement': return 'text-pink-600 bg-pink-100';
-			case 'convenience': return 'text-gray-600 bg-gray-100';
-			default: return 'text-gray-600 bg-gray-100';
+			case 'operating':
+				return 'text-blue-600 bg-blue-100';
+			case 'maintenance':
+				return 'text-orange-600 bg-orange-100';
+			case 'financial':
+				return 'text-green-600 bg-green-100';
+			case 'regulatory':
+				return 'text-purple-600 bg-purple-100';
+			case 'enhancement':
+				return 'text-pink-600 bg-pink-100';
+			case 'convenience':
+				return 'text-gray-600 bg-gray-100';
+			default:
+				return 'text-gray-600 bg-gray-100';
 		}
 	}
 
@@ -182,10 +200,7 @@
 		<!-- Header -->
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-4">
-				<button 
-					onclick={() => goto('/vehicles')}
-					class="btn btn-secondary p-2"
-				>
+				<button onclick={() => goto('/vehicles')} class="btn btn-secondary p-2">
 					<ArrowLeft class="h-4 w-4" />
 				</button>
 				<div>
@@ -195,14 +210,14 @@
 			</div>
 
 			<div class="flex gap-2">
-				<a 
+				<a
 					href="/vehicles/{vehicleId}/edit"
 					class="btn btn-secondary inline-flex items-center gap-2"
 				>
 					<Edit class="h-4 w-4" />
 					Edit
 				</a>
-				<a 
+				<a
 					href="/vehicles/{vehicleId}/expenses/new"
 					class="btn btn-primary inline-flex items-center gap-2"
 				>
@@ -218,22 +233,26 @@
 				<div class="flex items-center justify-between">
 					<div>
 						<p class="text-sm font-medium text-gray-600">Total Expenses</p>
-						<p class="text-2xl font-bold text-gray-900">{formatCurrency(vehicleStats.totalExpenses)}</p>
+						<p class="text-2xl font-bold text-gray-900">
+							{formatCurrency(vehicleStats.totalExpenses)}
+						</p>
 					</div>
 					<DollarSign class="h-8 w-8 text-primary-600" />
 				</div>
 			</div>
-			
+
 			<div class="card-compact">
 				<div class="flex items-center justify-between">
 					<div>
 						<p class="text-sm font-medium text-gray-600">Last 30 Days</p>
-						<p class="text-2xl font-bold text-gray-900">{formatCurrency(vehicleStats.recentExpenses)}</p>
+						<p class="text-2xl font-bold text-gray-900">
+							{formatCurrency(vehicleStats.recentExpenses)}
+						</p>
 					</div>
 					<TrendingUp class="h-8 w-8 text-green-600" />
 				</div>
 			</div>
-			
+
 			<div class="card-compact">
 				<div class="flex items-center justify-between">
 					<div>
@@ -243,7 +262,7 @@
 					<Calendar class="h-8 w-8 text-blue-600" />
 				</div>
 			</div>
-			
+
 			<div class="card-compact">
 				<div class="flex items-center justify-between">
 					<div>
@@ -280,33 +299,37 @@
 							<p class="text-sm text-gray-600">Make & Model</p>
 							<p class="font-medium text-gray-900">{vehicle.make} {vehicle.model}</p>
 						</div>
-						
+
 						<div>
 							<p class="text-sm text-gray-600">Year</p>
 							<p class="font-medium text-gray-900">{vehicle.year}</p>
 						</div>
-						
+
 						{#if vehicle.licensePlate}
 							<div>
 								<p class="text-sm text-gray-600">License Plate</p>
 								<p class="font-medium text-gray-900 font-mono">{vehicle.licensePlate}</p>
 							</div>
 						{/if}
-						
+
 						{#if vehicle.initialMileage}
 							<div>
 								<p class="text-sm text-gray-600">Initial Mileage</p>
-								<p class="font-medium text-gray-900">{vehicle.initialMileage.toLocaleString()} mi</p>
+								<p class="font-medium text-gray-900">
+									{vehicle.initialMileage.toLocaleString()} mi
+								</p>
 							</div>
 						{/if}
-						
+
 						{#if vehicle.purchaseDate}
 							<div>
 								<p class="text-sm text-gray-600">Purchase Date</p>
-								<p class="font-medium text-gray-900">{formatDate(new Date(vehicle.purchaseDate))}</p>
+								<p class="font-medium text-gray-900">
+									{formatDate(new Date(vehicle.purchaseDate))}
+								</p>
 							</div>
 						{/if}
-						
+
 						{#if vehicle.purchasePrice}
 							<div>
 								<p class="text-sm text-gray-600">Purchase Price</p>
@@ -329,27 +352,33 @@
 								<p class="text-sm text-gray-600">Lender</p>
 								<p class="font-medium text-gray-900">{vehicle.loan.lender}</p>
 							</div>
-							
+
 							<div>
 								<p class="text-sm text-gray-600">Current Balance</p>
-								<p class="font-medium text-gray-900">{formatCurrency(vehicle.loan.currentBalance)}</p>
+								<p class="font-medium text-gray-900">
+									{formatCurrency(vehicle.loan.currentBalance)}
+								</p>
 							</div>
-							
+
 							<div>
 								<p class="text-sm text-gray-600">Original Amount</p>
-								<p class="font-medium text-gray-900">{formatCurrency(vehicle.loan.originalAmount)}</p>
+								<p class="font-medium text-gray-900">
+									{formatCurrency(vehicle.loan.originalAmount)}
+								</p>
 							</div>
-							
+
 							<div>
 								<p class="text-sm text-gray-600">APR</p>
 								<p class="font-medium text-gray-900">{vehicle.loan.apr}%</p>
 							</div>
-							
+
 							<div>
 								<p class="text-sm text-gray-600">Monthly Payment</p>
-								<p class="font-medium text-gray-900">{formatCurrency(vehicle.loan.standardPayment.amount)}</p>
+								<p class="font-medium text-gray-900">
+									{formatCurrency(vehicle.loan.standardPayment.amount)}
+								</p>
 							</div>
-							
+
 							<div>
 								<p class="text-sm text-gray-600">Term</p>
 								<p class="font-medium text-gray-900">{vehicle.loan.termMonths} months</p>
@@ -361,13 +390,19 @@
 							<div class="flex justify-between text-sm text-gray-600 mb-2">
 								<span>Loan Progress</span>
 								<span>
-									{Math.round(((vehicle.loan.originalAmount - vehicle.loan.currentBalance) / vehicle.loan.originalAmount) * 100)}% paid
+									{Math.round(
+										((vehicle.loan.originalAmount - vehicle.loan.currentBalance) /
+											vehicle.loan.originalAmount) *
+											100
+									)}% paid
 								</span>
 							</div>
 							<div class="w-full bg-gray-200 rounded-full h-2">
-								<div 
+								<div
 									class="bg-primary-600 h-2 rounded-full transition-all duration-300"
-									style="width: {((vehicle.loan.originalAmount - vehicle.loan.currentBalance) / vehicle.loan.originalAmount) * 100}%"
+									style="width: {((vehicle.loan.originalAmount - vehicle.loan.currentBalance) /
+										vehicle.loan.originalAmount) *
+										100}%"
 								></div>
 							</div>
 						</div>
@@ -378,7 +413,7 @@
 				<div class="card">
 					<div class="flex items-center justify-between mb-4">
 						<h2 class="text-lg font-semibold text-gray-900">Recent Expenses</h2>
-						<a 
+						<a
 							href="/vehicles/{vehicleId}/expenses"
 							class="text-primary-600 hover:text-primary-700 text-sm font-medium"
 						>
@@ -391,7 +426,7 @@
 							<DollarSign class="h-12 w-12 text-gray-400 mx-auto mb-4" />
 							<h3 class="text-lg font-medium text-gray-900 mb-2">No expenses yet</h3>
 							<p class="text-gray-600 mb-4">Start tracking expenses for this vehicle</p>
-							<a 
+							<a
 								href="/vehicles/{vehicleId}/expenses/new"
 								class="btn btn-primary inline-flex items-center gap-2"
 							>
@@ -431,7 +466,9 @@
 							{#each Object.entries(vehicleStats.expensesByCategory) as [category, amount]}
 								<div class="flex items-center justify-between">
 									<div class="flex items-center gap-2">
-										<div class="w-3 h-3 rounded-full {getCategoryColor(category).split(' ')[1]}"></div>
+										<div
+											class="w-3 h-3 rounded-full {getCategoryColor(category).split(' ')[1]}"
+										></div>
 										<span class="text-sm text-gray-700">{formatCategoryName(category)}</span>
 									</div>
 									<span class="text-sm font-medium text-gray-900">{formatCurrency(amount)}</span>
@@ -445,22 +482,19 @@
 				<div class="card">
 					<h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
 					<div class="space-y-2">
-						<a 
+						<a
 							href="/vehicles/{vehicleId}/expenses/new"
 							class="btn btn-primary w-full justify-center"
 						>
 							Add Expense
 						</a>
-						<a 
+						<a
 							href="/vehicles/{vehicleId}/analytics"
 							class="btn btn-secondary w-full justify-center"
 						>
 							View Analytics
 						</a>
-						<a 
-							href="/vehicles/{vehicleId}/edit"
-							class="btn btn-outline w-full justify-center"
-						>
+						<a href="/vehicles/{vehicleId}/edit" class="btn btn-outline w-full justify-center">
 							Edit Vehicle
 						</a>
 					</div>
@@ -472,12 +506,9 @@
 	<div class="text-center py-12">
 		<Car class="h-12 w-12 text-gray-400 mx-auto mb-4" />
 		<h3 class="text-lg font-medium text-gray-900 mb-2">Vehicle not found</h3>
-		<p class="text-gray-600 mb-4">The vehicle you're looking for doesn't exist or you don't have access to it.</p>
-		<button 
-			onclick={() => goto('/vehicles')}
-			class="btn btn-primary"
-		>
-			Back to Vehicles
-		</button>
+		<p class="text-gray-600 mb-4">
+			The vehicle you're looking for doesn't exist or you don't have access to it.
+		</p>
+		<button onclick={() => goto('/vehicles')} class="btn btn-primary"> Back to Vehicles </button>
 	</div>
 {/if}

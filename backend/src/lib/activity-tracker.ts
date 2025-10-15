@@ -37,7 +37,7 @@ export class ActivityTracker {
    */
   recordActivity(userId: string, config?: Partial<SyncConfig>): void {
     const userConfig = { ...this.defaultConfig, ...config };
-    
+
     if (!userConfig.enabled || !userConfig.autoSyncEnabled) {
       return;
     }
@@ -51,9 +51,12 @@ export class ActivityTracker {
     }
 
     // Set new inactivity timer
-    const inactivityTimer = setTimeout(() => {
-      this.handleInactivity(userId);
-    }, userConfig.inactivityDelayMinutes * 60 * 1000);
+    const inactivityTimer = setTimeout(
+      () => {
+        this.handleInactivity(userId);
+      },
+      userConfig.inactivityDelayMinutes * 60 * 1000
+    );
 
     // Update user activity
     this.userActivities.set(userId, {
@@ -63,7 +66,9 @@ export class ActivityTracker {
       syncInProgress: existingActivity?.syncInProgress || false,
     });
 
-    console.log(`Activity recorded for user ${userId}, auto-sync will trigger in ${userConfig.inactivityDelayMinutes} minutes`);
+    console.log(
+      `Activity recorded for user ${userId}, auto-sync will trigger in ${userConfig.inactivityDelayMinutes} minutes`
+    );
   }
 
   /**
@@ -71,7 +76,7 @@ export class ActivityTracker {
    */
   private async handleInactivity(userId: string): Promise<void> {
     const activity = this.userActivities.get(userId);
-    
+
     if (!activity || activity.syncInProgress) {
       return;
     }
@@ -130,7 +135,7 @@ export class ActivityTracker {
    */
   async triggerManualSync(userId: string): Promise<{ success: boolean; message: string }> {
     const activity = this.userActivities.get(userId);
-    
+
     if (activity?.syncInProgress) {
       return {
         success: false,
@@ -181,7 +186,7 @@ export class ActivityTracker {
     nextSyncIn?: number; // minutes until next auto-sync
   } {
     const activity = this.userActivities.get(userId);
-    
+
     if (!activity) {
       return { syncInProgress: false };
     }
@@ -189,7 +194,8 @@ export class ActivityTracker {
     let nextSyncIn: number | undefined;
     if (activity.inactivityTimer && activity.lastActivity) {
       const timeSinceActivity = Date.now() - activity.lastActivity.getTime();
-      const timeUntilSync = (this.defaultConfig.inactivityDelayMinutes * 60 * 1000) - timeSinceActivity;
+      const timeUntilSync =
+        this.defaultConfig.inactivityDelayMinutes * 60 * 1000 - timeSinceActivity;
       nextSyncIn = Math.max(0, Math.ceil(timeUntilSync / (60 * 1000)));
     }
 
@@ -205,11 +211,11 @@ export class ActivityTracker {
    */
   stopTracking(userId: string): void {
     const activity = this.userActivities.get(userId);
-    
+
     if (activity?.inactivityTimer) {
       clearTimeout(activity.inactivityTimer);
     }
-    
+
     this.userActivities.delete(userId);
     console.log(`Stopped activity tracking for user ${userId}`);
   }
@@ -219,18 +225,21 @@ export class ActivityTracker {
    */
   updateSyncConfig(userId: string, config: Partial<SyncConfig>): void {
     const activity = this.userActivities.get(userId);
-    
+
     if (activity && config.inactivityDelayMinutes) {
       // Clear existing timer and set new one with updated delay
       if (activity.inactivityTimer) {
         clearTimeout(activity.inactivityTimer);
       }
-      
+
       if (config.enabled && config.autoSyncEnabled) {
-        const inactivityTimer = setTimeout(() => {
-          this.handleInactivity(userId);
-        }, config.inactivityDelayMinutes * 60 * 1000);
-        
+        const inactivityTimer = setTimeout(
+          () => {
+            this.handleInactivity(userId);
+          },
+          config.inactivityDelayMinutes * 60 * 1000
+        );
+
         activity.inactivityTimer = inactivityTimer;
         this.userActivities.set(userId, activity);
       }
@@ -248,8 +257,8 @@ export class ActivityTracker {
    * Clean up inactive users (for memory management)
    */
   cleanupInactiveUsers(maxInactiveHours: number = 24): void {
-    const cutoffTime = new Date(Date.now() - (maxInactiveHours * 60 * 60 * 1000));
-    
+    const cutoffTime = new Date(Date.now() - maxInactiveHours * 60 * 60 * 1000);
+
     for (const [userId, activity] of this.userActivities.entries()) {
       if (activity.lastActivity < cutoffTime && !activity.syncInProgress) {
         this.stopTracking(userId);
@@ -268,6 +277,9 @@ export function recordUserActivity(userId: string, config?: Partial<SyncConfig>)
 export const activityTracker = ActivityTracker.getInstance();
 
 // Clean up inactive users every hour
-setInterval(() => {
-  activityTracker.cleanupInactiveUsers();
-}, 60 * 60 * 1000);
+setInterval(
+  () => {
+    activityTracker.cleanupInactiveUsers();
+  },
+  60 * 60 * 1000
+);

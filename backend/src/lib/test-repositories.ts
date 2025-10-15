@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
+import { getCategoryForExpenseType } from '../db/types.js';
 import { databaseService } from './database.js';
 import { repositoryFactory } from './repositories/index.js';
-import { getCategoryForExpenseType } from '../db/types.js';
 
 async function testRepositories() {
   try {
@@ -57,7 +57,7 @@ async function testRepositories() {
       vehicleId: testVehicle.id,
       type: 'fuel',
       category: getCategoryForExpenseType('fuel'),
-      amount: 50.00,
+      amount: 50.0,
       currency: 'USD',
       date: new Date(),
       gallons: 12.5,
@@ -115,7 +115,6 @@ async function testRepositories() {
     console.log('Monthly totals for 2024:', monthlyTotals);
 
     console.log('\n✅ All repository tests passed!');
-
   } catch (error) {
     console.error('❌ Repository test failed:', error);
     throw error;

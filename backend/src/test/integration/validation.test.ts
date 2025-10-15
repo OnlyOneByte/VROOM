@@ -1,26 +1,25 @@
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
-import { repositoryFactory } from '../../lib/repositories/index.js';
-import { runMigrations, closeDatabaseConnection } from '../../db/connection.js';
-import { clearDatabase } from '../../db/seed.js';
-import { 
-  validateRequired, 
-  validateEmail, 
-  validatePositiveNumber, 
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import {
+  ValidationError,
+  validateEmail,
+  validatePositiveNumber,
+  validateRequired,
   validateYear,
-  ValidationError 
 } from '../../lib/database.js';
+import { repositoryFactory } from '../../lib/repositories/index.js';
+import { clearTestData, setupTestDatabase, teardownTestDatabase } from '../setup.js';
 
 describe('Data Validation Tests', () => {
-  beforeAll(async () => {
-    await runMigrations();
+  beforeAll(() => {
+    setupTestDatabase();
   });
 
-  beforeEach(async () => {
-    await clearDatabase();
+  beforeEach(() => {
+    clearTestData();
   });
 
   afterAll(() => {
-    closeDatabaseConnection();
+    teardownTestDatabase();
   });
 
   describe('Validation Utilities', () => {
@@ -41,7 +40,9 @@ describe('Data Validation Tests', () => {
     test('validatePositiveNumber should validate positive numbers', () => {
       expect(() => validatePositiveNumber(-1, 'amount')).toThrow(ValidationError);
       expect(() => validatePositiveNumber(0, 'amount')).toThrow(ValidationError);
-      expect(() => validatePositiveNumber('invalid' as any, 'amount')).toThrow(ValidationError);
+      expect(() => validatePositiveNumber('invalid' as unknown as number, 'amount')).toThrow(
+        ValidationError
+      );
       expect(() => validatePositiveNumber(100, 'amount')).not.toThrow();
     });
 
@@ -55,7 +56,7 @@ describe('Data Validation Tests', () => {
   describe('Database Constraint Tests', () => {
     test('should enforce unique email constraint', async () => {
       const userRepo = repositoryFactory.getUserRepository();
-      
+
       const userData = {
         email: 'test@example.com',
         displayName: 'Test User',
@@ -64,7 +65,7 @@ describe('Data Validation Tests', () => {
       };
 
       await userRepo.create(userData);
-      
+
       // Should throw error for duplicate email
       await expect(async () => {
         await userRepo.create({
@@ -76,7 +77,7 @@ describe('Data Validation Tests', () => {
 
     test('should enforce foreign key constraints', async () => {
       const vehicleRepo = repositoryFactory.getVehicleRepository();
-      
+
       // Should throw error for non-existent user ID
       await expect(async () => {
         await vehicleRepo.create({
@@ -92,7 +93,7 @@ describe('Data Validation Tests', () => {
       const userRepo = repositoryFactory.getUserRepository();
       const vehicleRepo = repositoryFactory.getVehicleRepository();
       const expenseRepo = repositoryFactory.getExpenseRepository();
-      
+
       // Create user, vehicle, and expense
       const user = await userRepo.create({
         email: 'test@example.com',
@@ -112,17 +113,17 @@ describe('Data Validation Tests', () => {
         vehicleId: vehicle.id,
         type: 'fuel',
         category: 'operating',
-        amount: 50.00,
+        amount: 50.0,
         currency: 'USD',
         date: new Date(),
       });
 
       // Delete user should cascade to vehicle and expenses
       await userRepo.delete(user.id);
-      
+
       const foundVehicle = await vehicleRepo.findById(vehicle.id);
       expect(foundVehicle).toBeNull();
-      
+
       const vehicleExpenses = await expenseRepo.findByVehicleId(vehicle.id);
       expect(vehicleExpenses).toHaveLength(0);
     });
@@ -133,7 +134,7 @@ describe('Data Validation Tests', () => {
       const userRepo = repositoryFactory.getUserRepository();
       const vehicleRepo = repositoryFactory.getVehicleRepository();
       const expenseRepo = repositoryFactory.getExpenseRepository();
-      
+
       const user = await userRepo.create({
         email: 'test@example.com',
         displayName: 'Test User',
@@ -153,7 +154,7 @@ describe('Data Validation Tests', () => {
         vehicleId: vehicle.id,
         type: 'fuel',
         category: 'operating',
-        amount: 50.00,
+        amount: 50.0,
         currency: 'USD',
         date: new Date('2024-01-15'),
       });
@@ -162,7 +163,7 @@ describe('Data Validation Tests', () => {
         vehicleId: vehicle.id,
         type: 'maintenance',
         category: 'maintenance',
-        amount: 100.00,
+        amount: 100.0,
         currency: 'USD',
         date: new Date('2024-01-20'),
       });
@@ -170,7 +171,7 @@ describe('Data Validation Tests', () => {
       // Verify expenses are linked to correct vehicle
       const vehicleExpenses = await expenseRepo.findByVehicleId(vehicle.id);
       expect(vehicleExpenses).toHaveLength(2);
-      expect(vehicleExpenses.every(e => e.vehicleId === vehicle.id)).toBe(true);
+      expect(vehicleExpenses.every((e) => e.vehicleId === vehicle.id)).toBe(true);
 
       // Verify user can access all their expenses
       const userExpenses = await expenseRepo.findByUserId(user.id);
@@ -182,7 +183,7 @@ describe('Data Validation Tests', () => {
       const vehicleRepo = repositoryFactory.getVehicleRepository();
       const loanRepo = repositoryFactory.getVehicleLoanRepository();
       const paymentRepo = repositoryFactory.getLoanPaymentRepository();
-      
+
       const user = await userRepo.create({
         email: 'test@example.com',
         displayName: 'Test User',
@@ -216,7 +217,7 @@ describe('Data Validation Tests', () => {
         paymentDate: new Date('2024-01-15'),
         paymentAmount: 372.86,
         principalAmount: 297.86,
-        interestAmount: 75.00,
+        interestAmount: 75.0,
         remainingBalance: 19702.14,
         paymentNumber: 1,
         paymentType: 'standard',

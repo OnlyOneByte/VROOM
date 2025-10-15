@@ -38,8 +38,10 @@
 
 			alerts = allAlerts.sort((a, b) => {
 				const severityOrder = { high: 3, medium: 2, low: 1, positive: 0 };
-				return (severityOrder[b.severity as keyof typeof severityOrder] || 0) - 
-				       (severityOrder[a.severity as keyof typeof severityOrder] || 0);
+				return (
+					(severityOrder[b.severity as keyof typeof severityOrder] || 0) -
+					(severityOrder[a.severity as keyof typeof severityOrder] || 0)
+				);
 			});
 		} catch (error) {
 			console.error('Error loading efficiency alerts:', error);
@@ -50,19 +52,20 @@
 
 	function analyzeEfficiencyAlerts(fuelData: any, vehicle: any) {
 		if (!fuelData || !fuelData.trend || fuelData.trend.length < 3) return [];
-		
+
 		const alerts = [];
 		const trend = fuelData.trend;
 		const averageMPG = fuelData.averageMPG;
 		const vehicleName = vehicle.nickname || vehicle.name;
-		
+
 		// Get recent readings (last 3)
 		const recentReadings = trend.slice(-3);
-		const recentAverage = recentReadings.reduce((sum: number, d: any) => sum + d.mpg, 0) / recentReadings.length;
-		
+		const recentAverage =
+			recentReadings.reduce((sum: number, d: any) => sum + d.mpg, 0) / recentReadings.length;
+
 		// Significant efficiency drop
 		if (recentAverage < averageMPG * 0.85) {
-			const dropPercentage = ((averageMPG - recentAverage) / averageMPG * 100);
+			const dropPercentage = ((averageMPG - recentAverage) / averageMPG) * 100;
 			alerts.push({
 				id: `${vehicle.id}-efficiency-drop`,
 				vehicleId: vehicle.id,
@@ -71,9 +74,10 @@
 				severity: recentAverage < averageMPG * 0.7 ? 'high' : 'medium',
 				title: `${vehicleName}: Fuel Efficiency Drop`,
 				message: `Efficiency dropped ${dropPercentage.toFixed(1)}% below average (${recentAverage.toFixed(1)} vs ${averageMPG.toFixed(1)} MPG)`,
-				recommendation: dropPercentage > 25 
-					? 'Schedule maintenance check - possible engine issues'
-					: 'Check tire pressure and driving habits',
+				recommendation:
+					dropPercentage > 25
+						? 'Schedule maintenance check - possible engine issues'
+						: 'Check tire pressure and driving habits',
 				timestamp: new Date().toISOString(),
 				data: {
 					currentMPG: recentAverage,
@@ -82,13 +86,13 @@
 				}
 			});
 		}
-		
+
 		// Consistent improvement
 		if (recentReadings.length >= 3) {
-			const isImproving = recentReadings.every((reading: any, index: number) => 
-				index === 0 || reading.mpg >= recentReadings[index - 1].mpg
+			const isImproving = recentReadings.every(
+				(reading: any, index: number) => index === 0 || reading.mpg >= recentReadings[index - 1].mpg
 			);
-			
+
 			if (isImproving && recentAverage > averageMPG * 1.1) {
 				alerts.push({
 					id: `${vehicle.id}-efficiency-improvement`,
@@ -97,25 +101,26 @@
 					type: 'efficiency_improvement',
 					severity: 'positive',
 					title: `${vehicleName}: Efficiency Improvement`,
-					message: `Great job! Efficiency improved ${((recentAverage - averageMPG) / averageMPG * 100).toFixed(1)}% above average`,
+					message: `Great job! Efficiency improved ${(((recentAverage - averageMPG) / averageMPG) * 100).toFixed(1)}% above average`,
 					recommendation: 'Keep up the efficient driving habits',
 					timestamp: new Date().toISOString(),
 					data: {
 						currentMPG: recentAverage,
 						averageMPG,
-						improvementPercentage: ((recentAverage - averageMPG) / averageMPG * 100)
+						improvementPercentage: ((recentAverage - averageMPG) / averageMPG) * 100
 					}
 				});
 			}
 		}
-		
+
 		// Erratic efficiency (high variance)
 		if (trend.length >= 5) {
 			const last5 = trend.slice(-5);
 			const variance = calculateVariance(last5.map((d: any) => d.mpg));
 			const stdDev = Math.sqrt(variance);
-			
-			if (stdDev > averageMPG * 0.15) { // 15% standard deviation
+
+			if (stdDev > averageMPG * 0.15) {
+				// 15% standard deviation
 				alerts.push({
 					id: `${vehicle.id}-erratic-efficiency`,
 					vehicleId: vehicle.id,
@@ -123,18 +128,18 @@
 					type: 'erratic_efficiency',
 					severity: 'medium',
 					title: `${vehicleName}: Inconsistent Efficiency`,
-					message: `Fuel efficiency varies significantly (±${(stdDev / averageMPG * 100).toFixed(1)}%)`,
+					message: `Fuel efficiency varies significantly (±${((stdDev / averageMPG) * 100).toFixed(1)}%)`,
 					recommendation: 'Consider consistent driving habits and regular maintenance',
 					timestamp: new Date().toISOString(),
 					data: {
 						averageMPG,
 						standardDeviation: stdDev,
-						variancePercentage: (stdDev / averageMPG * 100)
+						variancePercentage: (stdDev / averageMPG) * 100
 					}
 				});
 			}
 		}
-		
+
 		// Low overall efficiency (compared to vehicle class average)
 		const vehicleClassAverage = getVehicleClassAverage(vehicle); // This would need vehicle type data
 		if (vehicleClassAverage && averageMPG < vehicleClassAverage * 0.8) {
@@ -154,7 +159,7 @@
 				}
 			});
 		}
-		
+
 		return alerts;
 	}
 
@@ -169,7 +174,7 @@
 		// For now, return a generic average based on vehicle age
 		const currentYear = new Date().getFullYear();
 		const vehicleAge = currentYear - (vehicle.year || currentYear);
-		
+
 		if (vehicleAge < 5) return 28; // Newer vehicles
 		if (vehicleAge < 10) return 25; // Mid-age vehicles
 		return 22; // Older vehicles
@@ -228,7 +233,9 @@
 	<div class="flex items-center justify-between">
 		<h2 class="text-lg font-semibold text-gray-900">Efficiency Alerts</h2>
 		{#if visibleAlerts.length > 0}
-			<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+			<span
+				class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+			>
 				{visibleAlerts.length} alert{visibleAlerts.length !== 1 ? 's' : ''}
 			</span>
 		{/if}
@@ -237,7 +244,9 @@
 	{#if isLoading}
 		<div class="flex items-center justify-center h-24">
 			<div class="text-center">
-				<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+				<div
+					class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"
+				></div>
 				<p class="text-sm text-gray-600">Analyzing efficiency data...</p>
 			</div>
 		</div>
@@ -259,9 +268,11 @@
 					>
 						<X class="h-4 w-4 text-gray-500" />
 					</button>
-					
+
 					<div class="flex items-start pr-8">
-						<AlertIcon class="h-5 w-5 mt-0.5 mr-3 flex-shrink-0 {getAlertTextColor(alert.severity)}" />
+						<AlertIcon
+							class="h-5 w-5 mt-0.5 mr-3 flex-shrink-0 {getAlertTextColor(alert.severity)}"
+						/>
 						<div class="flex-1">
 							<h4 class="text-sm font-medium {getAlertTextColor(alert.severity)} mb-1">
 								{alert.title}
@@ -272,22 +283,25 @@
 							<p class="text-xs font-medium {getAlertTextColor(alert.severity)}">
 								💡 {alert.recommendation}
 							</p>
-							
+
 							{#if alert.data}
 								<div class="mt-2 text-xs {getAlertTextColor(alert.severity)} opacity-75">
 									{#if alert.type === 'efficiency_drop'}
-										Drop: {alert.data.dropPercentage.toFixed(1)}% | 
-										Current: {alert.data.currentMPG.toFixed(1)} MPG | 
-										Average: {alert.data.averageMPG.toFixed(1)} MPG
+										Drop: {alert.data.dropPercentage.toFixed(1)}% | Current: {alert.data.currentMPG.toFixed(
+											1
+										)} MPG | Average: {alert.data.averageMPG.toFixed(1)} MPG
 									{:else if alert.type === 'efficiency_improvement'}
-										Improvement: +{alert.data.improvementPercentage.toFixed(1)}% | 
-										Current: {alert.data.currentMPG.toFixed(1)} MPG
+										Improvement: +{alert.data.improvementPercentage.toFixed(1)}% | Current: {alert.data.currentMPG.toFixed(
+											1
+										)} MPG
 									{:else if alert.type === 'erratic_efficiency'}
-										Variance: ±{alert.data.variancePercentage.toFixed(1)}% | 
-										Average: {alert.data.averageMPG.toFixed(1)} MPG
+										Variance: ±{alert.data.variancePercentage.toFixed(1)}% | Average: {alert.data.averageMPG.toFixed(
+											1
+										)} MPG
 									{:else if alert.type === 'low_efficiency'}
-										Your Average: {alert.data.averageMPG.toFixed(1)} MPG | 
-										Typical: {alert.data.classAverage.toFixed(1)} MPG
+										Your Average: {alert.data.averageMPG.toFixed(1)} MPG | Typical: {alert.data.classAverage.toFixed(
+											1
+										)} MPG
 									{/if}
 								</div>
 							{/if}

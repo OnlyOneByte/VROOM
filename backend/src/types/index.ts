@@ -54,33 +54,44 @@ export interface LoanPaymentConfig {
   amount: number;
   frequency: 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
   dayOfMonth?: number; // For monthly (1-31)
-  dayOfWeek?: number;  // For weekly (0-6, Sunday=0)
+  dayOfWeek?: number; // For weekly (0-6, Sunday=0)
   customSchedule?: {
     amount: number;
     dayOfMonth: number;
   }[]; // For future: multiple payments per month
 }
 
-export type ExpenseType = 
+export type ExpenseType =
   // Operating Costs
-  | 'fuel' | 'tolls' | 'parking'
+  | 'fuel'
+  | 'tolls'
+  | 'parking'
   // Maintenance & Repairs
-  | 'maintenance' | 'repairs' | 'tires' | 'oil-change'
+  | 'maintenance'
+  | 'repairs'
+  | 'tires'
+  | 'oil-change'
   // Financial
-  | 'insurance' | 'loan-payment'
+  | 'insurance'
+  | 'loan-payment'
   // Regulatory/Legal
-  | 'registration' | 'inspection' | 'emissions' | 'tickets'
+  | 'registration'
+  | 'inspection'
+  | 'emissions'
+  | 'tickets'
   // Enhancements/Modifications
-  | 'modifications' | 'accessories' | 'detailing'
+  | 'modifications'
+  | 'accessories'
+  | 'detailing'
   // Other
   | 'other';
 
-export type ExpenseCategory = 
-  | 'operating'     // Day-to-day driving costs (fuel, tolls, parking)
-  | 'maintenance'   // Keeping the car running (oil, repairs, tires)
-  | 'financial'    // Loans, insurance
-  | 'regulatory'   // Government-required (registration, inspection, tickets)
-  | 'enhancement'  // Optional improvements (tint, accessories, detailing)
+export type ExpenseCategory =
+  | 'operating' // Day-to-day driving costs (fuel, tolls, parking)
+  | 'maintenance' // Keeping the car running (oil, repairs, tires)
+  | 'financial' // Loans, insurance
+  | 'regulatory' // Government-required (registration, inspection, tickets)
+  | 'enhancement' // Optional improvements (tint, accessories, detailing)
   | 'convenience'; // Nice-to-have (vanity plates, car washes)
 
 export interface Expense {
@@ -172,7 +183,7 @@ export interface StorageConfig {
 }
 
 // API Response types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

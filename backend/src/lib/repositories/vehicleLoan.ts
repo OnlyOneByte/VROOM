@@ -1,18 +1,20 @@
-import { eq, and } from 'drizzle-orm';
-import { db } from '../../db/connection.js';
+import { eq } from 'drizzle-orm';
+import type { NewVehicleLoan, VehicleLoan } from '../../db/schema.js';
 import { vehicleLoans } from '../../db/schema.js';
-import type { VehicleLoan, NewVehicleLoan } from '../../db/schema.js';
-import type { IVehicleLoanRepository } from './interfaces.js';
 import { BaseRepository } from './base.js';
+import type { IVehicleLoanRepository } from './interfaces.js';
 
-export class VehicleLoanRepository extends BaseRepository<VehicleLoan, NewVehicleLoan> implements IVehicleLoanRepository {
+export class VehicleLoanRepository
+  extends BaseRepository<VehicleLoan, NewVehicleLoan>
+  implements IVehicleLoanRepository
+{
   constructor() {
     super(vehicleLoans);
   }
 
   async findByVehicleId(vehicleId: string): Promise<VehicleLoan | null> {
     try {
-      const result = await db
+      const result = await this.database
         .select()
         .from(vehicleLoans)
         .where(eq(vehicleLoans.vehicleId, vehicleId))
@@ -26,7 +28,7 @@ export class VehicleLoanRepository extends BaseRepository<VehicleLoan, NewVehicl
 
   async findActiveLoans(): Promise<VehicleLoan[]> {
     try {
-      const result = await db
+      const result = await this.database
         .select()
         .from(vehicleLoans)
         .where(eq(vehicleLoans.isActive, true))
@@ -40,19 +42,19 @@ export class VehicleLoanRepository extends BaseRepository<VehicleLoan, NewVehicl
 
   async updateBalance(id: string, newBalance: number): Promise<VehicleLoan> {
     try {
-      const result = await db
+      const result = await this.database
         .update(vehicleLoans)
-        .set({ 
+        .set({
           currentBalance: newBalance,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
         .where(eq(vehicleLoans.id, id))
         .returning();
-      
+
       if (result.length === 0) {
         throw new Error(`Vehicle loan with id ${id} not found`);
       }
-      
+
       return result[0];
     } catch (error) {
       console.error(`Error updating balance for loan ${id}:`, error);
@@ -62,21 +64,21 @@ export class VehicleLoanRepository extends BaseRepository<VehicleLoan, NewVehicl
 
   async markAsPaidOff(id: string, payoffDate: Date): Promise<VehicleLoan> {
     try {
-      const result = await db
+      const result = await this.database
         .update(vehicleLoans)
-        .set({ 
+        .set({
           isActive: false,
           currentBalance: 0,
           payoffDate: payoffDate,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
         .where(eq(vehicleLoans.id, id))
         .returning();
-      
+
       if (result.length === 0) {
         throw new Error(`Vehicle loan with id ${id} not found`);
       }
-      
+
       return result[0];
     } catch (error) {
       console.error(`Error marking loan ${id} as paid off:`, error);

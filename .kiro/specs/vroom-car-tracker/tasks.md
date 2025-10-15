@@ -111,7 +111,7 @@ Convert the feature design into a series of prompts for a code-generation LLM th
     - Add user profile display and logout functionality
     - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-  - [ ]* 6.3 Write frontend component tests
+  - [x] 6.3 Write frontend component tests
     - Test authentication flow and protected routes
     - Verify responsive layout on different screen sizes
     - Test Svelte store state management
@@ -132,7 +132,7 @@ Convert the feature design into a series of prompts for a code-generation LLM th
     - Include purchase information and initial mileage tracking
     - _Requirements: 2.1, 2.2, 1.4_
 
-  - [ ]* 7.3 Write vehicle management component tests
+  - [x] 7.3 Write vehicle management component tests
     - Test vehicle form validation and submission
     - Verify dashboard display and vehicle filtering
     - Test responsive behavior on mobile devices
@@ -153,7 +153,7 @@ Convert the feature design into a series of prompts for a code-generation LLM th
     - Build expense summary cards showing category totals
     - _Requirements: 1.3, 1.4, 2.4_
 
-  - [ ]* 8.3 Write expense management component tests
+  - [x] 8.3 Write expense management component tests
     - Test expense form submission and validation
     - Verify mobile-optimized touch interactions
     - Test expense filtering and search functionality
@@ -174,7 +174,7 @@ Convert the feature design into a series of prompts for a code-generation LLM th
     - Build vehicle efficiency summary displays
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-  - [ ]* 9.3 Write analytics component tests
+  - [x] 9.3 Write analytics component tests
     - Test chart rendering and data visualization accuracy
     - Verify interactive time range filtering
     - Test fuel efficiency calculations and alert triggers
@@ -201,27 +201,27 @@ Convert the feature design into a series of prompts for a code-generation LLM th
     - Include sync conflict resolution and error handling
     - _Requirements: 5.4, 5.5_
 
-  - [ ]* 10.4 Write Google integration tests
+  - [x] 10.4 Write Google integration tests
     - Test Google Drive folder creation and management
     - Verify spreadsheet generation and data accuracy
     - Test bi-directional sync and conflict resolution
     - _Requirements: 5.2, 5.4, 5.5_
 
-- [ ] 11. Add PWA capabilities and offline functionality
-  - [ ] 11.1 Implement service worker for offline support
+- [x] 11. Add PWA capabilities and offline functionality
+  - [x] 11.1 Implement service worker for offline support
     - Create service worker with caching strategies for app shell and data
     - Implement offline expense entry with background sync
     - Add offline detection and user feedback
     - Configure PWA manifest for app installation
     - _Requirements: 1.1, 1.2, 1.4_
 
-  - [ ] 11.2 Build offline data synchronization
+  - [x] 11.2 Build offline data synchronization
     - Implement offline expense queue with automatic sync when online
     - Add conflict resolution for offline/online data discrepancies
     - Create sync status indicators and retry mechanisms
     - _Requirements: 1.4, 5.4_
 
-  - [ ] 11.3 Write PWA and offline functionality tests
+  - [x] 11.3 Write PWA and offline functionality tests
     - Test service worker caching and offline capabilities
     - Verify offline expense entry and background sync
     - Test PWA installation and app-like behavior

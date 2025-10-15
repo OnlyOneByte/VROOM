@@ -2,51 +2,75 @@ import type { ErrorHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
 import { config } from '../config';
+import { formatErrorResponse, handleDatabaseError, isAppError, ValidationError } from '../errors';
 
 export const errorHandler: ErrorHandler = (err, c) => {
-  console.error('❌ Error occurred:', err);
+  // Log error with appropriate level
+  const isDevelopment = config.env === 'development';
+
+  if (isAppError(err) && err.statusCode < 500) {
+    console.warn('⚠️  Client error:', err.message);
+  } else {
+    console.error('❌ Server error:', err);
+  }
 
   // Handle Zod validation errors
   if (err instanceof ZodError) {
-    return c.json({
-      error: 'Validation Error',
-      message: 'Invalid request data',
-      details: config.env === 'development' ? err.errors : undefined,
-    }, 400);
+    const validationError = new ValidationError('Invalid request data', err.issues);
+    const response = formatErrorResponse(validationError, isDevelopment);
+    return c.json(response, 400);
   }
 
-  // Handle HTTP exceptions
+  // Handle HTTP exceptions from Hono
   if (err instanceof HTTPException) {
-    return c.json({
-      error: err.message,
-      message: err.message,
-    }, err.status);
+    return c.json(
+      {
+        error: 'HTTPException',
+        message: err.message,
+        statusCode: err.status,
+      },
+      err.status
+    );
+  }
+
+  // Handle custom app errors
+  if (isAppError(err)) {
+    const response = formatErrorResponse(err, isDevelopment);
+    return c.json(response, err.statusCode as 200 | 201 | 400 | 401 | 403 | 404 | 409 | 422 | 500);
   }
 
   // Handle database errors
-  if (err.message?.includes('SQLITE_')) {
-    return c.json({
-      error: 'Database Error',
-      message: 'A database error occurred',
-      details: config.env === 'development' ? err.message : undefined,
-    }, 500);
+  if (err instanceof Error && err.message.includes('SQLITE_')) {
+    const dbError = handleDatabaseError(err);
+    const response = formatErrorResponse(dbError, isDevelopment);
+    return c.json(
+      response,
+      dbError.statusCode as 200 | 201 | 400 | 401 | 403 | 404 | 409 | 422 | 500
+    );
   }
 
-  // Handle authentication errors
-  if (err.message?.includes('OAUTH_') || err.message?.includes('Unauthorized')) {
-    return c.json({
-      error: 'Authentication Error',
-      message: 'Authentication failed',
-      details: config.env === 'development' ? err.message : undefined,
-    }, 401);
+  // Handle authentication/OAuth errors
+  if (
+    err instanceof Error &&
+    (err.message.includes('OAUTH_') ||
+      err.message.includes('Unauthorized') ||
+      err.message.includes('Invalid session'))
+  ) {
+    return c.json(
+      {
+        error: 'AuthenticationError',
+        message: 'Authentication failed',
+        statusCode: 401,
+        details: isDevelopment ? err.message : undefined,
+      },
+      401
+    );
   }
 
-  // Generic error handler
-  return c.json({
-    error: 'Internal Server Error',
-    message: config.env === 'development' 
-      ? err.message 
-      : 'An unexpected error occurred',
-    stack: config.env === 'development' ? err.stack : undefined,
-  }, 500);
+  // Generic error handler for unknown errors
+  const response = formatErrorResponse(err, isDevelopment);
+  return c.json(
+    response,
+    response.statusCode as 200 | 201 | 400 | 401 | 403 | 404 | 409 | 422 | 500
+  );
 };

@@ -1,6 +1,6 @@
 import { db } from './connection.js';
-import { users, vehicles, expenses, insurancePolicies, vehicleLoans } from './schema.js';
-import type { ExpenseType, ExpenseCategory } from './types.js';
+import { expenses, insurancePolicies, users, vehicleLoans, vehicles } from './schema.js';
+import type { ExpenseType } from './types.js';
 import { getCategoryForExpenseType } from './types.js';
 
 // Sample data for development and testing
@@ -9,39 +9,48 @@ export async function seedDatabase() {
     console.log('Seeding database with sample data...');
 
     // Create a sample user
-    const [sampleUser] = await db.insert(users).values({
-      email: 'demo@example.com',
-      displayName: 'Demo User',
-      provider: 'google',
-      providerId: 'demo-provider-id',
-    }).returning();
+    const [sampleUser] = await db
+      .insert(users)
+      .values({
+        email: 'demo@example.com',
+        displayName: 'Demo User',
+        provider: 'google',
+        providerId: 'demo-provider-id',
+      })
+      .returning();
 
     console.log('Created sample user:', sampleUser.id);
 
     // Create sample vehicles
-    const [vehicle1] = await db.insert(vehicles).values({
-      userId: sampleUser.id,
-      make: 'Toyota',
-      model: 'Camry',
-      year: 2020,
-      licensePlate: 'ABC123',
-      nickname: 'Daily Driver',
-      initialMileage: 25000,
-      purchasePrice: 22000,
-      purchaseDate: new Date('2020-03-15'),
-    }).returning();
+    const [vehicle1] = await db
+      .insert(vehicles)
+      .values({
+        userId: sampleUser.id,
+        make: 'Toyota',
+        model: 'Camry',
+        year: 2020,
+        licensePlate: 'ABC123',
+        nickname: 'Daily Driver',
+        initialMileage: 25000,
+        purchasePrice: 22000,
+        purchaseDate: new Date('2020-03-15'),
+      })
+      .returning();
 
-    const [vehicle2] = await db.insert(vehicles).values({
-      userId: sampleUser.id,
-      make: 'Honda',
-      model: 'Civic',
-      year: 2019,
-      licensePlate: 'XYZ789',
-      nickname: 'Weekend Car',
-      initialMileage: 15000,
-      purchasePrice: 18000,
-      purchaseDate: new Date('2019-08-20'),
-    }).returning();
+    const [vehicle2] = await db
+      .insert(vehicles)
+      .values({
+        userId: sampleUser.id,
+        make: 'Honda',
+        model: 'Civic',
+        year: 2019,
+        licensePlate: 'XYZ789',
+        nickname: 'Weekend Car',
+        initialMileage: 15000,
+        purchasePrice: 18000,
+        purchaseDate: new Date('2019-08-20'),
+      })
+      .returning();
 
     console.log('Created sample vehicles:', vehicle1.id, vehicle2.id);
 
@@ -90,7 +99,7 @@ export async function seedDatabase() {
         vehicleId: vehicle1.id,
         type: 'fuel' as ExpenseType,
         category: getCategoryForExpenseType('fuel'),
-        amount: 45.50,
+        amount: 45.5,
         date: new Date('2024-01-15'),
         mileage: 25500,
         gallons: 12.5,
@@ -100,7 +109,7 @@ export async function seedDatabase() {
         vehicleId: vehicle1.id,
         type: 'fuel' as ExpenseType,
         category: getCategoryForExpenseType('fuel'),
-        amount: 52.30,
+        amount: 52.3,
         date: new Date('2024-01-28'),
         mileage: 25850,
         gallons: 14.2,
@@ -111,7 +120,7 @@ export async function seedDatabase() {
         vehicleId: vehicle1.id,
         type: 'oil-change' as ExpenseType,
         category: getCategoryForExpenseType('oil-change'),
-        amount: 75.00,
+        amount: 75.0,
         date: new Date('2024-01-10'),
         mileage: 25400,
         description: 'Jiffy Lube - Full synthetic oil change',
@@ -120,7 +129,7 @@ export async function seedDatabase() {
         vehicleId: vehicle2.id,
         type: 'maintenance' as ExpenseType,
         category: getCategoryForExpenseType('maintenance'),
-        amount: 150.00,
+        amount: 150.0,
         date: new Date('2024-01-20'),
         mileage: 15200,
         description: 'Brake pad replacement',
@@ -130,7 +139,7 @@ export async function seedDatabase() {
         vehicleId: vehicle1.id,
         type: 'insurance' as ExpenseType,
         category: getCategoryForExpenseType('insurance'),
-        amount: 200.00,
+        amount: 200.0,
         date: new Date('2024-01-01'),
         description: 'State Farm - Monthly premium',
       },
@@ -139,7 +148,7 @@ export async function seedDatabase() {
         vehicleId: vehicle1.id,
         type: 'parking' as ExpenseType,
         category: getCategoryForExpenseType('parking'),
-        amount: 15.00,
+        amount: 15.0,
         date: new Date('2024-01-12'),
         description: 'Downtown parking garage',
       },
@@ -147,7 +156,7 @@ export async function seedDatabase() {
         vehicleId: vehicle1.id,
         type: 'tolls' as ExpenseType,
         category: getCategoryForExpenseType('tolls'),
-        amount: 8.50,
+        amount: 8.5,
         date: new Date('2024-01-18'),
         description: 'Highway toll',
       },
@@ -157,7 +166,6 @@ export async function seedDatabase() {
 
     console.log('Database seeding completed successfully');
     console.log(`Created ${sampleExpenses.length} sample expenses`);
-
   } catch (error) {
     console.error('Error seeding database:', error);
     throw error;
@@ -168,14 +176,14 @@ export async function seedDatabase() {
 export async function clearDatabase() {
   try {
     console.log('Clearing database...');
-    
+
     // Delete in reverse order of dependencies
     await db.delete(expenses);
     await db.delete(insurancePolicies);
     await db.delete(vehicleLoans);
     await db.delete(vehicles);
     await db.delete(users);
-    
+
     console.log('Database cleared successfully');
   } catch (error) {
     console.error('Error clearing database:', error);

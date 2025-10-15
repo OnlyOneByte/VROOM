@@ -1,10 +1,10 @@
+import { ExpenseRepository } from './expense.js';
+import { InsurancePolicyRepository } from './insurancePolicy.js';
 import type { IRepositoryFactory } from './interfaces.js';
+import { LoanPaymentRepository } from './loanPayment.js';
 import { UserRepository } from './user.js';
 import { VehicleRepository } from './vehicle.js';
 import { VehicleLoanRepository } from './vehicleLoan.js';
-import { LoanPaymentRepository } from './loanPayment.js';
-import { InsurancePolicyRepository } from './insurancePolicy.js';
-import { ExpenseRepository } from './expense.js';
 
 // SQLite repository factory implementation
 export class SQLiteRepositoryFactory implements IRepositoryFactory {

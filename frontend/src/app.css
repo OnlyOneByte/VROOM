@@ -1,163 +1,163 @@
-@import "tailwindcss/theme" reference;
-@import "tailwindcss/utilities" reference;
+@import 'tailwindcss/theme' reference;
+@import 'tailwindcss/utilities' reference;
 
 @theme {
-  --color-primary-50: #f0f9ff;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-900: #1e3a8a;
+	--color-primary-50: #f0f9ff;
+	--color-primary-500: #3b82f6;
+	--color-primary-600: #2563eb;
+	--color-primary-700: #1d4ed8;
+	--color-primary-900: #1e3a8a;
 }
 
 @layer base {
-  html {
-    font-family: system-ui, sans-serif;
-    -webkit-text-size-adjust: 100%;
-    -webkit-tap-highlight-color: transparent;
-  }
-  
-  body {
-    @apply text-gray-900 bg-gray-50;
-  }
-  
-  /* Mobile-first responsive typography */
-  h1 {
-    @apply text-xl sm:text-2xl lg:text-3xl font-bold;
-  }
-  
-  h2 {
-    @apply text-lg sm:text-xl lg:text-2xl font-semibold;
-  }
-  
-  h3 {
-    @apply text-base sm:text-lg font-medium;
-  }
+	html {
+		font-family: system-ui, sans-serif;
+		-webkit-text-size-adjust: 100%;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	body {
+		@apply text-gray-900 bg-gray-50;
+	}
+
+	/* Mobile-first responsive typography */
+	h1 {
+		@apply text-xl sm:text-2xl lg:text-3xl font-bold;
+	}
+
+	h2 {
+		@apply text-lg sm:text-xl lg:text-2xl font-semibold;
+	}
+
+	h3 {
+		@apply text-base sm:text-lg font-medium;
+	}
 }
 
 @layer components {
-  /* Button components with mobile-first design */
-  .btn {
-    @apply px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
-    @apply text-sm sm:text-base;
-    min-height: 44px; /* iOS touch target minimum */
-  }
-  
-  .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
-  }
-  
-  .btn-secondary {
-    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
-  }
-  
-  .btn-outline {
-    @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-primary-500;
-  }
-  
-  /* Card component with responsive padding */
-  .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200;
-    @apply p-4 sm:p-6;
-  }
-  
-  .card-compact {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4;
-  }
-  
-  /* Form components optimized for mobile */
-  .form-input {
-    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500;
-    @apply text-base; /* Prevents zoom on iOS */
-    min-height: 44px; /* iOS touch target minimum */
-  }
-  
-  .form-label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
-  }
-  
-  .form-group {
-    @apply space-y-1 mb-4;
-  }
-  
-  .form-error {
-    @apply text-sm text-red-600 mt-1;
-  }
-  
-  /* Mobile-optimized navigation */
-  .nav-link {
-    @apply flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200;
-    min-height: 44px; /* iOS touch target minimum */
-  }
-  
-  /* Responsive grid utilities */
-  .grid-responsive {
-    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6;
-  }
-  
-  .grid-responsive-2 {
-    @apply grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6;
-  }
-  
-  /* Mobile-first container */
-  .container-responsive {
-    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
-  }
-  
-  /* Loading states */
-  .loading-spinner {
-    @apply animate-spin rounded-full border-b-2 border-primary-600;
-  }
-  
-  /* Touch-friendly interactive elements */
-  .touch-target {
-    min-height: 44px;
-    min-width: 44px;
-  }
-  
-  /* Mobile-optimized search */
-  .search-input {
-    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 pl-10 pr-4;
-  }
-  
-  /* Responsive text utilities */
-  .text-responsive {
-    @apply text-sm sm:text-base;
-  }
-  
-  .text-responsive-lg {
-    @apply text-base sm:text-lg lg:text-xl;
-  }
+	/* Button components with mobile-first design */
+	.btn {
+		@apply px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+		@apply text-sm sm:text-base;
+		min-height: 44px; /* iOS touch target minimum */
+	}
+
+	.btn-primary {
+		@apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+	}
+
+	.btn-secondary {
+		@apply bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
+	}
+
+	.btn-outline {
+		@apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-primary-500;
+	}
+
+	/* Card component with responsive padding */
+	.card {
+		@apply bg-white rounded-lg shadow-sm border border-gray-200;
+		@apply p-4 sm:p-6;
+	}
+
+	.card-compact {
+		@apply bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4;
+	}
+
+	/* Form components optimized for mobile */
+	.form-input {
+		@apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500;
+		@apply text-base; /* Prevents zoom on iOS */
+		min-height: 44px; /* iOS touch target minimum */
+	}
+
+	.form-label {
+		@apply block text-sm font-medium text-gray-700 mb-1;
+	}
+
+	.form-group {
+		@apply space-y-1 mb-4;
+	}
+
+	.form-error {
+		@apply text-sm text-red-600 mt-1;
+	}
+
+	/* Mobile-optimized navigation */
+	.nav-link {
+		@apply flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200;
+		min-height: 44px; /* iOS touch target minimum */
+	}
+
+	/* Responsive grid utilities */
+	.grid-responsive {
+		@apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6;
+	}
+
+	.grid-responsive-2 {
+		@apply grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6;
+	}
+
+	/* Mobile-first container */
+	.container-responsive {
+		@apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+	}
+
+	/* Loading states */
+	.loading-spinner {
+		@apply animate-spin rounded-full border-b-2 border-primary-600;
+	}
+
+	/* Touch-friendly interactive elements */
+	.touch-target {
+		min-height: 44px;
+		min-width: 44px;
+	}
+
+	/* Mobile-optimized search */
+	.search-input {
+		@apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 pl-10 pr-4;
+	}
+
+	/* Responsive text utilities */
+	.text-responsive {
+		@apply text-sm sm:text-base;
+	}
+
+	.text-responsive-lg {
+		@apply text-base sm:text-lg lg:text-xl;
+	}
 }
 
 @layer utilities {
-  /* Safe area utilities for mobile devices */
-  .safe-top {
-    padding-top: env(safe-area-inset-top);
-  }
-  
-  .safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  
-  .safe-left {
-    padding-left: env(safe-area-inset-left);
-  }
-  
-  .safe-right {
-    padding-right: env(safe-area-inset-right);
-  }
-  
-  /* Mobile-specific utilities */
-  .mobile-only {
-    @apply block sm:hidden;
-  }
-  
-  .desktop-only {
-    @apply hidden sm:block;
-  }
-  
-  /* Smooth scrolling for mobile */
-  .scroll-smooth {
-    -webkit-overflow-scrolling: touch;
-  }
+	/* Safe area utilities for mobile devices */
+	.safe-top {
+		padding-top: env(safe-area-inset-top);
+	}
+
+	.safe-bottom {
+		padding-bottom: env(safe-area-inset-bottom);
+	}
+
+	.safe-left {
+		padding-left: env(safe-area-inset-left);
+	}
+
+	.safe-right {
+		padding-right: env(safe-area-inset-right);
+	}
+
+	/* Mobile-specific utilities */
+	.mobile-only {
+		@apply block sm:hidden;
+	}
+
+	.desktop-only {
+		@apply hidden sm:block;
+	}
+
+	/* Smooth scrolling for mobile */
+	.scroll-smooth {
+		-webkit-overflow-scrolling: touch;
+	}
 }

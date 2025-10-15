@@ -2,19 +2,32 @@
 	import { onMount } from 'svelte';
 	import { authStore } from '$lib/stores/auth.js';
 	import { appStore } from '$lib/stores/app.js';
+	import type { AuthState, AppState } from '$lib/types/index.js';
 	import { Plus, Car, TrendingUp, DollarSign } from 'lucide-svelte';
 
-	let authState = $state({ user: null, isAuthenticated: false });
-	let appState = $state({ vehicles: [], isLoading: false });
+	let authState = $state<AuthState>({
+		user: null,
+		isAuthenticated: false,
+		isLoading: true,
+		error: null,
+		token: null
+	});
+	let appState = $state<AppState>({
+		vehicles: [],
+		selectedVehicle: null,
+		notifications: [],
+		isLoading: false,
+		isMobileMenuOpen: false
+	});
 
 	onMount(() => {
 		// Subscribe to auth store
-		const unsubscribeAuth = authStore.subscribe((state) => {
+		const unsubscribeAuth = authStore.subscribe(state => {
 			authState = state;
 		});
 
 		// Subscribe to app store
-		const unsubscribeApp = appStore.subscribe((state) => {
+		const unsubscribeApp = appStore.subscribe(state => {
 			appState = state;
 		});
 
@@ -45,7 +58,7 @@
 					message: 'Failed to load vehicles'
 				});
 			}
-		} catch (error) {
+		} catch {
 			appStore.addNotification({
 				type: 'error',
 				message: 'Error loading vehicles'
@@ -68,11 +81,8 @@
 			<h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
 			<p class="text-gray-600">Welcome back, {authState.user?.displayName || 'User'}!</p>
 		</div>
-		
-		<a 
-			href="/vehicles/new" 
-			class="btn btn-primary inline-flex items-center gap-2"
-		>
+
+		<a href="/vehicles/new" class="btn btn-primary inline-flex items-center gap-2">
 			<Plus class="h-4 w-4" />
 			Add Vehicle
 		</a>
@@ -138,9 +148,7 @@
 			<div class="card text-center py-12">
 				<Car class="h-12 w-12 text-gray-400 mx-auto mb-4" />
 				<h3 class="text-lg font-medium text-gray-900 mb-2">No vehicles yet</h3>
-				<p class="text-gray-600 mb-6">
-					Add your first vehicle to start tracking expenses
-				</p>
+				<p class="text-gray-600 mb-6">Add your first vehicle to start tracking expenses</p>
 				<a href="/vehicles/new" class="btn btn-primary inline-flex items-center gap-2">
 					<Plus class="h-4 w-4" />
 					Add Your First Vehicle
@@ -156,12 +164,14 @@
 									{vehicle.nickname || `${vehicle.make} ${vehicle.model}`}
 								</h3>
 								<p class="text-sm text-gray-600">
-									{vehicle.year} {vehicle.make} {vehicle.model}
+									{vehicle.year}
+									{vehicle.make}
+									{vehicle.model}
 								</p>
 							</div>
 							<Car class="h-5 w-5 text-gray-400" />
 						</div>
-						
+
 						{#if vehicle.licensePlate}
 							<p class="text-xs text-gray-500 mb-3">
 								License: {vehicle.licensePlate}
@@ -173,8 +183,8 @@
 								<span class="text-gray-600">Recent expenses:</span>
 								<span class="font-medium text-gray-900">$0.00</span>
 							</div>
-							<a 
-								href="/vehicles/{vehicle.id}" 
+							<a
+								href="/vehicles/{vehicle.id}"
 								class="text-primary-600 hover:text-primary-700 text-sm font-medium"
 							>
 								View Details

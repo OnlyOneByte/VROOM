@@ -3,7 +3,7 @@
 	import { User, LogOut, Settings } from 'lucide-svelte';
 
 	let { user, compact = false } = $props();
-	
+
 	let showDropdown = $state(false);
 
 	function toggleDropdown() {
@@ -47,7 +47,9 @@
 			class="flex items-center w-full px-3 py-2 text-left hover:bg-gray-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
 			onclick={toggleDropdown}
 		>
-			<div class="flex items-center justify-center w-8 h-8 bg-primary-100 rounded-full mr-3 flex-shrink-0">
+			<div
+				class="flex items-center justify-center w-8 h-8 bg-primary-100 rounded-full mr-3 flex-shrink-0"
+			>
 				<User class="h-4 w-4 text-primary-600" />
 			</div>
 			<div class="flex-1 min-w-0">
@@ -62,7 +64,9 @@
 	{/if}
 
 	{#if showDropdown}
-		<div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+		<div
+			class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50"
+		>
 			<div class="py-1">
 				{#if compact}
 					<!-- Show user info in dropdown for compact version -->
@@ -75,7 +79,7 @@
 						</p>
 					</div>
 				{/if}
-				
+
 				<a
 					href="/settings"
 					class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-200"
@@ -84,7 +88,7 @@
 					<Settings class="mr-3 h-4 w-4 text-gray-500" />
 					Settings
 				</a>
-				
+
 				<button
 					type="button"
 					class="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-200"

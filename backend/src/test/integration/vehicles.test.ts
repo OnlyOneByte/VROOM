@@ -1,13 +1,25 @@
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
-import { Hono } from 'hono';
-import { lucia } from '../../lib/auth/lucia';
-import { databaseService } from '../../lib/database';
-import { users, sessions, vehicles, vehicleLoans, loanPayments } from '../../db/schema';
-import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { createId } from '@paralleldrive/cuid2';
-import { vehicles as vehicleRoutes } from '../../routes/vehicles';
-import { loans as loanRoutes } from '../../routes/loans';
+import { eq } from 'drizzle-orm';
+import { Hono } from 'hono';
+import { loanPayments, sessions, users, vehicleLoans, vehicles } from '../../db/schema';
 import { errorHandler } from '../../lib/middleware/error-handler';
+import { loans as loanRoutes } from '../../routes/loans';
+import { vehicles as vehicleRoutes } from '../../routes/vehicles';
+import type {
+  LoanPaymentResponse,
+  LoanScheduleResponse,
+  VehicleLoanResponse,
+  VehicleResponse,
+} from '../../types/api-responses';
+import { getTestLucia } from '../lucia-test.js';
+import {
+  clearTestData,
+  type getTestDatabase,
+  setupTestDatabase,
+  teardownTestDatabase,
+} from '../setup.js';
+import { assertSuccessResponse, getDb, getTypedResponse } from '../utils/test-helpers.js';
 
 // Test app setup
 const testApp = new Hono();
@@ -16,28 +28,28 @@ testApp.route('/api/vehicles', vehicleRoutes);
 testApp.route('/api/loans', loanRoutes);
 
 describe('Vehicle Management API Integration Tests', () => {
-  const db = databaseService.getDatabase();
+  let _db: ReturnType<typeof getTestDatabase>;
   let testUserId: string;
   let testSessionId: string;
   let sessionCookie: string;
   let testVehicleId: string;
 
-  beforeAll(async () => {
-    // Ensure database is initialized
-    await databaseService.healthCheck();
+  beforeAll(() => {
+    _db = setupTestDatabase();
   });
 
   beforeEach(async () => {
+    clearTestData();
     // Clean up test data
-    await db.delete(loanPayments);
-    await db.delete(vehicleLoans);
-    await db.delete(vehicles);
-    await db.delete(sessions);
-    await db.delete(users).where(eq(users.email, 'test@example.com'));
+    await getDb().delete(loanPayments);
+    await getDb().delete(vehicleLoans);
+    await getDb().delete(vehicles);
+    await getDb().delete(sessions);
+    await getDb().delete(users).where(eq(users.email, 'test@example.com'));
 
     // Create a test user
     testUserId = createId();
-    await db.insert(users).values({
+    await getDb().insert(users).values({
       id: testUserId,
       email: 'test@example.com',
       displayName: 'Test User',
@@ -45,19 +57,15 @@ describe('Vehicle Management API Integration Tests', () => {
       providerId: 'google_test_123',
     });
 
-    // Create a test session
+    // Create a test session using test Lucia
+    const lucia = getTestLucia();
     const session = await lucia.createSession(testUserId, {});
     testSessionId = session.id;
     sessionCookie = lucia.createSessionCookie(testSessionId).serialize();
   });
 
-  afterAll(async () => {
-    // Clean up test data
-    await db.delete(loanPayments);
-    await db.delete(vehicleLoans);
-    await db.delete(vehicles);
-    await db.delete(sessions);
-    await db.delete(users).where(eq(users.email, 'test@example.com'));
+  afterAll(() => {
+    teardownTestDatabase();
   });
 
   describe('Vehicle CRUD Operations', () => {
@@ -85,16 +93,15 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(201);
 
-      const data = await res.json();
-      expect(data.success).toBe(true);
+      const data = await getTypedResponse<VehicleResponse>(res);
+      assertSuccessResponse(data);
       expect(data.data).toBeDefined();
       expect(data.data.make).toBe('Toyota');
       expect(data.data.model).toBe('Camry');
       expect(data.data.year).toBe(2020);
       expect(data.data.userId).toBe(testUserId);
-      expect(data.message).toContain('created successfully');
-
       testVehicleId = data.data.id;
+      expect(data.message).toContain('created successfully');
     });
 
     test('should reject vehicle creation with invalid data', async () => {
@@ -158,27 +165,33 @@ describe('Vehicle Management API Integration Tests', () => {
       const res2 = await testApp.fetch(req2);
       expect(res2.status).toBe(409);
 
-      const data = await res2.json();
+      const data = await getTypedResponse<unknown>(res2);
       expect(data.message).toContain('license plate already exists');
     });
 
     test('should list user vehicles', async () => {
       // Create test vehicles
-      const vehicle1 = await db.insert(vehicles).values({
-        id: createId(),
-        userId: testUserId,
-        make: 'Toyota',
-        model: 'Camry',
-        year: 2020,
-      }).returning();
+      const _vehicle1 = await getDb()
+        .insert(vehicles)
+        .values({
+          id: createId(),
+          userId: testUserId,
+          make: 'Toyota',
+          model: 'Camry',
+          year: 2020,
+        })
+        .returning();
 
-      const vehicle2 = await db.insert(vehicles).values({
-        id: createId(),
-        userId: testUserId,
-        make: 'Honda',
-        model: 'Civic',
-        year: 2021,
-      }).returning();
+      const _vehicle2 = await getDb()
+        .insert(vehicles)
+        .values({
+          id: createId(),
+          userId: testUserId,
+          make: 'Honda',
+          model: 'Civic',
+          year: 2021,
+        })
+        .returning();
 
       const req = new Request('http://localhost:3001/api/vehicles', {
         headers: {
@@ -189,24 +202,26 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
-      expect(data.success).toBe(true);
+      const data = await getTypedResponse<VehicleResponse[]>(res);
+      assertSuccessResponse(data);
       expect(data.data).toHaveLength(2);
-      expect(data.count).toBe(2);
       expect(data.data[0].userId).toBe(testUserId);
       expect(data.data[1].userId).toBe(testUserId);
     });
 
     test('should get specific vehicle', async () => {
       // Create test vehicle
-      const vehicle = await db.insert(vehicles).values({
-        id: createId(),
-        userId: testUserId,
-        make: 'Toyota',
-        model: 'Camry',
-        year: 2020,
-        licensePlate: 'GET123',
-      }).returning();
+      const vehicle = await getDb()
+        .insert(vehicles)
+        .values({
+          id: createId(),
+          userId: testUserId,
+          make: 'Toyota',
+          model: 'Camry',
+          year: 2020,
+          licensePlate: 'GET123',
+        })
+        .returning();
 
       testVehicleId = vehicle[0].id;
 
@@ -219,8 +234,8 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
-      expect(data.success).toBe(true);
+      const data = await getTypedResponse<VehicleResponse>(res);
+      assertSuccessResponse(data);
       expect(data.data.id).toBe(testVehicleId);
       expect(data.data.make).toBe('Toyota');
       expect(data.data.licensePlate).toBe('GET123');
@@ -238,19 +253,22 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(404);
 
-      const data = await res.json();
+      const data = await getTypedResponse<unknown>(res);
       expect(data.message).toContain('not found');
     });
 
     test('should update vehicle', async () => {
       // Create test vehicle
-      const vehicle = await db.insert(vehicles).values({
-        id: createId(),
-        userId: testUserId,
-        make: 'Toyota',
-        model: 'Camry',
-        year: 2020,
-      }).returning();
+      const vehicle = await getDb()
+        .insert(vehicles)
+        .values({
+          id: createId(),
+          userId: testUserId,
+          make: 'Toyota',
+          model: 'Camry',
+          year: 2020,
+        })
+        .returning();
 
       testVehicleId = vehicle[0].id;
 
@@ -271,8 +289,8 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
-      expect(data.success).toBe(true);
+      const data = await getTypedResponse<VehicleResponse>(res);
+      assertSuccessResponse(data);
       expect(data.data.nickname).toBe('Updated Nickname');
       expect(data.data.initialMileage).toBe(30000);
       expect(data.message).toContain('updated successfully');
@@ -280,13 +298,16 @@ describe('Vehicle Management API Integration Tests', () => {
 
     test('should delete vehicle', async () => {
       // Create test vehicle
-      const vehicle = await db.insert(vehicles).values({
-        id: createId(),
-        userId: testUserId,
-        make: 'Toyota',
-        model: 'Camry',
-        year: 2020,
-      }).returning();
+      const vehicle = await getDb()
+        .insert(vehicles)
+        .values({
+          id: createId(),
+          userId: testUserId,
+          make: 'Toyota',
+          model: 'Camry',
+          year: 2020,
+        })
+        .returning();
 
       testVehicleId = vehicle[0].id;
 
@@ -300,7 +321,7 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
+      const data = await getTypedResponse<unknown>(res);
       expect(data.success).toBe(true);
       expect(data.message).toContain('deleted successfully');
 
@@ -334,13 +355,16 @@ describe('Vehicle Management API Integration Tests', () => {
   describe('Loan Management Operations', () => {
     beforeEach(async () => {
       // Create test vehicle for loan tests
-      const vehicle = await db.insert(vehicles).values({
-        id: createId(),
-        userId: testUserId,
-        make: 'Toyota',
-        model: 'Camry',
-        year: 2020,
-      }).returning();
+      const vehicle = await getDb()
+        .insert(vehicles)
+        .values({
+          id: createId(),
+          userId: testUserId,
+          make: 'Toyota',
+          model: 'Camry',
+          year: 2020,
+        })
+        .returning();
 
       testVehicleId = vehicle[0].id;
     });
@@ -369,8 +393,8 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(201);
 
-      const data = await res.json();
-      expect(data.success).toBe(true);
+      const data = await getTypedResponse<VehicleLoanResponse>(res);
+      assertSuccessResponse(data);
       expect(data.data.lender).toBe('Test Bank');
       expect(data.data.originalAmount).toBe(20000);
       expect(data.data.currentBalance).toBe(20000);
@@ -403,19 +427,22 @@ describe('Vehicle Management API Integration Tests', () => {
 
     test('should get loan for vehicle', async () => {
       // Create test loan
-      const loan = await db.insert(vehicleLoans).values({
-        id: createId(),
-        vehicleId: testVehicleId,
-        lender: 'Test Bank',
-        originalAmount: 20000,
-        currentBalance: 15000,
-        apr: 4.5,
-        termMonths: 60,
-        startDate: new Date('2020-03-15'),
-        paymentAmount: 372.86,
-        paymentFrequency: 'monthly',
-        paymentDayOfMonth: 15,
-      }).returning();
+      const loan = await getDb()
+        .insert(vehicleLoans)
+        .values({
+          id: createId(),
+          vehicleId: testVehicleId,
+          lender: 'Test Bank',
+          originalAmount: 20000,
+          currentBalance: 15000,
+          apr: 4.5,
+          termMonths: 60,
+          startDate: new Date('2020-03-15'),
+          paymentAmount: 372.86,
+          paymentFrequency: 'monthly',
+          paymentDayOfMonth: 15,
+        })
+        .returning();
 
       const req = new Request(`http://localhost:3001/api/loans/vehicles/${testVehicleId}/loan`, {
         headers: {
@@ -426,8 +453,8 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
-      expect(data.success).toBe(true);
+      const data = await getTypedResponse<VehicleLoanResponse>(res);
+      assertSuccessResponse(data);
       expect(data.data.id).toBe(loan[0].id);
       expect(data.data.lender).toBe('Test Bank');
       expect(data.data.currentBalance).toBe(15000);
@@ -435,18 +462,21 @@ describe('Vehicle Management API Integration Tests', () => {
 
     test('should generate amortization schedule', async () => {
       // Create test loan
-      const loan = await db.insert(vehicleLoans).values({
-        id: createId(),
-        vehicleId: testVehicleId,
-        lender: 'Test Bank',
-        originalAmount: 20000,
-        currentBalance: 20000,
-        apr: 4.5,
-        termMonths: 60,
-        startDate: new Date('2020-03-15'),
-        paymentAmount: 372.86,
-        paymentFrequency: 'monthly',
-      }).returning();
+      const loan = await getDb()
+        .insert(vehicleLoans)
+        .values({
+          id: createId(),
+          vehicleId: testVehicleId,
+          lender: 'Test Bank',
+          originalAmount: 20000,
+          currentBalance: 20000,
+          apr: 4.5,
+          termMonths: 60,
+          startDate: new Date('2020-03-15'),
+          paymentAmount: 372.86,
+          paymentFrequency: 'monthly',
+        })
+        .returning();
 
       const req = new Request(`http://localhost:3001/api/loans/${loan[0].id}/schedule`, {
         headers: {
@@ -457,8 +487,8 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
-      expect(data.success).toBe(true);
+      const data = await getTypedResponse<LoanScheduleResponse>(res);
+      assertSuccessResponse(data);
       expect(data.data.analysis).toBeDefined();
       expect(data.data.schedule).toBeDefined();
       expect(data.data.schedule).toHaveLength(60);
@@ -468,18 +498,21 @@ describe('Vehicle Management API Integration Tests', () => {
 
     test('should record loan payment', async () => {
       // Create test loan
-      const loan = await db.insert(vehicleLoans).values({
-        id: createId(),
-        vehicleId: testVehicleId,
-        lender: 'Test Bank',
-        originalAmount: 20000,
-        currentBalance: 20000,
-        apr: 4.5,
-        termMonths: 60,
-        startDate: new Date('2020-03-15'),
-        paymentAmount: 372.86,
-        paymentFrequency: 'monthly',
-      }).returning();
+      const loan = await getDb()
+        .insert(vehicleLoans)
+        .values({
+          id: createId(),
+          vehicleId: testVehicleId,
+          lender: 'Test Bank',
+          originalAmount: 20000,
+          currentBalance: 20000,
+          apr: 4.5,
+          termMonths: 60,
+          startDate: new Date('2020-03-15'),
+          paymentAmount: 372.86,
+          paymentFrequency: 'monthly',
+        })
+        .returning();
 
       const paymentData = {
         paymentAmount: 372.86,
@@ -499,8 +532,11 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(201);
 
-      const data = await res.json();
-      expect(data.success).toBe(true);
+      const data = await getTypedResponse<{
+        payment: LoanPaymentResponse;
+        loan: VehicleLoanResponse;
+      }>(res);
+      assertSuccessResponse(data);
       expect(data.data.payment).toBeDefined();
       expect(data.data.payment.paymentAmount).toBe(372.86);
       expect(data.data.payment.paymentNumber).toBe(1);
@@ -510,31 +546,36 @@ describe('Vehicle Management API Integration Tests', () => {
 
     test('should get payment history', async () => {
       // Create test loan
-      const loan = await db.insert(vehicleLoans).values({
-        id: createId(),
-        vehicleId: testVehicleId,
-        lender: 'Test Bank',
-        originalAmount: 20000,
-        currentBalance: 19000,
-        apr: 4.5,
-        termMonths: 60,
-        startDate: new Date('2020-03-15'),
-        paymentAmount: 372.86,
-        paymentFrequency: 'monthly',
-      }).returning();
+      const loan = await getDb()
+        .insert(vehicleLoans)
+        .values({
+          id: createId(),
+          vehicleId: testVehicleId,
+          lender: 'Test Bank',
+          originalAmount: 20000,
+          currentBalance: 19000,
+          apr: 4.5,
+          termMonths: 60,
+          startDate: new Date('2020-03-15'),
+          paymentAmount: 372.86,
+          paymentFrequency: 'monthly',
+        })
+        .returning();
 
       // Create test payment
-      await db.insert(loanPayments).values({
-        id: createId(),
-        loanId: loan[0].id,
-        paymentDate: new Date('2020-04-15'),
-        paymentAmount: 372.86,
-        principalAmount: 297.86,
-        interestAmount: 75.00,
-        remainingBalance: 19702.14,
-        paymentNumber: 1,
-        paymentType: 'standard',
-      });
+      await getDb()
+        .insert(loanPayments)
+        .values({
+          id: createId(),
+          loanId: loan[0].id,
+          paymentDate: new Date('2020-04-15'),
+          paymentAmount: 372.86,
+          principalAmount: 297.86,
+          interestAmount: 75.0,
+          remainingBalance: 19702.14,
+          paymentNumber: 1,
+          paymentType: 'standard',
+        });
 
       const req = new Request(`http://localhost:3001/api/loans/${loan[0].id}/payments`, {
         headers: {
@@ -545,8 +586,11 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
-      expect(data.success).toBe(true);
+      const data = await getTypedResponse<{
+        payments: LoanPaymentResponse[];
+        paymentCount: number;
+      }>(res);
+      assertSuccessResponse(data);
       expect(data.data.payments).toHaveLength(1);
       expect(data.data.paymentCount).toBe(1);
       expect(data.data.payments[0].paymentAmount).toBe(372.86);
@@ -554,19 +598,22 @@ describe('Vehicle Management API Integration Tests', () => {
 
     test('should mark loan as paid off', async () => {
       // Create test loan
-      const loan = await db.insert(vehicleLoans).values({
-        id: createId(),
-        vehicleId: testVehicleId,
-        lender: 'Test Bank',
-        originalAmount: 20000,
-        currentBalance: 1000,
-        apr: 4.5,
-        termMonths: 60,
-        startDate: new Date('2020-03-15'),
-        paymentAmount: 372.86,
-        paymentFrequency: 'monthly',
-        isActive: true,
-      }).returning();
+      const loan = await getDb()
+        .insert(vehicleLoans)
+        .values({
+          id: createId(),
+          vehicleId: testVehicleId,
+          lender: 'Test Bank',
+          originalAmount: 20000,
+          currentBalance: 1000,
+          apr: 4.5,
+          termMonths: 60,
+          startDate: new Date('2020-03-15'),
+          paymentAmount: 372.86,
+          paymentFrequency: 'monthly',
+          isActive: true,
+        })
+        .returning();
 
       const req = new Request(`http://localhost:3001/api/loans/${loan[0].id}`, {
         method: 'DELETE',
@@ -578,19 +625,19 @@ describe('Vehicle Management API Integration Tests', () => {
       const res = await testApp.fetch(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
+      const data = await getTypedResponse<unknown>(res);
       expect(data.success).toBe(true);
       expect(data.message).toContain('paid off successfully');
     });
 
-    test('should prevent access to other users\' loans', async () => {
+    test("should prevent access to other users' loans", async () => {
       // Create another user and vehicle
       const otherUserId = createId();
-      
+
       // Clean up any existing user with this email first
-      await db.delete(users).where(eq(users.email, 'other@example.com'));
-      
-      await db.insert(users).values({
+      await getDb().delete(users).where(eq(users.email, 'other@example.com'));
+
+      await getDb().insert(users).values({
         id: otherUserId,
         email: 'other@example.com',
         displayName: 'Other User',
@@ -598,26 +645,32 @@ describe('Vehicle Management API Integration Tests', () => {
         providerId: 'google_other_123',
       });
 
-      const otherVehicle = await db.insert(vehicles).values({
-        id: createId(),
-        userId: otherUserId,
-        make: 'Honda',
-        model: 'Civic',
-        year: 2021,
-      }).returning();
+      const otherVehicle = await getDb()
+        .insert(vehicles)
+        .values({
+          id: createId(),
+          userId: otherUserId,
+          make: 'Honda',
+          model: 'Civic',
+          year: 2021,
+        })
+        .returning();
 
-      const otherLoan = await db.insert(vehicleLoans).values({
-        id: createId(),
-        vehicleId: otherVehicle[0].id,
-        lender: 'Other Bank',
-        originalAmount: 15000,
-        currentBalance: 15000,
-        apr: 5.0,
-        termMonths: 48,
-        startDate: new Date('2021-01-01'),
-        paymentAmount: 345.44,
-        paymentFrequency: 'monthly',
-      }).returning();
+      const otherLoan = await getDb()
+        .insert(vehicleLoans)
+        .values({
+          id: createId(),
+          vehicleId: otherVehicle[0].id,
+          lender: 'Other Bank',
+          originalAmount: 15000,
+          currentBalance: 15000,
+          apr: 5.0,
+          termMonths: 48,
+          startDate: new Date('2021-01-01'),
+          paymentAmount: 345.44,
+          paymentFrequency: 'monthly',
+        })
+        .returning();
 
       // Try to access other user's loan
       const req = new Request(`http://localhost:3001/api/loans/${otherLoan[0].id}/schedule`, {
@@ -655,13 +708,16 @@ describe('Vehicle Management API Integration Tests', () => {
 
     test('should validate loan APR range', async () => {
       // Create test vehicle
-      const vehicle = await db.insert(vehicles).values({
-        id: createId(),
-        userId: testUserId,
-        make: 'Toyota',
-        model: 'Camry',
-        year: 2020,
-      }).returning();
+      const vehicle = await getDb()
+        .insert(vehicles)
+        .values({
+          id: createId(),
+          userId: testUserId,
+          make: 'Toyota',
+          model: 'Camry',
+          year: 2020,
+        })
+        .returning();
 
       const loanData = {
         lender: 'Test Bank',

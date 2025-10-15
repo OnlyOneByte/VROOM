@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { requireAuth } from '../lib/middleware/auth';
-import { GoogleDriveService, createDriveServiceForUser } from '../lib/google-drive';
 import { z } from 'zod';
+import { createDriveServiceForUser } from '../lib/google-drive';
+import { requireAuth } from '../lib/middleware/auth';
 
 const drive = new Hono();
 
@@ -16,7 +16,7 @@ drive.use('*', requireAuth);
 drive.post('/setup', async (c) => {
   try {
     const user = c.get('user');
-    
+
     const driveService = await createDriveServiceForUser(user.id);
     const folderStructure = await driveService.createVroomFolderStructure(user.displayName);
 
@@ -47,17 +47,17 @@ drive.post('/setup', async (c) => {
     });
   } catch (error) {
     console.error('Drive setup error:', error);
-    
+
     if (error instanceof Error) {
       if (error.message.includes('not found') || error.message.includes('access not available')) {
-        throw new HTTPException(401, { 
-          message: 'Google Drive access not available. Please re-authenticate with Google.' 
+        throw new HTTPException(401, {
+          message: 'Google Drive access not available. Please re-authenticate with Google.',
         });
       }
     }
-    
-    throw new HTTPException(500, { 
-      message: 'Failed to set up Google Drive folder structure' 
+
+    throw new HTTPException(500, {
+      message: 'Failed to set up Google Drive folder structure',
     });
   }
 });
@@ -69,17 +69,19 @@ drive.post('/setup', async (c) => {
 drive.get('/folder', async (c) => {
   try {
     const user = c.get('user');
-    
+
     const driveService = await createDriveServiceForUser(user.id);
     const folderStructure = await driveService.createVroomFolderStructure(user.displayName);
 
     // Get contents of each folder
-    const [mainContents, receiptsContents, maintenanceContents, photosContents] = await Promise.all([
-      driveService.listFilesInFolder(folderStructure.mainFolder.id),
-      driveService.listFilesInFolder(folderStructure.subFolders.receipts.id),
-      driveService.listFilesInFolder(folderStructure.subFolders.maintenance.id),
-      driveService.listFilesInFolder(folderStructure.subFolders.photos.id),
-    ]);
+    const [mainContents, receiptsContents, maintenanceContents, photosContents] = await Promise.all(
+      [
+        driveService.listFilesInFolder(folderStructure.mainFolder.id),
+        driveService.listFilesInFolder(folderStructure.subFolders.receipts.id),
+        driveService.listFilesInFolder(folderStructure.subFolders.maintenance.id),
+        driveService.listFilesInFolder(folderStructure.subFolders.photos.id),
+      ]
+    );
 
     return c.json({
       folders: {
@@ -111,17 +113,17 @@ drive.get('/folder', async (c) => {
     });
   } catch (error) {
     console.error('Get drive folder error:', error);
-    
+
     if (error instanceof Error) {
       if (error.message.includes('not found') || error.message.includes('access not available')) {
-        throw new HTTPException(401, { 
-          message: 'Google Drive access not available. Please re-authenticate with Google.' 
+        throw new HTTPException(401, {
+          message: 'Google Drive access not available. Please re-authenticate with Google.',
         });
       }
     }
-    
-    throw new HTTPException(500, { 
-      message: 'Failed to get Google Drive folder information' 
+
+    throw new HTTPException(500, {
+      message: 'Failed to get Google Drive folder information',
     });
   }
 });
@@ -140,10 +142,10 @@ drive.post('/folder/receipts/organize', async (c) => {
     const user = c.get('user');
     const body = await c.req.json();
     const { year, month } = organizeFoldersSchema.parse(body);
-    
+
     const driveService = await createDriveServiceForUser(user.id);
     const folderStructure = await driveService.createVroomFolderStructure(user.displayName);
-    
+
     const dateFolder = await driveService.createReceiptDateFolders(
       folderStructure.subFolders.receipts.id,
       year,
@@ -160,23 +162,23 @@ drive.post('/folder/receipts/organize', async (c) => {
     });
   } catch (error) {
     console.error('Organize receipts folder error:', error);
-    
+
     if (error instanceof z.ZodError) {
-      throw new HTTPException(400, { 
-        message: `Invalid request data: ${error.issues.map(i => i.message).join(', ')}`,
+      throw new HTTPException(400, {
+        message: `Invalid request data: ${error.issues.map((i) => i.message).join(', ')}`,
       });
     }
-    
+
     if (error instanceof Error) {
       if (error.message.includes('not found') || error.message.includes('access not available')) {
-        throw new HTTPException(401, { 
-          message: 'Google Drive access not available. Please re-authenticate with Google.' 
+        throw new HTTPException(401, {
+          message: 'Google Drive access not available. Please re-authenticate with Google.',
         });
       }
     }
-    
-    throw new HTTPException(500, { 
-      message: 'Failed to organize receipts folder' 
+
+    throw new HTTPException(500, {
+      message: 'Failed to organize receipts folder',
     });
   }
 });
@@ -189,11 +191,11 @@ drive.get('/folder/:folderId/contents', async (c) => {
   try {
     const user = c.get('user');
     const folderId = c.req.param('folderId');
-    
+
     if (!folderId) {
       throw new HTTPException(400, { message: 'Folder ID is required' });
     }
-    
+
     const driveService = await createDriveServiceForUser(user.id);
     const contents = await driveService.listFilesInFolder(folderId);
 
@@ -203,17 +205,17 @@ drive.get('/folder/:folderId/contents', async (c) => {
     });
   } catch (error) {
     console.error('Get folder contents error:', error);
-    
+
     if (error instanceof Error) {
       if (error.message.includes('not found') || error.message.includes('access not available')) {
-        throw new HTTPException(401, { 
-          message: 'Google Drive access not available. Please re-authenticate with Google.' 
+        throw new HTTPException(401, {
+          message: 'Google Drive access not available. Please re-authenticate with Google.',
         });
       }
     }
-    
-    throw new HTTPException(500, { 
-      message: 'Failed to get folder contents' 
+
+    throw new HTTPException(500, {
+      message: 'Failed to get folder contents',
     });
   }
 });
@@ -226,11 +228,11 @@ drive.get('/folder/:folderId/permissions', async (c) => {
   try {
     const user = c.get('user');
     const folderId = c.req.param('folderId');
-    
+
     if (!folderId) {
       throw new HTTPException(400, { message: 'Folder ID is required' });
     }
-    
+
     const driveService = await createDriveServiceForUser(user.id);
     const permissions = await driveService.getFolderPermissions(folderId);
 
@@ -240,17 +242,17 @@ drive.get('/folder/:folderId/permissions', async (c) => {
     });
   } catch (error) {
     console.error('Get folder permissions error:', error);
-    
+
     if (error instanceof Error) {
       if (error.message.includes('not found') || error.message.includes('access not available')) {
-        throw new HTTPException(401, { 
-          message: 'Google Drive access not available. Please re-authenticate with Google.' 
+        throw new HTTPException(401, {
+          message: 'Google Drive access not available. Please re-authenticate with Google.',
         });
       }
     }
-    
-    throw new HTTPException(500, { 
-      message: 'Failed to get folder permissions' 
+
+    throw new HTTPException(500, {
+      message: 'Failed to get folder permissions',
     });
   }
 });
@@ -270,11 +272,11 @@ drive.post('/folder/:folderId/share', async (c) => {
     const folderId = c.req.param('folderId');
     const body = await c.req.json();
     const { email, role } = shareFolderSchema.parse(body);
-    
+
     if (!folderId) {
       throw new HTTPException(400, { message: 'Folder ID is required' });
     }
-    
+
     const driveService = await createDriveServiceForUser(user.id);
     await driveService.setFolderPermissions(folderId, email, role);
 
@@ -286,23 +288,23 @@ drive.post('/folder/:folderId/share', async (c) => {
     });
   } catch (error) {
     console.error('Share folder error:', error);
-    
+
     if (error instanceof z.ZodError) {
-      throw new HTTPException(400, { 
-        message: `Invalid request data: ${error.issues.map(i => i.message).join(', ')}`,
+      throw new HTTPException(400, {
+        message: `Invalid request data: ${error.issues.map((i) => i.message).join(', ')}`,
       });
     }
-    
+
     if (error instanceof Error) {
       if (error.message.includes('not found') || error.message.includes('access not available')) {
-        throw new HTTPException(401, { 
-          message: 'Google Drive access not available. Please re-authenticate with Google.' 
+        throw new HTTPException(401, {
+          message: 'Google Drive access not available. Please re-authenticate with Google.',
         });
       }
     }
-    
-    throw new HTTPException(500, { 
-      message: 'Failed to share folder' 
+
+    throw new HTTPException(500, {
+      message: 'Failed to share folder',
     });
   }
 });

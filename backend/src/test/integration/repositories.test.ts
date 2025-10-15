@@ -1,8 +1,8 @@
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
-import { repositoryFactory } from '../../lib/repositories/index.js';
-import { runMigrations, closeDatabaseConnection } from '../../db/connection.js';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import { closeDatabaseConnection, runMigrations } from '../../db/connection.js';
 import { clearDatabase } from '../../db/seed.js';
 import { getCategoryForExpenseType } from '../../db/types.js';
+import { repositoryFactory } from '../../lib/repositories/index.js';
 
 describe('Repository Integration Tests', () => {
   beforeAll(async () => {
@@ -23,7 +23,7 @@ describe('Repository Integration Tests', () => {
   describe('User Repository Integration', () => {
     test('should create and find user', async () => {
       const userRepo = repositoryFactory.getUserRepository();
-      
+
       const userData = {
         email: 'test@example.com',
         displayName: 'Test User',
@@ -41,7 +41,7 @@ describe('Repository Integration Tests', () => {
 
     test('should update user Google refresh token', async () => {
       const userRepo = repositoryFactory.getUserRepository();
-      
+
       const user = await userRepo.create({
         email: 'test@example.com',
         displayName: 'Test User',
@@ -51,7 +51,7 @@ describe('Repository Integration Tests', () => {
 
       const token = 'new-refresh-token';
       const updatedUser = await userRepo.updateGoogleRefreshToken(user.id, token);
-      
+
       expect(updatedUser.googleRefreshToken).toBe(token);
     });
   });
@@ -60,7 +60,7 @@ describe('Repository Integration Tests', () => {
     test('should create vehicle and find by user', async () => {
       const userRepo = repositoryFactory.getUserRepository();
       const vehicleRepo = repositoryFactory.getVehicleRepository();
-      
+
       const user = await userRepo.create({
         email: 'test@example.com',
         displayName: 'Test User',
@@ -91,7 +91,7 @@ describe('Repository Integration Tests', () => {
       const userRepo = repositoryFactory.getUserRepository();
       const vehicleRepo = repositoryFactory.getVehicleRepository();
       const expenseRepo = repositoryFactory.getExpenseRepository();
-      
+
       // Create user and vehicle
       const user = await userRepo.create({
         email: 'test@example.com',
@@ -108,21 +108,21 @@ describe('Repository Integration Tests', () => {
       });
 
       // Create expenses
-      const fuelExpense = await expenseRepo.create({
+      const _fuelExpense = await expenseRepo.create({
         vehicleId: vehicle.id,
         type: 'fuel',
         category: getCategoryForExpenseType('fuel'),
-        amount: 50.00,
+        amount: 50.0,
         currency: 'USD',
         date: new Date('2024-01-15'),
         gallons: 12.5,
       });
 
-      const maintenanceExpense = await expenseRepo.create({
+      const _maintenanceExpense = await expenseRepo.create({
         vehicleId: vehicle.id,
         type: 'oil-change',
         category: getCategoryForExpenseType('oil-change'),
-        amount: 75.00,
+        amount: 75.0,
         currency: 'USD',
         date: new Date('2024-01-20'),
       });
@@ -138,12 +138,12 @@ describe('Repository Integration Tests', () => {
       // Test analytics
       const categoryTotals = await expenseRepo.getTotalByCategory(vehicle.id);
       expect(categoryTotals).toHaveLength(2);
-      
-      const operatingTotal = categoryTotals.find(ct => ct.category === 'operating');
-      const maintenanceTotal = categoryTotals.find(ct => ct.category === 'maintenance');
-      
-      expect(operatingTotal?.total).toBe(50.00);
-      expect(maintenanceTotal?.total).toBe(75.00);
+
+      const operatingTotal = categoryTotals.find((ct) => ct.category === 'operating');
+      const maintenanceTotal = categoryTotals.find((ct) => ct.category === 'maintenance');
+
+      expect(operatingTotal?.total).toBe(50.0);
+      expect(maintenanceTotal?.total).toBe(75.0);
     });
   });
 
@@ -152,7 +152,7 @@ describe('Repository Integration Tests', () => {
       const userRepo = repositoryFactory.getUserRepository();
       const vehicleRepo = repositoryFactory.getVehicleRepository();
       const loanRepo = repositoryFactory.getVehicleLoanRepository();
-      
+
       // Create user and vehicle
       const user = await userRepo.create({
         email: 'test@example.com',
@@ -201,7 +201,7 @@ describe('Repository Integration Tests', () => {
       const userRepo = repositoryFactory.getUserRepository();
       const vehicleRepo = repositoryFactory.getVehicleRepository();
       const insuranceRepo = repositoryFactory.getInsurancePolicyRepository();
-      
+
       // Create user and vehicle
       const user = await userRepo.create({
         email: 'test@example.com',

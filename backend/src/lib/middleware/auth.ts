@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { lucia } from '../auth/lucia';
 import type { AuthUser } from '../auth/lucia';
+import { getLucia } from '../auth/lucia-provider.js';
 
 // Extend Hono context to include user
 declare module 'hono' {
@@ -17,14 +17,15 @@ declare module 'hono' {
 // Authentication middleware - requires valid session
 export const requireAuth: MiddlewareHandler = async (c, next) => {
   try {
+    const lucia = getLucia();
     const sessionId = lucia.readSessionCookie(c.req.header('Cookie') || '');
-    
+
     if (!sessionId) {
       throw new HTTPException(401, { message: 'Authentication required' });
     }
 
     const { session, user } = await lucia.validateSession(sessionId);
-    
+
     if (!session || !user) {
       // Invalid session, clear cookie
       const sessionCookie = lucia.createBlankSessionCookie();
@@ -44,7 +45,7 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
       const newSession = await lucia.createSession(user.id, {});
       const sessionCookie = lucia.createSessionCookie(newSession.id);
       c.header('Set-Cookie', sessionCookie.serialize());
-      
+
       // Update session in context
       c.set('session', {
         id: newSession.id,
@@ -59,15 +60,15 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
 
     // Set user in context
     c.set('user', user);
-    
+
     return next();
   } catch (error) {
     console.error('Auth middleware error:', error);
-    
+
     if (error instanceof HTTPException) {
       throw error;
     }
-    
+
     throw new HTTPException(500, { message: 'Authentication error' });
   }
 };
@@ -75,11 +76,12 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
 // Optional authentication middleware - sets user if session exists but doesn't require it
 export const optionalAuth: MiddlewareHandler = async (c, next) => {
   try {
+    const lucia = getLucia();
     const sessionId = lucia.readSessionCookie(c.req.header('Cookie') || '');
-    
+
     if (sessionId) {
       const { session, user } = await lucia.validateSession(sessionId);
-      
+
       if (session && user) {
         c.set('user', user);
         c.set('session', {
@@ -88,7 +90,7 @@ export const optionalAuth: MiddlewareHandler = async (c, next) => {
         });
       }
     }
-    
+
     return next();
   } catch (error) {
     console.error('Optional auth middleware error:', error);

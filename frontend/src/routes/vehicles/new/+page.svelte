@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { appStore } from '$lib/stores/app.js';
-	import { ArrowLeft, Car, DollarSign, Calendar, Calculator } from 'lucide-svelte';
-	import type { VehicleFormData, LoanPaymentConfig } from '$lib/types.js';
+	import { ArrowLeft, Car, DollarSign, Calculator } from 'lucide-svelte';
+	import type {
+		VehicleFormData,
+		LoanPaymentConfig,
+		VehicleFormErrors,
+		LoanFormErrors
+	} from '$lib/types.js';
 
 	// Form state
 	let isSubmitting = $state(false);
 	let showLoanForm = $state(false);
-	let showAmortizationPreview = $state(false);
 
 	// Vehicle form data
 	let vehicleForm = $state<VehicleFormData>({
@@ -34,7 +38,7 @@
 	});
 
 	// Form validation
-	let errors = $state<Record<string, string>>({});
+	let errors = $state<VehicleFormErrors & LoanFormErrors>({});
 
 	// Amortization preview data
 	let amortizationPreview = $state<{
@@ -48,23 +52,23 @@
 		errors = {};
 
 		if (!vehicleForm.make.trim()) {
-			errors.make = 'Make is required';
+			errors['make'] = 'Make is required';
 		}
 
 		if (!vehicleForm.model.trim()) {
-			errors.model = 'Model is required';
+			errors['model'] = 'Model is required';
 		}
 
 		if (vehicleForm.year < 1900 || vehicleForm.year > new Date().getFullYear() + 2) {
-			errors.year = 'Please enter a valid year';
+			errors['year'] = 'Please enter a valid year';
 		}
 
 		if (vehicleForm.initialMileage !== undefined && vehicleForm.initialMileage < 0) {
-			errors.initialMileage = 'Mileage cannot be negative';
+			errors['initialMileage'] = 'Mileage cannot be negative';
 		}
 
 		if (vehicleForm.purchasePrice !== undefined && vehicleForm.purchasePrice < 0) {
-			errors.purchasePrice = 'Purchase price cannot be negative';
+			errors['purchasePrice'] = 'Purchase price cannot be negative';
 		}
 
 		return Object.keys(errors).length === 0;
@@ -74,34 +78,39 @@
 		if (!showLoanForm) return true;
 
 		if (!loanForm.lender.trim()) {
-			errors.lender = 'Lender is required';
+			errors['lender'] = 'Lender is required';
 		}
 
 		if (loanForm.originalAmount <= 0) {
-			errors.originalAmount = 'Loan amount must be greater than 0';
+			errors['originalAmount'] = 'Loan amount must be greater than 0';
 		}
 
 		if (loanForm.apr < 0 || loanForm.apr > 50) {
-			errors.apr = 'APR must be between 0% and 50%';
+			errors['apr'] = 'APR must be between 0% and 50%';
 		}
 
 		if (loanForm.termMonths < 1 || loanForm.termMonths > 360) {
-			errors.termMonths = 'Term must be between 1 and 360 months';
+			errors['termMonths'] = 'Term must be between 1 and 360 months';
 		}
 
 		if (!loanForm.startDate) {
-			errors.startDate = 'Start date is required';
+			errors['startDate'] = 'Start date is required';
 		}
 
 		if (loanForm.paymentAmount <= 0) {
-			errors.paymentAmount = 'Payment amount must be greater than 0';
+			errors['paymentAmount'] = 'Payment amount must be greater than 0';
 		}
 
 		return Object.keys(errors).length === 0;
 	}
 
 	function calculateAmortization() {
-		if (!showLoanForm || loanForm.originalAmount <= 0 || loanForm.apr <= 0 || loanForm.termMonths <= 0) {
+		if (
+			!showLoanForm ||
+			loanForm.originalAmount <= 0 ||
+			loanForm.apr <= 0 ||
+			loanForm.termMonths <= 0
+		) {
 			amortizationPreview = null;
 			return;
 		}
@@ -111,7 +120,8 @@
 		const numPayments = loanForm.termMonths;
 
 		// Calculate monthly payment using standard amortization formula
-		const monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / 
+		const monthlyPayment =
+			(principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))) /
 			(Math.pow(1 + monthlyRate, numPayments) - 1);
 
 		const totalPayments = monthlyPayment * numPayments;
@@ -150,7 +160,7 @@
 
 		try {
 			// Prepare vehicle data
-			const vehicleData = {
+			const vehicleData: any = {
 				...vehicleForm,
 				purchaseDate: vehicleForm.purchaseDate ? new Date(vehicleForm.purchaseDate) : undefined
 			};
@@ -197,7 +207,7 @@
 					message: errorData.message || 'Failed to add vehicle'
 				});
 			}
-		} catch (error) {
+		} catch {
 			appStore.addNotification({
 				type: 'error',
 				message: 'Error adding vehicle. Please try again.'
@@ -230,10 +240,7 @@
 <div class="space-y-6">
 	<!-- Header -->
 	<div class="flex items-center gap-4">
-		<button 
-			onclick={() => goto('/vehicles')}
-			class="btn btn-secondary p-2"
-		>
+		<button onclick={() => goto('/vehicles')} class="btn btn-secondary p-2">
 			<ArrowLeft class="h-4 w-4" />
 		</button>
 		<div>
@@ -257,13 +264,13 @@
 						id="make"
 						type="text"
 						class="form-input"
-						class:border-red-300={errors.make}
+						class:border-red-300={errors['make']}
 						placeholder="e.g., Toyota, Honda, Ford"
 						bind:value={vehicleForm.make}
 						required
 					/>
-					{#if errors.make}
-						<p class="form-error">{errors.make}</p>
+					{#if errors['make']}
+						<p class="form-error">{errors['make']}</p>
 					{/if}
 				</div>
 
@@ -273,13 +280,13 @@
 						id="model"
 						type="text"
 						class="form-input"
-						class:border-red-300={errors.model}
+						class:border-red-300={errors['model']}
 						placeholder="e.g., Camry, Civic, F-150"
 						bind:value={vehicleForm.model}
 						required
 					/>
-					{#if errors.model}
-						<p class="form-error">{errors.model}</p>
+					{#if errors['model']}
+						<p class="form-error">{errors['model']}</p>
 					{/if}
 				</div>
 
@@ -289,14 +296,14 @@
 						id="year"
 						type="number"
 						class="form-input"
-						class:border-red-300={errors.year}
+						class:border-red-300={errors['year']}
 						min="1900"
 						max={new Date().getFullYear() + 2}
 						bind:value={vehicleForm.year}
 						required
 					/>
-					{#if errors.year}
-						<p class="form-error">{errors.year}</p>
+					{#if errors['year']}
+						<p class="form-error">{errors['year']}</p>
 					{/if}
 				</div>
 
@@ -328,13 +335,13 @@
 						id="initialMileage"
 						type="number"
 						class="form-input"
-						class:border-red-300={errors.initialMileage}
+						class:border-red-300={errors['initialMileage']}
 						min="0"
 						placeholder="Current odometer reading"
 						bind:value={vehicleForm.initialMileage}
 					/>
-					{#if errors.initialMileage}
-						<p class="form-error">{errors.initialMileage}</p>
+					{#if errors['initialMileage']}
+						<p class="form-error">{errors['initialMileage']}</p>
 					{/if}
 				</div>
 
@@ -344,14 +351,14 @@
 						id="purchasePrice"
 						type="number"
 						class="form-input"
-						class:border-red-300={errors.purchasePrice}
+						class:border-red-300={errors['purchasePrice']}
 						min="0"
 						step="0.01"
 						placeholder="0.00"
 						bind:value={vehicleForm.purchasePrice}
 					/>
-					{#if errors.purchasePrice}
-						<p class="form-error">{errors.purchasePrice}</p>
+					{#if errors['purchasePrice']}
+						<p class="form-error">{errors['purchasePrice']}</p>
 					{/if}
 				</div>
 
@@ -393,13 +400,13 @@
 								id="lender"
 								type="text"
 								class="form-input"
-								class:border-red-300={errors.lender}
+								class:border-red-300={errors['lender']}
 								placeholder="e.g., Chase Bank, Credit Union"
 								bind:value={loanForm.lender}
 								required
 							/>
-							{#if errors.lender}
-								<p class="form-error">{errors.lender}</p>
+							{#if errors['lender']}
+								<p class="form-error">{errors['lender']}</p>
 							{/if}
 						</div>
 
@@ -409,15 +416,15 @@
 								id="originalAmount"
 								type="number"
 								class="form-input"
-								class:border-red-300={errors.originalAmount}
+								class:border-red-300={errors['originalAmount']}
 								min="0"
 								step="0.01"
 								placeholder="0.00"
 								bind:value={loanForm.originalAmount}
 								required
 							/>
-							{#if errors.originalAmount}
-								<p class="form-error">{errors.originalAmount}</p>
+							{#if errors['originalAmount']}
+								<p class="form-error">{errors['originalAmount']}</p>
 							{/if}
 						</div>
 
@@ -427,7 +434,7 @@
 								id="apr"
 								type="number"
 								class="form-input"
-								class:border-red-300={errors.apr}
+								class:border-red-300={errors['apr']}
 								min="0"
 								max="50"
 								step="0.01"
@@ -435,8 +442,8 @@
 								bind:value={loanForm.apr}
 								required
 							/>
-							{#if errors.apr}
-								<p class="form-error">{errors.apr}</p>
+							{#if errors['apr']}
+								<p class="form-error">{errors['apr']}</p>
 							{/if}
 						</div>
 
@@ -445,7 +452,7 @@
 							<select
 								id="termMonths"
 								class="form-input"
-								class:border-red-300={errors.termMonths}
+								class:border-red-300={errors['termMonths']}
 								bind:value={loanForm.termMonths}
 								required
 							>
@@ -455,8 +462,8 @@
 								<option value={72}>72 months (6 years)</option>
 								<option value={84}>84 months (7 years)</option>
 							</select>
-							{#if errors.termMonths}
-								<p class="form-error">{errors.termMonths}</p>
+							{#if errors['termMonths']}
+								<p class="form-error">{errors['termMonths']}</p>
 							{/if}
 						</div>
 
@@ -466,22 +473,18 @@
 								id="startDate"
 								type="date"
 								class="form-input"
-								class:border-red-300={errors.startDate}
+								class:border-red-300={errors['startDate']}
 								bind:value={loanForm.startDate}
 								required
 							/>
-							{#if errors.startDate}
-								<p class="form-error">{errors.startDate}</p>
+							{#if errors['startDate']}
+								<p class="form-error">{errors['startDate']}</p>
 							{/if}
 						</div>
 
 						<div class="form-group">
 							<label for="dayOfMonth" class="form-label">Payment Day of Month</label>
-							<select
-								id="dayOfMonth"
-								class="form-input"
-								bind:value={loanForm.dayOfMonth}
-							>
+							<select id="dayOfMonth" class="form-input" bind:value={loanForm.dayOfMonth}>
 								{#each Array(28) as _, i}
 									<option value={i + 1}>{i + 1}</option>
 								{/each}
@@ -496,7 +499,7 @@
 								<Calculator class="h-4 w-4 text-blue-600" />
 								<h3 class="font-medium text-blue-900">Loan Calculation Preview</h3>
 							</div>
-							
+
 							<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
 								<div>
 									<p class="text-blue-700 font-medium">Monthly Payment</p>
@@ -504,21 +507,21 @@
 										{formatCurrency(amortizationPreview.monthlyPayment)}
 									</p>
 								</div>
-								
+
 								<div>
 									<p class="text-blue-700 font-medium">Total Interest</p>
 									<p class="text-blue-900 font-semibold">
 										{formatCurrency(amortizationPreview.totalInterest)}
 									</p>
 								</div>
-								
+
 								<div>
 									<p class="text-blue-700 font-medium">Total Payments</p>
 									<p class="text-blue-900 font-semibold">
 										{formatCurrency(amortizationPreview.totalPayments)}
 									</p>
 								</div>
-								
+
 								<div>
 									<p class="text-blue-700 font-medium">Payoff Date</p>
 									<p class="text-blue-900 font-semibold">
@@ -546,12 +549,8 @@
 			>
 				Cancel
 			</button>
-			
-			<button
-				type="submit"
-				class="btn btn-primary"
-				disabled={isSubmitting}
-			>
+
+			<button type="submit" class="btn btn-primary" disabled={isSubmitting}>
 				{#if isSubmitting}
 					<div class="loading-spinner h-4 w-4 mr-2"></div>
 					Adding Vehicle...

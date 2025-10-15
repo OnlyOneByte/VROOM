@@ -4,7 +4,13 @@
 	import { onMount } from 'svelte';
 	import { appStore } from '$lib/stores/app.js';
 	import { ArrowLeft, Car, DollarSign, Calculator, Trash2 } from 'lucide-svelte';
-	import type { Vehicle, VehicleFormData, LoanPaymentConfig } from '$lib/types.js';
+	import type {
+		Vehicle,
+		VehicleFormData,
+		LoanPaymentConfig,
+		VehicleFormErrors,
+		LoanFormErrors
+	} from '$lib/types.js';
 
 	const vehicleId = $page.params.id;
 
@@ -40,7 +46,7 @@
 	});
 
 	// Form validation
-	let errors = $state<Record<string, string>>({});
+	let errors = $state<VehicleFormErrors & LoanFormErrors>({});
 
 	// Amortization preview
 	let amortizationPreview = $state<{
@@ -71,7 +77,7 @@
 				});
 				goto('/vehicles');
 			}
-		} catch (error) {
+		} catch {
 			appStore.addNotification({
 				type: 'error',
 				message: 'Error loading vehicle'
@@ -93,7 +99,9 @@
 			nickname: vehicle.nickname || '',
 			initialMileage: vehicle.initialMileage,
 			purchasePrice: vehicle.purchasePrice,
-			purchaseDate: vehicle.purchaseDate ? new Date(vehicle.purchaseDate).toISOString().split('T')[0] : ''
+			purchaseDate: vehicle.purchaseDate
+				? new Date(vehicle.purchaseDate).toISOString().split('T')[0]
+				: ''
 		};
 
 		if (vehicle.loan?.isActive) {
@@ -103,7 +111,7 @@
 				originalAmount: vehicle.loan.originalAmount,
 				apr: vehicle.loan.apr,
 				termMonths: vehicle.loan.termMonths,
-				startDate: new Date(vehicle.loan.startDate).toISOString().split('T')[0],
+				startDate: new Date(vehicle.loan.startDate).toISOString().split('T')[0]!,
 				paymentAmount: vehicle.loan.standardPayment.amount,
 				frequency: vehicle.loan.standardPayment.frequency,
 				dayOfMonth: vehicle.loan.standardPayment.dayOfMonth || 1
@@ -168,7 +176,12 @@
 	}
 
 	function calculateAmortization() {
-		if (!showLoanForm || loanForm.originalAmount <= 0 || loanForm.apr <= 0 || loanForm.termMonths <= 0) {
+		if (
+			!showLoanForm ||
+			loanForm.originalAmount <= 0 ||
+			loanForm.apr <= 0 ||
+			loanForm.termMonths <= 0
+		) {
 			amortizationPreview = null;
 			return;
 		}
@@ -177,7 +190,8 @@
 		const monthlyRate = loanForm.apr / 100 / 12;
 		const numPayments = loanForm.termMonths;
 
-		const monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / 
+		const monthlyPayment =
+			(principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))) /
 			(Math.pow(1 + monthlyRate, numPayments) - 1);
 
 		const totalPayments = monthlyPayment * numPayments;
@@ -211,7 +225,7 @@
 		isSubmitting = true;
 
 		try {
-			const vehicleData = {
+			const vehicleData: any = {
 				...vehicleForm,
 				purchaseDate: vehicleForm.purchaseDate ? new Date(vehicleForm.purchaseDate) : undefined
 			};
@@ -244,7 +258,7 @@
 
 			if (response.ok) {
 				const updatedVehicle = await response.json();
-				appStore.updateVehicle(vehicleId, updatedVehicle);
+				appStore.updateVehicle(vehicleId!, updatedVehicle);
 				appStore.addNotification({
 					type: 'success',
 					message: 'Vehicle updated successfully!'
@@ -257,7 +271,7 @@
 					message: errorData.message || 'Failed to update vehicle'
 				});
 			}
-		} catch (error) {
+		} catch {
 			appStore.addNotification({
 				type: 'error',
 				message: 'Error updating vehicle. Please try again.'
@@ -282,7 +296,7 @@
 			});
 
 			if (response.ok) {
-				appStore.removeVehicle(vehicleId);
+				appStore.removeVehicle(vehicleId!);
 				appStore.addNotification({
 					type: 'success',
 					message: 'Vehicle deleted successfully'
@@ -295,7 +309,7 @@
 					message: errorData.message || 'Failed to delete vehicle'
 				});
 			}
-		} catch (error) {
+		} catch {
 			appStore.addNotification({
 				type: 'error',
 				message: 'Error deleting vehicle. Please try again.'
@@ -340,10 +354,7 @@
 		<!-- Header -->
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-4">
-				<button 
-					onclick={() => goto(`/vehicles/${vehicleId}`)}
-					class="btn btn-secondary p-2"
-				>
+				<button onclick={() => goto(`/vehicles/${vehicleId}`)} class="btn btn-secondary p-2">
 					<ArrowLeft class="h-4 w-4" />
 				</button>
 				<div>
@@ -366,13 +377,11 @@
 			<div class="bg-red-50 border border-red-200 rounded-lg p-4">
 				<p class="text-red-800 font-medium mb-2">Are you sure you want to delete this vehicle?</p>
 				<p class="text-red-700 text-sm mb-4">
-					This will permanently delete the vehicle and all associated expenses. This action cannot be undone.
+					This will permanently delete the vehicle and all associated expenses. This action cannot
+					be undone.
 				</p>
 				<div class="flex gap-2">
-					<button
-						onclick={() => showDeleteConfirm = false}
-						class="btn btn-secondary text-sm"
-					>
+					<button onclick={() => (showDeleteConfirm = false)} class="btn btn-secondary text-sm">
 						Cancel
 					</button>
 					<button
@@ -576,7 +585,7 @@
 									id="apr"
 									type="number"
 									class="form-input"
-									class:border-red-300={errors.apr}
+									class:border-red-300={errors['apr']}
 									min="0"
 									max="50"
 									step="0.01"
@@ -584,8 +593,8 @@
 									bind:value={loanForm.apr}
 									required
 								/>
-								{#if errors.apr}
-									<p class="form-error">{errors.apr}</p>
+								{#if errors['apr']}
+									<p class="form-error">{errors['apr']}</p>
 								{/if}
 							</div>
 
@@ -594,7 +603,7 @@
 								<select
 									id="termMonths"
 									class="form-input"
-									class:border-red-300={errors.termMonths}
+									class:border-red-300={errors['termMonths']}
 									bind:value={loanForm.termMonths}
 									required
 								>
@@ -604,8 +613,8 @@
 									<option value={72}>72 months (6 years)</option>
 									<option value={84}>84 months (7 years)</option>
 								</select>
-								{#if errors.termMonths}
-									<p class="form-error">{errors.termMonths}</p>
+								{#if errors['termMonths']}
+									<p class="form-error">{errors['termMonths']}</p>
 								{/if}
 							</div>
 
@@ -615,22 +624,18 @@
 									id="startDate"
 									type="date"
 									class="form-input"
-									class:border-red-300={errors.startDate}
+									class:border-red-300={errors['startDate']}
 									bind:value={loanForm.startDate}
 									required
 								/>
-								{#if errors.startDate}
-									<p class="form-error">{errors.startDate}</p>
+								{#if errors['startDate']}
+									<p class="form-error">{errors['startDate']}</p>
 								{/if}
 							</div>
 
 							<div class="form-group">
 								<label for="dayOfMonth" class="form-label">Payment Day of Month</label>
-								<select
-									id="dayOfMonth"
-									class="form-input"
-									bind:value={loanForm.dayOfMonth}
-								>
+								<select id="dayOfMonth" class="form-input" bind:value={loanForm.dayOfMonth}>
 									{#each Array(28) as _, i}
 										<option value={i + 1}>{i + 1}</option>
 									{/each}
@@ -672,7 +677,7 @@
 									<Calculator class="h-4 w-4 text-blue-600" />
 									<h3 class="font-medium text-blue-900">Updated Loan Calculation</h3>
 								</div>
-								
+
 								<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
 									<div>
 										<p class="text-blue-700 font-medium">Monthly Payment</p>
@@ -680,21 +685,21 @@
 											{formatCurrency(amortizationPreview.monthlyPayment)}
 										</p>
 									</div>
-									
+
 									<div>
 										<p class="text-blue-700 font-medium">Total Interest</p>
 										<p class="text-blue-900 font-semibold">
 											{formatCurrency(amortizationPreview.totalInterest)}
 										</p>
 									</div>
-									
+
 									<div>
 										<p class="text-blue-700 font-medium">Total Payments</p>
 										<p class="text-blue-900 font-semibold">
 											{formatCurrency(amortizationPreview.totalPayments)}
 										</p>
 									</div>
-									
+
 									<div>
 										<p class="text-blue-700 font-medium">Payoff Date</p>
 										<p class="text-blue-900 font-semibold">
@@ -722,12 +727,8 @@
 				>
 					Cancel
 				</button>
-				
-				<button
-					type="submit"
-					class="btn btn-primary"
-					disabled={isSubmitting}
-				>
+
+				<button type="submit" class="btn btn-primary" disabled={isSubmitting}>
 					{#if isSubmitting}
 						<div class="loading-spinner h-4 w-4 mr-2"></div>
 						Updating Vehicle...
@@ -741,10 +742,7 @@
 {:else}
 	<div class="text-center py-12">
 		<p class="text-gray-500">Vehicle not found</p>
-		<button 
-			onclick={() => goto('/vehicles')}
-			class="btn btn-primary mt-4"
-		>
+		<button onclick={() => goto('/vehicles')} class="btn btn-primary mt-4">
 			Back to Vehicles
 		</button>
 	</div>

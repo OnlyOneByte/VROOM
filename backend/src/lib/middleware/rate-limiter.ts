@@ -1,10 +1,140 @@
-import type { MiddlewareHandler } from 'hono';
-import { HTTPException } from 'hono/http-exception';
+import type { Context, MiddlewareHandler } from 'hono';
 import { config } from '../config';
+import { RateLimitError } from '../errors';
 
-// Simple in-memory rate limiter
-// Note: In production, consider using Redis or a more sophisticated solution
-const requestCounts = new Map<string, { count: number; resetTime: number }>();
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+  firstRequest: number;
+}
+
+// Simple in-memory rate limiter with cleanup
+// Note: In production, consider using Redis for distributed rate limiting
+class RateLimiter {
+  private requests = new Map<string, RateLimitEntry>();
+  private cleanupInterval: Timer | null = null;
+
+  constructor() {
+    // Clean up expired entries every 5 minutes
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanup();
+      },
+      5 * 60 * 1000
+    );
+  }
+
+  private cleanup(): void {
+    const now = Date.now();
+    for (const [key, value] of this.requests.entries()) {
+      if (now > value.resetTime) {
+        this.requests.delete(key);
+      }
+    }
+  }
+
+  private getClientId(c: Context): string {
+    // Try to get real IP from various headers
+    const forwarded = c.req.header('x-forwarded-for');
+    const realIp = c.req.header('x-real-ip');
+    const cfConnectingIp = c.req.header('cf-connecting-ip');
+
+    if (forwarded) {
+      // x-forwarded-for can contain multiple IPs, take the first one
+      return forwarded.split(',')[0].trim();
+    }
+
+    return cfConnectingIp || realIp || 'unknown';
+  }
+
+  public checkLimit(c: Context): { allowed: boolean; headers: Record<string, string> } {
+    const clientId = this.getClientId(c);
+    const now = Date.now();
+    const windowMs = config.rateLimit.windowMs;
+    const maxRequests = config.rateLimit.max;
+
+    const current = this.requests.get(clientId);
+
+    if (!current) {
+      // First request from this client
+      this.requests.set(clientId, {
+        count: 1,
+        resetTime: now + windowMs,
+        firstRequest: now,
+      });
+
+      return {
+        allowed: true,
+        headers: {
+          'X-RateLimit-Limit': maxRequests.toString(),
+          'X-RateLimit-Remaining': (maxRequests - 1).toString(),
+          'X-RateLimit-Reset': Math.ceil(windowMs / 1000).toString(),
+        },
+      };
+    }
+
+    if (now > current.resetTime) {
+      // Window has expired, reset
+      this.requests.set(clientId, {
+        count: 1,
+        resetTime: now + windowMs,
+        firstRequest: now,
+      });
+
+      return {
+        allowed: true,
+        headers: {
+          'X-RateLimit-Limit': maxRequests.toString(),
+          'X-RateLimit-Remaining': (maxRequests - 1).toString(),
+          'X-RateLimit-Reset': Math.ceil(windowMs / 1000).toString(),
+        },
+      };
+    }
+
+    // Within window, increment count
+    current.count++;
+    const remaining = Math.max(0, maxRequests - current.count);
+    const resetTime = Math.ceil((current.resetTime - now) / 1000);
+
+    const headers = {
+      'X-RateLimit-Limit': maxRequests.toString(),
+      'X-RateLimit-Remaining': remaining.toString(),
+      'X-RateLimit-Reset': resetTime.toString(),
+    };
+
+    if (current.count > maxRequests) {
+      return {
+        allowed: false,
+        headers,
+      };
+    }
+
+    return {
+      allowed: true,
+      headers,
+    };
+  }
+
+  public destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.requests.clear();
+  }
+}
+
+// Global rate limiter instance
+const rateLimiterInstance = new RateLimiter();
+
+// Graceful shutdown cleanup
+process.on('SIGTERM', () => {
+  rateLimiterInstance.destroy();
+});
+
+process.on('SIGINT', () => {
+  rateLimiterInstance.destroy();
+});
 
 export const rateLimiter: MiddlewareHandler = async (c, next) => {
   // Skip rate limiting in test environment
@@ -12,51 +142,17 @@ export const rateLimiter: MiddlewareHandler = async (c, next) => {
     return next();
   }
 
-  const clientIP = c.req.header('x-forwarded-for') || 
-                   c.req.header('x-real-ip') || 
-                   'unknown';
-  
-  const now = Date.now();
-  const windowMs = config.rateLimit.windowMs;
-  const maxRequests = config.rateLimit.max;
-  
-  // Get or create request count for this IP
-  let requestData = requestCounts.get(clientIP);
-  
-  if (!requestData || now > requestData.resetTime) {
-    // Reset window
-    requestData = {
-      count: 0,
-      resetTime: now + windowMs,
-    };
-    requestCounts.set(clientIP, requestData);
+  const { allowed, headers } = rateLimiterInstance.checkLimit(c);
+
+  // Set rate limit headers
+  for (const [key, value] of Object.entries(headers)) {
+    c.header(key, value);
   }
-  
-  requestData.count++;
-  
-  // Check if limit exceeded
-  if (requestData.count > maxRequests) {
-    const resetIn = Math.ceil((requestData.resetTime - now) / 1000);
-    
-    throw new HTTPException(429, {
-      message: `Too many requests. Try again in ${resetIn} seconds.`,
-    });
+
+  if (!allowed) {
+    const resetTime = parseInt(headers['X-RateLimit-Reset'], 10);
+    throw new RateLimitError(`Too many requests. Try again in ${resetTime} seconds.`);
   }
-  
-  // Add rate limit headers
-  c.res.headers.set('X-RateLimit-Limit', maxRequests.toString());
-  c.res.headers.set('X-RateLimit-Remaining', (maxRequests - requestData.count).toString());
-  c.res.headers.set('X-RateLimit-Reset', Math.ceil(requestData.resetTime / 1000).toString());
-  
+
   return next();
 };
-
-// Cleanup old entries periodically (every 5 minutes)
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, data] of requestCounts.entries()) {
-    if (now > data.resetTime) {
-      requestCounts.delete(ip);
-    }
-  }
-}, 5 * 60 * 1000);

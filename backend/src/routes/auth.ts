@@ -1,12 +1,13 @@
+import { createId } from '@paralleldrive/cuid2';
+import { generateCodeVerifier, generateState } from 'arctic';
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { generateState, generateCodeVerifier } from 'arctic';
 import { parseCookies, serializeCookie } from 'oslo/cookie';
-import { lucia, google } from '../lib/auth/lucia';
-import { databaseService } from '../lib/database';
 import { users } from '../db/schema';
-import { eq } from 'drizzle-orm';
-import { createId } from '@paralleldrive/cuid2';
+import { google } from '../lib/auth/lucia';
+import { getLucia } from '../lib/auth/lucia-provider.js';
+import { databaseService } from '../lib/database';
 
 const auth = new Hono();
 
@@ -25,21 +26,27 @@ auth.get('/login/google', async (c) => {
     });
 
     // Store state and code verifier in cookies
-    c.header('Set-Cookie', serializeCookie('google_oauth_state', state, {
-      path: '/',
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 60 * 10, // 10 minutes
-      sameSite: 'lax',
-    }));
+    c.header(
+      'Set-Cookie',
+      serializeCookie('google_oauth_state', state, {
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 60 * 10, // 10 minutes
+        sameSite: 'lax',
+      })
+    );
 
-    c.header('Set-Cookie', serializeCookie('google_code_verifier', codeVerifier, {
-      path: '/',
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 60 * 10, // 10 minutes
-      sameSite: 'lax',
-    }));
+    c.header(
+      'Set-Cookie',
+      serializeCookie('google_code_verifier', codeVerifier, {
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 60 * 10, // 10 minutes
+        sameSite: 'lax',
+      })
+    );
 
     return c.redirect(url.toString());
   } catch (error) {
@@ -70,7 +77,7 @@ auth.get('/callback/google', async (c) => {
 
     // Exchange code for tokens
     const tokens = await google.validateAuthorizationCode(code, codeVerifier);
-    
+
     // Get user info from Google
     const googleUserResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
       headers: {
@@ -82,7 +89,7 @@ auth.get('/callback/google', async (c) => {
       throw new HTTPException(500, { message: 'Failed to fetch user info from Google' });
     }
 
-    const googleUser = await googleUserResponse.json() as {
+    const googleUser = (await googleUserResponse.json()) as {
       sub: string;
       email: string;
       name: string;
@@ -93,7 +100,7 @@ auth.get('/callback/google', async (c) => {
     const db = databaseService.getDatabase();
 
     // Check if user exists
-    let existingUser = await db
+    const existingUser = await db
       .select()
       .from(users)
       .where(eq(users.providerId, googleUser.sub))
@@ -119,7 +126,7 @@ auth.get('/callback/google', async (c) => {
       if (tokens.refreshToken) {
         await db
           .update(users)
-          .set({ 
+          .set({
             googleRefreshToken: tokens.refreshToken,
             updatedAt: new Date(),
           })
@@ -128,42 +135,48 @@ auth.get('/callback/google', async (c) => {
     }
 
     // Create session
+    const lucia = getLucia();
     const session = await lucia.createSession(userId, {});
     const sessionCookie = lucia.createSessionCookie(session.id);
 
     // Clear OAuth cookies
-    c.header('Set-Cookie', serializeCookie('google_oauth_state', '', {
-      path: '/',
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 0,
-      sameSite: 'lax',
-    }));
+    c.header(
+      'Set-Cookie',
+      serializeCookie('google_oauth_state', '', {
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 0,
+        sameSite: 'lax',
+      })
+    );
 
-    c.header('Set-Cookie', serializeCookie('google_code_verifier', '', {
-      path: '/',
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 0,
-      sameSite: 'lax',
-    }));
+    c.header(
+      'Set-Cookie',
+      serializeCookie('google_code_verifier', '', {
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 0,
+        sameSite: 'lax',
+      })
+    );
 
     // Set session cookie
     c.header('Set-Cookie', sessionCookie.serialize());
 
     // Redirect to frontend
-    const frontendUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://your-domain.com' 
-      : 'http://localhost:5173';
-    
+    const frontendUrl =
+      process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:5173';
+
     return c.redirect(`${frontendUrl}/dashboard`);
   } catch (error) {
     console.error('OAuth callback error:', error);
-    
+
     if (error instanceof HTTPException) {
       throw error;
     }
-    
+
     throw new HTTPException(500, { message: 'Authentication failed' });
   }
 });
@@ -171,14 +184,15 @@ auth.get('/callback/google', async (c) => {
 // Get current user
 auth.get('/me', async (c) => {
   try {
+    const lucia = getLucia();
     const sessionId = lucia.readSessionCookie(c.req.header('Cookie') || '');
-    
+
     if (!sessionId) {
       throw new HTTPException(401, { message: 'No session found' });
     }
 
     const { session, user } = await lucia.validateSession(sessionId);
-    
+
     if (!session) {
       throw new HTTPException(401, { message: 'Invalid session' });
     }
@@ -197,11 +211,11 @@ auth.get('/me', async (c) => {
     });
   } catch (error) {
     console.error('Get user error:', error);
-    
+
     if (error instanceof HTTPException) {
       throw error;
     }
-    
+
     throw new HTTPException(500, { message: 'Failed to get user info' });
   }
 });
@@ -209,8 +223,9 @@ auth.get('/me', async (c) => {
 // Logout
 auth.post('/logout', async (c) => {
   try {
+    const lucia = getLucia();
     const sessionId = lucia.readSessionCookie(c.req.header('Cookie') || '');
-    
+
     if (sessionId) {
       await lucia.invalidateSession(sessionId);
     }
@@ -228,14 +243,15 @@ auth.post('/logout', async (c) => {
 // Refresh session (extend session if valid)
 auth.post('/refresh', async (c) => {
   try {
+    const lucia = getLucia();
     const sessionId = lucia.readSessionCookie(c.req.header('Cookie') || '');
-    
+
     if (!sessionId) {
       throw new HTTPException(401, { message: 'No session found' });
     }
 
     const { session, user } = await lucia.validateSession(sessionId);
-    
+
     if (!session) {
       throw new HTTPException(401, { message: 'Invalid session' });
     }
@@ -265,7 +281,7 @@ auth.post('/refresh', async (c) => {
     await lucia.invalidateSession(session.id);
     const newSession = await lucia.createSession(user.id, {});
     const sessionCookie = lucia.createSessionCookie(newSession.id);
-    
+
     c.header('Set-Cookie', sessionCookie.serialize());
 
     return c.json({
@@ -282,11 +298,11 @@ auth.post('/refresh', async (c) => {
     });
   } catch (error) {
     console.error('Refresh session error:', error);
-    
+
     if (error instanceof HTTPException) {
       throw error;
     }
-    
+
     throw new HTTPException(500, { message: 'Failed to refresh session' });
   }
 });

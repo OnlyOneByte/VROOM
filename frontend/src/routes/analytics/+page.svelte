@@ -1,11 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Calendar, Filter, Download, RefreshCw } from 'lucide-svelte';
-	import { getDashboardAnalytics, getTrendData, type DashboardData, type TrendData } from '$lib/utils/analytics-api';
+	import { Filter, Download, RefreshCw } from 'lucide-svelte';
+	import {
+		getDashboardAnalytics,
+		getTrendData,
+		type DashboardData,
+		type TrendData
+	} from '$lib/utils/analytics-api';
 	import { appStore } from '$lib/stores/app';
 	import CostTrendChart from '$lib/components/charts/CostTrendChart.svelte';
 	import CategoryBreakdownChart from '$lib/components/charts/CategoryBreakdownChart.svelte';
-	import FuelEfficiencyChart from '$lib/components/charts/FuelEfficiencyChart.svelte';
+
 	import MultiTrendChart from '$lib/components/charts/MultiTrendChart.svelte';
 	import EfficiencyAlerts from '$lib/components/analytics/EfficiencyAlerts.svelte';
 	import VehicleEfficiencySummary from '$lib/components/analytics/VehicleEfficiencySummary.svelte';
@@ -25,10 +30,10 @@
 	onMount(() => {
 		const now = new Date();
 		const twelveMonthsAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1);
-		
-		startDate = twelveMonthsAgo.toISOString().split('T')[0];
-		endDate = now.toISOString().split('T')[0];
-		
+
+		startDate = twelveMonthsAgo.toISOString().split('T')[0] ?? '';
+		endDate = now.toISOString().split('T')[0] ?? '';
+
 		loadAnalyticsData();
 	});
 
@@ -57,7 +62,7 @@
 			error = err instanceof Error ? err.message : 'Failed to load analytics data';
 			appStore.addNotification({
 				type: 'error',
-				message: 'Failed to load analytics data. Please try again.',
+				message: 'Failed to load analytics data. Please try again.'
 			});
 		} finally {
 			isLoading = false;
@@ -70,7 +75,7 @@
 
 	function exportData() {
 		if (!dashboardData) return;
-		
+
 		const exportData = {
 			summary: {
 				totalExpenses: dashboardData.totalExpenses,
@@ -97,7 +102,7 @@
 
 		appStore.addNotification({
 			type: 'success',
-			message: 'Analytics data exported successfully',
+			message: 'Analytics data exported successfully'
 		});
 	}
 </script>
@@ -114,7 +119,7 @@
 			<h1 class="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
 			<p class="text-gray-600">Visualize your spending patterns and trends</p>
 		</div>
-		
+
 		<div class="flex items-center space-x-2 mt-4 sm:mt-0">
 			<button
 				onclick={loadAnalyticsData}
@@ -124,7 +129,7 @@
 				<RefreshCw class="h-4 w-4 mr-2 {isLoading ? 'animate-spin' : ''}" />
 				Refresh
 			</button>
-			
+
 			<button
 				onclick={exportData}
 				disabled={!dashboardData}
@@ -142,7 +147,7 @@
 			<Filter class="h-5 w-5 text-gray-400" />
 			<h3 class="text-lg font-medium text-gray-900">Filters</h3>
 		</div>
-		
+
 		<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 			<div>
 				<label for="startDate" class="block text-sm font-medium text-gray-700 mb-1">
@@ -156,11 +161,9 @@
 					class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
 				/>
 			</div>
-			
+
 			<div>
-				<label for="endDate" class="block text-sm font-medium text-gray-700 mb-1">
-					End Date
-				</label>
+				<label for="endDate" class="block text-sm font-medium text-gray-700 mb-1"> End Date </label>
 				<input
 					id="endDate"
 					type="date"
@@ -169,11 +172,9 @@
 					class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
 				/>
 			</div>
-			
+
 			<div>
-				<label for="groupBy" class="block text-sm font-medium text-gray-700 mb-1">
-					Group By
-				</label>
+				<label for="groupBy" class="block text-sm font-medium text-gray-700 mb-1"> Group By </label>
 				<select
 					id="groupBy"
 					bind:value={groupBy}
@@ -186,11 +187,9 @@
 					<option value="year">Yearly</option>
 				</select>
 			</div>
-			
+
 			<div>
-				<label for="vehicle" class="block text-sm font-medium text-gray-700 mb-1">
-					Vehicle
-				</label>
+				<label for="vehicle" class="block text-sm font-medium text-gray-700 mb-1"> Vehicle </label>
 				<select
 					id="vehicle"
 					bind:value={selectedVehicle}
@@ -240,9 +239,7 @@
 		<div class="text-center py-12">
 			<div class="text-gray-400 text-6xl mb-4">📊</div>
 			<h3 class="text-lg font-medium text-gray-900 mb-2">No Data Available</h3>
-			<p class="text-gray-600">
-				Start by adding some vehicles and expenses to see your analytics.
-			</p>
+			<p class="text-gray-600">Start by adding some vehicles and expenses to see your analytics.</p>
 		</div>
 	{:else}
 		<!-- Summary Cards -->
@@ -252,31 +249,37 @@
 					<div class="text-3xl mr-3">💰</div>
 					<div>
 						<p class="text-sm font-medium text-gray-600">Total Expenses</p>
-						<p class="text-2xl font-bold text-gray-900">${dashboardData.totalExpenses.toFixed(2)}</p>
+						<p class="text-2xl font-bold text-gray-900">
+							${dashboardData.totalExpenses.toFixed(2)}
+						</p>
 					</div>
 				</div>
 			</div>
-			
+
 			<div class="bg-white p-6 rounded-lg shadow border">
 				<div class="flex items-center">
 					<div class="text-3xl mr-3">⛽</div>
 					<div>
 						<p class="text-sm font-medium text-gray-600">Average MPG</p>
-						<p class="text-2xl font-bold text-gray-900">{dashboardData.fuelEfficiency.averageMPG.toFixed(1)}</p>
+						<p class="text-2xl font-bold text-gray-900">
+							{dashboardData.fuelEfficiency.averageMPG.toFixed(1)}
+						</p>
 					</div>
 				</div>
 			</div>
-			
+
 			<div class="bg-white p-6 rounded-lg shadow border">
 				<div class="flex items-center">
 					<div class="text-3xl mr-3">🛣️</div>
 					<div>
 						<p class="text-sm font-medium text-gray-600">Cost per Mile</p>
-						<p class="text-2xl font-bold text-gray-900">${dashboardData.costPerMile.totalCostPerMile.toFixed(3)}</p>
+						<p class="text-2xl font-bold text-gray-900">
+							${dashboardData.costPerMile.totalCostPerMile.toFixed(3)}
+						</p>
 					</div>
 				</div>
 			</div>
-			
+
 			<div class="bg-white p-6 rounded-lg shadow border">
 				<div class="flex items-center">
 					<div class="text-3xl mr-3">🚗</div>
@@ -292,22 +295,22 @@
 		<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 			<!-- Cost Trends -->
 			<div class="xl:col-span-2">
-				<CostTrendChart 
-					data={dashboardData.monthlyTrends} 
+				<CostTrendChart
+					data={dashboardData.monthlyTrends}
 					title="Monthly Cost Trends"
 					width={1200}
 					height={400}
 				/>
 			</div>
-			
+
 			<!-- Category Breakdown -->
-			<CategoryBreakdownChart 
+			<CategoryBreakdownChart
 				data={dashboardData.categoryBreakdown}
 				title="Expense Categories"
 				width={600}
 				height={400}
 			/>
-			
+
 			<!-- Multi-Trend Chart -->
 			{#if trendData}
 				<MultiTrendChart
@@ -326,7 +329,7 @@
 			<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 				<!-- Efficiency Alerts -->
 				<EfficiencyAlerts vehicles={dashboardData.vehicles} />
-				
+
 				<!-- Vehicle Efficiency Summary -->
 				<VehicleEfficiencySummary vehicles={dashboardData.vehicles} />
 			</div>
@@ -336,25 +339,33 @@
 		{#if dashboardData.fuelEfficiency.totalGallons > 0}
 			<div class="bg-white p-6 rounded-lg shadow border">
 				<h3 class="text-lg font-semibold text-gray-900 mb-4">Fleet Fuel Efficiency Summary</h3>
-				
+
 				<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 					<div class="text-center">
-						<div class="text-2xl font-bold text-green-600">{dashboardData.fuelEfficiency.averageMPG.toFixed(1)}</div>
+						<div class="text-2xl font-bold text-green-600">
+							{dashboardData.fuelEfficiency.averageMPG.toFixed(1)}
+						</div>
 						<div class="text-sm text-gray-600">Average MPG</div>
 					</div>
-					
+
 					<div class="text-center">
-						<div class="text-2xl font-bold text-blue-600">{dashboardData.fuelEfficiency.totalGallons.toFixed(1)}</div>
+						<div class="text-2xl font-bold text-blue-600">
+							{dashboardData.fuelEfficiency.totalGallons.toFixed(1)}
+						</div>
 						<div class="text-sm text-gray-600">Total Gallons</div>
 					</div>
-					
+
 					<div class="text-center">
-						<div class="text-2xl font-bold text-purple-600">${dashboardData.fuelEfficiency.totalFuelCost.toFixed(2)}</div>
+						<div class="text-2xl font-bold text-purple-600">
+							${dashboardData.fuelEfficiency.totalFuelCost.toFixed(2)}
+						</div>
 						<div class="text-sm text-gray-600">Total Fuel Cost</div>
 					</div>
-					
+
 					<div class="text-center">
-						<div class="text-2xl font-bold text-orange-600">${dashboardData.fuelEfficiency.averageCostPerGallon.toFixed(2)}</div>
+						<div class="text-2xl font-bold text-orange-600">
+							${dashboardData.fuelEfficiency.averageCostPerGallon.toFixed(2)}
+						</div>
 						<div class="text-sm text-gray-600">Avg Cost/Gallon</div>
 					</div>
 				</div>

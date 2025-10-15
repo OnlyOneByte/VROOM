@@ -1,10 +1,16 @@
-import type { 
-  User, NewUser, 
-  Vehicle, NewVehicle,
-  VehicleLoan, NewVehicleLoan,
-  LoanPayment, NewLoanPayment,
-  InsurancePolicy, NewInsurancePolicy,
-  Expense, NewExpense 
+import type {
+  Expense,
+  InsurancePolicy,
+  LoanPayment,
+  NewExpense,
+  NewInsurancePolicy,
+  NewLoanPayment,
+  NewUser,
+  NewVehicle,
+  NewVehicleLoan,
+  User,
+  Vehicle,
+  VehicleLoan,
 } from '../../db/schema.js';
 
 // Base repository interface with common CRUD operations
@@ -47,7 +53,8 @@ export interface ILoanPaymentRepository extends IBaseRepository<LoanPayment, New
 }
 
 // Insurance Policy repository interface
-export interface IInsurancePolicyRepository extends IBaseRepository<InsurancePolicy, NewInsurancePolicy> {
+export interface IInsurancePolicyRepository
+  extends IBaseRepository<InsurancePolicy, NewInsurancePolicy> {
   findByVehicleId(vehicleId: string): Promise<InsurancePolicy[]>;
   findActiveByVehicleId(vehicleId: string): Promise<InsurancePolicy | null>;
   findExpiringPolicies(userId: string, daysFromNow: number): Promise<InsurancePolicy[]>;
@@ -57,13 +64,21 @@ export interface IInsurancePolicyRepository extends IBaseRepository<InsurancePol
 // Expense repository interface
 export interface IExpenseRepository extends IBaseRepository<Expense, NewExpense> {
   findByVehicleId(vehicleId: string): Promise<Expense[]>;
-  findByVehicleIdAndDateRange(vehicleId: string, startDate: Date, endDate: Date): Promise<Expense[]>;
+  findByVehicleIdAndDateRange(
+    vehicleId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<Expense[]>;
   findByUserId(userId: string): Promise<Expense[]>;
   findByType(vehicleId: string, type: string): Promise<Expense[]>;
   findByCategory(vehicleId: string, category: string): Promise<Expense[]>;
   findFuelExpenses(vehicleId: string): Promise<Expense[]>;
   batchCreate(expenses: NewExpense[]): Promise<Expense[]>; // For offline sync
-  getTotalByCategory(vehicleId: string, startDate?: Date, endDate?: Date): Promise<{ category: string; total: number }[]>;
+  getTotalByCategory(
+    vehicleId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<{ category: string; total: number }[]>;
   getMonthlyTotals(vehicleId: string, year: number): Promise<{ month: number; total: number }[]>;
 }
 

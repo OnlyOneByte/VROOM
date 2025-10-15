@@ -13,27 +13,31 @@ export default defineConfig({
 			manifest: {
 				name: 'VROOM Car Tracker',
 				short_name: 'VROOM',
-				description: 'Track your vehicle expenses and analyze costs',
+				description: 'Track your vehicle expenses and analyze costs with offline support',
 				theme_color: '#1f2937',
 				background_color: '#ffffff',
 				display: 'standalone',
+				scope: '/',
+				start_url: '/',
 				icons: [
 					{
-						src: '/icon-192.png',
-						sizes: '192x192',
-						type: 'image/png'
-					},
-					{
-						src: '/icon-512.png',
-						sizes: '512x512',
-						type: 'image/png'
+						src: '/favicon.svg',
+						sizes: 'any',
+						type: 'image/svg+xml'
 					}
 				]
 			}
 		})
 	],
 	test: {
-		include: ['src/**/*.{test,spec}.{js,ts}']
+		include: ['src/**/*.{test,spec}.{js,ts}'],
+		environment: 'happy-dom',
+		setupFiles: ['src/test-setup.ts'],
+		globals: true,
+		alias: {
+			$lib: new URL('./src/lib', import.meta.url).pathname,
+			$app: new URL('./node_modules/@sveltejs/kit/src/runtime/app', import.meta.url).pathname
+		}
 	},
 	server: {
 		proxy: {

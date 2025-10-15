@@ -18,8 +18,6 @@
 	<div class="card text-center py-12">
 		<Settings class="h-12 w-12 text-gray-400 mx-auto mb-4" />
 		<h3 class="text-lg font-medium text-gray-900 mb-2">Settings coming soon</h3>
-		<p class="text-gray-600 mb-6">
-			This feature will be implemented in a future task
-		</p>
+		<p class="text-gray-600 mb-6">This feature will be implemented in a future task</p>
 	</div>
 </div>

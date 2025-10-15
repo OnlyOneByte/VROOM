@@ -3,26 +3,31 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { appStore } from '$lib/stores/app.js';
-	import { 
-		ArrowLeft, 
-		Plus, 
-		Search, 
-		Filter, 
-		Edit, 
-		Trash2, 
-		DollarSign, 
-		Calendar, 
-		Fuel, 
-		Wrench, 
-		CreditCard, 
+	import {
+		ArrowLeft,
+		Plus,
+		Search,
+		Filter,
+		Edit,
+		Trash2,
+		DollarSign,
+		Calendar,
+		Fuel,
+		Wrench,
+		CreditCard,
 		FileText,
 		TrendingUp,
-		MoreVertical,
 		SortAsc,
 		SortDesc,
 		X
 	} from 'lucide-svelte';
-	import type { Vehicle, Expense, ExpenseType, ExpenseCategory, ExpenseFilters } from '$lib/types.js';
+	import type {
+		Vehicle,
+		Expense,
+		ExpenseType,
+		ExpenseCategory,
+		ExpenseFilters
+	} from '$lib/types.js';
 
 	const vehicleId = $page.params.id;
 
@@ -38,12 +43,7 @@
 
 	// Filters and search
 	let searchTerm = $state('');
-	let filters = $state<ExpenseFilters>({
-		category: undefined,
-		type: undefined,
-		startDate: undefined,
-		endDate: undefined
-	});
+	let filters = $state<ExpenseFilters>({});
 
 	// Sorting
 	let sortBy = $state<'date' | 'amount' | 'type'>('date');
@@ -108,7 +108,7 @@
 				});
 				goto('/vehicles');
 			}
-		} catch (error) {
+		} catch {
 			appStore.addNotification({
 				type: 'error',
 				message: 'Error loading vehicle'
@@ -146,11 +146,12 @@
 		// Apply search filter
 		if (searchTerm.trim()) {
 			const term = searchTerm.toLowerCase();
-			filtered = filtered.filter(expense => 
-				expense.description?.toLowerCase().includes(term) ||
-				expense.type.toLowerCase().includes(term) ||
-				expense.category.toLowerCase().includes(term) ||
-				expense.amount.toString().includes(term)
+			filtered = filtered.filter(
+				expense =>
+					expense.description?.toLowerCase().includes(term) ||
+					expense.type.toLowerCase().includes(term) ||
+					expense.category.toLowerCase().includes(term) ||
+					expense.amount.toString().includes(term)
 			);
 		}
 
@@ -175,7 +176,7 @@
 		// Apply sorting
 		filtered.sort((a, b) => {
 			let comparison = 0;
-			
+
 			switch (sortBy) {
 				case 'date':
 					comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
@@ -196,20 +197,27 @@
 
 	function calculateSummaryStats() {
 		const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-		const categoryTotals = expenses.reduce((acc, expense) => {
-			acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
-			return acc;
-		}, {} as Record<string, number>);
+		const categoryTotals = expenses.reduce(
+			(acc, expense) => {
+				acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+				return acc;
+			},
+			{} as Record<string, number>
+		);
 
 		// Calculate monthly average (last 12 months)
 		const twelveMonthsAgo = new Date();
 		twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 		const recentExpenses = expenses.filter(expense => new Date(expense.date) >= twelveMonthsAgo);
-		const monthlyAverage = recentExpenses.length > 0 ? recentExpenses.reduce((sum, expense) => sum + expense.amount, 0) / 12 : 0;
+		const monthlyAverage =
+			recentExpenses.length > 0
+				? recentExpenses.reduce((sum, expense) => sum + expense.amount, 0) / 12
+				: 0;
 
-		const lastExpenseDate = expenses.length > 0 
-			? new Date(Math.max(...expenses.map(expense => new Date(expense.date).getTime())))
-			: null;
+		const lastExpenseDate =
+			expenses.length > 0
+				? new Date(Math.max(...expenses.map(expense => new Date(expense.date).getTime())))
+				: null;
 
 		summaryStats = {
 			totalAmount,
@@ -240,12 +248,7 @@
 
 	function clearFilters() {
 		searchTerm = '';
-		filters = {
-			category: undefined,
-			type: undefined,
-			startDate: undefined,
-			endDate: undefined
-		};
+		filters = {};
 		applyFiltersAndSort();
 	}
 
@@ -269,7 +272,7 @@
 				expenses = expenses.filter(e => e.id !== expenseToDelete!.id);
 				applyFiltersAndSort();
 				calculateSummaryStats();
-				
+
 				appStore.addNotification({
 					type: 'success',
 					message: 'Expense deleted successfully'
@@ -316,22 +319,33 @@
 
 	function getCategoryIcon(category: ExpenseCategory) {
 		switch (category) {
-			case 'operating': return Fuel;
-			case 'maintenance': return Wrench;
-			case 'financial': return CreditCard;
-			default: return DollarSign;
+			case 'operating':
+				return Fuel;
+			case 'maintenance':
+				return Wrench;
+			case 'financial':
+				return CreditCard;
+			default:
+				return DollarSign;
 		}
 	}
 
 	function getCategoryColor(category: ExpenseCategory): string {
 		switch (category) {
-			case 'operating': return 'text-blue-600 bg-blue-100';
-			case 'maintenance': return 'text-orange-600 bg-orange-100';
-			case 'financial': return 'text-green-600 bg-green-100';
-			case 'regulatory': return 'text-purple-600 bg-purple-100';
-			case 'enhancement': return 'text-pink-600 bg-pink-100';
-			case 'convenience': return 'text-gray-600 bg-gray-100';
-			default: return 'text-gray-600 bg-gray-100';
+			case 'operating':
+				return 'text-blue-600 bg-blue-100';
+			case 'maintenance':
+				return 'text-orange-600 bg-orange-100';
+			case 'financial':
+				return 'text-green-600 bg-green-100';
+			case 'regulatory':
+				return 'text-purple-600 bg-purple-100';
+			case 'enhancement':
+				return 'text-pink-600 bg-pink-100';
+			case 'convenience':
+				return 'text-gray-600 bg-gray-100';
+			default:
+				return 'text-gray-600 bg-gray-100';
 		}
 	}
 
@@ -359,10 +373,7 @@
 		<!-- Header -->
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-4">
-				<button 
-					onclick={() => goto(`/vehicles/${vehicleId}`)}
-					class="btn btn-secondary p-2"
-				>
+				<button onclick={() => goto(`/vehicles/${vehicleId}`)} class="btn btn-secondary p-2">
 					<ArrowLeft class="h-4 w-4" />
 				</button>
 				<div>
@@ -371,7 +382,7 @@
 				</div>
 			</div>
 
-			<a 
+			<a
 				href="/vehicles/{vehicleId}/expenses/new"
 				class="btn btn-primary inline-flex items-center gap-2"
 			>
@@ -386,12 +397,14 @@
 				<div class="flex items-center justify-between">
 					<div>
 						<p class="text-sm font-medium text-gray-600">Total Expenses</p>
-						<p class="text-2xl font-bold text-gray-900">{formatCurrency(summaryStats.totalAmount)}</p>
+						<p class="text-2xl font-bold text-gray-900">
+							{formatCurrency(summaryStats.totalAmount)}
+						</p>
 					</div>
 					<DollarSign class="h-8 w-8 text-primary-600" />
 				</div>
 			</div>
-			
+
 			<div class="card-compact">
 				<div class="flex items-center justify-between">
 					<div>
@@ -401,17 +414,19 @@
 					<FileText class="h-8 w-8 text-blue-600" />
 				</div>
 			</div>
-			
+
 			<div class="card-compact">
 				<div class="flex items-center justify-between">
 					<div>
 						<p class="text-sm font-medium text-gray-600">Monthly Average</p>
-						<p class="text-2xl font-bold text-gray-900">{formatCurrency(summaryStats.monthlyAverage)}</p>
+						<p class="text-2xl font-bold text-gray-900">
+							{formatCurrency(summaryStats.monthlyAverage)}
+						</p>
 					</div>
 					<TrendingUp class="h-8 w-8 text-green-600" />
 				</div>
 			</div>
-			
+
 			<div class="card-compact">
 				<div class="flex items-center justify-between">
 					<div>
@@ -437,7 +452,9 @@
 								<div class="p-2 rounded-lg {getCategoryColor(category as ExpenseCategory)}">
 									<IconComponent class="h-4 w-4" />
 								</div>
-								<span class="text-sm font-medium text-gray-700">{categoryLabels[category as ExpenseCategory]}</span>
+								<span class="text-sm font-medium text-gray-700"
+									>{categoryLabels[category as ExpenseCategory]}</span
+								>
 							</div>
 							<span class="text-sm font-bold text-gray-900">{formatCurrency(amount)}</span>
 						</div>
@@ -462,7 +479,7 @@
 					/>
 				</div>
 				<button
-					onclick={() => showFilters = !showFilters}
+					onclick={() => (showFilters = !showFilters)}
 					class="btn btn-outline inline-flex items-center gap-2"
 				>
 					<Filter class="h-4 w-4" />
@@ -476,30 +493,37 @@
 					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 						<!-- Category Filter -->
 						<div>
-							<label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
-							<select bind:value={filters.category} class="input">
+							<label for="category-filter" class="block text-sm font-medium text-gray-700 mb-2"
+								>Category</label
+							>
+							<select id="category-filter" bind:value={filters.category} class="input">
 								<option value={undefined}>All Categories</option>
 								{#each Object.entries(categoryLabels) as [value, label]}
-									<option value={value}>{label}</option>
+									<option {value}>{label}</option>
 								{/each}
 							</select>
 						</div>
 
 						<!-- Type Filter -->
 						<div>
-							<label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
-							<select bind:value={filters.type} class="input">
+							<label for="type-filter" class="block text-sm font-medium text-gray-700 mb-2"
+								>Type</label
+							>
+							<select id="type-filter" bind:value={filters.type} class="input">
 								<option value={undefined}>All Types</option>
 								{#each Object.entries(typeLabels) as [value, label]}
-									<option value={value}>{label}</option>
+									<option {value}>{label}</option>
 								{/each}
 							</select>
 						</div>
 
 						<!-- Start Date -->
 						<div>
-							<label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+							<label for="start-date-filter" class="block text-sm font-medium text-gray-700 mb-2"
+								>Start Date</label
+							>
 							<input
+								id="start-date-filter"
 								type="date"
 								bind:value={filters.startDate}
 								class="input"
@@ -508,20 +532,15 @@
 
 						<!-- End Date -->
 						<div>
-							<label class="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-							<input
-								type="date"
-								bind:value={filters.endDate}
-								class="input"
-							/>
+							<label for="end-date-filter" class="block text-sm font-medium text-gray-700 mb-2"
+								>End Date</label
+							>
+							<input id="end-date-filter" type="date" bind:value={filters.endDate} class="input" />
 						</div>
 					</div>
 
 					<div class="flex justify-end">
-						<button
-							onclick={clearFilters}
-							class="btn btn-outline inline-flex items-center gap-2"
-						>
+						<button onclick={clearFilters} class="btn btn-outline inline-flex items-center gap-2">
 							<X class="h-4 w-4" />
 							Clear Filters
 						</button>
@@ -536,7 +555,7 @@
 				<h3 class="text-lg font-semibold text-gray-900">
 					Expenses ({filteredExpenses.length})
 				</h3>
-				
+
 				<!-- Sort Controls -->
 				<div class="flex gap-2">
 					<button
@@ -578,7 +597,7 @@
 						<DollarSign class="h-12 w-12 text-gray-400 mx-auto mb-4" />
 						<h3 class="text-lg font-medium text-gray-900 mb-2">No expenses yet</h3>
 						<p class="text-gray-600 mb-4">Start tracking expenses for this vehicle</p>
-						<a 
+						<a
 							href="/vehicles/{vehicleId}/expenses/new"
 							class="btn btn-primary inline-flex items-center gap-2"
 						>
@@ -589,30 +608,29 @@
 						<Search class="h-12 w-12 text-gray-400 mx-auto mb-4" />
 						<h3 class="text-lg font-medium text-gray-900 mb-2">No matching expenses</h3>
 						<p class="text-gray-600 mb-4">Try adjusting your search or filters</p>
-						<button 
-							onclick={clearFilters}
-							class="btn btn-outline"
-						>
-							Clear Filters
-						</button>
+						<button onclick={clearFilters} class="btn btn-outline"> Clear Filters </button>
 					{/if}
 				</div>
 			{:else}
 				<div class="space-y-3">
 					{#each filteredExpenses as expense}
 						{@const IconComponent = getCategoryIcon(expense.category)}
-						<div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+						<div
+							class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+						>
 							<div class="flex items-center gap-4 flex-1">
 								<div class="p-2 rounded-lg {getCategoryColor(expense.category)}">
 									<IconComponent class="h-5 w-5" />
 								</div>
-								
+
 								<div class="flex-1 min-w-0">
 									<div class="flex items-center gap-2 mb-1">
 										<h4 class="font-medium text-gray-900 truncate">
 											{expense.description || typeLabels[expense.type]}
 										</h4>
-										<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800">
+										<span
+											class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800"
+										>
 											{typeLabels[expense.type]}
 										</span>
 									</div>
@@ -632,7 +650,7 @@
 								<span class="text-lg font-bold text-gray-900">
 									{formatCurrency(expense.amount)}
 								</span>
-								
+
 								<div class="flex items-center gap-1">
 									<a
 										href="/vehicles/{vehicleId}/expenses/{expense.id}/edit"
@@ -666,7 +684,7 @@
 				<p class="text-gray-600 mb-6">
 					Are you sure you want to delete this expense? This action cannot be undone.
 				</p>
-				
+
 				<div class="bg-gray-50 rounded-lg p-3 mb-6">
 					<div class="flex items-center gap-3">
 						<div class="p-2 rounded-lg {getCategoryColor(expenseToDelete.category)}">
@@ -677,7 +695,9 @@
 								{expenseToDelete.description || typeLabels[expenseToDelete.type]}
 							</p>
 							<p class="text-sm text-gray-600">
-								{formatDate(new Date(expenseToDelete.date))} • {formatCurrency(expenseToDelete.amount)}
+								{formatDate(new Date(expenseToDelete.date))} • {formatCurrency(
+									expenseToDelete.amount
+								)}
 							</p>
 						</div>
 					</div>
@@ -685,7 +705,10 @@
 
 				<div class="flex gap-3">
 					<button
-						onclick={() => { showDeleteModal = false; expenseToDelete = null; }}
+						onclick={() => {
+							showDeleteModal = false;
+							expenseToDelete = null;
+						}}
 						class="btn btn-outline flex-1"
 						disabled={isDeleting}
 					>
@@ -722,7 +745,7 @@
 		outline: none;
 		font-size: 1rem;
 	}
-	
+
 	.input:focus {
 		outline: none;
 		border-color: #2563eb;
@@ -737,7 +760,11 @@
 	}
 
 	@keyframes spin {
-		0% { transform: rotate(0deg); }
-		100% { transform: rotate(360deg); }
+		0% {
+			transform: rotate(0deg);
+		}
+		100% {
+			transform: rotate(360deg);
+		}
 	}
 </style>

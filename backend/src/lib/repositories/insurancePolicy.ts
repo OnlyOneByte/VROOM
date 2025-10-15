@@ -1,18 +1,20 @@
-import { eq, and, lte, sql } from 'drizzle-orm';
-import { db } from '../../db/connection.js';
-import { insurancePolicies, vehicles } from '../../db/schema.js';
+import { and, eq, lte } from 'drizzle-orm';
 import type { InsurancePolicy, NewInsurancePolicy } from '../../db/schema.js';
-import type { IInsurancePolicyRepository } from './interfaces.js';
+import { insurancePolicies, vehicles } from '../../db/schema.js';
 import { BaseRepository } from './base.js';
+import type { IInsurancePolicyRepository } from './interfaces.js';
 
-export class InsurancePolicyRepository extends BaseRepository<InsurancePolicy, NewInsurancePolicy> implements IInsurancePolicyRepository {
+export class InsurancePolicyRepository
+  extends BaseRepository<InsurancePolicy, NewInsurancePolicy>
+  implements IInsurancePolicyRepository
+{
   constructor() {
     super(insurancePolicies);
   }
 
   async findByVehicleId(vehicleId: string): Promise<InsurancePolicy[]> {
     try {
-      const result = await db
+      const result = await this.database
         .select()
         .from(insurancePolicies)
         .where(eq(insurancePolicies.vehicleId, vehicleId))
@@ -26,14 +28,11 @@ export class InsurancePolicyRepository extends BaseRepository<InsurancePolicy, N
 
   async findActiveByVehicleId(vehicleId: string): Promise<InsurancePolicy | null> {
     try {
-      const result = await db
+      const result = await this.database
         .select()
         .from(insurancePolicies)
         .where(
-          and(
-            eq(insurancePolicies.vehicleId, vehicleId),
-            eq(insurancePolicies.isActive, true)
-          )
+          and(eq(insurancePolicies.vehicleId, vehicleId), eq(insurancePolicies.isActive, true))
         )
         .limit(1);
       return result[0] || null;
@@ -47,8 +46,8 @@ export class InsurancePolicyRepository extends BaseRepository<InsurancePolicy, N
     try {
       const expirationDate = new Date();
       expirationDate.setDate(expirationDate.getDate() + daysFromNow);
-      
-      const result = await db
+
+      const result = await this.database
         .select({
           id: insurancePolicies.id,
           vehicleId: insurancePolicies.vehicleId,
@@ -82,19 +81,19 @@ export class InsurancePolicyRepository extends BaseRepository<InsurancePolicy, N
 
   async markAsInactive(id: string): Promise<InsurancePolicy> {
     try {
-      const result = await db
+      const result = await this.database
         .update(insurancePolicies)
-        .set({ 
+        .set({
           isActive: false,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
         .where(eq(insurancePolicies.id, id))
         .returning();
-      
+
       if (result.length === 0) {
         throw new Error(`Insurance policy with id ${id} not found`);
       }
-      
+
       return result[0];
     } catch (error) {
       console.error(`Error marking insurance policy ${id} as inactive:`, error);

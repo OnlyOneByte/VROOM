@@ -3,19 +3,25 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { appStore } from '$lib/stores/app.js';
-	import { 
-		ArrowLeft, 
-		DollarSign, 
-		Calendar, 
-		Fuel, 
-		Wrench, 
-		CreditCard, 
+	import {
+		ArrowLeft,
+		DollarSign,
+		Calendar,
+		Fuel,
+		Wrench,
+		CreditCard,
 		FileText,
 		AlertCircle,
 		CheckCircle,
 		Gauge
 	} from 'lucide-svelte';
-	import type { Vehicle, ExpenseType, ExpenseCategory, ExpenseFormData } from '$lib/types.js';
+	import type {
+		Vehicle,
+		ExpenseType,
+		ExpenseCategory,
+		ExpenseFormData,
+		ExpenseFormErrors
+	} from '$lib/types.js';
 
 	const vehicleId = $page.params.id;
 
@@ -33,14 +39,14 @@
 		type: 'fuel',
 		category: 'operating',
 		amount: 0,
-		date: new Date().toISOString().split('T')[0],
-		mileage: undefined,
+		date: new Date().toISOString().split('T')[0] ?? '',
+
 		gallons: undefined,
 		description: ''
 	});
 
 	// Form validation
-	let errors = $state<Record<string, string>>({});
+	let errors = $state<ExpenseFormErrors>({});
 	let touched = $state<Record<string, boolean>>({});
 
 	// Expense categories and types mapping
@@ -102,7 +108,7 @@
 				});
 				goto('/vehicles');
 			}
-		} catch (error) {
+		} catch {
 			appStore.addNotification({
 				type: 'error',
 				message: 'Error loading vehicle'
@@ -115,9 +121,12 @@
 
 	async function loadLastFuelExpense() {
 		try {
-			const response = await fetch(`/api/expenses/vehicles/${vehicleId}/expenses?type=fuel&limit=1`, {
-				credentials: 'include'
-			});
+			const response = await fetch(
+				`/api/expenses/vehicles/${vehicleId}/expenses?type=fuel&limit=1`,
+				{
+					credentials: 'include'
+				}
+			);
 
 			if (response.ok) {
 				const result = await response.json();
@@ -132,7 +141,7 @@
 
 	function handleTypeChange(newType: ExpenseType) {
 		formData.type = newType;
-		
+
 		// Auto-select appropriate category
 		for (const [category, types] of Object.entries(categoryMapping)) {
 			if (types.includes(newType)) {
@@ -143,8 +152,8 @@
 
 		// Clear fuel-specific fields if not fuel
 		if (newType !== 'fuel') {
-			formData.gallons = undefined;
-			formData.mileage = undefined;
+			delete formData.gallons;
+			delete formData.mileage;
 			showMpgCalculation = false;
 			calculatedMpg = null;
 		}
@@ -155,7 +164,12 @@
 	}
 
 	function handleMileageChange() {
-		if (formData.type === 'fuel' && formData.mileage && formData.gallons && lastFuelExpense?.mileage) {
+		if (
+			formData.type === 'fuel' &&
+			formData.mileage &&
+			formData.gallons &&
+			lastFuelExpense?.mileage
+		) {
 			const milesDriven = formData.mileage - lastFuelExpense.mileage;
 			if (milesDriven > 0) {
 				calculatedMpg = Math.round((milesDriven / formData.gallons) * 100) / 100;
@@ -177,18 +191,20 @@
 				if (!value || value <= 0) return 'Amount must be greater than 0';
 				if (value > 999999) return 'Amount seems too large';
 				break;
-			case 'date':
+			case 'date': {
 				if (!value) return 'Date is required';
 				const selectedDate = new Date(value);
 				const today = new Date();
 				if (selectedDate > today) return 'Date cannot be in the future';
 				break;
-			case 'gallons':
+			}
+			case 'gallons': {
 				if (formData.type === 'fuel') {
 					if (!value || value <= 0) return 'Gallons required for fuel expenses';
 					if (value > 100) return 'Gallons seems too large';
 				}
 				break;
+			}
 			case 'mileage':
 				if (formData.type === 'fuel') {
 					if (!value || value <= 0) return 'Mileage required for fuel expenses';
@@ -216,7 +232,7 @@
 
 	function validateForm(): boolean {
 		const newErrors: Record<string, string> = {};
-		
+
 		// Validate required fields
 		const requiredFields = ['amount', 'date'];
 		if (formData.type === 'fuel') {
@@ -256,7 +272,7 @@
 			const response = await fetch(`/api/expenses/vehicles/${vehicleId}/expenses`, {
 				method: 'POST',
 				headers: {
-					'Content-Type': 'application/json',
+					'Content-Type': 'application/json'
 				},
 				credentials: 'include',
 				body: JSON.stringify(submitData)
@@ -294,10 +310,14 @@
 
 	function getCategoryIcon(category: ExpenseCategory) {
 		switch (category) {
-			case 'operating': return Fuel;
-			case 'maintenance': return Wrench;
-			case 'financial': return CreditCard;
-			default: return DollarSign;
+			case 'operating':
+				return Fuel;
+			case 'maintenance':
+				return Wrench;
+			case 'financial':
+				return CreditCard;
+			default:
+				return DollarSign;
 		}
 	}
 </script>
@@ -316,10 +336,7 @@
 	<div class="max-w-2xl mx-auto space-y-6">
 		<!-- Header -->
 		<div class="flex items-center gap-4">
-			<button 
-				onclick={() => goto(`/vehicles/${vehicleId}`)}
-				class="btn btn-secondary p-2"
-			>
+			<button onclick={() => goto(`/vehicles/${vehicleId}`)} class="btn btn-secondary p-2">
 				<ArrowLeft class="h-4 w-4" />
 			</button>
 			<div>
@@ -331,56 +348,48 @@
 		<!-- Expense Form -->
 		<form onsubmit={handleSubmit} class="card space-y-6">
 			<!-- Expense Type Selection -->
-			<div>
-				<label class="block text-sm font-medium text-gray-700 mb-3">
-					Expense Type
-				</label>
+			<fieldset>
+				<legend class="block text-sm font-medium text-gray-700 mb-3"> Expense Type </legend>
 				<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
 					{#each Object.entries(typeLabels) as [type, label]}
 						<button
 							type="button"
 							onclick={() => handleTypeChange(type as ExpenseType)}
-							class="p-3 text-sm font-medium rounded-lg border-2 transition-all duration-200 {
-								formData.type === type
-									? 'border-primary-500 bg-primary-50 text-primary-700'
-									: 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-							}"
+							class="p-3 text-sm font-medium rounded-lg border-2 transition-all duration-200 {formData.type ===
+							type
+								? 'border-primary-500 bg-primary-50 text-primary-700'
+								: 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'}"
 						>
 							{label}
 						</button>
 					{/each}
 				</div>
-			</div>
+			</fieldset>
 
 			<!-- Category (Auto-selected, but can be changed) -->
-			<div>
-				<label class="block text-sm font-medium text-gray-700 mb-3">
-					Category
-				</label>
+			<fieldset>
+				<legend class="block text-sm font-medium text-gray-700 mb-3"> Category </legend>
 				<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
 					{#each Object.entries(categoryLabels) as [category, label]}
 						{@const IconComponent = getCategoryIcon(category as ExpenseCategory)}
 						<button
 							type="button"
-							onclick={() => formData.category = category as ExpenseCategory}
-							class="p-3 text-sm font-medium rounded-lg border-2 transition-all duration-200 flex items-center gap-2 {
-								formData.category === category
-									? 'border-primary-500 bg-primary-50 text-primary-700'
-									: 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-							}"
+							onclick={() => (formData.category = category as ExpenseCategory)}
+							class="p-3 text-sm font-medium rounded-lg border-2 transition-all duration-200 flex items-center gap-2 {formData.category ===
+							category
+								? 'border-primary-500 bg-primary-50 text-primary-700'
+								: 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'}"
 						>
 							<IconComponent class="h-4 w-4" />
 							{label}
 						</button>
 					{/each}
 				</div>
-			</div>
+			</fieldset>
 
 			<!-- Amount -->
 			<div>
-				<label for="amount" class="block text-sm font-medium text-gray-700 mb-2">
-					Amount *
-				</label>
+				<label for="amount" class="block text-sm font-medium text-gray-700 mb-2"> Amount * </label>
 				<div class="relative">
 					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 						<DollarSign class="h-5 w-5 text-gray-400" />
@@ -393,27 +402,25 @@
 						max="999999"
 						bind:value={formData.amount}
 						onblur={() => handleBlur('amount')}
-						class="input pl-10 text-lg font-medium {
-							touched.amount && errors.amount ? 'border-red-500 focus:border-red-500' : ''
-						}"
+						class="input pl-10 text-lg font-medium {touched['amount'] && errors['amount']
+							? 'border-red-500 focus:border-red-500'
+							: ''}"
 						placeholder="0.00"
 						inputmode="decimal"
 						autocomplete="off"
 					/>
 				</div>
-				{#if touched.amount && errors.amount}
+				{#if touched['amount'] && errors['amount']}
 					<p class="mt-1 text-sm text-red-600 flex items-center gap-1">
 						<AlertCircle class="h-4 w-4" />
-						{errors.amount}
+						{errors['amount']}
 					</p>
 				{/if}
 			</div>
 
 			<!-- Date -->
 			<div>
-				<label for="date" class="block text-sm font-medium text-gray-700 mb-2">
-					Date *
-				</label>
+				<label for="date" class="block text-sm font-medium text-gray-700 mb-2"> Date * </label>
 				<div class="relative">
 					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 						<Calendar class="h-5 w-5 text-gray-400" />
@@ -424,15 +431,15 @@
 						bind:value={formData.date}
 						onblur={() => handleBlur('date')}
 						max={new Date().toISOString().split('T')[0]}
-						class="input pl-10 {
-							touched.date && errors.date ? 'border-red-500 focus:border-red-500' : ''
-						}"
+						class="input pl-10 {touched['date'] && errors['date']
+							? 'border-red-500 focus:border-red-500'
+							: ''}"
 					/>
 				</div>
-				{#if touched.date && errors.date}
+				{#if touched['date'] && errors['date']}
 					<p class="mt-1 text-sm text-red-600 flex items-center gap-1">
 						<AlertCircle class="h-4 w-4" />
-						{errors.date}
+						{errors['date']}
 					</p>
 				{/if}
 			</div>
@@ -459,17 +466,17 @@
 							bind:value={formData.gallons}
 							oninput={handleGallonsChange}
 							onblur={() => handleBlur('gallons')}
-							class="input {
-								touched.gallons && errors.gallons ? 'border-red-500 focus:border-red-500' : ''
-							}"
+							class="input {touched['gallons'] && errors['gallons']
+								? 'border-red-500 focus:border-red-500'
+								: ''}"
 							placeholder="0.000"
 							inputmode="decimal"
 							autocomplete="off"
 						/>
-						{#if touched.gallons && errors.gallons}
+						{#if touched['gallons'] && errors['gallons']}
 							<p class="mt-1 text-sm text-red-600 flex items-center gap-1">
 								<AlertCircle class="h-4 w-4" />
-								{errors.gallons}
+								{errors['gallons']}
 							</p>
 						{/if}
 					</div>
@@ -486,9 +493,9 @@
 							bind:value={formData.mileage}
 							oninput={handleMileageChange}
 							onblur={() => handleBlur('mileage')}
-							class="input {
-								touched.mileage && errors.mileage ? 'border-red-500 focus:border-red-500' : ''
-							}"
+							class="input {touched['mileage'] && errors['mileage']
+								? 'border-red-500 focus:border-red-500'
+								: ''}"
 							placeholder="Current odometer reading"
 							inputmode="numeric"
 							autocomplete="off"
@@ -498,10 +505,10 @@
 								Last fuel entry: {lastFuelExpense.mileage.toLocaleString()} miles
 							</p>
 						{/if}
-						{#if touched.mileage && errors.mileage}
+						{#if touched['mileage'] && errors['mileage']}
 							<p class="mt-1 text-sm text-red-600 flex items-center gap-1">
 								<AlertCircle class="h-4 w-4" />
-								{errors.mileage}
+								{errors['mileage']}
 							</p>
 						{/if}
 					</div>
@@ -520,9 +527,7 @@
 									⚠️ Low fuel efficiency - consider maintenance check
 								</p>
 							{:else if calculatedMpg > 50}
-								<p class="text-xs text-green-600 mt-1">
-									✅ Excellent fuel efficiency!
-								</p>
+								<p class="text-xs text-green-600 mt-1">✅ Excellent fuel efficiency!</p>
 							{/if}
 						</div>
 					{/if}
@@ -582,13 +587,10 @@
 	<div class="text-center py-12">
 		<AlertCircle class="h-12 w-12 text-gray-400 mx-auto mb-4" />
 		<h3 class="text-lg font-medium text-gray-900 mb-2">Vehicle not found</h3>
-		<p class="text-gray-600 mb-4">The vehicle you're looking for doesn't exist or you don't have access to it.</p>
-		<button 
-			onclick={() => goto('/vehicles')}
-			class="btn btn-primary"
-		>
-			Back to Vehicles
-		</button>
+		<p class="text-gray-600 mb-4">
+			The vehicle you're looking for doesn't exist or you don't have access to it.
+		</p>
+		<button onclick={() => goto('/vehicles')} class="btn btn-primary"> Back to Vehicles </button>
 	</div>
 {/if}
 
@@ -606,7 +608,7 @@
 		/* Prevent zoom on iOS */
 		font-size: 16px;
 	}
-	
+
 	.input:focus {
 		outline: none;
 		border-color: #2563eb;
@@ -622,8 +624,12 @@
 	}
 
 	@keyframes spin {
-		0% { transform: rotate(0deg); }
-		100% { transform: rotate(360deg); }
+		0% {
+			transform: rotate(0deg);
+		}
+		100% {
+			transform: rotate(360deg);
+		}
 	}
 
 	/* Touch-friendly button sizing */

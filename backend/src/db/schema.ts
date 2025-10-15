@@ -1,9 +1,11 @@
-import { sqliteTable, text, integer, real, blob } from 'drizzle-orm/sqlite-core';
 import { createId } from '@paralleldrive/cuid2';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // User table
 export const users = sqliteTable('users', {
-  id: text('id').primaryKey().$defaultFn(() => createId()),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => createId()),
   email: text('email').notNull().unique(),
   displayName: text('display_name').notNull(),
   provider: text('provider').notNull().default('google'),
@@ -15,8 +17,12 @@ export const users = sqliteTable('users', {
 
 // Vehicle table
 export const vehicles = sqliteTable('vehicles', {
-  id: text('id').primaryKey().$defaultFn(() => createId()),
-  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
   make: text('make').notNull(),
   model: text('model').notNull(),
   year: integer('year').notNull(),
@@ -31,8 +37,12 @@ export const vehicles = sqliteTable('vehicles', {
 
 // Vehicle Loan table (containerized loan information)
 export const vehicleLoans = sqliteTable('vehicle_loans', {
-  id: text('id').primaryKey().$defaultFn(() => createId()),
-  vehicleId: text('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  vehicleId: text('vehicle_id')
+    .notNull()
+    .references(() => vehicles.id, { onDelete: 'cascade' }),
   lender: text('lender').notNull(),
   originalAmount: real('original_amount').notNull(),
   currentBalance: real('current_balance').notNull(),
@@ -53,8 +63,12 @@ export const vehicleLoans = sqliteTable('vehicle_loans', {
 
 // Loan Payment Records
 export const loanPayments = sqliteTable('loan_payments', {
-  id: text('id').primaryKey().$defaultFn(() => createId()),
-  loanId: text('loan_id').notNull().references(() => vehicleLoans.id, { onDelete: 'cascade' }),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  loanId: text('loan_id')
+    .notNull()
+    .references(() => vehicleLoans.id, { onDelete: 'cascade' }),
   paymentDate: integer('payment_date', { mode: 'timestamp' }).notNull(),
   paymentAmount: real('payment_amount').notNull(),
   principalAmount: real('principal_amount').notNull(),
@@ -69,8 +83,12 @@ export const loanPayments = sqliteTable('loan_payments', {
 
 // Insurance Policy table
 export const insurancePolicies = sqliteTable('insurance_policies', {
-  id: text('id').primaryKey().$defaultFn(() => createId()),
-  vehicleId: text('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  vehicleId: text('vehicle_id')
+    .notNull()
+    .references(() => vehicles.id, { onDelete: 'cascade' }),
   company: text('company').notNull(),
   policyNumber: text('policy_number'),
   totalCost: real('total_cost').notNull(),
@@ -85,8 +103,12 @@ export const insurancePolicies = sqliteTable('insurance_policies', {
 
 // Expense table
 export const expenses = sqliteTable('expenses', {
-  id: text('id').primaryKey().$defaultFn(() => createId()),
-  vehicleId: text('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  vehicleId: text('vehicle_id')
+    .notNull()
+    .references(() => vehicles.id, { onDelete: 'cascade' }),
   type: text('type').notNull(), // ExpenseType enum values
   category: text('category').notNull(), // ExpenseCategory enum values
   amount: real('amount').notNull(),
@@ -103,7 +125,9 @@ export const expenses = sqliteTable('expenses', {
 // Lucia Auth session table
 export const sessions = sqliteTable('sessions', {
   id: text('id').notNull().primaryKey(),
-  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
   expiresAt: integer('expires_at').notNull(),
 });
 

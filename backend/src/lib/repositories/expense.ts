@@ -1,18 +1,20 @@
-import { eq, and, gte, lte, sql, desc } from 'drizzle-orm';
-import { db } from '../../db/connection.js';
-import { expenses, vehicles } from '../../db/schema.js';
+import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import type { Expense, NewExpense } from '../../db/schema.js';
-import type { IExpenseRepository } from './interfaces.js';
+import { expenses, vehicles } from '../../db/schema.js';
 import { BaseRepository } from './base.js';
+import type { IExpenseRepository } from './interfaces.js';
 
-export class ExpenseRepository extends BaseRepository<Expense, NewExpense> implements IExpenseRepository {
+export class ExpenseRepository
+  extends BaseRepository<Expense, NewExpense>
+  implements IExpenseRepository
+{
   constructor() {
     super(expenses);
   }
 
   async findByVehicleId(vehicleId: string): Promise<Expense[]> {
     try {
-      const result = await db
+      const result = await this.database
         .select()
         .from(expenses)
         .where(eq(expenses.vehicleId, vehicleId))
@@ -24,9 +26,13 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> imple
     }
   }
 
-  async findByVehicleIdAndDateRange(vehicleId: string, startDate: Date, endDate: Date): Promise<Expense[]> {
+  async findByVehicleIdAndDateRange(
+    vehicleId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<Expense[]> {
     try {
-      const result = await db
+      const result = await this.database
         .select()
         .from(expenses)
         .where(
@@ -46,7 +52,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> imple
 
   async findByUserId(userId: string): Promise<Expense[]> {
     try {
-      const result = await db
+      const result = await this.database
         .select({
           id: expenses.id,
           vehicleId: expenses.vehicleId,
@@ -75,7 +81,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> imple
 
   async findByType(vehicleId: string, type: string): Promise<Expense[]> {
     try {
-      const result = await db
+      const result = await this.database
         .select()
         .from(expenses)
         .where(and(eq(expenses.vehicleId, vehicleId), eq(expenses.type, type)))
@@ -89,21 +95,24 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> imple
 
   async findByCategory(vehicleId: string, category: string): Promise<Expense[]> {
     try {
-      const result = await db
+      const result = await this.database
         .select()
         .from(expenses)
         .where(and(eq(expenses.vehicleId, vehicleId), eq(expenses.category, category)))
         .orderBy(desc(expenses.date));
       return result;
     } catch (error) {
-      console.error(`Error finding expenses by category ${category} for vehicle ${vehicleId}:`, error);
+      console.error(
+        `Error finding expenses by category ${category} for vehicle ${vehicleId}:`,
+        error
+      );
       throw new Error('Failed to find expenses by category');
     }
   }
 
   async findFuelExpenses(vehicleId: string): Promise<Expense[]> {
     try {
-      const result = await db
+      const result = await this.database
         .select()
         .from(expenses)
         .where(and(eq(expenses.vehicleId, vehicleId), eq(expenses.type, 'fuel')))
@@ -117,7 +126,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> imple
 
   async batchCreate(expenseList: NewExpense[]): Promise<Expense[]> {
     try {
-      const result = await db.insert(expenses).values(expenseList).returning();
+      const result = await this.database.insert(expenses).values(expenseList).returning();
       return result;
     } catch (error) {
       console.error('Error batch creating expenses:', error);
@@ -125,29 +134,30 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> imple
     }
   }
 
-  async getTotalByCategory(vehicleId: string, startDate?: Date, endDate?: Date): Promise<{ category: string; total: number }[]> {
+  async getTotalByCategory(
+    vehicleId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<{ category: string; total: number }[]> {
     try {
-      let query = db
+      const whereConditions = [eq(expenses.vehicleId, vehicleId)];
+
+      if (startDate && endDate) {
+        whereConditions.push(gte(expenses.date, startDate));
+        whereConditions.push(lte(expenses.date, endDate));
+      }
+
+      const query = this.database
         .select({
           category: expenses.category,
           total: sql<number>`sum(${expenses.amount})`.as('total'),
         })
         .from(expenses)
-        .where(eq(expenses.vehicleId, vehicleId))
+        .where(and(...whereConditions))
         .groupBy(expenses.category);
 
-      if (startDate && endDate) {
-        query = query.where(
-          and(
-            eq(expenses.vehicleId, vehicleId),
-            gte(expenses.date, startDate),
-            lte(expenses.date, endDate)
-          )
-        );
-      }
-
       const result = await query;
-      return result.map(row => ({
+      return result.map((row) => ({
         category: row.category,
         total: Number(row.total) || 0,
       }));
@@ -157,29 +167,42 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> imple
     }
   }
 
-  async getMonthlyTotals(vehicleId: string, year: number): Promise<{ month: number; total: number }[]> {
+  async getMonthlyTotals(
+    vehicleId: string,
+    year: number
+  ): Promise<{ month: number; total: number }[]> {
     try {
-      const result = await db
+      const startDate = new Date(year, 0, 1); // January 1st of the year
+      const endDate = new Date(year, 11, 31, 23, 59, 59); // December 31st of the year
+
+      const result = await this.database
         .select({
-          month: sql<number>`cast(strftime('%m', ${expenses.date}) as integer)`.as('month'),
+          month:
+            sql<number>`cast(strftime('%m', datetime(${expenses.date} / 1000, 'unixepoch')) as integer)`.as(
+              'month'
+            ),
           total: sql<number>`sum(${expenses.amount})`.as('total'),
         })
         .from(expenses)
         .where(
           and(
             eq(expenses.vehicleId, vehicleId),
-            sql`strftime('%Y', ${expenses.date}) = ${year.toString()}`
+            gte(expenses.date, startDate),
+            lte(expenses.date, endDate)
           )
         )
-        .groupBy(sql`strftime('%m', ${expenses.date})`)
+        .groupBy(sql`strftime('%m', datetime(${expenses.date} / 1000, 'unixepoch'))`)
         .orderBy(sql`month`);
 
-      return result.map(row => ({
+      return result.map((row) => ({
         month: row.month,
         total: Number(row.total) || 0,
       }));
     } catch (error) {
-      console.error(`Error getting monthly totals for vehicle ${vehicleId} in year ${year}:`, error);
+      console.error(
+        `Error getting monthly totals for vehicle ${vehicleId} in year ${year}:`,
+        error
+      );
       throw new Error('Failed to get monthly totals');
     }
   }

@@ -28,12 +28,14 @@
 			for (const vehicle of vehicles) {
 				try {
 					const fuelData = await getFuelEfficiency(vehicle.id);
-					efficiencyData[vehicle.id] = {
-						...fuelData,
-						vehicle,
-						trend: calculateTrend(fuelData.trend),
-						rating: calculateEfficiencyRating(fuelData.averageMPG, vehicle)
-					};
+					if (fuelData && typeof fuelData === 'object') {
+						efficiencyData[vehicle.id] = {
+							...fuelData,
+							vehicle,
+							trend: calculateTrend((fuelData as any).trend),
+							rating: calculateEfficiencyRating((fuelData as any).averageMPG)
+						};
+					}
 				} catch (error) {
 					console.warn(`Failed to load fuel data for vehicle ${vehicle.id}:`, error);
 					efficiencyData[vehicle.id] = {
@@ -58,25 +60,25 @@
 
 	function calculateTrend(trendData: any[]) {
 		if (!trendData || trendData.length < 4) return 'stable';
-		
+
 		const recent = trendData.slice(-3);
 		const older = trendData.slice(-6, -3);
-		
+
 		if (recent.length === 0 || older.length === 0) return 'stable';
-		
+
 		const recentAvg = recent.reduce((sum, d) => sum + d.mpg, 0) / recent.length;
 		const olderAvg = older.reduce((sum, d) => sum + d.mpg, 0) / older.length;
-		
+
 		const change = (recentAvg - olderAvg) / olderAvg;
-		
+
 		if (change > 0.05) return 'improving'; // 5% improvement
 		if (change < -0.05) return 'declining'; // 5% decline
 		return 'stable';
 	}
 
-	function calculateEfficiencyRating(averageMPG: number, vehicle: any): string {
+	function calculateEfficiencyRating(averageMPG: number): string {
 		if (averageMPG === 0) return 'unknown';
-		
+
 		// Simple rating based on MPG ranges
 		// In a real app, this would consider vehicle class, age, etc.
 		if (averageMPG >= 35) return 'excellent';
@@ -144,8 +146,15 @@
 
 	// Sort vehicles by efficiency rating
 	let sortedVehicles = $derived.by(() => {
-		const ratingOrder = { excellent: 5, good: 4, average: 3, 'below-average': 2, poor: 1, unknown: 0 };
-		
+		const ratingOrder = {
+			excellent: 5,
+			good: 4,
+			average: 3,
+			'below-average': 2,
+			poor: 1,
+			unknown: 0
+		};
+
 		return vehicles
 			.map(vehicle => ({
 				...vehicle,
@@ -173,7 +182,7 @@
 
 	{#if isLoading}
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-			{#each vehicles as vehicle}
+			{#each vehicles as _}
 				<div class="bg-white p-4 rounded-lg shadow border animate-pulse">
 					<div class="flex items-center mb-3">
 						<div class="w-8 h-8 bg-gray-200 rounded mr-3"></div>
@@ -200,7 +209,7 @@
 			{#each sortedVehicles as vehicleData}
 				{@const efficiency = vehicleData.efficiency}
 				{@const TrendIcon = getTrendIcon(efficiency.trend)}
-				
+
 				<div class="bg-white p-4 rounded-lg shadow border hover:shadow-md transition-shadow">
 					<div class="flex items-center mb-3">
 						<Car class="h-8 w-8 text-gray-400 mr-3" />
@@ -223,7 +232,11 @@
 
 						<!-- Rating Badge -->
 						<div class="flex justify-center">
-							<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getRatingColor(efficiency.rating)}">
+							<span
+								class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getRatingColor(
+									efficiency.rating
+								)}"
+							>
 								{getRatingLabel(efficiency.rating)}
 							</span>
 						</div>
@@ -244,14 +257,14 @@
 									<div>Gallons</div>
 								</div>
 								<div class="text-center">
-									<div class="font-medium text-gray-900">{efficiency.totalMiles.toLocaleString()}</div>
+									<div class="font-medium text-gray-900">
+										{efficiency.totalMiles.toLocaleString()}
+									</div>
 									<div>Miles</div>
 								</div>
 							</div>
 						{:else}
-							<div class="text-center text-xs text-gray-500">
-								No fuel data available
-							</div>
+							<div class="text-center text-xs text-gray-500">No fuel data available</div>
 						{/if}
 
 						<!-- Quick Actions -->
@@ -277,34 +290,39 @@
 		<!-- Overall Fleet Summary -->
 		{#if Object.keys(vehicleEfficiencyData).length > 0}
 			{@const fleetData = Object.values(vehicleEfficiencyData).filter(d => d.averageMPG > 0)}
-			{@const fleetAvgMPG = fleetData.length > 0 
-				? fleetData.reduce((sum, d) => sum + d.averageMPG, 0) / fleetData.length 
-				: 0}
+			{@const fleetAvgMPG =
+				fleetData.length > 0
+					? fleetData.reduce((sum, d) => sum + d.averageMPG, 0) / fleetData.length
+					: 0}
 			{@const totalGallons = fleetData.reduce((sum, d) => sum + d.totalGallons, 0)}
 			{@const totalMiles = fleetData.reduce((sum, d) => sum + d.totalMiles, 0)}
-			
+
 			<div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
 				<h3 class="text-lg font-medium text-gray-900 mb-3">Fleet Summary</h3>
-				
+
 				<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
 					<div>
 						<div class="text-xl font-bold text-blue-600">{fleetAvgMPG.toFixed(1)}</div>
 						<div class="text-sm text-gray-600">Fleet Avg MPG</div>
 					</div>
-					
+
 					<div>
 						<div class="text-xl font-bold text-green-600">{totalGallons.toFixed(0)}</div>
 						<div class="text-sm text-gray-600">Total Gallons</div>
 					</div>
-					
+
 					<div>
 						<div class="text-xl font-bold text-purple-600">{totalMiles.toLocaleString()}</div>
 						<div class="text-sm text-gray-600">Total Miles</div>
 					</div>
-					
+
 					<div>
 						<div class="text-xl font-bold text-orange-600">
-							{totalMiles > 0 ? (totalGallons > 0 ? (totalMiles / totalGallons).toFixed(1) : '0.0') : '0.0'}
+							{totalMiles > 0
+								? totalGallons > 0
+									? (totalMiles / totalGallons).toFixed(1)
+									: '0.0'
+								: '0.0'}
 						</div>
 						<div class="text-sm text-gray-600">Overall MPG</div>
 					</div>

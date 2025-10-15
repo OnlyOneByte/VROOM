@@ -1,8 +1,8 @@
-import { google } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
-import { databaseService } from './database';
-import { users } from '../db/schema';
 import { eq } from 'drizzle-orm';
+import type { OAuth2Client } from 'google-auth-library';
+import { type drive_v3, google } from 'googleapis';
+import { users } from '../db/schema';
+import { databaseService } from './database';
 
 export interface DriveFolder {
   id: string;
@@ -24,7 +24,7 @@ export interface DriveFile {
 
 export class GoogleDriveService {
   private oauth2Client: OAuth2Client;
-  private drive: any;
+  private drive: drive_v3.Drive;
 
   constructor(accessToken: string, refreshToken?: string) {
     this.oauth2Client = new google.auth.OAuth2(
@@ -99,7 +99,16 @@ export class GoogleDriveService {
       });
 
       const folders = response.data.files;
-      return folders && folders.length > 0 ? folders[0] : null;
+      if (folders && folders.length > 0) {
+        const folder = folders[0];
+        return {
+          id: folder.id || '',
+          name: folder.name || '',
+          parents: folder.parents,
+          webViewLink: folder.webViewLink,
+        } as DriveFolder;
+      }
+      return null;
     } catch (error) {
       console.error('Error finding VROOM folder:', error);
       return null;
@@ -121,27 +130,44 @@ export class GoogleDriveService {
       });
 
       const folders = response.data.files || [];
-      
-      // Find or create each subfolder
-      let receiptsFolder = folders.find((f: any) => f.name === 'Receipts');
-      let maintenanceFolder = folders.find((f: any) => f.name === 'Maintenance Records');
-      let photosFolder = folders.find((f: any) => f.name === 'Vehicle Photos');
 
-      // Create missing subfolders
-      if (!receiptsFolder) {
-        receiptsFolder = await this.createFolder('Receipts', mainFolderId);
-      }
-      if (!maintenanceFolder) {
-        maintenanceFolder = await this.createFolder('Maintenance Records', mainFolderId);
-      }
-      if (!photosFolder) {
-        photosFolder = await this.createFolder('Vehicle Photos', mainFolderId);
-      }
+      // Find or create each subfolder
+      const receiptsFolder = folders.find((f) => f.name === 'Receipts');
+      const maintenanceFolder = folders.find((f) => f.name === 'Maintenance Records');
+      const photosFolder = folders.find((f) => f.name === 'Vehicle Photos');
+
+      // Create missing subfolders or convert existing ones
+      const receipts = receiptsFolder
+        ? ({
+            id: receiptsFolder.id || '',
+            name: receiptsFolder.name || '',
+            parents: receiptsFolder.parents,
+            webViewLink: receiptsFolder.webViewLink,
+          } as DriveFolder)
+        : await this.createFolder('Receipts', mainFolderId);
+
+      const maintenance = maintenanceFolder
+        ? ({
+            id: maintenanceFolder.id || '',
+            name: maintenanceFolder.name || '',
+            parents: maintenanceFolder.parents,
+            webViewLink: maintenanceFolder.webViewLink,
+          } as DriveFolder)
+        : await this.createFolder('Maintenance Records', mainFolderId);
+
+      const photos = photosFolder
+        ? ({
+            id: photosFolder.id || '',
+            name: photosFolder.name || '',
+            parents: photosFolder.parents,
+            webViewLink: photosFolder.webViewLink,
+          } as DriveFolder)
+        : await this.createFolder('Vehicle Photos', mainFolderId);
 
       return {
-        receipts: receiptsFolder,
-        maintenance: maintenanceFolder,
-        photos: photosFolder,
+        receipts,
+        maintenance,
+        photos,
       };
     } catch (error) {
       console.error('Error getting VROOM subfolders:', error);
@@ -154,7 +180,7 @@ export class GoogleDriveService {
    */
   async createFolder(name: string, parentId?: string): Promise<DriveFolder> {
     try {
-      const folderMetadata: any = {
+      const folderMetadata: drive_v3.Schema$File = {
         name,
         mimeType: 'application/vnd.google-apps.folder',
       };
@@ -164,11 +190,15 @@ export class GoogleDriveService {
       }
 
       const response = await this.drive.files.create({
-        resource: folderMetadata,
+        requestBody: folderMetadata,
         fields: 'id, name, parents, webViewLink',
       });
 
-      return response.data;
+      if (!response.data) {
+        throw new Error('Failed to create folder - no response data');
+      }
+
+      return response.data as DriveFolder;
     } catch (error) {
       console.error('Error creating folder:', error);
       throw new Error(`Failed to create folder: ${name}`);
@@ -178,21 +208,34 @@ export class GoogleDriveService {
   /**
    * Create year/month subfolders in receipts folder for organization
    */
-  async createReceiptDateFolders(receiptsFolderId: string, year: number, month: number): Promise<DriveFolder> {
+  async createReceiptDateFolders(
+    receiptsFolderId: string,
+    year: number,
+    month: number
+  ): Promise<DriveFolder> {
     try {
       // Create year folder if it doesn't exist
       const yearFolderName = year.toString();
       let yearFolder = await this.findFolderByName(yearFolderName, receiptsFolderId);
-      
+
       if (!yearFolder) {
         yearFolder = await this.createFolder(yearFolderName, receiptsFolderId);
       }
 
       // Create month folder if it doesn't exist
       const monthNames = [
-        '01-January', '02-February', '03-March', '04-April',
-        '05-May', '06-June', '07-July', '08-August',
-        '09-September', '10-October', '11-November', '12-December'
+        '01-January',
+        '02-February',
+        '03-March',
+        '04-April',
+        '05-May',
+        '06-June',
+        '07-July',
+        '08-August',
+        '09-September',
+        '10-October',
+        '11-November',
+        '12-December',
       ];
       const monthFolderName = monthNames[month - 1];
       let monthFolder = await this.findFolderByName(monthFolderName, yearFolder.id);
@@ -219,7 +262,16 @@ export class GoogleDriveService {
       });
 
       const folders = response.data.files;
-      return folders && folders.length > 0 ? folders[0] : null;
+      if (folders && folders.length > 0) {
+        const folder = folders[0];
+        return {
+          id: folder.id || '',
+          name: folder.name || '',
+          parents: folder.parents,
+          webViewLink: folder.webViewLink,
+        } as DriveFolder;
+      }
+      return null;
     } catch (error) {
       console.error('Error finding folder by name:', error);
       return null;
@@ -237,7 +289,17 @@ export class GoogleDriveService {
         orderBy: 'modifiedTime desc',
       });
 
-      return response.data.files || [];
+      const files = response.data.files || [];
+      return files.map((file) => ({
+        id: file.id || '',
+        name: file.name || '',
+        mimeType: file.mimeType || '',
+        parents: file.parents,
+        webViewLink: file.webViewLink,
+        size: file.size,
+        createdTime: file.createdTime,
+        modifiedTime: file.modifiedTime,
+      })) as DriveFile[];
     } catch (error) {
       console.error('Error listing files in folder:', error);
       throw new Error('Failed to list files in folder');
@@ -247,7 +309,7 @@ export class GoogleDriveService {
   /**
    * Get folder permissions and sharing status
    */
-  async getFolderPermissions(folderId: string): Promise<any[]> {
+  async getFolderPermissions(folderId: string): Promise<drive_v3.Schema$Permission[]> {
     try {
       const response = await this.drive.permissions.list({
         fileId: folderId,
@@ -264,11 +326,15 @@ export class GoogleDriveService {
   /**
    * Set folder permissions (make it accessible to the user)
    */
-  async setFolderPermissions(folderId: string, email: string, role: 'reader' | 'writer' | 'owner' = 'writer'): Promise<void> {
+  async setFolderPermissions(
+    folderId: string,
+    email: string,
+    role: 'reader' | 'writer' | 'owner' = 'writer'
+  ): Promise<void> {
     try {
       await this.drive.permissions.create({
         fileId: folderId,
-        resource: {
+        requestBody: {
           type: 'user',
           role,
           emailAddress: email,
@@ -290,7 +356,7 @@ export class GoogleDriveService {
     parentFolderId?: string
   ): Promise<DriveFile> {
     try {
-      const fileMetadata: any = {
+      const fileMetadata: drive_v3.Schema$File = {
         name: fileName,
       };
 
@@ -304,12 +370,16 @@ export class GoogleDriveService {
       };
 
       const response = await this.drive.files.create({
-        resource: fileMetadata,
+        requestBody: fileMetadata,
         media,
         fields: 'id, name, mimeType, parents, webViewLink, size, createdTime, modifiedTime',
       });
 
-      return response.data;
+      if (!response.data) {
+        throw new Error('Failed to upload file - no response data');
+      }
+
+      return response.data as DriveFile;
     } catch (error) {
       console.error('Error uploading file:', error);
       throw new Error(`Failed to upload file: ${fileName}`);
@@ -336,12 +406,8 @@ export class GoogleDriveService {
  */
 export async function createDriveServiceForUser(userId: string): Promise<GoogleDriveService> {
   const db = databaseService.getDatabase();
-  
-  const user = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
+
+  const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
   if (!user.length || !user[0].googleRefreshToken) {
     throw new Error('User not found or Google Drive access not available');

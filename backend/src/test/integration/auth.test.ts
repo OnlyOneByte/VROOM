@@ -1,13 +1,19 @@
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
-import { Hono } from 'hono';
-import { lucia } from '../../lib/auth/lucia';
-import { databaseService } from '../../lib/database';
-import { users, sessions } from '../../db/schema';
-import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { createId } from '@paralleldrive/cuid2';
-import { auth } from '../../routes/auth';
+import { Hono } from 'hono';
+import { sessions, users } from '../../db/schema';
 import { requireAuth } from '../../lib/middleware/auth';
 import { errorHandler } from '../../lib/middleware/error-handler';
+import { auth } from '../../routes/auth';
+import type { AuthResponse, LogoutResponse } from '../../types/api';
+import { getTestLucia } from '../lucia-test.js';
+import {
+  clearTestData,
+  type getTestDatabase,
+  setupTestDatabase,
+  teardownTestDatabase,
+} from '../setup.js';
+import { getDb, getDirectResponse } from '../utils/test-helpers.js';
 
 // Test app setup
 const testApp = new Hono();
@@ -19,25 +25,20 @@ testApp.get('/protected', requireAuth, (c) => {
 });
 
 describe('Authentication Integration Tests', () => {
-  const db = databaseService.getDatabase();
+  let _db: ReturnType<typeof getTestDatabase>;
   let testUserId: string;
   let testSessionId: string;
 
-  beforeAll(async () => {
-    // Ensure database is initialized
-    await databaseService.healthCheck();
+  beforeAll(() => {
+    _db = setupTestDatabase();
   });
 
-  beforeEach(async () => {
-    // Clean up test data
-    await db.delete(sessions);
-    await db.delete(users).where(eq(users.email, 'test@example.com'));
+  beforeEach(() => {
+    clearTestData();
   });
 
-  afterAll(async () => {
-    // Clean up test data
-    await db.delete(sessions);
-    await db.delete(users).where(eq(users.email, 'test@example.com'));
+  afterAll(() => {
+    teardownTestDatabase();
   });
 
   describe('OAuth Flow Tests', () => {
@@ -46,7 +47,7 @@ describe('Authentication Integration Tests', () => {
       const res = await testApp.fetch(req);
 
       expect(res.status).toBe(302);
-      
+
       const location = res.headers.get('Location');
       expect(location).toBeTruthy();
       expect(location).toContain('accounts.google.com');
@@ -67,7 +68,9 @@ describe('Authentication Integration Tests', () => {
     });
 
     test('should handle OAuth callback with invalid state', async () => {
-      const req = new Request('http://localhost:3001/auth/callback/google?code=test_code&state=invalid_state');
+      const req = new Request(
+        'http://localhost:3001/auth/callback/google?code=test_code&state=invalid_state'
+      );
       const res = await testApp.fetch(req);
 
       expect(res.status).toBe(400);
@@ -79,7 +82,7 @@ describe('Authentication Integration Tests', () => {
     beforeEach(async () => {
       // Create a test user
       testUserId = createId();
-      await db.insert(users).values({
+      await getDb().insert(users).values({
         id: testUserId,
         email: 'test@example.com',
         displayName: 'Test User',
@@ -88,14 +91,16 @@ describe('Authentication Integration Tests', () => {
         googleRefreshToken: 'test_refresh_token',
       });
 
-      // Create a test session
+      // Create a test session using test Lucia
+      const lucia = getTestLucia();
       const session = await lucia.createSession(testUserId, {});
       testSessionId = session.id;
     });
 
     test('should get current user with valid session', async () => {
+      const lucia = getTestLucia();
       const sessionCookie = lucia.createSessionCookie(testSessionId);
-      
+
       const req = new Request('http://localhost:3001/auth/me', {
         headers: {
           Cookie: sessionCookie.serialize(),
@@ -104,8 +109,8 @@ describe('Authentication Integration Tests', () => {
       const res = await testApp.fetch(req);
 
       expect(res.status).toBe(200);
-      
-      const data = await res.json();
+
+      const data = await getDirectResponse<AuthResponse>(res);
       expect(data.user).toBeDefined();
       expect(data.user.id).toBe(testUserId);
       expect(data.user.email).toBe('test@example.com');
@@ -135,8 +140,9 @@ describe('Authentication Integration Tests', () => {
     });
 
     test('should refresh session successfully', async () => {
+      const lucia = getTestLucia();
       const sessionCookie = lucia.createSessionCookie(testSessionId);
-      
+
       const req = new Request('http://localhost:3001/auth/refresh', {
         method: 'POST',
         headers: {
@@ -146,19 +152,20 @@ describe('Authentication Integration Tests', () => {
       const res = await testApp.fetch(req);
 
       expect(res.status).toBe(200);
-      
-      const data = await res.json();
+
+      const data = await getDirectResponse<AuthResponse>(res);
       expect(data.user).toBeDefined();
       expect(data.user.id).toBe(testUserId);
       expect(data.session).toBeDefined();
-      
+
       // Session ID might be the same if not close to expiry
       expect(data.session.id).toBeDefined();
     });
 
     test('should logout successfully', async () => {
-      const sessionCookie = lucia.createSessionCookie(testSessionId);
-      
+      const luciaInstance = getTestLucia();
+      const sessionCookie = luciaInstance.createSessionCookie(testSessionId);
+
       const req = new Request('http://localhost:3001/auth/logout', {
         method: 'POST',
         headers: {
@@ -168,8 +175,8 @@ describe('Authentication Integration Tests', () => {
       const res = await testApp.fetch(req);
 
       expect(res.status).toBe(200);
-      
-      const data = await res.json();
+
+      const data = await getDirectResponse<LogoutResponse>(res);
       expect(data.message).toContain('Logged out successfully');
 
       // Check that session cookie is cleared
@@ -177,7 +184,7 @@ describe('Authentication Integration Tests', () => {
       expect(cookies).toContain('auth_session=;');
 
       // Verify session is invalidated
-      const { session } = await lucia.validateSession(testSessionId);
+      const { session } = await luciaInstance.validateSession(testSessionId);
       expect(session).toBeNull();
     });
 
@@ -188,8 +195,8 @@ describe('Authentication Integration Tests', () => {
       const res = await testApp.fetch(req);
 
       expect(res.status).toBe(200);
-      
-      const data = await res.json();
+
+      const data = await getDirectResponse<LogoutResponse>(res);
       expect(data.message).toContain('Logged out successfully');
     });
   });
@@ -198,7 +205,7 @@ describe('Authentication Integration Tests', () => {
     beforeEach(async () => {
       // Create a test user and session
       testUserId = createId();
-      await db.insert(users).values({
+      await getDb().insert(users).values({
         id: testUserId,
         email: 'test@example.com',
         displayName: 'Test User',
@@ -206,13 +213,15 @@ describe('Authentication Integration Tests', () => {
         providerId: 'google_test_123',
       });
 
+      const lucia = getTestLucia();
       const session = await lucia.createSession(testUserId, {});
       testSessionId = session.id;
     });
 
     test('should access protected route with valid session', async () => {
+      const lucia = getTestLucia();
       const sessionCookie = lucia.createSessionCookie(testSessionId);
-      
+
       const req = new Request('http://localhost:3001/protected', {
         headers: {
           Cookie: sessionCookie.serialize(),
@@ -221,8 +230,8 @@ describe('Authentication Integration Tests', () => {
       const res = await testApp.fetch(req);
 
       expect(res.status).toBe(200);
-      
-      const data = await res.json();
+
+      const data = await getDirectResponse<AuthResponse>(res);
       expect(data.user).toBeDefined();
       expect(data.user.id).toBe(testUserId);
       expect(data.user.email).toBe('test@example.com');
@@ -253,7 +262,7 @@ describe('Authentication Integration Tests', () => {
     test('should handle expired session', async () => {
       // Create a user
       testUserId = createId();
-      await db.insert(users).values({
+      await getDb().insert(users).values({
         id: testUserId,
         email: 'test@example.com',
         displayName: 'Test User',
@@ -263,11 +272,13 @@ describe('Authentication Integration Tests', () => {
 
       // Create an expired session manually
       const expiredDate = new Date(Date.now() - 1000 * 60 * 60); // 1 hour ago
-      await db.insert(sessions).values({
-        id: 'expired_session_id',
-        userId: testUserId,
-        expiresAt: Math.floor(expiredDate.getTime() / 1000),
-      });
+      await getDb()
+        .insert(sessions)
+        .values({
+          id: 'expired_session_id',
+          userId: testUserId,
+          expiresAt: Math.floor(expiredDate.getTime() / 1000),
+        });
 
       const req = new Request('http://localhost:3001/auth/me', {
         headers: {

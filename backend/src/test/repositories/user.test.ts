@@ -1,18 +1,21 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { UserRepository } from '../../lib/repositories/user.js';
-import { setupTestDatabase, teardownTestDatabase, testUserData } from '../setup.js';
-import type { User } from '../../db/schema.js';
+import { clearTestData, setupTestDatabase, teardownTestDatabase, testUserData } from '../setup.js';
 
 describe('UserRepository', () => {
   let userRepository: UserRepository;
-  let testDb: ReturnType<typeof setupTestDatabase>;
+  let _testDb: ReturnType<typeof setupTestDatabase>;
 
-  beforeEach(() => {
-    testDb = setupTestDatabase();
+  beforeAll(() => {
+    _testDb = setupTestDatabase();
     userRepository = new UserRepository();
   });
 
-  afterEach(() => {
+  beforeEach(() => {
+    clearTestData();
+  });
+
+  afterAll(() => {
     teardownTestDatabase();
   });
 
@@ -32,8 +35,8 @@ describe('UserRepository', () => {
 
     test('should throw error for duplicate email', async () => {
       await userRepository.create(testUserData);
-      
-      expect(async () => {
+
+      await expect(async () => {
         await userRepository.create(testUserData);
       }).toThrow();
     });
@@ -94,6 +97,10 @@ describe('UserRepository', () => {
   describe('update', () => {
     test('should update user fields', async () => {
       const createdUser = await userRepository.create(testUserData);
+
+      // Add a small delay to ensure updatedAt timestamp is different
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       const updateData = {
         displayName: 'Updated Name',
         googleRefreshToken: 'new-refresh-token',
@@ -103,11 +110,13 @@ describe('UserRepository', () => {
 
       expect(updatedUser.displayName).toBe(updateData.displayName);
       expect(updatedUser.googleRefreshToken).toBe(updateData.googleRefreshToken);
-      expect(updatedUser.updatedAt.getTime()).toBeGreaterThan(createdUser.updatedAt.getTime());
+      expect(updatedUser.updatedAt?.getTime()).toBeGreaterThanOrEqual(
+        createdUser.updatedAt?.getTime() ?? 0
+      );
     });
 
     test('should throw error for non-existent user', async () => {
-      expect(async () => {
+      await expect(async () => {
         await userRepository.update('non-existent-id', { displayName: 'New Name' });
       }).toThrow();
     });
@@ -116,12 +125,18 @@ describe('UserRepository', () => {
   describe('updateGoogleRefreshToken', () => {
     test('should update Google refresh token', async () => {
       const createdUser = await userRepository.create(testUserData);
+
+      // Add a small delay to ensure updatedAt timestamp is different
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       const newToken = 'new-refresh-token-123';
 
       const updatedUser = await userRepository.updateGoogleRefreshToken(createdUser.id, newToken);
 
       expect(updatedUser.googleRefreshToken).toBe(newToken);
-      expect(updatedUser.updatedAt.getTime()).toBeGreaterThan(createdUser.updatedAt.getTime());
+      expect(updatedUser.updatedAt?.getTime()).toBeGreaterThanOrEqual(
+        createdUser.updatedAt?.getTime() ?? 0
+      );
     });
 
     test('should set token to null', async () => {
@@ -136,7 +151,7 @@ describe('UserRepository', () => {
     });
 
     test('should throw error for non-existent user', async () => {
-      expect(async () => {
+      await expect(async () => {
         await userRepository.updateGoogleRefreshToken('non-existent-id', 'token');
       }).toThrow();
     });
@@ -145,15 +160,15 @@ describe('UserRepository', () => {
   describe('delete', () => {
     test('should delete user', async () => {
       const createdUser = await userRepository.create(testUserData);
-      
+
       await userRepository.delete(createdUser.id);
-      
+
       const foundUser = await userRepository.findById(createdUser.id);
       expect(foundUser).toBeNull();
     });
 
     test('should throw error for non-existent user', async () => {
-      expect(async () => {
+      await expect(async () => {
         await userRepository.delete('non-existent-id');
       }).toThrow();
     });

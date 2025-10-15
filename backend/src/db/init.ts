@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { runMigrations, checkDatabaseHealth } from './connection.js';
+import { checkDatabaseHealth, runMigrations } from './connection.js';
 import { seedDatabase } from './seed.js';
 
 async function initializeDatabase() {
@@ -20,7 +20,7 @@ async function initializeDatabase() {
 
     // Ask if user wants to seed with sample data
     const shouldSeed = process.argv.includes('--seed');
-    
+
     if (shouldSeed) {
       console.log('🌱 Seeding database with sample data...');
       await seedDatabase();
@@ -28,7 +28,6 @@ async function initializeDatabase() {
     } else {
       console.log('💡 To seed with sample data, run: bun src/db/init.ts --seed');
     }
-
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
     process.exit(1);

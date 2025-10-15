@@ -1,13 +1,5 @@
 import { writable } from 'svelte/store';
-import type { User } from '../types/auth.js';
-
-interface AuthState {
-	user: User | null;
-	isAuthenticated: boolean;
-	isLoading: boolean;
-	error: string | null;
-	token: string | null;
-}
+import type { User, AuthState } from '../types/index.js';
 
 const initialState: AuthState = {
 	user: null,
@@ -18,11 +10,11 @@ const initialState: AuthState = {
 };
 
 function createAuthStore() {
-	const { subscribe, set, update } = writable<AuthState>(initialState);
+	const { subscribe, update } = writable<AuthState>(initialState);
 
 	return {
 		subscribe,
-		
+
 		// Set user after successful authentication
 		setUser: (user: User, token?: string) => {
 			update(state => ({
@@ -34,7 +26,7 @@ function createAuthStore() {
 				token: token || state.token
 			}));
 		},
-		
+
 		// Clear user on logout
 		clearUser: () => {
 			update(state => ({
@@ -46,7 +38,7 @@ function createAuthStore() {
 				token: null
 			}));
 		},
-		
+
 		// Set loading state
 		setLoading: (isLoading: boolean) => {
 			update(state => ({
@@ -54,7 +46,7 @@ function createAuthStore() {
 				isLoading
 			}));
 		},
-		
+
 		// Set error state
 		setError: (error: string | null) => {
 			update(state => ({
@@ -63,16 +55,16 @@ function createAuthStore() {
 				isLoading: false
 			}));
 		},
-		
+
 		// Initialize auth state (check for existing session)
 		initialize: async () => {
 			update(state => ({ ...state, isLoading: true }));
-			
+
 			try {
 				const response = await fetch('/api/auth/me', {
 					credentials: 'include'
 				});
-				
+
 				if (response.ok) {
 					const user = await response.json();
 					update(state => ({
@@ -101,12 +93,12 @@ function createAuthStore() {
 				}));
 			}
 		},
-		
+
 		// Login with Google OAuth
 		loginWithGoogle: () => {
 			window.location.href = '/api/auth/login/google';
 		},
-		
+
 		// Refresh token
 		refreshToken: async () => {
 			try {
@@ -114,7 +106,7 @@ function createAuthStore() {
 					method: 'POST',
 					credentials: 'include'
 				});
-				
+
 				if (response.ok) {
 					const data = await response.json();
 					update(state => ({
@@ -137,7 +129,7 @@ function createAuthStore() {
 				throw error;
 			}
 		},
-		
+
 		// Logout
 		logout: async () => {
 			try {
@@ -145,7 +137,7 @@ function createAuthStore() {
 					method: 'POST',
 					credentials: 'include'
 				});
-				
+
 				update(state => ({
 					...state,
 					user: null,

@@ -1,9 +1,10 @@
-import { db, checkDatabaseHealth, closeDatabaseConnection } from '../db/connection.js';
+import { checkDatabaseHealth, closeDatabaseConnection, db } from '../db/connection.js';
 import { repositoryFactory } from './repositories/index.js';
 
 // Database service class for centralized database operations
 export class DatabaseService {
   private static instance: DatabaseService;
+  private testDatabase: typeof db | null = null;
 
   private constructor() {}
 
@@ -14,9 +15,14 @@ export class DatabaseService {
     return DatabaseService.instance;
   }
 
+  // Set test database instance (for testing only)
+  setTestDatabase(testDb: typeof db | null) {
+    this.testDatabase = testDb;
+  }
+
   // Get the Drizzle database instance
   getDatabase() {
-    return db;
+    return this.testDatabase || db;
   }
 
   // Get repository factory
@@ -30,12 +36,12 @@ export class DatabaseService {
       const isHealthy = checkDatabaseHealth();
       return {
         healthy: isHealthy,
-        message: isHealthy ? 'Database is healthy' : 'Database health check failed'
+        message: isHealthy ? 'Database is healthy' : 'Database health check failed',
       };
     } catch (error) {
       return {
         healthy: false,
-        message: `Database health check error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        message: `Database health check error: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }
@@ -52,12 +58,18 @@ export class DatabaseService {
   }
 
   // Transaction wrapper for complex operations
-  async transaction<T>(callback: (db: typeof db) => Promise<T>): Promise<T> {
+  async transaction<T>(
+    callback: (
+      tx: Parameters<typeof db.transaction>[0] extends (tx: infer U) => unknown ? U : never
+    ) => Promise<T>
+  ): Promise<T> {
     try {
       return await db.transaction(callback);
     } catch (error) {
       console.error('Transaction failed:', error);
-      throw new Error(`Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 }
@@ -81,7 +93,7 @@ export class ValidationError extends Error {
   constructor(
     message: string,
     public readonly field: string,
-    public readonly value?: any
+    public readonly value?: unknown
   ) {
     super(message);
     this.name = 'ValidationError';
@@ -103,7 +115,7 @@ export function handleDatabaseError(error: unknown, operation: string): never {
   if (error instanceof DatabaseError) {
     throw error;
   }
-  
+
   if (error instanceof Error) {
     throw new DatabaseError(
       `Database operation '${operation}' failed: ${error.message}`,
@@ -111,15 +123,12 @@ export function handleDatabaseError(error: unknown, operation: string): never {
       error
     );
   }
-  
-  throw new DatabaseError(
-    `Database operation '${operation}' failed with unknown error`,
-    operation
-  );
+
+  throw new DatabaseError(`Database operation '${operation}' failed with unknown error`, operation);
 }
 
 // Validation utilities
-export function validateRequired(value: any, fieldName: string): void {
+export function validateRequired(value: unknown, fieldName: string): void {
   if (value === null || value === undefined || value === '') {
     throw new ValidationError(`${fieldName} is required`, fieldName, value);
   }

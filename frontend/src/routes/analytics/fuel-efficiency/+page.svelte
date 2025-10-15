@@ -1,18 +1,25 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+
 	import { Car, ArrowLeft } from 'lucide-svelte';
 	import { getVehicleAnalytics } from '$lib/utils/analytics-api';
 	import { appStore } from '$lib/stores/app';
+	import type { AppState } from '$lib/types/index.js';
 	import FuelEfficiencyMonitor from '$lib/components/analytics/FuelEfficiencyMonitor.svelte';
 
 	let vehicleId = $state('');
-	let vehicleData: any = $state(null);
+
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
 	// Get available vehicles from app store
-	let appState = $state({ vehicles: [] });
+	let appState = $state<AppState>({
+		vehicles: [],
+		selectedVehicle: null,
+		notifications: [],
+		isLoading: false,
+		isMobileMenuOpen: false
+	});
 
 	onMount(() => {
 		// Get vehicle ID from URL params
@@ -20,7 +27,7 @@
 		vehicleId = urlParams.get('vehicle') || '';
 
 		// Subscribe to app state for vehicles
-		const unsubscribe = appStore.subscribe((state) => {
+		const unsubscribe = appStore.subscribe(state => {
 			appState = state;
 		});
 
@@ -29,7 +36,7 @@
 			loadVehicleData();
 		} else if (appState.vehicles.length > 0) {
 			// Default to first vehicle if no ID specified
-			vehicleId = appState.vehicles[0].id;
+			vehicleId = appState.vehicles[0]?.id ?? '';
 			loadVehicleData();
 		}
 
@@ -42,9 +49,8 @@
 		try {
 			isLoading = true;
 			error = null;
-			
-			const data = await getVehicleAnalytics(vehicleId);
-			vehicleData = data;
+
+			await getVehicleAnalytics(vehicleId);
 		} catch (err) {
 			console.error('Error loading vehicle analytics:', err);
 			error = err instanceof Error ? err.message : 'Failed to load vehicle data';
@@ -55,12 +61,12 @@
 
 	function handleVehicleChange(newVehicleId: string) {
 		vehicleId = newVehicleId;
-		
+
 		// Update URL without page reload
 		const url = new URL(window.location.href);
 		url.searchParams.set('vehicle', vehicleId);
 		window.history.replaceState({}, '', url.toString());
-		
+
 		loadVehicleData();
 	}
 
@@ -78,8 +84,8 @@
 <div class="space-y-6">
 	<!-- Header -->
 	<div class="flex items-center space-x-4">
-		<a 
-			href="/analytics" 
+		<a
+			href="/analytics"
 			class="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
 		>
 			<ArrowLeft class="h-5 w-5 mr-1" />
@@ -103,7 +109,7 @@
 			<select
 				id="vehicle-select"
 				bind:value={vehicleId}
-				onchange={(e) => handleVehicleChange(e.target.value)}
+				onchange={e => handleVehicleChange((e.target as HTMLSelectElement).value)}
 				class="block w-full max-w-xs rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
 			>
 				{#each appState.vehicles as vehicle}
@@ -142,15 +148,14 @@
 		<div class="text-center py-12">
 			<Car class="h-12 w-12 text-gray-400 mx-auto mb-4" />
 			<h3 class="text-lg font-medium text-gray-900 mb-2">No Vehicle Selected</h3>
-			<p class="text-gray-600">
-				Please select a vehicle to view fuel efficiency data.
-			</p>
+			<p class="text-gray-600">Please select a vehicle to view fuel efficiency data.</p>
 		</div>
 	{:else}
 		<!-- Fuel Efficiency Monitor Component -->
-		<FuelEfficiencyMonitor 
-			vehicleId={vehicleId}
-			vehicleName={currentVehicle.nickname || `${currentVehicle.year} ${currentVehicle.make} ${currentVehicle.model}`}
+		<FuelEfficiencyMonitor
+			{vehicleId}
+			vehicleName={currentVehicle.nickname ||
+				`${currentVehicle.year} ${currentVehicle.make} ${currentVehicle.model}`}
 		/>
 	{/if}
 </div>

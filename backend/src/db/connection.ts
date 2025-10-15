@@ -1,9 +1,9 @@
 import { Database } from 'bun:sqlite';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import * as schema from './schema.js';
-import { existsSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
 
 // Database configuration
 const DATABASE_URL = process.env.DATABASE_URL || './data/vroom.db';
@@ -42,8 +42,8 @@ export async function runMigrations() {
 // Database health check
 export function checkDatabaseHealth(): boolean {
   try {
-    const result = sqlite.query('SELECT 1 as health').get();
-    return result && (result as any).health === 1;
+    const result = sqlite.query('SELECT 1 as health').get() as { health: number } | null;
+    return result?.health === 1;
   } catch (error) {
     console.error('Database health check failed:', error);
     return false;

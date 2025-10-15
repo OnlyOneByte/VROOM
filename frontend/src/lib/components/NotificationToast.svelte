@@ -49,18 +49,23 @@
 
 			return () => clearTimeout(timer);
 		}
+
+		return () => {}; // Return empty cleanup function when no timer is set
 	});
 </script>
 
-<div 
-	class="max-w-sm w-full border rounded-lg shadow-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out {colors[notification.type]}"
+<div
+	class="max-w-sm w-full border rounded-lg shadow-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out {colors[
+		notification.type
+	]}"
+	role="alert"
+	aria-live="polite"
+	aria-atomic="true"
 >
 	<div class="p-4">
 		<div class="flex items-start">
 			<div class="flex-shrink-0">
-				<IconComponent 
-					class="h-5 w-5 {iconColors[notification.type]}" 
-				/>
+				<IconComponent class="h-5 w-5 {iconColors[notification.type]}" />
 			</div>
 			<div class="ml-3 w-0 flex-1">
 				<p class="text-sm font-medium">
@@ -72,6 +77,7 @@
 					type="button"
 					class="inline-flex rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
 					onclick={dismiss}
+					aria-label="Dismiss notification"
 				>
 					<X class="h-4 w-4" />
 				</button>

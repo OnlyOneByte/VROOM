@@ -1,57 +1,144 @@
 import { Database } from 'bun:sqlite';
+import { existsSync, unlinkSync } from 'node:fs';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import * as schema from '../db/schema.js';
-import { existsSync, unlinkSync } from 'fs';
 import { BaseRepository } from '../lib/repositories/base.js';
-import { UserRepository } from '../lib/repositories/user.js';
 
-// Test database configuration
-const TEST_DB_PATH = './test.db';
+// Test database configuration - use unique names to avoid conflicts
+const getTestDbPath = () => `./test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.db`;
 
-// Create test database instance
-let testSqlite: Database;
-let testDb: ReturnType<typeof drizzle>;
+// Global test database instances
+let testSqlite: Database | null = null;
+let testDb: ReturnType<typeof drizzle> | null = null;
+let currentTestDbPath: string | null = null;
 
 export function setupTestDatabase() {
-  // Remove existing test database
-  if (existsSync(TEST_DB_PATH)) {
-    unlinkSync(TEST_DB_PATH);
+  // Don't recreate if already exists and healthy
+  if (testDb && testSqlite) {
+    try {
+      // Test if database is still accessible
+      testSqlite.query('SELECT 1').get();
+      return testDb;
+    } catch (_error) {
+      // Database is closed, need to recreate
+      teardownTestDatabase();
+    }
   }
 
-  // Create new test database
-  testSqlite = new Database(TEST_DB_PATH);
-  
+  // Create new test database with unique name
+  currentTestDbPath = getTestDbPath();
+  testSqlite = new Database(currentTestDbPath);
+
   // Configure for testing
   testSqlite.exec('PRAGMA journal_mode = MEMORY');
   testSqlite.exec('PRAGMA synchronous = OFF');
   testSqlite.exec('PRAGMA foreign_keys = ON');
-  
+  testSqlite.exec('PRAGMA temp_store = MEMORY');
+
   testDb = drizzle(testSqlite, { schema });
-  
+
   // Run migrations
-  migrate(testDb, { migrationsFolder: './drizzle' });
-  
+  try {
+    migrate(testDb, { migrationsFolder: './drizzle' });
+  } catch (error) {
+    console.error('Migration failed:', error);
+    throw error;
+  }
+
   // Configure repositories to use test database
   BaseRepository.setDatabaseInstance(testDb);
-  UserRepository.setDatabaseInstance(testDb);
-  
+
+  // Configure database service to use test database
+  try {
+    const { databaseService } = require('../lib/database.js');
+    databaseService.setTestDatabase(testDb);
+  } catch (_error) {
+    // Ignore if module doesn't exist
+  }
+
+  // Configure Lucia provider to use test instance
+  try {
+    const { getTestLucia } = require('./lucia-test.js');
+    const { setLucia } = require('../lib/auth/lucia-provider.js');
+    setLucia(getTestLucia());
+  } catch (_error) {
+    // Ignore if modules don't exist
+  }
+
   return testDb;
 }
 
 export function teardownTestDatabase() {
+  // Reset repositories to use production database
+  BaseRepository.resetDatabaseInstance();
+
+  // Reset database service to use production database
+  try {
+    const { databaseService } = require('../lib/database.js');
+    databaseService.setTestDatabase(null);
+  } catch (_error) {
+    // Ignore if module doesn't exist
+  }
+
+  // Reset Lucia provider to use production instance
+  try {
+    const { resetLucia } = require('../lib/auth/lucia-provider.js');
+    resetLucia();
+  } catch (_error) {
+    // Ignore if module doesn't exist
+  }
+
+  // Reset test Lucia instance
+  try {
+    const { resetTestLucia } = require('./lucia-test.js');
+    resetTestLucia();
+  } catch (_error) {
+    // Ignore if lucia-test module doesn't exist
+  }
+
+  // Close database connection
   if (testSqlite) {
-    testSqlite.close();
+    try {
+      testSqlite.close();
+    } catch (_error) {
+      // Ignore errors when closing already closed database
+    }
+    testSqlite = null;
   }
-  
+
   // Clean up test database file
-  if (existsSync(TEST_DB_PATH)) {
-    unlinkSync(TEST_DB_PATH);
+  if (currentTestDbPath && existsSync(currentTestDbPath)) {
+    try {
+      unlinkSync(currentTestDbPath);
+    } catch (_error) {
+      // Ignore errors when deleting non-existent file
+    }
   }
+
+  testDb = null;
+  currentTestDbPath = null;
 }
 
 export function getTestDatabase() {
   return testDb;
+}
+
+export function clearTestData() {
+  if (!testDb) return;
+
+  try {
+    // Clear all tables in reverse dependency order
+    testDb.delete(schema.sessions).run();
+    testDb.delete(schema.expenses).run();
+    testDb.delete(schema.loanPayments).run();
+    testDb.delete(schema.vehicleLoans).run();
+    testDb.delete(schema.insurancePolicies).run();
+    testDb.delete(schema.vehicles).run();
+    testDb.delete(schema.users).run();
+  } catch (error) {
+    console.error('Error clearing test data:', error);
+  }
 }
 
 // Test data factories
@@ -76,7 +163,7 @@ export const testVehicleData = {
 export const testExpenseData = {
   type: 'fuel' as const,
   category: 'operating' as const,
-  amount: 45.50,
+  amount: 45.5,
   currency: 'USD',
   date: new Date('2024-01-15'),
   mileage: 25500,
