@@ -39,12 +39,12 @@ const vehicleParamsSchema = z.object({
 // Apply authentication to all routes
 vehicles.use('*', requireAuth);
 
-// GET /api/vehicles - List user's vehicles
+// GET /api/vehicles - List user's vehicles (including shared)
 vehicles.get('/', async (c) => {
   const user = c.get('user');
   const vehicleRepository = repositoryFactory.getVehicleRepository();
 
-  const userVehicles = await vehicleRepository.findByUserId(user.id);
+  const userVehicles = await vehicleRepository.findAccessibleVehicles(user.id);
 
   const response: ApiResponse<typeof userVehicles> = {
     success: true,
@@ -85,13 +85,13 @@ vehicles.post('/', zValidator('json', createVehicleSchema), async (c) => {
   return c.json(response, 201);
 });
 
-// GET /api/vehicles/:id - Get specific vehicle
+// GET /api/vehicles/:id - Get specific vehicle (with shared access)
 vehicles.get('/:id', zValidator('param', vehicleParamsSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
   const vehicleRepository = repositoryFactory.getVehicleRepository();
 
-  const vehicle = await vehicleRepository.findByUserIdAndId(user.id, id);
+  const vehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
 
   if (!vehicle) {
     throw new NotFoundError('Vehicle');
@@ -105,7 +105,7 @@ vehicles.get('/:id', zValidator('param', vehicleParamsSchema), async (c) => {
   return c.json(response);
 });
 
-// PUT /api/vehicles/:id - Update vehicle
+// PUT /api/vehicles/:id - Update vehicle (with shared access check)
 vehicles.put(
   '/:id',
   zValidator('param', vehicleParamsSchema),
@@ -116,11 +116,20 @@ vehicles.put(
       const { id } = c.req.valid('param');
       const updateData = c.req.valid('json');
       const vehicleRepository = repositoryFactory.getVehicleRepository();
+      const shareRepository = repositoryFactory.getVehicleShareRepository();
 
-      // Check if vehicle exists and belongs to user
-      const existingVehicle = await vehicleRepository.findByUserIdAndId(user.id, id);
+      // Check if vehicle exists and user has access
+      const existingVehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
       if (!existingVehicle) {
         throw new HTTPException(404, { message: 'Vehicle not found' });
+      }
+
+      // Check if user has edit permission
+      const permission = await shareRepository.getPermission(id, user.id);
+      if (permission !== 'edit') {
+        throw new HTTPException(403, {
+          message: 'You do not have permission to edit this vehicle',
+        });
       }
 
       // Check if license plate already exists (if being updated)

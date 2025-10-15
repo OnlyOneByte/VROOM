@@ -15,8 +15,10 @@ export type {
   IUserRepository,
   IVehicleLoanRepository,
   IVehicleRepository,
+  IVehicleShareRepository,
 } from './interfaces.js';
 export { LoanPaymentRepository } from './loanPayment.js';
 export { UserRepository } from './user.js';
 export { VehicleRepository } from './vehicle.js';
 export { VehicleLoanRepository } from './vehicleLoan.js';
+export { VehicleShareRepository } from './vehicleShare.js';

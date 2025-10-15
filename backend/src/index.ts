@@ -13,6 +13,7 @@ import { drive } from './routes/drive';
 import { expenses } from './routes/expenses';
 import { insurance } from './routes/insurance';
 import { loans } from './routes/loans';
+import { sharing } from './routes/sharing';
 import { sheets } from './routes/sheets';
 import { vehicles } from './routes/vehicles';
 
@@ -72,6 +73,7 @@ app.route('/api/insurance', insurance);
 app.route('/api/analytics', analytics);
 app.route('/api/drive', drive);
 app.route('/api/sheets', sheets);
+app.route('/api/sharing', sharing);
 
 // API info endpoint
 app.get('/api', optionalAuth, (c) => {
@@ -104,6 +106,7 @@ app.get('/api', optionalAuth, (c) => {
       analytics: '/api/analytics',
       drive: '/api/drive',
       sheets: '/api/sheets',
+      sharing: '/api/sharing',
     },
   });
 });

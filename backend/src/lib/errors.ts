@@ -41,6 +41,13 @@ export class AuthorizationError extends AppError {
   }
 }
 
+// Alias for AuthorizationError
+export class ForbiddenError extends AuthorizationError {
+  constructor(message: string = 'Access forbidden') {
+    super(message);
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(resource: string = 'Resource') {
     super(`${resource} not found`, 404, true);

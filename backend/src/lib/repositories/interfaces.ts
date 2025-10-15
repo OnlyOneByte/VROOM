@@ -8,9 +8,11 @@ import type {
   NewUser,
   NewVehicle,
   NewVehicleLoan,
+  NewVehicleShare,
   User,
   Vehicle,
   VehicleLoan,
+  VehicleShare,
 } from '../../db/schema.js';
 
 // Base repository interface with common CRUD operations
@@ -34,6 +36,8 @@ export interface IVehicleRepository extends IBaseRepository<Vehicle, NewVehicle>
   findByUserIdAndId(userId: string, vehicleId: string): Promise<Vehicle | null>;
   findByLicensePlate(licensePlate: string): Promise<Vehicle | null>;
   updateMileage(id: string, mileage: number): Promise<Vehicle>;
+  findAccessibleVehicles(userId: string): Promise<Vehicle[]>;
+  findByIdWithAccess(vehicleId: string, userId: string): Promise<Vehicle | null>;
 }
 
 // Vehicle Loan repository interface
@@ -82,6 +86,18 @@ export interface IExpenseRepository extends IBaseRepository<Expense, NewExpense>
   getMonthlyTotals(vehicleId: string, year: number): Promise<{ month: number; total: number }[]>;
 }
 
+// Vehicle Share repository interface
+export interface IVehicleShareRepository extends IBaseRepository<VehicleShare, NewVehicleShare> {
+  findByVehicleId(vehicleId: string): Promise<VehicleShare[]>;
+  findByOwnerId(ownerId: string): Promise<VehicleShare[]>;
+  findBySharedWithUserId(userId: string): Promise<VehicleShare[]>;
+  findByVehicleAndUser(vehicleId: string, userId: string): Promise<VehicleShare | null>;
+  findPendingInvitations(userId: string): Promise<VehicleShare[]>;
+  updateStatus(id: string, status: 'accepted' | 'declined'): Promise<VehicleShare>;
+  hasAccess(vehicleId: string, userId: string): Promise<boolean>;
+  getPermission(vehicleId: string, userId: string): Promise<'view' | 'edit' | null>;
+}
+
 // Repository factory interface for dependency injection
 export interface IRepositoryFactory {
   getUserRepository(): IUserRepository;
@@ -90,4 +106,5 @@ export interface IRepositoryFactory {
   getLoanPaymentRepository(): ILoanPaymentRepository;
   getInsurancePolicyRepository(): IInsurancePolicyRepository;
   getExpenseRepository(): IExpenseRepository;
+  getVehicleShareRepository(): IVehicleShareRepository;
 }

@@ -39,6 +39,10 @@ export type PaymentType = 'standard' | 'extra' | 'custom-split';
 
 export type AuthProvider = 'google';
 
+export type SharePermission = 'view' | 'edit';
+
+export type ShareStatus = 'pending' | 'accepted' | 'declined';
+
 // Utility function to get category for expense type
 export function getCategoryForExpenseType(type: ExpenseType): ExpenseCategory {
   const categoryMap: Record<ExpenseType, ExpenseCategory> = {
@@ -119,4 +123,14 @@ export function isValidPaymentFrequency(frequency: string): frequency is Payment
 export function isValidPaymentType(type: string): type is PaymentType {
   const validTypes: PaymentType[] = ['standard', 'extra', 'custom-split'];
   return validTypes.includes(type as PaymentType);
+}
+
+export function isValidSharePermission(permission: string): permission is SharePermission {
+  const validPermissions: SharePermission[] = ['view', 'edit'];
+  return validPermissions.includes(permission as SharePermission);
+}
+
+export function isValidShareStatus(status: string): status is ShareStatus {
+  const validStatuses: ShareStatus[] = ['pending', 'accepted', 'declined'];
+  return validStatuses.includes(status as ShareStatus);
 }

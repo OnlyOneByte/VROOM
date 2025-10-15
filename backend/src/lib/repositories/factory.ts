@@ -5,6 +5,7 @@ import { LoanPaymentRepository } from './loanPayment.js';
 import { UserRepository } from './user.js';
 import { VehicleRepository } from './vehicle.js';
 import { VehicleLoanRepository } from './vehicleLoan.js';
+import { VehicleShareRepository } from './vehicleShare.js';
 
 // SQLite repository factory implementation
 export class SQLiteRepositoryFactory implements IRepositoryFactory {
@@ -14,6 +15,7 @@ export class SQLiteRepositoryFactory implements IRepositoryFactory {
   private loanPaymentRepository?: LoanPaymentRepository;
   private insurancePolicyRepository?: InsurancePolicyRepository;
   private expenseRepository?: ExpenseRepository;
+  private vehicleShareRepository?: VehicleShareRepository;
 
   getUserRepository(): UserRepository {
     if (!this.userRepository) {
@@ -55,6 +57,13 @@ export class SQLiteRepositoryFactory implements IRepositoryFactory {
       this.expenseRepository = new ExpenseRepository();
     }
     return this.expenseRepository;
+  }
+
+  getVehicleShareRepository(): VehicleShareRepository {
+    if (!this.vehicleShareRepository) {
+      this.vehicleShareRepository = new VehicleShareRepository();
+    }
+    return this.vehicleShareRepository;
   }
 }
 

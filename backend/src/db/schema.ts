@@ -122,6 +122,26 @@ export const expenses = sqliteTable('expenses', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
+// Vehicle Shares table (for sharing vehicles between users)
+export const vehicleShares = sqliteTable('vehicle_shares', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  vehicleId: text('vehicle_id')
+    .notNull()
+    .references(() => vehicles.id, { onDelete: 'cascade' }),
+  ownerId: text('owner_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  sharedWithUserId: text('shared_with_user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  permission: text('permission').notNull().default('view'), // 'view' | 'edit'
+  status: text('status').notNull().default('pending'), // 'pending' | 'accepted' | 'declined'
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
 // Lucia Auth session table
 export const sessions = sqliteTable('sessions', {
   id: text('id').notNull().primaryKey(),
@@ -149,6 +169,9 @@ export type NewInsurancePolicy = typeof insurancePolicies.$inferInsert;
 
 export type Expense = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;
+
+export type VehicleShare = typeof vehicleShares.$inferSelect;
+export type NewVehicleShare = typeof vehicleShares.$inferInsert;
 
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
