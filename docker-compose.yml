@@ -1,0 +1,78 @@
+# Docker Compose configuration for VROOM Car Tracker
+# Development environment with hot reload
+version: '3.8'
+
+services:
+  # Backend service with Bun
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: vroom-backend-dev
+    ports:
+      - "3001:3001"
+    volumes:
+      # Mount source code for hot reload
+      - ./backend/src:/app/src:ro
+      - ./backend/drizzle:/app/drizzle:ro
+      - ./backend/drizzle.config.ts:/app/drizzle.config.ts:ro
+      # Persistent database storage
+      - vroom-data:/app/data
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - HOST=0.0.0.0
+      - DATABASE_URL=/app/data/vroom.db
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:3001/auth/callback/google}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - GOOGLE_DRIVE_API_KEY=${GOOGLE_DRIVE_API_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+    command: bun --watch src/index.ts
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bun", "run", "-e", "fetch('http://localhost:3001/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - vroom-network
+
+  # Frontend service with SvelteKit
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: vroom-frontend-dev
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend/src:/app/src:ro
+      - ./frontend/static:/app/static:ro
+      - ./frontend/svelte.config.js:/app/svelte.config.js:ro
+      - ./frontend/vite.config.ts:/app/vite.config.ts:ro
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js:ro
+    environment:
+      - NODE_ENV=development
+      - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:3001}
+    command: npm run dev -- --host 0.0.0.0
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - vroom-network
+
+volumes:
+  vroom-data:
+    driver: local
+
+networks:
+  vroom-network:
+    driver: bridge

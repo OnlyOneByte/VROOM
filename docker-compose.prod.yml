@@ -1,0 +1,99 @@
+# Docker Compose configuration for VROOM Car Tracker
+# Production environment with optimized builds
+version: '3.8'
+
+services:
+  # Backend service with Bun (production)
+  backend:
+    image: ghcr.io/${GITHUB_REPOSITORY}/backend:latest
+    container_name: vroom-backend
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    volumes:
+      # Persistent database storage
+      - vroom-data:/app/data
+      # Optional: Mount custom config
+      - ./config/backend.env:/app/.env:ro
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - HOST=0.0.0.0
+      - DATABASE_URL=/app/data/vroom.db
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - GOOGLE_DRIVE_API_KEY=${GOOGLE_DRIVE_API_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-900000}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
+      - LOG_LEVEL=${LOG_LEVEL:-warn}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bun", "run", "-e", "fetch('http://localhost:3001/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - vroom-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "io.portainer.accesscontrol.teams=vroom"
+
+  # Frontend service with SvelteKit (production)
+  frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY}/frontend:latest
+    container_name: vroom-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - PUBLIC_API_URL=${PUBLIC_API_URL}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - vroom-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "io.portainer.accesscontrol.teams=vroom"
+
+  # Optional: Watchtower for automatic updates
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: vroom-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=3600
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_INCLUDE_STOPPED=false
+      - WATCHTOWER_REVIVE_STOPPED=false
+    restart: unless-stopped
+    networks:
+      - vroom-network
+    profiles:
+      - auto-update
+
+volumes:
+  vroom-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}
+
+networks:
+  vroom-network:
+    driver: bridge

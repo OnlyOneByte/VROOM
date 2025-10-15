@@ -17,6 +17,7 @@
     "test:repositories": "bun src/test/run-tests.ts",
     "test:auth": "bun src/test/run-auth-tests.ts",
     "test:vehicles": "bun src/test/run-vehicle-tests.ts",
+    "test:deployment": "bun src/test/run-deployment-tests.ts",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --write src/",
     "format": "biome format src/",
@@ -46,6 +47,7 @@
     "@types/cors": "^2.8.17",
     "bun-types": "^1.0.25",
     "drizzle-kit": "^0.31.5",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "yaml": "^2.8.1"
   }
 }

@@ -1,0 +1,105 @@
+# Portainer Stack Configuration for VROOM Car Tracker
+# This file is optimized for deployment via Portainer UI
+# 
+# Instructions:
+# 1. In Portainer, go to Stacks → Add Stack
+# 2. Name: vroom-production
+# 3. Upload this file or paste its contents
+# 4. Add environment variables (see below)
+# 5. Deploy the stack
+
+version: '3.8'
+
+services:
+  backend:
+    image: ghcr.io/${GITHUB_REPOSITORY}/backend:latest
+    container_name: vroom-backend
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    volumes:
+      - vroom-data:/app/data
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOST: 0.0.0.0
+      DATABASE_URL: /app/data/vroom.db
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+      SESSION_SECRET: ${SESSION_SECRET}
+      GOOGLE_DRIVE_API_KEY: ${GOOGLE_DRIVE_API_KEY:-}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bun", "run", "-e", "fetch('http://localhost:3001/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - vroom-network
+    labels:
+      io.portainer.accesscontrol.teams: vroom
+      com.centurylinklabs.watchtower.enable: "true"
+
+  frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY}/frontend:latest
+    container_name: vroom-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - backend
+    networks:
+      - vroom-network
+    labels:
+      io.portainer.accesscontrol.teams: vroom
+      com.centurylinklabs.watchtower.enable: "true"
+
+volumes:
+  vroom-data:
+    driver: local
+
+networks:
+  vroom-network:
+    driver: bridge
+
+# ============================================================================
+# REQUIRED ENVIRONMENT VARIABLES (Add in Portainer UI)
+# ============================================================================
+# 
+# GITHUB_REPOSITORY=your-username/vroom
+# 
+# GOOGLE_CLIENT_ID=your_google_client_id
+# GOOGLE_CLIENT_SECRET=your_google_client_secret
+# GOOGLE_REDIRECT_URI=https://yourdomain.com/auth/callback/google
+# 
+# SESSION_SECRET=your_secure_session_secret_at_least_32_chars
+# 
+# CORS_ORIGINS=https://yourdomain.com
+# PUBLIC_API_URL=https://api.yourdomain.com
+# 
+# ============================================================================
+# OPTIONAL ENVIRONMENT VARIABLES
+# ============================================================================
+# 
+# BACKEND_PORT=3001
+# FRONTEND_PORT=3000
+# GOOGLE_DRIVE_API_KEY=your_google_drive_api_key
+# RATE_LIMIT_WINDOW_MS=900000
+# RATE_LIMIT_MAX_REQUESTS=100
+# LOG_LEVEL=warn
