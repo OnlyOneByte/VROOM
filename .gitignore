@@ -1,8 +1,8 @@
 # Dependencies
 node_modules/
-bun.lockb
-package-lock.json
-yarn.lock
+
+# Backend uses bun
+backend/package-lock.json
 
 # Environment variables
 .env

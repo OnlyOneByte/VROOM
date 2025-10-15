@@ -14,35 +14,47 @@ const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 const skipInCI = isCI ? test.skip : test;
 
 describe('Docker Container Tests', () => {
-  skipInCI('should build backend Docker image successfully', async () => {
-    try {
-      const { stdout, stderr } = await execAsync(
-        'docker build -t vroom-backend-test:latest -f backend/Dockerfile backend/',
-        { cwd: process.cwd().replace('/backend', '') }
-      );
+  skipInCI(
+    'should build backend Docker image successfully',
+    async () => {
+      try {
+        const { stdout, stderr } = await execAsync(
+          'docker build -t vroom-backend-test:latest -f backend/Dockerfile backend/',
+          { cwd: process.cwd().replace('/backend', '') }
+        );
 
-      expect(stderr).not.toContain('ERROR');
-      expect(stdout.includes('Successfully built') || stdout.includes('writing image')).toBe(true);
-    } catch (error) {
-      console.error('Docker build failed:', error);
-      throw error;
-    }
-  }, 120000); // 2 minute timeout for build
+        expect(stderr).not.toContain('ERROR');
+        expect(stdout.includes('Successfully built') || stdout.includes('writing image')).toBe(
+          true
+        );
+      } catch (error) {
+        console.error('Docker build failed:', error);
+        throw error;
+      }
+    },
+    120000
+  ); // 2 minute timeout for build
 
-  skipInCI('should build frontend Docker image successfully', async () => {
-    try {
-      const { stdout, stderr } = await execAsync(
-        'docker build -t vroom-frontend-test:latest -f frontend/Dockerfile frontend/',
-        { cwd: process.cwd().replace('/backend', '') }
-      );
+  skipInCI(
+    'should build frontend Docker image successfully',
+    async () => {
+      try {
+        const { stdout, stderr } = await execAsync(
+          'docker build -t vroom-frontend-test:latest -f frontend/Dockerfile frontend/',
+          { cwd: process.cwd().replace('/backend', '') }
+        );
 
-      expect(stderr).not.toContain('ERROR');
-      expect(stdout.includes('Successfully built') || stdout.includes('writing image')).toBe(true);
-    } catch (error) {
-      console.error('Docker build failed:', error);
-      throw error;
-    }
-  }, 120000);
+        expect(stderr).not.toContain('ERROR');
+        expect(stdout.includes('Successfully built') || stdout.includes('writing image')).toBe(
+          true
+        );
+      } catch (error) {
+        console.error('Docker build failed:', error);
+        throw error;
+      }
+    },
+    120000
+  );
 
   skipInCI('should verify backend image has correct entrypoint', async () => {
     try {
@@ -199,13 +211,15 @@ describe('Docker Compose Tests', () => {
 });
 
 describe('Container Startup Tests', () => {
-  skipInCI('should verify backend container can start with minimal config', async () => {
-    const containerId = `vroom-backend-test-${Date.now()}`;
+  skipInCI(
+    'should verify backend container can start with minimal config',
+    async () => {
+      const containerId = `vroom-backend-test-${Date.now()}`;
 
-    try {
-      // Start container with minimal environment
-      await execAsync(
-        `docker run -d --name ${containerId} \
+      try {
+        // Start container with minimal environment
+        await execAsync(
+          `docker run -d --name ${containerId} \
           -e NODE_ENV=test \
           -e DATABASE_URL=/tmp/test.db \
           -e GOOGLE_CLIENT_ID=test \
@@ -213,29 +227,31 @@ describe('Container Startup Tests', () => {
           -e GOOGLE_REDIRECT_URI=http://localhost:3001/auth/callback/google \
           -e SESSION_SECRET=test_secret_at_least_32_characters_long \
           vroom-backend-test:latest`,
-        { timeout: 30000 }
-      );
+          { timeout: 30000 }
+        );
 
-      // Wait for container to start
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+        // Wait for container to start
+        await new Promise((resolve) => setTimeout(resolve, 5000));
 
-      // Check if container is running
-      const { stdout } = await execAsync(
-        `docker ps --filter name=${containerId} --format "{{.Status}}"`
-      );
+        // Check if container is running
+        const { stdout } = await execAsync(
+          `docker ps --filter name=${containerId} --format "{{.Status}}"`
+        );
 
-      expect(stdout).toContain('Up');
-    } catch (error) {
-      console.error('Container startup test failed:', error);
-      throw error;
-    } finally {
-      // Cleanup
-      try {
-        await execAsync(`docker stop ${containerId}`);
-        await execAsync(`docker rm ${containerId}`);
-      } catch (_e) {
-        // Ignore cleanup errors
+        expect(stdout).toContain('Up');
+      } catch (error) {
+        console.error('Container startup test failed:', error);
+        throw error;
+      } finally {
+        // Cleanup
+        try {
+          await execAsync(`docker stop ${containerId}`);
+          await execAsync(`docker rm ${containerId}`);
+        } catch (_e) {
+          // Ignore cleanup errors
+        }
       }
-    }
-  }, 60000);
+    },
+    60000
+  );
 });

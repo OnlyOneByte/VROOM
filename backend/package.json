@@ -25,7 +25,7 @@
     "check": "biome check src/",
     "check:fix": "biome check --write src/",
     "type-check": "tsc --noEmit",
-    "validate": "bun run type-check && bun run check && bun run test && bun run build"
+    "validate": "bun run type-check && bun run check && CI=true bun run test && bun run build"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.0",
