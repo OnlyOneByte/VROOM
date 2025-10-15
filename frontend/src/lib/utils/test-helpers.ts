@@ -1,6 +1,5 @@
-import { render, type RenderResult } from '@testing-library/svelte';
+import { render } from '@testing-library/svelte';
 import { vi, type MockedFunction } from 'vitest';
-import type { ComponentType, SvelteComponent } from 'svelte';
 
 // Mock data generators
 export const mockUser = {
@@ -100,14 +99,15 @@ export function mockFetch(responses: Record<string, { data: unknown; status?: nu
 }
 
 // Component testing utilities
-export function renderWithMocks<T extends SvelteComponent>(
-	component: ComponentType<T>,
+export function renderWithMocks(
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	component: any,
 	props?: Record<string, unknown>,
 	options?: {
 		authState?: unknown;
 		appState?: unknown;
 	}
-): RenderResult<T> {
+) {
 	// Mock stores if needed
 	if (options?.authState) {
 		vi.doMock('$lib/stores/auth.js', () => ({
@@ -131,7 +131,7 @@ export function renderWithMocks<T extends SvelteComponent>(
 		}));
 	}
 
-	return render(component, props || {}) as RenderResult<T>;
+	return render(component, props || {});
 }
 
 // Event testing utilities
