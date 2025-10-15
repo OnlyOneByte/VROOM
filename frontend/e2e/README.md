@@ -9,6 +9,7 @@ These tests cover critical user journeys and ensure the application works correc
 ## Test Coverage
 
 ### Authentication (`auth.spec.ts`)
+
 - Google OAuth login flow
 - Session management
 - Protected route access
@@ -18,6 +19,7 @@ These tests cover critical user journeys and ensure the application works correc
 **Requirements Covered:** 3.1, 3.2, 3.3, 3.4
 
 ### Vehicle Management (`vehicle-management.spec.ts`)
+
 - Adding new vehicles
 - Viewing vehicle list
 - Vehicle form validation
@@ -27,6 +29,7 @@ These tests cover critical user journeys and ensure the application works correc
 **Requirements Covered:** 2.1, 2.2, 2.3, 2.4
 
 ### Expense Entry (`expense-entry.spec.ts`)
+
 - Creating expenses with categorization
 - Fuel expense with MPG calculation
 - Form validation
@@ -37,6 +40,7 @@ These tests cover critical user journeys and ensure the application works correc
 **Requirements Covered:** 1.1, 1.2, 1.3, 1.4
 
 ### PWA Functionality (`pwa.spec.ts`)
+
 - PWA manifest validation
 - Service worker registration
 - Offline functionality
@@ -50,31 +54,37 @@ These tests cover critical user journeys and ensure the application works correc
 ## Running Tests
 
 ### Run all tests
+
 ```bash
 npm run test:e2e
 ```
 
 ### Run with UI mode (interactive)
+
 ```bash
 npm run test:e2e:ui
 ```
 
 ### Run in headed mode (see browser)
+
 ```bash
 npm run test:e2e:headed
 ```
 
 ### Run specific browser
+
 ```bash
 npm run test:e2e:chromium
 ```
 
 ### Run mobile tests only
+
 ```bash
 npm run test:e2e:mobile
 ```
 
 ### Run specific test file
+
 ```bash
 npx playwright test e2e/auth.spec.ts
 ```
@@ -95,19 +105,20 @@ The tests run across multiple browser configurations:
 ## Writing New Tests
 
 ### Test Structure
+
 ```typescript
 import { test, expect } from '@playwright/test';
 
 test.describe('Feature Name', () => {
-  test('should do something', async ({ page }) => {
-    await page.goto('/path');
-    
-    // Interact with page
-    await page.getByRole('button', { name: /click me/i }).click();
-    
-    // Assert expectations
-    await expect(page.getByText('Success')).toBeVisible();
-  });
+	test('should do something', async ({ page }) => {
+		await page.goto('/path');
+
+		// Interact with page
+		await page.getByRole('button', { name: /click me/i }).click();
+
+		// Assert expectations
+		await expect(page.getByText('Success')).toBeVisible();
+	});
 });
 ```
 
@@ -126,49 +137,52 @@ Most tests need authentication. Use the helper function:
 
 ```typescript
 async function setupAuthenticatedSession(page, context) {
-  await context.addCookies([
-    {
-      name: 'auth_session',
-      value: 'mock_session_token',
-      domain: 'localhost',
-      path: '/',
-      httpOnly: true,
-      secure: false,
-      sameSite: 'Lax'
-    }
-  ]);
+	await context.addCookies([
+		{
+			name: 'auth_session',
+			value: 'mock_session_token',
+			domain: 'localhost',
+			path: '/',
+			httpOnly: true,
+			secure: false,
+			sameSite: 'Lax'
+		}
+	]);
 
-  await page.route('**/api/auth/me', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: 'user123',
-        email: 'test@example.com',
-        displayName: 'Test User'
-      })
-    });
-  });
+	await page.route('**/api/auth/me', async route => {
+		await route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				id: 'user123',
+				email: 'test@example.com',
+				displayName: 'Test User'
+			})
+		});
+	});
 }
 
 test.beforeEach(async ({ page, context }) => {
-  await setupAuthenticatedSession(page, context);
+	await setupAuthenticatedSession(page, context);
 });
 ```
 
 ## Debugging Tests
 
 ### View test report
+
 ```bash
 npx playwright show-report
 ```
 
 ### Debug specific test
+
 ```bash
 npx playwright test --debug e2e/auth.spec.ts
 ```
 
 ### Generate trace
+
 ```bash
 npx playwright test --trace on
 ```
@@ -176,6 +190,7 @@ npx playwright test --trace on
 ## CI/CD Integration
 
 Tests are configured to run in CI with:
+
 - Automatic retries (2 retries on failure)
 - Single worker for stability
 - HTML report generation
@@ -185,16 +200,19 @@ Tests are configured to run in CI with:
 ## Troubleshooting
 
 ### Tests timing out
+
 - Increase timeout in `playwright.config.ts`
 - Check if backend is running
 - Verify network requests are being mocked
 
 ### Flaky tests
+
 - Add explicit waits: `await expect(element).toBeVisible()`
 - Avoid `page.waitForTimeout()` - use event-based waits
 - Check for race conditions in async operations
 
 ### Mobile tests failing
+
 - Verify viewport size is set correctly
 - Check touch target sizes (minimum 44x44px)
 - Test on actual mobile devices if possible

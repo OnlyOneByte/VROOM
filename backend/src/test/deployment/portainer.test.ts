@@ -3,12 +3,13 @@
  * Tests Portainer stack configuration and compatibility
  */
 
-import { describe, test, expect, beforeAll } from 'bun:test';
+import { beforeAll, describe, expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import yaml from 'yaml';
 
 // Shared stack configuration
+// biome-ignore lint/suspicious/noExplicitAny: YAML config has dynamic structure
 let stackConfig: any;
 
 describe('Portainer Stack Configuration Tests', () => {
@@ -26,7 +27,7 @@ describe('Portainer Stack Configuration Tests', () => {
 
   test('should have backend service configured', () => {
     expect(stackConfig.services.backend).toBeDefined();
-    
+
     const backend = stackConfig.services.backend;
     expect(backend.image).toContain('ghcr.io');
     expect(backend.image).toContain('backend');
@@ -35,7 +36,7 @@ describe('Portainer Stack Configuration Tests', () => {
 
   test('should have frontend service configured', () => {
     expect(stackConfig.services.frontend).toBeDefined();
-    
+
     const frontend = stackConfig.services.frontend;
     expect(frontend.image).toContain('ghcr.io');
     expect(frontend.image).toContain('frontend');
@@ -45,10 +46,10 @@ describe('Portainer Stack Configuration Tests', () => {
   test('should have Portainer-specific labels', () => {
     const backend = stackConfig.services.backend;
     const frontend = stackConfig.services.frontend;
-    
+
     expect(backend.labels).toBeDefined();
     expect(frontend.labels).toBeDefined();
-    
+
     // Check for Portainer access control labels
     expect(backend.labels['io.portainer.accesscontrol.teams']).toBe('vroom');
     expect(frontend.labels['io.portainer.accesscontrol.teams']).toBe('vroom');
@@ -57,7 +58,7 @@ describe('Portainer Stack Configuration Tests', () => {
   test('should have Watchtower labels for auto-updates', () => {
     const backend = stackConfig.services.backend;
     const frontend = stackConfig.services.frontend;
-    
+
     expect(backend.labels['com.centurylinklabs.watchtower.enable']).toBe('true');
     expect(frontend.labels['com.centurylinklabs.watchtower.enable']).toBe('true');
   });
@@ -65,7 +66,7 @@ describe('Portainer Stack Configuration Tests', () => {
   test('should have proper restart policies', () => {
     const backend = stackConfig.services.backend;
     const frontend = stackConfig.services.frontend;
-    
+
     expect(backend.restart).toBe('unless-stopped');
     expect(frontend.restart).toBe('unless-stopped');
   });
@@ -73,10 +74,10 @@ describe('Portainer Stack Configuration Tests', () => {
   test('should have health checks configured', () => {
     const backend = stackConfig.services.backend;
     const frontend = stackConfig.services.frontend;
-    
+
     expect(backend.healthcheck).toBeDefined();
     expect(frontend.healthcheck).toBeDefined();
-    
+
     expect(backend.healthcheck.interval).toBe('30s');
     expect(backend.healthcheck.timeout).toBe('10s');
     expect(backend.healthcheck.retries).toBe(3);
@@ -84,7 +85,7 @@ describe('Portainer Stack Configuration Tests', () => {
 
   test('should have persistent volume for database', () => {
     const backend = stackConfig.services.backend;
-    
+
     expect(backend.volumes).toBeDefined();
     expect(backend.volumes).toContain('vroom-data:/app/data');
   });
@@ -103,16 +104,19 @@ describe('Portainer Stack Configuration Tests', () => {
 
   test('should use environment variable substitution', () => {
     const backend = stackConfig.services.backend;
-    
+
     // Check that environment variables use ${VAR} syntax
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: Testing Docker Compose variable syntax
     expect(backend.image).toContain('${GITHUB_REPOSITORY}');
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: Testing Docker Compose variable syntax
     expect(backend.environment.GOOGLE_CLIENT_ID).toContain('${GOOGLE_CLIENT_ID}');
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: Testing Docker Compose variable syntax
     expect(backend.environment.SESSION_SECRET).toContain('${SESSION_SECRET}');
   });
 
   test('should have frontend depend on backend', () => {
     const frontend = stackConfig.services.frontend;
-    
+
     expect(frontend.depends_on).toBeDefined();
     expect(frontend.depends_on).toContain('backend');
   });
@@ -120,14 +124,14 @@ describe('Portainer Stack Configuration Tests', () => {
   test('should expose correct ports', () => {
     const backend = stackConfig.services.backend;
     const frontend = stackConfig.services.frontend;
-    
+
     expect(backend.ports).toBeDefined();
     expect(frontend.ports).toBeDefined();
-    
+
     // Check port mappings
     const backendPort = backend.ports[0];
     const frontendPort = frontend.ports[0];
-    
+
     expect(backendPort).toContain('3001');
     expect(frontendPort).toContain('3000');
   });
@@ -135,7 +139,7 @@ describe('Portainer Stack Configuration Tests', () => {
   test('should have production environment settings', () => {
     const backend = stackConfig.services.backend;
     const frontend = stackConfig.services.frontend;
-    
+
     expect(backend.environment.NODE_ENV).toBe('production');
     expect(frontend.environment.NODE_ENV).toBe('production');
   });
@@ -147,9 +151,9 @@ describe('Portainer Deployment Documentation Tests', () => {
   test('should have deployment documentation', async () => {
     const rootDir = process.cwd().replace('/backend', '');
     const docPath = join(rootDir, 'DEPLOYMENT.md');
-    
+
     deploymentDoc = await readFile(docPath, 'utf-8');
-    
+
     expect(deploymentDoc).toBeDefined();
     expect(deploymentDoc.length).toBeGreaterThan(0);
   });
@@ -205,19 +209,19 @@ describe('Docker Compose Compatibility Tests', () => {
   test('should be compatible with Docker Compose v3.8', async () => {
     const rootDir = process.cwd().replace('/backend', '');
     const stackPath = join(rootDir, 'portainer-stack.yml');
-    
+
     const content = await readFile(stackPath, 'utf-8');
     const config = yaml.parse(content);
-    
+
     expect(config.version).toBe('3.8');
   });
 
   test('should use standard Docker Compose syntax', async () => {
     const rootDir = process.cwd().replace('/backend', '');
     const stackPath = join(rootDir, 'portainer-stack.yml');
-    
+
     const content = await readFile(stackPath, 'utf-8');
-    
+
     // Should not throw on parse
     expect(() => yaml.parse(content)).not.toThrow();
   });
@@ -243,9 +247,9 @@ describe('Environment Variable Documentation Tests', () => {
   test('should have .env.example file', async () => {
     const rootDir = process.cwd().replace('/backend', '');
     const envPath = join(rootDir, '.env.example');
-    
+
     const content = await readFile(envPath, 'utf-8');
-    
+
     expect(content).toBeDefined();
     expect(content.length).toBeGreaterThan(0);
   });
@@ -253,9 +257,9 @@ describe('Environment Variable Documentation Tests', () => {
   test('should document all required variables', async () => {
     const rootDir = process.cwd().replace('/backend', '');
     const envPath = join(rootDir, '.env.example');
-    
+
     const content = await readFile(envPath, 'utf-8');
-    
+
     expect(content).toContain('GITHUB_REPOSITORY');
     expect(content).toContain('GOOGLE_CLIENT_ID');
     expect(content).toContain('GOOGLE_CLIENT_SECRET');
@@ -268,9 +272,9 @@ describe('Environment Variable Documentation Tests', () => {
   test('should have helpful comments', async () => {
     const rootDir = process.cwd().replace('/backend', '');
     const envPath = join(rootDir, '.env.example');
-    
+
     const content = await readFile(envPath, 'utf-8');
-    
+
     expect(content).toContain('#');
     expect(content).toContain('Configuration');
   });
@@ -278,9 +282,9 @@ describe('Environment Variable Documentation Tests', () => {
   test('should document how to generate secrets', async () => {
     const rootDir = process.cwd().replace('/backend', '');
     const envPath = join(rootDir, '.env.example');
-    
+
     const content = await readFile(envPath, 'utf-8');
-    
+
     expect(content).toContain('openssl rand -base64 32');
   });
 });

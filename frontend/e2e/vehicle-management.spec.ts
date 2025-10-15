@@ -20,7 +20,7 @@ async function setupAuthenticatedSession(page, context) {
 		}
 	]);
 
-	await page.route('**/api/auth/me', async (route) => {
+	await page.route('**/api/auth/me', async route => {
 		await route.fulfill({
 			status: 200,
 			contentType: 'application/json',
@@ -39,7 +39,7 @@ test.describe('Vehicle Management', () => {
 	});
 
 	test('should display empty state when no vehicles exist', async ({ page }) => {
-		await page.route('**/api/vehicles', async (route) => {
+		await page.route('**/api/vehicles', async route => {
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -48,17 +48,17 @@ test.describe('Vehicle Management', () => {
 		});
 
 		await page.goto('/dashboard');
-		
+
 		// Should show empty state message
 		await expect(page.getByText(/no vehicles|add your first vehicle/i)).toBeVisible();
-		
+
 		// Should show add vehicle button
 		const addButton = page.getByRole('button', { name: /add vehicle/i });
 		await expect(addButton).toBeVisible();
 	});
 
 	test('should display vehicle list with summary statistics', async ({ page }) => {
-		await page.route('**/api/vehicles', async (route) => {
+		await page.route('**/api/vehicles', async route => {
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -83,7 +83,7 @@ test.describe('Vehicle Management', () => {
 		});
 
 		await page.goto('/dashboard');
-		
+
 		// Should display both vehicles
 		await expect(page.getByText('Toyota Camry')).toBeVisible();
 		await expect(page.getByText('Honda Civic')).toBeVisible();
@@ -91,7 +91,7 @@ test.describe('Vehicle Management', () => {
 	});
 
 	test('should open vehicle creation form', async ({ page }) => {
-		await page.route('**/api/vehicles', async (route) => {
+		await page.route('**/api/vehicles', async route => {
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -100,10 +100,10 @@ test.describe('Vehicle Management', () => {
 		});
 
 		await page.goto('/dashboard');
-		
+
 		const addButton = page.getByRole('button', { name: /add vehicle/i });
 		await addButton.click();
-		
+
 		// Should show vehicle form
 		await expect(page.getByLabel(/make/i)).toBeVisible();
 		await expect(page.getByLabel(/model/i)).toBeVisible();
@@ -111,7 +111,7 @@ test.describe('Vehicle Management', () => {
 	});
 
 	test('should validate required vehicle fields', async ({ page }) => {
-		await page.route('**/api/vehicles', async (route) => {
+		await page.route('**/api/vehicles', async route => {
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -120,20 +120,20 @@ test.describe('Vehicle Management', () => {
 		});
 
 		await page.goto('/dashboard');
-		
+
 		const addButton = page.getByRole('button', { name: /add vehicle/i });
 		await addButton.click();
-		
+
 		// Try to submit without filling required fields
 		const submitButton = page.getByRole('button', { name: /save|add|create/i });
 		await submitButton.click();
-		
+
 		// Should show validation errors
 		await expect(page.getByText(/required|must be provided/i)).toBeVisible();
 	});
 
 	test('should successfully add a new vehicle', async ({ page }) => {
-		await page.route('**/api/vehicles', async (route) => {
+		await page.route('**/api/vehicles', async route => {
 			if (route.request().method() === 'GET') {
 				await route.fulfill({
 					status: 200,
@@ -154,26 +154,26 @@ test.describe('Vehicle Management', () => {
 		});
 
 		await page.goto('/dashboard');
-		
+
 		const addButton = page.getByRole('button', { name: /add vehicle/i });
 		await addButton.click();
-		
+
 		// Fill in vehicle details
 		await page.getByLabel(/make/i).fill('Tesla');
 		await page.getByLabel(/model/i).fill('Model 3');
 		await page.getByLabel(/year/i).fill('2023');
 		await page.getByLabel(/license plate/i).fill('TESLA1');
-		
+
 		// Submit form
 		const submitButton = page.getByRole('button', { name: /save|add|create/i });
 		await submitButton.click();
-		
+
 		// Should show success message
 		await expect(page.getByText(/success|added|created/i)).toBeVisible();
 	});
 
 	test('should display vehicle with loan information', async ({ page }) => {
-		await page.route('**/api/vehicles', async (route) => {
+		await page.route('**/api/vehicles', async route => {
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -192,7 +192,7 @@ test.describe('Vehicle Management', () => {
 							apr: 4.5,
 							termMonths: 60,
 							standardPayment: {
-								amount: 745.50,
+								amount: 745.5,
 								frequency: 'monthly'
 							}
 						}
@@ -202,7 +202,7 @@ test.describe('Vehicle Management', () => {
 		});
 
 		await page.goto('/dashboard');
-		
+
 		// Should display loan information
 		await expect(page.getByText('Ford F-150')).toBeVisible();
 		await expect(page.getByText(/loan|financing/i)).toBeVisible();
@@ -210,7 +210,7 @@ test.describe('Vehicle Management', () => {
 	});
 
 	test('should filter vehicles by selection', async ({ page }) => {
-		await page.route('**/api/vehicles', async (route) => {
+		await page.route('**/api/vehicles', async route => {
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -232,10 +232,10 @@ test.describe('Vehicle Management', () => {
 		});
 
 		await page.goto('/dashboard');
-		
+
 		// Click on a specific vehicle
 		await page.getByText('Toyota Camry').click();
-		
+
 		// Should filter to show only that vehicle's data
 		await expect(page).toHaveURL(/vehicle1|vehicles\/vehicle1/);
 	});

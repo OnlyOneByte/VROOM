@@ -20,14 +20,14 @@ let hasErrors = false;
 for (const testFile of testFiles) {
   console.log(`\n📋 Running: ${testFile}`);
   console.log('─'.repeat(80));
-  
+
   const proc = spawn(['bun', 'test', testFile], {
     stdout: 'inherit',
     stderr: 'inherit',
   });
-  
+
   const exitCode = await proc.exited;
-  
+
   if (exitCode !== 0) {
     hasErrors = true;
     console.error(`\n❌ Tests failed in ${testFile}`);
@@ -36,7 +36,7 @@ for (const testFile of testFiles) {
   }
 }
 
-console.log('\n' + '='.repeat(80));
+console.log(`\n${'='.repeat(80)}`);
 
 if (hasErrors) {
   console.error('\n❌ Some deployment tests failed');

@@ -12,10 +12,7 @@ import { databaseService } from '../lib/database';
 const auth = new Hono();
 
 // Temporary storage for OAuth state (in production, use Redis or database)
-const oauthStateStore = new Map<
-  string,
-  { codeVerifier: string; createdAt: number }
->();
+const oauthStateStore = new Map<string, { codeVerifier: string; createdAt: number }>();
 
 // Clean up expired states (older than 10 minutes)
 const cleanupExpiredStates = () => {

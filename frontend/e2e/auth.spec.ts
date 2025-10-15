@@ -9,10 +9,10 @@ import { test, expect } from '@playwright/test';
 test.describe('Authentication Flow', () => {
 	test('should display login page for unauthenticated users', async ({ page }) => {
 		await page.goto('/');
-		
+
 		// Should redirect to login or show login option
 		await expect(page).toHaveURL(/\/(login)?/);
-		
+
 		// Check for Google OAuth button
 		const loginButton = page.getByRole('button', { name: /sign in with google/i });
 		await expect(loginButton).toBeVisible();
@@ -20,7 +20,7 @@ test.describe('Authentication Flow', () => {
 
 	test('should show Google OAuth button with correct attributes', async ({ page }) => {
 		await page.goto('/login');
-		
+
 		const googleButton = page.getByRole('button', { name: /sign in with google/i });
 		await expect(googleButton).toBeVisible();
 		await expect(googleButton).toBeEnabled();
@@ -28,23 +28,23 @@ test.describe('Authentication Flow', () => {
 
 	test('should handle OAuth redirect flow', async ({ page }) => {
 		await page.goto('/login');
-		
+
 		// Click Google OAuth button
 		const googleButton = page.getByRole('button', { name: /sign in with google/i });
-		
+
 		// Mock OAuth flow by intercepting the redirect
-		await page.route('**/auth/login/google', async (route) => {
+		await page.route('**/auth/login/google', async route => {
 			// Simulate successful OAuth callback
 			await route.fulfill({
 				status: 302,
 				headers: {
-					'Location': '/auth/callback/google?code=mock_auth_code&state=mock_state'
+					Location: '/auth/callback/google?code=mock_auth_code&state=mock_state'
 				}
 			});
 		});
-		
+
 		await googleButton.click();
-		
+
 		// Should attempt to redirect to Google OAuth
 		await page.waitForURL(/auth\/login\/google|accounts\.google\.com/);
 	});
@@ -52,7 +52,7 @@ test.describe('Authentication Flow', () => {
 	test('should protect routes requiring authentication', async ({ page }) => {
 		// Try to access protected route without authentication
 		await page.goto('/dashboard');
-		
+
 		// Should redirect to login
 		await expect(page).toHaveURL(/login/);
 	});
@@ -72,7 +72,7 @@ test.describe('Authentication Flow', () => {
 		]);
 
 		// Mock API response for user info
-		await page.route('**/api/auth/me', async (route) => {
+		await page.route('**/api/auth/me', async route => {
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -86,7 +86,7 @@ test.describe('Authentication Flow', () => {
 		});
 
 		await page.goto('/dashboard');
-		
+
 		// Should show user profile
 		await expect(page.getByText('Test User')).toBeVisible();
 	});
@@ -105,7 +105,7 @@ test.describe('Authentication Flow', () => {
 			}
 		]);
 
-		await page.route('**/api/auth/me', async (route) => {
+		await page.route('**/api/auth/me', async route => {
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -120,7 +120,7 @@ test.describe('Authentication Flow', () => {
 		await page.goto('/dashboard');
 
 		// Mock logout endpoint
-		await page.route('**/api/auth/logout', async (route) => {
+		await page.route('**/api/auth/logout', async route => {
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
