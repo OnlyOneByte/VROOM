@@ -118,9 +118,103 @@ VROOM/
 - 🐳 **Docker Ready** - Easy self-hosting with Docker
 - 📈 **Fuel Efficiency Tracking** - MPG monitoring and alerts
 
+## Documentation
+
+### For Users
+- **[Self-Hosting Guide](docs/SELF_HOSTING_GUIDE.md)** - Complete guide for self-hosting VROOM
+- **[Deployment Guide](DEPLOYMENT.md)** - Docker deployment and production setup
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+
+### For Developers
+- **[Development Guide](docs/DEVELOPMENT.md)** - Setting up development environment
+- **[API Documentation](docs/API.md)** - Backend API reference (coming soon)
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute (coming soon)
+
+### Project Specifications
+- **[Requirements](. kiro/specs/vroom-car-tracker/requirements.md)** - Feature requirements
+- **[Design](. kiro/specs/vroom-car-tracker/design.md)** - Technical design document
+- **[Tasks](. kiro/specs/vroom-car-tracker/tasks.md)** - Implementation roadmap
+
+## Quick Start
+
+### Using Docker (Recommended)
+
+```bash
+# Clone repository
+git clone https://github.com/your-username/vroom.git
+cd vroom
+
+# Configure environment
+cp .env.example .env
+nano .env  # Add your Google OAuth credentials
+
+# Start services
+docker-compose -f docker-compose.prod.yml up -d
+
+# Access application
+open http://localhost:3000
+```
+
+See [Deployment Guide](DEPLOYMENT.md) for detailed instructions.
+
+### Manual Installation
+
+See [Development Guide](docs/DEVELOPMENT.md) for manual setup instructions.
+
+## Testing
+
+### Backend Tests
+```bash
+cd backend
+bun test
+```
+
+### Frontend Unit Tests
+```bash
+cd frontend
+npm test
+```
+
+### E2E Tests
+```bash
+cd frontend
+npm run test:e2e
+```
+
+See [Development Guide](docs/DEVELOPMENT.md#testing) for more testing options.
+
 ## Development Status
 
-This project is currently in the initial setup phase. The core project structure and type definitions have been established. See `.kiro/specs/vroom-car-tracker/tasks.md` for the complete implementation roadmap.
+VROOM is feature-complete and ready for self-hosting! All core features have been implemented:
+
+✅ Multi-vehicle management  
+✅ Comprehensive expense tracking  
+✅ Fuel efficiency monitoring  
+✅ Loan and insurance management  
+✅ Google Sheets backup & sync  
+✅ PWA with offline support  
+✅ Analytics and visualizations  
+✅ Vehicle sharing  
+✅ Docker deployment  
+✅ E2E testing  
+
+See [Tasks](. kiro/specs/vroom-car-tracker/tasks.md) for implementation details.
+
+## Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting PRs.
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/your-username/vroom/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-username/vroom/discussions)
+- **Documentation**: [Wiki](https://github.com/your-username/vroom/wiki)
 
 ## License
 

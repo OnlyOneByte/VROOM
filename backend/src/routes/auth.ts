@@ -3,13 +3,30 @@ import { generateCodeVerifier, generateState } from 'arctic';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { parseCookies, serializeCookie } from 'oslo/cookie';
+
 import { users } from '../db/schema';
 import { google } from '../lib/auth/lucia';
 import { getLucia } from '../lib/auth/lucia-provider.js';
 import { databaseService } from '../lib/database';
 
 const auth = new Hono();
+
+// Temporary storage for OAuth state (in production, use Redis or database)
+const oauthStateStore = new Map<
+  string,
+  { codeVerifier: string; createdAt: number }
+>();
+
+// Clean up expired states (older than 10 minutes)
+const cleanupExpiredStates = () => {
+  const now = Date.now();
+  const tenMinutes = 10 * 60 * 1000;
+  for (const [state, data] of oauthStateStore.entries()) {
+    if (now - data.createdAt > tenMinutes) {
+      oauthStateStore.delete(state);
+    }
+  }
+};
 
 // Google OAuth login initiation
 auth.get('/login/google', async (c) => {
@@ -25,28 +42,15 @@ auth.get('/login/google', async (c) => {
       ],
     });
 
-    // Store state and code verifier in cookies
-    c.header(
-      'Set-Cookie',
-      serializeCookie('google_oauth_state', state, {
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 60 * 10, // 10 minutes
-        sameSite: 'lax',
-      })
-    );
+    // Store state and code verifier in memory (for development)
+    // In production, use Redis or a database with TTL
+    oauthStateStore.set(state, {
+      codeVerifier,
+      createdAt: Date.now(),
+    });
 
-    c.header(
-      'Set-Cookie',
-      serializeCookie('google_code_verifier', codeVerifier, {
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 60 * 10, // 10 minutes
-        sameSite: 'lax',
-      })
-    );
+    // Clean up old states
+    cleanupExpiredStates();
 
     return c.redirect(url.toString());
   } catch (error) {
@@ -66,14 +70,19 @@ auth.get('/callback/google', async (c) => {
       throw new HTTPException(400, { message: 'Missing code or state parameter' });
     }
 
-    // Verify state and get code verifier from cookies
-    const cookies = parseCookies(c.req.header('Cookie') || '');
-    const storedState = cookies.get('google_oauth_state');
-    const codeVerifier = cookies.get('google_code_verifier');
+    // Verify state and get code verifier from memory store
+    const storedData = oauthStateStore.get(state);
 
-    if (!storedState || !codeVerifier || storedState !== state) {
-      throw new HTTPException(400, { message: 'Invalid state parameter' });
+    if (!storedData) {
+      throw new HTTPException(400, {
+        message: 'Invalid or expired state parameter. Please try logging in again.',
+      });
     }
+
+    const { codeVerifier } = storedData;
+
+    // Clean up used state
+    oauthStateStore.delete(state);
 
     // Exchange code for tokens
     const tokens = await google.validateAuthorizationCode(code, codeVerifier);
@@ -138,29 +147,6 @@ auth.get('/callback/google', async (c) => {
     const lucia = getLucia();
     const session = await lucia.createSession(userId, {});
     const sessionCookie = lucia.createSessionCookie(session.id);
-
-    // Clear OAuth cookies
-    c.header(
-      'Set-Cookie',
-      serializeCookie('google_oauth_state', '', {
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 0,
-        sameSite: 'lax',
-      })
-    );
-
-    c.header(
-      'Set-Cookie',
-      serializeCookie('google_code_verifier', '', {
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 0,
-        sameSite: 'lax',
-      })
-    );
 
     // Set session cookie
     c.header('Set-Cookie', sessionCookie.serialize());

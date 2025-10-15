@@ -63,7 +63,7 @@ app.get('/health', (c) => {
 });
 
 // Mount auth routes
-app.route('/auth', auth);
+app.route('/api/auth', auth);
 
 // Mount API routes
 app.route('/api/vehicles', vehicles);
@@ -94,11 +94,11 @@ app.get('/api', optionalAuth, (c) => {
     endpoints: {
       health: '/health',
       auth: {
-        login: '/auth/login/google',
-        callback: '/auth/callback/google',
-        logout: '/auth/logout',
-        me: '/auth/me',
-        refresh: '/auth/refresh',
+        login: '/api/auth/login/google',
+        callback: '/api/auth/callback/google',
+        logout: '/api/auth/logout',
+        me: '/api/auth/me',
+        refresh: '/api/auth/refresh',
       },
       vehicles: '/api/vehicles',
       loans: '/api/loans',

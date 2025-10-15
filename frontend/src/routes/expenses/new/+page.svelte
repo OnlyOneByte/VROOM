@@ -51,7 +51,8 @@
 		try {
 			const response = await fetch('/api/vehicles');
 			if (response.ok) {
-				vehicles = await response.json();
+				const result = await response.json();
+				vehicles = result.data || [];
 				if (vehicles.length > 0) {
 					formData.vehicleId = vehicles[0].id;
 				}

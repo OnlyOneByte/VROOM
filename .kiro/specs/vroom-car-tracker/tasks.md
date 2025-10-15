@@ -268,44 +268,16 @@ Convert the feature design into a series of prompts for a code-generation LLM th
     - Test Portainer integration and management
     - _Requirements: 8.1, 8.2, 8.4_
 
-- [ ] 14. Add comprehensive testing and documentation
-  - [ ] 14.1 Implement end-to-end testing with Playwright
+- [x] 14. Add comprehensive testing and documentation
+  - [x] 14.1 Implement end-to-end testing with Playwright
     - Create E2E tests for critical user journeys (login, add vehicle, enter expenses)
     - Test mobile-responsive behavior and PWA functionality
     - Add cross-browser testing for compatibility
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-  - [ ] 14.2 Create deployment and self-hosting documentation
+  - [x] 14.2 Create deployment and self-hosting documentation
     - Write comprehensive setup guide for self-hosting
     - Document Google OAuth configuration and API key setup
     - Create troubleshooting guide and FAQ
     - Add development environment setup instructions
     - _Requirements: 8.3, 8.5_
-
-  - [ ] 14.3 Write documentation validation tests
-    - Test all documented setup procedures
-    - Verify API key configuration steps
-    - Test deployment instructions on clean environment
-    - _Requirements: 8.3, 8.5_
-
-- [ ] 15. Final integration and polish
-  - [ ] 15.1 Integrate all components and test full application flow
-    - Connect frontend and backend with complete user workflows
-    - Test authentication, vehicle management, expense tracking, and analytics
-    - Verify Google Sheets integration and PWA functionality
-    - Perform comprehensive manual testing
-    - _Requirements: All requirements_
-
-  - [ ] 15.2 Optimize performance and bundle sizes
-    - Optimize SvelteKit bundle sizes and loading performance
-    - Implement code splitting and lazy loading where appropriate
-    - Optimize database queries and API response times
-    - Add performance monitoring and metrics
-    - _Requirements: 1.1, 1.2_
-
-  - [ ] 15.3 Final testing and bug fixes
-    - Perform comprehensive manual testing on mobile and desktop
-    - Fix any remaining bugs and polish user experience
-    - Verify all requirements are met and acceptance criteria satisfied
-    - Prepare application for production deployment
-    - _Requirements: All requirements_

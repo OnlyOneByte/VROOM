@@ -13,6 +13,11 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest --run",
 		"test:watch": "vitest",
+		"test:e2e": "playwright test",
+		"test:e2e:ui": "playwright test --ui",
+		"test:e2e:headed": "playwright test --headed",
+		"test:e2e:chromium": "playwright test --project=chromium",
+		"test:e2e:mobile": "playwright test --project='Mobile Chrome' --project='Mobile Safari'",
 		"lint": "eslint . --ext .js,.ts,.svelte",
 		"lint:fix": "eslint . --ext .js,.ts,.svelte --fix",
 		"format": "prettier --write .",
@@ -21,6 +26,8 @@
 		"validate": "npm run lint && npm run format:check && npm run type-check && npm run test"
 	},
 	"devDependencies": {
+		"@axe-core/playwright": "^4.10.2",
+		"@playwright/test": "^1.56.0",
 		"@sveltejs/adapter-auto": "^6.1.0",
 		"@sveltejs/kit": "^2.43.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.0",

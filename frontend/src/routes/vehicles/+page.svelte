@@ -90,7 +90,8 @@
 			});
 
 			if (response.ok) {
-				const vehicles = await response.json();
+				const result = await response.json();
+				const vehicles = result.data || [];
 				appStore.setVehicles(vehicles);
 
 				// Load expenses for each vehicle
