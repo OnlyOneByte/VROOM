@@ -4,8 +4,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files and npmrc
+COPY package*.json .npmrc ./
 
 # Install dependencies
 RUN npm ci
@@ -29,7 +29,7 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S -D -H -u 1001 -h /app -s /sbin/nologin -G nodejs -g nodejs nodejs
 
 # Copy package files and install production dependencies only
-COPY --chown=nodejs:nodejs package*.json ./
+COPY --chown=nodejs:nodejs package*.json .npmrc ./
 RUN npm ci --omit=dev
 
 # Copy built application from builder stage

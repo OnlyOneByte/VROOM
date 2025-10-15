@@ -27,9 +27,7 @@ WORKDIR /app
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S bun && \
-    adduser -S -D -H -u 1001 -h /app -s /sbin/nologin -G bun -g bun bun
+# The bun user already exists in the base image, so we don't need to create it
 
 # Copy package files and install production dependencies only
 COPY --chown=bun:bun package.json bun.lock* ./

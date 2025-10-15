@@ -179,7 +179,7 @@ describe('Workflow Validation Tests', () => {
     const webhookStep = deploy.steps.find((s: any) => s.name === 'Trigger deployment webhook');
 
     expect(webhookStep).toBeDefined();
-    expect(webhookStep.if).toContain('DEPLOY_WEBHOOK_URL');
+    expect(webhookStep.run).toContain('DEPLOY_WEBHOOK_URL');
     expect(webhookStep.run).toContain('curl');
   });
 });

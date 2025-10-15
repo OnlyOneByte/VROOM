@@ -54,9 +54,10 @@ describe('Authentication Integration Tests', () => {
       expect(location).toContain('oauth2');
       expect(location).toContain('response_type=code');
 
-      // Check that cookies are set (at least one should be present)
-      const setCookieHeaders = res.headers.getSetCookie();
-      expect(setCookieHeaders.length).toBeGreaterThan(0);
+      // OAuth state is stored in memory, not cookies
+      // Just verify the redirect is correct
+      expect(location).toContain('state=');
+      expect(location).toContain('code_challenge=');
     });
 
     test('should handle OAuth callback with missing parameters', async () => {

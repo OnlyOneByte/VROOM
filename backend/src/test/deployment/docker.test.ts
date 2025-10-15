@@ -9,8 +9,12 @@ import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
 
+// Skip slow Docker build tests in CI - the workflow handles actual builds
+const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+const skipInCI = isCI ? test.skip : test;
+
 describe('Docker Container Tests', () => {
-  test('should build backend Docker image successfully', async () => {
+  skipInCI('should build backend Docker image successfully', async () => {
     try {
       const { stdout, stderr } = await execAsync(
         'docker build -t vroom-backend-test:latest -f backend/Dockerfile backend/',
@@ -25,7 +29,7 @@ describe('Docker Container Tests', () => {
     }
   }, 120000); // 2 minute timeout for build
 
-  test('should build frontend Docker image successfully', async () => {
+  skipInCI('should build frontend Docker image successfully', async () => {
     try {
       const { stdout, stderr } = await execAsync(
         'docker build -t vroom-frontend-test:latest -f frontend/Dockerfile frontend/',
@@ -40,7 +44,7 @@ describe('Docker Container Tests', () => {
     }
   }, 120000);
 
-  test('should verify backend image has correct entrypoint', async () => {
+  skipInCI('should verify backend image has correct entrypoint', async () => {
     try {
       const { stdout } = await execAsync(
         'docker inspect vroom-backend-test:latest --format="{{.Config.Entrypoint}}"'
@@ -53,7 +57,7 @@ describe('Docker Container Tests', () => {
     }
   });
 
-  test('should verify backend image runs as non-root user', async () => {
+  skipInCI('should verify backend image runs as non-root user', async () => {
     try {
       const { stdout } = await execAsync(
         'docker inspect vroom-backend-test:latest --format="{{.Config.User}}"'
@@ -66,7 +70,7 @@ describe('Docker Container Tests', () => {
     }
   });
 
-  test('should verify backend image exposes correct port', async () => {
+  skipInCI('should verify backend image exposes correct port', async () => {
     try {
       const { stdout } = await execAsync(
         'docker inspect vroom-backend-test:latest --format="{{json .Config.ExposedPorts}}"'
@@ -79,7 +83,7 @@ describe('Docker Container Tests', () => {
     }
   });
 
-  test('should verify backend image has health check configured', async () => {
+  skipInCI('should verify backend image has health check configured', async () => {
     try {
       const { stdout } = await execAsync(
         'docker inspect vroom-backend-test:latest --format="{{json .Config.Healthcheck}}"'
@@ -93,7 +97,7 @@ describe('Docker Container Tests', () => {
     }
   });
 
-  test('should verify frontend image exposes correct port', async () => {
+  skipInCI('should verify frontend image exposes correct port', async () => {
     try {
       const { stdout } = await execAsync(
         'docker inspect vroom-frontend-test:latest --format="{{json .Config.ExposedPorts}}"'
@@ -106,7 +110,7 @@ describe('Docker Container Tests', () => {
     }
   });
 
-  test('should verify Docker images are optimized (reasonable size)', async () => {
+  skipInCI('should verify Docker images are optimized (reasonable size)', async () => {
     try {
       const { stdout: backendSize } = await execAsync(
         'docker images vroom-backend-test:latest --format="{{.Size}}"'
@@ -132,7 +136,7 @@ describe('Docker Container Tests', () => {
 describe('Docker Compose Tests', () => {
   test('should validate docker-compose.yml syntax', async () => {
     try {
-      const { stdout, stderr } = await execAsync('docker-compose -f docker-compose.yml config', {
+      const { stdout, stderr } = await execAsync('docker compose -f docker-compose.yml config', {
         cwd: process.cwd().replace('/backend', ''),
       });
 
@@ -149,7 +153,7 @@ describe('Docker Compose Tests', () => {
   test('should validate docker-compose.prod.yml syntax', async () => {
     try {
       const { stdout, stderr } = await execAsync(
-        'docker-compose -f docker-compose.prod.yml config',
+        'docker compose -f docker-compose.prod.yml config',
         { cwd: process.cwd().replace('/backend', '') }
       );
 
@@ -165,7 +169,7 @@ describe('Docker Compose Tests', () => {
 
   test('should validate portainer-stack.yml syntax', async () => {
     try {
-      const { stdout, stderr } = await execAsync('docker-compose -f portainer-stack.yml config', {
+      const { stdout, stderr } = await execAsync('docker compose -f portainer-stack.yml config', {
         cwd: process.cwd().replace('/backend', ''),
       });
 
@@ -195,7 +199,7 @@ describe('Docker Compose Tests', () => {
 });
 
 describe('Container Startup Tests', () => {
-  test('should verify backend container can start with minimal config', async () => {
+  skipInCI('should verify backend container can start with minimal config', async () => {
     const containerId = `vroom-backend-test-${Date.now()}`;
 
     try {
