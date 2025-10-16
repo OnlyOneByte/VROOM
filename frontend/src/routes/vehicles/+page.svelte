@@ -248,7 +248,8 @@
 		}).format(amount);
 	}
 
-	function getRelativeTime(date: Date): string {
+	function getRelativeTime(date: Date | null): string {
+		if (!date) return 'Never';
 		const days = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
 		if (days === 0) return 'Today';
 		if (days === 1) return 'Yesterday';

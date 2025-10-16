@@ -141,38 +141,15 @@ console.log(`🚗 VROOM Backend starting on port ${config.server.port}`);
 console.log(`📊 Environment: ${config.env}`);
 console.log(`🗄️  Database: ${config.database.url}`);
 
-// Track server instance for cleanup
-let serverInstance: ReturnType<typeof Bun.serve> | null = null;
-
 // Graceful shutdown handler
-const shutdown = async (signal: string) => {
+const shutdown = (signal: string) => {
   console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
-  
-  if (serverInstance) {
-    try {
-      serverInstance.stop();
-      console.log('✅ Server stopped successfully');
-    } catch (error) {
-      console.error('❌ Error stopping server:', error);
-    }
-  }
-  
   process.exit(0);
 };
 
-// Register signal handlers
+// Register signal handlers for graceful shutdown
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
-
-// Handle hot reload cleanup
-if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
-    console.log('🔄 Hot reload detected, cleaning up...');
-    if (serverInstance) {
-      serverInstance.stop();
-    }
-  });
-}
 
 export default {
   port: config.server.port,
