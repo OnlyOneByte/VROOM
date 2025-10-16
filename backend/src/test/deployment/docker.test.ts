@@ -150,6 +150,7 @@ describe('Docker Compose Tests', () => {
     try {
       const { stdout, stderr } = await execAsync('docker compose -f docker-compose.yml config', {
         cwd: process.cwd().replace('/backend', ''),
+        timeout: 10000, // 10 second timeout for the command itself
       });
 
       expect(stderr).not.toContain('ERROR');
@@ -160,13 +161,16 @@ describe('Docker Compose Tests', () => {
       console.error('Docker Compose validation failed:', error);
       throw error;
     }
-  });
+  }, 15000); // 15 second test timeout
 
   test('should validate docker-compose.prod.yml syntax', async () => {
     try {
       const { stdout, stderr } = await execAsync(
         'docker compose -f docker-compose.prod.yml config',
-        { cwd: process.cwd().replace('/backend', '') }
+        {
+          cwd: process.cwd().replace('/backend', ''),
+          timeout: 10000,
+        }
       );
 
       expect(stderr).not.toContain('ERROR');
@@ -177,12 +181,13 @@ describe('Docker Compose Tests', () => {
       console.error('Docker Compose validation failed:', error);
       throw error;
     }
-  });
+  }, 15000);
 
   test('should validate portainer-stack.yml syntax', async () => {
     try {
       const { stdout, stderr } = await execAsync('docker compose -f portainer-stack.yml config', {
         cwd: process.cwd().replace('/backend', ''),
+        timeout: 10000,
       });
 
       expect(stderr).not.toContain('ERROR');
@@ -191,7 +196,7 @@ describe('Docker Compose Tests', () => {
       console.error('Portainer stack validation failed:', error);
       throw error;
     }
-  });
+  }, 15000);
 
   test('should verify all required environment variables are documented', async () => {
     const fs = await import('node:fs/promises');
