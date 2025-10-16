@@ -2,9 +2,9 @@ import { goto } from '$app/navigation';
 import { authStore } from '$lib/stores/auth.js';
 
 // Protected routes that require authentication
-export const protectedRoutes = ['/dashboard', '/vehicles', '/expenses', '/analytics', '/settings'];
+export const protectedRoutes = ['/vehicles', '/expenses', '/analytics', '/settings'];
 
-// Public routes that redirect to dashboard if authenticated
+// Public routes that redirect to vehicles if authenticated
 export const publicRoutes = ['/auth'];
 
 export function isProtectedRoute(pathname: string): boolean {
@@ -30,11 +30,11 @@ export function handleRouteProtection(
 		// Redirect to auth page if trying to access protected route without authentication
 		goto('/auth');
 	} else if (isPublic && isAuthenticated) {
-		// Redirect to dashboard if trying to access public route while authenticated
-		goto('/dashboard');
+		// Redirect to vehicles if trying to access public route while authenticated
+		goto('/vehicles');
 	} else if (pathname === '/' && isAuthenticated) {
-		// Redirect root to dashboard if authenticated
-		goto('/dashboard');
+		// Redirect root to vehicles if authenticated
+		goto('/vehicles');
 	} else if (pathname === '/' && !isAuthenticated) {
 		// Redirect root to auth if not authenticated
 		goto('/auth');

@@ -9,7 +9,7 @@
 		const unsubscribe = authStore.subscribe(({ isAuthenticated, isLoading }) => {
 			if (!isLoading) {
 				if (isAuthenticated) {
-					goto('/dashboard');
+					goto('/vehicles');
 				} else {
 					goto('/auth');
 				}

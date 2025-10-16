@@ -12,7 +12,7 @@
 	onMount(() => {
 		const unsubscribe = authStore.subscribe(({ isAuthenticated, isLoading: authLoading }) => {
 			if (!authLoading && isAuthenticated) {
-				goto('/dashboard');
+				goto('/vehicles');
 			}
 		});
 

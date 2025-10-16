@@ -3,7 +3,7 @@
 	import { authStore } from '$lib/stores/auth.js';
 	import { appStore } from '$lib/stores/app.js';
 	import type { AuthState, AppState } from '$lib/types/index.js';
-	import { Home, Car, Receipt, BarChart3, Settings, Menu, X, LogOut, User } from 'lucide-svelte';
+	import { Home, Receipt, BarChart3, Settings, Menu, X, LogOut, User } from 'lucide-svelte';
 	import SyncStatusIndicator from './SyncStatusIndicator.svelte';
 
 	let authState = $state<AuthState>({
@@ -44,16 +44,15 @@
 	});
 
 	const navigation = [
-		{ name: 'Dashboard', href: '/dashboard', icon: Home },
-		{ name: 'Vehicles', href: '/vehicles', icon: Car },
+		{ name: 'Dashboard', href: '/vehicles', icon: Home },
 		{ name: 'Expenses', href: '/expenses', icon: Receipt },
 		{ name: 'Analytics', href: '/analytics', icon: BarChart3 },
 		{ name: 'Settings', href: '/settings', icon: Settings }
 	];
 
 	function isActive(href: string): boolean {
-		if (href === '/dashboard') {
-			return currentPath === '/' || currentPath === '/dashboard';
+		if (href === '/vehicles') {
+			return currentPath === '/' || currentPath === '/vehicles';
 		}
 		return currentPath.startsWith(href);
 	}

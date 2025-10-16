@@ -1,12 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { isOnline } from '$lib/stores/offline';
 	import { addOfflineExpense } from '$lib/utils/offline-storage';
 	import { requestBackgroundSync } from '$lib/utils/pwa';
 	import { appStore } from '$lib/stores/app';
 	import { Save, ArrowLeft, Fuel, Wrench, DollarSign, FileText } from 'lucide-svelte';
 	import type { ExpenseFormErrors } from '$lib/types.js';
+
+	// Get URL parameters
+	let returnTo = $state('/expenses');
+	let preselectedVehicleId = $state<string | null>(null);
 
 	// Form data
 	let formData = {
@@ -19,6 +24,16 @@
 		gallons: '',
 		description: ''
 	};
+
+	// Update from URL params
+	$effect(() => {
+		const params = $page.url.searchParams;
+		returnTo = params.get('returnTo') || '/expenses';
+		preselectedVehicleId = params.get('vehicleId');
+		if (preselectedVehicleId && !formData.vehicleId) {
+			formData.vehicleId = preselectedVehicleId;
+		}
+	});
 
 	// Form state
 	let isSubmitting = false;
@@ -63,15 +78,17 @@
 	});
 
 	// Auto-set category when type changes
-	$: if (formData.type) {
-		const selectedType = expenseTypes.find(t => t.value === formData.type);
-		if (selectedType) {
-			formData.category = selectedType.category;
+	$effect(() => {
+		if (formData.type) {
+			const selectedType = expenseTypes.find(t => t.value === formData.type);
+			if (selectedType) {
+				formData.category = selectedType.category;
+			}
 		}
-	}
+	});
 
 	// Show fuel-specific fields
-	$: showFuelFields = formData.type === 'fuel';
+	let showFuelFields = $derived(formData.type === 'fuel');
 
 	function validateForm(): boolean {
 		errors = {};
@@ -118,7 +135,7 @@
 				type: formData.type,
 				category: formData.category,
 				amount: parseFloat(formData.amount),
-				date: formData.date,
+				date: formData.date ? new Date(formData.date).toISOString() : new Date().toISOString(),
 				mileage: formData.mileage ? parseInt(formData.mileage) : undefined,
 				gallons: formData.gallons ? parseFloat(formData.gallons) : undefined,
 				description: formData.description || undefined
@@ -126,7 +143,7 @@
 
 			if ($isOnline) {
 				// Try to submit directly
-				const response = await fetch(`/api/vehicles/${formData.vehicleId}/expenses`, {
+				const response = await fetch(`/api/expenses`, {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json'
@@ -139,7 +156,7 @@
 						type: 'success',
 						message: 'Expense added successfully'
 					});
-					goto('/expenses');
+					goto(returnTo);
 				} else {
 					throw new Error('Failed to save expense');
 				}
@@ -164,7 +181,7 @@
 					message: 'Expense saved offline. Will sync when online.'
 				});
 
-				goto('/expenses');
+				goto(returnTo);
 			}
 		} catch (error) {
 			console.error('Failed to save expense:', error);
@@ -198,7 +215,7 @@
 				message: 'Saved offline due to connection issue. Will sync when online.'
 			});
 
-			goto('/expenses');
+			goto(returnTo);
 		} finally {
 			isSubmitting = false;
 		}
@@ -213,7 +230,7 @@
 <div class="max-w-2xl mx-auto space-y-6">
 	<!-- Header -->
 	<div class="flex items-center gap-4">
-		<button on:click={() => goto('/expenses')} class="p-2 hover:bg-gray-100 rounded-lg">
+		<button on:click={() => goto(returnTo)} class="p-2 hover:bg-gray-100 rounded-lg">
 			<ArrowLeft class="h-5 w-5" />
 		</button>
 
@@ -338,9 +355,28 @@
 			{/if}
 		</div>
 
+		<!-- Mileage (always visible, required for fuel) -->
+		<div>
+			<label for="mileage" class="block text-sm font-medium text-gray-700 mb-2">
+				Current Mileage {showFuelFields ? '*' : '(Optional)'}
+			</label>
+			<input
+				id="mileage"
+				type="number"
+				min="0"
+				bind:value={formData.mileage}
+				placeholder="123456"
+				class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+				class:border-red-300={errors['mileage']}
+			/>
+			{#if errors['mileage']}
+				<p class="text-red-600 text-sm mt-1">{errors['mileage']}</p>
+			{/if}
+		</div>
+
 		<!-- Fuel-specific fields -->
 		{#if showFuelFields}
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
+			<div class="p-4 bg-blue-50 rounded-lg space-y-4">
 				<div>
 					<label for="gallons" class="block text-sm font-medium text-gray-700 mb-2">
 						Gallons *
@@ -360,26 +396,8 @@
 					{/if}
 				</div>
 
-				<div>
-					<label for="mileage" class="block text-sm font-medium text-gray-700 mb-2">
-						Current Mileage *
-					</label>
-					<input
-						id="mileage"
-						type="number"
-						min="0"
-						bind:value={formData.mileage}
-						placeholder="123456"
-						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-						class:border-red-300={errors['mileage']}
-					/>
-					{#if errors['mileage']}
-						<p class="text-red-600 text-sm mt-1">{errors['mileage']}</p>
-					{/if}
-				</div>
-
 				{#if formData.gallons && formData.amount}
-					<div class="sm:col-span-2 text-sm text-gray-600">
+					<div class="text-sm text-gray-600">
 						<strong>Price per gallon:</strong> ${(
 							parseFloat(formData.amount) / parseFloat(formData.gallons)
 						).toFixed(3)}

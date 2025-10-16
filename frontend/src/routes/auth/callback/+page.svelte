@@ -34,7 +34,7 @@
 						if (isAuthenticated) {
 							status = 'success';
 							setTimeout(() => {
-								goto('/dashboard');
+								goto('/vehicles');
 							}, 1000);
 						} else {
 							status = 'error';

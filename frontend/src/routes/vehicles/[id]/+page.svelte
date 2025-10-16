@@ -9,14 +9,26 @@
 		Edit,
 		Plus,
 		DollarSign,
-		Calendar,
 		Gauge,
 		TrendingUp,
 		CreditCard,
 		Fuel,
-		Wrench
+		Wrench,
+		Search,
+		Filter,
+		Trash2,
+		SortAsc,
+		SortDesc,
+		X,
+		FileText
 	} from 'lucide-svelte';
-	import type { Vehicle, Expense } from '$lib/types.js';
+	import type {
+		Vehicle,
+		Expense,
+		ExpenseType,
+		ExpenseCategory,
+		ExpenseFilters
+	} from '$lib/types.js';
 
 	const vehicleId = $page.params.id;
 
@@ -24,14 +36,59 @@
 	let isLoading = $state(true);
 	let vehicle = $state<Vehicle | null>(null);
 	let expenses = $state<Expense[]>([]);
+	let filteredExpenses = $state<Expense[]>([]);
+	let showFilters = $state(false);
+	let showDeleteModal = $state(false);
+	let expenseToDelete = $state<Expense | null>(null);
+	let isDeleting = $state(false);
+
+	// Filters and search
+	let searchTerm = $state('');
+	let filters = $state<ExpenseFilters>({});
+
+	// Sorting
+	let sortBy = $state<'date' | 'amount' | 'type'>('date');
+	let sortOrder = $state<'asc' | 'desc'>('desc');
+
 	let vehicleStats = $state({
 		totalExpenses: 0,
 		recentExpenses: 0,
 		expenseCount: 0,
 		avgMpg: 0,
+		monthlyAverage: 0,
 		lastExpenseDate: null as Date | null,
 		expensesByCategory: {} as Record<string, number>
 	});
+
+	// Category and type mappings
+	const categoryLabels: Record<ExpenseCategory, string> = {
+		operating: 'Operating',
+		maintenance: 'Maintenance',
+		financial: 'Financial',
+		regulatory: 'Regulatory',
+		enhancement: 'Enhancement',
+		convenience: 'Convenience'
+	};
+
+	const typeLabels: Record<ExpenseType, string> = {
+		fuel: 'Fuel',
+		tolls: 'Tolls',
+		parking: 'Parking',
+		maintenance: 'Maintenance',
+		repairs: 'Repairs',
+		tires: 'Tires',
+		'oil-change': 'Oil Change',
+		insurance: 'Insurance',
+		'loan-payment': 'Loan Payment',
+		registration: 'Registration',
+		inspection: 'Inspection',
+		emissions: 'Emissions',
+		tickets: 'Tickets',
+		modifications: 'Modifications',
+		accessories: 'Accessories',
+		detailing: 'Detailing',
+		other: 'Other'
+	};
 
 	onMount(async () => {
 		await loadVehicle();
@@ -45,7 +102,8 @@
 			});
 
 			if (response.ok) {
-				vehicle = await response.json();
+				const result = await response.json();
+				vehicle = result.data || result;
 			} else {
 				appStore.addNotification({
 					type: 'error',
@@ -64,12 +122,14 @@
 
 	async function loadExpenses() {
 		try {
-			const response = await fetch(`/api/vehicles/${vehicleId}/expenses`, {
+			const response = await fetch(`/api/expenses?vehicleId=${vehicleId}`, {
 				credentials: 'include'
 			});
 
 			if (response.ok) {
-				expenses = await response.json();
+				const result = await response.json();
+				expenses = result.data || result || [];
+				applyFiltersAndSort();
 				calculateStats();
 			}
 		} catch (error) {
@@ -77,6 +137,61 @@
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	function applyFiltersAndSort() {
+		let filtered = [...expenses];
+
+		// Apply search filter
+		if (searchTerm.trim()) {
+			const term = searchTerm.toLowerCase();
+			filtered = filtered.filter(
+				expense =>
+					expense.description?.toLowerCase().includes(term) ||
+					expense.type.toLowerCase().includes(term) ||
+					expense.category.toLowerCase().includes(term) ||
+					expense.amount.toString().includes(term)
+			);
+		}
+
+		// Apply category filter
+		if (filters.category) {
+			filtered = filtered.filter(expense => expense.category === filters.category);
+		}
+
+		// Apply type filter
+		if (filters.type) {
+			filtered = filtered.filter(expense => expense.type === filters.type);
+		}
+
+		// Apply date range filter
+		if (filters.startDate) {
+			filtered = filtered.filter(expense => new Date(expense.date) >= filters.startDate!);
+		}
+		if (filters.endDate) {
+			filtered = filtered.filter(expense => new Date(expense.date) <= filters.endDate!);
+		}
+
+		// Apply sorting
+		filtered.sort((a, b) => {
+			let comparison = 0;
+
+			switch (sortBy) {
+				case 'date':
+					comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+					break;
+				case 'amount':
+					comparison = a.amount - b.amount;
+					break;
+				case 'type':
+					comparison = a.type.localeCompare(b.type);
+					break;
+			}
+
+			return sortOrder === 'asc' ? comparison : -comparison;
+		});
+
+		filteredExpenses = filtered;
 	}
 
 	function calculateStats() {
@@ -95,6 +210,17 @@
 			},
 			{} as Record<string, number>
 		);
+
+		// Calculate monthly average (last 12 months)
+		const twelveMonthsAgo = new Date();
+		twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+		const recentExpensesYear = expenses.filter(
+			expense => new Date(expense.date) >= twelveMonthsAgo
+		);
+		const monthlyAverage =
+			recentExpensesYear.length > 0
+				? recentExpensesYear.reduce((sum, expense) => sum + expense.amount, 0) / 12
+				: 0;
 
 		// Calculate fuel efficiency
 		const fuelExpenses = expenses.filter(e => e.type === 'fuel' && e.gallons && e.mileage);
@@ -121,6 +247,7 @@
 			recentExpenses: recentAmount,
 			expenseCount: expenses.length,
 			avgMpg: Math.round(avgMpg * 10) / 10,
+			monthlyAverage,
 			lastExpenseDate:
 				expenses.length > 0
 					? new Date(Math.max(...expenses.map(e => new Date(e.date).getTime())))
@@ -128,6 +255,72 @@
 			expensesByCategory
 		};
 	}
+
+	function handleSort(newSortBy: typeof sortBy) {
+		if (sortBy === newSortBy) {
+			sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+		} else {
+			sortBy = newSortBy;
+			sortOrder = 'desc';
+		}
+		applyFiltersAndSort();
+	}
+
+	function clearFilters() {
+		searchTerm = '';
+		filters = {};
+		applyFiltersAndSort();
+	}
+
+	function confirmDelete(expense: Expense) {
+		expenseToDelete = expense;
+		showDeleteModal = true;
+	}
+
+	async function deleteExpense() {
+		if (!expenseToDelete) return;
+
+		isDeleting = true;
+
+		try {
+			const response = await fetch(`/api/expenses/${expenseToDelete.id}`, {
+				method: 'DELETE',
+				credentials: 'include'
+			});
+
+			if (response.ok) {
+				expenses = expenses.filter(e => e.id !== expenseToDelete!.id);
+				applyFiltersAndSort();
+				calculateStats();
+
+				appStore.addNotification({
+					type: 'success',
+					message: 'Expense deleted successfully'
+				});
+			} else {
+				const result = await response.json();
+				appStore.addNotification({
+					type: 'error',
+					message: result.message || 'Failed to delete expense'
+				});
+			}
+		} catch (error) {
+			console.error('Error deleting expense:', error);
+			appStore.addNotification({
+				type: 'error',
+				message: 'Network error. Please try again.'
+			});
+		} finally {
+			isDeleting = false;
+			showDeleteModal = false;
+			expenseToDelete = null;
+		}
+	}
+
+	// Reactive updates
+	$effect(() => {
+		applyFiltersAndSort();
+	});
 
 	function getVehicleDisplayName(): string {
 		if (!vehicle) return '';
@@ -256,10 +449,12 @@
 			<div class="card-compact">
 				<div class="flex items-center justify-between">
 					<div>
-						<p class="text-sm font-medium text-gray-600">Expense Count</p>
-						<p class="text-2xl font-bold text-gray-900">{vehicleStats.expenseCount}</p>
+						<p class="text-sm font-medium text-gray-600">Monthly Average</p>
+						<p class="text-2xl font-bold text-gray-900">
+							{formatCurrency(vehicleStats.monthlyAverage)}
+						</p>
 					</div>
-					<Calendar class="h-8 w-8 text-blue-600" />
+					<FileText class="h-8 w-8 text-blue-600" />
 				</div>
 			</div>
 
@@ -267,7 +462,7 @@
 				<div class="flex items-center justify-between">
 					<div>
 						<p class="text-sm font-medium text-gray-600">
-							{vehicleStats.avgMpg > 0 ? 'Avg MPG' : 'Last Activity'}
+							{vehicleStats.avgMpg > 0 ? 'Avg MPG' : 'Last Expense'}
 						</p>
 						<p class="text-2xl font-bold text-gray-900">
 							{#if vehicleStats.avgMpg > 0}
@@ -284,224 +479,412 @@
 			</div>
 		</div>
 
-		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-			<!-- Vehicle Details -->
-			<div class="lg:col-span-2 space-y-6">
-				<!-- Basic Information -->
-				<div class="card">
-					<div class="flex items-center gap-2 mb-4">
-						<Car class="h-5 w-5 text-primary-600" />
-						<h2 class="text-lg font-semibold text-gray-900">Vehicle Information</h2>
-					</div>
-
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<div>
-							<p class="text-sm text-gray-600">Make & Model</p>
-							<p class="font-medium text-gray-900">{vehicle.make} {vehicle.model}</p>
+		<!-- Expenses by Category -->
+		{#if Object.keys(vehicleStats.expensesByCategory).length > 0}
+			<div class="card">
+				<h3 class="text-lg font-semibold text-gray-900 mb-4">Expenses by Category</h3>
+				<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+					{#each Object.entries(vehicleStats.expensesByCategory) as [category, amount]}
+						{@const IconComponent = getCategoryIcon(category)}
+						<div class="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
+							<div class="p-2 rounded-lg {getCategoryColor(category)} mb-2">
+								<IconComponent class="h-4 w-4" />
+							</div>
+							<span class="text-xs font-medium text-gray-700 mb-1"
+								>{formatCategoryName(category)}</span
+							>
+							<span class="text-sm font-bold text-gray-900">{formatCurrency(amount)}</span>
 						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
 
-						<div>
-							<p class="text-sm text-gray-600">Year</p>
-							<p class="font-medium text-gray-900">{vehicle.year}</p>
-						</div>
+		<!-- Basic Information -->
+		<div class="card">
+			<div class="flex items-center gap-2 mb-4">
+				<Car class="h-5 w-5 text-primary-600" />
+				<h2 class="text-lg font-semibold text-gray-900">Vehicle Information</h2>
+			</div>
 
-						{#if vehicle.licensePlate}
-							<div>
-								<p class="text-sm text-gray-600">License Plate</p>
-								<p class="font-medium text-gray-900 font-mono">{vehicle.licensePlate}</p>
-							</div>
-						{/if}
-
-						{#if vehicle.initialMileage}
-							<div>
-								<p class="text-sm text-gray-600">Initial Mileage</p>
-								<p class="font-medium text-gray-900">
-									{vehicle.initialMileage.toLocaleString()} mi
-								</p>
-							</div>
-						{/if}
-
-						{#if vehicle.purchaseDate}
-							<div>
-								<p class="text-sm text-gray-600">Purchase Date</p>
-								<p class="font-medium text-gray-900">
-									{formatDate(new Date(vehicle.purchaseDate))}
-								</p>
-							</div>
-						{/if}
-
-						{#if vehicle.purchasePrice}
-							<div>
-								<p class="text-sm text-gray-600">Purchase Price</p>
-								<p class="font-medium text-gray-900">{formatCurrency(vehicle.purchasePrice)}</p>
-							</div>
-						{/if}
-					</div>
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+				<div>
+					<p class="text-sm text-gray-600">Make & Model</p>
+					<p class="font-medium text-gray-900">{vehicle.make} {vehicle.model}</p>
 				</div>
 
-				<!-- Loan Information -->
-				{#if vehicle.loan?.isActive}
-					<div class="card">
-						<div class="flex items-center gap-2 mb-4">
-							<CreditCard class="h-5 w-5 text-primary-600" />
-							<h2 class="text-lg font-semibold text-gray-900">Loan Information</h2>
-						</div>
+				<div>
+					<p class="text-sm text-gray-600">Year</p>
+					<p class="font-medium text-gray-900">{vehicle.year}</p>
+				</div>
 
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-							<div>
-								<p class="text-sm text-gray-600">Lender</p>
-								<p class="font-medium text-gray-900">{vehicle.loan.lender}</p>
-							</div>
-
-							<div>
-								<p class="text-sm text-gray-600">Current Balance</p>
-								<p class="font-medium text-gray-900">
-									{formatCurrency(vehicle.loan.currentBalance)}
-								</p>
-							</div>
-
-							<div>
-								<p class="text-sm text-gray-600">Original Amount</p>
-								<p class="font-medium text-gray-900">
-									{formatCurrency(vehicle.loan.originalAmount)}
-								</p>
-							</div>
-
-							<div>
-								<p class="text-sm text-gray-600">APR</p>
-								<p class="font-medium text-gray-900">{vehicle.loan.apr}%</p>
-							</div>
-
-							<div>
-								<p class="text-sm text-gray-600">Monthly Payment</p>
-								<p class="font-medium text-gray-900">
-									{formatCurrency(vehicle.loan.standardPayment.amount)}
-								</p>
-							</div>
-
-							<div>
-								<p class="text-sm text-gray-600">Term</p>
-								<p class="font-medium text-gray-900">{vehicle.loan.termMonths} months</p>
-							</div>
-						</div>
-
-						<!-- Loan Progress -->
-						<div class="mt-4 pt-4 border-t border-gray-200">
-							<div class="flex justify-between text-sm text-gray-600 mb-2">
-								<span>Loan Progress</span>
-								<span>
-									{Math.round(
-										((vehicle.loan.originalAmount - vehicle.loan.currentBalance) /
-											vehicle.loan.originalAmount) *
-											100
-									)}% paid
-								</span>
-							</div>
-							<div class="w-full bg-gray-200 rounded-full h-2">
-								<div
-									class="bg-primary-600 h-2 rounded-full transition-all duration-300"
-									style="width: {((vehicle.loan.originalAmount - vehicle.loan.currentBalance) /
-										vehicle.loan.originalAmount) *
-										100}%"
-								></div>
-							</div>
-						</div>
+				{#if vehicle.licensePlate}
+					<div>
+						<p class="text-sm text-gray-600">License Plate</p>
+						<p class="font-medium text-gray-900 font-mono">{vehicle.licensePlate}</p>
 					</div>
 				{/if}
 
-				<!-- Recent Expenses -->
-				<div class="card">
-					<div class="flex items-center justify-between mb-4">
-						<h2 class="text-lg font-semibold text-gray-900">Recent Expenses</h2>
-						<a
-							href="/vehicles/{vehicleId}/expenses"
-							class="text-primary-600 hover:text-primary-700 text-sm font-medium"
-						>
-							View All
-						</a>
+				{#if vehicle.initialMileage}
+					<div>
+						<p class="text-sm text-gray-600">Initial Mileage</p>
+						<p class="font-medium text-gray-900">
+							{vehicle.initialMileage.toLocaleString()} mi
+						</p>
+					</div>
+				{/if}
+
+				{#if vehicle.purchaseDate}
+					<div>
+						<p class="text-sm text-gray-600">Purchase Date</p>
+						<p class="font-medium text-gray-900">
+							{formatDate(new Date(vehicle.purchaseDate))}
+						</p>
+					</div>
+				{/if}
+
+				{#if vehicle.purchasePrice}
+					<div>
+						<p class="text-sm text-gray-600">Purchase Price</p>
+						<p class="font-medium text-gray-900">{formatCurrency(vehicle.purchasePrice)}</p>
+					</div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Loan Information -->
+		{#if vehicle.loan?.isActive}
+			<div class="card">
+				<div class="flex items-center gap-2 mb-4">
+					<CreditCard class="h-5 w-5 text-primary-600" />
+					<h2 class="text-lg font-semibold text-gray-900">Loan Information</h2>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					<div>
+						<p class="text-sm text-gray-600">Lender</p>
+						<p class="font-medium text-gray-900">{vehicle.loan.lender}</p>
 					</div>
 
-					{#if expenses.length === 0}
-						<div class="text-center py-8">
-							<DollarSign class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-							<h3 class="text-lg font-medium text-gray-900 mb-2">No expenses yet</h3>
-							<p class="text-gray-600 mb-4">Start tracking expenses for this vehicle</p>
-							<a
-								href="/vehicles/{vehicleId}/expenses/new"
-								class="btn btn-primary inline-flex items-center gap-2"
+					<div>
+						<p class="text-sm text-gray-600">Current Balance</p>
+						<p class="font-medium text-gray-900">
+							{formatCurrency(vehicle.loan.currentBalance)}
+						</p>
+					</div>
+
+					<div>
+						<p class="text-sm text-gray-600">Original Amount</p>
+						<p class="font-medium text-gray-900">
+							{formatCurrency(vehicle.loan.originalAmount)}
+						</p>
+					</div>
+
+					<div>
+						<p class="text-sm text-gray-600">APR</p>
+						<p class="font-medium text-gray-900">{vehicle.loan.apr}%</p>
+					</div>
+
+					<div>
+						<p class="text-sm text-gray-600">Monthly Payment</p>
+						<p class="font-medium text-gray-900">
+							{formatCurrency(vehicle.loan.standardPayment.amount)}
+						</p>
+					</div>
+
+					<div>
+						<p class="text-sm text-gray-600">Term</p>
+						<p class="font-medium text-gray-900">{vehicle.loan.termMonths} months</p>
+					</div>
+				</div>
+
+				<!-- Loan Progress -->
+				<div class="mt-4 pt-4 border-t border-gray-200">
+					<div class="flex justify-between text-sm text-gray-600 mb-2">
+						<span>Loan Progress</span>
+						<span>
+							{Math.round(
+								((vehicle.loan.originalAmount - vehicle.loan.currentBalance) /
+									vehicle.loan.originalAmount) *
+									100
+							)}% paid
+						</span>
+					</div>
+					<div class="w-full bg-gray-200 rounded-full h-2">
+						<div
+							class="bg-primary-600 h-2 rounded-full transition-all duration-300"
+							style="width: {((vehicle.loan.originalAmount - vehicle.loan.currentBalance) /
+								vehicle.loan.originalAmount) *
+								100}%"
+						></div>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Search and Filters -->
+		<div class="card space-y-4">
+			<!-- Search Bar -->
+			<div class="flex gap-2">
+				<div class="flex-1 relative">
+					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+						<Search class="h-5 w-5 text-gray-400" />
+					</div>
+					<input
+						type="text"
+						bind:value={searchTerm}
+						placeholder="Search expenses..."
+						class="form-input pl-10 w-full"
+					/>
+				</div>
+				<button
+					onclick={() => (showFilters = !showFilters)}
+					class="btn btn-outline inline-flex items-center gap-2"
+				>
+					<Filter class="h-4 w-4" />
+					Filters
+				</button>
+			</div>
+
+			<!-- Filter Panel -->
+			{#if showFilters}
+				<div class="border-t border-gray-200 pt-4 space-y-4">
+					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+						<!-- Category Filter -->
+						<div>
+							<label for="category-filter" class="block text-sm font-medium text-gray-700 mb-2"
+								>Category</label
 							>
-								<Plus class="h-4 w-4" />
-								Add First Expense
-							</a>
+							<select id="category-filter" bind:value={filters.category} class="form-input">
+								<option value={undefined}>All Categories</option>
+								{#each Object.entries(categoryLabels) as [value, label]}
+									<option {value}>{label}</option>
+								{/each}
+							</select>
 						</div>
-					{:else}
-						<div class="space-y-3">
-							{#each expenses.slice(0, 5) as expense}
-								{@const IconComponent = getCategoryIcon(expense.category)}
-								<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-									<div class="flex items-center gap-3">
-										<div class="p-2 rounded-lg {getCategoryColor(expense.category)}">
-											<IconComponent class="h-4 w-4" />
-										</div>
-										<div>
-											<p class="font-medium text-gray-900">{expense.description || expense.type}</p>
-											<p class="text-sm text-gray-600">{formatDate(new Date(expense.date))}</p>
-										</div>
-									</div>
-									<p class="font-semibold text-gray-900">{formatCurrency(expense.amount)}</p>
-								</div>
-							{/each}
+
+						<!-- Type Filter -->
+						<div>
+							<label for="type-filter" class="block text-sm font-medium text-gray-700 mb-2"
+								>Type</label
+							>
+							<select id="type-filter" bind:value={filters.type} class="form-input">
+								<option value={undefined}>All Types</option>
+								{#each Object.entries(typeLabels) as [value, label]}
+									<option {value}>{label}</option>
+								{/each}
+							</select>
 						</div>
-					{/if}
+
+						<!-- Start Date -->
+						<div>
+							<label for="start-date-filter" class="block text-sm font-medium text-gray-700 mb-2"
+								>Start Date</label
+							>
+							<input
+								id="start-date-filter"
+								type="date"
+								bind:value={filters.startDate}
+								class="form-input"
+							/>
+						</div>
+
+						<!-- End Date -->
+						<div>
+							<label for="end-date-filter" class="block text-sm font-medium text-gray-700 mb-2"
+								>End Date</label
+							>
+							<input
+								id="end-date-filter"
+								type="date"
+								bind:value={filters.endDate}
+								class="form-input"
+							/>
+						</div>
+					</div>
+
+					<div class="flex justify-end">
+						<button onclick={clearFilters} class="btn btn-outline inline-flex items-center gap-2">
+							<X class="h-4 w-4" />
+							Clear Filters
+						</button>
+					</div>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Expense List -->
+		<div class="card">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-lg font-semibold text-gray-900">
+					All Expenses ({filteredExpenses.length})
+				</h2>
+
+				<!-- Sort Controls -->
+				<div class="flex gap-2">
+					<button
+						onclick={() => handleSort('date')}
+						class="btn btn-outline btn-sm inline-flex items-center gap-1"
+					>
+						Date
+						{#if sortBy === 'date'}
+							{@const SortIcon = sortOrder === 'asc' ? SortAsc : SortDesc}
+							<SortIcon class="h-3 w-3" />
+						{/if}
+					</button>
+					<button
+						onclick={() => handleSort('amount')}
+						class="btn btn-outline btn-sm inline-flex items-center gap-1"
+					>
+						Amount
+						{#if sortBy === 'amount'}
+							{@const SortIcon = sortOrder === 'asc' ? SortAsc : SortDesc}
+							<SortIcon class="h-3 w-3" />
+						{/if}
+					</button>
 				</div>
 			</div>
 
-			<!-- Sidebar -->
-			<div class="space-y-6">
-				<!-- Expense Categories -->
-				{#if Object.keys(vehicleStats.expensesByCategory).length > 0}
-					<div class="card">
-						<h3 class="text-lg font-semibold text-gray-900 mb-4">Expenses by Category</h3>
-						<div class="space-y-3">
-							{#each Object.entries(vehicleStats.expensesByCategory) as [category, amount]}
-								<div class="flex items-center justify-between">
-									<div class="flex items-center gap-2">
-										<div
-											class="w-3 h-3 rounded-full {getCategoryColor(category).split(' ')[1]}"
-										></div>
-										<span class="text-sm text-gray-700">{formatCategoryName(category)}</span>
-									</div>
-									<span class="text-sm font-medium text-gray-900">{formatCurrency(amount)}</span>
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Quick Actions -->
-				<div class="card">
-					<h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-					<div class="space-y-2">
+			{#if filteredExpenses.length === 0}
+				<div class="text-center py-8">
+					{#if expenses.length === 0}
+						<DollarSign class="h-12 w-12 text-gray-400 mx-auto mb-4" />
+						<h3 class="text-lg font-medium text-gray-900 mb-2">No expenses yet</h3>
+						<p class="text-gray-600 mb-4">Start tracking expenses for this vehicle</p>
 						<a
 							href="/vehicles/{vehicleId}/expenses/new"
-							class="btn btn-primary w-full justify-center"
+							class="btn btn-primary inline-flex items-center gap-2"
 						>
-							Add Expense
+							<Plus class="h-4 w-4" />
+							Add First Expense
 						</a>
-						<a
-							href="/vehicles/{vehicleId}/analytics"
-							class="btn btn-secondary w-full justify-center"
+					{:else}
+						<Search class="h-12 w-12 text-gray-400 mx-auto mb-4" />
+						<h3 class="text-lg font-medium text-gray-900 mb-2">No matching expenses</h3>
+						<p class="text-gray-600 mb-4">Try adjusting your search or filters</p>
+						<button onclick={clearFilters} class="btn btn-outline"> Clear Filters </button>
+					{/if}
+				</div>
+			{:else}
+				<div class="space-y-3">
+					{#each filteredExpenses as expense}
+						{@const IconComponent = getCategoryIcon(expense.category)}
+						<div
+							class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
 						>
-							View Analytics
-						</a>
-						<a href="/vehicles/{vehicleId}/edit" class="btn btn-outline w-full justify-center">
-							Edit Vehicle
-						</a>
+							<div class="flex items-center gap-4 flex-1">
+								<div class="p-2 rounded-lg {getCategoryColor(expense.category)}">
+									<IconComponent class="h-5 w-5" />
+								</div>
+
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-2 mb-1">
+										<h4 class="font-medium text-gray-900 truncate">
+											{expense.description || typeLabels[expense.type]}
+										</h4>
+										<span
+											class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800"
+										>
+											{typeLabels[expense.type]}
+										</span>
+									</div>
+									<div class="flex items-center gap-4 text-sm text-gray-600">
+										<span>{formatDate(new Date(expense.date))}</span>
+										{#if expense.mileage}
+											<span>{expense.mileage.toLocaleString()} mi</span>
+										{/if}
+										{#if expense.gallons}
+											<span>{expense.gallons} gal</span>
+										{/if}
+									</div>
+								</div>
+							</div>
+
+							<div class="flex items-center gap-3">
+								<span class="text-lg font-bold text-gray-900">
+									{formatCurrency(expense.amount)}
+								</span>
+
+								<div class="flex items-center gap-1">
+									<a
+										href="/expenses/{expense.id}/edit"
+										class="btn btn-outline btn-sm p-2"
+										title="Edit expense"
+									>
+										<Edit class="h-4 w-4" />
+									</a>
+									<button
+										onclick={() => confirmDelete(expense)}
+										class="btn btn-outline btn-sm p-2 text-red-600 hover:text-red-700 hover:border-red-300"
+										title="Delete expense"
+									>
+										<Trash2 class="h-4 w-4" />
+									</button>
+								</div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	</div>
+
+	<!-- Delete Confirmation Modal -->
+	{#if showDeleteModal && expenseToDelete}
+		{@const IconComponent = getCategoryIcon(expenseToDelete.category)}
+		<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+			<div class="bg-white rounded-lg max-w-md w-full p-6">
+				<h3 class="text-lg font-semibold text-gray-900 mb-4">Delete Expense</h3>
+				<p class="text-gray-600 mb-6">
+					Are you sure you want to delete this expense? This action cannot be undone.
+				</p>
+
+				<div class="bg-gray-50 rounded-lg p-3 mb-6">
+					<div class="flex items-center gap-3">
+						<div class="p-2 rounded-lg {getCategoryColor(expenseToDelete.category)}">
+							<IconComponent class="h-4 w-4" />
+						</div>
+						<div>
+							<p class="font-medium text-gray-900">
+								{expenseToDelete.description || typeLabels[expenseToDelete.type]}
+							</p>
+							<p class="text-sm text-gray-600">
+								{formatDate(new Date(expenseToDelete.date))} • {formatCurrency(
+									expenseToDelete.amount
+								)}
+							</p>
+						</div>
 					</div>
+				</div>
+
+				<div class="flex gap-3">
+					<button
+						onclick={() => {
+							showDeleteModal = false;
+							expenseToDelete = null;
+						}}
+						class="btn btn-outline flex-1"
+						disabled={isDeleting}
+					>
+						Cancel
+					</button>
+					<button
+						onclick={deleteExpense}
+						class="btn bg-red-600 hover:bg-red-700 text-white flex-1 flex items-center justify-center gap-2"
+						disabled={isDeleting}
+					>
+						{#if isDeleting}
+							<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+							Deleting...
+						{:else}
+							<Trash2 class="h-4 w-4" />
+							Delete
+						{/if}
+					</button>
 				</div>
 			</div>
 		</div>
-	</div>
+	{/if}
 {:else}
 	<div class="text-center py-12">
 		<Car class="h-12 w-12 text-gray-400 mx-auto mb-4" />

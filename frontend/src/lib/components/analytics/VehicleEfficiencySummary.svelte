@@ -270,7 +270,7 @@
 						<!-- Quick Actions -->
 						<div class="flex space-x-2">
 							<a
-								href="/vehicles/{vehicleData.id}/expenses"
+								href="/vehicles/{vehicleData.id}"
 								class="flex-1 text-center px-3 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
 							>
 								View Expenses

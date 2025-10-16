@@ -152,7 +152,7 @@ auth.get('/callback/google', async (c) => {
     const frontendUrl =
       process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:5173';
 
-    return c.redirect(`${frontendUrl}/dashboard`);
+    return c.redirect(`${frontendUrl}/vehicles`);
   } catch (error) {
     console.error('OAuth callback error:', error);
 

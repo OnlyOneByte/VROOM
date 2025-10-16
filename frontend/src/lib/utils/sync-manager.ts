@@ -41,6 +41,7 @@ export const lastSyncTime = writable<Date | null>(null);
 class SyncManager {
 	private retryCount = new Map<string, number>();
 	private syncInProgress = false;
+	private autoSyncSetup = false;
 
 	async syncAll(): Promise<SyncResult> {
 		if (this.syncInProgress) {
@@ -169,6 +170,7 @@ class SyncManager {
 					type: expense.type,
 					category: expense.category,
 					amount: expense.amount,
+					currency: expense.currency || 'USD',
 					date: expense.date,
 					mileage: expense.mileage,
 					gallons: expense.gallons,
@@ -197,19 +199,19 @@ class SyncManager {
 			);
 
 			if (response.ok) {
-				const expenses = await response.json();
+				const result = await response.json();
+
+				// Handle API response format
+				const expenses = result.data || result;
 
 				// Ensure expenses is an array
 				if (!Array.isArray(expenses)) {
 					return null;
 				}
 
-				// Look for potential duplicates
+				// Look for potential duplicates (backend already filters by date/amount)
 				return expenses.find(
 					(existing: { date: string; amount: number; type: string }) =>
-						Math.abs(new Date(existing.date).getTime() - new Date(expense.date).getTime()) <
-							24 * 60 * 60 * 1000 && // Same day
-						Math.abs(existing.amount - expense.amount) < 0.01 && // Same amount (within 1 cent)
 						existing.type === expense.type
 				);
 			}
@@ -332,6 +334,12 @@ class SyncManager {
 
 	// Auto-sync when coming online
 	setupAutoSync(): void {
+		if (this.autoSyncSetup) {
+			return;
+		}
+
+		this.autoSyncSetup = true;
+
 		isOnline.subscribe(async online => {
 			if (online && !this.syncInProgress) {
 				const pendingExpenses = this.getPendingExpenses();

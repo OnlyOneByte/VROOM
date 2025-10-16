@@ -7,11 +7,9 @@ import { errorHandler } from '../../lib/middleware/error-handler';
 import { expenses as expenseRoutes } from '../../routes/expenses';
 import type { ExpenseResponse } from '../../types/api';
 import type {
-  CostPerMileApiResponse,
   ExpenseCategoriesApiResponse,
   ExpenseListApiResponse,
   ExpenseListApiResponseWithMeta,
-  FuelEfficiencyApiResponse,
 } from '../../types/api-responses';
 import { getTestLucia } from '../lucia-test.js';
 import {
@@ -82,6 +80,7 @@ describe('Expense Management API Integration Tests', () => {
   describe('Expense CRUD Operations', () => {
     test('should create a new expense', async () => {
       const expenseData = {
+        vehicleId: testVehicleId,
         type: 'fuel',
         category: 'operating',
         amount: 45.5,
@@ -92,17 +91,14 @@ describe('Expense Management API Integration Tests', () => {
         description: 'Gas station fill-up',
       };
 
-      const req = new Request(
-        `http://localhost:3001/api/expenses/vehicles/${testVehicleId}/expenses`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Cookie: sessionCookie,
-          },
-          body: JSON.stringify(expenseData),
-        }
-      );
+      const req = new Request(`http://localhost:3001/api/expenses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: sessionCookie,
+        },
+        body: JSON.stringify(expenseData),
+      });
 
       const res = await testApp.fetch(req);
       expect(res.status).toBe(201);
@@ -121,6 +117,7 @@ describe('Expense Management API Integration Tests', () => {
 
     test('should reject fuel expense without gallons and mileage', async () => {
       const invalidExpenseData = {
+        vehicleId: testVehicleId,
         type: 'fuel', // ExpenseCategory value (confusingly called "type")
         category: 'operating', // ExpenseType value (confusingly called "category")
         amount: 45.5,
@@ -128,17 +125,14 @@ describe('Expense Management API Integration Tests', () => {
         // Missing gallons and mileage for fuel expense
       };
 
-      const req = new Request(
-        `http://localhost:3001/api/expenses/vehicles/${testVehicleId}/expenses`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Cookie: sessionCookie,
-          },
-          body: JSON.stringify(invalidExpenseData),
-        }
-      );
+      const req = new Request(`http://localhost:3001/api/expenses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: sessionCookie,
+        },
+        body: JSON.stringify(invalidExpenseData),
+      });
 
       const res = await testApp.fetch(req);
       expect(res.status).toBe(400);
@@ -149,6 +143,7 @@ describe('Expense Management API Integration Tests', () => {
 
     test('should create non-fuel expense without gallons', async () => {
       const expenseData = {
+        vehicleId: testVehicleId,
         type: 'maintenance',
         category: 'maintenance',
         amount: 89.99,
@@ -156,17 +151,14 @@ describe('Expense Management API Integration Tests', () => {
         description: 'Oil change',
       };
 
-      const req = new Request(
-        `http://localhost:3001/api/expenses/vehicles/${testVehicleId}/expenses`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Cookie: sessionCookie,
-          },
-          body: JSON.stringify(expenseData),
-        }
-      );
+      const req = new Request(`http://localhost:3001/api/expenses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: sessionCookie,
+        },
+        body: JSON.stringify(expenseData),
+      });
 
       const res = await testApp.fetch(req);
       expect(res.status).toBe(201);
@@ -209,14 +201,11 @@ describe('Expense Management API Integration Tests', () => {
         })
         .returning();
 
-      const req = new Request(
-        `http://localhost:3001/api/expenses/vehicles/${testVehicleId}/expenses`,
-        {
-          headers: {
-            Cookie: sessionCookie,
-          },
-        }
-      );
+      const req = new Request(`http://localhost:3001/api/expenses?vehicleId=${testVehicleId}`, {
+        headers: {
+          Cookie: sessionCookie,
+        },
+      });
 
       const res = await testApp.fetch(req);
       expect(res.status).toBe(200);
@@ -260,7 +249,7 @@ describe('Expense Management API Integration Tests', () => {
         ]);
 
       const req = new Request(
-        `http://localhost:3001/api/expenses/vehicles/${testVehicleId}/expenses?type=fuel`,
+        `http://localhost:3001/api/expenses?vehicleId=${testVehicleId}&type=fuel`,
         {
           headers: {
             Cookie: sessionCookie,
@@ -307,7 +296,7 @@ describe('Expense Management API Integration Tests', () => {
         ]);
 
       const req = new Request(
-        `http://localhost:3001/api/expenses/vehicles/${testVehicleId}/expenses?startDate=2024-01-01T00:00:00.000Z&endDate=2024-01-31T23:59:59.999Z`,
+        `http://localhost:3001/api/expenses?vehicleId=${testVehicleId}&startDate=2024-01-01T00:00:00.000Z&endDate=2024-01-31T23:59:59.999Z`,
         {
           headers: {
             Cookie: sessionCookie,
@@ -480,222 +469,6 @@ describe('Expense Management API Integration Tests', () => {
         expect(data.data.categories).toContain('maintenance');
         expect(data.data.categoryMapping).toBeDefined();
         expect(data.data.categoryMapping.operating).toContain('fuel');
-      }
-    });
-  });
-
-  describe('Fuel Efficiency Tracking', () => {
-    test('should calculate fuel efficiency metrics', async () => {
-      // Create fuel expenses with mileage data
-      await getDb()
-        .insert(expenses)
-        .values([
-          {
-            id: createId(),
-            vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
-            amount: 45.5,
-            currency: 'USD',
-            date: new Date('2024-01-15'),
-            gallons: 12.5,
-            mileage: 25000,
-          },
-          {
-            id: createId(),
-            vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
-            amount: 48.75,
-            currency: 'USD',
-            date: new Date('2024-01-30'),
-            gallons: 13.0,
-            mileage: 25350, // 350 miles driven, 13 gallons = ~26.9 MPG
-          },
-          {
-            id: createId(),
-            vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
-            amount: 52.25,
-            currency: 'USD',
-            date: new Date('2024-02-15'),
-            gallons: 14.2,
-            mileage: 25720, // 370 miles driven, 14.2 gallons = ~26.1 MPG
-          },
-        ]);
-
-      const req = new Request(
-        `http://localhost:3001/api/expenses/vehicles/${testVehicleId}/fuel-efficiency`,
-        {
-          headers: {
-            Cookie: sessionCookie,
-          },
-        }
-      );
-
-      const res = await testApp.fetch(req);
-      expect(res.status).toBe(200);
-
-      const data = await getTypedResponse<FuelEfficiencyApiResponse>(res);
-      expect(data.success).toBe(true);
-      if (data.success && data.data) {
-        expect(data.data.vehicleId).toBe(testVehicleId);
-        expect(data.data.totalFuelExpenses).toBe(3);
-        expect(data.data.totalGallons).toBeGreaterThan(0);
-        expect(data.data.averageMPG).toBeGreaterThan(0);
-        expect(data.data.averageCostPerGallon).toBeGreaterThan(0);
-        expect(data.data.averageCostPerMile).toBeGreaterThan(0);
-        expect(data.data.efficiencyTrend).toHaveLength(2); // Should have 2 calculated MPG readings
-      }
-    });
-
-    test('should calculate cost per mile metrics', async () => {
-      // Create various expenses
-      await getDb()
-        .insert(expenses)
-        .values([
-          {
-            id: createId(),
-            vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
-            amount: 45.5,
-            currency: 'USD',
-            date: new Date('2024-01-15'),
-            mileage: 25000,
-          },
-          {
-            id: createId(),
-            vehicleId: testVehicleId,
-            type: 'maintenance',
-            category: 'maintenance',
-            amount: 89.99,
-            currency: 'USD',
-            date: new Date('2024-01-20'),
-            mileage: 25100,
-          },
-          {
-            id: createId(),
-            vehicleId: testVehicleId,
-            type: 'insurance',
-            category: 'financial',
-            amount: 150.0,
-            currency: 'USD',
-            date: new Date('2024-01-25'),
-            mileage: 25200,
-          },
-        ]);
-
-      const req = new Request(
-        `http://localhost:3001/api/expenses/vehicles/${testVehicleId}/cost-per-mile`,
-        {
-          headers: {
-            Cookie: sessionCookie,
-          },
-        }
-      );
-
-      const res = await testApp.fetch(req);
-      expect(res.status).toBe(200);
-
-      const data = await getTypedResponse<CostPerMileApiResponse>(res);
-      expect(data.success).toBe(true);
-      if (data.success && data.data) {
-        expect(data.data.totalCostPerMile).toBeGreaterThan(0);
-        expect(data.data.categoryBreakdown).toBeDefined();
-        expect(data.data.categoryBreakdown.operating).toBeDefined();
-        expect(data.data.categoryBreakdown.maintenance).toBeDefined();
-        expect(data.data.categoryBreakdown.financial).toBeDefined();
-        expect(data.data.monthlyTrends).toBeDefined();
-        expect(data.data.currentMileage).toBe(25200);
-        expect(data.data.totalMiles).toBe(200); // 25200 - 25000
-      }
-    });
-
-    test('should handle vehicle with no fuel expenses', async () => {
-      const req = new Request(
-        `http://localhost:3001/api/expenses/vehicles/${testVehicleId}/fuel-efficiency`,
-        {
-          headers: {
-            Cookie: sessionCookie,
-          },
-        }
-      );
-
-      const res = await testApp.fetch(req);
-      expect(res.status).toBe(200);
-
-      const data = await getTypedResponse<FuelEfficiencyApiResponse>(res);
-      expect(data.success).toBe(true);
-      if (data.success && data.data) {
-        expect(data.data.totalFuelExpenses).toBe(0);
-        expect(data.data.averageMPG).toBe(0);
-        expect(data.data.totalGallons).toBe(0);
-        expect(data.data.efficiencyTrend).toHaveLength(0);
-        expect(data.data.alerts).toHaveLength(0);
-      }
-    });
-
-    test('should detect efficiency alerts for significant MPG drops', async () => {
-      // Create fuel expenses with declining efficiency
-      await getDb()
-        .insert(expenses)
-        .values([
-          {
-            id: createId(),
-            vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
-            amount: 45.5,
-            currency: 'USD',
-            date: new Date('2024-01-01'),
-            gallons: 12.0,
-            mileage: 25000,
-          },
-          {
-            id: createId(),
-            vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
-            amount: 48.75,
-            currency: 'USD',
-            date: new Date('2024-01-15'),
-            gallons: 12.5,
-            mileage: 25360, // 360 miles, 12.5 gallons = 28.8 MPG (good)
-          },
-          {
-            id: createId(),
-            vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
-            amount: 52.25,
-            currency: 'USD',
-            date: new Date('2024-01-30'),
-            gallons: 15.0,
-            mileage: 25660, // 300 miles, 15 gallons = 20 MPG (significant drop)
-          },
-        ]);
-
-      const req = new Request(
-        `http://localhost:3001/api/expenses/vehicles/${testVehicleId}/fuel-efficiency`,
-        {
-          headers: {
-            Cookie: sessionCookie,
-          },
-        }
-      );
-
-      const res = await testApp.fetch(req);
-      expect(res.status).toBe(200);
-
-      const data = await getTypedResponse<FuelEfficiencyApiResponse>(res);
-      expect(data.success).toBe(true);
-      if (data.success && data.data) {
-        expect(data.data.alerts).toHaveLength(1);
-        expect(data.data.alerts[0].type).toBe('efficiency_drop');
-        expect(data.data.alerts[0].severity).toBeDefined();
-        expect(data.data.alerts[0].currentMPG).toBeLessThan(data.data.alerts[0].averageMPG ?? 0);
       }
     });
   });

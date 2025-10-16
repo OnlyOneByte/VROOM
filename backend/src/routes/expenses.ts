@@ -41,74 +41,6 @@ function validateFuelExpenseUpdate(
   }
 }
 
-function processFuelExpense(
-  expense: ExpenseData,
-  previousMileage: number,
-  mpgReadings: number[],
-  index: number
-): {
-  mpg: number;
-  trendData: {
-    date: Date;
-    mpg: number;
-    cost: number;
-    mileage?: number;
-    gallons?: number;
-    costPerGallon?: number;
-  };
-  alert?: {
-    type: string;
-    message: string;
-    severity: string;
-    date: Date;
-    currentMPG?: number;
-    averageMPG?: number;
-  };
-} | null {
-  if (!expense.gallons || !expense.mileage) return null;
-
-  const milesDriven = expense.mileage - previousMileage;
-  const mpg = milesDriven > 0 ? milesDriven / expense.gallons : 0;
-
-  if (mpg <= 0 || mpg >= 100) return null;
-
-  const trendData = {
-    date: expense.date,
-    mpg: Math.round(mpg * 100) / 100,
-    cost: expense.amount,
-    mileage: expense.mileage,
-    gallons: expense.gallons,
-    costPerGallon: Math.round((expense.amount / expense.gallons) * 100) / 100,
-  };
-
-  let alert:
-    | {
-        type: string;
-        message: string;
-        severity: string;
-        date: Date;
-        currentMPG?: number;
-        averageMPG?: number;
-      }
-    | undefined;
-  if (index > 0 && mpgReadings.length > 0) {
-    const overallAverage = mpgReadings.reduce((sum, val) => sum + val, 0) / mpgReadings.length;
-
-    if (mpg < overallAverage * 0.85) {
-      alert = {
-        type: 'efficiency_drop',
-        date: expense.date,
-        message: `Fuel efficiency dropped to ${mpg.toFixed(1)} MPG (${(((overallAverage - mpg) / overallAverage) * 100).toFixed(1)}% below average)`,
-        severity: mpg < overallAverage * 0.7 ? 'high' : 'medium',
-        currentMPG: Math.round(mpg * 100) / 100,
-        averageMPG: Math.round(overallAverage * 100) / 100,
-      };
-    }
-  }
-
-  return { mpg, trendData, alert };
-}
-
 // Validation schemas
 const expenseTypeSchema = z.enum([
   // Operating Costs
@@ -146,6 +78,7 @@ const expenseCategorySchema = z.enum([
 ]);
 
 const createExpenseSchema = z.object({
+  vehicleId: z.string().min(1, 'Vehicle ID is required'),
   type: expenseTypeSchema,
   category: expenseCategorySchema,
   amount: z.number().positive('Amount must be positive'),
@@ -154,7 +87,7 @@ const createExpenseSchema = z.object({
     .string()
     .datetime()
     .transform((val) => new Date(val)),
-  mileage: z.number().int().min(0, 'Mileage cannot be negative').optional(),
+  mileage: z.number().int().min(0, 'Mileage cannot be negative').nullable().optional(),
   gallons: z.number().positive('Gallons must be positive').optional(),
   description: z.string().max(500, 'Description must be 500 characters or less').optional(),
   receiptUrl: z.string().url('Receipt URL must be valid').optional(),
@@ -166,11 +99,8 @@ const expenseParamsSchema = z.object({
   id: z.string().min(1, 'Expense ID is required'),
 });
 
-const vehicleParamsSchema = z.object({
-  id: z.string().min(1, 'Vehicle ID is required'),
-});
-
 const expenseQuerySchema = z.object({
+  vehicleId: z.string().optional(),
   type: expenseTypeSchema.optional(),
   category: expenseCategorySchema.optional(),
   startDate: z
@@ -248,128 +178,154 @@ expenses.get('/categories', async (c) => {
   });
 });
 
-// POST /api/expenses/vehicles/:id/expenses - Add expense to vehicle
-expenses.post(
-  '/vehicles/:id/expenses',
-  zValidator('param', vehicleParamsSchema),
-  zValidator('json', createExpenseSchema),
-  async (c) => {
-    try {
-      const user = c.get('user');
-      const { id: vehicleId } = c.req.valid('param');
-      const expenseData = c.req.valid('json');
+// POST /api/expenses - Create a new expense
+expenses.post('/', zValidator('json', createExpenseSchema), async (c) => {
+  try {
+    const user = c.get('user');
+    const expenseData = c.req.valid('json');
 
-      const vehicleRepository = repositoryFactory.getVehicleRepository();
-      const expenseRepository = repositoryFactory.getExpenseRepository();
+    const vehicleRepository = repositoryFactory.getVehicleRepository();
+    const expenseRepository = repositoryFactory.getExpenseRepository();
 
-      // Verify vehicle exists and belongs to user
-      const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-      if (!vehicle) {
-        throw new HTTPException(404, { message: 'Vehicle not found' });
-      }
-
-      // Validate fuel expense requirements
-      if (expenseData.type === 'fuel') {
-        if (!expenseData.gallons || !expenseData.mileage) {
-          throw new HTTPException(400, {
-            message: 'Fuel expenses require both gallons and mileage data',
-          });
-        }
-      }
-
-      const newExpense: NewExpense = {
-        ...expenseData,
-        vehicleId,
-      };
-
-      const createdExpense = await expenseRepository.create(newExpense);
-
-      return c.json(
-        {
-          success: true,
-          data: createdExpense,
-          message: 'Expense created successfully',
-        },
-        201
-      );
-    } catch (error) {
-      console.error('Error creating expense:', error);
-
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-
-      throw new HTTPException(500, { message: 'Failed to create expense' });
+    // Verify vehicle exists and belongs to user
+    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, expenseData.vehicleId);
+    if (!vehicle) {
+      throw new HTTPException(404, { message: 'Vehicle not found' });
     }
+
+    // Validate fuel expense requirements
+    if (expenseData.type === 'fuel') {
+      if (!expenseData.gallons || !expenseData.mileage) {
+        throw new HTTPException(400, {
+          message: 'Fuel expenses require both gallons and mileage data',
+        });
+      }
+    }
+
+    const newExpense: NewExpense = {
+      ...expenseData,
+    };
+
+    const createdExpense = await expenseRepository.create(newExpense);
+
+    return c.json(
+      {
+        success: true,
+        data: createdExpense,
+        message: 'Expense created successfully',
+      },
+      201
+    );
+  } catch (error) {
+    console.error('Error creating expense:', error);
+
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+
+    throw new HTTPException(500, { message: 'Failed to create expense' });
   }
-);
+});
 
-// GET /api/expenses/vehicles/:id/expenses - Get vehicle expenses
-expenses.get(
-  '/vehicles/:id/expenses',
-  zValidator('param', vehicleParamsSchema),
-  zValidator('query', expenseQuerySchema),
-  async (c) => {
-    try {
-      const user = c.get('user');
-      const { id: vehicleId } = c.req.valid('param');
-      const query = c.req.valid('query');
+// Helper function to fetch expenses for a vehicle based on query filters
+async function fetchVehicleExpenses(
+  expenseRepository: ReturnType<typeof repositoryFactory.getExpenseRepository>,
+  vehicleId: string,
+  query: {
+    startDate?: Date;
+    endDate?: Date;
+    type?: string;
+    category?: string;
+  }
+): Promise<ExpenseData[]> {
+  if (query.startDate && query.endDate) {
+    return await expenseRepository.findByVehicleIdAndDateRange(
+      vehicleId,
+      query.startDate,
+      query.endDate
+    );
+  }
+  if (query.type) {
+    return await expenseRepository.findByType(vehicleId, query.type);
+  }
+  if (query.category) {
+    return await expenseRepository.findByCategory(vehicleId, query.category);
+  }
+  return await expenseRepository.findByVehicleId(vehicleId);
+}
 
-      const vehicleRepository = repositoryFactory.getVehicleRepository();
-      const expenseRepository = repositoryFactory.getExpenseRepository();
+// GET /api/expenses - Get all expenses for the user (with optional vehicle filter)
+expenses.get('/', zValidator('query', expenseQuerySchema), async (c) => {
+  try {
+    const user = c.get('user');
+    const query = c.req.valid('query');
 
-      // Verify vehicle exists and belongs to user
-      const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-      if (!vehicle) {
-        throw new HTTPException(404, { message: 'Vehicle not found' });
-      }
+    const vehicleRepository = repositoryFactory.getVehicleRepository();
+    const expenseRepository = repositoryFactory.getExpenseRepository();
 
-      let vehicleExpenses: ExpenseData[];
+    // Get all user vehicles
+    const userVehicles = await vehicleRepository.findByUserId(user.id);
+    const vehicleIds = userVehicles.map((v) => v.id);
 
-      // Apply filters based on query parameters
-      if (query.startDate && query.endDate) {
-        vehicleExpenses = await expenseRepository.findByVehicleIdAndDateRange(
-          vehicleId,
-          query.startDate,
-          query.endDate
-        );
-      } else if (query.type) {
-        vehicleExpenses = await expenseRepository.findByType(vehicleId, query.type);
-      } else if (query.category) {
-        vehicleExpenses = await expenseRepository.findByCategory(vehicleId, query.category);
-      } else {
-        vehicleExpenses = await expenseRepository.findByVehicleId(vehicleId);
-      }
-
-      // Apply pagination if specified
-      if (query.limit || query.offset) {
-        const offset = query.offset || 0;
-        const limit = query.limit || 50;
-        vehicleExpenses = vehicleExpenses.slice(offset, offset + limit);
-      }
-
+    if (vehicleIds.length === 0) {
       return c.json({
         success: true,
-        data: vehicleExpenses,
-        count: vehicleExpenses.length,
-        filters: {
-          type: query.type,
-          category: query.category,
-          startDate: query.startDate,
-          endDate: query.endDate,
-        },
+        data: [],
+        count: 0,
       });
-    } catch (error) {
-      console.error('Error fetching vehicle expenses:', error);
+    }
 
-      if (error instanceof HTTPException) {
-        throw error;
+    let allExpenses: ExpenseData[] = [];
+
+    // If vehicleId filter is provided, only get expenses for that vehicle
+    if (query.vehicleId) {
+      // Verify user owns this vehicle
+      if (!vehicleIds.includes(query.vehicleId)) {
+        throw new HTTPException(404, { message: 'Vehicle not found' });
       }
 
-      throw new HTTPException(500, { message: 'Failed to fetch vehicle expenses' });
+      allExpenses = await fetchVehicleExpenses(expenseRepository, query.vehicleId, query);
+    } else {
+      // Get expenses for all user vehicles
+      const expensePromises = vehicleIds.map((vehicleId) =>
+        fetchVehicleExpenses(expenseRepository, vehicleId, query)
+      );
+      const expenseArrays = await Promise.all(expensePromises);
+      allExpenses = expenseArrays.flat();
     }
+
+    // Sort by date (newest first)
+    allExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Apply pagination if specified
+    if (query.limit || query.offset) {
+      const offset = query.offset || 0;
+      const limit = query.limit || 50;
+      allExpenses = allExpenses.slice(offset, offset + limit);
+    }
+
+    return c.json({
+      success: true,
+      data: allExpenses,
+      count: allExpenses.length,
+      filters: {
+        vehicleId: query.vehicleId,
+        type: query.type,
+        category: query.category,
+        startDate: query.startDate,
+        endDate: query.endDate,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching expenses:', error);
+
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+
+    throw new HTTPException(500, { message: 'Failed to fetch expenses' });
   }
-);
+});
 
 // GET /api/expenses/:id - Get specific expense
 expenses.get('/:id', zValidator('param', expenseParamsSchema), async (c) => {
@@ -491,257 +447,5 @@ expenses.delete('/:id', zValidator('param', expenseParamsSchema), async (c) => {
     throw new HTTPException(500, { message: 'Failed to delete expense' });
   }
 });
-
-// GET /api/expenses/vehicles/:id/fuel-efficiency - Get fuel efficiency data
-expenses.get(
-  '/vehicles/:id/fuel-efficiency',
-  zValidator('param', vehicleParamsSchema),
-  async (c) => {
-    try {
-      const user = c.get('user');
-      const { id: vehicleId } = c.req.valid('param');
-
-      const vehicleRepository = repositoryFactory.getVehicleRepository();
-      const expenseRepository = repositoryFactory.getExpenseRepository();
-
-      // Verify vehicle exists and belongs to user
-      const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-      if (!vehicle) {
-        throw new HTTPException(404, { message: 'Vehicle not found' });
-      }
-
-      // Get all fuel expenses for the vehicle
-      const fuelExpenses = await expenseRepository.findFuelExpenses(vehicleId);
-
-      // Calculate MPG and efficiency metrics
-      const efficiencyData = calculateFuelEfficiency(fuelExpenses, vehicle.initialMileage || 0);
-
-      return c.json({
-        success: true,
-        data: {
-          vehicleId,
-          totalFuelExpenses: fuelExpenses.length,
-          averageMPG: efficiencyData.averageMPG,
-          totalGallons: efficiencyData.totalGallons,
-          totalMiles: efficiencyData.totalMiles,
-          averageCostPerGallon: efficiencyData.averageCostPerGallon,
-          averageCostPerMile: efficiencyData.averageCostPerMile,
-          efficiencyTrend: efficiencyData.trend,
-          alerts: efficiencyData.alerts,
-        },
-      });
-    } catch (error) {
-      console.error('Error fetching fuel efficiency:', error);
-
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-
-      throw new HTTPException(500, { message: 'Failed to fetch fuel efficiency data' });
-    }
-  }
-);
-
-// GET /api/expenses/vehicles/:id/cost-per-mile - Get cost per mile analysis
-expenses.get('/vehicles/:id/cost-per-mile', zValidator('param', vehicleParamsSchema), async (c) => {
-  try {
-    const user = c.get('user');
-    const { id: vehicleId } = c.req.valid('param');
-
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
-    const expenseRepository = repositoryFactory.getExpenseRepository();
-
-    // Verify vehicle exists and belongs to user
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-    if (!vehicle) {
-      throw new HTTPException(404, { message: 'Vehicle not found' });
-    }
-
-    // Get all expenses for the vehicle
-    const allExpenses = await expenseRepository.findByVehicleId(vehicleId);
-
-    // Calculate cost per mile metrics
-    const costPerMileData = calculateCostPerMile(allExpenses, vehicle.initialMileage || 0);
-
-    return c.json({
-      success: true,
-      data: costPerMileData,
-    });
-  } catch (error) {
-    console.error('Error calculating cost per mile:', error);
-
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-
-    throw new HTTPException(500, { message: 'Failed to calculate cost per mile' });
-  }
-});
-
-// Helper functions for fuel efficiency calculations
-function calculateFuelEfficiency(fuelExpenses: ExpenseData[], initialMileage: number) {
-  if (fuelExpenses.length === 0) {
-    return {
-      averageMPG: 0,
-      totalGallons: 0,
-      totalMiles: 0,
-      averageCostPerGallon: 0,
-      averageCostPerMile: 0,
-      trend: [],
-      alerts: [],
-    };
-  }
-
-  // Sort by date to calculate trends
-  const sortedExpenses = fuelExpenses.sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
-
-  let totalGallons = 0;
-  let totalCost = 0;
-  const mpgReadings: number[] = [];
-  const trend: {
-    date: Date;
-    mpg: number;
-    cost: number;
-    mileage?: number;
-    gallons?: number;
-    costPerGallon?: number;
-  }[] = [];
-  const alerts: {
-    type: string;
-    message: string;
-    severity: string;
-    date: Date;
-    currentMPG?: number;
-    averageMPG?: number;
-  }[] = [];
-  let previousMileage = initialMileage;
-
-  sortedExpenses.forEach((expense, index) => {
-    // Always count gallons and cost for totals
-    totalGallons += expense.gallons || 0;
-    totalCost += expense.amount;
-
-    const result = processFuelExpense(expense, previousMileage, mpgReadings, index);
-    if (result) {
-      mpgReadings.push(result.mpg);
-      trend.push(result.trendData);
-
-      if (result.alert) {
-        alerts.push({
-          type: result.alert.type,
-          message: result.alert.message,
-          severity: result.alert.severity,
-          date: result.alert.date,
-          currentMPG: result.alert.currentMPG,
-          averageMPG: result.alert.averageMPG,
-        });
-      }
-    }
-
-    // Update previous mileage for next calculation
-    if (expense.mileage) {
-      previousMileage = expense.mileage;
-    }
-  });
-
-  const totalMiles = previousMileage - initialMileage;
-  const averageMPG = totalGallons > 0 ? totalMiles / totalGallons : 0;
-  const averageCostPerGallon = totalGallons > 0 ? totalCost / totalGallons : 0;
-  const averageCostPerMile = totalMiles > 0 ? totalCost / totalMiles : 0;
-
-  return {
-    averageMPG: Math.round(averageMPG * 100) / 100,
-    totalGallons: Math.round(totalGallons * 100) / 100,
-    totalMiles,
-    averageCostPerGallon: Math.round(averageCostPerGallon * 100) / 100,
-    averageCostPerMile: Math.round(averageCostPerMile * 100) / 100,
-    trend,
-    alerts,
-  };
-}
-
-function calculateCostPerMile(allExpenses: ExpenseData[], initialMileage: number) {
-  if (allExpenses.length === 0) {
-    return {
-      totalCostPerMile: 0,
-      categoryBreakdown: {},
-      monthlyTrends: [],
-      currentMileage: initialMileage,
-    };
-  }
-
-  // Find the highest mileage to calculate total miles driven
-  const expensesWithMileage = allExpenses.filter((e) => e.mileage && e.mileage > 0);
-  const maxMileage =
-    expensesWithMileage.length > 0
-      ? Math.max(...expensesWithMileage.map((e) => e.mileage).filter((m): m is number => m != null))
-      : initialMileage;
-  const totalMiles = maxMileage - initialMileage;
-
-  if (totalMiles <= 0) {
-    return {
-      totalCostPerMile: 0,
-      categoryBreakdown: {},
-      monthlyTrends: [],
-      currentMileage: maxMileage,
-    };
-  }
-
-  // Calculate total cost and breakdown by category
-  let totalCost = 0;
-  const categoryBreakdown: { [key: string]: { cost: number; costPerMile: number } } = {};
-
-  allExpenses.forEach((expense) => {
-    totalCost += expense.amount;
-
-    if (!categoryBreakdown[expense.category]) {
-      categoryBreakdown[expense.category] = { cost: 0, costPerMile: 0 };
-    }
-    categoryBreakdown[expense.category].cost += expense.amount;
-  });
-
-  // Calculate cost per mile for each category
-  Object.keys(categoryBreakdown).forEach((category) => {
-    categoryBreakdown[category].costPerMile =
-      Math.round((categoryBreakdown[category].cost / totalMiles) * 100) / 100;
-    categoryBreakdown[category].cost = Math.round(categoryBreakdown[category].cost * 100) / 100;
-  });
-
-  // Calculate monthly trends
-  const monthlyData: { [key: string]: { cost: number; miles: number } } = {};
-
-  allExpenses.forEach((expense) => {
-    const monthKey = new Date(expense.date).toISOString().substring(0, 7); // YYYY-MM
-    if (!monthlyData[monthKey]) {
-      monthlyData[monthKey] = { cost: 0, miles: 0 };
-    }
-    monthlyData[monthKey].cost += expense.amount;
-  });
-
-  // Estimate miles per month (simplified - could be improved with more data)
-  const months = Object.keys(monthlyData).length;
-  const avgMilesPerMonth = months > 0 ? totalMiles / months : 0;
-
-  const monthlyTrends = Object.entries(monthlyData)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, data]) => ({
-      month,
-      cost: Math.round(data.cost * 100) / 100,
-      estimatedMiles: Math.round(avgMilesPerMonth),
-      costPerMile:
-        avgMilesPerMonth > 0 ? Math.round((data.cost / avgMilesPerMonth) * 100) / 100 : 0,
-    }));
-
-  return {
-    totalCostPerMile: Math.round((totalCost / totalMiles) * 100) / 100,
-    categoryBreakdown,
-    monthlyTrends,
-    currentMileage: maxMileage,
-    totalMiles,
-    totalCost: Math.round(totalCost * 100) / 100,
-  };
-}
 
 export { expenses };

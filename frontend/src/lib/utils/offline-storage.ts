@@ -8,6 +8,7 @@ export interface OfflineExpense {
 	type: string;
 	category: string;
 	amount: number;
+	currency?: string;
 	date: string;
 	mileage?: number;
 	gallons?: number;
@@ -102,6 +103,7 @@ export async function syncOfflineExpenses(): Promise<void> {
 				type: expense.type,
 				category: expense.category,
 				amount: expense.amount,
+				currency: expense.currency || 'USD',
 				date: expense.date,
 				mileage: expense.mileage,
 				gallons: expense.gallons,
