@@ -82,7 +82,13 @@ export default [
 					varsIgnorePattern: '^_'
 				}
 			],
-			'no-console': 'off'
+			'no-console': 'off',
+			'svelte/valid-compile': [
+				'error',
+				{
+					ignoreWarnings: true
+				}
+			]
 		}
 	},
 	{
