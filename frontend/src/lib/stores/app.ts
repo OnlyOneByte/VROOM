@@ -91,23 +91,14 @@ function createAppStore() {
 			const newNotification: Notification = {
 				...notification,
 				id,
-				duration: notification.duration ?? 5000
+				duration: notification.duration ?? 5000,
+				timestamp: Date.now()
 			};
 
 			update(state => ({
 				...state,
 				notifications: [...state.notifications, newNotification]
 			}));
-
-			// Auto-remove notification after duration
-			if (newNotification.duration && newNotification.duration > 0) {
-				setTimeout(() => {
-					update(state => ({
-						...state,
-						notifications: state.notifications.filter(n => n.id !== id)
-					}));
-				}, newNotification.duration);
-			}
 		},
 
 		removeNotification: (id: string) => {
@@ -136,15 +127,6 @@ function createAppStore() {
 				...state,
 				notifications: [...state.notifications, notification]
 			}));
-
-			if (notification.duration && notification.duration > 0) {
-				setTimeout(() => {
-					update(state => ({
-						...state,
-						notifications: state.notifications.filter(n => n.id !== id)
-					}));
-				}, notification.duration);
-			}
 		},
 
 		showError: (message: string, duration?: number) => {
@@ -161,15 +143,6 @@ function createAppStore() {
 				...state,
 				notifications: [...state.notifications, notification]
 			}));
-
-			if (notification.duration && notification.duration > 0) {
-				setTimeout(() => {
-					update(state => ({
-						...state,
-						notifications: state.notifications.filter(n => n.id !== id)
-					}));
-				}, notification.duration);
-			}
 		},
 
 		showWarning: (message: string, duration?: number) => {
@@ -186,15 +159,6 @@ function createAppStore() {
 				...state,
 				notifications: [...state.notifications, notification]
 			}));
-
-			if (notification.duration && notification.duration > 0) {
-				setTimeout(() => {
-					update(state => ({
-						...state,
-						notifications: state.notifications.filter(n => n.id !== id)
-					}));
-				}, notification.duration);
-			}
 		},
 
 		showInfo: (message: string, duration?: number) => {
@@ -211,15 +175,6 @@ function createAppStore() {
 				...state,
 				notifications: [...state.notifications, notification]
 			}));
-
-			if (notification.duration && notification.duration > 0) {
-				setTimeout(() => {
-					update(state => ({
-						...state,
-						notifications: state.notifications.filter(n => n.id !== id)
-					}));
-				}, notification.duration);
-			}
 		},
 
 		// Reset state (on logout)

@@ -7,6 +7,9 @@
 	import { requestBackgroundSync } from '$lib/utils/pwa';
 	import { appStore } from '$lib/stores/app';
 	import { Save, ArrowLeft, Fuel, Wrench, DollarSign, FileText } from 'lucide-svelte';
+	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import Input from '$lib/components/ui/input/input.svelte';
+	import Label from '$lib/components/ui/label/label.svelte';
 	import type { ExpenseFormErrors } from '$lib/types.js';
 
 	// Get URL parameters
@@ -14,7 +17,7 @@
 	let preselectedVehicleId = $state<string | null>(null);
 
 	// Form data
-	let formData = {
+	let formData = $state({
 		vehicleId: '',
 		type: '',
 		category: '',
@@ -23,7 +26,7 @@
 		mileage: '',
 		gallons: '',
 		description: ''
-	};
+	});
 
 	// Update from URL params
 	$effect(() => {
@@ -36,9 +39,9 @@
 	});
 
 	// Form state
-	let isSubmitting = false;
-	let vehicles: any[] = [];
-	let errors: ExpenseFormErrors = {};
+	let isSubmitting = $state(false);
+	let vehicles = $state<any[]>([]);
+	let errors = $state<ExpenseFormErrors>({});
 
 	// Expense types and categories
 	const expenseTypes = [
@@ -318,81 +321,75 @@
 		</div>
 
 		<!-- Amount -->
-		<div>
-			<label for="amount" class="block text-sm font-medium text-gray-700 mb-2"> Amount * </label>
+		<div class="space-y-2">
+			<Label for="amount">Amount *</Label>
 			<div class="relative">
 				<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 					<span class="text-gray-500">$</span>
 				</div>
-				<input
+				<Input
 					id="amount"
 					type="number"
 					step="0.01"
 					min="0"
 					bind:value={formData.amount}
 					placeholder="0.00"
-					class="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-					class:border-red-300={errors['amount']}
+					class="pl-8"
+					aria-invalid={!!errors['amount']}
 				/>
 			</div>
 			{#if errors['amount']}
-				<p class="text-red-600 text-sm mt-1">{errors['amount']}</p>
+				<p class="text-sm text-destructive">{errors['amount']}</p>
 			{/if}
 		</div>
 
 		<!-- Date -->
-		<div>
-			<label for="date" class="block text-sm font-medium text-gray-700 mb-2"> Date * </label>
-			<input
+		<div class="space-y-2">
+			<Label for="date">Date *</Label>
+			<DatePicker
 				id="date"
-				type="date"
 				bind:value={formData.date}
-				class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-				class:border-red-300={errors['date']}
+				placeholder="Select date"
 			/>
 			{#if errors['date']}
-				<p class="text-red-600 text-sm mt-1">{errors['date']}</p>
+				<p class="text-sm text-destructive">{errors['date']}</p>
 			{/if}
 		</div>
 
 		<!-- Mileage (always visible, required for fuel) -->
-		<div>
-			<label for="mileage" class="block text-sm font-medium text-gray-700 mb-2">
+		<div class="space-y-2">
+			<Label for="mileage">
 				Current Mileage {showFuelFields ? '*' : '(Optional)'}
-			</label>
-			<input
+			</Label>
+			<Input
 				id="mileage"
 				type="number"
 				min="0"
 				bind:value={formData.mileage}
 				placeholder="123456"
-				class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-				class:border-red-300={errors['mileage']}
+				aria-invalid={!!errors['mileage']}
 			/>
 			{#if errors['mileage']}
-				<p class="text-red-600 text-sm mt-1">{errors['mileage']}</p>
+				<p class="text-sm text-destructive">{errors['mileage']}</p>
 			{/if}
 		</div>
 
 		<!-- Fuel-specific fields -->
 		{#if showFuelFields}
 			<div class="p-4 bg-blue-50 rounded-lg space-y-4">
-				<div>
-					<label for="gallons" class="block text-sm font-medium text-gray-700 mb-2">
-						Gallons *
-					</label>
-					<input
+				<div class="space-y-2">
+					<Label for="gallons">Gallons *</Label>
+					<Input
 						id="gallons"
 						type="number"
 						step="0.001"
 						min="0"
 						bind:value={formData.gallons}
 						placeholder="0.000"
-						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-						class:border-red-300={errors['gallons']}
+						aria-invalid={!!errors['gallons']}
 					/>
 					{#if errors['gallons']}
-						<p class="text-red-600 text-sm mt-1">{errors['gallons']}</p>
+						<p class="text-sm text-destructive">{errors['gallons']}</p>
 					{/if}
 				</div>
 

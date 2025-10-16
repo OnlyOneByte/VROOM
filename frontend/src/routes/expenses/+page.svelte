@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import {
 		Plus,
 		RefreshCw,
@@ -25,6 +26,8 @@
 	import { syncOfflineExpenses } from '$lib/utils/offline-storage';
 	import { appStore } from '$lib/stores/app.js';
 	import type { ExpenseType, ExpenseCategory, ExpenseFilters } from '$lib/types.js';
+	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import Input from '$lib/components/ui/input/input.svelte';
 
 	// Component state
 	let loading = $state(true);
@@ -577,11 +580,11 @@
 					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 						<Search class="h-5 w-5 text-gray-400" />
 					</div>
-					<input
+					<Input
 						type="text"
 						bind:value={searchTerm}
 						placeholder="Search expenses..."
-						class="input pl-10 w-full"
+						class="pl-10 w-full"
 					/>
 				</div>
 				<button
@@ -628,11 +631,10 @@
 							<label for="start-date-filter" class="block text-sm font-medium text-gray-700 mb-2"
 								>Start Date</label
 							>
-							<input
+							<DatePicker
 								id="start-date-filter"
-								type="date"
 								bind:value={filters.startDate}
-								class="input"
+								placeholder="Select start date"
 							/>
 						</div>
 
@@ -641,7 +643,11 @@
 							<label for="end-date-filter" class="block text-sm font-medium text-gray-700 mb-2"
 								>End Date</label
 							>
-							<input id="end-date-filter" type="date" bind:value={filters.endDate} class="input" />
+							<DatePicker
+								id="end-date-filter"
+								bind:value={filters.endDate}
+								placeholder="Select end date"
+							/>
 						</div>
 					</div>
 
@@ -719,7 +725,16 @@
 					{#each filteredExpenses as expense}
 						{@const IconComponent = getCategoryIcon(expense.category)}
 						<div
-							class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+							class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+							onclick={() => goto(`/expenses/${expense.id}/edit`)}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									goto(`/expenses/${expense.id}/edit`);
+								}
+							}}
+							role="button"
+							tabindex="0"
 						>
 							<div class="flex items-center gap-4 flex-1">
 								<div class="p-2 rounded-lg {getCategoryColor(expense.category)}">
@@ -758,7 +773,7 @@
 									{formatCurrency(expense.amount)}
 								</span>
 
-								<div class="flex items-center gap-1">
+								<div class="flex items-center gap-1" onclick={(e) => e.stopPropagation()}>
 									<a
 										href="/expenses/{expense.id}/edit"
 										class="btn btn-outline btn-sm p-2"
@@ -767,7 +782,10 @@
 										<Edit class="h-4 w-4" />
 									</a>
 									<button
-										onclick={() => confirmDelete(expense)}
+										onclick={(e) => {
+											e.stopPropagation();
+											confirmDelete(expense);
+										}}
 										class="btn btn-outline btn-sm p-2 text-red-600 hover:text-red-700 hover:border-red-300"
 										title="Delete expense"
 									>

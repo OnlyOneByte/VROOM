@@ -2,6 +2,10 @@
 	import { goto } from '$app/navigation';
 	import { appStore } from '$lib/stores/app.js';
 	import { ArrowLeft, Car, DollarSign, Calculator } from 'lucide-svelte';
+	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import Input from '$lib/components/ui/input/input.svelte';
+	import Label from '$lib/components/ui/label/label.svelte';
+	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
 	import type {
 		VehicleFormData,
 		LoanPaymentConfig,
@@ -22,7 +26,7 @@
 		nickname: '',
 		initialMileage: undefined,
 		purchasePrice: undefined,
-		purchaseDate: ''
+		purchaseDate: undefined
 	});
 
 	// Loan form data
@@ -31,7 +35,7 @@
 		originalAmount: 0,
 		apr: 0,
 		termMonths: 60,
-		startDate: '',
+		startDate: undefined as string | undefined,
 		paymentAmount: 0,
 		frequency: 'monthly' as LoanPaymentConfig['frequency'],
 		dayOfMonth: 1
@@ -138,15 +142,31 @@
 			totalPayments: Math.round(totalPayments * 100) / 100,
 			payoffDate
 		};
-
-		// Update the payment amount in the form
-		loanForm.paymentAmount = amortizationPreview.monthlyPayment;
 	}
 
 	// Recalculate when loan parameters change
 	$effect(() => {
-		if (showLoanForm) {
+		// Explicitly track the inputs that should trigger recalculation
+		// We copy values to local variables to establish dependencies without tracking the whole object
+		const amount = loanForm.originalAmount;
+		const apr = loanForm.apr;
+		const term = loanForm.termMonths;
+		const show = showLoanForm;
+
+		// Also track startDate to ensure changes trigger recalculation
+		void loanForm.startDate;
+
+		if (show && amount > 0 && apr >= 0 && term > 0) {
 			calculateAmortization();
+		} else if (!show) {
+			amortizationPreview = null;
+		}
+	});
+
+	// Sync payment amount from amortization preview (separate effect to avoid circular dependency)
+	$effect(() => {
+		if (amortizationPreview) {
+			loanForm.paymentAmount = amortizationPreview.monthlyPayment;
 		}
 	});
 
@@ -166,7 +186,7 @@
 			};
 
 			// Add loan data if provided
-			if (showLoanForm && loanForm.lender.trim()) {
+			if (showLoanForm && loanForm.lender.trim() && loanForm.startDate) {
 				vehicleData.loan = {
 					lender: loanForm.lender,
 					originalAmount: loanForm.originalAmount,
@@ -258,117 +278,109 @@
 			</div>
 
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-				<div class="form-group">
-					<label for="make" class="form-label">Make *</label>
-					<input
+				<div class="space-y-2">
+					<Label for="make">Make *</Label>
+					<Input
 						id="make"
 						type="text"
-						class="form-input"
-						class:border-red-300={errors['make']}
 						placeholder="e.g., Toyota, Honda, Ford"
 						bind:value={vehicleForm.make}
+						aria-invalid={!!errors['make']}
 						required
 					/>
 					{#if errors['make']}
-						<p class="form-error">{errors['make']}</p>
+						<p class="text-sm text-destructive">{errors['make']}</p>
 					{/if}
 				</div>
 
-				<div class="form-group">
-					<label for="model" class="form-label">Model *</label>
-					<input
+				<div class="space-y-2">
+					<Label for="model">Model *</Label>
+					<Input
 						id="model"
 						type="text"
-						class="form-input"
-						class:border-red-300={errors['model']}
 						placeholder="e.g., Camry, Civic, F-150"
 						bind:value={vehicleForm.model}
+						aria-invalid={!!errors['model']}
 						required
 					/>
 					{#if errors['model']}
-						<p class="form-error">{errors['model']}</p>
+						<p class="text-sm text-destructive">{errors['model']}</p>
 					{/if}
 				</div>
 
-				<div class="form-group">
-					<label for="year" class="form-label">Year *</label>
-					<input
+				<div class="space-y-2">
+					<Label for="year">Year *</Label>
+					<Input
 						id="year"
 						type="number"
-						class="form-input"
-						class:border-red-300={errors['year']}
 						min="1900"
 						max={new Date().getFullYear() + 2}
 						bind:value={vehicleForm.year}
+						aria-invalid={!!errors['year']}
 						required
 					/>
 					{#if errors['year']}
-						<p class="form-error">{errors['year']}</p>
+						<p class="text-sm text-destructive">{errors['year']}</p>
 					{/if}
 				</div>
 
-				<div class="form-group">
-					<label for="licensePlate" class="form-label">License Plate</label>
-					<input
+				<div class="space-y-2">
+					<Label for="licensePlate">License Plate</Label>
+					<Input
 						id="licensePlate"
 						type="text"
-						class="form-input"
 						placeholder="e.g., ABC-1234"
 						bind:value={vehicleForm.licensePlate}
 					/>
 				</div>
 
-				<div class="form-group">
-					<label for="nickname" class="form-label">Nickname</label>
-					<input
+				<div class="space-y-2">
+					<Label for="nickname">Nickname</Label>
+					<Input
 						id="nickname"
 						type="text"
-						class="form-input"
 						placeholder="e.g., Daily Driver, Weekend Car"
 						bind:value={vehicleForm.nickname}
 					/>
 				</div>
 
-				<div class="form-group">
-					<label for="initialMileage" class="form-label">Initial Mileage</label>
-					<input
+				<div class="space-y-2">
+					<Label for="initialMileage">Initial Mileage</Label>
+					<Input
 						id="initialMileage"
 						type="number"
-						class="form-input"
-						class:border-red-300={errors['initialMileage']}
 						min="0"
 						placeholder="Current odometer reading"
 						bind:value={vehicleForm.initialMileage}
+						aria-invalid={!!errors['initialMileage']}
 					/>
 					{#if errors['initialMileage']}
-						<p class="form-error">{errors['initialMileage']}</p>
+						<p class="text-sm text-destructive">{errors['initialMileage']}</p>
 					{/if}
 				</div>
 
-				<div class="form-group">
-					<label for="purchasePrice" class="form-label">Purchase Price</label>
-					<input
+				<div class="space-y-2">
+					<Label for="purchasePrice">Purchase Price</Label>
+					<Input
 						id="purchasePrice"
 						type="number"
-						class="form-input"
-						class:border-red-300={errors['purchasePrice']}
 						min="0"
 						step="0.01"
 						placeholder="0.00"
 						bind:value={vehicleForm.purchasePrice}
+						aria-invalid={!!errors['purchasePrice']}
 					/>
 					{#if errors['purchasePrice']}
-						<p class="form-error">{errors['purchasePrice']}</p>
+						<p class="text-sm text-destructive">{errors['purchasePrice']}</p>
 					{/if}
 				</div>
 
-				<div class="form-group">
-					<label for="purchaseDate" class="form-label">Purchase Date</label>
-					<input
+				<div class="space-y-2">
+					<Label for="purchaseDate">Purchase Date</Label>
+					<DatePicker
 						id="purchaseDate"
-						type="date"
-						class="form-input"
 						bind:value={vehicleForm.purchaseDate}
+						placeholder="Select purchase date"
 					/>
 				</div>
 			</div>
@@ -382,11 +394,7 @@
 					<h2 class="text-lg font-semibold text-gray-900">Loan Information</h2>
 				</div>
 				<label class="flex items-center gap-2 cursor-pointer">
-					<input
-						type="checkbox"
-						class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-						bind:checked={showLoanForm}
-					/>
+					<Checkbox bind:checked={showLoanForm} />
 					<span class="text-sm text-gray-700">This vehicle has a loan</span>
 				</label>
 			</div>
@@ -394,66 +402,63 @@
 			{#if showLoanForm}
 				<div class="space-y-6">
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-						<div class="form-group">
-							<label for="lender" class="form-label">Lender *</label>
-							<input
+						<div class="space-y-2">
+							<Label for="lender">Lender *</Label>
+							<Input
 								id="lender"
 								type="text"
-								class="form-input"
-								class:border-red-300={errors['lender']}
 								placeholder="e.g., Chase Bank, Credit Union"
 								bind:value={loanForm.lender}
+								aria-invalid={!!errors['lender']}
 								required
 							/>
 							{#if errors['lender']}
-								<p class="form-error">{errors['lender']}</p>
+								<p class="text-sm text-destructive">{errors['lender']}</p>
 							{/if}
 						</div>
 
-						<div class="form-group">
-							<label for="originalAmount" class="form-label">Loan Amount *</label>
-							<input
+						<div class="space-y-2">
+							<Label for="originalAmount">Loan Amount *</Label>
+							<Input
 								id="originalAmount"
 								type="number"
-								class="form-input"
-								class:border-red-300={errors['originalAmount']}
 								min="0"
 								step="0.01"
 								placeholder="0.00"
 								bind:value={loanForm.originalAmount}
+								aria-invalid={!!errors['originalAmount']}
 								required
 							/>
 							{#if errors['originalAmount']}
-								<p class="form-error">{errors['originalAmount']}</p>
+								<p class="text-sm text-destructive">{errors['originalAmount']}</p>
 							{/if}
 						</div>
 
-						<div class="form-group">
-							<label for="apr" class="form-label">APR (%) *</label>
-							<input
+						<div class="space-y-2">
+							<Label for="apr">APR (%) *</Label>
+							<Input
 								id="apr"
 								type="number"
-								class="form-input"
-								class:border-red-300={errors['apr']}
 								min="0"
 								max="50"
 								step="0.01"
 								placeholder="e.g., 4.5"
 								bind:value={loanForm.apr}
+								aria-invalid={!!errors['apr']}
 								required
 							/>
 							{#if errors['apr']}
-								<p class="form-error">{errors['apr']}</p>
+								<p class="text-sm text-destructive">{errors['apr']}</p>
 							{/if}
 						</div>
 
-						<div class="form-group">
-							<label for="termMonths" class="form-label">Term (Months) *</label>
+						<div class="space-y-2">
+							<Label for="termMonths">Term (Months) *</Label>
 							<select
 								id="termMonths"
-								class="form-input"
-								class:border-red-300={errors['termMonths']}
+								class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
 								bind:value={loanForm.termMonths}
+								aria-invalid={!!errors['termMonths']}
 								required
 							>
 								<option value={36}>36 months (3 years)</option>
@@ -463,28 +468,29 @@
 								<option value={84}>84 months (7 years)</option>
 							</select>
 							{#if errors['termMonths']}
-								<p class="form-error">{errors['termMonths']}</p>
+								<p class="text-sm text-destructive">{errors['termMonths']}</p>
 							{/if}
 						</div>
 
-						<div class="form-group">
-							<label for="startDate" class="form-label">Loan Start Date *</label>
-							<input
+						<div class="space-y-2">
+							<Label for="startDate">Loan Start Date *</Label>
+							<DatePicker
 								id="startDate"
-								type="date"
-								class="form-input"
-								class:border-red-300={errors['startDate']}
 								bind:value={loanForm.startDate}
-								required
+								placeholder="Select loan start date"
 							/>
 							{#if errors['startDate']}
-								<p class="form-error">{errors['startDate']}</p>
+								<p class="text-sm text-destructive">{errors['startDate']}</p>
 							{/if}
 						</div>
 
-						<div class="form-group">
-							<label for="dayOfMonth" class="form-label">Payment Day of Month</label>
-							<select id="dayOfMonth" class="form-input" bind:value={loanForm.dayOfMonth}>
+						<div class="space-y-2">
+							<Label for="dayOfMonth">Payment Day of Month</Label>
+							<select
+								id="dayOfMonth"
+								class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+								bind:value={loanForm.dayOfMonth}
+							>
 								{#each Array(28) as _, i}
 									<option value={i + 1}>{i + 1}</option>
 								{/each}

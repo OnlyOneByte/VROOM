@@ -115,7 +115,105 @@
 	* {
 		@apply border-border outline-ring/50;
 	}
+
 	body {
 		@apply bg-background text-foreground;
+	}
+}
+
+/* Sonner Toast Customization */
+@layer components {
+
+	/* Individual toast styling */
+	[data-sonner-toast] {
+		@apply rounded-lg shadow-lg border;
+		position: relative !important;
+		overflow: hidden !important;
+		min-width: 24rem;
+		max-width: 32rem;
+	}
+
+	/* Close button styling - left side, vertically centered */
+	[data-sonner-toast] [data-close-button] {
+		position: absolute !important;
+		left: 0.75rem !important;
+		top: 50% !important;
+		transform: translateY(-50%) !important;
+	}
+
+	/* Message text - add left padding for close button */
+	[data-sonner-toast] [data-title] {
+		font-size: 0.875rem;
+		font-weight: 500;
+		line-height: 1.25rem;
+		padding-left: 2.5rem;
+	}
+
+	/* Progress bar at bottom of toast */
+	[data-sonner-toast]::after {
+		content: '';
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		height: 3px;
+		width: 100%;
+		background: currentColor;
+		opacity: 0.4;
+		animation: toast-progress var(--toast-duration, 5000ms) linear forwards;
+	}
+
+	/* Success toast colors */
+	[data-sonner-toast][data-type='success'] {
+		background-color: rgb(240 253 244) !important;
+		border-color: rgb(187 247 208) !important;
+		color: rgb(22 101 52) !important;
+	}
+
+	[data-sonner-toast][data-type='success']::after {
+		background-color: rgb(34 197 94) !important;
+	}
+
+	/* Error toast colors */
+	[data-sonner-toast][data-type='error'] {
+		background-color: rgb(254 242 242) !important;
+		border-color: rgb(254 202 202) !important;
+		color: rgb(153 27 27) !important;
+	}
+
+	[data-sonner-toast][data-type='error']::after {
+		background-color: rgb(239 68 68) !important;
+	}
+
+	/* Warning toast colors */
+	[data-sonner-toast][data-type='warning'] {
+		background-color: rgb(254 252 232) !important;
+		border-color: rgb(254 240 138) !important;
+		color: rgb(133 77 14) !important;
+	}
+
+	[data-sonner-toast][data-type='warning']::after {
+		background-color: rgb(234 179 8) !important;
+	}
+
+	/* Info toast colors */
+	[data-sonner-toast][data-type='info'] {
+		background-color: rgb(239 246 255) !important;
+		border-color: rgb(191 219 254) !important;
+		color: rgb(30 64 175) !important;
+	}
+
+	[data-sonner-toast][data-type='info']::after {
+		background-color: rgb(59 130 246) !important;
+	}
+
+	/* Progress bar animation */
+	@keyframes toast-progress {
+		from {
+			width: 100%;
+		}
+
+		to {
+			width: 0%;
+		}
 	}
 }

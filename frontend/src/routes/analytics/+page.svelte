@@ -10,10 +10,10 @@
 	import { appStore } from '$lib/stores/app';
 	import CostTrendChart from '$lib/components/charts/CostTrendChart.svelte';
 	import CategoryBreakdownChart from '$lib/components/charts/CategoryBreakdownChart.svelte';
-
 	import MultiTrendChart from '$lib/components/charts/MultiTrendChart.svelte';
 	import EfficiencyAlerts from '$lib/components/analytics/EfficiencyAlerts.svelte';
 	import VehicleEfficiencySummary from '$lib/components/analytics/VehicleEfficiencySummary.svelte';
+	import DatePicker from '$lib/components/ui/date-picker.svelte';
 
 	let dashboardData: DashboardData | null = $state(null);
 	let trendData: TrendData | null = $state(null);
@@ -153,23 +153,21 @@
 				<label for="startDate" class="block text-sm font-medium text-gray-700 mb-1">
 					Start Date
 				</label>
-				<input
+				<DatePicker
 					id="startDate"
-					type="date"
 					bind:value={startDate}
 					onchange={handleFilterChange}
-					class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+					placeholder="Select start date"
 				/>
 			</div>
 
 			<div>
 				<label for="endDate" class="block text-sm font-medium text-gray-700 mb-1"> End Date </label>
-				<input
+				<DatePicker
 					id="endDate"
-					type="date"
 					bind:value={endDate}
 					onchange={handleFilterChange}
-					class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+					placeholder="Select end date"
 				/>
 			</div>
 

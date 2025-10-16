@@ -3,10 +3,11 @@
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth.js';
 	import { appStore } from '$lib/stores/app.js';
-	import type { AuthState, AppState } from '$lib/types/index.js';
+	import type { AuthState } from '$lib/types/index.js';
 	import { handleRouteProtection } from '$lib/utils/auth.js';
 	import Navigation from '$lib/components/Navigation.svelte';
-	import NotificationToast from '$lib/components/NotificationToast.svelte';
+	import { Toaster } from '$lib/components/ui/sonner';
+	import { toast } from 'svelte-sonner';
 	import OfflineIndicator from '$lib/components/OfflineIndicator.svelte';
 	import PWAInstallPrompt from '$lib/components/PWAInstallPrompt.svelte';
 	import SyncConflictResolver from '$lib/components/SyncConflictResolver.svelte';
@@ -24,13 +25,6 @@
 		isLoading: true,
 		error: null,
 		token: null
-	});
-	let appState = $state<AppState>({
-		vehicles: [],
-		selectedVehicle: null,
-		notifications: [],
-		isLoading: false,
-		isMobileMenuOpen: false
 	});
 	let currentPath = $state('');
 
@@ -52,7 +46,32 @@
 
 		// Subscribe to app state for notifications
 		const unsubscribeApp = appStore.subscribe(state => {
-			appState = state;
+			// Show toasts for new notifications
+			state.notifications.forEach(notification => {
+				const duration = notification.duration || 5000;
+				const options = {
+					duration,
+					style: `--toast-duration: ${duration}ms;`
+				};
+
+				switch (notification.type) {
+					case 'success':
+						toast.success(notification.message, options);
+						break;
+					case 'error':
+						toast.error(notification.message, options);
+						break;
+					case 'warning':
+						toast.warning(notification.message, options);
+						break;
+					case 'info':
+						toast.info(notification.message, options);
+						break;
+				}
+
+				// Remove notification from store after showing
+				appStore.removeNotification(notification.id);
+			});
 		});
 
 		// Subscribe to page changes for route protection
@@ -102,7 +121,7 @@
 	<div class="min-h-screen bg-gray-50">
 		<Navigation />
 
-		<main class="lg:pl-64">
+		<main class="lg:pl-20 transition-all duration-300">
 			<div class="px-4 sm:px-6 lg:px-8 py-6">
 				{@render children?.()}
 			</div>
@@ -124,11 +143,5 @@
 <!-- Sync conflict resolver -->
 <SyncConflictResolver />
 
-<!-- Notification toasts -->
-{#if appState.notifications.length > 0}
-	<div class="fixed top-4 left-4 z-50 space-y-2">
-		{#each appState.notifications as notification}
-			<NotificationToast {notification} />
-		{/each}
-	</div>
-{/if}
+<!-- Sonner toast container -->
+<Toaster position="bottom-right" richColors closeButton />

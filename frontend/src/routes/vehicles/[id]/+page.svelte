@@ -22,6 +22,8 @@
 		X,
 		FileText
 	} from 'lucide-svelte';
+	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import Input from '$lib/components/ui/input/input.svelte';
 	import type {
 		Vehicle,
 		Expense,
@@ -630,11 +632,11 @@
 					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 						<Search class="h-5 w-5 text-gray-400" />
 					</div>
-					<input
+					<Input
 						type="text"
 						bind:value={searchTerm}
 						placeholder="Search expenses..."
-						class="form-input pl-10 w-full"
+						class="pl-10 w-full"
 					/>
 				</div>
 				<button
@@ -681,11 +683,10 @@
 							<label for="start-date-filter" class="block text-sm font-medium text-gray-700 mb-2"
 								>Start Date</label
 							>
-							<input
+							<DatePicker
 								id="start-date-filter"
-								type="date"
 								bind:value={filters.startDate}
-								class="form-input"
+								placeholder="Select start date"
 							/>
 						</div>
 
@@ -694,11 +695,10 @@
 							<label for="end-date-filter" class="block text-sm font-medium text-gray-700 mb-2"
 								>End Date</label
 							>
-							<input
+							<DatePicker
 								id="end-date-filter"
-								type="date"
 								bind:value={filters.endDate}
-								class="form-input"
+								placeholder="Select end date"
 							/>
 						</div>
 					</div>

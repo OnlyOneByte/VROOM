@@ -6,7 +6,6 @@
 	import {
 		ArrowLeft,
 		DollarSign,
-		Calendar,
 		Fuel,
 		Wrench,
 		CreditCard,
@@ -15,6 +14,9 @@
 		Gauge,
 		Save
 	} from 'lucide-svelte';
+	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import Input from '$lib/components/ui/input/input.svelte';
+	import Label from '$lib/components/ui/label/label.svelte';
 	import type {
 		Vehicle,
 		Expense,
@@ -427,13 +429,13 @@
 			</fieldset>
 
 			<!-- Amount -->
-			<div>
-				<label for="amount" class="block text-sm font-medium text-gray-700 mb-2"> Amount * </label>
+			<div class="space-y-2">
+				<Label for="amount">Amount *</Label>
 				<div class="relative">
 					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 						<DollarSign class="h-5 w-5 text-gray-400" />
 					</div>
-					<input
+					<Input
 						id="amount"
 						type="number"
 						step="0.01"
@@ -441,16 +443,15 @@
 						max="999999"
 						bind:value={formData.amount}
 						onblur={() => handleBlur('amount')}
-						class="input pl-10 text-lg font-medium {touched['amount'] && errors['amount']
-							? 'border-red-500 focus:border-red-500'
-							: ''}"
+						class="pl-10 text-lg font-medium"
 						placeholder="0.00"
 						inputmode="decimal"
 						autocomplete="off"
+						aria-invalid={!!(touched['amount'] && errors['amount'])}
 					/>
 				</div>
 				{#if touched['amount'] && errors['amount']}
-					<p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+					<p class="text-sm text-destructive flex items-center gap-1">
 						<AlertCircle class="h-4 w-4" />
 						{errors['amount']}
 					</p>
@@ -458,25 +459,15 @@
 			</div>
 
 			<!-- Date -->
-			<div>
-				<label for="date" class="block text-sm font-medium text-gray-700 mb-2"> Date * </label>
-				<div class="relative">
-					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-						<Calendar class="h-5 w-5 text-gray-400" />
-					</div>
-					<input
-						id="date"
-						type="date"
-						bind:value={formData.date}
-						onblur={() => handleBlur('date')}
-						max={new Date().toISOString().split('T')[0]}
-						class="input pl-10 {touched['date'] && errors['date']
-							? 'border-red-500 focus:border-red-500'
-							: ''}"
-					/>
-				</div>
+			<div class="space-y-2">
+				<Label for="date">Date *</Label>
+				<DatePicker
+					id="date"
+					bind:value={formData.date}
+					placeholder="Select date"
+				/>
 				{#if touched['date'] && errors['date']}
-					<p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+					<p class="text-sm text-destructive flex items-center gap-1">
 						<AlertCircle class="h-4 w-4" />
 						{errors['date']}
 					</p>
@@ -484,36 +475,35 @@
 			</div>
 
 			<!-- Mileage (always visible, required for fuel) -->
-			<div>
-				<label for="mileage" class="block text-sm font-medium text-gray-700 mb-2">
+			<div class="space-y-2">
+				<Label for="mileage">
 					Current Mileage {formData.type === 'fuel' ? '*' : '(Optional)'}
-				</label>
+				</Label>
 				<div class="relative">
 					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 						<Gauge class="h-5 w-5 text-gray-400" />
 					</div>
-					<input
+					<Input
 						id="mileage"
 						type="number"
 						min="0"
 						bind:value={formData.mileage}
 						oninput={handleMileageChange}
 						onblur={() => handleBlur('mileage')}
-						class="input pl-10 {touched['mileage'] && errors['mileage']
-							? 'border-red-500 focus:border-red-500'
-							: ''}"
+						class="pl-10"
 						placeholder="Current odometer reading"
 						inputmode="numeric"
 						autocomplete="off"
+						aria-invalid={!!(touched['mileage'] && errors['mileage'])}
 					/>
 				</div>
 				{#if lastFuelExpense?.mileage && formData.type === 'fuel'}
-					<p class="mt-1 text-xs text-gray-500">
+					<p class="text-xs text-muted-foreground">
 						Previous fuel entry: {lastFuelExpense.mileage.toLocaleString()} miles
 					</p>
 				{/if}
 				{#if touched['mileage'] && errors['mileage']}
-					<p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+					<p class="text-sm text-destructive flex items-center gap-1">
 						<AlertCircle class="h-4 w-4" />
 						{errors['mileage']}
 					</p>
@@ -529,11 +519,9 @@
 					</div>
 
 					<!-- Gallons -->
-					<div>
-						<label for="gallons" class="block text-sm font-medium text-gray-700 mb-2">
-							Gallons *
-						</label>
-						<input
+					<div class="space-y-2">
+						<Label for="gallons">Gallons *</Label>
+						<Input
 							id="gallons"
 							type="number"
 							step="0.001"
@@ -542,15 +530,13 @@
 							bind:value={formData.gallons}
 							oninput={handleGallonsChange}
 							onblur={() => handleBlur('gallons')}
-							class="input {touched['gallons'] && errors['gallons']
-								? 'border-red-500 focus:border-red-500'
-								: ''}"
 							placeholder="0.000"
 							inputmode="decimal"
 							autocomplete="off"
+							aria-invalid={!!(touched['gallons'] && errors['gallons'])}
 						/>
 						{#if touched['gallons'] && errors['gallons']}
-							<p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+							<p class="text-sm text-destructive flex items-center gap-1">
 								<AlertCircle class="h-4 w-4" />
 								{errors['gallons']}
 							</p>

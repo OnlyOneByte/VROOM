@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { syncStatus, isOnline, offlineExpenses } from '$lib/stores/offline';
 	import { syncManager, lastSyncTime, syncConflicts } from '$lib/utils/sync-manager';
-	import { RefreshCw, CheckCircle, AlertCircle, Clock, Wifi, WifiOff } from 'lucide-svelte';
+	import { RefreshCw, CircleCheck, CircleAlert, Clock, Wifi, WifiOff } from 'lucide-svelte';
 
 	let showDetails = false;
 
@@ -51,10 +51,10 @@
 
 	function getStatusIcon() {
 		if (!$isOnline) return WifiOff;
-		if (hasConflicts) return AlertCircle;
+		if (hasConflicts) return CircleAlert;
 		if ($syncStatus === 'syncing') return RefreshCw;
-		if ($syncStatus === 'error') return AlertCircle;
-		if ($syncStatus === 'success') return CheckCircle;
+		if ($syncStatus === 'error') return CircleAlert;
+		if ($syncStatus === 'success') return CircleCheck;
 		if (pendingCount > 0) return Clock;
 		return Wifi;
 	}
@@ -114,7 +114,7 @@
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-gray-600">Conflicts</span>
 						<div class="flex items-center gap-2 text-orange-600">
-							<AlertCircle class="h-4 w-4" />
+							<CircleAlert class="h-4 w-4" />
 							<span class="text-sm font-medium">{$syncConflicts.length} need resolution</span>
 						</div>
 					</div>

@@ -2,6 +2,8 @@
 
 A modern, self-hostable car cost tracking and visualization web application with mobile-first design and comprehensive expense analytics.
 
+Note: This project is currently under active development and not ready for use.
+
 ## Project Structure
 
 ```
@@ -130,18 +132,13 @@ VROOM/
 - **[API Documentation](docs/API.md)** - Backend API reference (coming soon)
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute (coming soon)
 
-### Project Specifications
-- **[Requirements](. kiro/specs/vroom-car-tracker/requirements.md)** - Feature requirements
-- **[Design](. kiro/specs/vroom-car-tracker/design.md)** - Technical design document
-- **[Tasks](. kiro/specs/vroom-car-tracker/tasks.md)** - Implementation roadmap
-
 ## Quick Start
 
 ### Using Docker (Recommended)
 
 ```bash
 # Clone repository
-git clone https://github.com/your-username/vroom.git
+git clone https://github.com/OnlyOneByte/vroom.git
 cd vroom
 
 # Configure environment
@@ -182,23 +179,6 @@ npm run test:e2e
 ```
 
 See [Development Guide](docs/DEVELOPMENT.md#testing) for more testing options.
-
-## Development Status
-
-VROOM is feature-complete and ready for self-hosting! All core features have been implemented:
-
-✅ Multi-vehicle management  
-✅ Comprehensive expense tracking  
-✅ Fuel efficiency monitoring  
-✅ Loan and insurance management  
-✅ Google Sheets backup & sync  
-✅ PWA with offline support  
-✅ Analytics and visualizations  
-✅ Vehicle sharing  
-✅ Docker deployment  
-✅ E2E testing  
-
-See [Tasks](. kiro/specs/vroom-car-tracker/tasks.md) for implementation details.
 
 ## Contributing
 
