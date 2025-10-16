@@ -168,10 +168,10 @@
 
 		// Apply date range filter
 		if (filters.startDate) {
-			filtered = filtered.filter(expense => new Date(expense.date) >= filters.startDate!);
+			filtered = filtered.filter(expense => new Date(expense.date) >= new Date(filters.startDate!));
 		}
 		if (filters.endDate) {
-			filtered = filtered.filter(expense => new Date(expense.date) <= filters.endDate!);
+			filtered = filtered.filter(expense => new Date(expense.date) <= new Date(filters.endDate!));
 		}
 
 		// Apply sorting

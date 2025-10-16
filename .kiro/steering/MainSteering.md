@@ -2,6 +2,7 @@
    Add Rules to this file or a short description and have Kiro refine them for you:   
 -------------------------------------------------------------------------------------> 
 
+Make sure after finishing your task, that `bun run validate` in the backend and `npm run validate` in the frontend are successful without warnings. If there are errors or warnings, fix them even if they existed before your changes. 
 
 Make sure you add `--no-pager` to git commands that display a lot of text (like diff).
 

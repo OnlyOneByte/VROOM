@@ -223,7 +223,7 @@
 			loanForm.apr;
 			loanForm.termMonths;
 			loanForm.startDate;
-			
+
 			calculateAmortization();
 		}
 	});

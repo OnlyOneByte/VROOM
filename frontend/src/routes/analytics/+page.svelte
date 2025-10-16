@@ -73,6 +73,13 @@
 		loadAnalyticsData();
 	}
 
+	// Watch for date changes and reload data
+	$effect(() => {
+		if (startDate || endDate) {
+			handleFilterChange();
+		}
+	});
+
 	function exportData() {
 		if (!dashboardData) return;
 
@@ -153,22 +160,12 @@
 				<label for="startDate" class="block text-sm font-medium text-gray-700 mb-1">
 					Start Date
 				</label>
-				<DatePicker
-					id="startDate"
-					bind:value={startDate}
-					onchange={handleFilterChange}
-					placeholder="Select start date"
-				/>
+				<DatePicker id="startDate" bind:value={startDate} placeholder="Select start date" />
 			</div>
 
 			<div>
 				<label for="endDate" class="block text-sm font-medium text-gray-700 mb-1"> End Date </label>
-				<DatePicker
-					id="endDate"
-					bind:value={endDate}
-					onchange={handleFilterChange}
-					placeholder="Select end date"
-				/>
+				<DatePicker id="endDate" bind:value={endDate} placeholder="Select end date" />
 			</div>
 
 			<div>

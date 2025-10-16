@@ -161,10 +161,10 @@
 
 		// Apply date range filter
 		if (filters.startDate) {
-			filtered = filtered.filter(expense => new Date(expense.date) >= filters.startDate!);
+			filtered = filtered.filter(expense => new Date(expense.date) >= new Date(filters.startDate!));
 		}
 		if (filters.endDate) {
-			filtered = filtered.filter(expense => new Date(expense.date) <= filters.endDate!);
+			filtered = filtered.filter(expense => new Date(expense.date) <= new Date(filters.endDate!));
 		}
 
 		// Apply sorting
@@ -727,7 +727,7 @@
 						<div
 							class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
 							onclick={() => goto(`/expenses/${expense.id}/edit`)}
-							onkeydown={(e) => {
+							onkeydown={e => {
 								if (e.key === 'Enter' || e.key === ' ') {
 									e.preventDefault();
 									goto(`/expenses/${expense.id}/edit`);
@@ -773,16 +773,17 @@
 									{formatCurrency(expense.amount)}
 								</span>
 
-								<div class="flex items-center gap-1" onclick={(e) => e.stopPropagation()}>
+								<div class="flex items-center gap-1">
 									<a
 										href="/expenses/{expense.id}/edit"
 										class="btn btn-outline btn-sm p-2"
 										title="Edit expense"
+										onclick={e => e.stopPropagation()}
 									>
 										<Edit class="h-4 w-4" />
 									</a>
 									<button
-										onclick={(e) => {
+										onclick={e => {
 											e.stopPropagation();
 											confirmDelete(expense);
 										}}
@@ -875,12 +876,6 @@
 		outline: none;
 		border-color: #2563eb;
 		box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.5);
-	}
-
-	/* Ensure proper padding for inputs with icons */
-	input.input.pl-10,
-	textarea.input.pl-10 {
-		padding-left: 2.5rem;
 	}
 
 	.loading-spinner {

@@ -61,9 +61,7 @@
 	});
 
 	let displayValue = $derived(
-		calendarValue
-			? df.format(calendarValue.toDate(getLocalTimeZone()))
-			: placeholder
+		calendarValue ? df.format(calendarValue.toDate(getLocalTimeZone())) : placeholder
 	);
 </script>
 

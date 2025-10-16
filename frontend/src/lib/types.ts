@@ -181,8 +181,8 @@ export interface ExpenseFilters {
 	vehicleId?: string;
 	category?: ExpenseCategory | undefined;
 	type?: ExpenseType | undefined;
-	startDate?: Date | undefined;
-	endDate?: Date | undefined;
+	startDate?: string | undefined;
+	endDate?: string | undefined;
 	searchTerm?: string;
 }
 

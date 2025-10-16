@@ -461,11 +461,7 @@
 			<!-- Date -->
 			<div class="space-y-2">
 				<Label for="date">Date *</Label>
-				<DatePicker
-					id="date"
-					bind:value={formData.date}
-					placeholder="Select date"
-				/>
+				<DatePicker id="date" bind:value={formData.date} placeholder="Select date" />
 				{#if touched['date'] && errors['date']}
 					<p class="text-sm text-destructive flex items-center gap-1">
 						<AlertCircle class="h-4 w-4" />
@@ -643,12 +639,6 @@
 		outline: none;
 		border-color: #2563eb;
 		box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.5);
-	}
-
-	/* Ensure proper padding for inputs with icons */
-	input.input.pl-10,
-	textarea.input.pl-10 {
-		padding-left: 2.75rem;
 	}
 
 	/* Loading spinner */

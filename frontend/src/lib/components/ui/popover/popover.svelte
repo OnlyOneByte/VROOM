@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Popover as PopoverPrimitive } from "bits-ui";
-	import type { Snippet } from "svelte";
+	import { Popover as PopoverPrimitive } from 'bits-ui';
+	import type { Snippet } from 'svelte';
 
 	interface Props {
 		open?: boolean;

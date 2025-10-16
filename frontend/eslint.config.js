@@ -28,7 +28,14 @@ export default [
 			globals: {
 				...globals.browser,
 				...globals.node,
-				...globals.es2020
+				...globals.es2020,
+				// Svelte 5 runes
+				$state: 'readonly',
+				$derived: 'readonly',
+				$effect: 'readonly',
+				$props: 'readonly',
+				$bindable: 'readonly',
+				$inspect: 'readonly'
 			}
 		},
 		plugins: {

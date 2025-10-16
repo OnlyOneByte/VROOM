@@ -233,7 +233,7 @@
 <div class="max-w-2xl mx-auto space-y-6">
 	<!-- Header -->
 	<div class="flex items-center gap-4">
-		<button on:click={() => goto(returnTo)} class="p-2 hover:bg-gray-100 rounded-lg">
+		<button onclick={() => goto(returnTo)} class="p-2 hover:bg-gray-100 rounded-lg">
 			<ArrowLeft class="h-5 w-5" />
 		</button>
 
@@ -250,7 +250,13 @@
 	</div>
 
 	<!-- Form -->
-	<form on:submit|preventDefault={handleSubmit} class="card space-y-6">
+	<form
+		onsubmit={e => {
+			e.preventDefault();
+			handleSubmit();
+		}}
+		class="card space-y-6"
+	>
 		<!-- Vehicle Selection -->
 		<div>
 			<label for="vehicle" class="block text-sm font-medium text-gray-700 mb-2"> Vehicle * </label>
@@ -284,17 +290,18 @@
 				aria-labelledby="expense-type-legend"
 			>
 				{#each expenseTypes as type}
+					{@const IconComponent = type.icon}
 					<button
 						type="button"
 						role="radio"
 						aria-checked={formData.type === type.value}
-						on:click={() => (formData.type = type.value)}
+						onclick={() => (formData.type = type.value)}
 						class="p-3 border rounded-lg text-center hover:bg-gray-50 transition-colors"
 						class:border-blue-500={formData.type === type.value}
 						class:bg-blue-50={formData.type === type.value}
 						class:border-red-300={errors['type']}
 					>
-						<svelte:component this={type.icon} class="h-5 w-5 mx-auto mb-1" />
+						<IconComponent class="h-5 w-5 mx-auto mb-1" />
 						<div class="text-xs font-medium">{type.label}</div>
 					</button>
 				{/each}
@@ -346,11 +353,7 @@
 		<!-- Date -->
 		<div class="space-y-2">
 			<Label for="date">Date *</Label>
-			<DatePicker
-				id="date"
-				bind:value={formData.date}
-				placeholder="Select date"
-			/>
+			<DatePicker id="date" bind:value={formData.date} placeholder="Select date" />
 			{#if errors['date']}
 				<p class="text-sm text-destructive">{errors['date']}</p>
 			{/if}
@@ -437,7 +440,7 @@
 
 			<button
 				type="button"
-				on:click={() => goto('/expenses')}
+				onclick={() => goto('/expenses')}
 				class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
 			>
 				Cancel

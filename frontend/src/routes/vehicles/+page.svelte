@@ -343,12 +343,7 @@
 	<div class="flex flex-col sm:flex-row gap-4">
 		<div class="relative flex-1">
 			<Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-			<Input
-				type="text"
-				placeholder="Search vehicles..."
-				class="pl-10"
-				bind:value={searchTerm}
-			/>
+			<Input type="text" placeholder="Search vehicles..." class="pl-10" bind:value={searchTerm} />
 		</div>
 
 		<div class="flex gap-2">
