@@ -24,7 +24,8 @@ export class SettingsRepository {
     const newSettings: NewUserSettings = {
       userId,
       distanceUnit: 'miles',
-      fuelUnit: 'gallons',
+      volumeUnit: 'gallons_us',
+      chargeUnit: 'kwh',
       currencyUnit: 'USD',
       autoBackupEnabled: false,
       backupFrequency: 'weekly',

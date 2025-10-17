@@ -52,7 +52,7 @@ describe('ExpenseRepository', () => {
       expect(expense.vehicleId).toBe(testVehicle.id);
       expect(expense.category).toBe(testExpenseData.category);
       expect(expense.amount).toBe(testExpenseData.amount);
-      expect(expense.gallons).toBe(testExpenseData.gallons);
+      expect(expense.volume).toBe(testExpenseData.volume);
       expect(expense.createdAt).toBeInstanceOf(Date);
     });
 
@@ -70,7 +70,7 @@ describe('ExpenseRepository', () => {
 
       expect(expense).toBeDefined();
       expect(expense.amount).toBe(minimalExpenseData.amount);
-      expect(expense.gallons).toBeNull();
+      expect(expense.volume).toBeNull();
       expect(expense.mileage).toBeNull();
     });
   });
@@ -216,7 +216,7 @@ describe('ExpenseRepository', () => {
       const fuelExpenses = await expenseRepository.findFuelExpenses(testVehicle.id);
 
       expect(fuelExpenses).toHaveLength(1);
-      expect(fuelExpenses[0].gallons).toBe(testExpenseData.gallons);
+      expect(fuelExpenses[0].volume).toBe(testExpenseData.volume);
     });
   });
 

@@ -75,7 +75,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
   describe('Expense CRUD Operations with Proper Categorization', () => {
     test('should create expenses with all supported categories', async () => {
       const expenseCategories = [
-        { tags: ['fuel'], category: 'fuel', amount: 45.5, gallons: 12.5, mileage: 10300 },
+        { tags: ['fuel'], category: 'fuel', amount: 45.5, volume: 12.5, mileage: 10300 },
         { tags: ['tolls'], category: 'misc', amount: 5.75 },
         { tags: ['parking'], category: 'misc', amount: 15.0 },
         { tags: ['maintenance'], category: 'maintenance', amount: 89.99 },
@@ -587,7 +587,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           tags: ['fuel'],
           category: 'fuel',
           amount: 45.0,
-          gallons: 12.0,
+          volume: 12.0,
           mileage: 10000,
         },
         {
@@ -609,7 +609,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           tags: ['fuel'],
           category: 'fuel',
           amount: 48.5,
-          gallons: 13.0,
+          volume: 13.0,
           mileage: 10350,
         },
         { date: '2024-01-25', tags: ['tolls'], category: 'misc', amount: 15.75, mileage: 10400 },
@@ -620,7 +620,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           tags: ['fuel'],
           category: 'fuel',
           amount: 52.0,
-          gallons: 14.0,
+          volume: 14.0,
           mileage: 10720,
         },
         {
@@ -642,7 +642,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           tags: ['fuel'],
           category: 'fuel',
           amount: 49.25,
-          gallons: 13.5,
+          volume: 13.5,
           mileage: 11100,
         },
         {
@@ -666,7 +666,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
             amount: expense.amount,
             currency: 'USD',
             date: new Date(expense.date),
-            gallons: expense.gallons || null,
+            volume: expense.volume || null,
             mileage: expense.mileage,
             description: `${expense.tags[0]} expense`,
           });
@@ -733,7 +733,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           amount: 45.5,
           currency: 'USD',
           date: '2024-01-15T10:30:00.000Z',
-          gallons: 12.5,
+          volume: 12.5,
           mileage: 10300,
           description: 'Initial fuel expense',
         }),
@@ -756,7 +756,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
         },
         body: JSON.stringify({
           amount: 48.75,
-          gallons: 13.0,
+          volume: 13.0,
           description: 'Updated fuel expense',
         }),
       });
@@ -765,11 +765,11 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       expect(updateRes.status).toBe(200);
       const updateData = await getTypedResponse<{
         amount: number;
-        gallons: number;
+        volume: number;
       }>(updateRes);
       assertSuccessResponse(updateData);
       expect(updateData.data.amount).toBe(48.75);
-      expect(updateData.data.gallons).toBe(13.0);
+      expect(updateData.data.volume).toBe(13.0);
 
       // Verify update in list
       const listReq = new Request(`http://localhost:3001/api/expenses?vehicleId=${testVehicleId}`, {

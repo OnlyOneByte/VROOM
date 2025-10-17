@@ -9,14 +9,12 @@ import { errorHandler } from './lib/middleware/error-handler';
 import { rateLimiter } from './lib/middleware/rate-limiter';
 import { analytics } from './routes/analytics';
 import { auth } from './routes/auth';
-import { backup } from './routes/backup';
-import { drive } from './routes/drive';
 import { expenses } from './routes/expenses';
 import { financing } from './routes/financing';
 import { insurance } from './routes/insurance';
 import { settings } from './routes/settings';
 import { sharing } from './routes/sharing';
-import { sheets } from './routes/sheets';
+import { sync } from './routes/sync';
 import { vehicles } from './routes/vehicles';
 
 const app = new Hono();
@@ -73,11 +71,9 @@ app.route('/api/financing', financing);
 app.route('/api/expenses', expenses);
 app.route('/api/insurance', insurance);
 app.route('/api/analytics', analytics);
-app.route('/api/drive', drive);
-app.route('/api/sheets', sheets);
-app.route('/api/backup', backup);
 app.route('/api/settings', settings);
 app.route('/api/sharing', sharing);
+app.route('/api/sync', sync);
 
 // API info endpoint
 app.get('/api', optionalAuth, (c) => {
@@ -108,9 +104,6 @@ app.get('/api', optionalAuth, (c) => {
       financing: '/api/financing',
       expenses: '/api/expenses',
       analytics: '/api/analytics',
-      drive: '/api/drive',
-      sheets: '/api/sheets',
-      backup: '/api/backup',
       sharing: '/api/sharing',
     },
   });

@@ -647,7 +647,7 @@ describe('Google Integration Tests', () => {
             currency: 'USD',
             date: new Date('2024-01-15'),
             mileage: 25500,
-            gallons: 12.5,
+            volume: 12.5,
             description: 'Shell Gas Station',
           },
           {
@@ -737,8 +737,10 @@ describe('Google Integration Tests', () => {
       // Check that we have at least headers
       expect(vehicleData.length).toBeGreaterThan(0);
 
-      // Check headers exist
-      expect(vehicleData[0]).toEqual(expect.arrayContaining(['Make', 'Model', 'Year']));
+      // Check headers exist (using actual database column names)
+      expect(vehicleData[0]).toEqual(
+        expect.arrayContaining(['make', 'model', 'year', 'vehicleType'])
+      );
 
       // The test vehicle should be included in the data
       // Since we have a test vehicle, we should have at least 2 rows (headers + 1 vehicle)
@@ -770,159 +772,14 @@ describe('Google Integration Tests', () => {
       // Check that we have at least headers
       expect(expenseData.length).toBeGreaterThan(0);
 
-      // Check headers exist
-      expect(expenseData[0]).toEqual(expect.arrayContaining(['Date', 'Amount', 'MPG']));
+      // Check headers exist (using actual database column names)
+      expect(expenseData[0]).toEqual(
+        expect.arrayContaining(['date', 'amount', 'volume', 'charge'])
+      );
 
       // The test should have created expense data
       // Since we have test expenses, we should have at least headers
       expect(expenseData.length).toBeGreaterThanOrEqual(1);
-    });
-
-    test('should generate accurate category breakdown', async () => {
-      // Mock folder structure creation
-      mockDriveFiles.list.mockReturnValueOnce({ data: { files: [] } });
-      mockDriveFiles.create.mockReturnValueOnce({
-        data: {
-          id: 'main-folder-id',
-          name: 'VROOM Car Tracker - Test User',
-          webViewLink: 'https://drive.google.com/test',
-        },
-      });
-      mockDriveFiles.list.mockReturnValueOnce({ data: { files: [] } });
-
-      await sheetsService.createOrUpdateVroomSpreadsheet(testUserId, 'Test User');
-
-      // Verify category data
-      const categoryUpdateCall = mockSheetsValues.update.mock.calls.find((call: unknown[]) =>
-        (call?.[0] as { range?: string })?.range?.includes('Expense Categories!')
-      );
-
-      expect(categoryUpdateCall).toBeDefined();
-      const categoryData = categoryUpdateCall?.[0]?.requestBody?.values;
-
-      // Check that we have at least headers
-      expect(categoryData.length).toBeGreaterThan(0);
-
-      // Check headers exist
-      expect(categoryData[0]).toEqual(expect.arrayContaining(['Category', 'Total Amount']));
-
-      // If we have expense data, check that categories are calculated
-      if (categoryData.length > 1) {
-        const hasOperatingCategory = categoryData.some(
-          (row: unknown[]) =>
-            Array.isArray(row) && row.some((cell: unknown) => String(cell).includes('fuel'))
-        );
-        const hasMaintenanceCategory = categoryData.some(
-          (row: unknown[]) =>
-            Array.isArray(row) && row.some((cell: unknown) => String(cell).includes('maintenance'))
-        );
-
-        // At least one category should exist if we have expenses
-        expect(hasOperatingCategory || hasMaintenanceCategory).toBe(true);
-      }
-    });
-
-    test('should generate accurate loan and insurance data', async () => {
-      // Mock folder structure creation
-      mockDriveFiles.list.mockReturnValueOnce({ data: { files: [] } });
-      mockDriveFiles.create.mockReturnValueOnce({
-        data: {
-          id: 'main-folder-id',
-          name: 'VROOM Car Tracker - Test User',
-          webViewLink: 'https://drive.google.com/test',
-        },
-      });
-      mockDriveFiles.list.mockReturnValueOnce({ data: { files: [] } });
-
-      await sheetsService.createOrUpdateVroomSpreadsheet(testUserId, 'Test User');
-
-      // Verify loan data
-      const financingUpdateCall = mockSheetsValues.update.mock.calls.find((call: unknown[]) =>
-        (call?.[0] as { range?: string })?.range?.includes('Financing Details!')
-      );
-
-      expect(financingUpdateCall).toBeDefined();
-      const financingData = financingUpdateCall?.[0]?.requestBody?.values;
-
-      // Check that we have data (headers + at least one row)
-      expect(financingData.length).toBeGreaterThan(0);
-
-      // Check headers exist
-      expect(financingData[0]).toEqual(
-        expect.arrayContaining(['Vehicle', 'Provider', 'Original Amount'])
-      );
-
-      // If we have financing data, check it
-      if (financingData.length > 1) {
-        const hasFinancingData = financingData.some(
-          (row: unknown[]) =>
-            Array.isArray(row) && row.some((cell: unknown) => String(cell).includes('Test Bank'))
-        );
-        expect(hasFinancingData).toBe(true);
-      }
-
-      // Verify insurance data
-      const insuranceUpdateCall = mockSheetsValues.update.mock.calls.find((call: unknown[]) =>
-        (call?.[0] as { range?: string })?.range?.includes('Insurance!')
-      );
-
-      expect(insuranceUpdateCall).toBeDefined();
-      const insuranceData = insuranceUpdateCall?.[0]?.requestBody?.values;
-
-      // Check that we have data
-      expect(insuranceData.length).toBeGreaterThan(0);
-
-      // Check headers exist
-      expect(insuranceData[0]).toEqual(
-        expect.arrayContaining(['Vehicle', 'Company', 'Total Cost'])
-      );
-
-      // If we have insurance data, check it
-      if (insuranceData.length > 1) {
-        const hasInsuranceData = insuranceData.some(
-          (row: unknown[]) =>
-            Array.isArray(row) &&
-            row.some((cell: unknown) => String(cell).includes('Test Insurance Co'))
-        );
-        expect(hasInsuranceData).toBe(true);
-      }
-    });
-  });
-
-  describe('Data Export Functionality', () => {
-    test('should export data as JSON', async () => {
-      const result = await sheetsService.exportData('test-spreadsheet-id', 'json');
-
-      expect(result).toBeDefined();
-      expect(typeof result).toBe('object');
-      expect(mockSheetsSpreadsheets.get).toHaveBeenCalled();
-      expect(mockSheetsValues.get).toHaveBeenCalled();
-    });
-
-    test('should export data as CSV', async () => {
-      const result = await sheetsService.exportData('test-spreadsheet-id', 'csv');
-
-      expect(result).toBeInstanceOf(Buffer);
-      expect(mockSheetsValues.get).toHaveBeenCalledWith({
-        spreadsheetId: 'test-spreadsheet-id',
-        range: 'Expenses!A:Z',
-      });
-    });
-
-    test('should export data as XLSX', async () => {
-      const result = await sheetsService.exportData('test-spreadsheet-id', 'xlsx');
-
-      expect(result).toBeInstanceOf(Buffer);
-      expect(mockDriveFiles.export).toHaveBeenCalledWith({
-        fileId: 'test-spreadsheet-id',
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-    });
-
-    test('should handle unsupported export format', async () => {
-      await expect(
-        sheetsService.exportData('test-spreadsheet-id', 'unsupported' as 'json')
-      ).rejects.toThrow('Failed to export data as unsupported');
     });
   });
 
@@ -932,7 +789,17 @@ describe('Google Integration Tests', () => {
       mockSheetsValues.get.mockReturnValueOnce({
         data: {
           values: [
-            ['Date', 'Vehicle', 'Type', 'Category', 'Description', 'Amount', 'Mileage', 'Gallons'],
+            [
+              'Date',
+              'Vehicle',
+              'Type',
+              'Category',
+              'Description',
+              'Amount',
+              'Mileage',
+              'Volume',
+              'Charge',
+            ],
             [
               '1/15/2024',
               '2020 Toyota Camry',

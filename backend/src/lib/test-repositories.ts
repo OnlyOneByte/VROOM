@@ -59,7 +59,7 @@ async function testRepositories() {
       amount: 50.0,
       currency: 'USD',
       date: new Date(),
-      gallons: 12.5,
+      volume: 12.5,
       description: 'Test fuel expense',
     });
     console.log('Created expense:', testExpense.id);

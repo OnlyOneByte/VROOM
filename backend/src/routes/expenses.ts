@@ -20,7 +20,8 @@ type ExpenseDataRaw = {
   date: Date;
   description?: string | null;
   mileage?: number | null;
-  gallons?: number | null;
+  volume?: number | null;
+  charge?: number | null;
   vehicleId: string;
 };
 
@@ -33,7 +34,8 @@ type ExpenseData = {
   date: Date;
   description?: string | null;
   mileage?: number | null;
-  gallons?: number | null;
+  volume?: number | null;
+  charge?: number | null;
   vehicleId: string;
 };
 
@@ -54,7 +56,8 @@ const createExpenseSchema = z.object({
   currency: z.string().length(3, 'Currency must be 3 characters').default('USD'),
   date: z.coerce.date(),
   mileage: z.number().int().min(0, 'Mileage cannot be negative').nullable().optional(),
-  gallons: z.number().positive('Gallons must be positive').optional(),
+  volume: z.number().positive('Volume must be positive').optional(),
+  charge: z.number().positive('Charge must be positive').optional(),
   description: z.string().max(500, 'Description must be 500 characters or less').optional(),
   receiptUrl: z.string().url('Receipt URL must be valid').optional(),
 });
@@ -119,9 +122,9 @@ expenses.post('/', zValidator('json', createExpenseSchema), async (c) => {
     // Validate fuel expense requirements
     const category = expenseData.category as string;
     if (category === 'fuel') {
-      if (!expenseData.gallons || !expenseData.mileage) {
+      if ((!expenseData.volume && !expenseData.charge) || !expenseData.mileage) {
         throw new HTTPException(400, {
-          message: 'Fuel expenses require both gallons and mileage data',
+          message: 'Fuel expenses require volume/charge and mileage data',
         });
       }
     }
@@ -355,12 +358,14 @@ expenses.put(
       if (finalCategory === 'fuel') {
         const finalMileage =
           updateData.mileage !== undefined ? updateData.mileage : existingExpense.mileage;
-        const finalGallons =
-          updateData.gallons !== undefined ? updateData.gallons : existingExpense.gallons;
+        const finalVolume =
+          updateData.volume !== undefined ? updateData.volume : existingExpense.volume;
+        const finalCharge =
+          updateData.charge !== undefined ? updateData.charge : existingExpense.charge;
 
-        if (!finalGallons || !finalMileage) {
+        if ((!finalVolume && !finalCharge) || !finalMileage) {
           throw new HTTPException(400, {
-            message: 'Fuel expenses require both gallons and mileage data',
+            message: 'Fuel expenses require volume/charge and mileage data',
           });
         }
       }

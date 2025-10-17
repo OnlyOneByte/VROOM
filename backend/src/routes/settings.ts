@@ -13,7 +13,8 @@ settings.use('*', requireAuth);
 // Validation schemas
 const updateSettingsSchema = z.object({
   distanceUnit: z.enum(['miles', 'kilometers']).optional(),
-  fuelUnit: z.enum(['gallons', 'liters']).optional(),
+  volumeUnit: z.enum(['gallons_us', 'gallons_uk', 'liters']).optional(),
+  chargeUnit: z.enum(['kwh']).optional(),
   currencyUnit: z.string().optional(),
   autoBackupEnabled: z.boolean().optional(),
   backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),

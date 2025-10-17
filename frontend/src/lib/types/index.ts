@@ -15,6 +15,7 @@ export interface Vehicle {
 	make: string;
 	model: string;
 	year: number;
+	vehicleType: 'gas' | 'electric' | 'hybrid';
 	licensePlate?: string;
 	nickname?: string;
 	initialMileage?: number;
@@ -62,6 +63,7 @@ export interface VehicleFormData {
 	make: string;
 	model: string;
 	year: number;
+	vehicleType: 'gas' | 'electric' | 'hybrid';
 	licensePlate?: string;
 	nickname?: string;
 	initialMileage?: number;
@@ -78,7 +80,8 @@ export interface Expense {
 	amount: number;
 	date: string;
 	mileage?: number;
-	gallons?: number;
+	volume?: number; // For fuel
+	charge?: number; // For electric
 	description?: string;
 	createdAt: string;
 	updatedAt: string;
@@ -125,7 +128,8 @@ export interface UserSettings {
 	id: string;
 	userId: string;
 	distanceUnit: 'miles' | 'kilometers';
-	fuelUnit: 'gallons' | 'liters';
+	volumeUnit: 'gallons_us' | 'gallons_uk' | 'liters';
+	chargeUnit: 'kwh';
 	currencyUnit: string;
 	autoBackupEnabled: boolean;
 	backupFrequency: 'daily' | 'weekly' | 'monthly';
@@ -143,7 +147,8 @@ export interface UserSettings {
 
 export interface SettingsFormData {
 	distanceUnit: 'miles' | 'kilometers';
-	fuelUnit: 'gallons' | 'liters';
+	volumeUnit: 'gallons_us' | 'gallons_uk' | 'liters';
+	chargeUnit: 'kwh';
 	currencyUnit: string;
 	autoBackupEnabled: boolean;
 	backupFrequency: 'daily' | 'weekly' | 'monthly';

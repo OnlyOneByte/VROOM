@@ -26,6 +26,7 @@ export const vehicles = sqliteTable('vehicles', {
   make: text('make').notNull(),
   model: text('model').notNull(),
   year: integer('year').notNull(),
+  vehicleType: text('vehicle_type').notNull().default('gas'), // 'gas' | 'electric' | 'hybrid'
   licensePlate: text('license_plate'),
   nickname: text('nickname'),
   initialMileage: integer('initial_mileage'),
@@ -120,7 +121,8 @@ export const expenses = sqliteTable('expenses', {
   currency: text('currency').notNull().default('USD'),
   date: integer('date', { mode: 'timestamp' }).notNull(),
   mileage: integer('mileage'),
-  gallons: real('gallons'), // For fuel expenses
+  volume: real('volume'), // For fuel expenses (gallons or liters)
+  charge: real('charge'), // For electric charging (kWh)
   description: text('description'),
   receiptUrl: text('receipt_url'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -158,7 +160,8 @@ export const userSettings = sqliteTable('user_settings', {
     .references(() => users.id, { onDelete: 'cascade' }),
   // Unit preferences
   distanceUnit: text('distance_unit').notNull().default('miles'), // 'miles' | 'kilometers'
-  fuelUnit: text('fuel_unit').notNull().default('gallons'), // 'gallons' | 'liters'
+  volumeUnit: text('volume_unit').notNull().default('gallons_us'), // 'gallons_us' | 'gallons_uk' | 'liters'
+  chargeUnit: text('charge_unit').notNull().default('kwh'), // 'kwh' (for electric vehicles)
   currencyUnit: text('currency_unit').notNull().default('USD'),
   // Backup preferences (for data dumps)
   autoBackupEnabled: integer('auto_backup_enabled', { mode: 'boolean' }).notNull().default(false),

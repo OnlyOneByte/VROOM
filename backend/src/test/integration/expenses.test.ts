@@ -87,7 +87,7 @@ describe('Expense Management API Integration Tests', () => {
         currency: 'USD',
         date: '2024-01-15T10:30:00.000Z',
         mileage: 25000,
-        gallons: 12.5,
+        volume: 12.5,
         description: 'Gas station fill-up',
       };
 
@@ -115,14 +115,14 @@ describe('Expense Management API Integration Tests', () => {
       expect(data.message).toContain('created successfully');
     });
 
-    test('should reject fuel expense without gallons and mileage', async () => {
+    test('should reject fuel expense without volume and mileage', async () => {
       const invalidExpenseData = {
         vehicleId: testVehicleId,
         tags: ['fuel'],
         category: 'fuel',
         amount: 45.5,
         date: '2024-01-15T10:30:00.000Z',
-        // Missing gallons and mileage for fuel expense
+        // Missing volume and mileage for fuel expense
       };
 
       const req = new Request(`http://localhost:3001/api/expenses`, {
@@ -138,10 +138,10 @@ describe('Expense Management API Integration Tests', () => {
       expect(res.status).toBe(400);
 
       const data = (await res.json()) as { message: string };
-      expect(data.message).toContain('gallons and mileage data');
+      expect(data.message).toContain('volume/charge and mileage data');
     });
 
-    test('should create non-fuel expense without gallons', async () => {
+    test('should create non-fuel expense without volume', async () => {
       const expenseData = {
         vehicleId: testVehicleId,
         tags: ['maintenance'],
@@ -167,7 +167,7 @@ describe('Expense Management API Integration Tests', () => {
       expect(data.success).toBe(true);
       if (data.success && data.data) {
         expect(data.data.tags).toContain('maintenance');
-        expect(data.data.gallons).toBeNull();
+        expect(data.data.volume).toBeNull();
       }
     });
     test('should list vehicle expenses', async () => {
@@ -182,7 +182,7 @@ describe('Expense Management API Integration Tests', () => {
           amount: 45.5,
           currency: 'USD',
           date: new Date('2024-01-15'),
-          gallons: 12.5,
+          volume: 12.5,
           mileage: 25000,
         })
         .returning();
@@ -327,7 +327,7 @@ describe('Expense Management API Integration Tests', () => {
           amount: 45.5,
           currency: 'USD',
           date: new Date('2024-01-15'),
-          gallons: 12.5,
+          volume: 12.5,
           mileage: 25000,
           description: 'Test fuel expense',
         })

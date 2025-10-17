@@ -153,6 +153,7 @@ export const testVehicleData = {
   make: 'Toyota',
   model: 'Camry',
   year: 2020,
+  vehicleType: 'gas' as const,
   licensePlate: 'TEST123',
   nickname: 'Test Car',
   initialMileage: 25000,
@@ -167,7 +168,7 @@ export const testExpenseData = {
   currency: 'USD',
   date: new Date('2024-01-15'),
   mileage: 25500,
-  gallons: 12.5,
+  volume: 12.5,
   description: 'Shell Gas Station',
 };
 

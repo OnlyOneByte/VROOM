@@ -16,14 +16,29 @@ import { databaseService } from './database';
 import type { GoogleDriveService } from './google-drive';
 
 export interface BackupData {
-  version: string;
-  timestamp: string;
-  userId: string;
+  metadata: {
+    version: string;
+    timestamp: string;
+    userId: string;
+  };
   vehicles: Vehicle[];
   expenses: Expense[];
   financing: VehicleFinancing[];
   financingPayments: VehicleFinancingPayment[];
   insurance: InsurancePolicy[];
+}
+
+export interface ParsedBackupData {
+  metadata: {
+    version: string;
+    timestamp: string;
+    userId: string;
+  };
+  vehicles: Record<string, unknown>[];
+  expenses: Record<string, unknown>[];
+  financing: Record<string, unknown>[];
+  financingPayments: Record<string, unknown>[];
+  insurance: Record<string, unknown>[];
 }
 
 export class BackupService {
@@ -67,23 +82,17 @@ export class BackupService {
       ]);
 
     return {
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-      userId,
+      metadata: {
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+        userId,
+      },
       vehicles: userVehicles,
       expenses: userExpenses,
       financing: userFinancing,
       financingPayments: userFinancingPayments,
       insurance: userInsurance,
     };
-  }
-
-  /**
-   * Export backup as JSON
-   */
-  async exportAsJson(userId: string): Promise<Buffer> {
-    const backup = await this.createBackup(userId);
-    return Buffer.from(JSON.stringify(backup, null, 2), 'utf-8');
   }
 
   /**
@@ -94,21 +103,7 @@ export class BackupService {
     const zip = new AdmZip();
 
     // Add metadata
-    zip.addFile(
-      'metadata.json',
-      Buffer.from(
-        JSON.stringify(
-          {
-            version: backup.version,
-            timestamp: backup.timestamp,
-            userId: backup.userId,
-          },
-          null,
-          2
-        ),
-        'utf-8'
-      )
-    );
+    zip.addFile('metadata.json', Buffer.from(JSON.stringify(backup.metadata, null, 2), 'utf-8'));
 
     // Add vehicles CSV
     const vehiclesCsv = this.convertToCSV(backup.vehicles, [
@@ -144,7 +139,7 @@ export class BackupService {
     ]);
     zip.addFile('expenses.csv', Buffer.from(expensesCsv, 'utf-8'));
 
-    // Add financing CSV
+    // Add vehicle_financing CSV
     const financingCsv = this.convertToCSV(backup.financing, [
       'id',
       'vehicleId',
@@ -157,6 +152,8 @@ export class BackupService {
       'startDate',
       'paymentAmount',
       'paymentFrequency',
+      'paymentDayOfMonth',
+      'paymentDayOfWeek',
       'residualValue',
       'mileageLimit',
       'excessMileageFee',
@@ -165,9 +162,9 @@ export class BackupService {
       'createdAt',
       'updatedAt',
     ]);
-    zip.addFile('financing.csv', Buffer.from(financingCsv, 'utf-8'));
+    zip.addFile('vehicle_financing.csv', Buffer.from(financingCsv, 'utf-8'));
 
-    // Add financing payments CSV
+    // Add vehicle_financing_payments CSV
     const financingPaymentsCsv = this.convertToCSV(backup.financingPayments, [
       'id',
       'financingId',
@@ -178,10 +175,11 @@ export class BackupService {
       'remainingBalance',
       'paymentNumber',
       'paymentType',
+      'isScheduled',
       'createdAt',
       'updatedAt',
     ]);
-    zip.addFile('financing_payments.csv', Buffer.from(financingPaymentsCsv, 'utf-8'));
+    zip.addFile('vehicle_financing_payments.csv', Buffer.from(financingPaymentsCsv, 'utf-8'));
 
     // Add insurance CSV
     const insuranceCsv = this.convertToCSV(backup.insurance, [
@@ -230,27 +228,95 @@ export class BackupService {
   }
 
   /**
-   * Upload backup to Google Drive
+   * Parse ZIP backup file and validate structure
+   */
+  async parseZipBackup(file: Buffer): Promise<ParsedBackupData> {
+    try {
+      const zip = new AdmZip(file);
+      const zipEntries = zip.getEntries();
+
+      // Check for required files
+      const requiredFiles = [
+        'metadata.json',
+        'vehicles.csv',
+        'expenses.csv',
+        'insurance_policies.csv',
+        'vehicle_financing.csv',
+        'vehicle_financing_payments.csv',
+      ];
+
+      const fileNames = zipEntries.map((entry) => entry.entryName);
+      const missingFiles = requiredFiles.filter((file) => !fileNames.includes(file));
+
+      if (missingFiles.length > 0) {
+        throw new Error(`Missing required files: ${missingFiles.join(', ')}`);
+      }
+
+      // Parse metadata
+      const metadataEntry = zip.getEntry('metadata.json');
+      if (!metadataEntry) {
+        throw new Error('metadata.json not found in backup');
+      }
+
+      const metadataContent = metadataEntry.getData().toString('utf-8');
+      const metadata = JSON.parse(metadataContent) as {
+        version: string;
+        timestamp: string;
+        userId: string;
+      };
+
+      // Parse CSV files
+      const parseCSV = (csvContent: string): Record<string, unknown>[] => {
+        const lines = csvContent.trim().split('\n');
+        if (lines.length < 2) return [];
+
+        const headers = lines[0].split(',');
+        return lines.slice(1).map((line) => {
+          const values = line.split(',');
+          const obj: Record<string, unknown> = {};
+          headers.forEach((header, index) => {
+            obj[header] = values[index] || '';
+          });
+          return obj;
+        });
+      };
+
+      const getCSVData = (fileName: string): Record<string, unknown>[] => {
+        const entry = zip.getEntry(fileName);
+        if (!entry) return [];
+        const content = entry.getData().toString('utf-8');
+        return parseCSV(content);
+      };
+
+      return {
+        metadata,
+        vehicles: getCSVData('vehicles.csv'),
+        expenses: getCSVData('expenses.csv'),
+        financing: getCSVData('vehicle_financing.csv'),
+        financingPayments: getCSVData('vehicle_financing_payments.csv'),
+        insurance: getCSVData('insurance_policies.csv'),
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to parse ZIP backup: ${error.message}`);
+      }
+      throw new Error('Failed to parse ZIP backup: Unknown error');
+    }
+  }
+
+  /**
+   * Upload backup to Google Drive (ZIP format only)
    */
   async uploadToGoogleDrive(
     userId: string,
     driveService: GoogleDriveService,
-    backupFolderId: string,
-    format: 'json' | 'zip' = 'zip'
+    backupFolderId: string
   ): Promise<{ fileId: string; fileName: string; webViewLink: string }> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `vroom-backup-${timestamp}.${format}`;
+    const fileName = `vroom-backup-${timestamp}.zip`;
 
-    let fileContent: Buffer;
-    let mimeType: string;
-
-    if (format === 'json') {
-      fileContent = await this.exportAsJson(userId);
-      mimeType = 'application/json';
-    } else {
-      fileContent = await this.exportAsZip(userId);
-      mimeType = 'application/zip';
-    }
+    const fileContent = await this.exportAsZip(userId);
+    const mimeType = 'application/zip';
 
     const uploadedFile = await driveService.uploadFile(
       fileName,
@@ -285,11 +351,7 @@ export class BackupService {
     const files = await driveService.listFilesInFolder(backupFolderId);
 
     return files
-      .filter(
-        (file) =>
-          file.name.startsWith('vroom-backup-') &&
-          (file.name.endsWith('.json') || file.name.endsWith('.zip'))
-      )
+      .filter((file) => file.name.startsWith('vroom-backup-') && file.name.endsWith('.zip'))
       .map((file) => ({
         id: file.id,
         name: file.name,

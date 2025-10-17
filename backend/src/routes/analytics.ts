@@ -15,7 +15,8 @@ type ExpenseData = {
   date: Date;
   description?: string | null;
   mileage?: number | null;
-  gallons?: number | null;
+  volume?: number | null;
+  charge?: number | null;
   vehicleId: string;
 };
 
@@ -344,13 +345,13 @@ function calculateOverallFuelEfficiency(expenses: ExpenseData[], vehicles: Vehic
   if (fuelExpenses.length === 0) {
     return {
       averageMPG: 0,
-      totalGallons: 0,
+      totalVolume: 0,
       totalFuelCost: 0,
       averageCostPerGallon: 0,
     };
   }
 
-  let totalGallons = 0;
+  let totalVolume = 0;
   let totalFuelCost = 0;
   let totalMiles = 0;
 
@@ -373,17 +374,17 @@ function calculateOverallFuelEfficiency(expenses: ExpenseData[], vehicles: Vehic
       const vehicleMiles = maxMileage - initialMileage;
 
       totalMiles += vehicleMiles;
-      totalGallons += vehicleFuelExpenses.reduce((sum, e) => sum + (e.gallons || 0), 0);
+      totalVolume += vehicleFuelExpenses.reduce((sum, e) => sum + (e.volume || 0), 0);
       totalFuelCost += vehicleFuelExpenses.reduce((sum, e) => sum + e.amount, 0);
     }
   });
 
-  const averageMPG = totalGallons > 0 ? totalMiles / totalGallons : 0;
-  const averageCostPerGallon = totalGallons > 0 ? totalFuelCost / totalGallons : 0;
+  const averageMPG = totalVolume > 0 ? totalMiles / totalVolume : 0;
+  const averageCostPerGallon = totalVolume > 0 ? totalFuelCost / totalVolume : 0;
 
   return {
     averageMPG: Math.round(averageMPG * 100) / 100,
-    totalGallons: Math.round(totalGallons * 100) / 100,
+    totalVolume: Math.round(totalVolume * 100) / 100,
     totalFuelCost: Math.round(totalFuelCost * 100) / 100,
     averageCostPerGallon: Math.round(averageCostPerGallon * 100) / 100,
   };
@@ -422,7 +423,7 @@ function calculateFuelEfficiencyForVehicle(fuelExpenses: ExpenseData[], initialM
   if (fuelExpenses.length === 0) {
     return {
       averageMPG: 0,
-      totalGallons: 0,
+      totalVolume: 0,
       totalMiles: 0,
       trend: [],
     };
@@ -432,14 +433,14 @@ function calculateFuelEfficiencyForVehicle(fuelExpenses: ExpenseData[], initialM
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
-  let totalGallons = 0;
+  let totalVolume = 0;
   let previousMileage = initialMileage;
   const trend: { date: Date; mpg: number; mileage?: number }[] = [];
 
   sortedExpenses.forEach((expense) => {
-    if (expense.gallons && expense.mileage) {
+    if (expense.volume && expense.mileage) {
       const milesDriven = expense.mileage - previousMileage;
-      const mpg = milesDriven > 0 ? milesDriven / expense.gallons : 0;
+      const mpg = milesDriven > 0 ? milesDriven / expense.volume : 0;
 
       if (mpg > 0 && mpg < 100) {
         trend.push({
@@ -449,17 +450,17 @@ function calculateFuelEfficiencyForVehicle(fuelExpenses: ExpenseData[], initialM
         });
       }
 
-      totalGallons += expense.gallons;
+      totalVolume += expense.volume;
       previousMileage = expense.mileage;
     }
   });
 
   const totalMiles = previousMileage - initialMileage;
-  const averageMPG = totalGallons > 0 ? totalMiles / totalGallons : 0;
+  const averageMPG = totalVolume > 0 ? totalMiles / totalVolume : 0;
 
   return {
     averageMPG: Math.round(averageMPG * 100) / 100,
-    totalGallons: Math.round(totalGallons * 100) / 100,
+    totalVolume: Math.round(totalVolume * 100) / 100,
     totalMiles,
     trend,
   };
@@ -540,8 +541,8 @@ function calculateMilesTrends(fuelExpenses: ExpenseData[], groupBy: string) {
       trends[dateKey] = { miles: 0, count: 0 };
     }
 
-    // Estimate miles from gallons and average MPG (rough calculation)
-    const estimatedMiles = (expense.gallons || 0) * 25; // Assume 25 MPG average
+    // Estimate miles from volume and average MPG (rough calculation)
+    const estimatedMiles = (expense.volume || 0) * 25; // Assume 25 MPG average
     trends[dateKey].miles += estimatedMiles;
     trends[dateKey].count += 1;
   });

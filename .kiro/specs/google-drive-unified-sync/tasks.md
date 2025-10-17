@@ -5,8 +5,8 @@ This implementation plan follows an incremental approach, starting with cleanup 
 
 ## Tasks
 
-- [ ] 1. Cleanup old endpoints and prepare foundation
-  - [ ] 1.1 Delete old route files
+- [x] 1. Cleanup old endpoints and prepare foundation
+  - [x] 1.1 Delete old route files
     - Delete backend/src/routes/sheets.ts
     - Delete backend/src/routes/backup.ts
     - Delete backend/src/routes/drive.ts (if exists)
@@ -14,14 +14,14 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Verify application compiles without errors
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
   
-  - [ ] 1.2 Create sync-service.ts with base structure
+  - [x] 1.2 Create sync-service.ts with base structure
     - Create backend/src/lib/sync-service.ts
     - Define SyncService class with method signatures
     - Define TypeScript interfaces (SyncRequest, SyncResponse, RestoreRequest, RestoreResponse, BackupData, BackupMetadata)
     - Add error handling types (SyncError, SyncErrorCode enum)
     - _Requirements: 2.1, 2.2, 2.3, 9.1, 9.2_
   
-  - [ ] 1.3 Refactor backup-service.ts for ZIP-only support
+  - [x] 1.3 Refactor backup-service.ts for ZIP-only support
     - Remove exportAsJson method
     - Remove individual CSV export methods
     - Update createBackup to include vehicle_financing and vehicle_financing_payments tables
@@ -29,8 +29,8 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Update convertToCSV to handle all table types
     - _Requirements: 2.2, 2.3, 5.1, 5.2, 5.3_
 
-- [ ] 2. Implement manual backup and restore
-  - [ ] 2.1 Create sync routes with download endpoint
+- [x] 2. Implement manual backup and restore
+  - [x] 2.1 Create sync routes with download endpoint
     - Create backend/src/routes/sync.ts
     - Implement GET /api/sync/download endpoint
     - Use backup-service.exportAsZip to generate file
@@ -38,7 +38,7 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Add route registration in backend/src/index.ts
     - _Requirements: 2.4, 2.12, 1.4_
   
-  - [ ] 2.2 Implement upload and validation
+  - [x] 2.2 Implement upload and validation
     - Add POST /api/sync/upload endpoint with multipart/form-data support
     - Add file size validation (max 50MB)
     - Parse uploaded ZIP using backup-service.parseZipBackup
@@ -48,7 +48,7 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Return validation errors without modifying data
     - _Requirements: 2.5, 2.6, 2.10, 2.13, 9.3, 9.4, 9.5_
   
-  - [ ] 2.3 Implement restore modes in sync-service
+  - [x] 2.3 Implement restore modes in sync-service
     - Add restoreFromBackup method with mode parameter (preview, replace, merge)
     - Implement preview mode: parse data and return import summary without changes
     - Implement replace mode: delete all user data, import backup data in transaction
@@ -58,8 +58,8 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Rollback on any error
     - _Requirements: 2.7, 2.8, 2.9, 2.11, 9.6, 9.7_
 
-- [ ] 3. Refactor and implement Google Sheets sync
-  - [ ] 3.1 Refactor google-sheets.ts to match database schema
+- [x] 3. Refactor and implement Google Sheets sync
+  - [x] 3.1 Refactor google-sheets.ts to match database schema
     - Remove updateDashboardSheet method
     - Remove updateMonthlySummarySheet method
     - Remove updateExpenseCategoriesSheet method
@@ -69,14 +69,14 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Replace loan_payments with vehicle_financing_payments (update column names)
     - _Requirements: 10.2, 4.2, 4.3_
   
-  - [ ] 3.2 Add readSpreadsheetData method
+  - [x] 3.2 Add readSpreadsheetData method
     - Implement method to read all 5 sheets from spreadsheet
     - Parse sheet data into BackupData structure
     - Handle empty sheets gracefully
     - Validate data types during parsing
     - _Requirements: 4.6_
   
-  - [ ] 3.3 Implement sheets sync in sync-service
+  - [x] 3.3 Implement sheets sync in sync-service
     - Add syncToSheets method
     - Get user settings to verify googleSheetsSyncEnabled
     - Create GoogleSheetsService instance with user tokens
@@ -86,7 +86,7 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Handle authentication errors (401)
     - _Requirements: 4.1, 4.4, 4.5, 4.9, 4.10_
   
-  - [ ] 3.4 Add sheets restore functionality
+  - [x] 3.4 Add sheets restore functionality
     - Add restoreFromSheets method in sync-service
     - Read data using readSpreadsheetData
     - Validate data types and formats

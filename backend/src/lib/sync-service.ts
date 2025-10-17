@@ -1,0 +1,819 @@
+/**
+ * Error codes for sync operations
+ */
+export enum SyncErrorCode {
+  AUTH_INVALID = 'AUTH_INVALID',
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  QUOTA_EXCEEDED = 'QUOTA_EXCEEDED',
+  PERMISSION_DENIED = 'PERMISSION_DENIED',
+  VALIDATION_ERROR = 'VALIDATION_ERROR',
+  CONFLICT_DETECTED = 'CONFLICT_DETECTED',
+  SYNC_IN_PROGRESS = 'SYNC_IN_PROGRESS',
+  INVALID_FILE_FORMAT = 'INVALID_FILE_FORMAT',
+  VERSION_MISMATCH = 'VERSION_MISMATCH',
+}
+
+/**
+ * Custom error class for sync operations
+ */
+export class SyncError extends Error {
+  constructor(
+    public code: SyncErrorCode,
+    message: string,
+    public details?: unknown
+  ) {
+    super(message);
+    this.name = 'SyncError';
+  }
+}
+
+/**
+ * Metadata for backup files
+ */
+export interface BackupMetadata {
+  version: string;
+  timestamp: string;
+  userId: string;
+}
+
+/**
+ * Complete backup data structure
+ */
+export interface BackupData {
+  metadata: BackupMetadata;
+  vehicles: unknown[];
+  expenses: unknown[];
+  financing: unknown[];
+  financingPayments: unknown[];
+  insurance: unknown[];
+}
+
+/**
+ * Conflict information for merge operations
+ */
+export interface Conflict {
+  table: string;
+  id: string;
+  localData: unknown;
+  remoteData: unknown;
+}
+
+/**
+ * Request to trigger sync operations
+ */
+export interface SyncRequest {
+  syncTypes: ('sheets' | 'backup')[];
+}
+
+/**
+ * Result of sheets sync operation
+ */
+export interface SheetsSyncResult {
+  spreadsheetId: string;
+  webViewLink: string;
+  lastSyncDate: string;
+}
+
+/**
+ * Result of backup sync operation
+ */
+export interface BackupSyncResult {
+  fileId: string;
+  fileName: string;
+  webViewLink: string;
+  lastBackupDate: string;
+}
+
+/**
+ * Response from sync operations
+ */
+export interface SyncResponse {
+  success: boolean;
+  results: {
+    sheets?: SheetsSyncResult;
+    backup?: BackupSyncResult;
+  };
+  errors?: {
+    sheets?: string;
+    backup?: string;
+  };
+}
+
+/**
+ * Request to restore data
+ */
+export interface RestoreRequest {
+  mode: 'replace' | 'merge' | 'preview';
+}
+
+/**
+ * Summary of data to be imported
+ */
+export interface ImportSummary {
+  vehicles: number;
+  expenses: number;
+  financing: number;
+  financingPayments: number;
+  insurance: number;
+}
+
+/**
+ * Response from restore operations
+ */
+export interface RestoreResponse {
+  success: boolean;
+  preview?: ImportSummary;
+  imported?: ImportSummary;
+  conflicts?: Conflict[];
+}
+
+/**
+ * Service for managing unified sync operations
+ */
+export class SyncService {
+  /**
+   * Execute sync operations for specified types
+   */
+  async executeSync(
+    _userId: string,
+    _syncTypes: string[]
+  ): Promise<{
+    sheets?: SheetsSyncResult;
+    backup?: BackupSyncResult;
+    errors?: Record<string, string>;
+  }> {
+    // TODO: Implement in task 4.1
+    throw new Error('Not implemented');
+  }
+
+  /**
+   * Generate backup ZIP file
+   */
+  async generateBackup(_userId: string): Promise<Buffer> {
+    // TODO: Implement in task 2.1
+    throw new Error('Not implemented');
+  }
+
+  /**
+   * Restore from backup file
+   */
+  async restoreFromBackup(
+    userId: string,
+    file: Buffer,
+    mode: 'replace' | 'merge' | 'preview'
+  ): Promise<RestoreResponse> {
+    const { backupService } = await import('./backup-service');
+    const { databaseService } = await import('./database');
+    const { eq } = await import('drizzle-orm');
+    const { vehicles, expenses, vehicleFinancing, vehicleFinancingPayments, insurancePolicies } =
+      await import('../db/schema');
+
+    // Parse backup file
+    const parsedBackup = await backupService.parseZipBackup(file);
+
+    // Validate userId matches
+    if (parsedBackup.metadata.userId !== userId) {
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        'Backup file belongs to a different user'
+      );
+    }
+
+    const summary: ImportSummary = {
+      vehicles: parsedBackup.vehicles.length,
+      expenses: parsedBackup.expenses.length,
+      financing: parsedBackup.financing.length,
+      financingPayments: parsedBackup.financingPayments.length,
+      insurance: parsedBackup.insurance.length,
+    };
+
+    // Preview mode: just return summary
+    if (mode === 'preview') {
+      return {
+        success: true,
+        preview: summary,
+      };
+    }
+
+    const db = databaseService.getDatabase();
+
+    // Merge mode: detect conflicts
+    if (mode === 'merge') {
+      const conflicts = await this.detectConflicts(userId, parsedBackup);
+      if (conflicts.length > 0) {
+        return {
+          success: false,
+          conflicts,
+        };
+      }
+    }
+
+    // Replace or merge mode: perform restore in transaction
+    try {
+      await db.transaction(async (tx) => {
+        // Replace mode: delete all existing user data
+        if (mode === 'replace') {
+          // Delete in correct order (child tables first)
+          await tx
+            .delete(vehicleFinancingPayments)
+            .where(
+              eq(
+                vehicleFinancingPayments.financingId,
+                tx
+                  .select({ id: vehicleFinancing.id })
+                  .from(vehicleFinancing)
+                  .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+                  .where(eq(vehicles.userId, userId))
+                  .limit(1)
+                  .as('subquery')
+              )
+            );
+
+          await tx
+            .delete(vehicleFinancing)
+            .where(
+              eq(
+                vehicleFinancing.vehicleId,
+                tx
+                  .select({ id: vehicles.id })
+                  .from(vehicles)
+                  .where(eq(vehicles.userId, userId))
+                  .limit(1)
+                  .as('subquery')
+              )
+            );
+
+          await tx
+            .delete(insurancePolicies)
+            .where(
+              eq(
+                insurancePolicies.vehicleId,
+                tx
+                  .select({ id: vehicles.id })
+                  .from(vehicles)
+                  .where(eq(vehicles.userId, userId))
+                  .limit(1)
+                  .as('subquery')
+              )
+            );
+
+          await tx
+            .delete(expenses)
+            .where(
+              eq(
+                expenses.vehicleId,
+                tx
+                  .select({ id: vehicles.id })
+                  .from(vehicles)
+                  .where(eq(vehicles.userId, userId))
+                  .limit(1)
+                  .as('subquery')
+              )
+            );
+
+          await tx.delete(vehicles).where(eq(vehicles.userId, userId));
+        }
+
+        // Insert backup data
+        if (parsedBackup.vehicles.length > 0) {
+          // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
+          await tx.insert(vehicles).values(parsedBackup.vehicles.map((v: any) => v));
+        }
+
+        if (parsedBackup.expenses.length > 0) {
+          // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
+          await tx.insert(expenses).values(parsedBackup.expenses.map((e: any) => e));
+        }
+
+        if (parsedBackup.financing.length > 0) {
+          // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
+          await tx.insert(vehicleFinancing).values(parsedBackup.financing.map((f: any) => f));
+        }
+
+        if (parsedBackup.financingPayments.length > 0) {
+          await tx
+            .insert(vehicleFinancingPayments)
+            // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
+            .values(parsedBackup.financingPayments.map((p: any) => p));
+        }
+
+        if (parsedBackup.insurance.length > 0) {
+          // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
+          await tx.insert(insurancePolicies).values(parsedBackup.insurance.map((i: any) => i));
+        }
+      });
+
+      return {
+        success: true,
+        imported: summary,
+      };
+    } catch (error) {
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        'Failed to restore backup',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
+  }
+
+  /**
+   * Detect conflicts between local and remote data
+   */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Conflict detection requires checking multiple tables
+  private async detectConflicts(
+    userId: string,
+    remoteData: {
+      vehicles: Record<string, unknown>[];
+      expenses: Record<string, unknown>[];
+      financing: Record<string, unknown>[];
+      financingPayments: Record<string, unknown>[];
+      insurance: Record<string, unknown>[];
+    }
+  ): Promise<Conflict[]> {
+    const { databaseService } = await import('./database');
+    const { eq } = await import('drizzle-orm');
+    const { vehicles, expenses, vehicleFinancing, vehicleFinancingPayments, insurancePolicies } =
+      await import('../db/schema');
+
+    const db = databaseService.getDatabase();
+    const conflicts: Conflict[] = [];
+
+    // Get all local data
+    const [localVehicles, localExpenses, localFinancing, localFinancingPayments, localInsurance] =
+      await Promise.all([
+        db.select().from(vehicles).where(eq(vehicles.userId, userId)),
+        db
+          .select()
+          .from(expenses)
+          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId))
+          .then((results) => results.map((r) => r.expenses)),
+        db
+          .select()
+          .from(vehicleFinancing)
+          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId))
+          .then((results) => results.map((r) => r.vehicle_financing)),
+        db
+          .select()
+          .from(vehicleFinancingPayments)
+          .innerJoin(
+            vehicleFinancing,
+            eq(vehicleFinancingPayments.financingId, vehicleFinancing.id)
+          )
+          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId))
+          .then((results) => results.map((r) => r.vehicle_financing_payments)),
+        db
+          .select()
+          .from(insurancePolicies)
+          .innerJoin(vehicles, eq(insurancePolicies.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId))
+          .then((results) => results.map((r) => r.insurance_policies)),
+      ]);
+
+    // Check for conflicts in vehicles
+    for (const remoteVehicle of remoteData.vehicles) {
+      const localVehicle = localVehicles.find((v) => v.id === remoteVehicle.id);
+      if (localVehicle && JSON.stringify(localVehicle) !== JSON.stringify(remoteVehicle)) {
+        conflicts.push({
+          table: 'vehicles',
+          id: remoteVehicle.id as string,
+          localData: localVehicle,
+          remoteData: remoteVehicle,
+        });
+      }
+    }
+
+    // Check for conflicts in expenses
+    for (const remoteExpense of remoteData.expenses) {
+      const localExpense = localExpenses.find((e) => e.id === remoteExpense.id);
+      if (localExpense && JSON.stringify(localExpense) !== JSON.stringify(remoteExpense)) {
+        conflicts.push({
+          table: 'expenses',
+          id: remoteExpense.id as string,
+          localData: localExpense,
+          remoteData: remoteExpense,
+        });
+      }
+    }
+
+    // Check for conflicts in financing
+    for (const remoteFinancing of remoteData.financing) {
+      const localFinancingItem = localFinancing.find((f) => f.id === remoteFinancing.id);
+      if (
+        localFinancingItem &&
+        JSON.stringify(localFinancingItem) !== JSON.stringify(remoteFinancing)
+      ) {
+        conflicts.push({
+          table: 'vehicle_financing',
+          id: remoteFinancing.id as string,
+          localData: localFinancingItem,
+          remoteData: remoteFinancing,
+        });
+      }
+    }
+
+    // Check for conflicts in financing payments
+    for (const remotePayment of remoteData.financingPayments) {
+      const localPayment = localFinancingPayments.find((p) => p.id === remotePayment.id);
+      if (localPayment && JSON.stringify(localPayment) !== JSON.stringify(remotePayment)) {
+        conflicts.push({
+          table: 'vehicle_financing_payments',
+          id: remotePayment.id as string,
+          localData: localPayment,
+          remoteData: remotePayment,
+        });
+      }
+    }
+
+    // Check for conflicts in insurance
+    for (const remoteInsurance of remoteData.insurance) {
+      const localInsuranceItem = localInsurance.find((i) => i.id === remoteInsurance.id);
+      if (
+        localInsuranceItem &&
+        JSON.stringify(localInsuranceItem) !== JSON.stringify(remoteInsurance)
+      ) {
+        conflicts.push({
+          table: 'insurance_policies',
+          id: remoteInsurance.id as string,
+          localData: localInsuranceItem,
+          remoteData: remoteInsurance,
+        });
+      }
+    }
+
+    return conflicts;
+  }
+
+  /**
+   * Sync data to Google Sheets
+   */
+  async syncToSheets(userId: string): Promise<SheetsSyncResult> {
+    const { databaseService } = await import('./database');
+    const { eq } = await import('drizzle-orm');
+    const { users, userSettings } = await import('../db/schema');
+    const { GoogleSheetsService } = await import('./google-sheets');
+
+    const db = databaseService.getDatabase();
+
+    // Get user settings to verify googleSheetsSyncEnabled
+    const settings = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    if (!settings.length || !settings[0].googleSheetsSyncEnabled) {
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        'Google Sheets sync is not enabled for this user'
+      );
+    }
+
+    // Get user info for tokens and name
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!user.length || !user[0].googleRefreshToken) {
+      throw new SyncError(
+        SyncErrorCode.AUTH_INVALID,
+        'Google Drive access not available. Please re-authenticate with Google.'
+      );
+    }
+
+    try {
+      // Create GoogleSheetsService instance with user tokens
+      const sheetsService = new GoogleSheetsService(
+        user[0].googleRefreshToken,
+        user[0].googleRefreshToken
+      );
+
+      // Call createOrUpdateVroomSpreadsheet
+      const spreadsheetInfo = await sheetsService.createOrUpdateVroomSpreadsheet(
+        userId,
+        user[0].displayName
+      );
+
+      // Update lastSyncDate and spreadsheetId in user settings
+      await db
+        .update(userSettings)
+        .set({
+          lastSyncDate: new Date(),
+          googleSheetsSpreadsheetId: spreadsheetInfo.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(userSettings.userId, userId));
+
+      // Return spreadsheet info
+      return {
+        spreadsheetId: spreadsheetInfo.id,
+        webViewLink: spreadsheetInfo.webViewLink,
+        lastSyncDate: new Date().toISOString(),
+      };
+    } catch (error) {
+      // Handle authentication errors
+      if (error instanceof Error && error.message.includes('auth')) {
+        throw new SyncError(
+          SyncErrorCode.AUTH_INVALID,
+          'Google Drive access not available. Please re-authenticate with Google.',
+          error.message
+        );
+      }
+
+      // Re-throw SyncErrors as-is
+      if (error instanceof SyncError) {
+        throw error;
+      }
+
+      // Wrap other errors
+      throw new SyncError(
+        SyncErrorCode.NETWORK_ERROR,
+        'Failed to sync to Google Sheets',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
+  }
+
+  /**
+   * Restore data from Google Sheets
+   */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Restore logic requires multiple validation and transaction steps
+  async restoreFromSheets(
+    userId: string,
+    mode: 'replace' | 'merge' | 'preview'
+  ): Promise<RestoreResponse> {
+    const { databaseService } = await import('./database');
+    const { eq } = await import('drizzle-orm');
+    const {
+      users,
+      userSettings,
+      vehicles,
+      expenses,
+      vehicleFinancing,
+      vehicleFinancingPayments,
+      insurancePolicies,
+    } = await import('../db/schema');
+    const { GoogleSheetsService } = await import('./google-sheets');
+
+    const db = databaseService.getDatabase();
+
+    // Get user settings to get spreadsheet ID
+    const settings = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    if (!settings.length || !settings[0].googleSheetsSpreadsheetId) {
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        'No Google Sheets spreadsheet found for this user'
+      );
+    }
+
+    // Get user info for tokens
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!user.length || !user[0].googleRefreshToken) {
+      throw new SyncError(
+        SyncErrorCode.AUTH_INVALID,
+        'Google Drive access not available. Please re-authenticate with Google.'
+      );
+    }
+
+    try {
+      // Create GoogleSheetsService instance
+      const sheetsService = new GoogleSheetsService(
+        user[0].googleRefreshToken,
+        user[0].googleRefreshToken
+      );
+
+      // Read data from spreadsheet
+      const sheetData = await sheetsService.readSpreadsheetData(
+        settings[0].googleSheetsSpreadsheetId
+      );
+
+      // Validate userId matches
+      if (sheetData.metadata.userId !== userId) {
+        throw new SyncError(
+          SyncErrorCode.VALIDATION_ERROR,
+          'Spreadsheet data belongs to a different user'
+        );
+      }
+
+      // Validate data types and formats
+      this.validateSheetData(sheetData);
+
+      const summary: ImportSummary = {
+        vehicles: sheetData.vehicles.length,
+        expenses: sheetData.expenses.length,
+        financing: sheetData.financing.length,
+        financingPayments: sheetData.financingPayments.length,
+        insurance: sheetData.insurance.length,
+      };
+
+      // Preview mode: just return summary
+      if (mode === 'preview') {
+        return {
+          success: true,
+          preview: summary,
+        };
+      }
+
+      // Merge mode: detect conflicts
+      if (mode === 'merge') {
+        const conflicts = await this.detectConflicts(userId, sheetData);
+        if (conflicts.length > 0) {
+          return {
+            success: false,
+            conflicts,
+          };
+        }
+      }
+
+      // Replace or merge mode: perform restore in transaction
+      await db.transaction(async (tx) => {
+        // Replace mode: delete all existing user data
+        if (mode === 'replace') {
+          // Delete in correct order (child tables first)
+          await tx
+            .delete(vehicleFinancingPayments)
+            .where(
+              eq(
+                vehicleFinancingPayments.financingId,
+                tx
+                  .select({ id: vehicleFinancing.id })
+                  .from(vehicleFinancing)
+                  .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+                  .where(eq(vehicles.userId, userId))
+                  .limit(1)
+                  .as('subquery')
+              )
+            );
+
+          await tx
+            .delete(vehicleFinancing)
+            .where(
+              eq(
+                vehicleFinancing.vehicleId,
+                tx
+                  .select({ id: vehicles.id })
+                  .from(vehicles)
+                  .where(eq(vehicles.userId, userId))
+                  .limit(1)
+                  .as('subquery')
+              )
+            );
+
+          await tx
+            .delete(insurancePolicies)
+            .where(
+              eq(
+                insurancePolicies.vehicleId,
+                tx
+                  .select({ id: vehicles.id })
+                  .from(vehicles)
+                  .where(eq(vehicles.userId, userId))
+                  .limit(1)
+                  .as('subquery')
+              )
+            );
+
+          await tx
+            .delete(expenses)
+            .where(
+              eq(
+                expenses.vehicleId,
+                tx
+                  .select({ id: vehicles.id })
+                  .from(vehicles)
+                  .where(eq(vehicles.userId, userId))
+                  .limit(1)
+                  .as('subquery')
+              )
+            );
+
+          await tx.delete(vehicles).where(eq(vehicles.userId, userId));
+        }
+
+        // Insert sheet data
+        if (sheetData.vehicles.length > 0) {
+          // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
+          await tx.insert(vehicles).values(sheetData.vehicles.map((v: any) => v));
+        }
+
+        if (sheetData.expenses.length > 0) {
+          // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
+          await tx.insert(expenses).values(sheetData.expenses.map((e: any) => e));
+        }
+
+        if (sheetData.financing.length > 0) {
+          // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
+          await tx.insert(vehicleFinancing).values(sheetData.financing.map((f: any) => f));
+        }
+
+        if (sheetData.financingPayments.length > 0) {
+          await tx
+            .insert(vehicleFinancingPayments)
+            // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
+            .values(sheetData.financingPayments.map((p: any) => p));
+        }
+
+        if (sheetData.insurance.length > 0) {
+          // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
+          await tx.insert(insurancePolicies).values(sheetData.insurance.map((i: any) => i));
+        }
+      });
+
+      return {
+        success: true,
+        imported: summary,
+      };
+    } catch (error) {
+      // Handle authentication errors
+      if (error instanceof Error && error.message.includes('auth')) {
+        throw new SyncError(
+          SyncErrorCode.AUTH_INVALID,
+          'Google Drive access not available. Please re-authenticate with Google.',
+          error.message
+        );
+      }
+
+      // Re-throw SyncErrors as-is
+      if (error instanceof SyncError) {
+        throw error;
+      }
+
+      // Wrap other errors
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        'Failed to restore from Google Sheets',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
+  }
+
+  /**
+   * Validate sheet data types and formats
+   */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Validation requires checking multiple tables and fields
+  private validateSheetData(data: {
+    vehicles: Record<string, unknown>[];
+    expenses: Record<string, unknown>[];
+    financing: Record<string, unknown>[];
+    financingPayments: Record<string, unknown>[];
+    insurance: Record<string, unknown>[];
+  }): void {
+    // Basic validation - ensure required fields exist
+    // This is a simplified validation, could be expanded
+
+    for (const vehicle of data.vehicles) {
+      if (!vehicle.id || !vehicle.userId || !vehicle.make || !vehicle.model || !vehicle.year) {
+        throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Invalid vehicle data in spreadsheet');
+      }
+    }
+
+    for (const expense of data.expenses) {
+      if (!expense.id || !expense.vehicleId || !expense.category || !expense.amount) {
+        throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Invalid expense data in spreadsheet');
+      }
+    }
+
+    for (const fin of data.financing) {
+      if (!fin.id || !fin.vehicleId || !fin.financingType || !fin.provider) {
+        throw new SyncError(
+          SyncErrorCode.VALIDATION_ERROR,
+          'Invalid financing data in spreadsheet'
+        );
+      }
+    }
+
+    for (const payment of data.financingPayments) {
+      if (!payment.id || !payment.financingId || !payment.paymentAmount) {
+        throw new SyncError(
+          SyncErrorCode.VALIDATION_ERROR,
+          'Invalid financing payment data in spreadsheet'
+        );
+      }
+    }
+
+    for (const ins of data.insurance) {
+      if (!ins.id || !ins.vehicleId || !ins.company || !ins.totalCost) {
+        throw new SyncError(
+          SyncErrorCode.VALIDATION_ERROR,
+          'Invalid insurance data in spreadsheet'
+        );
+      }
+    }
+  }
+
+  /**
+   * Upload backup to Google Drive
+   */
+  async uploadToGoogleDrive(_userId: string): Promise<BackupSyncResult> {
+    // TODO: Implement in task 4.2
+    throw new Error('Not implemented');
+  }
+}
+
+export const syncService = new SyncService();

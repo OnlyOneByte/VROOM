@@ -23,13 +23,15 @@ type VehicleData = {
   make: string;
   model: string;
   year: number;
+  vehicleType: string;
   licensePlate?: string | null;
   nickname?: string | null;
-  currentMileage?: number | null;
   initialMileage?: number | null;
   purchasePrice?: number | null;
   purchaseDate?: Date | null;
   userId: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
 };
 
 // Type for expense data from database (joined with vehicles)
@@ -38,13 +40,17 @@ type ExpenseData = {
     id: string;
     amount: number;
     category: string;
-    type?: string | null; // Deprecated
-    tags?: string | null; // JSON string from database
+    tags?: string | null;
     date: Date;
     description?: string | null;
     mileage?: number | null;
-    gallons?: number | null;
+    volume?: number | null;
+    charge?: number | null;
+    currency: string;
+    receiptUrl?: string | null;
     vehicleId: string;
+    createdAt: Date | null;
+    updatedAt: Date | null;
   };
   vehicles: {
     id: string;
@@ -68,6 +74,8 @@ type InsuranceData = {
     termLengthMonths: number;
     monthlyCost: number;
     isActive: boolean;
+    createdAt: Date | null;
+    updatedAt: Date | null;
   };
   vehicles: {
     id: string;
@@ -92,9 +100,15 @@ type FinancingData = {
     vehicleId: string;
     paymentAmount: number;
     paymentFrequency: string;
+    paymentDayOfMonth: number | null;
+    paymentDayOfWeek: number | null;
     residualValue: number | null;
     mileageLimit: number | null;
+    excessMileageFee: number | null;
     isActive: boolean;
+    endDate: Date | null;
+    createdAt: Date | null;
+    updatedAt: Date | null;
   };
   vehicles: {
     id: string;
@@ -117,6 +131,9 @@ type FinancingPaymentData = {
     financingId: string;
     remainingBalance: number;
     paymentType: string;
+    isScheduled: boolean;
+    createdAt: Date | null;
+    updatedAt: Date | null;
   };
   vehicle_financing: {
     id: string;
@@ -246,14 +263,11 @@ export class GoogleSheetsService {
             title,
           },
           sheets: [
-            { properties: { title: 'Dashboard' } },
             { properties: { title: 'Vehicles' } },
             { properties: { title: 'Expenses' } },
-            { properties: { title: 'Expense Categories' } },
-            { properties: { title: 'Insurance' } },
-            { properties: { title: 'Financing Details' } },
-            { properties: { title: 'Financing Payments' } },
-            { properties: { title: 'Monthly Summary' } },
+            { properties: { title: 'Insurance Policies' } },
+            { properties: { title: 'Vehicle Financing' } },
+            { properties: { title: 'Vehicle Financing Payments' } },
           ],
         },
       });
@@ -339,14 +353,11 @@ export class GoogleSheetsService {
 
       // Update each sheet
       await Promise.all([
-        this.updateDashboardSheet(spreadsheetId, userVehicles, userExpenses),
         this.updateVehiclesSheet(spreadsheetId, userVehicles),
         this.updateExpensesSheet(spreadsheetId, userExpenses),
-        this.updateExpenseCategoriesSheet(spreadsheetId, userExpenses),
-        this.updateInsuranceSheet(spreadsheetId, userInsurance),
-        this.updateFinancingDetailsSheet(spreadsheetId, userFinancing),
-        this.updateFinancingPaymentsSheet(spreadsheetId, userFinancingPayments),
-        this.updateMonthlySummarySheet(spreadsheetId, userExpenses),
+        this.updateInsurancePoliciesSheet(spreadsheetId, userInsurance),
+        this.updateVehicleFinancingSheet(spreadsheetId, userFinancing),
+        this.updateVehicleFinancingPaymentsSheet(spreadsheetId, userFinancingPayments),
       ]);
     } catch (error) {
       console.error('Error updating spreadsheet with user data:', error);
@@ -355,332 +366,261 @@ export class GoogleSheetsService {
   }
 
   /**
-   * Update Dashboard sheet
-   */
-  private async updateDashboardSheet(
-    spreadsheetId: string,
-    vehicles: VehicleData[],
-    expenses: ExpenseData[]
-  ): Promise<void> {
-    const totalVehicles = vehicles.length;
-    const totalExpenses = expenses.reduce((sum, exp) => sum + exp.expenses.amount, 0);
-    const thisMonthExpenses = expenses
-      .filter((exp) => {
-        const expDate = new Date(exp.expenses.date);
-        const now = new Date();
-        return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear();
-      })
-      .reduce((sum, exp) => sum + exp.expenses.amount, 0);
-
-    const values = [
-      ['VROOM Car Tracker - Dashboard', '', '', ''],
-      ['Generated:', new Date().toISOString(), '', ''],
-      ['', '', '', ''],
-      ['Summary Statistics', '', '', ''],
-      ['Total Vehicles:', totalVehicles, '', ''],
-      ['Total Expenses:', `$${totalExpenses.toFixed(2)}`, '', ''],
-      ['This Month Expenses:', `$${thisMonthExpenses.toFixed(2)}`, '', ''],
-      ['', '', '', ''],
-      ['Quick Links', '', '', ''],
-      ['• Vehicles Sheet', '', '', ''],
-      ['• Expenses Sheet', '', '', ''],
-      ['• Monthly Summary Sheet', '', '', ''],
-    ];
-
-    await this.updateSheetData(spreadsheetId, 'Dashboard!A1:D12', values);
-  }
-
-  /**
-   * Update Vehicles sheet
+   * Update Vehicles sheet with all database columns
    */
   private async updateVehiclesSheet(spreadsheetId: string, vehicles: VehicleData[]): Promise<void> {
     const headers = [
-      'Make',
-      'Model',
-      'Year',
-      'License Plate',
-      'Nickname',
-      'Purchase Date',
-      'Purchase Price',
-      'Initial Mileage',
+      'id',
+      'userId',
+      'make',
+      'model',
+      'year',
+      'vehicleType',
+      'licensePlate',
+      'nickname',
+      'initialMileage',
+      'purchasePrice',
+      'purchaseDate',
+      'createdAt',
+      'updatedAt',
     ];
 
     const values = [
       headers,
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data mapping requires checking multiple fields
       ...vehicles.map((vehicle) => [
+        vehicle.id || '',
+        vehicle.userId || '',
         vehicle.make || '',
         vehicle.model || '',
         vehicle.year || '',
+        vehicle.vehicleType || '',
         vehicle.licensePlate || '',
         vehicle.nickname || '',
-        vehicle.purchaseDate ? new Date(vehicle.purchaseDate).toLocaleDateString() : '',
-        vehicle.purchasePrice ? `$${vehicle.purchasePrice.toFixed(2)}` : '',
         vehicle.initialMileage || '',
+        vehicle.purchasePrice || '',
+        vehicle.purchaseDate ? new Date(vehicle.purchaseDate).toISOString() : '',
+        vehicle.createdAt ? new Date(vehicle.createdAt).toISOString() : '',
+        vehicle.updatedAt ? new Date(vehicle.updatedAt).toISOString() : '',
       ]),
     ];
 
-    await this.updateSheetData(spreadsheetId, `Vehicles!A1:H${vehicles.length + 1}`, values);
+    await this.updateSheetData(spreadsheetId, `Vehicles!A1:M${vehicles.length + 1}`, values);
   }
 
   /**
-   * Update Expenses sheet
+   * Update Expenses sheet with all database columns
    */
   private async updateExpensesSheet(spreadsheetId: string, expenses: ExpenseData[]): Promise<void> {
     const headers = [
-      'Date',
-      'Vehicle',
-      'Type',
-      'Category',
-      'Description',
-      'Amount',
-      'Mileage',
-      'Gallons',
-      'MPG',
-      'Cost/Mile',
+      'id',
+      'vehicleId',
+      'tags',
+      'category',
+      'amount',
+      'currency',
+      'date',
+      'mileage',
+      'volume',
+      'charge',
+      'description',
+      'receiptUrl',
+      'createdAt',
+      'updatedAt',
     ];
 
     const values = [
       headers,
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data mapping requires checking multiple fields
       ...expenses.map((exp) => {
         const expense = exp.expenses;
-        const vehicle = exp.vehicles;
-        const mpg =
-          expense.gallons && expense.mileage ? (expense.mileage / expense.gallons).toFixed(2) : '';
-        const costPerMile = expense.mileage ? (expense.amount / expense.mileage).toFixed(4) : '';
-
         return [
-          new Date(expense.date).toLocaleDateString(),
-          `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-          expense.tags ? JSON.parse(expense.tags).join(', ') : expense.type || '',
-          expense.category,
-          expense.description || '',
-          `$${expense.amount.toFixed(2)}`,
+          expense.id || '',
+          expense.vehicleId || '',
+          expense.tags || '',
+          expense.category || '',
+          expense.amount || '',
+          expense.currency || '',
+          expense.date ? new Date(expense.date).toISOString() : '',
           expense.mileage || '',
-          expense.gallons || '',
-          mpg,
-          costPerMile ? `$${costPerMile}` : '',
+          expense.volume || '',
+          expense.charge || '',
+          expense.description || '',
+          expense.receiptUrl || '',
+          expense.createdAt ? new Date(expense.createdAt).toISOString() : '',
+          expense.updatedAt ? new Date(expense.updatedAt).toISOString() : '',
         ];
       }),
     ];
 
-    await this.updateSheetData(spreadsheetId, `Expenses!A1:J${expenses.length + 1}`, values);
+    await this.updateSheetData(spreadsheetId, `Expenses!A1:M${expenses.length + 1}`, values);
   }
 
   /**
-   * Update Expense Categories sheet
+   * Update Insurance Policies sheet with all database columns
    */
-  private async updateExpenseCategoriesSheet(
-    spreadsheetId: string,
-    expenses: ExpenseData[]
-  ): Promise<void> {
-    const categoryTotals = expenses.reduce(
-      (acc, exp) => {
-        const category = exp.expenses.category;
-        acc[category] = (acc[category] || 0) + exp.expenses.amount;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-
-    const headers = ['Category', 'Total Amount', 'Percentage'];
-    const amounts = Object.values(categoryTotals) as number[];
-    const totalAmount = amounts.reduce((sum, amount) => sum + amount, 0);
-
-    const values = [
-      headers,
-      ...Object.entries(categoryTotals).map(([category, amount]) => [
-        category,
-        `$${amount.toFixed(2)}`,
-        `${((amount / totalAmount) * 100).toFixed(1)}%`,
-      ]),
-    ];
-
-    await this.updateSheetData(
-      spreadsheetId,
-      `Expense Categories!A1:C${Object.keys(categoryTotals).length + 1}`,
-      values
-    );
-  }
-
-  /**
-   * Update Insurance sheet
-   */
-  private async updateInsuranceSheet(
+  private async updateInsurancePoliciesSheet(
     spreadsheetId: string,
     insurance: InsuranceData[]
   ): Promise<void> {
     const headers = [
-      'Vehicle',
-      'Company',
-      'Policy Number',
-      'Total Cost',
-      'Term (Months)',
-      'Start Date',
-      'End Date',
-      'Monthly Cost',
-      'Active',
+      'id',
+      'vehicleId',
+      'company',
+      'policyNumber',
+      'totalCost',
+      'termLengthMonths',
+      'startDate',
+      'endDate',
+      'monthlyCost',
+      'isActive',
+      'createdAt',
+      'updatedAt',
     ];
 
     const values = [
       headers,
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data mapping requires checking multiple fields
       ...insurance.map((ins) => {
         const policy = ins.insurance_policies;
-        const vehicle = ins.vehicles;
-
         return [
-          `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-          policy.company,
+          policy.id || '',
+          policy.vehicleId || '',
+          policy.company || '',
           policy.policyNumber || '',
-          `$${policy.totalCost.toFixed(2)}`,
-          policy.termLengthMonths,
-          new Date(policy.startDate).toLocaleDateString(),
-          new Date(policy.endDate).toLocaleDateString(),
-          `$${policy.monthlyCost.toFixed(2)}`,
-          policy.isActive ? 'Yes' : 'No',
+          policy.totalCost || '',
+          policy.termLengthMonths || '',
+          policy.startDate ? new Date(policy.startDate).toISOString() : '',
+          policy.endDate ? new Date(policy.endDate).toISOString() : '',
+          policy.monthlyCost || '',
+          policy.isActive ? 'true' : 'false',
+          policy.createdAt ? new Date(policy.createdAt).toISOString() : '',
+          policy.updatedAt ? new Date(policy.updatedAt).toISOString() : '',
         ];
       }),
     ];
 
-    await this.updateSheetData(spreadsheetId, `Insurance!A1:I${insurance.length + 1}`, values);
+    await this.updateSheetData(
+      spreadsheetId,
+      `Insurance Policies!A1:L${insurance.length + 1}`,
+      values
+    );
   }
 
   /**
-   * Update Financing Details sheet
+   * Update Vehicle Financing sheet with all database columns
    */
-  private async updateFinancingDetailsSheet(
+  private async updateVehicleFinancingSheet(
     spreadsheetId: string,
     financing: FinancingData[]
   ): Promise<void> {
     const headers = [
-      'Vehicle',
-      'Provider',
-      'Original Amount',
-      'Current Balance',
-      'APR',
-      'Term (Months)',
-      'Monthly Payment',
-      'Start Date',
-      'Active',
+      'id',
+      'vehicleId',
+      'financingType',
+      'provider',
+      'originalAmount',
+      'currentBalance',
+      'apr',
+      'termMonths',
+      'startDate',
+      'paymentAmount',
+      'paymentFrequency',
+      'paymentDayOfMonth',
+      'paymentDayOfWeek',
+      'residualValue',
+      'mileageLimit',
+      'excessMileageFee',
+      'isActive',
+      'endDate',
+      'createdAt',
+      'updatedAt',
     ];
 
     const values = [
       headers,
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data mapping requires checking multiple fields
       ...financing.map((fin) => {
         const finData = fin.vehicle_financing;
-        const vehicle = fin.vehicles;
-
         return [
-          `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-          finData.provider,
-          `$${finData.originalAmount.toFixed(2)}`,
-          `$${finData.currentBalance.toFixed(2)}`,
-          `${finData.apr}%`,
-          finData.termMonths,
-          `$${finData.paymentAmount?.toFixed(2) || '0.00'}`,
-          new Date(finData.startDate).toLocaleDateString(),
-          finData.isActive ? 'Yes' : 'No',
+          finData.id || '',
+          finData.vehicleId || '',
+          finData.financingType || '',
+          finData.provider || '',
+          finData.originalAmount || '',
+          finData.currentBalance || '',
+          finData.apr || '',
+          finData.termMonths || '',
+          finData.startDate ? new Date(finData.startDate).toISOString() : '',
+          finData.paymentAmount || '',
+          finData.paymentFrequency || '',
+          finData.paymentDayOfMonth || '',
+          finData.paymentDayOfWeek || '',
+          finData.residualValue || '',
+          finData.mileageLimit || '',
+          finData.excessMileageFee || '',
+          finData.isActive ? 'true' : 'false',
+          finData.endDate ? new Date(finData.endDate).toISOString() : '',
+          finData.createdAt ? new Date(finData.createdAt).toISOString() : '',
+          finData.updatedAt ? new Date(finData.updatedAt).toISOString() : '',
         ];
       }),
     ];
 
     await this.updateSheetData(
       spreadsheetId,
-      `Financing Details!A1:I${financing.length + 1}`,
+      `Vehicle Financing!A1:T${financing.length + 1}`,
       values
     );
   }
 
   /**
-   * Update Financing Payments sheet
+   * Update Vehicle Financing Payments sheet with all database columns
    */
-  private async updateFinancingPaymentsSheet(
+  private async updateVehicleFinancingPaymentsSheet(
     spreadsheetId: string,
     payments: FinancingPaymentData[]
   ): Promise<void> {
     const headers = [
-      'Vehicle',
-      'Payment Date',
-      'Payment #',
-      'Amount',
-      'Principal',
-      'Interest',
-      'Remaining Balance',
-      'Payment Type',
+      'id',
+      'financingId',
+      'paymentDate',
+      'paymentAmount',
+      'principalAmount',
+      'interestAmount',
+      'remainingBalance',
+      'paymentNumber',
+      'paymentType',
+      'isScheduled',
+      'createdAt',
+      'updatedAt',
     ];
 
     const values = [
       headers,
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data mapping requires checking multiple fields
       ...payments.map((payment) => {
         const paymentData = payment.vehicle_financing_payments;
-        const vehicle = payment.vehicles;
-
         return [
-          `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-          new Date(paymentData.paymentDate).toLocaleDateString(),
-          paymentData.paymentNumber,
-          `$${paymentData.paymentAmount.toFixed(2)}`,
-          `$${paymentData.principalAmount.toFixed(2)}`,
-          `$${paymentData.interestAmount.toFixed(2)}`,
-          `$${paymentData.remainingBalance.toFixed(2)}`,
-          paymentData.paymentType,
+          paymentData.id || '',
+          paymentData.financingId || '',
+          paymentData.paymentDate ? new Date(paymentData.paymentDate).toISOString() : '',
+          paymentData.paymentAmount || '',
+          paymentData.principalAmount || '',
+          paymentData.interestAmount || '',
+          paymentData.remainingBalance || '',
+          paymentData.paymentNumber || '',
+          paymentData.paymentType || '',
+          paymentData.isScheduled ? 'true' : 'false',
+          paymentData.createdAt ? new Date(paymentData.createdAt).toISOString() : '',
+          paymentData.updatedAt ? new Date(paymentData.updatedAt).toISOString() : '',
         ];
       }),
     ];
 
     await this.updateSheetData(
       spreadsheetId,
-      `Financing Payments!A1:H${payments.length + 1}`,
-      values
-    );
-  }
-
-  /**
-   * Update Monthly Summary sheet
-   */
-  private async updateMonthlySummarySheet(
-    spreadsheetId: string,
-    expenses: ExpenseData[]
-  ): Promise<void> {
-    // Group expenses by month and category
-    const monthlyData = expenses.reduce(
-      (acc, exp) => {
-        const expense = exp.expenses;
-        const date = new Date(expense.date);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-        if (!acc[monthKey]) {
-          acc[monthKey] = {};
-        }
-
-        const category = expense.category;
-        acc[monthKey][category] = (acc[monthKey][category] || 0) + expense.amount;
-
-        return acc;
-      },
-      {} as Record<string, Record<string, number>>
-    );
-
-    const allCategories = [...new Set(expenses.map((exp) => exp.expenses.category))];
-    const headers = ['Month', ...allCategories, 'Total'];
-
-    const values = [
-      headers,
-      ...Object.entries(monthlyData).map(([month, categories]) => {
-        const amounts = Object.values(categories) as number[];
-        const total = amounts.reduce((sum, amount) => sum + amount, 0);
-        return [
-          month,
-          ...allCategories.map((cat) => `$${(categories[cat] || 0).toFixed(2)}`),
-          `$${total.toFixed(2)}`,
-        ];
-      }),
-    ];
-
-    await this.updateSheetData(
-      spreadsheetId,
-      'Monthly Summary!A1:' +
-        String.fromCharCode(65 + headers.length - 1) +
-        (Object.keys(monthlyData).length + 1),
+      `Vehicle Financing Payments!A1:L${payments.length + 1}`,
       values
     );
   }
@@ -729,69 +669,118 @@ export class GoogleSheetsService {
   }
 
   /**
-   * Export data in different formats
+   * Read all data from spreadsheet and parse into BackupData structure
    */
-  async exportData(
-    spreadsheetId: string,
-    format: 'json' | 'csv' | 'xlsx'
-  ): Promise<Buffer | object> {
+  async readSpreadsheetData(spreadsheetId: string): Promise<{
+    metadata: { version: string; timestamp: string; userId: string };
+    vehicles: Record<string, unknown>[];
+    expenses: Record<string, unknown>[];
+    financing: Record<string, unknown>[];
+    financingPayments: Record<string, unknown>[];
+    insurance: Record<string, unknown>[];
+  }> {
     try {
-      switch (format) {
-        case 'json':
-          return await this.exportAsJson(spreadsheetId);
-        case 'csv':
-          return await this.exportAsCsv(spreadsheetId);
-        case 'xlsx':
-          return await this.exportAsXlsx(spreadsheetId);
-        default:
-          throw new Error('Unsupported export format');
-      }
+      // Read all 5 sheets
+      const [vehiclesData, expensesData, insuranceData, financingData, financingPaymentsData] =
+        await Promise.all([
+          this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
+          this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
+          this.readSheetData(spreadsheetId, 'Insurance Policies!A:Z'),
+          this.readSheetData(spreadsheetId, 'Vehicle Financing!A:Z'),
+          this.readSheetData(spreadsheetId, 'Vehicle Financing Payments!A:Z'),
+        ]);
+
+      // Parse vehicles
+      const vehicles = this.parseSheetData(vehiclesData);
+
+      // Parse expenses
+      const expenses = this.parseSheetData(expensesData);
+
+      // Parse insurance
+      const insurance = this.parseSheetData(insuranceData);
+
+      // Parse financing
+      const financing = this.parseSheetData(financingData);
+
+      // Parse financing payments
+      const financingPayments = this.parseSheetData(financingPaymentsData);
+
+      // Extract userId from first vehicle (all data should belong to same user)
+      const userId = vehicles.length > 0 ? (vehicles[0].userId as string) : '';
+
+      return {
+        metadata: {
+          version: '1.0.0',
+          timestamp: new Date().toISOString(),
+          userId,
+        },
+        vehicles,
+        expenses,
+        financing,
+        financingPayments,
+        insurance,
+      };
     } catch (error) {
-      console.error('Error exporting data:', error);
-      throw new Error(`Failed to export data as ${format}`);
+      console.error('Error reading spreadsheet data:', error);
+      throw new Error('Failed to read spreadsheet data');
     }
   }
 
   /**
-   * Export as JSON
+   * Parse sheet data into array of objects
+   * First row is headers, subsequent rows are data
    */
-  private async exportAsJson(spreadsheetId: string): Promise<object> {
-    const info = await this.getSpreadsheetInfo(spreadsheetId);
-    const data: Record<string, (string | number | boolean)[][]> = {};
-
-    for (const sheet of info.sheets) {
-      const sheetData = await this.readSheetData(spreadsheetId, `${sheet.title}!A:Z`);
-      data[sheet.title] = sheetData;
+  private parseSheetData(sheetData: (string | number | boolean)[][]): Record<string, unknown>[] {
+    if (sheetData.length === 0) {
+      return [];
     }
 
-    return data;
-  }
+    const headers = sheetData[0] as string[];
+    const rows = sheetData.slice(1);
 
-  /**
-   * Export as CSV (expenses sheet only)
-   */
-  private async exportAsCsv(spreadsheetId: string): Promise<Buffer> {
-    const expensesData = await this.readSheetData(spreadsheetId, 'Expenses!A:Z');
-    const csvContent = expensesData.map((row) => row.join(',')).join('\n');
-    return Buffer.from(csvContent, 'utf-8');
-  }
+    return rows.map((row) => {
+      const obj: Record<string, unknown> = {};
 
-  /**
-   * Export as XLSX
-   */
-  private async exportAsXlsx(spreadsheetId: string): Promise<Buffer> {
-    try {
-      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
-      const response = await drive.files.export({
-        fileId: spreadsheetId,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data parsing requires type checking multiple conditions
+      headers.forEach((header, index) => {
+        const value = row[index];
+
+        // Handle empty values
+        if (value === '' || value === null || value === undefined) {
+          obj[header] = null;
+          return;
+        }
+
+        // Parse booleans
+        if (value === 'true' || value === 'false') {
+          obj[header] = value === 'true';
+          return;
+        }
+
+        // Parse numbers
+        if (typeof value === 'number') {
+          obj[header] = value;
+          return;
+        }
+
+        // Try to parse as number if it looks like one
+        if (typeof value === 'string' && !Number.isNaN(Number(value)) && value.trim() !== '') {
+          obj[header] = Number(value);
+          return;
+        }
+
+        // Parse ISO dates
+        if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+          obj[header] = new Date(value);
+          return;
+        }
+
+        // Default: keep as string
+        obj[header] = value;
       });
 
-      return Buffer.from(response.data as string);
-    } catch (error) {
-      console.error('Error exporting as XLSX:', error);
-      throw new Error('Failed to export as XLSX');
-    }
+      return obj;
+    });
   }
 }
 

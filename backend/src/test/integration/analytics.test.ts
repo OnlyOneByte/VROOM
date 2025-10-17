@@ -86,7 +86,7 @@ describe('Analytics API Integration Tests', () => {
             amount: 45.5,
             currency: 'USD',
             date: new Date('2024-01-15'),
-            gallons: 12.5,
+            volume: 12.5,
             mileage: 25000,
           },
           {
@@ -97,8 +97,8 @@ describe('Analytics API Integration Tests', () => {
             amount: 48.75,
             currency: 'USD',
             date: new Date('2024-01-30'),
-            gallons: 13.0,
-            mileage: 25350, // 350 miles driven, 13 gallons = ~26.9 MPG
+            volume: 13.0,
+            mileage: 25350, // 350 miles driven, 13 volume = ~26.9 MPG
           },
           {
             id: createId(),
@@ -108,8 +108,8 @@ describe('Analytics API Integration Tests', () => {
             amount: 52.25,
             currency: 'USD',
             date: new Date('2024-02-15'),
-            gallons: 14.2,
-            mileage: 25720, // 370 miles driven, 14.2 gallons = ~26.1 MPG
+            volume: 14.2,
+            mileage: 25720, // 370 miles driven, 14.2 volume = ~26.1 MPG
           },
         ]);
 
@@ -126,7 +126,7 @@ describe('Analytics API Integration Tests', () => {
         vehicle: { id: string; name: string };
         fuelEfficiency: {
           averageMPG: number;
-          totalGallons: number;
+          totalVolume: number;
           totalMiles: number;
           trend: Array<{ date: Date; mpg: number }>;
         };
@@ -134,7 +134,7 @@ describe('Analytics API Integration Tests', () => {
       assertSuccessResponse(data);
       expect(data.data.vehicle.id).toBe(testVehicleId);
       expect(data.data.fuelEfficiency.averageMPG).toBeGreaterThan(0);
-      expect(data.data.fuelEfficiency.totalGallons).toBeGreaterThan(0);
+      expect(data.data.fuelEfficiency.totalVolume).toBeGreaterThan(0);
       expect(data.data.fuelEfficiency.trend.length).toBeGreaterThan(0);
     });
 
@@ -151,24 +151,24 @@ describe('Analytics API Integration Tests', () => {
       const data = await getTypedResponse<{
         fuelEfficiency: {
           averageMPG: number;
-          totalGallons: number;
+          totalVolume: number;
           totalMiles: number;
           trend: unknown[];
         };
       }>(res);
       assertSuccessResponse(data);
       expect(data.data.fuelEfficiency.averageMPG).toBe(0);
-      expect(data.data.fuelEfficiency.totalGallons).toBe(0);
+      expect(data.data.fuelEfficiency.totalVolume).toBe(0);
       expect(data.data.fuelEfficiency.trend).toHaveLength(0);
     });
 
     test('should calculate accurate MPG for sequential fuel entries', async () => {
       // Create sequential fuel expenses with realistic data
       const fuelEntries = [
-        { date: '2024-01-01', gallons: 12.0, mileage: 25000, amount: 42.0 }, // Starting point
-        { date: '2024-01-08', gallons: 11.5, mileage: 25320, amount: 40.25 }, // 320 miles, 11.5 gallons = 27.8 MPG
-        { date: '2024-01-15', gallons: 12.2, mileage: 25650, amount: 43.5 }, // 330 miles, 12.2 gallons = 27.0 MPG
-        { date: '2024-01-22', gallons: 13.1, mileage: 25950, amount: 46.85 }, // 300 miles, 13.1 gallons = 22.9 MPG
+        { date: '2024-01-01', volume: 12.0, mileage: 25000, amount: 42.0 }, // Starting point
+        { date: '2024-01-08', volume: 11.5, mileage: 25320, amount: 40.25 }, // 320 miles, 11.5 volume = 27.8 MPG
+        { date: '2024-01-15', volume: 12.2, mileage: 25650, amount: 43.5 }, // 330 miles, 12.2 volume = 27.0 MPG
+        { date: '2024-01-22', volume: 13.1, mileage: 25950, amount: 46.85 }, // 300 miles, 13.1 volume = 22.9 MPG
       ];
 
       for (const entry of fuelEntries) {
@@ -182,7 +182,7 @@ describe('Analytics API Integration Tests', () => {
             amount: entry.amount,
             currency: 'USD',
             date: new Date(entry.date),
-            gallons: entry.gallons,
+            volume: entry.volume,
             mileage: entry.mileage,
           });
       }
@@ -197,13 +197,13 @@ describe('Analytics API Integration Tests', () => {
       const data = await getTypedResponse<{
         fuelEfficiency: {
           averageMPG: number;
-          totalGallons: number;
+          totalVolume: number;
           totalMiles: number;
           trend: Array<{ mpg: number }>;
         };
       }>(res);
       assertSuccessResponse(data);
-      expect(data.data.fuelEfficiency.totalGallons).toBeCloseTo(48.8, 1);
+      expect(data.data.fuelEfficiency.totalVolume).toBeCloseTo(48.8, 1);
       expect(data.data.fuelEfficiency.totalMiles).toBe(950); // 25950 - 25000
       expect(data.data.fuelEfficiency.averageMPG).toBeCloseTo(19.47, 1);
       expect(data.data.fuelEfficiency.trend).toHaveLength(3); // 3 calculated MPG readings
@@ -455,7 +455,7 @@ describe('Analytics API Integration Tests', () => {
             amount: 45.5,
             currency: 'USD',
             date: new Date('2024-01-15'),
-            gallons: 12.5,
+            volume: 12.5,
             mileage: 25000,
           },
           {
@@ -485,7 +485,7 @@ describe('Analytics API Integration Tests', () => {
         categoryBreakdown: Record<string, { amount: number; count: number }>;
         fuelEfficiency: {
           averageMPG: number;
-          totalGallons: number;
+          totalVolume: number;
         };
         costPerMile: {
           totalCostPerMile: number;
@@ -532,7 +532,7 @@ describe('Analytics API Integration Tests', () => {
             amount: 45.5,
             currency: 'USD',
             date: new Date('2024-01-15'),
-            gallons: 12.5,
+            volume: 12.5,
             mileage: 25000,
           },
           {

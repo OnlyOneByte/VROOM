@@ -79,10 +79,15 @@ export const createExpenseSchema = z.object({
   currency: z.nativeEnum(Currency).default(Currency.USD),
   date: z.string().datetime(),
   mileage: z.number().int().min(0, 'Mileage cannot be negative').optional(),
-  gallons: z
+  volume: z
     .number()
-    .positive('Gallons must be positive')
-    .max(1000, 'Gallons cannot exceed 1000')
+    .positive('Volume must be positive')
+    .max(1000, 'Volume cannot exceed 1000')
+    .optional(),
+  charge: z
+    .number()
+    .positive('Charge must be positive')
+    .max(1000, 'Charge cannot exceed 1000 kWh')
     .optional(),
   description: z
     .string()
@@ -232,7 +237,8 @@ export const updateUserProfileSchema = z.object({
       currency: z.nativeEnum(Currency).optional(),
       dateFormat: z.enum(['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD']).optional(),
       distanceUnit: z.enum(['miles', 'kilometers']).optional(),
-      fuelUnit: z.enum(['gallons', 'liters']).optional(),
+      volumeUnit: z.enum(['gallons_us', 'gallons_uk', 'liters']).optional(),
+      chargeUnit: z.enum(['kwh']).optional(),
     })
     .optional(),
 });
@@ -277,16 +283,16 @@ export const insuranceDateRefinement = createInsurancePolicySchema.refine(
   }
 );
 
-// Fuel expense validation - require gallons and mileage for fuel expenses
+// Fuel expense validation - require volume/charge and mileage for fuel expenses
 export const fuelExpenseRefinement = createExpenseSchema.refine(
   (data) => {
     if (data.category === 'fuel') {
-      return data.gallons !== undefined && data.mileage !== undefined;
+      return (data.volume !== undefined || data.charge !== undefined) && data.mileage !== undefined;
     }
     return true;
   },
   {
-    message: 'Gallons and mileage are required for fuel expenses',
-    path: ['gallons'],
+    message: 'Volume/charge and mileage are required for fuel expenses',
+    path: ['volume'],
   }
 );

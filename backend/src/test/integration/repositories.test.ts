@@ -114,7 +114,7 @@ describe('Repository Integration Tests', () => {
         amount: 50.0,
         currency: 'USD',
         date: new Date('2024-01-15'),
-        gallons: 12.5,
+        volume: 12.5,
       });
 
       const _maintenanceExpense = await expenseRepo.create({
@@ -132,7 +132,7 @@ describe('Repository Integration Tests', () => {
 
       const fuelExpenses = await expenseRepo.findFuelExpenses(vehicle.id);
       expect(fuelExpenses).toHaveLength(1);
-      expect(fuelExpenses[0].gallons).toBe(12.5);
+      expect(fuelExpenses[0].volume).toBe(12.5);
 
       // Test analytics
       const categoryTotals = await expenseRepo.getTotalByCategory(vehicle.id);

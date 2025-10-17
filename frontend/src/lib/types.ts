@@ -12,12 +12,15 @@ export interface User {
 	updatedAt: Date;
 }
 
+export type VehicleType = 'gas' | 'electric' | 'hybrid';
+
 export interface Vehicle {
 	id: string;
 	userId: string;
 	make: string;
 	model: string;
 	year: number;
+	vehicleType: VehicleType;
 	licensePlate?: string;
 	nickname?: string;
 	initialMileage?: number;
@@ -99,6 +102,10 @@ export interface ExpenseCategoryInfo {
 	description: string;
 }
 
+export type VolumeUnit = 'gallons_us' | 'gallons_uk' | 'liters';
+export type ChargeUnit = 'kwh';
+export type DistanceUnit = 'miles' | 'kilometers';
+
 export interface Expense {
 	id: string;
 	vehicleId: string;
@@ -108,7 +115,8 @@ export interface Expense {
 	currency: string;
 	date: Date;
 	mileage?: number;
-	gallons?: number;
+	volume?: number; // For fuel expenses (gallons or liters)
+	charge?: number; // For electric charging (kWh)
 	description?: string;
 	receiptUrl?: string;
 	createdAt: Date;
@@ -173,6 +181,7 @@ export interface VehicleFormData {
 	make: string;
 	model: string;
 	year: number;
+	vehicleType: VehicleType;
 	licensePlate?: string;
 	nickname?: string;
 	initialMileage?: number | undefined;
@@ -187,7 +196,8 @@ export interface ExpenseFormData {
 	amount: number;
 	date: string;
 	mileage?: number | undefined;
-	gallons?: number | undefined;
+	volume?: number | undefined; // For fuel
+	charge?: number | undefined; // For electric
 	description?: string;
 }
 
@@ -238,7 +248,8 @@ export interface ExpenseFormErrors {
 	amount?: string;
 	date?: string;
 	mileage?: string;
-	gallons?: string;
+	volume?: string;
+	charge?: string;
 	description?: string;
 	[key: string]: string | undefined;
 }

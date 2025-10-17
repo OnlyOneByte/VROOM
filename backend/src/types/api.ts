@@ -31,7 +31,8 @@ export interface ExpenseResponse {
   description?: string;
   date: Date;
   mileage?: number;
-  gallons?: number;
+  volume?: number;
+  charge?: number;
 }
 
 export interface VehicleResponse {

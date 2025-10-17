@@ -36,7 +36,8 @@
 
 	// Form state
 	let distanceUnit = $state<'miles' | 'kilometers'>('miles');
-	let fuelUnit = $state<'gallons' | 'liters'>('gallons');
+	let volumeUnit = $state<'gallons_us' | 'gallons_uk' | 'liters'>('gallons_us');
+	let chargeUnit = $state<'kwh'>('kwh');
 	let currencyUnit = $state('USD');
 	let autoBackupEnabled = $state(false);
 	let backupFrequency = $state<'daily' | 'weekly' | 'monthly'>('weekly');
@@ -60,7 +61,8 @@
 
 		if (settings) {
 			distanceUnit = settings.distanceUnit;
-			fuelUnit = settings.fuelUnit;
+			volumeUnit = settings.volumeUnit;
+			chargeUnit = settings.chargeUnit;
 			currencyUnit = settings.currencyUnit;
 			autoBackupEnabled = settings.autoBackupEnabled;
 			backupFrequency = settings.backupFrequency;
@@ -76,7 +78,8 @@
 		try {
 			await settingsStore.update({
 				distanceUnit,
-				fuelUnit,
+				volumeUnit,
+				chargeUnit,
 				currencyUnit,
 				autoBackupEnabled,
 				backupFrequency,
@@ -144,8 +147,17 @@
 		return unit === 'miles' ? 'Miles' : 'Kilometers';
 	}
 
-	function getFuelLabel(unit: 'gallons' | 'liters'): string {
-		return unit === 'gallons' ? 'Gallons' : 'Liters';
+	function getVolumeLabel(unit: 'gallons_us' | 'gallons_uk' | 'liters'): string {
+		const labels = {
+			gallons_us: 'Gallons (US)',
+			gallons_uk: 'Gallons (UK)',
+			liters: 'Liters'
+		};
+		return labels[unit];
+	}
+
+	function getChargeLabel(unit: 'kwh'): string {
+		return 'kWh';
 	}
 
 	function getCurrencyLabel(currency: string): string {
@@ -211,27 +223,54 @@
 						</Select.Root>
 					</div>
 
-					<!-- Fuel Unit -->
+					<!-- Volume Unit (Fuel) -->
 					<div class="space-y-2">
-						<Label for="fuel-unit" class="flex items-center gap-2">
+						<Label for="volume-unit" class="flex items-center gap-2">
 							<Fuel class="h-4 w-4" />
-							Fuel Unit
+							Fuel Volume Unit
 						</Label>
+						<p class="text-xs text-gray-500">For gas and diesel vehicles</p>
 						<Select.Root
 							type="single"
-							value={fuelUnit}
+							value={volumeUnit}
 							onValueChange={v => {
 								if (v) {
-									fuelUnit = v as 'gallons' | 'liters';
+									volumeUnit = v as 'gallons_us' | 'gallons_uk' | 'liters';
 								}
 							}}
 						>
-							<Select.Trigger id="fuel-unit" class="w-full">
-								{getFuelLabel(fuelUnit)}
+							<Select.Trigger id="volume-unit" class="w-full">
+								{getVolumeLabel(volumeUnit)}
 							</Select.Trigger>
 							<Select.Content>
-								<Select.Item value="gallons" label="Gallons">Gallons</Select.Item>
+								<Select.Item value="gallons_us" label="Gallons (US)">Gallons (US)</Select.Item>
+								<Select.Item value="gallons_uk" label="Gallons (UK)">Gallons (UK)</Select.Item>
 								<Select.Item value="liters" label="Liters">Liters</Select.Item>
+							</Select.Content>
+						</Select.Root>
+					</div>
+
+					<!-- Charge Unit (Electric) -->
+					<div class="space-y-2">
+						<Label for="charge-unit" class="flex items-center gap-2">
+							<Fuel class="h-4 w-4" />
+							Electric Charge Unit
+						</Label>
+						<p class="text-xs text-gray-500">For electric and hybrid vehicles</p>
+						<Select.Root
+							type="single"
+							value={chargeUnit}
+							onValueChange={v => {
+								if (v) {
+									chargeUnit = v as 'kwh';
+								}
+							}}
+						>
+							<Select.Trigger id="charge-unit" class="w-full">
+								{getChargeLabel(chargeUnit)}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="kwh" label="kWh">kWh</Select.Item>
 							</Select.Content>
 						</Select.Root>
 					</div>

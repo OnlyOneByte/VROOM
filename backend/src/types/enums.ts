@@ -34,6 +34,27 @@ export enum Environment {
   TEST = 'test',
 }
 
+export enum DistanceUnit {
+  MILES = 'miles',
+  KILOMETERS = 'kilometers',
+}
+
+export enum VolumeUnit {
+  GALLONS_US = 'gallons_us',
+  GALLONS_UK = 'gallons_uk',
+  LITERS = 'liters',
+}
+
+export enum ChargeUnit {
+  KWH = 'kwh',
+}
+
+export enum VehicleType {
+  GAS = 'gas',
+  ELECTRIC = 'electric',
+  HYBRID = 'hybrid',
+}
+
 /**
  * Type guards for enums
  */
@@ -44,6 +65,22 @@ export const isPaymentFrequency = (value: string): value is PaymentFrequency => 
 
 export const isCurrency = (value: string): value is Currency => {
   return Object.values(Currency).includes(value as Currency);
+};
+
+export const isDistanceUnit = (value: string): value is DistanceUnit => {
+  return Object.values(DistanceUnit).includes(value as DistanceUnit);
+};
+
+export const isVolumeUnit = (value: string): value is VolumeUnit => {
+  return Object.values(VolumeUnit).includes(value as VolumeUnit);
+};
+
+export const isChargeUnit = (value: string): value is ChargeUnit => {
+  return Object.values(ChargeUnit).includes(value as ChargeUnit);
+};
+
+export const isVehicleType = (value: string): value is VehicleType => {
+  return Object.values(VehicleType).includes(value as VehicleType);
 };
 
 /**
