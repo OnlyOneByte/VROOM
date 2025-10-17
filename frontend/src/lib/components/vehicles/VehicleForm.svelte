@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { appStore } from '$lib/stores/app.js';
+	import { formatCurrency } from '$lib/utils/formatters';
 	import { ArrowLeft, Car, DollarSign, Calculator, Trash2, X, Check } from 'lucide-svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
@@ -480,14 +481,7 @@
 		}
 	}
 
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD'
-		}).format(amount);
-	}
-
-	function formatDate(date: Date): string {
+	function formatPayoffDate(date: Date): string {
 		return new Intl.DateTimeFormat('en-US', {
 			month: 'long',
 			year: 'numeric'
@@ -962,7 +956,7 @@
 									<div>
 										<p class="text-blue-700 font-medium">Payoff Date</p>
 										<p class="text-blue-900 font-semibold">
-											{formatDate(amortizationPreview.payoffDate)}
+											{formatPayoffDate(amortizationPreview.payoffDate)}
 										</p>
 									</div>
 								</div>

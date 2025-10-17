@@ -5,6 +5,7 @@
 	import { appStore } from '$lib/stores/app.js';
 	import { settingsStore } from '$lib/stores/settings';
 	import { getVolumeUnitLabel, getChargeUnitLabel } from '$lib/utils/units';
+	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import {
 		ArrowLeft,
 		Car,
@@ -331,21 +332,6 @@
 	function getVehicleDisplayName(): string {
 		if (!vehicle) return '';
 		return vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
-	}
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD'
-		}).format(amount);
-	}
-
-	function formatDate(date: Date): string {
-		return new Intl.DateTimeFormat('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric'
-		}).format(date);
 	}
 
 	function getCategoryIcon(category: string) {

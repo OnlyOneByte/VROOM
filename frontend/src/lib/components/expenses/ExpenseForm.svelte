@@ -88,6 +88,7 @@
 	let volumeUnit = $derived(settings?.volumeUnit || 'gallons_us');
 	let chargeUnit = $derived(settings?.chargeUnit || 'kwh');
 	let distanceUnit = $derived(settings?.distanceUnit || 'miles');
+	let currencyUnit = $derived(settings?.currencyUnit || 'USD');
 
 	// Tag suggestions will be populated from user's previous tags in the future
 	// const commonTags: string[] = [];
@@ -524,7 +525,7 @@
 				volume: formData.volume ? parseFloat(formData.volume) : undefined,
 				charge: formData.charge ? parseFloat(formData.charge) : undefined,
 				description: formData.description || undefined,
-				currency: 'USD'
+				currency: currencyUnit
 			};
 
 			if (isEditMode) {
