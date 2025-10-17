@@ -229,29 +229,53 @@
 			const result = await settingsStore.executeSync(syncTypes);
 			syncResults = result;
 
+			// Check for errors in results
+			const hasErrors = result.results?.errors && Object.keys(result.results.errors).length > 0;
+
+			if (hasErrors) {
+				// Check if any error is AUTH_INVALID
+				const hasAuthError = Object.values(result.results.errors).some(error =>
+					String(error).includes('re-authenticate')
+				);
+
+				// Show individual error toasts for each sync type that failed
+				Object.entries(result.results.errors).forEach(([type, error]) => {
+					const typeName = type === 'sheets' ? 'Google Sheets' : 'Google Drive backup';
+					appStore.showError(`${typeName}: ${String(error)}`);
+				});
+
+				// If auth error, show additional message
+				if (hasAuthError) {
+					appStore.showError(
+						'Google Drive access expired. Click "Re-authenticate with Google" below to continue syncing.'
+					);
+				}
+			}
+
+			// Show success messages for successful syncs
 			const messages: string[] = [];
-			if (result.results?.sheets) {
+			if (result.results?.sheets && !result.results?.errors?.sheets) {
 				messages.push('Google Sheets');
 			}
-			if (result.results?.backup) {
+			if (result.results?.backup && !result.results?.errors?.backup) {
 				messages.push('Google Drive backup');
 			}
 
 			if (messages.length > 0) {
 				appStore.showSuccess(`Successfully synced to ${messages.join(' and ')}`);
 			}
-
-			if (result.errors && Object.keys(result.errors).length > 0) {
-				const errorMessages = Object.entries(result.errors)
-					.map(([type, error]) => `${type}: ${error}`)
-					.join(', ');
-				appStore.showError(`Sync errors: ${errorMessages}`);
-			}
-		} catch {
-			appStore.showError('Failed to execute sync');
+		} catch (error) {
+			// Handle network or other errors
+			const errorMessage = error instanceof Error ? error.message : 'Failed to execute sync';
+			appStore.showError(errorMessage);
 		} finally {
 			isSyncing = false;
 		}
+	}
+
+	function handleReauthenticate() {
+		// Redirect to re-authentication endpoint
+		window.location.href = '/api/auth/reauth/google';
 	}
 
 	let lastBackupText = $derived(
@@ -539,10 +563,14 @@
 							</div>
 
 							<!-- Sync Now Button -->
-							<div class="pl-6">
+							<div class="pl-6 space-y-2">
 								<Button variant="outline" onclick={handleSyncNowClick} class="w-full">
 									<RefreshCw class="mr-2 h-4 w-4" />
 									Sync Now
+								</Button>
+								<Button variant="outline" onclick={handleReauthenticate} class="w-full">
+									<RefreshCw class="mr-2 h-4 w-4" />
+									Re-authenticate with Google
 								</Button>
 							</div>
 						{/if}

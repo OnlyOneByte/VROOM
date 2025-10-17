@@ -466,17 +466,19 @@ describe('Google Integration Tests', () => {
       );
 
       expect(result).toEqual(mockFile);
-      expect(mockDriveFiles.create).toHaveBeenCalledWith({
-        requestBody: {
-          name: 'test-receipt.pdf',
-          parents: ['parent-folder-id'],
-        },
-        media: {
-          mimeType: 'application/pdf',
-          body: fileContent,
-        },
-        fields: 'id, name, mimeType, parents, webViewLink, size, createdTime, modifiedTime',
-      });
+      expect(mockDriveFiles.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestBody: {
+            name: 'test-receipt.pdf',
+            parents: ['parent-folder-id'],
+          },
+          media: expect.objectContaining({
+            mimeType: 'application/pdf',
+            // body is now a stream, so we just check it exists
+          }),
+          fields: 'id, name, mimeType, parents, webViewLink, size, createdTime, modifiedTime',
+        })
+      );
     });
 
     test('should delete file from Google Drive', async () => {

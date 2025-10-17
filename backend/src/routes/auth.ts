@@ -39,6 +39,10 @@ auth.get('/login/google', async (c) => {
     ],
   });
 
+  // Add access_type=offline to get refresh token
+  url.searchParams.set('access_type', 'offline');
+  url.searchParams.set('prompt', 'consent');
+
   // Store state and code verifier in memory (for development)
   // In production, use Redis or a database with TTL
   oauthStateStore.set(state, {
@@ -268,6 +272,49 @@ auth.post('/refresh', async (c) => {
       expiresAt: newSession.expiresAt,
     },
   });
+});
+
+// Re-authenticate with Google (force new OAuth flow to get fresh tokens)
+auth.get('/reauth/google', async (c) => {
+  const lucia = getLucia();
+  const sessionId = getCookie(c, lucia.sessionCookieName);
+
+  if (!sessionId) {
+    throw new HTTPException(401, { message: 'No session found' });
+  }
+
+  const { session } = await lucia.validateSession(sessionId);
+
+  if (!session) {
+    throw new HTTPException(401, { message: 'Invalid session' });
+  }
+
+  // Generate new OAuth state and code verifier
+  const state = generateState();
+  const codeVerifier = generateCodeVerifier();
+  const url = await google.createAuthorizationURL(state, codeVerifier, {
+    scopes: [
+      'openid',
+      'profile',
+      'email',
+      'https://www.googleapis.com/auth/drive.file', // For Google Drive integration
+    ],
+  });
+
+  // Add prompt=consent to force re-consent and get new refresh token
+  url.searchParams.set('prompt', 'consent');
+  url.searchParams.set('access_type', 'offline');
+
+  // Store state and code verifier
+  oauthStateStore.set(state, {
+    codeVerifier,
+    createdAt: Date.now(),
+  });
+
+  // Clean up old states
+  cleanupExpiredStates();
+
+  return c.redirect(url.toString());
 });
 
 export { auth };

@@ -74,9 +74,9 @@ export class DatabaseService {
 // Export singleton instance
 export const databaseService = DatabaseService.getInstance();
 
+import { checkDatabaseHealth, closeDatabaseConnection, db } from '../db/connection.js';
 // Import for use in validation functions
 import { ValidationError } from './errors.js';
-import { checkDatabaseHealth, closeDatabaseConnection, db } from '../db/connection.js';
 import { repositoryFactory } from './repositories/index.js';
 
 // Re-export error classes from centralized location

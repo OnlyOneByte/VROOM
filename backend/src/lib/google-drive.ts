@@ -379,9 +379,14 @@ export class GoogleDriveService {
         fileMetadata.parents = [parentFolderId];
       }
 
+      // Convert Buffer to stream for googleapis
+      const { Readable } = await import('node:stream');
+      const buffer = Buffer.isBuffer(fileContent) ? fileContent : Buffer.from(fileContent);
+      const stream = Readable.from(buffer);
+
       const media = {
         mimeType,
-        body: fileContent,
+        body: stream,
       };
 
       const response = await this.drive.files.create({
