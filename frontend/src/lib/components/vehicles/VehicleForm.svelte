@@ -111,7 +111,7 @@
 			vehicle = vehicleResult.data;
 
 			// Fetch financing data separately
-			const financingResponse = await fetch(`/api/vehicles/${vehicleId}/financing`, {
+			const financingResponse = await fetch(`/api/financing/vehicles/${vehicleId}/financing`, {
 				credentials: 'include'
 			});
 
@@ -374,14 +374,17 @@
 
 				console.log('Submitting financing data:', financingData);
 
-				const financingResponse = await fetch(`/api/vehicles/${finalVehicleId}/financing`, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					credentials: 'include',
-					body: JSON.stringify(financingData)
-				});
+				const financingResponse = await fetch(
+					`/api/financing/vehicles/${finalVehicleId}/financing`,
+					{
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						credentials: 'include',
+						body: JSON.stringify(financingData)
+					}
+				);
 
 				if (!financingResponse.ok) {
 					const errorData = await financingResponse.json();
