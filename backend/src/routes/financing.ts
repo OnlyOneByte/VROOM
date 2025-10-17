@@ -10,6 +10,7 @@ import {
   validateLoanTerms,
 } from '../lib/loan-calculator';
 import { requireAuth } from '../lib/middleware/auth';
+import { trackDataChanges } from '../lib/middleware/change-tracker';
 import { repositoryFactory } from '../lib/repositories/factory';
 
 const financing = new Hono();
@@ -60,8 +61,9 @@ const vehicleParamsSchema = z.object({
   vehicleId: z.string().min(1, 'Vehicle ID is required'),
 });
 
-// Apply authentication to all routes
+// Apply authentication and change tracking to all routes
 financing.use('*', requireAuth);
+financing.use('*', trackDataChanges);
 
 // GET /api/vehicles/:vehicleId/financing - Get financing details for a vehicle
 financing.get(

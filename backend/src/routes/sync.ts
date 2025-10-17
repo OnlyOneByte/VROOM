@@ -53,6 +53,10 @@ sync.post('/', async (c) => {
       );
     }
 
+    // Check if there are changes since last sync
+    const { changeTracker } = await import('../lib/change-tracker');
+    const hasChanges = await changeTracker.hasChangesSinceLastSync(userId);
+
     // Mark sync as in progress
     syncInProgress.set(userId, true);
 
@@ -69,6 +73,10 @@ sync.post('/', async (c) => {
       return c.json({
         success: !hasErrors,
         results: result,
+        hasChangesSinceLastSync: hasChanges,
+        message: hasChanges
+          ? 'Sync completed successfully'
+          : 'Sync completed - no changes detected since last sync',
       });
     } finally {
       // Always clear sync in progress flag
@@ -182,6 +190,7 @@ sync.get('/status', async (c) => {
     const { databaseService } = await import('../lib/database');
     const { eq } = await import('drizzle-orm');
     const { userSettings } = await import('../db/schema');
+    const { changeTracker } = await import('../lib/change-tracker');
 
     const db = databaseService.getDatabase();
 
@@ -216,6 +225,9 @@ sync.get('/status', async (c) => {
       enabledTypes.push('backup');
     }
 
+    // Check if there are changes since last sync
+    const hasChanges = await changeTracker.hasChangesSinceLastSync(userId);
+
     return c.json({
       success: true,
       status: {
@@ -224,6 +236,8 @@ sync.get('/status', async (c) => {
         syncInactivityMinutes: userSetting.syncInactivityMinutes,
         lastSyncDate: userSetting.lastSyncDate?.toISOString() || null,
         lastBackupDate: userSetting.lastBackupDate?.toISOString() || null,
+        lastDataChangeDate: userSetting.lastDataChangeDate?.toISOString() || null,
+        hasChangesSinceLastSync: hasChanges,
         enabledTypes,
         syncInProgress: syncInProgress.get(userId) || false,
       },

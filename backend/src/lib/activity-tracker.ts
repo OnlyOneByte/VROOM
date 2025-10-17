@@ -107,6 +107,15 @@ export class ActivityTracker {
    */
   private async performAutoSync(userId: string): Promise<void> {
     try {
+      // Check if there are changes since last sync
+      const { changeTracker } = await import('./change-tracker');
+      const hasChanges = await changeTracker.hasChangesSinceLastSync(userId);
+
+      if (!hasChanges) {
+        console.log(`Auto-sync skipped for user ${userId}: No changes since last sync`);
+        return;
+      }
+
       // Get user settings to determine enabled sync types
       const db = databaseService.getDatabase();
       const { eq } = await import('drizzle-orm');
@@ -139,6 +148,8 @@ export class ActivityTracker {
         console.log(`Auto-sync skipped for user ${userId}: No sync types enabled`);
         return;
       }
+
+      console.log(`Auto-sync starting for user ${userId} (changes detected)`);
 
       // Call SyncService.executeSync with syncTypes array
       const { SyncService } = await import('./sync-service');

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { NewVehicle } from '../db/schema';
 import { AuthorizationError, ConflictError, NotFoundError } from '../lib/errors';
 import { requireAuth } from '../lib/middleware/auth';
+import { trackDataChanges } from '../lib/middleware/change-tracker';
 import { repositoryFactory } from '../lib/repositories/factory';
 import type { ApiResponse } from '../types/api';
 
@@ -31,8 +32,9 @@ const vehicleParamsSchema = z.object({
   id: z.string().min(1, 'Vehicle ID is required'),
 });
 
-// Apply authentication to all routes
+// Apply authentication and change tracking to all routes
 vehicles.use('*', requireAuth);
+vehicles.use('*', trackDataChanges);
 
 // GET /api/vehicles - List user's vehicles (including shared)
 vehicles.get('/', async (c) => {

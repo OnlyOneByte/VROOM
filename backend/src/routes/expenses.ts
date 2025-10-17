@@ -9,6 +9,7 @@ import {
 } from '../db/types';
 import { NotFoundError, ValidationError } from '../lib/errors';
 import { requireAuth } from '../lib/middleware/auth';
+import { trackDataChanges } from '../lib/middleware/change-tracker';
 import { repositoryFactory } from '../lib/repositories/factory';
 
 // Types for expense data (from database)
@@ -99,8 +100,9 @@ const expenseQuerySchema = z.object({
     .optional(),
 });
 
-// Apply authentication to all routes
+// Apply authentication and change tracking to all routes
 expenses.use('*', requireAuth);
+expenses.use('*', trackDataChanges);
 
 // GET /api/expenses/categories - Get expense categories
 expenses.get('/categories', async (c) => {

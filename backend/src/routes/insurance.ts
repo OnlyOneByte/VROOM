@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import type { NewInsurancePolicy } from '../db/schema';
 import { requireAuth } from '../lib/middleware/auth';
+import { trackDataChanges } from '../lib/middleware/change-tracker';
 import { repositoryFactory } from '../lib/repositories/factory';
 
 const insurance = new Hono();
@@ -35,8 +36,9 @@ const vehicleParamsSchema = z.object({
   id: z.string().min(1, 'Vehicle ID is required'),
 });
 
-// Apply authentication to all routes
+// Apply authentication and change tracking to all routes
 insurance.use('*', requireAuth);
+insurance.use('*', trackDataChanges);
 
 // GET /api/insurance/expiring-soon - Get policies expiring soon (must be before /:id route)
 insurance.get('/expiring-soon', async (c) => {
