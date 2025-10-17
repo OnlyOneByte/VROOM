@@ -125,15 +125,21 @@
 		restorePreview = null;
 		restoreConflicts = [];
 		selectedFile = null;
-		restoreMode = 'preview';
+		restoreMode = 'replace';
 	}
 
-	function handleFileSelect(event: Event) {
+	async function handleFileSelect(event: Event) {
 		const target = event.target as HTMLInputElement;
 		if (target.files && target.files.length > 0) {
 			selectedFile = target.files[0] || null;
+			// Automatically generate preview when file is selected
+			if (selectedFile) {
+				await handleRestorePreview();
+			}
 		} else {
 			selectedFile = null;
+			restorePreview = null;
+			restoreConflicts = [];
 		}
 	}
 
@@ -579,47 +585,44 @@
 							Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
 						</p>
 					{/if}
+					{#if isRestoring && !restorePreview}
+						<div class="flex items-center gap-2 text-sm text-primary-600">
+							<LoaderCircle class="h-4 w-4 animate-spin" />
+							<span>Generating preview...</span>
+						</div>
+					{/if}
 				</div>
 
-				<!-- Restore Mode -->
-				<div class="space-y-3">
-					<Label>Restore Mode</Label>
-					<RadioGroup.Root bind:value={restoreMode}>
-						<div class="flex items-center space-x-2">
-							<RadioGroup.Item value="preview" id="mode-preview" />
-							<Label for="mode-preview" class="font-normal cursor-pointer">
-								<div>
-									<div class="font-medium">Preview</div>
-									<div class="text-sm text-gray-500">
-										See what will be imported without making changes
+				<!-- Restore Mode (only show after preview is loaded) -->
+				{#if restorePreview}
+					<div class="space-y-3">
+						<Label>Restore Mode</Label>
+						<RadioGroup.Root bind:value={restoreMode}>
+							<div class="flex items-center space-x-2">
+								<RadioGroup.Item value="replace" id="mode-replace" />
+								<Label for="mode-replace" class="font-normal cursor-pointer">
+									<div>
+										<div class="font-medium">Replace All</div>
+										<div class="text-sm text-gray-500">
+											Delete all existing data and import from backup
+										</div>
 									</div>
-								</div>
-							</Label>
-						</div>
-						<div class="flex items-center space-x-2">
-							<RadioGroup.Item value="replace" id="mode-replace" />
-							<Label for="mode-replace" class="font-normal cursor-pointer">
-								<div>
-									<div class="font-medium">Replace All</div>
-									<div class="text-sm text-gray-500">
-										Delete all existing data and import from backup
+								</Label>
+							</div>
+							<div class="flex items-center space-x-2">
+								<RadioGroup.Item value="merge" id="mode-merge" />
+								<Label for="mode-merge" class="font-normal cursor-pointer">
+									<div>
+										<div class="font-medium">Merge</div>
+										<div class="text-sm text-gray-500">
+											Merge backup data with existing data (conflicts must be resolved)
+										</div>
 									</div>
-								</div>
-							</Label>
-						</div>
-						<div class="flex items-center space-x-2">
-							<RadioGroup.Item value="merge" id="mode-merge" />
-							<Label for="mode-merge" class="font-normal cursor-pointer">
-								<div>
-									<div class="font-medium">Merge</div>
-									<div class="text-sm text-gray-500">
-										Merge backup data with existing data (conflicts must be resolved)
-									</div>
-								</div>
-							</Label>
-						</div>
-					</RadioGroup.Root>
-				</div>
+								</Label>
+							</div>
+						</RadioGroup.Root>
+					</div>
+				{/if}
 
 				<!-- Preview Results -->
 				{#if restorePreview}
@@ -671,17 +674,13 @@
 
 			<Dialog.Footer class="flex gap-2">
 				<Button variant="outline" onclick={() => (showRestoreDialog = false)}>Cancel</Button>
-				{#if restoreMode === 'preview'}
-					<Button onclick={handleRestorePreview} disabled={!selectedFile || isRestoring}>
-						{#if isRestoring}
-							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-							Loading...
-						{:else}
-							Preview
-						{/if}
-					</Button>
-				{:else}
-					<Button onclick={handleRestoreExecute} disabled={!selectedFile || isRestoring}>
+				{#if restorePreview}
+					<Button
+						onclick={handleRestoreExecute}
+						disabled={!selectedFile ||
+							isRestoring ||
+							(restoreMode === 'merge' && restoreConflicts.length > 0)}
+					>
 						{#if isRestoring}
 							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 							Restoring...
