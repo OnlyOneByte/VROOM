@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { databaseService } from '../../lib/database';
+import { userSettings, users } from '../../db/schema';
 import { changeTracker } from '../../lib/change-tracker';
-import { users, userSettings } from '../../db/schema';
+import { databaseService } from '../../lib/database';
 
 describe('ChangeTracker', () => {
   let testUserId: string;

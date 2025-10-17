@@ -909,6 +909,126 @@ sync.post('/upload', async (c) => {
 });
 
 /**
+ * POST /api/sync/initialize-drive
+ * Initialize Google Drive folder structure and check for existing backups
+ */
+sync.post('/initialize-drive', async (c) => {
+  try {
+    const user = c.get('user');
+    const userId = user.id;
+
+    // Import sync service
+    const { syncService } = await import('../lib/sync-service');
+
+    // Initialize folder structure and get existing backups
+    const result = await syncService.initializeGoogleDriveForUser(userId);
+
+    return c.json({
+      success: true,
+      folderStructure: result.folderStructure,
+      existingBackups: result.existingBackups,
+      message:
+        result.existingBackups.length > 0
+          ? `Found ${result.existingBackups.length} existing backup(s)`
+          : 'No existing backups found',
+    });
+  } catch (error) {
+    console.error('Error initializing Google Drive:', error);
+
+    // Handle SyncError
+    if (error && typeof error === 'object' && 'code' in error) {
+      const syncError = error as { code: string; message: string; details?: unknown };
+
+      if (syncError.code === 'AUTH_INVALID') {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: syncError.code,
+              message: syncError.message,
+              details: syncError.details,
+            },
+          },
+          401
+        );
+      }
+
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: syncError.code,
+            message: syncError.message,
+            details: syncError.details,
+          },
+        },
+        500
+      );
+    }
+
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'INITIALIZE_FAILED',
+          message: 'Failed to initialize Google Drive',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        },
+      },
+      500
+    );
+  }
+});
+
+/**
+ * POST /api/sync/auto-restore
+ * Automatically restore from the latest Google Drive backup
+ */
+sync.post('/auto-restore', async (c) => {
+  try {
+    const user = c.get('user');
+    const userId = user.id;
+
+    // Import sync service
+    const { syncService } = await import('../lib/sync-service');
+
+    // Attempt auto-restore
+    const result = await syncService.autoRestoreFromLatestBackup(userId);
+
+    if (result.restored) {
+      return c.json({
+        success: true,
+        restored: true,
+        backupInfo: result.backupInfo,
+        summary: result.summary,
+        message: 'Successfully restored data from latest backup',
+      });
+    }
+
+    return c.json({
+      success: false,
+      restored: false,
+      error: result.error || 'Failed to restore from backup',
+    });
+  } catch (error) {
+    console.error('Error during auto-restore:', error);
+
+    return c.json(
+      {
+        success: false,
+        restored: false,
+        error: {
+          code: 'AUTO_RESTORE_FAILED',
+          message: 'Failed to auto-restore from backup',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        },
+      },
+      500
+    );
+  }
+});
+
+/**
  * POST /api/sync/restore-from-sheets
  * Restore data from Google Sheets
  */

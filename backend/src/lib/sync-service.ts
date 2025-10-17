@@ -1048,6 +1048,355 @@ export class SyncService {
       );
     }
   }
+
+  /**
+   * Check for existing Google Drive folder structure and backups
+   * Does NOT create folders - only checks if they already exist
+   * Called when a user logs in to discover existing backups
+   */
+  async checkExistingGoogleDriveBackups(userId: string): Promise<{
+    hasBackupFolder: boolean;
+    backupFolderId?: string;
+    existingBackups: Array<{
+      id: string;
+      name: string;
+      createdTime?: string;
+      modifiedTime?: string;
+      size?: string;
+    }>;
+  }> {
+    const { databaseService } = await import('./database');
+    const { eq } = await import('drizzle-orm');
+    const { users, userSettings } = await import('../db/schema');
+    const { GoogleDriveService } = await import('./google-drive');
+    const { backupService } = await import('./backup-service');
+
+    const db = databaseService.getDatabase();
+
+    // Get user settings to check if backup folder ID is already stored
+    const settings = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    // If we already have a backup folder ID, use it
+    if (settings.length > 0 && settings[0].googleDriveBackupFolderId) {
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+      if (!user.length || !user[0].googleRefreshToken) {
+        return {
+          hasBackupFolder: false,
+          existingBackups: [],
+        };
+      }
+
+      try {
+        const driveService = new GoogleDriveService(
+          user[0].googleRefreshToken,
+          user[0].googleRefreshToken
+        );
+
+        // List existing backups in the known backup folder
+        const existingBackups = await backupService.listBackupsInDrive(
+          driveService,
+          settings[0].googleDriveBackupFolderId
+        );
+
+        return {
+          hasBackupFolder: true,
+          backupFolderId: settings[0].googleDriveBackupFolderId,
+          existingBackups,
+        };
+      } catch (error) {
+        // If we can't access the folder, it might have been deleted
+        console.error('Error accessing backup folder:', error);
+        return {
+          hasBackupFolder: false,
+          existingBackups: [],
+        };
+      }
+    }
+
+    // No backup folder ID stored - check if folder exists in Drive
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!user.length || !user[0].googleRefreshToken) {
+      return {
+        hasBackupFolder: false,
+        existingBackups: [],
+      };
+    }
+
+    try {
+      const driveService = new GoogleDriveService(
+        user[0].googleRefreshToken,
+        user[0].googleRefreshToken
+      );
+
+      // Try to find existing VROOM folder (without creating it)
+      const folderName = `VROOM Car Tracker - ${user[0].displayName}`;
+      const response = await driveService['drive'].files.list({
+        q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        fields: 'files(id, name)',
+      });
+
+      const folders = response.data.files;
+      if (!folders || folders.length === 0) {
+        // No VROOM folder exists yet
+        return {
+          hasBackupFolder: false,
+          existingBackups: [],
+        };
+      }
+
+      const mainFolderId = folders[0].id;
+      if (!mainFolderId) {
+        return {
+          hasBackupFolder: false,
+          existingBackups: [],
+        };
+      }
+
+      // Check for Backups subfolder
+      const subFolderResponse = await driveService['drive'].files.list({
+        q: `'${mainFolderId}' in parents and name='Backups' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        fields: 'files(id, name)',
+      });
+
+      const backupFolders = subFolderResponse.data.files;
+      if (!backupFolders || backupFolders.length === 0) {
+        // No Backups folder exists yet
+        return {
+          hasBackupFolder: false,
+          existingBackups: [],
+        };
+      }
+
+      const backupFolderId = backupFolders[0].id;
+      if (!backupFolderId) {
+        return {
+          hasBackupFolder: false,
+          existingBackups: [],
+        };
+      }
+
+      // Found backup folder - list backups
+      const existingBackups = await backupService.listBackupsInDrive(
+        driveService,
+        backupFolderId
+      );
+
+      // Store the backup folder ID for future use
+      await db
+        .update(userSettings)
+        .set({
+          googleDriveBackupFolderId: backupFolderId,
+          updatedAt: new Date(),
+        })
+        .where(eq(userSettings.userId, userId));
+
+      return {
+        hasBackupFolder: true,
+        backupFolderId,
+        existingBackups,
+      };
+    } catch (error) {
+      console.error('Error checking for existing backup folder:', error);
+      return {
+        hasBackupFolder: false,
+        existingBackups: [],
+      };
+    }
+  }
+
+  /**
+   * Initialize Google Drive folder structure and check for existing backups
+   * This DOES create folders if they don't exist
+   * Should only be called when user explicitly enables backup sync
+   */
+  async initializeGoogleDriveForUser(userId: string): Promise<{
+    folderStructure: {
+      mainFolder: { id: string; name: string; webViewLink?: string };
+      subFolders: {
+        receipts: { id: string; name: string };
+        maintenance: { id: string; name: string };
+        photos: { id: string; name: string };
+        backups: { id: string; name: string };
+      };
+    };
+    existingBackups: Array<{
+      id: string;
+      name: string;
+      createdTime?: string;
+      modifiedTime?: string;
+      size?: string;
+    }>;
+  }> {
+    const { databaseService } = await import('./database');
+    const { eq } = await import('drizzle-orm');
+    const { users, userSettings } = await import('../db/schema');
+    const { GoogleDriveService } = await import('./google-drive');
+    const { backupService } = await import('./backup-service');
+
+    const db = databaseService.getDatabase();
+
+    // Get user info for tokens and name
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!user.length || !user[0].googleRefreshToken) {
+      throw new SyncError(
+        SyncErrorCode.AUTH_INVALID,
+        'Google Drive access not available. Please re-authenticate with Google.'
+      );
+    }
+
+    try {
+      // Create GoogleDriveService instance
+      const driveService = new GoogleDriveService(
+        user[0].googleRefreshToken,
+        user[0].googleRefreshToken
+      );
+
+      // Create or get existing folder structure
+      const folderStructure = await driveService.createVroomFolderStructure(user[0].displayName);
+
+      // List existing backups in the backups folder
+      const existingBackups = await backupService.listBackupsInDrive(
+        driveService,
+        folderStructure.subFolders.backups.id
+      );
+
+      // Update user settings with folder IDs
+      await db
+        .update(userSettings)
+        .set({
+          googleDriveBackupFolderId: folderStructure.subFolders.backups.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(userSettings.userId, userId));
+
+      return {
+        folderStructure,
+        existingBackups,
+      };
+    } catch (error) {
+      // Handle authentication errors
+      if (error instanceof Error && error.message.includes('auth')) {
+        throw new SyncError(
+          SyncErrorCode.AUTH_INVALID,
+          'Google Drive access not available. Please re-authenticate with Google.',
+          error.message
+        );
+      }
+
+      // Wrap other errors
+      throw new SyncError(
+        SyncErrorCode.NETWORK_ERROR,
+        'Failed to initialize Google Drive folder structure',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
+  }
+
+  /**
+   * Auto-restore from the latest Google Drive backup if user has no local data
+   * Called during login to automatically restore data for returning users
+   */
+  async autoRestoreFromLatestBackup(userId: string): Promise<{
+    restored: boolean;
+    backupInfo?: {
+      fileId: string;
+      fileName: string;
+      createdTime?: string;
+    };
+    summary?: ImportSummary;
+    error?: string;
+  }> {
+    const { databaseService } = await import('./database');
+    const { eq } = await import('drizzle-orm');
+    const { users, vehicles } = await import('../db/schema');
+    const { GoogleDriveService } = await import('./google-drive');
+
+    const db = databaseService.getDatabase();
+
+    try {
+      // Check if user already has local data
+      const existingVehicles = await db
+        .select()
+        .from(vehicles)
+        .where(eq(vehicles.userId, userId))
+        .limit(1);
+
+      // If user has data, don't auto-restore
+      if (existingVehicles.length > 0) {
+        return {
+          restored: false,
+          error: 'User already has local data',
+        };
+      }
+
+      // Check for existing backups (does NOT create folders)
+      const { hasBackupFolder, existingBackups } =
+        await this.checkExistingGoogleDriveBackups(userId);
+
+      // If no backup folder or no backups exist, nothing to restore
+      if (!hasBackupFolder || existingBackups.length === 0) {
+        return {
+          restored: false,
+          error: 'No backups found',
+        };
+      }
+
+      // Get the latest backup (first in the list, as they're sorted by modified time desc)
+      const latestBackup = existingBackups[0];
+
+      // Get user info for tokens
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+      if (!user.length || !user[0].googleRefreshToken) {
+        return {
+          restored: false,
+          error: 'Google Drive access not available',
+        };
+      }
+
+      // Create GoogleDriveService instance
+      const driveService = new GoogleDriveService(
+        user[0].googleRefreshToken,
+        user[0].googleRefreshToken
+      );
+
+      // Download the backup file
+      const fileBuffer = await driveService.downloadFile(latestBackup.id);
+
+      // Restore from backup in 'replace' mode (safe since user has no data)
+      const restoreResult = await this.restoreFromBackup(userId, fileBuffer, 'replace');
+
+      if (restoreResult.success && restoreResult.imported) {
+        return {
+          restored: true,
+          backupInfo: {
+            fileId: latestBackup.id,
+            fileName: latestBackup.name,
+            createdTime: latestBackup.createdTime,
+          },
+          summary: restoreResult.imported,
+        };
+      }
+
+      return {
+        restored: false,
+        error: 'Restore operation failed',
+      };
+    } catch (error) {
+      console.error('Error during auto-restore:', error);
+      return {
+        restored: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
 }
 
 export const syncService = new SyncService();
