@@ -30,62 +30,39 @@
 		open = false;
 	}
 
-	function formatLastSync(date: Date | null): string {
-		if (!date) return 'Never';
+	import { formatCompactRelativeTime } from '$lib/utils/formatters';
 
-		const now = new Date();
-		const diff = now.getTime() - date.getTime();
-		const minutes = Math.floor(diff / 60000);
-		const hours = Math.floor(minutes / 60);
-		const days = Math.floor(hours / 24);
-
-		if (minutes < 1) return 'Just now';
-		if (minutes < 60) return `${minutes}m ago`;
-		if (hours < 24) return `${hours}h ago`;
-		return `${days}d ago`;
-	}
-
-	function getStatusColor(): string {
-		if (!$isOnline) return 'text-red-500';
-		if (hasConflicts) return 'text-orange-500';
-		if ($syncStatus === 'syncing') return 'text-blue-500';
-		if ($syncStatus === 'error') return 'text-red-500';
-		if ($syncStatus === 'success') return 'text-green-500';
-		if (pendingCount > 0) return 'text-yellow-500';
-		return 'text-gray-500';
-	}
-
-	function getStatusIcon() {
-		if (!$isOnline) return WifiOff;
-		if (hasConflicts) return CircleAlert;
-		if ($syncStatus === 'syncing') return RefreshCw;
-		if ($syncStatus === 'error') return CircleAlert;
-		if ($syncStatus === 'success') return CircleCheck;
-		if (pendingCount > 0) return Clock;
-		return Wifi;
-	}
-
-	function getStatusText(): string {
-		if (!$isOnline) return 'Offline';
-		if (hasConflicts) return `${$syncConflicts.length} conflicts`;
-		if ($syncStatus === 'syncing') return 'Syncing...';
-		if ($syncStatus === 'error') return 'Sync failed';
-		if ($syncStatus === 'success') return 'Synced';
-		if (pendingCount > 0) return `${pendingCount} pending`;
-		return 'Up to date';
+	function getSyncStatusInfo() {
+		if (!$isOnline) return { color: 'text-red-500', icon: WifiOff, text: 'Offline' };
+		if (hasConflicts)
+			return {
+				color: 'text-orange-500',
+				icon: CircleAlert,
+				text: `${$syncConflicts.length} conflicts`
+			};
+		if ($syncStatus === 'syncing')
+			return { color: 'text-blue-500', icon: RefreshCw, text: 'Syncing...' };
+		if ($syncStatus === 'error')
+			return { color: 'text-red-500', icon: CircleAlert, text: 'Sync failed' };
+		if ($syncStatus === 'success')
+			return { color: 'text-green-500', icon: CircleCheck, text: 'Synced' };
+		if (pendingCount > 0)
+			return { color: 'text-yellow-500', icon: Clock, text: `${pendingCount} pending` };
+		return { color: 'text-gray-500', icon: Wifi, text: 'Up to date' };
 	}
 </script>
 
 <Popover bind:open>
 	<PopoverTrigger>
 		{#snippet child({ props })}
-			{@const StatusIcon = getStatusIcon()}
+			{@const statusInfo = getSyncStatusInfo()}
+			{@const StatusIcon = statusInfo.icon}
 			<button
 				{...props}
-				class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors {getStatusColor()}"
+				class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors {statusInfo.color}"
 			>
 				<StatusIcon class="h-4 w-4 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
-				<span class="text-sm font-medium">{getStatusText()}</span>
+				<span class="text-sm font-medium">{statusInfo.text}</span>
 			</button>
 		{/snippet}
 	</PopoverTrigger>
@@ -136,7 +113,7 @@
 			<div class="flex items-center justify-between">
 				<span class="text-sm text-gray-600">Last sync</span>
 				<span class="text-sm font-medium text-gray-900">
-					{formatLastSync($lastSyncTime)}
+					{formatCompactRelativeTime($lastSyncTime)}
 				</span>
 			</div>
 

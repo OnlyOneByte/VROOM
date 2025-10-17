@@ -102,45 +102,7 @@ export function validateField<T>(
 	}
 }
 
-// Currency formatting
-export function formatCurrency(amount: number, currency = 'USD'): string {
-	return new Intl.NumberFormat('en-US', {
-		style: 'currency',
-		currency
-	}).format(amount);
-}
-
-// Number formatting
-export function formatNumber(value: number, decimals = 2): string {
-	return new Intl.NumberFormat('en-US', {
-		minimumFractionDigits: decimals,
-		maximumFractionDigits: decimals
-	}).format(value);
-}
-
-// Date formatting
-export function formatDate(date: string | Date): string {
-	const d = typeof date === 'string' ? new Date(date) : date;
-	return new Intl.DateTimeFormat('en-US', {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric'
-	}).format(d);
-}
-
 // Input sanitization
 export function sanitizeInput(input: string): string {
 	return input.trim().replace(/[<>]/g, '');
-}
-
-// Debounce utility for form validation
-export function debounce<T extends (...args: unknown[]) => unknown>(
-	func: T,
-	wait: number
-): (...args: Parameters<T>) => void {
-	let timeout: ReturnType<typeof setTimeout>;
-	return (...args: Parameters<T>) => {
-		clearTimeout(timeout);
-		timeout = setTimeout(() => func(...args), wait);
-	};
 }

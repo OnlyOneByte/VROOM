@@ -10,9 +10,6 @@
 		Filter,
 		Edit,
 		Trash2,
-		Fuel,
-		Wrench,
-		CreditCard,
 		FileText,
 		TrendingUp,
 		SortAsc,
@@ -27,6 +24,9 @@
 	import { settingsStore } from '$lib/stores/settings';
 	import type { ExpenseCategory, ExpenseFilters } from '$lib/types.js';
 	import { getVolumeUnitLabel, getChargeUnitLabel } from '$lib/utils/units';
+	import { formatCurrency, formatDate } from '$lib/utils/formatters';
+	import { categoryLabels, getCategoryIcon, getCategoryColor } from '$lib/utils/expense-helpers';
+	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -100,16 +100,6 @@
 
 	let pendingExpenses = $derived($offlineExpenses.filter(expense => !expense.synced));
 	let syncedExpenses = $derived($offlineExpenses.filter(expense => expense.synced));
-
-	// Category and type mappings
-	const categoryLabels: Record<ExpenseCategory, string> = {
-		fuel: 'Fuel',
-		maintenance: 'Maintenance',
-		financial: 'Financial',
-		regulatory: 'Regulatory',
-		enhancement: 'Enhancement',
-		misc: 'Misc'
-	};
 
 	// Get all unique tags from expenses
 	let allTags = $derived(Array.from(new Set(expenses.flatMap(e => e.tags || []))).sort());
@@ -340,59 +330,6 @@
 			showDeleteModal = false;
 			expenseToDelete = null;
 		}
-	}
-
-	function formatDate(date: Date | string): string {
-		const dateObj = typeof date === 'string' ? new Date(date) : date;
-		return new Intl.DateTimeFormat('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric'
-		}).format(dateObj);
-	}
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD'
-		}).format(amount);
-	}
-
-	function getCategoryIcon(category: ExpenseCategory) {
-		switch (category) {
-			case 'fuel':
-				return Fuel;
-			case 'maintenance':
-				return Wrench;
-			case 'financial':
-				return CreditCard;
-			default:
-				return DollarSign;
-		}
-	}
-
-	function getCategoryColor(category: ExpenseCategory): string {
-		switch (category) {
-			case 'fuel':
-				return 'text-blue-600 bg-blue-100';
-			case 'maintenance':
-				return 'text-orange-600 bg-orange-100';
-			case 'financial':
-				return 'text-green-600 bg-green-100';
-			case 'regulatory':
-				return 'text-purple-600 bg-purple-100';
-			case 'enhancement':
-				return 'text-pink-600 bg-pink-100';
-			case 'misc':
-				return 'text-gray-600 bg-gray-100';
-			default:
-				return 'text-gray-600 bg-gray-100';
-		}
-	}
-
-	function getVehicleDisplayName(vehicle: any): string {
-		if (!vehicle) return 'Unknown Vehicle';
-		return vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
 	}
 
 	// Reactive updates

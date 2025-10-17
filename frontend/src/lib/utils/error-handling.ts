@@ -54,15 +54,8 @@ export function handleApiError(error: unknown): AppError {
 		};
 	}
 
-	if (error instanceof Error) {
-		return {
-			message: error.message,
-			code: 'UNKNOWN_ERROR'
-		};
-	}
-
 	return {
-		message: 'An unexpected error occurred',
+		message: error instanceof Error ? error.message : 'An unexpected error occurred',
 		code: 'UNKNOWN_ERROR'
 	};
 }

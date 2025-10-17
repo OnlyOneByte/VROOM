@@ -20,24 +20,23 @@ export function handleRouteProtection(
 	isAuthenticated: boolean,
 	isLoading: boolean
 ) {
-	// Skip route protection while auth is loading
 	if (isLoading) return;
 
-	const isProtected = isProtectedRoute(pathname);
-	const isPublic = isPublicRoute(pathname);
+	// Handle root path
+	if (pathname === '/') {
+		goto(isAuthenticated ? '/vehicles' : '/auth');
+		return;
+	}
 
-	if (isProtected && !isAuthenticated) {
-		// Redirect to auth page if trying to access protected route without authentication
+	// Handle protected routes
+	if (isProtectedRoute(pathname) && !isAuthenticated) {
 		goto('/auth');
-	} else if (isPublic && isAuthenticated) {
-		// Redirect to vehicles if trying to access public route while authenticated
+		return;
+	}
+
+	// Handle public routes
+	if (isPublicRoute(pathname) && isAuthenticated) {
 		goto('/vehicles');
-	} else if (pathname === '/' && isAuthenticated) {
-		// Redirect root to vehicles if authenticated
-		goto('/vehicles');
-	} else if (pathname === '/' && !isAuthenticated) {
-		// Redirect root to auth if not authenticated
-		goto('/auth');
 	}
 }
 

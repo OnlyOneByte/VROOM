@@ -92,44 +92,38 @@ export function clearSyncedExpenses(): void {
 export async function syncOfflineExpenses(): Promise<void> {
 	const pendingExpenses = getPendingExpenses();
 
-	if (pendingExpenses.length === 0) {
-		return;
-	}
+	if (pendingExpenses.length === 0) return;
 
 	syncStatus.set('syncing');
 
 	try {
 		for (const expense of pendingExpenses) {
 			// Validate fuel expense requirements
-			const tags = expense.tags || [];
-			if ((expense.category === 'fuel' && !expense.volume && !expense.charge) || !expense.mileage) {
+			if (
+				expense.category === 'fuel' &&
+				((!expense.volume && !expense.charge) || !expense.mileage)
+			) {
 				console.warn(
 					`Skipping expense ${expense.id}: Fuel expenses require volume/charge and mileage data`
 				);
 				continue;
 			}
 
-			// Convert offline expense to API format
-			const apiExpense = {
-				vehicleId: expense.vehicleId,
-				tags: tags,
-				category: expense.category,
-				amount: expense.amount,
-				currency: expense.currency || 'USD',
-				date: expense.date,
-				mileage: expense.mileage,
-				volume: expense.volume,
-				charge: expense.charge,
-				description: expense.description
-			};
-
-			// Send to API
-			const response = await fetch(`/api/expenses`, {
+			const response = await fetch('/api/expenses', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(apiExpense)
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					vehicleId: expense.vehicleId,
+					tags: expense.tags || [],
+					category: expense.category,
+					amount: expense.amount,
+					currency: expense.currency || 'USD',
+					date: expense.date,
+					mileage: expense.mileage,
+					volume: expense.volume,
+					charge: expense.charge,
+					description: expense.description
+				})
 			});
 
 			if (response.ok) {
@@ -139,17 +133,12 @@ export async function syncOfflineExpenses(): Promise<void> {
 			}
 		}
 
-		// Clean up synced expenses
 		clearSyncedExpenses();
 		syncStatus.set('success');
-
-		// Reset status after 3 seconds
 		setTimeout(() => syncStatus.set('idle'), 3000);
 	} catch (error) {
 		console.error('Failed to sync offline expenses:', error);
 		syncStatus.set('error');
-
-		// Reset status after 5 seconds
 		setTimeout(() => syncStatus.set('idle'), 5000);
 	}
 }

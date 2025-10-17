@@ -40,85 +40,57 @@
 		}
 	}
 
-	// Track shown notifications globally to prevent duplicates across remounts
 	const shownNotifications = new Set<string>();
 	let previousNotificationIds = new Set<string>();
 
 	onMount(() => {
-		// Initialize authentication
 		authStore.initialize();
-
-		// Initialize PWA functionality
 		registerServiceWorker();
-
-		// Load offline expenses
-		const savedOfflineExpenses = loadOfflineExpenses();
-		offlineExpenses.set(savedOfflineExpenses);
+		offlineExpenses.set(loadOfflineExpenses());
 	});
 
-	// Use automatic store subscriptions with $
 	let authState = $derived($authStore);
 	let appState = $derived($appStore);
 	let currentPath = $derived($page.url.pathname);
+	let showNavigation = $derived(authState.isAuthenticated && !authState.isLoading);
+	let isAuthPage = $derived(currentPath.startsWith('/auth'));
 
-	// Load vehicles when user becomes authenticated
 	$effect(() => {
 		if (authState.isAuthenticated && !authState.isLoading) {
 			loadUserVehicles();
 		}
 	});
 
-	// Handle notifications
 	$effect(() => {
-		// Only process NEW notifications (not in previous set)
 		appState.notifications.forEach(notification => {
-			// Skip if we've seen this notification before
 			if (previousNotificationIds.has(notification.id) || shownNotifications.has(notification.id)) {
 				return;
 			}
 
-			// Mark as shown
 			shownNotifications.add(notification.id);
 
-			const duration = notification.duration || 5000;
 			const options = {
-				duration,
-				style: `--toast-duration: ${duration}ms;`
+				duration: notification.duration || 5000,
+				style: `--toast-duration: ${notification.duration || 5000}ms;`
 			};
 
-			switch (notification.type) {
-				case 'success':
-					toast.success(notification.message, options);
-					break;
-				case 'error':
-					toast.error(notification.message, options);
-					break;
-				case 'warning':
-					toast.warning(notification.message, options);
-					break;
-				case 'info':
-					toast.info(notification.message, options);
-					break;
-			}
+			const toastFn = {
+				success: toast.success,
+				error: toast.error,
+				warning: toast.warning,
+				info: toast.info
+			}[notification.type];
 
-			// Remove notification from store after showing
+			toastFn(notification.message, options);
 			appStore.removeNotification(notification.id);
 		});
 
-		// Update previous notification IDs for next comparison
 		previousNotificationIds = new Set(appState.notifications.map(n => n.id));
 	});
 
-	// Handle route protection
 	$effect(() => {
 		handleRouteProtection(currentPath, authState.isAuthenticated, authState.isLoading);
 	});
-
-	// Determine if we should show the navigation
-	let showNavigation = $derived(authState.isAuthenticated && !authState.isLoading);
-
-	// Determine if we should show the main layout
-	let isAuthPage = $derived(currentPath.startsWith('/auth'));
 </script>
 
 <svelte:head>

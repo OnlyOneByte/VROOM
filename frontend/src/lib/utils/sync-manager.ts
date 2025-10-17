@@ -205,48 +205,40 @@ class SyncManager {
 		expense: OfflineExpense
 	): Promise<{ date: string; amount: number; tags: string[] } | null> {
 		try {
-			// Check if an expense with similar characteristics already exists
 			const response = await fetch(
 				`/api/expenses?vehicleId=${expense.vehicleId}&date=${expense.date}&amount=${expense.amount}`
 			);
 
-			if (response.ok) {
-				const result = await response.json();
+			if (!response.ok) return null;
 
-				// Handle API response format
-				const expenses = result.data || result;
+			const result = await response.json();
+			const expenses = Array.isArray(result.data)
+				? result.data
+				: Array.isArray(result)
+					? result
+					: [];
 
-				// Ensure expenses is an array
-				if (!Array.isArray(expenses)) {
-					return null;
-				}
-
-				// Look for potential duplicates (backend already filters by date/amount)
-				// Check if tags overlap
-				return expenses.find((existing: { date: string; amount: number; tags: string[] }) => {
-					// Check if any tags match
-					return expense.tags.some(tag => existing.tags?.includes(tag));
-				});
-			}
+			// Look for potential duplicates with overlapping tags
+			return (
+				expenses.find((existing: { date: string; amount: number; tags: string[] }) =>
+					expense.tags.some(tag => existing.tags?.includes(tag))
+				) || null
+			);
 		} catch (error) {
 			console.warn('Failed to check for existing expense:', error);
+			return null;
 		}
-
-		return null;
 	}
 
 	private determineConflictType(
 		local: OfflineExpense,
 		server: { amount: number; tags: string[]; date: string }
 	): SyncConflict['conflictType'] {
-		// Simple conflict detection logic
 		const tagsMatch = local.tags.some(tag => server.tags?.includes(tag));
+		const amountMatch = Math.abs(local.amount - server.amount) < 0.01;
+		const dateMatch = local.date === server.date;
 
-		if (Math.abs(local.amount - server.amount) < 0.01 && tagsMatch && local.date === server.date) {
-			return 'duplicate';
-		}
-
-		return 'modified';
+		return amountMatch && tagsMatch && dateMatch ? 'duplicate' : 'modified';
 	}
 
 	private markExpenseAsSynced(expenseId: string): void {

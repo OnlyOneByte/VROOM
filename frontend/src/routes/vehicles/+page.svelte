@@ -262,27 +262,8 @@
 		};
 	}
 
-	function getVehicleDisplayName(vehicle: Vehicle): string {
-		return vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
-	}
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD'
-		}).format(amount);
-	}
-
-	function getRelativeTime(date: Date | null): string {
-		if (!date) return 'Never';
-		const days = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
-		if (days === 0) return 'Today';
-		if (days === 1) return 'Yesterday';
-		if (days < 7) return `${days} days ago`;
-		if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-		if (days < 365) return `${Math.floor(days / 30)} months ago`;
-		return `${Math.floor(days / 365)} years ago`;
-	}
+	import { formatCurrency, formatRelativeTime } from '$lib/utils/formatters';
+	import { getVehicleDisplayName, getFinancingProgress } from '$lib/utils/vehicle-helpers';
 
 	function navigateToVehicle(vehicleId: string) {
 		goto(`/vehicles/${vehicleId}`);
@@ -572,11 +553,7 @@
 									<p class="text-xs font-medium text-gray-900">Last Activity</p>
 								</div>
 								<p class="font-semibold text-gray-900 text-sm">
-									{#if stats.lastExpenseDate}
-										{getRelativeTime(stats.lastExpenseDate)}
-									{:else}
-										None
-									{/if}
+									{formatRelativeTime(stats.lastExpenseDate)}
 								</p>
 							</div>
 						{/if}
@@ -646,7 +623,7 @@
 												Last Service
 											</span>
 											<span class="text-gray-900 font-medium">
-												{getRelativeTime(stats.lastMaintenanceDate)}
+												{formatRelativeTime(stats.lastMaintenanceDate)}
 											</span>
 										</div>
 									{/if}
@@ -660,10 +637,7 @@
 
 									<!-- Loan Info -->
 									{#if vehicle.financing?.isActive}
-										{@const financingProgressValue =
-											((vehicle.financing.originalAmount - vehicle.financing.currentBalance) /
-												vehicle.financing.originalAmount) *
-											100}
+										{@const progressValue = getFinancingProgress(vehicle)}
 										<div class="pt-2 border-t border-gray-100">
 											<div class="flex items-center justify-between text-sm mb-2">
 												<span class="text-gray-600">Loan Balance</span>
@@ -677,13 +651,12 @@
 													{formatCurrency(vehicle.financing.originalAmount)}
 												</span>
 											</div>
-											<!-- Loan Progress Bar -->
 											<div class="mt-2">
 												<div class="flex justify-between text-xs text-gray-600 mb-1">
 													<span>Loan Progress</span>
-													<span>{Math.round(financingProgressValue)}% paid</span>
+													<span>{Math.round(progressValue)}% paid</span>
 												</div>
-												<Progress value={financingProgressValue} class="h-1.5" />
+												<Progress value={progressValue} class="h-1.5" />
 											</div>
 										</div>
 									{/if}

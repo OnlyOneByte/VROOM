@@ -57,22 +57,13 @@
 	let pendingCount = $derived($offlineExpenses.filter(expense => !expense.synced).length);
 	let hasConflicts = $derived($syncConflicts.length > 0);
 
-	function getMobileStatusColor(): string {
-		if (!$isOnline) return 'text-red-500';
-		if (hasConflicts) return 'text-orange-500';
-		if ($syncStatus === 'syncing') return 'text-yellow-500';
-		if ($syncStatus === 'error') return 'text-red-500';
-		if (pendingCount > 0) return 'text-yellow-500';
-		return 'text-green-500';
-	}
-
-	function getMobileStatusIcon() {
-		if (!$isOnline) return WifiOff;
-		if (hasConflicts) return CircleAlert;
-		if ($syncStatus === 'syncing') return RefreshCw;
-		if ($syncStatus === 'error') return CircleAlert;
-		if (pendingCount > 0) return Clock;
-		return Wifi;
+	function getSyncStatusInfo() {
+		if (!$isOnline) return { color: 'text-red-500', icon: WifiOff };
+		if (hasConflicts) return { color: 'text-orange-500', icon: CircleAlert };
+		if ($syncStatus === 'syncing') return { color: 'text-yellow-500', icon: RefreshCw };
+		if ($syncStatus === 'error') return { color: 'text-red-500', icon: CircleAlert };
+		if (pendingCount > 0) return { color: 'text-yellow-500', icon: Clock };
+		return { color: 'text-green-500', icon: Wifi };
 	}
 </script>
 
@@ -87,8 +78,9 @@
 		<div class="flex items-center gap-3">
 			<!-- Mobile sync status icon -->
 			{#snippet mobileStatusIcon()}
-				{@const StatusIcon = getMobileStatusIcon()}
-				<div class="{getMobileStatusColor()} relative">
+				{@const statusInfo = getSyncStatusInfo()}
+				{@const StatusIcon = statusInfo.icon}
+				<div class="{statusInfo.color} relative">
 					<StatusIcon class="h-5 w-5 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
 					{#if pendingCount > 0}
 						<Badge
