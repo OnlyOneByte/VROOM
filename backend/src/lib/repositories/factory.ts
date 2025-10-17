@@ -1,18 +1,18 @@
 import { ExpenseRepository } from './expense.js';
 import { InsurancePolicyRepository } from './insurancePolicy.js';
 import type { IRepositoryFactory } from './interfaces.js';
-import { LoanPaymentRepository } from './loanPayment.js';
 import { UserRepository } from './user.js';
 import { VehicleRepository } from './vehicle.js';
-import { VehicleLoanRepository } from './vehicleLoan.js';
+import { VehicleFinancingRepository } from './vehicleFinancing.js';
+import { VehicleFinancingPaymentRepository } from './vehicleFinancingPayment.js';
 import { VehicleShareRepository } from './vehicleShare.js';
 
 // SQLite repository factory implementation
 export class SQLiteRepositoryFactory implements IRepositoryFactory {
   private userRepository?: UserRepository;
   private vehicleRepository?: VehicleRepository;
-  private vehicleLoanRepository?: VehicleLoanRepository;
-  private loanPaymentRepository?: LoanPaymentRepository;
+  private vehicleFinancingRepository?: VehicleFinancingRepository;
+  private vehicleFinancingPaymentRepository?: VehicleFinancingPaymentRepository;
   private insurancePolicyRepository?: InsurancePolicyRepository;
   private expenseRepository?: ExpenseRepository;
   private vehicleShareRepository?: VehicleShareRepository;
@@ -31,18 +31,18 @@ export class SQLiteRepositoryFactory implements IRepositoryFactory {
     return this.vehicleRepository;
   }
 
-  getVehicleLoanRepository(): VehicleLoanRepository {
-    if (!this.vehicleLoanRepository) {
-      this.vehicleLoanRepository = new VehicleLoanRepository();
+  getVehicleFinancingRepository(): VehicleFinancingRepository {
+    if (!this.vehicleFinancingRepository) {
+      this.vehicleFinancingRepository = new VehicleFinancingRepository();
     }
-    return this.vehicleLoanRepository;
+    return this.vehicleFinancingRepository;
   }
 
-  getLoanPaymentRepository(): LoanPaymentRepository {
-    if (!this.loanPaymentRepository) {
-      this.loanPaymentRepository = new LoanPaymentRepository();
+  getVehicleFinancingPaymentRepository(): VehicleFinancingPaymentRepository {
+    if (!this.vehicleFinancingPaymentRepository) {
+      this.vehicleFinancingPaymentRepository = new VehicleFinancingPaymentRepository();
     }
-    return this.loanPaymentRepository;
+    return this.vehicleFinancingPaymentRepository;
   }
 
   getInsurancePolicyRepository(): InsurancePolicyRepository {

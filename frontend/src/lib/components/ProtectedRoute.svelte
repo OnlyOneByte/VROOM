@@ -1,23 +1,17 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/auth.js';
 
 	let { children } = $props();
 
-	let authState = $state({ isAuthenticated: false, isLoading: true });
+	// Use automatic store subscription
+	let authState = $derived($authStore);
 
-	onMount(() => {
-		const unsubscribe = authStore.subscribe(state => {
-			authState = state;
-
-			// Redirect to auth page if not authenticated and not loading
-			if (!state.isLoading && !state.isAuthenticated) {
-				goto('/auth');
-			}
-		});
-
-		return unsubscribe;
+	// Redirect to auth page if not authenticated and not loading
+	$effect(() => {
+		if (!authState.isLoading && !authState.isAuthenticated) {
+			goto('/auth');
+		}
 	});
 </script>
 

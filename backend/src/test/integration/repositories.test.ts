@@ -150,7 +150,7 @@ describe('Repository Integration Tests', () => {
     test('should create and manage vehicle loan', async () => {
       const userRepo = repositoryFactory.getUserRepository();
       const vehicleRepo = repositoryFactory.getVehicleRepository();
-      const loanRepo = repositoryFactory.getVehicleLoanRepository();
+      const loanRepo = repositoryFactory.getVehicleFinancingRepository();
 
       // Create user and vehicle
       const user = await userRepo.create({
@@ -170,7 +170,8 @@ describe('Repository Integration Tests', () => {
       // Create loan
       const loanData = {
         vehicleId: vehicle.id,
-        lender: 'Test Bank',
+        provider: 'Test Bank',
+        financingType: 'loan',
         originalAmount: 20000,
         currentBalance: 15000,
         apr: 4.5,

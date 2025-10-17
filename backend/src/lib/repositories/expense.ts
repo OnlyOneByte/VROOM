@@ -79,24 +79,6 @@ export class ExpenseRepository
     }
   }
 
-  /**
-   * @deprecated Use findByCategory or filter by tags instead. The type field is deprecated.
-   */
-  async findByType(vehicleId: string, _type: string): Promise<Expense[]> {
-    try {
-      // Type field is deprecated, return all expenses for the vehicle
-      const result = await this.database
-        .select()
-        .from(expenses)
-        .where(eq(expenses.vehicleId, vehicleId))
-        .orderBy(desc(expenses.date));
-      return result;
-    } catch (error) {
-      console.error(`Error finding expenses for vehicle ${vehicleId}:`, error);
-      throw new Error('Failed to find expenses');
-    }
-  }
-
   async findByCategory(vehicleId: string, category: string): Promise<Expense[]> {
     try {
       const result = await this.database

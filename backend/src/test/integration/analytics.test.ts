@@ -229,7 +229,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'maintenance',
+            tags: JSON.stringify(['maintenance']),
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
@@ -239,7 +239,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'insurance',
+            tags: JSON.stringify(['insurance']),
             category: 'financial',
             amount: 150.0,
             currency: 'USD',
@@ -278,7 +278,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
+            tags: JSON.stringify(['fuel']),
             category: 'fuel',
             amount: 150.0,
             currency: 'USD',
@@ -288,7 +288,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'tolls',
+            tags: JSON.stringify(['tolls']),
             category: 'fuel',
             amount: 25.0,
             currency: 'USD',
@@ -298,7 +298,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'maintenance',
+            tags: JSON.stringify(['maintenance']),
             category: 'maintenance',
             amount: 200.0,
             currency: 'USD',
@@ -308,7 +308,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'oil-change',
+            tags: JSON.stringify(['oil-change']),
             category: 'maintenance',
             amount: 65.0,
             currency: 'USD',
@@ -318,7 +318,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'insurance',
+            tags: JSON.stringify(['insurance']),
             category: 'financial',
             amount: 200.0,
             currency: 'USD',
@@ -328,7 +328,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'registration',
+            tags: JSON.stringify(['registration']),
             category: 'regulatory',
             amount: 125.0,
             currency: 'USD',
@@ -377,7 +377,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
+            tags: JSON.stringify(['fuel']),
             category: 'fuel',
             amount: 150.0,
             currency: 'USD',
@@ -387,7 +387,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'maintenance',
+            tags: JSON.stringify(['maintenance']),
             category: 'maintenance',
             amount: 200.0,
             currency: 'USD',
@@ -397,7 +397,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
+            tags: JSON.stringify(['fuel']),
             category: 'fuel',
             amount: 160.0,
             currency: 'USD',
@@ -407,7 +407,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'insurance',
+            tags: JSON.stringify(['insurance']),
             category: 'financial',
             amount: 200.0,
             currency: 'USD',
@@ -450,7 +450,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
+            tags: JSON.stringify(['fuel']),
             category: 'fuel',
             amount: 45.5,
             currency: 'USD',
@@ -461,7 +461,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'maintenance',
+            tags: JSON.stringify(['maintenance']),
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
@@ -527,7 +527,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
+            tags: JSON.stringify(['fuel']),
             category: 'fuel',
             amount: 45.5,
             currency: 'USD',
@@ -538,7 +538,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'maintenance',
+            tags: JSON.stringify(['maintenance']),
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',

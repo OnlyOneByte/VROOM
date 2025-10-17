@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-
 	import { Car, ArrowLeft } from 'lucide-svelte';
 	import { getVehicleAnalytics } from '$lib/utils/analytics-api';
 	import { appStore } from '$lib/stores/app';
-	import type { AppState } from '$lib/types/index.js';
 	import FuelEfficiencyMonitor from '$lib/components/analytics/FuelEfficiencyMonitor.svelte';
 
 	let vehicleId = $state('');
@@ -12,24 +10,13 @@
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
-	// Get available vehicles from app store
-	let appState = $state<AppState>({
-		vehicles: [],
-		selectedVehicle: null,
-		notifications: [],
-		isLoading: false,
-		isMobileMenuOpen: false
-	});
+	// Use automatic store subscription
+	let appState = $derived($appStore);
 
 	onMount(() => {
 		// Get vehicle ID from URL params
 		const urlParams = new URLSearchParams(window.location.search);
 		vehicleId = urlParams.get('vehicle') || '';
-
-		// Subscribe to app state for vehicles
-		const unsubscribe = appStore.subscribe(state => {
-			appState = state;
-		});
 
 		// Load vehicle data if we have an ID
 		if (vehicleId) {
@@ -39,8 +26,6 @@
 			vehicleId = appState.vehicles[0]?.id ?? '';
 			loadVehicleData();
 		}
-
-		return unsubscribe;
 	});
 
 	async function loadVehicleData() {

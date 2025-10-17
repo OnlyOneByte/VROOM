@@ -220,8 +220,8 @@ export function validateLoanTerms(terms: Partial<LoanTerms>): string[] {
     errors.push('Term must be between 1 and 600 months');
   }
 
-  if (!terms.startDate || terms.startDate > new Date()) {
-    errors.push('Start date cannot be in the future');
+  if (!terms.startDate) {
+    errors.push('Start date is required');
   }
 
   return errors;

@@ -40,16 +40,20 @@ export const expenseSchema = z.object({
 	notes: z.string().optional()
 });
 
-// Loan validation schemas
-export const loanSchema = z.object({
-	principal: positiveNumberSchema('Principal amount'),
-	interestRate: z
-		.number()
-		.min(0, 'Interest rate cannot be negative')
-		.max(100, 'Interest rate cannot exceed 100%'),
+// Financing validation schemas
+export const financingSchema = z.object({
+	financingType: z.enum(['loan', 'lease', 'own']),
+	provider: requiredStringSchema('Provider'),
+	originalAmount: positiveNumberSchema('Original amount'),
+	apr: z.number().min(0, 'APR cannot be negative').max(50, 'APR cannot exceed 50%').optional(),
 	termMonths: z.number().int().positive('Term must be a positive number of months'),
 	startDate: z.string().min(1, 'Start date is required'),
-	monthlyPayment: positiveNumberSchema('Monthly payment').optional()
+	paymentAmount: positiveNumberSchema('Payment amount'),
+	paymentFrequency: z.enum(['monthly', 'bi-weekly', 'weekly']),
+	// Lease-specific fields
+	residualValue: z.number().min(0).optional(),
+	mileageLimit: z.number().int().min(0).optional(),
+	excessMileageFee: z.number().min(0).optional()
 });
 
 // Form validation helper

@@ -4,6 +4,8 @@
 
 Make sure after finishing your task, that `bun run validate` in the backend and `npm run validate` in the frontend are successful without warnings. If there are errors or warnings, fix them even if they existed before your changes. You only have to check the subfolders you modified (so if all changes are in frontend, you only have to validate the frontend)
 
+To save time, before running validation, go ahead and run all:fix package.json script for the respective backend or frontend to auto-fix all the lint, format, or check issues that can be fixed
+
 Minimize task summary to be a few key points, no need for full paragraphs
 
 Make sure you add `--no-pager` to git commands that display a lot of text (like diff).

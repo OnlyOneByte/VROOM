@@ -17,19 +17,10 @@
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { cn } from '$lib/utils';
 
-	let currentPath = $state('');
 	let mobileMenuOpen = $state(false);
 
-	// Subscribe to stores using $effect
-	$effect(() => {
-		const unsubscribePage = page.subscribe($page => {
-			currentPath = $page.url.pathname;
-		});
-
-		return () => {
-			unsubscribePage();
-		};
-	});
+	// Use automatic store subscription
+	let currentPath = $derived($page.url.pathname);
 
 	const navigation = [
 		{ name: 'Dashboard', href: '/vehicles', icon: House },

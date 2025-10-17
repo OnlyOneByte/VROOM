@@ -23,31 +23,37 @@ export interface Vehicle {
 	initialMileage?: number;
 	purchasePrice?: number;
 	purchaseDate?: Date;
-	loan?: VehicleLoan;
+	financing?: VehicleFinancing;
 	createdAt: Date;
 	updatedAt: Date;
 }
 
-export interface VehicleLoan {
+export interface VehicleFinancing {
 	id: string;
 	vehicleId: string;
-	lender: string;
+	financingType: 'loan' | 'lease' | 'own';
+	provider: string;
 	originalAmount: number;
 	currentBalance: number;
-	apr: number;
+	apr?: number;
 	termMonths: number;
 	startDate: Date;
 	paymentAmount: number;
 	paymentFrequency: 'monthly' | 'bi-weekly' | 'weekly';
 	paymentDayOfMonth?: number;
 	paymentDayOfWeek?: number;
+	// Lease-specific fields
+	residualValue?: number;
+	mileageLimit?: number;
+	excessMileageFee?: number;
+	// Status
 	isActive: boolean;
-	payoffDate?: Date;
+	endDate?: Date;
 	createdAt: Date;
 	updatedAt: Date;
 }
 
-export interface LoanPaymentConfig {
+export interface FinancingPaymentConfig {
 	amount: number;
 	frequency: 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 	dayOfMonth?: number;
@@ -83,13 +89,15 @@ export const COMMON_EXPENSE_TAGS = [
 	'routine'
 ] as const;
 
-export type ExpenseCategory =
-	| 'fuel'
-	| 'maintenance'
-	| 'financial'
-	| 'regulatory'
-	| 'enhancement'
-	| 'misc';
+// ExpenseCategory is fetched from the backend API
+// See /api/expenses/categories endpoint
+export type ExpenseCategory = string;
+
+export interface ExpenseCategoryInfo {
+	value: string;
+	label: string;
+	description: string;
+}
 
 export interface Expense {
 	id: string;
@@ -122,9 +130,9 @@ export interface InsurancePolicy {
 	updatedAt: Date;
 }
 
-export interface LoanPayment {
+export interface FinancingPayment {
 	id: string;
-	loanId: string;
+	financingId: string;
 	paymentDate: Date;
 	paymentAmount: number;
 	principalAmount: number;
@@ -207,8 +215,9 @@ export interface VehicleFormErrors {
 	[key: string]: string | undefined;
 }
 
-export interface LoanFormErrors {
-	lender?: string;
+export interface FinancingFormErrors {
+	financingType?: string;
+	provider?: string;
 	originalAmount?: string;
 	apr?: string;
 	termMonths?: string;
@@ -216,6 +225,9 @@ export interface LoanFormErrors {
 	paymentAmount?: string;
 	frequency?: string;
 	dayOfMonth?: string;
+	residualValue?: string;
+	mileageLimit?: string;
+	excessMileageFee?: string;
 	[key: string]: string | undefined;
 }
 

@@ -1,6 +1,17 @@
 // Core data model interfaces for VROOM Car Tracker
 // Based on design document specifications
 
+// Import and re-export expense category types and constants from db/types
+import type { ExpenseCategory as ExpenseCategoryType } from '../db/types';
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_DESCRIPTIONS,
+  EXPENSE_CATEGORY_LABELS,
+} from '../db/types';
+
+export type ExpenseCategory = ExpenseCategoryType;
+export { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_DESCRIPTIONS, EXPENSE_CATEGORY_LABELS };
+
 export interface User {
   id: string;
   email: string;
@@ -60,14 +71,6 @@ export interface LoanPaymentConfig {
     dayOfMonth: number;
   }[]; // For future: multiple payments per month
 }
-
-export type ExpenseCategory =
-  | 'fuel'
-  | 'maintenance'
-  | 'financial'
-  | 'regulatory'
-  | 'enhancement'
-  | 'misc';
 
 export interface Expense {
   id: string;

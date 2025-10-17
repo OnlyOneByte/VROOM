@@ -24,8 +24,7 @@ export interface LogoutResponse {
 
 export interface ExpenseResponse {
   id: string;
-  type?: string; // Deprecated: for backwards compatibility
-  tags: string[]; // New: flexible tags
+  tags: string[];
   category: string;
   amount: number;
   vehicleId: string;
@@ -61,7 +60,7 @@ export interface InsuranceResponse {
 export interface ExpenseListResponse {
   data: ExpenseResponse[];
   filters: {
-    type?: string;
+    tags?: string[];
     category?: string;
     vehicleId?: string;
   };

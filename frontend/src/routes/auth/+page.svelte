@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/auth.js';
 	import { Button } from '$lib/components/ui/button';
@@ -8,15 +7,14 @@
 
 	let isLoading = false;
 
-	// Redirect if already authenticated
-	onMount(() => {
-		const unsubscribe = authStore.subscribe(({ isAuthenticated, isLoading: authLoading }) => {
-			if (!authLoading && isAuthenticated) {
-				goto('/vehicles');
-			}
-		});
+	// Use automatic store subscription
+	let authState = $derived($authStore);
 
-		return unsubscribe;
+	// Redirect if already authenticated
+	$effect(() => {
+		if (!authState.isLoading && authState.isAuthenticated) {
+			goto('/vehicles');
+		}
 	});
 
 	function handleGoogleLogin() {

@@ -23,14 +23,22 @@ export const errorHandler: ErrorHandler = (err, c) => {
 
   // Handle HTTP exceptions from Hono
   if (err instanceof HTTPException) {
-    return c.json(
-      {
-        error: 'HTTPException',
-        message: err.message,
-        statusCode: err.status,
-      },
-      err.status
-    );
+    const response: {
+      error: string;
+      message: string;
+      statusCode: number;
+      details?: unknown;
+    } = {
+      error: 'HTTPException',
+      message: err.message,
+      statusCode: err.status,
+    };
+
+    if (err.cause) {
+      response.details = err.cause;
+    }
+
+    return c.json(response, err.status);
   }
 
   // Handle custom app errors

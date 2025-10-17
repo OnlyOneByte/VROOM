@@ -1,22 +1,19 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/auth.js';
 
-	onMount(() => {
-		// This page will be handled by the layout's route protection
-		// Just show a loading state while auth is being determined
-		const unsubscribe = authStore.subscribe(({ isAuthenticated, isLoading }) => {
-			if (!isLoading) {
-				if (isAuthenticated) {
-					goto('/vehicles');
-				} else {
-					goto('/auth');
-				}
-			}
-		});
+	// Use automatic store subscription
+	let authState = $derived($authStore);
 
-		return unsubscribe;
+	// Redirect based on auth state
+	$effect(() => {
+		if (!authState.isLoading) {
+			if (authState.isAuthenticated) {
+				goto('/vehicles');
+			} else {
+				goto('/auth');
+			}
+		}
 	});
 </script>
 

@@ -144,7 +144,7 @@ describe('Expense Management API Integration Tests', () => {
     test('should create non-fuel expense without gallons', async () => {
       const expenseData = {
         vehicleId: testVehicleId,
-        type: 'maintenance',
+        tags: ['maintenance'],
         category: 'maintenance',
         amount: 89.99,
         date: '2024-01-15T10:30:00.000Z',
@@ -166,7 +166,7 @@ describe('Expense Management API Integration Tests', () => {
       const data = await getTypedResponse<ExpenseResponse>(res);
       expect(data.success).toBe(true);
       if (data.success && data.data) {
-        expect(data.data.type).toBe('maintenance');
+        expect(data.data.tags).toContain('maintenance');
         expect(data.data.gallons).toBeNull();
       }
     });
@@ -249,7 +249,7 @@ describe('Expense Management API Integration Tests', () => {
         ]);
 
       const req = new Request(
-        `http://localhost:3001/api/expenses?vehicleId=${testVehicleId}&type=fuel`,
+        `http://localhost:3001/api/expenses?vehicleId=${testVehicleId}&tags=fuel`,
         {
           headers: {
             Cookie: sessionCookie,
@@ -266,8 +266,8 @@ describe('Expense Management API Integration Tests', () => {
       expect(data.success).toBe(true);
       if (data.success && data.data) {
         expect(data.data).toHaveLength(1);
-        expect(data.data[0].type).toBe('fuel');
-        expect(data.filters.type).toBe('fuel');
+        expect(data.data[0].tags).toContain('fuel');
+        expect(data.filters.tags).toContain('fuel');
       }
     });
     test('should filter expenses by date range', async () => {
@@ -463,12 +463,21 @@ describe('Expense Management API Integration Tests', () => {
       const data = await getTypedResponse<ExpenseCategoriesApiResponse>(res);
       expect(data.success).toBe(true);
       if (data.success && data.data) {
-        expect(data.data.types).toContain('fuel');
-        expect(data.data.types).toContain('maintenance');
-        expect(data.data.categories).toContain('fuel');
-        expect(data.data.categories).toContain('maintenance');
-        expect(data.data.categoryMapping).toBeDefined();
-        expect(data.data.categoryMapping.operating).toContain('fuel');
+        expect(Array.isArray(data.data)).toBe(true);
+        expect(data.data.length).toBe(6);
+
+        const categoryValues = data.data.map((c) => c.value);
+        expect(categoryValues).toContain('fuel');
+        expect(categoryValues).toContain('maintenance');
+        expect(categoryValues).toContain('financial');
+        expect(categoryValues).toContain('regulatory');
+        expect(categoryValues).toContain('enhancement');
+        expect(categoryValues).toContain('misc');
+
+        // Verify structure
+        expect(data.data[0]).toHaveProperty('value');
+        expect(data.data[0]).toHaveProperty('label');
+        expect(data.data[0]).toHaveProperty('description');
       }
     });
   });

@@ -26,6 +26,7 @@
     "check": "biome check src/",
     "check:fix": "biome check --write src/",
     "type-check": "tsc --noEmit",
+    "all:fix": "bun run lint:fix && bun run format:fix && bun run check:fix",
     "validate": "bun run type-check && bun run check && CI=true bun run test && bun run build"
   },
   "dependencies": {

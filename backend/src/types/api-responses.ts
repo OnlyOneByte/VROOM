@@ -45,21 +45,27 @@ export interface InsurancePolicyResponse {
 export interface VehicleLoanResponse {
   id: string;
   vehicleId: string;
-  lender: string;
+  financingType: string;
+  provider: string;
   originalAmount: number;
   currentBalance: number;
-  apr: number;
+  apr?: number;
   termMonths: number;
   startDate: string;
   paymentAmount: number;
   paymentFrequency: string;
-  paymentDayOfMonth: number;
+  paymentDayOfMonth?: number;
+  paymentDayOfWeek?: number;
+  residualValue?: number;
+  mileageLimit?: number;
+  excessMileageFee?: number;
   isActive: boolean;
+  endDate?: string;
 }
 
 export interface LoanPaymentResponse {
   id: string;
-  loanId: string;
+  financingId: string;
   paymentAmount: number;
   paymentNumber: number;
   principalAmount: number;
@@ -101,7 +107,7 @@ export interface CostBreakdownResponse {
 
 export type ExpenseListApiResponse = Array<{
   id: string;
-  type: string;
+  tags: string[];
   category: string;
   amount: number;
   vehicleId: string;
@@ -114,20 +120,20 @@ export type ExpenseListApiResponse = Array<{
 export interface ExpenseListApiResponseWithMeta extends ApiResponse<ExpenseListApiResponse> {
   count: number;
   filters: {
-    type?: string;
+    tags?: string[];
     category?: string;
     startDate?: string;
     endDate?: string;
   };
 }
 
-export interface ExpenseCategoriesApiResponse {
-  types: string[];
-  categories: string[];
-  categoryMapping: {
-    [category: string]: string[];
-  };
+export interface ExpenseCategoryInfo {
+  value: string;
+  label: string;
+  description: string;
 }
+
+export type ExpenseCategoriesApiResponse = ExpenseCategoryInfo[];
 
 export interface FuelEfficiencyApiResponse {
   vehicleId: string;

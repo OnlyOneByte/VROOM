@@ -3,6 +3,11 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import type { NewExpense } from '../db/schema';
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_DESCRIPTIONS,
+  EXPENSE_CATEGORY_LABELS,
+} from '../db/types';
 import { requireAuth } from '../lib/middleware/auth';
 import { repositoryFactory } from '../lib/repositories/factory';
 
@@ -11,7 +16,6 @@ type ExpenseDataRaw = {
   id: string;
   amount: number;
   category: string;
-  type?: string | null; // Deprecated
   tags: string | null; // JSON string from database
   date: Date;
   description?: string | null;
@@ -25,7 +29,6 @@ type ExpenseData = {
   id: string;
   amount: number;
   category: string;
-  type?: string | null; // Deprecated
   tags: string[]; // Parsed array
   date: Date;
   description?: string | null;
@@ -36,96 +39,25 @@ type ExpenseData = {
 
 const expenses = new Hono();
 
-// Helper functions
-function _validateFuelExpenseUpdate(
-  updateData: Partial<NewExpense> & { tags?: string[] },
-  existingExpense: ExpenseData
-): void {
-  const finalTags = updateData.tags
-    ? Array.isArray(updateData.tags)
-      ? updateData.tags
-      : JSON.parse(updateData.tags)
-    : existingExpense.tags;
-  const hasFuelTag = finalTags.includes('fuel');
-
-  if (hasFuelTag) {
-    const finalGallons =
-      updateData.gallons !== undefined ? updateData.gallons : existingExpense.gallons;
-    const finalMileage =
-      updateData.mileage !== undefined ? updateData.mileage : existingExpense.mileage;
-
-    if (!finalGallons || !finalMileage) {
-      throw new HTTPException(400, {
-        message: 'Fuel expenses require both gallons and mileage data',
-      });
-    }
-  }
-}
-
 // Validation schemas
-const _expenseTypeSchema = z.enum([
-  // Operating Costs
-  'fuel',
-  'tolls',
-  'parking',
-  // Maintenance & Repairs
-  'maintenance',
-  'repairs',
-  'tires',
-  'oil-change',
-  // Financial
-  'insurance',
-  'loan-payment',
-  // Regulatory/Legal
-  'registration',
-  'inspection',
-  'emissions',
-  'tickets',
-  // Enhancements/Modifications
-  'modifications',
-  'accessories',
-  'detailing',
-  // Other
-  'other',
-]);
+const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
 
-const expenseCategorySchema = z.enum([
-  'fuel', // Fuel and gas costs
-  'maintenance', // Keeping the car running (oil, repairs, tires)
-  'financial', // Loans, insurance
-  'regulatory', // Government-required (registration, inspection, tickets)
-  'enhancement', // Optional improvements (tint, accessories, detailing)
-  'misc', // Misc operating costs (tolls, parking, car washes, etc.)
-]);
-
-const createExpenseSchema = z
-  .object({
-    vehicleId: z.string().min(1, 'Vehicle ID is required'),
-    tags: z
-      .array(z.string().min(1).max(50))
-      .max(10, 'Maximum 10 tags allowed')
-      .optional()
-      .default([]),
-    type: _expenseTypeSchema.optional(), // Deprecated: for backwards compatibility
-    category: expenseCategorySchema,
-    amount: z.number().positive('Amount must be positive'),
-    currency: z.string().length(3, 'Currency must be 3 characters').default('USD'),
-    date: z
-      .string()
-      .datetime()
-      .transform((val) => new Date(val)),
-    mileage: z.number().int().min(0, 'Mileage cannot be negative').nullable().optional(),
-    gallons: z.number().positive('Gallons must be positive').optional(),
-    description: z.string().max(500, 'Description must be 500 characters or less').optional(),
-    receiptUrl: z.string().url('Receipt URL must be valid').optional(),
-  })
-  .refine((data) => {
-    // If type is provided but tags is empty, convert type to tags
-    if (data.type && (!data.tags || data.tags.length === 0)) {
-      data.tags = [data.type];
-    }
-    return true;
-  });
+const createExpenseSchema = z.object({
+  vehicleId: z.string().min(1, 'Vehicle ID is required'),
+  tags: z
+    .array(z.string().min(1).max(50))
+    .max(10, 'Maximum 10 tags allowed')
+    .optional()
+    .default([]),
+  category: expenseCategorySchema,
+  amount: z.number().positive('Amount must be positive'),
+  currency: z.string().length(3, 'Currency must be 3 characters').default('USD'),
+  date: z.coerce.date(),
+  mileage: z.number().int().min(0, 'Mileage cannot be negative').nullable().optional(),
+  gallons: z.number().positive('Gallons must be positive').optional(),
+  description: z.string().max(500, 'Description must be 500 characters or less').optional(),
+  receiptUrl: z.string().url('Receipt URL must be valid').optional(),
+});
 
 const updateExpenseSchema = createExpenseSchema.partial();
 
@@ -140,16 +72,8 @@ const expenseQuerySchema = z.object({
     .optional()
     .transform((val) => (val ? val.split(',').map((t) => t.trim()) : undefined)),
   category: expenseCategorySchema.optional(),
-  startDate: z
-    .string()
-    .datetime()
-    .optional()
-    .transform((val) => (val ? new Date(val) : undefined)),
-  endDate: z
-    .string()
-    .datetime()
-    .optional()
-    .transform((val) => (val ? new Date(val) : undefined)),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
   limit: z
     .string()
     .transform((val) => parseInt(val, 10))
@@ -165,53 +89,15 @@ const expenseQuerySchema = z.object({
 // Apply authentication to all routes
 expenses.use('*', requireAuth);
 
-// GET /api/expenses/categories - Get expense categories and types
+// GET /api/expenses/categories - Get expense categories
 expenses.get('/categories', async (c) => {
   return c.json({
     success: true,
-    data: {
-      types: [
-        // Operating Costs
-        'fuel',
-        'tolls',
-        'parking',
-        // Maintenance & Repairs
-        'maintenance',
-        'repairs',
-        'tires',
-        'oil-change',
-        // Financial
-        'insurance',
-        'loan-payment',
-        // Regulatory/Legal
-        'registration',
-        'inspection',
-        'emissions',
-        'tickets',
-        // Enhancements/Modifications
-        'modifications',
-        'accessories',
-        'detailing',
-        // Other
-        'other',
-      ],
-      categories: [
-        'fuel', // Fuel and gas costs
-        'maintenance', // Keeping the car running (oil, repairs, tires)
-        'financial', // Loans, insurance
-        'regulatory', // Government-required (registration, inspection, tickets)
-        'enhancement', // Optional improvements (tint, accessories, detailing)
-        'misc', // Misc operating costs (tolls, parking, car washes, etc.)
-      ],
-      categoryMapping: {
-        fuel: ['fuel'],
-        maintenance: ['maintenance', 'repairs', 'tires', 'oil-change'],
-        financial: ['insurance', 'loan-payment'],
-        regulatory: ['registration', 'inspection', 'emissions', 'tickets'],
-        enhancement: ['modifications', 'accessories', 'detailing'],
-        misc: ['tolls', 'parking', 'other'],
-      },
-    },
+    data: EXPENSE_CATEGORIES.map((category) => ({
+      value: category,
+      label: EXPENSE_CATEGORY_LABELS[category],
+      description: EXPENSE_CATEGORY_DESCRIPTIONS[category],
+    })),
   });
 });
 
@@ -247,10 +133,13 @@ expenses.post('/', zValidator('json', createExpenseSchema), async (c) => {
 
     const createdExpense = await expenseRepository.create(newExpense);
 
+    // Parse tags from JSON string for response
+    const parsedExpense = parseExpenseTags(createdExpense as ExpenseDataRaw);
+
     return c.json(
       {
         success: true,
-        data: createdExpense,
+        data: parsedExpense,
         message: 'Expense created successfully',
       },
       201
@@ -484,9 +373,12 @@ expenses.put(
 
       const updatedExpense = await expenseRepository.update(id, updatePayload);
 
+      // Parse tags from JSON string for response
+      const parsedUpdatedExpense = parseExpenseTags(updatedExpense as ExpenseDataRaw);
+
       return c.json({
         success: true,
-        data: updatedExpense,
+        data: parsedUpdatedExpense,
         message: 'Expense updated successfully',
       });
     } catch (error) {

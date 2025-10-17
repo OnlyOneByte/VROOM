@@ -48,8 +48,11 @@ const mockVehicles: Vehicle[] = [
 		purchaseDate: '2020-01-15',
 		createdAt: '2024-01-01T00:00:00Z',
 		updatedAt: '2024-01-01T00:00:00Z',
-		loan: {
-			lender: 'Chase Bank',
+		financing: {
+			id: 'f1',
+			vehicleId: '1',
+			financingType: 'loan' as const,
+			provider: 'Chase Bank',
 			originalAmount: 20000,
 			currentBalance: 15000,
 			apr: 4.5,
@@ -209,7 +212,7 @@ describe('Vehicle Management Components', () => {
 				if (filter === 'all') return vehicles;
 
 				if (filter === 'with-loans') {
-					return vehicles.filter(v => v.loan?.isActive);
+					return vehicles.filter(v => v.financing?.isActive);
 				}
 
 				if (filter === 'recent') {
@@ -228,7 +231,7 @@ describe('Vehicle Management Components', () => {
 			// Test vehicles with loans
 			filtered = filterByCategory(mockVehicles, 'with-loans');
 			expect(filtered).toHaveLength(1);
-			expect(filtered[0]?.loan?.isActive).toBe(true);
+			expect(filtered[0]?.financing?.isActive).toBe(true);
 
 			// Test recent vehicles (created in last month)
 			// Note: Since we're using current date, we need to adjust the test
@@ -242,7 +245,7 @@ describe('Vehicle Management Components', () => {
 
 			const calculateDashboardStats = (vehicles: Vehicle[]) => {
 				const totalVehicles = vehicles.length;
-				const activeLoans = vehicles.filter(v => v.loan?.isActive).length;
+				const activeLoans = vehicles.filter(v => v.financing?.isActive).length;
 
 				return {
 					totalVehicles,
@@ -346,12 +349,12 @@ describe('Vehicle Management Components', () => {
 
 				if (!showLoanForm) return { isValid: true, errors };
 
-				if (!form['lender']?.trim()) {
-					errors['lender'] = 'Lender is required';
+				if (!form['provider']?.trim()) {
+					errors['provider'] = 'Provider is required';
 				}
 
 				if (form['originalAmount'] <= 0) {
-					errors['originalAmount'] = 'Loan amount must be greater than 0';
+					errors['originalAmount'] = 'Amount must be greater than 0';
 				}
 
 				if (form['apr'] < 0 || form['apr'] > 50) {
@@ -375,7 +378,7 @@ describe('Vehicle Management Components', () => {
 
 			// Test valid loan form
 			const validLoanForm = {
-				lender: 'Chase Bank',
+				provider: 'Chase Bank',
 				originalAmount: 20000,
 				apr: 4.5,
 				termMonths: 60,
@@ -392,7 +395,7 @@ describe('Vehicle Management Components', () => {
 
 			// Test invalid loan form
 			const invalidLoanForm = {
-				lender: '',
+				provider: '',
 				originalAmount: -1000,
 				apr: 60,
 				termMonths: 500,
@@ -402,8 +405,8 @@ describe('Vehicle Management Components', () => {
 
 			result = validateLoanForm(invalidLoanForm, true);
 			expect(result.isValid).toBe(false);
-			expect(result.errors['lender']).toBe('Lender is required');
-			expect(result.errors['originalAmount']).toBe('Loan amount must be greater than 0');
+			expect(result.errors['provider']).toBe('Provider is required');
+			expect(result.errors['originalAmount']).toBe('Amount must be greater than 0');
 			expect(result.errors['apr']).toBe('APR must be between 0% and 50%');
 			expect(result.errors['termMonths']).toBe('Term must be between 1 and 360 months');
 			expect(result.errors['startDate']).toBe('Start date is required');

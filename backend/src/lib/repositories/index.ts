@@ -10,15 +10,15 @@ export type {
   IBaseRepository,
   IExpenseRepository,
   IInsurancePolicyRepository,
-  ILoanPaymentRepository,
   IRepositoryFactory,
   IUserRepository,
-  IVehicleLoanRepository,
+  IVehicleFinancingPaymentRepository,
+  IVehicleFinancingRepository,
   IVehicleRepository,
   IVehicleShareRepository,
 } from './interfaces.js';
-export { LoanPaymentRepository } from './loanPayment.js';
 export { UserRepository } from './user.js';
 export { VehicleRepository } from './vehicle.js';
-export { VehicleLoanRepository } from './vehicleLoan.js';
+export { VehicleFinancingRepository } from './vehicleFinancing.js';
+export { VehicleFinancingPaymentRepository } from './vehicleFinancingPayment.js';
 export { VehicleShareRepository } from './vehicleShare.js';

@@ -5,11 +5,11 @@ import {
   expenses,
   type InsurancePolicy,
   insurancePolicies,
-  type LoanPayment,
-  loanPayments,
   type Vehicle,
-  type VehicleLoan,
-  vehicleLoans,
+  type VehicleFinancing,
+  type VehicleFinancingPayment,
+  vehicleFinancing,
+  vehicleFinancingPayments,
   vehicles,
 } from '../db/schema';
 import { databaseService } from './database';
@@ -21,8 +21,8 @@ export interface BackupData {
   userId: string;
   vehicles: Vehicle[];
   expenses: Expense[];
-  loans: VehicleLoan[];
-  loanPayments: LoanPayment[];
+  financing: VehicleFinancing[];
+  financingPayments: VehicleFinancingPayment[];
   insurance: InsurancePolicy[];
 }
 
@@ -33,7 +33,7 @@ export class BackupService {
   async createBackup(userId: string): Promise<BackupData> {
     const db = databaseService.getDatabase();
 
-    const [userVehicles, userExpenses, userLoans, userLoanPayments, userInsurance] =
+    const [userVehicles, userExpenses, userFinancing, userFinancingPayments, userInsurance] =
       await Promise.all([
         db.select().from(vehicles).where(eq(vehicles.userId, userId)),
         db
@@ -44,17 +44,20 @@ export class BackupService {
           .then((results) => results.map((r) => r.expenses)),
         db
           .select()
-          .from(vehicleLoans)
-          .innerJoin(vehicles, eq(vehicleLoans.vehicleId, vehicles.id))
+          .from(vehicleFinancing)
+          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
           .where(eq(vehicles.userId, userId))
-          .then((results) => results.map((r) => r.vehicle_loans)),
+          .then((results) => results.map((r) => r.vehicle_financing)),
         db
           .select()
-          .from(loanPayments)
-          .innerJoin(vehicleLoans, eq(loanPayments.loanId, vehicleLoans.id))
-          .innerJoin(vehicles, eq(vehicleLoans.vehicleId, vehicles.id))
+          .from(vehicleFinancingPayments)
+          .innerJoin(
+            vehicleFinancing,
+            eq(vehicleFinancingPayments.financingId, vehicleFinancing.id)
+          )
+          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
           .where(eq(vehicles.userId, userId))
-          .then((results) => results.map((r) => r.loan_payments)),
+          .then((results) => results.map((r) => r.vehicle_financing_payments)),
         db
           .select()
           .from(insurancePolicies)
@@ -69,8 +72,8 @@ export class BackupService {
       userId,
       vehicles: userVehicles,
       expenses: userExpenses,
-      loans: userLoans,
-      loanPayments: userLoanPayments,
+      financing: userFinancing,
+      financingPayments: userFinancingPayments,
       insurance: userInsurance,
     };
   }
@@ -141,11 +144,12 @@ export class BackupService {
     ]);
     zip.addFile('expenses.csv', Buffer.from(expensesCsv, 'utf-8'));
 
-    // Add loans CSV
-    const loansCsv = this.convertToCSV(backup.loans, [
+    // Add financing CSV
+    const financingCsv = this.convertToCSV(backup.financing, [
       'id',
       'vehicleId',
-      'lender',
+      'financingType',
+      'provider',
       'originalAmount',
       'currentBalance',
       'apr',
@@ -153,16 +157,20 @@ export class BackupService {
       'startDate',
       'paymentAmount',
       'paymentFrequency',
+      'residualValue',
+      'mileageLimit',
+      'excessMileageFee',
       'isActive',
+      'endDate',
       'createdAt',
       'updatedAt',
     ]);
-    zip.addFile('loans.csv', Buffer.from(loansCsv, 'utf-8'));
+    zip.addFile('financing.csv', Buffer.from(financingCsv, 'utf-8'));
 
-    // Add loan payments CSV
-    const loanPaymentsCsv = this.convertToCSV(backup.loanPayments, [
+    // Add financing payments CSV
+    const financingPaymentsCsv = this.convertToCSV(backup.financingPayments, [
       'id',
-      'loanId',
+      'financingId',
       'paymentDate',
       'paymentAmount',
       'principalAmount',
@@ -173,7 +181,7 @@ export class BackupService {
       'createdAt',
       'updatedAt',
     ]);
-    zip.addFile('loan_payments.csv', Buffer.from(loanPaymentsCsv, 'utf-8'));
+    zip.addFile('financing_payments.csv', Buffer.from(financingPaymentsCsv, 'utf-8'));
 
     // Add insurance CSV
     const insuranceCsv = this.convertToCSV(backup.insurance, [

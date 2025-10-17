@@ -131,8 +131,8 @@ export function clearTestData() {
     // Clear all tables in reverse dependency order
     testDb.delete(schema.sessions).run();
     testDb.delete(schema.expenses).run();
-    testDb.delete(schema.loanPayments).run();
-    testDb.delete(schema.vehicleLoans).run();
+    testDb.delete(schema.vehicleFinancingPayments).run();
+    testDb.delete(schema.vehicleFinancing).run();
     testDb.delete(schema.insurancePolicies).run();
     testDb.delete(schema.vehicles).run();
     testDb.delete(schema.users).run();

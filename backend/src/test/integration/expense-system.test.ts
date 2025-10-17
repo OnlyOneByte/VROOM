@@ -682,7 +682,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
             data: unknown[];
             filters: Record<string, unknown>;
           }) => {
-            expect(response.data.length).toBe(5); // 4 fuel + 1 tolls
+            expect(response.data.length).toBe(4); // 4 fuel expenses
             expect(response.filters.category).toBe('fuel');
           },
         },

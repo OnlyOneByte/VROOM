@@ -3,7 +3,6 @@
 	import { page } from '$app/stores';
 	import { authStore } from '$lib/stores/auth.js';
 	import { appStore } from '$lib/stores/app.js';
-	import type { AuthState } from '$lib/types/index.js';
 	import { handleRouteProtection } from '$lib/utils/auth.js';
 	import Navigation from '$lib/components/Navigation.svelte';
 	import { Toaster } from '$lib/components/ui/sonner';
@@ -19,14 +18,6 @@
 
 	let { children } = $props();
 
-	let authState = $state<AuthState>({
-		user: null,
-		isAuthenticated: false,
-		isLoading: true,
-		error: null,
-		token: null
-	});
-	let currentPath = $state('');
 	let vehiclesLoaded = $state(false);
 
 	async function loadUserVehicles() {
@@ -63,72 +54,64 @@
 		// Load offline expenses
 		const savedOfflineExpenses = loadOfflineExpenses();
 		offlineExpenses.set(savedOfflineExpenses);
+	});
 
-		// Subscribe to auth state
-		const unsubscribeAuth = authStore.subscribe(state => {
-			authState = state;
+	// Use automatic store subscriptions with $
+	let authState = $derived($authStore);
+	let appState = $derived($appStore);
+	let currentPath = $derived($page.url.pathname);
 
-			// Load vehicles when user becomes authenticated
-			if (state.isAuthenticated && !state.isLoading) {
-				loadUserVehicles();
+	// Load vehicles when user becomes authenticated
+	$effect(() => {
+		if (authState.isAuthenticated && !authState.isLoading) {
+			loadUserVehicles();
+		}
+	});
+
+	// Handle notifications
+	$effect(() => {
+		// Only process NEW notifications (not in previous set)
+		appState.notifications.forEach(notification => {
+			// Skip if we've seen this notification before
+			if (previousNotificationIds.has(notification.id) || shownNotifications.has(notification.id)) {
+				return;
 			}
+
+			// Mark as shown
+			shownNotifications.add(notification.id);
+
+			const duration = notification.duration || 5000;
+			const options = {
+				duration,
+				style: `--toast-duration: ${duration}ms;`
+			};
+
+			switch (notification.type) {
+				case 'success':
+					toast.success(notification.message, options);
+					break;
+				case 'error':
+					toast.error(notification.message, options);
+					break;
+				case 'warning':
+					toast.warning(notification.message, options);
+					break;
+				case 'info':
+					toast.info(notification.message, options);
+					break;
+			}
+
+			// Remove notification from store after showing
+			appStore.removeNotification(notification.id);
 		});
 
-		// Subscribe to app state for notifications
-		const unsubscribeApp = appStore.subscribe(state => {
-			// Only process NEW notifications (not in previous set)
-			state.notifications.forEach(notification => {
-				// Skip if we've seen this notification before
-				if (
-					previousNotificationIds.has(notification.id) ||
-					shownNotifications.has(notification.id)
-				) {
-					return;
-				}
+		// Update previous notification IDs for next comparison
+		previousNotificationIds = new Set(appState.notifications.map(n => n.id));
+	});
 
-				// Mark as shown
-				shownNotifications.add(notification.id);
-
-				const duration = notification.duration || 5000;
-				const options = {
-					duration,
-					style: `--toast-duration: ${duration}ms;`
-				};
-
-				switch (notification.type) {
-					case 'success':
-						toast.success(notification.message, options);
-						break;
-					case 'error':
-						toast.error(notification.message, options);
-						break;
-					case 'warning':
-						toast.warning(notification.message, options);
-						break;
-					case 'info':
-						toast.info(notification.message, options);
-						break;
-				}
-
-				// Remove notification from store after showing
-				appStore.removeNotification(notification.id);
-			});
-
-			// Update previous notification IDs for next comparison
-			previousNotificationIds = new Set(state.notifications.map(n => n.id));
-		});
-
-		// Subscribe to page changes for route protection
-		const unsubscribePage = page.subscribe($page => {
-			currentPath = $page.url.pathname;
-			handleRouteProtection($page.url.pathname, authState.isAuthenticated, authState.isLoading);
-		});
-
-		return () => {
-			unsubscribeAuth();
-			unsubscribeApp();
-			unsubscribePage();
-		};
+	// Handle route protection
+	$effect(() => {
+		handleRouteProtection(currentPath, authState.isAuthenticated, authState.isLoading);
 	});
 
 	// Determine if we should show the navigation

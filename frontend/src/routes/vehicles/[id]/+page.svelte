@@ -759,59 +759,117 @@
 
 			<!-- Finance Tab -->
 			<TabsContent value="loan" class="space-y-6">
-				{#if vehicle.loan?.isActive}
+				{#if vehicle.financing?.isActive}
 					<div class="card">
 						<div class="flex items-center gap-2 mb-4">
 							<CreditCard class="h-5 w-5 text-primary-600" />
-							<h2 class="text-lg font-semibold text-gray-900">Finance Information</h2>
+							<h2 class="text-lg font-semibold text-gray-900">
+								{vehicle.financing.financingType === 'loan'
+									? 'Loan'
+									: vehicle.financing.financingType === 'lease'
+										? 'Lease'
+										: 'Financing'} Information
+							</h2>
 						</div>
 
 						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 							<div>
-								<p class="text-sm text-gray-600">Lender</p>
-								<p class="font-medium text-gray-900">{vehicle.loan.lender}</p>
+								<p class="text-sm text-gray-600">Type</p>
+								<p class="font-medium text-gray-900 capitalize">
+									{vehicle.financing.financingType}
+								</p>
+							</div>
+
+							<div>
+								<p class="text-sm text-gray-600">
+									{vehicle.financing.financingType === 'loan'
+										? 'Lender'
+										: vehicle.financing.financingType === 'lease'
+											? 'Leasing Company'
+											: 'Provider'}
+								</p>
+								<p class="font-medium text-gray-900">{vehicle.financing.provider}</p>
 							</div>
 
 							<div>
 								<p class="text-sm text-gray-600">Current Balance</p>
 								<p class="font-medium text-gray-900">
-									{formatCurrency(vehicle.loan.currentBalance)}
+									{formatCurrency(vehicle.financing.currentBalance)}
 								</p>
 							</div>
 
 							<div>
 								<p class="text-sm text-gray-600">Original Amount</p>
 								<p class="font-medium text-gray-900">
-									{formatCurrency(vehicle.loan.originalAmount)}
+									{formatCurrency(vehicle.financing.originalAmount)}
 								</p>
 							</div>
 
-							<div>
-								<p class="text-sm text-gray-600">APR</p>
-								<p class="font-medium text-gray-900">{vehicle.loan.apr}%</p>
-							</div>
+							{#if vehicle.financing.apr !== undefined && vehicle.financing.apr !== null}
+								<div>
+									<p class="text-sm text-gray-600">APR</p>
+									<p class="font-medium text-gray-900">{vehicle.financing.apr}%</p>
+								</div>
+							{/if}
 
 							<div>
-								<p class="text-sm text-gray-600">Monthly Payment</p>
+								<p class="text-sm text-gray-600">
+									{vehicle.financing.financingType === 'lease' ? 'Lease' : ''} Payment
+								</p>
 								<p class="font-medium text-gray-900">
-									{formatCurrency(vehicle.loan.paymentAmount)}
+									{formatCurrency(vehicle.financing.paymentAmount)}
 								</p>
 							</div>
 
 							<div>
 								<p class="text-sm text-gray-600">Term</p>
-								<p class="font-medium text-gray-900">{vehicle.loan.termMonths} months</p>
+								<p class="font-medium text-gray-900">{vehicle.financing.termMonths} months</p>
 							</div>
+
+							{#if vehicle.financing.financingType === 'lease'}
+								{#if vehicle.financing.residualValue}
+									<div>
+										<p class="text-sm text-gray-600">Residual Value</p>
+										<p class="font-medium text-gray-900">
+											{formatCurrency(vehicle.financing.residualValue)}
+										</p>
+									</div>
+								{/if}
+
+								{#if vehicle.financing.mileageLimit}
+									<div>
+										<p class="text-sm text-gray-600">Annual Mileage Limit</p>
+										<p class="font-medium text-gray-900">
+											{vehicle.financing.mileageLimit.toLocaleString()} miles
+										</p>
+									</div>
+								{/if}
+
+								{#if vehicle.financing.excessMileageFee}
+									<div>
+										<p class="text-sm text-gray-600">Excess Mileage Fee</p>
+										<p class="font-medium text-gray-900">
+											{formatCurrency(vehicle.financing.excessMileageFee)}/mile
+										</p>
+									</div>
+								{/if}
+							{/if}
 						</div>
 
-						<!-- Loan Progress -->
+						<!-- Progress Bar -->
 						<div class="mt-4 pt-4 border-t border-gray-200">
 							<div class="flex justify-between text-sm text-gray-600 mb-2">
-								<span>Loan Progress</span>
+								<span>
+									{vehicle.financing.financingType === 'loan'
+										? 'Loan'
+										: vehicle.financing.financingType === 'lease'
+											? 'Lease'
+											: 'Payment'} Progress
+								</span>
 								<span>
 									{Math.round(
-										((vehicle.loan.originalAmount - vehicle.loan.currentBalance) /
-											vehicle.loan.originalAmount) *
+										((vehicle.financing.originalAmount - vehicle.financing.currentBalance) /
+											vehicle.financing.originalAmount) *
 											100
 									)}% paid
 								</span>
@@ -819,8 +877,9 @@
 							<div class="w-full bg-gray-200 rounded-full h-2">
 								<div
 									class="bg-primary-600 h-2 rounded-full transition-all duration-300"
-									style="width: {((vehicle.loan.originalAmount - vehicle.loan.currentBalance) /
-										vehicle.loan.originalAmount) *
+									style="width: {((vehicle.financing.originalAmount -
+										vehicle.financing.currentBalance) /
+										vehicle.financing.originalAmount) *
 										100}%"
 								></div>
 							</div>
@@ -830,8 +889,8 @@
 					<div class="card">
 						<div class="text-center py-12">
 							<CreditCard class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-							<h3 class="text-lg font-medium text-gray-900 mb-2">No active loan</h3>
-							<p class="text-gray-600">This vehicle doesn't have an active loan</p>
+							<h3 class="text-lg font-medium text-gray-900 mb-2">No active financing</h3>
+							<p class="text-gray-600">This vehicle doesn't have active financing</p>
 						</div>
 					</div>
 				{/if}

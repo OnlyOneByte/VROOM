@@ -33,15 +33,10 @@
 		EmptyMedia,
 		EmptyTitle
 	} from '$lib/components/ui/empty';
-	import type { Vehicle, Expense, AppState } from '$lib/types/index.js';
+	import type { Vehicle, Expense } from '$lib/types/index.js';
 
-	let appState = $state<AppState>({
-		vehicles: [],
-		selectedVehicle: null,
-		notifications: [],
-		isLoading: false,
-		isMobileMenuOpen: false
-	});
+	// Use automatic store subscription
+	let appState = $derived($appStore);
 	let searchTerm = $state('');
 	let selectedFilter = $state('all');
 	let vehicleExpenses = $state<Record<string, Expense[]>>({});
@@ -62,7 +57,7 @@
 
 			// Apply category filter
 			if (selectedFilter === 'all') return true;
-			if (selectedFilter === 'with-loans') return !!vehicle.loan?.isActive;
+			if (selectedFilter === 'with-loans') return !!vehicle.financing?.isActive;
 			if (selectedFilter === 'recent') {
 				const oneMonthAgo = new Date();
 				oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
@@ -76,7 +71,7 @@
 	// Calculate dashboard summary statistics
 	let dashboardStats = $derived.by(() => {
 		const totalVehicles = appState.vehicles.length;
-		const activeLoans = appState.vehicles.filter((v: Vehicle) => v.loan?.isActive).length;
+		const activeLoans = appState.vehicles.filter((v: Vehicle) => v.financing?.isActive).length;
 
 		// Calculate total recent expenses (last 30 days)
 		const thirtyDaysAgo = new Date();
@@ -104,10 +99,6 @@
 	});
 
 	onMount(() => {
-		const unsubscribe = appStore.subscribe(state => {
-			appState = state;
-		});
-
 		// Load vehicles if not already loaded, then load expenses
 		if (appState.vehicles.length === 0) {
 			loadVehicles();
@@ -115,8 +106,6 @@
 			// Vehicles already loaded, just load expenses
 			loadVehicleExpenses(appState.vehicles);
 		}
-
-		return unsubscribe;
 	});
 
 	async function loadVehicles() {
@@ -447,12 +436,20 @@
 								<h3 class="font-bold text-gray-900 text-lg truncate">
 									{getVehicleDisplayName(vehicle)}
 								</h3>
-								{#if vehicle.loan?.isActive}
+								{#if vehicle.financing?.isActive}
 									<span
 										class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800"
-										title="Active Loan"
+										title="Active {vehicle.financing.financingType === 'loan'
+											? 'Loan'
+											: vehicle.financing.financingType === 'lease'
+												? 'Lease'
+												: 'Financing'}"
 									>
-										Loan
+										{vehicle.financing.financingType === 'loan'
+											? 'Loan'
+											: vehicle.financing.financingType === 'lease'
+												? 'Lease'
+												: 'Financed'}
 									</span>
 								{/if}
 							</div>
@@ -649,31 +646,31 @@
 									{/if}
 
 									<!-- Loan Info -->
-									{#if vehicle.loan?.isActive}
-										{@const loanProgressValue =
-											((vehicle.loan.originalAmount - vehicle.loan.currentBalance) /
-												vehicle.loan.originalAmount) *
+									{#if vehicle.financing?.isActive}
+										{@const financingProgressValue =
+											((vehicle.financing.originalAmount - vehicle.financing.currentBalance) /
+												vehicle.financing.originalAmount) *
 											100}
 										<div class="pt-2 border-t border-gray-100">
 											<div class="flex items-center justify-between text-sm mb-2">
 												<span class="text-gray-600">Loan Balance</span>
 												<span class="text-gray-900 font-semibold">
-													{formatCurrency(vehicle.loan.currentBalance)}
+													{formatCurrency(vehicle.financing.currentBalance)}
 												</span>
 											</div>
 											<div class="flex items-center justify-between text-sm mb-2">
 												<span class="text-gray-600">Original Amount</span>
 												<span class="text-gray-900 font-medium">
-													{formatCurrency(vehicle.loan.originalAmount)}
+													{formatCurrency(vehicle.financing.originalAmount)}
 												</span>
 											</div>
 											<!-- Loan Progress Bar -->
 											<div class="mt-2">
 												<div class="flex justify-between text-xs text-gray-600 mb-1">
 													<span>Loan Progress</span>
-													<span>{Math.round(loanProgressValue)}% paid</span>
+													<span>{Math.round(financingProgressValue)}% paid</span>
 												</div>
-												<Progress value={loanProgressValue} class="h-1.5" />
+												<Progress value={financingProgressValue} class="h-1.5" />
 											</div>
 										</div>
 									{/if}

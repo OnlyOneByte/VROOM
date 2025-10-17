@@ -4,9 +4,9 @@ import { google, type sheets_v4 } from 'googleapis';
 import {
   expenses,
   insurancePolicies,
-  loanPayments,
   users,
-  vehicleLoans,
+  vehicleFinancing,
+  vehicleFinancingPayments,
   vehicles,
 } from '../db/schema';
 import { databaseService } from './database';
@@ -78,19 +78,22 @@ type InsuranceData = {
   };
 };
 
-// Type for loan data from database (joined with vehicles)
-type LoanData = {
-  vehicle_loans: {
+// Type for financing data from database (joined with vehicles)
+type FinancingData = {
+  vehicle_financing: {
     id: string;
-    lender: string;
+    financingType: string;
+    provider: string;
     originalAmount: number;
     currentBalance: number;
-    apr: number;
+    apr: number | null;
     termMonths: number;
     startDate: Date;
     vehicleId: string;
     paymentAmount: number;
     paymentFrequency: string;
+    residualValue: number | null;
+    mileageLimit: number | null;
     isActive: boolean;
   };
   vehicles: {
@@ -102,22 +105,23 @@ type LoanData = {
   };
 };
 
-// Type for loan payment data from database (joined with loans and vehicles)
-type LoanPaymentData = {
-  loan_payments: {
+// Type for financing payment data from database (joined with financing and vehicles)
+type FinancingPaymentData = {
+  vehicle_financing_payments: {
     id: string;
     paymentAmount: number;
     paymentDate: Date;
     principalAmount: number;
     interestAmount: number;
     paymentNumber: number;
-    loanId: string;
+    financingId: string;
     remainingBalance: number;
     paymentType: string;
   };
-  vehicle_loans: {
+  vehicle_financing: {
     id: string;
-    lender: string;
+    provider: string;
+    financingType: string;
     vehicleId: string;
   };
   vehicles: {
@@ -247,8 +251,8 @@ export class GoogleSheetsService {
             { properties: { title: 'Expenses' } },
             { properties: { title: 'Expense Categories' } },
             { properties: { title: 'Insurance' } },
-            { properties: { title: 'Loan Details' } },
-            { properties: { title: 'Loan Payments' } },
+            { properties: { title: 'Financing Details' } },
+            { properties: { title: 'Financing Payments' } },
             { properties: { title: 'Monthly Summary' } },
           ],
         },
@@ -304,7 +308,7 @@ export class GoogleSheetsService {
       const db = databaseService.getDatabase();
 
       // Get user data
-      const [userVehicles, userExpenses, userInsurance, userLoans, userLoanPayments] =
+      const [userVehicles, userExpenses, userInsurance, userFinancing, userFinancingPayments] =
         await Promise.all([
           db.select().from(vehicles).where(eq(vehicles.userId, userId)),
           db
@@ -319,14 +323,17 @@ export class GoogleSheetsService {
             .where(eq(vehicles.userId, userId)),
           db
             .select()
-            .from(vehicleLoans)
-            .innerJoin(vehicles, eq(vehicleLoans.vehicleId, vehicles.id))
+            .from(vehicleFinancing)
+            .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
             .where(eq(vehicles.userId, userId)),
           db
             .select()
-            .from(loanPayments)
-            .innerJoin(vehicleLoans, eq(loanPayments.loanId, vehicleLoans.id))
-            .innerJoin(vehicles, eq(vehicleLoans.vehicleId, vehicles.id))
+            .from(vehicleFinancingPayments)
+            .innerJoin(
+              vehicleFinancing,
+              eq(vehicleFinancingPayments.financingId, vehicleFinancing.id)
+            )
+            .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
             .where(eq(vehicles.userId, userId)),
         ]);
 
@@ -337,8 +344,8 @@ export class GoogleSheetsService {
         this.updateExpensesSheet(spreadsheetId, userExpenses),
         this.updateExpenseCategoriesSheet(spreadsheetId, userExpenses),
         this.updateInsuranceSheet(spreadsheetId, userInsurance),
-        this.updateLoanDetailsSheet(spreadsheetId, userLoans),
-        this.updateLoanPaymentsSheet(spreadsheetId, userLoanPayments),
+        this.updateFinancingDetailsSheet(spreadsheetId, userFinancing),
+        this.updateFinancingPaymentsSheet(spreadsheetId, userFinancingPayments),
         this.updateMonthlySummarySheet(spreadsheetId, userExpenses),
       ]);
     } catch (error) {
@@ -538,12 +545,15 @@ export class GoogleSheetsService {
   }
 
   /**
-   * Update Loan Details sheet
+   * Update Financing Details sheet
    */
-  private async updateLoanDetailsSheet(spreadsheetId: string, loans: LoanData[]): Promise<void> {
+  private async updateFinancingDetailsSheet(
+    spreadsheetId: string,
+    financing: FinancingData[]
+  ): Promise<void> {
     const headers = [
       'Vehicle',
-      'Loan Company',
+      'Provider',
       'Original Amount',
       'Current Balance',
       'APR',
@@ -555,33 +565,37 @@ export class GoogleSheetsService {
 
     const values = [
       headers,
-      ...loans.map((loan) => {
-        const loanData = loan.vehicle_loans;
-        const vehicle = loan.vehicles;
+      ...financing.map((fin) => {
+        const finData = fin.vehicle_financing;
+        const vehicle = fin.vehicles;
 
         return [
           `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-          loanData.lender,
-          `$${loanData.originalAmount.toFixed(2)}`,
-          `$${loanData.currentBalance.toFixed(2)}`,
-          `${loanData.apr}%`,
-          loanData.termMonths,
-          `$${loanData.paymentAmount?.toFixed(2) || '0.00'}`,
-          new Date(loanData.startDate).toLocaleDateString(),
-          loanData.isActive ? 'Yes' : 'No',
+          finData.provider,
+          `$${finData.originalAmount.toFixed(2)}`,
+          `$${finData.currentBalance.toFixed(2)}`,
+          `${finData.apr}%`,
+          finData.termMonths,
+          `$${finData.paymentAmount?.toFixed(2) || '0.00'}`,
+          new Date(finData.startDate).toLocaleDateString(),
+          finData.isActive ? 'Yes' : 'No',
         ];
       }),
     ];
 
-    await this.updateSheetData(spreadsheetId, `Loan Details!A1:I${loans.length + 1}`, values);
+    await this.updateSheetData(
+      spreadsheetId,
+      `Financing Details!A1:I${financing.length + 1}`,
+      values
+    );
   }
 
   /**
-   * Update Loan Payments sheet
+   * Update Financing Payments sheet
    */
-  private async updateLoanPaymentsSheet(
+  private async updateFinancingPaymentsSheet(
     spreadsheetId: string,
-    payments: LoanPaymentData[]
+    payments: FinancingPaymentData[]
   ): Promise<void> {
     const headers = [
       'Vehicle',
@@ -597,7 +611,7 @@ export class GoogleSheetsService {
     const values = [
       headers,
       ...payments.map((payment) => {
-        const paymentData = payment.loan_payments;
+        const paymentData = payment.vehicle_financing_payments;
         const vehicle = payment.vehicles;
 
         return [
@@ -613,7 +627,11 @@ export class GoogleSheetsService {
       }),
     ];
 
-    await this.updateSheetData(spreadsheetId, `Loan Payments!A1:H${payments.length + 1}`, values);
+    await this.updateSheetData(
+      spreadsheetId,
+      `Financing Payments!A1:H${payments.length + 1}`,
+      values
+    );
   }
 
   /**

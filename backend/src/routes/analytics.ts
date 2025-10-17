@@ -255,7 +255,7 @@ function calculateVehicleAnalytics(expenses: ExpenseData[], vehicle: VehicleData
   const categoryBreakdown = calculateCategoryBreakdown(expenses);
 
   // Fuel efficiency for this vehicle
-  const fuelExpenses = expenses.filter((e) => e.type === 'fuel');
+  const fuelExpenses = expenses.filter((e) => e.category === 'fuel');
   const fuelEfficiency = calculateFuelEfficiencyForVehicle(
     fuelExpenses,
     vehicle.initialMileage || 0
@@ -339,7 +339,7 @@ function calculateCategoryBreakdown(expenses: ExpenseData[]) {
 }
 
 function calculateOverallFuelEfficiency(expenses: ExpenseData[], vehicles: VehicleData[]) {
-  const fuelExpenses = expenses.filter((e) => e.type === 'fuel');
+  const fuelExpenses = expenses.filter((e) => e.category === 'fuel');
 
   if (fuelExpenses.length === 0) {
     return {

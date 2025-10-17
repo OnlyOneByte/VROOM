@@ -1,5 +1,5 @@
 import { db } from './connection.js';
-import { expenses, insurancePolicies, users, vehicleLoans, vehicles } from './schema.js';
+import { expenses, insurancePolicies, users, vehicleFinancing, vehicles } from './schema.js';
 
 // Sample data for development and testing
 export async function seedDatabase() {
@@ -52,10 +52,11 @@ export async function seedDatabase() {
 
     console.log('Created sample vehicles:', vehicle1.id, vehicle2.id);
 
-    // Create sample loan for vehicle1
-    await db.insert(vehicleLoans).values({
+    // Create sample financing for vehicle1
+    await db.insert(vehicleFinancing).values({
       vehicleId: vehicle1.id,
-      lender: 'Bank of America',
+      financingType: 'loan',
+      provider: 'Bank of America',
       originalAmount: 20000,
       currentBalance: 15000,
       apr: 4.5,
@@ -178,7 +179,7 @@ export async function clearDatabase() {
     // Delete in reverse order of dependencies
     await db.delete(expenses);
     await db.delete(insurancePolicies);
-    await db.delete(vehicleLoans);
+    await db.delete(vehicleFinancing);
     await db.delete(vehicles);
     await db.delete(users);
 

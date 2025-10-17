@@ -12,8 +12,8 @@ import { auth } from './routes/auth';
 import { backup } from './routes/backup';
 import { drive } from './routes/drive';
 import { expenses } from './routes/expenses';
+import { financing } from './routes/financing';
 import { insurance } from './routes/insurance';
-import { loans } from './routes/loans';
 import { settings } from './routes/settings';
 import { sharing } from './routes/sharing';
 import { sheets } from './routes/sheets';
@@ -69,7 +69,7 @@ app.route('/api/auth', auth);
 
 // Mount API routes
 app.route('/api/vehicles', vehicles);
-app.route('/api/loans', loans);
+app.route('/api/financing', financing);
 app.route('/api/expenses', expenses);
 app.route('/api/insurance', insurance);
 app.route('/api/analytics', analytics);
@@ -105,7 +105,7 @@ app.get('/api', optionalAuth, (c) => {
         refresh: '/api/auth/refresh',
       },
       vehicles: '/api/vehicles',
-      loans: '/api/loans',
+      financing: '/api/financing',
       expenses: '/api/expenses',
       analytics: '/api/analytics',
       drive: '/api/drive',

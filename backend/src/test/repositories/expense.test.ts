@@ -40,7 +40,11 @@ describe('ExpenseRepository', () => {
 
   describe('create', () => {
     test('should create a new expense', async () => {
-      const expenseData = { ...testExpenseData, vehicleId: testVehicle.id, tags: JSON.stringify(testExpenseData.tags) };
+      const expenseData = {
+        ...testExpenseData,
+        vehicleId: testVehicle.id,
+        tags: JSON.stringify(testExpenseData.tags),
+      };
       const expense = await expenseRepository.create(expenseData);
 
       expect(expense).toBeDefined();
@@ -91,7 +95,11 @@ describe('ExpenseRepository', () => {
 
   describe('findByVehicleId', () => {
     test('should find all expenses for a vehicle', async () => {
-      const expense1Data = { ...testExpenseData, vehicleId: testVehicle.id, tags: JSON.stringify(testExpenseData.tags) };
+      const expense1Data = {
+        ...testExpenseData,
+        vehicleId: testVehicle.id,
+        tags: JSON.stringify(testExpenseData.tags),
+      };
       const expense2Data = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
@@ -161,26 +169,6 @@ describe('ExpenseRepository', () => {
     });
   });
 
-  describe('findByType', () => {
-    test('should find expenses by type', async () => {
-      const fuelExpense = { ...testExpenseData, vehicleId: testVehicle.id, tags: JSON.stringify(['fuel']) };
-      const parkingExpense = {
-        ...testExpenseData,
-        vehicleId: testVehicle.id,
-        tags: JSON.stringify(['parking']),
-        category: 'misc' as const,
-        amount: 15.0,
-      };
-
-      await expenseRepository.create(fuelExpense);
-      await expenseRepository.create(parkingExpense);
-
-      const fuelExpenses = await expenseRepository.findByType(testVehicle.id, 'fuel');
-
-      expect(fuelExpenses).toHaveLength(1);
-    });
-  });
-
   describe('findByCategory', () => {
     test('should find expenses by category', async () => {
       const operatingExpense = {
@@ -209,7 +197,11 @@ describe('ExpenseRepository', () => {
 
   describe('findFuelExpenses', () => {
     test('should find only fuel expenses', async () => {
-      const fuelExpense = { ...testExpenseData, vehicleId: testVehicle.id, tags: JSON.stringify(['fuel']) };
+      const fuelExpense = {
+        ...testExpenseData,
+        vehicleId: testVehicle.id,
+        tags: JSON.stringify(['fuel']),
+      };
       const parkingExpense = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
@@ -231,7 +223,11 @@ describe('ExpenseRepository', () => {
   describe('batchCreate', () => {
     test('should create multiple expenses at once', async () => {
       const expensesData = [
-        { ...testExpenseData, vehicleId: testVehicle.id, tags: JSON.stringify(testExpenseData.tags) },
+        {
+          ...testExpenseData,
+          vehicleId: testVehicle.id,
+          tags: JSON.stringify(testExpenseData.tags),
+        },
         {
           ...testExpenseData,
           vehicleId: testVehicle.id,
@@ -282,10 +278,12 @@ describe('ExpenseRepository', () => {
 
       expect(categoryTotals).toHaveLength(3);
 
-      const operatingTotal = categoryTotals.find((ct) => ct.category === 'fuel');
+      const fuelTotal = categoryTotals.find((ct) => ct.category === 'fuel');
+      const miscTotal = categoryTotals.find((ct) => ct.category === 'misc');
       const maintenanceTotal = categoryTotals.find((ct) => ct.category === 'maintenance');
 
-      expect(operatingTotal?.total).toBe(65.0);
+      expect(fuelTotal?.total).toBe(50.0);
+      expect(miscTotal?.total).toBe(15.0);
       expect(maintenanceTotal?.total).toBe(75.0);
     });
 

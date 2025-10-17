@@ -1,17 +1,17 @@
 import type {
   Expense,
   InsurancePolicy,
-  LoanPayment,
   NewExpense,
   NewInsurancePolicy,
-  NewLoanPayment,
   NewUser,
   NewVehicle,
-  NewVehicleLoan,
+  NewVehicleFinancing,
+  NewVehicleFinancingPayment,
   NewVehicleShare,
   User,
   Vehicle,
-  VehicleLoan,
+  VehicleFinancing,
+  VehicleFinancingPayment,
   VehicleShare,
 } from '../../db/schema.js';
 
@@ -40,20 +40,26 @@ export interface IVehicleRepository extends IBaseRepository<Vehicle, NewVehicle>
   findByIdWithAccess(vehicleId: string, userId: string): Promise<Vehicle | null>;
 }
 
-// Vehicle Loan repository interface
-export interface IVehicleLoanRepository extends IBaseRepository<VehicleLoan, NewVehicleLoan> {
-  findByVehicleId(vehicleId: string): Promise<VehicleLoan | null>;
-  findActiveLoans(): Promise<VehicleLoan[]>;
-  updateBalance(id: string, newBalance: number): Promise<VehicleLoan>;
-  markAsPaidOff(id: string, payoffDate: Date): Promise<VehicleLoan>;
+// Vehicle Financing repository interface
+export interface IVehicleFinancingRepository
+  extends IBaseRepository<VehicleFinancing, NewVehicleFinancing> {
+  findByVehicleId(vehicleId: string): Promise<VehicleFinancing | null>;
+  findActiveFinancing(): Promise<VehicleFinancing[]>;
+  updateBalance(id: string, newBalance: number): Promise<VehicleFinancing>;
+  markAsCompleted(id: string, endDate: Date): Promise<VehicleFinancing>;
 }
 
-// Loan Payment repository interface
-export interface ILoanPaymentRepository extends IBaseRepository<LoanPayment, NewLoanPayment> {
-  findByLoanId(loanId: string): Promise<LoanPayment[]>;
-  findByLoanIdAndDateRange(loanId: string, startDate: Date, endDate: Date): Promise<LoanPayment[]>;
-  getLastPayment(loanId: string): Promise<LoanPayment | null>;
-  getPaymentCount(loanId: string): Promise<number>;
+// Vehicle Financing Payment repository interface
+export interface IVehicleFinancingPaymentRepository
+  extends IBaseRepository<VehicleFinancingPayment, NewVehicleFinancingPayment> {
+  findByFinancingId(financingId: string): Promise<VehicleFinancingPayment[]>;
+  findByFinancingIdAndDateRange(
+    financingId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<VehicleFinancingPayment[]>;
+  getLastPayment(financingId: string): Promise<VehicleFinancingPayment | null>;
+  getPaymentCount(financingId: string): Promise<number>;
 }
 
 // Insurance Policy repository interface
@@ -74,7 +80,6 @@ export interface IExpenseRepository extends IBaseRepository<Expense, NewExpense>
     endDate: Date
   ): Promise<Expense[]>;
   findByUserId(userId: string): Promise<Expense[]>;
-  findByType(vehicleId: string, type: string): Promise<Expense[]>;
   findByCategory(vehicleId: string, category: string): Promise<Expense[]>;
   findFuelExpenses(vehicleId: string): Promise<Expense[]>;
   batchCreate(expenses: NewExpense[]): Promise<Expense[]>; // For offline sync
@@ -102,8 +107,8 @@ export interface IVehicleShareRepository extends IBaseRepository<VehicleShare, N
 export interface IRepositoryFactory {
   getUserRepository(): IUserRepository;
   getVehicleRepository(): IVehicleRepository;
-  getVehicleLoanRepository(): IVehicleLoanRepository;
-  getLoanPaymentRepository(): ILoanPaymentRepository;
+  getVehicleFinancingRepository(): IVehicleFinancingRepository;
+  getVehicleFinancingPaymentRepository(): IVehicleFinancingPaymentRepository;
   getInsurancePolicyRepository(): IInsurancePolicyRepository;
   getExpenseRepository(): IExpenseRepository;
   getVehicleShareRepository(): IVehicleShareRepository;

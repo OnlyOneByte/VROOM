@@ -35,18 +35,19 @@ export const vehicles = sqliteTable('vehicles', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
-// Vehicle Loan table (containerized loan information)
-export const vehicleLoans = sqliteTable('vehicle_loans', {
+// Vehicle Financing table (loans, leases, or owned vehicles)
+export const vehicleFinancing = sqliteTable('vehicle_financing', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => createId()),
   vehicleId: text('vehicle_id')
     .notNull()
     .references(() => vehicles.id, { onDelete: 'cascade' }),
-  lender: text('lender').notNull(),
+  financingType: text('financing_type').notNull().default('loan'), // 'loan' | 'lease' | 'own'
+  provider: text('provider').notNull(), // Lender name, leasing company, or dealer
   originalAmount: real('original_amount').notNull(),
   currentBalance: real('current_balance').notNull(),
-  apr: real('apr').notNull(),
+  apr: real('apr'), // For loans, null for leases/own
   termMonths: integer('term_months').notNull(),
   startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
   // Payment Configuration
@@ -54,25 +55,29 @@ export const vehicleLoans = sqliteTable('vehicle_loans', {
   paymentFrequency: text('payment_frequency').notNull().default('monthly'), // 'monthly' | 'bi-weekly' | 'weekly' | 'custom'
   paymentDayOfMonth: integer('payment_day_of_month'), // For monthly (1-31)
   paymentDayOfWeek: integer('payment_day_of_week'), // For weekly (0-6, Sunday=0)
-  // Loan Status
+  // Lease-specific fields
+  residualValue: real('residual_value'), // End-of-lease buyout price
+  mileageLimit: integer('mileage_limit'), // Annual mileage limit for leases
+  excessMileageFee: real('excess_mileage_fee'), // Per-mile fee over limit
+  // Status
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-  payoffDate: integer('payoff_date', { mode: 'timestamp' }), // Actual payoff date if paid early
+  endDate: integer('end_date', { mode: 'timestamp' }), // Payoff date or lease end date
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
-// Loan Payment Records
-export const loanPayments = sqliteTable('loan_payments', {
+// Vehicle Financing Payment Records
+export const vehicleFinancingPayments = sqliteTable('vehicle_financing_payments', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => createId()),
-  loanId: text('loan_id')
+  financingId: text('financing_id')
     .notNull()
-    .references(() => vehicleLoans.id, { onDelete: 'cascade' }),
+    .references(() => vehicleFinancing.id, { onDelete: 'cascade' }),
   paymentDate: integer('payment_date', { mode: 'timestamp' }).notNull(),
   paymentAmount: real('payment_amount').notNull(),
   principalAmount: real('principal_amount').notNull(),
-  interestAmount: real('interest_amount').notNull(),
+  interestAmount: real('interest_amount').notNull(), // 0 for leases
   remainingBalance: real('remaining_balance').notNull(),
   paymentNumber: integer('payment_number').notNull(),
   paymentType: text('payment_type').notNull().default('standard'), // 'standard' | 'extra' | 'custom-split'
@@ -191,11 +196,11 @@ export type NewUser = typeof users.$inferInsert;
 export type Vehicle = typeof vehicles.$inferSelect;
 export type NewVehicle = typeof vehicles.$inferInsert;
 
-export type VehicleLoan = typeof vehicleLoans.$inferSelect;
-export type NewVehicleLoan = typeof vehicleLoans.$inferInsert;
+export type VehicleFinancing = typeof vehicleFinancing.$inferSelect;
+export type NewVehicleFinancing = typeof vehicleFinancing.$inferInsert;
 
-export type LoanPayment = typeof loanPayments.$inferSelect;
-export type NewLoanPayment = typeof loanPayments.$inferInsert;
+export type VehicleFinancingPayment = typeof vehicleFinancingPayments.$inferSelect;
+export type NewVehicleFinancingPayment = typeof vehicleFinancingPayments.$inferInsert;
 
 export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
 export type NewInsurancePolicy = typeof insurancePolicies.$inferInsert;

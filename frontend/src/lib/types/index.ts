@@ -22,27 +22,35 @@ export interface Vehicle {
 	purchaseDate?: string;
 	createdAt: string;
 	updatedAt: string;
-	loan?: VehicleLoan;
+	financing?: VehicleFinancing;
 }
 
-export interface VehicleLoan {
-	lender: string;
+export interface VehicleFinancing {
+	id: string;
+	vehicleId: string;
+	financingType: 'loan' | 'lease' | 'own';
+	provider: string;
 	originalAmount: number;
 	currentBalance: number;
-	apr: number;
+	apr?: number;
 	termMonths: number;
 	startDate: string;
 	paymentAmount: number;
 	paymentFrequency: 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 	paymentDayOfMonth?: number;
 	paymentDayOfWeek?: number;
+	// Lease-specific fields
+	residualValue?: number;
+	mileageLimit?: number;
+	excessMileageFee?: number;
+	// Status
 	isActive: boolean;
-	payoffDate?: string;
+	endDate?: string;
 	createdAt: string;
 	updatedAt: string;
 }
 
-export interface LoanPaymentConfig {
+export interface FinancingPaymentConfig {
 	amount: number;
 	frequency: 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 	dayOfMonth?: number;
@@ -76,13 +84,15 @@ export interface Expense {
 	updatedAt: string;
 }
 
-export type ExpenseCategory =
-	| 'fuel'
-	| 'maintenance'
-	| 'financial'
-	| 'regulatory'
-	| 'enhancement'
-	| 'misc';
+// ExpenseCategory is fetched from the backend API
+// See /api/expenses/categories endpoint
+export type ExpenseCategory = string;
+
+export interface ExpenseCategoryInfo {
+	value: string;
+	label: string;
+	description: string;
+}
 
 // Notification types
 export interface Notification {

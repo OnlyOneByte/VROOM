@@ -22,9 +22,9 @@
 	import type {
 		Vehicle,
 		VehicleFormData,
-		LoanPaymentConfig,
+		FinancingPaymentConfig,
 		VehicleFormErrors,
-		LoanFormErrors
+		FinancingFormErrors
 	} from '$lib/types.js';
 
 	interface Props {
@@ -41,7 +41,7 @@
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
-	let showLoanForm = $state(false);
+	let showFinancingForm = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 
 	// Form data
@@ -56,19 +56,23 @@
 		purchaseDate: ''
 	});
 
-	let loanForm = $state({
-		lender: '',
+	let financingForm = $state({
+		financingType: 'loan' as 'loan' | 'lease' | 'own',
+		provider: '',
 		originalAmount: 0,
 		apr: 0,
 		termMonths: 60,
 		startDate: undefined as string | undefined,
 		paymentAmount: 0,
-		frequency: 'monthly' as LoanPaymentConfig['frequency'],
-		dayOfMonth: 1
+		frequency: 'monthly' as FinancingPaymentConfig['frequency'],
+		dayOfMonth: 1,
+		residualValue: undefined as number | undefined,
+		mileageLimit: undefined as number | undefined,
+		excessMileageFee: undefined as number | undefined
 	});
 
 	// Form validation
-	let errors = $state<VehicleFormErrors & LoanFormErrors>({});
+	let errors = $state<VehicleFormErrors & FinancingFormErrors>({});
 
 	// Amortization preview
 	let amortizationPreview = $state<{
@@ -105,16 +109,16 @@
 			const vehicleResult = await vehicleResponse.json();
 			vehicle = vehicleResult.data;
 
-			// Fetch loan data separately
-			const loanResponse = await fetch(`/api/loans/vehicles/${vehicleId}/loan`, {
+			// Fetch financing data separately
+			const financingResponse = await fetch(`/api/vehicles/${vehicleId}/financing`, {
 				credentials: 'include'
 			});
 
-			if (loanResponse.ok) {
-				const loanResult = await loanResponse.json();
-				if (loanResult.data && vehicle) {
-					// Attach loan to vehicle object for populateForm
-					vehicle.loan = loanResult.data;
+			if (financingResponse.ok) {
+				const financingResult = await financingResponse.json();
+				if (financingResult.data && vehicle) {
+					// Attach financing to vehicle object for populateForm
+					vehicle.financing = financingResult.data;
 				}
 			}
 
@@ -147,17 +151,21 @@
 				: ''
 		};
 
-		if (vehicle.loan?.isActive) {
-			showLoanForm = true;
-			loanForm = {
-				lender: vehicle.loan.lender,
-				originalAmount: vehicle.loan.originalAmount,
-				apr: vehicle.loan.apr,
-				termMonths: vehicle.loan.termMonths,
-				startDate: new Date(vehicle.loan.startDate).toISOString().split('T')[0]!,
-				paymentAmount: vehicle.loan.paymentAmount,
-				frequency: vehicle.loan.paymentFrequency,
-				dayOfMonth: vehicle.loan.paymentDayOfMonth || 1
+		if (vehicle.financing?.isActive) {
+			showFinancingForm = true;
+			financingForm = {
+				financingType: vehicle.financing.financingType,
+				provider: vehicle.financing.provider,
+				originalAmount: vehicle.financing.originalAmount,
+				apr: vehicle.financing.apr || 0,
+				termMonths: vehicle.financing.termMonths,
+				startDate: new Date(vehicle.financing.startDate).toISOString().split('T')[0]!,
+				paymentAmount: vehicle.financing.paymentAmount,
+				frequency: vehicle.financing.paymentFrequency,
+				dayOfMonth: vehicle.financing.paymentDayOfMonth || 1,
+				residualValue: vehicle.financing.residualValue,
+				mileageLimit: vehicle.financing.mileageLimit,
+				excessMileageFee: vehicle.financing.excessMileageFee
 			};
 		}
 	}
@@ -188,30 +196,32 @@
 		return Object.keys(errors).length === 0;
 	}
 
-	function validateLoanForm(): boolean {
-		if (!showLoanForm) return true;
+	function validateFinancingForm(): boolean {
+		if (!showFinancingForm) return true;
 
-		if (!loanForm.lender.trim()) {
-			errors['lender'] = 'Lender is required';
+		if (!financingForm.provider.trim()) {
+			errors['provider'] = 'Provider is required';
 		}
 
-		if (loanForm.originalAmount <= 0) {
-			errors['originalAmount'] = 'Loan amount must be greater than 0';
+		if (financingForm.originalAmount <= 0) {
+			errors['originalAmount'] = 'Amount must be greater than 0';
 		}
 
-		if (loanForm.apr < 0 || loanForm.apr > 50) {
-			errors['apr'] = 'APR must be between 0% and 50%';
+		if (financingForm.financingType === 'loan') {
+			if (financingForm.apr < 0 || financingForm.apr > 50) {
+				errors['apr'] = 'APR must be between 0% and 50%';
+			}
 		}
 
-		if (loanForm.termMonths < 1 || loanForm.termMonths > 360) {
-			errors['termMonths'] = 'Term must be between 1 and 360 months';
+		if (financingForm.termMonths < 1 || financingForm.termMonths > 600) {
+			errors['termMonths'] = 'Term must be between 1 and 600 months';
 		}
 
-		if (!loanForm.startDate) {
+		if (!financingForm.startDate) {
 			errors['startDate'] = 'Start date is required';
 		}
 
-		if (loanForm.paymentAmount <= 0) {
+		if (financingForm.paymentAmount <= 0) {
 			errors['paymentAmount'] = 'Payment amount must be greater than 0';
 		}
 
@@ -220,18 +230,19 @@
 
 	function calculateAmortization() {
 		if (
-			!showLoanForm ||
-			loanForm.originalAmount <= 0 ||
-			loanForm.apr <= 0 ||
-			loanForm.termMonths <= 0
+			!showFinancingForm ||
+			financingForm.financingType !== 'loan' ||
+			financingForm.originalAmount <= 0 ||
+			financingForm.apr <= 0 ||
+			financingForm.termMonths <= 0
 		) {
 			amortizationPreview = null;
 			return;
 		}
 
-		const principal = loanForm.originalAmount;
-		const monthlyRate = loanForm.apr / 100 / 12;
-		const numPayments = loanForm.termMonths;
+		const principal = financingForm.originalAmount;
+		const monthlyRate = financingForm.apr / 100 / 12;
+		const numPayments = financingForm.termMonths;
 
 		const monthlyPayment =
 			(principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))) /
@@ -240,7 +251,7 @@
 		const totalPayments = monthlyPayment * numPayments;
 		const totalInterest = totalPayments - principal;
 
-		const startDate = new Date(loanForm.startDate || new Date());
+		const startDate = new Date(financingForm.startDate || new Date());
 		const payoffDate = new Date(startDate);
 		payoffDate.setMonth(payoffDate.getMonth() + numPayments);
 
@@ -252,32 +263,33 @@
 		};
 	}
 
-	// Recalculate when loan parameters change
+	// Recalculate when financing parameters change
 	$effect(() => {
-		const amount = loanForm.originalAmount;
-		const apr = loanForm.apr;
-		const term = loanForm.termMonths;
-		const show = showLoanForm;
+		const amount = financingForm.originalAmount;
+		const apr = financingForm.apr;
+		const term = financingForm.termMonths;
+		const show = showFinancingForm;
+		const type = financingForm.financingType;
 
-		void loanForm.startDate;
+		void financingForm.startDate;
 
-		if (show && amount > 0 && apr >= 0 && term > 0) {
+		if (show && type === 'loan' && amount > 0 && apr >= 0 && term > 0) {
 			calculateAmortization();
-		} else if (!show) {
+		} else {
 			amortizationPreview = null;
 		}
 	});
 
 	// Sync payment amount from amortization preview
 	$effect(() => {
-		if (amortizationPreview) {
-			loanForm.paymentAmount = amortizationPreview.monthlyPayment;
+		if (amortizationPreview && financingForm.financingType === 'loan') {
+			financingForm.paymentAmount = amortizationPreview.monthlyPayment;
 		}
 	});
 
 	async function handleSubmit(event: Event) {
 		event.preventDefault();
-		if (!validateVehicleForm() || !validateLoanForm()) {
+		if (!validateVehicleForm() || !validateFinancingForm()) {
 			return;
 		}
 
@@ -327,33 +339,54 @@
 			const savedVehicle = savedVehicleResponse.data || savedVehicleResponse;
 			const finalVehicleId = isEditMode ? vehicleId! : savedVehicle.id;
 
-			// Handle loan data separately if provided
-			if (showLoanForm && loanForm.lender.trim() && loanForm.startDate) {
-				const loanData = {
-					lender: loanForm.lender,
-					originalAmount: Number(loanForm.originalAmount),
-					apr: Number(loanForm.apr),
-					termMonths: Number(loanForm.termMonths),
-					startDate: new Date(loanForm.startDate).toISOString(),
-					paymentAmount: Number(loanForm.paymentAmount),
-					paymentFrequency: loanForm.frequency,
-					paymentDayOfMonth: Number(loanForm.dayOfMonth)
+			// Handle financing data separately if provided
+			if (showFinancingForm && financingForm.provider.trim() && financingForm.startDate) {
+				const financingData: any = {
+					financingType: financingForm.financingType,
+					provider: financingForm.provider,
+					originalAmount: Number(financingForm.originalAmount),
+					termMonths: Number(financingForm.termMonths),
+					startDate: new Date(financingForm.startDate).toISOString(),
+					paymentAmount: Number(financingForm.paymentAmount),
+					paymentFrequency: financingForm.frequency,
+					paymentDayOfMonth: Number(financingForm.dayOfMonth)
 				};
 
-				const loanResponse = await fetch(`/api/loans/vehicles/${finalVehicleId}/loan`, {
+				// Add APR for loans
+				if (financingForm.financingType === 'loan') {
+					financingData.apr = Number(financingForm.apr);
+				}
+
+				// Add lease-specific fields
+				if (financingForm.financingType === 'lease') {
+					if (financingForm.residualValue !== undefined) {
+						financingData.residualValue = Number(financingForm.residualValue);
+					}
+					if (financingForm.mileageLimit !== undefined) {
+						financingData.mileageLimit = Number(financingForm.mileageLimit);
+					}
+					if (financingForm.excessMileageFee !== undefined) {
+						financingData.excessMileageFee = Number(financingForm.excessMileageFee);
+					}
+				}
+
+				console.log('Submitting financing data:', financingData);
+
+				const financingResponse = await fetch(`/api/vehicles/${finalVehicleId}/financing`, {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json'
 					},
 					credentials: 'include',
-					body: JSON.stringify(loanData)
+					body: JSON.stringify(financingData)
 				});
 
-				if (!loanResponse.ok) {
-					const errorData = await loanResponse.json();
+				if (!financingResponse.ok) {
+					const errorData = await financingResponse.json();
+					console.error('Financing submission error:', errorData);
 					appStore.addNotification({
 						type: 'warning',
-						message: `Vehicle saved but loan failed: ${errorData.message || 'Unknown error'}`
+						message: `Vehicle saved but financing failed: ${errorData.message || 'Unknown error'}`
 					});
 				}
 			}
@@ -608,49 +641,87 @@
 				</div>
 			</div>
 
-			<!-- Loan Information -->
+			<!-- Financing Information -->
 			<div class="card">
 				<div class="flex items-center justify-between mb-6">
 					<div class="flex items-center gap-2">
 						<DollarSign class="h-5 w-5 text-primary-600" />
-						<h2 class="text-lg font-semibold text-gray-900">Loan Information</h2>
+						<h2 class="text-lg font-semibold text-gray-900">Financing Information</h2>
 					</div>
 					<div class="flex items-center gap-2">
-						<Switch bind:checked={showLoanForm} id="loan-toggle" />
-						<Label for="loan-toggle" class="text-sm text-gray-700 cursor-pointer"
-							>This vehicle has a loan</Label
+						<Switch bind:checked={showFinancingForm} id="financing-toggle" />
+						<Label for="financing-toggle" class="text-sm text-gray-700 cursor-pointer"
+							>This vehicle has financing</Label
 						>
 					</div>
 				</div>
 
-				{#if showLoanForm}
+				{#if showFinancingForm}
 					<div class="space-y-6">
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div class="space-y-2">
-								<Label for="lender">Lender *</Label>
+								<Label for="financingType">Financing Type *</Label>
+								<Select.Root
+									type="single"
+									value={financingForm.financingType}
+									onValueChange={v => {
+										if (v) {
+											financingForm.financingType = v as 'loan' | 'lease' | 'own';
+										}
+									}}
+								>
+									<Select.Trigger id="financingType" class="w-full">
+										{financingForm.financingType === 'loan'
+											? 'Loan'
+											: financingForm.financingType === 'lease'
+												? 'Lease'
+												: 'Owned'}
+									</Select.Trigger>
+									<Select.Content>
+										<Select.Item value="loan" label="Loan">Loan</Select.Item>
+										<Select.Item value="lease" label="Lease">Lease</Select.Item>
+										<Select.Item value="own" label="Owned">Owned</Select.Item>
+									</Select.Content>
+								</Select.Root>
+							</div>
+
+							<div class="space-y-2">
+								<Label for="provider">
+									{financingForm.financingType === 'loan'
+										? 'Lender'
+										: financingForm.financingType === 'lease'
+											? 'Leasing Company'
+											: 'Dealer/Seller'} *
+								</Label>
 								<Input
-									id="lender"
+									id="provider"
 									type="text"
-									placeholder="e.g., Chase Bank, Credit Union"
-									bind:value={loanForm.lender}
-									aria-invalid={!!errors['lender']}
-									aria-describedby={errors['lender'] ? 'lender-error' : undefined}
+									placeholder="e.g., Chase Bank, Toyota Financial"
+									bind:value={financingForm.provider}
+									aria-invalid={!!errors['provider']}
+									aria-describedby={errors['provider'] ? 'provider-error' : undefined}
 									required
 								/>
-								{#if errors['lender']}
-									<FormFieldError id="lender-error">{errors['lender']}</FormFieldError>
+								{#if errors['provider']}
+									<FormFieldError id="provider-error">{errors['provider']}</FormFieldError>
 								{/if}
 							</div>
 
 							<div class="space-y-2">
-								<Label for="originalAmount">{isEditMode ? 'Original ' : ''}Loan Amount *</Label>
+								<Label for="originalAmount">
+									{isEditMode ? 'Original ' : ''}{financingForm.financingType === 'lease'
+										? 'Lease'
+										: financingForm.financingType === 'loan'
+											? 'Loan'
+											: 'Purchase'} Amount *
+								</Label>
 								<Input
 									id="originalAmount"
 									type="number"
 									min="0"
 									step="0.01"
 									placeholder="0.00"
-									bind:value={loanForm.originalAmount}
+									bind:value={financingForm.originalAmount}
 									aria-invalid={!!errors['originalAmount']}
 									aria-describedby={errors['originalAmount'] ? 'originalAmount-error' : undefined}
 									required
@@ -662,33 +733,35 @@
 								{/if}
 							</div>
 
-							<div class="space-y-2">
-								<Label for="apr">APR (%) *</Label>
-								<Input
-									id="apr"
-									type="number"
-									min="0"
-									max="50"
-									step="0.01"
-									placeholder="e.g., 4.5"
-									bind:value={loanForm.apr}
-									aria-invalid={!!errors['apr']}
-									aria-describedby={errors['apr'] ? 'apr-error' : undefined}
-									required
-								/>
-								{#if errors['apr']}
-									<FormFieldError id="apr-error">{errors['apr']}</FormFieldError>
-								{/if}
-							</div>
+							{#if financingForm.financingType === 'loan'}
+								<div class="space-y-2">
+									<Label for="apr">APR (%) *</Label>
+									<Input
+										id="apr"
+										type="number"
+										min="0"
+										max="50"
+										step="0.01"
+										placeholder="e.g., 4.5"
+										bind:value={financingForm.apr}
+										aria-invalid={!!errors['apr']}
+										aria-describedby={errors['apr'] ? 'apr-error' : undefined}
+										required
+									/>
+									{#if errors['apr']}
+										<FormFieldError id="apr-error">{errors['apr']}</FormFieldError>
+									{/if}
+								</div>
+							{/if}
 
 							<div class="space-y-2">
 								<Label for="termMonths">Term (Months) *</Label>
 								<Select.Root
 									type="single"
-									value={String(loanForm.termMonths)}
+									value={String(financingForm.termMonths)}
 									onValueChange={v => {
 										if (v) {
-											loanForm.termMonths = Number(v);
+											financingForm.termMonths = Number(v);
 										}
 									}}
 								>
@@ -698,9 +771,12 @@
 										aria-invalid={!!errors['termMonths']}
 										aria-describedby={errors['termMonths'] ? 'termMonths-error' : undefined}
 									>
-										{loanForm.termMonths} months ({Math.floor(loanForm.termMonths / 12)} years)
+										{financingForm.termMonths} months ({Math.floor(financingForm.termMonths / 12)} years)
 									</Select.Trigger>
 									<Select.Content>
+										<Select.Item value="24" label="24 months (2 years)"
+											>24 months (2 years)</Select.Item
+										>
 										<Select.Item value="36" label="36 months (3 years)"
 											>36 months (3 years)</Select.Item
 										>
@@ -724,11 +800,11 @@
 							</div>
 
 							<div class="space-y-2">
-								<Label for="startDate">Loan Start Date *</Label>
+								<Label for="startDate">Start Date *</Label>
 								<DatePicker
 									id="startDate"
-									bind:value={loanForm.startDate}
-									placeholder="Select loan start date"
+									bind:value={financingForm.startDate}
+									placeholder="Select start date"
 									aria-invalid={!!errors['startDate']}
 									aria-describedby={errors['startDate'] ? 'startDate-error' : undefined}
 								/>
@@ -741,10 +817,10 @@
 								<Label for="dayOfMonth">Payment Day of Month</Label>
 								<Select.Root
 									type="single"
-									value={String(loanForm.dayOfMonth)}
+									value={String(financingForm.dayOfMonth)}
 									onValueChange={v => {
 										if (v) {
-											loanForm.dayOfMonth = Number(v);
+											financingForm.dayOfMonth = Number(v);
 										}
 									}}
 								>
@@ -754,7 +830,7 @@
 										aria-invalid={!!errors['dayOfMonth']}
 										aria-describedby={errors['dayOfMonth'] ? 'dayOfMonth-error' : undefined}
 									>
-										{loanForm.dayOfMonth}
+										{financingForm.dayOfMonth}
 									</Select.Trigger>
 									<Select.Content>
 										{#each Array(28) as _, i}
@@ -766,37 +842,76 @@
 									<FormFieldError id="dayOfMonth-error">{errors['dayOfMonth']}</FormFieldError>
 								{/if}
 							</div>
+
+							{#if financingForm.financingType === 'lease'}
+								<div class="space-y-2">
+									<Label for="residualValue">Residual Value (Buyout Price)</Label>
+									<Input
+										id="residualValue"
+										type="number"
+										min="0"
+										step="0.01"
+										placeholder="0.00"
+										bind:value={financingForm.residualValue}
+									/>
+								</div>
+
+								<div class="space-y-2">
+									<Label for="mileageLimit">Annual Mileage Limit</Label>
+									<Input
+										id="mileageLimit"
+										type="number"
+										min="0"
+										placeholder="e.g., 12000"
+										bind:value={financingForm.mileageLimit}
+									/>
+								</div>
+
+								<div class="space-y-2">
+									<Label for="excessMileageFee">Excess Mileage Fee (per mile)</Label>
+									<Input
+										id="excessMileageFee"
+										type="number"
+										min="0"
+										step="0.01"
+										placeholder="e.g., 0.25"
+										bind:value={financingForm.excessMileageFee}
+									/>
+								</div>
+							{/if}
 						</div>
 
 						<!-- Current Balance Display (Edit Mode Only) -->
-						{#if isEditMode && vehicle?.loan?.currentBalance}
+						{#if isEditMode && vehicle?.financing?.currentBalance !== undefined}
 							<div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-								<h3 class="font-medium text-gray-900 mb-2">Current Loan Status</h3>
+								<h3 class="font-medium text-gray-900 mb-2">Current Status</h3>
 								<div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
 									<div>
 										<p class="text-gray-600">Current Balance</p>
 										<p class="font-semibold text-gray-900">
-											{formatCurrency(vehicle.loan.currentBalance)}
+											{formatCurrency(vehicle.financing.currentBalance)}
 										</p>
 									</div>
 									<div>
 										<p class="text-gray-600">Original Amount</p>
 										<p class="font-semibold text-gray-900">
-											{formatCurrency(vehicle.loan.originalAmount)}
+											{formatCurrency(vehicle.financing.originalAmount)}
 										</p>
 									</div>
 									<div>
 										<p class="text-gray-600">Amount Paid</p>
 										<p class="font-semibold text-gray-900">
-											{formatCurrency(vehicle.loan.originalAmount - vehicle.loan.currentBalance)}
+											{formatCurrency(
+												vehicle.financing.originalAmount - vehicle.financing.currentBalance
+											)}
 										</p>
 									</div>
 								</div>
 							</div>
 						{/if}
 
-						<!-- Amortization Preview -->
-						{#if amortizationPreview}
+						<!-- Amortization Preview (Loans Only) -->
+						{#if amortizationPreview && financingForm.financingType === 'loan'}
 							<div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
 								<div class="flex items-center gap-2 mb-3">
 									<Calculator class="h-4 w-4 text-blue-600" />
@@ -839,7 +954,8 @@
 					</div>
 				{:else}
 					<p class="text-gray-500 text-center py-8">
-						Check the box above to {isEditMode ? 'add or edit' : 'add'} loan information for this vehicle
+						Check the box above to {isEditMode ? 'add or edit' : 'add'} financing information for this
+						vehicle
 					</p>
 				{/if}
 			</div>

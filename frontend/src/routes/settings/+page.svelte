@@ -45,30 +45,30 @@
 	let syncOnInactivity = $state(true);
 	let syncInactivityMinutes = $state(5);
 
+	// Use automatic store subscription
+	let settingsState = $derived($settingsStore);
+
 	onMount(() => {
 		isLoading = true;
 		settingsStore.load();
+	});
 
-		const unsubscribe = settingsStore.subscribe(state => {
-			settings = state.settings;
-			isLoading = state.isLoading;
+	// Update local state when settings change
+	$effect(() => {
+		settings = settingsState.settings;
+		isLoading = settingsState.isLoading;
 
-			if (settings) {
-				distanceUnit = settings.distanceUnit;
-				fuelUnit = settings.fuelUnit;
-				currencyUnit = settings.currencyUnit;
-				autoBackupEnabled = settings.autoBackupEnabled;
-				backupFrequency = settings.backupFrequency;
-				googleDriveBackupEnabled = settings.googleDriveBackupEnabled;
-				googleSheetsSyncEnabled = settings.googleSheetsSyncEnabled || false;
-				syncOnInactivity = settings.syncOnInactivity ?? true;
-				syncInactivityMinutes = settings.syncInactivityMinutes || 5;
-			}
-		});
-
-		return () => {
-			unsubscribe();
-		};
+		if (settings) {
+			distanceUnit = settings.distanceUnit;
+			fuelUnit = settings.fuelUnit;
+			currencyUnit = settings.currencyUnit;
+			autoBackupEnabled = settings.autoBackupEnabled;
+			backupFrequency = settings.backupFrequency;
+			googleDriveBackupEnabled = settings.googleDriveBackupEnabled;
+			googleSheetsSyncEnabled = settings.googleSheetsSyncEnabled || false;
+			syncOnInactivity = settings.syncOnInactivity ?? true;
+			syncInactivityMinutes = settings.syncInactivityMinutes || 5;
+		}
 	});
 
 	async function handleSave() {

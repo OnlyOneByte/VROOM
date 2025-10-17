@@ -2,9 +2,15 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:tes
 import { createId } from '@paralleldrive/cuid2';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { loanPayments, sessions, users, vehicleLoans, vehicles } from '../../db/schema';
+import {
+  sessions,
+  users,
+  vehicleFinancing,
+  vehicleFinancingPayments,
+  vehicles,
+} from '../../db/schema';
 import { errorHandler } from '../../lib/middleware/error-handler';
-import { loans as loanRoutes } from '../../routes/loans';
+import { financing as financingRoutes } from '../../routes/financing';
 import { vehicles as vehicleRoutes } from '../../routes/vehicles';
 import type {
   LoanPaymentResponse,
@@ -25,7 +31,7 @@ import { assertSuccessResponse, getDb, getTypedResponse } from '../utils/test-he
 const testApp = new Hono();
 testApp.onError(errorHandler);
 testApp.route('/api/vehicles', vehicleRoutes);
-testApp.route('/api/loans', loanRoutes);
+testApp.route('/api/loans', financingRoutes);
 
 describe('Vehicle Management API Integration Tests', () => {
   let _db: ReturnType<typeof getTestDatabase>;
@@ -41,8 +47,8 @@ describe('Vehicle Management API Integration Tests', () => {
   beforeEach(async () => {
     clearTestData();
     // Clean up test data
-    await getDb().delete(loanPayments);
-    await getDb().delete(vehicleLoans);
+    await getDb().delete(vehicleFinancingPayments);
+    await getDb().delete(vehicleFinancing);
     await getDb().delete(vehicles);
     await getDb().delete(sessions);
     await getDb().delete(users).where(eq(users.email, 'test@example.com'));
@@ -371,7 +377,8 @@ describe('Vehicle Management API Integration Tests', () => {
 
     test('should create loan for vehicle', async () => {
       const loanData = {
-        lender: 'Test Bank',
+        provider: 'Test Bank',
+        financingType: 'loan',
         originalAmount: 20000,
         apr: 4.5,
         termMonths: 60,
@@ -381,21 +388,24 @@ describe('Vehicle Management API Integration Tests', () => {
         paymentDayOfMonth: 15,
       };
 
-      const req = new Request(`http://localhost:3001/api/loans/vehicles/${testVehicleId}/loan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: sessionCookie,
-        },
-        body: JSON.stringify(loanData),
-      });
+      const req = new Request(
+        `http://localhost:3001/api/loans/vehicles/${testVehicleId}/financing`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: sessionCookie,
+          },
+          body: JSON.stringify(loanData),
+        }
+      );
 
       const res = await testApp.fetch(req);
       expect(res.status).toBe(201);
 
       const data = await getTypedResponse<VehicleLoanResponse>(res);
       assertSuccessResponse(data);
-      expect(data.data.lender).toBe('Test Bank');
+      expect(data.data.provider).toBe('Test Bank');
       expect(data.data.originalAmount).toBe(20000);
       expect(data.data.currentBalance).toBe(20000);
       expect(data.data.isActive).toBe(true);
@@ -404,7 +414,8 @@ describe('Vehicle Management API Integration Tests', () => {
 
     test('should reject loan with invalid terms', async () => {
       const invalidLoanData = {
-        lender: 'Test Bank',
+        provider: 'Test Bank',
+        financingType: 'loan',
         originalAmount: -1000, // Negative amount should fail
         apr: 4.5,
         termMonths: 60,
@@ -412,14 +423,17 @@ describe('Vehicle Management API Integration Tests', () => {
         paymentAmount: 372.86,
       };
 
-      const req = new Request(`http://localhost:3001/api/loans/vehicles/${testVehicleId}/loan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: sessionCookie,
-        },
-        body: JSON.stringify(invalidLoanData),
-      });
+      const req = new Request(
+        `http://localhost:3001/api/loans/vehicles/${testVehicleId}/financing`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: sessionCookie,
+          },
+          body: JSON.stringify(invalidLoanData),
+        }
+      );
 
       const res = await testApp.fetch(req);
       expect(res.status).toBe(400);
@@ -428,11 +442,12 @@ describe('Vehicle Management API Integration Tests', () => {
     test('should get loan for vehicle', async () => {
       // Create test loan
       const loan = await getDb()
-        .insert(vehicleLoans)
+        .insert(vehicleFinancing)
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          lender: 'Test Bank',
+          provider: 'Test Bank',
+          financingType: 'loan',
           originalAmount: 20000,
           currentBalance: 15000,
           apr: 4.5,
@@ -444,11 +459,14 @@ describe('Vehicle Management API Integration Tests', () => {
         })
         .returning();
 
-      const req = new Request(`http://localhost:3001/api/loans/vehicles/${testVehicleId}/loan`, {
-        headers: {
-          Cookie: sessionCookie,
-        },
-      });
+      const req = new Request(
+        `http://localhost:3001/api/loans/vehicles/${testVehicleId}/financing`,
+        {
+          headers: {
+            Cookie: sessionCookie,
+          },
+        }
+      );
 
       const res = await testApp.fetch(req);
       expect(res.status).toBe(200);
@@ -456,18 +474,19 @@ describe('Vehicle Management API Integration Tests', () => {
       const data = await getTypedResponse<VehicleLoanResponse>(res);
       assertSuccessResponse(data);
       expect(data.data.id).toBe(loan[0].id);
-      expect(data.data.lender).toBe('Test Bank');
+      expect(data.data.provider).toBe('Test Bank');
       expect(data.data.currentBalance).toBe(15000);
     });
 
     test('should generate amortization schedule', async () => {
       // Create test loan
       const loan = await getDb()
-        .insert(vehicleLoans)
+        .insert(vehicleFinancing)
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          lender: 'Test Bank',
+          provider: 'Test Bank',
+          financingType: 'loan',
           originalAmount: 20000,
           currentBalance: 20000,
           apr: 4.5,
@@ -499,11 +518,12 @@ describe('Vehicle Management API Integration Tests', () => {
     test('should record loan payment', async () => {
       // Create test loan
       const loan = await getDb()
-        .insert(vehicleLoans)
+        .insert(vehicleFinancing)
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          lender: 'Test Bank',
+          provider: 'Test Bank',
+          financingType: 'loan',
           originalAmount: 20000,
           currentBalance: 20000,
           apr: 4.5,
@@ -534,24 +554,25 @@ describe('Vehicle Management API Integration Tests', () => {
 
       const data = await getTypedResponse<{
         payment: LoanPaymentResponse;
-        loan: VehicleLoanResponse;
+        financing: VehicleLoanResponse;
       }>(res);
       assertSuccessResponse(data);
       expect(data.data.payment).toBeDefined();
       expect(data.data.payment.paymentAmount).toBe(372.86);
       expect(data.data.payment.paymentNumber).toBe(1);
-      expect(data.data.loan.currentBalance).toBeLessThan(20000);
+      expect(data.data.financing.currentBalance).toBeLessThan(20000);
       expect(data.message).toContain('recorded successfully');
     });
 
     test('should get payment history', async () => {
       // Create test loan
       const loan = await getDb()
-        .insert(vehicleLoans)
+        .insert(vehicleFinancing)
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          lender: 'Test Bank',
+          provider: 'Test Bank',
+          financingType: 'loan',
           originalAmount: 20000,
           currentBalance: 19000,
           apr: 4.5,
@@ -564,10 +585,10 @@ describe('Vehicle Management API Integration Tests', () => {
 
       // Create test payment
       await getDb()
-        .insert(loanPayments)
+        .insert(vehicleFinancingPayments)
         .values({
           id: createId(),
-          loanId: loan[0].id,
+          financingId: loan[0].id,
           paymentDate: new Date('2020-04-15'),
           paymentAmount: 372.86,
           principalAmount: 297.86,
@@ -599,11 +620,12 @@ describe('Vehicle Management API Integration Tests', () => {
     test('should mark loan as paid off', async () => {
       // Create test loan
       const loan = await getDb()
-        .insert(vehicleLoans)
+        .insert(vehicleFinancing)
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          lender: 'Test Bank',
+          provider: 'Test Bank',
+          financingType: 'loan',
           originalAmount: 20000,
           currentBalance: 1000,
           apr: 4.5,
@@ -627,7 +649,7 @@ describe('Vehicle Management API Integration Tests', () => {
 
       const data = await getTypedResponse<unknown>(res);
       expect(data.success).toBe(true);
-      expect(data.message).toContain('paid off successfully');
+      expect(data.message).toContain('completed successfully');
     });
 
     test("should prevent access to other users' loans", async () => {
@@ -657,11 +679,11 @@ describe('Vehicle Management API Integration Tests', () => {
         .returning();
 
       const otherLoan = await getDb()
-        .insert(vehicleLoans)
+        .insert(vehicleFinancing)
         .values({
           id: createId(),
           vehicleId: otherVehicle[0].id,
-          lender: 'Other Bank',
+          provider: 'Other Bank',
           originalAmount: 15000,
           currentBalance: 15000,
           apr: 5.0,
@@ -720,7 +742,8 @@ describe('Vehicle Management API Integration Tests', () => {
         .returning();
 
       const loanData = {
-        lender: 'Test Bank',
+        provider: 'Test Bank',
+        financingType: 'loan',
         originalAmount: 20000,
         apr: 100, // Invalid APR > 50%
         termMonths: 60,
@@ -728,14 +751,17 @@ describe('Vehicle Management API Integration Tests', () => {
         paymentAmount: 372.86,
       };
 
-      const req = new Request(`http://localhost:3001/api/loans/vehicles/${vehicle[0].id}/loan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: sessionCookie,
-        },
-        body: JSON.stringify(loanData),
-      });
+      const req = new Request(
+        `http://localhost:3001/api/loans/vehicles/${vehicle[0].id}/financing`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: sessionCookie,
+          },
+          body: JSON.stringify(loanData),
+        }
+      );
 
       const res = await testApp.fetch(req);
       expect(res.status).toBe(400);

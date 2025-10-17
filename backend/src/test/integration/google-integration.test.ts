@@ -24,9 +24,9 @@ import { createId } from '@paralleldrive/cuid2';
 import {
   expenses,
   insurancePolicies,
-  loanPayments,
   users,
-  vehicleLoans,
+  vehicleFinancing,
+  vehicleFinancingPayments,
   vehicles,
 } from '../../db/schema';
 import { GoogleDriveService } from '../../lib/google-drive';
@@ -665,11 +665,11 @@ describe('Google Integration Tests', () => {
 
       const loanId = createId();
       await getDb()
-        .insert(vehicleLoans)
+        .insert(vehicleFinancing)
         .values({
           id: loanId,
           vehicleId: testVehicleId,
-          lender: 'Test Bank',
+          provider: 'Test Bank',
           originalAmount: 20000,
           currentBalance: 15000,
           apr: 4.5,
@@ -682,10 +682,10 @@ describe('Google Integration Tests', () => {
         });
 
       await getDb()
-        .insert(loanPayments)
+        .insert(vehicleFinancingPayments)
         .values({
           id: createId(),
-          loanId: loanId,
+          financingId: loanId,
           paymentDate: new Date('2024-01-15'),
           paymentAmount: 372.86,
           principalAmount: 310.36,
@@ -837,28 +837,28 @@ describe('Google Integration Tests', () => {
       await sheetsService.createOrUpdateVroomSpreadsheet(testUserId, 'Test User');
 
       // Verify loan data
-      const loanUpdateCall = mockSheetsValues.update.mock.calls.find((call: unknown[]) =>
-        (call?.[0] as { range?: string })?.range?.includes('Loan Details!')
+      const financingUpdateCall = mockSheetsValues.update.mock.calls.find((call: unknown[]) =>
+        (call?.[0] as { range?: string })?.range?.includes('Financing Details!')
       );
 
-      expect(loanUpdateCall).toBeDefined();
-      const loanData = loanUpdateCall?.[0]?.requestBody?.values;
+      expect(financingUpdateCall).toBeDefined();
+      const financingData = financingUpdateCall?.[0]?.requestBody?.values;
 
       // Check that we have data (headers + at least one row)
-      expect(loanData.length).toBeGreaterThan(0);
+      expect(financingData.length).toBeGreaterThan(0);
 
       // Check headers exist
-      expect(loanData[0]).toEqual(
-        expect.arrayContaining(['Vehicle', 'Loan Company', 'Original Amount'])
+      expect(financingData[0]).toEqual(
+        expect.arrayContaining(['Vehicle', 'Provider', 'Original Amount'])
       );
 
-      // If we have loan data, check it
-      if (loanData.length > 1) {
-        const hasLoanData = loanData.some(
+      // If we have financing data, check it
+      if (financingData.length > 1) {
+        const hasFinancingData = financingData.some(
           (row: unknown[]) =>
             Array.isArray(row) && row.some((cell: unknown) => String(cell).includes('Test Bank'))
         );
-        expect(hasLoanData).toBe(true);
+        expect(hasFinancingData).toBe(true);
       }
 
       // Verify insurance data

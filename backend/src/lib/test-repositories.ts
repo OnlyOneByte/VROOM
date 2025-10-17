@@ -19,7 +19,7 @@ async function testRepositories() {
     const userRepo = repositoryFactory.getUserRepository();
     const vehicleRepo = repositoryFactory.getVehicleRepository();
     const expenseRepo = repositoryFactory.getExpenseRepository();
-    const loanRepo = repositoryFactory.getVehicleLoanRepository();
+    const loanRepo = repositoryFactory.getVehicleFinancingRepository();
     const insuranceRepo = repositoryFactory.getInsurancePolicyRepository();
 
     // Test user operations
@@ -74,7 +74,8 @@ async function testRepositories() {
     console.log('\n🏦 Testing Loan Repository...');
     const testLoan = await loanRepo.create({
       vehicleId: testVehicle.id,
-      lender: 'Test Bank',
+      provider: 'Test Bank',
+      financingType: 'loan',
       originalAmount: 20000,
       currentBalance: 15000,
       apr: 4.5,

@@ -7,6 +7,9 @@
 	let status = $state('processing');
 	let error = $state('');
 
+	// Use automatic store subscription
+	let authState = $derived($authStore);
+
 	onMount(async () => {
 		try {
 			// Get the current URL parameters
@@ -26,31 +29,24 @@
 			// The backend should handle the OAuth callback and set the session
 			// We just need to check if we're now authenticated
 			await authStore.initialize();
-
-			// Check auth state
-			const unsubscribe = authStore.subscribe(
-				({ isAuthenticated, isLoading, error: authError }) => {
-					if (!isLoading) {
-						if (isAuthenticated) {
-							status = 'success';
-							setTimeout(() => {
-								goto('/vehicles');
-							}, 1000);
-						} else {
-							status = 'error';
-							error = authError || 'Authentication failed';
-						}
-					}
-				}
-			);
-
-			// Cleanup subscription after 10 seconds to prevent memory leaks
-			setTimeout(() => {
-				unsubscribe();
-			}, 10000);
 		} catch (err) {
 			status = 'error';
 			error = err instanceof Error ? err.message : 'Authentication failed';
+		}
+	});
+
+	// Check auth state and redirect
+	$effect(() => {
+		if (!authState.isLoading) {
+			if (authState.isAuthenticated) {
+				status = 'success';
+				setTimeout(() => {
+					goto('/vehicles');
+				}, 1000);
+			} else if (status === 'processing') {
+				status = 'error';
+				error = authState.error || 'Authentication failed';
+			}
 		}
 	});
 

@@ -181,8 +181,8 @@ describe('Data Validation Tests', () => {
     test('should handle loan payment calculations correctly', async () => {
       const userRepo = repositoryFactory.getUserRepository();
       const vehicleRepo = repositoryFactory.getVehicleRepository();
-      const loanRepo = repositoryFactory.getVehicleLoanRepository();
-      const paymentRepo = repositoryFactory.getLoanPaymentRepository();
+      const loanRepo = repositoryFactory.getVehicleFinancingRepository();
+      const paymentRepo = repositoryFactory.getVehicleFinancingPaymentRepository();
 
       const user = await userRepo.create({
         email: 'test@example.com',
@@ -200,7 +200,8 @@ describe('Data Validation Tests', () => {
 
       const loan = await loanRepo.create({
         vehicleId: vehicle.id,
-        lender: 'Test Bank',
+        provider: 'Test Bank',
+        financingType: 'loan',
         originalAmount: 20000,
         currentBalance: 20000,
         apr: 4.5,
@@ -213,7 +214,7 @@ describe('Data Validation Tests', () => {
 
       // Create a payment record
       await paymentRepo.create({
-        loanId: loan.id,
+        financingId: loan.id,
         paymentDate: new Date('2024-01-15'),
         paymentAmount: 372.86,
         principalAmount: 297.86,
@@ -225,7 +226,7 @@ describe('Data Validation Tests', () => {
       });
 
       // Verify payment was recorded
-      const loanPayments = await paymentRepo.findByLoanId(loan.id);
+      const loanPayments = await paymentRepo.findByFinancingId(loan.id);
       expect(loanPayments).toHaveLength(1);
       expect(loanPayments[0].remainingBalance).toBe(19702.14);
 
