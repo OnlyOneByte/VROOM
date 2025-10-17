@@ -49,7 +49,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
     const lucia = getTestLucia();
     const session = await lucia.createSession(testUserId, {});
     testSessionId = session.id;
-    sessionCookie = lucia.createSessionCookie(testSessionId).serialize();
+    sessionCookie = `${lucia.sessionCookieName}=${testSessionId}`;
 
     // Create a test vehicle with initial mileage for calculations
     const vehicle = await getDb()

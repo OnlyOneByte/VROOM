@@ -51,7 +51,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
     const lucia = getTestLucia();
     const session = await lucia.createSession(testUserId, {});
     testSessionId = session.id;
-    sessionCookie = lucia.createSessionCookie(testSessionId).serialize();
+    sessionCookie = `${lucia.sessionCookieName}=${testSessionId}`;
 
     // Create a test vehicle
     const vehicle = await getDb()

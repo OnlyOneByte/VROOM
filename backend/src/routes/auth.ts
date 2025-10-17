@@ -2,11 +2,13 @@ import { createId } from '@paralleldrive/cuid2';
 import { generateCodeVerifier, generateState } from 'arctic';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
 
 import { users } from '../db/schema';
 import { google } from '../lib/auth/lucia';
 import { getLucia } from '../lib/auth/lucia-provider.js';
+import { config } from '../lib/config';
 import { databaseService } from '../lib/database';
 
 const auth = new Hono();
@@ -143,10 +145,16 @@ auth.get('/callback/google', async (c) => {
     // Create session
     const lucia = getLucia();
     const session = await lucia.createSession(userId, {});
-    const sessionCookie = lucia.createSessionCookie(session.id);
 
     // Set session cookie
-    c.header('Set-Cookie', sessionCookie.serialize());
+    setCookie(c, lucia.sessionCookieName, session.id, {
+      path: '/',
+      secure: config.env === 'production',
+      httpOnly: true,
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      expires: session.expiresAt,
+      sameSite: 'Lax',
+    });
 
     // Redirect to frontend
     const frontendUrl =
@@ -168,7 +176,7 @@ auth.get('/callback/google', async (c) => {
 auth.get('/me', async (c) => {
   try {
     const lucia = getLucia();
-    const sessionId = lucia.readSessionCookie(c.req.header('Cookie') || '');
+    const sessionId = getCookie(c, lucia.sessionCookieName);
 
     if (!sessionId) {
       throw new HTTPException(401, { message: 'No session found' });
@@ -207,14 +215,19 @@ auth.get('/me', async (c) => {
 auth.post('/logout', async (c) => {
   try {
     const lucia = getLucia();
-    const sessionId = lucia.readSessionCookie(c.req.header('Cookie') || '');
+    const sessionId = getCookie(c, lucia.sessionCookieName);
 
     if (sessionId) {
       await lucia.invalidateSession(sessionId);
     }
 
-    const sessionCookie = lucia.createBlankSessionCookie();
-    c.header('Set-Cookie', sessionCookie.serialize());
+    deleteCookie(c, lucia.sessionCookieName, {
+      path: '/',
+      secure: config.env === 'production',
+      httpOnly: true,
+      maxAge: 60 * 60 * 24 * 30,
+      sameSite: 'Lax',
+    });
 
     return c.json({ message: 'Logged out successfully' });
   } catch (error) {
@@ -227,7 +240,7 @@ auth.post('/logout', async (c) => {
 auth.post('/refresh', async (c) => {
   try {
     const lucia = getLucia();
-    const sessionId = lucia.readSessionCookie(c.req.header('Cookie') || '');
+    const sessionId = getCookie(c, lucia.sessionCookieName);
 
     if (!sessionId) {
       throw new HTTPException(401, { message: 'No session found' });
@@ -262,9 +275,15 @@ auth.post('/refresh', async (c) => {
 
     // Create new session - create first to avoid losing session if creation fails
     const newSession = await lucia.createSession(user.id, {});
-    const sessionCookie = lucia.createSessionCookie(newSession.id);
 
-    c.header('Set-Cookie', sessionCookie.serialize());
+    setCookie(c, lucia.sessionCookieName, newSession.id, {
+      path: '/',
+      secure: config.env === 'production',
+      httpOnly: true,
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      expires: newSession.expiresAt,
+      sameSite: 'Lax',
+    });
 
     // Only invalidate old session after new one is successfully created
     await lucia.invalidateSession(session.id);

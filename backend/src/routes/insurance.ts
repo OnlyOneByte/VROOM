@@ -21,14 +21,8 @@ const createInsurancePolicySchema = z.object({
     .int()
     .min(1, 'Term length must be at least 1 month')
     .max(24, 'Term length cannot exceed 24 months'),
-  startDate: z
-    .string()
-    .datetime()
-    .transform((val) => new Date(val)),
-  endDate: z
-    .string()
-    .datetime()
-    .transform((val) => new Date(val)),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
 });
 
 const updateInsurancePolicySchema = createInsurancePolicySchema.partial();
@@ -157,11 +151,11 @@ insurance.get('/vehicles/:id/policies', zValidator('param', vehicleParamsSchema)
         expirationAlert:
           daysUntilExpiration <= 30
             ? {
-                type: 'expiration_warning',
-                severity: daysUntilExpiration <= 7 ? 'high' : 'medium',
-                message: `Policy expires in ${daysUntilExpiration} days`,
-                daysRemaining: daysUntilExpiration,
-              }
+              type: 'expiration_warning',
+              severity: daysUntilExpiration <= 7 ? 'high' : 'medium',
+              message: `Policy expires in ${daysUntilExpiration} days`,
+              daysRemaining: daysUntilExpiration,
+            }
             : null,
       };
     });

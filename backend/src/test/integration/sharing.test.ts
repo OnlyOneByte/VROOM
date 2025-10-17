@@ -69,11 +69,11 @@ describe('Vehicle Sharing System Integration Tests', () => {
     const lucia = getTestLucia();
     const ownerSession = await lucia.createSession(ownerUserId, {});
     ownerSessionId = ownerSession.id;
-    ownerSessionCookie = lucia.createSessionCookie(ownerSessionId).serialize();
+    ownerSessionCookie = `${lucia.sessionCookieName}=${ownerSessionId}`;
 
     const sharedUserSession = await lucia.createSession(sharedUserId, {});
     sharedUserSessionId = sharedUserSession.id;
-    sharedUserSessionCookie = lucia.createSessionCookie(sharedUserSessionId).serialize();
+    sharedUserSessionCookie = `${lucia.sessionCookieName}=${sharedUserSessionId}`;
 
     // Create a test vehicle for the owner
     const vehicle = await getDb()
@@ -580,7 +580,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
 
       const lucia = getTestLucia();
       const otherSession = await lucia.createSession(otherUserId, {});
-      const otherSessionCookie = lucia.createSessionCookie(otherSession.id).serialize();
+      const otherSessionCookie = `${lucia.sessionCookieName}=${otherSession.id}`;
 
       const req = new Request(`http://localhost:3001/api/sharing/${shareId}`, {
         method: 'DELETE',

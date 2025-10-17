@@ -59,7 +59,17 @@ const createExpenseSchema = z.object({
   volume: z.number().positive('Volume must be positive').optional(),
   charge: z.number().positive('Charge must be positive').optional(),
   description: z.string().max(500, 'Description must be 500 characters or less').optional(),
-  receiptUrl: z.string().url('Receipt URL must be valid').optional(),
+  receiptUrl: z
+    .string()
+    .refine((val) => {
+      try {
+        new URL(val);
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'Receipt URL must be valid')
+    .optional(),
 });
 
 const updateExpenseSchema = createExpenseSchema.partial();

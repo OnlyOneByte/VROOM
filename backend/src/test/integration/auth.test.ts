@@ -100,11 +100,10 @@ describe('Authentication Integration Tests', () => {
 
     test('should get current user with valid session', async () => {
       const lucia = getTestLucia();
-      const sessionCookie = lucia.createSessionCookie(testSessionId);
 
       const req = new Request('http://localhost:3001/auth/me', {
         headers: {
-          Cookie: sessionCookie.serialize(),
+          Cookie: `${lucia.sessionCookieName}=${testSessionId}`,
         },
       });
       const res = await testApp.fetch(req);
@@ -142,12 +141,11 @@ describe('Authentication Integration Tests', () => {
 
     test('should refresh session successfully', async () => {
       const lucia = getTestLucia();
-      const sessionCookie = lucia.createSessionCookie(testSessionId);
 
       const req = new Request('http://localhost:3001/auth/refresh', {
         method: 'POST',
         headers: {
-          Cookie: sessionCookie.serialize(),
+          Cookie: `${lucia.sessionCookieName}=${testSessionId}`,
         },
       });
       const res = await testApp.fetch(req);
@@ -165,12 +163,11 @@ describe('Authentication Integration Tests', () => {
 
     test('should logout successfully', async () => {
       const luciaInstance = getTestLucia();
-      const sessionCookie = luciaInstance.createSessionCookie(testSessionId);
 
       const req = new Request('http://localhost:3001/auth/logout', {
         method: 'POST',
         headers: {
-          Cookie: sessionCookie.serialize(),
+          Cookie: `${luciaInstance.sessionCookieName}=${testSessionId}`,
         },
       });
       const res = await testApp.fetch(req);
@@ -221,11 +218,10 @@ describe('Authentication Integration Tests', () => {
 
     test('should access protected route with valid session', async () => {
       const lucia = getTestLucia();
-      const sessionCookie = lucia.createSessionCookie(testSessionId);
 
       const req = new Request('http://localhost:3001/protected', {
         headers: {
-          Cookie: sessionCookie.serialize(),
+          Cookie: `${lucia.sessionCookieName}=${testSessionId}`,
         },
       });
       const res = await testApp.fetch(req);

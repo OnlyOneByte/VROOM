@@ -23,11 +23,7 @@ const createVehicleSchema = z.object({
   nickname: z.string().max(50, 'Nickname must be 50 characters or less').optional(),
   initialMileage: z.number().int().min(0, 'Initial mileage cannot be negative').optional(),
   purchasePrice: z.number().min(0, 'Purchase price cannot be negative').optional(),
-  purchaseDate: z
-    .string()
-    .datetime()
-    .optional()
-    .transform((val) => (val ? new Date(val) : undefined)),
+  purchaseDate: z.coerce.date().optional(),
 });
 
 const updateVehicleSchema = createVehicleSchema.partial();

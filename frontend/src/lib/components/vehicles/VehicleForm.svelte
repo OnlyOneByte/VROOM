@@ -6,7 +6,6 @@
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
-	import Switch from '$lib/components/ui/switch/switch.svelte';
 	import * as Select from '$lib/components/ui/select';
 	import { FormFieldError } from '$lib/components/ui/form-field';
 	import {
@@ -41,7 +40,6 @@
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
-	let showFinancingForm = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 
 	// Form data
@@ -56,6 +54,8 @@
 		purchasePrice: undefined,
 		purchaseDate: ''
 	});
+
+	let ownershipType = $state<'own' | 'lease' | 'finance'>('own');
 
 	let financingForm = $state({
 		financingType: 'loan' as 'loan' | 'lease' | 'own',
@@ -154,7 +154,15 @@
 		};
 
 		if (vehicle.financing?.isActive) {
-			showFinancingForm = true;
+			// Set ownership type based on financing type
+			if (vehicle.financing.financingType === 'loan') {
+				ownershipType = 'finance';
+			} else if (vehicle.financing.financingType === 'lease') {
+				ownershipType = 'lease';
+			} else {
+				ownershipType = 'own';
+			}
+
 			financingForm = {
 				financingType: vehicle.financing.financingType,
 				provider: vehicle.financing.provider,
@@ -199,7 +207,7 @@
 	}
 
 	function validateFinancingForm(): boolean {
-		if (!showFinancingForm) return true;
+		if (ownershipType === 'own') return true;
 
 		if (!financingForm.provider.trim()) {
 			errors['provider'] = 'Provider is required';
@@ -232,7 +240,7 @@
 
 	function calculateAmortization() {
 		if (
-			!showFinancingForm ||
+			ownershipType !== 'finance' ||
 			financingForm.financingType !== 'loan' ||
 			financingForm.originalAmount <= 0 ||
 			financingForm.apr <= 0 ||
@@ -270,12 +278,12 @@
 		const amount = financingForm.originalAmount;
 		const apr = financingForm.apr;
 		const term = financingForm.termMonths;
-		const show = showFinancingForm;
+		const ownership = ownershipType;
 		const type = financingForm.financingType;
 
 		void financingForm.startDate;
 
-		if (show && type === 'loan' && amount > 0 && apr >= 0 && term > 0) {
+		if (ownership === 'finance' && type === 'loan' && amount > 0 && apr >= 0 && term > 0) {
 			calculateAmortization();
 		} else {
 			amortizationPreview = null;
@@ -286,6 +294,17 @@
 	$effect(() => {
 		if (amortizationPreview && financingForm.financingType === 'loan') {
 			financingForm.paymentAmount = amortizationPreview.monthlyPayment;
+		}
+	});
+
+	// Update financingType when ownershipType changes
+	$effect(() => {
+		if (ownershipType === 'finance') {
+			financingForm.financingType = 'loan';
+		} else if (ownershipType === 'lease') {
+			financingForm.financingType = 'lease';
+		} else {
+			financingForm.financingType = 'own';
 		}
 	});
 
@@ -342,7 +361,7 @@
 			const finalVehicleId = isEditMode ? vehicleId! : savedVehicle.id;
 
 			// Handle financing data separately if provided
-			if (showFinancingForm && financingForm.provider.trim() && financingForm.startDate) {
+			if (ownershipType !== 'own' && financingForm.provider.trim() && financingForm.startDate) {
 				const financingData: any = {
 					financingType: financingForm.financingType,
 					provider: financingForm.provider,
@@ -648,55 +667,51 @@
 
 			<!-- Financing Information -->
 			<div class="card">
-				<div class="flex items-center justify-between mb-6">
-					<div class="flex items-center gap-2">
-						<DollarSign class="h-5 w-5 text-primary-600" />
-						<h2 class="text-lg font-semibold text-gray-900">Financing Information</h2>
-					</div>
-					<div class="flex items-center gap-2">
-						<Switch bind:checked={showFinancingForm} id="financing-toggle" />
-						<Label for="financing-toggle" class="text-sm text-gray-700 cursor-pointer"
-							>This vehicle has financing</Label
+				<div class="flex items-center gap-2 mb-6">
+					<DollarSign class="h-5 w-5 text-primary-600" />
+					<h2 class="text-lg font-semibold text-gray-900">Financing Information</h2>
+				</div>
+
+				<!-- Ownership Type Selector -->
+				<div class="mb-6">
+					<Label class="mb-3 block">How do you own this vehicle? *</Label>
+					<div class="grid grid-cols-3 gap-3">
+						<button
+							type="button"
+							onclick={() => (ownershipType = 'own')}
+							class="px-4 py-3 rounded-lg border-2 transition-all {ownershipType === 'own'
+								? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
+								: 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'}"
 						>
+							Own
+						</button>
+						<button
+							type="button"
+							onclick={() => (ownershipType = 'lease')}
+							class="px-4 py-3 rounded-lg border-2 transition-all {ownershipType === 'lease'
+								? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
+								: 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'}"
+						>
+							Lease
+						</button>
+						<button
+							type="button"
+							onclick={() => (ownershipType = 'finance')}
+							class="px-4 py-3 rounded-lg border-2 transition-all {ownershipType === 'finance'
+								? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
+								: 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'}"
+						>
+							Finance
+						</button>
 					</div>
 				</div>
 
-				{#if showFinancingForm}
+				{#if ownershipType !== 'own'}
 					<div class="space-y-6">
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div class="space-y-2">
-								<Label for="financingType">Financing Type *</Label>
-								<Select.Root
-									type="single"
-									value={financingForm.financingType}
-									onValueChange={v => {
-										if (v) {
-											financingForm.financingType = v as 'loan' | 'lease' | 'own';
-										}
-									}}
-								>
-									<Select.Trigger id="financingType" class="w-full">
-										{financingForm.financingType === 'loan'
-											? 'Loan'
-											: financingForm.financingType === 'lease'
-												? 'Lease'
-												: 'Owned'}
-									</Select.Trigger>
-									<Select.Content>
-										<Select.Item value="loan" label="Loan">Loan</Select.Item>
-										<Select.Item value="lease" label="Lease">Lease</Select.Item>
-										<Select.Item value="own" label="Owned">Owned</Select.Item>
-									</Select.Content>
-								</Select.Root>
-							</div>
-
-							<div class="space-y-2">
 								<Label for="provider">
-									{financingForm.financingType === 'loan'
-										? 'Lender'
-										: financingForm.financingType === 'lease'
-											? 'Leasing Company'
-											: 'Dealer/Seller'} *
+									{ownershipType === 'finance' ? 'Lender' : 'Leasing Company'} *
 								</Label>
 								<Input
 									id="provider"
@@ -714,11 +729,8 @@
 
 							<div class="space-y-2">
 								<Label for="originalAmount">
-									{isEditMode ? 'Original ' : ''}{financingForm.financingType === 'lease'
-										? 'Lease'
-										: financingForm.financingType === 'loan'
-											? 'Loan'
-											: 'Purchase'} Amount *
+									{isEditMode ? 'Original ' : ''}{ownershipType === 'lease' ? 'Lease' : 'Loan'} Amount
+									*
 								</Label>
 								<Input
 									id="originalAmount"
@@ -738,7 +750,7 @@
 								{/if}
 							</div>
 
-							{#if financingForm.financingType === 'loan'}
+							{#if ownershipType === 'finance'}
 								<div class="space-y-2">
 									<Label for="apr">APR (%) *</Label>
 									<Input
@@ -848,7 +860,7 @@
 								{/if}
 							</div>
 
-							{#if financingForm.financingType === 'lease'}
+							{#if ownershipType === 'lease'}
 								<div class="space-y-2">
 									<Label for="residualValue">Residual Value (Buyout Price)</Label>
 									<Input
@@ -916,7 +928,7 @@
 						{/if}
 
 						<!-- Amortization Preview (Loans Only) -->
-						{#if amortizationPreview && financingForm.financingType === 'loan'}
+						{#if amortizationPreview && ownershipType === 'finance'}
 							<div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
 								<div class="flex items-center gap-2 mb-3">
 									<Calculator class="h-4 w-4 text-blue-600" />
@@ -959,8 +971,7 @@
 					</div>
 				{:else}
 					<p class="text-gray-500 text-center py-8">
-						Check the box above to {isEditMode ? 'add or edit' : 'add'} financing information for this
-						vehicle
+						This vehicle is owned outright with no financing or lease.
 					</p>
 				{/if}
 			</div>
