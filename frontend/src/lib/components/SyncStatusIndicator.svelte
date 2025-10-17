@@ -1,7 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { syncStatus, isOnline, offlineExpenses } from '$lib/stores/offline';
-	import { syncManager, lastSyncTime, syncConflicts } from '$lib/utils/sync-manager';
+	import {
+		syncManager,
+		lastSyncTime,
+		syncConflicts,
+		fetchLastSyncTime
+	} from '$lib/utils/sync-manager';
 	import { RefreshCw, CircleCheck, CircleAlert, Clock, Wifi, WifiOff } from 'lucide-svelte';
 	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
 
@@ -13,6 +18,15 @@
 	onMount(() => {
 		// Setup auto-sync
 		syncManager.setupAutoSync();
+
+		// Refresh last sync time every 30 seconds
+		const interval = setInterval(() => {
+			if ($isOnline) {
+				fetchLastSyncTime();
+			}
+		}, 60000);
+
+		return () => clearInterval(interval);
 	});
 
 	async function handleManualSync() {

@@ -39,6 +39,42 @@ export const syncQueue = writable<OfflineExpense[]>([]);
 export const syncConflicts = writable<SyncConflict[]>([]);
 export const lastSyncTime = writable<Date | null>(null);
 
+// Fetch last sync time from server
+export async function fetchLastSyncTime(): Promise<void> {
+	try {
+		const response = await fetch('/api/sync/status', {
+			credentials: 'include'
+		});
+
+		if (response.ok) {
+			const result = await response.json();
+			if (result.success && result.status) {
+				// Use lastSyncDate (Google Sheets sync) or lastBackupDate (Google Drive backup)
+				// Prefer the most recent one
+				const syncDate = result.status.lastSyncDate ? new Date(result.status.lastSyncDate) : null;
+				const backupDate = result.status.lastBackupDate
+					? new Date(result.status.lastBackupDate)
+					: null;
+
+				let mostRecentSync: Date | null = null;
+				if (syncDate && backupDate) {
+					mostRecentSync = syncDate > backupDate ? syncDate : backupDate;
+				} else if (syncDate) {
+					mostRecentSync = syncDate;
+				} else if (backupDate) {
+					mostRecentSync = backupDate;
+				}
+
+				if (mostRecentSync) {
+					lastSyncTime.set(mostRecentSync);
+				}
+			}
+		}
+	} catch (error) {
+		console.error('Failed to fetch last sync time:', error);
+	}
+}
+
 class SyncManager {
 	private retryCount = new Map<string, number>();
 	private syncInProgress = false;
@@ -342,8 +378,14 @@ class SyncManager {
 
 		this.autoSyncSetup = true;
 
+		// Fetch initial last sync time
+		fetchLastSyncTime();
+
 		isOnline.subscribe(async online => {
 			if (online && !this.syncInProgress) {
+				// Refresh last sync time when coming online
+				fetchLastSyncTime();
+
 				const pendingExpenses = this.getPendingExpenses();
 				if (pendingExpenses.length > 0) {
 					// Wait a bit for network to stabilize
