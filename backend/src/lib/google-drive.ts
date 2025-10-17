@@ -419,6 +419,47 @@ export class GoogleDriveService {
       throw new Error('Failed to delete file');
     }
   }
+
+  /**
+   * Download a file from Google Drive
+   */
+  async downloadFile(fileId: string): Promise<Buffer> {
+    try {
+      const response = await this.drive.files.get(
+        {
+          fileId,
+          alt: 'media',
+        },
+        { responseType: 'arraybuffer' }
+      );
+
+      return Buffer.from(response.data as ArrayBuffer);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      throw new Error('Failed to download file');
+    }
+  }
+
+  /**
+   * Get file metadata
+   */
+  async getFileMetadata(fileId: string): Promise<DriveFile> {
+    try {
+      const response = await this.drive.files.get({
+        fileId,
+        fields: 'id, name, mimeType, parents, webViewLink, size, createdTime, modifiedTime',
+      });
+
+      if (!response.data) {
+        throw new Error('Failed to get file metadata - no response data');
+      }
+
+      return response.data as DriveFile;
+    } catch (error) {
+      console.error('Error getting file metadata:', error);
+      throw new Error('Failed to get file metadata');
+    }
+  }
 }
 
 /**

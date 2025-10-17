@@ -436,6 +436,106 @@ sync.get('/backups', async (c) => {
 });
 
 /**
+ * GET /api/sync/backups/:fileId/download
+ * Download a specific backup from Google Drive
+ */
+sync.get('/backups/:fileId/download', async (c) => {
+  try {
+    const user = c.get('user');
+    const userId = user.id;
+    const fileId = c.req.param('fileId');
+
+    if (!fileId) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'fileId parameter is required',
+          },
+        },
+        400
+      );
+    }
+
+    // Import dependencies
+    const { databaseService } = await import('../lib/database');
+    const { eq } = await import('drizzle-orm');
+    const { users } = await import('../db/schema');
+    const { GoogleDriveService } = await import('../lib/google-drive');
+
+    const db = databaseService.getDatabase();
+
+    // Get user info for tokens
+    const userInfo = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!userInfo.length || !userInfo[0].googleRefreshToken) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'AUTH_INVALID',
+            message: 'Google Drive access not available. Please re-authenticate with Google.',
+          },
+        },
+        401
+      );
+    }
+
+    // Create GoogleDriveService instance
+    const driveService = new GoogleDriveService(
+      userInfo[0].googleRefreshToken,
+      userInfo[0].googleRefreshToken
+    );
+
+    // Download the file
+    const fileBuffer = await driveService.downloadFile(fileId);
+
+    // Get file metadata for filename
+    const fileMetadata = await driveService.getFileMetadata(fileId);
+
+    // Return buffer as response
+    return new Response(fileBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${fileMetadata.name || 'backup.zip'}"`,
+        'Content-Length': fileBuffer.length.toString(),
+      },
+    });
+  } catch (error) {
+    console.error('Error downloading backup:', error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message.includes('auth')) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'AUTH_INVALID',
+            message: 'Google Drive access not available. Please re-authenticate with Google.',
+            details: error.message,
+          },
+        },
+        401
+      );
+    }
+
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'DOWNLOAD_BACKUP_FAILED',
+          message: 'Failed to download backup',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        },
+      },
+      500
+    );
+  }
+});
+
+/**
  * DELETE /api/sync/backups/:fileId
  * Delete a specific backup from Google Drive
  */

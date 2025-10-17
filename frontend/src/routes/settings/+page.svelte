@@ -25,10 +25,9 @@
 		CardHeader,
 		CardTitle
 	} from '$lib/components/ui/card';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as RadioGroup from '$lib/components/ui/radio-group';
-	import { Input } from '$lib/components/ui/input';
-	import { Checkbox } from '$lib/components/ui/checkbox';
+	import SyncNowDialog from '$lib/components/settings/SyncNowDialog.svelte';
+	import RestoreFromFileDialog from '$lib/components/settings/RestoreFromFileDialog.svelte';
+	import RestoreFromDriveDialog from '$lib/components/settings/RestoreFromDriveDialog.svelte';
 
 	// Derive state directly from store
 	let settings = $derived($settingsStore.settings);
@@ -56,9 +55,14 @@
 	let autoBackupEnabled = $state(false);
 	let backupFrequency = $state<'daily' | 'weekly' | 'monthly'>('weekly');
 	let googleDriveBackupEnabled = $state(false);
+	let googleDriveBackupRetentionCount = $state(10);
 	let googleSheetsSyncEnabled = $state(false);
 	let syncInactivityMinutes = $state(5);
 	let isInitialized = $state(false);
+	let showDriveRestoreDialog = $state(false);
+	let driveBackups = $state<any[]>([]);
+	let isLoadingBackups = $state(false);
+	let selectedDriveBackup = $state<string | null>(null);
 
 	onMount(() => {
 		settingsStore.load();
@@ -74,6 +78,7 @@
 			autoBackupEnabled = settings.autoBackupEnabled;
 			backupFrequency = settings.backupFrequency;
 			googleDriveBackupEnabled = settings.googleDriveBackupEnabled;
+			googleDriveBackupRetentionCount = settings.googleDriveBackupRetentionCount || 10;
 			googleSheetsSyncEnabled = settings.googleSheetsSyncEnabled || false;
 			syncInactivityMinutes = settings.syncInactivityMinutes || 5;
 			isInitialized = true;
@@ -97,7 +102,8 @@
 				chargeUnit,
 				currencyUnit,
 				autoBackupEnabled,
-				backupFrequency
+				backupFrequency,
+				googleDriveBackupRetentionCount
 			});
 
 			// Reset initialization flag to allow settings to update from server
@@ -211,6 +217,87 @@
 		syncBackup = googleDriveBackupEnabled;
 		syncResults = null;
 		showSyncDialog = true;
+	}
+
+	async function handleRestoreFromDriveClick() {
+		showDriveRestoreDialog = true;
+		selectedDriveBackup = null;
+		restorePreview = null;
+		restoreConflicts = [];
+		await loadDriveBackups();
+	}
+
+	async function loadDriveBackups() {
+		isLoadingBackups = true;
+		try {
+			const result = await settingsStore.listBackups();
+			if (result.success) {
+				driveBackups = result.backups || [];
+			}
+		} catch {
+			appStore.showError('Failed to load backups from Google Drive');
+		} finally {
+			isLoadingBackups = false;
+		}
+	}
+
+	async function handleDriveBackupSelect(fileId: string) {
+		selectedDriveBackup = fileId;
+		restorePreview = null;
+		restoreConflicts = [];
+
+		// Automatically generate preview
+		isRestoring = true;
+		try {
+			const result = await settingsStore.restoreFromDriveBackup(fileId, 'preview');
+
+			if (result.success && result.preview) {
+				restorePreview = result.preview;
+			}
+
+			if (result.conflicts && result.conflicts.length > 0) {
+				restoreConflicts = result.conflicts;
+			}
+		} catch {
+			appStore.showError('Failed to preview backup');
+		} finally {
+			isRestoring = false;
+		}
+	}
+
+	async function handleDriveRestoreExecute() {
+		if (!selectedDriveBackup) {
+			appStore.showError('Please select a backup');
+			return;
+		}
+
+		if (restoreMode === 'merge' && restoreConflicts.length > 0) {
+			appStore.showError('Please resolve conflicts before merging');
+			return;
+		}
+
+		isRestoring = true;
+		try {
+			const result = await settingsStore.restoreFromDriveBackup(selectedDriveBackup, restoreMode);
+
+			if (result.success) {
+				if (result.imported) {
+					const total = Object.values(result.imported).reduce(
+						(sum: number, count) => sum + (count as number),
+						0
+					);
+					appStore.showSuccess(`Successfully restored ${total} records`);
+				}
+				showDriveRestoreDialog = false;
+				selectedDriveBackup = null;
+				restorePreview = null;
+				restoreConflicts = [];
+			}
+		} catch {
+			appStore.showError('Failed to restore backup');
+		} finally {
+			isRestoring = false;
+		}
 	}
 
 	async function handleSyncExecute() {
@@ -493,17 +580,55 @@
 							<div class="space-y-0.5">
 								<Label for="google-drive-backup">Google Drive Backup</Label>
 								<p class="text-sm text-gray-500">
-									Auto-sync backup files to Google Drive after inactivity
+									Auto-backup files to Google Drive after inactivity
 								</p>
 							</div>
 							<Switch id="google-drive-backup" bind:checked={googleDriveBackupEnabled} />
 						</div>
 
-						{#if googleDriveBackupEnabled && settings?.lastBackupDate}
+						{#if googleDriveBackupEnabled}
+							{#if settings?.lastBackupDate}
+								<div class="pl-6">
+									<p class="text-sm text-gray-600">
+										Last backup: <span class="font-medium">{lastBackupText}</span>
+									</p>
+								</div>
+							{/if}
+
+							<!-- Retention Count -->
+							<div class="space-y-2 pl-6">
+								<Label for="retention-count">Number of backups to keep</Label>
+								<Select.Root
+									type="single"
+									value={googleDriveBackupRetentionCount.toString()}
+									onValueChange={v => {
+										if (v) {
+											googleDriveBackupRetentionCount = parseInt(v);
+										}
+									}}
+								>
+									<Select.Trigger id="retention-count" class="w-full">
+										{googleDriveBackupRetentionCount}
+										{googleDriveBackupRetentionCount === 1 ? 'backup' : 'backups'}
+									</Select.Trigger>
+									<Select.Content>
+										<Select.Item value="5" label="5 backups">5 backups</Select.Item>
+										<Select.Item value="10" label="10 backups">10 backups</Select.Item>
+										<Select.Item value="15" label="15 backups">15 backups</Select.Item>
+										<Select.Item value="20" label="20 backups">20 backups</Select.Item>
+										<Select.Item value="30" label="30 backups">30 backups</Select.Item>
+										<Select.Item value="50" label="50 backups">50 backups</Select.Item>
+									</Select.Content>
+								</Select.Root>
+								<p class="text-xs text-gray-500">Older backups will be automatically deleted</p>
+							</div>
+
+							<!-- Restore from Drive Button -->
 							<div class="pl-6">
-								<p class="text-sm text-gray-600">
-									Last backup: <span class="font-medium">{lastBackupText}</span>
-								</p>
+								<Button variant="outline" onclick={handleRestoreFromDriveClick} class="w-full">
+									<Upload class="mr-2 h-4 w-4" />
+									Restore from Drive Backup
+								</Button>
 							</div>
 						{/if}
 
@@ -595,230 +720,39 @@
 		{/if}
 	</Button>
 
-	<!-- Restore Dialog -->
-	<Dialog.Root bind:open={showRestoreDialog}>
-		<Dialog.Content class="max-w-2xl max-h-[90vh] overflow-y-auto">
-			<Dialog.Header>
-				<Dialog.Title>Restore from Backup</Dialog.Title>
-				<Dialog.Description>
-					Upload a backup file and choose how to restore your data
-				</Dialog.Description>
-			</Dialog.Header>
+	<!-- Dialogs -->
+	<RestoreFromFileDialog
+		bind:open={showRestoreDialog}
+		{isRestoring}
+		{selectedFile}
+		bind:restoreMode
+		{restorePreview}
+		{restoreConflicts}
+		onFileSelect={handleFileSelect}
+		onRestore={handleRestoreExecute}
+	/>
 
-			<div class="space-y-6 py-4">
-				<!-- File Upload -->
-				<div class="space-y-2">
-					<Label for="backup-file">Backup File</Label>
-					<Input id="backup-file" type="file" accept=".zip" onchange={handleFileSelect} />
-					{#if selectedFile}
-						<p class="text-sm text-gray-600">
-							Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
-						</p>
-					{/if}
-					{#if isRestoring && !restorePreview}
-						<div class="flex items-center gap-2 text-sm text-primary-600">
-							<LoaderCircle class="h-4 w-4 animate-spin" />
-							<span>Generating preview...</span>
-						</div>
-					{/if}
-				</div>
+	<RestoreFromDriveDialog
+		bind:open={showDriveRestoreDialog}
+		{isLoadingBackups}
+		{isRestoring}
+		{driveBackups}
+		selectedBackupId={selectedDriveBackup}
+		bind:restoreMode
+		{restorePreview}
+		{restoreConflicts}
+		onBackupSelect={handleDriveBackupSelect}
+		onRestore={handleDriveRestoreExecute}
+	/>
 
-				<!-- Restore Mode (only show after preview is loaded) -->
-				{#if restorePreview}
-					<div class="space-y-3">
-						<Label>Restore Mode</Label>
-						<RadioGroup.Root bind:value={restoreMode}>
-							<div class="flex items-center space-x-2">
-								<RadioGroup.Item value="replace" id="mode-replace" />
-								<Label for="mode-replace" class="font-normal cursor-pointer">
-									<div>
-										<div class="font-medium">Replace All</div>
-										<div class="text-sm text-gray-500">
-											Delete all existing data and import from backup
-										</div>
-									</div>
-								</Label>
-							</div>
-							<div class="flex items-center space-x-2 opacity-50">
-								<RadioGroup.Item value="merge" id="mode-merge" disabled />
-								<Label for="mode-merge" class="font-normal cursor-not-allowed">
-									<div>
-										<div class="font-medium">Merge (Coming Soon)</div>
-										<div class="text-sm text-gray-500">
-											Merge backup data with existing data - currently unavailable
-										</div>
-									</div>
-								</Label>
-							</div>
-						</RadioGroup.Root>
-					</div>
-				{/if}
-
-				<!-- Preview Results -->
-				{#if restorePreview}
-					<div class="border rounded-lg p-4 bg-gray-50">
-						<h4 class="font-medium mb-3">Import Summary</h4>
-						<div class="space-y-2 text-sm">
-							<div class="flex justify-between">
-								<span>Vehicles:</span>
-								<span class="font-medium">{restorePreview.vehicles || 0}</span>
-							</div>
-							<div class="flex justify-between">
-								<span>Expenses:</span>
-								<span class="font-medium">{restorePreview.expenses || 0}</span>
-							</div>
-							<div class="flex justify-between">
-								<span>Insurance Policies:</span>
-								<span class="font-medium">{restorePreview.insurance || 0}</span>
-							</div>
-							<div class="flex justify-between">
-								<span>Vehicle Financing:</span>
-								<span class="font-medium">{restorePreview.financing || 0}</span>
-							</div>
-							<div class="flex justify-between">
-								<span>Financing Payments:</span>
-								<span class="font-medium">{restorePreview.financingPayments || 0}</span>
-							</div>
-						</div>
-					</div>
-				{/if}
-
-				<!-- Conflicts -->
-				{#if restoreConflicts.length > 0}
-					<div class="border border-yellow-300 rounded-lg p-4 bg-yellow-50">
-						<h4 class="font-medium mb-3 text-yellow-800">Conflicts Detected</h4>
-						<p class="text-sm text-yellow-700 mb-3">
-							{restoreConflicts.length} conflict(s) found. These records exist in both your current data
-							and the backup with different values.
-						</p>
-						<div class="space-y-2 max-h-48 overflow-y-auto">
-							{#each restoreConflicts as conflict}
-								<div class="text-sm bg-white p-2 rounded border">
-									<div class="font-medium">{conflict.table} - ID: {conflict.id}</div>
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-			</div>
-
-			<Dialog.Footer class="flex gap-2">
-				<Button variant="outline" onclick={() => (showRestoreDialog = false)}>Cancel</Button>
-				{#if restorePreview}
-					<Button
-						onclick={handleRestoreExecute}
-						disabled={!selectedFile ||
-							isRestoring ||
-							(restoreMode === 'merge' && restoreConflicts.length > 0)}
-					>
-						{#if isRestoring}
-							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-							Restoring...
-						{:else}
-							Restore
-						{/if}
-					</Button>
-				{/if}
-			</Dialog.Footer>
-		</Dialog.Content>
-	</Dialog.Root>
-
-	<!-- Sync Now Dialog -->
-	<Dialog.Root bind:open={showSyncDialog}>
-		<Dialog.Content class="max-w-lg">
-			<Dialog.Header>
-				<Dialog.Title>Sync Now</Dialog.Title>
-				<Dialog.Description>Choose which sync operations to perform</Dialog.Description>
-			</Dialog.Header>
-
-			<div class="space-y-4 py-4">
-				<!-- Sync Type Selection -->
-				<div class="space-y-3">
-					<Label>Sync Types</Label>
-					<div class="space-y-3">
-						<div class="flex items-center space-x-2">
-							<Checkbox
-								id="sync-sheets"
-								bind:checked={syncSheets}
-								disabled={!googleSheetsSyncEnabled}
-							/>
-							<Label for="sync-sheets" class="font-normal cursor-pointer">
-								<div>
-									<div class="font-medium">Google Sheets</div>
-									<div class="text-sm text-gray-500">
-										{googleSheetsSyncEnabled
-											? 'Sync data to Google Sheets'
-											: 'Enable Google Sheets sync in settings first'}
-									</div>
-								</div>
-							</Label>
-						</div>
-						<div class="flex items-center space-x-2">
-							<Checkbox
-								id="sync-backup"
-								bind:checked={syncBackup}
-								disabled={!googleDriveBackupEnabled}
-							/>
-							<Label for="sync-backup" class="font-normal cursor-pointer">
-								<div>
-									<div class="font-medium">Google Drive Backup</div>
-									<div class="text-sm text-gray-500">
-										{googleDriveBackupEnabled
-											? 'Upload backup to Google Drive'
-											: 'Enable Google Drive backup in settings first'}
-									</div>
-								</div>
-							</Label>
-						</div>
-					</div>
-				</div>
-
-				<!-- Sync Results -->
-				{#if syncResults}
-					<div class="border rounded-lg p-4 bg-gray-50">
-						<h4 class="font-medium mb-3">Sync Results</h4>
-						<div class="space-y-2 text-sm">
-							{#if syncResults.results?.sheets}
-								<div class="flex items-center gap-2 text-green-600">
-									<span class="font-medium">✓ Google Sheets:</span>
-									<span>Synced successfully</span>
-								</div>
-							{/if}
-							{#if syncResults.results?.backup}
-								<div class="flex items-center gap-2 text-green-600">
-									<span class="font-medium">✓ Google Drive:</span>
-									<span>Backup uploaded</span>
-								</div>
-							{/if}
-							{#if syncResults.errors}
-								{#each Object.entries(syncResults.errors) as [type, error]}
-									<div class="flex items-center gap-2 text-red-600">
-										<span class="font-medium">✗ {type}:</span>
-										<span>{error}</span>
-									</div>
-								{/each}
-							{/if}
-						</div>
-					</div>
-				{/if}
-			</div>
-
-			<Dialog.Footer class="flex gap-2">
-				<Button variant="outline" onclick={() => (showSyncDialog = false)}>
-					{syncResults ? 'Close' : 'Cancel'}
-				</Button>
-				{#if !syncResults}
-					<Button onclick={handleSyncExecute} disabled={isSyncing || (!syncSheets && !syncBackup)}>
-						{#if isSyncing}
-							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-							Syncing...
-						{:else}
-							<RefreshCw class="mr-2 h-4 w-4" />
-							Sync Now
-						{/if}
-					</Button>
-				{/if}
-			</Dialog.Footer>
-		</Dialog.Content>
-	</Dialog.Root>
+	<SyncNowDialog
+		bind:open={showSyncDialog}
+		{isSyncing}
+		bind:syncSheets
+		bind:syncBackup
+		{googleSheetsSyncEnabled}
+		{googleDriveBackupEnabled}
+		{syncResults}
+		onSync={handleSyncExecute}
+	/>
 </div>

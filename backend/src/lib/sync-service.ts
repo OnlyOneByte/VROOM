@@ -1000,11 +1000,12 @@ export class SyncService {
         folderStructure.subFolders.backups.id
       );
 
-      // Call cleanupOldBackups (keep last 10)
+      // Call cleanupOldBackups using retention count from settings
+      const retentionCount = settings[0].googleDriveBackupRetentionCount || 10;
       await backupService.cleanupOldBackups(
         driveService,
         folderStructure.subFolders.backups.id,
-        10
+        retentionCount
       );
 
       // Update lastBackupDate and googleDriveBackupFolderId in user settings

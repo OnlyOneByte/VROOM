@@ -20,6 +20,7 @@ const updateSettingsSchema = z.object({
   backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
   googleDriveBackupEnabled: z.boolean().optional(),
   googleDriveBackupFolderId: z.string().optional(),
+  googleDriveBackupRetentionCount: z.number().min(1).max(100).optional(),
   googleSheetsSyncEnabled: z.boolean().optional(),
   googleSheetsSpreadsheetId: z.string().optional(),
   syncOnInactivity: z.boolean().optional(),

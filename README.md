@@ -4,6 +4,16 @@ VROOM (Vehicle Record & Organization Of Maintenance)
 
 A modern, self-hostable car cost tracking and visualization web application with mobile-first design and comprehensive expense analytics.
 
+## Why VROOM?
+
+🔓 **Fully Open Source** - Make it your own! Fork, customize, and host it yourself with complete control over your data.
+
+📊 **Open Format CSVs** - All your data is stored in standard CSV format. Migrate to any platform, anytime, with zero lock-in.
+
+☁️ **Direct Google Drive Integration** - Your data syncs directly to your Google Drive. No proprietary databases, no vendor lock-in.
+
+🔒 **Privacy First** - No data stored beyond sync. Everything lives in your Google Drive, under your control.
+
 Note: This project is currently under active development and not ready for use.
 
 ## Project Structure

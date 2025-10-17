@@ -236,6 +236,84 @@ function createSettingsStore() {
 			}
 		},
 
+		async downloadBackupFromDrive(fileId: string) {
+			try {
+				const response = await fetch(`/api/sync/backups/${fileId}/download`, {
+					credentials: 'include'
+				});
+
+				if (!response.ok) {
+					throw new Error('Failed to download backup from Drive');
+				}
+
+				// Download the file
+				const blob = await response.blob();
+				const url = window.URL.createObjectURL(blob);
+				const a = document.createElement('a');
+				a.href = url;
+
+				// Extract filename from Content-Disposition header if available
+				const contentDisposition = response.headers.get('Content-Disposition');
+				let fileName = 'backup.zip';
+				if (contentDisposition) {
+					const matches = /filename="([^"]+)"/.exec(contentDisposition);
+					if (matches && matches[1]) {
+						fileName = matches[1];
+					}
+				}
+
+				a.download = fileName;
+				document.body.appendChild(a);
+				a.click();
+				window.URL.revokeObjectURL(url);
+				document.body.removeChild(a);
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : 'Failed to download backup from Drive';
+				update(state => ({ ...state, error: errorMessage }));
+				throw error;
+			}
+		},
+
+		async restoreFromDriveBackup(
+			fileId: string,
+			mode: 'preview' | 'replace' | 'merge' = 'preview'
+		) {
+			try {
+				// First download the file
+				const response = await fetch(`/api/sync/backups/${fileId}/download`, {
+					credentials: 'include'
+				});
+
+				if (!response.ok) {
+					throw new Error('Failed to download backup from Drive');
+				}
+
+				const blob = await response.blob();
+
+				// Extract filename from Content-Disposition header if available
+				const contentDisposition = response.headers.get('Content-Disposition');
+				let fileName = 'backup.zip';
+				if (contentDisposition) {
+					const matches = /filename="([^"]+)"/.exec(contentDisposition);
+					if (matches && matches[1]) {
+						fileName = matches[1];
+					}
+				}
+
+				// Create a File object from the blob
+				const file = new File([blob], fileName, { type: 'application/zip' });
+
+				// Use the existing uploadBackup method to restore
+				return await this.uploadBackup(file, mode);
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : 'Failed to restore from Drive backup';
+				update(state => ({ ...state, error: errorMessage }));
+				throw error;
+			}
+		},
+
 		async deleteBackup(fileId: string) {
 			try {
 				const response = await fetch(`/api/sync/backups/${fileId}`, {

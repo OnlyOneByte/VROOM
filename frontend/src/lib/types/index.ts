@@ -136,6 +136,7 @@ export interface UserSettings {
 	lastBackupDate?: string;
 	googleDriveBackupEnabled: boolean;
 	googleDriveBackupFolderId?: string;
+	googleDriveBackupRetentionCount?: number;
 	googleSheetsSyncEnabled?: boolean;
 	googleSheetsSpreadsheetId?: string;
 	syncOnInactivity?: boolean;
