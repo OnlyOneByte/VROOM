@@ -1,4 +1,3 @@
-import { createId } from '@paralleldrive/cuid2';
 import { generateCodeVerifier, generateState } from 'arctic';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -107,7 +106,7 @@ auth.get('/callback/google', async (c) => {
     // Get database instance
     const db = databaseService.getDatabase();
 
-    // Check if user exists
+    // Check if user exists by providerId (handles both old and new user records)
     const existingUser = await db
       .select()
       .from(users)
@@ -117,17 +116,17 @@ auth.get('/callback/google', async (c) => {
     let userId: string;
 
     if (existingUser.length === 0) {
-      // Create new user
-      const newUserId = createId();
+      // Create new user - use providerId as the userId for consistency
+      // This ensures the same OAuth account always gets the same userId
+      userId = `google_${googleUser.sub}`;
       await db.insert(users).values({
-        id: newUserId,
+        id: userId,
         email: googleUser.email,
         displayName: googleUser.name,
         provider: 'google',
         providerId: googleUser.sub,
         googleRefreshToken: tokens.refreshToken || null,
       });
-      userId = newUserId;
     } else {
       // Update existing user with fresh refresh token if available
       userId = existingUser[0].id;

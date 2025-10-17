@@ -639,98 +639,8 @@ sync.get('/download', async (c) => {
 });
 
 /**
- * POST /api/sync/restore
- * Restore data from an uploaded backup file
- */
-sync.post('/restore', async (c) => {
-  try {
-    const user = c.get('user');
-    const userId = user.id;
-
-    // Parse multipart form data
-    const body = await c.req.parseBody();
-    const file = body.file;
-    const mode = (body.mode as string) || 'preview';
-
-    // Validate file exists
-    if (!file || !(file instanceof File)) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'No file uploaded or invalid file format',
-          },
-        },
-        400
-      );
-    }
-
-    // Validate mode
-    if (!['preview', 'replace', 'merge'].includes(mode)) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid restore mode. Must be one of: preview, replace, merge',
-          },
-        },
-        400
-      );
-    }
-
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const fileBuffer = Buffer.from(arrayBuffer);
-
-    // Import sync service
-    const { syncService } = await import('../lib/sync-service');
-
-    // Restore from backup
-    const result = await syncService.restoreFromBackup(
-      userId,
-      fileBuffer,
-      mode as 'preview' | 'replace' | 'merge'
-    );
-
-    return c.json(result);
-  } catch (error) {
-    console.error('Error restoring backup:', error);
-
-    // Handle SyncError
-    if (error && typeof error === 'object' && 'code' in error) {
-      const syncError = error as { code: string; message: string; details?: unknown };
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: syncError.code,
-            message: syncError.message,
-            details: syncError.details,
-          },
-        },
-        400
-      );
-    }
-
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: 'RESTORE_FAILED',
-          message: 'Failed to restore backup',
-          details: error instanceof Error ? error.message : 'Unknown error',
-        },
-      },
-      500
-    );
-  }
-});
-
-/**
  * POST /api/sync/upload
- * Upload and validate a backup ZIP file
+ * Upload and restore from a backup ZIP file
  */
 sync.post('/upload', async (c) => {
   try {
@@ -740,6 +650,13 @@ sync.post('/upload', async (c) => {
     // Parse multipart form data
     const body = await c.req.parseBody();
     const file = body.file;
+
+    console.log('Upload request received:', {
+      userId,
+      hasFile: !!file,
+      fileType: file instanceof File ? 'File' : typeof file,
+      mode: body.mode,
+    });
 
     // Validate file exists
     if (!file || !(file instanceof File)) {
@@ -852,19 +769,15 @@ sync.post('/upload', async (c) => {
       );
     }
 
-    // Return validation success with preview data
-    return c.json({
-      success: true,
-      message: 'Backup file validated successfully',
-      metadata: parsedBackup.metadata,
-      summary: {
-        vehicles: parsedBackup.vehicles.length,
-        expenses: parsedBackup.expenses.length,
-        financing: parsedBackup.financing.length,
-        financingPayments: parsedBackup.financingPayments.length,
-        insurance: parsedBackup.insurance.length,
-      },
-    });
+    // Import sync service and perform restore
+    const { syncService } = await import('../lib/sync-service');
+    const result = await syncService.restoreFromBackup(
+      userId,
+      fileBuffer,
+      mode as 'preview' | 'replace' | 'merge'
+    );
+
+    return c.json(result);
   } catch (error) {
     console.error('Error uploading backup:', error);
     return c.json(

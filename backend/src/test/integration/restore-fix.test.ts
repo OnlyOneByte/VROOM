@@ -5,9 +5,9 @@ import { backupService } from '../../lib/backup-service';
 import { syncService } from '../../lib/sync-service';
 import {
   clearTestData,
+  type getTestDatabase,
   setupTestDatabase,
   teardownTestDatabase,
-  type getTestDatabase,
 } from '../setup';
 import { getDb } from '../utils/test-helpers';
 
