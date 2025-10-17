@@ -99,6 +99,8 @@ backend/
 - `bun run db:studio` - Open Drizzle Studio (database GUI)
 - `bun run db:init` - Initialize database schema
 - `bun run db:seed` - Seed database with sample data
+- `bun run db:checkpoint` - Manually checkpoint WAL to persist data
+- `bun run db:checkpoint:force` - Force checkpoint (use if data seems lost)
 
 ### Code Quality
 - `bun run lint` - Run Biome linter
@@ -274,6 +276,50 @@ Run tests with:
 bun run test
 ```
 
+## 💾 Data Persistence & WAL Mode
+
+### Understanding SQLite WAL Mode
+
+The backend uses SQLite's Write-Ahead Logging (WAL) mode for better performance and concurrency. However, this can cause data to appear "lost" during development with hot reload.
+
+### How WAL Works
+
+1. **Write Operations**: Data is first written to the WAL file (`vroom.db-wal`)
+2. **Checkpoint**: Periodically, data is moved from WAL to the main database file (`vroom.db`)
+3. **Hot Reload Issue**: When the backend restarts (hot reload), uncommitted WAL data might not be visible
+
+### Automatic Solutions Implemented
+
+- **Frequent Checkpoints**: Automatic checkpoint every 30 seconds in development (5 minutes in production)
+- **Auto-checkpoint**: SQLite configured to checkpoint after 100 pages (~400KB) of writes
+- **Post-Write Checkpoint**: Automatic checkpoint after successful write operations (POST/PUT/DELETE)
+- **Startup Checkpoint**: Force checkpoint on server startup to ensure previous data is visible
+- **Shutdown Checkpoint**: Force checkpoint on graceful shutdown
+
+### Manual Checkpoint (If Needed)
+
+If you notice data seems to disappear after backend restart:
+
+```bash
+# Normal checkpoint
+bun run db:checkpoint
+
+# Force checkpoint (more aggressive)
+bun run db:checkpoint:force
+```
+
+### Why This Happens
+
+During development with `bun --hot`, the server restarts frequently. If data is written to the WAL file but not yet checkpointed to the main database file, it might not be visible after restart. The fixes above ensure data is persisted more frequently.
+
+### Production Considerations
+
+In production, this is less of an issue because:
+- Server restarts are infrequent
+- Graceful shutdown ensures proper checkpoint
+- Longer checkpoint intervals are acceptable
+- Docker volumes ensure data persistence
+
 ## 📈 Performance Optimizations
 
 - **Bun Runtime**: Fast JavaScript execution and built-in optimizations
@@ -281,6 +327,7 @@ bun run test
 - **Connection Pooling**: Efficient database connection management
 - **Response Caching**: Strategic caching for analytics endpoints
 - **Compression**: Gzip compression for API responses
+- **Smart Checkpointing**: Balanced between data safety and performance
 
 ## 🔧 Development Tools
 

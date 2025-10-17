@@ -14,6 +14,8 @@
     "db:studio": "drizzle-kit studio",
     "db:init": "bun src/db/init.ts",
     "db:seed": "bun src/db/init.ts --seed",
+    "db:checkpoint": "bun src/db/checkpoint.ts",
+    "db:checkpoint:force": "bun src/db/checkpoint.ts --force",
     "test": "bun test",
     "test:repositories": "bun src/test/run-tests.ts",
     "test:auth": "bun src/test/run-auth-tests.ts",
