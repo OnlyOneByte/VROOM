@@ -155,7 +155,6 @@
 
 			if (result.success && result.preview) {
 				restorePreview = result.preview;
-				appStore.showSuccess('Preview loaded successfully');
 			}
 
 			if (result.conflicts && result.conflicts.length > 0) {
@@ -609,13 +608,13 @@
 									</div>
 								</Label>
 							</div>
-							<div class="flex items-center space-x-2">
-								<RadioGroup.Item value="merge" id="mode-merge" />
-								<Label for="mode-merge" class="font-normal cursor-pointer">
+							<div class="flex items-center space-x-2 opacity-50">
+								<RadioGroup.Item value="merge" id="mode-merge" disabled />
+								<Label for="mode-merge" class="font-normal cursor-not-allowed">
 									<div>
-										<div class="font-medium">Merge</div>
+										<div class="font-medium">Merge (Coming Soon)</div>
 										<div class="text-sm text-gray-500">
-											Merge backup data with existing data (conflicts must be resolved)
+											Merge backup data with existing data - currently unavailable
 										</div>
 									</div>
 								</Label>
