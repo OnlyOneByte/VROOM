@@ -5,6 +5,7 @@
 	import { addOfflineExpense } from '$lib/utils/offline-storage';
 	import { requestBackgroundSync } from '$lib/utils/pwa';
 	import { appStore } from '$lib/stores/app';
+	import { settingsStore } from '$lib/stores/settings';
 	import {
 		Save,
 		ArrowLeft,
@@ -17,7 +18,8 @@
 		CreditCard,
 		FileText,
 		Sparkles,
-		Coffee
+		Coffee,
+		Zap
 	} from 'lucide-svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
@@ -28,6 +30,14 @@
 	import { Button } from '$lib/components/ui/button';
 	import { FormFieldError } from '$lib/components/ui/form-field';
 	import type { ExpenseFormErrors, Vehicle, Expense } from '$lib/types.js';
+	import {
+		getVolumeUnitLabel,
+		getChargeUnitLabel,
+		usesLiquidFuel,
+		usesElectricCharge,
+		getFuelEfficiencyLabel,
+		getElectricEfficiencyLabel
+	} from '$lib/utils/units';
 
 	interface Props {
 		expenseId?: string;
@@ -48,7 +58,8 @@
 		amount: '',
 		date: new Date().toISOString().split('T')[0],
 		mileage: '',
-		gallons: '',
+		volume: '',
+		charge: '',
 		description: ''
 	});
 
@@ -70,6 +81,13 @@
 	let allVehicleExpenses = $state<any[]>([]);
 	let showMpgCalculation = $state(false);
 	let calculatedMpg = $state<number | null>(null);
+	let calculatedEfficiency = $state<number | null>(null);
+
+	// Get user settings for units
+	let settings = $derived($settingsStore.settings);
+	let volumeUnit = $derived(settings?.volumeUnit || 'gallons_us');
+	let chargeUnit = $derived(settings?.chargeUnit || 'kwh');
+	let distanceUnit = $derived(settings?.distanceUnit || 'miles');
 
 	// Tag suggestions will be populated from user's previous tags in the future
 	// const commonTags: string[] = [];
@@ -114,6 +132,7 @@
 	];
 
 	onMount(async () => {
+		await settingsStore.load();
 		await loadVehicles();
 
 		if (isEditMode && expenseId) {
@@ -166,7 +185,8 @@
 					const day = String(expenseDate.getDate()).padStart(2, '0');
 					formData.date = `${year}-${month}-${day}`;
 					formData.mileage = originalExpense.mileage?.toString() ?? '';
-					formData.gallons = originalExpense.gallons?.toString() ?? '';
+					formData.volume = originalExpense.volume?.toString() ?? '';
+					formData.charge = originalExpense.charge?.toString() ?? '';
 					formData.description = originalExpense.description || '';
 
 					// Set the category label for fuel field detection
@@ -267,6 +287,12 @@
 	// Show fuel-specific fields when Fuel category is selected
 	let showFuelFields = $derived(selectedCategoryLabel === 'Fuel');
 
+	// Determine which fuel type fields to show based on vehicle type
+	let showVolumeField = $derived(showFuelFields && vehicle && usesLiquidFuel(vehicle.vehicleType));
+	let showChargeField = $derived(
+		showFuelFields && vehicle && usesElectricCharge(vehicle.vehicleType)
+	);
+
 	// Filtered tag suggestions (will be populated from user's previous tags in the future)
 	let filteredSuggestions = $derived<string[]>([]);
 
@@ -298,18 +324,28 @@
 	}
 
 	function handleMileageChange() {
-		if (
-			selectedCategoryLabel === 'Fuel' &&
-			formData.mileage &&
-			formData.gallons &&
-			lastFuelExpense?.mileage
-		) {
+		if (selectedCategoryLabel === 'Fuel' && formData.mileage && lastFuelExpense?.mileage) {
 			const milesDriven = parseInt(formData.mileage) - lastFuelExpense.mileage;
+
 			if (milesDriven > 0) {
-				calculatedMpg = Math.round((milesDriven / parseFloat(formData.gallons)) * 100) / 100;
-				showMpgCalculation = true;
+				// Calculate fuel efficiency for liquid fuel vehicles
+				if (formData.volume && vehicle && usesLiquidFuel(vehicle.vehicleType)) {
+					calculatedMpg = Math.round((milesDriven / parseFloat(formData.volume)) * 100) / 100;
+					showMpgCalculation = true;
+				}
+				// Calculate electric efficiency for electric vehicles
+				else if (formData.charge && vehicle && usesElectricCharge(vehicle.vehicleType)) {
+					calculatedEfficiency =
+						Math.round((milesDriven / parseFloat(formData.charge)) * 100) / 100;
+					showMpgCalculation = true;
+				} else {
+					calculatedMpg = null;
+					calculatedEfficiency = null;
+					showMpgCalculation = false;
+				}
 			} else {
 				calculatedMpg = null;
+				calculatedEfficiency = null;
 				showMpgCalculation = false;
 			}
 		}
@@ -355,11 +391,25 @@
 				if (selectedDate > today) return 'Date cannot be in the future';
 				break;
 			}
-			case 'gallons': {
-				if (selectedCategoryLabel === 'Fuel') {
-					const gallons = parseFloat(value as string);
-					if (!value || gallons <= 0) return 'Gallons required for fuel expenses';
-					if (gallons > 100) return 'Gallons seems too large';
+			case 'volume': {
+				if (selectedCategoryLabel === 'Fuel' && vehicle && usesLiquidFuel(vehicle.vehicleType)) {
+					const volume = parseFloat(value as string);
+					const unitLabel = getVolumeUnitLabel(volumeUnit);
+					if (!value || volume <= 0) return `${unitLabel} required for fuel expenses`;
+					if (volume > 1000) return `${unitLabel} seems too large`;
+				}
+				break;
+			}
+			case 'charge': {
+				if (
+					selectedCategoryLabel === 'Fuel' &&
+					vehicle &&
+					usesElectricCharge(vehicle.vehicleType)
+				) {
+					const charge = parseFloat(value as string);
+					const unitLabel = getChargeUnitLabel(chargeUnit);
+					if (!value || charge <= 0) return `${unitLabel} required for charging expenses`;
+					if (charge > 1000) return `${unitLabel} seems too large`;
 				}
 				break;
 			}
@@ -421,7 +471,13 @@
 
 		const fields = ['vehicleId', 'category', 'amount', 'date'];
 		if (showFuelFields) {
-			fields.push('gallons', 'mileage');
+			fields.push('mileage');
+			if (showVolumeField) {
+				fields.push('volume');
+			}
+			if (showChargeField) {
+				fields.push('charge');
+			}
 		}
 
 		fields.forEach(field => {
@@ -465,7 +521,8 @@
 				amount: parseFloat(formData.amount),
 				date: dateISO,
 				mileage: formData.mileage ? parseInt(formData.mileage) : undefined,
-				gallons: formData.gallons ? parseFloat(formData.gallons) : undefined,
+				volume: formData.volume ? parseFloat(formData.volume) : undefined,
+				charge: formData.charge ? parseFloat(formData.charge) : undefined,
 				description: formData.description || undefined,
 				currency: 'USD'
 			};
@@ -522,7 +579,8 @@
 						date: expenseData.date ?? '',
 						description: expenseData.description ?? '',
 						...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
-						...(expenseData.gallons !== undefined && { gallons: expenseData.gallons })
+						...(expenseData.volume !== undefined && { volume: expenseData.volume }),
+						...(expenseData.charge !== undefined && { charge: expenseData.charge })
 					});
 
 					requestBackgroundSync('expense-sync');
@@ -547,7 +605,8 @@
 					amount: parseFloat(formData.amount),
 					date: formData.date,
 					mileage: formData.mileage ? parseInt(formData.mileage) : undefined,
-					gallons: formData.gallons ? parseFloat(formData.gallons) : undefined,
+					volume: formData.volume ? parseFloat(formData.volume) : undefined,
+					charge: formData.charge ? parseFloat(formData.charge) : undefined,
 					description: formData.description || undefined
 				};
 
@@ -559,7 +618,8 @@
 					date: expenseData.date ?? '',
 					description: expenseData.description ?? '',
 					...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
-					...(expenseData.gallons !== undefined && { gallons: expenseData.gallons })
+					...(expenseData.volume !== undefined && { volume: expenseData.volume }),
+					...(expenseData.charge !== undefined && { charge: expenseData.charge })
 				});
 				requestBackgroundSync('expense-sync');
 
@@ -847,56 +907,116 @@
 			{#if showFuelFields}
 				<div class="p-4 bg-blue-50 rounded-lg space-y-4">
 					<div class="flex items-center gap-2 text-blue-700">
-						<Fuel class="h-5 w-5" />
-						<h3 class="font-medium">Fuel Details</h3>
-					</div>
-
-					<div class="space-y-2">
-						<Label for="gallons">Gallons *</Label>
-						<Input
-							id="gallons"
-							type="number"
-							step="0.001"
-							min="0"
-							bind:value={formData.gallons}
-							placeholder="0.000"
-							oninput={handleMileageChange}
-							onblur={() => handleBlur('gallons')}
-							aria-invalid={!!(touched['gallons'] && errors['gallons'])}
-							aria-describedby={touched['gallons'] && errors['gallons']
-								? 'gallons-error'
-								: undefined}
-						/>
-						{#if touched['gallons'] && errors['gallons']}
-							<FormFieldError id="gallons-error">{errors['gallons']}</FormFieldError>
+						{#if vehicle?.vehicleType === 'electric'}
+							<Zap class="h-5 w-5" />
+							<h3 class="font-medium">Charging Details</h3>
+						{:else}
+							<Fuel class="h-5 w-5" />
+							<h3 class="font-medium">Fuel Details</h3>
 						{/if}
 					</div>
 
-					{#if formData.gallons && formData.amount}
-						<div class="text-sm text-gray-600">
-							<strong>Price per gallon:</strong> ${(
-								parseFloat(formData.amount) / parseFloat(formData.gallons)
-							).toFixed(3)}
-						</div>
-					{/if}
-
-					<!-- MPG Calculation -->
-					{#if showMpgCalculation && calculatedMpg}
-						<div class="bg-green-50 border border-green-200 rounded-lg p-3">
-							<div class="flex items-center gap-2 text-green-700">
-								<Gauge class="h-4 w-4" />
-								<span class="text-sm font-medium">
-									Calculated MPG: {calculatedMpg}
-								</span>
-							</div>
-							{#if calculatedMpg < 15}
-								<p class="text-xs text-orange-600 mt-1">
-									⚠️ Low fuel efficiency - consider maintenance check
-								</p>
-							{:else if calculatedMpg > 50}
-								<p class="text-xs text-green-600 mt-1">✅ Excellent fuel efficiency!</p>
+					<!-- Volume field for gas/hybrid vehicles -->
+					{#if showVolumeField}
+						<div class="space-y-2">
+							<Label for="volume">{getVolumeUnitLabel(volumeUnit)} *</Label>
+							<Input
+								id="volume"
+								type="number"
+								step="0.001"
+								min="0"
+								bind:value={formData.volume}
+								placeholder="0.000"
+								oninput={handleMileageChange}
+								onblur={() => handleBlur('volume')}
+								aria-invalid={!!(touched['volume'] && errors['volume'])}
+								aria-describedby={touched['volume'] && errors['volume']
+									? 'volume-error'
+									: undefined}
+							/>
+							{#if touched['volume'] && errors['volume']}
+								<FormFieldError id="volume-error">{errors['volume']}</FormFieldError>
 							{/if}
 						</div>
+
+						{#if formData.volume && formData.amount}
+							<div class="text-sm text-gray-600">
+								<strong>Price per {getVolumeUnitLabel(volumeUnit, true)}:</strong> ${(
+									parseFloat(formData.amount) / parseFloat(formData.volume)
+								).toFixed(3)}
+							</div>
+						{/if}
+					{/if}
+
+					<!-- Charge field for electric/hybrid vehicles -->
+					{#if showChargeField}
+						<div class="space-y-2">
+							<Label for="charge">{getChargeUnitLabel(chargeUnit)} *</Label>
+							<Input
+								id="charge"
+								type="number"
+								step="0.01"
+								min="0"
+								bind:value={formData.charge}
+								placeholder="0.00"
+								oninput={handleMileageChange}
+								onblur={() => handleBlur('charge')}
+								aria-invalid={!!(touched['charge'] && errors['charge'])}
+								aria-describedby={touched['charge'] && errors['charge']
+									? 'charge-error'
+									: undefined}
+							/>
+							{#if touched['charge'] && errors['charge']}
+								<FormFieldError id="charge-error">{errors['charge']}</FormFieldError>
+							{/if}
+						</div>
+
+						{#if formData.charge && formData.amount}
+							<div class="text-sm text-gray-600">
+								<strong>Price per {getChargeUnitLabel(chargeUnit, true)}:</strong> ${(
+									parseFloat(formData.amount) / parseFloat(formData.charge)
+								).toFixed(3)}
+							</div>
+						{/if}
+					{/if}
+
+					<!-- Efficiency Calculation -->
+					{#if showMpgCalculation}
+						{#if calculatedMpg && showVolumeField}
+							<div class="bg-green-50 border border-green-200 rounded-lg p-3">
+								<div class="flex items-center gap-2 text-green-700">
+									<Gauge class="h-4 w-4" />
+									<span class="text-sm font-medium">
+										Calculated: {calculatedMpg}
+										{getFuelEfficiencyLabel(distanceUnit, volumeUnit)}
+									</span>
+								</div>
+								{#if calculatedMpg < 15}
+									<p class="text-xs text-orange-600 mt-1">
+										⚠️ Low fuel efficiency - consider maintenance check
+									</p>
+								{:else if calculatedMpg > 50}
+									<p class="text-xs text-green-600 mt-1">✅ Excellent fuel efficiency!</p>
+								{/if}
+							</div>
+						{:else if calculatedEfficiency && showChargeField}
+							<div class="bg-green-50 border border-green-200 rounded-lg p-3">
+								<div class="flex items-center gap-2 text-green-700">
+									<Zap class="h-4 w-4" />
+									<span class="text-sm font-medium">
+										Calculated: {calculatedEfficiency}
+										{getElectricEfficiencyLabel(distanceUnit, chargeUnit)}
+									</span>
+								</div>
+								{#if calculatedEfficiency < 2}
+									<p class="text-xs text-orange-600 mt-1">
+										⚠️ Low efficiency - check driving conditions
+									</p>
+								{:else if calculatedEfficiency > 4}
+									<p class="text-xs text-green-600 mt-1">✅ Excellent efficiency!</p>
+								{/if}
+							</div>
+						{/if}
 					{/if}
 				</div>
 			{/if}

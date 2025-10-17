@@ -135,15 +135,100 @@ export class SyncService {
    * Execute sync operations for specified types
    */
   async executeSync(
-    _userId: string,
-    _syncTypes: string[]
+    userId: string,
+    syncTypes: string[]
   ): Promise<{
     sheets?: SheetsSyncResult;
     backup?: BackupSyncResult;
     errors?: Record<string, string>;
   }> {
-    // TODO: Implement in task 4.1
-    throw new Error('Not implemented');
+    // Validate syncTypes array
+    this.validateSyncTypes(syncTypes);
+
+    // Execute sync operations in parallel using Promise.allSettled
+    const syncPromises = this.createSyncPromises(userId, syncTypes);
+    const results = await Promise.allSettled(syncPromises);
+
+    // Collect results and errors
+    return this.collectSyncResults(results, syncTypes);
+  }
+
+  /**
+   * Validate sync types array
+   */
+  private validateSyncTypes(syncTypes: string[]): void {
+    if (!syncTypes || syncTypes.length === 0) {
+      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'syncTypes array cannot be empty');
+    }
+
+    const validSyncTypes = ['sheets', 'backup'];
+    const invalidTypes = syncTypes.filter((type) => !validSyncTypes.includes(type));
+    if (invalidTypes.length > 0) {
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        `Invalid sync types: ${invalidTypes.join(', ')}. Valid types are: ${validSyncTypes.join(', ')}`
+      );
+    }
+  }
+
+  /**
+   * Create sync promises for each sync type
+   */
+  private createSyncPromises(
+    userId: string,
+    syncTypes: string[]
+  ): Promise<{ type: string; result: SheetsSyncResult | BackupSyncResult }>[] {
+    return syncTypes.map(async (type) => {
+      if (type === 'sheets') {
+        return { type: 'sheets', result: await this.syncToSheets(userId) };
+      }
+      if (type === 'backup') {
+        return { type: 'backup', result: await this.uploadToGoogleDrive(userId) };
+      }
+      throw new Error(`Unknown sync type: ${type}`);
+    });
+  }
+
+  /**
+   * Collect results from Promise.allSettled
+   */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Result collection requires checking multiple result types
+  private collectSyncResults(
+    results: PromiseSettledResult<{ type: string; result: SheetsSyncResult | BackupSyncResult }>[],
+    syncTypes: string[]
+  ): {
+    sheets?: SheetsSyncResult;
+    backup?: BackupSyncResult;
+    errors?: Record<string, string>;
+  } {
+    const response: {
+      sheets?: SheetsSyncResult;
+      backup?: BackupSyncResult;
+      errors?: Record<string, string>;
+    } = {};
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const { type, result: syncResult } = result.value;
+        if (type === 'sheets') {
+          response.sheets = syncResult as SheetsSyncResult;
+        } else if (type === 'backup') {
+          response.backup = syncResult as BackupSyncResult;
+        }
+      } else {
+        const errorMessage =
+          result.reason instanceof Error ? result.reason.message : String(result.reason);
+        const failedIndex = results.indexOf(result);
+        const failedType = syncTypes[failedIndex];
+
+        if (!response.errors) {
+          response.errors = {};
+        }
+        response.errors[failedType] = errorMessage;
+      }
+    }
+
+    return response;
   }
 
   /**
@@ -810,9 +895,102 @@ export class SyncService {
   /**
    * Upload backup to Google Drive
    */
-  async uploadToGoogleDrive(_userId: string): Promise<BackupSyncResult> {
-    // TODO: Implement in task 4.2
-    throw new Error('Not implemented');
+  async uploadToGoogleDrive(userId: string): Promise<BackupSyncResult> {
+    const { databaseService } = await import('./database');
+    const { eq } = await import('drizzle-orm');
+    const { users, userSettings } = await import('../db/schema');
+    const { GoogleDriveService } = await import('./google-drive');
+    const { backupService } = await import('./backup-service');
+
+    const db = databaseService.getDatabase();
+
+    // Get user settings to verify googleDriveBackupEnabled
+    const settings = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    if (!settings.length || !settings[0].googleDriveBackupEnabled) {
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        'Google Drive backup is not enabled for this user'
+      );
+    }
+
+    // Get user info for tokens and name
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!user.length || !user[0].googleRefreshToken) {
+      throw new SyncError(
+        SyncErrorCode.AUTH_INVALID,
+        'Google Drive access not available. Please re-authenticate with Google.'
+      );
+    }
+
+    try {
+      // Create GoogleDriveService instance
+      const driveService = new GoogleDriveService(
+        user[0].googleRefreshToken,
+        user[0].googleRefreshToken
+      );
+
+      // Call createVroomFolderStructure to get/create folders
+      const folderStructure = await driveService.createVroomFolderStructure(user[0].displayName);
+
+      // Upload to Backups subfolder
+      const uploadResult = await backupService.uploadToGoogleDrive(
+        userId,
+        driveService,
+        folderStructure.subFolders.backups.id
+      );
+
+      // Call cleanupOldBackups (keep last 10)
+      await backupService.cleanupOldBackups(
+        driveService,
+        folderStructure.subFolders.backups.id,
+        10
+      );
+
+      // Update lastBackupDate and googleDriveBackupFolderId in user settings
+      await db
+        .update(userSettings)
+        .set({
+          lastBackupDate: new Date(),
+          googleDriveBackupFolderId: folderStructure.subFolders.backups.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(userSettings.userId, userId));
+
+      // Return file info
+      return {
+        fileId: uploadResult.fileId,
+        fileName: uploadResult.fileName,
+        webViewLink: uploadResult.webViewLink,
+        lastBackupDate: new Date().toISOString(),
+      };
+    } catch (error) {
+      // Handle authentication errors
+      if (error instanceof Error && error.message.includes('auth')) {
+        throw new SyncError(
+          SyncErrorCode.AUTH_INVALID,
+          'Google Drive access not available. Please re-authenticate with Google.',
+          error.message
+        );
+      }
+
+      // Re-throw SyncErrors as-is
+      if (error instanceof SyncError) {
+        throw error;
+      }
+
+      // Wrap other errors
+      throw new SyncError(
+        SyncErrorCode.NETWORK_ERROR,
+        'Failed to upload backup to Google Drive',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
   }
 }
 

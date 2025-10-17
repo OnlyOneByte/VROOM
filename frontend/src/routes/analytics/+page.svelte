@@ -8,6 +8,8 @@
 		type TrendData
 	} from '$lib/utils/analytics-api';
 	import { appStore } from '$lib/stores/app';
+	import { settingsStore } from '$lib/stores/settings';
+	import { getVolumeUnitLabel } from '$lib/utils/units';
 	import CostTrendChart from '$lib/components/charts/CostTrendChart.svelte';
 	import CategoryBreakdownChart from '$lib/components/charts/CategoryBreakdownChart.svelte';
 	import MultiTrendChart from '$lib/components/charts/MultiTrendChart.svelte';
@@ -28,7 +30,9 @@
 	let selectedVehicle = $state<string>('all');
 
 	// Set default date range (last 12 months)
-	onMount(() => {
+	onMount(async () => {
+		await settingsStore.load();
+
 		const now = new Date();
 		const twelveMonthsAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1);
 
@@ -338,7 +342,7 @@
 		{/if}
 
 		<!-- Fuel Efficiency Section -->
-		{#if dashboardData.fuelEfficiency.totalGallons > 0}
+		{#if dashboardData.fuelEfficiency.totalVolume > 0}
 			<div class="bg-white p-6 rounded-lg shadow border">
 				<h3 class="text-lg font-semibold text-gray-900 mb-4">Fleet Fuel Efficiency Summary</h3>
 
@@ -347,14 +351,16 @@
 						<div class="text-2xl font-bold text-green-600">
 							{dashboardData.fuelEfficiency.averageMPG.toFixed(1)}
 						</div>
-						<div class="text-sm text-gray-600">Average MPG</div>
+						<div class="text-sm text-gray-600">Average Efficiency</div>
 					</div>
 
 					<div class="text-center">
 						<div class="text-2xl font-bold text-blue-600">
-							{dashboardData.fuelEfficiency.totalGallons.toFixed(1)}
+							{dashboardData.fuelEfficiency.totalVolume.toFixed(1)}
 						</div>
-						<div class="text-sm text-gray-600">Total Gallons</div>
+						<div class="text-sm text-gray-600">
+							Total {getVolumeUnitLabel($settingsStore.settings?.volumeUnit || 'gallons_us')}
+						</div>
 					</div>
 
 					<div class="text-center">
@@ -368,7 +374,12 @@
 						<div class="text-2xl font-bold text-orange-600">
 							${dashboardData.fuelEfficiency.averageCostPerGallon.toFixed(2)}
 						</div>
-						<div class="text-sm text-gray-600">Avg Cost/Gallon</div>
+						<div class="text-sm text-gray-600">
+							Avg Cost/{getVolumeUnitLabel(
+								$settingsStore.settings?.volumeUnit || 'gallons_us',
+								true
+							)}
+						</div>
 					</div>
 				</div>
 			</div>

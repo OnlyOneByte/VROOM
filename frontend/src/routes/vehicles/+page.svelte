@@ -184,26 +184,39 @@
 		}
 
 		// Calculate fuel efficiency if fuel expenses exist
-		const fuelExpenses = expenses.filter(e => e.category === 'fuel' && e.gallons && e.mileage);
+		const fuelExpenses = expenses.filter(
+			e => e.category === 'fuel' && (e.volume || e.charge) && e.mileage
+		);
 		let avgMpg = 0;
 		let currentMileage = 0;
 		if (fuelExpenses.length > 1) {
-			// Calculate MPG for each fuel-up and average them
-			const mpgValues = [];
+			// Calculate efficiency for each fuel-up and average them
+			const efficiencyValues = [];
 			for (let i = 1; i < fuelExpenses.length; i++) {
 				const current = fuelExpenses[i];
 				const previous = fuelExpenses[i - 1];
-				if (current?.mileage && previous?.mileage && current?.gallons) {
+				if (current?.mileage && previous?.mileage) {
 					const miles = current.mileage - previous.mileage;
-					const mpg = miles / current.gallons;
-					if (mpg > 0 && mpg < 100) {
-						// Reasonable MPG range
-						mpgValues.push(mpg);
+					// For liquid fuel
+					if (current?.volume) {
+						const mpg = miles / current.volume;
+						if (mpg > 0 && mpg < 100) {
+							efficiencyValues.push(mpg);
+						}
+					}
+					// For electric charge
+					else if (current?.charge) {
+						const efficiency = miles / current.charge;
+						if (efficiency > 0 && efficiency < 20) {
+							efficiencyValues.push(efficiency);
+						}
 					}
 				}
 			}
 			avgMpg =
-				mpgValues.length > 0 ? mpgValues.reduce((sum, mpg) => sum + mpg, 0) / mpgValues.length : 0;
+				efficiencyValues.length > 0
+					? efficiencyValues.reduce((sum, eff) => sum + eff, 0) / efficiencyValues.length
+					: 0;
 			currentMileage = Math.max(...fuelExpenses.map(e => e.mileage || 0));
 		}
 

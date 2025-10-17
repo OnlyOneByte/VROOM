@@ -1,5 +1,4 @@
 import { databaseService } from './database';
-import { createSheetsServiceForUser } from './google-sheets';
 
 export interface UserActivity {
   userId: string;
@@ -108,25 +107,60 @@ export class ActivityTracker {
    */
   private async performAutoSync(userId: string): Promise<void> {
     try {
-      // Get user info from database
+      // Get user settings to determine enabled sync types
       const db = databaseService.getDatabase();
-      const user = await db.query.users.findFirst({
-        where: (users, { eq }) => eq(users.id, userId),
-      });
+      const { eq } = await import('drizzle-orm');
+      const { userSettings } = await import('../db/schema');
 
-      if (!user || !user.googleRefreshToken) {
-        console.log(`Auto-sync skipped for user ${userId}: Google access not available`);
+      const settings = await db
+        .select()
+        .from(userSettings)
+        .where(eq(userSettings.userId, userId))
+        .limit(1);
+
+      if (!settings.length) {
+        console.log(`Auto-sync skipped for user ${userId}: No settings found`);
         return;
       }
 
-      // Create sheets service and perform backup
-      const sheetsService = await createSheetsServiceForUser(userId);
-      await sheetsService.createOrUpdateVroomSpreadsheet(userId, user.displayName);
+      const userSetting = settings[0];
 
-      console.log(`Auto-sync backup completed for user ${userId}`);
+      // Build syncTypes array based on enabled sync types
+      const syncTypes: string[] = [];
+      if (userSetting.googleSheetsSyncEnabled) {
+        syncTypes.push('sheets');
+      }
+      if (userSetting.googleDriveBackupEnabled) {
+        syncTypes.push('backup');
+      }
+
+      // Skip if no sync types are enabled
+      if (syncTypes.length === 0) {
+        console.log(`Auto-sync skipped for user ${userId}: No sync types enabled`);
+        return;
+      }
+
+      // Call SyncService.executeSync with syncTypes array
+      const { SyncService } = await import('./sync-service');
+      const syncService = new SyncService();
+      const results = await syncService.executeSync(userId, syncTypes);
+
+      // Log results
+      if (results.sheets) {
+        console.log(`Auto-sync to sheets completed for user ${userId}`);
+      }
+      if (results.backup) {
+        console.log(`Auto-sync backup to Drive completed for user ${userId}`);
+      }
+      if (results.errors) {
+        console.error(`Auto-sync errors for user ${userId}:`, results.errors);
+      }
+
+      console.log(`Auto-sync completed for user ${userId}`);
     } catch (error) {
+      // Handle errors gracefully (log but don't crash)
       console.error(`Auto-sync operation failed for user ${userId}:`, error);
-      throw error;
+      // Don't re-throw - we want to handle errors gracefully
     }
   }
 

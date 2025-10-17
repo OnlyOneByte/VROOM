@@ -96,8 +96,8 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Add POST /api/sync/restore-from-sheets endpoint
     - _Requirements: 4.6, 4.7, 6.10, 9.3, 9.4, 9.5, 9.6, 9.7_
 
-- [ ] 4. Implement unified sync endpoint and Drive backup
-  - [ ] 4.1 Create executeSync method in sync-service
+- [x] 4. Implement unified sync endpoint and Drive backup
+  - [x] 4.1 Create executeSync method in sync-service
     - Accept userId and syncTypes array
     - Validate syncTypes array (not empty, valid values: 'sheets', 'backup')
     - Execute sync operations in parallel using Promise.allSettled
@@ -107,7 +107,7 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Return combined results
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
   
-  - [ ] 4.2 Implement Drive backup upload
+  - [x] 4.2 Implement Drive backup upload
     - Add uploadToGoogleDrive method in sync-service
     - Get user settings to verify googleDriveBackupEnabled
     - Create GoogleDriveService instance
@@ -119,7 +119,7 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Return file info (fileId, fileName, webViewLink)
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
   
-  - [ ] 4.3 Add sync management endpoints
+  - [x] 4.3 Add sync management endpoints
     - Add POST /api/sync endpoint (calls executeSync)
     - Add GET /api/sync/status endpoint (return settings, timestamps, enabled types)
     - Add POST /api/sync/configure endpoint (update settings, validate params, update activity tracker)
@@ -129,8 +129,8 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Add sync-in-progress check (return 409 if already syncing)
     - _Requirements: 6.7, 6.8, 6.9, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7_
 
-- [ ] 5. Update activity tracker and auto-sync
-  - [ ] 5.1 Refactor activity tracker to use new sync service
+- [x] 5. Update activity tracker and auto-sync
+  - [x] 5.1 Refactor activity tracker to use new sync service
     - Update performAutoSync method in activity-tracker.ts
     - Get user settings to determine enabled sync types
     - Build syncTypes array (add 'sheets' if googleSheetsSyncEnabled, add 'backup' if googleDriveBackupEnabled)
@@ -138,14 +138,14 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Handle errors gracefully (log but don't crash)
     - _Requirements: 3.8_
   
-  - [ ] 5.2 Verify activity tracking middleware
+  - [x] 5.2 Verify activity tracking middleware
     - Ensure activity is recorded on all relevant endpoints
     - Verify inactivity timer resets on user activity
     - Test auto-sync triggers after configured inactivity period
     - _Requirements: 3.9_
 
-- [ ] 6. Update frontend for new sync system
-  - [ ] 6.1 Update settings page
+- [x] 6. Update frontend for new sync system
+  - [x] 6.1 Update settings page
     - Add toggle for Google Sheets sync (googleSheetsSyncEnabled)
     - Add toggle for Google Drive backup (googleDriveBackupEnabled)
     - Add input for inactivity timeout (syncInactivityMinutes)
@@ -153,7 +153,7 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Display last sync/backup timestamps from GET /api/sync/status
     - _Requirements: 3.1, 3.2, 3.5, 3.6, 3.7_
   
-  - [ ] 6.2 Add backup/restore UI
+  - [x] 6.2 Add backup/restore UI
     - Add "Download Backup" button (calls GET /api/sync/download)
     - Add file upload input for restore
     - Add restore mode selector (preview, replace, merge)
@@ -162,7 +162,7 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Call POST /api/sync/upload with selected mode
     - _Requirements: 2.4, 2.7, 2.11_
   
-  - [ ] 6.3 Add manual sync UI
+  - [x] 6.3 Add manual sync UI
     - Add "Sync Now" button
     - Allow selection of sync types (sheets, backup, both)
     - Call POST /api/sync with selected types
@@ -170,7 +170,7 @@ This implementation plan follows an incremental approach, starting with cleanup 
     - Display errors if sync fails
     - _Requirements: 4.5_
   
-  - [ ] 6.4 Remove old endpoint references
+  - [x] 6.4 Remove old endpoint references
     - Search codebase for /api/sheets, /api/backup, /api/drive
     - Replace all references with /api/sync endpoints
     - Update API client/service files

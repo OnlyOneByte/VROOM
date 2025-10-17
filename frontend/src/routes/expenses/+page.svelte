@@ -24,7 +24,9 @@
 	import { offlineExpenses } from '$lib/stores/offline';
 	import { removeOfflineExpense } from '$lib/utils/offline-storage';
 	import { appStore } from '$lib/stores/app.js';
+	import { settingsStore } from '$lib/stores/settings';
 	import type { ExpenseCategory, ExpenseFilters } from '$lib/types.js';
+	import { getVolumeUnitLabel, getChargeUnitLabel } from '$lib/utils/units';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -113,6 +115,7 @@
 	let allTags = $derived(Array.from(new Set(expenses.flatMap(e => e.tags || []))).sort());
 
 	onMount(async () => {
+		await settingsStore.load();
 		await loadExpenses();
 	});
 
@@ -888,16 +891,27 @@
 												<div class="truncate">
 													{expense.description || '-'}
 												</div>
-												{#if expense.mileage || expense.gallons}
+												{#if expense.mileage || expense.volume || expense.charge}
 													<div class="text-xs text-gray-500 mt-1 whitespace-nowrap">
 														{#if expense.mileage}
 															{expense.mileage.toLocaleString()} mi
 														{/if}
-														{#if expense.mileage && expense.gallons}
+														{#if expense.mileage && (expense.volume || expense.charge)}
 															•
 														{/if}
-														{#if expense.gallons}
-															{expense.gallons} gal
+														{#if expense.volume}
+															{expense.volume}
+															{getVolumeUnitLabel(
+																$settingsStore.settings?.volumeUnit || 'gallons_us',
+																true
+															)}
+														{/if}
+														{#if expense.charge}
+															{expense.charge}
+															{getChargeUnitLabel(
+																$settingsStore.settings?.chargeUnit || 'kwh',
+																true
+															)}
 														{/if}
 													</div>
 												{/if}

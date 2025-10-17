@@ -83,9 +83,58 @@ function createSettingsStore() {
 			}
 		},
 
-		async downloadBackup(format: 'json' | 'zip' = 'zip') {
+		async configureSyncSettings(config: {
+			googleSheetsSyncEnabled?: boolean;
+			googleDriveBackupEnabled?: boolean;
+			syncInactivityMinutes?: number;
+		}) {
 			try {
-				const response = await fetch(`/api/backup/download/${format}`, {
+				const response = await fetch('/api/sync/configure', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					credentials: 'include',
+					body: JSON.stringify(config)
+				});
+
+				if (!response.ok) {
+					throw new Error('Failed to configure sync settings');
+				}
+
+				// Reload settings to get updated values
+				await this.load();
+
+				return await response.json();
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : 'Failed to configure sync settings';
+				update(state => ({ ...state, error: errorMessage }));
+				throw error;
+			}
+		},
+
+		async getSyncStatus() {
+			try {
+				const response = await fetch('/api/sync/status', {
+					credentials: 'include'
+				});
+
+				if (!response.ok) {
+					throw new Error('Failed to get sync status');
+				}
+
+				return await response.json();
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : 'Failed to get sync status';
+				update(state => ({ ...state, error: errorMessage }));
+				throw error;
+			}
+		},
+
+		async downloadBackup() {
+			try {
+				const response = await fetch('/api/sync/download', {
 					credentials: 'include'
 				});
 
@@ -98,7 +147,7 @@ function createSettingsStore() {
 				const url = window.URL.createObjectURL(blob);
 				const a = document.createElement('a');
 				a.href = url;
-				a.download = `vroom-backup-${new Date().toISOString().split('T')[0]}.${format}`;
+				a.download = `vroom-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`;
 				document.body.appendChild(a);
 				a.click();
 				window.URL.revokeObjectURL(url);
@@ -110,51 +159,126 @@ function createSettingsStore() {
 			}
 		},
 
-		async uploadBackupToDrive(format: 'json' | 'zip' = 'zip') {
+		async uploadBackup(file: File, mode: 'preview' | 'replace' | 'merge' = 'preview') {
 			try {
-				const response = await fetch('/api/backup/upload-to-drive', {
+				const formData = new FormData();
+				formData.append('file', file);
+				formData.append('mode', mode);
+
+				const response = await fetch('/api/sync/upload', {
 					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
 					credentials: 'include',
-					body: JSON.stringify({ format })
+					body: formData
 				});
 
 				if (!response.ok) {
-					throw new Error('Failed to upload backup to Drive');
+					throw new Error('Failed to upload backup');
 				}
 
-				// Update last backup date
-				await this.load();
+				const result = await response.json();
 
-				return await response.json();
+				// Reload settings if restore was successful
+				if (mode !== 'preview' && result.success) {
+					await this.load();
+				}
+
+				return result;
 			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : 'Failed to upload backup to Drive';
+				const errorMessage = error instanceof Error ? error.message : 'Failed to upload backup';
 				update(state => ({ ...state, error: errorMessage }));
 				throw error;
 			}
 		},
 
-		async syncToSheets() {
+		async executeSync(syncTypes: ('sheets' | 'backup')[]) {
 			try {
-				const response = await fetch('/api/sheets/sync', {
+				const response = await fetch('/api/sync', {
 					method: 'POST',
-					credentials: 'include'
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					credentials: 'include',
+					body: JSON.stringify({ syncTypes })
 				});
 
 				if (!response.ok) {
-					throw new Error('Failed to sync to Google Sheets');
+					throw new Error('Failed to execute sync');
 				}
 
-				// Update last sync date
+				// Reload settings to get updated timestamps
 				await this.load();
 
 				return await response.json();
 			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : 'Failed to execute sync';
+				update(state => ({ ...state, error: errorMessage }));
+				throw error;
+			}
+		},
+
+		async listBackups() {
+			try {
+				const response = await fetch('/api/sync/backups', {
+					credentials: 'include'
+				});
+
+				if (!response.ok) {
+					throw new Error('Failed to list backups');
+				}
+
+				return await response.json();
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : 'Failed to list backups';
+				update(state => ({ ...state, error: errorMessage }));
+				throw error;
+			}
+		},
+
+		async deleteBackup(fileId: string) {
+			try {
+				const response = await fetch(`/api/sync/backups/${fileId}`, {
+					method: 'DELETE',
+					credentials: 'include'
+				});
+
+				if (!response.ok) {
+					throw new Error('Failed to delete backup');
+				}
+
+				return await response.json();
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : 'Failed to delete backup';
+				update(state => ({ ...state, error: errorMessage }));
+				throw error;
+			}
+		},
+
+		async restoreFromSheets(mode: 'preview' | 'replace' | 'merge' = 'preview') {
+			try {
+				const response = await fetch('/api/sync/restore-from-sheets', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					credentials: 'include',
+					body: JSON.stringify({ mode })
+				});
+
+				if (!response.ok) {
+					throw new Error('Failed to restore from sheets');
+				}
+
+				const result = await response.json();
+
+				// Reload settings if restore was successful
+				if (mode !== 'preview' && result.success) {
+					await this.load();
+				}
+
+				return result;
+			} catch (error) {
 				const errorMessage =
-					error instanceof Error ? error.message : 'Failed to sync to Google Sheets';
+					error instanceof Error ? error.message : 'Failed to restore from sheets';
 				update(state => ({ ...state, error: errorMessage }));
 				throw error;
 			}

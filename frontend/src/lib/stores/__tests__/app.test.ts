@@ -9,6 +9,7 @@ const mockVehicle: Vehicle = {
 	make: 'Toyota',
 	model: 'Camry',
 	year: 2020,
+	vehicleType: 'gas' as const,
 	licensePlate: 'ABC123',
 	nickname: 'My Car',
 	initialMileage: 50000,
@@ -23,6 +24,7 @@ const mockVehicle2: Vehicle = {
 	make: 'Honda',
 	model: 'Civic',
 	year: 2019,
+	vehicleType: 'gas' as const,
 	licensePlate: 'XYZ789',
 	createdAt: '2024-01-01T00:00:00Z',
 	updatedAt: '2024-01-01T00:00:00Z'

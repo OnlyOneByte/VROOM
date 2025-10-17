@@ -133,10 +133,16 @@
 										<p class="font-medium mt-1">{currentConflict.localExpense.description}</p>
 									</div>
 								{/if}
-								{#if currentConflict.localExpense.gallons}
+								{#if currentConflict.localExpense.volume}
 									<div class="flex justify-between">
-										<span class="text-gray-600">Gallons:</span>
-										<span class="font-medium">{currentConflict.localExpense.gallons}</span>
+										<span class="text-gray-600">Volume:</span>
+										<span class="font-medium">{currentConflict.localExpense.volume}</span>
+									</div>
+								{/if}
+								{#if currentConflict.localExpense.charge}
+									<div class="flex justify-between">
+										<span class="text-gray-600">Charge:</span>
+										<span class="font-medium">{currentConflict.localExpense.charge}</span>
 									</div>
 								{/if}
 							</div>
@@ -180,10 +186,16 @@
 											</p>
 										</div>
 									{/if}
-									{#if currentConflict.serverExpense.gallons}
+									{#if currentConflict.serverExpense.volume}
 										<div class="flex justify-between">
-											<span class="text-gray-600">Gallons:</span>
-											<span class="font-medium">{currentConflict.serverExpense.gallons}</span>
+											<span class="text-gray-600">Volume:</span>
+											<span class="font-medium">{currentConflict.serverExpense.volume}</span>
+										</div>
+									{/if}
+									{#if currentConflict.serverExpense.charge}
+										<div class="flex justify-between">
+											<span class="text-gray-600">Charge:</span>
+											<span class="font-medium">{currentConflict.serverExpense.charge}</span>
 										</div>
 									{/if}
 								</div>

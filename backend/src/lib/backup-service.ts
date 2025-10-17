@@ -240,7 +240,7 @@ export class BackupService {
         'metadata.json',
         'vehicles.csv',
         'expenses.csv',
-        'insurance_policies.csv',
+        'insurance.csv',
         'vehicle_financing.csv',
         'vehicle_financing_payments.csv',
       ];
@@ -294,7 +294,7 @@ export class BackupService {
         expenses: getCSVData('expenses.csv'),
         financing: getCSVData('vehicle_financing.csv'),
         financingPayments: getCSVData('vehicle_financing_payments.csv'),
-        insurance: getCSVData('insurance_policies.csv'),
+        insurance: getCSVData('insurance.csv'),
       };
     } catch (error) {
       if (error instanceof Error) {

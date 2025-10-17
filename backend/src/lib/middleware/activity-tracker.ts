@@ -32,8 +32,9 @@ export const activityTrackerMiddleware = async (c: Context, next: Next) => {
       const settingsRepo = new SettingsRepository(db);
       const settings = await settingsRepo.getOrCreate(user.id);
 
-      // Only record activity if sync on inactivity is enabled
-      if (settings.syncOnInactivity && settings.googleSheetsSyncEnabled) {
+      // Only record activity if sync on inactivity is enabled and at least one sync type is enabled
+      const hasSyncEnabled = settings.googleSheetsSyncEnabled || settings.googleDriveBackupEnabled;
+      if (settings.syncOnInactivity && hasSyncEnabled) {
         recordUserActivity(user.id, {
           enabled: true,
           inactivityDelayMinutes: settings.syncInactivityMinutes,

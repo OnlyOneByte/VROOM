@@ -50,7 +50,7 @@ describe('Sync Manager', () => {
 					amount: 50.0,
 					date: '2024-01-01',
 					mileage: 50000,
-					gallons: 10.5,
+					volume: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}
@@ -80,7 +80,7 @@ describe('Sync Manager', () => {
 					amount: 50.0,
 					date: '2024-01-01',
 					mileage: 50000,
-					gallons: 10.5,
+					volume: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}
@@ -115,7 +115,7 @@ describe('Sync Manager', () => {
 					amount: 50.0,
 					date: '2024-01-01',
 					mileage: 50000,
-					gallons: 10.5,
+					volume: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}
@@ -150,7 +150,7 @@ describe('Sync Manager', () => {
 					amount: 50.0,
 					date: '2024-01-01',
 					mileage: 50000,
-					gallons: 10.5,
+					volume: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}
@@ -194,7 +194,7 @@ describe('Sync Manager', () => {
 					amount: 50.0,
 					date: '2024-01-01',
 					mileage: 50000,
-					gallons: 10.5,
+					volume: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				},
@@ -233,7 +233,7 @@ describe('Sync Manager', () => {
 					amount: 50.0,
 					date: '2024-01-01',
 					mileage: 50000,
-					gallons: 10.5,
+					volume: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				},
@@ -265,7 +265,7 @@ describe('Sync Manager', () => {
 					amount: 50.0,
 					date: '2024-01-01',
 					mileage: 50000,
-					gallons: 10.5,
+					volume: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}
@@ -299,7 +299,7 @@ describe('Sync Manager', () => {
 					amount: 50.0,
 					date: '2024-01-01',
 					mileage: 50000,
-					gallons: 10.5,
+					volume: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}

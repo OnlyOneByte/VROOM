@@ -11,7 +11,8 @@ export interface SyncConflict {
 		tags: string[];
 		category?: string;
 		description?: string;
-		gallons?: number;
+		volume?: number;
+		charge?: number;
 	};
 	conflictType: 'duplicate' | 'modified' | 'deleted';
 	resolution?: 'keep_local' | 'keep_server' | 'merge';
@@ -161,19 +162,12 @@ class SyncManager {
 			}
 
 			// Validate fuel expense requirements
-			let tags = expense.tags || [];
-			if (tags.includes('fuel') && (!expense.gallons || !expense.mileage)) {
-				// Remove fuel tag if required fields are missing
-				tags = tags.filter(tag => tag !== 'fuel');
-
-				// If no tags remain, this is an invalid expense
-				if (tags.length === 0) {
-					return {
-						success: false,
-						error:
-							'Fuel expenses require both gallons and mileage data. Please edit the expense and add the missing information.'
-					};
-				}
+			if ((expense.category === 'fuel' && !expense.volume && !expense.charge) || !expense.mileage) {
+				return {
+					success: false,
+					error:
+						'Fuel expenses require volume/charge and mileage data. Please edit the expense and add the missing information.'
+				};
 			}
 
 			// No conflict, proceed with sync
@@ -184,13 +178,14 @@ class SyncManager {
 				},
 				body: JSON.stringify({
 					vehicleId: expense.vehicleId,
-					tags: tags,
+					tags: expense.tags,
 					category: expense.category,
 					amount: expense.amount,
 					currency: expense.currency || 'USD',
 					date: expense.date,
 					mileage: expense.mileage,
-					gallons: expense.gallons,
+					volume: expense.volume,
+					charge: expense.charge,
 					description: expense.description
 				})
 			});
@@ -306,7 +301,8 @@ class SyncManager {
 							amount: conflict.localExpense.amount,
 							date: conflict.localExpense.date,
 							mileage: conflict.localExpense.mileage,
-							gallons: conflict.localExpense.gallons,
+							volume: conflict.localExpense.volume,
+							charge: conflict.localExpense.charge,
 							description: conflict.localExpense.description,
 							forceOverwrite: true
 						})

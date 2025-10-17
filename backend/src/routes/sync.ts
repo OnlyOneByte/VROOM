@@ -5,8 +5,527 @@ import { requireAuth } from '../lib/middleware/auth';
 
 const sync = new Hono();
 
+// Track sync operations in progress per user
+const syncInProgress = new Map<string, boolean>();
+
 // All sync routes require authentication
 sync.use('*', requireAuth);
+
+/**
+ * POST /api/sync
+ * Trigger sync operations for specified types
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Error handling requires checking multiple error types
+sync.post('/', async (c) => {
+  try {
+    const user = c.get('user');
+    const userId = user.id;
+
+    // Check if sync is already in progress
+    if (syncInProgress.get(userId)) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'SYNC_IN_PROGRESS',
+            message: 'A sync operation is already in progress for this user',
+          },
+        },
+        409
+      );
+    }
+
+    // Parse request body
+    const body = await c.req.json();
+    const syncTypes = body.syncTypes as string[];
+
+    // Validate syncTypes
+    if (!syncTypes || !Array.isArray(syncTypes) || syncTypes.length === 0) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'syncTypes must be a non-empty array',
+          },
+        },
+        400
+      );
+    }
+
+    // Mark sync as in progress
+    syncInProgress.set(userId, true);
+
+    try {
+      // Import sync service
+      const { syncService } = await import('../lib/sync-service');
+
+      // Execute sync
+      const result = await syncService.executeSync(userId, syncTypes);
+
+      // Check if there were any errors
+      const hasErrors = result.errors && Object.keys(result.errors).length > 0;
+
+      return c.json({
+        success: !hasErrors,
+        results: result,
+      });
+    } finally {
+      // Always clear sync in progress flag
+      syncInProgress.delete(userId);
+    }
+  } catch (error) {
+    // Clear sync in progress flag on error
+    const user = c.get('user');
+    syncInProgress.delete(user.id);
+
+    console.error('Error executing sync:', error);
+
+    // Handle SyncError
+    if (error && typeof error === 'object' && 'code' in error) {
+      const syncError = error as { code: string; message: string; details?: unknown };
+
+      // Map error codes to HTTP status codes
+      if (syncError.code === 'AUTH_INVALID') {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: syncError.code,
+              message: syncError.message,
+              details: syncError.details,
+            },
+          },
+          401
+        );
+      }
+
+      if (syncError.code === 'VALIDATION_ERROR') {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: syncError.code,
+              message: syncError.message,
+              details: syncError.details,
+            },
+          },
+          400
+        );
+      }
+
+      if (syncError.code === 'PERMISSION_DENIED') {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: syncError.code,
+              message: syncError.message,
+              details: syncError.details,
+            },
+          },
+          403
+        );
+      }
+
+      if (syncError.code === 'QUOTA_EXCEEDED') {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: syncError.code,
+              message: syncError.message,
+              details: syncError.details,
+            },
+          },
+          429
+        );
+      }
+
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: syncError.code,
+            message: syncError.message,
+            details: syncError.details,
+          },
+        },
+        500
+      );
+    }
+
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'SYNC_FAILED',
+          message: 'Failed to execute sync operation',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        },
+      },
+      500
+    );
+  }
+});
+
+/**
+ * GET /api/sync/status
+ * Get sync configuration and status
+ */
+sync.get('/status', async (c) => {
+  try {
+    const user = c.get('user');
+    const userId = user.id;
+
+    // Import database dependencies
+    const { databaseService } = await import('../lib/database');
+    const { eq } = await import('drizzle-orm');
+    const { userSettings } = await import('../db/schema');
+
+    const db = databaseService.getDatabase();
+
+    // Get user settings
+    const settings = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    if (!settings.length) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'User settings not found',
+          },
+        },
+        404
+      );
+    }
+
+    const userSetting = settings[0];
+
+    // Determine enabled sync types
+    const enabledTypes: string[] = [];
+    if (userSetting.googleSheetsSyncEnabled) {
+      enabledTypes.push('sheets');
+    }
+    if (userSetting.googleDriveBackupEnabled) {
+      enabledTypes.push('backup');
+    }
+
+    return c.json({
+      success: true,
+      status: {
+        googleSheetsSyncEnabled: userSetting.googleSheetsSyncEnabled,
+        googleDriveBackupEnabled: userSetting.googleDriveBackupEnabled,
+        syncInactivityMinutes: userSetting.syncInactivityMinutes,
+        lastSyncDate: userSetting.lastSyncDate?.toISOString() || null,
+        lastBackupDate: userSetting.lastBackupDate?.toISOString() || null,
+        enabledTypes,
+        syncInProgress: syncInProgress.get(userId) || false,
+      },
+    });
+  } catch (error) {
+    console.error('Error getting sync status:', error);
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'STATUS_FAILED',
+          message: 'Failed to get sync status',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        },
+      },
+      500
+    );
+  }
+});
+
+/**
+ * POST /api/sync/configure
+ * Update sync settings
+ */
+sync.post('/configure', async (c) => {
+  try {
+    const user = c.get('user');
+    const userId = user.id;
+
+    // Parse request body
+    const body = await c.req.json();
+    const { googleSheetsSyncEnabled, googleDriveBackupEnabled, syncInactivityMinutes } = body;
+
+    // Validate parameters
+    if (
+      typeof googleSheetsSyncEnabled !== 'boolean' ||
+      typeof googleDriveBackupEnabled !== 'boolean'
+    ) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'googleSheetsSyncEnabled and googleDriveBackupEnabled must be boolean values',
+          },
+        },
+        400
+      );
+    }
+
+    if (
+      syncInactivityMinutes !== undefined &&
+      (typeof syncInactivityMinutes !== 'number' || syncInactivityMinutes < 1)
+    ) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'syncInactivityMinutes must be a positive number',
+          },
+        },
+        400
+      );
+    }
+
+    // Import database dependencies
+    const { databaseService } = await import('../lib/database');
+    const { eq } = await import('drizzle-orm');
+    const { userSettings } = await import('../db/schema');
+
+    const db = databaseService.getDatabase();
+
+    // Update settings
+    const updateData: {
+      googleSheetsSyncEnabled: boolean;
+      googleDriveBackupEnabled: boolean;
+      syncInactivityMinutes?: number;
+      updatedAt: Date;
+    } = {
+      googleSheetsSyncEnabled,
+      googleDriveBackupEnabled,
+      updatedAt: new Date(),
+    };
+
+    if (syncInactivityMinutes !== undefined) {
+      updateData.syncInactivityMinutes = syncInactivityMinutes;
+    }
+
+    await db.update(userSettings).set(updateData).where(eq(userSettings.userId, userId));
+
+    // Update activity tracker if needed
+    // Note: Activity tracker will pick up the new settings on next activity
+
+    return c.json({
+      success: true,
+      message: 'Sync settings updated successfully',
+      settings: updateData,
+    });
+  } catch (error) {
+    console.error('Error configuring sync:', error);
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'CONFIGURE_FAILED',
+          message: 'Failed to update sync settings',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        },
+      },
+      500
+    );
+  }
+});
+
+/**
+ * GET /api/sync/backups
+ * List backups in Google Drive
+ */
+sync.get('/backups', async (c) => {
+  try {
+    const user = c.get('user');
+    const userId = user.id;
+
+    // Import dependencies
+    const { databaseService } = await import('../lib/database');
+    const { eq } = await import('drizzle-orm');
+    const { users, userSettings } = await import('../db/schema');
+    const { GoogleDriveService } = await import('../lib/google-drive');
+
+    const db = databaseService.getDatabase();
+
+    // Get user settings to get backup folder ID
+    const settings = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    if (!settings.length || !settings[0].googleDriveBackupFolderId) {
+      return c.json({
+        success: true,
+        backups: [],
+        message: 'No backup folder configured',
+      });
+    }
+
+    // Get user info for tokens
+    const userInfo = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!userInfo.length || !userInfo[0].googleRefreshToken) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'AUTH_INVALID',
+            message: 'Google Drive access not available. Please re-authenticate with Google.',
+          },
+        },
+        401
+      );
+    }
+
+    // Create GoogleDriveService instance
+    const driveService = new GoogleDriveService(
+      userInfo[0].googleRefreshToken,
+      userInfo[0].googleRefreshToken
+    );
+
+    // List backups
+    const backups = await backupService.listBackupsInDrive(
+      driveService,
+      settings[0].googleDriveBackupFolderId
+    );
+
+    return c.json({
+      success: true,
+      backups,
+    });
+  } catch (error) {
+    console.error('Error listing backups:', error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message.includes('auth')) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'AUTH_INVALID',
+            message: 'Google Drive access not available. Please re-authenticate with Google.',
+            details: error.message,
+          },
+        },
+        401
+      );
+    }
+
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'LIST_BACKUPS_FAILED',
+          message: 'Failed to list backups',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        },
+      },
+      500
+    );
+  }
+});
+
+/**
+ * DELETE /api/sync/backups/:fileId
+ * Delete a specific backup from Google Drive
+ */
+sync.delete('/backups/:fileId', async (c) => {
+  try {
+    const user = c.get('user');
+    const userId = user.id;
+    const fileId = c.req.param('fileId');
+
+    if (!fileId) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'fileId parameter is required',
+          },
+        },
+        400
+      );
+    }
+
+    // Import dependencies
+    const { databaseService } = await import('../lib/database');
+    const { eq } = await import('drizzle-orm');
+    const { users } = await import('../db/schema');
+    const { GoogleDriveService } = await import('../lib/google-drive');
+
+    const db = databaseService.getDatabase();
+
+    // Get user info for tokens
+    const userInfo = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!userInfo.length || !userInfo[0].googleRefreshToken) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'AUTH_INVALID',
+            message: 'Google Drive access not available. Please re-authenticate with Google.',
+          },
+        },
+        401
+      );
+    }
+
+    // Create GoogleDriveService instance
+    const driveService = new GoogleDriveService(
+      userInfo[0].googleRefreshToken,
+      userInfo[0].googleRefreshToken
+    );
+
+    // Delete the file
+    await driveService.deleteFile(fileId);
+
+    return c.json({
+      success: true,
+      message: 'Backup deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting backup:', error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message.includes('auth')) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'AUTH_INVALID',
+            message: 'Google Drive access not available. Please re-authenticate with Google.',
+            details: error.message,
+          },
+        },
+        401
+      );
+    }
+
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'DELETE_BACKUP_FAILED',
+          message: 'Failed to delete backup',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        },
+      },
+      500
+    );
+  }
+});
 
 /**
  * Validate CSV data structure

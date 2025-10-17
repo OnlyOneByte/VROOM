@@ -29,7 +29,7 @@ export interface DashboardData {
 	};
 	fuelEfficiency: {
 		averageMPG: number;
-		totalGallons: number;
+		totalVolume: number;
 		totalFuelCost: number;
 		averageCostPerGallon: number;
 	};
@@ -60,7 +60,7 @@ export interface VehicleAnalytics {
 	};
 	fuelEfficiency: {
 		averageMPG: number;
-		totalGallons: number;
+		totalVolume: number;
 		totalMiles: number;
 		trend: Array<{
 			date: string;

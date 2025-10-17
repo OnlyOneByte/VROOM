@@ -41,6 +41,7 @@ const mockVehicles: Vehicle[] = [
 		make: 'Toyota',
 		model: 'Camry',
 		year: 2020,
+		vehicleType: 'gas' as const,
 		licensePlate: 'ABC-123',
 		nickname: 'Daily Driver',
 		initialMileage: 50000,
@@ -70,6 +71,7 @@ const mockVehicles: Vehicle[] = [
 		make: 'Honda',
 		model: 'Civic',
 		year: 2019,
+		vehicleType: 'gas' as const,
 		licensePlate: 'XYZ-789',
 		nickname: 'Weekend Car',
 		initialMileage: 30000,
@@ -81,6 +83,7 @@ const mockVehicles: Vehicle[] = [
 		make: 'Ford',
 		model: 'F-150',
 		year: 2021,
+		vehicleType: 'gas' as const,
 		licensePlate: 'DEF-456',
 		initialMileage: 25000,
 		createdAt: '2024-02-01T00:00:00Z',
@@ -307,6 +310,7 @@ describe('Vehicle Management Components', () => {
 				make: 'Toyota',
 				model: 'Camry',
 				year: 2020,
+				vehicleType: 'gas' as const,
 				initialMileage: 50000,
 				purchasePrice: 25000
 			};
@@ -333,6 +337,7 @@ describe('Vehicle Management Components', () => {
 				make: 'Toyota',
 				model: 'Camry',
 				year: 2020,
+				vehicleType: 'gas' as const,
 				initialMileage: -100,
 				purchasePrice: -1000
 			};
@@ -467,6 +472,7 @@ describe('Vehicle Management Components', () => {
 				make: 'Toyota',
 				model: 'Camry',
 				year: 2020,
+				vehicleType: 'gas' as const,
 				licensePlate: 'ABC-123',
 				nickname: 'Test Car',
 				initialMileage: 50000,

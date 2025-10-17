@@ -3,6 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { appStore } from '$lib/stores/app.js';
+	import { settingsStore } from '$lib/stores/settings';
+	import { getVolumeUnitLabel, getChargeUnitLabel } from '$lib/utils/units';
 	import {
 		ArrowLeft,
 		Car,
@@ -213,23 +215,37 @@
 				: 0;
 
 		// Calculate fuel efficiency
-		const fuelExpenses = expenses.filter(e => e.category === 'fuel' && e.gallons && e.mileage);
+		const fuelExpenses = expenses.filter(
+			e => e.category === 'fuel' && (e.volume || e.charge) && e.mileage
+		);
 		let avgMpg = 0;
 		if (fuelExpenses.length > 1) {
-			const mpgValues = [];
+			const efficiencyValues = [];
 			for (let i = 1; i < fuelExpenses.length; i++) {
 				const current = fuelExpenses[i];
 				const previous = fuelExpenses[i - 1];
-				if (current?.mileage && previous?.mileage && current?.gallons) {
+				if (current?.mileage && previous?.mileage) {
 					const miles = current.mileage - previous.mileage;
-					const mpg = miles / current.gallons;
-					if (mpg > 0 && mpg < 100) {
-						mpgValues.push(mpg);
+					// For liquid fuel
+					if (current?.volume) {
+						const mpg = miles / current.volume;
+						if (mpg > 0 && mpg < 100) {
+							efficiencyValues.push(mpg);
+						}
+					}
+					// For electric charge
+					else if (current?.charge) {
+						const efficiency = miles / current.charge;
+						if (efficiency > 0 && efficiency < 20) {
+							efficiencyValues.push(efficiency);
+						}
 					}
 				}
 			}
 			avgMpg =
-				mpgValues.length > 0 ? mpgValues.reduce((sum, mpg) => sum + mpg, 0) / mpgValues.length : 0;
+				efficiencyValues.length > 0
+					? efficiencyValues.reduce((sum, eff) => sum + eff, 0) / efficiencyValues.length
+					: 0;
 		}
 
 		vehicleStats = {
@@ -704,8 +720,23 @@
 												{#if expense.mileage}
 													<span>{expense.mileage.toLocaleString()} mi</span>
 												{/if}
-												{#if expense.gallons}
-													<span>{expense.gallons} gal</span>
+												{#if expense.volume}
+													<span
+														>{expense.volume}
+														{getVolumeUnitLabel(
+															$settingsStore.settings?.volumeUnit || 'gallons_us',
+															true
+														)}</span
+													>
+												{/if}
+												{#if expense.charge}
+													<span
+														>{expense.charge}
+														{getChargeUnitLabel(
+															$settingsStore.settings?.chargeUnit || 'kwh',
+															true
+														)}</span
+													>
 												{/if}
 											</div>
 										</div>

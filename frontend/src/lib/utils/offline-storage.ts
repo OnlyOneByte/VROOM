@@ -12,7 +12,8 @@ export interface OfflineExpense {
 	currency?: string;
 	date: string;
 	mileage?: number;
-	gallons?: number;
+	volume?: number; // For fuel expenses
+	charge?: number; // For electric charging
 	description?: string;
 	timestamp: number;
 	synced: boolean;
@@ -100,18 +101,12 @@ export async function syncOfflineExpenses(): Promise<void> {
 	try {
 		for (const expense of pendingExpenses) {
 			// Validate fuel expense requirements
-			let tags = expense.tags || [];
-			if (tags.includes('fuel') && (!expense.gallons || !expense.mileage)) {
-				// Remove fuel tag if required fields are missing
-				tags = tags.filter(tag => tag !== 'fuel');
-
-				// If no tags remain, skip this expense
-				if (tags.length === 0) {
-					console.warn(
-						`Skipping expense ${expense.id}: Fuel expenses require both gallons and mileage data`
-					);
-					continue;
-				}
+			const tags = expense.tags || [];
+			if ((expense.category === 'fuel' && !expense.volume && !expense.charge) || !expense.mileage) {
+				console.warn(
+					`Skipping expense ${expense.id}: Fuel expenses require volume/charge and mileage data`
+				);
+				continue;
 			}
 
 			// Convert offline expense to API format
@@ -123,7 +118,8 @@ export async function syncOfflineExpenses(): Promise<void> {
 				currency: expense.currency || 'USD',
 				date: expense.date,
 				mileage: expense.mileage,
-				gallons: expense.gallons,
+				volume: expense.volume,
+				charge: expense.charge,
 				description: expense.description
 			};
 
