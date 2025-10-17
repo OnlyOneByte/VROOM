@@ -151,11 +151,11 @@ insurance.get('/vehicles/:id/policies', zValidator('param', vehicleParamsSchema)
         expirationAlert:
           daysUntilExpiration <= 30
             ? {
-              type: 'expiration_warning',
-              severity: daysUntilExpiration <= 7 ? 'high' : 'medium',
-              message: `Policy expires in ${daysUntilExpiration} days`,
-              daysRemaining: daysUntilExpiration,
-            }
+                type: 'expiration_warning',
+                severity: daysUntilExpiration <= 7 ? 'high' : 'medium',
+                message: `Policy expires in ${daysUntilExpiration} days`,
+                daysRemaining: daysUntilExpiration,
+              }
             : null,
       };
     });

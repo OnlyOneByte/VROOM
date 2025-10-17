@@ -108,9 +108,11 @@ export class BackupService {
     // Add vehicles CSV
     const vehiclesCsv = this.convertToCSV(backup.vehicles, [
       'id',
+      'userId',
       'make',
       'model',
       'year',
+      'vehicleType',
       'licensePlate',
       'nickname',
       'initialMileage',

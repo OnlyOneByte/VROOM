@@ -128,6 +128,85 @@ export interface RestoreResponse {
 }
 
 /**
+ * Helper function to convert CSV string values to proper types
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Type conversion requires checking multiple field patterns
+function convertCSVValue(value: string, fieldName: string): unknown {
+  // Empty string means null
+  if (value === '' || value === 'null' || value === 'undefined' || value === 'NULL') {
+    return null;
+  }
+
+  // Date/timestamp fields (ending with 'At' or 'Date', or is 'date')
+  if (fieldName.endsWith('At') || fieldName.endsWith('Date') || fieldName === 'date') {
+    // Try to parse as date
+    try {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return null;
+      }
+      return date;
+    } catch {
+      return null;
+    }
+  }
+
+  // Boolean fields
+  if (fieldName.startsWith('is') || fieldName === 'isActive' || fieldName === 'isScheduled') {
+    return value === 'true' || value === '1' || value === 'TRUE';
+  }
+
+  // Numeric fields - check common patterns
+  if (
+    fieldName.includes('amount') ||
+    fieldName.includes('Amount') ||
+    fieldName.includes('price') ||
+    fieldName.includes('Price') ||
+    fieldName.includes('cost') ||
+    fieldName.includes('Cost') ||
+    fieldName.includes('balance') ||
+    fieldName.includes('Balance') ||
+    fieldName === 'apr' ||
+    fieldName === 'gallons' ||
+    fieldName === 'mileage' ||
+    fieldName === 'initialMileage' ||
+    fieldName === 'mileageLimit' ||
+    fieldName === 'excessMileageFee' ||
+    fieldName === 'residualValue'
+  ) {
+    const num = Number.parseFloat(value);
+    return Number.isNaN(num) ? null : num;
+  }
+
+  // Integer fields
+  if (
+    fieldName === 'year' ||
+    fieldName === 'termMonths' ||
+    fieldName === 'termLengthMonths' ||
+    fieldName === 'paymentNumber' ||
+    fieldName === 'paymentDayOfMonth' ||
+    fieldName === 'paymentDayOfWeek'
+  ) {
+    const num = Number.parseInt(value, 10);
+    return Number.isNaN(num) ? null : num;
+  }
+
+  // Default: return as string
+  return value;
+}
+
+/**
+ * Convert CSV row data to properly typed object
+ */
+function convertCSVRow(row: Record<string, unknown>): Record<string, unknown> {
+  const converted: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    converted[key] = convertCSVValue(String(value), key);
+  }
+  return converted;
+}
+
+/**
  * Service for managing unified sync operations
  */
 export class SyncService {
@@ -295,96 +374,84 @@ export class SyncService {
 
     // Replace or merge mode: perform restore in transaction
     try {
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Transaction logic requires multiple conditional steps
       await db.transaction(async (tx) => {
         // Replace mode: delete all existing user data
         if (mode === 'replace') {
-          // Delete in correct order (child tables first)
-          await tx
-            .delete(vehicleFinancingPayments)
-            .where(
-              eq(
-                vehicleFinancingPayments.financingId,
-                tx
-                  .select({ id: vehicleFinancing.id })
-                  .from(vehicleFinancing)
-                  .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-                  .where(eq(vehicles.userId, userId))
-                  .limit(1)
-                  .as('subquery')
-              )
-            );
+          // Get all vehicle IDs for this user
+          const userVehicles = await tx
+            .select({ id: vehicles.id })
+            .from(vehicles)
+            .where(eq(vehicles.userId, userId));
 
-          await tx
-            .delete(vehicleFinancing)
-            .where(
-              eq(
-                vehicleFinancing.vehicleId,
-                tx
-                  .select({ id: vehicles.id })
-                  .from(vehicles)
-                  .where(eq(vehicles.userId, userId))
-                  .limit(1)
-                  .as('subquery')
-              )
-            );
+          const vehicleIds = userVehicles.map((v) => v.id);
 
-          await tx
-            .delete(insurancePolicies)
-            .where(
-              eq(
-                insurancePolicies.vehicleId,
-                tx
-                  .select({ id: vehicles.id })
-                  .from(vehicles)
-                  .where(eq(vehicles.userId, userId))
-                  .limit(1)
-                  .as('subquery')
-              )
-            );
+          if (vehicleIds.length > 0) {
+            const { inArray } = await import('drizzle-orm');
 
-          await tx
-            .delete(expenses)
-            .where(
-              eq(
-                expenses.vehicleId,
-                tx
-                  .select({ id: vehicles.id })
-                  .from(vehicles)
-                  .where(eq(vehicles.userId, userId))
-                  .limit(1)
-                  .as('subquery')
-              )
-            );
+            // Get all financing IDs for these vehicles
+            const userFinancing = await tx
+              .select({ id: vehicleFinancing.id })
+              .from(vehicleFinancing)
+              .where(inArray(vehicleFinancing.vehicleId, vehicleIds));
+
+            const financingIds = userFinancing.map((f) => f.id);
+
+            // Delete in correct order (child tables first)
+            if (financingIds.length > 0) {
+              await tx
+                .delete(vehicleFinancingPayments)
+                .where(inArray(vehicleFinancingPayments.financingId, financingIds));
+            }
+
+            await tx
+              .delete(vehicleFinancing)
+              .where(inArray(vehicleFinancing.vehicleId, vehicleIds));
+
+            await tx
+              .delete(insurancePolicies)
+              .where(inArray(insurancePolicies.vehicleId, vehicleIds));
+
+            await tx.delete(expenses).where(inArray(expenses.vehicleId, vehicleIds));
+          }
 
           await tx.delete(vehicles).where(eq(vehicles.userId, userId));
         }
 
-        // Insert backup data
+        // Insert backup data with proper type conversion
         if (parsedBackup.vehicles.length > 0) {
           // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
-          await tx.insert(vehicles).values(parsedBackup.vehicles.map((v: any) => v));
+          await tx
+            .insert(vehicles)
+            .values(parsedBackup.vehicles.map((v: any) => convertCSVRow(v)) as any);
         }
 
         if (parsedBackup.expenses.length > 0) {
           // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
-          await tx.insert(expenses).values(parsedBackup.expenses.map((e: any) => e));
+          await tx
+            .insert(expenses)
+            .values(parsedBackup.expenses.map((e: any) => convertCSVRow(e)) as any);
         }
 
         if (parsedBackup.financing.length > 0) {
           // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
-          await tx.insert(vehicleFinancing).values(parsedBackup.financing.map((f: any) => f));
+          await tx
+            .insert(vehicleFinancing)
+            .values(parsedBackup.financing.map((f: any) => convertCSVRow(f)) as any);
         }
 
         if (parsedBackup.financingPayments.length > 0) {
+          // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
           await tx
             .insert(vehicleFinancingPayments)
-            // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
-            .values(parsedBackup.financingPayments.map((p: any) => p));
+            .values(parsedBackup.financingPayments.map((p: any) => convertCSVRow(p)) as any);
         }
 
         if (parsedBackup.insurance.length > 0) {
           // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
-          await tx.insert(insurancePolicies).values(parsedBackup.insurance.map((i: any) => i));
+          await tx
+            .insert(insurancePolicies)
+            .values(parsedBackup.insurance.map((i: any) => convertCSVRow(i)) as any);
         }
       });
 
@@ -717,96 +784,84 @@ export class SyncService {
       }
 
       // Replace or merge mode: perform restore in transaction
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Transaction logic requires multiple conditional steps
       await db.transaction(async (tx) => {
         // Replace mode: delete all existing user data
         if (mode === 'replace') {
-          // Delete in correct order (child tables first)
-          await tx
-            .delete(vehicleFinancingPayments)
-            .where(
-              eq(
-                vehicleFinancingPayments.financingId,
-                tx
-                  .select({ id: vehicleFinancing.id })
-                  .from(vehicleFinancing)
-                  .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-                  .where(eq(vehicles.userId, userId))
-                  .limit(1)
-                  .as('subquery')
-              )
-            );
+          // Get all vehicle IDs for this user
+          const userVehicles = await tx
+            .select({ id: vehicles.id })
+            .from(vehicles)
+            .where(eq(vehicles.userId, userId));
 
-          await tx
-            .delete(vehicleFinancing)
-            .where(
-              eq(
-                vehicleFinancing.vehicleId,
-                tx
-                  .select({ id: vehicles.id })
-                  .from(vehicles)
-                  .where(eq(vehicles.userId, userId))
-                  .limit(1)
-                  .as('subquery')
-              )
-            );
+          const vehicleIds = userVehicles.map((v) => v.id);
 
-          await tx
-            .delete(insurancePolicies)
-            .where(
-              eq(
-                insurancePolicies.vehicleId,
-                tx
-                  .select({ id: vehicles.id })
-                  .from(vehicles)
-                  .where(eq(vehicles.userId, userId))
-                  .limit(1)
-                  .as('subquery')
-              )
-            );
+          if (vehicleIds.length > 0) {
+            const { inArray } = await import('drizzle-orm');
 
-          await tx
-            .delete(expenses)
-            .where(
-              eq(
-                expenses.vehicleId,
-                tx
-                  .select({ id: vehicles.id })
-                  .from(vehicles)
-                  .where(eq(vehicles.userId, userId))
-                  .limit(1)
-                  .as('subquery')
-              )
-            );
+            // Get all financing IDs for these vehicles
+            const userFinancing = await tx
+              .select({ id: vehicleFinancing.id })
+              .from(vehicleFinancing)
+              .where(inArray(vehicleFinancing.vehicleId, vehicleIds));
+
+            const financingIds = userFinancing.map((f) => f.id);
+
+            // Delete in correct order (child tables first)
+            if (financingIds.length > 0) {
+              await tx
+                .delete(vehicleFinancingPayments)
+                .where(inArray(vehicleFinancingPayments.financingId, financingIds));
+            }
+
+            await tx
+              .delete(vehicleFinancing)
+              .where(inArray(vehicleFinancing.vehicleId, vehicleIds));
+
+            await tx
+              .delete(insurancePolicies)
+              .where(inArray(insurancePolicies.vehicleId, vehicleIds));
+
+            await tx.delete(expenses).where(inArray(expenses.vehicleId, vehicleIds));
+          }
 
           await tx.delete(vehicles).where(eq(vehicles.userId, userId));
         }
 
-        // Insert sheet data
+        // Insert sheet data with proper type conversion
         if (sheetData.vehicles.length > 0) {
           // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
-          await tx.insert(vehicles).values(sheetData.vehicles.map((v: any) => v));
+          await tx
+            .insert(vehicles)
+            .values(sheetData.vehicles.map((v: any) => convertCSVRow(v)) as any);
         }
 
         if (sheetData.expenses.length > 0) {
           // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
-          await tx.insert(expenses).values(sheetData.expenses.map((e: any) => e));
+          await tx
+            .insert(expenses)
+            .values(sheetData.expenses.map((e: any) => convertCSVRow(e)) as any);
         }
 
         if (sheetData.financing.length > 0) {
           // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
-          await tx.insert(vehicleFinancing).values(sheetData.financing.map((f: any) => f));
+          await tx
+            .insert(vehicleFinancing)
+            .values(sheetData.financing.map((f: any) => convertCSVRow(f)) as any);
         }
 
         if (sheetData.financingPayments.length > 0) {
+          // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
           await tx
             .insert(vehicleFinancingPayments)
-            // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
-            .values(sheetData.financingPayments.map((p: any) => p));
+            .values(sheetData.financingPayments.map((p: any) => convertCSVRow(p)) as any);
         }
 
         if (sheetData.insurance.length > 0) {
           // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
-          await tx.insert(insurancePolicies).values(sheetData.insurance.map((i: any) => i));
+          await tx
+            .insert(insurancePolicies)
+            .values(sheetData.insurance.map((i: any) => convertCSVRow(i)) as any);
         }
       });
 
