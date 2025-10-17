@@ -5,7 +5,6 @@ import { prettyJSON } from 'hono/pretty-json';
 import { config } from './lib/config';
 import { activityTrackerMiddleware } from './lib/middleware/activity-tracker';
 import { optionalAuth, requireAuth } from './lib/middleware/auth';
-import { checkpointAfterWrite } from './lib/middleware/checkpoint';
 import { errorHandler } from './lib/middleware/error-handler';
 import { rateLimiter } from './lib/middleware/rate-limiter';
 import { analytics } from './routes/analytics';
@@ -47,9 +46,6 @@ if (config.env === 'development') {
 
 // Activity tracking middleware (after auth middleware)
 app.use('*', activityTrackerMiddleware);
-
-// Checkpoint middleware to persist data after write operations
-app.use('*', checkpointAfterWrite);
 
 // Health check endpoint with detailed status
 app.get('/health', (c) => {
@@ -143,15 +139,16 @@ console.log(`🚗 VROOM Backend starting on port ${config.server.port}`);
 console.log(`📊 Environment: ${config.env}`);
 console.log(`🗄️  Database: ${config.database.url}`);
 
-// Periodic WAL checkpoint to ensure data persistence (every 30 seconds in dev, 5 minutes in prod)
+// Periodic WAL checkpoint to ensure data persistence
+// Auto-checkpoint (1000 pages) handles most cases, this is just a safety net
 import { checkpointWAL, forceCheckpointWAL } from './db/connection';
 
 const checkpointInterval = setInterval(
   () => {
     checkpointWAL();
   },
-  config.env === 'development' ? 30 * 1000 : 5 * 60 * 1000
-); // 30 seconds in dev, 5 minutes in prod
+  config.env === 'development' ? 5 * 60 * 1000 : 15 * 60 * 1000
+); // 5 minutes in dev, 15 minutes in prod
 
 // Force checkpoint on startup to ensure any previous data is persisted
 forceCheckpointWAL();

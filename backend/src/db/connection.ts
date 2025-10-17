@@ -25,9 +25,9 @@ sqlite.run('PRAGMA foreign_keys = ON');
 sqlite.run('PRAGMA temp_store = MEMORY');
 
 // Configure WAL auto-checkpoint to prevent data loss during hot reload
-// Checkpoint after 100 pages (~400KB) to ensure data is persisted more frequently
-// This is especially important for development with hot reload
-sqlite.run('PRAGMA wal_autocheckpoint = 100');
+// Checkpoint after 1000 pages (~4MB) - SQLite default, good balance
+// Auto-checkpoint handles most cases, reducing need for manual checkpoints
+sqlite.run('PRAGMA wal_autocheckpoint = 1000');
 
 // Create Drizzle instance
 export const db = drizzle(sqlite, { schema });
@@ -65,12 +65,11 @@ export function checkpointWAL(): void {
       checkpointed: number;
     } | null;
 
-    if (result) {
+    // Only log if there was actual work done
+    if (result && result.checkpointed > 0) {
       console.log(
         `WAL checkpoint completed: ${result.checkpointed} pages written, ${result.log} pages in WAL`
       );
-    } else {
-      console.log('WAL checkpoint completed successfully');
     }
   } catch (error) {
     console.error('WAL checkpoint failed:', error);
@@ -81,8 +80,16 @@ export function checkpointWAL(): void {
 export function forceCheckpointWAL(): void {
   try {
     // RESTART mode: force checkpoint even if there are readers
-    sqlite.run('PRAGMA wal_checkpoint(RESTART)');
-    console.log('Forced WAL checkpoint completed');
+    const result = sqlite.query('PRAGMA wal_checkpoint(RESTART)').get() as {
+      busy: number;
+      log: number;
+      checkpointed: number;
+    } | null;
+
+    // Only log if there was actual work done
+    if (result && result.checkpointed > 0) {
+      console.log(`Forced WAL checkpoint completed: ${result.checkpointed} pages written`);
+    }
   } catch (error) {
     console.error('Forced WAL checkpoint failed:', error);
   }
