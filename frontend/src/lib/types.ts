@@ -162,6 +162,19 @@ export interface FuelEfficiency {
 	totalGallons: number;
 }
 
+export interface VehicleStats {
+	period: '7d' | '30d' | '90d' | '1y' | 'all';
+	totalMileage: number;
+	currentMileage: number | null;
+	totalFuelConsumed: number;
+	totalChargeConsumed: number;
+	averageMpg: number | null;
+	averageMilesPerKwh: number | null;
+	totalFuelCost: number;
+	costPerMile: number | null;
+	fuelExpenseCount: number;
+}
+
 // Frontend-specific types
 export interface ApiResponse<T = unknown> {
 	success: boolean;

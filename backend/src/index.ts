@@ -15,6 +15,7 @@ import { insurance } from './routes/insurance';
 import { settings } from './routes/settings';
 import { sharing } from './routes/sharing';
 import { sync } from './routes/sync';
+import { vehicleStats } from './routes/vehicle-stats';
 import { vehicles } from './routes/vehicles';
 
 const app = new Hono();
@@ -67,6 +68,7 @@ app.route('/api/auth', auth);
 
 // Mount API routes
 app.route('/api/vehicles', vehicles);
+app.route('/api/vehicles', vehicleStats);
 app.route('/api/financing', financing);
 app.route('/api/expenses', expenses);
 app.route('/api/insurance', insurance);

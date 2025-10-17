@@ -1182,10 +1182,7 @@ export class SyncService {
       }
 
       // Found backup folder - list backups
-      const existingBackups = await backupService.listBackupsInDrive(
-        driveService,
-        backupFolderId
-      );
+      const existingBackups = await backupService.listBackupsInDrive(driveService, backupFolderId);
 
       // Store the backup folder ID for future use
       await db

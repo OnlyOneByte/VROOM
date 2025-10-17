@@ -40,7 +40,7 @@
 		AlertDialogTitle
 	} from '$lib/components/ui/alert-dialog';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import type { Vehicle, Expense, ExpenseFilters } from '$lib/types.js';
+	import type { Vehicle, Expense, ExpenseFilters, VehicleStats } from '$lib/types.js';
 
 	const vehicleId = $page.params.id;
 
@@ -54,6 +54,8 @@
 	let expenseToDelete = $state<Expense | null>(null);
 	let isDeleting = $state(false);
 	let activeTab = $state('overview');
+	let vehicleStatsData = $state<VehicleStats | null>(null);
+	let selectedStatsPeriod = $state<'7d' | '30d' | '90d' | '1y' | 'all'>('all');
 
 	// Filters and search
 	let searchTerm = $state('');
@@ -86,6 +88,7 @@
 	onMount(async () => {
 		await loadVehicle();
 		await loadExpenses();
+		await loadVehicleStats();
 	});
 
 	async function loadVehicle() {
@@ -131,6 +134,28 @@
 			isLoading = false;
 		}
 	}
+
+	async function loadVehicleStats() {
+		try {
+			const response = await fetch(
+				`/api/vehicles/${vehicleId}/stats?period=${selectedStatsPeriod}`,
+				{
+					credentials: 'include'
+				}
+			);
+
+			if (response.ok) {
+				const result = await response.json();
+				vehicleStatsData = result.data;
+			}
+		} catch (error) {
+			console.error('Error loading vehicle stats:', error);
+		}
+	}
+
+	$effect(() => {
+		loadVehicleStats();
+	});
 
 	function applyFiltersAndSort() {
 		let filtered = [...expenses];
@@ -416,6 +441,17 @@
 
 			<!-- Overview Tab -->
 			<TabsContent value="overview" class="space-y-6">
+				<!-- Period Selector -->
+				<div class="flex justify-end">
+					<select bind:value={selectedStatsPeriod} class="form-input w-auto text-sm">
+						<option value="7d">Last 7 Days</option>
+						<option value="30d">Last 30 Days</option>
+						<option value="90d">Last 90 Days</option>
+						<option value="1y">Last Year</option>
+						<option value="all">All Time</option>
+					</select>
+				</div>
+
 				<!-- Vehicle Overview Cards -->
 				<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
 					<div class="card-compact">
@@ -474,6 +510,98 @@
 						</div>
 					</div>
 				</div>
+
+				<!-- Mileage & Fuel Statistics -->
+				{#if vehicleStatsData && vehicleStatsData.fuelExpenseCount > 0}
+					<div class="card">
+						<h3 class="text-lg font-semibold text-gray-900 mb-4">Mileage & Fuel Statistics</h3>
+						<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+							{#if vehicleStatsData.currentMileage !== null}
+								<div class="flex flex-col p-4 bg-gray-50 rounded-lg">
+									<span class="text-sm font-medium text-gray-600 mb-1">Current Mileage</span>
+									<span class="text-2xl font-bold text-gray-900">
+										{vehicleStatsData.currentMileage.toLocaleString()}
+									</span>
+									<span class="text-xs text-gray-500 mt-1">miles</span>
+								</div>
+
+								<div class="flex flex-col p-4 bg-gray-50 rounded-lg">
+									<span class="text-sm font-medium text-gray-600 mb-1">Miles Driven</span>
+									<span class="text-2xl font-bold text-gray-900">
+										{vehicleStatsData.totalMileage.toLocaleString()}
+									</span>
+									<span class="text-xs text-gray-500 mt-1">
+										{selectedStatsPeriod === 'all' ? 'lifetime' : `in ${selectedStatsPeriod}`}
+									</span>
+								</div>
+							{/if}
+
+							{#if vehicleStatsData.totalFuelConsumed > 0}
+								<div class="flex flex-col p-4 bg-blue-50 rounded-lg">
+									<span class="text-sm font-medium text-blue-700 mb-1">Fuel Consumed</span>
+									<span class="text-2xl font-bold text-blue-900">
+										{vehicleStatsData.totalFuelConsumed.toFixed(1)}
+									</span>
+									<span class="text-xs text-blue-600 mt-1">
+										{getVolumeUnitLabel($settingsStore.settings?.volumeUnit || 'gallons_us', true)}
+									</span>
+								</div>
+							{/if}
+
+							{#if vehicleStatsData.totalChargeConsumed > 0}
+								<div class="flex flex-col p-4 bg-green-50 rounded-lg">
+									<span class="text-sm font-medium text-green-700 mb-1">Charge Consumed</span>
+									<span class="text-2xl font-bold text-green-900">
+										{vehicleStatsData.totalChargeConsumed.toFixed(1)}
+									</span>
+									<span class="text-xs text-green-600 mt-1">
+										{getChargeUnitLabel($settingsStore.settings?.chargeUnit || 'kwh', true)}
+									</span>
+								</div>
+							{/if}
+
+							{#if vehicleStatsData.averageMpg !== null}
+								<div class="flex flex-col p-4 bg-orange-50 rounded-lg">
+									<span class="text-sm font-medium text-orange-700 mb-1">Average MPG</span>
+									<span class="text-2xl font-bold text-orange-900">
+										{vehicleStatsData.averageMpg.toFixed(1)}
+									</span>
+									<span class="text-xs text-orange-600 mt-1">miles per gallon</span>
+								</div>
+							{/if}
+
+							{#if vehicleStatsData.averageMilesPerKwh !== null}
+								<div class="flex flex-col p-4 bg-purple-50 rounded-lg">
+									<span class="text-sm font-medium text-purple-700 mb-1">Efficiency</span>
+									<span class="text-2xl font-bold text-purple-900">
+										{vehicleStatsData.averageMilesPerKwh.toFixed(2)}
+									</span>
+									<span class="text-xs text-purple-600 mt-1">mi/kWh</span>
+								</div>
+							{/if}
+
+							{#if vehicleStatsData.costPerMile !== null}
+								<div class="flex flex-col p-4 bg-red-50 rounded-lg">
+									<span class="text-sm font-medium text-red-700 mb-1">Cost per Mile</span>
+									<span class="text-2xl font-bold text-red-900">
+										{formatCurrency(vehicleStatsData.costPerMile)}
+									</span>
+									<span class="text-xs text-red-600 mt-1">fuel only</span>
+								</div>
+							{/if}
+
+							<div class="flex flex-col p-4 bg-gray-50 rounded-lg">
+								<span class="text-sm font-medium text-gray-600 mb-1">Total Fuel Cost</span>
+								<span class="text-2xl font-bold text-gray-900">
+									{formatCurrency(vehicleStatsData.totalFuelCost)}
+								</span>
+								<span class="text-xs text-gray-500 mt-1">
+									{vehicleStatsData.fuelExpenseCount} fill-ups
+								</span>
+							</div>
+						</div>
+					</div>
+				{/if}
 
 				<!-- Expenses by Category -->
 				{#if Object.keys(vehicleStats.expensesByCategory).length > 0}
