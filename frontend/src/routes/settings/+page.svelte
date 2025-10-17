@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, untrack } from 'svelte';
+	import { onMount } from 'svelte';
 	import { settingsStore } from '$lib/stores/settings.js';
 	import { appStore } from '$lib/stores/app.js';
 	import {
@@ -58,31 +58,38 @@
 	let googleDriveBackupEnabled = $state(false);
 	let googleSheetsSyncEnabled = $state(false);
 	let syncInactivityMinutes = $state(5);
+	let isInitialized = $state(false);
 
 	onMount(() => {
 		settingsStore.load();
 	});
 
-	// Update form state when settings load - use untrack to prevent infinite loops
+	// Update form state when settings load - only on initial load
 	$effect(() => {
-		if (settings) {
-			untrack(() => {
-				distanceUnit = settings.distanceUnit;
-				volumeUnit = settings.volumeUnit;
-				chargeUnit = settings.chargeUnit;
-				currencyUnit = settings.currencyUnit;
-				autoBackupEnabled = settings.autoBackupEnabled;
-				backupFrequency = settings.backupFrequency;
-				googleDriveBackupEnabled = settings.googleDriveBackupEnabled;
-				googleSheetsSyncEnabled = settings.googleSheetsSyncEnabled || false;
-				syncInactivityMinutes = settings.syncInactivityMinutes || 5;
-			});
+		if (settings && !isInitialized) {
+			distanceUnit = settings.distanceUnit;
+			volumeUnit = settings.volumeUnit;
+			chargeUnit = settings.chargeUnit;
+			currencyUnit = settings.currencyUnit;
+			autoBackupEnabled = settings.autoBackupEnabled;
+			backupFrequency = settings.backupFrequency;
+			googleDriveBackupEnabled = settings.googleDriveBackupEnabled;
+			googleSheetsSyncEnabled = settings.googleSheetsSyncEnabled || false;
+			syncInactivityMinutes = settings.syncInactivityMinutes || 5;
+			isInitialized = true;
 		}
 	});
 
 	async function handleSave() {
 		isSaving = true;
 		try {
+			// Update sync-specific settings via the new endpoint first
+			await settingsStore.configureSyncSettings({
+				googleSheetsSyncEnabled,
+				googleDriveBackupEnabled,
+				syncInactivityMinutes
+			});
+
 			// Update general settings
 			await settingsStore.update({
 				distanceUnit,
@@ -93,12 +100,8 @@
 				backupFrequency
 			});
 
-			// Update sync-specific settings via the new endpoint
-			await settingsStore.configureSyncSettings({
-				googleSheetsSyncEnabled,
-				googleDriveBackupEnabled,
-				syncInactivityMinutes
-			});
+			// Reset initialization flag to allow settings to update from server
+			isInitialized = false;
 
 			appStore.showSuccess('Settings saved successfully');
 		} catch {

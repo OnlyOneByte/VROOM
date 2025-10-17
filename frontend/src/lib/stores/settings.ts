@@ -102,10 +102,12 @@ function createSettingsStore() {
 					throw new Error('Failed to configure sync settings');
 				}
 
+				const result = await response.json();
+
 				// Reload settings to get updated values
 				await this.load();
 
-				return await response.json();
+				return result;
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : 'Failed to configure sync settings';

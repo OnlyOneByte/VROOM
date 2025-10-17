@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { authStore } from '$lib/stores/auth.js';
 	import { House, Receipt, ChartColumn, Settings, Menu, LogOut, User, MapPin } from 'lucide-svelte';
 	import SyncStatusInline from './SyncStatusInline.svelte';
@@ -19,8 +19,8 @@
 
 	let mobileMenuOpen = $state(false);
 
-	// Use automatic store subscription
-	let currentPath = $derived($page.url.pathname);
+	// Use page rune from $app/state
+	let currentPath = $derived(page.url.pathname);
 
 	const navigation = [
 		{ name: 'Dashboard', href: '/vehicles', icon: House },
