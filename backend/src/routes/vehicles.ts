@@ -1,9 +1,8 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import type { NewVehicle } from '../db/schema';
-import { ConflictError, NotFoundError } from '../lib/errors';
+import { AuthorizationError, ConflictError, NotFoundError } from '../lib/errors';
 import { requireAuth } from '../lib/middleware/auth';
 import { repositoryFactory } from '../lib/repositories/factory';
 import type { ApiResponse } from '../types/api';
@@ -107,86 +106,60 @@ vehicles.put(
   zValidator('param', vehicleParamsSchema),
   zValidator('json', updateVehicleSchema),
   async (c) => {
-    try {
-      const user = c.get('user');
-      const { id } = c.req.valid('param');
-      const updateData = c.req.valid('json');
-      const vehicleRepository = repositoryFactory.getVehicleRepository();
-      const shareRepository = repositoryFactory.getVehicleShareRepository();
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const updateData = c.req.valid('json');
+    const vehicleRepository = repositoryFactory.getVehicleRepository();
+    const shareRepository = repositoryFactory.getVehicleShareRepository();
 
-      // Check if vehicle exists and user has access
-      const existingVehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
-      if (!existingVehicle) {
-        throw new HTTPException(404, { message: 'Vehicle not found' });
-      }
-
-      // Check if user has edit permission
-      const permission = await shareRepository.getPermission(id, user.id);
-      if (permission !== 'edit') {
-        throw new HTTPException(403, {
-          message: 'You do not have permission to edit this vehicle',
-        });
-      }
-
-      // Check if license plate already exists (if being updated)
-      if (updateData.licensePlate && updateData.licensePlate !== existingVehicle.licensePlate) {
-        const vehicleWithPlate = await vehicleRepository.findByLicensePlate(
-          updateData.licensePlate
-        );
-        if (vehicleWithPlate && vehicleWithPlate.id !== id) {
-          throw new HTTPException(409, {
-            message: 'A vehicle with this license plate already exists',
-          });
-        }
-      }
-
-      const updatedVehicle = await vehicleRepository.update(id, updateData);
-
-      return c.json({
-        success: true,
-        data: updatedVehicle,
-        message: 'Vehicle updated successfully',
-      });
-    } catch (error) {
-      console.error('Error updating vehicle:', error);
-
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-
-      throw new HTTPException(500, { message: 'Failed to update vehicle' });
+    // Check if vehicle exists and user has access
+    const existingVehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
+    if (!existingVehicle) {
+      throw new NotFoundError('Vehicle');
     }
+
+    // Check if user has edit permission
+    const permission = await shareRepository.getPermission(id, user.id);
+    if (permission !== 'edit') {
+      throw new AuthorizationError('You do not have permission to edit this vehicle');
+    }
+
+    // Check if license plate already exists (if being updated)
+    if (updateData.licensePlate && updateData.licensePlate !== existingVehicle.licensePlate) {
+      const vehicleWithPlate = await vehicleRepository.findByLicensePlate(updateData.licensePlate);
+      if (vehicleWithPlate && vehicleWithPlate.id !== id) {
+        throw new ConflictError('A vehicle with this license plate already exists');
+      }
+    }
+
+    const updatedVehicle = await vehicleRepository.update(id, updateData);
+
+    return c.json({
+      success: true,
+      data: updatedVehicle,
+      message: 'Vehicle updated successfully',
+    });
   }
 );
 
 // DELETE /api/vehicles/:id - Delete vehicle
 vehicles.delete('/:id', zValidator('param', vehicleParamsSchema), async (c) => {
-  try {
-    const user = c.get('user');
-    const { id } = c.req.valid('param');
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
+  const user = c.get('user');
+  const { id } = c.req.valid('param');
+  const vehicleRepository = repositoryFactory.getVehicleRepository();
 
-    // Check if vehicle exists and belongs to user
-    const existingVehicle = await vehicleRepository.findByUserIdAndId(user.id, id);
-    if (!existingVehicle) {
-      throw new HTTPException(404, { message: 'Vehicle not found' });
-    }
-
-    await vehicleRepository.delete(id);
-
-    return c.json({
-      success: true,
-      message: 'Vehicle deleted successfully',
-    });
-  } catch (error) {
-    console.error('Error deleting vehicle:', error);
-
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-
-    throw new HTTPException(500, { message: 'Failed to delete vehicle' });
+  // Check if vehicle exists and belongs to user
+  const existingVehicle = await vehicleRepository.findByUserIdAndId(user.id, id);
+  if (!existingVehicle) {
+    throw new NotFoundError('Vehicle');
   }
+
+  await vehicleRepository.delete(id);
+
+  return c.json({
+    success: true,
+    message: 'Vehicle deleted successfully',
+  });
 });
 
 export { vehicles };

@@ -1,6 +1,3 @@
-import { checkDatabaseHealth, closeDatabaseConnection, db } from '../db/connection.js';
-import { repositoryFactory } from './repositories/index.js';
-
 // Database service class for centralized database operations
 export class DatabaseService {
   private static instance: DatabaseService;
@@ -77,79 +74,38 @@ export class DatabaseService {
 // Export singleton instance
 export const databaseService = DatabaseService.getInstance();
 
-// Database error types
-export class DatabaseError extends Error {
-  constructor(
-    message: string,
-    public readonly operation: string,
-    public readonly originalError?: Error
-  ) {
-    super(message);
-    this.name = 'DatabaseError';
-  }
-}
+// Import for use in validation functions
+import { ValidationError } from './errors.js';
+import { checkDatabaseHealth, closeDatabaseConnection, db } from '../db/connection.js';
+import { repositoryFactory } from './repositories/index.js';
 
-export class ValidationError extends Error {
-  constructor(
-    message: string,
-    public readonly field: string,
-    public readonly value?: unknown
-  ) {
-    super(message);
-    this.name = 'ValidationError';
-  }
-}
+// Re-export error classes from centralized location
+export { DatabaseError, NotFoundError, ValidationError } from './errors.js';
 
-export class NotFoundError extends Error {
-  constructor(
-    public readonly resource: string,
-    public readonly identifier: string
-  ) {
-    super(`${resource} with identifier '${identifier}' not found`);
-    this.name = 'NotFoundError';
-  }
-}
-
-// Error handler utility
-export function handleDatabaseError(error: unknown, operation: string): never {
-  if (error instanceof DatabaseError) {
-    throw error;
-  }
-
-  if (error instanceof Error) {
-    throw new DatabaseError(
-      `Database operation '${operation}' failed: ${error.message}`,
-      operation,
-      error
-    );
-  }
-
-  throw new DatabaseError(`Database operation '${operation}' failed with unknown error`, operation);
-}
-
-// Validation utilities
+// Validation utilities - use Zod schemas instead for better type safety
+// These are kept for backward compatibility but should be migrated to Zod
 export function validateRequired(value: unknown, fieldName: string): void {
   if (value === null || value === undefined || value === '') {
-    throw new ValidationError(`${fieldName} is required`, fieldName, value);
+    throw new ValidationError(`${fieldName} is required`);
   }
 }
 
 export function validateEmail(email: string): void {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    throw new ValidationError('Invalid email format', 'email', email);
+    throw new ValidationError('Invalid email format');
   }
 }
 
 export function validatePositiveNumber(value: number, fieldName: string): void {
   if (typeof value !== 'number' || value <= 0) {
-    throw new ValidationError(`${fieldName} must be a positive number`, fieldName, value);
+    throw new ValidationError(`${fieldName} must be a positive number`);
   }
 }
 
 export function validateYear(year: number): void {
   const currentYear = new Date().getFullYear();
   if (year < 1900 || year > currentYear + 1) {
-    throw new ValidationError('Invalid year', 'year', year);
+    throw new ValidationError('Invalid year');
   }
 }

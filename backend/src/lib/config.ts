@@ -137,5 +137,7 @@ export const validateProductionConfig = () => {
   }
 };
 
-// Run production validation
+// Run production validation on module load
+// Note: This is a side effect that runs on import. In testing environments,
+// you may want to mock process.env before importing this module.
 validateProductionConfig();

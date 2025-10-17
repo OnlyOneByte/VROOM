@@ -8,8 +8,19 @@ interface RateLimitEntry {
   firstRequest: number;
 }
 
-// Simple in-memory rate limiter with cleanup
-// Note: In production, consider using Redis for distributed rate limiting
+/**
+ * Simple in-memory rate limiter with cleanup
+ *
+ * ⚠️ PRODUCTION WARNING:
+ * This in-memory implementation will NOT work correctly in multi-instance deployments.
+ * Each instance maintains its own rate limit counters, so the actual rate limit
+ * will be multiplied by the number of instances.
+ *
+ * For production deployments with multiple instances, use Redis-based rate limiting:
+ * - @upstash/ratelimit
+ * - ioredis with custom implementation
+ * - rate-limiter-flexible with Redis adapter
+ */
 class RateLimiter {
   private requests = new Map<string, RateLimitEntry>();
   private cleanupInterval: Timer | null = null;

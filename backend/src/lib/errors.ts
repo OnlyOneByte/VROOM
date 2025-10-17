@@ -159,15 +159,3 @@ export const handleDatabaseError = (error: unknown): AppError => {
 
   return new DatabaseError('Unknown database error');
 };
-
-/**
- * Async Error Handler Wrapper
- */
-
-export const asyncHandler = <T extends unknown[], R>(fn: (...args: T) => Promise<R>) => {
-  return (...args: T): Promise<R> => {
-    return Promise.resolve(fn(...args)).catch((error) => {
-      throw isAppError(error) ? error : new AppError(error.message || 'Unknown error');
-    });
-  };
-};
