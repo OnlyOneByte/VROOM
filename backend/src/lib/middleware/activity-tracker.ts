@@ -1,5 +1,7 @@
 import type { Context, Next } from 'hono';
 import { recordUserActivity } from '../activity-tracker';
+import { databaseService } from '../database';
+import { SettingsRepository } from '../repositories/settings';
 
 /**
  * Middleware to automatically track user activity for authenticated requests
@@ -25,11 +27,19 @@ export const activityTrackerMiddleware = async (c: Context, next: Next) => {
       path.startsWith('/auth/');
 
     if (shouldTrack) {
-      recordUserActivity(user.id, {
-        enabled: true,
-        inactivityDelayMinutes: 5, // Default 5 minutes
-        autoSyncEnabled: true,
-      });
+      // Fetch user settings to get their configured sync preferences
+      const db = databaseService.getDatabase();
+      const settingsRepo = new SettingsRepository(db);
+      const settings = await settingsRepo.getOrCreate(user.id);
+
+      // Only record activity if sync on inactivity is enabled
+      if (settings.syncOnInactivity && settings.googleSheetsSyncEnabled) {
+        recordUserActivity(user.id, {
+          enabled: true,
+          inactivityDelayMinutes: settings.syncInactivityMinutes,
+          autoSyncEnabled: true,
+        });
+      }
     }
   }
 };

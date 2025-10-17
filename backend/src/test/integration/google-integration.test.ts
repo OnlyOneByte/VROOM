@@ -304,10 +304,11 @@ describe('Google Integration Tests', () => {
       expect(result.subFolders.receipts.id).toBe('receipts-folder-id');
       expect(result.subFolders.maintenance.id).toBe('maintenance-folder-id');
       expect(result.subFolders.photos.id).toBe('photos-folder-id');
+      expect(result.subFolders.backups).toBeDefined();
 
       // Verify API calls
       expect(mockDriveFiles.list).toHaveBeenCalledTimes(1);
-      expect(mockDriveFiles.create).toHaveBeenCalledTimes(4);
+      expect(mockDriveFiles.create).toHaveBeenCalledTimes(5);
     });
 
     test('should return existing VROOM folder structure if it exists', async () => {
@@ -340,9 +341,10 @@ describe('Google Integration Tests', () => {
       expect(result.subFolders.receipts.id).toBe('existing-receipts-id');
       expect(result.subFolders.maintenance.id).toBe('existing-maintenance-id');
       expect(result.subFolders.photos.id).toBe('existing-photos-id');
+      expect(result.subFolders.backups).toBeDefined();
 
-      // Should not create new folders
-      expect(mockDriveFiles.create).not.toHaveBeenCalled();
+      // Should create backups folder if missing
+      expect(mockDriveFiles.create).toHaveBeenCalledTimes(1);
     });
 
     test('should create missing subfolders if main folder exists', async () => {
@@ -383,9 +385,10 @@ describe('Google Integration Tests', () => {
       expect(result.subFolders.receipts.id).toBe('existing-receipts-id');
       expect(result.subFolders.maintenance.id).toBe('new-maintenance-id');
       expect(result.subFolders.photos.id).toBe('new-photos-id');
+      expect(result.subFolders.backups).toBeDefined();
 
-      // Should create 2 missing folders
-      expect(mockDriveFiles.create).toHaveBeenCalledTimes(2);
+      // Should create 3 missing folders (maintenance, photos, backups)
+      expect(mockDriveFiles.create).toHaveBeenCalledTimes(3);
     });
 
     test('should create date-organized receipt folders', async () => {
@@ -638,8 +641,8 @@ describe('Google Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
+            tags: JSON.stringify(['fuel']),
+            category: 'fuel',
             amount: 45.5,
             currency: 'USD',
             date: new Date('2024-01-15'),
@@ -650,7 +653,7 @@ describe('Google Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'maintenance',
+            tags: JSON.stringify(['oil-change']),
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
@@ -807,7 +810,7 @@ describe('Google Integration Tests', () => {
       if (categoryData.length > 1) {
         const hasOperatingCategory = categoryData.some(
           (row: unknown[]) =>
-            Array.isArray(row) && row.some((cell: unknown) => String(cell).includes('operating'))
+            Array.isArray(row) && row.some((cell: unknown) => String(cell).includes('fuel'))
         );
         const hasMaintenanceCategory = categoryData.some(
           (row: unknown[]) =>
@@ -934,7 +937,7 @@ describe('Google Integration Tests', () => {
               '1/15/2024',
               '2020 Toyota Camry',
               'fuel',
-              'operating',
+              'fuel',
               'Shell Gas Station',
               '45.50',
               '25500',

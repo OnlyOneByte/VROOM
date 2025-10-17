@@ -14,6 +14,7 @@
 	import EfficiencyAlerts from '$lib/components/analytics/EfficiencyAlerts.svelte';
 	import VehicleEfficiencySummary from '$lib/components/analytics/VehicleEfficiencySummary.svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import { ScrollArea } from '$lib/components/ui/scroll-area';
 
 	let dashboardData: DashboardData | null = $state(null);
 	let trendData: TrendData | null = $state(null);
@@ -290,32 +291,38 @@
 		<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 			<!-- Cost Trends -->
 			<div class="xl:col-span-2">
-				<CostTrendChart
-					data={dashboardData.monthlyTrends}
-					title="Monthly Cost Trends"
-					width={1200}
-					height={400}
-				/>
+				<ScrollArea class="w-full" orientation="horizontal">
+					<CostTrendChart
+						data={dashboardData.monthlyTrends}
+						title="Monthly Cost Trends"
+						width={1200}
+						height={400}
+					/>
+				</ScrollArea>
 			</div>
 
 			<!-- Category Breakdown -->
-			<CategoryBreakdownChart
-				data={dashboardData.categoryBreakdown}
-				title="Expense Categories"
-				width={600}
-				height={400}
-			/>
-
-			<!-- Multi-Trend Chart -->
-			{#if trendData}
-				<MultiTrendChart
-					costData={trendData.costTrends}
-					milesData={trendData.milesTrends}
-					costPerMileData={trendData.costPerMileTrends}
-					title="Multi-Metric Analysis"
+			<ScrollArea class="w-full" orientation="horizontal">
+				<CategoryBreakdownChart
+					data={dashboardData.categoryBreakdown}
+					title="Expense Categories"
 					width={600}
 					height={400}
 				/>
+			</ScrollArea>
+
+			<!-- Multi-Trend Chart -->
+			{#if trendData}
+				<ScrollArea class="w-full" orientation="horizontal">
+					<MultiTrendChart
+						costData={trendData.costTrends}
+						milesData={trendData.milesTrends}
+						costPerMileData={trendData.costPerMileTrends}
+						title="Multi-Metric Analysis"
+						width={600}
+						height={400}
+					/>
+				</ScrollArea>
 			{/if}
 		</div>
 

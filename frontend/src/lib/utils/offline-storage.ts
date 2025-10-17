@@ -5,7 +5,8 @@ const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
 export interface OfflineExpense {
 	id: string;
 	vehicleId: string;
-	type: string;
+	type?: string; // Deprecated, kept for backwards compatibility
+	tags: string[]; // New flexible tags
 	category: string;
 	amount: number;
 	currency?: string;
@@ -98,9 +99,25 @@ export async function syncOfflineExpenses(): Promise<void> {
 
 	try {
 		for (const expense of pendingExpenses) {
+			// Validate fuel expense requirements
+			let tags = expense.tags || [];
+			if (tags.includes('fuel') && (!expense.gallons || !expense.mileage)) {
+				// Remove fuel tag if required fields are missing
+				tags = tags.filter(tag => tag !== 'fuel');
+
+				// If no tags remain, skip this expense
+				if (tags.length === 0) {
+					console.warn(
+						`Skipping expense ${expense.id}: Fuel expenses require both gallons and mileage data`
+					);
+					continue;
+				}
+			}
+
 			// Convert offline expense to API format
 			const apiExpense = {
-				type: expense.type,
+				vehicleId: expense.vehicleId,
+				tags: tags,
 				category: expense.category,
 				amount: expense.amount,
 				currency: expense.currency || 'USD',
@@ -111,7 +128,7 @@ export async function syncOfflineExpenses(): Promise<void> {
 			};
 
 			// Send to API
-			const response = await fetch(`/api/vehicles/${expense.vehicleId}/expenses`, {
+			const response = await fetch(`/api/expenses`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'

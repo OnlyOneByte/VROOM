@@ -109,7 +109,7 @@ export const expenses = sqliteTable('expenses', {
   vehicleId: text('vehicle_id')
     .notNull()
     .references(() => vehicles.id, { onDelete: 'cascade' }),
-  type: text('type').notNull(), // ExpenseType enum values
+  tags: text('tags'), // JSON array of tags (replaces type)
   category: text('category').notNull(), // ExpenseCategory enum values
   amount: real('amount').notNull(),
   currency: text('currency').notNull().default('USD'),
@@ -138,6 +138,39 @@ export const vehicleShares = sqliteTable('vehicle_shares', {
     .references(() => users.id, { onDelete: 'cascade' }),
   permission: text('permission').notNull().default('view'), // 'view' | 'edit'
   status: text('status').notNull().default('pending'), // 'pending' | 'accepted' | 'declined'
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// User Settings table
+export const userSettings = sqliteTable('user_settings', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  userId: text('user_id')
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  // Unit preferences
+  distanceUnit: text('distance_unit').notNull().default('miles'), // 'miles' | 'kilometers'
+  fuelUnit: text('fuel_unit').notNull().default('gallons'), // 'gallons' | 'liters'
+  currencyUnit: text('currency_unit').notNull().default('USD'),
+  // Backup preferences (for data dumps)
+  autoBackupEnabled: integer('auto_backup_enabled', { mode: 'boolean' }).notNull().default(false),
+  backupFrequency: text('backup_frequency').notNull().default('weekly'), // 'daily' | 'weekly' | 'monthly'
+  lastBackupDate: integer('last_backup_date', { mode: 'timestamp' }),
+  googleDriveBackupEnabled: integer('google_drive_backup_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  googleDriveBackupFolderId: text('google_drive_backup_folder_id'), // Folder for backups
+  // Sync preferences (for Google Sheets mirroring)
+  googleSheetsSyncEnabled: integer('google_sheets_sync_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  googleSheetsSpreadsheetId: text('google_sheets_spreadsheet_id'), // The synced spreadsheet
+  syncOnInactivity: integer('sync_on_inactivity', { mode: 'boolean' }).notNull().default(true),
+  syncInactivityMinutes: integer('sync_inactivity_minutes').notNull().default(5), // Minutes of inactivity before sync
+  lastSyncDate: integer('last_sync_date', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
@@ -172,6 +205,9 @@ export type NewExpense = typeof expenses.$inferInsert;
 
 export type VehicleShare = typeof vehicleShares.$inferSelect;
 export type NewVehicleShare = typeof vehicleShares.$inferInsert;
+
+export type UserSettings = typeof userSettings.$inferSelect;
+export type NewUserSettings = typeof userSettings.$inferInsert;
 
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;

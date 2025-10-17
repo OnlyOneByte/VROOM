@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Currency, ExpenseCategory, ExpenseType, PaymentFrequency } from '../../types/enums';
+import { Currency, PaymentFrequency } from '../../types/enums';
 
 /**
  * Common validation schemas
@@ -67,10 +67,9 @@ export const vehicleParamsSchema = z.object({
  */
 
 export const createExpenseSchema = z.object({
-  type: z.nativeEnum(ExpenseCategory, {
-    message: 'Invalid expense type',
-  }),
-  category: z.nativeEnum(ExpenseType, {
+  vehicleId: idSchema,
+  tags: z.array(z.string()).default([]),
+  category: z.enum(['fuel', 'maintenance', 'financial', 'regulatory', 'enhancement', 'misc'], {
     message: 'Invalid expense category',
   }),
   amount: z
@@ -108,8 +107,10 @@ export const expenseParamsSchema = z.object({
 export const expenseQuerySchema = z.object({
   ...paginationSchema.shape,
   ...dateRangeSchema.shape,
-  type: z.nativeEnum(ExpenseType).optional(),
-  category: z.nativeEnum(ExpenseCategory).optional(),
+  tags: z.array(z.string()).optional(),
+  category: z
+    .enum(['fuel', 'maintenance', 'financial', 'regulatory', 'enhancement', 'misc'])
+    .optional(),
   minAmount: z.coerce.number().min(0).optional(),
   maxAmount: z.coerce.number().min(0).optional(),
 });
@@ -279,7 +280,7 @@ export const insuranceDateRefinement = createInsurancePolicySchema.refine(
 // Fuel expense validation - require gallons and mileage for fuel expenses
 export const fuelExpenseRefinement = createExpenseSchema.refine(
   (data) => {
-    if (data.type === ExpenseCategory.FUEL) {
+    if (data.category === 'fuel') {
       return data.gallons !== undefined && data.mileage !== undefined;
     }
     return true;

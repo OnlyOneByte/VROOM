@@ -81,8 +81,8 @@ describe('Expense Management API Integration Tests', () => {
     test('should create a new expense', async () => {
       const expenseData = {
         vehicleId: testVehicleId,
-        type: 'fuel',
-        category: 'operating',
+        tags: ['fuel'],
+        category: 'fuel',
         amount: 45.5,
         currency: 'USD',
         date: '2024-01-15T10:30:00.000Z',
@@ -107,8 +107,8 @@ describe('Expense Management API Integration Tests', () => {
       expect(data.success).toBe(true);
       if (data.success && data.data) {
         expect(data.data).toBeDefined();
-        expect(data.data.type).toBe('fuel');
-        expect(data.data.category).toBe('operating');
+        expect(data.data.tags).toContain('fuel');
+        expect(data.data.category).toBe('fuel');
         expect(data.data.amount).toBe(45.5);
         expect(data.data.vehicleId).toBe(testVehicleId);
       }
@@ -118,8 +118,8 @@ describe('Expense Management API Integration Tests', () => {
     test('should reject fuel expense without gallons and mileage', async () => {
       const invalidExpenseData = {
         vehicleId: testVehicleId,
-        type: 'fuel', // ExpenseCategory value (confusingly called "type")
-        category: 'operating', // ExpenseType value (confusingly called "category")
+        tags: ['fuel'],
+        category: 'fuel',
         amount: 45.5,
         date: '2024-01-15T10:30:00.000Z',
         // Missing gallons and mileage for fuel expense
@@ -177,8 +177,8 @@ describe('Expense Management API Integration Tests', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          type: 'fuel',
-          category: 'operating',
+          tags: JSON.stringify(['fuel']),
+          category: 'fuel',
           amount: 45.5,
           currency: 'USD',
           date: new Date('2024-01-15'),
@@ -192,7 +192,7 @@ describe('Expense Management API Integration Tests', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          type: 'maintenance',
+          tags: JSON.stringify(['oil-change']),
           category: 'maintenance',
           amount: 89.99,
           currency: 'USD',
@@ -231,8 +231,8 @@ describe('Expense Management API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
+            tags: JSON.stringify(['fuel']),
+            category: 'fuel',
             amount: 45.5,
             currency: 'USD',
             date: new Date('2024-01-15'),
@@ -240,11 +240,11 @@ describe('Expense Management API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'maintenance',
+            tags: JSON.stringify(['maintenance']),
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
-            date: new Date('2024-01-10'),
+            date: new Date('2024-01-15'),
           },
         ]);
 
@@ -278,8 +278,8 @@ describe('Expense Management API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
+            tags: JSON.stringify(['fuel']),
+            category: 'fuel',
             amount: 45.5,
             currency: 'USD',
             date: new Date('2024-01-15'),
@@ -287,7 +287,7 @@ describe('Expense Management API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'maintenance',
+            tags: JSON.stringify(['maintenance']),
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
@@ -322,8 +322,8 @@ describe('Expense Management API Integration Tests', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          type: 'fuel',
-          category: 'operating',
+          tags: JSON.stringify(['fuel']),
+          category: 'fuel',
           amount: 45.5,
           currency: 'USD',
           date: new Date('2024-01-15'),
@@ -346,7 +346,7 @@ describe('Expense Management API Integration Tests', () => {
       expect(data.success).toBe(true);
       if (data.success && data.data) {
         expect(data.data.id).toBe(expense[0].id);
-        expect(data.data.type).toBe('fuel');
+        expect(data.data.category).toBe('fuel');
         expect(data.data.amount).toBe(45.5);
         expect(data.data.description).toBe('Test fuel expense');
       }
@@ -374,7 +374,7 @@ describe('Expense Management API Integration Tests', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          type: 'maintenance',
+          tags: JSON.stringify(['oil-change']),
           category: 'maintenance',
           amount: 89.99,
           currency: 'USD',
@@ -417,7 +417,7 @@ describe('Expense Management API Integration Tests', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          type: 'maintenance',
+          tags: JSON.stringify(['maintenance']),
           category: 'maintenance',
           amount: 89.99,
           currency: 'USD',
@@ -465,7 +465,7 @@ describe('Expense Management API Integration Tests', () => {
       if (data.success && data.data) {
         expect(data.data.types).toContain('fuel');
         expect(data.data.types).toContain('maintenance');
-        expect(data.data.categories).toContain('operating');
+        expect(data.data.categories).toContain('fuel');
         expect(data.data.categories).toContain('maintenance');
         expect(data.data.categoryMapping).toBeDefined();
         expect(data.data.categoryMapping.operating).toContain('fuel');

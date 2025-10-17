@@ -146,6 +146,10 @@ function createAuthStore() {
 					error: null,
 					token: null
 				}));
+
+				// Import appStore dynamically to avoid circular dependency
+				const { appStore } = await import('./app.js');
+				appStore.reset();
 			} catch (error) {
 				update(state => ({
 					...state,

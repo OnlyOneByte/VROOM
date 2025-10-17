@@ -17,6 +17,8 @@
 		class?: string;
 		disabled?: boolean;
 		id?: string;
+		'aria-invalid'?: boolean;
+		'aria-describedby'?: string;
 	}
 
 	let {
@@ -24,7 +26,9 @@
 		placeholder = 'Pick a date',
 		class: className,
 		disabled = false,
-		id
+		id,
+		'aria-invalid': ariaInvalid,
+		'aria-describedby': ariaDescribedby
 	}: Props = $props();
 
 	const df = new DateFormatter('en-US', {
@@ -77,6 +81,8 @@
 				)}
 				{disabled}
 				{id}
+				aria-invalid={ariaInvalid}
+				aria-describedby={ariaDescribedby}
 				{...props}
 			>
 				<CalendarIcon class="mr-2 size-4" />

@@ -17,6 +17,22 @@
 		ArrowRight
 	} from 'lucide-svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import {
+		Accordion,
+		AccordionContent,
+		AccordionItem,
+		AccordionTrigger
+	} from '$lib/components/ui/accordion';
+	import { Progress } from '$lib/components/ui/progress';
+	import {
+		Empty,
+		EmptyContent,
+		EmptyDescription,
+		EmptyHeader,
+		EmptyMedia,
+		EmptyTitle
+	} from '$lib/components/ui/empty';
 	import type { Vehicle, Expense, AppState } from '$lib/types/index.js';
 
 	let appState = $state<AppState>({
@@ -92,7 +108,13 @@
 			appState = state;
 		});
 
-		loadVehicles();
+		// Load vehicles if not already loaded, then load expenses
+		if (appState.vehicles.length === 0) {
+			loadVehicles();
+		} else {
+			// Vehicles already loaded, just load expenses
+			loadVehicleExpenses(appState.vehicles);
+		}
 
 		return unsubscribe;
 	});
@@ -173,7 +195,7 @@
 		}
 
 		// Calculate fuel efficiency if fuel expenses exist
-		const fuelExpenses = expenses.filter(e => e.type === 'fuel' && e.gallons && e.mileage);
+		const fuelExpenses = expenses.filter(e => e.category === 'fuel' && e.gallons && e.mileage);
 		let avgMpg = 0;
 		let currentMileage = 0;
 		if (fuelExpenses.length > 1) {
@@ -279,15 +301,10 @@
 				{#if appState.vehicles.length > 0}
 					Manage your vehicle fleet and track expenses
 				{:else}
-					Welcome! Add your first vehicle to get started
+					Welcome! Get started by adding your first vehicle
 				{/if}
 			</p>
 		</div>
-
-		<a href="/vehicles/new" class="btn btn-primary inline-flex items-center gap-2">
-			<Plus class="h-4 w-4" />
-			Add Vehicle
-		</a>
 	</div>
 
 	<!-- Dashboard Statistics -->
@@ -373,21 +390,40 @@
 			{/each}
 		</div>
 	{:else if filteredVehicles.length === 0}
-		<div class="card text-center py-12">
-			<Car class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-			{#if searchTerm}
-				<h3 class="text-lg font-medium text-gray-900 mb-2">No vehicles found</h3>
-				<p class="text-gray-600 mb-6">Try adjusting your search terms</p>
-				<button class="btn btn-secondary" onclick={() => (searchTerm = '')}> Clear Search </button>
-			{:else}
-				<h3 class="text-lg font-medium text-gray-900 mb-2">No vehicles yet</h3>
-				<p class="text-gray-600 mb-6">Add your first vehicle to start tracking expenses</p>
-				<a href="/vehicles/new" class="btn btn-primary inline-flex items-center gap-2">
-					<Plus class="h-4 w-4" />
-					Add Your First Vehicle
-				</a>
-			{/if}
-		</div>
+		{#if searchTerm}
+			<Empty>
+				<EmptyHeader>
+					<EmptyMedia>
+						<Search class="h-12 w-12 text-muted-foreground" />
+					</EmptyMedia>
+					<EmptyTitle>No vehicles found</EmptyTitle>
+					<EmptyDescription>
+						Try adjusting your search terms to find what you're looking for.
+					</EmptyDescription>
+				</EmptyHeader>
+				<EmptyContent>
+					<Button onclick={() => (searchTerm = '')} variant="outline">Clear Search</Button>
+				</EmptyContent>
+			</Empty>
+		{:else}
+			<Empty>
+				<EmptyHeader>
+					<EmptyMedia>
+						<Car class="h-12 w-12 text-muted-foreground" />
+					</EmptyMedia>
+					<EmptyTitle>No vehicles yet</EmptyTitle>
+					<EmptyDescription>
+						Add your first vehicle to start tracking expenses and maintenance.
+					</EmptyDescription>
+				</EmptyHeader>
+				<EmptyContent>
+					<Button href="/vehicles/new" class="inline-flex items-center gap-2">
+						<Plus class="h-4 w-4" />
+						Add First Vehicle
+					</Button>
+				</EmptyContent>
+			</Empty>
+		{/if}
 	{:else}
 		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
 			{#each filteredVehicles as vehicle}
@@ -536,10 +572,9 @@
 						{/if}
 					</div>
 
-					<!-- Additional Info & Alerts -->
-					<div class="space-y-2 mb-4">
-						<!-- Maintenance Alert -->
-						{#if stats.daysSinceLastMaintenance !== null}
+					<!-- Maintenance Alert (Always Visible) -->
+					{#if stats.daysSinceLastMaintenance !== null}
+						<div class="mb-3">
 							{#if stats.daysSinceLastMaintenance > 90}
 								<div class="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
 									<AlertCircle class="h-4 w-4 text-red-600 flex-shrink-0" />
@@ -556,62 +591,96 @@
 										Maintenance due soon ({stats.daysSinceLastMaintenance} days)
 									</p>
 								</div>
-							{:else}
-								<div
-									class="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg"
-								>
-									<Wrench class="h-4 w-4 text-green-600 flex-shrink-0" />
-									<p class="text-xs text-green-800 font-medium">
-										Last service: {getRelativeTime(stats.lastMaintenanceDate)}
-									</p>
-								</div>
 							{/if}
-						{/if}
+						</div>
+					{/if}
 
-						<!-- Current Mileage -->
-						{#if stats.currentMileage > 0}
-							<div class="flex items-center justify-between text-sm">
-								<span class="text-gray-600 flex items-center gap-1">
-									<Gauge class="h-3.5 w-3.5" />
-									Current Mileage
-								</span>
-								<span class="text-gray-900 font-semibold">
-									{stats.currentMileage.toLocaleString()} mi
-								</span>
-							</div>
-						{/if}
+					<!-- More Details Accordion -->
+					<Accordion type="single" class="mb-4">
+						<AccordionItem value="details" class="border-0">
+							<AccordionTrigger
+								class="py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:no-underline"
+							>
+								More Details
+							</AccordionTrigger>
+							<AccordionContent class="pt-2 pb-0">
+								<div class="space-y-3">
+									<!-- Vehicle Details -->
+									{#if vehicle.purchaseDate}
+										<div class="flex items-center justify-between text-sm">
+											<span class="text-gray-600">Purchase Date</span>
+											<span class="text-gray-900 font-medium">
+												{new Date(vehicle.purchaseDate).toLocaleDateString()}
+											</span>
+										</div>
+									{/if}
 
-						<!-- Loan Info -->
-						{#if vehicle.loan?.isActive}
-							<div class="flex items-center justify-between text-sm">
-								<span class="text-gray-600">Loan Balance</span>
-								<span class="text-gray-900 font-semibold">
-									{formatCurrency(vehicle.loan.currentBalance)}
-								</span>
-							</div>
-							<!-- Loan Progress Bar -->
-							<div class="mt-2">
-								<div class="flex justify-between text-xs text-gray-600 mb-1">
-									<span>Loan Progress</span>
-									<span>
-										{Math.round(
+									<!-- Current Mileage -->
+									{#if stats.currentMileage > 0}
+										<div class="flex items-center justify-between text-sm">
+											<span class="text-gray-600 flex items-center gap-1">
+												<Gauge class="h-3.5 w-3.5" />
+												Current Mileage
+											</span>
+											<span class="text-gray-900 font-semibold">
+												{stats.currentMileage.toLocaleString()} mi
+											</span>
+										</div>
+									{/if}
+
+									<!-- Maintenance Info -->
+									{#if stats.daysSinceLastMaintenance !== null && stats.daysSinceLastMaintenance <= 60}
+										<div class="flex items-center justify-between text-sm">
+											<span class="text-gray-600 flex items-center gap-1">
+												<Wrench class="h-3.5 w-3.5" />
+												Last Service
+											</span>
+											<span class="text-gray-900 font-medium">
+												{getRelativeTime(stats.lastMaintenanceDate)}
+											</span>
+										</div>
+									{/if}
+
+									{#if stats.maintenanceCount > 0}
+										<div class="flex items-center justify-between text-sm">
+											<span class="text-gray-600">Total Services</span>
+											<span class="text-gray-900 font-medium">{stats.maintenanceCount}</span>
+										</div>
+									{/if}
+
+									<!-- Loan Info -->
+									{#if vehicle.loan?.isActive}
+										{@const loanProgressValue =
 											((vehicle.loan.originalAmount - vehicle.loan.currentBalance) /
 												vehicle.loan.originalAmount) *
-												100
-										)}% paid
-									</span>
+											100}
+										<div class="pt-2 border-t border-gray-100">
+											<div class="flex items-center justify-between text-sm mb-2">
+												<span class="text-gray-600">Loan Balance</span>
+												<span class="text-gray-900 font-semibold">
+													{formatCurrency(vehicle.loan.currentBalance)}
+												</span>
+											</div>
+											<div class="flex items-center justify-between text-sm mb-2">
+												<span class="text-gray-600">Original Amount</span>
+												<span class="text-gray-900 font-medium">
+													{formatCurrency(vehicle.loan.originalAmount)}
+												</span>
+											</div>
+											<!-- Loan Progress Bar -->
+											<div class="mt-2">
+												<div class="flex justify-between text-xs text-gray-600 mb-1">
+													<span>Loan Progress</span>
+													<span>{Math.round(loanProgressValue)}% paid</span>
+												</div>
+												<Progress value={loanProgressValue} class="h-1.5" />
+											</div>
+										</div>
+									{/if}
 								</div>
-								<div class="w-full bg-gray-200 rounded-full h-1.5">
-									<div
-										class="bg-gradient-to-r from-orange-500 to-orange-600 h-1.5 rounded-full transition-all duration-300"
-										style="width: {((vehicle.loan.originalAmount - vehicle.loan.currentBalance) /
-											vehicle.loan.originalAmount) *
-											100}%"
-									></div>
-								</div>
-							</div>
-						{/if}
-					</div>
+							</AccordionContent>
+						</AccordionItem>
+					</Accordion>
 
 					<!-- Action Buttons -->
 					<div class="flex gap-2 pt-3 border-t border-gray-100">
@@ -640,4 +709,13 @@
 			{/each}
 		</div>
 	{/if}
+
+	<!-- Floating Action Button -->
+	<Button
+		href="/vehicles/new"
+		class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto sm:rounded-full rounded-full group !bg-gradient-to-r !from-primary-600 !to-primary-700 hover:!from-primary-700 hover:!to-primary-800 !text-white shadow-2xl hover:shadow-primary-500/50 transition-all duration-300 sm:hover:scale-110 !z-50 h-16 sm:h-16 !pl-6 !pr-10 !border-0 !justify-center"
+	>
+		<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
+		<span class="font-bold text-lg">Add Vehicle</span>
+	</Button>
 </div>

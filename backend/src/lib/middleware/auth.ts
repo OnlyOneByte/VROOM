@@ -40,17 +40,28 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
     const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
     if (timeUntilExpiry < oneDay) {
-      // Refresh session
-      await lucia.invalidateSession(session.id);
-      const newSession = await lucia.createSession(user.id, {});
-      const sessionCookie = lucia.createSessionCookie(newSession.id);
-      c.header('Set-Cookie', sessionCookie.serialize());
+      // Refresh session - create new one first to avoid losing session if creation fails
+      try {
+        const newSession = await lucia.createSession(user.id, {});
+        const sessionCookie = lucia.createSessionCookie(newSession.id);
+        c.header('Set-Cookie', sessionCookie.serialize());
 
-      // Update session in context
-      c.set('session', {
-        id: newSession.id,
-        expiresAt: newSession.expiresAt,
-      });
+        // Only invalidate old session after new one is successfully created
+        await lucia.invalidateSession(session.id);
+
+        // Update session in context
+        c.set('session', {
+          id: newSession.id,
+          expiresAt: newSession.expiresAt,
+        });
+      } catch (error) {
+        console.error('Session refresh failed, keeping existing session:', error);
+        // Keep existing session if refresh fails
+        c.set('session', {
+          id: session.id,
+          expiresAt: session.expiresAt,
+        });
+      }
     } else {
       c.set('session', {
         id: session.id,

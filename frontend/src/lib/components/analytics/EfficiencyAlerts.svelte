@@ -1,7 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { AlertTriangle, CheckCircle, TrendingDown, TrendingUp, X } from 'lucide-svelte';
+	import { TriangleAlert, CircleCheck, TrendingDown, TrendingUp, X } from 'lucide-svelte';
 	import { getFuelEfficiency } from '$lib/utils/analytics-api';
+	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
+	import {
+		Empty,
+		EmptyDescription,
+		EmptyHeader,
+		EmptyMedia,
+		EmptyTitle
+	} from '$lib/components/ui/empty';
 
 	interface Props {
 		vehicles: Array<{
@@ -193,35 +201,22 @@
 				return TrendingDown;
 			case 'erratic_efficiency':
 			case 'low_efficiency':
-				return AlertTriangle;
+				return TriangleAlert;
 			default:
-				return AlertTriangle;
+				return TriangleAlert;
 		}
 	}
 
-	function getAlertColor(severity: string) {
+	function getAlertVariant(severity: string): 'default' | 'destructive' | 'warning' | 'success' {
 		switch (severity) {
 			case 'high':
-				return 'bg-red-50 border-red-200';
+				return 'destructive';
 			case 'medium':
-				return 'bg-yellow-50 border-yellow-200';
+				return 'warning';
 			case 'positive':
-				return 'bg-green-50 border-green-200';
+				return 'success';
 			default:
-				return 'bg-gray-50 border-gray-200';
-		}
-	}
-
-	function getAlertTextColor(severity: string) {
-		switch (severity) {
-			case 'high':
-				return 'text-red-800';
-			case 'medium':
-				return 'text-yellow-800';
-			case 'positive':
-				return 'text-green-800';
-			default:
-				return 'text-gray-800';
+				return 'default';
 		}
 	}
 
@@ -251,63 +246,60 @@
 			</div>
 		</div>
 	{:else if visibleAlerts.length === 0}
-		<div class="text-center py-8">
-			<CheckCircle class="h-12 w-12 text-green-400 mx-auto mb-4" />
-			<h3 class="text-lg font-medium text-gray-900 mb-2">All Good!</h3>
-			<p class="text-gray-600">No efficiency alerts at this time. Keep up the good work!</p>
-		</div>
+		<Empty>
+			<EmptyHeader>
+				<EmptyMedia>
+					<CircleCheck class="h-12 w-12 text-green-500" />
+				</EmptyMedia>
+				<EmptyTitle>All Good!</EmptyTitle>
+				<EmptyDescription>
+					No efficiency alerts at this time. Keep up the good work!
+				</EmptyDescription>
+			</EmptyHeader>
+		</Empty>
 	{:else}
 		<div class="space-y-3">
-			{#each visibleAlerts as alert}
+			{#each visibleAlerts as alert (alert.id)}
 				{@const AlertIcon = getAlertIcon(alert)}
-				<div class="p-4 rounded-lg border {getAlertColor(alert.severity)} relative">
+				<Alert variant={getAlertVariant(alert.severity)} class="relative pr-8">
+					<AlertIcon />
 					<button
 						onclick={() => dismissAlert(alert.id)}
-						class="absolute top-2 right-2 p-1 rounded-full hover:bg-black hover:bg-opacity-10 transition-colors"
+						class="absolute top-3 right-3 p-1 rounded-full hover:bg-black hover:bg-opacity-10 transition-colors"
 						title="Dismiss alert"
+						aria-label="Dismiss alert"
 					>
-						<X class="h-4 w-4 text-gray-500" />
+						<X class="h-4 w-4" />
 					</button>
 
-					<div class="flex items-start pr-8">
-						<AlertIcon
-							class="h-5 w-5 mt-0.5 mr-3 flex-shrink-0 {getAlertTextColor(alert.severity)}"
-						/>
-						<div class="flex-1">
-							<h4 class="text-sm font-medium {getAlertTextColor(alert.severity)} mb-1">
-								{alert.title}
-							</h4>
-							<p class="text-sm {getAlertTextColor(alert.severity)} mb-2">
-								{alert.message}
-							</p>
-							<p class="text-xs font-medium {getAlertTextColor(alert.severity)}">
-								💡 {alert.recommendation}
-							</p>
+					<AlertTitle>{alert.title}</AlertTitle>
+					<AlertDescription>
+						<p class="mb-2">{alert.message}</p>
+						<p class="font-medium">💡 {alert.recommendation}</p>
 
-							{#if alert.data}
-								<div class="mt-2 text-xs {getAlertTextColor(alert.severity)} opacity-75">
-									{#if alert.type === 'efficiency_drop'}
-										Drop: {alert.data.dropPercentage.toFixed(1)}% | Current: {alert.data.currentMPG.toFixed(
-											1
-										)} MPG | Average: {alert.data.averageMPG.toFixed(1)} MPG
-									{:else if alert.type === 'efficiency_improvement'}
-										Improvement: +{alert.data.improvementPercentage.toFixed(1)}% | Current: {alert.data.currentMPG.toFixed(
-											1
-										)} MPG
-									{:else if alert.type === 'erratic_efficiency'}
-										Variance: ±{alert.data.variancePercentage.toFixed(1)}% | Average: {alert.data.averageMPG.toFixed(
-											1
-										)} MPG
-									{:else if alert.type === 'low_efficiency'}
-										Your Average: {alert.data.averageMPG.toFixed(1)} MPG | Typical: {alert.data.classAverage.toFixed(
-											1
-										)} MPG
-									{/if}
-								</div>
-							{/if}
-						</div>
-					</div>
-				</div>
+						{#if alert.data}
+							<div class="mt-2 text-xs opacity-75">
+								{#if alert.type === 'efficiency_drop'}
+									Drop: {alert.data.dropPercentage.toFixed(1)}% | Current: {alert.data.currentMPG.toFixed(
+										1
+									)} MPG | Average: {alert.data.averageMPG.toFixed(1)} MPG
+								{:else if alert.type === 'efficiency_improvement'}
+									Improvement: +{alert.data.improvementPercentage.toFixed(1)}% | Current: {alert.data.currentMPG.toFixed(
+										1
+									)} MPG
+								{:else if alert.type === 'erratic_efficiency'}
+									Variance: ±{alert.data.variancePercentage.toFixed(1)}% | Average: {alert.data.averageMPG.toFixed(
+										1
+									)} MPG
+								{:else if alert.type === 'low_efficiency'}
+									Your Average: {alert.data.averageMPG.toFixed(1)} MPG | Typical: {alert.data.classAverage.toFixed(
+										1
+									)} MPG
+								{/if}
+							</div>
+						{/if}
+					</AlertDescription>
+				</Alert>
 			{/each}
 		</div>
 	{/if}

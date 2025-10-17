@@ -52,11 +52,14 @@ const mockVehicles: Vehicle[] = [
 			lender: 'Chase Bank',
 			originalAmount: 20000,
 			currentBalance: 15000,
-			interestRate: 4.5,
-			monthlyPayment: 350,
+			apr: 4.5,
+			termMonths: 60,
+			paymentAmount: 350,
+			paymentFrequency: 'monthly' as const,
 			startDate: '2020-01-15',
-			endDate: '2025-01-15',
-			isActive: true
+			isActive: true,
+			createdAt: '2024-01-01T00:00:00Z',
+			updatedAt: '2024-01-01T00:00:00Z'
 		}
 	},
 	{

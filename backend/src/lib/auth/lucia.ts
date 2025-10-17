@@ -1,6 +1,6 @@
 import { DrizzleSQLiteAdapter } from '@lucia-auth/adapter-drizzle';
 import { Google } from 'arctic';
-import { Lucia } from 'lucia';
+import { Lucia, TimeSpan } from 'lucia';
 import type { User } from '../../db/schema';
 import { sessions, users } from '../../db/schema';
 import { config } from '../config';
@@ -18,6 +18,7 @@ export const lucia = new Lucia(adapter, {
       sameSite: 'lax',
     },
   },
+  sessionExpiresIn: new TimeSpan(30, 'd'), // 30 days
   getUserAttributes: (attributes) => {
     return {
       id: attributes.id,

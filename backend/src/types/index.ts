@@ -61,43 +61,18 @@ export interface LoanPaymentConfig {
   }[]; // For future: multiple payments per month
 }
 
-export type ExpenseType =
-  // Operating Costs
-  | 'fuel'
-  | 'tolls'
-  | 'parking'
-  // Maintenance & Repairs
-  | 'maintenance'
-  | 'repairs'
-  | 'tires'
-  | 'oil-change'
-  // Financial
-  | 'insurance'
-  | 'loan-payment'
-  // Regulatory/Legal
-  | 'registration'
-  | 'inspection'
-  | 'emissions'
-  | 'tickets'
-  // Enhancements/Modifications
-  | 'modifications'
-  | 'accessories'
-  | 'detailing'
-  // Other
-  | 'other';
-
 export type ExpenseCategory =
-  | 'operating' // Day-to-day driving costs (fuel, tolls, parking)
-  | 'maintenance' // Keeping the car running (oil, repairs, tires)
-  | 'financial' // Loans, insurance
-  | 'regulatory' // Government-required (registration, inspection, tickets)
-  | 'enhancement' // Optional improvements (tint, accessories, detailing)
-  | 'convenience'; // Nice-to-have (vanity plates, car washes)
+  | 'fuel'
+  | 'maintenance'
+  | 'financial'
+  | 'regulatory'
+  | 'enhancement'
+  | 'misc';
 
 export interface Expense {
   id: string;
   vehicleId: string;
-  type: ExpenseType;
+  tags: string[];
   category: ExpenseCategory;
   amount: number;
   currency: string;

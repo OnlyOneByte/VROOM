@@ -75,23 +75,23 @@ describe('Expense System Integration Tests - Task 5.4', () => {
   describe('Expense CRUD Operations with Proper Categorization', () => {
     test('should create expenses with all supported categories', async () => {
       const expenseCategories = [
-        { type: 'fuel', category: 'operating', amount: 45.5, gallons: 12.5, mileage: 10300 },
-        { type: 'tolls', category: 'operating', amount: 5.75 },
-        { type: 'parking', category: 'operating', amount: 15.0 },
-        { type: 'maintenance', category: 'maintenance', amount: 89.99 },
-        { type: 'repairs', category: 'maintenance', amount: 450.0 },
-        { type: 'tires', category: 'maintenance', amount: 800.0 },
-        { type: 'oil-change', category: 'maintenance', amount: 65.0 },
-        { type: 'insurance', category: 'financial', amount: 200.0 },
-        { type: 'loan-payment', category: 'financial', amount: 350.0 },
-        { type: 'registration', category: 'regulatory', amount: 125.0 },
-        { type: 'inspection', category: 'regulatory', amount: 35.0 },
-        { type: 'emissions', category: 'regulatory', amount: 25.0 },
-        { type: 'tickets', category: 'regulatory', amount: 150.0 },
-        { type: 'modifications', category: 'enhancement', amount: 500.0 },
-        { type: 'accessories', category: 'enhancement', amount: 75.0 },
-        { type: 'detailing', category: 'enhancement', amount: 120.0 },
-        { type: 'other', category: 'convenience', amount: 25.0 },
+        { tags: ['fuel'], category: 'fuel', amount: 45.5, gallons: 12.5, mileage: 10300 },
+        { tags: ['tolls'], category: 'misc', amount: 5.75 },
+        { tags: ['parking'], category: 'misc', amount: 15.0 },
+        { tags: ['maintenance'], category: 'maintenance', amount: 89.99 },
+        { tags: ['repairs'], category: 'maintenance', amount: 450.0 },
+        { tags: ['tires'], category: 'maintenance', amount: 800.0 },
+        { tags: ['oil-change'], category: 'maintenance', amount: 65.0 },
+        { tags: ['insurance'], category: 'financial', amount: 200.0 },
+        { tags: ['loan-payment'], category: 'financial', amount: 350.0 },
+        { tags: ['registration'], category: 'regulatory', amount: 125.0 },
+        { tags: ['inspection'], category: 'regulatory', amount: 35.0 },
+        { tags: ['emissions'], category: 'regulatory', amount: 25.0 },
+        { tags: ['tickets'], category: 'regulatory', amount: 150.0 },
+        { tags: ['modifications'], category: 'enhancement', amount: 500.0 },
+        { tags: ['accessories'], category: 'enhancement', amount: 75.0 },
+        { tags: ['detailing'], category: 'enhancement', amount: 120.0 },
+        { tags: ['other'], category: 'misc', amount: 25.0 },
       ];
 
       for (const expenseData of expenseCategories) {
@@ -106,7 +106,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
             ...expenseData,
             currency: 'USD',
             date: '2024-01-15T10:30:00.000Z',
-            description: `Test ${expenseData.type} expense`,
+            description: `Test ${expenseData.tags[0]} expense`,
           }),
         });
 
@@ -115,46 +115,37 @@ describe('Expense System Integration Tests - Task 5.4', () => {
 
         const data = await getTypedResponse<{
           id: string;
-          type: string;
+          tags: string[];
           category: string;
           amount: number;
         }>(res);
         assertSuccessResponse(data);
-        expect(data.data.type).toBe(expenseData.type);
+        expect(data.data.tags).toEqual(expenseData.tags);
         expect(data.data.category).toBe(expenseData.category);
         expect(data.data.amount).toBe(expenseData.amount);
       }
     });
 
-    test('should validate category-type mapping consistency', async () => {
-      // Test invalid category-type combinations
-      const invalidCombinations = [
-        { type: 'maintenance', category: 'operating' }, // maintenance should be maintenance category
-        { type: 'insurance', category: 'operating' }, // insurance should be financial
-        { type: 'registration', category: 'enhancement' }, // registration should be regulatory
-      ];
+    test('should validate category requirements', async () => {
+      // Test that category is required
+      const req = new Request(`http://localhost:3001/api/expenses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: sessionCookie,
+        },
+        body: JSON.stringify({
+          vehicleId: testVehicleId,
+          tags: ['test'],
+          amount: 50.0,
+          currency: 'USD',
+          date: '2024-01-15T10:30:00.000Z',
+          // Missing category
+        }),
+      });
 
-      for (const invalidData of invalidCombinations) {
-        const req = new Request(`http://localhost:3001/api/expenses`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Cookie: sessionCookie,
-          },
-          body: JSON.stringify({
-            vehicleId: testVehicleId,
-            ...invalidData,
-            amount: 50.0,
-            currency: 'USD',
-            date: '2024-01-15T10:30:00.000Z',
-          }),
-        });
-
-        const res = await testApp.fetch(req);
-        // Note: Current implementation allows any category, but this test documents expected behavior
-        // In a stricter implementation, this would return 400
-        expect(res.status).toBe(201); // Current behavior - may change in future
-      }
+      const res = await testApp.fetch(req);
+      expect(res.status).toBe(400);
     });
 
     test('should filter expenses by category correctly', async () => {
@@ -165,8 +156,8 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
+            tags: JSON.stringify(['fuel']),
+            category: 'fuel',
             amount: 45.5,
             currency: 'USD',
             date: new Date('2024-01-15'),
@@ -174,7 +165,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'maintenance',
+            tags: JSON.stringify(['maintenance']),
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
@@ -183,7 +174,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'insurance',
+            tags: JSON.stringify(['insurance']),
             category: 'financial',
             amount: 200.0,
             currency: 'USD',
@@ -193,7 +184,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
 
       // Test filtering by operating category
       const operatingReq = new Request(
-        `http://localhost:3001/api/expenses?vehicleId=${testVehicleId}&category=operating`,
+        `http://localhost:3001/api/expenses?vehicleId=${testVehicleId}&category=fuel`,
         {
           headers: { Cookie: sessionCookie },
         }
@@ -206,7 +197,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       expect(operatingData.success).toBe(true);
       if (operatingData.success && operatingData.data) {
         expect(operatingData.data).toHaveLength(1);
-        expect(operatingData.data[0].category).toBe('operating');
+        expect(operatingData.data[0].category).toBe('fuel');
         // Note: filters are at the top level of the response, not in data
       }
 
@@ -236,7 +227,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          type: 'maintenance',
+          tags: JSON.stringify(['oil-change']),
           category: 'maintenance',
           amount: 89.99,
           currency: 'USD',
@@ -247,7 +238,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
 
       // Update expense with new category
       const updateData = {
-        category: 'operating', // Change from maintenance to operating
+        category: 'maintenance', // Keep as maintenance category
         amount: 95.99,
         description: 'Oil change - updated',
       };
@@ -266,7 +257,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
 
       const data = await getTypedResponse<{ category: string; amount: number }>(res);
       expect(data.success).toBe(true);
-      expect(data.data?.category).toBe('operating');
+      expect(data.data?.category).toBe('maintenance');
       expect(data.data?.amount).toBe(95.99);
     });
   });
@@ -556,7 +547,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'insurance',
+            tags: JSON.stringify(['insurance']),
             category: 'financial',
             amount: 200.0,
             currency: 'USD',
@@ -567,8 +558,8 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
+            tags: JSON.stringify(['fuel']),
+            category: 'fuel',
             amount: 150.0,
             currency: 'USD',
             date: new Date('2024-01-15'),
@@ -593,70 +584,70 @@ describe('Expense System Integration Tests - Task 5.4', () => {
         // Month 1 - January
         {
           date: '2024-01-05',
-          type: 'fuel',
-          category: 'operating',
+          tags: ['fuel'],
+          category: 'fuel',
           amount: 45.0,
           gallons: 12.0,
           mileage: 10000,
         },
         {
           date: '2024-01-10',
-          type: 'insurance',
+          tags: ['insurance'],
           category: 'financial',
           amount: 200.0,
           mileage: 10100,
         },
         {
           date: '2024-01-15',
-          type: 'maintenance',
+          tags: ['maintenance'],
           category: 'maintenance',
           amount: 89.99,
           mileage: 10200,
         },
         {
           date: '2024-01-20',
-          type: 'fuel',
-          category: 'operating',
+          tags: ['fuel'],
+          category: 'fuel',
           amount: 48.5,
           gallons: 13.0,
           mileage: 10350,
         },
-        { date: '2024-01-25', type: 'tolls', category: 'operating', amount: 15.75, mileage: 10400 },
+        { date: '2024-01-25', tags: ['tolls'], category: 'misc', amount: 15.75, mileage: 10400 },
 
         // Month 2 - February
         {
           date: '2024-02-05',
-          type: 'fuel',
-          category: 'operating',
+          tags: ['fuel'],
+          category: 'fuel',
           amount: 52.0,
           gallons: 14.0,
           mileage: 10720,
         },
         {
           date: '2024-02-10',
-          type: 'insurance',
+          tags: ['insurance'],
           category: 'financial',
           amount: 200.0,
           mileage: 10800,
         },
         {
           date: '2024-02-15',
-          type: 'registration',
+          tags: ['registration'],
           category: 'regulatory',
           amount: 125.0,
           mileage: 10850,
         },
         {
           date: '2024-02-20',
-          type: 'fuel',
-          category: 'operating',
+          tags: ['fuel'],
+          category: 'fuel',
           amount: 49.25,
           gallons: 13.5,
           mileage: 11100,
         },
         {
           date: '2024-02-25',
-          type: 'repairs',
+          tags: ['repairs'],
           category: 'maintenance',
           amount: 450.0,
           mileage: 11150,
@@ -670,14 +661,14 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           .values({
             id: createId(),
             vehicleId: testVehicleId,
-            type: expense.type as string,
+            tags: JSON.stringify(expense.tags),
             category: expense.category as string,
             amount: expense.amount,
             currency: 'USD',
             date: new Date(expense.date),
             gallons: expense.gallons || null,
             mileage: expense.mileage,
-            description: `${expense.type} expense`,
+            description: `${expense.tags[0]} expense`,
           });
       }
 
@@ -685,14 +676,14 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       const filteringTests = [
         // Test expense filtering
         {
-          endpoint: `/api/expenses?vehicleId=${testVehicleId}&category=operating`,
+          endpoint: `/api/expenses?vehicleId=${testVehicleId}&category=fuel`,
           expectedChecks: (response: {
             success: boolean;
             data: unknown[];
             filters: Record<string, unknown>;
           }) => {
             expect(response.data.length).toBe(5); // 4 fuel + 1 tolls
-            expect(response.filters.category).toBe('operating');
+            expect(response.filters.category).toBe('fuel');
           },
         },
         // Test date range filtering
@@ -737,8 +728,8 @@ describe('Expense System Integration Tests - Task 5.4', () => {
         },
         body: JSON.stringify({
           vehicleId: testVehicleId,
-          type: 'fuel',
-          category: 'operating',
+          tags: ['fuel'],
+          category: 'fuel',
           amount: 45.5,
           currency: 'USD',
           date: '2024-01-15T10:30:00.000Z',

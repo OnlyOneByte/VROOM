@@ -81,8 +81,8 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
+            tags: JSON.stringify(['fuel']),
+            category: 'fuel',
             amount: 45.5,
             currency: 'USD',
             date: new Date('2024-01-15'),
@@ -92,8 +92,8 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
+            tags: JSON.stringify(['fuel']),
+            category: 'fuel',
             amount: 48.75,
             currency: 'USD',
             date: new Date('2024-01-30'),
@@ -103,8 +103,8 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
+            tags: JSON.stringify(['fuel']),
+            category: 'fuel',
             amount: 52.25,
             currency: 'USD',
             date: new Date('2024-02-15'),
@@ -177,8 +177,8 @@ describe('Analytics API Integration Tests', () => {
           .values({
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
+            tags: JSON.stringify(['fuel']),
+            category: 'fuel',
             amount: entry.amount,
             currency: 'USD',
             date: new Date(entry.date),
@@ -219,8 +219,8 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            type: 'fuel',
-            category: 'operating',
+            tags: JSON.stringify(['fuel']),
+            category: 'fuel',
             amount: 45.5,
             currency: 'USD',
             date: new Date('2024-01-15'),
@@ -279,7 +279,7 @@ describe('Analytics API Integration Tests', () => {
             id: createId(),
             vehicleId: testVehicleId,
             type: 'fuel',
-            category: 'operating',
+            category: 'fuel',
             amount: 150.0,
             currency: 'USD',
             date: new Date('2024-01-01'),
@@ -289,7 +289,7 @@ describe('Analytics API Integration Tests', () => {
             id: createId(),
             vehicleId: testVehicleId,
             type: 'tolls',
-            category: 'operating',
+            category: 'fuel',
             amount: 25.0,
             currency: 'USD',
             date: new Date('2024-01-05'),
@@ -351,7 +351,7 @@ describe('Analytics API Integration Tests', () => {
           totalMiles: number;
         };
         categoryBreakdown: {
-          operating: { amount: number; count: number };
+          fuel: { amount: number; count: number };
           maintenance: { amount: number; count: number };
           financial: { amount: number; count: number };
           regulatory: { amount: number; count: number };
@@ -363,8 +363,8 @@ describe('Analytics API Integration Tests', () => {
       expect(data.data.costPerMile.totalCost).toBe(765.0);
 
       // Check category breakdown
-      expect(data.data.categoryBreakdown.operating).toBeDefined();
-      expect(data.data.categoryBreakdown.operating.amount).toBe(175.0);
+      expect(data.data.categoryBreakdown.fuel).toBeDefined();
+      expect(data.data.categoryBreakdown.fuel.amount).toBe(175.0);
       expect(data.data.categoryBreakdown.maintenance).toBeDefined();
       expect(data.data.categoryBreakdown.maintenance.amount).toBe(265.0);
     });
@@ -378,7 +378,7 @@ describe('Analytics API Integration Tests', () => {
             id: createId(),
             vehicleId: testVehicleId,
             type: 'fuel',
-            category: 'operating',
+            category: 'fuel',
             amount: 150.0,
             currency: 'USD',
             date: new Date('2024-01-15'),
@@ -398,7 +398,7 @@ describe('Analytics API Integration Tests', () => {
             id: createId(),
             vehicleId: testVehicleId,
             type: 'fuel',
-            category: 'operating',
+            category: 'fuel',
             amount: 160.0,
             currency: 'USD',
             date: new Date('2024-02-15'),
@@ -451,7 +451,7 @@ describe('Analytics API Integration Tests', () => {
             id: createId(),
             vehicleId: testVehicleId,
             type: 'fuel',
-            category: 'operating',
+            category: 'fuel',
             amount: 45.5,
             currency: 'USD',
             date: new Date('2024-01-15'),
@@ -528,7 +528,7 @@ describe('Analytics API Integration Tests', () => {
             id: createId(),
             vehicleId: testVehicleId,
             type: 'fuel',
-            category: 'operating',
+            category: 'fuel',
             amount: 45.5,
             currency: 'USD',
             date: new Date('2024-01-15'),

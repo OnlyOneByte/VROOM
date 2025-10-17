@@ -45,9 +45,12 @@ describe('Sync Manager', () => {
 					id: 'test-1',
 					vehicleId: 'vehicle-1',
 					type: 'fuel',
+					tags: ['fuel'],
 					category: 'operating',
 					amount: 50.0,
 					date: '2024-01-01',
+					mileage: 50000,
+					gallons: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}
@@ -72,9 +75,12 @@ describe('Sync Manager', () => {
 					id: 'test-1',
 					vehicleId: 'vehicle-1',
 					type: 'fuel',
+					tags: ['fuel'],
 					category: 'operating',
 					amount: 50.0,
 					date: '2024-01-01',
+					mileage: 50000,
+					gallons: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}
@@ -104,9 +110,12 @@ describe('Sync Manager', () => {
 					id: 'test-1',
 					vehicleId: 'vehicle-1',
 					type: 'fuel',
+					tags: ['fuel'],
 					category: 'operating',
 					amount: 50.0,
 					date: '2024-01-01',
+					mileage: 50000,
+					gallons: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}
@@ -136,9 +145,12 @@ describe('Sync Manager', () => {
 					id: 'test-1',
 					vehicleId: 'vehicle-1',
 					type: 'fuel',
+					tags: ['fuel'],
 					category: 'operating',
 					amount: 50.0,
 					date: '2024-01-01',
+					mileage: 50000,
+					gallons: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}
@@ -146,7 +158,7 @@ describe('Sync Manager', () => {
 
 			const existingExpense = {
 				id: 'server-1',
-				type: 'fuel',
+				tags: ['fuel'],
 				category: 'operating',
 				amount: 50.0,
 				date: '2024-01-01'
@@ -177,14 +189,17 @@ describe('Sync Manager', () => {
 					id: 'test-1',
 					vehicleId: 'vehicle-1',
 					type: 'fuel',
+					tags: ['fuel'],
 					category: 'operating',
 					amount: 50.0,
 					date: '2024-01-01',
+					mileage: 50000,
+					gallons: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				},
 				serverExpense: {
-					type: 'fuel',
+					tags: ['fuel'],
 					amount: 45.0,
 					date: '2024-01-01'
 				},
@@ -198,7 +213,7 @@ describe('Sync Manager', () => {
 
 			expect(result).toBe(true);
 			expect(fetch).toHaveBeenCalledWith(
-				expect.stringContaining('/api/vehicles/vehicle-1/expenses'),
+				expect.stringContaining('/api/expenses'),
 				expect.objectContaining({
 					method: 'POST',
 					body: expect.stringContaining('"forceOverwrite":true')
@@ -213,14 +228,17 @@ describe('Sync Manager', () => {
 					id: 'test-1',
 					vehicleId: 'vehicle-1',
 					type: 'fuel',
+					tags: ['fuel'],
 					category: 'operating',
 					amount: 50.0,
 					date: '2024-01-01',
+					mileage: 50000,
+					gallons: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				},
 				serverExpense: {
-					type: 'fuel',
+					tags: ['fuel'],
 					amount: 45.0,
 					date: '2024-01-01'
 				},
@@ -242,9 +260,12 @@ describe('Sync Manager', () => {
 					id: 'test-1',
 					vehicleId: 'vehicle-1',
 					type: 'fuel',
+					tags: ['fuel'],
 					category: 'operating',
 					amount: 50.0,
 					date: '2024-01-01',
+					mileage: 50000,
+					gallons: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}
@@ -273,9 +294,12 @@ describe('Sync Manager', () => {
 					id: 'test-1',
 					vehicleId: 'vehicle-1',
 					type: 'fuel',
+					tags: ['fuel'],
 					category: 'operating',
 					amount: 50.0,
 					date: '2024-01-01',
+					mileage: 50000,
+					gallons: 10.5,
 					timestamp: Date.now(),
 					synced: false
 				}

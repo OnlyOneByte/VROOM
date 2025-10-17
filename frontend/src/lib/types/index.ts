@@ -29,14 +29,17 @@ export interface VehicleLoan {
 	lender: string;
 	originalAmount: number;
 	currentBalance: number;
-	interestRate: number;
-	monthlyPayment: number;
+	apr: number;
+	termMonths: number;
 	startDate: string;
-	endDate: string;
+	paymentAmount: number;
+	paymentFrequency: 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
+	paymentDayOfMonth?: number;
+	paymentDayOfWeek?: number;
 	isActive: boolean;
-	apr?: number;
-	termMonths?: number;
-	standardPayment?: LoanPaymentConfig;
+	payoffDate?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface LoanPaymentConfig {
@@ -62,7 +65,7 @@ export interface VehicleFormData {
 export interface Expense {
 	id: string;
 	vehicleId: string;
-	type: ExpenseType;
+	tags: string[];
 	category: ExpenseCategory;
 	amount: number;
 	date: string;
@@ -73,23 +76,13 @@ export interface Expense {
 	updatedAt: string;
 }
 
-export type ExpenseType =
-	| 'fuel'
-	| 'maintenance'
-	| 'repairs'
-	| 'insurance'
-	| 'registration'
-	| 'tolls'
-	| 'parking'
-	| 'other';
-
 export type ExpenseCategory =
-	| 'operating'
+	| 'fuel'
 	| 'maintenance'
 	| 'financial'
 	| 'regulatory'
 	| 'enhancement'
-	| 'convenience';
+	| 'misc';
 
 // Notification types
 export interface Notification {
@@ -115,6 +108,39 @@ export interface AppState {
 	notifications: Notification[];
 	isLoading: boolean;
 	isMobileMenuOpen: boolean;
+}
+
+// Settings types
+export interface UserSettings {
+	id: string;
+	userId: string;
+	distanceUnit: 'miles' | 'kilometers';
+	fuelUnit: 'gallons' | 'liters';
+	currencyUnit: string;
+	autoBackupEnabled: boolean;
+	backupFrequency: 'daily' | 'weekly' | 'monthly';
+	lastBackupDate?: string;
+	googleDriveBackupEnabled: boolean;
+	googleDriveBackupFolderId?: string;
+	googleSheetsSyncEnabled?: boolean;
+	googleSheetsSpreadsheetId?: string;
+	syncOnInactivity?: boolean;
+	syncInactivityMinutes?: number;
+	lastSyncDate?: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface SettingsFormData {
+	distanceUnit: 'miles' | 'kilometers';
+	fuelUnit: 'gallons' | 'liters';
+	currencyUnit: string;
+	autoBackupEnabled: boolean;
+	backupFrequency: 'daily' | 'weekly' | 'monthly';
+	googleDriveBackupEnabled: boolean;
+	googleSheetsSyncEnabled?: boolean;
+	syncOnInactivity?: boolean;
+	syncInactivityMinutes?: number;
 }
 
 // Analytics types

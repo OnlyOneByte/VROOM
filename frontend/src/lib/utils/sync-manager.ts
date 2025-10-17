@@ -8,7 +8,7 @@ export interface SyncConflict {
 	serverExpense?: {
 		date: string;
 		amount: number;
-		type: string;
+		tags: string[];
 		category?: string;
 		description?: string;
 		gallons?: number;
@@ -160,14 +160,31 @@ class SyncManager {
 				return { success: false, conflict };
 			}
 
+			// Validate fuel expense requirements
+			let tags = expense.tags || [];
+			if (tags.includes('fuel') && (!expense.gallons || !expense.mileage)) {
+				// Remove fuel tag if required fields are missing
+				tags = tags.filter(tag => tag !== 'fuel');
+
+				// If no tags remain, this is an invalid expense
+				if (tags.length === 0) {
+					return {
+						success: false,
+						error:
+							'Fuel expenses require both gallons and mileage data. Please edit the expense and add the missing information.'
+					};
+				}
+			}
+
 			// No conflict, proceed with sync
-			const response = await fetch(`/api/vehicles/${expense.vehicleId}/expenses`, {
+			const response = await fetch(`/api/expenses`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					type: expense.type,
+					vehicleId: expense.vehicleId,
+					tags: tags,
 					category: expense.category,
 					amount: expense.amount,
 					currency: expense.currency || 'USD',
@@ -191,11 +208,11 @@ class SyncManager {
 
 	private async checkForExistingExpense(
 		expense: OfflineExpense
-	): Promise<{ date: string; amount: number; type: string } | null> {
+	): Promise<{ date: string; amount: number; tags: string[] } | null> {
 		try {
 			// Check if an expense with similar characteristics already exists
 			const response = await fetch(
-				`/api/vehicles/${expense.vehicleId}/expenses?date=${expense.date}&amount=${expense.amount}`
+				`/api/expenses?vehicleId=${expense.vehicleId}&date=${expense.date}&amount=${expense.amount}`
 			);
 
 			if (response.ok) {
@@ -210,10 +227,11 @@ class SyncManager {
 				}
 
 				// Look for potential duplicates (backend already filters by date/amount)
-				return expenses.find(
-					(existing: { date: string; amount: number; type: string }) =>
-						existing.type === expense.type
-				);
+				// Check if tags overlap
+				return expenses.find((existing: { date: string; amount: number; tags: string[] }) => {
+					// Check if any tags match
+					return expense.tags.some(tag => existing.tags?.includes(tag));
+				});
 			}
 		} catch (error) {
 			console.warn('Failed to check for existing expense:', error);
@@ -224,14 +242,12 @@ class SyncManager {
 
 	private determineConflictType(
 		local: OfflineExpense,
-		server: { amount: number; type: string; date: string }
+		server: { amount: number; tags: string[]; date: string }
 	): SyncConflict['conflictType'] {
 		// Simple conflict detection logic
-		if (
-			Math.abs(local.amount - server.amount) < 0.01 &&
-			local.type === server.type &&
-			local.date === server.date
-		) {
+		const tagsMatch = local.tags.some(tag => server.tags?.includes(tag));
+
+		if (Math.abs(local.amount - server.amount) < 0.01 && tagsMatch && local.date === server.date) {
 			return 'duplicate';
 		}
 
@@ -278,25 +294,23 @@ class SyncManager {
 			switch (resolution) {
 				case 'keep_local': {
 					// Force sync the local version
-					const response = await fetch(
-						`/api/vehicles/${conflict.localExpense.vehicleId}/expenses`,
-						{
-							method: 'POST',
-							headers: {
-								'Content-Type': 'application/json'
-							},
-							body: JSON.stringify({
-								type: conflict.localExpense.type,
-								category: conflict.localExpense.category,
-								amount: conflict.localExpense.amount,
-								date: conflict.localExpense.date,
-								mileage: conflict.localExpense.mileage,
-								gallons: conflict.localExpense.gallons,
-								description: conflict.localExpense.description,
-								forceOverwrite: true
-							})
-						}
-					);
+					const response = await fetch(`/api/expenses`, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify({
+							vehicleId: conflict.localExpense.vehicleId,
+							tags: conflict.localExpense.tags,
+							category: conflict.localExpense.category,
+							amount: conflict.localExpense.amount,
+							date: conflict.localExpense.date,
+							mileage: conflict.localExpense.mileage,
+							gallons: conflict.localExpense.gallons,
+							description: conflict.localExpense.description,
+							forceOverwrite: true
+						})
+					});
 
 					if (response.ok) {
 						this.markExpenseAsSynced(conflict.localExpense.id);

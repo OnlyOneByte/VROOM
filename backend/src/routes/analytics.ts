@@ -10,7 +10,8 @@ type ExpenseData = {
   id: string;
   amount: number;
   category: string;
-  type: string;
+  type?: string | null; // Deprecated
+  tags?: string | null; // JSON string from database
   date: Date;
   description?: string | null;
   mileage?: number | null;

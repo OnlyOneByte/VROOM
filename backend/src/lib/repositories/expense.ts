@@ -56,7 +56,6 @@ export class ExpenseRepository
         .select({
           id: expenses.id,
           vehicleId: expenses.vehicleId,
-          type: expenses.type,
           category: expenses.category,
           amount: expenses.amount,
           currency: expenses.currency,
@@ -65,6 +64,7 @@ export class ExpenseRepository
           gallons: expenses.gallons,
           description: expenses.description,
           receiptUrl: expenses.receiptUrl,
+          tags: expenses.tags,
           createdAt: expenses.createdAt,
           updatedAt: expenses.updatedAt,
         })
@@ -79,17 +79,21 @@ export class ExpenseRepository
     }
   }
 
-  async findByType(vehicleId: string, type: string): Promise<Expense[]> {
+  /**
+   * @deprecated Use findByCategory or filter by tags instead. The type field is deprecated.
+   */
+  async findByType(vehicleId: string, _type: string): Promise<Expense[]> {
     try {
+      // Type field is deprecated, return all expenses for the vehicle
       const result = await this.database
         .select()
         .from(expenses)
-        .where(and(eq(expenses.vehicleId, vehicleId), eq(expenses.type, type)))
+        .where(eq(expenses.vehicleId, vehicleId))
         .orderBy(desc(expenses.date));
       return result;
     } catch (error) {
-      console.error(`Error finding expenses by type ${type} for vehicle ${vehicleId}:`, error);
-      throw new Error('Failed to find expenses by type');
+      console.error(`Error finding expenses for vehicle ${vehicleId}:`, error);
+      throw new Error('Failed to find expenses');
     }
   }
 
@@ -115,7 +119,7 @@ export class ExpenseRepository
       const result = await this.database
         .select()
         .from(expenses)
-        .where(and(eq(expenses.vehicleId, vehicleId), eq(expenses.type, 'fuel')))
+        .where(and(eq(expenses.vehicleId, vehicleId), eq(expenses.category, 'fuel')))
         .orderBy(desc(expenses.date));
       return result;
     } catch (error) {

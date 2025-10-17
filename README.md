@@ -1,5 +1,7 @@
 # VROOM Car Tracker
 
+VROOM (Vehicle Record & Organization Of Maintenance) 
+
 A modern, self-hostable car cost tracking and visualization web application with mobile-first design and comprehensive expense analytics.
 
 Note: This project is currently under active development and not ready for use.

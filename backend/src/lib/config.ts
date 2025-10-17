@@ -26,9 +26,6 @@ const envSchema = z.object({
   GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/auth/callback/google'),
   SESSION_SECRET: z.string().min(32, 'Session secret must be at least 32 characters').optional(),
 
-  // Google Drive API (for backup/sync)
-  GOOGLE_DRIVE_API_KEY: z.string().optional(),
-
   // Rate limiting
   RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform(Number), // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: z.string().default('100').transform(Number),
@@ -100,10 +97,6 @@ export const config = {
     session: {
       secret: env.SESSION_SECRET,
     },
-  },
-
-  googleDrive: {
-    apiKey: env.GOOGLE_DRIVE_API_KEY,
   },
 
   cors: {

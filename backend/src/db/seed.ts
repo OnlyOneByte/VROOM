@@ -1,7 +1,5 @@
 import { db } from './connection.js';
 import { expenses, insurancePolicies, users, vehicleLoans, vehicles } from './schema.js';
-import type { ExpenseType } from './types.js';
-import { getCategoryForExpenseType } from './types.js';
 
 // Sample data for development and testing
 export async function seedDatabase() {
@@ -97,8 +95,8 @@ export async function seedDatabase() {
       // Fuel expenses for vehicle1
       {
         vehicleId: vehicle1.id,
-        type: 'fuel' as ExpenseType,
-        category: getCategoryForExpenseType('fuel'),
+        tags: JSON.stringify(['fuel', 'gas']),
+        category: 'fuel',
         amount: 45.5,
         date: new Date('2024-01-15'),
         mileage: 25500,
@@ -107,8 +105,8 @@ export async function seedDatabase() {
       },
       {
         vehicleId: vehicle1.id,
-        type: 'fuel' as ExpenseType,
-        category: getCategoryForExpenseType('fuel'),
+        tags: JSON.stringify(['fuel', 'gas']),
+        category: 'fuel',
         amount: 52.3,
         date: new Date('2024-01-28'),
         mileage: 25850,
@@ -118,8 +116,8 @@ export async function seedDatabase() {
       // Maintenance expenses
       {
         vehicleId: vehicle1.id,
-        type: 'oil-change' as ExpenseType,
-        category: getCategoryForExpenseType('oil-change'),
+        tags: JSON.stringify(['oil-change', 'maintenance']),
+        category: 'maintenance',
         amount: 75.0,
         date: new Date('2024-01-10'),
         mileage: 25400,
@@ -127,8 +125,8 @@ export async function seedDatabase() {
       },
       {
         vehicleId: vehicle2.id,
-        type: 'maintenance' as ExpenseType,
-        category: getCategoryForExpenseType('maintenance'),
+        tags: JSON.stringify(['brakes', 'maintenance']),
+        category: 'maintenance',
         amount: 150.0,
         date: new Date('2024-01-20'),
         mileage: 15200,
@@ -137,8 +135,8 @@ export async function seedDatabase() {
       // Insurance payments
       {
         vehicleId: vehicle1.id,
-        type: 'insurance' as ExpenseType,
-        category: getCategoryForExpenseType('insurance'),
+        tags: JSON.stringify(['insurance', 'monthly']),
+        category: 'financial',
         amount: 200.0,
         date: new Date('2024-01-01'),
         description: 'State Farm - Monthly premium',
@@ -146,16 +144,16 @@ export async function seedDatabase() {
       // Parking and tolls
       {
         vehicleId: vehicle1.id,
-        type: 'parking' as ExpenseType,
-        category: getCategoryForExpenseType('parking'),
+        tags: JSON.stringify(['parking']),
+        category: 'misc',
         amount: 15.0,
         date: new Date('2024-01-12'),
         description: 'Downtown parking garage',
       },
       {
         vehicleId: vehicle1.id,
-        type: 'tolls' as ExpenseType,
-        category: getCategoryForExpenseType('tolls'),
+        tags: JSON.stringify(['tolls']),
+        category: 'misc',
         amount: 8.5,
         date: new Date('2024-01-18'),
         description: 'Highway toll',

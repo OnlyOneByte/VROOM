@@ -3,6 +3,7 @@
 	import { syncStatus, isOnline, offlineExpenses } from '$lib/stores/offline';
 	import { syncManager, lastSyncTime, syncConflicts } from '$lib/utils/sync-manager';
 	import { RefreshCw, CircleCheck, CircleAlert, Clock, Wifi, WifiOff } from 'lucide-svelte';
+	import { Badge } from '$lib/components/ui/badge';
 
 	let { isExpanded = true } = $props();
 
@@ -90,10 +91,13 @@
 				<span class="text-gray-500">Connection</span>
 				{#snippet connectionStatus()}
 					{@const ConnectionIcon = $isOnline ? Wifi : WifiOff}
-					<div class="flex items-center gap-1 {$isOnline ? 'text-green-600' : 'text-red-600'}">
+					<Badge
+						variant={$isOnline ? 'default' : 'destructive'}
+						class="text-xs px-2 py-0.5 gap-1 {$isOnline ? 'bg-green-600 border-transparent' : ''}"
+					>
 						<ConnectionIcon class="h-3 w-3" />
 						<span>{$isOnline ? 'Online' : 'Offline'}</span>
-					</div>
+					</Badge>
 				{/snippet}
 				{@render connectionStatus()}
 			</div>
@@ -102,10 +106,13 @@
 			{#if pendingCount > 0}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-gray-500">Pending</span>
-					<div class="flex items-center gap-1 text-yellow-600">
+					<Badge
+						variant="secondary"
+						class="text-xs px-2 py-0.5 gap-1 bg-yellow-500 text-white border-transparent"
+					>
 						<Clock class="h-3 w-3" />
 						<span>{pendingCount}</span>
-					</div>
+					</Badge>
 				</div>
 			{/if}
 
@@ -113,10 +120,13 @@
 			{#if hasConflicts}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-gray-500">Conflicts</span>
-					<div class="flex items-center gap-1 text-orange-600">
+					<Badge
+						variant="secondary"
+						class="text-xs px-2 py-0.5 gap-1 bg-orange-500 text-white border-transparent"
+					>
 						<CircleAlert class="h-3 w-3" />
 						<span>{$syncConflicts.length}</span>
-					</div>
+					</Badge>
 				</div>
 			{/if}
 
@@ -146,11 +156,12 @@
 				<div class="{getStatusColor()} relative" title={getStatusText()}>
 					<StatusIcon class="h-5 w-5 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
 					{#if pendingCount > 0}
-						<span
-							class="absolute -top-1 -right-1 bg-yellow-500 text-white text-[10px] font-bold rounded-full h-3.5 w-3.5 flex items-center justify-center"
+						<Badge
+							variant="secondary"
+							class="absolute -top-1 -right-1 bg-yellow-500 text-white text-[10px] font-bold h-3.5 w-3.5 p-0 flex items-center justify-center border-transparent"
 						>
 							{pendingCount > 9 ? '9+' : pendingCount}
-						</span>
+						</Badge>
 					{/if}
 				</div>
 			</div>

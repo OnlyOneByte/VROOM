@@ -2,8 +2,10 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { activityTracker } from '../lib/activity-tracker';
+import { databaseService } from '../lib/database';
 import { createSheetsServiceForUser } from '../lib/google-sheets';
 import { requireAuth } from '../lib/middleware/auth';
+import { SettingsRepository } from '../lib/repositories/settings';
 
 const sheets = new Hono();
 
@@ -11,10 +13,10 @@ const sheets = new Hono();
 sheets.use('*', requireAuth);
 
 /**
- * POST /api/sheets/backup
- * Create or update the VROOM spreadsheet with current data
+ * POST /api/sheets/sync
+ * Sync data to Google Sheets (replaces old backup endpoint)
  */
-sheets.post('/backup', async (c) => {
+sheets.post('/sync', async (c) => {
   try {
     const user = c.get('user');
 
@@ -24,8 +26,21 @@ sheets.post('/backup', async (c) => {
       user.displayName
     );
 
+    // Update last sync date in settings
+    const db = databaseService.getDatabase();
+    const settingsRepo = new SettingsRepository(db);
+    await settingsRepo.updateSyncDate(user.id);
+
+    // Save spreadsheet ID to settings if not already saved
+    const settings = await settingsRepo.getOrCreate(user.id);
+    if (!settings.googleSheetsSpreadsheetId) {
+      await settingsRepo.update(user.id, {
+        googleSheetsSpreadsheetId: spreadsheetInfo.id,
+      });
+    }
+
     return c.json({
-      message: 'Data backed up to Google Sheets successfully',
+      message: 'Data synced to Google Sheets successfully',
       spreadsheet: {
         id: spreadsheetInfo.id,
         name: spreadsheetInfo.name,
@@ -35,7 +50,7 @@ sheets.post('/backup', async (c) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Sheets backup error:', error);
+    console.error('Sheets sync error:', error);
 
     if (error instanceof Error) {
       if (error.message.includes('not found') || error.message.includes('access not available')) {
@@ -46,7 +61,7 @@ sheets.post('/backup', async (c) => {
     }
 
     throw new HTTPException(500, {
-      message: 'Failed to backup data to Google Sheets',
+      message: 'Failed to sync data to Google Sheets',
     });
   }
 });
@@ -88,49 +103,6 @@ sheets.get('/status', async (c) => {
 
     throw new HTTPException(500, {
       message: 'Failed to get Google Sheets status',
-    });
-  }
-});
-
-/**
- * POST /api/sheets/sync
- * Bi-directional sync between SQLite and Google Sheets
- */
-sheets.post('/sync', async (c) => {
-  try {
-    const user = c.get('user');
-
-    // For now, this is a simple backup operation
-    // In a full implementation, you'd compare timestamps and sync changes both ways
-    const sheetsService = await createSheetsServiceForUser(user.id);
-    const spreadsheetInfo = await sheetsService.createOrUpdateVroomSpreadsheet(
-      user.id,
-      user.displayName
-    );
-
-    return c.json({
-      message: 'Data synchronized with Google Sheets successfully',
-      spreadsheet: {
-        id: spreadsheetInfo.id,
-        name: spreadsheetInfo.name,
-        webViewLink: spreadsheetInfo.webViewLink,
-      },
-      syncType: 'backup', // In full implementation: 'backup', 'restore', 'bidirectional'
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error('Sheets sync error:', error);
-
-    if (error instanceof Error) {
-      if (error.message.includes('not found') || error.message.includes('access not available')) {
-        throw new HTTPException(401, {
-          message: 'Google Sheets access not available. Please re-authenticate with Google.',
-        });
-      }
-    }
-
-    throw new HTTPException(500, {
-      message: 'Failed to sync data with Google Sheets',
     });
   }
 });
@@ -249,13 +221,12 @@ sheets.get('/:spreadsheetId/export/:format', async (c) => {
 
 /**
  * POST /api/sheets/configure
- * Configure Google Sheets integration settings
+ * Configure Google Sheets sync settings
  */
 const configureSchema = z.object({
-  autoSync: z.boolean().default(true),
-  syncInterval: z.enum(['manual', 'daily', 'weekly', 'on-inactivity']).default('on-inactivity'),
-  inactivityDelay: z.number().min(1).max(60).default(5), // minutes
-  organizeByDate: z.boolean().default(true),
+  googleSheetsSyncEnabled: z.boolean(),
+  syncOnInactivity: z.boolean().default(true),
+  syncInactivityMinutes: z.number().min(1).max(30).default(5),
 });
 
 sheets.post('/configure', async (c) => {
@@ -264,17 +235,38 @@ sheets.post('/configure', async (c) => {
     const body = await c.req.json();
     const config = configureSchema.parse(body);
 
-    // In a full implementation, you'd save these settings to the database
-    // For now, we'll just return the configuration
+    const db = databaseService.getDatabase();
+    const settingsRepo = new SettingsRepository(db);
+
+    // Update settings
+    await settingsRepo.update(user.id, {
+      googleSheetsSyncEnabled: config.googleSheetsSyncEnabled,
+      syncOnInactivity: config.syncOnInactivity,
+      syncInactivityMinutes: config.syncInactivityMinutes,
+    });
+
+    // Update activity tracker configuration
+    if (config.googleSheetsSyncEnabled && config.syncOnInactivity) {
+      activityTracker.updateSyncConfig(user.id, {
+        enabled: true,
+        autoSyncEnabled: true,
+        inactivityDelayMinutes: config.syncInactivityMinutes,
+      });
+    } else {
+      activityTracker.updateSyncConfig(user.id, {
+        enabled: false,
+        autoSyncEnabled: false,
+        inactivityDelayMinutes: config.syncInactivityMinutes,
+      });
+    }
 
     return c.json({
-      message: 'Google Sheets configuration updated successfully',
+      message: 'Google Sheets sync configuration updated successfully',
       configuration: {
         userId: user.id,
-        autoSync: config.autoSync,
-        syncInterval: config.syncInterval,
-        inactivityDelay: config.inactivityDelay,
-        organizeByDate: config.organizeByDate,
+        googleSheetsSyncEnabled: config.googleSheetsSyncEnabled,
+        syncOnInactivity: config.syncOnInactivity,
+        syncInactivityMinutes: config.syncInactivityMinutes,
         updatedAt: new Date().toISOString(),
       },
     });
@@ -288,7 +280,7 @@ sheets.post('/configure', async (c) => {
     }
 
     throw new HTTPException(500, {
-      message: 'Failed to configure Google Sheets integration',
+      message: 'Failed to configure Google Sheets sync',
     });
   }
 });

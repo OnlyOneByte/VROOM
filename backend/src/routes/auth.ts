@@ -260,12 +260,14 @@ auth.post('/refresh', async (c) => {
       });
     }
 
-    // Create new session
-    await lucia.invalidateSession(session.id);
+    // Create new session - create first to avoid losing session if creation fails
     const newSession = await lucia.createSession(user.id, {});
     const sessionCookie = lucia.createSessionCookie(newSession.id);
 
     c.header('Set-Cookie', sessionCookie.serialize());
+
+    // Only invalidate old session after new one is successfully created
+    await lucia.invalidateSession(session.id);
 
     return c.json({
       user: {

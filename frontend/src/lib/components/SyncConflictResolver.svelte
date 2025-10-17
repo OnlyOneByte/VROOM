@@ -1,16 +1,26 @@
 <script lang="ts">
 	import { syncConflicts, syncManager, type SyncConflict } from '$lib/utils/sync-manager';
-	import { AlertTriangle, Check, X, Merge } from 'lucide-svelte';
+	import { TriangleAlert, Check, X, Merge } from 'lucide-svelte';
+	import {
+		Dialog,
+		DialogContent,
+		DialogDescription,
+		DialogHeader,
+		DialogTitle
+	} from '$lib/components/ui/dialog';
+	import { ScrollArea } from '$lib/components/ui/scroll-area';
 
-	let showModal = false;
-	let currentConflict: SyncConflict | null = null;
-	let resolving = false;
+	let showModal = $state(false);
+	let currentConflict = $state<SyncConflict | null>(null);
+	let resolving = $state(false);
 
 	// Subscribe to conflicts
-	$: if ($syncConflicts.length > 0 && !showModal) {
-		currentConflict = $syncConflicts[0] ?? null;
-		showModal = true;
-	}
+	$effect(() => {
+		if ($syncConflicts.length > 0 && !showModal) {
+			currentConflict = $syncConflicts[0] ?? null;
+			showModal = true;
+		}
+	});
 
 	async function resolveConflict(resolution: 'keep_local' | 'keep_server' | 'merge') {
 		if (!currentConflict) return;
@@ -49,137 +59,144 @@
 	}
 
 	function formatAmount(amount: number): string {
-		return `$${amount.toFixed(2)}`;
+		return `${amount.toFixed(2)}`;
 	}
 </script>
 
-{#if showModal && currentConflict}
-	<!-- Modal backdrop -->
-	<div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-		<div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-			<!-- Header -->
-			<div class="flex items-center gap-3 p-6 border-b border-gray-200">
-				<AlertTriangle class="h-6 w-6 text-orange-500" />
-				<div>
-					<h2 class="text-xl font-semibold text-gray-900">Sync Conflict Detected</h2>
-					<p class="text-sm text-gray-600">
-						{$syncConflicts.length} conflict{$syncConflicts.length !== 1 ? 's' : ''} need{$syncConflicts.length ===
-						1
-							? 's'
-							: ''} resolution
-					</p>
+<Dialog bind:open={showModal}>
+	<DialogContent class="max-w-2xl">
+		{#if currentConflict}
+			<DialogHeader>
+				<div class="flex items-center gap-3">
+					<TriangleAlert class="h-6 w-6 text-orange-500" />
+					<div>
+						<DialogTitle>Sync Conflict Detected</DialogTitle>
+						<DialogDescription>
+							{$syncConflicts.length} conflict{$syncConflicts.length !== 1 ? 's' : ''} need{$syncConflicts.length ===
+							1
+								? 's'
+								: ''} resolution
+						</DialogDescription>
+					</div>
 				</div>
-			</div>
+			</DialogHeader>
 
-			<!-- Conflict details -->
-			<div class="p-6 space-y-6">
-				<div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
-					<h3 class="font-medium text-orange-900 mb-2">
-						{currentConflict.conflictType === 'duplicate'
-							? 'Duplicate Expense'
-							: 'Modified Expense'}
-					</h3>
-					<p class="text-sm text-orange-700">
-						{#if currentConflict.conflictType === 'duplicate'}
-							An expense with similar details already exists on the server.
-						{:else}
-							The expense has been modified both locally and on the server.
-						{/if}
-					</p>
-				</div>
-
-				<!-- Local vs Server comparison -->
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<!-- Local version -->
-					<div class="border border-blue-200 rounded-lg p-4">
-						<div class="flex items-center gap-2 mb-3">
-							<div class="w-3 h-3 bg-blue-500 rounded-full"></div>
-							<h4 class="font-medium text-gray-900">Your Version (Local)</h4>
-						</div>
-
-						<div class="space-y-2 text-sm">
-							<div class="flex justify-between">
-								<span class="text-gray-600">Type:</span>
-								<span class="font-medium capitalize">{currentConflict.localExpense.type}</span>
-							</div>
-							<div class="flex justify-between">
-								<span class="text-gray-600">Amount:</span>
-								<span class="font-medium">{formatAmount(currentConflict.localExpense.amount)}</span>
-							</div>
-							<div class="flex justify-between">
-								<span class="text-gray-600">Date:</span>
-								<span class="font-medium">{formatDate(currentConflict.localExpense.date)}</span>
-							</div>
-							<div class="flex justify-between">
-								<span class="text-gray-600">Category:</span>
-								<span class="font-medium capitalize">{currentConflict.localExpense.category}</span>
-							</div>
-							{#if currentConflict.localExpense.description}
-								<div>
-									<span class="text-gray-600">Description:</span>
-									<p class="font-medium mt-1">{currentConflict.localExpense.description}</p>
-								</div>
+			<ScrollArea class="max-h-[60vh]">
+				<div class="space-y-6 pr-4">
+					<div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+						<h3 class="font-medium text-orange-900 mb-2">
+							{currentConflict.conflictType === 'duplicate'
+								? 'Duplicate Expense'
+								: 'Modified Expense'}
+						</h3>
+						<p class="text-sm text-orange-700">
+							{#if currentConflict.conflictType === 'duplicate'}
+								An expense with similar details already exists on the server.
+							{:else}
+								The expense has been modified both locally and on the server.
 							{/if}
-							{#if currentConflict.localExpense.gallons}
-								<div class="flex justify-between">
-									<span class="text-gray-600">Gallons:</span>
-									<span class="font-medium">{currentConflict.localExpense.gallons}</span>
-								</div>
-							{/if}
-						</div>
+						</p>
 					</div>
 
-					<!-- Server version -->
-					{#if currentConflict.serverExpense}
-						<div class="border border-green-200 rounded-lg p-4">
+					<!-- Local vs Server comparison -->
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<!-- Local version -->
+						<div class="border border-blue-200 rounded-lg p-4">
 							<div class="flex items-center gap-2 mb-3">
-								<div class="w-3 h-3 bg-green-500 rounded-full"></div>
-								<h4 class="font-medium text-gray-900">Server Version</h4>
+								<div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+								<h4 class="font-medium text-gray-900">Your Version (Local)</h4>
 							</div>
 
 							<div class="space-y-2 text-sm">
 								<div class="flex justify-between">
 									<span class="text-gray-600">Type:</span>
-									<span class="font-medium capitalize">{currentConflict.serverExpense.type}</span>
+									<span class="font-medium capitalize">{currentConflict.localExpense.type}</span>
 								</div>
 								<div class="flex justify-between">
 									<span class="text-gray-600">Amount:</span>
 									<span class="font-medium"
-										>{formatAmount(currentConflict.serverExpense.amount)}</span
+										>{formatAmount(currentConflict.localExpense.amount)}</span
 									>
 								</div>
 								<div class="flex justify-between">
 									<span class="text-gray-600">Date:</span>
-									<span class="font-medium">{formatDate(currentConflict.serverExpense.date)}</span>
+									<span class="font-medium">{formatDate(currentConflict.localExpense.date)}</span>
 								</div>
 								<div class="flex justify-between">
 									<span class="text-gray-600">Category:</span>
-									<span class="font-medium capitalize"
-										>{currentConflict.serverExpense.category}</span
+									<span class="font-medium capitalize">{currentConflict.localExpense.category}</span
 									>
 								</div>
-								{#if currentConflict.serverExpense.description}
+								{#if currentConflict.localExpense.description}
 									<div>
 										<span class="text-gray-600">Description:</span>
-										<p class="font-medium mt-1">{currentConflict.serverExpense.description}</p>
+										<p class="font-medium mt-1">{currentConflict.localExpense.description}</p>
 									</div>
 								{/if}
-								{#if currentConflict.serverExpense.gallons}
+								{#if currentConflict.localExpense.gallons}
 									<div class="flex justify-between">
 										<span class="text-gray-600">Gallons:</span>
-										<span class="font-medium">{currentConflict.serverExpense.gallons}</span>
+										<span class="font-medium">{currentConflict.localExpense.gallons}</span>
 									</div>
 								{/if}
 							</div>
 						</div>
-					{/if}
+
+						<!-- Server version -->
+						{#if currentConflict.serverExpense}
+							<div class="border border-green-200 rounded-lg p-4">
+								<div class="flex items-center gap-2 mb-3">
+									<div class="w-3 h-3 bg-green-500 rounded-full"></div>
+									<h4 class="font-medium text-gray-900">Server Version</h4>
+								</div>
+
+								<div class="space-y-2 text-sm">
+									<div class="flex justify-between">
+										<span class="text-gray-600">Tags:</span>
+										<span class="font-medium">{currentConflict.serverExpense.tags.join(', ')}</span>
+									</div>
+									<div class="flex justify-between">
+										<span class="text-gray-600">Amount:</span>
+										<span class="font-medium"
+											>{formatAmount(currentConflict.serverExpense.amount)}</span
+										>
+									</div>
+									<div class="flex justify-between">
+										<span class="text-gray-600">Date:</span>
+										<span class="font-medium">{formatDate(currentConflict.serverExpense.date)}</span
+										>
+									</div>
+									<div class="flex justify-between">
+										<span class="text-gray-600">Category:</span>
+										<span class="font-medium capitalize"
+											>{currentConflict.serverExpense.category}</span
+										>
+									</div>
+									{#if currentConflict.serverExpense.description}
+										<div>
+											<span class="text-gray-600">Description:</span>
+											<p class="font-medium mt-1">
+												{currentConflict.serverExpense.description}
+											</p>
+										</div>
+									{/if}
+									{#if currentConflict.serverExpense.gallons}
+										<div class="flex justify-between">
+											<span class="text-gray-600">Gallons:</span>
+											<span class="font-medium">{currentConflict.serverExpense.gallons}</span>
+										</div>
+									{/if}
+								</div>
+							</div>
+						{/if}
+					</div>
 				</div>
-			</div>
+			</ScrollArea>
 
 			<!-- Actions -->
-			<div class="flex flex-col sm:flex-row gap-3 p-6 border-t border-gray-200">
+			<div class="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
 				<button
-					on:click={() => resolveConflict('keep_local')}
+					onclick={() => resolveConflict('keep_local')}
 					disabled={resolving}
 					class="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2"
 				>
@@ -189,7 +206,7 @@
 
 				{#if currentConflict.serverExpense}
 					<button
-						on:click={() => resolveConflict('keep_server')}
+						onclick={() => resolveConflict('keep_server')}
 						disabled={resolving}
 						class="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2"
 					>
@@ -199,7 +216,7 @@
 				{/if}
 
 				<button
-					on:click={() => resolveConflict('merge')}
+					onclick={() => resolveConflict('merge')}
 					disabled={resolving}
 					class="flex-1 bg-purple-500 hover:bg-purple-600 disabled:bg-purple-300 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2"
 				>
@@ -208,7 +225,7 @@
 				</button>
 
 				<button
-					on:click={closeModal}
+					onclick={closeModal}
 					disabled={resolving}
 					class="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:text-gray-400 font-medium"
 				>
@@ -227,6 +244,6 @@
 					</div>
 				</div>
 			{/if}
-		</div>
-	</div>
-{/if}
+		{/if}
+	</DialogContent>
+</Dialog>

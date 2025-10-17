@@ -37,8 +37,10 @@ export interface VehicleLoan {
 	apr: number;
 	termMonths: number;
 	startDate: Date;
-	standardPayment: LoanPaymentConfig;
-	customPaymentSchedule?: LoanPaymentConfig[];
+	paymentAmount: number;
+	paymentFrequency: 'monthly' | 'bi-weekly' | 'weekly';
+	paymentDayOfMonth?: number;
+	paymentDayOfWeek?: number;
 	isActive: boolean;
 	payoffDate?: Date;
 	createdAt: Date;
@@ -56,37 +58,43 @@ export interface LoanPaymentConfig {
 	}[];
 }
 
-export type ExpenseType =
-	| 'fuel'
-	| 'tolls'
-	| 'parking'
-	| 'maintenance'
-	| 'repairs'
-	| 'tires'
-	| 'oil-change'
-	| 'insurance'
-	| 'loan-payment'
-	| 'registration'
-	| 'inspection'
-	| 'emissions'
-	| 'tickets'
-	| 'modifications'
-	| 'accessories'
-	| 'detailing'
-	| 'other';
+// Common tag suggestions (not enforced)
+export const COMMON_EXPENSE_TAGS = [
+	'fuel',
+	'tolls',
+	'parking',
+	'maintenance',
+	'repairs',
+	'tires',
+	'oil-change',
+	'insurance',
+	'loan-payment',
+	'registration',
+	'inspection',
+	'emissions',
+	'tickets',
+	'modifications',
+	'accessories',
+	'detailing',
+	'car-wash',
+	'wax',
+	'interior-cleaning',
+	'emergency',
+	'routine'
+] as const;
 
 export type ExpenseCategory =
-	| 'operating'
+	| 'fuel'
 	| 'maintenance'
 	| 'financial'
 	| 'regulatory'
 	| 'enhancement'
-	| 'convenience';
+	| 'misc';
 
 export interface Expense {
 	id: string;
 	vehicleId: string;
-	type: ExpenseType;
+	tags: string[]; // Flexible tags
 	category: ExpenseCategory;
 	amount: number;
 	currency: string;
@@ -166,7 +174,7 @@ export interface VehicleFormData {
 
 export interface ExpenseFormData {
 	vehicleId: string;
-	type: ExpenseType;
+	tags: string[]; // Flexible tags
 	category: ExpenseCategory;
 	amount: number;
 	date: string;
@@ -180,7 +188,7 @@ export interface ExpenseFormData {
 export interface ExpenseFilters {
 	vehicleId?: string;
 	category?: ExpenseCategory | undefined;
-	type?: ExpenseType | undefined;
+	tags?: string[]; // Filter by tags
 	startDate?: string | undefined;
 	endDate?: string | undefined;
 	searchTerm?: string;
@@ -213,7 +221,7 @@ export interface LoanFormErrors {
 
 export interface ExpenseFormErrors {
 	vehicleId?: string;
-	type?: string;
+	tags?: string;
 	category?: string;
 	amount?: string;
 	date?: string;

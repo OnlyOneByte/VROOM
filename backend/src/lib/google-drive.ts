@@ -50,6 +50,7 @@ export class GoogleDriveService {
       receipts: DriveFolder;
       maintenance: DriveFolder;
       photos: DriveFolder;
+      backups: DriveFolder;
     };
   }> {
     try {
@@ -72,6 +73,7 @@ export class GoogleDriveService {
       const receiptsFolder = await this.createFolder('Receipts', mainFolder.id);
       const maintenanceFolder = await this.createFolder('Maintenance Records', mainFolder.id);
       const photosFolder = await this.createFolder('Vehicle Photos', mainFolder.id);
+      const backupsFolder = await this.createFolder('Backups', mainFolder.id);
 
       return {
         mainFolder,
@@ -79,6 +81,7 @@ export class GoogleDriveService {
           receipts: receiptsFolder,
           maintenance: maintenanceFolder,
           photos: photosFolder,
+          backups: backupsFolder,
         },
       };
     } catch (error) {
@@ -122,6 +125,7 @@ export class GoogleDriveService {
     receipts: DriveFolder;
     maintenance: DriveFolder;
     photos: DriveFolder;
+    backups: DriveFolder;
   }> {
     try {
       const response = await this.drive.files.list({
@@ -135,6 +139,7 @@ export class GoogleDriveService {
       const receiptsFolder = folders.find((f) => f.name === 'Receipts');
       const maintenanceFolder = folders.find((f) => f.name === 'Maintenance Records');
       const photosFolder = folders.find((f) => f.name === 'Vehicle Photos');
+      const backupsFolder = folders.find((f) => f.name === 'Backups');
 
       // Create missing subfolders or convert existing ones
       const receipts = receiptsFolder
@@ -164,10 +169,20 @@ export class GoogleDriveService {
           } as DriveFolder)
         : await this.createFolder('Vehicle Photos', mainFolderId);
 
+      const backups = backupsFolder
+        ? ({
+            id: backupsFolder.id || '',
+            name: backupsFolder.name || '',
+            parents: backupsFolder.parents,
+            webViewLink: backupsFolder.webViewLink,
+          } as DriveFolder)
+        : await this.createFolder('Backups', mainFolderId);
+
       return {
         receipts,
         maintenance,
         photos,
+        backups,
       };
     } catch (error) {
       console.error('Error getting VROOM subfolders:', error);

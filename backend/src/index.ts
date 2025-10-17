@@ -9,10 +9,12 @@ import { errorHandler } from './lib/middleware/error-handler';
 import { rateLimiter } from './lib/middleware/rate-limiter';
 import { analytics } from './routes/analytics';
 import { auth } from './routes/auth';
+import { backup } from './routes/backup';
 import { drive } from './routes/drive';
 import { expenses } from './routes/expenses';
 import { insurance } from './routes/insurance';
 import { loans } from './routes/loans';
+import { settings } from './routes/settings';
 import { sharing } from './routes/sharing';
 import { sheets } from './routes/sheets';
 import { vehicles } from './routes/vehicles';
@@ -73,6 +75,8 @@ app.route('/api/insurance', insurance);
 app.route('/api/analytics', analytics);
 app.route('/api/drive', drive);
 app.route('/api/sheets', sheets);
+app.route('/api/backup', backup);
+app.route('/api/settings', settings);
 app.route('/api/sharing', sharing);
 
 // API info endpoint
@@ -106,6 +110,7 @@ app.get('/api', optionalAuth, (c) => {
       analytics: '/api/analytics',
       drive: '/api/drive',
       sheets: '/api/sheets',
+      backup: '/api/backup',
       sharing: '/api/sharing',
     },
   });
@@ -141,9 +146,26 @@ console.log(`🚗 VROOM Backend starting on port ${config.server.port}`);
 console.log(`📊 Environment: ${config.env}`);
 console.log(`🗄️  Database: ${config.database.url}`);
 
+// Periodic WAL checkpoint to ensure data persistence (every 5 minutes)
+import { checkpointWAL } from './db/connection';
+
+const checkpointInterval = setInterval(
+  () => {
+    checkpointWAL();
+  },
+  5 * 60 * 1000
+); // 5 minutes
+
 // Graceful shutdown handler
 const shutdown = (signal: string) => {
   console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+
+  // Clear checkpoint interval
+  clearInterval(checkpointInterval);
+
+  // Final checkpoint before shutdown
+  checkpointWAL();
+
   process.exit(0);
 };
 

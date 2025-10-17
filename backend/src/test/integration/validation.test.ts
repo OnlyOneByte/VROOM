@@ -111,8 +111,8 @@ describe('Data Validation Tests', () => {
 
       await expenseRepo.create({
         vehicleId: vehicle.id,
-        type: 'fuel',
-        category: 'operating',
+        tags: JSON.stringify(['fuel']),
+        category: 'fuel',
         amount: 50.0,
         currency: 'USD',
         date: new Date(),
@@ -152,8 +152,8 @@ describe('Data Validation Tests', () => {
       // Create multiple expenses
       await expenseRepo.create({
         vehicleId: vehicle.id,
-        type: 'fuel',
-        category: 'operating',
+        tags: JSON.stringify(['fuel']),
+        category: 'fuel',
         amount: 50.0,
         currency: 'USD',
         date: new Date('2024-01-15'),
@@ -161,7 +161,7 @@ describe('Data Validation Tests', () => {
 
       await expenseRepo.create({
         vehicleId: vehicle.id,
-        type: 'maintenance',
+        tags: JSON.stringify(['maintenance']),
         category: 'maintenance',
         amount: 100.0,
         currency: 'USD',

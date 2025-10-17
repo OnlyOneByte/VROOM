@@ -38,7 +38,8 @@ type ExpenseData = {
     id: string;
     amount: number;
     category: string;
-    type: string;
+    type?: string | null; // Deprecated
+    tags?: string | null; // JSON string from database
     date: Date;
     description?: string | null;
     mileage?: number | null;
@@ -443,7 +444,7 @@ export class GoogleSheetsService {
         return [
           new Date(expense.date).toLocaleDateString(),
           `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-          expense.type,
+          expense.tags ? JSON.parse(expense.tags).join(', ') : expense.type || '',
           expense.category,
           expense.description || '',
           `$${expense.amount.toFixed(2)}`,

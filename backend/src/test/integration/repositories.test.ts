@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { closeDatabaseConnection, runMigrations } from '../../db/connection.js';
 import { clearDatabase } from '../../db/seed.js';
-import { getCategoryForExpenseType } from '../../db/types.js';
 import { repositoryFactory } from '../../lib/repositories/index.js';
 
 describe('Repository Integration Tests', () => {
@@ -110,8 +109,8 @@ describe('Repository Integration Tests', () => {
       // Create expenses
       const _fuelExpense = await expenseRepo.create({
         vehicleId: vehicle.id,
-        type: 'fuel',
-        category: getCategoryForExpenseType('fuel'),
+        tags: JSON.stringify(['fuel']),
+        category: 'fuel',
         amount: 50.0,
         currency: 'USD',
         date: new Date('2024-01-15'),
@@ -120,8 +119,8 @@ describe('Repository Integration Tests', () => {
 
       const _maintenanceExpense = await expenseRepo.create({
         vehicleId: vehicle.id,
-        type: 'oil-change',
-        category: getCategoryForExpenseType('oil-change'),
+        tags: JSON.stringify(['oil-change', 'maintenance']),
+        category: 'maintenance',
         amount: 75.0,
         currency: 'USD',
         date: new Date('2024-01-20'),
@@ -139,7 +138,7 @@ describe('Repository Integration Tests', () => {
       const categoryTotals = await expenseRepo.getTotalByCategory(vehicle.id);
       expect(categoryTotals).toHaveLength(2);
 
-      const operatingTotal = categoryTotals.find((ct) => ct.category === 'operating');
+      const operatingTotal = categoryTotals.find((ct) => ct.category === 'fuel');
       const maintenanceTotal = categoryTotals.find((ct) => ct.category === 'maintenance');
 
       expect(operatingTotal?.total).toBe(50.0);

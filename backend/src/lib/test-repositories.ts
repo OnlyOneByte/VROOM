@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { getCategoryForExpenseType } from '../db/types.js';
 import { databaseService } from './database.js';
 import { repositoryFactory } from './repositories/index.js';
 
@@ -55,8 +54,8 @@ async function testRepositories() {
     console.log('\n💰 Testing Expense Repository...');
     const testExpense = await expenseRepo.create({
       vehicleId: testVehicle.id,
-      type: 'fuel',
-      category: getCategoryForExpenseType('fuel'),
+      tags: JSON.stringify(['fuel', 'test']),
+      category: 'fuel',
       amount: 50.0,
       currency: 'USD',
       date: new Date(),

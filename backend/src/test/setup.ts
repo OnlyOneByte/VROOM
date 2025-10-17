@@ -161,8 +161,8 @@ export const testVehicleData = {
 };
 
 export const testExpenseData = {
-  type: 'fuel' as const,
-  category: 'operating' as const,
+  tags: ['fuel'],
+  category: 'fuel' as const,
   amount: 45.5,
   currency: 'USD',
   date: new Date('2024-01-15'),

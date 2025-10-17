@@ -126,7 +126,6 @@
 	/* Individual toast styling */
 	[data-sonner-toast] {
 		@apply rounded-lg shadow-lg border;
-		position: relative !important;
 		overflow: hidden !important;
 		min-width: 24rem;
 		max-width: 32rem;

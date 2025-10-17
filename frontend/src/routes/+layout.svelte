@@ -27,6 +27,31 @@
 		token: null
 	});
 	let currentPath = $state('');
+	let vehiclesLoaded = $state(false);
+
+	async function loadUserVehicles() {
+		// Prevent loading vehicles multiple times
+		if (vehiclesLoaded) return;
+
+		try {
+			const response = await fetch('/api/vehicles', {
+				credentials: 'include'
+			});
+
+			if (response.ok) {
+				const result = await response.json();
+				const vehicles = result.data || [];
+				appStore.setVehicles(vehicles);
+				vehiclesLoaded = true;
+			}
+		} catch (error) {
+			console.error('Failed to load vehicles:', error);
+		}
+	}
+
+	// Track shown notifications globally to prevent duplicates across remounts
+	const shownNotifications = new Set<string>();
+	let previousNotificationIds = new Set<string>();
 
 	onMount(() => {
 		// Initialize authentication
@@ -42,12 +67,28 @@
 		// Subscribe to auth state
 		const unsubscribeAuth = authStore.subscribe(state => {
 			authState = state;
+
+			// Load vehicles when user becomes authenticated
+			if (state.isAuthenticated && !state.isLoading) {
+				loadUserVehicles();
+			}
 		});
 
 		// Subscribe to app state for notifications
 		const unsubscribeApp = appStore.subscribe(state => {
-			// Show toasts for new notifications
+			// Only process NEW notifications (not in previous set)
 			state.notifications.forEach(notification => {
+				// Skip if we've seen this notification before
+				if (
+					previousNotificationIds.has(notification.id) ||
+					shownNotifications.has(notification.id)
+				) {
+					return;
+				}
+
+				// Mark as shown
+				shownNotifications.add(notification.id);
+
 				const duration = notification.duration || 5000;
 				const options = {
 					duration,
@@ -72,6 +113,9 @@
 				// Remove notification from store after showing
 				appStore.removeNotification(notification.id);
 			});
+
+			// Update previous notification IDs for next comparison
+			previousNotificationIds = new Set(state.notifications.map(n => n.id));
 		});
 
 		// Subscribe to page changes for route protection
