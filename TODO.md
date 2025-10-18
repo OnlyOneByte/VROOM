@@ -13,6 +13,8 @@
 - [ ] All vehicle expenses dashboard
 - [ ] Analytics dashboard rework
 - [x] Rework Vehicle specific analytics page
+- [ ] Expenses page rework
+- [ ] expenses table rework
 
 
 Maybes

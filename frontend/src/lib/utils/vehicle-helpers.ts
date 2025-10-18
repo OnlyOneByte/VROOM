@@ -1,13 +1,26 @@
+// Vehicle helper utilities
+// Using a flexible type to handle both API responses and store data
+
+interface VehicleLike {
+	year: number;
+	make: string;
+	model: string;
+	nickname?: string;
+	financing?: {
+		isActive: boolean;
+		originalAmount: number;
+		currentBalance: number;
+	};
+}
+
 // Get display name for a vehicle
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getVehicleDisplayName(vehicle: any | null | undefined): string {
+export function getVehicleDisplayName(vehicle: VehicleLike | null | undefined): string {
 	if (!vehicle) return 'Unknown Vehicle';
 	return vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
 }
 
 // Calculate financing progress percentage
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getFinancingProgress(vehicle: any): number {
+export function getFinancingProgress(vehicle: VehicleLike): number {
 	if (!vehicle?.financing?.isActive) return 0;
 
 	const { originalAmount, currentBalance } = vehicle.financing;

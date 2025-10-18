@@ -3,10 +3,15 @@
 	import type { Snippet } from 'svelte';
 
 	interface Props {
+		/** Optional icon snippet to display above the title */
 		icon?: Snippet;
+		/** Title snippet for the empty state */
 		title: Snippet;
+		/** Description snippet explaining the empty state */
 		description: Snippet;
+		/** Optional action snippet (typically a button) */
 		action?: Snippet;
+		/** Additional CSS classes */
 		class?: string;
 	}
 

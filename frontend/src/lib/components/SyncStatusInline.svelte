@@ -7,14 +7,23 @@
 		syncConflicts,
 		fetchLastSyncTime
 	} from '$lib/utils/sync-manager';
-	import { RefreshCw, CircleCheck, CircleAlert, Clock, Wifi, WifiOff } from 'lucide-svelte';
+	import { RefreshCw, CircleAlert, Clock, Wifi, WifiOff } from 'lucide-svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { formatCompactRelativeTime } from '$lib/utils/formatters';
+	import { getSyncStatusInfo } from '$lib/utils/sync-status';
 
 	let { isExpanded = true } = $props();
 
 	let pendingCount = $derived($offlineExpenses.filter(expense => !expense.synced).length);
-	let hasConflicts = $derived($syncConflicts.length > 0);
+
+	let statusInfo = $derived(
+		getSyncStatusInfo({
+			isOnline: $isOnline,
+			syncStatus: $syncStatus,
+			pendingCount,
+			conflictsCount: $syncConflicts.length
+		})
+	);
 
 	onMount(() => {
 		syncManager.setupAutoSync();
@@ -38,25 +47,6 @@
 			}
 		}
 	}
-
-	function getSyncStatusInfo() {
-		if (!$isOnline) return { color: 'text-red-500', icon: WifiOff, text: 'Offline' };
-		if (hasConflicts)
-			return {
-				color: 'text-orange-500',
-				icon: CircleAlert,
-				text: `${$syncConflicts.length} conflicts`
-			};
-		if ($syncStatus === 'syncing')
-			return { color: 'text-yellow-500', icon: RefreshCw, text: 'Syncing...' };
-		if ($syncStatus === 'error')
-			return { color: 'text-red-500', icon: CircleAlert, text: 'Sync failed' };
-		if ($syncStatus === 'success')
-			return { color: 'text-green-500', icon: CircleCheck, text: 'Synced' };
-		if (pendingCount > 0)
-			return { color: 'text-yellow-500', icon: Clock, text: `${pendingCount} pending` };
-		return { color: 'text-green-500', icon: Wifi, text: 'Up to date' };
-	}
 </script>
 
 <div class="border-t border-gray-200 pt-3 space-y-2">
@@ -66,7 +56,6 @@
 			<!-- Status header -->
 			<div class="flex items-center justify-between">
 				{#snippet statusHeader()}
-					{@const statusInfo = getSyncStatusInfo()}
 					{@const StatusIcon = statusInfo.icon}
 					<div class="flex items-center gap-2 {statusInfo.color}">
 						<StatusIcon class="h-4 w-4 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
@@ -107,7 +96,7 @@
 			{/if}
 
 			<!-- Conflicts -->
-			{#if hasConflicts}
+			{#if $syncConflicts.length > 0}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-gray-500">Conflicts</span>
 					<Badge
@@ -141,7 +130,6 @@
 	{:else}
 		<!-- Collapsed view - just icon -->
 		{#snippet collapsedIcon()}
-			{@const statusInfo = getSyncStatusInfo()}
 			{@const StatusIcon = statusInfo.icon}
 			<div class="flex justify-center px-3">
 				<div class="{statusInfo.color} relative" title={statusInfo.text}>

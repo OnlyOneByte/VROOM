@@ -3,7 +3,7 @@
 	import {
 		Plus,
 		Clock,
-		CheckCircle,
+		CircleCheck,
 		Calendar,
 		DollarSign,
 		Search,
@@ -17,10 +17,16 @@
 	import { offlineExpenses } from '$lib/stores/offline';
 	import { removeOfflineExpense } from '$lib/utils/offline-storage';
 	import { settingsStore } from '$lib/stores/settings';
-	import type { ExpenseCategory, ExpenseFilters } from '$lib/types.js';
+	import type { Expense, Vehicle, ExpenseCategory, ExpenseFilters } from '$lib/types.js';
+
+	// Extended Expense type with vehicle info
+	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import { categoryLabels, getCategoryIcon, getCategoryColor } from '$lib/utils/expense-helpers';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import { extractUniqueTags } from '$lib/utils/expense-filters';
+	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '$lib/constants/messages';
+	import { DISPLAY_LIMITS } from '$lib/constants/limits';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -34,10 +40,10 @@
 	import * as Select from '$lib/components/ui/select';
 
 	// Component state
-	let loading = $state(true);
-	let expenses = $state<any[]>([]);
-	let vehicles = $state<any[]>([]);
-	let filteredExpenses = $state<any[]>([]);
+	let isLoading = $state(true);
+	let expenses = $state<ExpenseWithVehicle[]>([]);
+	let vehicles = $state<Vehicle[]>([]);
+	let filteredExpenses = $state<ExpenseWithVehicle[]>([]);
 
 	// Filters and search
 	let searchTerm = $state('');
@@ -64,7 +70,7 @@
 	let syncedExpenses = $derived($offlineExpenses.filter(expense => expense.synced));
 
 	// Get all unique tags from expenses
-	let allTags = $derived(Array.from(new Set(expenses.flatMap(e => e.tags || []))).sort());
+	let allTags = $derived(extractUniqueTags(expenses));
 
 	onMount(async () => {
 		await settingsStore.load();
@@ -72,7 +78,7 @@
 	});
 
 	async function loadExpenses() {
-		loading = true;
+		isLoading = true;
 		try {
 			// Load vehicles first to map vehicle info to expenses
 			const vehiclesResponse = await fetch('/api/vehicles');
@@ -85,10 +91,10 @@
 			const expensesResponse = await fetch('/api/expenses');
 			if (expensesResponse.ok) {
 				const expensesResult = await expensesResponse.json();
-				const allExpenses = expensesResult.data || [];
+				const allExpenses: Expense[] = expensesResult.data || [];
 
 				// Map vehicle info to each expense
-				expenses = allExpenses.map((expense: any) => ({
+				expenses = allExpenses.map(expense => ({
 					...expense,
 					vehicle: vehicles.find(v => v.id === expense.vehicleId)
 				}));
@@ -99,7 +105,7 @@
 		} catch (error) {
 			console.error('Failed to load expenses:', error);
 		} finally {
-			loading = false;
+			isLoading = false;
 		}
 	}
 
@@ -117,7 +123,7 @@
 			filtered = filtered.filter(
 				expense =>
 					expense.description?.toLowerCase().includes(term) ||
-					expense.tags?.some((tag: string) => tag.toLowerCase().includes(term)) ||
+					expense.tags?.some(tag => tag.toLowerCase().includes(term)) ||
 					expense.category.toLowerCase().includes(term) ||
 					expense.amount.toString().includes(term) ||
 					expense.vehicle?.make?.toLowerCase().includes(term) ||
@@ -216,7 +222,7 @@
 		filters = { ...filters, tags: selectedTags.length > 0 ? selectedTags : undefined };
 	}
 
-	async function handleDeleteExpense(deletedExpense: any) {
+	async function handleDeleteExpense(deletedExpense: ExpenseWithVehicle) {
 		expenses = expenses.filter(e => e.id !== deletedExpense.id);
 		applyFiltersAndSort();
 		calculateSummaryStats();
@@ -237,7 +243,7 @@
 	<meta name="description" content="Track and manage your vehicle expenses" />
 </svelte:head>
 
-{#if loading}
+{#if isLoading}
 	<div class="flex items-center justify-center py-12">
 		<div class="loading-spinner h-8 w-8"></div>
 	</div>
@@ -269,14 +275,16 @@
 							{#if selectedVehicle}
 								{getVehicleDisplayName(selectedVehicle)}
 							{:else}
-								All Vehicles
+								{COMMON_MESSAGES.ALL_VEHICLES}
 							{/if}
 						{:else}
-							All Vehicles
+							{COMMON_MESSAGES.ALL_VEHICLES}
 						{/if}
 					</Select.Trigger>
 					<Select.Content>
-						<Select.Item value="" label="All Vehicles">All Vehicles</Select.Item>
+						<Select.Item value="" label={COMMON_MESSAGES.ALL_VEHICLES}
+							>{COMMON_MESSAGES.ALL_VEHICLES}</Select.Item
+						>
 						{#each vehicles as vehicle (vehicle.id)}
 							<Select.Item value={vehicle.id} label={getVehicleDisplayName(vehicle)}>
 								{getVehicleDisplayName(vehicle)}
@@ -292,7 +300,7 @@
 			<div class="card-compact">
 				<div class="flex items-center justify-between">
 					<div>
-						<p class="text-sm font-medium text-gray-600">Total Expenses</p>
+						<p class="text-sm font-medium text-gray-600">{EXPENSE_MESSAGES.TOTAL_EXPENSES}</p>
 						<p class="text-2xl font-bold text-gray-900">
 							{formatCurrency(summaryStats.totalAmount)}
 						</p>
@@ -304,7 +312,7 @@
 			<div class="card-compact">
 				<div class="flex items-center justify-between">
 					<div>
-						<p class="text-sm font-medium text-gray-600">Total Count</p>
+						<p class="text-sm font-medium text-gray-600">{EXPENSE_MESSAGES.TOTAL_COUNT}</p>
 						<p class="text-2xl font-bold text-gray-900">{summaryStats.expenseCount}</p>
 					</div>
 					<FileText class="h-8 w-8 text-blue-600" />
@@ -314,7 +322,7 @@
 			<div class="card-compact">
 				<div class="flex items-center justify-between">
 					<div>
-						<p class="text-sm font-medium text-gray-600">Monthly Average</p>
+						<p class="text-sm font-medium text-gray-600">{EXPENSE_MESSAGES.MONTHLY_AVERAGE}</p>
 						<p class="text-2xl font-bold text-gray-900">
 							{formatCurrency(summaryStats.monthlyAverage)}
 						</p>
@@ -326,7 +334,7 @@
 			<div class="card-compact">
 				<div class="flex items-center justify-between">
 					<div>
-						<p class="text-sm font-medium text-gray-600">Last Expense</p>
+						<p class="text-sm font-medium text-gray-600">{EXPENSE_MESSAGES.LAST_EXPENSE}</p>
 						<p class="text-lg font-bold text-gray-900">
 							{summaryStats.lastExpenseDate ? formatDate(summaryStats.lastExpenseDate) : 'None'}
 						</p>
@@ -339,7 +347,9 @@
 		<!-- Category Summary -->
 		{#if Object.keys(summaryStats.categoryTotals).length > 0}
 			<div class="card">
-				<h3 class="text-lg font-semibold text-gray-900 mb-4">Expenses by Category</h3>
+				<h3 class="text-lg font-semibold text-gray-900 mb-4">
+					{EXPENSE_MESSAGES.EXPENSES_BY_CATEGORY}
+				</h3>
 				<div class="grid grid-cols-2 md:grid-cols-3 gap-4">
 					{#each Object.entries(summaryStats.categoryTotals) as [category, amount]}
 						{@const IconComponent = getCategoryIcon(category as ExpenseCategory)}
@@ -365,7 +375,7 @@
 				<div class="flex items-center gap-2 mb-4">
 					<Clock class="h-5 w-5 text-orange-500" />
 					<h2 class="text-lg font-semibold text-gray-900">
-						Pending Sync ({pendingExpenses.length})
+						{EXPENSE_MESSAGES.PENDING_SYNC} ({pendingExpenses.length})
 					</h2>
 				</div>
 
@@ -405,14 +415,14 @@
 		{#if syncedExpenses.length > 0}
 			<div class="card">
 				<div class="flex items-center gap-2 mb-4">
-					<CheckCircle class="h-5 w-5 text-green-500" />
+					<CircleCheck class="h-5 w-5 text-green-500" />
 					<h2 class="text-lg font-semibold text-gray-900">
-						Recently Synced ({syncedExpenses.length})
+						{EXPENSE_MESSAGES.RECENTLY_SYNCED} ({syncedExpenses.length})
 					</h2>
 				</div>
 
 				<div class="space-y-3">
-					{#each syncedExpenses.slice(0, 5) as expense}
+					{#each syncedExpenses.slice(0, DISPLAY_LIMITS.RECENT_SYNCED_EXPENSES) as expense}
 						<div
 							class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
 						>
@@ -429,7 +439,7 @@
 									{/if}
 								</div>
 							</div>
-							<CheckCircle class="h-4 w-4 text-green-500" />
+							<CircleCheck class="h-4 w-4 text-green-500" />
 						</div>
 					{/each}
 				</div>
@@ -447,7 +457,7 @@
 					<Input
 						type="text"
 						bind:value={searchTerm}
-						placeholder="Search expenses..."
+						placeholder={COMMON_MESSAGES.SEARCH_EXPENSES}
 						class="pl-10 w-full"
 					/>
 				</div>
@@ -489,11 +499,13 @@
 										{#if filters.category}
 											{categoryLabels[filters.category]}
 										{:else}
-											All Categories
+											{COMMON_MESSAGES.ALL_CATEGORIES}
 										{/if}
 									</Select.Trigger>
 									<Select.Content>
-										<Select.Item value="" label="All Categories">All Categories</Select.Item>
+										<Select.Item value="" label={COMMON_MESSAGES.ALL_CATEGORIES}
+											>{COMMON_MESSAGES.ALL_CATEGORIES}</Select.Item
+										>
 										{#each Object.entries(categoryLabels) as [value, label]}
 											<Select.Item {value} {label}>{label}</Select.Item>
 										{/each}
@@ -576,7 +588,7 @@
 				<div class="flex justify-end pt-2">
 					<button onclick={clearFilters} class="btn btn-outline inline-flex items-center gap-2">
 						<X class="h-4 w-4" />
-						Clear Filters
+						{COMMON_MESSAGES.CLEAR_FILTERS}
 					</button>
 				</div>
 			{/if}
@@ -596,9 +608,9 @@
 				showVehicleColumn={true}
 				returnTo="/expenses"
 				onDelete={handleDeleteExpense}
-				emptyTitle="No expenses yet"
-				emptyDescription="Start tracking your vehicle expenses to see insights and analytics."
-				emptyActionLabel="Add First Expense"
+				emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
+				emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
+				emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
 				emptyActionHref="/expenses/new"
 				scrollHeight="600px"
 				onClearFilters={clearFilters}
@@ -629,6 +641,6 @@
 		aria-label="Add expense"
 	>
 		<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
-		<span class="font-bold text-lg">Add Expense</span>
+		<span class="font-bold text-lg">{COMMON_MESSAGES.ADD_EXPENSE}</span>
 	</Button>
 {/if}

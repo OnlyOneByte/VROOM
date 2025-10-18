@@ -27,13 +27,14 @@
 		EmptyTitle
 	} from '$lib/components/ui/empty';
 	import type { Vehicle, Expense } from '$lib/types/index.js';
+	import type { VehicleStats } from '$lib/types/stats';
 
 	// Use automatic store subscription
 	let appState = $derived($appStore);
 	let searchTerm = $state('');
 	let selectedFilter = $state('all');
 	let vehicleExpenses = $state<Record<string, Expense[]>>({});
-	let vehicleStats = $state<Record<string, any>>({});
+	let vehicleStats = $state<Record<string, VehicleStats>>({});
 
 	let filteredVehicles = $derived(
 		appState.vehicles.filter((vehicle: Vehicle) => {
@@ -52,9 +53,9 @@
 			if (selectedFilter === 'all') return true;
 			if (selectedFilter === 'with-loans') return !!vehicle.financing?.isActive;
 			if (selectedFilter === 'recent') {
-				const oneMonthAgo = new Date();
-				oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-				return new Date(vehicle.createdAt) > oneMonthAgo;
+				const recentThreshold = new Date();
+				recentThreshold.setDate(recentThreshold.getDate() - VEHICLE_AGE_THRESHOLDS.RECENT);
+				return new Date(vehicle.createdAt) > recentThreshold;
 			}
 
 			return true;
@@ -66,9 +67,9 @@
 		const totalVehicles = appState.vehicles.length;
 		const activeLoans = appState.vehicles.filter((v: Vehicle) => v.financing?.isActive).length;
 
-		// Calculate total recent expenses (last 30 days)
+		// Calculate total recent expenses
 		const thirtyDaysAgo = new Date();
-		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - EXPENSE_PERIODS.RECENT);
 
 		let totalRecentExpenses = 0;
 		let totalExpenses = 0;
@@ -157,9 +158,9 @@
 
 	function calculateVehicleStats(vehicleId: string, expenses: Expense[]) {
 		const thirtyDaysAgo = new Date();
-		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - EXPENSE_PERIODS.RECENT);
 		const sixtyDaysAgo = new Date();
-		sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+		sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - EXPENSE_PERIODS.COMPARISON);
 
 		const recentExpenses = expenses.filter(e => new Date(e.date) > thirtyDaysAgo);
 		const previousMonthExpenses = expenses.filter(
@@ -257,6 +258,11 @@
 
 	import { formatCurrency, formatRelativeTime } from '$lib/utils/formatters';
 	import { getVehicleDisplayName, getFinancingProgress } from '$lib/utils/vehicle-helpers';
+	import {
+		MAINTENANCE_THRESHOLDS,
+		VEHICLE_AGE_THRESHOLDS,
+		EXPENSE_PERIODS
+	} from '$lib/constants/limits';
 
 	function navigateToVehicle(vehicleId: string) {
 		goto(`/vehicles/${vehicleId}`);
@@ -403,244 +409,246 @@
 	{:else}
 		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
 			{#each filteredVehicles as vehicle}
-				{@const stats = vehicleStats[vehicle.id] || {}}
-				<div
-					class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 group relative overflow-hidden border border-gray-100"
-				>
-					<!-- Gradient accent bar -->
+				{@const stats = vehicleStats[vehicle.id]}
+				{#if stats}
 					<div
-						class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 to-primary-600"
-					></div>
-
-					<!-- Clickable card area -->
-					<div
-						class="cursor-pointer"
-						onclick={() => navigateToVehicle(vehicle.id)}
-						role="button"
-						tabindex="0"
-						onkeydown={e => e.key === 'Enter' && navigateToVehicle(vehicle.id)}
+						class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 group relative overflow-hidden border border-gray-100"
 					>
-						<!-- Vehicle Header -->
-						<div class="flex items-start justify-between mb-4">
-							<div class="flex-1 min-w-0">
-								<div class="flex items-center gap-2 mb-1">
-									<h3 class="font-bold text-gray-900 text-lg truncate">
-										{getVehicleDisplayName(vehicle)}
-									</h3>
-									{#if vehicle.financing?.isActive}
-										<span
-											class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800"
-											title="Active {vehicle.financing.financingType === 'loan'
-												? 'Loan'
-												: vehicle.financing.financingType === 'lease'
-													? 'Lease'
-													: 'Financing'}"
+						<!-- Gradient accent bar -->
+						<div
+							class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 to-primary-600"
+						></div>
+
+						<!-- Clickable card area -->
+						<div
+							class="cursor-pointer"
+							onclick={() => navigateToVehicle(vehicle.id)}
+							role="button"
+							tabindex="0"
+							onkeydown={e => e.key === 'Enter' && navigateToVehicle(vehicle.id)}
+						>
+							<!-- Vehicle Header -->
+							<div class="flex items-start justify-between mb-4">
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-2 mb-1">
+										<h3 class="font-bold text-gray-900 text-lg truncate">
+											{getVehicleDisplayName(vehicle)}
+										</h3>
+										{#if vehicle.financing?.isActive}
+											<span
+												class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800"
+												title="Active {vehicle.financing.financingType === 'loan'
+													? 'Loan'
+													: vehicle.financing.financingType === 'lease'
+														? 'Lease'
+														: 'Financing'}"
+											>
+												{vehicle.financing.financingType === 'loan'
+													? 'Loan'
+													: vehicle.financing.financingType === 'lease'
+														? 'Lease'
+														: 'Financed'}
+											</span>
+										{/if}
+									</div>
+									<p class="text-sm text-gray-600 font-medium mb-1">
+										{vehicle.year}
+										{vehicle.make}
+										{vehicle.model}
+									</p>
+									{#if vehicle.licensePlate}
+										<p
+											class="text-xs text-gray-500 font-mono bg-gray-100 inline-block px-2 py-0.5 rounded"
 										>
-											{vehicle.financing.financingType === 'loan'
-												? 'Loan'
-												: vehicle.financing.financingType === 'lease'
-													? 'Lease'
-													: 'Financed'}
-										</span>
+											{vehicle.licensePlate}
+										</p>
 									{/if}
 								</div>
-								<p class="text-sm text-gray-600 font-medium mb-1">
-									{vehicle.year}
-									{vehicle.make}
-									{vehicle.model}
-								</p>
-								{#if vehicle.licensePlate}
-									<p
-										class="text-xs text-gray-500 font-mono bg-gray-100 inline-block px-2 py-0.5 rounded"
-									>
-										{vehicle.licensePlate}
-									</p>
-								{/if}
-							</div>
-							<div class="flex-shrink-0 ml-3">
-								<div
-									class="p-3 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 group-hover:from-primary-100 group-hover:to-primary-200 transition-all"
-								>
-									<Car class="h-6 w-6 text-primary-600" />
-								</div>
-							</div>
-						</div>
-
-						<!-- Key Metrics - Prominent Display -->
-						<div class="grid grid-cols-2 gap-3 mb-4">
-							<!-- Total Expenses -->
-							<div
-								class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border border-blue-200"
-							>
-								<div class="flex items-center gap-1 mb-1">
-									<DollarSign class="h-3.5 w-3.5 text-blue-600" />
-									<p class="text-xs font-medium text-blue-900">Total Spent</p>
-								</div>
-								<p class="font-bold text-gray-900 text-lg">
-									{formatCurrency(stats.totalExpenses || 0)}
-								</p>
-							</div>
-
-							<!-- Recent Expenses with Trend -->
-							<div
-								class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 border border-green-200"
-							>
-								<div class="flex items-center gap-1 mb-1">
-									<TrendingUp class="h-3.5 w-3.5 text-green-600" />
-									<p class="text-xs font-medium text-green-900">Last 30 Days</p>
-								</div>
-								<div class="flex items-baseline gap-2">
-									<p class="font-bold text-gray-900 text-lg">
-										{formatCurrency(stats.recentExpenses || 0)}
-									</p>
-									{#if stats.trend !== undefined && stats.trend !== 0}
-										<span
-											class="text-xs font-semibold {stats.trend > 0
-												? 'text-red-600'
-												: 'text-green-600'}"
-										>
-											{stats.trend > 0 ? '+' : ''}{stats.trend}%
-										</span>
-									{/if}
-								</div>
-							</div>
-
-							<!-- MPG or Expense Count -->
-							{#if stats.avgMpg > 0}
-								<div
-									class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 border border-purple-200"
-								>
-									<div class="flex items-center gap-1 mb-1">
-										<Fuel class="h-3.5 w-3.5 text-purple-600" />
-										<p class="text-xs font-medium text-purple-900">Avg MPG</p>
-									</div>
-									<p class="font-bold text-gray-900 text-lg">{stats.avgMpg}</p>
-								</div>
-							{:else}
-								<div
-									class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-3 border border-gray-200"
-								>
-									<div class="flex items-center gap-1 mb-1">
-										<Gauge class="h-3.5 w-3.5 text-gray-600" />
-										<p class="text-xs font-medium text-gray-900">Expenses</p>
-									</div>
-									<p class="font-bold text-gray-900 text-lg">{stats.expenseCount || 0}</p>
-								</div>
-							{/if}
-
-							<!-- Cost per Mile or Last Activity -->
-							{#if stats.costPerMile > 0}
-								<div
-									class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 border border-orange-200"
-								>
-									<div class="flex items-center gap-1 mb-1">
-										<Gauge class="h-3.5 w-3.5 text-orange-600" />
-										<p class="text-xs font-medium text-orange-900">Cost/Mile</p>
-									</div>
-									<p class="font-bold text-gray-900 text-lg">
-										${stats.costPerMile.toFixed(2)}
-									</p>
-								</div>
-							{:else}
-								<div
-									class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-3 border border-gray-200"
-								>
-									<div class="flex items-center gap-1 mb-1">
-										<Calendar class="h-3.5 w-3.5 text-gray-600" />
-										<p class="text-xs font-medium text-gray-900">Last Activity</p>
-									</div>
-									<p class="font-semibold text-gray-900 text-sm">
-										{formatRelativeTime(stats.lastExpenseDate)}
-									</p>
-								</div>
-							{/if}
-						</div>
-
-						<!-- Additional Details - Always Visible -->
-						<div class="space-y-2 mb-4">
-							<!-- Current Mileage -->
-							{#if stats.currentMileage > 0}
-								<div class="flex items-center justify-between text-sm">
-									<span class="text-gray-600 flex items-center gap-1.5">
-										<Gauge class="h-3.5 w-3.5" />
-										Current Mileage
-									</span>
-									<span class="text-gray-900 font-semibold">
-										{stats.currentMileage.toLocaleString()} mi
-									</span>
-								</div>
-							{/if}
-
-							<!-- Maintenance Info -->
-							{#if stats.daysSinceLastMaintenance !== null && stats.daysSinceLastMaintenance <= 60}
-								<div class="flex items-center justify-between text-sm">
-									<span class="text-gray-600 flex items-center gap-1.5">
-										<Wrench class="h-3.5 w-3.5" />
-										Last Service
-									</span>
-									<span class="text-gray-900 font-medium">
-										{formatRelativeTime(stats.lastMaintenanceDate)}
-									</span>
-								</div>
-							{/if}
-
-							<!-- Loan Progress -->
-							{#if vehicle.financing?.isActive}
-								{@const progressValue = getFinancingProgress(vehicle)}
-								<div class="pt-2 border-t border-gray-100">
-									<div class="flex items-center justify-between text-sm mb-2">
-										<span class="text-gray-600">Loan Balance</span>
-										<span class="text-gray-900 font-semibold">
-											{formatCurrency(vehicle.financing.currentBalance)}
-										</span>
-									</div>
-									<div class="flex justify-between text-xs text-gray-600 mb-1">
-										<span>Progress</span>
-										<span>{Math.round(progressValue)}% paid</span>
-									</div>
-									<Progress value={progressValue} class="h-1.5" />
-								</div>
-							{/if}
-						</div>
-
-						<!-- Maintenance Alert -->
-						{#if stats.daysSinceLastMaintenance !== null && stats.daysSinceLastMaintenance > 60}
-							<div class="mb-4">
-								{#if stats.daysSinceLastMaintenance > 90}
+								<div class="flex-shrink-0 ml-3">
 									<div
-										class="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg"
+										class="p-3 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 group-hover:from-primary-100 group-hover:to-primary-200 transition-all"
 									>
-										<CircleAlert class="h-4 w-4 text-red-600 flex-shrink-0" />
-										<p class="text-xs text-red-800 font-medium">
-											Maintenance overdue ({stats.daysSinceLastMaintenance} days)
+										<Car class="h-6 w-6 text-primary-600" />
+									</div>
+								</div>
+							</div>
+
+							<!-- Key Metrics - Prominent Display -->
+							<div class="grid grid-cols-2 gap-3 mb-4">
+								<!-- Total Expenses -->
+								<div
+									class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border border-blue-200"
+								>
+									<div class="flex items-center gap-1 mb-1">
+										<DollarSign class="h-3.5 w-3.5 text-blue-600" />
+										<p class="text-xs font-medium text-blue-900">Total Spent</p>
+									</div>
+									<p class="font-bold text-gray-900 text-lg">
+										{formatCurrency(stats.totalExpenses)}
+									</p>
+								</div>
+
+								<!-- Recent Expenses with Trend -->
+								<div
+									class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 border border-green-200"
+								>
+									<div class="flex items-center gap-1 mb-1">
+										<TrendingUp class="h-3.5 w-3.5 text-green-600" />
+										<p class="text-xs font-medium text-green-900">Last 30 Days</p>
+									</div>
+									<div class="flex items-baseline gap-2">
+										<p class="font-bold text-gray-900 text-lg">
+											{formatCurrency(stats.recentExpenses)}
+										</p>
+										{#if stats.trend !== 0}
+											<span
+												class="text-xs font-semibold {stats.trend > 0
+													? 'text-red-600'
+													: 'text-green-600'}"
+											>
+												{stats.trend > 0 ? '+' : ''}{stats.trend}%
+											</span>
+										{/if}
+									</div>
+								</div>
+
+								<!-- MPG or Expense Count -->
+								{#if stats.avgMpg > 0}
+									<div
+										class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 border border-purple-200"
+									>
+										<div class="flex items-center gap-1 mb-1">
+											<Fuel class="h-3.5 w-3.5 text-purple-600" />
+											<p class="text-xs font-medium text-purple-900">Avg MPG</p>
+										</div>
+										<p class="font-bold text-gray-900 text-lg">{stats.avgMpg}</p>
+									</div>
+								{:else}
+									<div
+										class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-3 border border-gray-200"
+									>
+										<div class="flex items-center gap-1 mb-1">
+											<Gauge class="h-3.5 w-3.5 text-gray-600" />
+											<p class="text-xs font-medium text-gray-900">Expenses</p>
+										</div>
+										<p class="font-bold text-gray-900 text-lg">{stats.expenseCount}</p>
+									</div>
+								{/if}
+
+								<!-- Cost per Mile or Last Activity -->
+								{#if stats.costPerMile > 0}
+									<div
+										class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 border border-orange-200"
+									>
+										<div class="flex items-center gap-1 mb-1">
+											<Gauge class="h-3.5 w-3.5 text-orange-600" />
+											<p class="text-xs font-medium text-orange-900">Cost/Mile</p>
+										</div>
+										<p class="font-bold text-gray-900 text-lg">
+											${stats.costPerMile.toFixed(2)}
 										</p>
 									</div>
 								{:else}
 									<div
-										class="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg"
+										class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-3 border border-gray-200"
 									>
-										<Wrench class="h-4 w-4 text-yellow-600 flex-shrink-0" />
-										<p class="text-xs text-yellow-800 font-medium">
-											Maintenance due soon ({stats.daysSinceLastMaintenance} days)
+										<div class="flex items-center gap-1 mb-1">
+											<Calendar class="h-3.5 w-3.5 text-gray-600" />
+											<p class="text-xs font-medium text-gray-900">Last Activity</p>
+										</div>
+										<p class="font-semibold text-gray-900 text-sm">
+											{formatRelativeTime(stats.lastExpenseDate)}
 										</p>
 									</div>
 								{/if}
 							</div>
-						{/if}
-					</div>
 
-					<!-- Action Button - Outside clickable area for better UX -->
-					<div class="pt-3 border-t border-gray-100">
-						<a
-							href="/vehicles/{vehicle.id}/expenses/new"
-							class="btn btn-primary w-full text-center text-sm inline-flex items-center justify-center gap-2 group/btn hover:scale-[1.02] active:scale-[0.98] transition-transform"
-							onclick={e => e.stopPropagation()}
-						>
-							<Plus class="h-4 w-4 group-hover/btn:rotate-90 transition-transform duration-300" />
-							<span class="font-semibold">Add Expense</span>
-						</a>
+							<!-- Additional Details - Always Visible -->
+							<div class="space-y-2 mb-4">
+								<!-- Current Mileage -->
+								{#if stats.currentMileage > 0}
+									<div class="flex items-center justify-between text-sm">
+										<span class="text-gray-600 flex items-center gap-1.5">
+											<Gauge class="h-3.5 w-3.5" />
+											Current Mileage
+										</span>
+										<span class="text-gray-900 font-semibold">
+											{stats.currentMileage.toLocaleString()} mi
+										</span>
+									</div>
+								{/if}
+
+								<!-- Maintenance Info -->
+								{#if stats.daysSinceLastMaintenance !== null && stats.daysSinceLastMaintenance <= MAINTENANCE_THRESHOLDS.DUE_SOON}
+									<div class="flex items-center justify-between text-sm">
+										<span class="text-gray-600 flex items-center gap-1.5">
+											<Wrench class="h-3.5 w-3.5" />
+											Last Service
+										</span>
+										<span class="text-gray-900 font-medium">
+											{formatRelativeTime(stats.lastMaintenanceDate)}
+										</span>
+									</div>
+								{/if}
+
+								<!-- Loan Progress -->
+								{#if vehicle.financing?.isActive}
+									{@const progressValue = getFinancingProgress(vehicle)}
+									<div class="pt-2 border-t border-gray-100">
+										<div class="flex items-center justify-between text-sm mb-2">
+											<span class="text-gray-600">Loan Balance</span>
+											<span class="text-gray-900 font-semibold">
+												{formatCurrency(vehicle.financing.currentBalance)}
+											</span>
+										</div>
+										<div class="flex justify-between text-xs text-gray-600 mb-1">
+											<span>Progress</span>
+											<span>{Math.round(progressValue)}% paid</span>
+										</div>
+										<Progress value={progressValue} class="h-1.5" />
+									</div>
+								{/if}
+							</div>
+
+							<!-- Maintenance Alert -->
+							{#if stats.daysSinceLastMaintenance !== null && stats.daysSinceLastMaintenance > MAINTENANCE_THRESHOLDS.DUE_SOON}
+								<div class="mb-4">
+									{#if stats.daysSinceLastMaintenance > MAINTENANCE_THRESHOLDS.OVERDUE}
+										<div
+											class="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg"
+										>
+											<CircleAlert class="h-4 w-4 text-red-600 flex-shrink-0" />
+											<p class="text-xs text-red-800 font-medium">
+												Maintenance overdue ({stats.daysSinceLastMaintenance} days)
+											</p>
+										</div>
+									{:else}
+										<div
+											class="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg"
+										>
+											<Wrench class="h-4 w-4 text-yellow-600 flex-shrink-0" />
+											<p class="text-xs text-yellow-800 font-medium">
+												Maintenance due soon ({stats.daysSinceLastMaintenance} days)
+											</p>
+										</div>
+									{/if}
+								</div>
+							{/if}
+						</div>
+
+						<!-- Action Button - Outside clickable area for better UX -->
+						<div class="pt-3 border-t border-gray-100">
+							<a
+								href="/vehicles/{vehicle.id}/expenses/new"
+								class="btn btn-primary w-full text-center text-sm inline-flex items-center justify-center gap-2 group/btn hover:scale-[1.02] active:scale-[0.98] transition-transform"
+								onclick={e => e.stopPropagation()}
+							>
+								<Plus class="h-4 w-4 group-hover/btn:rotate-90 transition-transform duration-300" />
+								<span class="font-semibold">Add Expense</span>
+							</a>
+						</div>
 					</div>
-				</div>
+				{/if}
 			{/each}
 		</div>
 	{/if}

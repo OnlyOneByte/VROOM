@@ -1,4 +1,5 @@
 import type { ExpenseCategory, Expense } from '$lib/types';
+import type { ComponentType } from 'svelte';
 import { Fuel, Wrench, CreditCard, DollarSign } from 'lucide-svelte';
 
 // Constants for validation
@@ -18,11 +19,13 @@ export const categoryLabels: Record<ExpenseCategory, string> = {
 	misc: 'Misc'
 };
 
-// Get icon for expense category
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getCategoryIcon(category: ExpenseCategory): any {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const icons: Record<ExpenseCategory, any> = {
+/**
+ * Get icon component for expense category
+ * @param category - The expense category
+ * @returns Lucide icon component
+ */
+export function getCategoryIcon(category: ExpenseCategory): ComponentType {
+	const icons: Record<ExpenseCategory, ComponentType> = {
 		fuel: Fuel,
 		maintenance: Wrench,
 		financial: CreditCard,

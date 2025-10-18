@@ -26,6 +26,16 @@ export class VroomError extends Error {
 	}
 }
 
+/**
+ * API-specific error class for HTTP errors
+ */
+export class ApiError extends VroomError {
+	constructor(message: string, statusCode: number, details?: Record<string, unknown>) {
+		super(message, 'API_ERROR', statusCode, details);
+		this.name = 'ApiError';
+	}
+}
+
 // Error type guards
 export function isVroomError(error: unknown): error is VroomError {
 	return error instanceof VroomError;
@@ -35,8 +45,13 @@ export function isNetworkError(error: unknown): boolean {
 	return error instanceof TypeError && error.message.includes('fetch');
 }
 
-// Error handling utilities
-export function handleApiError(error: unknown): AppError {
+/**
+ * Enhanced error handling with fallback message support
+ * @param error - The error to handle
+ * @param fallbackMessage - Optional fallback message if error is not descriptive
+ * @returns Standardized AppError object
+ */
+export function handleApiError(error: unknown, fallbackMessage?: string): AppError {
 	if (isVroomError(error)) {
 		return {
 			message: error.message,
@@ -54,8 +69,11 @@ export function handleApiError(error: unknown): AppError {
 		};
 	}
 
+	const message =
+		fallbackMessage || (error instanceof Error ? error.message : 'An unexpected error occurred');
+
 	return {
-		message: error instanceof Error ? error.message : 'An unexpected error occurred',
+		message,
 		code: 'UNKNOWN_ERROR'
 	};
 }

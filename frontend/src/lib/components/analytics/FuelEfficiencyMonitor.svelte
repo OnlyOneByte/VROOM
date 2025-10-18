@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { AlertTriangle, TrendingDown, TrendingUp, Fuel } from 'lucide-svelte';
+	import { TriangleAlert, TrendingDown, TrendingUp, Fuel } from 'lucide-svelte';
 	import { getFuelEfficiency } from '$lib/utils/analytics-api';
 	import FuelEfficiencyChart from '$lib/components/charts/FuelEfficiencyChart.svelte';
 
@@ -137,9 +137,9 @@
 			case 'efficiency_drop':
 				return TrendingDown;
 			case 'erratic_efficiency':
-				return AlertTriangle;
+				return TriangleAlert;
 			default:
-				return AlertTriangle;
+				return TriangleAlert;
 		}
 	}
 
@@ -184,7 +184,7 @@
 	{:else if error}
 		<div class="bg-red-50 border border-red-200 rounded-lg p-4">
 			<div class="flex items-center">
-				<AlertTriangle class="h-5 w-5 text-red-400 mr-2" />
+				<TriangleAlert class="h-5 w-5 text-red-400 mr-2" />
 				<div>
 					<h3 class="text-sm font-medium text-red-800">Error Loading Data</h3>
 					<p class="text-sm text-red-700">{error}</p>

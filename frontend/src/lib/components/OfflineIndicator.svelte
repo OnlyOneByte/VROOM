@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { isOnline, syncStatus, offlineExpenses } from '$lib/stores/offline';
 	import { syncOfflineExpenses } from '$lib/utils/offline-storage';
-	import { Wifi, WifiOff, RefreshCw, CheckCircle, CircleAlert } from 'lucide-svelte';
+	import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert } from 'lucide-svelte';
 	import { Badge } from '$lib/components/ui/badge';
 
 	let pendingCount = $derived($offlineExpenses.filter(expense => !expense.synced).length);
@@ -40,7 +40,7 @@
 			variant="default"
 			class="px-3 py-2 shadow-lg text-sm gap-2 bg-green-500 text-white border-transparent"
 		>
-			<CheckCircle size={16} />
+			<CircleCheck size={16} />
 			<span class="font-medium">Synced</span>
 		</Badge>
 	{:else if $syncStatus === 'error'}

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { authStore } from '$lib/stores/auth.js';
 	import { appStore } from '$lib/stores/app.js';
 	import { handleRouteProtection } from '$lib/utils/auth.js';
@@ -8,6 +8,7 @@
 	import { Toaster } from '$lib/components/ui/sonner';
 	import { toast } from 'svelte-sonner';
 	import OfflineIndicator from '$lib/components/OfflineIndicator.svelte';
+	import { NOTIFICATION_LIMITS } from '$lib/constants/limits';
 	import PWAInstallPrompt from '$lib/components/PWAInstallPrompt.svelte';
 	import SyncConflictResolver from '$lib/components/SyncConflictResolver.svelte';
 	import { registerServiceWorker } from '$lib/utils/pwa';
@@ -51,7 +52,7 @@
 
 	let authState = $derived($authStore);
 	let appState = $derived($appStore);
-	let currentPath = $derived($page.url.pathname);
+	let currentPath = $derived(page.url.pathname);
 	let showNavigation = $derived(authState.isAuthenticated && !authState.isLoading);
 	let isAuthPage = $derived(currentPath.startsWith('/auth'));
 
@@ -68,6 +69,14 @@
 			}
 
 			shownNotifications.add(notification.id);
+
+			// Prevent memory leak by limiting Set size
+			if (shownNotifications.size > NOTIFICATION_LIMITS.MAX_HISTORY) {
+				const oldestId = Array.from(shownNotifications)[0];
+				if (oldestId) {
+					shownNotifications.delete(oldestId);
+				}
+			}
 
 			const options = {
 				duration: notification.duration || 5000,

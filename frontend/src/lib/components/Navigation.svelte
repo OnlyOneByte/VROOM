@@ -80,12 +80,13 @@
 			{#snippet mobileStatusIcon()}
 				{@const statusInfo = getSyncStatusInfo()}
 				{@const StatusIcon = statusInfo.icon}
-				<div class="{statusInfo.color} relative">
+				<div class="{statusInfo.color} relative" role="status" aria-label="Sync status">
 					<StatusIcon class="h-5 w-5 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
 					{#if pendingCount > 0}
 						<Badge
 							variant="secondary"
 							class="absolute -top-1 -right-1 bg-yellow-500 text-white text-[10px] font-bold h-3.5 w-3.5 p-0 flex items-center justify-center border-transparent"
+							aria-label="{pendingCount} pending items"
 						>
 							{pendingCount > 9 ? '9+' : pendingCount}
 						</Badge>
@@ -97,6 +98,7 @@
 			<Sheet bind:open={mobileMenuOpen}>
 				<SheetTrigger
 					class="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+					aria-label="Open navigation menu"
 				>
 					<Menu class="h-6 w-6" />
 				</SheetTrigger>

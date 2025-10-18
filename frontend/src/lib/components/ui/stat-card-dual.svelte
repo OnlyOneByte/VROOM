@@ -1,11 +1,18 @@
 <script lang="ts">
 	interface Props {
+		/** Primary metric label */
 		label: string;
+		/** Primary metric value */
 		value: string | number;
+		/** Optional unit for primary metric */
 		unit?: string;
+		/** Optional secondary metric label */
 		secondaryLabel?: string;
+		/** Optional secondary metric value */
 		secondaryValue?: string | number;
+		/** Optional unit for secondary metric */
 		secondaryUnit?: string;
+		/** Additional CSS classes */
 		class?: string;
 	}
 
