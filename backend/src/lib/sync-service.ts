@@ -420,37 +420,37 @@ export class SyncService {
 
         // Insert backup data with proper type conversion
         if (parsedBackup.vehicles.length > 0) {
-          // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
           await tx
             .insert(vehicles)
+            // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
             .values(parsedBackup.vehicles.map((v: any) => convertCSVRow(v)) as any);
         }
 
         if (parsedBackup.expenses.length > 0) {
-          // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
           await tx
             .insert(expenses)
+            // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
             .values(parsedBackup.expenses.map((e: any) => convertCSVRow(e)) as any);
         }
 
         if (parsedBackup.financing.length > 0) {
-          // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
           await tx
             .insert(vehicleFinancing)
+            // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
             .values(parsedBackup.financing.map((f: any) => convertCSVRow(f)) as any);
         }
 
         if (parsedBackup.financingPayments.length > 0) {
-          // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
           await tx
             .insert(vehicleFinancingPayments)
+            // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
             .values(parsedBackup.financingPayments.map((p: any) => convertCSVRow(p)) as any);
         }
 
         if (parsedBackup.insurance.length > 0) {
-          // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
           await tx
             .insert(insurancePolicies)
+            // biome-ignore lint/suspicious/noExplicitAny: CSV data is dynamic
             .values(parsedBackup.insurance.map((i: any) => convertCSVRow(i)) as any);
         }
       });
@@ -830,37 +830,37 @@ export class SyncService {
 
         // Insert sheet data with proper type conversion
         if (sheetData.vehicles.length > 0) {
-          // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
           await tx
             .insert(vehicles)
+            // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
             .values(sheetData.vehicles.map((v: any) => convertCSVRow(v)) as any);
         }
 
         if (sheetData.expenses.length > 0) {
-          // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
           await tx
             .insert(expenses)
+            // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
             .values(sheetData.expenses.map((e: any) => convertCSVRow(e)) as any);
         }
 
         if (sheetData.financing.length > 0) {
-          // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
           await tx
             .insert(vehicleFinancing)
+            // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
             .values(sheetData.financing.map((f: any) => convertCSVRow(f)) as any);
         }
 
         if (sheetData.financingPayments.length > 0) {
-          // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
           await tx
             .insert(vehicleFinancingPayments)
+            // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
             .values(sheetData.financingPayments.map((p: any) => convertCSVRow(p)) as any);
         }
 
         if (sheetData.insurance.length > 0) {
-          // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
           await tx
             .insert(insurancePolicies)
+            // biome-ignore lint/suspicious/noExplicitAny: Sheet data is dynamic
             .values(sheetData.insurance.map((i: any) => convertCSVRow(i)) as any);
         }
       });
@@ -1067,9 +1067,7 @@ export class SyncService {
   }> {
     const { databaseService } = await import('./database');
     const { eq } = await import('drizzle-orm');
-    const { users, userSettings } = await import('../db/schema');
-    const { GoogleDriveService } = await import('./google-drive');
-    const { backupService } = await import('./backup-service');
+    const { userSettings } = await import('../db/schema');
 
     const db = databaseService.getDatabase();
 
@@ -1082,50 +1080,41 @@ export class SyncService {
 
     // If we already have a backup folder ID, use it
     if (settings.length > 0 && settings[0].googleDriveBackupFolderId) {
-      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-
-      if (!user.length || !user[0].googleRefreshToken) {
-        return {
-          hasBackupFolder: false,
-          existingBackups: [],
-        };
-      }
-
-      try {
-        const driveService = new GoogleDriveService(
-          user[0].googleRefreshToken,
-          user[0].googleRefreshToken
-        );
-
-        // List existing backups in the known backup folder
-        const existingBackups = await backupService.listBackupsInDrive(
-          driveService,
-          settings[0].googleDriveBackupFolderId
-        );
-
-        return {
-          hasBackupFolder: true,
-          backupFolderId: settings[0].googleDriveBackupFolderId,
-          existingBackups,
-        };
-      } catch (error) {
-        // If we can't access the folder, it might have been deleted
-        console.error('Error accessing backup folder:', error);
-        return {
-          hasBackupFolder: false,
-          existingBackups: [],
-        };
-      }
+      return await this.checkKnownBackupFolder(userId, settings[0].googleDriveBackupFolderId);
     }
 
-    // No backup folder ID stored - check if folder exists in Drive
+    // No backup folder ID stored - search for folder in Drive
+    return await this.searchForBackupFolder(userId);
+  }
+
+  /**
+   * Check a known backup folder ID for existing backups
+   */
+  private async checkKnownBackupFolder(
+    userId: string,
+    backupFolderId: string
+  ): Promise<{
+    hasBackupFolder: boolean;
+    backupFolderId?: string;
+    existingBackups: Array<{
+      id: string;
+      name: string;
+      createdTime?: string;
+      modifiedTime?: string;
+      size?: string;
+    }>;
+  }> {
+    const { databaseService } = await import('./database');
+    const { eq } = await import('drizzle-orm');
+    const { users } = await import('../db/schema');
+    const { GoogleDriveService } = await import('./google-drive');
+    const { backupService } = await import('./backup-service');
+
+    const db = databaseService.getDatabase();
     const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
     if (!user.length || !user[0].googleRefreshToken) {
-      return {
-        hasBackupFolder: false,
-        existingBackups: [],
-      };
+      return { hasBackupFolder: false, existingBackups: [] };
     }
 
     try {
@@ -1134,54 +1123,65 @@ export class SyncService {
         user[0].googleRefreshToken
       );
 
-      // Try to find existing VROOM folder (without creating it)
+      const existingBackups = await backupService.listBackupsInDrive(driveService, backupFolderId);
+
+      return {
+        hasBackupFolder: true,
+        backupFolderId,
+        existingBackups,
+      };
+    } catch (error) {
+      console.error('Error accessing backup folder:', error);
+      return { hasBackupFolder: false, existingBackups: [] };
+    }
+  }
+
+  /**
+   * Search for backup folder in Google Drive
+   */
+  private async searchForBackupFolder(userId: string): Promise<{
+    hasBackupFolder: boolean;
+    backupFolderId?: string;
+    existingBackups: Array<{
+      id: string;
+      name: string;
+      createdTime?: string;
+      modifiedTime?: string;
+      size?: string;
+    }>;
+  }> {
+    const { databaseService } = await import('./database');
+    const { eq } = await import('drizzle-orm');
+    const { users, userSettings } = await import('../db/schema');
+    const { GoogleDriveService } = await import('./google-drive');
+    const { backupService } = await import('./backup-service');
+
+    const db = databaseService.getDatabase();
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!user.length || !user[0].googleRefreshToken) {
+      return { hasBackupFolder: false, existingBackups: [] };
+    }
+
+    try {
+      const driveService = new GoogleDriveService(
+        user[0].googleRefreshToken,
+        user[0].googleRefreshToken
+      );
+
       const folderName = `VROOM Car Tracker - ${user[0].displayName}`;
-      const response = await driveService['drive'].files.list({
-        q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        fields: 'files(id, name)',
-      });
+      const mainFolderId = await this.findFolderId(driveService, folderName, null);
 
-      const folders = response.data.files;
-      if (!folders || folders.length === 0) {
-        // No VROOM folder exists yet
-        return {
-          hasBackupFolder: false,
-          existingBackups: [],
-        };
-      }
-
-      const mainFolderId = folders[0].id;
       if (!mainFolderId) {
-        return {
-          hasBackupFolder: false,
-          existingBackups: [],
-        };
+        return { hasBackupFolder: false, existingBackups: [] };
       }
 
-      // Check for Backups subfolder
-      const subFolderResponse = await driveService['drive'].files.list({
-        q: `'${mainFolderId}' in parents and name='Backups' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        fields: 'files(id, name)',
-      });
+      const backupFolderId = await this.findFolderId(driveService, 'Backups', mainFolderId);
 
-      const backupFolders = subFolderResponse.data.files;
-      if (!backupFolders || backupFolders.length === 0) {
-        // No Backups folder exists yet
-        return {
-          hasBackupFolder: false,
-          existingBackups: [],
-        };
-      }
-
-      const backupFolderId = backupFolders[0].id;
       if (!backupFolderId) {
-        return {
-          hasBackupFolder: false,
-          existingBackups: [],
-        };
+        return { hasBackupFolder: false, existingBackups: [] };
       }
 
-      // Found backup folder - list backups
       const existingBackups = await backupService.listBackupsInDrive(driveService, backupFolderId);
 
       // Store the backup folder ID for future use
@@ -1200,11 +1200,30 @@ export class SyncService {
       };
     } catch (error) {
       console.error('Error checking for existing backup folder:', error);
-      return {
-        hasBackupFolder: false,
-        existingBackups: [],
-      };
+      return { hasBackupFolder: false, existingBackups: [] };
     }
+  }
+
+  /**
+   * Find a folder ID by name and optional parent
+   */
+  private async findFolderId(
+    // biome-ignore lint/suspicious/noExplicitAny: GoogleDriveService has private drive property
+    driveService: any,
+    folderName: string,
+    parentId: string | null
+  ): Promise<string | null> {
+    const query = parentId
+      ? `'${parentId}' in parents and name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+      : `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+
+    const response = await driveService.drive.files.list({
+      q: query,
+      fields: 'files(id, name)',
+    });
+
+    const folders = response.data.files;
+    return folders && folders.length > 0 && folders[0].id ? folders[0].id : null;
   }
 
   /**
