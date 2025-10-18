@@ -3,9 +3,11 @@ import { cors } from 'hono/cors';
 import { csrf } from 'hono/csrf';
 import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
+import { secureHeaders } from 'hono/secure-headers';
 import { config } from './lib/config';
 import { activityTrackerMiddleware } from './lib/middleware/activity-tracker';
 import { optionalAuth, requireAuth } from './lib/middleware/auth';
+import { bodyLimit } from './lib/middleware/body-limit';
 import { errorHandler } from './lib/middleware/error-handler';
 import { rateLimiter } from './lib/middleware/rate-limiter';
 import { analytics } from './routes/analytics';
@@ -23,6 +25,37 @@ const app = new Hono();
 
 // Global error handler
 app.onError(errorHandler);
+
+// Body size limit middleware - prevents DoS attacks via large payloads
+app.use(
+  '*',
+  bodyLimit({
+    maxSize: 10 * 1024 * 1024, // 10MB
+    message: 'Request body too large',
+  })
+);
+
+// Security headers middleware - protects against common web vulnerabilities
+app.use(
+  '*',
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+    xFrameOptions: 'DENY',
+    xContentTypeOptions: 'nosniff',
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    strictTransportSecurity: 'max-age=31536000; includeSubDomains',
+  })
+);
 
 // Rate limiting middleware - global rate limiter
 app.use(
