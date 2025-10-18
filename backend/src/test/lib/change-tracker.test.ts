@@ -7,32 +7,42 @@ describe('ChangeTracker', () => {
   let testUserId: string;
 
   beforeEach(async () => {
-    // Create test user
-    const db = databaseService.getDatabase();
-    const [user] = await db
-      .insert(users)
-      .values({
-        email: `test-${Date.now()}@example.com`,
-        displayName: 'Test User',
-        provider: 'google',
-        providerId: `test-${Date.now()}`,
-      })
-      .returning();
+    try {
+      // Create test user
+      const db = databaseService.getDatabase();
+      const [user] = await db
+        .insert(users)
+        .values({
+          email: `test-${Date.now()}@example.com`,
+          displayName: 'Test User',
+          provider: 'google',
+          providerId: `test-${Date.now()}`,
+        })
+        .returning();
 
-    testUserId = user.id;
+      testUserId = user.id;
 
-    // Create user settings
-    await db.insert(userSettings).values({
-      userId: testUserId,
-    });
+      // Create user settings
+      await db.insert(userSettings).values({
+        userId: testUserId,
+      });
+    } catch (error) {
+      console.error('Error in beforeEach:', error);
+      throw error;
+    }
   });
 
   afterEach(async () => {
-    // Clean up
-    const db = databaseService.getDatabase();
-    const { eq } = await import('drizzle-orm');
-    await db.delete(userSettings).where(eq(userSettings.userId, testUserId));
-    await db.delete(users).where(eq(users.id, testUserId));
+    try {
+      // Clean up
+      const db = databaseService.getDatabase();
+      const { eq } = await import('drizzle-orm');
+      await db.delete(userSettings).where(eq(userSettings.userId, testUserId));
+      await db.delete(users).where(eq(users.id, testUserId));
+    } catch (error) {
+      console.error('Error in afterEach:', error);
+      // Don't throw here to avoid masking test failures
+    }
   });
 
   test('should mark data as changed', async () => {

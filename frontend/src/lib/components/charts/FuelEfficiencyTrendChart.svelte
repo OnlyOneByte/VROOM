@@ -8,7 +8,7 @@
 
 	// Chart configuration constants
 	const CHART_HEIGHT = 280;
-	const MIN_DATA_POINTS = 2;
+	const MIN_DATA_POINTS = 1;
 
 	interface FuelEfficiencyData {
 		date: Date;
@@ -74,7 +74,6 @@
 					x="date"
 					xScale={scaleTime()}
 					y="efficiency"
-					axis="x"
 					{series}
 					props={{
 						spline: { strokeWidth: 2 },
@@ -84,6 +83,11 @@
 									month: 'short',
 									day: 'numeric'
 								});
+							}
+						},
+						yAxis: {
+							format: (v: number) => {
+								return v.toFixed(1);
 							}
 						}
 					}}
@@ -100,7 +104,7 @@
 						Insufficient fuel data
 					{/snippet}
 					{#snippet description()}
-						Add at least {MIN_DATA_POINTS} fuel entries with mileage
+						Add at least 2 fuel entries with mileage and volume to calculate efficiency
 					{/snippet}
 				</EmptyState>
 			</div>

@@ -167,7 +167,8 @@ function convertCSVValue(value: string, fieldName: string): unknown {
     fieldName.includes('balance') ||
     fieldName.includes('Balance') ||
     fieldName === 'apr' ||
-    fieldName === 'gallons' ||
+    fieldName === 'volume' ||
+    fieldName === 'charge' ||
     fieldName === 'mileage' ||
     fieldName === 'initialMileage' ||
     fieldName === 'mileageLimit' ||

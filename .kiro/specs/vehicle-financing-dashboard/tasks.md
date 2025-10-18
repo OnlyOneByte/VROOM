@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Set up financing utilities and calculations
+- [x] 1. Set up financing utilities and calculations
   - Create `frontend/src/lib/utils/financing-calculations.ts` with core calculation functions
   - Implement amortization schedule generation function
   - Implement payment date calculation functions (next payment, payoff date)
@@ -22,7 +22,7 @@
   - Test basic chart rendering with sample data
   - _Requirements: 1.3, 3.1, 8.1_
 
-- [ ] 3. Create backend API endpoint for payment history
+- [x] 3. Create backend API endpoint for payment history
   - Add GET route `/api/vehicles/:vehicleId/financing/payments` in backend
   - Implement controller to fetch payments using `VehicleFinancingPaymentRepository`
   - Add authorization check to ensure user owns the vehicle

@@ -272,7 +272,7 @@
 						/>
 
 						<!-- Fuel Efficiency Trend Chart -->
-						{#if fuelEfficiencyData.length >= 2 && vehicle}
+						{#if vehicle}
 							<FuelEfficiencyTrendChart
 								data={fuelEfficiencyData}
 								fuelType={vehicle.vehicleType || 'gas'}

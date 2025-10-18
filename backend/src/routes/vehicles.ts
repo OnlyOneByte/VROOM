@@ -164,4 +164,40 @@ vehicles.delete('/:id', zValidator('param', vehicleParamsSchema), async (c) => {
   });
 });
 
+// GET /api/vehicles/:id/financing/payments - Get payment history for vehicle financing
+vehicles.get('/:id/financing/payments', zValidator('param', vehicleParamsSchema), async (c) => {
+  const user = c.get('user');
+  const { id } = c.req.valid('param');
+  const vehicleRepository = repositoryFactory.getVehicleRepository();
+  const financingRepository = repositoryFactory.getVehicleFinancingRepository();
+  const paymentRepository = repositoryFactory.getVehicleFinancingPaymentRepository();
+
+  // Check if vehicle exists and user has access
+  const vehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
+  if (!vehicle) {
+    throw new NotFoundError('Vehicle');
+  }
+
+  // Get financing for the vehicle
+  const financing = await financingRepository.findByVehicleId(id);
+  if (!financing) {
+    // No financing exists, return empty array
+    return c.json({
+      success: true,
+      data: [],
+      count: 0,
+      message: 'No financing found for this vehicle',
+    });
+  }
+
+  // Get all payments for the financing, sorted by date descending
+  const payments = await paymentRepository.findByFinancingId(financing.id);
+
+  return c.json({
+    success: true,
+    data: payments,
+    count: payments.length,
+  });
+});
+
 export { vehicles };

@@ -1,5 +1,4 @@
 import type { ExpenseCategory, Expense } from '$lib/types';
-import type { ComponentType } from 'svelte';
 import { Fuel, Wrench, CreditCard, DollarSign } from 'lucide-svelte';
 
 // Constants for validation
@@ -24,8 +23,8 @@ export const categoryLabels: Record<ExpenseCategory, string> = {
  * @param category - The expense category
  * @returns Lucide icon component
  */
-export function getCategoryIcon(category: ExpenseCategory): ComponentType {
-	const icons: Record<ExpenseCategory, ComponentType> = {
+export function getCategoryIcon(category: ExpenseCategory): any {
+	const icons: Record<ExpenseCategory, any> = {
 		fuel: Fuel,
 		maintenance: Wrench,
 		financial: CreditCard,
