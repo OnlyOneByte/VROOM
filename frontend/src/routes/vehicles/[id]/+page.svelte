@@ -9,8 +9,6 @@
 	import {
 		ArrowLeft,
 		Car,
-		Edit,
-		Plus,
 		DollarSign,
 		Gauge,
 		TrendingUp,
@@ -19,27 +17,15 @@
 		Wrench,
 		Search,
 		Filter,
-		Trash2,
-		SortAsc,
-		SortDesc,
 		X,
 		FileText,
 		Settings
 	} from 'lucide-svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import {
-		AlertDialog,
-		AlertDialogAction,
-		AlertDialogCancel,
-		AlertDialogContent,
-		AlertDialogDescription,
-		AlertDialogFooter,
-		AlertDialogHeader,
-		AlertDialogTitle
-	} from '$lib/components/ui/alert-dialog';
+
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
 	import type { Vehicle, Expense, ExpenseFilters, VehicleStats } from '$lib/types.js';
 
 	const vehicleId = $page.params.id;
@@ -50,9 +36,6 @@
 	let expenses = $state<Expense[]>([]);
 	let filteredExpenses = $state<Expense[]>([]);
 	let showFilters = $state(false);
-	let showDeleteModal = $state(false);
-	let expenseToDelete = $state<Expense | null>(null);
-	let isDeleting = $state(false);
 	let activeTab = $state('overview');
 	let vehicleStatsData = $state<VehicleStats | null>(null);
 	let selectedStatsPeriod = $state<'7d' | '30d' | '90d' | '1y' | 'all'>('all');
@@ -60,10 +43,6 @@
 	// Filters and search
 	let searchTerm = $state('');
 	let filters = $state<ExpenseFilters>({});
-
-	// Sorting
-	let sortBy = $state<'date' | 'amount' | 'type'>('date');
-	let sortOrder = $state<'asc' | 'desc'>('desc');
 
 	let vehicleStats = $state({
 		totalExpenses: 0,
@@ -190,26 +169,13 @@
 			filtered = filtered.filter(expense => new Date(expense.date) <= new Date(filters.endDate!));
 		}
 
-		// Apply sorting
-		filtered.sort((a, b) => {
-			let comparison = 0;
-
-			switch (sortBy) {
-				case 'date':
-					comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
-					break;
-				case 'amount':
-					comparison = a.amount - b.amount;
-					break;
-				case 'type':
-					comparison = a.category.localeCompare(b.category);
-					break;
-			}
-
-			return sortOrder === 'asc' ? comparison : -comparison;
-		});
-
 		filteredExpenses = filtered;
+	}
+
+	async function handleDeleteExpense(deletedExpense: Expense) {
+		expenses = expenses.filter(e => e.id !== deletedExpense.id);
+		applyFiltersAndSort();
+		calculateStats();
 	}
 
 	function calculateStats() {
@@ -288,65 +254,10 @@
 		};
 	}
 
-	function handleSort(newSortBy: typeof sortBy) {
-		if (sortBy === newSortBy) {
-			sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-		} else {
-			sortBy = newSortBy;
-			sortOrder = 'desc';
-		}
-		applyFiltersAndSort();
-	}
-
 	function clearFilters() {
 		searchTerm = '';
 		filters = {};
 		applyFiltersAndSort();
-	}
-
-	function confirmDelete(expense: Expense) {
-		expenseToDelete = expense;
-		showDeleteModal = true;
-	}
-
-	async function deleteExpense() {
-		if (!expenseToDelete) return;
-
-		isDeleting = true;
-
-		try {
-			const response = await fetch(`/api/expenses/${expenseToDelete.id}`, {
-				method: 'DELETE',
-				credentials: 'include'
-			});
-
-			if (response.ok) {
-				expenses = expenses.filter(e => e.id !== expenseToDelete!.id);
-				applyFiltersAndSort();
-				calculateStats();
-
-				appStore.addNotification({
-					type: 'success',
-					message: 'Expense deleted successfully'
-				});
-			} else {
-				const result = await response.json();
-				appStore.addNotification({
-					type: 'error',
-					message: result.message || 'Failed to delete expense'
-				});
-			}
-		} catch (error) {
-			console.error('Error deleting expense:', error);
-			appStore.addNotification({
-				type: 'error',
-				message: 'Network error. Please try again.'
-			});
-		} finally {
-			isDeleting = false;
-			showDeleteModal = false;
-			expenseToDelete = null;
-		}
 	}
 
 	// Reactive updates
@@ -765,123 +676,27 @@
 						<h2 class="text-lg font-semibold text-gray-900">
 							All Expenses ({filteredExpenses.length})
 						</h2>
-
-						<!-- Sort Controls -->
-						<div class="flex gap-2">
-							<button
-								onclick={() => handleSort('date')}
-								class="btn btn-outline btn-sm inline-flex items-center gap-1"
-							>
-								Date
-								{#if sortBy === 'date'}
-									{@const SortIcon = sortOrder === 'asc' ? SortAsc : SortDesc}
-									<SortIcon class="h-3 w-3" />
-								{/if}
-							</button>
-							<button
-								onclick={() => handleSort('amount')}
-								class="btn btn-outline btn-sm inline-flex items-center gap-1"
-							>
-								Amount
-								{#if sortBy === 'amount'}
-									{@const SortIcon = sortOrder === 'asc' ? SortAsc : SortDesc}
-									<SortIcon class="h-3 w-3" />
-								{/if}
-							</button>
-						</div>
 					</div>
 
-					{#if filteredExpenses.length === 0}
-						<div class="text-center py-8">
-							{#if expenses.length === 0}
-								<DollarSign class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-								<h3 class="text-lg font-medium text-gray-900 mb-2">No expenses yet</h3>
-								<p class="text-gray-600">Start tracking expenses for this vehicle</p>
-							{:else}
-								<Search class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-								<h3 class="text-lg font-medium text-gray-900 mb-2">No matching expenses</h3>
-								<p class="text-gray-600 mb-4">Try adjusting your search or filters</p>
-								<button onclick={clearFilters} class="btn btn-outline"> Clear Filters </button>
-							{/if}
-						</div>
-					{:else}
-						<div class="space-y-3">
-							{#each filteredExpenses as expense}
-								{@const IconComponent = getCategoryIcon(expense.category)}
-								<div
-									class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-								>
-									<div class="flex items-center gap-4 flex-1">
-										<div class="p-2 rounded-lg {getCategoryColor(expense.category)}">
-											<IconComponent class="h-5 w-5" />
-										</div>
-
-										<div class="flex-1 min-w-0">
-											<div class="flex items-center gap-2 mb-1">
-												<h4 class="font-medium text-gray-900 truncate">
-													{expense.description || categoryLabels[expense.category] || 'Expense'}
-												</h4>
-												{#if expense.tags && expense.tags.length > 0}
-													<span
-														class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800"
-													>
-														{expense.tags[0]}
-													</span>
-												{/if}
-											</div>
-											<div class="flex items-center gap-4 text-sm text-gray-600">
-												<span>{formatDate(new Date(expense.date))}</span>
-												{#if expense.mileage}
-													<span>{expense.mileage.toLocaleString()} mi</span>
-												{/if}
-												{#if expense.volume}
-													<span
-														>{expense.volume}
-														{getVolumeUnitLabel(
-															$settingsStore.settings?.volumeUnit || 'gallons_us',
-															true
-														)}</span
-													>
-												{/if}
-												{#if expense.charge}
-													<span
-														>{expense.charge}
-														{getChargeUnitLabel(
-															$settingsStore.settings?.chargeUnit || 'kwh',
-															true
-														)}</span
-													>
-												{/if}
-											</div>
-										</div>
-									</div>
-
-									<div class="flex items-center gap-3">
-										<span class="text-lg font-bold text-gray-900">
-											{formatCurrency(expense.amount)}
-										</span>
-
-										<div class="flex items-center gap-1">
-											<a
-												href="/expenses/{expense.id}/edit?returnTo=/vehicles/{vehicleId}"
-												class="btn btn-outline btn-sm p-2"
-												title="Edit expense"
-											>
-												<Edit class="h-4 w-4" />
-											</a>
-											<button
-												onclick={() => confirmDelete(expense)}
-												class="btn btn-outline btn-sm p-2 text-red-600 hover:text-red-700 hover:border-red-300"
-												title="Delete expense"
-											>
-												<Trash2 class="h-4 w-4" />
-											</button>
-										</div>
-									</div>
-								</div>
-							{/each}
-						</div>
-					{/if}
+					<ExpensesTable
+						expenses={filteredExpenses}
+						showVehicleColumn={false}
+						returnTo="/vehicles/{vehicleId}"
+						onDelete={handleDeleteExpense}
+						emptyTitle="No expenses yet"
+						emptyDescription="Start tracking expenses for this vehicle"
+						emptyActionLabel="Add Expense"
+						emptyActionHref="/expenses/new?vehicleId={vehicleId}"
+						scrollHeight="600px"
+						onClearFilters={clearFilters}
+						hasActiveFilters={!!(
+							searchTerm ||
+							filters.category ||
+							filters.tags?.length ||
+							filters.startDate ||
+							filters.endDate
+						)}
+					/>
 				</div>
 			</TabsContent>
 
@@ -1042,67 +857,6 @@
 			</TabsContent>
 		</Tabs>
 	</div>
-
-	<!-- Floating Action Button -->
-	<Button
-		href="/vehicles/{vehicleId}/expenses/new"
-		class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto sm:rounded-full rounded-full group !bg-gradient-to-r !from-primary-600 !to-primary-700 hover:!from-primary-700 hover:!to-primary-800 !text-white shadow-2xl hover:shadow-primary-500/50 transition-all duration-300 sm:hover:scale-110 !z-50 h-16 sm:h-16 !pl-6 !pr-10 !border-0 !justify-center"
-	>
-		<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
-		<span class="font-bold text-lg">Add Expense</span>
-	</Button>
-
-	<!-- Delete Confirmation AlertDialog -->
-	<AlertDialog bind:open={showDeleteModal}>
-		<AlertDialogContent>
-			<AlertDialogHeader>
-				<AlertDialogTitle>Delete Expense</AlertDialogTitle>
-				<AlertDialogDescription>
-					Are you sure you want to delete this expense? This action cannot be undone.
-				</AlertDialogDescription>
-			</AlertDialogHeader>
-
-			{#if expenseToDelete}
-				{@const IconComponent = getCategoryIcon(expenseToDelete.category)}
-				<div class="bg-gray-50 rounded-lg p-3">
-					<div class="flex items-center gap-3">
-						<div class="p-2 rounded-lg {getCategoryColor(expenseToDelete.category)}">
-							<IconComponent class="h-4 w-4" />
-						</div>
-						<div>
-							<p class="font-medium text-gray-900">
-								{expenseToDelete.description ||
-									categoryLabels[expenseToDelete.category] ||
-									'Expense'}
-							</p>
-							<p class="text-sm text-gray-600">
-								{formatDate(new Date(expenseToDelete.date))} • {formatCurrency(
-									expenseToDelete.amount
-								)}
-							</p>
-						</div>
-					</div>
-				</div>
-			{/if}
-
-			<AlertDialogFooter>
-				<AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-				<AlertDialogAction
-					onclick={deleteExpense}
-					disabled={isDeleting}
-					class="bg-red-600 hover:bg-red-700 text-white"
-				>
-					{#if isDeleting}
-						<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-						Deleting...
-					{:else}
-						<Trash2 class="h-4 w-4 mr-2" />
-						Delete
-					{/if}
-				</AlertDialogAction>
-			</AlertDialogFooter>
-		</AlertDialogContent>
-	</AlertDialog>
 {:else}
 	<div class="text-center py-12">
 		<Car class="h-12 w-12 text-gray-400 mx-auto mb-4" />
