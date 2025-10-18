@@ -23,7 +23,7 @@
 	let currentPath = $derived(page.url.pathname);
 
 	const navigation = [
-		{ name: 'Dashboard', href: '/vehicles', icon: House },
+		{ name: 'Dashboard', href: '/dashboard', icon: House },
 		{ name: 'Expenses', href: '/expenses', icon: Receipt },
 		{ name: 'Analytics', href: '/analytics', icon: ChartColumn },
 		{ name: 'Trips', href: '/trips', icon: MapPin }
@@ -35,8 +35,8 @@
 	];
 
 	function isActive(href: string): boolean {
-		if (href === '/vehicles') {
-			return currentPath === '/' || currentPath === '/vehicles';
+		if (href === '/dashboard') {
+			return currentPath === '/' || currentPath === '/dashboard';
 		}
 		return currentPath.startsWith(href);
 	}

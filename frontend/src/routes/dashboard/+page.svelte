@@ -6,14 +6,14 @@
 		Plus,
 		Car,
 		Search,
-		Filter,
+		ListFilter,
 		DollarSign,
 		Gauge,
 		TrendingUp,
 		Calendar,
 		Fuel,
 		Wrench,
-		AlertCircle,
+		CircleAlert,
 		ArrowRight
 	} from 'lucide-svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
@@ -354,7 +354,7 @@
 			</select>
 
 			<button class="btn btn-secondary inline-flex items-center gap-2 desktop-only">
-				<Filter class="h-4 w-4" />
+				<ListFilter class="h-4 w-4" />
 				More Filters
 			</button>
 		</div>
@@ -564,7 +564,7 @@
 						<div class="mb-3">
 							{#if stats.daysSinceLastMaintenance > 90}
 								<div class="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
-									<AlertCircle class="h-4 w-4 text-red-600 flex-shrink-0" />
+									<CircleAlert class="h-4 w-4 text-red-600 flex-shrink-0" />
 									<p class="text-xs text-red-800 font-medium">
 										Maintenance overdue ({stats.daysSinceLastMaintenance} days)
 									</p>

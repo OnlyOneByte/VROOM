@@ -2,7 +2,7 @@ import { goto } from '$app/navigation';
 import { authStore } from '$lib/stores/auth.js';
 
 // Protected routes that require authentication
-export const protectedRoutes = ['/vehicles', '/expenses', '/analytics', '/settings'];
+export const protectedRoutes = ['/dashboard', '/vehicles', '/expenses', '/analytics', '/settings'];
 
 // Public routes that redirect to vehicles if authenticated
 export const publicRoutes = ['/auth'];
@@ -24,7 +24,7 @@ export function handleRouteProtection(
 
 	// Handle root path
 	if (pathname === '/') {
-		goto(isAuthenticated ? '/vehicles' : '/auth');
+		goto(isAuthenticated ? '/dashboard' : '/auth');
 		return;
 	}
 

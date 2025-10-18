@@ -16,7 +16,7 @@
 		Fuel,
 		Wrench,
 		Search,
-		Filter,
+		ListFilter,
 		X,
 		FileText,
 		Settings
@@ -76,16 +76,17 @@
 				credentials: 'include'
 			});
 
-			if (response.ok) {
-				const result = await response.json();
-				vehicle = result.data || result;
-			} else {
+			if (!response.ok) {
 				appStore.addNotification({
 					type: 'error',
 					message: 'Vehicle not found'
 				});
-				goto('/vehicles');
+				goto('/dashboard');
+				return;
 			}
+
+			const result = await response.json();
+			vehicle = result.data || result;
 		} catch {
 			appStore.addNotification({
 				type: 'error',
@@ -609,7 +610,7 @@
 							onclick={() => (showFilters = !showFilters)}
 							class="btn btn-outline inline-flex items-center gap-2"
 						>
-							<Filter class="h-4 w-4" />
+							<ListFilter class="h-4 w-4" />
 							Filters
 						</button>
 					</div>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { isOnline, syncStatus, offlineExpenses } from '$lib/stores/offline';
 	import { syncOfflineExpenses } from '$lib/utils/offline-storage';
-	import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-svelte';
+	import { Wifi, WifiOff, RefreshCw, CheckCircle, CircleAlert } from 'lucide-svelte';
 	import { Badge } from '$lib/components/ui/badge';
 
 	let pendingCount = $derived($offlineExpenses.filter(expense => !expense.synced).length);
@@ -46,7 +46,7 @@
 	{:else if $syncStatus === 'error'}
 		<!-- Error indicator -->
 		<Badge variant="destructive" class="px-3 py-2 shadow-lg text-sm gap-2">
-			<AlertCircle size={16} />
+			<CircleAlert size={16} />
 			<span class="font-medium">Sync failed</span>
 			<button onclick={handleSync} class="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs">
 				Retry

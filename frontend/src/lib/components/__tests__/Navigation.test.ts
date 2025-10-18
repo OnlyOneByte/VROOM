@@ -88,7 +88,7 @@ describe('Navigation Component Logic', () => {
 		// Test dashboard active states
 		expect(isActive('/dashboard', '/')).toBe(true);
 		expect(isActive('/dashboard', '/dashboard')).toBe(true);
-		expect(isActive('/dashboard', '/vehicles')).toBe(false);
+		expect(isActive('/dashboard', '/expenses')).toBe(false);
 
 		// Test other routes
 		expect(isActive('/vehicles', '/vehicles')).toBe(true);

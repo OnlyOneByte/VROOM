@@ -7,7 +7,7 @@
 		Calendar,
 		DollarSign,
 		Search,
-		Filter,
+		ListFilter,
 		FileText,
 		TrendingUp,
 		X,
@@ -461,7 +461,7 @@
 						class="flex items-center justify-between w-full py-3 hover:bg-gray-50 transition-colors rounded-lg px-2"
 					>
 						<div class="flex items-center gap-2">
-							<Filter class="h-4 w-4 text-gray-600" />
+							<ListFilter class="h-4 w-4 text-gray-600" />
 							<span class="font-medium text-gray-900">Category & Date Filters</span>
 						</div>
 						<ChevronDown

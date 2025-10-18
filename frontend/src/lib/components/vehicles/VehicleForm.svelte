@@ -130,7 +130,7 @@
 				type: 'error',
 				message: 'Error loading vehicle'
 			});
-			goto('/vehicles');
+			goto('/dashboard');
 		} finally {
 			isLoading = false;
 		}

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Filter, Download, RefreshCw } from 'lucide-svelte';
+	import { ListFilter, Download, RefreshCw } from 'lucide-svelte';
 	import {
 		getDashboardAnalytics,
 		getTrendData,
@@ -156,7 +156,7 @@
 	<!-- Filters -->
 	<div class="bg-white p-4 rounded-lg shadow border">
 		<div class="flex items-center space-x-2 mb-4">
-			<Filter class="h-5 w-5 text-gray-400" />
+			<ListFilter class="h-5 w-5 text-gray-400" />
 			<h3 class="text-lg font-medium text-gray-900">Filters</h3>
 		</div>
 

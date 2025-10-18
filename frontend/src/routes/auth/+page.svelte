@@ -3,7 +3,7 @@
 	import { authStore } from '$lib/stores/auth.js';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import { Loader2 } from 'lucide-svelte';
+	import { LoaderCircle } from 'lucide-svelte';
 
 	let isLoading = false;
 
@@ -58,7 +58,7 @@
 					onclick={handleGoogleLogin}
 				>
 					{#if isLoading}
-						<Loader2 class="mr-2 h-5 w-5 animate-spin" />
+						<LoaderCircle class="mr-2 h-5 w-5 animate-spin" />
 						Signing in...
 					{:else}
 						<svg class="mr-2 h-5 w-5" viewBox="0 0 24 24">
