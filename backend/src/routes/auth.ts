@@ -139,6 +139,39 @@ auth.get('/callback/google', async (c) => {
     }
   }
 
+  // Check for existing Google Drive backups and auto-enable if found
+  try {
+    const { syncService } = await import('../lib/sync-service');
+    const backupCheck = await syncService.checkExistingGoogleDriveBackups(userId);
+
+    if (backupCheck.hasBackupFolder && backupCheck.existingBackups.length > 0) {
+      // Auto-enable Google Drive backup if backups exist
+      const { userSettings } = await import('../db/schema');
+      const updateData: {
+        googleDriveBackupEnabled: boolean;
+        googleDriveBackupFolderId?: string;
+        updatedAt: Date;
+      } = {
+        googleDriveBackupEnabled: true,
+        updatedAt: new Date(),
+      };
+
+      // Store the backup folder ID if we found it
+      if (backupCheck.backupFolderId) {
+        updateData.googleDriveBackupFolderId = backupCheck.backupFolderId;
+      }
+
+      await db.update(userSettings).set(updateData).where(eq(userSettings.userId, userId));
+
+      console.log(
+        `Auto-enabled Google Drive backup for user ${userId} - found ${backupCheck.existingBackups.length} existing backup(s) in folder ${backupCheck.backupFolderId}`
+      );
+    }
+  } catch (error) {
+    // Don't fail login if backup check fails
+    console.error('Error checking for existing backups during login:', error);
+  }
+
   // Create session
   const lucia = getLucia();
   const session = await lucia.createSession(userId, {});
@@ -173,6 +206,55 @@ auth.get('/me', async (c) => {
 
   if (!session) {
     throw new HTTPException(401, { message: 'Invalid session' });
+  }
+
+  // Check for existing Google Drive backups and auto-enable if found (only once per session)
+  try {
+    const { databaseService } = await import('../lib/database');
+    const { userSettings } = await import('../db/schema');
+    const db = databaseService.getDatabase();
+
+    // Get current settings
+    const settings = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, user.id))
+      .limit(1);
+
+    // Only check if backup is disabled and we haven't checked yet (no folder ID stored)
+    if (
+      settings.length > 0 &&
+      !settings[0].googleDriveBackupEnabled &&
+      !settings[0].googleDriveBackupFolderId
+    ) {
+      const { syncService } = await import('../lib/sync-service');
+      const backupCheck = await syncService.checkExistingGoogleDriveBackups(user.id);
+
+      if (backupCheck.hasBackupFolder && backupCheck.existingBackups.length > 0) {
+        // Auto-enable Google Drive backup if backups exist
+        const updateData: {
+          googleDriveBackupEnabled: boolean;
+          googleDriveBackupFolderId?: string;
+          updatedAt: Date;
+        } = {
+          googleDriveBackupEnabled: true,
+          updatedAt: new Date(),
+        };
+
+        if (backupCheck.backupFolderId) {
+          updateData.googleDriveBackupFolderId = backupCheck.backupFolderId;
+        }
+
+        await db.update(userSettings).set(updateData).where(eq(userSettings.userId, user.id));
+
+        console.log(
+          `Auto-enabled Google Drive backup for user ${user.id} - found ${backupCheck.existingBackups.length} existing backup(s) in folder ${backupCheck.backupFolderId}`
+        );
+      }
+    }
+  } catch (error) {
+    // Don't fail the /me request if backup check fails
+    console.error('Error checking for existing backups in /me endpoint:', error);
   }
 
   return c.json({
