@@ -91,7 +91,7 @@
 				type: 'error',
 				message: 'Error loading vehicle'
 			});
-			goto('/vehicles');
+			goto('/dashboard');
 		}
 	}
 
@@ -321,7 +321,7 @@
 		<!-- Header -->
 		<div class="flex items-center gap-4">
 			<button
-				onclick={() => goto('/vehicles')}
+				onclick={() => goto('/dashboard')}
 				class="btn btn-secondary p-2 transition-all duration-200 hover:bg-primary-100 hover:border-primary-300 hover:scale-110"
 			>
 				<ArrowLeft class="h-4 w-4 transition-colors duration-200 hover:text-primary-700" />
@@ -864,6 +864,6 @@
 		<p class="text-gray-600 mb-4">
 			The vehicle you're looking for doesn't exist or you don't have access to it.
 		</p>
-		<button onclick={() => goto('/vehicles')} class="btn btn-primary"> Back to Vehicles </button>
+		<button onclick={() => goto('/dashboard')} class="btn btn-primary"> Back to Dashboard </button>
 	</div>
 {/if}

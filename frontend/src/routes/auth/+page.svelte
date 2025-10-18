@@ -13,7 +13,7 @@
 	// Redirect if already authenticated
 	$effect(() => {
 		if (!authState.isLoading && authState.isAuthenticated) {
-			goto('/vehicles');
+			goto('/dashboard');
 		}
 	});
 

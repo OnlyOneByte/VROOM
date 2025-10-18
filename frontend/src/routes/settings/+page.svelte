@@ -224,6 +224,7 @@
 		selectedDriveBackup = null;
 		restorePreview = null;
 		restoreConflicts = [];
+		restoreMode = 'replace';
 		await loadDriveBackups();
 	}
 

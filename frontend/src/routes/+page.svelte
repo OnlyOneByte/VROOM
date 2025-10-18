@@ -17,7 +17,7 @@
 		if (!authState.isLoading && showContent) {
 			const timer = setTimeout(() => {
 				if (authState.isAuthenticated) {
-					goto('/vehicles');
+					goto('/dashboard');
 				} else {
 					goto('/auth');
 				}

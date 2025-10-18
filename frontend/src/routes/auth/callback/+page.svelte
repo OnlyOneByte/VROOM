@@ -41,7 +41,7 @@
 			if (authState.isAuthenticated) {
 				status = 'success';
 				setTimeout(() => {
-					goto('/vehicles');
+					goto('/dashboard');
 				}, 1000);
 			} else if (status === 'processing') {
 				status = 'error';

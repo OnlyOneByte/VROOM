@@ -36,7 +36,7 @@ export function handleRouteProtection(
 
 	// Handle public routes
 	if (isPublicRoute(pathname) && isAuthenticated) {
-		goto('/vehicles');
+		goto('/dashboard');
 	}
 }
 

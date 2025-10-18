@@ -104,7 +104,7 @@
 					type: 'error',
 					message: 'Vehicle not found'
 				});
-				goto('/vehicles');
+				goto('/dashboard');
 				return;
 			}
 
@@ -430,7 +430,7 @@
 					type: 'success',
 					message: 'Vehicle added successfully!'
 				});
-				goto('/vehicles');
+				goto('/dashboard');
 			}
 		} catch (error) {
 			console.error('Error submitting vehicle:', error);
@@ -462,7 +462,7 @@
 					type: 'success',
 					message: 'Vehicle deleted successfully'
 				});
-				goto('/vehicles');
+				goto('/dashboard');
 			} else {
 				const errorData = await response.json();
 				appStore.addNotification({
@@ -492,7 +492,7 @@
 		if (isEditMode) {
 			goto(`/vehicles/${vehicleId}`);
 		} else {
-			goto('/vehicles');
+			goto('/dashboard');
 		}
 	}
 </script>
