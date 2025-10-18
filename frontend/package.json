@@ -50,6 +50,7 @@
 		"globals": "^16.4.0",
 		"happy-dom": "^20.0.1",
 		"jsdom": "^27.0.0",
+		"layerchart": "^2.0.0-next.27",
 		"mode-watcher": "^1.1.0",
 		"postcss": "^8.5.6",
 		"prettier": "^3.4.2",
@@ -71,8 +72,8 @@
 		"@tailwindcss/postcss": "^4.1.14",
 		"bits-ui": "^2.11.7",
 		"d3": "^7.9.0",
-		"layerchart": "^1.0.12",
 		"lucide-svelte": "^0.545.0",
+		"recharts": "^3.3.0",
 		"superforms": "^0.0.1",
 		"sveltekit-superforms": "^2.27.2",
 		"zod": "^4.1.12"

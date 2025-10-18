@@ -1,18 +1,21 @@
 <script lang="ts">
-	import { Chart, Svg, Area, Axis, Tooltip } from 'layerchart';
-	import {
-		Card,
-		CardHeader,
-		CardTitle,
-		CardDescription,
-		CardContent
-	} from '$lib/components/ui/card';
+	import { AreaChart } from 'layerchart';
+	import { scaleTime } from 'd3-scale';
+	import * as Card from '$lib/components/ui/card';
+	import * as Chart from '$lib/components/ui/chart';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/ui/empty-state.svelte';
 
 	// Chart configuration constants
-	const CHART_HEIGHT = 300;
-	const CHART_PADDING = { left: 60, bottom: 40, top: 20, right: 20 };
+	const CHART_HEIGHT = 280;
+
+	// Chart configuration for shadcn styling
+	const chartConfig: Chart.ChartConfig = {
+		amount: {
+			label: 'Amount',
+			color: 'hsl(var(--primary))'
+		}
+	};
 
 	interface ExpenseTrendData {
 		date: Date;
@@ -47,47 +50,22 @@
 		}
 	});
 
-	// Format date for display (full format for tooltip)
-	function formatDate(date: Date): string {
-		return new Date(date).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	}
-
-	// Format date for axis (shorter format)
-	function formatAxisDate(date: Date): string {
-		const d = new Date(date);
-		// For shorter periods, show month/day
-		if (period === '7d' || period === '30d') {
-			return d.toLocaleDateString('en-US', {
-				month: 'short',
-				day: 'numeric'
-			});
+	// Series configuration for the chart
+	const series = $derived([
+		{
+			key: 'amount',
+			label: chartConfig['amount']?.label || 'Amount',
+			color: chartConfig['amount']?.color || 'hsl(var(--primary))'
 		}
-		// For longer periods, show month/year
-		return d.toLocaleDateString('en-US', {
-			month: 'short',
-			year: '2-digit'
-		});
-	}
-
-	// Format currency
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD'
-		}).format(amount);
-	}
+	]);
 </script>
 
-<Card>
-	<CardHeader>
-		<CardTitle>Expense Trends</CardTitle>
-		<CardDescription>{periodLabel}</CardDescription>
-	</CardHeader>
-	<CardContent>
+<Card.Root>
+	<Card.Header>
+		<Card.Title>Expense Trends</Card.Title>
+		<Card.Description>{periodLabel}</Card.Description>
+	</Card.Header>
+	<Card.Content>
 		{#if isLoading}
 			<Skeleton class="h-[{CHART_HEIGHT}px] w-full" />
 		{:else if error}
@@ -102,24 +80,42 @@
 				</EmptyState>
 			</div>
 		{:else if data.length > 0}
-			<div class="h-[{CHART_HEIGHT}px]">
-				<Chart {data} x="date" y="amount" padding={CHART_PADDING}>
-					<Svg>
-						<Axis placement="bottom" format={formatAxisDate} />
-						<Axis placement="left" format={value => formatCurrency(value)} />
-						<Area class="fill-primary/20 stroke-primary stroke-2" />
-					</Svg>
-					<Tooltip.Root let:data>
-						<Tooltip.Header>
-							{formatDate(data.date)}
-						</Tooltip.Header>
-						<Tooltip.List>
-							<Tooltip.Item label="Amount" value={formatCurrency(data.amount)} />
-							<Tooltip.Item label="Count" value={`${data.count} expenses`} />
-						</Tooltip.List>
-					</Tooltip.Root>
-				</Chart>
-			</div>
+			<Chart.Container config={chartConfig} class="h-[{CHART_HEIGHT}px] w-full">
+				<AreaChart
+					{data}
+					x="date"
+					xScale={scaleTime()}
+					y="amount"
+					{series}
+					props={{
+						area: {
+							class: 'fill-primary/20 stroke-primary stroke-2'
+						},
+						xAxis: {
+							format: (v: Date) => {
+								return v.toLocaleDateString('en-US', {
+									month: 'short',
+									day: 'numeric'
+								});
+							}
+						},
+						yAxis: {
+							format: (v: number) => {
+								return new Intl.NumberFormat('en-US', {
+									style: 'currency',
+									currency: 'USD',
+									minimumFractionDigits: 0,
+									maximumFractionDigits: 0
+								}).format(v);
+							}
+						}
+					}}
+				>
+					{#snippet tooltip()}
+						<Chart.Tooltip hideLabel />
+					{/snippet}
+				</AreaChart>
+			</Chart.Container>
 		{:else}
 			<div class="h-[{CHART_HEIGHT}px]">
 				<EmptyState class="h-full">
@@ -132,5 +128,5 @@
 				</EmptyState>
 			</div>
 		{/if}
-	</CardContent>
-</Card>
+	</Card.Content>
+</Card.Root>

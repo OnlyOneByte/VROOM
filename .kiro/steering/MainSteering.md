@@ -10,9 +10,10 @@ Minimize task summary to be a few key points, no need for full paragraphs
 
 Make sure you add `--no-pager` to git commands that display a lot of text (like diff). Make sure you add no pager right after `git` and before the command
 
-For UI tasks, please use shadcnui-svelte for UI elements everywhere possible. For charts, you can use layerchart. Do not use other libraries without checking with the user.
+For UI tasks, please use shadcnui-svelte for UI elements everywhere possible. For charts, you use shadcnui charts. While the examples for the shadcnui charts are in react, they do exist for svelte (its built on top of layerchart). Do not add recharts!
 
-When coding, avoid using deprecated functions. Make sure to check files you edit that functions are not deprecated.
+
+When coding, avoid using deprecated functions. Make sure to check files you edit that functions are not deprecated. Specifically for svelte, make sure you are not using ComponentType, and instead use Component
 
 ## Svelte 5 Runes Mode
 
@@ -78,20 +79,22 @@ This project has MCP (Model Context Protocol) servers configured for enhanced de
   - `mcp_svelte_svelte_autofixer`: Validate and get suggestions for Svelte code
   - `mcp_svelte_playground_link`: Generate playground links for components
 
-### shadcn MCP Server
-- **Purpose**: Access shadcn/ui component registry for this project
+### shadcn-svelte MCP Server
+- **Purpose**: Access shadcn-svelte v4 component library for this Svelte project
 - **When to use**:
-  - Need to find or add UI components
-  - Look for component examples and demos
-  - Get installation commands for components
+  - Need to find or add UI components compatible with Svelte
+  - Look for component source code and usage examples
+  - Get component metadata and structure
 - **Key tools**:
-  - `mcp_shadcn_search_items_in_registries`: Search for components
-  - `mcp_shadcn_view_items_in_registries`: View component details and code
-  - `mcp_shadcn_get_item_examples_from_registries`: Find usage examples
-  - `mcp_shadcn_get_add_command_for_items`: Get CLI command to add components
+  - `mcp_shadcn_svelte_list_components`: List all available shadcn-svelte components
+  - `mcp_shadcn_svelte_get_component`: Get source code for a specific component
+  - `mcp_shadcn_svelte_get_component_demo`: Get demo/usage examples for a component
+  - `mcp_shadcn_svelte_get_component_metadata`: Get metadata for a component
+  - `mcp_shadcn_svelte_list_blocks`: List available UI blocks (calendar, dashboard, login, etc.)
+  - `mcp_shadcn_svelte_get_block`: Get source code for complex UI blocks
 
 ### Best Practices
 - Always validate Svelte components with `mcp_svelte_svelte_autofixer` before finalizing
-- Check shadcn registry for existing components before building custom ones
+- Check shadcn-svelte registry for existing components before building custom ones
 - Use Svelte documentation tools when unsure about Svelte 5 syntax or features
 

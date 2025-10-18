@@ -262,21 +262,24 @@
 						{selectedStatsPeriod}
 					/>
 
-					<!-- Expense Trend Chart -->
-					<ExpenseTrendChart
-						data={expenseTrendData}
-						period={selectedStatsPeriod}
-						isLoading={isLoadingStats}
-					/>
-
-					<!-- Fuel Efficiency Trend Chart -->
-					{#if fuelEfficiencyData.length >= 2 && vehicle}
-						<FuelEfficiencyTrendChart
-							data={fuelEfficiencyData}
-							fuelType={vehicle.vehicleType || 'gas'}
+					<!-- Trend Charts - Side by Side on Desktop -->
+					<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+						<!-- Expense Trend Chart -->
+						<ExpenseTrendChart
+							data={expenseTrendData}
+							period={selectedStatsPeriod}
 							isLoading={isLoadingStats}
 						/>
-					{/if}
+
+						<!-- Fuel Efficiency Trend Chart -->
+						{#if fuelEfficiencyData.length >= 2 && vehicle}
+							<FuelEfficiencyTrendChart
+								data={fuelEfficiencyData}
+								fuelType={vehicle.vehicleType || 'gas'}
+								isLoading={isLoadingStats}
+							/>
+						{/if}
+					</div>
 
 					<!-- Expenses by Category with Pie Chart -->
 					{#if categoryChartData.length > 0}

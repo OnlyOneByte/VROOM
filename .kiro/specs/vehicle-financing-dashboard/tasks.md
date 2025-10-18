@@ -16,7 +16,7 @@
   - Test lease mileage projection calculations
   - _Requirements: 1.1, 3.1, 4.2, 5.3_
 
-- [ ] 2. Add shadcn chart components
+- [x] 2. Add shadcn chart components
   - Run shadcn CLI to add chart component: `npx shadcn@latest add chart`
   - Verify chart component is properly installed in `frontend/src/lib/components/ui/chart`
   - Test basic chart rendering with sample data

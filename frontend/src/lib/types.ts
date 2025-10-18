@@ -42,7 +42,7 @@ export interface VehicleFinancing {
 	termMonths: number;
 	startDate: Date;
 	paymentAmount: number;
-	paymentFrequency: 'monthly' | 'bi-weekly' | 'weekly';
+	paymentFrequency: 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 	paymentDayOfMonth?: number;
 	paymentDayOfWeek?: number;
 	// Lease-specific fields

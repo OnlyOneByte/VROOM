@@ -13,7 +13,8 @@
 - [ ] All vehicle expenses dashboard
 - [ ] Analytics dashboard rework
 - [x] Rework Vehicle specific analytics page
-- [ ] Expenses page rework
+- [ ] Expenses page rework, specifically using dashboard components from shadcnui
+- [ ] Dashboard page rework, using charts/components from shadcnui
 - [ ] expenses table rework
 
 
