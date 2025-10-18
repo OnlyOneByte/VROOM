@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { csrf } from 'hono/csrf';
 import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { config } from './lib/config';
@@ -44,6 +45,15 @@ app.use(
     credentials: true,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
+// CSRF protection middleware - protects against cross-site request forgery
+// Only applies to state-changing methods (POST, PUT, DELETE, PATCH)
+app.use(
+  '*',
+  csrf({
+    origin: config.cors.origins,
   })
 );
 
