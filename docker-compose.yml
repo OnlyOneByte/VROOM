@@ -27,6 +27,7 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:3001/auth/callback/google}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
       - SESSION_SECRET=${SESSION_SECRET}
       - GOOGLE_DRIVE_API_KEY=${GOOGLE_DRIVE_API_KEY}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}

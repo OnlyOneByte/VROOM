@@ -187,10 +187,7 @@ auth.get('/callback/google', async (c) => {
   });
 
   // Redirect to frontend
-  const frontendUrl =
-    process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:5173';
-
-  return c.redirect(`${frontendUrl}/dashboard`);
+  return c.redirect(`${config.frontend.url}/dashboard`);
 });
 
 // Get current user
