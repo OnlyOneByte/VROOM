@@ -19,12 +19,14 @@
 		ListFilter,
 		X,
 		FileText,
-		Settings
+		Settings,
+		Plus
 	} from 'lucide-svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+	import { Button } from '$lib/components/ui/button';
 	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
 	import type { Vehicle, Expense, ExpenseFilters, VehicleStats } from '$lib/types.js';
 
@@ -687,7 +689,7 @@
 						emptyTitle="No expenses yet"
 						emptyDescription="Start tracking expenses for this vehicle"
 						emptyActionLabel="Add Expense"
-						emptyActionHref="/expenses/new?vehicleId={vehicleId}"
+						emptyActionHref="/expenses/new?vehicleId={vehicleId}&returnTo=/vehicles/{vehicleId}"
 						scrollHeight="600px"
 						onClearFilters={clearFilters}
 						hasActiveFilters={!!(
@@ -867,4 +869,15 @@
 		</p>
 		<button onclick={() => goto('/dashboard')} class="btn btn-primary"> Back to Dashboard </button>
 	</div>
+{/if}
+
+<!-- Floating Action Button -->
+{#if vehicle}
+	<Button
+		href="/expenses/new?vehicleId={vehicleId}&returnTo=/vehicles/{vehicleId}"
+		class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto sm:rounded-full rounded-full group !bg-gradient-to-r !from-primary-600 !to-primary-700 hover:!from-primary-700 hover:!to-primary-800 !text-white shadow-2xl hover:shadow-primary-500/50 transition-all duration-300 sm:hover:scale-110 !z-50 h-16 sm:h-16 !pl-6 !pr-10 !border-0 !justify-center"
+	>
+		<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
+		<span class="font-bold text-lg">Add Expense</span>
+	</Button>
 {/if}

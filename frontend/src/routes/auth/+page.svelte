@@ -132,7 +132,8 @@
 					<div>
 						<h3 class="font-semibold text-lg text-gray-900 mb-1">Privacy First</h3>
 						<p class="text-gray-600">
-							No data stored beyond sync. Everything lives with you or in your Google Drive, under your control.
+							No data stored beyond sync. Everything lives with you or in your Google Drive, under
+							your control.
 						</p>
 					</div>
 				</div>
