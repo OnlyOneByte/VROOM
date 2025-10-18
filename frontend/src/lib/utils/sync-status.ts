@@ -1,9 +1,9 @@
-import type { ComponentType } from 'svelte';
+import type { Component } from 'svelte';
 import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert, Clock } from 'lucide-svelte';
 
 export interface SyncStatusInfo {
 	color: string;
-	icon: ComponentType;
+	icon: Component;
 	text: string;
 }
 

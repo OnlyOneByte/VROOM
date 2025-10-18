@@ -12,6 +12,8 @@ Make sure you add `--no-pager` to git commands that display a lot of text (like 
 
 For UI tasks, please use shadcnui-svelte for UI elements everywhere possible. For charts, you can use layerchart. Do not use other libraries without checking with the user.
 
+When coding, avoid using deprecated functions. Make sure to check files you edit that functions are not deprecated.
+
 ## Svelte 5 Runes Mode
 
 This project uses Svelte 5 with runes mode. Follow these rules:
