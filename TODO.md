@@ -7,4 +7,13 @@
 
 - [ ] Add VIN input to vehicle
 - [ ] Update GAS to include gas type (octane)
+- [ ] Skip mpg calculation (missed fillup) 
+- [ ] Comprehensive insurance information
+- [ ] finance Information in car
+- [ ] All vehicle expenses dashboard
+- [ ] Analytics dashboard rework
+- [x] Rework Vehicle specific analytics page
 
+
+Maybes
+- [ ] Allow splitting expenses across multiple vehicles (?)

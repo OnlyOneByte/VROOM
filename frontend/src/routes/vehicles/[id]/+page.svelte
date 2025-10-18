@@ -1,20 +1,23 @@
 <script lang="ts">
-	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { SvelteDate } from 'svelte/reactivity';
 	import { appStore } from '$lib/stores/app.js';
 	import { settingsStore } from '$lib/stores/settings';
-	import { getVolumeUnitLabel, getChargeUnitLabel } from '$lib/utils/units';
+	import {
+		getVolumeUnitLabel,
+		getChargeUnitLabel,
+		getDistanceUnitLabel,
+		getFuelEfficiencyLabel,
+		getElectricEfficiencyLabel
+	} from '$lib/utils/units';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import {
 		ArrowLeft,
 		Car,
 		DollarSign,
 		Gauge,
-		TrendingUp,
 		CreditCard,
-		Fuel,
-		Wrench,
 		Search,
 		ListFilter,
 		X,
@@ -24,122 +27,78 @@
 	} from 'lucide-svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
-
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
+	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import * as Select from '$lib/components/ui/select';
+	import { Skeleton } from '$lib/components/ui/skeleton';
+	import StatCard from '$lib/components/ui/stat-card.svelte';
+	import StatCardDual from '$lib/components/ui/stat-card-dual.svelte';
 	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
+	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
+	import FuelEfficiencyTrendChart from '$lib/components/charts/FuelEfficiencyTrendChart.svelte';
+	import CategoryPieChart from '$lib/components/charts/CategoryPieChart.svelte';
+	import {
+		prepareExpenseTrendData,
+		prepareFuelEfficiencyData,
+		prepareCategoryChartData,
+		filterExpensesByPeriod,
+		groupExpensesByCategory,
+		categoryLabels
+	} from '$lib/utils/expense-helpers';
+	import {
+		PERIOD_OPTIONS,
+		DAYS_IN_RECENT_PERIOD,
+		MONTHS_IN_AVERAGE_PERIOD,
+		isValidPeriod,
+		type TimePeriod
+	} from '$lib/constants/time-periods';
+	import EmptyState from '$lib/components/ui/empty-state.svelte';
 	import type { Vehicle, Expense, ExpenseFilters, VehicleStats } from '$lib/types.js';
+	import type { PageData } from './$types';
 
-	const vehicleId = $page.params.id;
+	// Props from page load
+	let { data }: { data: PageData } = $props();
+	const vehicleId = data.vehicleId;
 
 	// Component state
 	let isLoading = $state(true);
+	let isLoadingStats = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 	let expenses = $state<Expense[]>([]);
-	let filteredExpenses = $state<Expense[]>([]);
 	let showFilters = $state(false);
 	let activeTab = $state('overview');
 	let vehicleStatsData = $state<VehicleStats | null>(null);
-	let selectedStatsPeriod = $state<'7d' | '30d' | '90d' | '1y' | 'all'>('all');
+	let selectedStatsPeriod = $state<TimePeriod>('all');
 
 	// Filters and search
 	let searchTerm = $state('');
 	let filters = $state<ExpenseFilters>({});
 
-	let vehicleStats = $state({
-		totalExpenses: 0,
-		recentExpenses: 0,
-		expenseCount: 0,
-		avgMpg: 0,
-		monthlyAverage: 0,
-		lastExpenseDate: null as Date | null,
-		expensesByCategory: {} as Record<string, number>
-	});
+	let selectedPeriodOption = $derived(
+		PERIOD_OPTIONS.find(opt => opt.value === selectedStatsPeriod)
+	);
 
-	// Category mappings
-	const categoryLabels: Record<string, string> = {
-		fuel: 'Fuel',
-		maintenance: 'Maintenance',
-		financial: 'Financial',
-		regulatory: 'Regulatory',
-		enhancement: 'Enhancement',
-		misc: 'Misc Operating Costs'
-	};
+	// Derived state for charts and stats
+	let expenseTrendData = $derived(prepareExpenseTrendData(expenses, selectedStatsPeriod));
+	let fuelEfficiencyData = $derived(prepareFuelEfficiencyData(expenses));
+	let periodFilteredExpenses = $derived(filterExpensesByPeriod(expenses, selectedStatsPeriod));
+	let periodExpensesByCategory = $derived(groupExpensesByCategory(periodFilteredExpenses));
+	let categoryChartData = $derived(prepareCategoryChartData(periodExpensesByCategory));
 
-	onMount(async () => {
-		await loadVehicle();
-		await loadExpenses();
-		await loadVehicleStats();
-	});
-
-	async function loadVehicle() {
-		try {
-			const response = await fetch(`/api/vehicles/${vehicleId}`, {
-				credentials: 'include'
-			});
-
-			if (!response.ok) {
-				appStore.addNotification({
-					type: 'error',
-					message: 'Vehicle not found'
-				});
-				goto('/dashboard');
-				return;
-			}
-
-			const result = await response.json();
-			vehicle = result.data || result;
-		} catch {
-			appStore.addNotification({
-				type: 'error',
-				message: 'Error loading vehicle'
-			});
-			goto('/dashboard');
+	// Filtered expenses based on search and filters
+	let filteredExpenses = $derived.by(() => {
+		// Early return if no filters applied (performance optimization)
+		if (
+			!searchTerm &&
+			!filters.category &&
+			!filters.tags?.length &&
+			!filters.startDate &&
+			!filters.endDate
+		) {
+			return expenses;
 		}
-	}
 
-	async function loadExpenses() {
-		try {
-			const response = await fetch(`/api/expenses?vehicleId=${vehicleId}`, {
-				credentials: 'include'
-			});
-
-			if (response.ok) {
-				const result = await response.json();
-				expenses = result.data || result || [];
-				applyFiltersAndSort();
-				calculateStats();
-			}
-		} catch (error) {
-			console.error('Error loading expenses:', error);
-		} finally {
-			isLoading = false;
-		}
-	}
-
-	async function loadVehicleStats() {
-		try {
-			const response = await fetch(
-				`/api/vehicles/${vehicleId}/stats?period=${selectedStatsPeriod}`,
-				{
-					credentials: 'include'
-				}
-			);
-
-			if (response.ok) {
-				const result = await response.json();
-				vehicleStatsData = result.data;
-			}
-		} catch (error) {
-			console.error('Error loading vehicle stats:', error);
-		}
-	}
-
-	$effect(() => {
-		loadVehicleStats();
-	});
-
-	function applyFiltersAndSort() {
 		let filtered = [...expenses];
 
 		// Apply search filter
@@ -172,141 +131,172 @@
 			filtered = filtered.filter(expense => new Date(expense.date) <= new Date(filters.endDate!));
 		}
 
-		filteredExpenses = filtered;
+		return filtered;
+	});
+
+	// Check if any filters are active
+	let hasActiveFilters = $derived(
+		searchTerm.trim() !== '' ||
+			!!filters.category ||
+			(filters.tags?.length ?? 0) > 0 ||
+			!!filters.startDate ||
+			!!filters.endDate
+	);
+
+	// Local stats for quick calculations (complementary to API stats)
+	let localStats = $derived.by(() => {
+		const recentPeriodDate = new SvelteDate();
+		recentPeriodDate.setDate(recentPeriodDate.getDate() - DAYS_IN_RECENT_PERIOD);
+
+		const recentExpenses = expenses.filter(e => new Date(e.date) > recentPeriodDate);
+		const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+		const recentAmount = recentExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+		// Calculate monthly average
+		const averagePeriodDate = new SvelteDate();
+		averagePeriodDate.setMonth(averagePeriodDate.getMonth() - MONTHS_IN_AVERAGE_PERIOD);
+		const recentExpensesYear = expenses.filter(
+			expense => new Date(expense.date) >= averagePeriodDate
+		);
+		const monthlyAverage =
+			recentExpensesYear.length > 0
+				? recentExpensesYear.reduce((sum, expense) => sum + expense.amount, 0) /
+					MONTHS_IN_AVERAGE_PERIOD
+				: 0;
+
+		const lastExpenseDate =
+			expenses.length > 0
+				? new Date(Math.max(...expenses.map(e => new Date(e.date).getTime())))
+				: null;
+
+		return {
+			totalExpenses: totalAmount,
+			recentExpenses: recentAmount,
+			expenseCount: expenses.length,
+			monthlyAverage,
+			lastExpenseDate
+		};
+	});
+
+	// Load data on mount
+	onMount(async () => {
+		await Promise.all([loadVehicle(), loadExpenses()]);
+		// Load stats after initial data is loaded
+		if (vehicle && expenses.length > 0) {
+			await loadVehicleStats();
+		}
+		isLoading = false;
+	});
+
+	// Reload stats when period changes
+	$effect(() => {
+		if (!isLoading && selectedStatsPeriod) {
+			loadVehicleStats();
+		}
+	});
+
+	async function loadVehicle() {
+		try {
+			const response = await fetch(`/api/vehicles/${vehicleId}`, {
+				credentials: 'include'
+			});
+
+			if (!response.ok) {
+				appStore.addNotification({
+					type: 'error',
+					message: 'Vehicle not found'
+				});
+				goto('/dashboard');
+				return;
+			}
+
+			const result = await response.json();
+			vehicle = result.data || result;
+		} catch (error) {
+			console.error('Error loading vehicle:', error);
+			appStore.addNotification({
+				type: 'error',
+				message: 'Error loading vehicle'
+			});
+			goto('/dashboard');
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	async function loadExpenses() {
+		try {
+			const response = await fetch(`/api/expenses?vehicleId=${vehicleId}`, {
+				credentials: 'include'
+			});
+
+			if (response.ok) {
+				const result = await response.json();
+				const data = result.data || result || [];
+				// Validate that we received an array
+				expenses = Array.isArray(data) ? data : [];
+				if (!Array.isArray(data)) {
+					console.warn('Invalid expenses data received, expected array');
+				}
+			} else {
+				appStore.addNotification({
+					type: 'error',
+					message: 'Failed to load expenses'
+				});
+			}
+		} catch (error) {
+			console.error('Error loading expenses:', error);
+			appStore.addNotification({
+				type: 'error',
+				message: 'Failed to load expenses'
+			});
+		}
+	}
+
+	async function loadVehicleStats() {
+		isLoadingStats = true;
+		try {
+			const response = await fetch(
+				`/api/vehicles/${vehicleId}/stats?period=${selectedStatsPeriod}`,
+				{
+					credentials: 'include'
+				}
+			);
+
+			if (response.ok) {
+				const result = await response.json();
+				vehicleStatsData = result.data;
+			} else {
+				appStore.addNotification({
+					type: 'error',
+					message: 'Failed to load vehicle statistics'
+				});
+			}
+		} catch (error) {
+			console.error('Error loading vehicle stats:', error);
+			appStore.addNotification({
+				type: 'error',
+				message: 'Failed to load vehicle statistics'
+			});
+		} finally {
+			isLoadingStats = false;
+		}
 	}
 
 	async function handleDeleteExpense(deletedExpense: Expense) {
 		expenses = expenses.filter(e => e.id !== deletedExpense.id);
-		applyFiltersAndSort();
-		calculateStats();
-	}
-
-	function calculateStats() {
-		const thirtyDaysAgo = new Date();
-		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-		const recentExpenses = expenses.filter(e => new Date(e.date) > thirtyDaysAgo);
-		const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
-		const recentAmount = recentExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-		// Calculate expenses by category
-		const expensesByCategory = expenses.reduce(
-			(acc, expense) => {
-				acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
-				return acc;
-			},
-			{} as Record<string, number>
-		);
-
-		// Calculate monthly average (last 12 months)
-		const twelveMonthsAgo = new Date();
-		twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-		const recentExpensesYear = expenses.filter(
-			expense => new Date(expense.date) >= twelveMonthsAgo
-		);
-		const monthlyAverage =
-			recentExpensesYear.length > 0
-				? recentExpensesYear.reduce((sum, expense) => sum + expense.amount, 0) / 12
-				: 0;
-
-		// Calculate fuel efficiency
-		const fuelExpenses = expenses.filter(
-			e => e.category === 'fuel' && (e.volume || e.charge) && e.mileage
-		);
-		let avgMpg = 0;
-		if (fuelExpenses.length > 1) {
-			const efficiencyValues = [];
-			for (let i = 1; i < fuelExpenses.length; i++) {
-				const current = fuelExpenses[i];
-				const previous = fuelExpenses[i - 1];
-				if (current?.mileage && previous?.mileage) {
-					const miles = current.mileage - previous.mileage;
-					// For liquid fuel
-					if (current?.volume) {
-						const mpg = miles / current.volume;
-						if (mpg > 0 && mpg < 100) {
-							efficiencyValues.push(mpg);
-						}
-					}
-					// For electric charge
-					else if (current?.charge) {
-						const efficiency = miles / current.charge;
-						if (efficiency > 0 && efficiency < 20) {
-							efficiencyValues.push(efficiency);
-						}
-					}
-				}
-			}
-			avgMpg =
-				efficiencyValues.length > 0
-					? efficiencyValues.reduce((sum, eff) => sum + eff, 0) / efficiencyValues.length
-					: 0;
-		}
-
-		vehicleStats = {
-			totalExpenses: totalAmount,
-			recentExpenses: recentAmount,
-			expenseCount: expenses.length,
-			avgMpg: Math.round(avgMpg * 10) / 10,
-			monthlyAverage,
-			lastExpenseDate:
-				expenses.length > 0
-					? new Date(Math.max(...expenses.map(e => new Date(e.date).getTime())))
-					: null,
-			expensesByCategory
-		};
+		// Reload stats after deletion
+		await loadVehicleStats();
 	}
 
 	function clearFilters() {
 		searchTerm = '';
 		filters = {};
-		applyFiltersAndSort();
 	}
-
-	// Reactive updates
-	$effect(() => {
-		applyFiltersAndSort();
-	});
 
 	function getVehicleDisplayName(): string {
 		if (!vehicle) return '';
 		return vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
-	}
-
-	function getCategoryIcon(category: string) {
-		switch (category) {
-			case 'operating':
-				return Fuel;
-			case 'maintenance':
-				return Wrench;
-			case 'financial':
-				return CreditCard;
-			default:
-				return DollarSign;
-		}
-	}
-
-	function getCategoryColor(category: string): string {
-		switch (category) {
-			case 'operating':
-				return 'text-blue-600 bg-blue-100';
-			case 'maintenance':
-				return 'text-orange-600 bg-orange-100';
-			case 'financial':
-				return 'text-green-600 bg-green-100';
-			case 'regulatory':
-				return 'text-purple-600 bg-purple-100';
-			case 'enhancement':
-				return 'text-pink-600 bg-pink-100';
-			case 'convenience':
-				return 'text-gray-600 bg-gray-100';
-			default:
-				return 'text-gray-600 bg-gray-100';
-		}
-	}
-
-	function formatCategoryName(category: string): string {
-		return category.charAt(0).toUpperCase() + category.slice(1);
 	}
 </script>
 
@@ -316,31 +306,51 @@
 </svelte:head>
 
 {#if isLoading}
-	<div class="flex items-center justify-center py-12">
-		<div class="loading-spinner h-8 w-8"></div>
+	<div class="space-y-6">
+		<!-- Header Skeleton -->
+		<div class="flex items-center gap-4">
+			<Skeleton class="h-10 w-10 rounded-md" />
+			<div class="space-y-2">
+				<Skeleton class="h-8 w-64" />
+				<Skeleton class="h-5 w-48" />
+			</div>
+		</div>
+
+		<!-- Tabs Skeleton -->
+		<div class="space-y-6">
+			<Skeleton class="h-10 w-full" />
+			<div class="flex justify-end">
+				<Skeleton class="h-10 w-[180px]" />
+			</div>
+
+			<!-- Stats Grid Skeleton -->
+			<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+				{#each Array(4) as _}
+					<Card>
+						<CardContent class="p-6 space-y-2">
+							<Skeleton class="h-4 w-24" />
+							<Skeleton class="h-8 w-32" />
+						</CardContent>
+					</Card>
+				{/each}
+			</div>
+		</div>
 	</div>
 {:else if vehicle}
 	<div class="space-y-6">
 		<!-- Header -->
 		<div class="flex items-center gap-4">
-			<button
+			<Button
+				variant="outline"
+				size="icon"
 				onclick={() => goto('/dashboard')}
-				class="btn btn-secondary p-2 transition-all duration-200 hover:bg-primary-100 hover:border-primary-300 hover:scale-110"
+				aria-label="Back to dashboard"
 			>
-				<ArrowLeft class="h-4 w-4 transition-colors duration-200 hover:text-primary-700" />
-			</button>
-			<div class="flex items-center gap-2">
-				<div>
-					<h1 class="text-2xl font-bold text-gray-900">{getVehicleDisplayName()}</h1>
-					<p class="text-gray-600">{vehicle.year} {vehicle.make} {vehicle.model}</p>
-				</div>
-				<a
-					href="/vehicles/{vehicleId}/edit"
-					class="btn btn-secondary p-2 transition-all duration-200 hover:bg-primary-100 hover:border-primary-300 hover:scale-110"
-					title="Edit vehicle"
-				>
-					<Settings class="h-5 w-5 transition-colors duration-200 hover:text-primary-700" />
-				</a>
+				<ArrowLeft class="h-4 w-4" />
+			</Button>
+			<div>
+				<h1 class="text-2xl font-bold text-gray-900">{getVehicleDisplayName()}</h1>
+				<p class="text-gray-600">{vehicle.year} {vehicle.make} {vehicle.model}</p>
 			</div>
 		</div>
 
@@ -355,240 +365,323 @@
 
 			<!-- Overview Tab -->
 			<TabsContent value="overview" class="space-y-6">
-				<!-- Period Selector -->
-				<div class="flex justify-end">
-					<select bind:value={selectedStatsPeriod} class="form-input w-auto text-sm">
-						<option value="7d">Last 7 Days</option>
-						<option value="30d">Last 30 Days</option>
-						<option value="90d">Last 90 Days</option>
-						<option value="1y">Last Year</option>
-						<option value="all">All Time</option>
-					</select>
-				</div>
-
-				<!-- Vehicle Overview Cards -->
-				<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-					<div class="card-compact">
+				<!-- Vehicle Information Card -->
+				<Card>
+					<CardHeader>
 						<div class="flex items-center justify-between">
-							<div>
-								<p class="text-sm font-medium text-gray-600">Total Expenses</p>
-								<p class="text-2xl font-bold text-gray-900">
-									{formatCurrency(vehicleStats.totalExpenses)}
-								</p>
-							</div>
-							<DollarSign class="h-8 w-8 text-primary-600" />
+							<CardTitle class="flex items-center gap-2">
+								<Car class="h-5 w-5" />
+								Vehicle Information
+							</CardTitle>
+							<Button
+								variant="outline"
+								size="icon"
+								href="/vehicles/{vehicleId}/edit"
+								aria-label="Edit vehicle"
+							>
+								<Settings class="h-5 w-5" />
+							</Button>
 						</div>
-					</div>
-
-					<div class="card-compact">
-						<div class="flex items-center justify-between">
-							<div>
-								<p class="text-sm font-medium text-gray-600">Last 30 Days</p>
-								<p class="text-2xl font-bold text-gray-900">
-									{formatCurrency(vehicleStats.recentExpenses)}
-								</p>
+					</CardHeader>
+					<CardContent>
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+							<div class="space-y-1">
+								<p class="text-sm font-medium text-muted-foreground">Make & Model</p>
+								<p class="text-base font-semibold">{vehicle.make} {vehicle.model}</p>
 							</div>
-							<TrendingUp class="h-8 w-8 text-green-600" />
-						</div>
-					</div>
 
-					<div class="card-compact">
-						<div class="flex items-center justify-between">
-							<div>
-								<p class="text-sm font-medium text-gray-600">Monthly Average</p>
-								<p class="text-2xl font-bold text-gray-900">
-									{formatCurrency(vehicleStats.monthlyAverage)}
-								</p>
+							<div class="space-y-1">
+								<p class="text-sm font-medium text-muted-foreground">Year</p>
+								<p class="text-base font-semibold">{vehicle.year}</p>
 							</div>
-							<FileText class="h-8 w-8 text-blue-600" />
-						</div>
-					</div>
 
-					<div class="card-compact">
-						<div class="flex items-center justify-between">
-							<div>
-								<p class="text-sm font-medium text-gray-600">
-									{vehicleStats.avgMpg > 0 ? 'Avg MPG' : 'Last Expense'}
-								</p>
-								<p class="text-2xl font-bold text-gray-900">
-									{#if vehicleStats.avgMpg > 0}
-										{vehicleStats.avgMpg}
-									{:else if vehicleStats.lastExpenseDate}
-										{formatDate(vehicleStats.lastExpenseDate)}
-									{:else}
-										None
+							{#if vehicle.licensePlate}
+								<div class="space-y-1">
+									<p class="text-sm font-medium text-muted-foreground">License Plate</p>
+									<p class="text-base font-semibold font-mono">{vehicle.licensePlate}</p>
+								</div>
+							{/if}
+
+							{#if vehicle.initialMileage}
+								<div class="space-y-1">
+									<p class="text-sm font-medium text-muted-foreground">Initial Mileage</p>
+									<p class="text-base font-semibold">
+										{vehicle.initialMileage.toLocaleString()}
+										{getDistanceUnitLabel($settingsStore.settings?.distanceUnit || 'miles', true)}
+									</p>
+								</div>
+							{/if}
+
+							{#if vehicle.purchaseDate}
+								<div class="space-y-1">
+									<p class="text-sm font-medium text-muted-foreground">Purchase Date</p>
+									<p class="text-base font-semibold">
+										{formatDate(new Date(vehicle.purchaseDate))}
+									</p>
+								</div>
+							{/if}
+
+							{#if vehicle.purchasePrice}
+								<div class="space-y-1">
+									<p class="text-sm font-medium text-muted-foreground">Purchase Price</p>
+									<p class="text-base font-semibold">{formatCurrency(vehicle.purchasePrice)}</p>
+								</div>
+							{/if}
+						</div>
+					</CardContent>
+				</Card>
+
+				{#if expenses.length === 0}
+					<!-- No Expenses Empty State -->
+					<EmptyState>
+						{#snippet icon()}
+							<FileText class="h-12 w-12 text-muted-foreground mb-4" />
+						{/snippet}
+						{#snippet title()}
+							No expenses yet
+						{/snippet}
+						{#snippet description()}
+							Start tracking expenses for this vehicle to see insights and trends
+						{/snippet}
+						{#snippet action()}
+							<Button href="/expenses/new?vehicleId={vehicleId}&returnTo=/vehicles/{vehicleId}">
+								<Plus class="h-4 w-4 mr-2" />
+								Add Expense
+							</Button>
+						{/snippet}
+					</EmptyState>
+				{:else}
+					<!-- Period Selector -->
+					<div class="flex justify-end">
+						<Select.Root
+							type="single"
+							value={selectedStatsPeriod}
+							onValueChange={value => {
+								if (value && isValidPeriod(value)) {
+									selectedStatsPeriod = value;
+								}
+							}}
+						>
+							<Select.Trigger
+								class="w-[180px]"
+								disabled={isLoadingStats}
+								aria-label="Select time period"
+							>
+								<span class="flex items-center gap-2">
+									{#if isLoadingStats}
+										<span
+											class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"
+										></span>
 									{/if}
-								</p>
-							</div>
-							<Gauge class="h-8 w-8 text-orange-600" />
-						</div>
-					</div>
-				</div>
-
-				<!-- Mileage & Fuel Statistics -->
-				{#if vehicleStatsData && vehicleStatsData.fuelExpenseCount > 0}
-					<div class="card">
-						<h3 class="text-lg font-semibold text-gray-900 mb-4">Mileage & Fuel Statistics</h3>
-						<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-							{#if vehicleStatsData.currentMileage !== null}
-								<div class="flex flex-col p-4 bg-gray-50 rounded-lg">
-									<span class="text-sm font-medium text-gray-600 mb-1">Current Mileage</span>
-									<span class="text-2xl font-bold text-gray-900">
-										{vehicleStatsData.currentMileage.toLocaleString()}
-									</span>
-									<span class="text-xs text-gray-500 mt-1">miles</span>
-								</div>
-
-								<div class="flex flex-col p-4 bg-gray-50 rounded-lg">
-									<span class="text-sm font-medium text-gray-600 mb-1">Miles Driven</span>
-									<span class="text-2xl font-bold text-gray-900">
-										{vehicleStatsData.totalMileage.toLocaleString()}
-									</span>
-									<span class="text-xs text-gray-500 mt-1">
-										{selectedStatsPeriod === 'all' ? 'lifetime' : `in ${selectedStatsPeriod}`}
-									</span>
-								</div>
-							{/if}
-
-							{#if vehicleStatsData.totalFuelConsumed > 0}
-								<div class="flex flex-col p-4 bg-blue-50 rounded-lg">
-									<span class="text-sm font-medium text-blue-700 mb-1">Fuel Consumed</span>
-									<span class="text-2xl font-bold text-blue-900">
-										{vehicleStatsData.totalFuelConsumed.toFixed(1)}
-									</span>
-									<span class="text-xs text-blue-600 mt-1">
-										{getVolumeUnitLabel($settingsStore.settings?.volumeUnit || 'gallons_us', true)}
-									</span>
-								</div>
-							{/if}
-
-							{#if vehicleStatsData.totalChargeConsumed > 0}
-								<div class="flex flex-col p-4 bg-green-50 rounded-lg">
-									<span class="text-sm font-medium text-green-700 mb-1">Charge Consumed</span>
-									<span class="text-2xl font-bold text-green-900">
-										{vehicleStatsData.totalChargeConsumed.toFixed(1)}
-									</span>
-									<span class="text-xs text-green-600 mt-1">
-										{getChargeUnitLabel($settingsStore.settings?.chargeUnit || 'kwh', true)}
-									</span>
-								</div>
-							{/if}
-
-							{#if vehicleStatsData.averageMpg !== null}
-								<div class="flex flex-col p-4 bg-orange-50 rounded-lg">
-									<span class="text-sm font-medium text-orange-700 mb-1">Average MPG</span>
-									<span class="text-2xl font-bold text-orange-900">
-										{vehicleStatsData.averageMpg.toFixed(1)}
-									</span>
-									<span class="text-xs text-orange-600 mt-1">miles per gallon</span>
-								</div>
-							{/if}
-
-							{#if vehicleStatsData.averageMilesPerKwh !== null}
-								<div class="flex flex-col p-4 bg-purple-50 rounded-lg">
-									<span class="text-sm font-medium text-purple-700 mb-1">Efficiency</span>
-									<span class="text-2xl font-bold text-purple-900">
-										{vehicleStatsData.averageMilesPerKwh.toFixed(2)}
-									</span>
-									<span class="text-xs text-purple-600 mt-1">mi/kWh</span>
-								</div>
-							{/if}
-
-							{#if vehicleStatsData.costPerMile !== null}
-								<div class="flex flex-col p-4 bg-red-50 rounded-lg">
-									<span class="text-sm font-medium text-red-700 mb-1">Cost per Mile</span>
-									<span class="text-2xl font-bold text-red-900">
-										{formatCurrency(vehicleStatsData.costPerMile)}
-									</span>
-									<span class="text-xs text-red-600 mt-1">fuel only</span>
-								</div>
-							{/if}
-
-							<div class="flex flex-col p-4 bg-gray-50 rounded-lg">
-								<span class="text-sm font-medium text-gray-600 mb-1">Total Fuel Cost</span>
-								<span class="text-2xl font-bold text-gray-900">
-									{formatCurrency(vehicleStatsData.totalFuelCost)}
+									{selectedPeriodOption?.label || 'Select period'}
 								</span>
-								<span class="text-xs text-gray-500 mt-1">
-									{vehicleStatsData.fuelExpenseCount} fill-ups
-								</span>
-							</div>
-						</div>
+							</Select.Trigger>
+							<Select.Content>
+								{#each PERIOD_OPTIONS as option}
+									<Select.Item value={option.value} label={option.label}>
+										{option.label}
+									</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
 					</div>
-				{/if}
 
-				<!-- Expenses by Category -->
-				{#if Object.keys(vehicleStats.expensesByCategory).length > 0}
-					<div class="card">
-						<h3 class="text-lg font-semibold text-gray-900 mb-4">Expenses by Category</h3>
-						<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-							{#each Object.entries(vehicleStats.expensesByCategory) as [category, amount]}
-								{@const IconComponent = getCategoryIcon(category)}
-								<div class="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
-									<div class="p-2 rounded-lg {getCategoryColor(category)} mb-2">
-										<IconComponent class="h-4 w-4" />
-									</div>
-									<span class="text-xs font-medium text-gray-700 mb-1"
-										>{formatCategoryName(category)}</span
-									>
-									<span class="text-sm font-bold text-gray-900">{formatCurrency(amount)}</span>
+					<!-- Expense Overview -->
+					<Card>
+						<CardHeader>
+							<CardTitle class="flex items-center gap-2">
+								<DollarSign class="h-5 w-5" />
+								Expense Overview
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+								<StatCard
+									label="Total Expenses"
+									value={formatCurrency(localStats.totalExpenses)}
+									unit="all time"
+								/>
+								<StatCard
+									label="Last 30 Days"
+									value={formatCurrency(localStats.recentExpenses)}
+									unit="recent spending"
+								/>
+								<StatCard
+									label="Monthly Average"
+									value={formatCurrency(localStats.monthlyAverage)}
+									unit="last 12 months"
+								/>
+							</div>
+						</CardContent>
+					</Card>
+
+					<!-- Mileage & Fuel Statistics -->
+					{#if isLoadingStats}
+						<Card>
+							<CardHeader>
+								<CardTitle class="flex items-center gap-2">
+									<Gauge class="h-5 w-5" />
+									Mileage & Fuel Statistics
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+									{#each Array(3) as _}
+										<div class="flex flex-col p-4 rounded-lg border bg-card">
+											<div class="flex items-start justify-between gap-4">
+												<div class="flex-1 space-y-1">
+													<Skeleton class="h-4 w-24" />
+													<Skeleton class="h-8 w-20" />
+												</div>
+												<div class="w-px bg-border self-stretch my-1"></div>
+												<div class="flex-1 space-y-1">
+													<Skeleton class="h-4 w-20" />
+													<Skeleton class="h-8 w-16" />
+												</div>
+											</div>
+										</div>
+									{/each}
 								</div>
-							{/each}
-						</div>
-					</div>
+							</CardContent>
+						</Card>
+					{:else if vehicleStatsData && vehicleStatsData.fuelExpenseCount > 0}
+						<Card>
+							<CardHeader>
+								<CardTitle class="flex items-center gap-2">
+									<Gauge class="h-5 w-5" />
+									Mileage & Fuel Statistics
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+									{#if vehicleStatsData.currentMileage !== null}
+										<StatCardDual
+											label="Current {$settingsStore.settings?.distanceUnit === 'kilometers'
+												? 'Odometer'
+												: 'Mileage'}"
+											value={vehicleStatsData.currentMileage.toLocaleString()}
+											unit={getDistanceUnitLabel(
+												$settingsStore.settings?.distanceUnit || 'miles',
+												false
+											)}
+											secondaryLabel="{$settingsStore.settings?.distanceUnit === 'kilometers'
+												? 'Distance'
+												: 'Miles'} Driven"
+											secondaryValue={vehicleStatsData.totalMileage.toLocaleString()}
+											secondaryUnit={selectedStatsPeriod === 'all'
+												? 'lifetime'
+												: `in ${selectedStatsPeriod}`}
+										/>
+									{/if}
+
+									{#if vehicleStatsData.totalFuelConsumed > 0}
+										<StatCardDual
+											label="Fuel Consumed"
+											value={vehicleStatsData.totalFuelConsumed.toFixed(1)}
+											unit={getVolumeUnitLabel(
+												$settingsStore.settings?.volumeUnit || 'gallons_us',
+												true
+											)}
+											secondaryLabel="Total Fuel Cost"
+											secondaryValue={formatCurrency(vehicleStatsData.totalFuelCost)}
+											secondaryUnit="{vehicleStatsData.fuelExpenseCount} fill-ups"
+										/>
+									{/if}
+
+									{#if vehicleStatsData.totalChargeConsumed > 0}
+										<StatCardDual
+											label="Charge Consumed"
+											value={vehicleStatsData.totalChargeConsumed.toFixed(1)}
+											unit={getChargeUnitLabel($settingsStore.settings?.chargeUnit || 'kwh', true)}
+											secondaryLabel="Total Charge Cost"
+											secondaryValue={formatCurrency(vehicleStatsData.totalFuelCost)}
+											secondaryUnit="{vehicleStatsData.fuelExpenseCount} charges"
+										/>
+									{/if}
+
+									{#if vehicleStatsData.averageMpg !== null}
+										<StatCardDual
+											label="Average {getFuelEfficiencyLabel(
+												$settingsStore.settings?.distanceUnit || 'miles',
+												$settingsStore.settings?.volumeUnit || 'gallons_us'
+											)}"
+											value={vehicleStatsData.averageMpg.toFixed(1)}
+											unit="fuel efficiency"
+											secondaryLabel="Cost per {getDistanceUnitLabel(
+												$settingsStore.settings?.distanceUnit || 'miles',
+												true
+											)}"
+											secondaryValue={vehicleStatsData.costPerMile !== null
+												? formatCurrency(vehicleStatsData.costPerMile)
+												: 'N/A'}
+											secondaryUnit="fuel only"
+										/>
+									{/if}
+
+									{#if vehicleStatsData.averageMilesPerKwh !== null}
+										<StatCardDual
+											label="Efficiency"
+											value={vehicleStatsData.averageMilesPerKwh.toFixed(2)}
+											unit={getElectricEfficiencyLabel(
+												$settingsStore.settings?.distanceUnit || 'miles',
+												$settingsStore.settings?.chargeUnit || 'kwh'
+											)}
+											secondaryLabel="Cost per {getDistanceUnitLabel(
+												$settingsStore.settings?.distanceUnit || 'miles',
+												true
+											)}"
+											secondaryValue={vehicleStatsData.costPerMile !== null
+												? formatCurrency(vehicleStatsData.costPerMile)
+												: 'N/A'}
+											secondaryUnit="charge only"
+										/>
+									{/if}
+								</div>
+							</CardContent>
+						</Card>
+					{:else if vehicleStatsData}
+						<EmptyState>
+							{#snippet icon()}
+								<Gauge class="h-12 w-12 text-muted-foreground mb-4" />
+							{/snippet}
+							{#snippet title()}
+								No fuel data yet
+							{/snippet}
+							{#snippet description()}
+								Add fuel expenses with mileage to see detailed fuel statistics
+							{/snippet}
+							{#snippet action()}
+								<Button
+									href="/expenses/new?vehicleId={vehicleId}&returnTo=/vehicles/{vehicleId}&category=fuel"
+								>
+									<Plus class="h-4 w-4 mr-2" />
+									Add Fuel Expense
+								</Button>
+							{/snippet}
+						</EmptyState>
+					{/if}
+
+					<!-- Expense Trend Chart -->
+					<ExpenseTrendChart
+						data={expenseTrendData}
+						period={selectedStatsPeriod}
+						isLoading={isLoadingStats}
+					/>
+
+					<!-- Fuel Efficiency Trend Chart -->
+					{#if fuelEfficiencyData.length >= 2 && vehicle}
+						<FuelEfficiencyTrendChart
+							data={fuelEfficiencyData}
+							fuelType={vehicle.vehicleType || 'gas'}
+							isLoading={isLoadingStats}
+						/>
+					{/if}
+
+					<!-- Expenses by Category with Pie Chart -->
+					{#if categoryChartData.length > 0}
+						<CategoryPieChart data={categoryChartData} isLoading={isLoadingStats} />
+					{/if}
 				{/if}
-
-				<!-- Basic Information -->
-				<div class="card">
-					<div class="flex items-center gap-2 mb-4">
-						<Car class="h-5 w-5 text-primary-600" />
-						<h2 class="text-lg font-semibold text-gray-900">Vehicle Information</h2>
-					</div>
-
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<div>
-							<p class="text-sm text-gray-600">Make & Model</p>
-							<p class="font-medium text-gray-900">{vehicle.make} {vehicle.model}</p>
-						</div>
-
-						<div>
-							<p class="text-sm text-gray-600">Year</p>
-							<p class="font-medium text-gray-900">{vehicle.year}</p>
-						</div>
-
-						{#if vehicle.licensePlate}
-							<div>
-								<p class="text-sm text-gray-600">License Plate</p>
-								<p class="font-medium text-gray-900 font-mono">{vehicle.licensePlate}</p>
-							</div>
-						{/if}
-
-						{#if vehicle.initialMileage}
-							<div>
-								<p class="text-sm text-gray-600">Initial Mileage</p>
-								<p class="font-medium text-gray-900">
-									{vehicle.initialMileage.toLocaleString()} mi
-								</p>
-							</div>
-						{/if}
-
-						{#if vehicle.purchaseDate}
-							<div>
-								<p class="text-sm text-gray-600">Purchase Date</p>
-								<p class="font-medium text-gray-900">
-									{formatDate(new Date(vehicle.purchaseDate))}
-								</p>
-							</div>
-						{/if}
-
-						{#if vehicle.purchasePrice}
-							<div>
-								<p class="text-sm text-gray-600">Purchase Price</p>
-								<p class="font-medium text-gray-900">{formatCurrency(vehicle.purchasePrice)}</p>
-							</div>
-						{/if}
-					</div>
-				</div>
 			</TabsContent>
 
 			<!-- Expenses Tab -->
@@ -606,20 +699,24 @@
 								bind:value={searchTerm}
 								placeholder="Search expenses..."
 								class="pl-10 w-full"
+								aria-label="Search expenses"
 							/>
 						</div>
-						<button
+						<Button
+							variant="outline"
 							onclick={() => (showFilters = !showFilters)}
-							class="btn btn-outline inline-flex items-center gap-2"
+							aria-label="Toggle filters"
+							aria-expanded={showFilters}
+							aria-controls="expense-filters"
 						>
-							<ListFilter class="h-4 w-4" />
+							<ListFilter class="h-4 w-4 mr-2" />
 							Filters
-						</button>
+						</Button>
 					</div>
 
 					<!-- Filter Panel -->
 					{#if showFilters}
-						<div class="border-t border-gray-200 pt-4 space-y-4">
+						<div id="expense-filters" class="border-t border-gray-200 pt-4 space-y-4">
 							<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 								<!-- Category Filter -->
 								<div>
@@ -661,13 +758,10 @@
 							</div>
 
 							<div class="flex justify-end">
-								<button
-									onclick={clearFilters}
-									class="btn btn-outline inline-flex items-center gap-2"
-								>
-									<X class="h-4 w-4" />
+								<Button variant="outline" onclick={clearFilters} aria-label="Clear all filters">
+									<X class="h-4 w-4 mr-2" />
 									Clear Filters
-								</button>
+								</Button>
 							</div>
 						</div>
 					{/if}
@@ -692,190 +786,186 @@
 						emptyActionHref="/expenses/new?vehicleId={vehicleId}&returnTo=/vehicles/{vehicleId}"
 						scrollHeight="600px"
 						onClearFilters={clearFilters}
-						hasActiveFilters={!!(
-							searchTerm ||
-							filters.category ||
-							filters.tags?.length ||
-							filters.startDate ||
-							filters.endDate
-						)}
+						{hasActiveFilters}
 					/>
 				</div>
 			</TabsContent>
 
-			<!-- Reminders Tab -->
+			<!-- Maintenance Tab -->
 			<TabsContent value="maintenance" class="space-y-6">
-				<div class="card">
-					<div class="flex items-center gap-2 mb-4">
-						<Wrench class="h-5 w-5 text-primary-600" />
-						<h2 class="text-lg font-semibold text-gray-900">Reminders</h2>
-					</div>
-					<div class="text-center py-12">
-						<Wrench class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-						<h3 class="text-lg font-medium text-gray-900 mb-2">Reminders coming soon</h3>
-						<p class="text-gray-600">
-							Set reminders for maintenance, registration renewals, and more
-						</p>
-					</div>
-				</div>
+				<EmptyState>
+					{#snippet icon()}
+						<FileText class="h-12 w-12 text-muted-foreground mb-4" />
+					{/snippet}
+					{#snippet title()}
+						Maintenance reminders coming soon
+					{/snippet}
+					{#snippet description()}
+						Set up reminders for oil changes, tire rotations, and more
+					{/snippet}
+				</EmptyState>
 			</TabsContent>
 
 			<!-- Finance Tab -->
 			<TabsContent value="loan" class="space-y-6">
 				{#if vehicle.financing?.isActive}
-					<div class="card">
-						<div class="flex items-center gap-2 mb-4">
-							<CreditCard class="h-5 w-5 text-primary-600" />
-							<h2 class="text-lg font-semibold text-gray-900">
+					<Card>
+						<CardHeader>
+							<CardTitle class="flex items-center gap-2">
+								<CreditCard class="h-5 w-5" />
 								{vehicle.financing.financingType === 'loan'
 									? 'Loan'
 									: vehicle.financing.financingType === 'lease'
 										? 'Lease'
 										: 'Financing'} Information
-							</h2>
-						</div>
-
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-							<div>
-								<p class="text-sm text-gray-600">Type</p>
-								<p class="font-medium text-gray-900 capitalize">
-									{vehicle.financing.financingType}
-								</p>
-							</div>
-
-							<div>
-								<p class="text-sm text-gray-600">
-									{vehicle.financing.financingType === 'loan'
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+								<div class="capitalize">
+									<StatCard label="Type" value={vehicle.financing.financingType} />
+								</div>
+								<StatCard
+									label={vehicle.financing.financingType === 'loan'
 										? 'Lender'
 										: vehicle.financing.financingType === 'lease'
 											? 'Leasing Company'
 											: 'Provider'}
-								</p>
-								<p class="font-medium text-gray-900">{vehicle.financing.provider}</p>
+									value={vehicle.financing.provider}
+								/>
+								<StatCard
+									label="Current Balance"
+									value={formatCurrency(vehicle.financing.currentBalance)}
+								/>
+								<StatCard
+									label="Original Amount"
+									value={formatCurrency(vehicle.financing.originalAmount)}
+								/>
+
+								{#if vehicle.financing.apr !== undefined && vehicle.financing.apr !== null}
+									<StatCard label="APR" value="{vehicle.financing.apr}%" />
+								{/if}
+
+								<StatCard
+									label="{vehicle.financing.financingType === 'lease' ? 'Lease' : ''} Payment"
+									value={formatCurrency(vehicle.financing.paymentAmount)}
+								/>
+								<StatCard label="Term" value={vehicle.financing.termMonths} unit="months" />
+
+								{#if vehicle.financing.financingType === 'lease'}
+									{#if vehicle.financing.residualValue}
+										<StatCard
+											label="Residual Value"
+											value={formatCurrency(vehicle.financing.residualValue)}
+										/>
+									{/if}
+
+									{#if vehicle.financing.mileageLimit}
+										<StatCard
+											label="Annual {$settingsStore.settings?.distanceUnit === 'kilometers'
+												? 'Distance'
+												: 'Mileage'} Limit"
+											value={vehicle.financing.mileageLimit.toLocaleString()}
+											unit={getDistanceUnitLabel(
+												$settingsStore.settings?.distanceUnit || 'miles',
+												false
+											)}
+										/>
+									{/if}
+
+									{#if vehicle.financing.excessMileageFee}
+										<StatCard
+											label="Excess {$settingsStore.settings?.distanceUnit === 'kilometers'
+												? 'Distance'
+												: 'Mileage'} Fee"
+											value={formatCurrency(vehicle.financing.excessMileageFee)}
+											unit="/{getDistanceUnitLabel(
+												$settingsStore.settings?.distanceUnit || 'miles',
+												true
+											)}"
+										/>
+									{/if}
+								{/if}
 							</div>
 
-							<div>
-								<p class="text-sm text-gray-600">Current Balance</p>
-								<p class="font-medium text-gray-900">
-									{formatCurrency(vehicle.financing.currentBalance)}
-								</p>
-							</div>
-
-							<div>
-								<p class="text-sm text-gray-600">Original Amount</p>
-								<p class="font-medium text-gray-900">
-									{formatCurrency(vehicle.financing.originalAmount)}
-								</p>
-							</div>
-
-							{#if vehicle.financing.apr !== undefined && vehicle.financing.apr !== null}
-								<div>
-									<p class="text-sm text-gray-600">APR</p>
-									<p class="font-medium text-gray-900">{vehicle.financing.apr}%</p>
+							<!-- Progress Bar -->
+							<div class="mt-6 pt-6 border-t">
+								<div class="flex justify-between text-sm text-muted-foreground mb-2">
+									<span>
+										{vehicle.financing.financingType === 'loan'
+											? 'Loan'
+											: vehicle.financing.financingType === 'lease'
+												? 'Lease'
+												: 'Payment'} Progress
+									</span>
+									<span class="font-semibold">
+										{Math.round(
+											((vehicle.financing.originalAmount - vehicle.financing.currentBalance) /
+												vehicle.financing.originalAmount) *
+												100
+										)}% paid
+									</span>
 								</div>
-							{/if}
-
-							<div>
-								<p class="text-sm text-gray-600">
-									{vehicle.financing.financingType === 'lease' ? 'Lease' : ''} Payment
-								</p>
-								<p class="font-medium text-gray-900">
-									{formatCurrency(vehicle.financing.paymentAmount)}
-								</p>
-							</div>
-
-							<div>
-								<p class="text-sm text-gray-600">Term</p>
-								<p class="font-medium text-gray-900">{vehicle.financing.termMonths} months</p>
-							</div>
-
-							{#if vehicle.financing.financingType === 'lease'}
-								{#if vehicle.financing.residualValue}
-									<div>
-										<p class="text-sm text-gray-600">Residual Value</p>
-										<p class="font-medium text-gray-900">
-											{formatCurrency(vehicle.financing.residualValue)}
-										</p>
-									</div>
-								{/if}
-
-								{#if vehicle.financing.mileageLimit}
-									<div>
-										<p class="text-sm text-gray-600">Annual Mileage Limit</p>
-										<p class="font-medium text-gray-900">
-											{vehicle.financing.mileageLimit.toLocaleString()} miles
-										</p>
-									</div>
-								{/if}
-
-								{#if vehicle.financing.excessMileageFee}
-									<div>
-										<p class="text-sm text-gray-600">Excess Mileage Fee</p>
-										<p class="font-medium text-gray-900">
-											{formatCurrency(vehicle.financing.excessMileageFee)}/mile
-										</p>
-									</div>
-								{/if}
-							{/if}
-						</div>
-
-						<!-- Progress Bar -->
-						<div class="mt-4 pt-4 border-t border-gray-200">
-							<div class="flex justify-between text-sm text-gray-600 mb-2">
-								<span>
-									{vehicle.financing.financingType === 'loan'
-										? 'Loan'
-										: vehicle.financing.financingType === 'lease'
-											? 'Lease'
-											: 'Payment'} Progress
-								</span>
-								<span>
-									{Math.round(
-										((vehicle.financing.originalAmount - vehicle.financing.currentBalance) /
+								<div class="w-full bg-secondary rounded-full h-3">
+									<div
+										class="bg-primary h-3 rounded-full transition-all duration-300"
+										style="width: {((vehicle.financing.originalAmount -
+											vehicle.financing.currentBalance) /
 											vehicle.financing.originalAmount) *
-											100
-									)}% paid
-								</span>
+											100}%"
+									></div>
+								</div>
 							</div>
-							<div class="w-full bg-gray-200 rounded-full h-2">
-								<div
-									class="bg-primary-600 h-2 rounded-full transition-all duration-300"
-									style="width: {((vehicle.financing.originalAmount -
-										vehicle.financing.currentBalance) /
-										vehicle.financing.originalAmount) *
-										100}%"
-								></div>
-							</div>
-						</div>
-					</div>
+						</CardContent>
+					</Card>
 				{:else}
-					<div class="card">
-						<div class="text-center py-12">
-							<CreditCard class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-							<h3 class="text-lg font-medium text-gray-900 mb-2">No active financing</h3>
-							<p class="text-gray-600">This vehicle doesn't have active financing</p>
-						</div>
-					</div>
+					<EmptyState>
+						{#snippet icon()}
+							<CreditCard class="h-12 w-12 text-muted-foreground mb-4" />
+						{/snippet}
+						{#snippet title()}
+							No active financing
+						{/snippet}
+						{#snippet description()}
+							This vehicle doesn't have active financing
+						{/snippet}
+					</EmptyState>
 				{/if}
 			</TabsContent>
 		</Tabs>
 	</div>
 {:else}
-	<div class="text-center py-12">
-		<Car class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-		<h3 class="text-lg font-medium text-gray-900 mb-2">Vehicle not found</h3>
-		<p class="text-gray-600 mb-4">
+	<!-- Vehicle Not Found State -->
+	<EmptyState>
+		{#snippet icon()}
+			<Car class="h-12 w-12 text-muted-foreground mb-4" />
+		{/snippet}
+		{#snippet title()}
+			Vehicle not found
+		{/snippet}
+		{#snippet description()}
 			The vehicle you're looking for doesn't exist or you don't have access to it.
-		</p>
-		<button onclick={() => goto('/dashboard')} class="btn btn-primary"> Back to Dashboard </button>
-	</div>
+		{/snippet}
+		{#snippet action()}
+			<Button onclick={() => goto('/dashboard')}>Back to Dashboard</Button>
+		{/snippet}
+	</EmptyState>
 {/if}
 
 <!-- Floating Action Button -->
 {#if vehicle}
 	<Button
 		href="/expenses/new?vehicleId={vehicleId}&returnTo=/vehicles/{vehicleId}"
-		class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto sm:rounded-full rounded-full group !bg-gradient-to-r !from-primary-600 !to-primary-700 hover:!from-primary-700 hover:!to-primary-800 !text-white shadow-2xl hover:shadow-primary-500/50 transition-all duration-300 sm:hover:scale-110 !z-50 h-16 sm:h-16 !pl-6 !pr-10 !border-0 !justify-center"
+		class="
+			fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full
+			sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto
+			flex items-center justify-center gap-2 pl-6 pr-10
+			bg-gray-900 hover:bg-gray-800
+			text-white shadow-2xl hover:shadow-gray-900/50
+			transition-all duration-300 sm:hover:scale-110
+			border-0 group
+		"
+		aria-label="Add expense"
 	>
 		<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
 		<span class="font-bold text-lg">Add Expense</span>

@@ -8,7 +8,9 @@ To save time, before running validation, go ahead and run all:fix package.json s
 
 Minimize task summary to be a few key points, no need for full paragraphs
 
-Make sure you add `--no-pager` to git commands that display a lot of text (like diff).
+Make sure you add `--no-pager` to git commands that display a lot of text (like diff). Make sure you add no pager right after `git` and before the command
+
+For UI tasks, please use shadcnui-svelte for UI elements everywhere possible. For charts, you can use layerchart. Do not use other libraries without checking with the user.
 
 ## Svelte 5 Runes Mode
 

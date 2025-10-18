@@ -71,6 +71,7 @@
 		"@tailwindcss/postcss": "^4.1.14",
 		"bits-ui": "^2.11.7",
 		"d3": "^7.9.0",
+		"layerchart": "^1.0.12",
 		"lucide-svelte": "^0.545.0",
 		"superforms": "^0.0.1",
 		"sveltekit-superforms": "^2.27.2",

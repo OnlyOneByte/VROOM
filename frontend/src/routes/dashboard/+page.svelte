@@ -648,7 +648,16 @@
 	<!-- Floating Action Button -->
 	<Button
 		href="/vehicles/new"
-		class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto sm:rounded-full rounded-full group !bg-gradient-to-r !from-primary-600 !to-primary-700 hover:!from-primary-700 hover:!to-primary-800 !text-white shadow-2xl hover:shadow-primary-500/50 transition-all duration-300 sm:hover:scale-110 !z-50 h-16 sm:h-16 !pl-6 !pr-10 !border-0 !justify-center"
+		class="
+			fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full
+			sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto
+			flex items-center justify-center gap-2 pl-6 pr-10
+			bg-gray-900 hover:bg-gray-800
+			text-white shadow-2xl hover:shadow-gray-900/50
+			transition-all duration-300 sm:hover:scale-110
+			border-0 group
+		"
+		aria-label="Add vehicle"
 	>
 		<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
 		<span class="font-bold text-lg">Add Vehicle</span>
