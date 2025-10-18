@@ -1,17 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
-import { closeDatabaseConnection, runMigrations } from '../../db/connection.js';
 import { clearDatabase } from '../../db/seed.js';
 import { repositoryFactory } from '../../lib/repositories/index.js';
 
 describe('Repository Integration Tests', () => {
   beforeAll(async () => {
-    try {
-      // Initialize test database
-      await runMigrations();
-    } catch (error) {
-      // If migrations fail (e.g., duplicate column), it's likely the database is already set up
-      console.log('Migration warning (may be expected):', error);
-    }
+    // Database is already initialized by test setup
   });
 
   beforeEach(async () => {

@@ -136,7 +136,7 @@ function createSettingsStore() {
 
 		async downloadBackup() {
 			try {
-				const response = await fetch('/api/sync/download', {
+				const response = await fetch('/api/sync/backups/download', {
 					credentials: 'include'
 				});
 
@@ -167,9 +167,15 @@ function createSettingsStore() {
 				formData.append('file', file);
 				formData.append('mode', mode);
 
-				const response = await fetch('/api/sync/upload', {
+				// Generate idempotency key for this operation
+				const idempotencyKey = `restore-${mode}-${file.name}-${file.size}-${Date.now()}`;
+
+				const response = await fetch('/api/sync/restore/from-backup', {
 					method: 'POST',
 					credentials: 'include',
+					headers: {
+						'Idempotency-Key': idempotencyKey
+					},
 					body: formData
 				});
 
@@ -213,6 +219,31 @@ function createSettingsStore() {
 				return await response.json();
 			} catch (error) {
 				const errorMessage = error instanceof Error ? error.message : 'Failed to execute sync';
+				update(state => ({ ...state, error: errorMessage }));
+				throw error;
+			}
+		},
+
+		async initializeDrive() {
+			try {
+				const response = await fetch('/api/sync/backups/initialize-drive', {
+					method: 'POST',
+					credentials: 'include'
+				});
+
+				if (!response.ok) {
+					throw new Error('Failed to initialize Google Drive');
+				}
+
+				const result = await response.json();
+
+				// Reload settings to get updated folder IDs
+				await this.load();
+
+				return result;
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : 'Failed to initialize Google Drive';
 				update(state => ({ ...state, error: errorMessage }));
 				throw error;
 			}
@@ -335,10 +366,14 @@ function createSettingsStore() {
 
 		async restoreFromSheets(mode: 'preview' | 'replace' | 'merge' = 'preview') {
 			try {
-				const response = await fetch('/api/sync/restore-from-sheets', {
+				// Generate idempotency key for this operation
+				const idempotencyKey = `restore-sheets-${mode}-${Date.now()}`;
+
+				const response = await fetch('/api/sync/restore/from-sheets', {
 					method: 'POST',
 					headers: {
-						'Content-Type': 'application/json'
+						'Content-Type': 'application/json',
+						'Idempotency-Key': idempotencyKey
 					},
 					credentials: 'include',
 					body: JSON.stringify({ mode })

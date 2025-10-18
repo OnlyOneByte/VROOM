@@ -15,6 +15,8 @@ For UI tasks, please use shadcnui-svelte for UI elements everywhere possible. Fo
 
 When coding, avoid using deprecated functions. Make sure to check files you edit that functions are not deprecated. Specifically for svelte, make sure you are not using ComponentType, and instead use Component
 
+Unless asked by the user, please do not generate any documentation docs other than updating readme or existing documentation where it makes sense to.
+
 ## Svelte 5 Runes Mode
 
 This project uses Svelte 5 with runes mode. Follow these rules:

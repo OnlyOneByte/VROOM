@@ -23,8 +23,18 @@ const app = new Hono();
 // Global error handler
 app.onError(errorHandler);
 
-// Rate limiting middleware
-app.use('*', rateLimiter);
+// Rate limiting middleware - global rate limiter
+app.use(
+  '*',
+  rateLimiter({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 100, // 100 requests per window
+    keyGenerator: (c) => {
+      const user = c.get('user');
+      return user?.id || c.req.header('x-forwarded-for') || 'anonymous';
+    },
+  })
+);
 
 // CORS middleware with environment-based origins
 app.use(

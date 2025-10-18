@@ -141,8 +141,8 @@ auth.get('/callback/google', async (c) => {
 
   // Check for existing Google Drive backups and auto-enable if found
   try {
-    const { syncService } = await import('../lib/sync-service');
-    const backupCheck = await syncService.checkExistingGoogleDriveBackups(userId);
+    const { driveSync } = await import('../lib/services/sync/drive-sync');
+    const backupCheck = await driveSync.checkExistingGoogleDriveBackups(userId);
 
     if (backupCheck.hasBackupFolder && backupCheck.existingBackups.length > 0) {
       // Auto-enable Google Drive backup if backups exist
@@ -224,8 +224,8 @@ auth.get('/me', async (c) => {
       !settings[0].googleDriveBackupEnabled &&
       !settings[0].googleDriveBackupFolderId
     ) {
-      const { syncService } = await import('../lib/sync-service');
-      const backupCheck = await syncService.checkExistingGoogleDriveBackups(user.id);
+      const { driveSync } = await import('../lib/services/sync/drive-sync');
+      const backupCheck = await driveSync.checkExistingGoogleDriveBackups(user.id);
 
       if (backupCheck.hasBackupFolder && backupCheck.existingBackups.length > 0) {
         // Auto-enable Google Drive backup if backups exist

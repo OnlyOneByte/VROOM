@@ -79,6 +79,9 @@ import { checkDatabaseHealth, closeDatabaseConnection, db } from '../db/connecti
 import { ValidationError } from './errors.js';
 import { repositoryFactory } from './repositories/index.js';
 
+// Export Database type for use in repositories
+export type Database = typeof db;
+
 // Re-export error classes from centralized location
 export { DatabaseError, NotFoundError, ValidationError } from './errors.js';
 

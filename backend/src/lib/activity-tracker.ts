@@ -151,10 +151,9 @@ export class ActivityTracker {
 
       console.log(`Auto-sync starting for user ${userId} (changes detected)`);
 
-      // Call SyncService.executeSync with syncTypes array
-      const { SyncService } = await import('./sync-service');
-      const syncService = new SyncService();
-      const results = await syncService.executeSync(userId, syncTypes);
+      // Call syncOrchestrator.executeSync with syncTypes array
+      const { syncOrchestrator } = await import('./services/sync/sync-orchestrator');
+      const results = await syncOrchestrator.executeSync(userId, syncTypes);
 
       // Log results
       if (results.sheets) {

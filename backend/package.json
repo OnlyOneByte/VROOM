@@ -39,6 +39,8 @@
     "adm-zip": "^0.5.16",
     "arctic": "^1.9.0",
     "cors": "^2.8.5",
+    "csv-parse": "^6.1.0",
+    "csv-stringify": "^6.6.0",
     "dotenv": "^16.3.1",
     "drizzle-orm": "^0.44.6",
     "googleapis": "^162.0.0",

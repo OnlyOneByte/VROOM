@@ -231,12 +231,18 @@
 	async function loadDriveBackups() {
 		isLoadingBackups = true;
 		try {
+			// First, initialize/check Google Drive folder structure
+			await settingsStore.initializeDrive();
+
+			// Then list available backups
 			const result = await settingsStore.listBackups();
-			if (result.success) {
-				driveBackups = result.backups || [];
+			if (result.success && result.data) {
+				driveBackups = result.data.backups || [];
 			}
-		} catch {
-			appStore.showError('Failed to load backups from Google Drive');
+		} catch (error) {
+			const errorMessage =
+				error instanceof Error ? error.message : 'Failed to load backups from Google Drive';
+			appStore.showError(errorMessage);
 		} finally {
 			isLoadingBackups = false;
 		}
