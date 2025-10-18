@@ -5,7 +5,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import { LoaderCircle } from 'lucide-svelte';
 
-	let isLoading = false;
+	let isLoading = $state(false);
 
 	// Use automatic store subscription
 	let authState = $derived($authStore);
@@ -31,7 +31,7 @@
 <div
 	class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4"
 >
-	<div class="w-full max-w-md space-y-8">
+	<div class="w-full max-w-2xl space-y-8">
 		<!-- Logo and Title -->
 		<div class="text-center space-y-2">
 			<div
@@ -39,8 +39,8 @@
 			>
 				<span class="text-5xl">🚗</span>
 			</div>
-			<h1 class="text-4xl font-bold tracking-tight">VROOM</h1>
-			<p class="text-muted-foreground text-lg">Track your vehicle expenses with ease</p>
+			<h1 class="text-4xl font-bold tracking-tight">VROOM Car Tracker</h1>
+			<p class="text-muted-foreground text-lg">Vehicle Record & Organization Of Maintenance</p>
 		</div>
 
 		<!-- Auth Card -->
@@ -93,5 +93,50 @@
 		<p class="text-center text-sm text-muted-foreground">
 			No account needed • Sign in with Google to get started
 		</p>
+
+		<!-- Features Section -->
+		<div class="bg-white rounded-lg shadow-lg p-8 border-2">
+			<div class="grid gap-6 text-left">
+				<div class="flex items-start gap-4">
+					<div class="text-3xl">🔓</div>
+					<div>
+						<h3 class="font-semibold text-lg text-gray-900 mb-1">Fully Open Source</h3>
+						<p class="text-gray-600">
+							Make it your own! Fork, customize, and host it yourself with complete control.
+						</p>
+					</div>
+				</div>
+
+				<div class="flex items-start gap-4">
+					<div class="text-3xl">📊</div>
+					<div>
+						<h3 class="font-semibold text-lg text-gray-900 mb-1">Open Format CSVs</h3>
+						<p class="text-gray-600">
+							All data in standard CSV format. Migrate anywhere, anytime, with zero lock-in.
+						</p>
+					</div>
+				</div>
+
+				<div class="flex items-start gap-4">
+					<div class="text-3xl">☁️</div>
+					<div>
+						<h3 class="font-semibold text-lg text-gray-900 mb-1">Direct Google Drive Sync</h3>
+						<p class="text-gray-600">
+							Your data can sync directly to your Drive. No proprietary databases to manage.
+						</p>
+					</div>
+				</div>
+
+				<div class="flex items-start gap-4">
+					<div class="text-3xl">🔒</div>
+					<div>
+						<h3 class="font-semibold text-lg text-gray-900 mb-1">Privacy First</h3>
+						<p class="text-gray-600">
+							No data stored beyond sync. Everything lives with you or in your Google Drive, under your control.
+						</p>
+					</div>
+				</div>
+			</div>
+		</div>
 	</div>
 </div>
