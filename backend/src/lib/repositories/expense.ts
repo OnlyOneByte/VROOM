@@ -80,6 +80,46 @@ export class ExpenseRepository
     }
   }
 
+  async findByUserIdAndDateRange(
+    userId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<Expense[]> {
+    try {
+      const result = await this.database
+        .select({
+          id: expenses.id,
+          vehicleId: expenses.vehicleId,
+          category: expenses.category,
+          amount: expenses.amount,
+          currency: expenses.currency,
+          date: expenses.date,
+          mileage: expenses.mileage,
+          volume: expenses.volume,
+          charge: expenses.charge,
+          description: expenses.description,
+          receiptUrl: expenses.receiptUrl,
+          tags: expenses.tags,
+          createdAt: expenses.createdAt,
+          updatedAt: expenses.updatedAt,
+        })
+        .from(expenses)
+        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+        .where(
+          and(
+            eq(vehicles.userId, userId),
+            gte(expenses.date, startDate),
+            lte(expenses.date, endDate)
+          )
+        )
+        .orderBy(desc(expenses.date));
+      return result;
+    } catch (error) {
+      console.error(`Error finding expenses for user ${userId} in date range:`, error);
+      throw new Error('Failed to find expenses for user in date range');
+    }
+  }
+
   async findByCategory(vehicleId: string, category: string): Promise<Expense[]> {
     try {
       const result = await this.database

@@ -80,6 +80,7 @@ export interface IExpenseRepository extends IBaseRepository<Expense, NewExpense>
     endDate: Date
   ): Promise<Expense[]>;
   findByUserId(userId: string): Promise<Expense[]>;
+  findByUserIdAndDateRange(userId: string, startDate: Date, endDate: Date): Promise<Expense[]>;
   findByCategory(vehicleId: string, category: string): Promise<Expense[]>;
   findFuelExpenses(vehicleId: string): Promise<Expense[]>;
   batchCreate(expenses: NewExpense[]): Promise<Expense[]>; // For offline sync

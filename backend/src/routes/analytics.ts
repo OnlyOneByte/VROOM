@@ -82,19 +82,11 @@ analytics.get('/dashboard', zValidator('query', analyticsQuerySchema), async (c)
       });
     }
 
-    // Get expenses for all vehicles
-    let allExpenses: ExpenseData[] = [];
-    for (const vehicle of userVehicles) {
-      const vehicleExpenses =
-        query.startDate && query.endDate
-          ? await expenseRepository.findByVehicleIdAndDateRange(
-              vehicle.id,
-              query.startDate,
-              query.endDate
-            )
-          : await expenseRepository.findByVehicleId(vehicle.id);
-      allExpenses = allExpenses.concat(vehicleExpenses);
-    }
+    // Get expenses for all vehicles with a single query
+    const allExpenses: ExpenseData[] =
+      query.startDate && query.endDate
+        ? await expenseRepository.findByUserIdAndDateRange(user.id, query.startDate, query.endDate)
+        : await expenseRepository.findByUserId(user.id);
 
     // Calculate analytics data
     const dashboardData = calculateDashboardAnalytics(allExpenses, userVehicles, query.groupBy);
@@ -175,27 +167,21 @@ analytics.get('/trends', zValidator('query', analyticsQuerySchema), async (c) =>
     // Get all user vehicles
     const userVehicles = await vehicleRepository.findByUserId(user.id);
 
-    // Get expenses for all vehicles
-    let allExpenses: ExpenseData[] = [];
-    for (const vehicle of userVehicles) {
-      const vehicleExpenses =
-        query.startDate && query.endDate
-          ? await expenseRepository.findByVehicleIdAndDateRange(
-              vehicle.id,
-              query.startDate,
-              query.endDate
-            )
-          : await expenseRepository.findByVehicleId(vehicle.id);
-      allExpenses = allExpenses.concat(
-        vehicleExpenses.map((e) => ({
-          ...e,
-          vehicleName: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-        }))
-      );
-    }
+    // Get expenses for all vehicles with a single query
+    const allExpenses: ExpenseData[] =
+      query.startDate && query.endDate
+        ? await expenseRepository.findByUserIdAndDateRange(user.id, query.startDate, query.endDate)
+        : await expenseRepository.findByUserId(user.id);
+
+    // Add vehicle names to expenses
+    const vehicleMap = new Map(userVehicles.map((v) => [v.id, `${v.year} ${v.make} ${v.model}`]));
+    const expensesWithVehicleNames = allExpenses.map((e) => ({
+      ...e,
+      vehicleName: vehicleMap.get(e.vehicleId) || 'Unknown Vehicle',
+    }));
 
     // Calculate trend data
-    const trendData = calculateTrendData(allExpenses, query.groupBy);
+    const trendData = calculateTrendData(expensesWithVehicleNames, query.groupBy);
 
     return c.json({
       success: true,
