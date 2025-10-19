@@ -18,8 +18,8 @@ describe('VehicleRepository', () => {
 
   beforeAll(() => {
     _testDb = setupTestDatabase();
-    vehicleRepository = new VehicleRepository();
-    userRepository = new UserRepository();
+    vehicleRepository = new VehicleRepository(_testDb);
+    userRepository = new UserRepository(_testDb);
   });
 
   beforeEach(async () => {

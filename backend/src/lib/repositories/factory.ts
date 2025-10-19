@@ -1,71 +1,46 @@
-import { ExpenseRepository } from './expense.js';
-import { InsurancePolicyRepository } from './insurancePolicy.js';
+import { container } from '../di/container.js';
+import { TYPES } from '../di/types.js';
+import type { ExpenseRepository } from './expense.js';
+import type { InsurancePolicyRepository } from './insurancePolicy.js';
 import type { IRepositoryFactory } from './interfaces.js';
-import { UserRepository } from './user.js';
-import { VehicleRepository } from './vehicle.js';
-import { VehicleFinancingRepository } from './vehicleFinancing.js';
-import { VehicleFinancingPaymentRepository } from './vehicleFinancingPayment.js';
-import { VehicleShareRepository } from './vehicleShare.js';
+import type { UserRepository } from './user.js';
+import type { VehicleRepository } from './vehicle.js';
+import type { VehicleFinancingRepository } from './vehicleFinancing.js';
+import type { VehicleFinancingPaymentRepository } from './vehicleFinancingPayment.js';
+import type { VehicleShareRepository } from './vehicleShare.js';
 
-// SQLite repository factory implementation
+// SQLite repository factory implementation using DI container
 export class SQLiteRepositoryFactory implements IRepositoryFactory {
-  private userRepository?: UserRepository;
-  private vehicleRepository?: VehicleRepository;
-  private vehicleFinancingRepository?: VehicleFinancingRepository;
-  private vehicleFinancingPaymentRepository?: VehicleFinancingPaymentRepository;
-  private insurancePolicyRepository?: InsurancePolicyRepository;
-  private expenseRepository?: ExpenseRepository;
-  private vehicleShareRepository?: VehicleShareRepository;
-
   getUserRepository(): UserRepository {
-    if (!this.userRepository) {
-      this.userRepository = new UserRepository();
-    }
-    return this.userRepository;
+    return container.get<UserRepository>(TYPES.UserRepository);
   }
 
   getVehicleRepository(): VehicleRepository {
-    if (!this.vehicleRepository) {
-      this.vehicleRepository = new VehicleRepository();
-    }
-    return this.vehicleRepository;
+    return container.get<VehicleRepository>(TYPES.VehicleRepository);
   }
 
   getVehicleFinancingRepository(): VehicleFinancingRepository {
-    if (!this.vehicleFinancingRepository) {
-      this.vehicleFinancingRepository = new VehicleFinancingRepository();
-    }
-    return this.vehicleFinancingRepository;
+    return container.get<VehicleFinancingRepository>(TYPES.VehicleFinancingRepository);
   }
 
   getVehicleFinancingPaymentRepository(): VehicleFinancingPaymentRepository {
-    if (!this.vehicleFinancingPaymentRepository) {
-      this.vehicleFinancingPaymentRepository = new VehicleFinancingPaymentRepository();
-    }
-    return this.vehicleFinancingPaymentRepository;
+    return container.get<VehicleFinancingPaymentRepository>(
+      TYPES.VehicleFinancingPaymentRepository
+    );
   }
 
   getInsurancePolicyRepository(): InsurancePolicyRepository {
-    if (!this.insurancePolicyRepository) {
-      this.insurancePolicyRepository = new InsurancePolicyRepository();
-    }
-    return this.insurancePolicyRepository;
+    return container.get<InsurancePolicyRepository>(TYPES.InsurancePolicyRepository);
   }
 
   getExpenseRepository(): ExpenseRepository {
-    if (!this.expenseRepository) {
-      this.expenseRepository = new ExpenseRepository();
-    }
-    return this.expenseRepository;
+    return container.get<ExpenseRepository>(TYPES.ExpenseRepository);
   }
 
   getVehicleShareRepository(): VehicleShareRepository {
-    if (!this.vehicleShareRepository) {
-      this.vehicleShareRepository = new VehicleShareRepository();
-    }
-    return this.vehicleShareRepository;
+    return container.get<VehicleShareRepository>(TYPES.VehicleShareRepository);
   }
 }
 
-// Global repository factory instance
+// Global repository factory instance (backward compatibility)
 export const repositoryFactory = new SQLiteRepositoryFactory();

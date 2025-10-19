@@ -52,6 +52,9 @@
       "arrowParentheses": "always",
       "bracketSameLine": false,
       "quoteStyle": "single"
+    },
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
     }
   },
   "json": {

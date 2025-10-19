@@ -1,12 +1,16 @@
 import { and, eq } from 'drizzle-orm';
+import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import { inject, injectable } from 'inversify';
 import type { NewUser, User } from '../../db/schema.js';
 import { users } from '../../db/schema.js';
+import { TYPES } from '../di/types.js';
 import { BaseRepository } from './base.js';
 import type { IUserRepository } from './interfaces.js';
 
+@injectable()
 export class UserRepository extends BaseRepository<User, NewUser> implements IUserRepository {
-  constructor() {
-    super(users);
+  constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
+    super(db, users);
   }
 
   async findByEmail(email: string): Promise<User | null> {

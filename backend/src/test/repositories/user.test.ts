@@ -8,7 +8,7 @@ describe('UserRepository', () => {
 
   beforeAll(() => {
     _testDb = setupTestDatabase();
-    userRepository = new UserRepository();
+    userRepository = new UserRepository(_testDb);
   });
 
   beforeEach(() => {

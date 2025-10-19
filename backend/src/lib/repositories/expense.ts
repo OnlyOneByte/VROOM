@@ -1,15 +1,19 @@
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import { inject, injectable } from 'inversify';
 import type { Expense, NewExpense } from '../../db/schema.js';
 import { expenses, vehicles } from '../../db/schema.js';
+import { TYPES } from '../di/types.js';
 import { BaseRepository } from './base.js';
 import type { IExpenseRepository } from './interfaces.js';
 
+@injectable()
 export class ExpenseRepository
   extends BaseRepository<Expense, NewExpense>
   implements IExpenseRepository
 {
-  constructor() {
-    super(expenses);
+  constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
+    super(db, expenses);
   }
 
   async findByVehicleId(vehicleId: string): Promise<Expense[]> {

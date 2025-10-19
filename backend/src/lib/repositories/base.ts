@@ -1,29 +1,34 @@
 import { eq } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
-import { db } from '../../db/connection.js';
+import { inject, injectable } from 'inversify';
+import { TYPES } from '../di/types.js';
 import type { IBaseRepository } from './interfaces.js';
 
 // Base repository implementation with common CRUD operations
+@injectable()
 export abstract class BaseRepository<T, TNew extends Record<string, unknown>>
   implements IBaseRepository<T, TNew>
 {
-  // Static database instance for testing
+  // Static database instance for testing (backward compatibility)
   private static testDb: BunSQLiteDatabase<Record<string, unknown>> | null = null;
 
-  constructor(protected table: SQLiteTable & { id: SQLiteColumn }) {}
+  constructor(
+    @inject(TYPES.Database) protected db: BunSQLiteDatabase<Record<string, unknown>>,
+    protected table: SQLiteTable & { id: SQLiteColumn }
+  ) {}
 
   // Get the database instance (test or production)
   protected get database() {
-    return BaseRepository.testDb || db;
+    return BaseRepository.testDb || this.db;
   }
 
-  // Static method to set test database instance
+  // Static method to set test database instance (backward compatibility)
   static setDatabaseInstance(testDatabase: BunSQLiteDatabase<Record<string, unknown>>) {
     BaseRepository.testDb = testDatabase;
   }
 
-  // Static method to reset to production database
+  // Static method to reset to production database (backward compatibility)
   static resetDatabaseInstance() {
     BaseRepository.testDb = null;
   }

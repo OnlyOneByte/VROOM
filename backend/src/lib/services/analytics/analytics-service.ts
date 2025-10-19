@@ -1,3 +1,5 @@
+import { inject, injectable } from 'inversify';
+import { TYPES } from '../../di/types';
 import type { IExpenseRepository, IVehicleRepository } from '../../repositories/interfaces';
 import { CostCalculator } from './cost-calculator';
 import { DashboardCalculator } from './dashboard-calculator';
@@ -12,6 +14,7 @@ import type {
   VehicleData,
 } from './types';
 
+@injectable()
 export class AnalyticsService {
   private dashboardCalc: DashboardCalculator;
   private trendCalc: TrendCalculator;
@@ -19,8 +22,8 @@ export class AnalyticsService {
   private costCalc: CostCalculator;
 
   constructor(
-    private expenseRepo: IExpenseRepository,
-    private vehicleRepo: IVehicleRepository
+    @inject(TYPES.ExpenseRepository) private expenseRepo: IExpenseRepository,
+    @inject(TYPES.VehicleRepository) private vehicleRepo: IVehicleRepository
   ) {
     this.dashboardCalc = new DashboardCalculator();
     this.trendCalc = new TrendCalculator();

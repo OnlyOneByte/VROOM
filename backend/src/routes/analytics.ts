@@ -2,9 +2,11 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
+import { container } from '../lib/di/container';
+import { TYPES } from '../lib/di/types';
 import { requireAuth } from '../lib/middleware/auth';
 import { repositoryFactory } from '../lib/repositories/factory';
-import { AnalyticsService } from '../lib/services/analytics/analytics-service';
+import type { AnalyticsService } from '../lib/services/analytics/analytics-service';
 
 const analytics = new Hono();
 
@@ -36,10 +38,7 @@ analytics.get('/dashboard', zValidator('query', analyticsQuerySchema), async (c)
     const user = c.get('user');
     const query = c.req.valid('query');
 
-    const expenseRepository = repositoryFactory.getExpenseRepository();
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
-    const analyticsService = new AnalyticsService(expenseRepository, vehicleRepository);
-
+    const analyticsService = container.get<AnalyticsService>(TYPES.AnalyticsService);
     const data = await analyticsService.getDashboardAnalytics(user.id, query);
 
     return c.json({
@@ -69,7 +68,6 @@ analytics.get(
       const query = c.req.valid('query');
 
       const vehicleRepository = repositoryFactory.getVehicleRepository();
-      const expenseRepository = repositoryFactory.getExpenseRepository();
 
       // Verify vehicle exists and belongs to user
       const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
@@ -77,7 +75,7 @@ analytics.get(
         throw new HTTPException(404, { message: 'Vehicle not found' });
       }
 
-      const analyticsService = new AnalyticsService(expenseRepository, vehicleRepository);
+      const analyticsService = container.get<AnalyticsService>(TYPES.AnalyticsService);
       const data = await analyticsService.getVehicleAnalytics(vehicleId, vehicle, query);
 
       return c.json({
@@ -102,10 +100,7 @@ analytics.get('/trends', zValidator('query', analyticsQuerySchema), async (c) =>
     const user = c.get('user');
     const query = c.req.valid('query');
 
-    const expenseRepository = repositoryFactory.getExpenseRepository();
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
-    const analyticsService = new AnalyticsService(expenseRepository, vehicleRepository);
-
+    const analyticsService = container.get<AnalyticsService>(TYPES.AnalyticsService);
     const data = await analyticsService.getTrendData(user.id, query);
 
     return c.json({
