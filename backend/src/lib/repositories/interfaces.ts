@@ -13,6 +13,7 @@ import type {
   VehicleFinancing,
   VehicleFinancingPayment,
   VehicleShare,
+  VehicleWithFinancing,
 } from '../../db/schema.js';
 
 // Base repository interface with common CRUD operations
@@ -32,12 +33,12 @@ export interface IUserRepository extends IBaseRepository<User, NewUser> {
 
 // Vehicle repository interface
 export interface IVehicleRepository extends IBaseRepository<Vehicle, NewVehicle> {
-  findByUserId(userId: string): Promise<Vehicle[]>;
+  findByUserId(userId: string): Promise<VehicleWithFinancing[]>;
   findByUserIdAndId(userId: string, vehicleId: string): Promise<Vehicle | null>;
   findByLicensePlate(licensePlate: string): Promise<Vehicle | null>;
   updateMileage(id: string, mileage: number): Promise<Vehicle>;
-  findAccessibleVehicles(userId: string): Promise<Vehicle[]>;
-  findByIdWithAccess(vehicleId: string, userId: string): Promise<Vehicle | null>;
+  findAccessibleVehicles(userId: string): Promise<VehicleWithFinancing[]>;
+  findByIdWithAccess(vehicleId: string, userId: string): Promise<VehicleWithFinancing | null>;
 }
 
 // Vehicle Financing repository interface

@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { SvelteDate } from 'svelte/reactivity';
-	import { Plus, Search, ListFilter, X, FileText } from 'lucide-svelte';
+	import { Plus, Search, ListFilter, X, FileText, CreditCard, AlertCircle } from 'lucide-svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
@@ -10,6 +10,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import * as CardFull from '$lib/components/ui/card';
+	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
 	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
 	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
 	import FuelEfficiencyTrendChart from '$lib/components/charts/FuelEfficiencyTrendChart.svelte';
@@ -18,9 +19,15 @@
 	import VehicleInfoCard from '$lib/components/vehicles/VehicleInfoCard.svelte';
 	import ExpenseOverviewCard from '$lib/components/vehicles/ExpenseOverviewCard.svelte';
 	import FuelEfficiencyStatsCard from '$lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
-	import FinancingCard from '$lib/components/vehicles/FinancingCard.svelte';
 	import PeriodSelector from '$lib/components/vehicles/PeriodSelector.svelte';
 	import EmptyState from '$lib/components/ui/empty-state.svelte';
+	import FinancingSummaryHeader from '$lib/components/financing/FinancingSummaryHeader.svelte';
+	import PaymentMetricsGrid from '$lib/components/financing/PaymentMetricsGrid.svelte';
+	import FinancingCharts from '$lib/components/financing/FinancingCharts.svelte';
+	import PaymentCalculator from '$lib/components/financing/PaymentCalculator.svelte';
+	import PaymentHistory from '$lib/components/financing/PaymentHistory.svelte';
+	import NextPaymentCard from '$lib/components/financing/NextPaymentCard.svelte';
+	import LeaseMetricsCard from '$lib/components/financing/LeaseMetricsCard.svelte';
 	import {
 		prepareExpenseTrendData,
 		prepareFuelEfficiencyData,
@@ -43,7 +50,18 @@
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { expenseApi } from '$lib/services/expense-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import type { Vehicle, Expense, ExpenseFilters, VehicleStats } from '$lib/types.js';
+	import {
+		calculateAmortizationSchedule,
+		calculateNextPaymentDate,
+		calculatePayoffDate
+	} from '$lib/utils/financing-calculations';
+	import type {
+		Vehicle,
+		Expense,
+		ExpenseFilters,
+		VehicleStats,
+		VehicleFinancingPayment
+	} from '$lib/types.js';
 	import type { PageData } from './$types';
 
 	// Props from page load
@@ -53,12 +71,16 @@
 	// Component state
 	let isLoading = $state(true);
 	let isLoadingStats = $state(false);
+	let isLoadingPayments = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 	let expenses = $state<Expense[]>([]);
+	let payments = $state<VehicleFinancingPayment[]>([]);
 	let showFilters = $state(false);
 	let activeTab = $state('overview');
 	let vehicleStatsData = $state<VehicleStats | null>(null);
 	let selectedStatsPeriod = $state<TimePeriod>('all');
+	let paymentHistoryError = $state<string | null>(null);
+	let hasAttemptedPaymentLoad = $state(false);
 
 	// Filters and search
 	let searchTerm = $state('');
@@ -109,6 +131,65 @@
 		vehicle ? vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}` : ''
 	);
 
+	// Financing derived state with error handling
+	let progressPercentage = $derived.by(() => {
+		try {
+			if (!vehicle?.financing?.isActive) return 0;
+			const financing = vehicle.financing;
+			if (!financing.originalAmount || financing.originalAmount <= 0) return 0;
+			return (
+				((financing.originalAmount - financing.currentBalance) / financing.originalAmount) * 100
+			);
+		} catch (error) {
+			console.error('Error calculating progress percentage:', error);
+			return 0;
+		}
+	});
+
+	let totalInterestPaid = $derived.by(() => {
+		try {
+			return payments.reduce((sum, payment) => sum + (payment.interestAmount || 0), 0);
+		} catch (error) {
+			console.error('Error calculating total interest paid:', error);
+			return 0;
+		}
+	});
+
+	let estimatedPayoffDate = $derived.by(() => {
+		try {
+			const financing = vehicle?.financing;
+			if (!financing || !financing.isActive) return new Date();
+			return calculatePayoffDate(financing);
+		} catch (error) {
+			console.error('Error calculating payoff date:', error);
+			return new Date();
+		}
+	});
+
+	let nextPaymentDate = $derived.by(() => {
+		try {
+			const financing = vehicle?.financing;
+			if (!financing || !financing.isActive) return new Date();
+			const lastPayment =
+				payments.length > 0 && payments[0] ? new Date(payments[0].paymentDate) : undefined;
+			return calculateNextPaymentDate(financing, lastPayment);
+		} catch (error) {
+			console.error('Error calculating next payment date:', error);
+			return new Date();
+		}
+	});
+
+	let amortizationSchedule = $derived.by(() => {
+		try {
+			const financing = vehicle?.financing;
+			if (!financing || !financing.isActive) return [];
+			return calculateAmortizationSchedule(financing, payments.length);
+		} catch (error) {
+			console.error('Error calculating amortization schedule:', error);
+			return [];
+		}
+	});
+
 	// Load data on mount
 	onMount(async () => {
 		await Promise.all([loadVehicle(), loadExpenses()]);
@@ -123,6 +204,18 @@
 	$effect(() => {
 		if (!isLoading && selectedStatsPeriod) {
 			loadVehicleStats();
+		}
+	});
+
+	// Load payment history when financing tab becomes active
+	$effect(() => {
+		if (
+			activeTab === 'loan' &&
+			vehicle?.financing?.isActive &&
+			!hasAttemptedPaymentLoad &&
+			!isLoadingPayments
+		) {
+			loadPaymentHistory();
 		}
 	});
 
@@ -151,6 +244,24 @@
 			handleErrorWithNotification(error, 'Failed to load vehicle statistics');
 		} finally {
 			isLoadingStats = false;
+		}
+	}
+
+	async function loadPaymentHistory() {
+		if (!vehicle?.financing?.isActive) return;
+
+		isLoadingPayments = true;
+		paymentHistoryError = null;
+		hasAttemptedPaymentLoad = true;
+
+		try {
+			payments = await vehicleApi.getFinancingPayments(vehicleId);
+		} catch (error) {
+			console.error('Error loading payment history:', error);
+			paymentHistoryError = 'Failed to load payment history. Please try again.';
+			// Don't show notification for payment history errors - show inline error instead
+		} finally {
+			isLoadingPayments = false;
 		}
 	}
 
@@ -411,8 +522,130 @@
 			</TabsContent>
 
 			<!-- Finance Tab -->
-			<TabsContent value="loan" class="space-y-6">
-				<FinancingCard {vehicle} />
+			<TabsContent value="loan" class="space-y-4 sm:space-y-6">
+				{#if vehicle.financing?.isActive}
+					<!-- Financing Summary Header -->
+					{#if vehicle.financing.originalAmount && vehicle.financing.originalAmount > 0}
+						<FinancingSummaryHeader financing={vehicle.financing} {progressPercentage} />
+					{:else}
+						<Alert variant="destructive">
+							<AlertCircle class="h-4 w-4" />
+							<AlertTitle>Invalid Financing Data</AlertTitle>
+							<AlertDescription>
+								The financing information for this vehicle is incomplete or invalid. Please update
+								the financing details.
+							</AlertDescription>
+						</Alert>
+					{/if}
+
+					<!-- Payment Metrics Grid -->
+					{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
+						<PaymentMetricsGrid
+							financing={vehicle.financing}
+							{totalInterestPaid}
+							{estimatedPayoffDate}
+							{nextPaymentDate}
+						/>
+					{/if}
+
+					<!-- Next Payment Card (Prominent) -->
+					{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
+						<NextPaymentCard
+							financing={vehicle.financing}
+							lastPayment={payments.length > 0 ? payments[0] : undefined}
+						/>
+					{/if}
+
+					<!-- Lease Metrics (if applicable) -->
+					{#if vehicle.financing.financingType === 'lease'}
+						<LeaseMetricsCard
+							financing={vehicle.financing}
+							currentMileage={vehicle.initialMileage || null}
+							initialMileage={vehicle.initialMileage || null}
+						/>
+					{/if}
+
+					<!-- Missing APR Warning (for loans) -->
+					{#if vehicle.financing.financingType === 'loan' && (!vehicle.financing.apr || vehicle.financing.apr <= 0)}
+						<Alert>
+							<AlertCircle class="h-4 w-4" />
+							<AlertTitle>APR Not Set</AlertTitle>
+							<AlertDescription>
+								The APR (Annual Percentage Rate) is not set for this loan. Some features like the
+								amortization schedule and interest calculations will not be available.
+							</AlertDescription>
+						</Alert>
+					{/if}
+
+					<!-- Charts Section - Responsive Grid -->
+					<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+						<FinancingCharts financing={vehicle.financing} {payments} {amortizationSchedule} />
+					</div>
+
+					<!-- Payment Calculator (Loans only) -->
+					{#if vehicle.financing.financingType === 'loan'}
+						<PaymentCalculator financing={vehicle.financing} />
+					{/if}
+
+					<!-- Payment History Loading State -->
+					{#if isLoadingPayments}
+						<Card>
+							<CardContent class="p-6 space-y-4">
+								<div class="flex items-center gap-2">
+									<Skeleton class="h-5 w-32" />
+								</div>
+								<div class="space-y-3">
+									{#each Array(3) as _}
+										<div class="flex gap-4">
+											<Skeleton class="h-12 w-12 rounded-full" />
+											<div class="flex-1 space-y-2">
+												<Skeleton class="h-4 w-24" />
+												<Skeleton class="h-6 w-32" />
+												<Skeleton class="h-4 w-full" />
+											</div>
+										</div>
+									{/each}
+								</div>
+							</CardContent>
+						</Card>
+					{:else if paymentHistoryError}
+						<!-- Payment History Error -->
+						<Alert variant="destructive">
+							<AlertCircle class="h-4 w-4" />
+							<AlertTitle>Error Loading Payment History</AlertTitle>
+							<AlertDescription>
+								{paymentHistoryError}
+								<Button
+									variant="outline"
+									size="sm"
+									class="mt-2"
+									onclick={() => {
+										hasAttemptedPaymentLoad = false;
+										loadPaymentHistory();
+									}}
+								>
+									Try Again
+								</Button>
+							</AlertDescription>
+						</Alert>
+					{:else}
+						<!-- Payment History -->
+						<PaymentHistory {payments} financing={vehicle.financing} />
+					{/if}
+				{:else}
+					<!-- No Financing Empty State -->
+					<EmptyState>
+						{#snippet icon()}
+							<CreditCard class="h-12 w-12 text-muted-foreground mb-4" />
+						{/snippet}
+						{#snippet title()}
+							No active financing
+						{/snippet}
+						{#snippet description()}
+							This vehicle doesn't have active financing
+						{/snippet}
+					</EmptyState>
+				{/if}
 			</TabsContent>
 		</Tabs>
 	</div>

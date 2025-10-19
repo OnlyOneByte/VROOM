@@ -1,4 +1,4 @@
-import type { Vehicle, VehicleStats, ApiResponse } from '$lib/types';
+import type { Vehicle, VehicleStats, VehicleFinancingPayment, ApiResponse } from '$lib/types';
 import type { TimePeriod } from '$lib/constants/time-periods';
 import { ApiError, handleApiError } from '$lib/utils/error-handling';
 
@@ -90,6 +90,27 @@ export const vehicleApi = {
 			}
 		} catch (error) {
 			throw handleApiError(error, 'Failed to delete vehicle');
+		}
+	},
+
+	/**
+	 * Fetch payment history for vehicle financing
+	 * @throws {ApiError} If the request fails
+	 */
+	async getFinancingPayments(vehicleId: string): Promise<VehicleFinancingPayment[]> {
+		try {
+			const response = await fetch(`/api/v1/vehicles/${vehicleId}/financing/payments`, {
+				credentials: 'include'
+			});
+
+			if (!response.ok) {
+				throw new ApiError('Failed to load payment history', response.status);
+			}
+
+			const result: ApiResponse<VehicleFinancingPayment[]> = await response.json();
+			return result.data || [];
+		} catch (error) {
+			throw handleApiError(error, 'Failed to load payment history');
 		}
 	}
 };

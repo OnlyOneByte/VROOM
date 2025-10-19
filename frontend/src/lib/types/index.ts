@@ -51,6 +51,21 @@ export interface VehicleFinancing {
 	updatedAt: string;
 }
 
+export interface VehicleFinancingPayment {
+	id: string;
+	financingId: string;
+	paymentDate: string;
+	paymentAmount: number;
+	principalAmount: number;
+	interestAmount: number;
+	remainingBalance: number;
+	paymentNumber: number;
+	paymentType: 'standard' | 'extra' | 'custom-split';
+	isScheduled: boolean;
+	createdAt: string;
+	updatedAt: string;
+}
+
 export interface FinancingPaymentConfig {
 	amount: number;
 	frequency: 'monthly' | 'bi-weekly' | 'weekly' | 'custom';

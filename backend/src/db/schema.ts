@@ -203,6 +203,11 @@ export type NewUser = typeof users.$inferInsert;
 export type Vehicle = typeof vehicles.$inferSelect;
 export type NewVehicle = typeof vehicles.$inferInsert;
 
+// Extended Vehicle type with optional financing relationship
+export type VehicleWithFinancing = Vehicle & {
+  financing?: VehicleFinancing;
+};
+
 export type VehicleFinancing = typeof vehicleFinancing.$inferSelect;
 export type NewVehicleFinancing = typeof vehicleFinancing.$inferInsert;
 

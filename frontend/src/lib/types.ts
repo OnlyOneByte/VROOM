@@ -153,6 +153,9 @@ export interface FinancingPayment {
 	updatedAt: Date;
 }
 
+// Alias for consistency with backend naming
+export type VehicleFinancingPayment = FinancingPayment;
+
 export interface FuelEfficiency {
 	vehicleId: string;
 	date: Date;
