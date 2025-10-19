@@ -7,6 +7,7 @@ import { TYPES } from '../lib/di/types';
 import { requireAuth } from '../lib/middleware/auth';
 import { repositoryFactory } from '../lib/repositories/factory';
 import type { AnalyticsService } from '../lib/services/analytics/analytics-service';
+import { logger } from '../lib/utils/logger';
 
 const analytics = new Hono();
 
@@ -46,7 +47,7 @@ analytics.get('/dashboard', zValidator('query', analyticsQuerySchema), async (c)
       data,
     });
   } catch (error) {
-    console.error('Error fetching dashboard analytics:', error);
+    logger.error('Error fetching dashboard analytics', { error });
 
     if (error instanceof HTTPException) {
       throw error;
@@ -83,7 +84,7 @@ analytics.get(
         data,
       });
     } catch (error) {
-      console.error('Error fetching vehicle analytics:', error);
+      logger.error('Error fetching vehicle analytics', { error });
 
       if (error instanceof HTTPException) {
         throw error;
@@ -108,7 +109,7 @@ analytics.get('/trends', zValidator('query', analyticsQuerySchema), async (c) =>
       data,
     });
   } catch (error) {
-    console.error('Error fetching trend data:', error);
+    logger.error('Error fetching trend data', { error });
 
     if (error instanceof HTTPException) {
       throw error;

@@ -1,4 +1,5 @@
 import { databaseService } from './database';
+import { logger } from './utils/logger';
 
 export interface UserActivity {
   userId: string;
@@ -65,9 +66,10 @@ export class ActivityTracker {
       syncInProgress: existingActivity?.syncInProgress || false,
     });
 
-    console.log(
-      `Activity recorded for user ${userId}, auto-sync will trigger in ${userConfig.inactivityDelayMinutes} minutes`
-    );
+    logger.debug('Activity recorded for user', {
+      userId,
+      inactivityDelayMinutes: userConfig.inactivityDelayMinutes,
+    });
   }
 
   /**
@@ -80,7 +82,7 @@ export class ActivityTracker {
       return;
     }
 
-    console.log(`User ${userId} has been inactive, triggering auto-sync...`);
+    logger.info('User inactive, triggering auto-sync', { userId });
 
     try {
       // Mark sync as in progress
@@ -90,9 +92,9 @@ export class ActivityTracker {
       // Perform the sync
       await this.performAutoSync(userId);
 
-      console.log(`Auto-sync completed successfully for user ${userId}`);
+      logger.info('Auto-sync completed successfully', { userId });
     } catch (error) {
-      console.error(`Auto-sync failed for user ${userId}:`, error);
+      logger.error('Auto-sync failed', { userId, error });
     } finally {
       // Mark sync as complete
       if (activity) {
@@ -112,7 +114,7 @@ export class ActivityTracker {
       const hasChanges = await changeTracker.hasChangesSinceLastSync(userId);
 
       if (!hasChanges) {
-        console.log(`Auto-sync skipped for user ${userId}: No changes since last sync`);
+        logger.debug('Auto-sync skipped: No changes since last sync', { userId });
         return;
       }
 
@@ -128,7 +130,7 @@ export class ActivityTracker {
         .limit(1);
 
       if (!settings.length) {
-        console.log(`Auto-sync skipped for user ${userId}: No settings found`);
+        logger.debug('Auto-sync skipped: No settings found', { userId });
         return;
       }
 
@@ -145,11 +147,11 @@ export class ActivityTracker {
 
       // Skip if no sync types are enabled
       if (syncTypes.length === 0) {
-        console.log(`Auto-sync skipped for user ${userId}: No sync types enabled`);
+        logger.debug('Auto-sync skipped: No sync types enabled', { userId });
         return;
       }
 
-      console.log(`Auto-sync starting for user ${userId} (changes detected)`);
+      logger.info('Auto-sync starting (changes detected)', { userId });
 
       // Call syncOrchestrator.executeSync with syncTypes array
       const { syncOrchestrator } = await import('./services/sync/sync-orchestrator');
@@ -157,19 +159,19 @@ export class ActivityTracker {
 
       // Log results
       if (results.sheets) {
-        console.log(`Auto-sync to sheets completed for user ${userId}`);
+        logger.info('Auto-sync to sheets completed', { userId });
       }
       if (results.backup) {
-        console.log(`Auto-sync backup to Drive completed for user ${userId}`);
+        logger.info('Auto-sync backup to Drive completed', { userId });
       }
       if (results.errors) {
-        console.error(`Auto-sync errors for user ${userId}:`, results.errors);
+        logger.error('Auto-sync errors', { userId, errors: results.errors });
       }
 
-      console.log(`Auto-sync completed for user ${userId}`);
+      logger.info('Auto-sync completed', { userId });
     } catch (error) {
       // Handle errors gracefully (log but don't crash)
-      console.error(`Auto-sync operation failed for user ${userId}:`, error);
+      logger.error('Auto-sync operation failed', { userId, error });
       // Don't re-throw - we want to handle errors gracefully
     }
   }
@@ -261,7 +263,7 @@ export class ActivityTracker {
     }
 
     this.userActivities.delete(userId);
-    console.log(`Stopped activity tracking for user ${userId}`);
+    logger.debug('Stopped activity tracking', { userId });
   }
 
   /**

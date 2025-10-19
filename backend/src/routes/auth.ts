@@ -10,6 +10,7 @@ import { getLucia } from '../lib/auth/lucia-provider.js';
 import { config } from '../lib/config';
 import { SESSION_CONFIG } from '../lib/constants';
 import { databaseService } from '../lib/database';
+import { logger } from '../lib/utils/logger';
 
 const auth = new Hono();
 
@@ -163,13 +164,15 @@ auth.get('/callback/google', async (c) => {
 
       await db.update(userSettings).set(updateData).where(eq(userSettings.userId, userId));
 
-      console.log(
-        `Auto-enabled Google Drive backup for user ${userId} - found ${backupCheck.existingBackups.length} existing backup(s) in folder ${backupCheck.backupFolderId}`
-      );
+      logger.info('Auto-enabled Google Drive backup', {
+        userId,
+        existingBackups: backupCheck.existingBackups.length,
+        backupFolderId: backupCheck.backupFolderId,
+      });
     }
   } catch (error) {
     // Don't fail login if backup check fails
-    console.error('Error checking for existing backups during login:', error);
+    logger.error('Error checking for existing backups during login', { error });
   }
 
   // Create session
@@ -244,14 +247,16 @@ auth.get('/me', async (c) => {
 
         await db.update(userSettings).set(updateData).where(eq(userSettings.userId, user.id));
 
-        console.log(
-          `Auto-enabled Google Drive backup for user ${user.id} - found ${backupCheck.existingBackups.length} existing backup(s) in folder ${backupCheck.backupFolderId}`
-        );
+        logger.info('Auto-enabled Google Drive backup', {
+          userId: user.id,
+          existingBackups: backupCheck.existingBackups.length,
+          backupFolderId: backupCheck.backupFolderId,
+        });
       }
     }
   } catch (error) {
     // Don't fail the /me request if backup check fails
-    console.error('Error checking for existing backups in /me endpoint:', error);
+    logger.error('Error checking for existing backups in /me endpoint', { error });
   }
 
   return c.json({

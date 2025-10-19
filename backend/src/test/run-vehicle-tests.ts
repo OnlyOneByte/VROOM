@@ -6,9 +6,10 @@
  */
 
 import { spawn } from 'bun';
+import { logger } from '../lib/utils/logger';
 
 async function runVehicleTests() {
-  console.log('🚗 Running Vehicle Management Integration Tests...\n');
+  logger.test('Running Vehicle Management Integration Tests...\n');
 
   try {
     const result = await spawn({
@@ -18,13 +19,13 @@ async function runVehicleTests() {
     });
 
     if (result.exitCode === 0) {
-      console.log('\n✅ All vehicle management tests passed!');
+      logger.test('All vehicle management tests passed!');
     } else {
-      console.log('\n❌ Some vehicle management tests failed.');
+      logger.error('Some vehicle management tests failed.');
       process.exit(1);
     }
   } catch (error) {
-    console.error('Error running vehicle tests:', error);
+    logger.error('Error running vehicle tests', { error });
     process.exit(1);
   }
 }

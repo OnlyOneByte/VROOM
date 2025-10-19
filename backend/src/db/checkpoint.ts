@@ -1,25 +1,26 @@
 #!/usr/bin/env bun
 
+import { logger } from '../lib/utils/logger';
 import { checkpointWAL, forceCheckpointWAL } from './connection.js';
 
 // Manual checkpoint script
 async function manualCheckpoint() {
   try {
-    console.log('🔄 Running manual WAL checkpoint...');
+    logger.checkpoint('Running manual WAL checkpoint...');
 
     const force = process.argv.includes('--force');
 
     if (force) {
-      console.log('⚡ Using FORCE mode (RESTART)...');
+      logger.checkpoint('Using FORCE mode (RESTART)...');
       forceCheckpointWAL();
     } else {
-      console.log('📝 Using normal mode (TRUNCATE)...');
+      logger.checkpoint('Using normal mode (TRUNCATE)...');
       checkpointWAL();
     }
 
-    console.log('✅ Checkpoint completed successfully');
+    logger.checkpoint('Checkpoint completed successfully');
   } catch (error) {
-    console.error('❌ Checkpoint failed:', error);
+    logger.error('Checkpoint failed', { error });
     process.exit(1);
   }
 }

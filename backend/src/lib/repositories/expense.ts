@@ -54,7 +54,7 @@ export class ExpenseRepository
         .orderBy(desc(expenses.date));
       return result;
     } catch (error) {
-      console.error(`Error finding expenses for vehicle ${vehicleId} in date range:`, error);
+      logger.error('Error finding expenses for vehicle in date range', { vehicleId, error });
       throw new Error('Failed to find expenses for date range');
     }
   }
@@ -127,7 +127,7 @@ export class ExpenseRepository
         .orderBy(desc(expenses.date));
       return result;
     } catch (error) {
-      console.error(`Error finding expenses for user ${userId} in date range:`, error);
+      logger.error('Error finding expenses for user in date range', { userId, error });
       throw new Error('Failed to find expenses for user in date range');
     }
   }
@@ -141,10 +141,11 @@ export class ExpenseRepository
         .orderBy(desc(expenses.date));
       return result;
     } catch (error) {
-      console.error(
-        `Error finding expenses by category ${category} for vehicle ${vehicleId}:`,
-        error
-      );
+      logger.error('Error finding expenses by category for vehicle', {
+        category,
+        vehicleId,
+        error,
+      });
       throw new Error('Failed to find expenses by category');
     }
   }
@@ -158,7 +159,7 @@ export class ExpenseRepository
         .orderBy(desc(expenses.date));
       return result;
     } catch (error) {
-      console.error(`Error finding fuel expenses for vehicle ${vehicleId}:`, error);
+      logger.error('Error finding fuel expenses for vehicle', { vehicleId, error });
       throw new Error('Failed to find fuel expenses');
     }
   }
@@ -212,7 +213,7 @@ export class ExpenseRepository
         total: Number(row.total) || 0,
       }));
     } catch (error) {
-      console.error(`Error getting total by category for vehicle ${vehicleId}:`, error);
+      logger.error('Error getting total by category for vehicle', { vehicleId, error });
       throw new Error('Failed to get total by category');
     }
   }
@@ -249,10 +250,7 @@ export class ExpenseRepository
         total: Number(row.total) || 0,
       }));
     } catch (error) {
-      console.error(
-        `Error getting monthly totals for vehicle ${vehicleId} in year ${year}:`,
-        error
-      );
+      logger.error('Error getting monthly totals for vehicle', { vehicleId, year, error });
       throw new Error('Failed to get monthly totals');
     }
   }

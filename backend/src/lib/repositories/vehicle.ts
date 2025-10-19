@@ -44,7 +44,7 @@ export class VehicleRepository
         .limit(1);
       return result[0] || null;
     } catch (error) {
-      console.error(`Error finding vehicle ${vehicleId} for user ${userId}:`, error);
+      logger.error('Error finding vehicle for user', { vehicleId, userId, error });
       throw new Error('Failed to find vehicle for user');
     }
   }
@@ -58,7 +58,7 @@ export class VehicleRepository
         .limit(1);
       return result[0] || null;
     } catch (error) {
-      console.error(`Error finding vehicle by license plate ${licensePlate}:`, error);
+      logger.error('Error finding vehicle by license plate', { licensePlate, error });
       throw new Error('Failed to find vehicle by license plate');
     }
   }
@@ -183,7 +183,7 @@ export class VehicleRepository
 
       return null;
     } catch (error) {
-      console.error(`Error finding vehicle ${vehicleId} with access for user ${userId}:`, error);
+      logger.error('Error finding vehicle with access for user', { vehicleId, userId, error });
       throw new Error('Failed to find vehicle with access');
     }
   }

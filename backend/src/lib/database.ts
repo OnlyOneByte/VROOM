@@ -47,9 +47,9 @@ export class DatabaseService {
   async shutdown(): Promise<void> {
     try {
       closeDatabaseConnection();
-      console.log('Database service shutdown completed');
+      logger.info('Database service shutdown completed');
     } catch (error) {
-      console.error('Error during database service shutdown:', error);
+      logger.error('Error during database service shutdown', { error });
       throw error;
     }
   }
@@ -63,7 +63,7 @@ export class DatabaseService {
     try {
       return await db.transaction(callback);
     } catch (error) {
-      console.error('Transaction failed:', error);
+      logger.error('Transaction failed', { error });
       throw new Error(
         `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -79,6 +79,7 @@ import { checkDatabaseHealth, closeDatabaseConnection, db } from '../db/connecti
 import { VALIDATION_LIMITS } from './constants';
 import { ValidationError } from './errors.js';
 import { repositoryFactory } from './repositories/index.js';
+import { logger } from './utils/logger';
 
 // Export Database type for use in repositories
 export type Database = typeof db;

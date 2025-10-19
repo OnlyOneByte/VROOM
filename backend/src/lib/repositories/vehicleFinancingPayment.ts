@@ -4,6 +4,7 @@ import { inject, injectable } from 'inversify';
 import type { NewVehicleFinancingPayment, VehicleFinancingPayment } from '../../db/schema.js';
 import { vehicleFinancingPayments } from '../../db/schema.js';
 import { TYPES } from '../di/types.js';
+import { logger } from '../utils/logger';
 import { BaseRepository } from './base.js';
 import type { IVehicleFinancingPaymentRepository } from './interfaces.js';
 
@@ -25,7 +26,7 @@ export class VehicleFinancingPaymentRepository
         .orderBy(desc(vehicleFinancingPayments.paymentDate));
       return result;
     } catch (error) {
-      console.error(`Error finding payments for financing ${financingId}:`, error);
+      logger.error('Error finding payments for financing', { financingId, error });
       throw new Error('Failed to find payments for financing');
     }
   }
@@ -49,7 +50,7 @@ export class VehicleFinancingPaymentRepository
         .orderBy(desc(vehicleFinancingPayments.paymentDate));
       return result;
     } catch (error) {
-      console.error(`Error finding payments for financing ${financingId} in date range:`, error);
+      logger.error('Error finding payments for financing in date range', { financingId, error });
       throw new Error('Failed to find payments for date range');
     }
   }
@@ -64,7 +65,7 @@ export class VehicleFinancingPaymentRepository
         .limit(1);
       return result[0] || null;
     } catch (error) {
-      console.error(`Error finding last payment for financing ${financingId}:`, error);
+      logger.error('Error finding last payment for financing', { financingId, error });
       throw new Error('Failed to find last payment');
     }
   }
@@ -80,7 +81,7 @@ export class VehicleFinancingPaymentRepository
 
       return Number(result[0]?.count) || 0;
     } catch (error) {
-      console.error(`Error getting payment count for financing ${financingId}:`, error);
+      logger.error('Error getting payment count for financing', { financingId, error });
       throw new Error('Failed to get payment count');
     }
   }

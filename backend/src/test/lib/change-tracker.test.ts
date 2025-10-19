@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { userSettings, users } from '../../db/schema';
 import { changeTracker } from '../../lib/change-tracker';
 import { databaseService } from '../../lib/database';
+import { logger } from '../../lib/utils/logger';
 
 describe('ChangeTracker', () => {
   let testUserId: string;
@@ -27,7 +28,7 @@ describe('ChangeTracker', () => {
         userId: testUserId,
       });
     } catch (error) {
-      console.error('Error in beforeEach:', error);
+      logger.error('Error in beforeEach', { error });
       throw error;
     }
   });
@@ -40,7 +41,7 @@ describe('ChangeTracker', () => {
       await db.delete(userSettings).where(eq(userSettings.userId, testUserId));
       await db.delete(users).where(eq(users.id, testUserId));
     } catch (error) {
-      console.error('Error in afterEach:', error);
+      logger.error('Error in afterEach', { error });
       // Don't throw here to avoid masking test failures
     }
   });

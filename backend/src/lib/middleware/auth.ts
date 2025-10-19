@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import type { AuthUser } from '../auth/lucia';
 import { getLucia } from '../auth/lucia-provider.js';
 import { config } from '../config';
+import { logger } from '../utils/logger';
 
 // Extend Hono context to include user
 declare module 'hono' {
@@ -69,7 +70,7 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
           expiresAt: newSession.expiresAt,
         });
       } catch (error) {
-        console.error('Session refresh failed, keeping existing session:', error);
+        logger.warn('Session refresh failed, keeping existing session', { error });
         // Keep existing session if refresh fails
         c.set('session', {
           id: session.id,
@@ -88,7 +89,7 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
 
     return next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    logger.error('Auth middleware error', { error });
 
     if (error instanceof HTTPException) {
       throw error;
@@ -118,7 +119,7 @@ export const optionalAuth: MiddlewareHandler = async (c, next) => {
 
     return next();
   } catch (error) {
-    console.error('Optional auth middleware error:', error);
+    logger.error('Optional auth middleware error', { error });
     // Don't throw error for optional auth, just continue without user
     return next();
   }

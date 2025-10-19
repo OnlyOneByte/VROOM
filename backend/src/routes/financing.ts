@@ -13,6 +13,7 @@ import {
 import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
 import { repositoryFactory } from '../lib/repositories/factory';
+import { logger } from '../lib/utils/logger';
 
 const financing = new Hono();
 
@@ -122,7 +123,7 @@ financing.get(
         data: financingData,
       });
     } catch (error) {
-      console.error('Error fetching vehicle financing:', error);
+      logger.error('Error fetching vehicle financing', { error });
 
       if (error instanceof HTTPException) {
         throw error;
@@ -164,8 +165,7 @@ financing.post(
 
         const validationErrors = validateLoanTerms(loanTerms);
         if (validationErrors.length > 0) {
-          console.error('Loan validation errors:', validationErrors);
-          console.error('Loan terms:', loanTerms);
+          logger.error('Loan validation errors', { validationErrors, loanTerms });
           throw new HTTPException(400, {
             message: `Invalid loan terms: ${validationErrors.join(', ')}`,
             cause: validationErrors,
@@ -208,7 +208,7 @@ financing.post(
         );
       }
     } catch (error) {
-      console.error('Error creating/updating vehicle financing:', error);
+      logger.error('Error creating/updating vehicle financing', { error });
 
       if (error instanceof HTTPException) {
         throw error;
@@ -262,7 +262,7 @@ financing.get('/:financingId/schedule', zValidator('param', financingParamsSchem
       },
     });
   } catch (error) {
-    console.error('Error generating amortization schedule:', error);
+    logger.error('Error generating amortization schedule', { error });
 
     if (error instanceof HTTPException) {
       throw error;
@@ -359,7 +359,7 @@ financing.post(
         201
       );
     } catch (error) {
-      console.error('Error recording financing payment:', error);
+      logger.error('Error recording financing payment', { error });
 
       if (error instanceof HTTPException) {
         throw error;
@@ -402,7 +402,7 @@ financing.get('/:financingId/payments', zValidator('param', financingParamsSchem
       },
     });
   } catch (error) {
-    console.error('Error fetching financing payments:', error);
+    logger.error('Error fetching financing payments', { error });
 
     if (error instanceof HTTPException) {
       throw error;
@@ -439,7 +439,7 @@ financing.delete('/:financingId', zValidator('param', financingParamsSchema), as
       message: 'Financing marked as completed successfully',
     });
   } catch (error) {
-    console.error('Error deleting financing:', error);
+    logger.error('Error deleting financing', { error });
 
     if (error instanceof HTTPException) {
       throw error;

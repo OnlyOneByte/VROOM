@@ -4,6 +4,7 @@ import { inject, injectable } from 'inversify';
 import type { NewVehicleFinancing, VehicleFinancing } from '../../db/schema.js';
 import { vehicleFinancing } from '../../db/schema.js';
 import { TYPES } from '../di/types.js';
+import { logger } from '../utils/logger';
 import { BaseRepository } from './base.js';
 import type { IVehicleFinancingRepository } from './interfaces.js';
 
@@ -25,7 +26,7 @@ export class VehicleFinancingRepository
         .limit(1);
       return result[0] || null;
     } catch (error) {
-      console.error(`Error finding financing for vehicle ${vehicleId}:`, error);
+      logger.error('Error finding financing for vehicle', { vehicleId, error });
       throw new Error('Failed to find financing for vehicle');
     }
   }
@@ -39,7 +40,7 @@ export class VehicleFinancingRepository
         .orderBy(vehicleFinancing.startDate);
       return result;
     } catch (error) {
-      console.error('Error finding active financing:', error);
+      logger.error('Error finding active financing', { error });
       throw new Error('Failed to find active financing');
     }
   }
@@ -61,7 +62,7 @@ export class VehicleFinancingRepository
 
       return result[0];
     } catch (error) {
-      console.error(`Error updating balance for financing ${id}:`, error);
+      logger.error('Error updating balance for financing', { id, error });
       throw new Error('Failed to update financing balance');
     }
   }
@@ -85,7 +86,7 @@ export class VehicleFinancingRepository
 
       return result[0];
     } catch (error) {
-      console.error(`Error marking financing ${id} as completed:`, error);
+      logger.error('Error marking financing as completed', { id, error });
       throw new Error('Failed to mark financing as completed');
     }
   }

@@ -15,8 +15,9 @@
  */
 
 import { spawn } from 'bun';
+import { logger } from '../lib/utils/logger';
 
-console.log('🚀 Running Google Integration Tests...\n');
+logger.test('Running Google Integration Tests...\n');
 
 const result = spawn({
   cmd: ['bun', 'test', 'src/test/integration/google-integration.test.ts', '--run'],
@@ -27,15 +28,15 @@ const result = spawn({
 const exitCode = await result.exited;
 
 if (exitCode === 0) {
-  console.log('\n✅ All Google integration tests passed!');
-  console.log('\nTests covered:');
-  console.log('  📁 Google Drive folder creation and management');
-  console.log('  📊 Google Sheets spreadsheet generation and data accuracy');
-  console.log('  🔄 Bi-directional sync and conflict resolution');
-  console.log('  ⚠️  Error handling and edge cases');
+  logger.test('All Google integration tests passed!');
+  logger.test('Tests covered:');
+  logger.test('  📁 Google Drive folder creation and management');
+  logger.test('  📊 Google Sheets spreadsheet generation and data accuracy');
+  logger.test('  🔄 Bi-directional sync and conflict resolution');
+  logger.test('  ⚠️  Error handling and edge cases');
 } else {
-  console.log('\n❌ Some Google integration tests failed.');
-  console.log('Check the output above for details.');
+  logger.error('Some Google integration tests failed.');
+  logger.error('Check the output above for details.');
 }
 
 process.exit(exitCode);

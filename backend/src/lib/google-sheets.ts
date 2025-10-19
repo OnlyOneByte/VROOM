@@ -11,6 +11,7 @@ import {
 } from '../db/schema';
 import { databaseService } from './database';
 import { GoogleDriveService } from './google-drive';
+import { logger } from './utils/logger';
 
 export interface SheetData {
   range: string;
@@ -223,7 +224,7 @@ export class GoogleSheetsService {
 
       return spreadsheetInfo;
     } catch (error) {
-      console.error('Error creating/updating VROOM spreadsheet:', error);
+      logger.error('Error creating/updating VROOM spreadsheet', { error });
       throw new Error('Failed to create or update VROOM spreadsheet');
     }
   }
@@ -247,7 +248,7 @@ export class GoogleSheetsService {
 
       return found ? { id: found.id, name: found.name } : null;
     } catch (error) {
-      console.error('Error finding VROOM spreadsheet:', error);
+      logger.error('Error finding VROOM spreadsheet', { error });
       return null;
     }
   }
@@ -274,7 +275,7 @@ export class GoogleSheetsService {
 
       return response.data;
     } catch (error) {
-      console.error('Error creating spreadsheet:', error);
+      logger.error('Error creating spreadsheet', { error });
       throw new Error('Failed to create spreadsheet');
     }
   }
@@ -306,7 +307,7 @@ export class GoogleSheetsService {
           })) || [],
       };
     } catch (error) {
-      console.error('Error getting spreadsheet info:', error);
+      logger.error('Error getting spreadsheet info', { error });
       throw new Error('Failed to get spreadsheet information');
     }
   }
@@ -360,7 +361,7 @@ export class GoogleSheetsService {
         this.updateVehicleFinancingPaymentsSheet(spreadsheetId, userFinancingPayments),
       ]);
     } catch (error) {
-      console.error('Error updating spreadsheet with user data:', error);
+      logger.error('Error updating spreadsheet with user data', { error });
       throw new Error('Failed to update spreadsheet with user data');
     }
   }
@@ -643,7 +644,7 @@ export class GoogleSheetsService {
         },
       });
     } catch (error) {
-      console.error(`Error updating sheet data for range ${range}:`, error);
+      logger.error('Error updating sheet data', { range, error });
       throw new Error(`Failed to update sheet data for range ${range}`);
     }
   }
@@ -663,7 +664,7 @@ export class GoogleSheetsService {
 
       return response.data.values || [];
     } catch (error) {
-      console.error(`Error reading sheet data for range ${range}:`, error);
+      logger.error('Error reading sheet data', { range, error });
       throw new Error(`Failed to read sheet data for range ${range}`);
     }
   }
@@ -721,7 +722,7 @@ export class GoogleSheetsService {
         insurance,
       };
     } catch (error) {
-      console.error('Error reading spreadsheet data:', error);
+      logger.error('Error reading spreadsheet data', { error });
       throw new Error('Failed to read spreadsheet data');
     }
   }

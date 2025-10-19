@@ -5,6 +5,7 @@ import { databaseService } from '../lib/database';
 import { AppError } from '../lib/errors';
 import { requireAuth } from '../lib/middleware/auth';
 import { SettingsRepository } from '../lib/repositories/settings';
+import { logger } from '../lib/utils/logger';
 
 const settings = new Hono();
 
@@ -53,7 +54,7 @@ settings.get('/', async (c) => {
       data: userSettings,
     });
   } catch (error) {
-    console.error('Error fetching settings:', error);
+    logger.error('Error fetching settings', { error });
     throw new AppError('Failed to fetch settings', 500);
   }
 });
@@ -86,7 +87,7 @@ settings.put('/', async (c) => {
     if (error instanceof z.ZodError) {
       throw new AppError('Invalid settings data', 400);
     }
-    console.error('Error updating settings:', error);
+    logger.error('Error updating settings', { error });
     throw new AppError('Failed to update settings', 500);
   }
 });
@@ -112,7 +113,7 @@ settings.post('/backup', async (c) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Error creating backup:', error);
+    logger.error('Error creating backup', { error });
     throw new AppError('Failed to create backup', 500);
   }
 });
@@ -130,7 +131,7 @@ settings.post('/restore', async (c) => {
       message: 'Data restored successfully',
     });
   } catch (error) {
-    console.error('Error restoring backup:', error);
+    logger.error('Error restoring backup', { error });
     throw new AppError('Failed to restore backup', 500);
   }
 });

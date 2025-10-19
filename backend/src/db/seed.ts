@@ -1,10 +1,11 @@
+import { logger } from '../lib/utils/logger';
 import { db } from './connection.js';
 import { expenses, insurancePolicies, users, vehicleFinancing, vehicles } from './schema.js';
 
 // Sample data for development and testing
 export async function seedDatabase() {
   try {
-    console.log('Seeding database with sample data...');
+    logger.info('Seeding database with sample data...');
 
     // Create a sample user
     const [sampleUser] = await db
@@ -17,7 +18,7 @@ export async function seedDatabase() {
       })
       .returning();
 
-    console.log('Created sample user:', sampleUser.id);
+    logger.info('Created sample user', { userId: sampleUser.id });
 
     // Create sample vehicles
     const [vehicle1] = await db
@@ -50,7 +51,7 @@ export async function seedDatabase() {
       })
       .returning();
 
-    console.log('Created sample vehicles:', vehicle1.id, vehicle2.id);
+    logger.info('Created sample vehicles', { vehicle1Id: vehicle1.id, vehicle2Id: vehicle2.id });
 
     // Create sample financing for vehicle1
     await db.insert(vehicleFinancing).values({
@@ -163,10 +164,9 @@ export async function seedDatabase() {
 
     await db.insert(expenses).values(sampleExpenses);
 
-    console.log('Database seeding completed successfully');
-    console.log(`Created ${sampleExpenses.length} sample expenses`);
+    logger.info('Database seeding completed successfully', { expenseCount: sampleExpenses.length });
   } catch (error) {
-    console.error('Error seeding database:', error);
+    logger.error('Error seeding database', { error });
     throw error;
   }
 }
@@ -174,7 +174,7 @@ export async function seedDatabase() {
 // Function to clear all data (useful for testing)
 export async function clearDatabase() {
   try {
-    console.log('Clearing database...');
+    logger.info('Clearing database...');
 
     // Delete in reverse order of dependencies
     await db.delete(expenses);
@@ -183,9 +183,9 @@ export async function clearDatabase() {
     await db.delete(vehicles);
     await db.delete(users);
 
-    console.log('Database cleared successfully');
+    logger.info('Database cleared successfully');
   } catch (error) {
-    console.error('Error clearing database:', error);
+    logger.error('Error clearing database', { error });
     throw error;
   }
 }

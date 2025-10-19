@@ -4,6 +4,7 @@ import { inject, injectable } from 'inversify';
 import type { NewUser, User } from '../../db/schema.js';
 import { users } from '../../db/schema.js';
 import { TYPES } from '../di/types.js';
+import { logger } from '../utils/logger';
 import { BaseRepository } from './base.js';
 import type { IUserRepository } from './interfaces.js';
 
@@ -22,7 +23,7 @@ export class UserRepository extends BaseRepository<User, NewUser> implements IUs
         .limit(1);
       return result[0] || null;
     } catch (error) {
-      console.error(`Error finding user by email ${email}:`, error);
+      logger.error('Error finding user by email', { email, error });
       throw new Error('Failed to find user by email');
     }
   }
@@ -36,10 +37,7 @@ export class UserRepository extends BaseRepository<User, NewUser> implements IUs
         .limit(1);
       return result[0] || null;
     } catch (error) {
-      console.error(
-        `Error finding user by provider ${provider} and providerId ${providerId}:`,
-        error
-      );
+      logger.error('Error finding user by provider', { provider, providerId, error });
       throw new Error('Failed to find user by provider');
     }
   }
@@ -61,7 +59,7 @@ export class UserRepository extends BaseRepository<User, NewUser> implements IUs
 
       return result[0];
     } catch (error) {
-      console.error(`Error updating Google refresh token for user ${id}:`, error);
+      logger.error('Error updating Google refresh token', { userId: id, error });
       throw new Error('Failed to update Google refresh token');
     }
   }

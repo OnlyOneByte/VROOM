@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { csrf } from 'hono/csrf';
-import { logger } from 'hono/logger';
+import { logger as honoLogger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
 import { config } from './lib/config';
@@ -11,6 +11,7 @@ import { optionalAuth, requireAuth } from './lib/middleware/auth';
 import { bodyLimit } from './lib/middleware/body-limit';
 import { errorHandler } from './lib/middleware/error-handler';
 import { rateLimiter } from './lib/middleware/rate-limiter';
+import { logger } from './lib/utils/logger';
 import { analytics } from './routes/analytics';
 import { auth } from './routes/auth';
 import { expenses } from './routes/expenses';
@@ -92,7 +93,7 @@ app.use(
 );
 
 // Logging middleware
-app.use('*', logger());
+app.use('*', honoLogger());
 
 // Pretty JSON in development
 if (config.env === 'development') {
@@ -191,9 +192,9 @@ app.notFound((c) => {
   );
 });
 
-console.log(`🚗 VROOM Backend starting on port ${config.server.port}`);
-console.log(`📊 Environment: ${config.env}`);
-console.log(`🗄️  Database: ${config.database.url}`);
+logger.startup(`VROOM Backend starting on port ${config.server.port}`);
+logger.startup(`Environment: ${config.env}`);
+logger.startup(`Database: ${config.database.url}`);
 
 // Periodic WAL checkpoint to ensure data persistence
 // Auto-checkpoint (1000 pages) handles most cases, this is just a safety net
@@ -211,7 +212,7 @@ forceCheckpointWAL();
 
 // Graceful shutdown handler
 const shutdown = (signal: string) => {
-  console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+  logger.shutdown(`Received ${signal}, shutting down gracefully...`);
 
   // Clear checkpoint interval
   clearInterval(checkpointInterval);

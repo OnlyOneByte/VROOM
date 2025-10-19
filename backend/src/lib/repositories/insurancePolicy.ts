@@ -4,6 +4,7 @@ import { inject, injectable } from 'inversify';
 import type { InsurancePolicy, NewInsurancePolicy } from '../../db/schema.js';
 import { insurancePolicies, vehicles } from '../../db/schema.js';
 import { TYPES } from '../di/types.js';
+import { logger } from '../utils/logger';
 import { BaseRepository } from './base.js';
 import type { IInsurancePolicyRepository } from './interfaces.js';
 
@@ -25,7 +26,7 @@ export class InsurancePolicyRepository
         .orderBy(insurancePolicies.startDate);
       return result;
     } catch (error) {
-      console.error(`Error finding insurance policies for vehicle ${vehicleId}:`, error);
+      logger.error('Error finding insurance policies for vehicle', { vehicleId, error });
       throw new Error('Failed to find insurance policies for vehicle');
     }
   }
@@ -41,7 +42,7 @@ export class InsurancePolicyRepository
         .limit(1);
       return result[0] || null;
     } catch (error) {
-      console.error(`Error finding active insurance policy for vehicle ${vehicleId}:`, error);
+      logger.error('Error finding active insurance policy for vehicle', { vehicleId, error });
       throw new Error('Failed to find active insurance policy');
     }
   }
@@ -78,7 +79,7 @@ export class InsurancePolicyRepository
         .orderBy(insurancePolicies.endDate);
       return result;
     } catch (error) {
-      console.error(`Error finding expiring insurance policies:`, error);
+      logger.error('Error finding expiring insurance policies', { error });
       throw new Error('Failed to find expiring insurance policies');
     }
   }
@@ -100,7 +101,7 @@ export class InsurancePolicyRepository
 
       return result[0];
     } catch (error) {
-      console.error(`Error marking insurance policy ${id} as inactive:`, error);
+      logger.error('Error marking insurance policy as inactive', { id, error });
       throw new Error('Failed to mark insurance policy as inactive');
     }
   }

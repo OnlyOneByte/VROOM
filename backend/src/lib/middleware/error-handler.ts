@@ -3,15 +3,16 @@ import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
 import { config } from '../config';
 import { formatErrorResponse, handleDatabaseError, isAppError, ValidationError } from '../errors';
+import { logger } from '../utils/logger';
 
 export const errorHandler: ErrorHandler = (err, c) => {
   const isDevelopment = config.env === 'development';
 
   // Log error with appropriate level
   if (isAppError(err) && err.statusCode < 500) {
-    console.warn('⚠️  Client error:', err.message);
+    logger.warn('Client error', { message: err.message, statusCode: err.statusCode });
   } else {
-    console.error('❌ Server error:', err);
+    logger.error('Server error', { error: err });
   }
 
   // Handle Zod validation errors

@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { DATABASE_CONFIG } from '../lib/constants';
+import { logger } from '../lib/utils/logger';
 import * as schema from './schema.js';
 
 // Database configuration
@@ -36,11 +37,11 @@ export const db = drizzle(sqlite, { schema });
 // Migration function
 export async function runMigrations() {
   try {
-    console.log('Running database migrations...');
+    logger.info('Running database migrations...');
     migrate(db, { migrationsFolder: './drizzle' });
-    console.log('Database migrations completed successfully');
+    logger.info('Database migrations completed successfully');
   } catch (error) {
-    console.error('Migration failed:', error);
+    logger.error('Migration failed', { error });
     throw error;
   }
 }

@@ -1,4 +1,5 @@
 import { databaseService } from './database';
+import { logger } from './utils/logger';
 
 /**
  * Service to track data changes for sync optimization
@@ -32,9 +33,9 @@ export class ChangeTracker {
         })
         .where(eq(userSettings.userId, userId));
 
-      console.log(`Data change marked for user ${userId}`);
+      logger.debug('Data change marked', { userId });
     } catch (error) {
-      console.error(`Failed to mark data change for user ${userId}:`, error);
+      logger.error('Failed to mark data change', { userId, error });
       // Don't throw - this is a non-critical operation
     }
   }
@@ -74,7 +75,7 @@ export class ChangeTracker {
       // Compare timestamps
       return lastDataChangeDate > lastSyncDate;
     } catch (error) {
-      console.error(`Failed to check changes for user ${userId}:`, error);
+      logger.error('Failed to check changes', { userId, error });
       // On error, assume changes exist to be safe
       return true;
     }
@@ -112,7 +113,7 @@ export class ChangeTracker {
         lastSyncDate: lastSyncDate || undefined,
       };
     } catch (error) {
-      console.error(`Failed to get change status for user ${userId}:`, error);
+      logger.error('Failed to get change status', { userId, error });
       return { hasChanges: true };
     }
   }
@@ -127,6 +128,6 @@ export const changeTracker = ChangeTracker.getInstance();
 export function markDataChanged(userId: string): void {
   // Fire and forget - don't await
   changeTracker.markDataChanged(userId).catch((error) => {
-    console.error('Failed to mark data changed:', error);
+    logger.error('Failed to mark data changed', { error });
   });
 }

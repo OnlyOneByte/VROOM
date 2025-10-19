@@ -7,6 +7,7 @@ import { TIME_CONSTANTS, VALIDATION_LIMITS } from '../lib/constants';
 import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
 import { repositoryFactory } from '../lib/repositories/factory';
+import { logger } from '../lib/utils/logger';
 
 const insurance = new Hono();
 
@@ -70,7 +71,7 @@ insurance.get('/expiring-soon', async (c) => {
       daysAhead,
     });
   } catch (error) {
-    console.error('Error fetching expiring policies:', error);
+    logger.error('Error fetching expiring policies', { error });
 
     if (error instanceof HTTPException) {
       throw error;
@@ -126,7 +127,7 @@ insurance.post(
         201
       );
     } catch (error) {
-      console.error('Error creating insurance policy:', error);
+      logger.error('Error creating insurance policy', { error });
 
       if (error instanceof HTTPException) {
         throw error;
@@ -181,7 +182,7 @@ insurance.get('/vehicles/:id/policies', zValidator('param', vehicleParamsSchema)
       count: policies.length,
     });
   } catch (error) {
-    console.error('Error fetching insurance policies:', error);
+    logger.error('Error fetching insurance policies', { error });
 
     if (error instanceof HTTPException) {
       throw error;
@@ -216,7 +217,7 @@ insurance.get('/:id', zValidator('param', insurancePolicyParamsSchema), async (c
       data: policy,
     });
   } catch (error) {
-    console.error('Error fetching insurance policy:', error);
+    logger.error('Error fetching insurance policy', { error });
 
     if (error instanceof HTTPException) {
       throw error;
@@ -278,7 +279,7 @@ insurance.put(
         message: 'Insurance policy updated successfully',
       });
     } catch (error) {
-      console.error('Error updating insurance policy:', error);
+      logger.error('Error updating insurance policy', { error });
 
       if (error instanceof HTTPException) {
         throw error;
@@ -317,7 +318,7 @@ insurance.delete('/:id', zValidator('param', insurancePolicyParamsSchema), async
       message: 'Insurance policy deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting insurance policy:', error);
+    logger.error('Error deleting insurance policy', { error });
 
     if (error instanceof HTTPException) {
       throw error;
@@ -365,7 +366,7 @@ insurance.get(
         },
       });
     } catch (error) {
-      console.error('Error calculating monthly breakdown:', error);
+      logger.error('Error calculating monthly breakdown', { error });
 
       if (error instanceof HTTPException) {
         throw error;

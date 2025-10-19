@@ -3,6 +3,7 @@ import type { OAuth2Client } from 'google-auth-library';
 import { type drive_v3, google } from 'googleapis';
 import { users } from '../db/schema';
 import { databaseService } from './database';
+import { logger } from './utils/logger';
 
 export interface DriveFolder {
   id: string;
@@ -85,7 +86,7 @@ export class GoogleDriveService {
         },
       };
     } catch (error) {
-      console.error('Error creating VROOM folder structure:', error);
+      logger.error('Error creating VROOM folder structure', { error });
       throw new Error('Failed to create Google Drive folder structure');
     }
   }
@@ -113,7 +114,7 @@ export class GoogleDriveService {
       }
       return null;
     } catch (error) {
-      console.error('Error finding VROOM folder:', error);
+      logger.error('Error finding VROOM folder', { error });
       return null;
     }
   }
@@ -185,7 +186,7 @@ export class GoogleDriveService {
         backups,
       };
     } catch (error) {
-      console.error('Error getting VROOM subfolders:', error);
+      logger.error('Error getting VROOM subfolders', { error });
       throw new Error('Failed to get or create subfolders');
     }
   }
@@ -215,7 +216,7 @@ export class GoogleDriveService {
 
       return response.data as DriveFolder;
     } catch (error) {
-      console.error('Error creating folder:', error);
+      logger.error('Error creating folder', { error });
       throw new Error(`Failed to create folder: ${name}`);
     }
   }
@@ -261,7 +262,7 @@ export class GoogleDriveService {
 
       return monthFolder;
     } catch (error) {
-      console.error('Error creating receipt date folders:', error);
+      logger.error('Error creating receipt date folders', { error });
       throw new Error('Failed to create date-organized folders');
     }
   }
@@ -288,7 +289,7 @@ export class GoogleDriveService {
       }
       return null;
     } catch (error) {
-      console.error('Error finding folder by name:', error);
+      logger.error('Error finding folder by name', { error });
       return null;
     }
   }
@@ -316,7 +317,7 @@ export class GoogleDriveService {
         modifiedTime: file.modifiedTime,
       })) as DriveFile[];
     } catch (error) {
-      console.error('Error listing files in folder:', error);
+      logger.error('Error listing files in folder', { error });
       throw new Error('Failed to list files in folder');
     }
   }
@@ -333,7 +334,7 @@ export class GoogleDriveService {
 
       return response.data.permissions || [];
     } catch (error) {
-      console.error('Error getting folder permissions:', error);
+      logger.error('Error getting folder permissions', { error });
       throw new Error('Failed to get folder permissions');
     }
   }
@@ -356,7 +357,7 @@ export class GoogleDriveService {
         },
       });
     } catch (error) {
-      console.error('Error setting folder permissions:', error);
+      logger.error('Error setting folder permissions', { error });
       throw new Error('Failed to set folder permissions');
     }
   }
@@ -401,7 +402,7 @@ export class GoogleDriveService {
 
       return response.data as DriveFile;
     } catch (error) {
-      console.error('Error uploading file:', error);
+      logger.error('Error uploading file', { error });
       throw new Error(`Failed to upload file: ${fileName}`);
     }
   }
@@ -415,7 +416,7 @@ export class GoogleDriveService {
         fileId,
       });
     } catch (error) {
-      console.error('Error deleting file:', error);
+      logger.error('Error deleting file', { error });
       throw new Error('Failed to delete file');
     }
   }
@@ -435,7 +436,7 @@ export class GoogleDriveService {
 
       return Buffer.from(response.data as ArrayBuffer);
     } catch (error) {
-      console.error('Error downloading file:', error);
+      logger.error('Error downloading file', { error });
       throw new Error('Failed to download file');
     }
   }
@@ -456,7 +457,7 @@ export class GoogleDriveService {
 
       return response.data as DriveFile;
     } catch (error) {
-      console.error('Error getting file metadata:', error);
+      logger.error('Error getting file metadata', { error });
       throw new Error('Failed to get file metadata');
     }
   }
