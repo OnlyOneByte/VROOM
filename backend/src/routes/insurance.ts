@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import type { NewInsurancePolicy } from '../db/schema';
+import { TIME_CONSTANTS, VALIDATION_LIMITS } from '../lib/constants';
 import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
 import { repositoryFactory } from '../lib/repositories/factory';
@@ -14,14 +15,26 @@ const createInsurancePolicySchema = z.object({
   company: z
     .string()
     .min(1, 'Insurance company is required')
-    .max(100, 'Company name must be 100 characters or less'),
-  policyNumber: z.string().max(50, 'Policy number must be 50 characters or less').optional(),
+    .max(
+      VALIDATION_LIMITS.INSURANCE.COMPANY_MAX_LENGTH,
+      `Company name must be ${VALIDATION_LIMITS.INSURANCE.COMPANY_MAX_LENGTH} characters or less`
+    ),
+  policyNumber: z
+    .string()
+    .max(
+      VALIDATION_LIMITS.INSURANCE.POLICY_NUMBER_MAX_LENGTH,
+      `Policy number must be ${VALIDATION_LIMITS.INSURANCE.POLICY_NUMBER_MAX_LENGTH} characters or less`
+    )
+    .optional(),
   totalCost: z.number().positive('Total cost must be positive'),
   termLengthMonths: z
     .number()
     .int()
     .min(1, 'Term length must be at least 1 month')
-    .max(24, 'Term length cannot exceed 24 months'),
+    .max(
+      VALIDATION_LIMITS.INSURANCE.MAX_TERM_MONTHS,
+      `Term length cannot exceed ${VALIDATION_LIMITS.INSURANCE.MAX_TERM_MONTHS} months`
+    ),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
 });
@@ -144,7 +157,7 @@ insurance.get('/vehicles/:id/policies', zValidator('param', vehicleParamsSchema)
     // Add expiration alerts
     const policiesWithAlerts = policies.map((policy) => {
       const daysUntilExpiration = Math.ceil(
-        (new Date(policy.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        (new Date(policy.endDate).getTime() - Date.now()) / TIME_CONSTANTS.MS_PER_DAY
       );
 
       return {
@@ -403,7 +416,7 @@ function calculateMonthlyBreakdown(policy: {
       cost: Math.round(monthlyCost * 100) / 100,
       isPaid: monthEnd < new Date(), // Assume past months are paid
       daysInMonth:
-        Math.ceil((monthEnd.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1,
+        Math.ceil((monthEnd.getTime() - monthStart.getTime()) / TIME_CONSTANTS.MS_PER_DAY) + 1,
     });
 
     currentDate.setMonth(currentDate.getMonth() + 1);

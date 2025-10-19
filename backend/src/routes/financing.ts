@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import type { NewVehicleFinancing, NewVehicleFinancingPayment } from '../db/schema';
+import { VALIDATION_LIMITS } from '../lib/constants';
 import {
   calculatePaymentBreakdown,
   generateAmortizationSchedule,
@@ -22,22 +23,45 @@ const createFinancingSchema = z.object({
   provider: z
     .string()
     .min(1, 'Provider is required')
-    .max(100, 'Provider must be 100 characters or less'),
+    .max(
+      VALIDATION_LIMITS.FINANCING.PROVIDER_MAX_LENGTH,
+      `Provider must be ${VALIDATION_LIMITS.FINANCING.PROVIDER_MAX_LENGTH} characters or less`
+    ),
   originalAmount: z.number().min(0.01, 'Original amount must be greater than 0'),
-  apr: z.number().min(0, 'APR cannot be negative').max(50, 'APR cannot exceed 50%').optional(),
+  apr: z
+    .number()
+    .min(0, 'APR cannot be negative')
+    .max(
+      VALIDATION_LIMITS.FINANCING.MAX_APR,
+      `APR cannot exceed ${VALIDATION_LIMITS.FINANCING.MAX_APR}%`
+    )
+    .optional(),
   termMonths: z
     .number()
     .int()
     .min(1, 'Term must be at least 1 month')
-    .max(600, 'Term cannot exceed 600 months'),
+    .max(
+      VALIDATION_LIMITS.FINANCING.MAX_TERM_MONTHS,
+      `Term cannot exceed ${VALIDATION_LIMITS.FINANCING.MAX_TERM_MONTHS} months`
+    ),
   startDate: z
     .string()
     .datetime()
     .transform((val) => new Date(val)),
   paymentAmount: z.number().min(0.01, 'Payment amount must be greater than 0'),
   paymentFrequency: z.enum(['monthly', 'bi-weekly', 'weekly']).default('monthly'),
-  paymentDayOfMonth: z.number().int().min(1).max(31).optional(),
-  paymentDayOfWeek: z.number().int().min(0).max(6).optional(),
+  paymentDayOfMonth: z
+    .number()
+    .int()
+    .min(VALIDATION_LIMITS.FINANCING.MIN_DAY_OF_MONTH)
+    .max(VALIDATION_LIMITS.FINANCING.MAX_DAY_OF_MONTH)
+    .optional(),
+  paymentDayOfWeek: z
+    .number()
+    .int()
+    .min(VALIDATION_LIMITS.FINANCING.MIN_DAY_OF_WEEK)
+    .max(VALIDATION_LIMITS.FINANCING.MAX_DAY_OF_WEEK)
+    .optional(),
   // Lease-specific fields
   residualValue: z.number().min(0).optional(),
   mileageLimit: z.number().int().min(0).optional(),

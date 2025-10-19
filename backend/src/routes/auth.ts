@@ -8,6 +8,7 @@ import { users } from '../db/schema';
 import { google } from '../lib/auth/lucia';
 import { getLucia } from '../lib/auth/lucia-provider.js';
 import { config } from '../lib/config';
+import { SESSION_CONFIG } from '../lib/constants';
 import { databaseService } from '../lib/database';
 
 const auth = new Hono();
@@ -18,9 +19,8 @@ const oauthStateStore = new Map<string, { codeVerifier: string; createdAt: numbe
 // Clean up expired states (older than 10 minutes)
 const cleanupExpiredStates = () => {
   const now = Date.now();
-  const tenMinutes = 10 * 60 * 1000;
   for (const [state, data] of oauthStateStore.entries()) {
-    if (now - data.createdAt > tenMinutes) {
+    if (now - data.createdAt > SESSION_CONFIG.OAUTH_STATE_EXPIRY) {
       oauthStateStore.delete(state);
     }
   }
@@ -181,7 +181,7 @@ auth.get('/callback/google', async (c) => {
     path: '/',
     secure: config.env === 'production',
     httpOnly: true,
-    maxAge: 60 * 60 * 24 * 30, // 30 days
+    maxAge: SESSION_CONFIG.COOKIE_MAX_AGE,
     expires: session.expiresAt,
     sameSite: 'Lax',
   });
@@ -281,7 +281,7 @@ auth.post('/logout', async (c) => {
     path: '/',
     secure: config.env === 'production',
     httpOnly: true,
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: SESSION_CONFIG.COOKIE_MAX_AGE,
     sameSite: 'Lax',
   });
 
@@ -307,9 +307,8 @@ auth.post('/refresh', async (c) => {
   const now = new Date();
   const sessionExpiry = new Date(session.expiresAt);
   const timeUntilExpiry = sessionExpiry.getTime() - now.getTime();
-  const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
-  if (timeUntilExpiry > oneDay) {
+  if (timeUntilExpiry > SESSION_CONFIG.REFRESH_THRESHOLD) {
     return c.json({
       user: {
         id: user.id,
@@ -331,7 +330,7 @@ auth.post('/refresh', async (c) => {
     path: '/',
     secure: config.env === 'production',
     httpOnly: true,
-    maxAge: 60 * 60 * 24 * 30, // 30 days
+    maxAge: SESSION_CONFIG.COOKIE_MAX_AGE,
     expires: newSession.expiresAt,
     sameSite: 'Lax',
   });

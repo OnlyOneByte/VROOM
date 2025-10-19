@@ -2,6 +2,7 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { NewVehicle } from '../db/schema';
+import { VALIDATION_LIMITS } from '../lib/constants';
 import { AuthorizationError, ConflictError, NotFoundError } from '../lib/errors';
 import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
@@ -12,15 +13,42 @@ const vehicles = new Hono();
 
 // Validation schemas
 const createVehicleSchema = z.object({
-  make: z.string().min(1, 'Make is required').max(50, 'Make must be 50 characters or less'),
-  model: z.string().min(1, 'Model is required').max(50, 'Model must be 50 characters or less'),
+  make: z
+    .string()
+    .min(1, 'Make is required')
+    .max(
+      VALIDATION_LIMITS.VEHICLE.MAKE_MAX_LENGTH,
+      `Make must be ${VALIDATION_LIMITS.VEHICLE.MAKE_MAX_LENGTH} characters or less`
+    ),
+  model: z
+    .string()
+    .min(1, 'Model is required')
+    .max(
+      VALIDATION_LIMITS.VEHICLE.MODEL_MAX_LENGTH,
+      `Model must be ${VALIDATION_LIMITS.VEHICLE.MODEL_MAX_LENGTH} characters or less`
+    ),
   year: z
     .number()
     .int()
-    .min(1900, 'Year must be 1900 or later')
+    .min(
+      VALIDATION_LIMITS.VEHICLE.MIN_YEAR,
+      `Year must be ${VALIDATION_LIMITS.VEHICLE.MIN_YEAR} or later`
+    )
     .max(new Date().getFullYear() + 1, 'Year cannot be in the future'),
-  licensePlate: z.string().max(20, 'License plate must be 20 characters or less').optional(),
-  nickname: z.string().max(50, 'Nickname must be 50 characters or less').optional(),
+  licensePlate: z
+    .string()
+    .max(
+      VALIDATION_LIMITS.VEHICLE.LICENSE_PLATE_MAX_LENGTH,
+      `License plate must be ${VALIDATION_LIMITS.VEHICLE.LICENSE_PLATE_MAX_LENGTH} characters or less`
+    )
+    .optional(),
+  nickname: z
+    .string()
+    .max(
+      VALIDATION_LIMITS.VEHICLE.NICKNAME_MAX_LENGTH,
+      `Nickname must be ${VALIDATION_LIMITS.VEHICLE.NICKNAME_MAX_LENGTH} characters or less`
+    )
+    .optional(),
   initialMileage: z.number().int().min(0, 'Initial mileage cannot be negative').optional(),
   purchasePrice: z.number().min(0, 'Purchase price cannot be negative').optional(),
   purchaseDate: z.coerce.date().optional(),

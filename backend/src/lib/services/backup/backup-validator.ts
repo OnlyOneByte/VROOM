@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { BACKUP_CONFIG } from '../../constants/backup';
+import { VALIDATION_LIMITS } from '../../constants/validation';
 import { logger } from '../../utils/logger';
 import type { ParsedBackupData } from './types';
 
@@ -16,7 +17,7 @@ const vehicleSchema = z.object({
   year: z.coerce
     .number()
     .int()
-    .min(1900)
+    .min(VALIDATION_LIMITS.VEHICLE.MIN_YEAR)
     .max(new Date().getFullYear() + 2),
   vehicleType: z.string().optional(),
   licensePlate: z.string().optional(),

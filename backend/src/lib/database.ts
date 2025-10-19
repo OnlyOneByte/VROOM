@@ -76,6 +76,7 @@ export const databaseService = DatabaseService.getInstance();
 
 import { checkDatabaseHealth, closeDatabaseConnection, db } from '../db/connection.js';
 // Import for use in validation functions
+import { VALIDATION_LIMITS } from './constants';
 import { ValidationError } from './errors.js';
 import { repositoryFactory } from './repositories/index.js';
 
@@ -108,7 +109,7 @@ export function validatePositiveNumber(value: number, fieldName: string): void {
 
 export function validateYear(year: number): void {
   const currentYear = new Date().getFullYear();
-  if (year < 1900 || year > currentYear + 1) {
+  if (year < VALIDATION_LIMITS.VEHICLE.MIN_YEAR || year > currentYear + 1) {
     throw new ValidationError('Invalid year');
   }
 }

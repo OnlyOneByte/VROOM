@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Currency, PaymentFrequency } from '../../types/enums';
+import { PAGINATION_CONFIG, VALIDATION_LIMITS } from '../constants';
 
 /**
  * Common validation schemas
@@ -9,7 +10,12 @@ export const idSchema = z.string().min(1, 'ID is required');
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(PAGINATION_CONFIG.MIN_PAGE_SIZE)
+    .max(PAGINATION_CONFIG.MAX_PAGE_SIZE)
+    .default(PAGINATION_CONFIG.DEFAULT_PAGE_SIZE),
   sortBy: z.string().optional(),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
@@ -24,26 +30,45 @@ export const dateRangeSchema = z.object({
  */
 
 export const createVehicleSchema = z.object({
-  make: z.string().min(1, 'Make is required').max(50, 'Make must be 50 characters or less').trim(),
+  make: z
+    .string()
+    .min(1, 'Make is required')
+    .max(
+      VALIDATION_LIMITS.VEHICLE.MAKE_MAX_LENGTH,
+      `Make must be ${VALIDATION_LIMITS.VEHICLE.MAKE_MAX_LENGTH} characters or less`
+    )
+    .trim(),
   model: z
     .string()
     .min(1, 'Model is required')
-    .max(50, 'Model must be 50 characters or less')
+    .max(
+      VALIDATION_LIMITS.VEHICLE.MODEL_MAX_LENGTH,
+      `Model must be ${VALIDATION_LIMITS.VEHICLE.MODEL_MAX_LENGTH} characters or less`
+    )
     .trim(),
   year: z
     .number()
     .int()
-    .min(1900, 'Year must be 1900 or later')
+    .min(
+      VALIDATION_LIMITS.VEHICLE.MIN_YEAR,
+      `Year must be ${VALIDATION_LIMITS.VEHICLE.MIN_YEAR} or later`
+    )
     .max(new Date().getFullYear() + 1, 'Year cannot be in the future'),
   licensePlate: z
     .string()
-    .max(20, 'License plate must be 20 characters or less')
+    .max(
+      VALIDATION_LIMITS.VEHICLE.LICENSE_PLATE_MAX_LENGTH,
+      `License plate must be ${VALIDATION_LIMITS.VEHICLE.LICENSE_PLATE_MAX_LENGTH} characters or less`
+    )
     .trim()
     .optional()
     .transform((val) => val || undefined),
   nickname: z
     .string()
-    .max(50, 'Nickname must be 50 characters or less')
+    .max(
+      VALIDATION_LIMITS.VEHICLE.NICKNAME_MAX_LENGTH,
+      `Nickname must be ${VALIDATION_LIMITS.VEHICLE.NICKNAME_MAX_LENGTH} characters or less`
+    )
     .trim()
     .optional()
     .transform((val) => val || undefined),

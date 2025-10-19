@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { VALIDATION_LIMITS } from '../lib/constants';
 import { databaseService } from '../lib/database';
 import { AppError } from '../lib/errors';
 import { requireAuth } from '../lib/middleware/auth';
@@ -20,11 +21,19 @@ const updateSettingsSchema = z.object({
   backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
   googleDriveBackupEnabled: z.boolean().optional(),
   googleDriveBackupFolderId: z.string().optional(),
-  googleDriveBackupRetentionCount: z.number().min(1).max(100).optional(),
+  googleDriveBackupRetentionCount: z
+    .number()
+    .min(1)
+    .max(VALIDATION_LIMITS.SETTINGS.MAX_BACKUP_RETENTION)
+    .optional(),
   googleSheetsSyncEnabled: z.boolean().optional(),
   googleSheetsSpreadsheetId: z.string().optional(),
   syncOnInactivity: z.boolean().optional(),
-  syncInactivityMinutes: z.number().min(1).max(30).optional(),
+  syncInactivityMinutes: z
+    .number()
+    .min(1)
+    .max(VALIDATION_LIMITS.SETTINGS.MAX_SYNC_INACTIVITY_MINUTES)
+    .optional(),
 });
 
 /**

@@ -7,6 +7,7 @@ import {
   EXPENSE_CATEGORY_DESCRIPTIONS,
   EXPENSE_CATEGORY_LABELS,
 } from '../db/types';
+import { VALIDATION_LIMITS } from '../lib/constants';
 import { NotFoundError, ValidationError } from '../lib/errors';
 import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
@@ -48,8 +49,19 @@ const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
 const createExpenseSchema = z.object({
   vehicleId: z.string().min(1, 'Vehicle ID is required'),
   tags: z
-    .array(z.string().min(1).max(50))
-    .max(10, 'Maximum 10 tags allowed')
+    .array(
+      z
+        .string()
+        .min(1)
+        .max(
+          VALIDATION_LIMITS.EXPENSE.TAG_MAX_LENGTH,
+          `Tag must be ${VALIDATION_LIMITS.EXPENSE.TAG_MAX_LENGTH} characters or less`
+        )
+    )
+    .max(
+      VALIDATION_LIMITS.EXPENSE.MAX_TAGS,
+      `Maximum ${VALIDATION_LIMITS.EXPENSE.MAX_TAGS} tags allowed`
+    )
     .optional()
     .default([]),
   category: expenseCategorySchema,
@@ -59,7 +71,13 @@ const createExpenseSchema = z.object({
   mileage: z.number().int().min(0, 'Mileage cannot be negative').nullable().optional(),
   volume: z.number().positive('Volume must be positive').optional(),
   charge: z.number().positive('Charge must be positive').optional(),
-  description: z.string().max(500, 'Description must be 500 characters or less').optional(),
+  description: z
+    .string()
+    .max(
+      VALIDATION_LIMITS.EXPENSE.DESCRIPTION_MAX_LENGTH,
+      `Description must be ${VALIDATION_LIMITS.EXPENSE.DESCRIPTION_MAX_LENGTH} characters or less`
+    )
+    .optional(),
   receiptUrl: z
     .string()
     .refine((val) => {

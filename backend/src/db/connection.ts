@@ -3,6 +3,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
+import { DATABASE_CONFIG } from '../lib/constants';
 import * as schema from './schema.js';
 
 // Database configuration
@@ -20,14 +21,14 @@ const sqlite = new Database(DATABASE_URL);
 // Enable WAL mode for better performance
 sqlite.run('PRAGMA journal_mode = WAL');
 sqlite.run('PRAGMA synchronous = NORMAL');
-sqlite.run('PRAGMA cache_size = 1000000');
+sqlite.run(`PRAGMA cache_size = ${DATABASE_CONFIG.CACHE_SIZE}`);
 sqlite.run('PRAGMA foreign_keys = ON');
 sqlite.run('PRAGMA temp_store = MEMORY');
 
 // Configure WAL auto-checkpoint to prevent data loss during hot reload
 // Checkpoint after 1000 pages (~4MB) - SQLite default, good balance
 // Auto-checkpoint handles most cases, reducing need for manual checkpoints
-sqlite.run('PRAGMA wal_autocheckpoint = 1000');
+sqlite.run(`PRAGMA wal_autocheckpoint = ${DATABASE_CONFIG.WAL_CHECKPOINT_PAGES}`);
 
 // Create Drizzle instance
 export const db = drizzle(sqlite, { schema });

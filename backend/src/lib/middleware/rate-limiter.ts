@@ -3,6 +3,7 @@
  */
 
 import type { Context, Next } from 'hono';
+import { RATE_LIMIT_CONFIG } from '../constants';
 import { createErrorResponse } from '../utils/error-response';
 
 interface RateLimitConfig {
@@ -29,7 +30,7 @@ setInterval(() => {
       rateLimitStore.delete(key);
     }
   }
-}, 60000); // Clean up every minute
+}, RATE_LIMIT_CONFIG.CLEANUP_INTERVAL);
 
 /**
  * Create a rate limiter middleware
