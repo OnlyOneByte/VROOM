@@ -28,6 +28,7 @@
 	import SyncNowDialog from '$lib/components/settings/SyncNowDialog.svelte';
 	import RestoreFromFileDialog from '$lib/components/settings/RestoreFromFileDialog.svelte';
 	import RestoreFromDriveDialog from '$lib/components/settings/RestoreFromDriveDialog.svelte';
+	import { fetchLastSyncTime } from '$lib/utils/sync-manager';
 
 	// Derive state directly from store
 	let settings = $derived($settingsStore.settings);
@@ -105,6 +106,9 @@
 				backupFrequency,
 				googleDriveBackupRetentionCount
 			});
+
+			// Fetch latest sync times to update the display immediately
+			await fetchLastSyncTime();
 
 			// Reset initialization flag to allow settings to update from server
 			isInitialized = false;

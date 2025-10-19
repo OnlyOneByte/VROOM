@@ -37,7 +37,7 @@
   - Test invalid vehicle ID
   - _Requirements: 2.1_
 
-- [ ] 4. Create FinancingSummaryHeader component
+- [x] 4. Create FinancingSummaryHeader component
   - Create `frontend/src/lib/components/financing/FinancingSummaryHeader.svelte`
   - Accept financing and progressPercentage props using `$props()`
   - Implement large progress bar using shadcn Progress component
@@ -47,7 +47,7 @@
   - Ensure responsive layout (4 cols desktop, 2 cols tablet, 1 col mobile)
   - _Requirements: 1.1, 1.2, 1.5, 9.1, 9.2, 9.3_
 
-- [ ] 5. Create PaymentMetricsGrid component
+- [x] 5. Create PaymentMetricsGrid component
   - Create `frontend/src/lib/components/financing/PaymentMetricsGrid.svelte`
   - Accept financing, payments, and calculated metrics as props
   - Implement responsive grid with 4 metric cards
@@ -58,7 +58,7 @@
   - Use `$derived()` for metric calculations
   - _Requirements: 4.1, 4.2, 4.3, 6.1, 6.2, 6.3, 9.1, 9.2, 9.3_
 
-- [ ] 6. Create FinancingCharts component with donut chart
+- [x] 6. Create FinancingCharts component with donut chart
   - Create `frontend/src/lib/components/financing/FinancingCharts.svelte`
   - Implement progress donut chart using shadcn chart-pie-donut pattern
   - Configure chart with two rings: paid vs. remaining (inner), principal vs. interest (outer)
@@ -68,7 +68,7 @@
   - Ensure responsive sizing
   - _Requirements: 1.3, 1.4, 8.1, 8.2, 8.3, 9.4_
 
-- [ ] 7. Add amortization chart to FinancingCharts component
+- [-] 7. Add amortization chart to FinancingCharts component
   - Implement amortization chart using shadcn chart-area-step or chart-bar-mixed
   - Generate amortization schedule data using utility function
   - Configure stacked chart with principal and interest series
@@ -175,26 +175,3 @@
   - Optimize chart data points for large datasets
   - Test performance with large payment histories
   - _Requirements: 2.1, 3.1, 5.3, 8.1_
-
-- [ ]* 17. Write component tests
-  - Test FinancingSummaryHeader with various financing states
-  - Test PaymentMetricsGrid calculations
-  - Test FinancingCharts rendering with sample data
-  - Test PaymentCalculator calculations and interactions
-  - Test PaymentHistory with various payment types
-  - Test NextPaymentCard conditional styling
-  - Test LeaseMetricsCard calculations
-  - Test responsive behavior
-  - _Requirements: 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 8.1, 9.1_
-
-- [ ] 18. Final validation and polish
-  - Run `npm run validate` in frontend to check for errors
-  - Fix any linting or type errors
-  - Test all financing scenarios: loan, lease, no financing
-  - Test with various data states: no payments, few payments, many payments
-  - Verify all charts display correctly
-  - Verify all calculations are accurate
-  - Test on multiple browsers (Chrome, Firefox, Safari)
-  - Verify mobile experience
-  - Check accessibility with screen reader
-  - _Requirements: All_

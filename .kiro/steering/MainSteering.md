@@ -10,7 +10,7 @@ Minimize task summary to be a few key points, no need for full paragraphs
 
 Make sure you add `--no-pager` to git commands that display a lot of text (like diff). Make sure you add no pager right after `git` and before the command
 
-For UI tasks, please use shadcnui-svelte for UI elements everywhere possible. For charts, you use shadcnui charts. While the examples for the shadcnui charts are in react, they do exist for svelte (its built on top of layerchart). Do not add recharts!
+For UI tasks, please use shadcnui-svelte for UI elements everywhere possible. For charts, you use shadcnui charts. You can use the mcp server to see how shadcnui-svelte charts work. they do exist for svelte (its built on top of layerchart). Do not add recharts!
 
 
 When coding, avoid using deprecated functions. Make sure to check files you edit that functions are not deprecated. Specifically for svelte, make sure you are not using ComponentType, and instead use Component

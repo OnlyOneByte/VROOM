@@ -9,6 +9,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Card, CardContent } from '$lib/components/ui/card';
+	import * as CardFull from '$lib/components/ui/card';
 	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
 	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
 	import FuelEfficiencyTrendChart from '$lib/components/charts/FuelEfficiencyTrendChart.svelte';
@@ -372,27 +373,26 @@
 				</div>
 
 				<!-- Expense List -->
-				<div class="card">
-					<div class="flex items-center justify-between mb-4">
-						<h2 class="text-lg font-semibold text-gray-900">
-							All Expenses ({filteredExpenses.length})
-						</h2>
-					</div>
-
-					<ExpensesTable
-						expenses={filteredExpenses}
-						showVehicleColumn={false}
-						returnTo="/vehicles/{vehicleId}"
-						onDelete={handleDeleteExpense}
-						emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
-						emptyDescription="Start tracking expenses for this vehicle"
-						emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
-						emptyActionHref="/expenses/new?vehicleId={vehicleId}&returnTo=/vehicles/{vehicleId}"
-						scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
-						onClearFilters={clearFilters}
-						{hasActiveFilters}
-					/>
-				</div>
+				<CardFull.Root>
+					<CardFull.Header>
+						<CardFull.Title>All Expenses ({filteredExpenses.length})</CardFull.Title>
+					</CardFull.Header>
+					<CardFull.Content>
+						<ExpensesTable
+							expenses={filteredExpenses}
+							showVehicleColumn={false}
+							returnTo="/vehicles/{vehicleId}"
+							onDelete={handleDeleteExpense}
+							emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
+							emptyDescription="Start tracking expenses for this vehicle"
+							emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
+							emptyActionHref="/expenses/new?vehicleId={vehicleId}&returnTo=/vehicles/{vehicleId}"
+							scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
+							onClearFilters={clearFilters}
+							{hasActiveFilters}
+						/>
+					</CardFull.Content>
+				</CardFull.Root>
 			</TabsContent>
 
 			<!-- Maintenance Tab -->

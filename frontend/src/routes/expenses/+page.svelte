@@ -30,6 +30,7 @@
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import * as Card from '$lib/components/ui/card';
 	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
 
 	import {
@@ -595,35 +596,34 @@
 		</div>
 
 		<!-- Expense List -->
-		<div class="card">
-			<div class="flex items-center justify-between mb-4">
-				<h3 class="text-lg font-semibold text-gray-900">
-					Expenses ({filteredExpenses.length})
-				</h3>
-			</div>
-
-			<ExpensesTable
-				expenses={filteredExpenses}
-				{vehicles}
-				showVehicleColumn={true}
-				returnTo="/expenses"
-				onDelete={handleDeleteExpense}
-				emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
-				emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
-				emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
-				emptyActionHref="/expenses/new"
-				scrollHeight="600px"
-				onClearFilters={clearFilters}
-				hasActiveFilters={!!(
-					searchTerm ||
-					selectedVehicleId ||
-					filters.category ||
-					selectedTags.length > 0 ||
-					filters.startDate ||
-					filters.endDate
-				)}
-			/>
-		</div>
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Expenses ({filteredExpenses.length})</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				<ExpensesTable
+					expenses={filteredExpenses}
+					{vehicles}
+					showVehicleColumn={true}
+					returnTo="/expenses"
+					onDelete={handleDeleteExpense}
+					emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
+					emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
+					emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
+					emptyActionHref="/expenses/new"
+					scrollHeight="600px"
+					onClearFilters={clearFilters}
+					hasActiveFilters={!!(
+						searchTerm ||
+						selectedVehicleId ||
+						filters.category ||
+						selectedTags.length > 0 ||
+						filters.startDate ||
+						filters.endDate
+					)}
+				/>
+			</Card.Content>
+		</Card.Root>
 	</div>
 
 	<!-- Floating Action Button -->

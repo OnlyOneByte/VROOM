@@ -191,7 +191,7 @@
 		</EmptyContent>
 	</Empty>
 {:else}
-	<div class="rounded-md border">
+	<div class="rounded-md border bg-card">
 		<ScrollArea class="h-[{scrollHeight}] w-full" orientation="both">
 			<div class="min-w-[800px]">
 				<Table>
