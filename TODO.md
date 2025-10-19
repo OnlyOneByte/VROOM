@@ -8,9 +8,11 @@
 - [ ] Expenses table rework
 - [ ] Finance Information in car
 - [ ] Expense Form rework
+    - Fix tags
 - [ ] Expenses page rework, specifically using dashboard components from shadcnui
 - [ ] Comprehensive insurance information
 - [ ] Analytics Buildout
+- [ ] Menu sync time doesn't show right after enabling backup/sync until page refresh
 
 ## Features
 - [ ] Add VIN input to vehicle

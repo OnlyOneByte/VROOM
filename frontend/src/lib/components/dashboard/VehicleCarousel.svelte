@@ -56,11 +56,13 @@
 					align: 'start',
 					loop: false
 				}}
-				class="w-full"
+				class="w-full relative"
 			>
 				<Carousel.Content class="-ml-2 md:-ml-4">
 					{#each vehicles as vehicle (vehicle.id)}
-						<Carousel.Item class="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3">
+						<Carousel.Item
+							class="pl-2 md:pl-4 basis-[85%] sm:basis-[70%] md:basis-1/2 lg:basis-1/3"
+						>
 							<div class="p-1">
 								<Card.Root
 									class="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
@@ -120,7 +122,9 @@
 													Last Activity
 												</span>
 												<span class="text-muted-foreground">
-													{vehicle.lastActivity ? formatRelativeTime(vehicle.lastActivity) : 'No activity'}
+													{vehicle.lastActivity
+														? formatRelativeTime(vehicle.lastActivity)
+														: 'No activity'}
 												</span>
 											</div>
 										</div>
@@ -143,9 +147,15 @@
 						</Carousel.Item>
 					{/each}
 				</Carousel.Content>
-				{#if vehicles.length > 3}
-					<Carousel.Previous class="hidden md:flex" />
-					<Carousel.Next class="hidden md:flex" />
+				{#if vehicles.length > 1}
+					<Carousel.Previous
+						variant="ghost"
+						class="left-2 md:left-4 bg-white/90 hover:bg-white shadow-md"
+					/>
+					<Carousel.Next
+						variant="ghost"
+						class="right-2 md:right-4 bg-white/90 hover:bg-white shadow-md"
+					/>
 				{/if}
 			</Carousel.Root>
 		{:else}
