@@ -4,33 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { requireAuth } from '../lib/middleware/auth';
 import { repositoryFactory } from '../lib/repositories/factory';
-
-// Types for analytics data
-type ExpenseData = {
-  id: string;
-  amount: number;
-  category: string;
-  type?: string | null; // Deprecated
-  tags?: string | null; // JSON string from database
-  date: Date;
-  description?: string | null;
-  mileage?: number | null;
-  volume?: number | null;
-  charge?: number | null;
-  vehicleId: string;
-};
-
-type VehicleData = {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  licensePlate?: string | null;
-  nickname?: string | null;
-  currentMileage?: number | null;
-  initialMileage?: number | null;
-  userId: string;
-};
+import { AnalyticsService } from '../lib/services/analytics/analytics-service';
 
 const analytics = new Hono();
 
@@ -62,38 +36,15 @@ analytics.get('/dashboard', zValidator('query', analyticsQuerySchema), async (c)
     const user = c.get('user');
     const query = c.req.valid('query');
 
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
     const expenseRepository = repositoryFactory.getExpenseRepository();
+    const vehicleRepository = repositoryFactory.getVehicleRepository();
+    const analyticsService = new AnalyticsService(expenseRepository, vehicleRepository);
 
-    // Get all user vehicles
-    const userVehicles = await vehicleRepository.findByUserId(user.id);
-
-    if (userVehicles.length === 0) {
-      return c.json({
-        success: true,
-        data: {
-          vehicles: [],
-          totalExpenses: 0,
-          monthlyTrends: [],
-          categoryBreakdown: {},
-          fuelEfficiency: {},
-          costPerMile: {},
-        },
-      });
-    }
-
-    // Get expenses for all vehicles with a single query
-    const allExpenses: ExpenseData[] =
-      query.startDate && query.endDate
-        ? await expenseRepository.findByUserIdAndDateRange(user.id, query.startDate, query.endDate)
-        : await expenseRepository.findByUserId(user.id);
-
-    // Calculate analytics data
-    const dashboardData = calculateDashboardAnalytics(allExpenses, userVehicles, query.groupBy);
+    const data = await analyticsService.getDashboardAnalytics(user.id, query);
 
     return c.json({
       success: true,
-      data: dashboardData,
+      data,
     });
   } catch (error) {
     console.error('Error fetching dashboard analytics:', error);
@@ -126,22 +77,12 @@ analytics.get(
         throw new HTTPException(404, { message: 'Vehicle not found' });
       }
 
-      // Get vehicle expenses
-      const vehicleExpenses =
-        query.startDate && query.endDate
-          ? await expenseRepository.findByVehicleIdAndDateRange(
-              vehicleId,
-              query.startDate,
-              query.endDate
-            )
-          : await expenseRepository.findByVehicleId(vehicleId);
-
-      // Calculate vehicle-specific analytics
-      const vehicleAnalytics = calculateVehicleAnalytics(vehicleExpenses, vehicle, query.groupBy);
+      const analyticsService = new AnalyticsService(expenseRepository, vehicleRepository);
+      const data = await analyticsService.getVehicleAnalytics(vehicleId, vehicle, query);
 
       return c.json({
         success: true,
-        data: vehicleAnalytics,
+        data,
       });
     } catch (error) {
       console.error('Error fetching vehicle analytics:', error);
@@ -161,31 +102,15 @@ analytics.get('/trends', zValidator('query', analyticsQuerySchema), async (c) =>
     const user = c.get('user');
     const query = c.req.valid('query');
 
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
     const expenseRepository = repositoryFactory.getExpenseRepository();
+    const vehicleRepository = repositoryFactory.getVehicleRepository();
+    const analyticsService = new AnalyticsService(expenseRepository, vehicleRepository);
 
-    // Get all user vehicles
-    const userVehicles = await vehicleRepository.findByUserId(user.id);
-
-    // Get expenses for all vehicles with a single query
-    const allExpenses: ExpenseData[] =
-      query.startDate && query.endDate
-        ? await expenseRepository.findByUserIdAndDateRange(user.id, query.startDate, query.endDate)
-        : await expenseRepository.findByUserId(user.id);
-
-    // Add vehicle names to expenses
-    const vehicleMap = new Map(userVehicles.map((v) => [v.id, `${v.year} ${v.make} ${v.model}`]));
-    const expensesWithVehicleNames = allExpenses.map((e) => ({
-      ...e,
-      vehicleName: vehicleMap.get(e.vehicleId) || 'Unknown Vehicle',
-    }));
-
-    // Calculate trend data
-    const trendData = calculateTrendData(expensesWithVehicleNames, query.groupBy);
+    const data = await analyticsService.getTrendData(user.id, query);
 
     return c.json({
       success: true,
-      data: trendData,
+      data,
     });
   } catch (error) {
     console.error('Error fetching trend data:', error);
@@ -197,368 +122,5 @@ analytics.get('/trends', zValidator('query', analyticsQuerySchema), async (c) =>
     throw new HTTPException(500, { message: 'Failed to fetch trend data' });
   }
 });
-
-// Helper functions
-function calculateDashboardAnalytics(
-  expenses: ExpenseData[],
-  vehicles: VehicleData[],
-  groupBy: string
-) {
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-
-  // Monthly trends
-  const monthlyTrends = calculateMonthlyTrends(expenses, groupBy);
-
-  // Category breakdown
-  const categoryBreakdown = calculateCategoryBreakdown(expenses);
-
-  // Fuel efficiency summary
-  const fuelEfficiency = calculateOverallFuelEfficiency(expenses, vehicles);
-
-  // Cost per mile summary
-  const costPerMile = calculateOverallCostPerMile(expenses, vehicles);
-
-  return {
-    vehicles: vehicles.map((v) => ({
-      id: v.id,
-      name: `${v.year} ${v.make} ${v.model}`,
-      nickname: v.nickname,
-    })),
-    totalExpenses: Math.round(totalExpenses * 100) / 100,
-    monthlyTrends,
-    categoryBreakdown,
-    fuelEfficiency,
-    costPerMile,
-  };
-}
-
-function calculateVehicleAnalytics(expenses: ExpenseData[], vehicle: VehicleData, groupBy: string) {
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-
-  // Monthly trends for this vehicle
-  const monthlyTrends = calculateMonthlyTrends(expenses, groupBy);
-
-  // Category breakdown for this vehicle
-  const categoryBreakdown = calculateCategoryBreakdown(expenses);
-
-  // Fuel efficiency for this vehicle
-  const fuelExpenses = expenses.filter((e) => e.category === 'fuel');
-  const fuelEfficiency = calculateFuelEfficiencyForVehicle(
-    fuelExpenses,
-    vehicle.initialMileage || 0
-  );
-
-  // Cost per mile for this vehicle
-  const costPerMile = calculateCostPerMileForVehicle(expenses, vehicle.initialMileage || 0);
-
-  return {
-    vehicle: {
-      id: vehicle.id,
-      name: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-      nickname: vehicle.nickname,
-    },
-    totalExpenses: Math.round(totalExpenses * 100) / 100,
-    monthlyTrends,
-    categoryBreakdown,
-    fuelEfficiency,
-    costPerMile,
-  };
-}
-
-function calculateMonthlyTrends(expenses: ExpenseData[], groupBy: string) {
-  const trends: { [key: string]: number } = {};
-
-  expenses.forEach((expense) => {
-    let dateKey: string;
-    const date = new Date(expense.date);
-
-    switch (groupBy) {
-      case 'day':
-        dateKey = date.toISOString().substring(0, 10); // YYYY-MM-DD
-        break;
-      case 'week': {
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - date.getDay());
-        dateKey = weekStart.toISOString().substring(0, 10);
-        break;
-      }
-      case 'month':
-        dateKey = date.toISOString().substring(0, 7); // YYYY-MM
-        break;
-      case 'year':
-        dateKey = date.getFullYear().toString();
-        break;
-      default:
-        dateKey = date.toISOString().substring(0, 7);
-    }
-
-    trends[dateKey] = (trends[dateKey] || 0) + expense.amount;
-  });
-
-  return Object.entries(trends)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([period, amount]) => ({
-      period,
-      amount: Math.round(amount * 100) / 100,
-    }));
-}
-
-function calculateCategoryBreakdown(expenses: ExpenseData[]) {
-  const breakdown: { [key: string]: { amount: number; count: number; percentage: number } } = {};
-  const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-
-  expenses.forEach((expense) => {
-    if (!breakdown[expense.category]) {
-      breakdown[expense.category] = { amount: 0, count: 0, percentage: 0 };
-    }
-    breakdown[expense.category].amount += expense.amount;
-    breakdown[expense.category].count += 1;
-  });
-
-  // Calculate percentages
-  Object.keys(breakdown).forEach((category) => {
-    breakdown[category].amount = Math.round(breakdown[category].amount * 100) / 100;
-    breakdown[category].percentage =
-      totalAmount > 0 ? Math.round((breakdown[category].amount / totalAmount) * 10000) / 100 : 0;
-  });
-
-  return breakdown;
-}
-
-function calculateOverallFuelEfficiency(expenses: ExpenseData[], vehicles: VehicleData[]) {
-  const fuelExpenses = expenses.filter((e) => e.category === 'fuel');
-
-  if (fuelExpenses.length === 0) {
-    return {
-      averageMPG: 0,
-      totalVolume: 0,
-      totalFuelCost: 0,
-      averageCostPerGallon: 0,
-    };
-  }
-
-  let totalVolume = 0;
-  let totalFuelCost = 0;
-  let totalMiles = 0;
-
-  // Group by vehicle to calculate miles driven
-  const vehicleData: { [key: string]: { expenses: ExpenseData[]; initialMileage: number } } = {};
-
-  vehicles.forEach((vehicle) => {
-    vehicleData[vehicle.id] = {
-      expenses: fuelExpenses.filter((e) => e.vehicleId === vehicle.id),
-      initialMileage: vehicle.initialMileage || 0,
-    };
-  });
-
-  Object.values(vehicleData).forEach(({ expenses: vehicleFuelExpenses, initialMileage }) => {
-    if (vehicleFuelExpenses.length > 0) {
-      const sortedExpenses = vehicleFuelExpenses.sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-      const maxMileage = Math.max(...sortedExpenses.map((e) => e.mileage || 0));
-      const vehicleMiles = maxMileage - initialMileage;
-
-      totalMiles += vehicleMiles;
-      totalVolume += vehicleFuelExpenses.reduce((sum, e) => sum + (e.volume || 0), 0);
-      totalFuelCost += vehicleFuelExpenses.reduce((sum, e) => sum + e.amount, 0);
-    }
-  });
-
-  const averageMPG = totalVolume > 0 ? totalMiles / totalVolume : 0;
-  const averageCostPerGallon = totalVolume > 0 ? totalFuelCost / totalVolume : 0;
-
-  return {
-    averageMPG: Math.round(averageMPG * 100) / 100,
-    totalVolume: Math.round(totalVolume * 100) / 100,
-    totalFuelCost: Math.round(totalFuelCost * 100) / 100,
-    averageCostPerGallon: Math.round(averageCostPerGallon * 100) / 100,
-  };
-}
-
-function calculateOverallCostPerMile(expenses: ExpenseData[], vehicles: VehicleData[]) {
-  let totalCost = 0;
-  let totalMiles = 0;
-
-  vehicles.forEach((vehicle) => {
-    const vehicleExpenses = expenses.filter((e) => e.vehicleId === vehicle.id);
-    const expensesWithMileage = vehicleExpenses.filter((e) => e.mileage && e.mileage > 0);
-
-    if (expensesWithMileage.length > 0) {
-      const maxMileage = Math.max(
-        ...expensesWithMileage.map((e) => e.mileage).filter((m): m is number => m != null)
-      );
-      const vehicleMiles = maxMileage - (vehicle.initialMileage || 0);
-      const vehicleCost = vehicleExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-      totalMiles += vehicleMiles;
-      totalCost += vehicleCost;
-    }
-  });
-
-  const costPerMile = totalMiles > 0 ? totalCost / totalMiles : 0;
-
-  return {
-    totalCostPerMile: Math.round(costPerMile * 100) / 100,
-    totalCost: Math.round(totalCost * 100) / 100,
-    totalMiles,
-  };
-}
-
-function calculateFuelEfficiencyForVehicle(fuelExpenses: ExpenseData[], initialMileage: number) {
-  if (fuelExpenses.length === 0) {
-    return {
-      averageMPG: 0,
-      totalVolume: 0,
-      totalMiles: 0,
-      trend: [],
-    };
-  }
-
-  const sortedExpenses = fuelExpenses.sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
-
-  let totalVolume = 0;
-  let previousMileage = initialMileage;
-  const trend: { date: Date; mpg: number; mileage?: number }[] = [];
-
-  sortedExpenses.forEach((expense) => {
-    if (expense.volume && expense.mileage) {
-      const milesDriven = expense.mileage - previousMileage;
-      const mpg = milesDriven > 0 ? milesDriven / expense.volume : 0;
-
-      if (mpg > 0 && mpg < 100) {
-        trend.push({
-          date: expense.date,
-          mpg: Math.round(mpg * 100) / 100,
-          mileage: expense.mileage,
-        });
-      }
-
-      totalVolume += expense.volume;
-      previousMileage = expense.mileage;
-    }
-  });
-
-  const totalMiles = previousMileage - initialMileage;
-  const averageMPG = totalVolume > 0 ? totalMiles / totalVolume : 0;
-
-  return {
-    averageMPG: Math.round(averageMPG * 100) / 100,
-    totalVolume: Math.round(totalVolume * 100) / 100,
-    totalMiles,
-    trend,
-  };
-}
-
-function calculateCostPerMileForVehicle(expenses: ExpenseData[], initialMileage: number) {
-  const expensesWithMileage = expenses.filter((e) => e.mileage && e.mileage > 0);
-
-  if (expensesWithMileage.length === 0) {
-    return {
-      costPerMile: 0,
-      totalCost: 0,
-      totalMiles: 0,
-    };
-  }
-
-  const maxMileage = Math.max(
-    ...expensesWithMileage.map((e) => e.mileage).filter((m): m is number => m != null)
-  );
-  const totalMiles = maxMileage - initialMileage;
-  const totalCost = expenses.reduce((sum, e) => sum + e.amount, 0);
-
-  const costPerMile = totalMiles > 0 ? totalCost / totalMiles : 0;
-
-  return {
-    costPerMile: Math.round(costPerMile * 100) / 100,
-    totalCost: Math.round(totalCost * 100) / 100,
-    totalMiles,
-  };
-}
-
-function calculateTrendData(expenses: ExpenseData[], groupBy: string) {
-  // Cost per month trends
-  const costTrends = calculateMonthlyTrends(expenses, groupBy);
-
-  // Miles per month (estimated from fuel expenses)
-  const fuelExpenses = expenses.filter((e) => e.type === 'fuel' && e.mileage);
-  const milesTrends = calculateMilesTrends(fuelExpenses, groupBy);
-
-  // Cost per mile trends
-  const costPerMileTrends = calculateCostPerMileTrends(expenses, groupBy);
-
-  return {
-    costTrends,
-    milesTrends,
-    costPerMileTrends,
-  };
-}
-
-function calculateMilesTrends(fuelExpenses: ExpenseData[], groupBy: string) {
-  const trends: { [key: string]: { miles: number; count: number } } = {};
-
-  fuelExpenses.forEach((expense) => {
-    let dateKey: string;
-    const date = new Date(expense.date);
-
-    switch (groupBy) {
-      case 'day':
-        dateKey = date.toISOString().substring(0, 10);
-        break;
-      case 'week': {
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - date.getDay());
-        dateKey = weekStart.toISOString().substring(0, 10);
-        break;
-      }
-      case 'month':
-        dateKey = date.toISOString().substring(0, 7);
-        break;
-      case 'year':
-        dateKey = date.getFullYear().toString();
-        break;
-      default:
-        dateKey = date.toISOString().substring(0, 7);
-    }
-
-    if (!trends[dateKey]) {
-      trends[dateKey] = { miles: 0, count: 0 };
-    }
-
-    // Estimate miles from volume and average MPG (rough calculation)
-    const estimatedMiles = (expense.volume || 0) * 25; // Assume 25 MPG average
-    trends[dateKey].miles += estimatedMiles;
-    trends[dateKey].count += 1;
-  });
-
-  return Object.entries(trends)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([period, data]) => ({
-      period,
-      miles: Math.round(data.miles),
-    }));
-}
-
-function calculateCostPerMileTrends(expenses: ExpenseData[], groupBy: string) {
-  const costTrends = calculateMonthlyTrends(expenses, groupBy);
-  const fuelExpenses = expenses.filter((e) => e.type === 'fuel' && e.mileage);
-  const milesTrends = calculateMilesTrends(fuelExpenses, groupBy);
-
-  // Combine cost and miles data
-  const costPerMileTrends = costTrends.map((costData) => {
-    const milesData = milesTrends.find((m) => m.period === costData.period);
-    const miles = milesData ? milesData.miles : 0;
-    const costPerMile = miles > 0 ? costData.amount / miles : 0;
-
-    return {
-      period: costData.period,
-      costPerMile: Math.round(costPerMile * 100) / 100,
-    };
-  });
-
-  return costPerMileTrends;
-}
 
 export { analytics };
