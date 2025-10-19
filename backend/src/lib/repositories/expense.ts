@@ -4,6 +4,8 @@ import { inject, injectable } from 'inversify';
 import type { Expense, NewExpense } from '../../db/schema.js';
 import { expenses, vehicles } from '../../db/schema.js';
 import { TYPES } from '../di/types.js';
+import { DatabaseError } from '../errors.js';
+import { logger } from '../utils/logger.js';
 import { BaseRepository } from './base.js';
 import type { IExpenseRepository } from './interfaces.js';
 
@@ -25,8 +27,11 @@ export class ExpenseRepository
         .orderBy(desc(expenses.date));
       return result;
     } catch (error) {
-      console.error(`Error finding expenses for vehicle ${vehicleId}:`, error);
-      throw new Error('Failed to find expenses for vehicle');
+      logger.error('Failed to find expenses by vehicle', {
+        vehicleId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError(`Failed to find expenses for vehicle ${vehicleId}`, error);
     }
   }
 
@@ -79,8 +84,11 @@ export class ExpenseRepository
         .orderBy(desc(expenses.date));
       return result;
     } catch (error) {
-      console.error(`Error finding expenses for user ${userId}:`, error);
-      throw new Error('Failed to find expenses for user');
+      logger.error('Failed to find expenses by user', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError(`Failed to find expenses for user ${userId}`, error);
     }
   }
 
@@ -158,10 +166,21 @@ export class ExpenseRepository
   async batchCreate(expenseList: NewExpense[]): Promise<Expense[]> {
     try {
       const result = await this.database.insert(expenses).values(expenseList).returning();
+      logger.info('Batch created expenses', { count: result.length });
       return result;
     } catch (error) {
-      console.error('Error batch creating expenses:', error);
-      throw new Error('Failed to batch create expenses');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to batch create expenses', {
+        count: expenseList.length,
+        error: errorMessage,
+      });
+
+      // Handle specific SQLite errors
+      if (errorMessage.includes('FOREIGN KEY constraint')) {
+        throw new DatabaseError('Invalid vehicle reference in batch expense creation', error);
+      }
+
+      throw new DatabaseError('Failed to batch create expenses', error);
     }
   }
 

@@ -4,6 +4,8 @@ import { inject, injectable } from 'inversify';
 import type { NewVehicle, Vehicle } from '../../db/schema.js';
 import { vehicleShares, vehicles } from '../../db/schema.js';
 import { TYPES } from '../di/types.js';
+import { DatabaseError, NotFoundError } from '../errors.js';
+import { logger } from '../utils/logger.js';
 import { BaseRepository } from './base.js';
 import type { IVehicleRepository } from './interfaces.js';
 
@@ -25,8 +27,11 @@ export class VehicleRepository
         .orderBy(vehicles.createdAt);
       return result;
     } catch (error) {
-      console.error(`Error finding vehicles for user ${userId}:`, error);
-      throw new Error('Failed to find vehicles for user');
+      logger.error('Failed to find vehicles by user', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError(`Failed to find vehicles for user ${userId}`, error);
     }
   }
 
@@ -70,13 +75,23 @@ export class VehicleRepository
         .returning();
 
       if (result.length === 0) {
-        throw new Error(`Vehicle with id ${id} not found`);
+        logger.warn('Vehicle not found for mileage update', { id, mileage });
+        throw new NotFoundError('Vehicle');
       }
 
+      logger.info('Updated vehicle mileage', { id, mileage });
       return result[0];
     } catch (error) {
-      console.error(`Error updating mileage for vehicle ${id}:`, error);
-      throw new Error('Failed to update vehicle mileage');
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+
+      logger.error('Failed to update vehicle mileage', {
+        id,
+        mileage,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError(`Failed to update mileage for vehicle ${id}`, error);
     }
   }
 
@@ -116,10 +131,20 @@ export class VehicleRepository
       const allVehicles = [...ownedVehicles, ...sharedVehicles];
       const uniqueVehicles = Array.from(new Map(allVehicles.map((v) => [v.id, v])).values());
 
+      logger.debug('Found accessible vehicles', {
+        userId,
+        ownedCount: ownedVehicles.length,
+        sharedCount: sharedVehicles.length,
+        totalCount: uniqueVehicles.length,
+      });
+
       return uniqueVehicles;
     } catch (error) {
-      console.error(`Error finding accessible vehicles for user ${userId}:`, error);
-      throw new Error('Failed to find accessible vehicles');
+      logger.error('Failed to find accessible vehicles', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError(`Failed to find accessible vehicles for user ${userId}`, error);
     }
   }
 

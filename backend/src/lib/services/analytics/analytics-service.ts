@@ -1,6 +1,8 @@
 import { inject, injectable } from 'inversify';
 import { TYPES } from '../../di/types';
+import { DatabaseError } from '../../errors';
 import type { IExpenseRepository, IVehicleRepository } from '../../repositories/interfaces';
+import { logger } from '../../utils/logger';
 import { CostCalculator } from './cost-calculator';
 import { DashboardCalculator } from './dashboard-calculator';
 import { FuelEfficiencyCalculator } from './fuel-efficiency-calculator';
@@ -32,27 +34,45 @@ export class AnalyticsService {
   }
 
   async getDashboardAnalytics(userId: string, query: AnalyticsQuery): Promise<DashboardAnalytics> {
-    // Get all user vehicles
-    const vehicles = await this.vehicleRepo.findByUserId(userId);
+    try {
+      logger.debug('Fetching dashboard analytics', { userId, query });
 
-    if (vehicles.length === 0) {
-      return this.getEmptyDashboard();
+      // Get all user vehicles
+      const vehicles = await this.vehicleRepo.findByUserId(userId);
+
+      if (vehicles.length === 0) {
+        logger.info('No vehicles found for user', { userId });
+        return this.getEmptyDashboard();
+      }
+
+      // Get expenses for all vehicles with a single query
+      const expenses: ExpenseData[] =
+        query.startDate && query.endDate
+          ? await this.expenseRepo.findByUserIdAndDateRange(userId, query.startDate, query.endDate)
+          : await this.expenseRepo.findByUserId(userId);
+
+      logger.debug('Dashboard analytics calculated', {
+        userId,
+        vehicleCount: vehicles.length,
+        expenseCount: expenses.length,
+      });
+
+      return {
+        vehicles: this.formatVehicles(vehicles),
+        totalExpenses: this.dashboardCalc.calculateTotal(expenses),
+        monthlyTrends: this.trendCalc.calculate(expenses, query.groupBy),
+        categoryBreakdown: this.dashboardCalc.calculateBreakdown(expenses),
+        fuelEfficiency: this.dashboardCalc.calculateFuelEfficiency(expenses, vehicles),
+        costPerMile: this.dashboardCalc.calculateCostPerMile(expenses, vehicles),
+      };
+    } catch (error) {
+      logger.error('Failed to get dashboard analytics', {
+        userId,
+        query,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to calculate dashboard analytics', error);
     }
-
-    // Get expenses for all vehicles with a single query
-    const expenses: ExpenseData[] =
-      query.startDate && query.endDate
-        ? await this.expenseRepo.findByUserIdAndDateRange(userId, query.startDate, query.endDate)
-        : await this.expenseRepo.findByUserId(userId);
-
-    return {
-      vehicles: this.formatVehicles(vehicles),
-      totalExpenses: this.dashboardCalc.calculateTotal(expenses),
-      monthlyTrends: this.trendCalc.calculate(expenses, query.groupBy),
-      categoryBreakdown: this.dashboardCalc.calculateBreakdown(expenses),
-      fuelEfficiency: this.dashboardCalc.calculateFuelEfficiency(expenses, vehicles),
-      costPerMile: this.dashboardCalc.calculateCostPerMile(expenses, vehicles),
-    };
   }
 
   async getVehicleAnalytics(
@@ -60,78 +80,111 @@ export class AnalyticsService {
     vehicle: VehicleData,
     query: AnalyticsQuery
   ): Promise<VehicleAnalytics> {
-    // Get vehicle expenses
-    const expenses: ExpenseData[] =
-      query.startDate && query.endDate
-        ? await this.expenseRepo.findByVehicleIdAndDateRange(
-            vehicleId,
-            query.startDate,
-            query.endDate
-          )
-        : await this.expenseRepo.findByVehicleId(vehicleId);
+    try {
+      logger.debug('Fetching vehicle analytics', { vehicleId, query });
 
-    const totalExpenses = this.dashboardCalc.calculateTotal(expenses);
-    const monthlyTrends = this.trendCalc.calculate(expenses, query.groupBy);
-    const categoryBreakdown = this.dashboardCalc.calculateBreakdown(expenses);
+      // Get vehicle expenses
+      const expenses: ExpenseData[] =
+        query.startDate && query.endDate
+          ? await this.expenseRepo.findByVehicleIdAndDateRange(
+              vehicleId,
+              query.startDate,
+              query.endDate
+            )
+          : await this.expenseRepo.findByVehicleId(vehicleId);
 
-    // Fuel efficiency for this vehicle
-    const fuelExpenses = expenses.filter((e) => e.category === 'fuel');
-    const fuelEfficiency = this.fuelEfficiencyCalc.calculateForVehicle(
-      fuelExpenses,
-      vehicle.initialMileage || 0
-    );
+      const totalExpenses = this.dashboardCalc.calculateTotal(expenses);
+      const monthlyTrends = this.trendCalc.calculate(expenses, query.groupBy);
+      const categoryBreakdown = this.dashboardCalc.calculateBreakdown(expenses);
 
-    // Cost per mile for this vehicle
-    const costPerMile = this.costCalc.calculateCostPerMileForVehicle(
-      expenses,
-      vehicle.initialMileage || 0
-    );
+      // Fuel efficiency for this vehicle
+      const fuelExpenses = expenses.filter((e) => e.category === 'fuel');
+      const fuelEfficiency = this.fuelEfficiencyCalc.calculateForVehicle(
+        fuelExpenses,
+        vehicle.initialMileage || 0
+      );
 
-    return {
-      vehicle: {
-        id: vehicle.id,
-        name: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
-        nickname: vehicle.nickname,
-      },
-      totalExpenses,
-      monthlyTrends,
-      categoryBreakdown,
-      fuelEfficiency,
-      costPerMile,
-    };
+      // Cost per mile for this vehicle
+      const costPerMile = this.costCalc.calculateCostPerMileForVehicle(
+        expenses,
+        vehicle.initialMileage || 0
+      );
+
+      logger.debug('Vehicle analytics calculated', {
+        vehicleId,
+        expenseCount: expenses.length,
+      });
+
+      return {
+        vehicle: {
+          id: vehicle.id,
+          name: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+          nickname: vehicle.nickname,
+        },
+        totalExpenses,
+        monthlyTrends,
+        categoryBreakdown,
+        fuelEfficiency,
+        costPerMile,
+      };
+    } catch (error) {
+      logger.error('Failed to get vehicle analytics', {
+        vehicleId,
+        query,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to calculate vehicle analytics', error);
+    }
   }
 
   async getTrendData(userId: string, query: AnalyticsQuery): Promise<TrendData> {
-    // Get all user vehicles
-    const vehicles = await this.vehicleRepo.findByUserId(userId);
+    try {
+      logger.debug('Fetching trend data', { userId, query });
 
-    // Get expenses for all vehicles with a single query
-    const expenses: ExpenseData[] =
-      query.startDate && query.endDate
-        ? await this.expenseRepo.findByUserIdAndDateRange(userId, query.startDate, query.endDate)
-        : await this.expenseRepo.findByUserId(userId);
+      // Get all user vehicles
+      const vehicles = await this.vehicleRepo.findByUserId(userId);
 
-    // Add vehicle names to expenses
-    const vehicleMap = new Map(vehicles.map((v) => [v.id, `${v.year} ${v.make} ${v.model}`]));
-    const expensesWithVehicleNames = expenses.map((e) => ({
-      ...e,
-      vehicleName: vehicleMap.get(e.vehicleId) || 'Unknown Vehicle',
-    }));
+      // Get expenses for all vehicles with a single query
+      const expenses: ExpenseData[] =
+        query.startDate && query.endDate
+          ? await this.expenseRepo.findByUserIdAndDateRange(userId, query.startDate, query.endDate)
+          : await this.expenseRepo.findByUserId(userId);
 
-    // Calculate trend data
-    const costTrends = this.trendCalc.calculate(expensesWithVehicleNames, query.groupBy);
-    const fuelExpenses = expensesWithVehicleNames.filter((e) => e.type === 'fuel' && e.mileage);
-    const milesTrends = this.trendCalc.calculateMilesTrends(fuelExpenses, query.groupBy);
-    const costPerMileTrends = this.trendCalc.calculateCostPerMileTrends(
-      expensesWithVehicleNames,
-      query.groupBy
-    );
+      // Add vehicle names to expenses
+      const vehicleMap = new Map(vehicles.map((v) => [v.id, `${v.year} ${v.make} ${v.model}`]));
+      const expensesWithVehicleNames = expenses.map((e) => ({
+        ...e,
+        vehicleName: vehicleMap.get(e.vehicleId) || 'Unknown Vehicle',
+      }));
 
-    return {
-      costTrends,
-      milesTrends,
-      costPerMileTrends,
-    };
+      // Calculate trend data
+      const costTrends = this.trendCalc.calculate(expensesWithVehicleNames, query.groupBy);
+      const fuelExpenses = expensesWithVehicleNames.filter((e) => e.type === 'fuel' && e.mileage);
+      const milesTrends = this.trendCalc.calculateMilesTrends(fuelExpenses, query.groupBy);
+      const costPerMileTrends = this.trendCalc.calculateCostPerMileTrends(
+        expensesWithVehicleNames,
+        query.groupBy
+      );
+
+      logger.debug('Trend data calculated', {
+        userId,
+        vehicleCount: vehicles.length,
+        expenseCount: expenses.length,
+      });
+
+      return {
+        costTrends,
+        milesTrends,
+        costPerMileTrends,
+      };
+    } catch (error) {
+      logger.error('Failed to get trend data', {
+        userId,
+        query,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to calculate trend data', error);
+    }
   }
 
   private formatVehicles(vehicles: VehicleData[]) {
