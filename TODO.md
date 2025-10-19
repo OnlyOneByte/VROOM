@@ -13,6 +13,7 @@
 - [ ] Comprehensive insurance information
 - [ ] Analytics Buildout
 - [ ] Menu sync time doesn't show right after enabling backup/sync until page refresh
+- [ ] Dark Mode switch
 
 ## Features
 - [ ] Add VIN input to vehicle

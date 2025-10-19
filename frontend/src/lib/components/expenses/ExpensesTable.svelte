@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Edit, Trash2, SortAsc, SortDesc, DollarSign, Search, Car } from 'lucide-svelte';
+	import { Pencil, Trash2, ArrowUpDown, DollarSign, Search, Car } from 'lucide-svelte';
 	import { settingsStore } from '$lib/stores/settings';
 	import { appStore } from '$lib/stores/app';
 	import type { Expense, Vehicle, ExpenseCategory } from '$lib/types';
@@ -8,6 +8,7 @@
 	import { categoryLabels, getCategoryIcon, getCategoryColor } from '$lib/utils/expense-helpers';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { Button } from '$lib/components/ui/button';
+	import { Badge } from '$lib/components/ui/badge';
 	import {
 		AlertDialog,
 		AlertDialogAction,
@@ -197,45 +198,48 @@
 					<TableHeader>
 						<TableRow>
 							<TableHead class="w-[120px]">
-								<button
+								<Button
+									variant="ghost"
+									size="sm"
 									onclick={() => handleSort('date')}
-									class="flex items-center gap-1 hover:text-gray-900 font-semibold"
+									class="h-8 px-2 -ml-2 hover:bg-muted"
 								>
 									Date
 									{#if sortBy === 'date'}
-										{@const SortIcon = sortOrder === 'asc' ? SortAsc : SortDesc}
-										<SortIcon class="h-3 w-3" />
+										<ArrowUpDown class="ml-1 h-3.5 w-3.5" />
 									{/if}
-								</button>
+								</Button>
 							</TableHead>
 							{#if showVehicleColumn}
 								<TableHead class="w-[180px]">Vehicle</TableHead>
 							{/if}
 							<TableHead class="w-[140px]">Category</TableHead>
 							<TableHead class="w-[200px]">
-								<button
+								<Button
+									variant="ghost"
+									size="sm"
 									onclick={() => handleSort('type')}
-									class="flex items-center gap-1 hover:text-gray-900 font-semibold"
+									class="h-8 px-2 -ml-2 hover:bg-muted"
 								>
 									Tags
 									{#if sortBy === 'type'}
-										{@const SortIcon = sortOrder === 'asc' ? SortAsc : SortDesc}
-										<SortIcon class="h-3 w-3" />
+										<ArrowUpDown class="ml-1 h-3.5 w-3.5" />
 									{/if}
-								</button>
+								</Button>
 							</TableHead>
 							<TableHead class="w-[200px]">Description</TableHead>
 							<TableHead class="text-right w-[120px]">
-								<button
+								<Button
+									variant="ghost"
+									size="sm"
 									onclick={() => handleSort('amount')}
-									class="flex items-center gap-1 hover:text-gray-900 font-semibold ml-auto"
+									class="h-8 px-2 -mr-2 ml-auto hover:bg-muted"
 								>
 									Amount
 									{#if sortBy === 'amount'}
-										{@const SortIcon = sortOrder === 'asc' ? SortAsc : SortDesc}
-										<SortIcon class="h-3 w-3" />
+										<ArrowUpDown class="ml-1 h-3.5 w-3.5" />
 									{/if}
-								</button>
+								</Button>
 							</TableHead>
 							<TableHead class="text-right w-[100px]">Actions</TableHead>
 						</TableRow>
@@ -244,14 +248,14 @@
 						{#each sortedExpenses as expense (expense.id)}
 							{@const IconComponent = getCategoryIcon(expense.category)}
 							{@const vehicle = getVehicleForExpense(expense)}
-							<TableRow class="cursor-pointer hover:bg-gray-50">
-								<TableCell class="font-medium">
+							<TableRow class="group">
+								<TableCell class="font-medium text-muted-foreground">
 									{formatDate(new Date(expense.date))}
 								</TableCell>
 								{#if showVehicleColumn}
 									<TableCell>
 										<div class="flex items-center gap-2">
-											<Car class="h-4 w-4 text-gray-500 flex-shrink-0" />
+											<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
 											<span class="truncate">
 												{vehicle ? getVehicleDisplayName(vehicle) : 'Unknown'}
 											</span>
@@ -273,20 +277,18 @@
 								<TableCell>
 									<div class="flex flex-wrap gap-1">
 										{#each expense.tags || [] as tag}
-											<span
-												class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-											>
+											<Badge variant="secondary" class="font-normal">
 												{tag}
-											</span>
+											</Badge>
 										{/each}
 									</div>
 								</TableCell>
 								<TableCell>
-									<div class="truncate">
+									<div class="truncate text-foreground">
 										{expense.description || '-'}
 									</div>
 									{#if expense.mileage || expense.volume || expense.charge}
-										<div class="text-xs text-gray-500 mt-1 whitespace-nowrap">
+										<div class="text-xs text-muted-foreground mt-1 whitespace-nowrap">
 											{#if expense.mileage}
 												{expense.mileage.toLocaleString()} mi
 											{/if}
@@ -311,26 +313,32 @@
 									{formatCurrency(expense.amount)}
 								</TableCell>
 								<TableCell class="text-right">
-									<div class="flex items-center justify-end gap-1">
-										<a
+									<div
+										class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+									>
+										<Button
+											variant="ghost"
+											size="icon"
+											class="h-8 w-8"
 											href="/expenses/{expense.id}/edit?returnTo={returnTo}"
-											class="btn btn-outline btn-sm p-2"
 											title="Edit expense"
 											onclick={e => e.stopPropagation()}
 										>
-											<Edit class="h-4 w-4" />
-										</a>
+											<Pencil class="h-4 w-4" />
+										</Button>
 										{#if onDelete}
-											<button
+											<Button
+												variant="ghost"
+												size="icon"
+												class="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
 												onclick={e => {
 													e.stopPropagation();
 													confirmDelete(expense);
 												}}
-												class="btn btn-outline btn-sm p-2 text-red-600 hover:text-red-700 hover:border-red-300"
 												title="Delete expense"
 											>
 												<Trash2 class="h-4 w-4" />
-											</button>
+											</Button>
 										{/if}
 									</div>
 								</TableCell>
@@ -356,28 +364,26 @@
 
 			{#if expenseToDelete}
 				{@const IconComponent = getCategoryIcon(expenseToDelete.category)}
-				<div class="bg-gray-50 rounded-lg p-3">
+				<div class="bg-muted rounded-lg p-3">
 					<div class="flex items-center gap-3">
 						<div class="p-2 rounded-lg {getCategoryColor(expenseToDelete.category)}">
 							<IconComponent class="h-4 w-4" />
 						</div>
 						<div class="flex-1">
-							<p class="font-medium text-gray-900">
+							<p class="font-medium text-foreground">
 								{expenseToDelete.description || expenseToDelete.tags?.join(', ') || 'Expense'}
 							</p>
-							<p class="text-sm text-gray-600">
+							<p class="text-sm text-muted-foreground">
 								{formatDate(new Date(expenseToDelete.date))} • {formatCurrency(
 									expenseToDelete.amount
 								)}
 							</p>
 							{#if expenseToDelete.tags && expenseToDelete.tags.length > 0}
-								<div class="flex flex-wrap gap-1 mt-1">
+								<div class="flex flex-wrap gap-1 mt-2">
 									{#each expenseToDelete.tags as tag}
-										<span
-											class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700"
-										>
+										<Badge variant="secondary" class="font-normal">
 											{tag}
-										</span>
+										</Badge>
 									{/each}
 								</div>
 							{/if}
@@ -391,7 +397,7 @@
 				<AlertDialogAction
 					onclick={deleteExpense}
 					disabled={isDeleting}
-					class="bg-red-600 hover:bg-red-700 text-white"
+					class="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
 				>
 					{#if isDeleting}
 						<div class="loading-spinner h-4 w-4 mr-2"></div>
