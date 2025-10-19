@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { inject, injectable } from 'inversify';
 import type { NewVehicleFinancing, VehicleFinancing } from '../../db/schema.js';
@@ -7,24 +7,26 @@ import { TYPES } from '../di/types.js';
 import { logger } from '../utils/logger';
 import { BaseRepository } from './base.js';
 import type { IVehicleFinancingRepository } from './interfaces.js';
+import { QueryBuilder } from './query-builder.js';
 
 @injectable()
 export class VehicleFinancingRepository
   extends BaseRepository<VehicleFinancing, NewVehicleFinancing>
   implements IVehicleFinancingRepository
 {
+  private queryBuilder: QueryBuilder<VehicleFinancing>;
+
   constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, vehicleFinancing);
+    this.queryBuilder = new QueryBuilder(this.database);
   }
 
   async findByVehicleId(vehicleId: string): Promise<VehicleFinancing | null> {
     try {
-      const result = await this.database
-        .select()
-        .from(vehicleFinancing)
-        .where(eq(vehicleFinancing.vehicleId, vehicleId))
-        .limit(1);
-      return result[0] || null;
+      return await this.queryBuilder.findOne(
+        vehicleFinancing,
+        eq(vehicleFinancing.vehicleId, vehicleId)
+      );
     } catch (error) {
       logger.error('Error finding financing for vehicle', { vehicleId, error });
       throw new Error('Failed to find financing for vehicle');
@@ -33,12 +35,11 @@ export class VehicleFinancingRepository
 
   async findActiveFinancing(): Promise<VehicleFinancing[]> {
     try {
-      const result = await this.database
-        .select()
-        .from(vehicleFinancing)
-        .where(eq(vehicleFinancing.isActive, true))
-        .orderBy(vehicleFinancing.startDate);
-      return result;
+      return await this.queryBuilder.findMany(
+        vehicleFinancing,
+        eq(vehicleFinancing.isActive, true),
+        asc(vehicleFinancing.startDate)
+      );
     } catch (error) {
       logger.error('Error finding active financing', { error });
       throw new Error('Failed to find active financing');

@@ -151,7 +151,7 @@
 
 	async function loadVehicles() {
 		try {
-			const response = await fetch('/api/vehicles');
+			const response = await fetch('/api/v1/vehicles');
 			if (response.ok) {
 				const result = await response.json();
 				vehicles = result.data || [];
@@ -166,7 +166,7 @@
 
 	async function loadExpense() {
 		try {
-			const response = await fetch(`/api/expenses/${expenseId}`, {
+			const response = await fetch(`/api/v1/expenses/${expenseId}`, {
 				credentials: 'include'
 			});
 
@@ -217,7 +217,7 @@
 
 	async function loadVehicle() {
 		try {
-			const response = await fetch(`/api/vehicles/${formData.vehicleId}`, {
+			const response = await fetch(`/api/v1/vehicles/${formData.vehicleId}`, {
 				credentials: 'include'
 			});
 
@@ -233,7 +233,7 @@
 	async function loadLastFuelExpense() {
 		try {
 			const response = await fetch(
-				`/api/expenses?vehicleId=${formData.vehicleId}&type=fuel&limit=2`,
+				`/api/v1/expenses?vehicleId=${formData.vehicleId}&type=fuel&limit=2`,
 				{
 					credentials: 'include'
 				}
@@ -252,7 +252,7 @@
 
 	async function loadAllVehicleExpenses() {
 		try {
-			const response = await fetch(`/api/expenses?vehicleId=${formData.vehicleId}`, {
+			const response = await fetch(`/api/v1/expenses?vehicleId=${formData.vehicleId}`, {
 				credentials: 'include'
 			});
 
@@ -530,7 +530,7 @@
 
 			if (isEditMode) {
 				// Update existing expense
-				const response = await fetch(`/api/expenses/${expenseId}`, {
+				const response = await fetch(`/api/v1/expenses/${expenseId}`, {
 					method: 'PUT',
 					headers: {
 						'Content-Type': 'application/json'
@@ -552,7 +552,7 @@
 			} else {
 				// Create new expense
 				if ($isOnline) {
-					const response = await fetch(`/api/expenses`, {
+					const response = await fetch(`/api/v1/expenses`, {
 						method: 'POST',
 						headers: {
 							'Content-Type': 'application/json'
@@ -651,7 +651,7 @@
 		isDeleting = true;
 
 		try {
-			const response = await fetch(`/api/expenses/${expenseId}`, {
+			const response = await fetch(`/api/v1/expenses/${expenseId}`, {
 				method: 'DELETE',
 				credentials: 'include'
 			});

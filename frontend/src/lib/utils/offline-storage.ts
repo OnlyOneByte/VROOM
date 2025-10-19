@@ -109,7 +109,7 @@ export async function syncOfflineExpenses(): Promise<void> {
 				continue;
 			}
 
-			const response = await fetch('/api/expenses', {
+			const response = await fetch('/api/v1/expenses', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({

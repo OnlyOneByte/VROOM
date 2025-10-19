@@ -7,21 +7,20 @@ import { TYPES } from '../di/types.js';
 import { logger } from '../utils/logger';
 import { BaseRepository } from './base.js';
 import type { IUserRepository } from './interfaces.js';
+import { QueryBuilder } from './query-builder.js';
 
 @injectable()
 export class UserRepository extends BaseRepository<User, NewUser> implements IUserRepository {
+  private queryBuilder: QueryBuilder<User>;
+
   constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, users);
+    this.queryBuilder = new QueryBuilder(this.database);
   }
 
   async findByEmail(email: string): Promise<User | null> {
     try {
-      const result = await this.database
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
-      return result[0] || null;
+      return await this.queryBuilder.findOne(users, eq(users.email, email));
     } catch (error) {
       logger.error('Error finding user by email', { email, error });
       throw new Error('Failed to find user by email');
@@ -30,12 +29,11 @@ export class UserRepository extends BaseRepository<User, NewUser> implements IUs
 
   async findByProviderId(provider: string, providerId: string): Promise<User | null> {
     try {
-      const result = await this.database
-        .select()
-        .from(users)
-        .where(and(eq(users.provider, provider), eq(users.providerId, providerId)))
-        .limit(1);
-      return result[0] || null;
+      const whereClause = and(eq(users.provider, provider), eq(users.providerId, providerId));
+      if (!whereClause) {
+        throw new Error('Invalid where clause');
+      }
+      return await this.queryBuilder.findOne(users, whereClause);
     } catch (error) {
       logger.error('Error finding user by provider', { provider, providerId, error });
       throw new Error('Failed to find user by provider');

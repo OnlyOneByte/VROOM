@@ -57,7 +57,7 @@ describe('Authentication Flow Integration', () => {
 			authStore.loginWithGoogle();
 
 			// Should redirect to Google OAuth
-			expect(mockLocation.href).toBe('/api/auth/login/google');
+			expect(mockLocation.href).toBe('/api/v1/auth/login/google');
 		});
 
 		it('manages loading state during authentication', () => {
@@ -292,7 +292,7 @@ describe('Authentication Flow Integration', () => {
 			expect(state.user).toEqual(mockUser);
 			expect(state.isAuthenticated).toBe(true);
 
-			expect(mockFetch).toHaveBeenCalledWith('/api/auth/me', {
+			expect(mockFetch).toHaveBeenCalledWith('/api/v1/auth/me', {
 				credentials: 'include'
 			});
 		});

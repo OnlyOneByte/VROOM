@@ -105,7 +105,7 @@
 	async function loadVehicles() {
 		appStore.setLoading(true);
 		try {
-			const response = await fetch('/api/vehicles', {
+			const response = await fetch('/api/v1/vehicles', {
 				credentials: 'include'
 			});
 
@@ -135,7 +135,7 @@
 	async function loadVehicleExpenses(vehicles: Vehicle[]) {
 		const expensePromises = vehicles.map(async vehicle => {
 			try {
-				const response = await fetch(`/api/expenses?vehicleId=${vehicle.id}`, {
+				const response = await fetch(`/api/v1/expenses?vehicleId=${vehicle.id}`, {
 					credentials: 'include'
 				});
 

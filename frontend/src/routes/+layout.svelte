@@ -26,7 +26,7 @@
 		if (vehiclesLoaded) return;
 
 		try {
-			const response = await fetch('/api/vehicles', {
+			const response = await fetch('/api/v1/vehicles', {
 				credentials: 'include'
 			});
 

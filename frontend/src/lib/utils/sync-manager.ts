@@ -42,7 +42,7 @@ export const lastSyncTime = writable<Date | null>(null);
 // Fetch last sync time from server
 export async function fetchLastSyncTime(): Promise<void> {
 	try {
-		const response = await fetch('/api/sync/status', {
+		const response = await fetch('/api/v1/sync/status', {
 			credentials: 'include'
 		});
 
@@ -207,7 +207,7 @@ class SyncManager {
 			}
 
 			// No conflict, proceed with sync
-			const response = await fetch(`/api/expenses`, {
+			const response = await fetch(`/api/v1/expenses`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -242,7 +242,7 @@ class SyncManager {
 	): Promise<{ date: string; amount: number; tags: string[] } | null> {
 		try {
 			const response = await fetch(
-				`/api/expenses?vehicleId=${expense.vehicleId}&date=${expense.date}&amount=${expense.amount}`
+				`/api/v1/expenses?vehicleId=${expense.vehicleId}&date=${expense.date}&amount=${expense.amount}`
 			);
 
 			if (!response.ok) return null;
@@ -317,7 +317,7 @@ class SyncManager {
 			switch (resolution) {
 				case 'keep_local': {
 					// Force sync the local version
-					const response = await fetch(`/api/expenses`, {
+					const response = await fetch(`/api/v1/expenses`, {
 						method: 'POST',
 						headers: {
 							'Content-Type': 'application/json'

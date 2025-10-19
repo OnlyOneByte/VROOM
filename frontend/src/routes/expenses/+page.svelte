@@ -81,14 +81,14 @@
 		isLoading = true;
 		try {
 			// Load vehicles first to map vehicle info to expenses
-			const vehiclesResponse = await fetch('/api/vehicles');
+			const vehiclesResponse = await fetch('/api/v1/vehicles');
 			if (vehiclesResponse.ok) {
 				const vehiclesResult = await vehiclesResponse.json();
 				vehicles = vehiclesResult.data || [];
 			}
 
 			// Load all expenses in a single request
-			const expensesResponse = await fetch('/api/expenses');
+			const expensesResponse = await fetch('/api/v1/expenses');
 			if (expensesResponse.ok) {
 				const expensesResult = await expensesResponse.json();
 				const allExpenses: Expense[] = expensesResult.data || [];

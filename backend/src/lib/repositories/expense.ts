@@ -8,24 +8,27 @@ import { DatabaseError } from '../errors.js';
 import { logger } from '../utils/logger.js';
 import { BaseRepository } from './base.js';
 import type { IExpenseRepository } from './interfaces.js';
+import { QueryBuilder } from './query-builder.js';
 
 @injectable()
 export class ExpenseRepository
   extends BaseRepository<Expense, NewExpense>
   implements IExpenseRepository
 {
+  private queryBuilder: QueryBuilder<Expense>;
+
   constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, expenses);
+    this.queryBuilder = new QueryBuilder(this.database);
   }
 
   async findByVehicleId(vehicleId: string): Promise<Expense[]> {
     try {
-      const result = await this.database
-        .select()
-        .from(expenses)
-        .where(eq(expenses.vehicleId, vehicleId))
-        .orderBy(desc(expenses.date));
-      return result;
+      return await this.queryBuilder.findMany(
+        expenses,
+        eq(expenses.vehicleId, vehicleId),
+        desc(expenses.date)
+      );
     } catch (error) {
       logger.error('Failed to find expenses by vehicle', {
         vehicleId,
@@ -41,18 +44,15 @@ export class ExpenseRepository
     endDate: Date
   ): Promise<Expense[]> {
     try {
-      const result = await this.database
-        .select()
-        .from(expenses)
-        .where(
-          and(
-            eq(expenses.vehicleId, vehicleId),
-            gte(expenses.date, startDate),
-            lte(expenses.date, endDate)
-          )
-        )
-        .orderBy(desc(expenses.date));
-      return result;
+      return await this.queryBuilder.findMany(
+        expenses,
+        and(
+          eq(expenses.vehicleId, vehicleId),
+          gte(expenses.date, startDate),
+          lte(expenses.date, endDate)
+        ),
+        desc(expenses.date)
+      );
     } catch (error) {
       logger.error('Error finding expenses for vehicle in date range', { vehicleId, error });
       throw new Error('Failed to find expenses for date range');
@@ -134,12 +134,11 @@ export class ExpenseRepository
 
   async findByCategory(vehicleId: string, category: string): Promise<Expense[]> {
     try {
-      const result = await this.database
-        .select()
-        .from(expenses)
-        .where(and(eq(expenses.vehicleId, vehicleId), eq(expenses.category, category)))
-        .orderBy(desc(expenses.date));
-      return result;
+      return await this.queryBuilder.findMany(
+        expenses,
+        and(eq(expenses.vehicleId, vehicleId), eq(expenses.category, category)),
+        desc(expenses.date)
+      );
     } catch (error) {
       logger.error('Error finding expenses by category for vehicle', {
         category,
@@ -152,12 +151,11 @@ export class ExpenseRepository
 
   async findFuelExpenses(vehicleId: string): Promise<Expense[]> {
     try {
-      const result = await this.database
-        .select()
-        .from(expenses)
-        .where(and(eq(expenses.vehicleId, vehicleId), eq(expenses.category, 'fuel')))
-        .orderBy(desc(expenses.date));
-      return result;
+      return await this.queryBuilder.findMany(
+        expenses,
+        and(eq(expenses.vehicleId, vehicleId), eq(expenses.category, 'fuel')),
+        desc(expenses.date)
+      );
     } catch (error) {
       logger.error('Error finding fuel expenses for vehicle', { vehicleId, error });
       throw new Error('Failed to find fuel expenses');

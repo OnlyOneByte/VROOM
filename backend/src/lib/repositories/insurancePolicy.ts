@@ -7,14 +7,18 @@ import { TYPES } from '../di/types.js';
 import { logger } from '../utils/logger';
 import { BaseRepository } from './base.js';
 import type { IInsurancePolicyRepository } from './interfaces.js';
+import { QueryBuilder } from './query-builder.js';
 
 @injectable()
 export class InsurancePolicyRepository
   extends BaseRepository<InsurancePolicy, NewInsurancePolicy>
   implements IInsurancePolicyRepository
 {
+  private queryBuilder: QueryBuilder<InsurancePolicy>;
+
   constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, insurancePolicies);
+    this.queryBuilder = new QueryBuilder(this.database);
   }
 
   async findByVehicleId(vehicleId: string): Promise<InsurancePolicy[]> {
@@ -33,14 +37,14 @@ export class InsurancePolicyRepository
 
   async findActiveByVehicleId(vehicleId: string): Promise<InsurancePolicy | null> {
     try {
-      const result = await this.database
-        .select()
-        .from(insurancePolicies)
-        .where(
-          and(eq(insurancePolicies.vehicleId, vehicleId), eq(insurancePolicies.isActive, true))
-        )
-        .limit(1);
-      return result[0] || null;
+      const whereClause = and(
+        eq(insurancePolicies.vehicleId, vehicleId),
+        eq(insurancePolicies.isActive, true)
+      );
+      if (!whereClause) {
+        throw new Error('Invalid where clause');
+      }
+      return await this.queryBuilder.findOne(insurancePolicies, whereClause);
     } catch (error) {
       logger.error('Error finding active insurance policy for vehicle', { vehicleId, error });
       throw new Error('Failed to find active insurance policy');

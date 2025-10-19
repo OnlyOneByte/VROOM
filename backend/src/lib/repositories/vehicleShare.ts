@@ -7,14 +7,18 @@ import { TYPES } from '../di/types';
 import { NotFoundError } from '../errors';
 import { BaseRepository } from './base';
 import type { IVehicleShareRepository } from './interfaces';
+import { QueryBuilder } from './query-builder.js';
 
 @injectable()
 export class VehicleShareRepository
   extends BaseRepository<VehicleShare, NewVehicleShare>
   implements IVehicleShareRepository
 {
+  private queryBuilder: QueryBuilder<VehicleShare>;
+
   constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, vehicleShares);
+    this.queryBuilder = new QueryBuilder(this.database);
   }
 
   async findByVehicleId(vehicleId: string): Promise<VehicleShare[]> {
@@ -42,15 +46,14 @@ export class VehicleShareRepository
   }
 
   async findByVehicleAndUser(vehicleId: string, userId: string): Promise<VehicleShare | null> {
-    const result = await this.database
-      .select()
-      .from(vehicleShares)
-      .where(
-        and(eq(vehicleShares.vehicleId, vehicleId), eq(vehicleShares.sharedWithUserId, userId))
-      )
-      .get();
-
-    return result || null;
+    const whereClause = and(
+      eq(vehicleShares.vehicleId, vehicleId),
+      eq(vehicleShares.sharedWithUserId, userId)
+    );
+    if (!whereClause) {
+      throw new Error('Invalid where clause');
+    }
+    return await this.queryBuilder.findOne(vehicleShares, whereClause);
   }
 
   async findPendingInvitations(userId: string): Promise<VehicleShare[]> {
@@ -86,30 +89,27 @@ export class VehicleShareRepository
 
   async hasAccess(vehicleId: string, userId: string): Promise<boolean> {
     // Check if user owns the vehicle
-    const vehicle = await this.database
-      .select()
-      .from(vehicles)
-      .where(and(eq(vehicles.id, vehicleId), eq(vehicles.userId, userId)))
-      .get();
+    const vehicleQueryBuilder = new QueryBuilder(this.database);
+    const vehicleWhereClause = and(eq(vehicles.id, vehicleId), eq(vehicles.userId, userId));
+    if (!vehicleWhereClause) {
+      throw new Error('Invalid where clause');
+    }
+    const vehicle = await vehicleQueryBuilder.findOne(vehicles, vehicleWhereClause);
 
     if (vehicle) {
       return true;
     }
 
     // Check if vehicle is shared with user and accepted
-    const share = await this.database
-      .select()
-      .from(vehicleShares)
-      .where(
-        and(
-          eq(vehicleShares.vehicleId, vehicleId),
-          eq(vehicleShares.sharedWithUserId, userId),
-          eq(vehicleShares.status, 'accepted')
-        )
-      )
-      .get();
-
-    return !!share;
+    const shareWhereClause = and(
+      eq(vehicleShares.vehicleId, vehicleId),
+      eq(vehicleShares.sharedWithUserId, userId),
+      eq(vehicleShares.status, 'accepted')
+    );
+    if (!shareWhereClause) {
+      throw new Error('Invalid where clause');
+    }
+    return await this.queryBuilder.exists(vehicleShares, shareWhereClause);
   }
 
   async getPermission(vehicleId: string, userId: string): Promise<'view' | 'edit' | null> {

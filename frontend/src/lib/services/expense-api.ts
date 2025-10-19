@@ -12,7 +12,7 @@ export const expenseApi = {
 	 */
 	async getExpensesByVehicle(vehicleId: string): Promise<Expense[]> {
 		try {
-			const response = await fetch(`/api/expenses?vehicleId=${vehicleId}`, {
+			const response = await fetch(`/api/v1/expenses?vehicleId=${vehicleId}`, {
 				credentials: 'include'
 			});
 
@@ -41,7 +41,7 @@ export const expenseApi = {
 	 */
 	async getAllExpenses(): Promise<Expense[]> {
 		try {
-			const response = await fetch('/api/expenses', {
+			const response = await fetch('/api/v1/expenses', {
 				credentials: 'include'
 			});
 
@@ -69,7 +69,7 @@ export const expenseApi = {
 	 */
 	async deleteExpense(expenseId: string): Promise<void> {
 		try {
-			const response = await fetch(`/api/expenses/${expenseId}`, {
+			const response = await fetch(`/api/v1/expenses/${expenseId}`, {
 				method: 'DELETE',
 				credentials: 'include'
 			});

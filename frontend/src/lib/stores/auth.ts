@@ -61,7 +61,7 @@ function createAuthStore() {
 			update(state => ({ ...state, isLoading: true }));
 
 			try {
-				const response = await fetch('/api/auth/me', {
+				const response = await fetch('/api/v1/auth/me', {
 					credentials: 'include'
 				});
 
@@ -96,13 +96,13 @@ function createAuthStore() {
 
 		// Login with Google OAuth
 		loginWithGoogle: () => {
-			window.location.href = '/api/auth/login/google';
+			window.location.href = '/api/v1/auth/login/google';
 		},
 
 		// Refresh token
 		refreshToken: async () => {
 			try {
-				const response = await fetch('/api/auth/refresh', {
+				const response = await fetch('/api/v1/auth/refresh', {
 					method: 'POST',
 					credentials: 'include'
 				});
@@ -133,7 +133,7 @@ function createAuthStore() {
 		// Logout
 		logout: async () => {
 			try {
-				await fetch('/api/auth/logout', {
+				await fetch('/api/v1/auth/logout', {
 					method: 'POST',
 					credentials: 'include'
 				});

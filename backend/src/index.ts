@@ -118,27 +118,41 @@ app.get('/health', (c) => {
   });
 });
 
-// Mount auth routes
-app.route('/api/auth', auth);
+// API Versioning - Mount v1 routes
+app.route('/api/v1/auth', auth);
+app.route('/api/v1/vehicles', vehicles);
+app.route('/api/v1/vehicles', vehicleStats);
+app.route('/api/v1/financing', financing);
+app.route('/api/v1/expenses', expenses);
+app.route('/api/v1/insurance', insurance);
+app.route('/api/v1/analytics', analytics);
+app.route('/api/v1/settings', settings);
+app.route('/api/v1/sharing', sharing);
+app.route('/api/v1/sync', sync);
 
-// Mount API routes
-app.route('/api/vehicles', vehicles);
-app.route('/api/vehicles', vehicleStats);
-app.route('/api/financing', financing);
-app.route('/api/expenses', expenses);
-app.route('/api/insurance', insurance);
-app.route('/api/analytics', analytics);
-app.route('/api/settings', settings);
-app.route('/api/sharing', sharing);
-app.route('/api/sync', sync);
+// Backward compatibility: Redirect /api/* to /api/v1/* (except /api root)
+app.use('/api/*', async (c, next) => {
+  const path = c.req.path;
+
+  // Skip if already versioned or is the root /api endpoint
+  if (path.startsWith('/api/v') || path === '/api') {
+    return next();
+  }
+
+  // Redirect to v1 with permanent redirect (308 preserves method)
+  const newPath = path.replace('/api/', '/api/v1/');
+  logger.debug('Redirecting to versioned API', { from: path, to: newPath });
+  return c.redirect(newPath, 308);
+});
 
 // API info endpoint
 app.get('/api', optionalAuth, (c) => {
   const user = c.get('user');
 
   return c.json({
-    message: 'VROOM Car Tracker API v1.0',
+    message: 'VROOM Car Tracker API',
     version: '1.0.0',
+    apiVersion: 'v1',
     environment: config.env,
     authenticated: !!user,
     user: user
@@ -151,17 +165,24 @@ app.get('/api', optionalAuth, (c) => {
     endpoints: {
       health: '/health',
       auth: {
-        login: '/api/auth/login/google',
-        callback: '/api/auth/callback/google',
-        logout: '/api/auth/logout',
-        me: '/api/auth/me',
-        refresh: '/api/auth/refresh',
+        login: '/api/v1/auth/login/google',
+        callback: '/api/v1/auth/callback/google',
+        logout: '/api/v1/auth/logout',
+        me: '/api/v1/auth/me',
+        refresh: '/api/v1/auth/refresh',
       },
-      vehicles: '/api/vehicles',
-      financing: '/api/financing',
-      expenses: '/api/expenses',
-      analytics: '/api/analytics',
-      sharing: '/api/sharing',
+      vehicles: '/api/v1/vehicles',
+      financing: '/api/v1/financing',
+      expenses: '/api/v1/expenses',
+      insurance: '/api/v1/insurance',
+      analytics: '/api/v1/analytics',
+      settings: '/api/v1/settings',
+      sharing: '/api/v1/sharing',
+      sync: '/api/v1/sync',
+    },
+    deprecation: {
+      message: 'Unversioned endpoints (/api/*) are deprecated and will redirect to /api/v1/*',
+      recommendation: 'Please update your client to use versioned endpoints (/api/v1/*)',
     },
   });
 });

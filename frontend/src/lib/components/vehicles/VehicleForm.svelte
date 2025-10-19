@@ -95,7 +95,7 @@
 		isLoading = true;
 		try {
 			// Fetch vehicle data
-			const vehicleResponse = await fetch(`/api/vehicles/${vehicleId}`, {
+			const vehicleResponse = await fetch(`/api/v1/vehicles/${vehicleId}`, {
 				credentials: 'include'
 			});
 
@@ -112,7 +112,7 @@
 			vehicle = vehicleResult.data;
 
 			// Fetch financing data separately
-			const financingResponse = await fetch(`/api/financing/vehicles/${vehicleId}/financing`, {
+			const financingResponse = await fetch(`/api/v1/financing/vehicles/${vehicleId}/financing`, {
 				credentials: 'include'
 			});
 
@@ -335,7 +335,7 @@
 			console.log('Submitting vehicle data:', vehicleData);
 
 			// Update/create vehicle
-			const vehicleUrl = isEditMode ? `/api/vehicles/${vehicleId}` : '/api/vehicles';
+			const vehicleUrl = isEditMode ? `/api/v1/vehicles/${vehicleId}` : '/api/v1/vehicles';
 			const vehicleMethod = isEditMode ? 'PUT' : 'POST';
 
 			const vehicleResponse = await fetch(vehicleUrl, {
@@ -395,7 +395,7 @@
 				console.log('Submitting financing data:', financingData);
 
 				const financingResponse = await fetch(
-					`/api/financing/vehicles/${finalVehicleId}/financing`,
+					`/api/v1/financing/vehicles/${finalVehicleId}/financing`,
 					{
 						method: 'POST',
 						headers: {
@@ -451,7 +451,7 @@
 		isDeleting = true;
 
 		try {
-			const response = await fetch(`/api/vehicles/${vehicleId}`, {
+			const response = await fetch(`/api/v1/vehicles/${vehicleId}`, {
 				method: 'DELETE',
 				credentials: 'include'
 			});

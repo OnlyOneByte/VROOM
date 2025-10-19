@@ -213,7 +213,7 @@ describe('Sync Manager', () => {
 
 			expect(result).toBe(true);
 			expect(fetch).toHaveBeenCalledWith(
-				expect.stringContaining('/api/expenses'),
+				expect.stringContaining('/api/v1/expenses'),
 				expect.objectContaining({
 					method: 'POST',
 					body: expect.stringContaining('"forceOverwrite":true')

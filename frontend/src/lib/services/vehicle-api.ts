@@ -13,7 +13,7 @@ export const vehicleApi = {
 	 */
 	async getVehicle(vehicleId: string): Promise<Vehicle> {
 		try {
-			const response = await fetch(`/api/vehicles/${vehicleId}`, {
+			const response = await fetch(`/api/v1/vehicles/${vehicleId}`, {
 				credentials: 'include'
 			});
 
@@ -34,7 +34,7 @@ export const vehicleApi = {
 	 */
 	async getVehicles(): Promise<Vehicle[]> {
 		try {
-			const response = await fetch('/api/vehicles', {
+			const response = await fetch('/api/v1/vehicles', {
 				credentials: 'include'
 			});
 
@@ -55,7 +55,7 @@ export const vehicleApi = {
 	 */
 	async getVehicleStats(vehicleId: string, period: TimePeriod): Promise<VehicleStats> {
 		try {
-			const response = await fetch(`/api/vehicles/${vehicleId}/stats?period=${period}`, {
+			const response = await fetch(`/api/v1/vehicles/${vehicleId}/stats?period=${period}`, {
 				credentials: 'include'
 			});
 
@@ -79,7 +79,7 @@ export const vehicleApi = {
 	 */
 	async deleteVehicle(vehicleId: string): Promise<void> {
 		try {
-			const response = await fetch(`/api/vehicles/${vehicleId}`, {
+			const response = await fetch(`/api/v1/vehicles/${vehicleId}`, {
 				method: 'DELETE',
 				credentials: 'include'
 			});

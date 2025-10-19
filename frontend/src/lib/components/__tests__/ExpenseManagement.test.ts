@@ -468,7 +468,7 @@ describe('Expense Management Integration', () => {
 				for (const expense of expenses) {
 					try {
 						// Simulate API call
-						const response = await fetch('/api/expenses', {
+						const response = await fetch('/api/v1/expenses', {
 							method: 'POST',
 							body: JSON.stringify(expense)
 						});

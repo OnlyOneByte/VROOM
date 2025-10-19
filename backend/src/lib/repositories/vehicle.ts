@@ -8,14 +8,18 @@ import { DatabaseError, NotFoundError } from '../errors.js';
 import { logger } from '../utils/logger.js';
 import { BaseRepository } from './base.js';
 import type { IVehicleRepository } from './interfaces.js';
+import { QueryBuilder } from './query-builder.js';
 
 @injectable()
 export class VehicleRepository
   extends BaseRepository<Vehicle, NewVehicle>
   implements IVehicleRepository
 {
+  private queryBuilder: QueryBuilder<Vehicle>;
+
   constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, vehicles);
+    this.queryBuilder = new QueryBuilder(this.database);
   }
 
   async findByUserId(userId: string): Promise<Vehicle[]> {
@@ -37,12 +41,11 @@ export class VehicleRepository
 
   async findByUserIdAndId(userId: string, vehicleId: string): Promise<Vehicle | null> {
     try {
-      const result = await this.database
-        .select()
-        .from(vehicles)
-        .where(and(eq(vehicles.userId, userId), eq(vehicles.id, vehicleId)))
-        .limit(1);
-      return result[0] || null;
+      const whereClause = and(eq(vehicles.userId, userId), eq(vehicles.id, vehicleId));
+      if (!whereClause) {
+        throw new Error('Invalid where clause');
+      }
+      return await this.queryBuilder.findOne(vehicles, whereClause);
     } catch (error) {
       logger.error('Error finding vehicle for user', { vehicleId, userId, error });
       throw new Error('Failed to find vehicle for user');
@@ -51,12 +54,7 @@ export class VehicleRepository
 
   async findByLicensePlate(licensePlate: string): Promise<Vehicle | null> {
     try {
-      const result = await this.database
-        .select()
-        .from(vehicles)
-        .where(eq(vehicles.licensePlate, licensePlate))
-        .limit(1);
-      return result[0] || null;
+      return await this.queryBuilder.findOne(vehicles, eq(vehicles.licensePlate, licensePlate));
     } catch (error) {
       logger.error('Error finding vehicle by license plate', { licensePlate, error });
       throw new Error('Failed to find vehicle by license plate');

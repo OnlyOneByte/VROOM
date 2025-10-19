@@ -23,7 +23,7 @@ function createSettingsStore() {
 			update(state => ({ ...state, isLoading: true, error: null }));
 
 			try {
-				const response = await fetch('/api/settings', {
+				const response = await fetch('/api/v1/settings', {
 					credentials: 'include'
 				});
 
@@ -51,7 +51,7 @@ function createSettingsStore() {
 			update(state => ({ ...state, isLoading: true, error: null }));
 
 			try {
-				const response = await fetch('/api/settings', {
+				const response = await fetch('/api/v1/settings', {
 					method: 'PUT',
 					headers: {
 						'Content-Type': 'application/json'
@@ -89,7 +89,7 @@ function createSettingsStore() {
 			syncInactivityMinutes?: number;
 		}) {
 			try {
-				const response = await fetch('/api/sync/configure', {
+				const response = await fetch('/api/v1/sync/configure', {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json'
@@ -118,7 +118,7 @@ function createSettingsStore() {
 
 		async getSyncStatus() {
 			try {
-				const response = await fetch('/api/sync/status', {
+				const response = await fetch('/api/v1/sync/status', {
 					credentials: 'include'
 				});
 
@@ -136,7 +136,7 @@ function createSettingsStore() {
 
 		async downloadBackup() {
 			try {
-				const response = await fetch('/api/sync/backups/download', {
+				const response = await fetch('/api/v1/sync/backups/download', {
 					credentials: 'include'
 				});
 
@@ -170,7 +170,7 @@ function createSettingsStore() {
 				// Generate idempotency key for this operation
 				const idempotencyKey = `restore-${mode}-${file.name}-${file.size}-${Date.now()}`;
 
-				const response = await fetch('/api/sync/restore/from-backup', {
+				const response = await fetch('/api/v1/sync/restore/from-backup', {
 					method: 'POST',
 					credentials: 'include',
 					headers: {
@@ -200,7 +200,7 @@ function createSettingsStore() {
 
 		async executeSync(syncTypes: ('sheets' | 'backup')[]) {
 			try {
-				const response = await fetch('/api/sync', {
+				const response = await fetch('/api/v1/sync', {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json'
@@ -226,7 +226,7 @@ function createSettingsStore() {
 
 		async initializeDrive() {
 			try {
-				const response = await fetch('/api/sync/backups/initialize-drive', {
+				const response = await fetch('/api/v1/sync/backups/initialize-drive', {
 					method: 'POST',
 					credentials: 'include'
 				});
@@ -251,7 +251,7 @@ function createSettingsStore() {
 
 		async listBackups() {
 			try {
-				const response = await fetch('/api/sync/backups', {
+				const response = await fetch('/api/v1/sync/backups', {
 					credentials: 'include'
 				});
 
@@ -269,7 +269,7 @@ function createSettingsStore() {
 
 		async downloadBackupFromDrive(fileId: string) {
 			try {
-				const response = await fetch(`/api/sync/backups/${fileId}/download`, {
+				const response = await fetch(`/api/v1/sync/backups/${fileId}/download`, {
 					credentials: 'include'
 				});
 
@@ -312,7 +312,7 @@ function createSettingsStore() {
 		) {
 			try {
 				// First download the file
-				const response = await fetch(`/api/sync/backups/${fileId}/download`, {
+				const response = await fetch(`/api/v1/sync/backups/${fileId}/download`, {
 					credentials: 'include'
 				});
 
@@ -347,7 +347,7 @@ function createSettingsStore() {
 
 		async deleteBackup(fileId: string) {
 			try {
-				const response = await fetch(`/api/sync/backups/${fileId}`, {
+				const response = await fetch(`/api/v1/sync/backups/${fileId}`, {
 					method: 'DELETE',
 					credentials: 'include'
 				});
@@ -369,7 +369,7 @@ function createSettingsStore() {
 				// Generate idempotency key for this operation
 				const idempotencyKey = `restore-sheets-${mode}-${Date.now()}`;
 
-				const response = await fetch('/api/sync/restore/from-sheets', {
+				const response = await fetch('/api/v1/sync/restore/from-sheets', {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',

@@ -123,7 +123,7 @@
 		isDeleting = true;
 
 		try {
-			const response = await fetch(`/api/expenses/${expenseToDelete.id}`, {
+			const response = await fetch(`/api/v1/expenses/${expenseToDelete.id}`, {
 				method: 'DELETE',
 				credentials: 'include'
 			});

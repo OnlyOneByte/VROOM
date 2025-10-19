@@ -140,7 +140,7 @@ describe('Auth Store', () => {
 			expect(state.isLoading).toBe(false);
 			expect(state.error).toBe(null);
 
-			expect(mockFetch).toHaveBeenCalledWith('/api/auth/me', {
+			expect(mockFetch).toHaveBeenCalledWith('/api/v1/auth/me', {
 				credentials: 'include'
 			});
 		});
@@ -177,7 +177,7 @@ describe('Auth Store', () => {
 		it('redirects to Google OAuth endpoint', () => {
 			authStore.loginWithGoogle();
 
-			expect(mockLocation.href).toBe('/api/auth/login/google');
+			expect(mockLocation.href).toBe('/api/v1/auth/login/google');
 		});
 	});
 
@@ -197,7 +197,7 @@ describe('Auth Store', () => {
 			expect(state.token).toBe(newToken);
 			expect(state.error).toBe(null);
 
-			expect(mockFetch).toHaveBeenCalledWith('/api/auth/refresh', {
+			expect(mockFetch).toHaveBeenCalledWith('/api/v1/auth/refresh', {
 				method: 'POST',
 				credentials: 'include'
 			});
@@ -249,7 +249,7 @@ describe('Auth Store', () => {
 			expect(state.error).toBe(null);
 			expect(state.token).toBe(null);
 
-			expect(mockFetch).toHaveBeenCalledWith('/api/auth/logout', {
+			expect(mockFetch).toHaveBeenCalledWith('/api/v1/auth/logout', {
 				method: 'POST',
 				credentials: 'include'
 			});

@@ -369,7 +369,7 @@
 
 	function handleReauthenticate() {
 		// Redirect to re-authentication endpoint
-		window.location.href = '/api/auth/reauth/google';
+		window.location.href = '/api/v1/auth/reauth/google';
 	}
 
 	let lastBackupText = $derived(
