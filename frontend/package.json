@@ -44,6 +44,7 @@
 		"@vitest/ui": "^3.2.4",
 		"autoprefixer": "^10.4.21",
 		"clsx": "^2.1.1",
+		"embla-carousel-svelte": "^8.6.0",
 		"eslint": "^9.18.0",
 		"eslint-config-prettier": "^9.1.0",
 		"eslint-plugin-svelte": "^2.46.0",

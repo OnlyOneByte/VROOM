@@ -6,7 +6,7 @@
 	import MonthlyTrendChart from '$lib/components/dashboard/MonthlyTrendChart.svelte';
 	import CategoryBreakdownChart from '$lib/components/dashboard/CategoryBreakdownChart.svelte';
 	import RecentActivityCard from '$lib/components/dashboard/RecentActivityCard.svelte';
-	import FleetOverviewTable from '$lib/components/dashboard/FleetOverviewTable.svelte';
+	import VehicleCarousel from '$lib/components/dashboard/VehicleCarousel.svelte';
 	import PeriodSelector from '$lib/components/vehicles/PeriodSelector.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
@@ -237,9 +237,9 @@
 		{isLoading}
 	/>
 
-	<!-- Fleet Overview Table -->
+	<!-- Vehicle Carousel -->
 	{#if stats.totalVehicles > 0}
-		<FleetOverviewTable vehicles={vehicleDetails} {isLoading} />
+		<VehicleCarousel vehicles={vehicleDetails} {isLoading} />
 	{/if}
 
 	<!-- Period Selector -->
