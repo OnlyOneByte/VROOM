@@ -3,15 +3,36 @@
  * Centralized rate limit settings with rationale
  */
 
+/**
+ * Rate limiter system configuration
+ */
+export const RATE_LIMIT_CONFIG = {
+  CLEANUP_INTERVAL: 60_000, // 1 minute in ms
+} as const;
+
+/**
+ * Rate limit settings for specific endpoints
+ */
 export const RATE_LIMITS = {
+  /**
+   * Global rate limiter for all API endpoints
+   * Prevents abuse while allowing normal usage
+   * 100 requests per 15 minutes = ~400 requests/hour
+   */
+  GLOBAL: {
+    windowMs: 15 * 60 * 1000,
+    limit: 1000,
+    message: 'Too many requests. Please wait before trying again.',
+  },
+
   /**
    * Sync operations (POST /api/sync)
    * Lower limit due to resource-intensive operations
-   * 10 requests per 15 minutes = ~40 requests/hour
+   * 50 requests per 15 minutes = ~200 requests/hour
    */
   SYNC: {
     windowMs: 15 * 60 * 1000,
-    limit: 10,
+    limit: 50,
     message: 'Too many sync requests. Please wait before trying again.',
   },
 

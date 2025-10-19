@@ -258,7 +258,6 @@ HOST=0.0.0.0
 DATABASE_URL=/app/data/vroom.db
 GOOGLE_REDIRECT_URI=https://yourdomain.com/auth/callback/google
 CORS_ORIGINS=https://yourdomain.com
-RATE_LIMIT_MAX_REQUESTS=100
 LOG_LEVEL=warn
 ```
 

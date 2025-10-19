@@ -26,8 +26,6 @@ services:
       - SESSION_SECRET=${SESSION_SECRET}
       - GOOGLE_DRIVE_API_KEY=${GOOGLE_DRIVE_API_KEY}
       - CORS_ORIGINS=${CORS_ORIGINS}
-      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-900000}
-      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
       - LOG_LEVEL=${LOG_LEVEL:-warn}
     restart: unless-stopped
     healthcheck:

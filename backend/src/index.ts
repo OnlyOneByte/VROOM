@@ -6,6 +6,7 @@ import { logger as honoLogger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
 import { config } from './lib/config';
+import { RATE_LIMITS } from './lib/constants/rate-limits';
 import { activityTrackerMiddleware } from './lib/middleware/activity-tracker';
 import { optionalAuth, requireAuth } from './lib/middleware/auth';
 import { bodyLimit } from './lib/middleware/body-limit';
@@ -60,17 +61,15 @@ app.use(
 );
 
 // Rate limiting middleware - global rate limiter
-app.use(
-  '*',
-  rateLimiter({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    limit: 100, // 100 requests per window
-    keyGenerator: (c) => {
-      const user = c.get('user');
-      return user?.id || c.req.header('x-forwarded-for') || 'anonymous';
-    },
-  })
-);
+const globalRateLimiter = rateLimiter({
+  ...RATE_LIMITS.GLOBAL,
+  keyGenerator: (c) => {
+    const user = c.get('user');
+    return user?.id || c.req.header('x-forwarded-for') || 'anonymous';
+  },
+});
+
+app.use('*', globalRateLimiter);
 
 // CORS middleware with environment-based origins
 app.use(

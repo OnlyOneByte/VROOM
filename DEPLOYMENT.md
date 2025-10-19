@@ -254,8 +254,6 @@ docker run -d \
 | `SESSION_SECRET` | Yes | - | Session encryption secret |
 | `GOOGLE_DRIVE_API_KEY` | No | - | Google Drive API key |
 | `CORS_ORIGINS` | No | - | Allowed CORS origins |
-| `RATE_LIMIT_WINDOW_MS` | No | `900000` | Rate limit window (ms) |
-| `RATE_LIMIT_MAX_REQUESTS` | No | `100` | Max requests per window |
 | `LOG_LEVEL` | No | `warn` | Logging level |
 
 ### Frontend Environment Variables

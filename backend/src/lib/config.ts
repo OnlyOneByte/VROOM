@@ -29,10 +29,6 @@ const envSchema = z.object({
   // Frontend URL for OAuth redirects
   FRONTEND_URL: z.string().optional(),
 
-  // Rate limiting
-  RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform(Number), // 15 minutes
-  RATE_LIMIT_MAX_REQUESTS: z.string().default('100').transform(Number),
-
   // CORS origins (comma-separated)
   CORS_ORIGINS: z
     .string()
@@ -123,11 +119,6 @@ export const config = {
       env.CORS_ORIGINS.length > 0
         ? env.CORS_ORIGINS
         : getDefaultCorsOrigins(env.NODE_ENV as Environment),
-  },
-
-  rateLimit: {
-    windowMs: env.RATE_LIMIT_WINDOW_MS,
-    max: env.RATE_LIMIT_MAX_REQUESTS,
   },
 
   logging: {

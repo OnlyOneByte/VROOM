@@ -3,7 +3,7 @@
  */
 
 import type { Context, Next } from 'hono';
-import { RATE_LIMIT_CONFIG } from '../constants';
+import { RATE_LIMIT_CONFIG } from '../constants/rate-limits';
 import { createErrorResponse } from '../utils/error-response';
 
 interface RateLimitConfig {
