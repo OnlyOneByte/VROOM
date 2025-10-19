@@ -10,6 +10,13 @@
 	import * as Select from '$lib/components/ui/select';
 	import { FormFieldError } from '$lib/components/ui/form-field';
 	import {
+		Card,
+		CardContent,
+		CardDescription,
+		CardHeader,
+		CardTitle
+	} from '$lib/components/ui/card';
+	import {
 		AlertDialog,
 		AlertDialogAction,
 		AlertDialogCancel,
@@ -505,485 +512,509 @@
 	<div class="space-y-6">
 		<!-- Header -->
 		<div class="flex items-center gap-4">
-			<button onclick={handleBack} class="btn btn-secondary p-2">
+			<Button variant="outline" size="icon" onclick={handleBack}>
 				<ArrowLeft class="h-4 w-4" />
-			</button>
+			</Button>
 			<div>
-				<h1 class="text-2xl font-bold text-gray-900">
+				<h1 class="text-3xl font-bold tracking-tight">
 					{isEditMode ? 'Edit Vehicle' : 'Add New Vehicle'}
 				</h1>
 				{#if isEditMode && vehicleForm.make && vehicleForm.model}
-					<p class="text-gray-600">
+					<p class="text-muted-foreground mt-1">
 						{vehicleForm.nickname || `${vehicleForm.year} ${vehicleForm.make} ${vehicleForm.model}`}
 					</p>
 				{:else if !isEditMode}
-					<p class="text-gray-600">Enter your vehicle information and optional loan details</p>
+					<p class="text-muted-foreground mt-1">
+						Enter your vehicle information and optional financing details
+					</p>
 				{/if}
 			</div>
 		</div>
 
-		<form onsubmit={handleSubmit} class="space-y-8 pb-32 sm:pb-24">
+		<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
 			<!-- Vehicle Information -->
-			<div class="card">
-				<div class="flex items-center gap-2 mb-6">
-					<Car class="h-5 w-5 text-primary-600" />
-					<h2 class="text-lg font-semibold text-gray-900">Vehicle Information</h2>
-				</div>
-
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-					<div class="space-y-2">
-						<Label for="make">Make *</Label>
-						<Input
-							id="make"
-							type="text"
-							placeholder="e.g., Toyota, Honda, Ford"
-							bind:value={vehicleForm.make}
-							aria-invalid={!!errors['make']}
-							aria-describedby={errors['make'] ? 'make-error' : undefined}
-							required
-						/>
-						{#if errors['make']}
-							<FormFieldError id="make-error">{errors['make']}</FormFieldError>
-						{/if}
+			<Card>
+				<CardHeader>
+					<div class="flex items-center gap-2">
+						<Car class="h-5 w-5 text-primary" />
+						<CardTitle>Vehicle Information</CardTitle>
 					</div>
+					<CardDescription>Basic details about your vehicle</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+						<div class="space-y-2">
+							<Label for="make">Make *</Label>
+							<Input
+								id="make"
+								type="text"
+								placeholder="e.g., Toyota, Honda, Ford"
+								bind:value={vehicleForm.make}
+								aria-invalid={!!errors['make']}
+								aria-describedby={errors['make'] ? 'make-error' : undefined}
+								required
+							/>
+							{#if errors['make']}
+								<FormFieldError id="make-error">{errors['make']}</FormFieldError>
+							{/if}
+						</div>
 
-					<div class="space-y-2">
-						<Label for="model">Model *</Label>
-						<Input
-							id="model"
-							type="text"
-							placeholder="e.g., Camry, Civic, F-150"
-							bind:value={vehicleForm.model}
-							aria-invalid={!!errors['model']}
-							aria-describedby={errors['model'] ? 'model-error' : undefined}
-							required
-						/>
-						{#if errors['model']}
-							<FormFieldError id="model-error">{errors['model']}</FormFieldError>
-						{/if}
-					</div>
+						<div class="space-y-2">
+							<Label for="model">Model *</Label>
+							<Input
+								id="model"
+								type="text"
+								placeholder="e.g., Camry, Civic, F-150"
+								bind:value={vehicleForm.model}
+								aria-invalid={!!errors['model']}
+								aria-describedby={errors['model'] ? 'model-error' : undefined}
+								required
+							/>
+							{#if errors['model']}
+								<FormFieldError id="model-error">{errors['model']}</FormFieldError>
+							{/if}
+						</div>
 
-					<div class="space-y-2">
-						<Label for="year">Year *</Label>
-						<Input
-							id="year"
-							type="number"
-							min="1900"
-							max={new Date().getFullYear() + 2}
-							bind:value={vehicleForm.year}
-							aria-invalid={!!errors['year']}
-							aria-describedby={errors['year'] ? 'year-error' : undefined}
-							required
-						/>
-						{#if errors['year']}
-							<FormFieldError id="year-error">{errors['year']}</FormFieldError>
-						{/if}
-					</div>
+						<div class="space-y-2">
+							<Label for="year">Year *</Label>
+							<Input
+								id="year"
+								type="number"
+								min="1900"
+								max={new Date().getFullYear() + 2}
+								bind:value={vehicleForm.year}
+								aria-invalid={!!errors['year']}
+								aria-describedby={errors['year'] ? 'year-error' : undefined}
+								required
+							/>
+							{#if errors['year']}
+								<FormFieldError id="year-error">{errors['year']}</FormFieldError>
+							{/if}
+						</div>
 
-					<div class="space-y-2">
-						<Label for="licensePlate">License Plate</Label>
-						<Input
-							id="licensePlate"
-							type="text"
-							placeholder="e.g., ABC-1234"
-							bind:value={vehicleForm.licensePlate}
-							aria-invalid={!!errors['licensePlate']}
-							aria-describedby={errors['licensePlate'] ? 'licensePlate-error' : undefined}
-						/>
-						{#if errors['licensePlate']}
-							<FormFieldError id="licensePlate-error">{errors['licensePlate']}</FormFieldError>
-						{/if}
-					</div>
+						<div class="space-y-2">
+							<Label for="licensePlate">License Plate</Label>
+							<Input
+								id="licensePlate"
+								type="text"
+								placeholder="e.g., ABC-1234"
+								bind:value={vehicleForm.licensePlate}
+								aria-invalid={!!errors['licensePlate']}
+								aria-describedby={errors['licensePlate'] ? 'licensePlate-error' : undefined}
+							/>
+							{#if errors['licensePlate']}
+								<FormFieldError id="licensePlate-error">{errors['licensePlate']}</FormFieldError>
+							{/if}
+						</div>
 
-					<div class="space-y-2">
-						<Label for="nickname">Nickname</Label>
-						<Input
-							id="nickname"
-							type="text"
-							placeholder="e.g., Daily Driver, Weekend Car"
-							bind:value={vehicleForm.nickname}
-							aria-invalid={!!errors['nickname']}
-							aria-describedby={errors['nickname'] ? 'nickname-error' : undefined}
-						/>
-						{#if errors['nickname']}
-							<FormFieldError id="nickname-error">{errors['nickname']}</FormFieldError>
-						{/if}
-					</div>
+						<div class="space-y-2">
+							<Label for="nickname">Nickname</Label>
+							<Input
+								id="nickname"
+								type="text"
+								placeholder="e.g., Daily Driver, Weekend Car"
+								bind:value={vehicleForm.nickname}
+								aria-invalid={!!errors['nickname']}
+								aria-describedby={errors['nickname'] ? 'nickname-error' : undefined}
+							/>
+							{#if errors['nickname']}
+								<FormFieldError id="nickname-error">{errors['nickname']}</FormFieldError>
+							{/if}
+						</div>
 
-					<div class="space-y-2">
-						<Label for="initialMileage">Initial Mileage</Label>
-						<Input
-							id="initialMileage"
-							type="number"
-							min="0"
-							placeholder="Current odometer reading"
-							bind:value={vehicleForm.initialMileage}
-							aria-invalid={!!errors['initialMileage']}
-							aria-describedby={errors['initialMileage'] ? 'initialMileage-error' : undefined}
-						/>
-						{#if errors['initialMileage']}
-							<FormFieldError id="initialMileage-error">{errors['initialMileage']}</FormFieldError>
-						{/if}
-					</div>
+						<div class="space-y-2">
+							<Label for="initialMileage">Initial Mileage</Label>
+							<Input
+								id="initialMileage"
+								type="number"
+								min="0"
+								placeholder="Current odometer reading"
+								bind:value={vehicleForm.initialMileage}
+								aria-invalid={!!errors['initialMileage']}
+								aria-describedby={errors['initialMileage'] ? 'initialMileage-error' : undefined}
+							/>
+							{#if errors['initialMileage']}
+								<FormFieldError id="initialMileage-error">{errors['initialMileage']}</FormFieldError
+								>
+							{/if}
+						</div>
 
-					<div class="space-y-2">
-						<Label for="purchasePrice">Purchase Price</Label>
-						<Input
-							id="purchasePrice"
-							type="number"
-							min="0"
-							step="0.01"
-							placeholder="0.00"
-							bind:value={vehicleForm.purchasePrice}
-							aria-invalid={!!errors['purchasePrice']}
-							aria-describedby={errors['purchasePrice'] ? 'purchasePrice-error' : undefined}
-						/>
-						{#if errors['purchasePrice']}
-							<FormFieldError id="purchasePrice-error">{errors['purchasePrice']}</FormFieldError>
-						{/if}
-					</div>
+						<div class="space-y-2">
+							<Label for="purchasePrice">Purchase Price</Label>
+							<Input
+								id="purchasePrice"
+								type="number"
+								min="0"
+								step="0.01"
+								placeholder="0.00"
+								bind:value={vehicleForm.purchasePrice}
+								aria-invalid={!!errors['purchasePrice']}
+								aria-describedby={errors['purchasePrice'] ? 'purchasePrice-error' : undefined}
+							/>
+							{#if errors['purchasePrice']}
+								<FormFieldError id="purchasePrice-error">{errors['purchasePrice']}</FormFieldError>
+							{/if}
+						</div>
 
-					<div class="space-y-2">
-						<Label for="purchaseDate">Purchase Date</Label>
-						<DatePicker
-							id="purchaseDate"
-							bind:value={vehicleForm.purchaseDate}
-							placeholder="Select purchase date"
-							aria-invalid={!!errors['purchaseDate']}
-							aria-describedby={errors['purchaseDate'] ? 'purchaseDate-error' : undefined}
-						/>
-						{#if errors['purchaseDate']}
-							<FormFieldError id="purchaseDate-error">{errors['purchaseDate']}</FormFieldError>
-						{/if}
+						<div class="space-y-2">
+							<Label for="purchaseDate">Purchase Date</Label>
+							<DatePicker
+								id="purchaseDate"
+								bind:value={vehicleForm.purchaseDate}
+								placeholder="Select purchase date"
+								aria-invalid={!!errors['purchaseDate']}
+								aria-describedby={errors['purchaseDate'] ? 'purchaseDate-error' : undefined}
+							/>
+							{#if errors['purchaseDate']}
+								<FormFieldError id="purchaseDate-error">{errors['purchaseDate']}</FormFieldError>
+							{/if}
+						</div>
 					</div>
-				</div>
-			</div>
+				</CardContent>
+			</Card>
 
 			<!-- Financing Information -->
-			<div class="card">
-				<div class="flex items-center gap-2 mb-6">
-					<DollarSign class="h-5 w-5 text-primary-600" />
-					<h2 class="text-lg font-semibold text-gray-900">Financing Information</h2>
-				</div>
-
-				<!-- Ownership Type Selector -->
-				<div class="mb-6">
-					<Label class="mb-3 block">How do you own this vehicle? *</Label>
-					<div class="grid grid-cols-3 gap-3">
-						<button
-							type="button"
-							onclick={() => (ownershipType = 'own')}
-							class="px-4 py-3 rounded-lg border-2 transition-all {ownershipType === 'own'
-								? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
-								: 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'}"
-						>
-							Own
-						</button>
-						<button
-							type="button"
-							onclick={() => (ownershipType = 'lease')}
-							class="px-4 py-3 rounded-lg border-2 transition-all {ownershipType === 'lease'
-								? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
-								: 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'}"
-						>
-							Lease
-						</button>
-						<button
-							type="button"
-							onclick={() => (ownershipType = 'finance')}
-							class="px-4 py-3 rounded-lg border-2 transition-all {ownershipType === 'finance'
-								? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
-								: 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'}"
-						>
-							Finance
-						</button>
+			<Card>
+				<CardHeader>
+					<div class="flex items-center gap-2">
+						<DollarSign class="h-5 w-5 text-primary" />
+						<CardTitle>Financing Information</CardTitle>
 					</div>
-				</div>
+					<CardDescription>
+						{ownershipType === 'own'
+							? 'This vehicle is owned outright'
+							: ownershipType === 'lease'
+								? 'Lease details and payment information'
+								: 'Loan details and payment information'}
+					</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<!-- Ownership Type Selector -->
+					<div class="mb-6">
+						<Label class="mb-3 block">How do you own this vehicle? *</Label>
+						<div class="grid grid-cols-3 gap-3">
+							<Button
+								type="button"
+								variant={ownershipType === 'own' ? 'default' : 'outline'}
+								onclick={() => (ownershipType = 'own')}
+								class="h-auto py-3"
+							>
+								Own
+							</Button>
+							<Button
+								type="button"
+								variant={ownershipType === 'lease' ? 'default' : 'outline'}
+								onclick={() => (ownershipType = 'lease')}
+								class="h-auto py-3"
+							>
+								Lease
+							</Button>
+							<Button
+								type="button"
+								variant={ownershipType === 'finance' ? 'default' : 'outline'}
+								onclick={() => (ownershipType = 'finance')}
+								class="h-auto py-3"
+							>
+								Finance
+							</Button>
+						</div>
+					</div>
 
-				{#if ownershipType !== 'own'}
-					<div class="space-y-6">
-						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-							<div class="space-y-2">
-								<Label for="provider">
-									{ownershipType === 'finance' ? 'Lender' : 'Leasing Company'} *
-								</Label>
-								<Input
-									id="provider"
-									type="text"
-									placeholder="e.g., Chase Bank, Toyota Financial"
-									bind:value={financingForm.provider}
-									aria-invalid={!!errors['provider']}
-									aria-describedby={errors['provider'] ? 'provider-error' : undefined}
-									required
-								/>
-								{#if errors['provider']}
-									<FormFieldError id="provider-error">{errors['provider']}</FormFieldError>
-								{/if}
-							</div>
-
-							<div class="space-y-2">
-								<Label for="originalAmount">
-									{isEditMode ? 'Original ' : ''}{ownershipType === 'lease' ? 'Lease' : 'Loan'} Amount
-									*
-								</Label>
-								<Input
-									id="originalAmount"
-									type="number"
-									min="0"
-									step="0.01"
-									placeholder="0.00"
-									bind:value={financingForm.originalAmount}
-									aria-invalid={!!errors['originalAmount']}
-									aria-describedby={errors['originalAmount'] ? 'originalAmount-error' : undefined}
-									required
-								/>
-								{#if errors['originalAmount']}
-									<FormFieldError id="originalAmount-error"
-										>{errors['originalAmount']}</FormFieldError
-									>
-								{/if}
-							</div>
-
-							{#if ownershipType === 'finance'}
+					{#if ownershipType !== 'own'}
+						<div class="space-y-6">
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 								<div class="space-y-2">
-									<Label for="apr">APR (%) *</Label>
+									<Label for="provider">
+										{ownershipType === 'finance' ? 'Lender' : 'Leasing Company'} *
+									</Label>
 									<Input
-										id="apr"
-										type="number"
-										min="0"
-										max="50"
-										step="0.01"
-										placeholder="e.g., 4.5"
-										bind:value={financingForm.apr}
-										aria-invalid={!!errors['apr']}
-										aria-describedby={errors['apr'] ? 'apr-error' : undefined}
+										id="provider"
+										type="text"
+										placeholder="e.g., Chase Bank, Toyota Financial"
+										bind:value={financingForm.provider}
+										aria-invalid={!!errors['provider']}
+										aria-describedby={errors['provider'] ? 'provider-error' : undefined}
 										required
 									/>
-									{#if errors['apr']}
-										<FormFieldError id="apr-error">{errors['apr']}</FormFieldError>
+									{#if errors['provider']}
+										<FormFieldError id="provider-error">{errors['provider']}</FormFieldError>
 									{/if}
 								</div>
-							{/if}
 
-							<div class="space-y-2">
-								<Label for="termMonths">Term (Months) *</Label>
-								<Select.Root
-									type="single"
-									value={String(financingForm.termMonths)}
-									onValueChange={v => {
-										if (v) {
-											financingForm.termMonths = Number(v);
-										}
-									}}
-								>
-									<Select.Trigger
-										id="termMonths"
-										class="w-full"
-										aria-invalid={!!errors['termMonths']}
-										aria-describedby={errors['termMonths'] ? 'termMonths-error' : undefined}
-									>
-										{financingForm.termMonths} months ({Math.floor(financingForm.termMonths / 12)} years)
-									</Select.Trigger>
-									<Select.Content>
-										<Select.Item value="24" label="24 months (2 years)"
-											>24 months (2 years)</Select.Item
-										>
-										<Select.Item value="36" label="36 months (3 years)"
-											>36 months (3 years)</Select.Item
-										>
-										<Select.Item value="48" label="48 months (4 years)"
-											>48 months (4 years)</Select.Item
-										>
-										<Select.Item value="60" label="60 months (5 years)"
-											>60 months (5 years)</Select.Item
-										>
-										<Select.Item value="72" label="72 months (6 years)"
-											>72 months (6 years)</Select.Item
-										>
-										<Select.Item value="84" label="84 months (7 years)"
-											>84 months (7 years)</Select.Item
-										>
-									</Select.Content>
-								</Select.Root>
-								{#if errors['termMonths']}
-									<FormFieldError id="termMonths-error">{errors['termMonths']}</FormFieldError>
-								{/if}
-							</div>
-
-							<div class="space-y-2">
-								<Label for="startDate">Start Date *</Label>
-								<DatePicker
-									id="startDate"
-									bind:value={financingForm.startDate}
-									placeholder="Select start date"
-									aria-invalid={!!errors['startDate']}
-									aria-describedby={errors['startDate'] ? 'startDate-error' : undefined}
-								/>
-								{#if errors['startDate']}
-									<FormFieldError id="startDate-error">{errors['startDate']}</FormFieldError>
-								{/if}
-							</div>
-
-							<div class="space-y-2">
-								<Label for="dayOfMonth">Payment Day of Month</Label>
-								<Select.Root
-									type="single"
-									value={String(financingForm.dayOfMonth)}
-									onValueChange={v => {
-										if (v) {
-											financingForm.dayOfMonth = Number(v);
-										}
-									}}
-								>
-									<Select.Trigger
-										id="dayOfMonth"
-										class="w-full"
-										aria-invalid={!!errors['dayOfMonth']}
-										aria-describedby={errors['dayOfMonth'] ? 'dayOfMonth-error' : undefined}
-									>
-										{financingForm.dayOfMonth}
-									</Select.Trigger>
-									<Select.Content>
-										{#each Array(28) as _, i}
-											<Select.Item value={String(i + 1)} label={String(i + 1)}>{i + 1}</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
-								{#if errors['dayOfMonth']}
-									<FormFieldError id="dayOfMonth-error">{errors['dayOfMonth']}</FormFieldError>
-								{/if}
-							</div>
-
-							{#if ownershipType === 'lease'}
 								<div class="space-y-2">
-									<Label for="residualValue">Residual Value (Buyout Price)</Label>
+									<Label for="originalAmount">
+										{isEditMode ? 'Original ' : ''}{ownershipType === 'lease' ? 'Lease' : 'Loan'} Amount
+										*
+									</Label>
 									<Input
-										id="residualValue"
+										id="originalAmount"
 										type="number"
 										min="0"
 										step="0.01"
 										placeholder="0.00"
-										bind:value={financingForm.residualValue}
+										bind:value={financingForm.originalAmount}
+										aria-invalid={!!errors['originalAmount']}
+										aria-describedby={errors['originalAmount'] ? 'originalAmount-error' : undefined}
+										required
 									/>
+									{#if errors['originalAmount']}
+										<FormFieldError id="originalAmount-error"
+											>{errors['originalAmount']}</FormFieldError
+										>
+									{/if}
+								</div>
+
+								{#if ownershipType === 'finance'}
+									<div class="space-y-2">
+										<Label for="apr">APR (%) *</Label>
+										<Input
+											id="apr"
+											type="number"
+											min="0"
+											max="50"
+											step="0.01"
+											placeholder="e.g., 4.5"
+											bind:value={financingForm.apr}
+											aria-invalid={!!errors['apr']}
+											aria-describedby={errors['apr'] ? 'apr-error' : undefined}
+											required
+										/>
+										{#if errors['apr']}
+											<FormFieldError id="apr-error">{errors['apr']}</FormFieldError>
+										{/if}
+									</div>
+								{/if}
+
+								<div class="space-y-2">
+									<Label for="termMonths">Term (Months) *</Label>
+									<Select.Root
+										type="single"
+										value={String(financingForm.termMonths)}
+										onValueChange={v => {
+											if (v) {
+												financingForm.termMonths = Number(v);
+											}
+										}}
+									>
+										<Select.Trigger
+											id="termMonths"
+											class="w-full"
+											aria-invalid={!!errors['termMonths']}
+											aria-describedby={errors['termMonths'] ? 'termMonths-error' : undefined}
+										>
+											{financingForm.termMonths} months ({Math.floor(financingForm.termMonths / 12)}
+											years)
+										</Select.Trigger>
+										<Select.Content>
+											<Select.Item value="24" label="24 months (2 years)"
+												>24 months (2 years)</Select.Item
+											>
+											<Select.Item value="36" label="36 months (3 years)"
+												>36 months (3 years)</Select.Item
+											>
+											<Select.Item value="48" label="48 months (4 years)"
+												>48 months (4 years)</Select.Item
+											>
+											<Select.Item value="60" label="60 months (5 years)"
+												>60 months (5 years)</Select.Item
+											>
+											<Select.Item value="72" label="72 months (6 years)"
+												>72 months (6 years)</Select.Item
+											>
+											<Select.Item value="84" label="84 months (7 years)"
+												>84 months (7 years)</Select.Item
+											>
+										</Select.Content>
+									</Select.Root>
+									{#if errors['termMonths']}
+										<FormFieldError id="termMonths-error">{errors['termMonths']}</FormFieldError>
+									{/if}
 								</div>
 
 								<div class="space-y-2">
-									<Label for="mileageLimit">Annual Mileage Limit</Label>
-									<Input
-										id="mileageLimit"
-										type="number"
-										min="0"
-										placeholder="e.g., 12000"
-										bind:value={financingForm.mileageLimit}
+									<Label for="startDate">Start Date *</Label>
+									<DatePicker
+										id="startDate"
+										bind:value={financingForm.startDate}
+										placeholder="Select start date"
+										aria-invalid={!!errors['startDate']}
+										aria-describedby={errors['startDate'] ? 'startDate-error' : undefined}
 									/>
+									{#if errors['startDate']}
+										<FormFieldError id="startDate-error">{errors['startDate']}</FormFieldError>
+									{/if}
 								</div>
 
 								<div class="space-y-2">
-									<Label for="excessMileageFee">Excess Mileage Fee (per mile)</Label>
-									<Input
-										id="excessMileageFee"
-										type="number"
-										min="0"
-										step="0.01"
-										placeholder="e.g., 0.25"
-										bind:value={financingForm.excessMileageFee}
-									/>
+									<Label for="dayOfMonth">Payment Day of Month</Label>
+									<Select.Root
+										type="single"
+										value={String(financingForm.dayOfMonth)}
+										onValueChange={v => {
+											if (v) {
+												financingForm.dayOfMonth = Number(v);
+											}
+										}}
+									>
+										<Select.Trigger
+											id="dayOfMonth"
+											class="w-full"
+											aria-invalid={!!errors['dayOfMonth']}
+											aria-describedby={errors['dayOfMonth'] ? 'dayOfMonth-error' : undefined}
+										>
+											{financingForm.dayOfMonth}
+										</Select.Trigger>
+										<Select.Content>
+											{#each Array(28) as _, i}
+												<Select.Item value={String(i + 1)} label={String(i + 1)}
+													>{i + 1}</Select.Item
+												>
+											{/each}
+										</Select.Content>
+									</Select.Root>
+									{#if errors['dayOfMonth']}
+										<FormFieldError id="dayOfMonth-error">{errors['dayOfMonth']}</FormFieldError>
+									{/if}
 								</div>
+
+								{#if ownershipType === 'lease'}
+									<div class="space-y-2">
+										<Label for="residualValue">Residual Value (Buyout Price)</Label>
+										<Input
+											id="residualValue"
+											type="number"
+											min="0"
+											step="0.01"
+											placeholder="0.00"
+											bind:value={financingForm.residualValue}
+										/>
+									</div>
+
+									<div class="space-y-2">
+										<Label for="mileageLimit">Annual Mileage Limit</Label>
+										<Input
+											id="mileageLimit"
+											type="number"
+											min="0"
+											placeholder="e.g., 12000"
+											bind:value={financingForm.mileageLimit}
+										/>
+									</div>
+
+									<div class="space-y-2">
+										<Label for="excessMileageFee">Excess Mileage Fee (per mile)</Label>
+										<Input
+											id="excessMileageFee"
+											type="number"
+											min="0"
+											step="0.01"
+											placeholder="e.g., 0.25"
+											bind:value={financingForm.excessMileageFee}
+										/>
+									</div>
+								{/if}
+							</div>
+
+							<!-- Current Balance Display (Edit Mode Only) -->
+							{#if isEditMode && vehicle?.financing?.currentBalance !== undefined}
+								<Card class="bg-muted/50">
+									<CardHeader>
+										<CardTitle class="text-base">Current Status</CardTitle>
+									</CardHeader>
+									<CardContent>
+										<div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+											<div>
+												<p class="text-muted-foreground">Current Balance</p>
+												<p class="font-semibold text-lg">
+													{formatCurrency(vehicle.financing.currentBalance)}
+												</p>
+											</div>
+											<div>
+												<p class="text-muted-foreground">Original Amount</p>
+												<p class="font-semibold text-lg">
+													{formatCurrency(vehicle.financing.originalAmount)}
+												</p>
+											</div>
+											<div>
+												<p class="text-muted-foreground">Amount Paid</p>
+												<p class="font-semibold text-lg">
+													{formatCurrency(
+														vehicle.financing.originalAmount - vehicle.financing.currentBalance
+													)}
+												</p>
+											</div>
+										</div>
+									</CardContent>
+								</Card>
+							{/if}
+
+							<!-- Amortization Preview (Loans Only) -->
+							{#if amortizationPreview && ownershipType === 'finance'}
+								<Card class="border-primary/20 bg-primary/5">
+									<CardHeader>
+										<div class="flex items-center gap-2">
+											<Calculator class="h-4 w-4 text-primary" />
+											<CardTitle class="text-base">
+												{isEditMode ? 'Updated ' : ''}Loan Calculation Preview
+											</CardTitle>
+										</div>
+									</CardHeader>
+									<CardContent>
+										<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+											<div>
+												<p class="text-muted-foreground font-medium">Monthly Payment</p>
+												<p class="font-semibold text-lg">
+													{formatCurrency(amortizationPreview.monthlyPayment)}
+												</p>
+											</div>
+
+											<div>
+												<p class="text-muted-foreground font-medium">Total Interest</p>
+												<p class="font-semibold">
+													{formatCurrency(amortizationPreview.totalInterest)}
+												</p>
+											</div>
+
+											<div>
+												<p class="text-muted-foreground font-medium">Total Payments</p>
+												<p class="font-semibold">
+													{formatCurrency(amortizationPreview.totalPayments)}
+												</p>
+											</div>
+
+											<div>
+												<p class="text-muted-foreground font-medium">Payoff Date</p>
+												<p class="font-semibold">
+													{formatPayoffDate(amortizationPreview.payoffDate)}
+												</p>
+											</div>
+										</div>
+									</CardContent>
+								</Card>
 							{/if}
 						</div>
-
-						<!-- Current Balance Display (Edit Mode Only) -->
-						{#if isEditMode && vehicle?.financing?.currentBalance !== undefined}
-							<div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-								<h3 class="font-medium text-gray-900 mb-2">Current Status</h3>
-								<div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-									<div>
-										<p class="text-gray-600">Current Balance</p>
-										<p class="font-semibold text-gray-900">
-											{formatCurrency(vehicle.financing.currentBalance)}
-										</p>
-									</div>
-									<div>
-										<p class="text-gray-600">Original Amount</p>
-										<p class="font-semibold text-gray-900">
-											{formatCurrency(vehicle.financing.originalAmount)}
-										</p>
-									</div>
-									<div>
-										<p class="text-gray-600">Amount Paid</p>
-										<p class="font-semibold text-gray-900">
-											{formatCurrency(
-												vehicle.financing.originalAmount - vehicle.financing.currentBalance
-											)}
-										</p>
-									</div>
-								</div>
-							</div>
-						{/if}
-
-						<!-- Amortization Preview (Loans Only) -->
-						{#if amortizationPreview && ownershipType === 'finance'}
-							<div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-								<div class="flex items-center gap-2 mb-3">
-									<Calculator class="h-4 w-4 text-blue-600" />
-									<h3 class="font-medium text-blue-900">
-										{isEditMode ? 'Updated ' : ''}Loan Calculation Preview
-									</h3>
-								</div>
-
-								<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-									<div>
-										<p class="text-blue-700 font-medium">Monthly Payment</p>
-										<p class="text-blue-900 font-semibold text-lg">
-											{formatCurrency(amortizationPreview.monthlyPayment)}
-										</p>
-									</div>
-
-									<div>
-										<p class="text-blue-700 font-medium">Total Interest</p>
-										<p class="text-blue-900 font-semibold">
-											{formatCurrency(amortizationPreview.totalInterest)}
-										</p>
-									</div>
-
-									<div>
-										<p class="text-blue-700 font-medium">Total Payments</p>
-										<p class="text-blue-900 font-semibold">
-											{formatCurrency(amortizationPreview.totalPayments)}
-										</p>
-									</div>
-
-									<div>
-										<p class="text-blue-700 font-medium">Payoff Date</p>
-										<p class="text-blue-900 font-semibold">
-											{formatPayoffDate(amortizationPreview.payoffDate)}
-										</p>
-									</div>
-								</div>
-							</div>
-						{/if}
-					</div>
-				{:else}
-					<p class="text-gray-500 text-center py-8">
-						This vehicle is owned outright with no financing or lease.
-					</p>
-				{/if}
-			</div>
+					{:else}
+						<p class="text-muted-foreground text-center py-8">
+							This vehicle is owned outright with no financing or lease.
+						</p>
+					{/if}
+				</CardContent>
+			</Card>
 		</form>
 
 		<!-- Floating Action Bar -->
-		<div
-			class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto !z-50"
-		>
+		<div class="fixed bottom-4 left-4 right-4 z-50 sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto">
 			<div
-				class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-white sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none"
+				class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none border sm:border-0"
 			>
 				{#if isEditMode}
 					<Button
 						type="button"
+						variant="destructive"
+						size="lg"
 						onclick={confirmDelete}
 						disabled={isDeleting || isSubmitting}
-						class="sm:rounded-full rounded-full !bg-red-600 hover:!bg-red-700 !text-white shadow-lg hover:shadow-red-500/50 transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 !px-5 !border-0 flex-shrink-0"
+						class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
 					>
 						<Trash2 class="h-5 w-5 sm:mr-2" />
 						<span class="hidden sm:inline font-semibold">Delete</span>
@@ -992,9 +1023,11 @@
 
 				<Button
 					type="button"
+					variant="outline"
+					size="lg"
 					onclick={handleBack}
 					disabled={isSubmitting || isDeleting}
-					class="sm:rounded-full rounded-full !bg-gray-600 hover:!bg-gray-700 !text-white shadow-lg hover:shadow-gray-500/50 transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 !px-5 !border-0 flex-shrink-0"
+					class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
 				>
 					<X class="h-5 w-5 sm:mr-2" />
 					<span class="hidden sm:inline font-semibold">Cancel</span>
@@ -1002,9 +1035,10 @@
 
 				<Button
 					type="submit"
+					size="lg"
 					onclick={handleSubmit}
 					disabled={isSubmitting || isDeleting}
-					class="sm:rounded-full rounded-full group !bg-gradient-to-r !from-primary-600 !to-primary-700 hover:!from-primary-700 hover:!to-primary-800 !text-white shadow-2xl hover:shadow-primary-500/50 transition-all duration-300 sm:hover:scale-110 h-14 sm:h-14 !px-6 !border-0 flex-1 sm:flex-initial"
+					class="rounded-full group shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 px-6 flex-1 sm:flex-initial"
 				>
 					{#if isSubmitting}
 						<div class="loading-spinner h-5 w-5 mr-2"></div>
@@ -1030,23 +1064,25 @@
 			</AlertDialogHeader>
 
 			{#if vehicle}
-				<div class="bg-gray-50 rounded-lg p-3">
-					<div class="flex items-center gap-3">
-						<div class="p-2 rounded-lg bg-red-100 text-red-600">
-							<Car class="h-4 w-4" />
+				<Card class="bg-muted/50">
+					<CardContent class="p-4">
+						<div class="flex items-center gap-3">
+							<div class="p-2 rounded-lg bg-destructive/10 text-destructive">
+								<Car class="h-4 w-4" />
+							</div>
+							<div>
+								<p class="font-medium">
+									{vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+								</p>
+								<p class="text-sm text-muted-foreground">
+									{vehicle.year}
+									{vehicle.make}
+									{vehicle.model}
+								</p>
+							</div>
 						</div>
-						<div>
-							<p class="font-medium text-gray-900">
-								{vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-							</p>
-							<p class="text-sm text-gray-600">
-								{vehicle.year}
-								{vehicle.make}
-								{vehicle.model}
-							</p>
-						</div>
-					</div>
-				</div>
+					</CardContent>
+				</Card>
 			{/if}
 
 			<AlertDialogFooter>
@@ -1054,7 +1090,7 @@
 				<AlertDialogAction
 					onclick={handleDelete}
 					disabled={isDeleting}
-					class="bg-red-600 hover:bg-red-700 text-white"
+					class="bg-destructive hover:bg-destructive/90"
 				>
 					{#if isDeleting}
 						<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

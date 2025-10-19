@@ -41,7 +41,7 @@ type ExpenseData = {
     id: string;
     amount: number;
     category: string;
-    tags?: string | null;
+    tags?: string[] | null;
     date: Date;
     description?: string | null;
     mileage?: number | null;
@@ -438,7 +438,7 @@ export class GoogleSheetsService {
         return [
           expense.id || '',
           expense.vehicleId || '',
-          expense.tags || '',
+          expense.tags ? expense.tags.join(', ') : '',
           expense.category || '',
           expense.amount || '',
           expense.currency || '',

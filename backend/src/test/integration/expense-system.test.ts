@@ -18,8 +18,8 @@ import { assertSuccessResponse, getDb, getTypedResponse } from '../utils/test-he
 // Test app setup
 const testApp = new Hono();
 testApp.onError(errorHandler);
-testApp.route('/api/expenses', expenseRoutes);
-testApp.route('/api/insurance', insuranceRoutes);
+testApp.route('/api/v1/expenses', expenseRoutes);
+testApp.route('/api/v1/insurance', insuranceRoutes);
 
 describe('Expense System Integration Tests - Task 5.4', () => {
   let _db: ReturnType<typeof getTestDatabase>;
@@ -95,7 +95,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       ];
 
       for (const expenseData of expenseCategories) {
-        const req = new Request(`http://localhost:3001/api/expenses`, {
+        const req = new Request(`http://localhost:3001/api/v1/expenses`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -128,7 +128,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
 
     test('should validate category requirements', async () => {
       // Test that category is required
-      const req = new Request(`http://localhost:3001/api/expenses`, {
+      const req = new Request(`http://localhost:3001/api/v1/expenses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +156,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 45.5,
             currency: 'USD',
@@ -165,7 +165,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['maintenance']),
+            tags: ['maintenance'],
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
@@ -174,7 +174,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['insurance']),
+            tags: ['insurance'],
             category: 'financial',
             amount: 200.0,
             currency: 'USD',
@@ -184,7 +184,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
 
       // Test filtering by operating category
       const operatingReq = new Request(
-        `http://localhost:3001/api/expenses?vehicleId=${testVehicleId}&category=fuel`,
+        `http://localhost:3001/api/v1/expenses?vehicleId=${testVehicleId}&category=fuel`,
         {
           headers: { Cookie: sessionCookie },
         }
@@ -203,7 +203,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
 
       // Test filtering by maintenance category
       const maintenanceReq = new Request(
-        `http://localhost:3001/api/expenses?vehicleId=${testVehicleId}&category=maintenance`,
+        `http://localhost:3001/api/v1/expenses?vehicleId=${testVehicleId}&category=maintenance`,
         {
           headers: { Cookie: sessionCookie },
         }
@@ -227,7 +227,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          tags: JSON.stringify(['oil-change']),
+          tags: ['oil-change'],
           category: 'maintenance',
           amount: 89.99,
           currency: 'USD',
@@ -243,7 +243,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
         description: 'Oil change - updated',
       };
 
-      const req = new Request(`http://localhost:3001/api/expenses/${expense[0].id}`, {
+      const req = new Request(`http://localhost:3001/api/v1/expenses/${expense[0].id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -275,7 +275,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       };
 
       const createReq = new Request(
-        `http://localhost:3001/api/insurance/vehicles/${testVehicleId}/policies`,
+        `http://localhost:3001/api/v1/insurance/vehicles/${testVehicleId}/policies`,
         {
           method: 'POST',
           headers: {
@@ -298,7 +298,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
 
       // Test monthly breakdown
       const breakdownReq = new Request(
-        `http://localhost:3001/api/insurance/${createData.data.id}/monthly-breakdown`,
+        `http://localhost:3001/api/v1/insurance/${createData.data.id}/monthly-breakdown`,
         {
           headers: { Cookie: sessionCookie },
         }
@@ -344,7 +344,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
         };
 
         const req = new Request(
-          `http://localhost:3001/api/insurance/vehicles/${testVehicleId}/policies`,
+          `http://localhost:3001/api/v1/insurance/vehicles/${testVehicleId}/policies`,
           {
             method: 'POST',
             headers: {
@@ -377,7 +377,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       };
 
       const createReq = new Request(
-        `http://localhost:3001/api/insurance/vehicles/${testVehicleId}/policies`,
+        `http://localhost:3001/api/v1/insurance/vehicles/${testVehicleId}/policies`,
         {
           method: 'POST',
           headers: {
@@ -400,7 +400,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
         totalCost: 1500.0, // Increase cost
       };
 
-      const updateReq = new Request(`http://localhost:3001/api/insurance/${policyId}`, {
+      const updateReq = new Request(`http://localhost:3001/api/v1/insurance/${policyId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -425,7 +425,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
         termLengthMonths: 12,
       };
 
-      const termUpdateReq = new Request(`http://localhost:3001/api/insurance/${policyId}`, {
+      const termUpdateReq = new Request(`http://localhost:3001/api/v1/insurance/${policyId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -460,7 +460,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       };
 
       const createReq = new Request(
-        `http://localhost:3001/api/insurance/vehicles/${testVehicleId}/policies`,
+        `http://localhost:3001/api/v1/insurance/vehicles/${testVehicleId}/policies`,
         {
           method: 'POST',
           headers: {
@@ -474,9 +474,12 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       await testApp.fetch(createReq);
 
       // Check expiring policies
-      const expiringReq = new Request(`http://localhost:3001/api/insurance/expiring-soon?days=30`, {
-        headers: { Cookie: sessionCookie },
-      });
+      const expiringReq = new Request(
+        `http://localhost:3001/api/v1/insurance/expiring-soon?days=30`,
+        {
+          headers: { Cookie: sessionCookie },
+        }
+      );
 
       const expiringRes = await testApp.fetch(expiringReq);
       expect(expiringRes.status).toBe(200);
@@ -489,7 +492,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
 
       // Check policy list includes expiration alerts
       const listReq = new Request(
-        `http://localhost:3001/api/insurance/vehicles/${testVehicleId}/policies`,
+        `http://localhost:3001/api/v1/insurance/vehicles/${testVehicleId}/policies`,
         {
           headers: { Cookie: sessionCookie },
         }
@@ -547,7 +550,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['insurance']),
+            tags: ['insurance'],
             category: 'financial',
             amount: 200.0,
             currency: 'USD',
@@ -558,7 +561,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 150.0,
             currency: 'USD',
@@ -661,7 +664,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
           .values({
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(expense.tags),
+            tags: expense.tags,
             category: expense.category as string,
             amount: expense.amount,
             currency: 'USD',
@@ -676,7 +679,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       const filteringTests = [
         // Test expense filtering
         {
-          endpoint: `/api/expenses?vehicleId=${testVehicleId}&category=fuel`,
+          endpoint: `/api/v1/expenses?vehicleId=${testVehicleId}&category=fuel`,
           expectedChecks: (response: {
             success: boolean;
             data: unknown[];
@@ -688,7 +691,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
         },
         // Test date range filtering
         {
-          endpoint: `/api/expenses?vehicleId=${testVehicleId}&startDate=2024-02-01T00:00:00.000Z&endDate=2024-02-28T23:59:59.999Z`,
+          endpoint: `/api/v1/expenses?vehicleId=${testVehicleId}&startDate=2024-02-01T00:00:00.000Z&endDate=2024-02-28T23:59:59.999Z`,
           expectedChecks: (data: {
             success: boolean;
             data: unknown[];
@@ -720,7 +723,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
 
     test('should maintain data consistency across operations', async () => {
       // Create initial expense
-      const createReq = new Request(`http://localhost:3001/api/expenses`, {
+      const createReq = new Request(`http://localhost:3001/api/v1/expenses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -748,7 +751,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       const expenseId = createData.data.id;
 
       // Update expense
-      const updateReq = new Request(`http://localhost:3001/api/expenses/${expenseId}`, {
+      const updateReq = new Request(`http://localhost:3001/api/v1/expenses/${expenseId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -772,9 +775,12 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       expect(updateData.data.volume).toBe(13.0);
 
       // Verify update in list
-      const listReq = new Request(`http://localhost:3001/api/expenses?vehicleId=${testVehicleId}`, {
-        headers: { Cookie: sessionCookie },
-      });
+      const listReq = new Request(
+        `http://localhost:3001/api/v1/expenses?vehicleId=${testVehicleId}`,
+        {
+          headers: { Cookie: sessionCookie },
+        }
+      );
 
       const listRes = await testApp.fetch(listReq);
       expect(listRes.status).toBe(200);
@@ -791,7 +797,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
       expect(listData.data[0].description).toBe('Updated fuel expense');
 
       // Delete expense
-      const deleteReq = new Request(`http://localhost:3001/api/expenses/${expenseId}`, {
+      const deleteReq = new Request(`http://localhost:3001/api/v1/expenses/${expenseId}`, {
         method: 'DELETE',
         headers: { Cookie: sessionCookie },
       });
@@ -801,7 +807,7 @@ describe('Expense System Integration Tests - Task 5.4', () => {
 
       // Verify deletion
       const finalListReq = new Request(
-        `http://localhost:3001/api/expenses?vehicleId=${testVehicleId}`,
+        `http://localhost:3001/api/v1/expenses?vehicleId=${testVehicleId}`,
         {
           headers: { Cookie: sessionCookie },
         }

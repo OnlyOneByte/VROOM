@@ -30,8 +30,8 @@ import { assertSuccessResponse, getDb, getTypedResponse } from '../utils/test-he
 // Test app setup
 const testApp = new Hono();
 testApp.onError(errorHandler);
-testApp.route('/api/vehicles', vehicleRoutes);
-testApp.route('/api/loans', financingRoutes);
+testApp.route('/api/v1/vehicles', vehicleRoutes);
+testApp.route('/api/v1/loans', financingRoutes);
 
 describe('Vehicle Management API Integration Tests', () => {
   let _db: ReturnType<typeof getTestDatabase>;
@@ -87,7 +87,7 @@ describe('Vehicle Management API Integration Tests', () => {
         purchaseDate: '2020-03-15T00:00:00.000Z',
       };
 
-      const req = new Request('http://localhost:3001/api/vehicles', {
+      const req = new Request('http://localhost:3001/api/v1/vehicles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -117,7 +117,7 @@ describe('Vehicle Management API Integration Tests', () => {
         year: 1800, // Year too old should fail validation
       };
 
-      const req = new Request('http://localhost:3001/api/vehicles', {
+      const req = new Request('http://localhost:3001/api/v1/vehicles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -139,7 +139,7 @@ describe('Vehicle Management API Integration Tests', () => {
         licensePlate: 'DUPLICATE123',
       };
 
-      const req1 = new Request('http://localhost:3001/api/vehicles', {
+      const req1 = new Request('http://localhost:3001/api/v1/vehicles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -159,7 +159,7 @@ describe('Vehicle Management API Integration Tests', () => {
         licensePlate: 'DUPLICATE123',
       };
 
-      const req2 = new Request('http://localhost:3001/api/vehicles', {
+      const req2 = new Request('http://localhost:3001/api/v1/vehicles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -199,7 +199,7 @@ describe('Vehicle Management API Integration Tests', () => {
         })
         .returning();
 
-      const req = new Request('http://localhost:3001/api/vehicles', {
+      const req = new Request('http://localhost:3001/api/v1/vehicles', {
         headers: {
           Cookie: sessionCookie,
         },
@@ -231,7 +231,7 @@ describe('Vehicle Management API Integration Tests', () => {
 
       testVehicleId = vehicle[0].id;
 
-      const req = new Request(`http://localhost:3001/api/vehicles/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/vehicles/${testVehicleId}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -250,7 +250,7 @@ describe('Vehicle Management API Integration Tests', () => {
     test('should return 404 for non-existent vehicle', async () => {
       const nonExistentId = createId();
 
-      const req = new Request(`http://localhost:3001/api/vehicles/${nonExistentId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/vehicles/${nonExistentId}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -283,7 +283,7 @@ describe('Vehicle Management API Integration Tests', () => {
         initialMileage: 30000,
       };
 
-      const req = new Request(`http://localhost:3001/api/vehicles/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/vehicles/${testVehicleId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -317,7 +317,7 @@ describe('Vehicle Management API Integration Tests', () => {
 
       testVehicleId = vehicle[0].id;
 
-      const req = new Request(`http://localhost:3001/api/vehicles/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/vehicles/${testVehicleId}`, {
         method: 'DELETE',
         headers: {
           Cookie: sessionCookie,
@@ -332,7 +332,7 @@ describe('Vehicle Management API Integration Tests', () => {
       expect(data.message).toContain('deleted successfully');
 
       // Verify vehicle is deleted
-      const checkReq = new Request(`http://localhost:3001/api/vehicles/${testVehicleId}`, {
+      const checkReq = new Request(`http://localhost:3001/api/v1/vehicles/${testVehicleId}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -344,11 +344,11 @@ describe('Vehicle Management API Integration Tests', () => {
 
     test('should require authentication for all vehicle operations', async () => {
       const requests = [
-        new Request('http://localhost:3001/api/vehicles'),
-        new Request('http://localhost:3001/api/vehicles', { method: 'POST' }),
-        new Request('http://localhost:3001/api/vehicles/test-id'),
-        new Request('http://localhost:3001/api/vehicles/test-id', { method: 'PUT' }),
-        new Request('http://localhost:3001/api/vehicles/test-id', { method: 'DELETE' }),
+        new Request('http://localhost:3001/api/v1/vehicles'),
+        new Request('http://localhost:3001/api/v1/vehicles', { method: 'POST' }),
+        new Request('http://localhost:3001/api/v1/vehicles/test-id'),
+        new Request('http://localhost:3001/api/v1/vehicles/test-id', { method: 'PUT' }),
+        new Request('http://localhost:3001/api/v1/vehicles/test-id', { method: 'DELETE' }),
       ];
 
       for (const req of requests) {
@@ -389,7 +389,7 @@ describe('Vehicle Management API Integration Tests', () => {
       };
 
       const req = new Request(
-        `http://localhost:3001/api/loans/vehicles/${testVehicleId}/financing`,
+        `http://localhost:3001/api/v1/loans/vehicles/${testVehicleId}/financing`,
         {
           method: 'POST',
           headers: {
@@ -424,7 +424,7 @@ describe('Vehicle Management API Integration Tests', () => {
       };
 
       const req = new Request(
-        `http://localhost:3001/api/loans/vehicles/${testVehicleId}/financing`,
+        `http://localhost:3001/api/v1/loans/vehicles/${testVehicleId}/financing`,
         {
           method: 'POST',
           headers: {
@@ -460,7 +460,7 @@ describe('Vehicle Management API Integration Tests', () => {
         .returning();
 
       const req = new Request(
-        `http://localhost:3001/api/loans/vehicles/${testVehicleId}/financing`,
+        `http://localhost:3001/api/v1/loans/vehicles/${testVehicleId}/financing`,
         {
           headers: {
             Cookie: sessionCookie,
@@ -497,7 +497,7 @@ describe('Vehicle Management API Integration Tests', () => {
         })
         .returning();
 
-      const req = new Request(`http://localhost:3001/api/loans/${loan[0].id}/schedule`, {
+      const req = new Request(`http://localhost:3001/api/v1/loans/${loan[0].id}/schedule`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -540,7 +540,7 @@ describe('Vehicle Management API Integration Tests', () => {
         paymentType: 'standard',
       };
 
-      const req = new Request(`http://localhost:3001/api/loans/${loan[0].id}/payment`, {
+      const req = new Request(`http://localhost:3001/api/v1/loans/${loan[0].id}/payment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -598,7 +598,7 @@ describe('Vehicle Management API Integration Tests', () => {
           paymentType: 'standard',
         });
 
-      const req = new Request(`http://localhost:3001/api/loans/${loan[0].id}/payments`, {
+      const req = new Request(`http://localhost:3001/api/v1/loans/${loan[0].id}/payments`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -637,7 +637,7 @@ describe('Vehicle Management API Integration Tests', () => {
         })
         .returning();
 
-      const req = new Request(`http://localhost:3001/api/loans/${loan[0].id}`, {
+      const req = new Request(`http://localhost:3001/api/v1/loans/${loan[0].id}`, {
         method: 'DELETE',
         headers: {
           Cookie: sessionCookie,
@@ -695,7 +695,7 @@ describe('Vehicle Management API Integration Tests', () => {
         .returning();
 
       // Try to access other user's loan
-      const req = new Request(`http://localhost:3001/api/loans/${otherLoan[0].id}/schedule`, {
+      const req = new Request(`http://localhost:3001/api/v1/loans/${otherLoan[0].id}/schedule`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -715,7 +715,7 @@ describe('Vehicle Management API Integration Tests', () => {
         year: futureYear,
       };
 
-      const req = new Request('http://localhost:3001/api/vehicles', {
+      const req = new Request('http://localhost:3001/api/v1/vehicles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -752,7 +752,7 @@ describe('Vehicle Management API Integration Tests', () => {
       };
 
       const req = new Request(
-        `http://localhost:3001/api/loans/vehicles/${vehicle[0].id}/financing`,
+        `http://localhost:3001/api/v1/loans/vehicles/${vehicle[0].id}/financing`,
         {
           method: 'POST',
           headers: {
@@ -768,7 +768,7 @@ describe('Vehicle Management API Integration Tests', () => {
     });
 
     test('should handle malformed JSON', async () => {
-      const req = new Request('http://localhost:3001/api/vehicles', {
+      const req = new Request('http://localhost:3001/api/v1/vehicles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

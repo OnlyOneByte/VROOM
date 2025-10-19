@@ -1,271 +1,210 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
-	import { appStore } from '$lib/stores/app.js';
-	import {
-		Plus,
-		Car,
-		Search,
-		ListFilter,
-		DollarSign,
-		Gauge,
-		TrendingUp,
-		Calendar,
-		Fuel,
-		Wrench,
-		CircleAlert
-	} from 'lucide-svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
+	import { Plus } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Progress } from '$lib/components/ui/progress';
-	import {
-		Empty,
-		EmptyContent,
-		EmptyDescription,
-		EmptyHeader,
-		EmptyMedia,
-		EmptyTitle
-	} from '$lib/components/ui/empty';
-	import type { Vehicle, Expense } from '$lib/types/index.js';
-	import type { VehicleStats } from '$lib/types/stats';
+	import DashboardStatsCards from '$lib/components/dashboard/DashboardStatsCards.svelte';
+	import MonthlyTrendChart from '$lib/components/dashboard/MonthlyTrendChart.svelte';
+	import CategoryBreakdownChart from '$lib/components/dashboard/CategoryBreakdownChart.svelte';
+	import RecentActivityCard from '$lib/components/dashboard/RecentActivityCard.svelte';
+	import FleetOverviewTable from '$lib/components/dashboard/FleetOverviewTable.svelte';
+	import PeriodSelector from '$lib/components/vehicles/PeriodSelector.svelte';
+	import { handleErrorWithNotification } from '$lib/utils/error-handling';
+	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import type { ExpenseCategory } from '$lib/types';
+	import type { TimePeriod } from '$lib/constants/time-periods';
 
-	// Use automatic store subscription
-	let appState = $derived($appStore);
-	let searchTerm = $state('');
-	let selectedFilter = $state('all');
-	let vehicleExpenses = $state<Record<string, Expense[]>>({});
-	let vehicleStats = $state<Record<string, VehicleStats>>({});
+	let isLoading = $state(true);
+	let selectedPeriod = $state<TimePeriod>('all');
 
-	let filteredVehicles = $derived(
-		appState.vehicles.filter((vehicle: Vehicle) => {
-			// Apply search filter
-			if (searchTerm) {
-				const search = searchTerm.toLowerCase();
-				const matchesSearch =
-					vehicle.make.toLowerCase().includes(search) ||
-					vehicle.model.toLowerCase().includes(search) ||
-					vehicle.nickname?.toLowerCase().includes(search) ||
-					vehicle.licensePlate?.toLowerCase().includes(search);
-				if (!matchesSearch) return false;
-			}
+	let dashboardData = $state<any>(null);
+	let vehicleDetails = $state<any[]>([]);
+	let recentExpenses = $state<any[]>([]);
 
-			// Apply category filter
-			if (selectedFilter === 'all') return true;
-			if (selectedFilter === 'with-loans') return !!vehicle.financing?.isActive;
-			if (selectedFilter === 'recent') {
-				const recentThreshold = new Date();
-				recentThreshold.setDate(recentThreshold.getDate() - VEHICLE_AGE_THRESHOLDS.RECENT);
-				return new Date(vehicle.createdAt) > recentThreshold;
-			}
+	let stats = $derived.by(() => {
+		if (!dashboardData) {
+			return { totalVehicles: 0, totalExpenses: 0, monthlyAverage: 0, activeFinancing: 0 };
+		}
+		const monthlyAverage =
+			dashboardData.monthlyTrends.length > 0
+				? dashboardData.monthlyTrends.reduce((sum: number, t: any) => sum + t.amount, 0) /
+					dashboardData.monthlyTrends.length
+				: 0;
+		return {
+			totalVehicles: dashboardData.vehicles.length,
+			totalExpenses: dashboardData.totalExpenses,
+			monthlyAverage,
+			activeFinancing: vehicleDetails.filter(v => v.hasActiveFinancing).length
+		};
+	});
 
-			return true;
-		})
+	let trendChartData = $derived(
+		dashboardData?.monthlyTrends.map((t: any) => ({
+			date: new Date(t.period),
+			amount: t.amount
+		})) || []
 	);
 
-	// Calculate dashboard summary statistics
-	let dashboardStats = $derived.by(() => {
-		const totalVehicles = appState.vehicles.length;
-		const activeLoans = appState.vehicles.filter((v: Vehicle) => v.financing?.isActive).length;
-
-		// Calculate total recent expenses
-		const thirtyDaysAgo = new Date();
-		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - EXPENSE_PERIODS.RECENT);
-
-		let totalRecentExpenses = 0;
-		let totalExpenses = 0;
-
-		Object.values(vehicleExpenses).forEach(expenses => {
-			expenses.forEach(expense => {
-				totalExpenses += expense.amount;
-				if (new Date(expense.date) > thirtyDaysAgo) {
-					totalRecentExpenses += expense.amount;
-				}
-			});
-		});
-
-		return {
-			totalVehicles,
-			activeLoans,
-			totalRecentExpenses,
-			totalExpenses,
-			averageExpensePerVehicle: totalVehicles > 0 ? totalExpenses / totalVehicles : 0
+	let categoryChartData = $derived.by(() => {
+		if (!dashboardData?.categoryBreakdown) return [];
+		const colors: Record<string, string> = {
+			fuel: 'hsl(217, 91%, 60%)',
+			maintenance: 'hsl(25, 95%, 53%)',
+			insurance: 'hsl(262, 83%, 58%)',
+			registration: 'hsl(142, 71%, 45%)',
+			parking: 'hsl(48, 96%, 53%)',
+			tolls: 'hsl(330, 81%, 60%)',
+			cleaning: 'hsl(189, 94%, 43%)',
+			other: 'hsl(215, 16%, 47%)'
 		};
+		return Object.entries(dashboardData.categoryBreakdown).map(
+			([category, data]: [string, any]) => ({
+				category,
+				name: categoryLabels[category as ExpenseCategory] || category,
+				amount: data.amount,
+				percentage: data.percentage,
+				color: (colors[category] ?? colors['other']) as string
+			})
+		);
 	});
 
-	onMount(() => {
-		// Load vehicles if not already loaded, then load expenses
-		if (appState.vehicles.length === 0) {
-			loadVehicles();
-		} else {
-			// Vehicles already loaded, just load expenses
-			loadVehicleExpenses(appState.vehicles);
+	onMount(async () => {
+		await loadDashboardData();
+		isLoading = false;
+	});
+
+	$effect(() => {
+		if (!isLoading && selectedPeriod) {
+			loadDashboardData();
 		}
 	});
 
-	async function loadVehicles() {
-		appStore.setLoading(true);
+	async function loadDashboardData() {
 		try {
-			const response = await fetch('/api/v1/vehicles', {
+			const params = new URLSearchParams();
+			params.append('groupBy', 'month');
+			if (selectedPeriod !== 'all') {
+				const endDate = new Date();
+				const startDate = new Date();
+				switch (selectedPeriod) {
+					case '7d':
+						startDate.setDate(startDate.getDate() - 7);
+						break;
+					case '30d':
+						startDate.setDate(startDate.getDate() - 30);
+						break;
+					case '90d':
+						startDate.setDate(startDate.getDate() - 90);
+						break;
+					case '1y':
+						startDate.setFullYear(startDate.getFullYear() - 1);
+						break;
+				}
+				params.append('startDate', startDate.toISOString());
+				params.append('endDate', endDate.toISOString());
+			}
+			const response = await fetch(`/api/v1/analytics/dashboard?${params.toString()}`, {
 				credentials: 'include'
 			});
+			if (!response.ok) throw new Error('Failed to load dashboard data');
+			const result = await response.json();
+			dashboardData = result.data;
+			await Promise.all([loadVehicleDetails(), loadRecentExpenses()]);
+		} catch (error) {
+			handleErrorWithNotification(error, 'Failed to load dashboard data');
+		}
+	}
 
-			if (response.ok) {
-				const result = await response.json();
-				const vehicles = result.data || [];
-				appStore.setVehicles(vehicles);
-
-				// Load expenses for each vehicle
-				await loadVehicleExpenses(vehicles);
-			} else {
-				appStore.addNotification({
-					type: 'error',
-					message: 'Failed to load vehicles'
-				});
-			}
-		} catch {
-			appStore.addNotification({
-				type: 'error',
-				message: 'Error loading vehicles'
+	async function loadVehicleDetails() {
+		try {
+			const response = await fetch('/api/v1/vehicles', { credentials: 'include' });
+			if (!response.ok) return;
+			const result = await response.json();
+			const vehicles = result.data || [];
+			const vehicleDetailsPromises = vehicles.map(async (vehicle: any) => {
+				try {
+					const expensesResponse = await fetch(`/api/v1/expenses?vehicleId=${vehicle.id}`, {
+						credentials: 'include'
+					});
+					if (!expensesResponse.ok) {
+						return {
+							id: vehicle.id,
+							name: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+							nickname: vehicle.nickname,
+							recentExpenses: 0,
+							totalExpenses: 0,
+							lastActivity: null,
+							hasActiveFinancing: vehicle.financing?.isActive || false
+						};
+					}
+					const expensesResult = await expensesResponse.json();
+					const expenses = expensesResult.data || [];
+					const thirtyDaysAgo = new Date();
+					thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+					const recentExpenses = expenses
+						.filter((e: any) => new Date(e.date) > thirtyDaysAgo)
+						.reduce((sum: number, e: any) => sum + e.amount, 0);
+					const totalExpenses = expenses.reduce((sum: number, e: any) => sum + e.amount, 0);
+					const lastActivity =
+						expenses.length > 0
+							? new Date(Math.max(...expenses.map((e: any) => new Date(e.date).getTime())))
+							: null;
+					return {
+						id: vehicle.id,
+						name: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+						nickname: vehicle.nickname,
+						recentExpenses,
+						totalExpenses,
+						lastActivity,
+						hasActiveFinancing: vehicle.financing?.isActive || false
+					};
+				} catch {
+					return {
+						id: vehicle.id,
+						name: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+						nickname: vehicle.nickname,
+						recentExpenses: 0,
+						totalExpenses: 0,
+						lastActivity: null,
+						hasActiveFinancing: vehicle.financing?.isActive || false
+					};
+				}
 			});
-		} finally {
-			appStore.setLoading(false);
+			vehicleDetails = await Promise.all(vehicleDetailsPromises);
+		} catch (error) {
+			console.error('Failed to load vehicle details:', error);
 		}
 	}
 
-	async function loadVehicleExpenses(vehicles: Vehicle[]) {
-		const expensePromises = vehicles.map(async vehicle => {
-			try {
-				const response = await fetch(`/api/v1/expenses?vehicleId=${vehicle.id}`, {
-					credentials: 'include'
-				});
-
-				if (response.ok) {
-					const result = await response.json();
-					const expenses = result.data || [];
-					vehicleExpenses[vehicle.id] = expenses;
-
-					// Calculate vehicle statistics
-					calculateVehicleStats(vehicle.id, expenses);
-				}
-			} catch (error) {
-				console.error(`Failed to load expenses for vehicle ${vehicle.id}:`, error);
-				vehicleExpenses[vehicle.id] = [];
-			}
-		});
-
-		await Promise.all(expensePromises);
+	async function loadRecentExpenses() {
+		try {
+			const response = await fetch('/api/v1/expenses?limit=10', { credentials: 'include' });
+			if (!response.ok) return;
+			const result = await response.json();
+			const expenses = result.data || [];
+			const vehiclesResponse = await fetch('/api/v1/vehicles', { credentials: 'include' });
+			if (!vehiclesResponse.ok) return;
+			const vehiclesResult = await vehiclesResponse.json();
+			const vehicles = vehiclesResult.data || [];
+			const vehicleMap = new Map(
+				vehicles.map((v: any) => [v.id, v.nickname || `${v.year} ${v.make} ${v.model}`])
+			);
+			recentExpenses = expenses
+				.map((e: any) => ({
+					id: e.id,
+					amount: e.amount,
+					category: e.category,
+					date: new Date(e.date),
+					description: e.description,
+					vehicleName: vehicleMap.get(e.vehicleId) || 'Unknown Vehicle'
+				}))
+				.slice(0, 5);
+		} catch (error) {
+			console.error('Failed to load recent expenses:', error);
+		}
 	}
 
-	function calculateVehicleStats(vehicleId: string, expenses: Expense[]) {
-		const thirtyDaysAgo = new Date();
-		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - EXPENSE_PERIODS.RECENT);
-		const sixtyDaysAgo = new Date();
-		sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - EXPENSE_PERIODS.COMPARISON);
-
-		const recentExpenses = expenses.filter(e => new Date(e.date) > thirtyDaysAgo);
-		const previousMonthExpenses = expenses.filter(
-			e => new Date(e.date) > sixtyDaysAgo && new Date(e.date) <= thirtyDaysAgo
-		);
-
-		const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
-		const recentAmount = recentExpenses.reduce((sum, e) => sum + e.amount, 0);
-		const previousAmount = previousMonthExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-		// Calculate trend (comparing last 30 days to previous 30 days)
-		let trend = 0;
-		if (previousAmount > 0) {
-			trend = ((recentAmount - previousAmount) / previousAmount) * 100;
-		}
-
-		// Calculate fuel efficiency if fuel expenses exist
-		const fuelExpenses = expenses.filter(
-			e => e.category === 'fuel' && (e.volume || e.charge) && e.mileage
-		);
-		let avgMpg = 0;
-		let currentMileage = 0;
-		if (fuelExpenses.length > 1) {
-			// Calculate efficiency for each fuel-up and average them
-			const efficiencyValues = [];
-			for (let i = 1; i < fuelExpenses.length; i++) {
-				const current = fuelExpenses[i];
-				const previous = fuelExpenses[i - 1];
-				if (current?.mileage && previous?.mileage) {
-					const miles = current.mileage - previous.mileage;
-					// For liquid fuel
-					if (current?.volume) {
-						const mpg = miles / current.volume;
-						if (mpg > 0 && mpg < 100) {
-							efficiencyValues.push(mpg);
-						}
-					}
-					// For electric charge
-					else if (current?.charge) {
-						const efficiency = miles / current.charge;
-						if (efficiency > 0 && efficiency < 20) {
-							efficiencyValues.push(efficiency);
-						}
-					}
-				}
-			}
-			avgMpg =
-				efficiencyValues.length > 0
-					? efficiencyValues.reduce((sum, eff) => sum + eff, 0) / efficiencyValues.length
-					: 0;
-			currentMileage = Math.max(...fuelExpenses.map(e => e.mileage || 0));
-		}
-
-		// Calculate cost per mile
-		let costPerMile = 0;
-		if (currentMileage > 0) {
-			const vehicle = appState.vehicles.find(v => v.id === vehicleId);
-			const initialMileage = vehicle?.initialMileage || 0;
-			const milesDriven = currentMileage - initialMileage;
-			if (milesDriven > 0) {
-				costPerMile = totalAmount / milesDriven;
-			}
-		}
-
-		// Get maintenance expenses
-		const maintenanceExpenses = expenses.filter(e => e.category === 'maintenance');
-		const lastMaintenanceDate =
-			maintenanceExpenses.length > 0
-				? new Date(Math.max(...maintenanceExpenses.map(e => new Date(e.date).getTime())))
-				: null;
-
-		// Days since last maintenance
-		const daysSinceLastMaintenance = lastMaintenanceDate
-			? Math.floor((Date.now() - lastMaintenanceDate.getTime()) / (1000 * 60 * 60 * 24))
-			: null;
-
-		vehicleStats[vehicleId] = {
-			totalExpenses: totalAmount,
-			recentExpenses: recentAmount,
-			expenseCount: expenses.length,
-			recentExpenseCount: recentExpenses.length,
-			avgMpg: Math.round(avgMpg * 10) / 10,
-			currentMileage,
-			costPerMile: Math.round(costPerMile * 100) / 100,
-			trend: Math.round(trend),
-			lastExpenseDate:
-				expenses.length > 0
-					? new Date(Math.max(...expenses.map(e => new Date(e.date).getTime())))
-					: null,
-			lastMaintenanceDate,
-			daysSinceLastMaintenance,
-			maintenanceCount: maintenanceExpenses.length
-		};
-	}
-
-	import { formatCurrency, formatRelativeTime } from '$lib/utils/formatters';
-	import { getVehicleDisplayName, getFinancingProgress } from '$lib/utils/vehicle-helpers';
-	import {
-		MAINTENANCE_THRESHOLDS,
-		VEHICLE_AGE_THRESHOLDS,
-		EXPENSE_PERIODS
-	} from '$lib/constants/limits';
-
-	function navigateToVehicle(vehicleId: string) {
-		goto(`/vehicles/${vehicleId}`);
+	function handlePeriodChange(period: TimePeriod) {
+		selectedPeriod = period;
 	}
 </script>
 
@@ -278,10 +217,10 @@
 	<!-- Header -->
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<div>
-			<h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-			<p class="text-gray-600">
-				{#if appState.vehicles.length > 0}
-					Manage your vehicle fleet and track expenses
+			<h1 class="text-3xl font-bold tracking-tight">Dashboard</h1>
+			<p class="text-muted-foreground mt-1">
+				{#if stats.totalVehicles > 0}
+					Overview of your {stats.totalVehicles} vehicle{stats.totalVehicles !== 1 ? 's' : ''}
 				{:else}
 					Welcome! Get started by adding your first vehicle
 				{/if}
@@ -289,385 +228,42 @@
 		</div>
 	</div>
 
-	<!-- Dashboard Statistics -->
-	{#if !appState.isLoading && appState.vehicles.length > 0}
-		<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-			<div class="card-compact">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-600">Total Vehicles</p>
-						<p class="text-2xl font-bold text-gray-900">{dashboardStats.totalVehicles}</p>
-					</div>
-					<Car class="h-8 w-8 text-primary-600" />
-				</div>
-			</div>
+	<!-- Stats Cards -->
+	<DashboardStatsCards
+		totalVehicles={stats.totalVehicles}
+		totalExpenses={stats.totalExpenses}
+		monthlyAverage={stats.monthlyAverage}
+		activeFinancing={stats.activeFinancing}
+		{isLoading}
+	/>
 
-			<div class="card-compact">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-600">Active Loans</p>
-						<p class="text-2xl font-bold text-gray-900">{dashboardStats.activeLoans}</p>
-					</div>
-					<DollarSign class="h-8 w-8 text-orange-600" />
-				</div>
-			</div>
-
-			<div class="card-compact">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-600">Last 30 Days</p>
-						<p class="text-2xl font-bold text-gray-900">
-							{formatCurrency(dashboardStats.totalRecentExpenses)}
-						</p>
-					</div>
-					<TrendingUp class="h-8 w-8 text-green-600" />
-				</div>
-			</div>
-
-			<div class="card-compact">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-600">Avg per Vehicle</p>
-						<p class="text-2xl font-bold text-gray-900">
-							{formatCurrency(dashboardStats.averageExpensePerVehicle)}
-						</p>
-					</div>
-					<Gauge class="h-8 w-8 text-blue-600" />
-				</div>
-			</div>
-		</div>
+	<!-- Fleet Overview Table -->
+	{#if stats.totalVehicles > 0}
+		<FleetOverviewTable vehicles={vehicleDetails} {isLoading} />
 	{/if}
 
-	<!-- Search and Filters -->
-	<div class="flex flex-col sm:flex-row gap-4">
-		<div class="relative flex-1">
-			<Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-			<Input type="text" placeholder="Search vehicles..." class="pl-10" bind:value={searchTerm} />
-		</div>
-
-		<div class="flex gap-2">
-			<select class="form-input min-w-0 sm:min-w-[140px]" bind:value={selectedFilter}>
-				<option value="all">All Vehicles</option>
-				<option value="recent">Recently Added</option>
-				<option value="with-loans">With Loans</option>
-			</select>
-
-			<button class="btn btn-secondary inline-flex items-center gap-2 desktop-only">
-				<ListFilter class="h-4 w-4" />
-				More Filters
-			</button>
-		</div>
-	</div>
-
-	<!-- Vehicles Grid -->
-	{#if appState.isLoading}
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-			{#each Array(6) as _}
-				<div class="card animate-pulse">
-					<div class="h-4 bg-gray-200 rounded mb-2"></div>
-					<div class="h-3 bg-gray-200 rounded mb-4 w-3/4"></div>
-					<div class="h-3 bg-gray-200 rounded mb-2 w-1/2"></div>
-					<div class="h-3 bg-gray-200 rounded w-2/3"></div>
-				</div>
-			{/each}
-		</div>
-	{:else if filteredVehicles.length === 0}
-		{#if searchTerm}
-			<Empty>
-				<EmptyHeader>
-					<EmptyMedia>
-						<Search class="h-12 w-12 text-muted-foreground" />
-					</EmptyMedia>
-					<EmptyTitle>No vehicles found</EmptyTitle>
-					<EmptyDescription>
-						Try adjusting your search terms to find what you're looking for.
-					</EmptyDescription>
-				</EmptyHeader>
-				<EmptyContent>
-					<Button onclick={() => (searchTerm = '')} variant="outline">Clear Search</Button>
-				</EmptyContent>
-			</Empty>
-		{:else}
-			<Empty>
-				<EmptyHeader>
-					<EmptyMedia>
-						<Car class="h-12 w-12 text-muted-foreground" />
-					</EmptyMedia>
-					<EmptyTitle>No vehicles yet</EmptyTitle>
-					<EmptyDescription>
-						Add your first vehicle to start tracking expenses and maintenance.
-					</EmptyDescription>
-				</EmptyHeader>
-				<EmptyContent>
-					<Button href="/vehicles/new" class="inline-flex items-center gap-2">
-						<Plus class="h-4 w-4" />
-						Add First Vehicle
-					</Button>
-				</EmptyContent>
-			</Empty>
-		{/if}
-	{:else}
-		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-			{#each filteredVehicles as vehicle}
-				{@const stats = vehicleStats[vehicle.id]}
-				{#if stats}
-					<div
-						class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 group relative overflow-hidden border border-gray-100"
-					>
-						<!-- Gradient accent bar -->
-						<div
-							class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 to-primary-600"
-						></div>
-
-						<!-- Clickable card area -->
-						<div
-							class="cursor-pointer"
-							onclick={() => navigateToVehicle(vehicle.id)}
-							role="button"
-							tabindex="0"
-							onkeydown={e => e.key === 'Enter' && navigateToVehicle(vehicle.id)}
-						>
-							<!-- Vehicle Header -->
-							<div class="flex items-start justify-between mb-4">
-								<div class="flex-1 min-w-0">
-									<div class="flex items-center gap-2 mb-1">
-										<h3 class="font-bold text-gray-900 text-lg truncate">
-											{getVehicleDisplayName(vehicle)}
-										</h3>
-										{#if vehicle.financing?.isActive}
-											<span
-												class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800"
-												title="Active {vehicle.financing.financingType === 'loan'
-													? 'Loan'
-													: vehicle.financing.financingType === 'lease'
-														? 'Lease'
-														: 'Financing'}"
-											>
-												{vehicle.financing.financingType === 'loan'
-													? 'Loan'
-													: vehicle.financing.financingType === 'lease'
-														? 'Lease'
-														: 'Financed'}
-											</span>
-										{/if}
-									</div>
-									<p class="text-sm text-gray-600 font-medium mb-1">
-										{vehicle.year}
-										{vehicle.make}
-										{vehicle.model}
-									</p>
-									{#if vehicle.licensePlate}
-										<p
-											class="text-xs text-gray-500 font-mono bg-gray-100 inline-block px-2 py-0.5 rounded"
-										>
-											{vehicle.licensePlate}
-										</p>
-									{/if}
-								</div>
-								<div class="flex-shrink-0 ml-3">
-									<div
-										class="p-3 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 group-hover:from-primary-100 group-hover:to-primary-200 transition-all"
-									>
-										<Car class="h-6 w-6 text-primary-600" />
-									</div>
-								</div>
-							</div>
-
-							<!-- Key Metrics - Prominent Display -->
-							<div class="grid grid-cols-2 gap-3 mb-4">
-								<!-- Total Expenses -->
-								<div
-									class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border border-blue-200"
-								>
-									<div class="flex items-center gap-1 mb-1">
-										<DollarSign class="h-3.5 w-3.5 text-blue-600" />
-										<p class="text-xs font-medium text-blue-900">Total Spent</p>
-									</div>
-									<p class="font-bold text-gray-900 text-lg">
-										{formatCurrency(stats.totalExpenses)}
-									</p>
-								</div>
-
-								<!-- Recent Expenses with Trend -->
-								<div
-									class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 border border-green-200"
-								>
-									<div class="flex items-center gap-1 mb-1">
-										<TrendingUp class="h-3.5 w-3.5 text-green-600" />
-										<p class="text-xs font-medium text-green-900">Last 30 Days</p>
-									</div>
-									<div class="flex items-baseline gap-2">
-										<p class="font-bold text-gray-900 text-lg">
-											{formatCurrency(stats.recentExpenses)}
-										</p>
-										{#if stats.trend !== 0}
-											<span
-												class="text-xs font-semibold {stats.trend > 0
-													? 'text-red-600'
-													: 'text-green-600'}"
-											>
-												{stats.trend > 0 ? '+' : ''}{stats.trend}%
-											</span>
-										{/if}
-									</div>
-								</div>
-
-								<!-- MPG or Expense Count -->
-								{#if stats.avgMpg > 0}
-									<div
-										class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 border border-purple-200"
-									>
-										<div class="flex items-center gap-1 mb-1">
-											<Fuel class="h-3.5 w-3.5 text-purple-600" />
-											<p class="text-xs font-medium text-purple-900">Avg MPG</p>
-										</div>
-										<p class="font-bold text-gray-900 text-lg">{stats.avgMpg}</p>
-									</div>
-								{:else}
-									<div
-										class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-3 border border-gray-200"
-									>
-										<div class="flex items-center gap-1 mb-1">
-											<Gauge class="h-3.5 w-3.5 text-gray-600" />
-											<p class="text-xs font-medium text-gray-900">Expenses</p>
-										</div>
-										<p class="font-bold text-gray-900 text-lg">{stats.expenseCount}</p>
-									</div>
-								{/if}
-
-								<!-- Cost per Mile or Last Activity -->
-								{#if stats.costPerMile > 0}
-									<div
-										class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 border border-orange-200"
-									>
-										<div class="flex items-center gap-1 mb-1">
-											<Gauge class="h-3.5 w-3.5 text-orange-600" />
-											<p class="text-xs font-medium text-orange-900">Cost/Mile</p>
-										</div>
-										<p class="font-bold text-gray-900 text-lg">
-											${stats.costPerMile.toFixed(2)}
-										</p>
-									</div>
-								{:else}
-									<div
-										class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-3 border border-gray-200"
-									>
-										<div class="flex items-center gap-1 mb-1">
-											<Calendar class="h-3.5 w-3.5 text-gray-600" />
-											<p class="text-xs font-medium text-gray-900">Last Activity</p>
-										</div>
-										<p class="font-semibold text-gray-900 text-sm">
-											{formatRelativeTime(stats.lastExpenseDate)}
-										</p>
-									</div>
-								{/if}
-							</div>
-
-							<!-- Additional Details - Always Visible -->
-							<div class="space-y-2 mb-4">
-								<!-- Current Mileage -->
-								{#if stats.currentMileage > 0}
-									<div class="flex items-center justify-between text-sm">
-										<span class="text-gray-600 flex items-center gap-1.5">
-											<Gauge class="h-3.5 w-3.5" />
-											Current Mileage
-										</span>
-										<span class="text-gray-900 font-semibold">
-											{stats.currentMileage.toLocaleString()} mi
-										</span>
-									</div>
-								{/if}
-
-								<!-- Maintenance Info -->
-								{#if stats.daysSinceLastMaintenance !== null && stats.daysSinceLastMaintenance <= MAINTENANCE_THRESHOLDS.DUE_SOON}
-									<div class="flex items-center justify-between text-sm">
-										<span class="text-gray-600 flex items-center gap-1.5">
-											<Wrench class="h-3.5 w-3.5" />
-											Last Service
-										</span>
-										<span class="text-gray-900 font-medium">
-											{formatRelativeTime(stats.lastMaintenanceDate)}
-										</span>
-									</div>
-								{/if}
-
-								<!-- Loan Progress -->
-								{#if vehicle.financing?.isActive}
-									{@const progressValue = getFinancingProgress(vehicle)}
-									<div class="pt-2 border-t border-gray-100">
-										<div class="flex items-center justify-between text-sm mb-2">
-											<span class="text-gray-600">Loan Balance</span>
-											<span class="text-gray-900 font-semibold">
-												{formatCurrency(vehicle.financing.currentBalance)}
-											</span>
-										</div>
-										<div class="flex justify-between text-xs text-gray-600 mb-1">
-											<span>Progress</span>
-											<span>{Math.round(progressValue)}% paid</span>
-										</div>
-										<Progress value={progressValue} class="h-1.5" />
-									</div>
-								{/if}
-							</div>
-
-							<!-- Maintenance Alert -->
-							{#if stats.daysSinceLastMaintenance !== null && stats.daysSinceLastMaintenance > MAINTENANCE_THRESHOLDS.DUE_SOON}
-								<div class="mb-4">
-									{#if stats.daysSinceLastMaintenance > MAINTENANCE_THRESHOLDS.OVERDUE}
-										<div
-											class="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg"
-										>
-											<CircleAlert class="h-4 w-4 text-red-600 flex-shrink-0" />
-											<p class="text-xs text-red-800 font-medium">
-												Maintenance overdue ({stats.daysSinceLastMaintenance} days)
-											</p>
-										</div>
-									{:else}
-										<div
-											class="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg"
-										>
-											<Wrench class="h-4 w-4 text-yellow-600 flex-shrink-0" />
-											<p class="text-xs text-yellow-800 font-medium">
-												Maintenance due soon ({stats.daysSinceLastMaintenance} days)
-											</p>
-										</div>
-									{/if}
-								</div>
-							{/if}
-						</div>
-
-						<!-- Action Button - Outside clickable area for better UX -->
-						<div class="pt-3 border-t border-gray-100">
-							<a
-								href="/vehicles/{vehicle.id}/expenses/new"
-								class="btn btn-primary w-full text-center text-sm inline-flex items-center justify-center gap-2 group/btn hover:scale-[1.02] active:scale-[0.98] transition-transform"
-								onclick={e => e.stopPropagation()}
-							>
-								<Plus class="h-4 w-4 group-hover/btn:rotate-90 transition-transform duration-300" />
-								<span class="font-semibold">Add Expense</span>
-							</a>
-						</div>
-					</div>
-				{/if}
-			{/each}
-		</div>
+	<!-- Period Selector -->
+	{#if stats.totalVehicles > 0}
+		<PeriodSelector {selectedPeriod} {isLoading} onPeriodChange={handlePeriodChange} />
 	{/if}
 
-	<!-- Floating Action Button -->
-	<Button
-		href="/vehicles/new"
-		class="
-			fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full
-			sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto
-			flex items-center justify-center gap-2 pl-6 pr-10
-			bg-gray-900 hover:bg-gray-800
-			text-white shadow-2xl hover:shadow-gray-900/50
-			transition-all duration-300 sm:hover:scale-110
-			border-0 group
-		"
-		aria-label="Add vehicle"
-	>
-		<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
-		<span class="font-bold text-lg">Add Vehicle</span>
-	</Button>
+	<!-- Charts Row -->
+	{#if stats.totalVehicles > 0}
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			<MonthlyTrendChart data={trendChartData} {isLoading} />
+			<CategoryBreakdownChart data={categoryChartData} {isLoading} />
+		</div>
+
+		<!-- Recent Activity -->
+		<RecentActivityCard expenses={recentExpenses} {isLoading} />
+	{/if}
 </div>
+
+<Button
+	href="/vehicles/new"
+	class="fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto flex items-center justify-center gap-2 pl-6 pr-10 bg-gray-900 hover:bg-gray-800 text-white shadow-2xl hover:shadow-gray-900/50 transition-all duration-300 sm:hover:scale-110 border-0 group"
+	aria-label="Add vehicle"
+>
+	<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
+	<span class="font-bold text-lg">Add Vehicle</span>
+</Button>

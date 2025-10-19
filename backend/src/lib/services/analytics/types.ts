@@ -4,7 +4,7 @@ export type ExpenseData = {
   amount: number;
   category: string;
   type?: string | null;
-  tags?: string | null;
+  tags?: string[] | null;
   date: Date;
   description?: string | null;
   mileage?: number | null;

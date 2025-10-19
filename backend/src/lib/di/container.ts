@@ -61,4 +61,67 @@ container
 // Bind services in transient scope (new instance per request)
 container.bind<AnalyticsService>(TYPES.AnalyticsService).to(AnalyticsService);
 
+// Helper function to rebind database for testing
+export function rebindDatabase(testDb: BunSQLiteDatabase<Record<string, unknown>>) {
+  // Unbind existing database binding
+  if (container.isBound(TYPES.Database)) {
+    container.unbind(TYPES.Database);
+  }
+
+  // Bind new database
+  container
+    .bind<BunSQLiteDatabase<Record<string, unknown>>>(TYPES.Database)
+    .toConstantValue(testDb);
+
+  // Unbind all singleton repositories so they get recreated with new database
+  if (container.isBound(TYPES.UserRepository)) {
+    container.unbind(TYPES.UserRepository);
+  }
+  if (container.isBound(TYPES.VehicleRepository)) {
+    container.unbind(TYPES.VehicleRepository);
+  }
+  if (container.isBound(TYPES.ExpenseRepository)) {
+    container.unbind(TYPES.ExpenseRepository);
+  }
+  if (container.isBound(TYPES.InsurancePolicyRepository)) {
+    container.unbind(TYPES.InsurancePolicyRepository);
+  }
+  if (container.isBound(TYPES.VehicleFinancingRepository)) {
+    container.unbind(TYPES.VehicleFinancingRepository);
+  }
+  if (container.isBound(TYPES.VehicleFinancingPaymentRepository)) {
+    container.unbind(TYPES.VehicleFinancingPaymentRepository);
+  }
+  if (container.isBound(TYPES.VehicleShareRepository)) {
+    container.unbind(TYPES.VehicleShareRepository);
+  }
+
+  // Rebind repositories with new database
+  container.bind<IUserRepository>(TYPES.UserRepository).to(UserRepository).inSingletonScope();
+  container
+    .bind<IVehicleRepository>(TYPES.VehicleRepository)
+    .to(VehicleRepository)
+    .inSingletonScope();
+  container
+    .bind<IExpenseRepository>(TYPES.ExpenseRepository)
+    .to(ExpenseRepository)
+    .inSingletonScope();
+  container
+    .bind<IInsurancePolicyRepository>(TYPES.InsurancePolicyRepository)
+    .to(InsurancePolicyRepository)
+    .inSingletonScope();
+  container
+    .bind<IVehicleFinancingRepository>(TYPES.VehicleFinancingRepository)
+    .to(VehicleFinancingRepository)
+    .inSingletonScope();
+  container
+    .bind<IVehicleFinancingPaymentRepository>(TYPES.VehicleFinancingPaymentRepository)
+    .to(VehicleFinancingPaymentRepository)
+    .inSingletonScope();
+  container
+    .bind<IVehicleShareRepository>(TYPES.VehicleShareRepository)
+    .to(VehicleShareRepository)
+    .inSingletonScope();
+}
+
 export { container };

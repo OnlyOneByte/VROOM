@@ -643,7 +643,7 @@ describe('Google Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 45.5,
             currency: 'USD',
@@ -655,7 +655,7 @@ describe('Google Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['oil-change']),
+            tags: ['oil-change'],
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',

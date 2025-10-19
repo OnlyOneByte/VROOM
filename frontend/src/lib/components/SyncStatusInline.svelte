@@ -3,7 +3,10 @@
 	import { syncStatus, isOnline, offlineExpenses } from '$lib/stores/offline';
 	import {
 		syncManager,
-		lastSyncTime,
+		lastBackupTime,
+		lastSheetsSync,
+		googleDriveBackupEnabled,
+		googleSheetsSyncEnabled,
 		syncConflicts,
 		fetchLastSyncTime
 	} from '$lib/utils/sync-manager';
@@ -109,11 +112,21 @@
 				</div>
 			{/if}
 
-			<!-- Last sync -->
-			<div class="flex items-center justify-between text-xs">
-				<span class="text-gray-500">Last sync</span>
-				<span class="text-gray-700">{formatCompactRelativeTime($lastSyncTime)}</span>
-			</div>
+			<!-- Last backup (Google Drive) -->
+			{#if $googleDriveBackupEnabled}
+				<div class="flex items-center justify-between text-xs">
+					<span class="text-gray-500">Last backup</span>
+					<span class="text-gray-700">{formatCompactRelativeTime($lastBackupTime)}</span>
+				</div>
+			{/if}
+
+			<!-- Last sync (Google Sheets) -->
+			{#if $googleSheetsSyncEnabled}
+				<div class="flex items-center justify-between text-xs">
+					<span class="text-gray-500">Last sync</span>
+					<span class="text-gray-700">{formatCompactRelativeTime($lastSheetsSync)}</span>
+				</div>
+			{/if}
 
 			<!-- Sync button -->
 			{#if $isOnline && pendingCount > 0}

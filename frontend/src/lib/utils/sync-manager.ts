@@ -38,6 +38,10 @@ export const syncConfig = writable({
 export const syncQueue = writable<OfflineExpense[]>([]);
 export const syncConflicts = writable<SyncConflict[]>([]);
 export const lastSyncTime = writable<Date | null>(null);
+export const lastBackupTime = writable<Date | null>(null);
+export const lastSheetsSync = writable<Date | null>(null);
+export const googleDriveBackupEnabled = writable<boolean>(false);
+export const googleSheetsSyncEnabled = writable<boolean>(false);
 
 // Fetch last sync time from server
 export async function fetchLastSyncTime(): Promise<void> {
@@ -48,14 +52,20 @@ export async function fetchLastSyncTime(): Promise<void> {
 
 		if (response.ok) {
 			const result = await response.json();
-			if (result.success && result.status) {
-				// Use lastSyncDate (Google Sheets sync) or lastBackupDate (Google Drive backup)
-				// Prefer the most recent one
-				const syncDate = result.status.lastSyncDate ? new Date(result.status.lastSyncDate) : null;
-				const backupDate = result.status.lastBackupDate
-					? new Date(result.status.lastBackupDate)
-					: null;
+			if (result.success && result.data) {
+				// Store individual sync times
+				const syncDate = result.data.lastSyncDate ? new Date(result.data.lastSyncDate) : null;
+				const backupDate = result.data.lastBackupDate ? new Date(result.data.lastBackupDate) : null;
 
+				// Update individual stores
+				lastSheetsSync.set(syncDate);
+				lastBackupTime.set(backupDate);
+
+				// Update enabled states
+				googleSheetsSyncEnabled.set(result.data.googleSheetsSyncEnabled || false);
+				googleDriveBackupEnabled.set(result.data.googleDriveBackupEnabled || false);
+
+				// For backwards compatibility, set lastSyncTime to most recent
 				let mostRecentSync: Date | null = null;
 				if (syncDate && backupDate) {
 					mostRecentSync = syncDate > backupDate ? syncDate : backupDate;

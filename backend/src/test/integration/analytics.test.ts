@@ -17,7 +17,7 @@ import { assertSuccessResponse, getDb, getTypedResponse } from '../utils/test-he
 // Test app setup
 const testApp = new Hono();
 testApp.onError(errorHandler);
-testApp.route('/api/analytics', analyticsRoutes);
+testApp.route('/api/v1/analytics', analyticsRoutes);
 
 describe('Analytics API Integration Tests', () => {
   let _db: ReturnType<typeof getTestDatabase>;
@@ -81,7 +81,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 45.5,
             currency: 'USD',
@@ -92,7 +92,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 48.75,
             currency: 'USD',
@@ -103,7 +103,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 52.25,
             currency: 'USD',
@@ -113,7 +113,7 @@ describe('Analytics API Integration Tests', () => {
           },
         ]);
 
-      const req = new Request(`http://localhost:3001/api/analytics/vehicle/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/analytics/vehicle/${testVehicleId}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -139,7 +139,7 @@ describe('Analytics API Integration Tests', () => {
     });
 
     test('should handle vehicle with no fuel expenses', async () => {
-      const req = new Request(`http://localhost:3001/api/analytics/vehicle/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/analytics/vehicle/${testVehicleId}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -177,7 +177,7 @@ describe('Analytics API Integration Tests', () => {
           .values({
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: entry.amount,
             currency: 'USD',
@@ -187,7 +187,7 @@ describe('Analytics API Integration Tests', () => {
           });
       }
 
-      const req = new Request(`http://localhost:3001/api/analytics/vehicle/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/analytics/vehicle/${testVehicleId}`, {
         headers: { Cookie: sessionCookie },
       });
 
@@ -219,7 +219,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 45.5,
             currency: 'USD',
@@ -229,7 +229,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['maintenance']),
+            tags: ['maintenance'],
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
@@ -239,7 +239,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['insurance']),
+            tags: ['insurance'],
             category: 'financial',
             amount: 150.0,
             currency: 'USD',
@@ -248,7 +248,7 @@ describe('Analytics API Integration Tests', () => {
           },
         ]);
 
-      const req = new Request(`http://localhost:3001/api/analytics/vehicle/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/analytics/vehicle/${testVehicleId}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -278,7 +278,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 150.0,
             currency: 'USD',
@@ -288,7 +288,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['tolls']),
+            tags: ['tolls'],
             category: 'fuel',
             amount: 25.0,
             currency: 'USD',
@@ -298,7 +298,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['maintenance']),
+            tags: ['maintenance'],
             category: 'maintenance',
             amount: 200.0,
             currency: 'USD',
@@ -308,7 +308,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['oil-change']),
+            tags: ['oil-change'],
             category: 'maintenance',
             amount: 65.0,
             currency: 'USD',
@@ -318,7 +318,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['insurance']),
+            tags: ['insurance'],
             category: 'financial',
             amount: 200.0,
             currency: 'USD',
@@ -328,7 +328,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['registration']),
+            tags: ['registration'],
             category: 'regulatory',
             amount: 125.0,
             currency: 'USD',
@@ -337,7 +337,7 @@ describe('Analytics API Integration Tests', () => {
           },
         ]);
 
-      const req = new Request(`http://localhost:3001/api/analytics/vehicle/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/analytics/vehicle/${testVehicleId}`, {
         headers: { Cookie: sessionCookie },
       });
 
@@ -377,7 +377,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 150.0,
             currency: 'USD',
@@ -387,7 +387,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['maintenance']),
+            tags: ['maintenance'],
             category: 'maintenance',
             amount: 200.0,
             currency: 'USD',
@@ -397,7 +397,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 160.0,
             currency: 'USD',
@@ -407,7 +407,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['insurance']),
+            tags: ['insurance'],
             category: 'financial',
             amount: 200.0,
             currency: 'USD',
@@ -416,7 +416,7 @@ describe('Analytics API Integration Tests', () => {
           },
         ]);
 
-      const req = new Request(`http://localhost:3001/api/analytics/vehicle/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/analytics/vehicle/${testVehicleId}`, {
         headers: { Cookie: sessionCookie },
       });
 
@@ -450,7 +450,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 45.5,
             currency: 'USD',
@@ -461,7 +461,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['maintenance']),
+            tags: ['maintenance'],
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
@@ -469,7 +469,7 @@ describe('Analytics API Integration Tests', () => {
           },
         ]);
 
-      const req = new Request('http://localhost:3001/api/analytics/dashboard', {
+      const req = new Request('http://localhost:3001/api/v1/analytics/dashboard', {
         headers: {
           Cookie: sessionCookie,
         },
@@ -499,7 +499,7 @@ describe('Analytics API Integration Tests', () => {
     });
 
     test('should handle dashboard with no data', async () => {
-      const req = new Request('http://localhost:3001/api/analytics/dashboard', {
+      const req = new Request('http://localhost:3001/api/v1/analytics/dashboard', {
         headers: {
           Cookie: sessionCookie,
         },
@@ -527,7 +527,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 45.5,
             currency: 'USD',
@@ -538,7 +538,7 @@ describe('Analytics API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['maintenance']),
+            tags: ['maintenance'],
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
@@ -546,7 +546,7 @@ describe('Analytics API Integration Tests', () => {
           },
         ]);
 
-      const req = new Request('http://localhost:3001/api/analytics/trends', {
+      const req = new Request('http://localhost:3001/api/v1/analytics/trends', {
         headers: {
           Cookie: sessionCookie,
         },

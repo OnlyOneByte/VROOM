@@ -666,44 +666,64 @@
 							</div>
 						{/if}
 
-						<!-- Inactivity Timeout (shown if either sync is enabled) -->
+						<!-- Auto-Sync Settings (shown if either sync is enabled) -->
 						{#if googleDriveBackupEnabled || googleSheetsSyncEnabled}
-							<div class="space-y-2 pl-6">
-								<Label for="inactivity-minutes">Auto-sync after inactivity</Label>
-								<Select.Root
-									type="single"
-									value={syncInactivityMinutes.toString()}
-									onValueChange={v => {
-										if (v) {
-											syncInactivityMinutes = parseInt(v);
-										}
-									}}
-								>
-									<Select.Trigger id="inactivity-minutes" class="w-full">
-										{syncInactivityMinutes}
-										{syncInactivityMinutes === 1 ? 'minute' : 'minutes'}
-									</Select.Trigger>
-									<Select.Content>
-										<Select.Item value="1" label="1 minute">1 minute</Select.Item>
-										<Select.Item value="2" label="2 minutes">2 minutes</Select.Item>
-										<Select.Item value="5" label="5 minutes">5 minutes</Select.Item>
-										<Select.Item value="10" label="10 minutes">10 minutes</Select.Item>
-										<Select.Item value="15" label="15 minutes">15 minutes</Select.Item>
-										<Select.Item value="30" label="30 minutes">30 minutes</Select.Item>
-									</Select.Content>
-								</Select.Root>
-							</div>
+							<div class="border-t pt-6 space-y-4">
+								<div class="space-y-1">
+									<Label for="inactivity-minutes" class="text-base font-semibold">
+										Automatic Sync Settings
+									</Label>
+									<p class="text-sm text-gray-500">
+										Automatically sync your data after a period of inactivity. This applies to both
+										Google Drive backups and Google Sheets sync when enabled.
+									</p>
+								</div>
 
-							<!-- Sync Now Button -->
-							<div class="pl-6 space-y-2">
-								<Button variant="outline" onclick={handleSyncNowClick} class="w-full">
-									<RefreshCw class="mr-2 h-4 w-4" />
-									Sync Now
-								</Button>
-								<Button variant="outline" onclick={handleReauthenticate} class="w-full">
-									<RefreshCw class="mr-2 h-4 w-4" />
-									Re-authenticate with Google
-								</Button>
+								<div class="space-y-2">
+									<Label for="inactivity-minutes" class="text-sm">
+										Trigger sync after inactivity
+									</Label>
+									<Select.Root
+										type="single"
+										value={syncInactivityMinutes.toString()}
+										onValueChange={v => {
+											if (v) {
+												syncInactivityMinutes = parseInt(v);
+											}
+										}}
+									>
+										<Select.Trigger id="inactivity-minutes" class="w-full">
+											{syncInactivityMinutes}
+											{syncInactivityMinutes === 1 ? 'minute' : 'minutes'}
+										</Select.Trigger>
+										<Select.Content>
+											<Select.Item value="1" label="1 minute">1 minute</Select.Item>
+											<Select.Item value="2" label="2 minutes">2 minutes</Select.Item>
+											<Select.Item value="5" label="5 minutes">5 minutes</Select.Item>
+											<Select.Item value="10" label="10 minutes">10 minutes</Select.Item>
+											<Select.Item value="15" label="15 minutes">15 minutes</Select.Item>
+											<Select.Item value="30" label="30 minutes">30 minutes</Select.Item>
+										</Select.Content>
+									</Select.Root>
+									<p class="text-xs text-gray-500">
+										Sync will trigger automatically after this period of no activity
+									</p>
+								</div>
+
+								<!-- Manual Sync Actions -->
+								<div class="space-y-2">
+									<Label class="text-sm">Manual Actions</Label>
+									<div class="space-y-2">
+										<Button variant="outline" onclick={handleSyncNowClick} class="w-full">
+											<RefreshCw class="mr-2 h-4 w-4" />
+											Sync Now
+										</Button>
+										<Button variant="outline" onclick={handleReauthenticate} class="w-full">
+											<RefreshCw class="mr-2 h-4 w-4" />
+											Re-authenticate with Google
+										</Button>
+									</div>
+								</div>
 							</div>
 						{/if}
 					</div>

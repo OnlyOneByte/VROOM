@@ -185,6 +185,19 @@ export class DriveSync {
         folderStructure.subFolders.backups.id
       );
 
+      // If existing backups found, update lastBackupDate with the most recent one
+      if (existingBackups.length > 0) {
+        const mostRecentBackup = existingBackups[0]; // Already sorted by modifiedTime descending
+        if (mostRecentBackup.modifiedTime) {
+          const lastBackupDate = new Date(mostRecentBackup.modifiedTime);
+          await this.settingsRepository.updateLastBackupDateWithTime(userId, lastBackupDate);
+          logger.info('Updated lastBackupDate from existing backup', {
+            userId,
+            lastBackupDate: lastBackupDate.toISOString(),
+          });
+        }
+      }
+
       logger.info('Google Drive folder structure initialized', {
         userId,
         backupCount: existingBackups.length,
@@ -299,6 +312,19 @@ export class DriveSync {
 
       const existingBackups = await this.listBackupsInDrive(driveService, backupFolderId);
 
+      // Update lastBackupDate if we found backups
+      if (existingBackups.length > 0) {
+        const mostRecentBackup = existingBackups[0]; // Already sorted by modifiedTime descending
+        if (mostRecentBackup.modifiedTime) {
+          const lastBackupDate = new Date(mostRecentBackup.modifiedTime);
+          await this.settingsRepository.updateLastBackupDateWithTime(userId, lastBackupDate);
+          logger.info('Updated lastBackupDate from existing backup folder', {
+            userId,
+            lastBackupDate: lastBackupDate.toISOString(),
+          });
+        }
+      }
+
       return {
         hasBackupFolder: true,
         backupFolderId,
@@ -341,6 +367,19 @@ export class DriveSync {
 
       // Update settings with found folder
       await this.settingsRepository.updateBackupFolderId(userId, backupFolderId);
+
+      // Update lastBackupDate if we found backups
+      if (existingBackups.length > 0) {
+        const mostRecentBackup = existingBackups[0]; // Already sorted by modifiedTime descending
+        if (mostRecentBackup.modifiedTime) {
+          const lastBackupDate = new Date(mostRecentBackup.modifiedTime);
+          await this.settingsRepository.updateLastBackupDateWithTime(userId, lastBackupDate);
+          logger.info('Updated lastBackupDate from search', {
+            userId,
+            lastBackupDate: lastBackupDate.toISOString(),
+          });
+        }
+      }
 
       return {
         hasBackupFolder: true,

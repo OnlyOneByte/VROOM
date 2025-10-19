@@ -83,6 +83,19 @@ export class SettingsRepository {
   }
 
   /**
+   * Update last backup date with a specific date (for pulling from existing backups)
+   */
+  async updateLastBackupDateWithTime(userId: string, backupDate: Date): Promise<void> {
+    await this.db
+      .update(userSettings)
+      .set({
+        lastBackupDate: backupDate,
+        updatedAt: new Date(),
+      })
+      .where(eq(userSettings.userId, userId));
+  }
+
+  /**
    * Update Google Drive backup folder ID
    */
   async updateBackupFolderId(userId: string, folderId: string): Promise<void> {

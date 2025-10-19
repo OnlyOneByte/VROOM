@@ -23,7 +23,7 @@ import { assertSuccessResponse, getDb, getTypedResponse } from '../utils/test-he
 // Test app setup
 const testApp = new Hono();
 testApp.onError(errorHandler);
-testApp.route('/api/expenses', expenseRoutes);
+testApp.route('/api/v1/expenses', expenseRoutes);
 
 describe('Expense Management API Integration Tests', () => {
   let _db: ReturnType<typeof getTestDatabase>;
@@ -91,7 +91,7 @@ describe('Expense Management API Integration Tests', () => {
         description: 'Gas station fill-up',
       };
 
-      const req = new Request(`http://localhost:3001/api/expenses`, {
+      const req = new Request(`http://localhost:3001/api/v1/expenses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -125,7 +125,7 @@ describe('Expense Management API Integration Tests', () => {
         // Missing volume and mileage for fuel expense
       };
 
-      const req = new Request(`http://localhost:3001/api/expenses`, {
+      const req = new Request(`http://localhost:3001/api/v1/expenses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -151,7 +151,7 @@ describe('Expense Management API Integration Tests', () => {
         description: 'Oil change',
       };
 
-      const req = new Request(`http://localhost:3001/api/expenses`, {
+      const req = new Request(`http://localhost:3001/api/v1/expenses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -177,7 +177,7 @@ describe('Expense Management API Integration Tests', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          tags: JSON.stringify(['fuel']),
+          tags: ['fuel'],
           category: 'fuel',
           amount: 45.5,
           currency: 'USD',
@@ -192,7 +192,7 @@ describe('Expense Management API Integration Tests', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          tags: JSON.stringify(['oil-change']),
+          tags: ['oil-change'],
           category: 'maintenance',
           amount: 89.99,
           currency: 'USD',
@@ -201,7 +201,7 @@ describe('Expense Management API Integration Tests', () => {
         })
         .returning();
 
-      const req = new Request(`http://localhost:3001/api/expenses?vehicleId=${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/expenses?vehicleId=${testVehicleId}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -231,7 +231,7 @@ describe('Expense Management API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 45.5,
             currency: 'USD',
@@ -240,7 +240,7 @@ describe('Expense Management API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['maintenance']),
+            tags: ['maintenance'],
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
@@ -249,7 +249,7 @@ describe('Expense Management API Integration Tests', () => {
         ]);
 
       const req = new Request(
-        `http://localhost:3001/api/expenses?vehicleId=${testVehicleId}&tags=fuel`,
+        `http://localhost:3001/api/v1/expenses?vehicleId=${testVehicleId}&tags=fuel`,
         {
           headers: {
             Cookie: sessionCookie,
@@ -278,7 +278,7 @@ describe('Expense Management API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['fuel']),
+            tags: ['fuel'],
             category: 'fuel',
             amount: 45.5,
             currency: 'USD',
@@ -287,7 +287,7 @@ describe('Expense Management API Integration Tests', () => {
           {
             id: createId(),
             vehicleId: testVehicleId,
-            tags: JSON.stringify(['maintenance']),
+            tags: ['maintenance'],
             category: 'maintenance',
             amount: 89.99,
             currency: 'USD',
@@ -296,7 +296,7 @@ describe('Expense Management API Integration Tests', () => {
         ]);
 
       const req = new Request(
-        `http://localhost:3001/api/expenses?vehicleId=${testVehicleId}&startDate=2024-01-01T00:00:00.000Z&endDate=2024-01-31T23:59:59.999Z`,
+        `http://localhost:3001/api/v1/expenses?vehicleId=${testVehicleId}&startDate=2024-01-01T00:00:00.000Z&endDate=2024-01-31T23:59:59.999Z`,
         {
           headers: {
             Cookie: sessionCookie,
@@ -322,7 +322,7 @@ describe('Expense Management API Integration Tests', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          tags: JSON.stringify(['fuel']),
+          tags: ['fuel'],
           category: 'fuel',
           amount: 45.5,
           currency: 'USD',
@@ -333,7 +333,7 @@ describe('Expense Management API Integration Tests', () => {
         })
         .returning();
 
-      const req = new Request(`http://localhost:3001/api/expenses/${expense[0].id}`, {
+      const req = new Request(`http://localhost:3001/api/v1/expenses/${expense[0].id}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -355,7 +355,7 @@ describe('Expense Management API Integration Tests', () => {
     test('should return 404 for non-existent expense', async () => {
       const nonExistentId = createId();
 
-      const req = new Request(`http://localhost:3001/api/expenses/${nonExistentId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/expenses/${nonExistentId}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -374,7 +374,7 @@ describe('Expense Management API Integration Tests', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          tags: JSON.stringify(['oil-change']),
+          tags: ['oil-change'],
           category: 'maintenance',
           amount: 89.99,
           currency: 'USD',
@@ -388,7 +388,7 @@ describe('Expense Management API Integration Tests', () => {
         description: 'Oil change with filter replacement',
       };
 
-      const req = new Request(`http://localhost:3001/api/expenses/${expense[0].id}`, {
+      const req = new Request(`http://localhost:3001/api/v1/expenses/${expense[0].id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -417,7 +417,7 @@ describe('Expense Management API Integration Tests', () => {
         .values({
           id: createId(),
           vehicleId: testVehicleId,
-          tags: JSON.stringify(['maintenance']),
+          tags: ['maintenance'],
           category: 'maintenance',
           amount: 89.99,
           currency: 'USD',
@@ -425,7 +425,7 @@ describe('Expense Management API Integration Tests', () => {
         })
         .returning();
 
-      const req = new Request(`http://localhost:3001/api/expenses/${expense[0].id}`, {
+      const req = new Request(`http://localhost:3001/api/v1/expenses/${expense[0].id}`, {
         method: 'DELETE',
         headers: {
           Cookie: sessionCookie,
@@ -440,7 +440,7 @@ describe('Expense Management API Integration Tests', () => {
       expect(data.message).toContain('deleted successfully');
 
       // Verify expense is deleted
-      const checkReq = new Request(`http://localhost:3001/api/expenses/${expense[0].id}`, {
+      const checkReq = new Request(`http://localhost:3001/api/v1/expenses/${expense[0].id}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -451,7 +451,7 @@ describe('Expense Management API Integration Tests', () => {
     });
 
     test('should get expense categories', async () => {
-      const req = new Request('http://localhost:3001/api/expenses/categories', {
+      const req = new Request('http://localhost:3001/api/v1/expenses/categories', {
         headers: {
           Cookie: sessionCookie,
         },

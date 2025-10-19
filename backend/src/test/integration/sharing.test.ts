@@ -19,8 +19,8 @@ import { assertSuccessResponse, getDb, getTypedResponse } from '../utils/test-he
 // Test app setup
 const testApp = new Hono();
 testApp.onError(errorHandler);
-testApp.route('/api/sharing', sharingRoutes);
-testApp.route('/api/vehicles', vehicleRoutes);
+testApp.route('/api/v1/sharing', sharingRoutes);
+testApp.route('/api/v1/vehicles', vehicleRoutes);
 
 describe('Vehicle Sharing System Integration Tests', () => {
   let _db: ReturnType<typeof getTestDatabase>;
@@ -103,7 +103,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
         permission: 'view',
       };
 
-      const req = new Request('http://localhost:3001/api/sharing', {
+      const req = new Request('http://localhost:3001/api/v1/sharing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,7 +135,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
         permission: 'edit',
       };
 
-      const req = new Request('http://localhost:3001/api/sharing', {
+      const req = new Request('http://localhost:3001/api/v1/sharing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -162,7 +162,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
         permission: 'view',
       };
 
-      const req = new Request('http://localhost:3001/api/sharing', {
+      const req = new Request('http://localhost:3001/api/v1/sharing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -185,7 +185,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
         permission: 'view',
       };
 
-      const req = new Request('http://localhost:3001/api/sharing', {
+      const req = new Request('http://localhost:3001/api/v1/sharing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -208,7 +208,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
         permission: 'view',
       };
 
-      const req = new Request('http://localhost:3001/api/sharing', {
+      const req = new Request('http://localhost:3001/api/v1/sharing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -229,7 +229,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
         permission: 'view',
       };
 
-      const req1 = new Request('http://localhost:3001/api/sharing', {
+      const req1 = new Request('http://localhost:3001/api/v1/sharing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -242,7 +242,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
       expect(res1.status).toBe(201);
 
       // Try to create duplicate invitation
-      const req2 = new Request('http://localhost:3001/api/sharing', {
+      const req2 = new Request('http://localhost:3001/api/v1/sharing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -265,7 +265,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
         permission: 'invalid',
       };
 
-      const req = new Request('http://localhost:3001/api/sharing', {
+      const req = new Request('http://localhost:3001/api/v1/sharing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -300,7 +300,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should get pending invitations', async () => {
-      const req = new Request('http://localhost:3001/api/sharing/invitations', {
+      const req = new Request('http://localhost:3001/api/v1/sharing/invitations', {
         headers: {
           Cookie: sharedUserSessionCookie,
         },
@@ -320,7 +320,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should accept share invitation', async () => {
-      const req = new Request(`http://localhost:3001/api/sharing/${shareId}/status`, {
+      const req = new Request(`http://localhost:3001/api/v1/sharing/${shareId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -342,7 +342,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should decline share invitation', async () => {
-      const req = new Request(`http://localhost:3001/api/sharing/${shareId}/status`, {
+      const req = new Request(`http://localhost:3001/api/v1/sharing/${shareId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -371,7 +371,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
         .where(eq(vehicleShares.id, shareId));
 
       // Try to respond again
-      const req = new Request(`http://localhost:3001/api/sharing/${shareId}/status`, {
+      const req = new Request(`http://localhost:3001/api/v1/sharing/${shareId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -388,7 +388,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should reject non-recipient responding to invitation', async () => {
-      const req = new Request(`http://localhost:3001/api/sharing/${shareId}/status`, {
+      const req = new Request(`http://localhost:3001/api/v1/sharing/${shareId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -443,7 +443,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should get shares sent by owner', async () => {
-      const req = new Request('http://localhost:3001/api/sharing/sent', {
+      const req = new Request('http://localhost:3001/api/v1/sharing/sent', {
         headers: {
           Cookie: ownerSessionCookie,
         },
@@ -461,7 +461,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should get vehicles shared with user', async () => {
-      const req = new Request('http://localhost:3001/api/sharing/received', {
+      const req = new Request('http://localhost:3001/api/v1/sharing/received', {
         headers: {
           Cookie: sharedUserSessionCookie,
         },
@@ -480,7 +480,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should get shares for specific vehicle', async () => {
-      const req = new Request(`http://localhost:3001/api/sharing/vehicle/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/sharing/vehicle/${testVehicleId}`, {
         headers: {
           Cookie: ownerSessionCookie,
         },
@@ -498,7 +498,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should reject non-owner viewing vehicle shares', async () => {
-      const req = new Request(`http://localhost:3001/api/sharing/vehicle/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/sharing/vehicle/${testVehicleId}`, {
         headers: {
           Cookie: sharedUserSessionCookie,
         },
@@ -529,7 +529,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should allow owner to delete share', async () => {
-      const req = new Request(`http://localhost:3001/api/sharing/${shareId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/sharing/${shareId}`, {
         method: 'DELETE',
         headers: {
           Cookie: ownerSessionCookie,
@@ -552,7 +552,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should allow shared user to delete share', async () => {
-      const req = new Request(`http://localhost:3001/api/sharing/${shareId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/sharing/${shareId}`, {
         method: 'DELETE',
         headers: {
           Cookie: sharedUserSessionCookie,
@@ -582,7 +582,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
       const otherSession = await lucia.createSession(otherUserId, {});
       const otherSessionCookie = `${lucia.sessionCookieName}=${otherSession.id}`;
 
-      const req = new Request(`http://localhost:3001/api/sharing/${shareId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/sharing/${shareId}`, {
         method: 'DELETE',
         headers: {
           Cookie: otherSessionCookie,
@@ -608,7 +608,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should allow shared user to view vehicle', async () => {
-      const req = new Request(`http://localhost:3001/api/vehicles/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/vehicles/${testVehicleId}`, {
         headers: {
           Cookie: sharedUserSessionCookie,
         },
@@ -626,7 +626,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
     });
 
     test('should list shared vehicles for user', async () => {
-      const req = new Request('http://localhost:3001/api/vehicles', {
+      const req = new Request('http://localhost:3001/api/v1/vehicles', {
         headers: {
           Cookie: sharedUserSessionCookie,
         },
@@ -649,7 +649,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
         nickname: 'Updated Nickname',
       };
 
-      const req = new Request(`http://localhost:3001/api/vehicles/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/vehicles/${testVehicleId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -679,7 +679,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
         nickname: 'Updated by Shared User',
       };
 
-      const req = new Request(`http://localhost:3001/api/vehicles/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/vehicles/${testVehicleId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -709,7 +709,7 @@ describe('Vehicle Sharing System Integration Tests', () => {
             eq(vehicleShares.sharedWithUserId, sharedUserId)
         );
 
-      const req = new Request(`http://localhost:3001/api/vehicles/${testVehicleId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/vehicles/${testVehicleId}`, {
         method: 'DELETE',
         headers: {
           Cookie: sharedUserSessionCookie,
@@ -724,12 +724,12 @@ describe('Vehicle Sharing System Integration Tests', () => {
   describe('Authentication and Authorization', () => {
     test('should require authentication for all sharing operations', async () => {
       const requests = [
-        new Request('http://localhost:3001/api/sharing', { method: 'POST' }),
-        new Request('http://localhost:3001/api/sharing/invitations'),
-        new Request('http://localhost:3001/api/sharing/sent'),
-        new Request('http://localhost:3001/api/sharing/received'),
-        new Request('http://localhost:3001/api/sharing/test-id/status', { method: 'PUT' }),
-        new Request('http://localhost:3001/api/sharing/test-id', { method: 'DELETE' }),
+        new Request('http://localhost:3001/api/v1/sharing', { method: 'POST' }),
+        new Request('http://localhost:3001/api/v1/sharing/invitations'),
+        new Request('http://localhost:3001/api/v1/sharing/sent'),
+        new Request('http://localhost:3001/api/v1/sharing/received'),
+        new Request('http://localhost:3001/api/v1/sharing/test-id/status', { method: 'PUT' }),
+        new Request('http://localhost:3001/api/v1/sharing/test-id', { method: 'DELETE' }),
       ];
 
       for (const req of requests) {

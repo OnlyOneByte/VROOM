@@ -13,26 +13,13 @@ import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
 import { repositoryFactory } from '../lib/repositories/factory';
 
-// Types for expense data (from database)
-type ExpenseDataRaw = {
-  id: string;
-  amount: number;
-  category: string;
-  tags: string | null; // JSON string from database
-  date: Date;
-  description?: string | null;
-  mileage?: number | null;
-  volume?: number | null;
-  charge?: number | null;
-  vehicleId: string;
-};
-
-// Types for expense data (parsed for API)
+// Types for expense data (from database and API)
+// With JSON mode, tags are automatically parsed/stringified
 type ExpenseData = {
   id: string;
   amount: number;
   category: string;
-  tags: string[]; // Parsed array
+  tags: string[]; // Automatically handled by Drizzle JSON mode
   date: Date;
   description?: string | null;
   mileage?: number | null;
@@ -158,42 +145,22 @@ expenses.post('/', zValidator('json', createExpenseSchema), async (c) => {
 
   const newExpense: NewExpense = {
     ...expenseData,
-    tags: serializeExpenseTags(expenseData.tags),
   };
 
   const createdExpense = await expenseRepository.create(newExpense);
 
-  // Parse tags from JSON string for response
-  const parsedExpense = parseExpenseTags(createdExpense as ExpenseDataRaw);
-
   return c.json(
     {
       success: true,
-      data: parsedExpense,
+      data: createdExpense,
       message: 'Expense created successfully',
     },
     201
   );
 });
 
-/**
- * Helper function to parse expense tags from JSON string
- * Centralizes tag parsing logic to avoid repetition
- */
-function parseExpenseTags(expense: ExpenseDataRaw): ExpenseData {
-  return {
-    ...expense,
-    tags: expense.tags ? JSON.parse(expense.tags) : [],
-  };
-}
-
-/**
- * Helper function to serialize expense tags to JSON string
- * Centralizes tag serialization logic
- */
-function serializeExpenseTags(tags: string[] | undefined): string {
-  return JSON.stringify(tags || []);
-}
+// Note: With Drizzle JSON mode, tags are automatically parsed/stringified
+// No need for manual JSON.parse/stringify helper functions
 
 /**
  * Validate fuel expense requirements
@@ -223,34 +190,26 @@ async function fetchVehicleExpenses(
     category?: string;
   }
 ): Promise<ExpenseData[]> {
-  let expenses: ExpenseDataRaw[] = [];
+  let expenses: ExpenseData[] = [];
 
   if (query.startDate && query.endDate) {
     expenses = (await expenseRepository.findByVehicleIdAndDateRange(
       vehicleId,
       query.startDate,
       query.endDate
-    )) as ExpenseDataRaw[];
+    )) as ExpenseData[];
   } else if (query.category) {
-    expenses = (await expenseRepository.findByCategory(
-      vehicleId,
-      query.category
-    )) as ExpenseDataRaw[];
+    expenses = (await expenseRepository.findByCategory(vehicleId, query.category)) as ExpenseData[];
   } else {
-    expenses = (await expenseRepository.findByVehicleId(vehicleId)) as ExpenseDataRaw[];
+    expenses = (await expenseRepository.findByVehicleId(vehicleId)) as ExpenseData[];
   }
-
-  // Parse tags from JSON strings
-  const parsedExpenses = expenses.map(parseExpenseTags);
 
   // Filter by tags if specified
   if (query.tags && query.tags.length > 0) {
-    return parsedExpenses.filter((expense) =>
-      query.tags?.some((tag) => expense.tags.includes(tag))
-    );
+    return expenses.filter((expense) => query.tags?.some((tag) => expense.tags.includes(tag)));
   }
 
-  return parsedExpenses;
+  return expenses;
 }
 
 // GET /api/expenses - Get all expenses for the user (with optional vehicle filter)
@@ -335,12 +294,9 @@ expenses.get('/:id', zValidator('param', expenseParamsSchema), async (c) => {
     throw new NotFoundError('Expense');
   }
 
-  // Parse tags from JSON string
-  const parsedExpense = parseExpenseTags(expense as ExpenseDataRaw);
-
   return c.json({
     success: true,
-    data: parsedExpense,
+    data: expense,
   });
 });
 
@@ -369,12 +325,6 @@ expenses.put(
       throw new NotFoundError('Expense');
     }
 
-    // Parse existing expense tags
-    const parsedExistingExpense = parseExpenseTags(existingExpense as ExpenseDataRaw);
-
-    // Handle tags - merge with existing if provided
-    const tags = updateData.tags !== undefined ? updateData.tags : parsedExistingExpense.tags;
-
     // Validate fuel expense requirements with merged data
     const finalCategory =
       updateData.category !== undefined ? updateData.category : existingExpense.category;
@@ -387,20 +337,11 @@ expenses.put(
 
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalCharge);
 
-    // Convert tags array to JSON string if present
-    const updatePayload: Partial<NewExpense> = {
-      ...updateData,
-      tags: Array.isArray(tags) ? serializeExpenseTags(tags) : tags,
-    };
-
-    const updatedExpense = await expenseRepository.update(id, updatePayload);
-
-    // Parse tags from JSON string for response
-    const parsedUpdatedExpense = parseExpenseTags(updatedExpense as ExpenseDataRaw);
+    const updatedExpense = await expenseRepository.update(id, updateData);
 
     return c.json({
       success: true,
-      data: parsedUpdatedExpense,
+      data: updatedExpense,
       message: 'Expense updated successfully',
     });
   }

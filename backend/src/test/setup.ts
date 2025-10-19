@@ -49,6 +49,14 @@ export function setupTestDatabase() {
   // Configure repositories to use test database
   BaseRepository.setDatabaseInstance(testDb);
 
+  // Configure DI container to use test database
+  try {
+    const { rebindDatabase } = require('../lib/di/container.js');
+    rebindDatabase(testDb);
+  } catch (_error) {
+    // Ignore if module doesn't exist
+  }
+
   // Configure database service to use test database
   try {
     const { databaseService } = require('../lib/database.js');
@@ -72,6 +80,15 @@ export function setupTestDatabase() {
 export function teardownTestDatabase() {
   // Reset repositories to use production database
   BaseRepository.resetDatabaseInstance();
+
+  // Reset DI container to use production database
+  try {
+    const { db } = require('../db/connection.js');
+    const { rebindDatabase } = require('../lib/di/container.js');
+    rebindDatabase(db);
+  } catch (_error) {
+    // Ignore if module doesn't exist
+  }
 
   // Reset database service to use production database
   try {

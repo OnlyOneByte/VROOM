@@ -54,7 +54,7 @@ async function testRepositories() {
     console.log('\n💰 Testing Expense Repository...');
     const testExpense = await expenseRepo.create({
       vehicleId: testVehicle.id,
-      tags: JSON.stringify(['fuel', 'test']),
+      tags: ['fuel', 'test'],
       category: 'fuel',
       amount: 50.0,
       currency: 'USD',

@@ -43,7 +43,6 @@ describe('ExpenseRepository', () => {
       const expenseData = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(testExpenseData.tags),
       };
       const expense = await expenseRepository.create(expenseData);
 
@@ -59,7 +58,7 @@ describe('ExpenseRepository', () => {
     test('should create expense with minimal required fields', async () => {
       const minimalExpenseData = {
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(['parking']),
+        tags: ['parking'],
         category: 'misc' as const,
         amount: 15.0,
         currency: 'USD',
@@ -77,8 +76,7 @@ describe('ExpenseRepository', () => {
 
   describe('findById', () => {
     test('should find expense by id', async () => {
-      const { tags, ...restData } = testExpenseData;
-      const expenseData = { ...restData, vehicleId: testVehicle.id, tags: JSON.stringify(tags) };
+      const expenseData = { ...testExpenseData, vehicleId: testVehicle.id };
       const createdExpense = await expenseRepository.create(expenseData);
       const foundExpense = await expenseRepository.findById(createdExpense.id);
 
@@ -98,12 +96,11 @@ describe('ExpenseRepository', () => {
       const expense1Data = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(testExpenseData.tags),
       };
       const expense2Data = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(['parking']),
+        tags: ['parking'],
         category: 'misc' as const,
         amount: 20.0,
         date: new Date('2024-01-20'),
@@ -132,13 +129,12 @@ describe('ExpenseRepository', () => {
       const expense1Data = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(testExpenseData.tags),
         date: new Date('2024-01-10'),
       };
       const expense2Data = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(['parking']),
+        tags: ['parking'],
         category: 'misc' as const,
         amount: 20.0,
         date: new Date('2024-01-20'),
@@ -146,7 +142,7 @@ describe('ExpenseRepository', () => {
       const expense3Data = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(['tolls']),
+        tags: ['tolls'],
         category: 'misc' as const,
         amount: 5.0,
         date: new Date('2024-02-05'),
@@ -174,13 +170,13 @@ describe('ExpenseRepository', () => {
       const operatingExpense = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(['fuel']),
+        tags: ['fuel'],
         category: 'fuel' as const,
       };
       const maintenanceExpense = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(['oil-change']),
+        tags: ['oil-change'],
         category: 'maintenance' as const,
         amount: 75.0,
       };
@@ -200,12 +196,12 @@ describe('ExpenseRepository', () => {
       const fuelExpense = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(['fuel']),
+        tags: ['fuel'],
       };
       const parkingExpense = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(['parking']),
+        tags: ['parking'],
         category: 'misc' as const,
         amount: 15.0,
       };
@@ -226,12 +222,11 @@ describe('ExpenseRepository', () => {
         {
           ...testExpenseData,
           vehicleId: testVehicle.id,
-          tags: JSON.stringify(testExpenseData.tags),
         },
         {
           ...testExpenseData,
           vehicleId: testVehicle.id,
-          tags: JSON.stringify(['parking']),
+          tags: ['parking'],
           category: 'misc' as const,
           amount: 15.0,
           date: new Date('2024-01-20'),
@@ -251,21 +246,21 @@ describe('ExpenseRepository', () => {
       const operatingExpense1 = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(['fuel']),
+        tags: ['fuel'],
         category: 'fuel' as const,
         amount: 50.0,
       };
       const operatingExpense2 = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(['parking']),
+        tags: ['parking'],
         category: 'misc' as const,
         amount: 15.0,
       };
       const maintenanceExpense = {
         ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(['oil-change']),
+        tags: ['oil-change'],
         category: 'maintenance' as const,
         amount: 75.0,
       };
@@ -288,18 +283,15 @@ describe('ExpenseRepository', () => {
     });
 
     test('should calculate totals by category within date range', async () => {
-      const { tags, ...restData } = testExpenseData;
       const expense1 = {
-        ...restData,
+        ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(tags),
         amount: 50.0,
         date: new Date('2024-01-15'),
       };
       const expense2 = {
-        ...restData,
+        ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(tags),
         amount: 30.0,
         date: new Date('2024-02-15'),
       };
@@ -323,18 +315,15 @@ describe('ExpenseRepository', () => {
   describe('getMonthlyTotals', () => {
     test('should calculate monthly totals for a year', async () => {
       // Create expenses with explicit dates to avoid timezone issues
-      const { tags, ...restData } = testExpenseData;
       const januaryExpense = {
-        ...restData,
+        ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(tags),
         amount: 100.0,
         date: new Date(2024, 0, 15), // January 15, 2024
       };
       const februaryExpense = {
-        ...restData,
+        ...testExpenseData,
         vehicleId: testVehicle.id,
-        tags: JSON.stringify(tags),
         amount: 150.0,
         date: new Date(2024, 1, 15), // February 15, 2024
       };
@@ -363,8 +352,7 @@ describe('ExpenseRepository', () => {
 
   describe('update', () => {
     test('should update expense fields', async () => {
-      const { tags, ...restData } = testExpenseData;
-      const expenseData = { ...restData, vehicleId: testVehicle.id, tags: JSON.stringify(tags) };
+      const expenseData = { ...testExpenseData, vehicleId: testVehicle.id };
       const createdExpense = await expenseRepository.create(expenseData);
 
       // Add a small delay to ensure updatedAt timestamp is different
@@ -393,8 +381,7 @@ describe('ExpenseRepository', () => {
 
   describe('delete', () => {
     test('should delete expense', async () => {
-      const { tags, ...restData } = testExpenseData;
-      const expenseData = { ...restData, vehicleId: testVehicle.id, tags: JSON.stringify(tags) };
+      const expenseData = { ...testExpenseData, vehicleId: testVehicle.id };
       const createdExpense = await expenseRepository.create(expenseData);
 
       await expenseRepository.delete(createdExpense.id);

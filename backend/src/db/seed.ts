@@ -97,7 +97,7 @@ export async function seedDatabase() {
       // Fuel expenses for vehicle1
       {
         vehicleId: vehicle1.id,
-        tags: JSON.stringify(['fuel', 'gas']),
+        tags: ['fuel', 'gas'],
         category: 'fuel',
         amount: 45.5,
         date: new Date('2024-01-15'),
@@ -107,7 +107,7 @@ export async function seedDatabase() {
       },
       {
         vehicleId: vehicle1.id,
-        tags: JSON.stringify(['fuel', 'gas']),
+        tags: ['fuel', 'gas'],
         category: 'fuel',
         amount: 52.3,
         date: new Date('2024-01-28'),
@@ -118,7 +118,7 @@ export async function seedDatabase() {
       // Maintenance expenses
       {
         vehicleId: vehicle1.id,
-        tags: JSON.stringify(['oil-change', 'maintenance']),
+        tags: ['oil-change', 'maintenance'],
         category: 'maintenance',
         amount: 75.0,
         date: new Date('2024-01-10'),
@@ -127,7 +127,7 @@ export async function seedDatabase() {
       },
       {
         vehicleId: vehicle2.id,
-        tags: JSON.stringify(['brakes', 'maintenance']),
+        tags: ['brakes', 'maintenance'],
         category: 'maintenance',
         amount: 150.0,
         date: new Date('2024-01-20'),
@@ -137,7 +137,7 @@ export async function seedDatabase() {
       // Insurance payments
       {
         vehicleId: vehicle1.id,
-        tags: JSON.stringify(['insurance', 'monthly']),
+        tags: ['insurance', 'monthly'],
         category: 'financial',
         amount: 200.0,
         date: new Date('2024-01-01'),
@@ -146,7 +146,7 @@ export async function seedDatabase() {
       // Parking and tolls
       {
         vehicleId: vehicle1.id,
-        tags: JSON.stringify(['parking']),
+        tags: ['parking'],
         category: 'misc',
         amount: 15.0,
         date: new Date('2024-01-12'),
@@ -154,7 +154,7 @@ export async function seedDatabase() {
       },
       {
         vehicleId: vehicle1.id,
-        tags: JSON.stringify(['tolls']),
+        tags: ['tolls'],
         category: 'misc',
         amount: 8.5,
         date: new Date('2024-01-18'),

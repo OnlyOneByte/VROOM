@@ -18,7 +18,7 @@ import { assertSuccessResponse, getDb, getTypedResponse } from '../utils/test-he
 // Test app setup
 const testApp = new Hono();
 testApp.onError(errorHandler);
-testApp.route('/api/insurance', insuranceRoutes);
+testApp.route('/api/v1/insurance', insuranceRoutes);
 
 describe('Insurance Policy Management API Integration Tests', () => {
   let _db: ReturnType<typeof getTestDatabase>;
@@ -83,7 +83,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
       };
 
       const req = new Request(
-        `http://localhost:3001/api/insurance/vehicles/${testVehicleId}/policies`,
+        `http://localhost:3001/api/v1/insurance/vehicles/${testVehicleId}/policies`,
         {
           method: 'POST',
           headers: {
@@ -119,7 +119,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
       };
 
       const req = new Request(
-        `http://localhost:3001/api/insurance/vehicles/${testVehicleId}/policies`,
+        `http://localhost:3001/api/v1/insurance/vehicles/${testVehicleId}/policies`,
         {
           method: 'POST',
           headers: {
@@ -170,7 +170,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
         .returning();
 
       const req = new Request(
-        `http://localhost:3001/api/insurance/vehicles/${testVehicleId}/policies`,
+        `http://localhost:3001/api/v1/insurance/vehicles/${testVehicleId}/policies`,
         {
           headers: {
             Cookie: sessionCookie,
@@ -207,7 +207,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
         })
         .returning();
 
-      const req = new Request(`http://localhost:3001/api/insurance/${policy[0].id}`, {
+      const req = new Request(`http://localhost:3001/api/v1/insurance/${policy[0].id}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -244,7 +244,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
         company: 'State Farm Updated',
       };
 
-      const req = new Request(`http://localhost:3001/api/insurance/${policy[0].id}`, {
+      const req = new Request(`http://localhost:3001/api/v1/insurance/${policy[0].id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -281,7 +281,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
         })
         .returning();
 
-      const req = new Request(`http://localhost:3001/api/insurance/${policy[0].id}`, {
+      const req = new Request(`http://localhost:3001/api/v1/insurance/${policy[0].id}`, {
         method: 'DELETE',
         headers: {
           Cookie: sessionCookie,
@@ -296,7 +296,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
       expect(data.message).toContain('deleted successfully');
 
       // Verify policy is deleted
-      const checkReq = new Request(`http://localhost:3001/api/insurance/${policy[0].id}`, {
+      const checkReq = new Request(`http://localhost:3001/api/v1/insurance/${policy[0].id}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -309,7 +309,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
     test('should return 404 for non-existent policy', async () => {
       const nonExistentId = createId();
 
-      const req = new Request(`http://localhost:3001/api/insurance/${nonExistentId}`, {
+      const req = new Request(`http://localhost:3001/api/v1/insurance/${nonExistentId}`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -342,7 +342,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
         .returning();
 
       const req = new Request(
-        `http://localhost:3001/api/insurance/${policy[0].id}/monthly-breakdown`,
+        `http://localhost:3001/api/v1/insurance/${policy[0].id}/monthly-breakdown`,
         {
           headers: {
             Cookie: sessionCookie,
@@ -385,7 +385,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
         })
         .returning();
 
-      const req = new Request(`http://localhost:3001/api/insurance/expiring-soon?days=30`, {
+      const req = new Request(`http://localhost:3001/api/v1/insurance/expiring-soon?days=30`, {
         headers: {
           Cookie: sessionCookie,
         },
@@ -421,7 +421,7 @@ describe('Insurance Policy Management API Integration Tests', () => {
         });
 
       const req = new Request(
-        `http://localhost:3001/api/insurance/vehicles/${testVehicleId}/policies`,
+        `http://localhost:3001/api/v1/insurance/vehicles/${testVehicleId}/policies`,
         {
           headers: {
             Cookie: sessionCookie,

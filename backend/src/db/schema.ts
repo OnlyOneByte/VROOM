@@ -115,7 +115,7 @@ export const expenses = sqliteTable('expenses', {
   vehicleId: text('vehicle_id')
     .notNull()
     .references(() => vehicles.id, { onDelete: 'cascade' }),
-  tags: text('tags'), // JSON array of tags (replaces type)
+  tags: text('tags', { mode: 'json' }).$type<string[]>(), // JSON array of tags (replaces type)
   category: text('category').notNull(), // ExpenseCategory enum values
   amount: real('amount').notNull(),
   currency: text('currency').notNull().default('USD'),

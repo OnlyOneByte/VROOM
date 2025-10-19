@@ -109,7 +109,7 @@ describe('Repository Integration Tests', () => {
       // Create expenses
       const _fuelExpense = await expenseRepo.create({
         vehicleId: vehicle.id,
-        tags: JSON.stringify(['fuel']),
+        tags: ['fuel'],
         category: 'fuel',
         amount: 50.0,
         currency: 'USD',
@@ -119,7 +119,7 @@ describe('Repository Integration Tests', () => {
 
       const _maintenanceExpense = await expenseRepo.create({
         vehicleId: vehicle.id,
-        tags: JSON.stringify(['oil-change', 'maintenance']),
+        tags: ['oil-change', 'maintenance'],
         category: 'maintenance',
         amount: 75.0,
         currency: 'USD',
