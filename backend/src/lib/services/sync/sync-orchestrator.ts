@@ -1,19 +1,101 @@
 /**
  * Sync Orchestrator - Coordinates all sync, backup, and restore operations
  * This is the single entry point for all sync-related functionality
+ *
+ * Includes sync lock management to prevent concurrent operations
  */
 
+import type { BackupData } from '../../types/sync';
 import { logger } from '../../utils/logger';
-import { backupCreator } from '../backup/backup-creator';
-import type { BackupData } from '../backup/types';
-import type { ImportSummary, RestoreResponse } from '../restore/restore-executor';
-import { restoreExecutor } from '../restore/restore-executor';
-import type { BackupSyncResult } from './drive-sync';
-import { driveSync } from './drive-sync';
-import type { SheetsSyncResult } from './sheets-sync';
-import { sheetsSync } from './sheets-sync';
+import { backupService } from './backup-service';
+import { type BackupSyncResult, googleSyncService, type SheetsSyncResult } from './google-sync';
+import type { ImportSummary, RestoreResponse } from './restore/restore-executor';
+import { restoreExecutor } from './restore/restore-executor';
 
+/**
+ * ⚠️ PRODUCTION WARNING:
+ * The sync lock is an in-memory implementation that will NOT work correctly in:
+ * - Multi-instance deployments (horizontal scaling)
+ * - Serverless environments (state is lost between invocations)
+ * - Load-balanced setups (locks are not shared across instances)
+ *
+ * For production, replace with:
+ * - Redis (recommended): Use SET NX EX for atomic lock acquisition
+ * - Database-based locks: Use SELECT FOR UPDATE or advisory locks
+ * - Distributed lock service: e.g., etcd, Consul
+ */
 export class SyncOrchestrator {
+  private locks = new Map<string, { timestamp: number; ttl: number }>();
+  private cleanupInterval: Timer | null = null;
+
+  constructor() {
+    // Clean up expired locks every minute
+    this.cleanupInterval = setInterval(() => this.cleanupLocks(), 60000);
+  }
+
+  // ============================================================================
+  // SYNC LOCK MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Acquire a sync lock for a user
+   */
+  async acquireLock(userId: string, ttl = 300000): Promise<boolean> {
+    const existing = this.locks.get(userId);
+    if (existing && Date.now() - existing.timestamp < existing.ttl) {
+      return false;
+    }
+
+    this.locks.set(userId, { timestamp: Date.now(), ttl });
+    return true;
+  }
+
+  /**
+   * Release a sync lock for a user
+   */
+  releaseLock(userId: string): void {
+    this.locks.delete(userId);
+  }
+
+  /**
+   * Check if a user has an active sync lock
+   */
+  isLocked(userId: string): boolean {
+    const existing = this.locks.get(userId);
+    if (!existing) return false;
+    return Date.now() - existing.timestamp < existing.ttl;
+  }
+
+  /**
+   * Get the number of active locks
+   */
+  getActiveLockCount(): number {
+    this.cleanupLocks();
+    return this.locks.size;
+  }
+
+  /**
+   * Clean up expired locks
+   */
+  private cleanupLocks(): void {
+    const now = Date.now();
+    for (const [userId, lock] of this.locks.entries()) {
+      if (now - lock.timestamp >= lock.ttl) {
+        this.locks.delete(userId);
+      }
+    }
+  }
+
+  /**
+   * Destroy the orchestrator and clean up resources
+   */
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.locks.clear();
+  }
   /**
    * Execute sync operations for specified types
    */
@@ -29,10 +111,13 @@ export class SyncOrchestrator {
 
     const syncPromises = syncTypes.map(async (type) => {
       if (type === 'sheets') {
-        return { type: 'sheets', result: await sheetsSync.syncToSheets(userId) };
+        return { type: 'sheets', result: await googleSyncService.syncToSheets(userId) };
       }
       if (type === 'backup') {
-        return { type: 'backup', result: await driveSync.uploadBackupToGoogleDrive(userId) };
+        return {
+          type: 'backup',
+          result: await googleSyncService.uploadBackupToGoogleDrive(userId),
+        };
       }
       throw new Error(`Unknown sync type: ${type}`);
     });
@@ -51,7 +136,7 @@ export class SyncOrchestrator {
    */
   async createBackup(userId: string): Promise<BackupData> {
     logger.info('Creating backup via orchestrator', { userId });
-    return backupCreator.createBackup(userId);
+    return backupService.createBackup(userId);
   }
 
   /**
@@ -59,7 +144,7 @@ export class SyncOrchestrator {
    */
   async exportBackupAsZip(userId: string): Promise<Buffer> {
     logger.info('Exporting backup as ZIP via orchestrator', { userId });
-    return backupCreator.exportAsZip(userId);
+    return backupService.exportAsZip(userId);
   }
 
   /**
@@ -67,7 +152,7 @@ export class SyncOrchestrator {
    */
   async uploadBackupToDrive(userId: string): Promise<BackupSyncResult> {
     logger.info('Uploading backup to Drive via orchestrator', { userId });
-    const result = await driveSync.uploadBackupToGoogleDrive(userId);
+    const result = await googleSyncService.uploadBackupToGoogleDrive(userId);
 
     // Enforce retention policy after successful upload
     // If we got a result with fileId, the upload was successful
@@ -96,22 +181,22 @@ export class SyncOrchestrator {
   > {
     logger.info('Listing Drive backups via orchestrator', { userId });
 
-    const { getDriveServiceForUser } = await import('../../helpers/drive-service-helper');
-    const { SettingsRepository } = await import('../../repositories/settings-repository');
-    const { databaseService } = await import('../../database');
+    const { getDriveServiceForUser } = await import('../integrations/drive-helper');
+    const { SettingsRepository } = await import('../../repositories/settings');
+    const { databaseService } = await import('../../core/database');
 
     const db = databaseService.getDatabase();
     const settingsRepo = new SettingsRepository(db);
-    let settings = await settingsRepo.getUserSettings(userId);
+    let settings = await settingsRepo.getByUserId(userId);
 
     // If no backup folder ID exists, try to initialize/find it
     if (!settings || !settings.googleDriveBackupFolderId) {
       logger.info('No backup folder ID found, checking for existing folder structure', { userId });
-      const checkResult = await driveSync.checkExistingGoogleDriveBackups(userId);
+      const checkResult = await googleSyncService.checkExistingGoogleDriveBackups(userId);
 
       if (checkResult.hasBackupFolder && checkResult.backupFolderId) {
         // Folder was found and settings were updated
-        settings = await settingsRepo.getUserSettings(userId);
+        settings = await settingsRepo.getByUserId(userId);
       } else {
         // No folder exists yet
         logger.info('No backup folder found', { userId });
@@ -124,7 +209,7 @@ export class SyncOrchestrator {
     }
 
     const driveService = await getDriveServiceForUser(userId);
-    const backups = await driveSync.listBackupsInDrive(
+    const backups = await googleSyncService.listBackupsInDrive(
       driveService,
       settings.googleDriveBackupFolderId
     );
@@ -156,7 +241,7 @@ export class SyncOrchestrator {
     }>;
   }> {
     logger.info('Initializing Drive via orchestrator', { userId });
-    return driveSync.initializeGoogleDriveForUser(userId);
+    return googleSyncService.initializeGoogleDriveForUser(userId);
   }
 
   /**
@@ -174,7 +259,7 @@ export class SyncOrchestrator {
     }>;
   }> {
     logger.info('Checking existing Drive backups via orchestrator', { userId });
-    return driveSync.checkExistingGoogleDriveBackups(userId);
+    return googleSyncService.checkExistingGoogleDriveBackups(userId);
   }
 
   /**
@@ -189,7 +274,7 @@ export class SyncOrchestrator {
   }> {
     logger.info('Downloading backup from Drive via orchestrator', { userId, fileId });
 
-    const { getDriveServiceForUser } = await import('../../helpers/drive-service-helper');
+    const { getDriveServiceForUser } = await import('../integrations/drive-helper');
     const driveService = await getDriveServiceForUser(userId);
 
     const buffer = await driveService.downloadFile(fileId);
@@ -204,7 +289,7 @@ export class SyncOrchestrator {
   async deleteBackupFromDrive(userId: string, fileId: string): Promise<void> {
     logger.info('Deleting backup from Drive via orchestrator', { userId, fileId });
 
-    const { getDriveServiceForUser } = await import('../../helpers/drive-service-helper');
+    const { getDriveServiceForUser } = await import('../integrations/drive-helper');
     const driveService = await getDriveServiceForUser(userId);
 
     await driveService.deleteFile(fileId);
@@ -263,7 +348,7 @@ export class SyncOrchestrator {
    */
   async syncToSheets(userId: string): Promise<SheetsSyncResult> {
     logger.info('Syncing to Sheets via orchestrator', { userId });
-    return sheetsSync.syncToSheets(userId);
+    return googleSyncService.syncToSheets(userId);
   }
 
   /**
@@ -271,7 +356,7 @@ export class SyncOrchestrator {
    * Deletes old backups beyond the retention limit
    */
   private async enforceBackupRetention(userId: string): Promise<void> {
-    const { BACKUP_CONFIG } = await import('../../constants/backup');
+    const { BACKUP_CONFIG } = await import('../../constants/sync');
 
     logger.info('Enforcing backup retention policy', { userId });
 

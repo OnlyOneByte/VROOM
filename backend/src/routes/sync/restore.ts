@@ -3,16 +3,19 @@
  */
 
 import { Hono } from 'hono';
-import { BACKUP_CONFIG } from '../../lib/constants/backup';
 import { RATE_LIMITS } from '../../lib/constants/rate-limits';
+import { BACKUP_CONFIG } from '../../lib/constants/sync';
+import {
+  createSuccessResponse,
+  handleSyncError,
+  SyncError,
+  SyncErrorCode,
+} from '../../lib/core/errors/';
 import { bodyLimit } from '../../lib/middleware/body-limit';
 import { idempotencyMiddleware } from '../../lib/middleware/idempotency';
 import { rateLimiter } from '../../lib/middleware/rate-limiter';
-import { backupValidator } from '../../lib/services/backup/backup-validator';
-import { SyncError, SyncErrorCode } from '../../lib/services/sync/sync-errors';
+import { backupService } from '../../lib/services/sync/backup-service';
 import { syncOrchestrator } from '../../lib/services/sync/sync-orchestrator';
-import { handleSyncError } from '../../lib/utils/error-handler';
-import { createSuccessResponse } from '../../lib/utils/error-response';
 import { logger } from '../../lib/utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../lib/utils/timeout';
 
@@ -72,7 +75,7 @@ restoreRoutes.post(
       }
 
       // Validate file size
-      const sizeValidation = backupValidator.validateFileSize(file.size);
+      const sizeValidation = backupService.validateFileSize(file.size);
       if (!sizeValidation.valid) {
         throw new SyncError(
           SyncErrorCode.VALIDATION_ERROR,

@@ -60,8 +60,22 @@
 		mileage: '',
 		volume: '',
 		charge: '',
+		fuelType: '',
 		description: ''
 	});
+
+	let showCustomFuelType = $state(false);
+
+	// Fuel type options
+	const FUEL_TYPE_OPTIONS = [
+		{ value: '87 (Regular)', label: '87 (Regular)' },
+		{ value: '89 (Mid-Grade)', label: '89 (Mid-Grade)' },
+		{ value: '91 (Premium)', label: '91 (Premium)' },
+		{ value: '93 (Super Premium)', label: '93 (Super Premium)' },
+		{ value: 'Diesel', label: 'Diesel' },
+		{ value: 'Ethanol-Free', label: 'Ethanol-Free' },
+		{ value: 'other', label: 'Other (Custom)' }
+	];
 
 	// Tag input state
 	let tagInput = $state('');
@@ -188,7 +202,16 @@
 					formData.mileage = originalExpense.mileage?.toString() ?? '';
 					formData.volume = originalExpense.volume?.toString() ?? '';
 					formData.charge = originalExpense.charge?.toString() ?? '';
+					formData.fuelType = originalExpense.fuelType || '';
 					formData.description = originalExpense.description || '';
+
+					// Check if fuel type is a custom value (not in preset options)
+					if (
+						originalExpense?.fuelType &&
+						!FUEL_TYPE_OPTIONS.some(opt => opt.value === originalExpense?.fuelType)
+					) {
+						showCustomFuelType = true;
+					}
 
 					// Set the category label for fuel field detection
 					const selectedCategory = categories.find(c => c.value === originalExpense?.category);
@@ -463,6 +486,13 @@
 				}
 				break;
 			}
+			case 'fuelType': {
+				// Fuel type is optional, but if provided, validate length
+				if (value && (value as string).length > 50) {
+					return 'Fuel type must be 50 characters or less';
+				}
+				break;
+			}
 		}
 		return null;
 	}
@@ -524,6 +554,7 @@
 				mileage: formData.mileage ? parseInt(formData.mileage) : undefined,
 				volume: formData.volume ? parseFloat(formData.volume) : undefined,
 				charge: formData.charge ? parseFloat(formData.charge) : undefined,
+				fuelType: formData.fuelType || undefined,
 				description: formData.description || undefined,
 				currency: currencyUnit
 			};
@@ -608,6 +639,7 @@
 					mileage: formData.mileage ? parseInt(formData.mileage) : undefined,
 					volume: formData.volume ? parseFloat(formData.volume) : undefined,
 					charge: formData.charge ? parseFloat(formData.charge) : undefined,
+					fuelType: formData.fuelType || undefined,
 					description: formData.description || undefined
 				};
 
@@ -945,6 +977,71 @@
 								<strong>Price per {getVolumeUnitLabel(volumeUnit, true)}:</strong> ${(
 									parseFloat(formData.amount) / parseFloat(formData.volume)
 								).toFixed(3)}
+							</div>
+						{/if}
+
+						<!-- Fuel Type field -->
+						<div class="space-y-2">
+							<Label for="fuelType">Fuel Type / Octane</Label>
+							<Select.Root
+								type="single"
+								value={showCustomFuelType ? 'other' : formData.fuelType || ''}
+								onValueChange={v => {
+									if (v === 'other') {
+										showCustomFuelType = true;
+										formData.fuelType = '';
+									} else {
+										showCustomFuelType = false;
+										formData.fuelType = v || '';
+									}
+								}}
+							>
+								<Select.Trigger
+									id="fuelType"
+									class="w-full"
+									aria-invalid={!!(touched['fuelType'] && errors['fuelType'])}
+									aria-describedby={touched['fuelType'] && errors['fuelType']
+										? 'fuelType-error'
+										: undefined}
+								>
+									{#if showCustomFuelType}
+										Other (Custom)
+									{:else if formData.fuelType}
+										{formData.fuelType}
+									{:else}
+										Select fuel type (optional)
+									{/if}
+								</Select.Trigger>
+								<Select.Content>
+									{#each FUEL_TYPE_OPTIONS as option}
+										<Select.Item value={option.value} label={option.label}
+											>{option.label}</Select.Item
+										>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+							{#if touched['fuelType'] && errors['fuelType']}
+								<FormFieldError id="fuelType-error">{errors['fuelType']}</FormFieldError>
+							{/if}
+						</div>
+
+						{#if showCustomFuelType}
+							<div class="space-y-2">
+								<Label for="customFuelType">Custom Fuel Type</Label>
+								<Input
+									id="customFuelType"
+									type="text"
+									placeholder="e.g., E85, E100 Race Fuel"
+									bind:value={formData.fuelType}
+									onblur={() => handleBlur('fuelType')}
+									aria-invalid={!!(touched['fuelType'] && errors['fuelType'])}
+									aria-describedby={touched['fuelType'] && errors['fuelType']
+										? 'fuelType-error'
+										: undefined}
+								/>
+								{#if touched['fuelType'] && errors['fuelType']}
+									<FormFieldError id="fuelType-error">{errors['fuelType']}</FormFieldError>
+								{/if}
 							</div>
 						{/if}
 					{/if}

@@ -6,21 +6,21 @@
 - [x] Dashboard rework, using charts/components from shadcnui
 - [x] Vehicle page Form rework
 - [x] Expenses table rework
-- [ ] Finance Information in car
+- [x] Finance Information in car
 - [ ] Expense Form rework
     - Fix tags
 - [ ] Expenses page rework, specifically using dashboard components from shadcnui
 - [ ] Analytics Buildout
 - [ ] Menu sync time doesn't show right after enabling backup/sync until page refresh
-- [ ] Dark Mode switch
 
 ## Features
-- [ ] Add VIN input to vehicle
-- [ ] Update GAS to include gas type (octane)
+- [x] Add VIN input to vehicle
+- [x] Update GAS to include gas type (octane)
 - [ ] Skip mpg calculation (missed fillup) 
 - [ ] Google Sheets integration fix
 - [ ] Comprehensive insurance information
 - [ ] Vehicle sharing
+- [ ] Dark Mode switch
 
 
 ## Deployment ready 

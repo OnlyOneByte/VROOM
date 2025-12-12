@@ -5,11 +5,10 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
 
 import { users } from '../db/schema';
-import { google } from '../lib/auth/lucia';
-import { getLucia } from '../lib/auth/lucia-provider.js';
-import { config } from '../lib/config';
-import { SESSION_CONFIG } from '../lib/constants';
-import { databaseService } from '../lib/database';
+import { getLucia, google } from '../lib/auth/lucia';
+import { APP_CONFIG } from '../lib/constants/app-config';
+import { config } from '../lib/core/config';
+import { databaseService } from '../lib/core/database';
 import { logger } from '../lib/utils/logger';
 
 const auth = new Hono();
@@ -21,7 +20,7 @@ const oauthStateStore = new Map<string, { codeVerifier: string; createdAt: numbe
 const cleanupExpiredStates = () => {
   const now = Date.now();
   for (const [state, data] of oauthStateStore.entries()) {
-    if (now - data.createdAt > SESSION_CONFIG.OAUTH_STATE_EXPIRY) {
+    if (now - data.createdAt > APP_CONFIG.SESSION.OAUTH_STATE_EXPIRY) {
       oauthStateStore.delete(state);
     }
   }
@@ -36,7 +35,7 @@ auth.get('/login/google', async (c) => {
       'openid',
       'profile',
       'email',
-      'https://www.googleapis.com/auth/drive.file', // For Google Drive integration
+      'https://www.googleapis.com/auth/drive', // For Google Drive integration (full access needed to create folders)
     ],
   });
 
@@ -142,8 +141,8 @@ auth.get('/callback/google', async (c) => {
 
   // Check for existing Google Drive backups and auto-enable if found
   try {
-    const { driveSync } = await import('../lib/services/sync/drive-sync');
-    const backupCheck = await driveSync.checkExistingGoogleDriveBackups(userId);
+    const { googleSyncService } = await import('../lib/services/sync/google-sync');
+    const backupCheck = await googleSyncService.checkExistingGoogleDriveBackups(userId);
 
     if (backupCheck.hasBackupFolder && backupCheck.existingBackups.length > 0) {
       // Auto-enable Google Drive backup if backups exist
@@ -184,7 +183,7 @@ auth.get('/callback/google', async (c) => {
     path: '/',
     secure: config.env === 'production',
     httpOnly: true,
-    maxAge: SESSION_CONFIG.COOKIE_MAX_AGE,
+    maxAge: APP_CONFIG.SESSION.COOKIE_MAX_AGE,
     expires: session.expiresAt,
     sameSite: 'Lax',
   });
@@ -210,7 +209,7 @@ auth.get('/me', async (c) => {
 
   // Check for existing Google Drive backups and auto-enable if found (only once per session)
   try {
-    const { databaseService } = await import('../lib/database');
+    const { databaseService } = await import('../lib/core/database');
     const { userSettings } = await import('../db/schema');
     const db = databaseService.getDatabase();
 
@@ -227,8 +226,8 @@ auth.get('/me', async (c) => {
       !settings[0].googleDriveBackupEnabled &&
       !settings[0].googleDriveBackupFolderId
     ) {
-      const { driveSync } = await import('../lib/services/sync/drive-sync');
-      const backupCheck = await driveSync.checkExistingGoogleDriveBackups(user.id);
+      const { googleSyncService } = await import('../lib/services/sync/google-sync');
+      const backupCheck = await googleSyncService.checkExistingGoogleDriveBackups(user.id);
 
       if (backupCheck.hasBackupFolder && backupCheck.existingBackups.length > 0) {
         // Auto-enable Google Drive backup if backups exist
@@ -286,7 +285,7 @@ auth.post('/logout', async (c) => {
     path: '/',
     secure: config.env === 'production',
     httpOnly: true,
-    maxAge: SESSION_CONFIG.COOKIE_MAX_AGE,
+    maxAge: APP_CONFIG.SESSION.COOKIE_MAX_AGE,
     sameSite: 'Lax',
   });
 
@@ -313,7 +312,7 @@ auth.post('/refresh', async (c) => {
   const sessionExpiry = new Date(session.expiresAt);
   const timeUntilExpiry = sessionExpiry.getTime() - now.getTime();
 
-  if (timeUntilExpiry > SESSION_CONFIG.REFRESH_THRESHOLD) {
+  if (timeUntilExpiry > APP_CONFIG.SESSION.REFRESH_THRESHOLD) {
     return c.json({
       user: {
         id: user.id,
@@ -335,7 +334,7 @@ auth.post('/refresh', async (c) => {
     path: '/',
     secure: config.env === 'production',
     httpOnly: true,
-    maxAge: SESSION_CONFIG.COOKIE_MAX_AGE,
+    maxAge: APP_CONFIG.SESSION.COOKIE_MAX_AGE,
     expires: newSession.expiresAt,
     sameSite: 'Lax',
   });
@@ -380,7 +379,7 @@ auth.get('/reauth/google', async (c) => {
       'openid',
       'profile',
       'email',
-      'https://www.googleapis.com/auth/drive.file', // For Google Drive integration
+      'https://www.googleapis.com/auth/drive', // For Google Drive integration (full access needed to create folders)
     ],
   });
 

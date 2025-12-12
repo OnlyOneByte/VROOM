@@ -1,8 +1,13 @@
 import type { ErrorHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
-import { config } from '../config';
-import { formatErrorResponse, handleDatabaseError, isAppError, ValidationError } from '../errors';
+import { config } from '../core/config';
+import {
+  formatErrorResponse,
+  handleDatabaseError,
+  isAppError,
+  ValidationError,
+} from '../core/errors/';
 import { logger } from '../utils/logger';
 
 export const errorHandler: ErrorHandler = (err, c) => {

@@ -1,18 +1,19 @@
 import { zValidator } from '@hono/zod-validator';
+import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
-import type { NewInsurancePolicy } from '../db/schema';
-import { TIME_CONSTANTS, VALIDATION_LIMITS } from '../lib/constants';
+import { insurancePolicies } from '../db/schema';
+import { APP_CONFIG, VALIDATION_LIMITS } from '../lib/constants';
 import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
-import { repositoryFactory } from '../lib/repositories/factory';
+import { insurancePolicyRepository, vehicleRepository } from '../lib/repositories';
 import { logger } from '../lib/utils/logger';
 
 const insurance = new Hono();
 
-// Validation schemas
-const createInsurancePolicySchema = z.object({
+// Validation schemas derived from db schema
+const baseInsuranceSchema = createInsertSchema(insurancePolicies, {
   company: z
     .string()
     .min(1, 'Insurance company is required')
@@ -40,6 +41,13 @@ const createInsurancePolicySchema = z.object({
   endDate: z.coerce.date(),
 });
 
+const createInsurancePolicySchema = baseInsuranceSchema.omit({
+  id: true,
+  monthlyCost: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 const updateInsurancePolicySchema = createInsurancePolicySchema.partial();
 
 const insurancePolicyParamsSchema = z.object({
@@ -60,9 +68,10 @@ insurance.get('/expiring-soon', async (c) => {
     const user = c.get('user');
     const daysAhead = parseInt(c.req.query('days') || '30', 10);
 
-    const insuranceRepository = repositoryFactory.getInsurancePolicyRepository();
-
-    const expiringPolicies = await insuranceRepository.findExpiringPolicies(user.id, daysAhead);
+    const expiringPolicies = await insurancePolicyRepository.findExpiringPolicies(
+      user.id,
+      daysAhead
+    );
 
     return c.json({
       success: true,
@@ -92,9 +101,6 @@ insurance.post(
       const { id: vehicleId } = c.req.valid('param');
       const policyData = c.req.valid('json');
 
-      const vehicleRepository = repositoryFactory.getVehicleRepository();
-      const insuranceRepository = repositoryFactory.getInsurancePolicyRepository();
-
       // Verify vehicle exists and belongs to user
       const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
       if (!vehicle) {
@@ -109,14 +115,14 @@ insurance.post(
       // Calculate monthly cost
       const monthlyCost = policyData.totalCost / policyData.termLengthMonths;
 
-      const newPolicy: NewInsurancePolicy = {
+      const newPolicy = {
         ...policyData,
         vehicleId,
         monthlyCost,
         isActive: true,
       };
 
-      const createdPolicy = await insuranceRepository.create(newPolicy);
+      const createdPolicy = await insurancePolicyRepository.create(newPolicy);
 
       return c.json(
         {
@@ -144,21 +150,18 @@ insurance.get('/vehicles/:id/policies', zValidator('param', vehicleParamsSchema)
     const user = c.get('user');
     const { id: vehicleId } = c.req.valid('param');
 
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
-    const insuranceRepository = repositoryFactory.getInsurancePolicyRepository();
-
     // Verify vehicle exists and belongs to user
     const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
     if (!vehicle) {
       throw new HTTPException(404, { message: 'Vehicle not found' });
     }
 
-    const policies = await insuranceRepository.findByVehicleId(vehicleId);
+    const policies = await insurancePolicyRepository.findByVehicleId(vehicleId);
 
     // Add expiration alerts
     const policiesWithAlerts = policies.map((policy) => {
       const daysUntilExpiration = Math.ceil(
-        (new Date(policy.endDate).getTime() - Date.now()) / TIME_CONSTANTS.MS_PER_DAY
+        (new Date(policy.endDate).getTime() - Date.now()) / APP_CONFIG.TIME.MS_PER_DAY
       );
 
       return {
@@ -198,10 +201,7 @@ insurance.get('/:id', zValidator('param', insurancePolicyParamsSchema), async (c
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const insuranceRepository = repositoryFactory.getInsurancePolicyRepository();
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
-
-    const policy = await insuranceRepository.findById(id);
+    const policy = await insurancePolicyRepository.findById(id);
     if (!policy) {
       throw new HTTPException(404, { message: 'Insurance policy not found' });
     }
@@ -238,11 +238,8 @@ insurance.put(
       const { id } = c.req.valid('param');
       const updateData = c.req.valid('json');
 
-      const insuranceRepository = repositoryFactory.getInsurancePolicyRepository();
-      const vehicleRepository = repositoryFactory.getVehicleRepository();
-
       // Check if policy exists
-      const existingPolicy = await insuranceRepository.findById(id);
+      const existingPolicy = await insurancePolicyRepository.findById(id);
       if (!existingPolicy) {
         throw new HTTPException(404, { message: 'Insurance policy not found' });
       }
@@ -271,7 +268,7 @@ insurance.put(
         finalUpdateData.monthlyCost = totalCost / termLengthMonths;
       }
 
-      const updatedPolicy = await insuranceRepository.update(id, finalUpdateData);
+      const updatedPolicy = await insurancePolicyRepository.update(id, finalUpdateData);
 
       return c.json({
         success: true,
@@ -296,11 +293,8 @@ insurance.delete('/:id', zValidator('param', insurancePolicyParamsSchema), async
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const insuranceRepository = repositoryFactory.getInsurancePolicyRepository();
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
-
     // Check if policy exists
-    const existingPolicy = await insuranceRepository.findById(id);
+    const existingPolicy = await insurancePolicyRepository.findById(id);
     if (!existingPolicy) {
       throw new HTTPException(404, { message: 'Insurance policy not found' });
     }
@@ -311,7 +305,7 @@ insurance.delete('/:id', zValidator('param', insurancePolicyParamsSchema), async
       throw new HTTPException(404, { message: 'Insurance policy not found' });
     }
 
-    await insuranceRepository.delete(id);
+    await insurancePolicyRepository.delete(id);
 
     return c.json({
       success: true,
@@ -337,10 +331,7 @@ insurance.get(
       const user = c.get('user');
       const { id } = c.req.valid('param');
 
-      const insuranceRepository = repositoryFactory.getInsurancePolicyRepository();
-      const vehicleRepository = repositoryFactory.getVehicleRepository();
-
-      const policy = await insuranceRepository.findById(id);
+      const policy = await insurancePolicyRepository.findById(id);
       if (!policy) {
         throw new HTTPException(404, { message: 'Insurance policy not found' });
       }
@@ -417,7 +408,7 @@ function calculateMonthlyBreakdown(policy: {
       cost: Math.round(monthlyCost * 100) / 100,
       isPaid: monthEnd < new Date(), // Assume past months are paid
       daysInMonth:
-        Math.ceil((monthEnd.getTime() - monthStart.getTime()) / TIME_CONSTANTS.MS_PER_DAY) + 1,
+        Math.ceil((monthEnd.getTime() - monthStart.getTime()) / APP_CONFIG.TIME.MS_PER_DAY) + 1,
     });
 
     currentDate.setMonth(currentDate.getMonth() + 1);

@@ -1,29 +1,5 @@
-// Types for analytics services
-export type ExpenseData = {
-  id: string;
-  amount: number;
-  category: string;
-  type?: string | null;
-  tags?: string[] | null;
-  date: Date;
-  description?: string | null;
-  mileage?: number | null;
-  volume?: number | null;
-  charge?: number | null;
-  vehicleId: string;
-};
-
-export type VehicleData = {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  licensePlate?: string | null;
-  nickname?: string | null;
-  currentMileage?: number | null;
-  initialMileage?: number | null;
-  userId: string;
-};
+// Re-export DB types for analytics
+export type { Expense, Vehicle } from '../../../db/schema';
 
 export type AnalyticsQuery = {
   startDate?: Date;
@@ -34,7 +10,7 @@ export type AnalyticsQuery = {
 export type DashboardAnalytics = {
   vehicles: Array<{ id: string; name: string; nickname?: string | null }>;
   totalExpenses: number;
-  monthlyTrends: Array<{ period: string; amount: number }>;
+  monthlyExpensesTrends: Array<{ period: string; amount: number }>;
   categoryBreakdown: {
     [key: string]: { amount: number; count: number; percentage: number };
   };

@@ -1,30 +1,19 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { inject, injectable } from 'inversify';
 import type { NewVehicle, Vehicle, VehicleWithFinancing } from '../../db/schema.js';
-import { vehicleFinancing, vehicleShares, vehicles } from '../../db/schema.js';
-import { TYPES } from '../di/types.js';
-import { DatabaseError, NotFoundError } from '../errors.js';
+import { vehicleFinancing, vehicles } from '../../db/schema.js';
+import { DatabaseError, NotFoundError } from '../core/errors/index.js';
 import { logger } from '../utils/logger.js';
 import { BaseRepository } from './base.js';
-import type { IVehicleRepository } from './interfaces.js';
-import { QueryBuilder } from './query-builder.js';
 
-@injectable()
-export class VehicleRepository
-  extends BaseRepository<Vehicle, NewVehicle>
-  implements IVehicleRepository
-{
-  private queryBuilder: QueryBuilder<Vehicle>;
-
-  constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
+export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
+  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, vehicles);
-    this.queryBuilder = new QueryBuilder(this.database);
   }
 
   async findByUserId(userId: string): Promise<VehicleWithFinancing[]> {
     try {
-      const result = await this.database
+      const result = await this.db
         .select({
           vehicle: vehicles,
           financing: vehicleFinancing,
@@ -71,7 +60,7 @@ export class VehicleRepository
 
   async updateMileage(id: string, mileage: number): Promise<Vehicle> {
     try {
-      const result = await this.database
+      const result = await this.db
         .update(vehicles)
         .set({
           initialMileage: mileage,
@@ -104,7 +93,7 @@ export class VehicleRepository
   async findAccessibleVehicles(userId: string): Promise<VehicleWithFinancing[]> {
     try {
       // Get vehicles owned by user with financing
-      const ownedVehiclesResult = await this.database
+      const ownedVehiclesResult = await this.db
         .select({
           vehicle: vehicles,
           financing: vehicleFinancing,
@@ -119,50 +108,12 @@ export class VehicleRepository
         financing: row.financing || undefined,
       })) as VehicleWithFinancing[];
 
-      // Get vehicles shared with user (accepted shares only)
-      const sharedVehicleIds = await this.database
-        .select({ vehicleId: vehicleShares.vehicleId })
-        .from(vehicleShares)
-        .where(
-          and(eq(vehicleShares.sharedWithUserId, userId), eq(vehicleShares.status, 'accepted'))
-        );
-
-      if (sharedVehicleIds.length === 0) {
-        return ownedVehicles;
-      }
-
-      const sharedVehiclesResult = await this.database
-        .select({
-          vehicle: vehicles,
-          financing: vehicleFinancing,
-        })
-        .from(vehicles)
-        .leftJoin(vehicleFinancing, eq(vehicles.id, vehicleFinancing.vehicleId))
-        .where(
-          inArray(
-            vehicles.id,
-            sharedVehicleIds.map((s) => s.vehicleId)
-          )
-        )
-        .orderBy(vehicles.createdAt);
-
-      const sharedVehicles = sharedVehiclesResult.map((row) => ({
-        ...row.vehicle,
-        financing: row.financing || undefined,
-      })) as VehicleWithFinancing[];
-
-      // Combine and deduplicate
-      const allVehicles = [...ownedVehicles, ...sharedVehicles];
-      const uniqueVehicles = Array.from(new Map(allVehicles.map((v) => [v.id, v])).values());
-
       logger.debug('Found accessible vehicles', {
         userId,
         ownedCount: ownedVehicles.length,
-        sharedCount: sharedVehicles.length,
-        totalCount: uniqueVehicles.length,
       });
 
-      return uniqueVehicles;
+      return ownedVehicles;
     } catch (error) {
       logger.error('Failed to find accessible vehicles', {
         userId,
@@ -178,7 +129,7 @@ export class VehicleRepository
   ): Promise<VehicleWithFinancing | null> {
     try {
       // Check if user owns the vehicle
-      const ownedVehicle = await this.database
+      const ownedVehicle = await this.db
         .select({
           vehicle: vehicles,
           financing: vehicleFinancing,
@@ -190,32 +141,6 @@ export class VehicleRepository
 
       if (ownedVehicle.length > 0) {
         const result = ownedVehicle[0];
-        return {
-          ...result.vehicle,
-          financing: result.financing || undefined,
-        } as VehicleWithFinancing;
-      }
-
-      // Check if vehicle is shared with user (accepted shares only)
-      const sharedVehicle = await this.database
-        .select({
-          vehicle: vehicles,
-          financing: vehicleFinancing,
-        })
-        .from(vehicles)
-        .innerJoin(vehicleShares, eq(vehicles.id, vehicleShares.vehicleId))
-        .leftJoin(vehicleFinancing, eq(vehicles.id, vehicleFinancing.vehicleId))
-        .where(
-          and(
-            eq(vehicles.id, vehicleId),
-            eq(vehicleShares.sharedWithUserId, userId),
-            eq(vehicleShares.status, 'accepted')
-          )
-        )
-        .limit(1);
-
-      if (sharedVehicle.length > 0) {
-        const result = sharedVehicle[0];
         return {
           ...result.vehicle,
           financing: result.financing || undefined,

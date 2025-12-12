@@ -1,24 +1,16 @@
 import { asc, eq } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { inject, injectable } from 'inversify';
 import type { NewVehicleFinancing, VehicleFinancing } from '../../db/schema.js';
 import { vehicleFinancing } from '../../db/schema.js';
-import { TYPES } from '../di/types.js';
 import { logger } from '../utils/logger';
 import { BaseRepository } from './base.js';
-import type { IVehicleFinancingRepository } from './interfaces.js';
-import { QueryBuilder } from './query-builder.js';
 
-@injectable()
-export class VehicleFinancingRepository
-  extends BaseRepository<VehicleFinancing, NewVehicleFinancing>
-  implements IVehicleFinancingRepository
-{
-  private queryBuilder: QueryBuilder<VehicleFinancing>;
-
-  constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
+export class VehicleFinancingRepository extends BaseRepository<
+  VehicleFinancing,
+  NewVehicleFinancing
+> {
+  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, vehicleFinancing);
-    this.queryBuilder = new QueryBuilder(this.database);
   }
 
   async findByVehicleId(vehicleId: string): Promise<VehicleFinancing | null> {
@@ -48,7 +40,7 @@ export class VehicleFinancingRepository
 
   async updateBalance(id: string, newBalance: number): Promise<VehicleFinancing> {
     try {
-      const result = await this.database
+      const result = await this.db
         .update(vehicleFinancing)
         .set({
           currentBalance: newBalance,
@@ -70,7 +62,7 @@ export class VehicleFinancingRepository
 
   async markAsCompleted(id: string, endDate: Date): Promise<VehicleFinancing> {
     try {
-      const result = await this.database
+      const result = await this.db
         .update(vehicleFinancing)
         .set({
           isActive: false,

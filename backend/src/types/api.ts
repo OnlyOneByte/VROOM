@@ -67,21 +67,6 @@ export interface ExpenseListResponse {
   };
 }
 
-export interface FuelAnalyticsResponse {
-  totalFuelExpenses: number;
-  averageMPG: number;
-  efficiencyTrend: Array<{
-    date: Date;
-    mpg: number;
-    costPerMile: number;
-  }>;
-  alerts: Array<{
-    type: string;
-    message: string;
-    severity: string;
-  }>;
-}
-
 export interface InsuranceBreakdownResponse {
   breakdown: Array<{
     cost: number;

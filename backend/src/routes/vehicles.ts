@@ -1,18 +1,24 @@
 import { zValidator } from '@hono/zod-validator';
+import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import type { NewVehicle } from '../db/schema';
+import { vehicles as vehiclesTable } from '../db/schema';
 import { VALIDATION_LIMITS } from '../lib/constants';
-import { AuthorizationError, ConflictError, NotFoundError } from '../lib/errors';
+import { ConflictError, NotFoundError } from '../lib/core/errors/';
 import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
-import { repositoryFactory } from '../lib/repositories/factory';
+import {
+  expenseRepository,
+  vehicleFinancingRepository as financingRepository,
+  vehicleFinancingPaymentRepository as paymentRepository,
+  vehicleRepository,
+} from '../lib/repositories';
 import type { ApiResponse } from '../types/api';
 
 const vehicles = new Hono();
 
-// Validation schemas
-const createVehicleSchema = z.object({
+// Validation schemas derived from db schema
+const baseVehicleSchema = createInsertSchema(vehiclesTable, {
   make: z
     .string()
     .min(1, 'Make is required')
@@ -54,6 +60,14 @@ const createVehicleSchema = z.object({
   purchaseDate: z.coerce.date().optional(),
 });
 
+// Omit auto-generated fields for create/update
+const createVehicleSchema = baseVehicleSchema.omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 const updateVehicleSchema = createVehicleSchema.partial();
 
 const vehicleParamsSchema = z.object({
@@ -67,7 +81,6 @@ vehicles.use('*', trackDataChanges);
 // GET /api/vehicles - List user's vehicles (including shared)
 vehicles.get('/', async (c) => {
   const user = c.get('user');
-  const vehicleRepository = repositoryFactory.getVehicleRepository();
 
   const userVehicles = await vehicleRepository.findAccessibleVehicles(user.id);
 
@@ -84,7 +97,6 @@ vehicles.get('/', async (c) => {
 vehicles.post('/', zValidator('json', createVehicleSchema), async (c) => {
   const user = c.get('user');
   const vehicleData = c.req.valid('json');
-  const vehicleRepository = repositoryFactory.getVehicleRepository();
 
   // Check if license plate already exists (if provided)
   if (vehicleData.licensePlate) {
@@ -94,12 +106,10 @@ vehicles.post('/', zValidator('json', createVehicleSchema), async (c) => {
     }
   }
 
-  const newVehicle: NewVehicle = {
+  const createdVehicle = await vehicleRepository.create({
     ...vehicleData,
     userId: user.id,
-  };
-
-  const createdVehicle = await vehicleRepository.create(newVehicle);
+  });
 
   const response: ApiResponse<typeof createdVehicle> = {
     success: true,
@@ -114,7 +124,6 @@ vehicles.post('/', zValidator('json', createVehicleSchema), async (c) => {
 vehicles.get('/:id', zValidator('param', vehicleParamsSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  const vehicleRepository = repositoryFactory.getVehicleRepository();
 
   const vehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
 
@@ -139,19 +148,11 @@ vehicles.put(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const updateData = c.req.valid('json');
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
-    const shareRepository = repositoryFactory.getVehicleShareRepository();
 
     // Check if vehicle exists and user has access
     const existingVehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
     if (!existingVehicle) {
       throw new NotFoundError('Vehicle');
-    }
-
-    // Check if user has edit permission
-    const permission = await shareRepository.getPermission(id, user.id);
-    if (permission !== 'edit') {
-      throw new AuthorizationError('You do not have permission to edit this vehicle');
     }
 
     // Check if license plate already exists (if being updated)
@@ -176,7 +177,6 @@ vehicles.put(
 vehicles.delete('/:id', zValidator('param', vehicleParamsSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  const vehicleRepository = repositoryFactory.getVehicleRepository();
 
   // Check if vehicle exists and belongs to user
   const existingVehicle = await vehicleRepository.findByUserIdAndId(user.id, id);
@@ -196,9 +196,6 @@ vehicles.delete('/:id', zValidator('param', vehicleParamsSchema), async (c) => {
 vehicles.get('/:id/financing/payments', zValidator('param', vehicleParamsSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  const vehicleRepository = repositoryFactory.getVehicleRepository();
-  const financingRepository = repositoryFactory.getVehicleFinancingRepository();
-  const paymentRepository = repositoryFactory.getVehicleFinancingPaymentRepository();
 
   // Check if vehicle exists and user has access
   const vehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
@@ -227,5 +224,193 @@ vehicles.get('/:id/financing/payments', zValidator('param', vehicleParamsSchema)
     count: payments.length,
   });
 });
+
+// Validation schema for stats
+const statsQuerySchema = z.object({
+  period: z.enum(['7d', '30d', '90d', '1y', 'all']).optional().default('all'),
+});
+
+// GET /api/vehicles/:id/stats - Get vehicle statistics
+vehicles.get(
+  '/:id/stats',
+  zValidator('param', vehicleParamsSchema),
+  zValidator('query', statsQuerySchema),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const { period } = c.req.valid('query');
+
+    // Verify vehicle exists and belongs to user
+    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, id);
+    if (!vehicle) {
+      throw new NotFoundError('Vehicle');
+    }
+
+    // Get all fuel expenses for this vehicle
+    const fuelExpenses = await expenseRepository.find({ vehicleId: id, category: 'fuel' });
+
+    // Filter by time period
+    const now = new Date();
+    let startDate: Date | null = null;
+
+    switch (period) {
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case '1y':
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = null;
+        break;
+    }
+
+    const filteredFuelExpenses = startDate
+      ? fuelExpenses.filter((e) => new Date(e.date) >= (startDate as Date))
+      : fuelExpenses;
+
+    // Sort by date ascending for calculations
+    const sortedExpenses = [...filteredFuelExpenses].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // Calculate statistics
+    const stats = calculateVehicleStats(sortedExpenses, vehicle.initialMileage || 0);
+
+    return c.json({
+      success: true,
+      data: {
+        period,
+        ...stats,
+      },
+    });
+  }
+);
+
+// Helper types and functions for vehicle stats
+interface FuelExpense {
+  id: string;
+  mileage: number | null;
+  fuelAmount: number | null;
+  fuelType: string | null;
+  date: Date;
+  expenseAmount: number;
+}
+
+interface VehicleStats {
+  totalMileage: number;
+  currentMileage: number | null;
+  totalFuelConsumed: number;
+  totalChargeConsumed: number;
+  averageMpg: number | null;
+  averageMilesPerKwh: number | null;
+  totalFuelCost: number;
+  costPerMile: number | null;
+  fuelExpenseCount: number;
+}
+
+function calculateVehicleStats(fuelExpenses: FuelExpense[], initialMileage: number): VehicleStats {
+  const stats: VehicleStats = {
+    totalMileage: 0,
+    currentMileage: null,
+    totalFuelConsumed: 0,
+    totalChargeConsumed: 0,
+    averageMpg: null,
+    averageMilesPerKwh: null,
+    totalFuelCost: 0,
+    costPerMile: null,
+    fuelExpenseCount: fuelExpenses.length,
+  };
+
+  if (fuelExpenses.length === 0) {
+    return stats;
+  }
+
+  // Calculate totals
+  const totals = calculateTotals(fuelExpenses);
+  stats.totalFuelConsumed = totals.fuelAmount;
+  stats.totalChargeConsumed = 0; // Deprecated - keeping for backward compatibility
+  stats.totalFuelCost = totals.cost;
+
+  // Get expenses with mileage data
+  const expensesWithMileage = fuelExpenses.filter(
+    (e) => e.mileage !== null && e.mileage !== undefined
+  );
+
+  if (expensesWithMileage.length > 0) {
+    calculateMileageStats(stats, expensesWithMileage, initialMileage, totals.cost);
+  }
+
+  // Calculate efficiency metrics
+  if (totals.fuelAmount > 0 && expensesWithMileage.length >= 2) {
+    stats.averageMpg = calculateAverageMpg(expensesWithMileage);
+  }
+
+  return stats;
+}
+
+function calculateTotals(expenses: FuelExpense[]): {
+  fuelAmount: number;
+  cost: number;
+} {
+  let fuelAmount = 0;
+  let cost = 0;
+
+  for (const expense of expenses) {
+    if (expense.fuelAmount) {
+      fuelAmount += expense.fuelAmount;
+    }
+    cost += expense.expenseAmount;
+  }
+
+  return { fuelAmount, cost };
+}
+
+function calculateMileageStats(
+  stats: VehicleStats,
+  expensesWithMileage: FuelExpense[],
+  initialMileage: number,
+  totalCost: number
+): void {
+  const mileages = expensesWithMileage.map((e) => e.mileage as number);
+  const latestMileage = Math.max(...mileages);
+  stats.currentMileage = latestMileage;
+  stats.totalMileage = latestMileage - initialMileage;
+
+  if (stats.totalMileage > 0) {
+    stats.costPerMile = totalCost / stats.totalMileage;
+  }
+}
+
+function calculateAverageMpg(expensesWithMileage: FuelExpense[]): number | null {
+  const mpgValues: number[] = [];
+
+  for (let i = 1; i < expensesWithMileage.length; i++) {
+    const current = expensesWithMileage[i];
+    const previous = expensesWithMileage[i - 1];
+
+    if (current.mileage && previous.mileage && current.fuelAmount) {
+      const milesDriven = current.mileage - previous.mileage;
+      const mpg = milesDriven / current.fuelAmount;
+
+      // Filter out unrealistic values (likely data errors)
+      if (mpg > 0 && mpg < 150) {
+        mpgValues.push(mpg);
+      }
+    }
+  }
+
+  if (mpgValues.length > 0) {
+    return mpgValues.reduce((sum, mpg) => sum + mpg, 0) / mpgValues.length;
+  }
+
+  return null;
+}
 
 export { vehicles };

@@ -3,7 +3,7 @@
  */
 
 import type { Context, Next } from 'hono';
-import { createErrorResponse } from '../utils/error-response';
+import { createErrorResponse } from '../core/errors/';
 
 interface BodyLimitConfig {
   maxSize: number; // Maximum size in bytes

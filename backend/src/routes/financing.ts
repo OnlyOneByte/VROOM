@@ -1,26 +1,29 @@
 import { zValidator } from '@hono/zod-validator';
+import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
-import type { NewVehicleFinancing, NewVehicleFinancingPayment } from '../db/schema';
+import { vehicleFinancing, vehicleFinancingPayments } from '../db/schema';
 import { VALIDATION_LIMITS } from '../lib/constants';
+import { requireAuth } from '../lib/middleware/auth';
+import { trackDataChanges } from '../lib/middleware/change-tracker';
+import {
+  vehicleFinancingRepository as financingRepository,
+  vehicleFinancingPaymentRepository as paymentRepository,
+  vehicleRepository,
+} from '../lib/repositories';
 import {
   calculatePaymentBreakdown,
   generateAmortizationSchedule,
   type LoanTerms,
   validateLoanTerms,
-} from '../lib/loan-calculator';
-import { requireAuth } from '../lib/middleware/auth';
-import { trackDataChanges } from '../lib/middleware/change-tracker';
-import { repositoryFactory } from '../lib/repositories/factory';
+} from '../lib/services/analytics/loan-calculator';
 import { logger } from '../lib/utils/logger';
 
 const financing = new Hono();
 
-// Validation schemas
-const createFinancingSchema = z.object({
-  vehicleId: z.string().min(1, 'Vehicle ID is required'),
-  financingType: z.enum(['loan', 'lease', 'own']).default('loan'),
+// Validation schemas derived from db schema
+const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
   provider: z
     .string()
     .min(1, 'Provider is required')
@@ -50,7 +53,6 @@ const createFinancingSchema = z.object({
     .datetime()
     .transform((val) => new Date(val)),
   paymentAmount: z.number().min(0.01, 'Payment amount must be greater than 0'),
-  paymentFrequency: z.enum(['monthly', 'bi-weekly', 'weekly']).default('monthly'),
   paymentDayOfMonth: z
     .number()
     .int()
@@ -63,19 +65,34 @@ const createFinancingSchema = z.object({
     .min(VALIDATION_LIMITS.FINANCING.MIN_DAY_OF_WEEK)
     .max(VALIDATION_LIMITS.FINANCING.MAX_DAY_OF_WEEK)
     .optional(),
-  // Lease-specific fields
   residualValue: z.number().min(0).optional(),
   mileageLimit: z.number().int().min(0).optional(),
   excessMileageFee: z.number().min(0).optional(),
 });
 
-const financingPaymentSchema = z.object({
+const createFinancingSchema = baseFinancingSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+const basePaymentSchema = createInsertSchema(vehicleFinancingPayments, {
   paymentAmount: z.number().min(0.01, 'Payment amount must be greater than 0'),
   paymentDate: z
     .string()
     .datetime()
     .transform((val) => new Date(val)),
-  paymentType: z.enum(['standard', 'extra', 'custom-split']).default('standard'),
+});
+
+const financingPaymentSchema = basePaymentSchema.omit({
+  id: true,
+  financingId: true,
+  principalAmount: true,
+  interestAmount: true,
+  remainingBalance: true,
+  paymentNumber: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 const financingParamsSchema = z.object({
@@ -98,9 +115,6 @@ financing.get(
     try {
       const user = c.get('user');
       const { vehicleId } = c.req.valid('param');
-
-      const vehicleRepository = repositoryFactory.getVehicleRepository();
-      const financingRepository = repositoryFactory.getVehicleFinancingRepository();
 
       // Verify vehicle belongs to user
       const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
@@ -145,9 +159,6 @@ financing.post(
       const { vehicleId } = c.req.valid('param');
       const financingData = c.req.valid('json');
 
-      const vehicleRepository = repositoryFactory.getVehicleRepository();
-      const financingRepository = repositoryFactory.getVehicleFinancingRepository();
-
       // Verify vehicle belongs to user
       const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
       if (!vehicle) {
@@ -190,7 +201,7 @@ financing.post(
         });
       } else {
         // Create new financing
-        const newFinancing: NewVehicleFinancing = {
+        const newFinancing = {
           ...financingData,
           vehicleId,
           currentBalance: financingData.originalAmount,
@@ -224,9 +235,6 @@ financing.get('/:financingId/schedule', zValidator('param', financingParamsSchem
   try {
     const user = c.get('user');
     const { financingId } = c.req.valid('param');
-
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
-    const financingRepository = repositoryFactory.getVehicleFinancingRepository();
 
     const financingData = await financingRepository.findById(financingId);
     if (!financingData) {
@@ -283,10 +291,6 @@ financing.post(
       const { financingId } = c.req.valid('param');
       const paymentData = c.req.valid('json');
 
-      const vehicleRepository = repositoryFactory.getVehicleRepository();
-      const financingRepository = repositoryFactory.getVehicleFinancingRepository();
-      const paymentRepository = repositoryFactory.getVehicleFinancingPaymentRepository();
-
       const financingRecord = await financingRepository.findById(financingId);
       if (!financingRecord) {
         throw new HTTPException(404, { message: 'Financing not found' });
@@ -322,7 +326,7 @@ financing.post(
       }
 
       // Create payment record
-      const newPayment: NewVehicleFinancingPayment = {
+      const newPayment = {
         financingId,
         paymentDate: paymentData.paymentDate,
         paymentAmount: paymentData.paymentAmount,
@@ -376,10 +380,6 @@ financing.get('/:financingId/payments', zValidator('param', financingParamsSchem
     const user = c.get('user');
     const { financingId } = c.req.valid('param');
 
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
-    const financingRepository = repositoryFactory.getVehicleFinancingRepository();
-    const paymentRepository = repositoryFactory.getVehicleFinancingPaymentRepository();
-
     const financingRecord = await financingRepository.findById(financingId);
     if (!financingRecord) {
       throw new HTTPException(404, { message: 'Financing not found' });
@@ -417,9 +417,6 @@ financing.delete('/:financingId', zValidator('param', financingParamsSchema), as
   try {
     const user = c.get('user');
     const { financingId } = c.req.valid('param');
-
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
-    const financingRepository = repositoryFactory.getVehicleFinancingRepository();
 
     const financingRecord = await financingRepository.findById(financingId);
     if (!financingRecord) {

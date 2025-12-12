@@ -1,25 +1,21 @@
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { inject, injectable } from 'inversify';
 import type { NewVehicleFinancingPayment, VehicleFinancingPayment } from '../../db/schema.js';
 import { vehicleFinancingPayments } from '../../db/schema.js';
-import { TYPES } from '../di/types.js';
 import { logger } from '../utils/logger';
 import { BaseRepository } from './base.js';
-import type { IVehicleFinancingPaymentRepository } from './interfaces.js';
 
-@injectable()
-export class VehicleFinancingPaymentRepository
-  extends BaseRepository<VehicleFinancingPayment, NewVehicleFinancingPayment>
-  implements IVehicleFinancingPaymentRepository
-{
-  constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
+export class VehicleFinancingPaymentRepository extends BaseRepository<
+  VehicleFinancingPayment,
+  NewVehicleFinancingPayment
+> {
+  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, vehicleFinancingPayments);
   }
 
   async findByFinancingId(financingId: string): Promise<VehicleFinancingPayment[]> {
     try {
-      const result = await this.database
+      const result = await this.db
         .select()
         .from(vehicleFinancingPayments)
         .where(eq(vehicleFinancingPayments.financingId, financingId))
@@ -37,7 +33,7 @@ export class VehicleFinancingPaymentRepository
     endDate: Date
   ): Promise<VehicleFinancingPayment[]> {
     try {
-      const result = await this.database
+      const result = await this.db
         .select()
         .from(vehicleFinancingPayments)
         .where(
@@ -57,7 +53,7 @@ export class VehicleFinancingPaymentRepository
 
   async getLastPayment(financingId: string): Promise<VehicleFinancingPayment | null> {
     try {
-      const result = await this.database
+      const result = await this.db
         .select()
         .from(vehicleFinancingPayments)
         .where(eq(vehicleFinancingPayments.financingId, financingId))
@@ -72,7 +68,7 @@ export class VehicleFinancingPaymentRepository
 
   async getPaymentCount(financingId: string): Promise<number> {
     try {
-      const result = await this.database
+      const result = await this.db
         .select({
           count: sql<number>`count(*)`.as('count'),
         })

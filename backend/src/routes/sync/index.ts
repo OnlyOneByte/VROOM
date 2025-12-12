@@ -3,18 +3,19 @@
  */
 
 import { Hono } from 'hono';
-import { changeTracker } from '../../lib/change-tracker';
 import { RATE_LIMITS } from '../../lib/constants/rate-limits';
-import { databaseService } from '../../lib/database';
+import {
+  createSuccessResponse,
+  handleSyncError,
+  SyncError,
+  SyncErrorCode,
+} from '../../lib/core/errors/';
 import { requireAuth } from '../../lib/middleware/auth';
 import { idempotencyMiddleware } from '../../lib/middleware/idempotency';
 import { rateLimiter } from '../../lib/middleware/rate-limiter';
-import { SettingsRepository } from '../../lib/repositories/settings-repository';
-import { SyncError, SyncErrorCode } from '../../lib/services/sync/sync-errors';
+import { settingsRepository } from '../../lib/repositories';
 import { syncOrchestrator } from '../../lib/services/sync/sync-orchestrator';
-import { syncLock } from '../../lib/sync-lock';
-import { handleSyncError } from '../../lib/utils/error-handler';
-import { createSuccessResponse } from '../../lib/utils/error-response';
+import { changeTracker } from '../../lib/services/sync/tracking/user-activity-tracker';
 import { logger } from '../../lib/utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../lib/utils/timeout';
 import { backupRoutes } from './backups';
@@ -34,7 +35,7 @@ sync.route('/restore', restoreRoutes);
  * Health check endpoint for sync service
  */
 sync.get('/health', async (c) => {
-  const activeLocks = syncLock.getActiveLockCount();
+  const activeLocks = syncOrchestrator.getActiveLockCount();
 
   return c.json({
     status: 'healthy',
@@ -82,7 +83,7 @@ sync.post('/', syncRateLimiter, idempotencyMiddleware({ required: false }), asyn
     const hasChanges = await changeTracker.hasChangesSinceLastSync(userId);
 
     // Acquire lock - single check to prevent race condition
-    const acquired = await syncLock.acquire(userId);
+    const acquired = await syncOrchestrator.acquireLock(userId);
     if (!acquired) {
       throw new SyncError(
         SyncErrorCode.SYNC_IN_PROGRESS,
@@ -110,7 +111,7 @@ sync.post('/', syncRateLimiter, idempotencyMiddleware({ required: false }), asyn
     } catch (error) {
       return handleSyncError(c, error, 'execute sync operation', 'SYNC_FAILED');
     } finally {
-      syncLock.release(userId);
+      syncOrchestrator.releaseLock(userId);
     }
   } catch (error) {
     return handleSyncError(c, error, 'execute sync operation', 'SYNC_FAILED');
@@ -126,9 +127,7 @@ sync.get('/status', async (c) => {
   const userId = user.id;
 
   try {
-    const db = databaseService.getDatabase();
-    const settingsRepo = new SettingsRepository(db);
-    const settings = await settingsRepo.getUserSettings(userId);
+    const settings = await settingsRepository.getByUserId(userId);
 
     if (!settings) {
       throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'User settings not found');
@@ -154,7 +153,7 @@ sync.get('/status', async (c) => {
         lastDataChangeDate: settings.lastDataChangeDate?.toISOString() || null,
         hasChangesSinceLastSync: hasChanges,
         enabledTypes,
-        syncInProgress: syncLock.isLocked(userId),
+        syncInProgress: syncOrchestrator.isLocked(userId),
       })
     );
   } catch (error) {
@@ -196,10 +195,7 @@ sync.post('/configure', async (c) => {
       );
     }
 
-    const db = databaseService.getDatabase();
-    const settingsRepo = new SettingsRepository(db);
-
-    await settingsRepo.updateSyncConfig(userId, {
+    await settingsRepository.updateSyncConfig(userId, {
       googleSheetsSyncEnabled,
       googleDriveBackupEnabled,
       syncInactivityMinutes,

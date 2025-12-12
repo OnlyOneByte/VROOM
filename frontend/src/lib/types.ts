@@ -23,6 +23,7 @@ export interface Vehicle {
 	vehicleType: VehicleType;
 	licensePlate?: string;
 	nickname?: string;
+	vin?: string;
 	initialMileage?: number;
 	purchasePrice?: number;
 	purchaseDate?: Date;
@@ -117,6 +118,7 @@ export interface Expense {
 	mileage?: number;
 	volume?: number; // For fuel expenses (gallons or liters)
 	charge?: number; // For electric charging (kWh)
+	fuelType?: string; // Octane rating or fuel type for fuel expenses
 	description?: string;
 	receiptUrl?: string;
 	createdAt: Date;
@@ -200,6 +202,7 @@ export interface VehicleFormData {
 	vehicleType: VehicleType;
 	licensePlate?: string;
 	nickname?: string;
+	vin?: string;
 	initialMileage?: number | undefined;
 	purchasePrice?: number | undefined;
 	purchaseDate?: string | undefined;
@@ -214,6 +217,7 @@ export interface ExpenseFormData {
 	mileage?: number | undefined;
 	volume?: number | undefined; // For fuel
 	charge?: number | undefined; // For electric
+	fuelType?: string; // Octane rating or fuel type for fuel expenses
 	description?: string;
 }
 
@@ -235,6 +239,7 @@ export interface VehicleFormErrors {
 	year?: string;
 	licensePlate?: string;
 	nickname?: string;
+	vin?: string;
 	initialMileage?: string;
 	purchasePrice?: string;
 	purchaseDate?: string;
@@ -266,6 +271,7 @@ export interface ExpenseFormErrors {
 	mileage?: string;
 	volume?: string;
 	charge?: string;
+	fuelType?: string;
 	description?: string;
 	[key: string]: string | undefined;
 }

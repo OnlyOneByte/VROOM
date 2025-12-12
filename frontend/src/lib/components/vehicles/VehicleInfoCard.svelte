@@ -50,6 +50,13 @@
 				</div>
 			{/if}
 
+			{#if vehicle.vin}
+				<div class="space-y-1">
+					<p class="text-sm font-medium text-muted-foreground">VIN</p>
+					<p class="text-base font-semibold font-mono">{vehicle.vin}</p>
+				</div>
+			{/if}
+
 			{#if vehicle.initialMileage}
 				<div class="space-y-1">
 					<p class="text-sm font-medium text-muted-foreground">Initial Mileage</p>

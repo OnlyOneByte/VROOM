@@ -1,38 +1,56 @@
 import { eq } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
-import { inject, injectable } from 'inversify';
-import { TYPES } from '../di/types.js';
-import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '../errors.js';
+import {
+  ConflictError,
+  DatabaseError,
+  NotFoundError,
+  ValidationError,
+} from '../core/errors/index.js';
 import { logger } from '../utils/logger.js';
-import type { IBaseRepository } from './interfaces.js';
+import { QueryBuilder } from './query-builder.js';
 
-// Base repository implementation with common CRUD operations
-@injectable()
-export abstract class BaseRepository<T, TNew extends Record<string, unknown>>
-  implements IBaseRepository<T, TNew>
-{
-  // Static database instance for testing (backward compatibility)
-  private static testDb: BunSQLiteDatabase<Record<string, unknown>> | null = null;
+/**
+ * Base Repository - Common CRUD Operations
+ *
+ * ARCHITECTURAL DECISION: Simplified Base Repository
+ * ===================================================
+ * This base class provides common CRUD operations with consistent error handling
+ * and logging. It has been simplified from the original implementation.
+ *
+ * What was removed:
+ * - Test database hooks (setTestDatabase, etc.) - moved to DatabaseService
+ * - Complex factory integration - now uses direct instantiation
+ * - Unnecessary abstractions - kept only essential CRUD operations
+ *
+ * What remains:
+ * - Core CRUD: findById, create, update, delete
+ * - Consistent error handling with typed errors
+ * - Comprehensive logging for all operations
+ * - QueryBuilder integration for complex queries
+ *
+ * Usage:
+ * ```typescript
+ * export class UserRepository extends BaseRepository<User, NewUser> {
+ *   constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
+ *     super(db, users);
+ *   }
+ *
+ *   // Add custom methods here
+ *   async findByEmail(email: string): Promise<User | null> {
+ *     return await this.queryBuilder.findOne(users, eq(users.email, email));
+ *   }
+ * }
+ * ```
+ */
+export abstract class BaseRepository<T, TNew extends Record<string, unknown>> {
+  protected queryBuilder: QueryBuilder<T>;
 
   constructor(
-    @inject(TYPES.Database) protected db: BunSQLiteDatabase<Record<string, unknown>>,
+    protected db: BunSQLiteDatabase<Record<string, unknown>>,
     protected table: SQLiteTable & { id: SQLiteColumn }
-  ) {}
-
-  // Get the database instance (test or production)
-  protected get database() {
-    return BaseRepository.testDb || this.db;
-  }
-
-  // Static method to set test database instance (backward compatibility)
-  static setDatabaseInstance(testDatabase: BunSQLiteDatabase<Record<string, unknown>>) {
-    BaseRepository.testDb = testDatabase;
-  }
-
-  // Static method to reset to production database (backward compatibility)
-  static resetDatabaseInstance() {
-    BaseRepository.testDb = null;
+  ) {
+    this.queryBuilder = new QueryBuilder<T>(db);
   }
 
   // Helper method to get table name safely
@@ -44,12 +62,7 @@ export abstract class BaseRepository<T, TNew extends Record<string, unknown>>
 
   async findById(id: string): Promise<T | null> {
     try {
-      const result = await this.database
-        .select()
-        .from(this.table)
-        .where(eq(this.table.id, id))
-        .limit(1);
-      return (result[0] as T) || null;
+      return await this.queryBuilder.findOne(this.table, eq(this.table.id, id));
     } catch (error) {
       const tableName = this.getTableName();
       logger.error(`Failed to find ${tableName} by id`, {
@@ -63,7 +76,7 @@ export abstract class BaseRepository<T, TNew extends Record<string, unknown>>
 
   async create(data: TNew): Promise<T> {
     try {
-      const result = await this.database.insert(this.table).values(data).returning();
+      const result = await this.db.insert(this.table).values(data).returning();
       const created = result[0] as T;
       const tableName = this.getTableName();
       logger.info(`Created ${tableName}`, { id: (created as { id?: string }).id });
@@ -101,7 +114,7 @@ export abstract class BaseRepository<T, TNew extends Record<string, unknown>>
         updatedAt: new Date(),
       };
 
-      const result = await this.database
+      const result = await this.db
         .update(this.table)
         .set(updateData)
         .where(eq(this.table.id, id))
@@ -142,10 +155,7 @@ export abstract class BaseRepository<T, TNew extends Record<string, unknown>>
   async delete(id: string): Promise<void> {
     const tableName = this.getTableName();
     try {
-      const result = await this.database
-        .delete(this.table)
-        .where(eq(this.table.id, id))
-        .returning();
+      const result = await this.db.delete(this.table).where(eq(this.table.id, id)).returning();
 
       if (result.length === 0) {
         logger.warn(`${tableName} not found for deletion`, { id, tableName });

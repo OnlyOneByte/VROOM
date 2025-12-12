@@ -1,170 +1,76 @@
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { inject, injectable } from 'inversify';
 import type { Expense, NewExpense } from '../../db/schema.js';
 import { expenses, vehicles } from '../../db/schema.js';
-import { TYPES } from '../di/types.js';
-import { DatabaseError } from '../errors.js';
+import { DatabaseError } from '../core/errors/index.js';
 import { logger } from '../utils/logger.js';
 import { BaseRepository } from './base.js';
-import type { IExpenseRepository } from './interfaces.js';
-import { QueryBuilder } from './query-builder.js';
 
-@injectable()
-export class ExpenseRepository
-  extends BaseRepository<Expense, NewExpense>
-  implements IExpenseRepository
-{
-  private queryBuilder: QueryBuilder<Expense>;
+export interface ExpenseFilters {
+  vehicleId?: string;
+  userId?: string;
+  category?: string;
+  startDate?: Date;
+  endDate?: Date;
+}
 
-  constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
+export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
+  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, expenses);
-    this.queryBuilder = new QueryBuilder(this.database);
   }
 
-  async findByVehicleId(vehicleId: string): Promise<Expense[]> {
+  /**
+   * Unified find method with optional filters
+   * Replaces: findByVehicleId, findByUserId, findByCategory, findByVehicleIdAndDateRange, etc.
+   */
+  async find(filters: ExpenseFilters = {}): Promise<Expense[]> {
     try {
-      return await this.queryBuilder.findMany(
-        expenses,
-        eq(expenses.vehicleId, vehicleId),
-        desc(expenses.date)
-      );
+      const conditions: SQL[] = [];
+
+      // Build WHERE conditions based on provided filters
+      if (filters.vehicleId) {
+        conditions.push(eq(expenses.vehicleId, filters.vehicleId));
+      }
+
+      if (filters.category) {
+        conditions.push(eq(expenses.category, filters.category));
+      }
+
+      if (filters.startDate) {
+        conditions.push(gte(expenses.date, filters.startDate));
+      }
+
+      if (filters.endDate) {
+        conditions.push(lte(expenses.date, filters.endDate));
+      }
+
+      // If userId is provided, we need to join with vehicles table
+      if (filters.userId) {
+        const result = await this.db
+          .select()
+          .from(expenses)
+          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+          .where(and(eq(vehicles.userId, filters.userId), ...conditions))
+          .orderBy(desc(expenses.date));
+
+        return result.map((row) => row.expenses);
+      }
+
+      // Simple query without join
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      return await this.db.select().from(expenses).where(whereClause).orderBy(desc(expenses.date));
     } catch (error) {
-      logger.error('Failed to find expenses by vehicle', {
-        vehicleId,
+      logger.error('Failed to find expenses', {
+        filters,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new DatabaseError(`Failed to find expenses for vehicle ${vehicleId}`, error);
-    }
-  }
-
-  async findByVehicleIdAndDateRange(
-    vehicleId: string,
-    startDate: Date,
-    endDate: Date
-  ): Promise<Expense[]> {
-    try {
-      return await this.queryBuilder.findMany(
-        expenses,
-        and(
-          eq(expenses.vehicleId, vehicleId),
-          gte(expenses.date, startDate),
-          lte(expenses.date, endDate)
-        ),
-        desc(expenses.date)
-      );
-    } catch (error) {
-      logger.error('Error finding expenses for vehicle in date range', { vehicleId, error });
-      throw new Error('Failed to find expenses for date range');
-    }
-  }
-
-  async findByUserId(userId: string): Promise<Expense[]> {
-    try {
-      const result = await this.database
-        .select({
-          id: expenses.id,
-          vehicleId: expenses.vehicleId,
-          category: expenses.category,
-          amount: expenses.amount,
-          currency: expenses.currency,
-          date: expenses.date,
-          mileage: expenses.mileage,
-          volume: expenses.volume,
-          charge: expenses.charge,
-          description: expenses.description,
-          receiptUrl: expenses.receiptUrl,
-          tags: expenses.tags,
-          createdAt: expenses.createdAt,
-          updatedAt: expenses.updatedAt,
-        })
-        .from(expenses)
-        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId))
-        .orderBy(desc(expenses.date));
-      return result;
-    } catch (error) {
-      logger.error('Failed to find expenses by user', {
-        userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new DatabaseError(`Failed to find expenses for user ${userId}`, error);
-    }
-  }
-
-  async findByUserIdAndDateRange(
-    userId: string,
-    startDate: Date,
-    endDate: Date
-  ): Promise<Expense[]> {
-    try {
-      const result = await this.database
-        .select({
-          id: expenses.id,
-          vehicleId: expenses.vehicleId,
-          category: expenses.category,
-          amount: expenses.amount,
-          currency: expenses.currency,
-          date: expenses.date,
-          mileage: expenses.mileage,
-          volume: expenses.volume,
-          charge: expenses.charge,
-          description: expenses.description,
-          receiptUrl: expenses.receiptUrl,
-          tags: expenses.tags,
-          createdAt: expenses.createdAt,
-          updatedAt: expenses.updatedAt,
-        })
-        .from(expenses)
-        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-        .where(
-          and(
-            eq(vehicles.userId, userId),
-            gte(expenses.date, startDate),
-            lte(expenses.date, endDate)
-          )
-        )
-        .orderBy(desc(expenses.date));
-      return result;
-    } catch (error) {
-      logger.error('Error finding expenses for user in date range', { userId, error });
-      throw new Error('Failed to find expenses for user in date range');
-    }
-  }
-
-  async findByCategory(vehicleId: string, category: string): Promise<Expense[]> {
-    try {
-      return await this.queryBuilder.findMany(
-        expenses,
-        and(eq(expenses.vehicleId, vehicleId), eq(expenses.category, category)),
-        desc(expenses.date)
-      );
-    } catch (error) {
-      logger.error('Error finding expenses by category for vehicle', {
-        category,
-        vehicleId,
-        error,
-      });
-      throw new Error('Failed to find expenses by category');
-    }
-  }
-
-  async findFuelExpenses(vehicleId: string): Promise<Expense[]> {
-    try {
-      return await this.queryBuilder.findMany(
-        expenses,
-        and(eq(expenses.vehicleId, vehicleId), eq(expenses.category, 'fuel')),
-        desc(expenses.date)
-      );
-    } catch (error) {
-      logger.error('Error finding fuel expenses for vehicle', { vehicleId, error });
-      throw new Error('Failed to find fuel expenses');
+      throw new DatabaseError('Failed to find expenses', error);
     }
   }
 
   async batchCreate(expenseList: NewExpense[]): Promise<Expense[]> {
     try {
-      const result = await this.database.insert(expenses).values(expenseList).returning();
+      const result = await this.db.insert(expenses).values(expenseList).returning();
       logger.info('Batch created expenses', { count: result.length });
       return result;
     } catch (error) {
@@ -174,7 +80,6 @@ export class ExpenseRepository
         error: errorMessage,
       });
 
-      // Handle specific SQLite errors
       if (errorMessage.includes('FOREIGN KEY constraint')) {
         throw new DatabaseError('Invalid vehicle reference in batch expense creation', error);
       }
@@ -196,23 +101,22 @@ export class ExpenseRepository
         whereConditions.push(lte(expenses.date, endDate));
       }
 
-      const query = this.database
+      const result = await this.db
         .select({
           category: expenses.category,
-          total: sql<number>`sum(${expenses.amount})`.as('total'),
+          total: sql<number>`sum(${expenses.expenseAmount})`.as('total'),
         })
         .from(expenses)
         .where(and(...whereConditions))
         .groupBy(expenses.category);
 
-      const result = await query;
       return result.map((row) => ({
         category: row.category,
         total: Number(row.total) || 0,
       }));
     } catch (error) {
       logger.error('Error getting total by category for vehicle', { vehicleId, error });
-      throw new Error('Failed to get total by category');
+      throw new DatabaseError('Failed to get total by category', error);
     }
   }
 
@@ -221,16 +125,16 @@ export class ExpenseRepository
     year: number
   ): Promise<{ month: number; total: number }[]> {
     try {
-      const startDate = new Date(year, 0, 1); // January 1st of the year
-      const endDate = new Date(year, 11, 31, 23, 59, 59); // December 31st of the year
+      const startDate = new Date(year, 0, 1);
+      const endDate = new Date(year, 11, 31, 23, 59, 59);
 
-      const result = await this.database
+      const result = await this.db
         .select({
           month:
             sql<number>`cast(strftime('%m', datetime(${expenses.date} / 1000, 'unixepoch')) as integer)`.as(
               'month'
             ),
-          total: sql<number>`sum(${expenses.amount})`.as('total'),
+          total: sql<number>`sum(${expenses.expenseAmount})`.as('total'),
         })
         .from(expenses)
         .where(
@@ -249,7 +153,7 @@ export class ExpenseRepository
       }));
     } catch (error) {
       logger.error('Error getting monthly totals for vehicle', { vehicleId, year, error });
-      throw new Error('Failed to get monthly totals');
+      throw new DatabaseError('Failed to get monthly totals', error);
     }
   }
 }

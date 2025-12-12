@@ -43,6 +43,7 @@
     "csv-stringify": "^6.6.0",
     "dotenv": "^16.3.1",
     "drizzle-orm": "^0.44.6",
+    "drizzle-zod": "^0.8.3",
     "googleapis": "^162.0.0",
     "hono": "^4.9.0",
     "inversify": "^7.10.3",

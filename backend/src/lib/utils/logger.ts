@@ -2,7 +2,7 @@
  * Structured logging utility with log levels and specialized logging methods
  */
 
-import { config } from '../config';
+import { config } from '../core/config';
 
 export enum LogLevel {
   ERROR = 0,

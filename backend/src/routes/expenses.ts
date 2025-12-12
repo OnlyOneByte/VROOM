@@ -1,40 +1,25 @@
 import { zValidator } from '@hono/zod-validator';
+import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import type { NewExpense } from '../db/schema';
+import { type Expense, expenses as expensesTable } from '../db/schema';
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_DESCRIPTIONS,
   EXPENSE_CATEGORY_LABELS,
 } from '../db/types';
 import { VALIDATION_LIMITS } from '../lib/constants';
-import { NotFoundError, ValidationError } from '../lib/errors';
+import { NotFoundError, ValidationError } from '../lib/core/errors/';
 import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
-import { repositoryFactory } from '../lib/repositories/factory';
-
-// Types for expense data (from database and API)
-// With JSON mode, tags are automatically parsed/stringified
-type ExpenseData = {
-  id: string;
-  amount: number;
-  category: string;
-  tags: string[]; // Automatically handled by Drizzle JSON mode
-  date: Date;
-  description?: string | null;
-  mileage?: number | null;
-  volume?: number | null;
-  charge?: number | null;
-  vehicleId: string;
-};
+import { expenseRepository, vehicleRepository } from '../lib/repositories';
 
 const expenses = new Hono();
 
-// Validation schemas
+// Validation schemas derived from db schema
 const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
 
-const createExpenseSchema = z.object({
-  vehicleId: z.string().min(1, 'Vehicle ID is required'),
+const baseExpenseSchema = createInsertSchema(expensesTable, {
   tags: z
     .array(
       z
@@ -52,12 +37,10 @@ const createExpenseSchema = z.object({
     .optional()
     .default([]),
   category: expenseCategorySchema,
-  amount: z.number().positive('Amount must be positive'),
-  currency: z.string().length(3, 'Currency must be 3 characters').default('USD'),
+  expenseAmount: z.number().positive('Expense amount must be positive'),
+  fuelAmount: z.number().positive('Fuel amount must be positive').nullable().optional(),
   date: z.coerce.date(),
   mileage: z.number().int().min(0, 'Mileage cannot be negative').nullable().optional(),
-  volume: z.number().positive('Volume must be positive').optional(),
-  charge: z.number().positive('Charge must be positive').optional(),
   description: z
     .string()
     .max(
@@ -76,6 +59,12 @@ const createExpenseSchema = z.object({
       }
     }, 'Receipt URL must be valid')
     .optional(),
+});
+
+const createExpenseSchema = baseExpenseSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 const updateExpenseSchema = createExpenseSchema.partial();
@@ -126,9 +115,6 @@ expenses.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const user = c.get('user');
   const expenseData = c.req.valid('json');
 
-  const vehicleRepository = repositoryFactory.getVehicleRepository();
-  const expenseRepository = repositoryFactory.getExpenseRepository();
-
   // Verify vehicle exists and belongs to user
   const vehicle = await vehicleRepository.findByUserIdAndId(user.id, expenseData.vehicleId);
   if (!vehicle) {
@@ -136,18 +122,9 @@ expenses.post('/', zValidator('json', createExpenseSchema), async (c) => {
   }
 
   // Validate fuel expense requirements
-  validateFuelExpenseData(
-    expenseData.category,
-    expenseData.mileage,
-    expenseData.volume,
-    expenseData.charge
-  );
+  validateFuelExpenseData(expenseData.category, expenseData.mileage, expenseData.fuelAmount);
 
-  const newExpense: NewExpense = {
-    ...expenseData,
-  };
-
-  const createdExpense = await expenseRepository.create(newExpense);
+  const createdExpense = await expenseRepository.create(expenseData);
 
   return c.json(
     {
@@ -169,19 +146,17 @@ expenses.post('/', zValidator('json', createExpenseSchema), async (c) => {
 function validateFuelExpenseData(
   category: string,
   mileage: number | null | undefined,
-  volume: number | null | undefined,
-  charge: number | null | undefined
+  fuelAmount: number | null | undefined
 ): void {
   if (category === 'fuel') {
-    if ((!volume && !charge) || !mileage) {
-      throw new ValidationError('Fuel expenses require volume/charge and mileage data');
+    if (!fuelAmount || !mileage) {
+      throw new ValidationError('Fuel expenses require fuelAmount and mileage data');
     }
   }
 }
 
 // Helper function to fetch expenses for a vehicle based on query filters
 async function fetchVehicleExpenses(
-  expenseRepository: ReturnType<typeof repositoryFactory.getExpenseRepository>,
   vehicleId: string,
   query: {
     startDate?: Date;
@@ -189,24 +164,17 @@ async function fetchVehicleExpenses(
     tags?: string[];
     category?: string;
   }
-): Promise<ExpenseData[]> {
-  let expenses: ExpenseData[] = [];
-
-  if (query.startDate && query.endDate) {
-    expenses = (await expenseRepository.findByVehicleIdAndDateRange(
-      vehicleId,
-      query.startDate,
-      query.endDate
-    )) as ExpenseData[];
-  } else if (query.category) {
-    expenses = (await expenseRepository.findByCategory(vehicleId, query.category)) as ExpenseData[];
-  } else {
-    expenses = (await expenseRepository.findByVehicleId(vehicleId)) as ExpenseData[];
-  }
+): Promise<Expense[]> {
+  const expenses = await expenseRepository.find({
+    vehicleId,
+    category: query.category,
+    startDate: query.startDate,
+    endDate: query.endDate,
+  });
 
   // Filter by tags if specified
   if (query.tags && query.tags.length > 0) {
-    return expenses.filter((expense) => query.tags?.some((tag) => expense.tags.includes(tag)));
+    return expenses.filter((expense) => query.tags?.some((tag) => expense.tags?.includes(tag)));
   }
 
   return expenses;
@@ -216,9 +184,6 @@ async function fetchVehicleExpenses(
 expenses.get('/', zValidator('query', expenseQuerySchema), async (c) => {
   const user = c.get('user');
   const query = c.req.valid('query');
-
-  const vehicleRepository = repositoryFactory.getVehicleRepository();
-  const expenseRepository = repositoryFactory.getExpenseRepository();
 
   // Get all user vehicles
   const userVehicles = await vehicleRepository.findByUserId(user.id);
@@ -232,7 +197,7 @@ expenses.get('/', zValidator('query', expenseQuerySchema), async (c) => {
     });
   }
 
-  let allExpenses: ExpenseData[] = [];
+  let allExpenses: Expense[] = [];
 
   // If vehicleId filter is provided, only get expenses for that vehicle
   if (query.vehicleId) {
@@ -241,12 +206,10 @@ expenses.get('/', zValidator('query', expenseQuerySchema), async (c) => {
       throw new NotFoundError('Vehicle');
     }
 
-    allExpenses = await fetchVehicleExpenses(expenseRepository, query.vehicleId, query);
+    allExpenses = await fetchVehicleExpenses(query.vehicleId, query);
   } else {
     // Get expenses for all user vehicles
-    const expensePromises = vehicleIds.map((vehicleId) =>
-      fetchVehicleExpenses(expenseRepository, vehicleId, query)
-    );
+    const expensePromises = vehicleIds.map((vehicleId) => fetchVehicleExpenses(vehicleId, query));
     const expenseArrays = await Promise.all(expensePromises);
     allExpenses = expenseArrays.flat();
   }
@@ -280,9 +243,6 @@ expenses.get('/:id', zValidator('param', expenseParamsSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const expenseRepository = repositoryFactory.getExpenseRepository();
-  const vehicleRepository = repositoryFactory.getVehicleRepository();
-
   const expense = await expenseRepository.findById(id);
   if (!expense) {
     throw new NotFoundError('Expense');
@@ -310,9 +270,6 @@ expenses.put(
     const { id } = c.req.valid('param');
     const updateData = c.req.valid('json');
 
-    const expenseRepository = repositoryFactory.getExpenseRepository();
-    const vehicleRepository = repositoryFactory.getVehicleRepository();
-
     // Check if expense exists
     const existingExpense = await expenseRepository.findById(id);
     if (!existingExpense) {
@@ -330,12 +287,10 @@ expenses.put(
       updateData.category !== undefined ? updateData.category : existingExpense.category;
     const finalMileage =
       updateData.mileage !== undefined ? updateData.mileage : existingExpense.mileage;
-    const finalVolume =
-      updateData.volume !== undefined ? updateData.volume : existingExpense.volume;
-    const finalCharge =
-      updateData.charge !== undefined ? updateData.charge : existingExpense.charge;
+    const finalFuelAmount =
+      updateData.fuelAmount !== undefined ? updateData.fuelAmount : existingExpense.fuelAmount;
 
-    validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalCharge);
+    validateFuelExpenseData(finalCategory, finalMileage, finalFuelAmount);
 
     const updatedExpense = await expenseRepository.update(id, updateData);
 
@@ -351,9 +306,6 @@ expenses.put(
 expenses.delete('/:id', zValidator('param', expenseParamsSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-
-  const expenseRepository = repositoryFactory.getExpenseRepository();
-  const vehicleRepository = repositoryFactory.getVehicleRepository();
 
   // Check if expense exists
   const existingExpense = await expenseRepository.findById(id);

@@ -4,11 +4,14 @@
 
 import { Hono } from 'hono';
 import { RATE_LIMITS } from '../../lib/constants/rate-limits';
+import {
+  createSuccessResponse,
+  handleSyncError,
+  SyncError,
+  SyncErrorCode,
+} from '../../lib/core/errors/';
 import { rateLimiter } from '../../lib/middleware/rate-limiter';
-import { validateFileIdMiddleware } from '../../lib/middleware/validation';
 import { syncOrchestrator } from '../../lib/services/sync/sync-orchestrator';
-import { handleSyncError } from '../../lib/utils/error-handler';
-import { createSuccessResponse } from '../../lib/utils/error-response';
 import { logger } from '../../lib/utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../lib/utils/timeout';
 
@@ -78,10 +81,14 @@ backupRoutes.get('/download', backupRateLimiter, async (c) => {
  * GET /api/sync/backups/:fileId/download
  * Download a specific backup from Google Drive
  */
-backupRoutes.get('/:fileId/download', validateFileIdMiddleware, async (c) => {
+backupRoutes.get('/:fileId/download', async (c) => {
   const user = c.get('user');
   const userId = user.id;
-  const fileId = c.get('fileId' as never) as string;
+  const fileId = c.req.param('fileId');
+
+  if (!fileId || fileId.trim() === '') {
+    throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'fileId parameter is required');
+  }
 
   try {
     const { buffer, metadata } = await withTimeout(
@@ -109,10 +116,14 @@ backupRoutes.get('/:fileId/download', validateFileIdMiddleware, async (c) => {
  * DELETE /api/sync/backups/:fileId
  * Delete a specific backup from Google Drive
  */
-backupRoutes.delete('/:fileId', validateFileIdMiddleware, async (c) => {
+backupRoutes.delete('/:fileId', async (c) => {
   const user = c.get('user');
   const userId = user.id;
-  const fileId = c.get('fileId' as never) as string;
+  const fileId = c.req.param('fileId');
+
+  if (!fileId || fileId.trim() === '') {
+    throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'fileId parameter is required');
+  }
 
   try {
     await syncOrchestrator.deleteBackupFromDrive(userId, fileId);

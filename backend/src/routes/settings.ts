@@ -1,10 +1,11 @@
+import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { userSettings } from '../db/schema';
 import { VALIDATION_LIMITS } from '../lib/constants';
-import { databaseService } from '../lib/database';
-import { AppError } from '../lib/errors';
+import { AppError } from '../lib/core/errors/';
 import { requireAuth } from '../lib/middleware/auth';
-import { SettingsRepository } from '../lib/repositories/settings';
+import { settingsRepository } from '../lib/repositories';
 import { logger } from '../lib/utils/logger';
 
 const settings = new Hono();
@@ -12,30 +13,31 @@ const settings = new Hono();
 // Apply auth middleware to all routes
 settings.use('*', requireAuth);
 
-// Validation schemas
-const updateSettingsSchema = z.object({
-  distanceUnit: z.enum(['miles', 'kilometers']).optional(),
-  volumeUnit: z.enum(['gallons_us', 'gallons_uk', 'liters']).optional(),
-  chargeUnit: z.enum(['kwh']).optional(),
-  currencyUnit: z.string().optional(),
-  autoBackupEnabled: z.boolean().optional(),
-  backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
-  googleDriveBackupEnabled: z.boolean().optional(),
-  googleDriveBackupFolderId: z.string().optional(),
+// Validation schemas derived from db schema
+const baseSettingsSchema = createInsertSchema(userSettings, {
   googleDriveBackupRetentionCount: z
     .number()
     .min(1)
     .max(VALIDATION_LIMITS.SETTINGS.MAX_BACKUP_RETENTION)
     .optional(),
-  googleSheetsSyncEnabled: z.boolean().optional(),
-  googleSheetsSpreadsheetId: z.string().optional(),
-  syncOnInactivity: z.boolean().optional(),
   syncInactivityMinutes: z
     .number()
     .min(1)
     .max(VALIDATION_LIMITS.SETTINGS.MAX_SYNC_INACTIVITY_MINUTES)
     .optional(),
 });
+
+const updateSettingsSchema = baseSettingsSchema
+  .omit({
+    id: true,
+    userId: true,
+    lastBackupDate: true,
+    lastSyncDate: true,
+    lastDataChangeDate: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .partial();
 
 /**
  * GET /api/settings
@@ -44,10 +46,8 @@ const updateSettingsSchema = z.object({
 settings.get('/', async (c) => {
   try {
     const user = c.get('user');
-    const db = databaseService.getDatabase();
-    const settingsRepo = new SettingsRepository(db);
 
-    const userSettings = await settingsRepo.getOrCreate(user.id);
+    const userSettings = await settingsRepository.getOrCreate(user.id);
 
     return c.json({
       success: true,
@@ -69,14 +69,11 @@ settings.put('/', async (c) => {
     const body = await c.req.json();
     const updates = updateSettingsSchema.parse(body);
 
-    const db = databaseService.getDatabase();
-    const settingsRepo = new SettingsRepository(db);
-
     // Ensure settings exist first
-    await settingsRepo.getOrCreate(user.id);
+    await settingsRepository.getOrCreate(user.id);
 
     // Update settings
-    const updatedSettings = await settingsRepo.update(user.id, updates);
+    const updatedSettings = await settingsRepository.update(user.id, updates);
 
     return c.json({
       success: true,
@@ -99,11 +96,8 @@ settings.put('/', async (c) => {
 settings.post('/backup', async (c) => {
   try {
     const user = c.get('user');
-    const db = databaseService.getDatabase();
-    const settingsRepo = new SettingsRepository(db);
-
     // Update last backup date
-    await settingsRepo.updateBackupDate(user.id);
+    await settingsRepository.updateBackupDate(user.id);
 
     // TODO: Implement actual backup logic (export data, upload to Drive, etc.)
 

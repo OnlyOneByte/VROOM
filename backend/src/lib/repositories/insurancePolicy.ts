@@ -1,29 +1,18 @@
 import { and, eq, lte } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { inject, injectable } from 'inversify';
 import type { InsurancePolicy, NewInsurancePolicy } from '../../db/schema.js';
 import { insurancePolicies, vehicles } from '../../db/schema.js';
-import { TYPES } from '../di/types.js';
 import { logger } from '../utils/logger';
 import { BaseRepository } from './base.js';
-import type { IInsurancePolicyRepository } from './interfaces.js';
-import { QueryBuilder } from './query-builder.js';
 
-@injectable()
-export class InsurancePolicyRepository
-  extends BaseRepository<InsurancePolicy, NewInsurancePolicy>
-  implements IInsurancePolicyRepository
-{
-  private queryBuilder: QueryBuilder<InsurancePolicy>;
-
-  constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
+export class InsurancePolicyRepository extends BaseRepository<InsurancePolicy, NewInsurancePolicy> {
+  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, insurancePolicies);
-    this.queryBuilder = new QueryBuilder(this.database);
   }
 
   async findByVehicleId(vehicleId: string): Promise<InsurancePolicy[]> {
     try {
-      const result = await this.database
+      const result = await this.db
         .select()
         .from(insurancePolicies)
         .where(eq(insurancePolicies.vehicleId, vehicleId))
@@ -56,7 +45,7 @@ export class InsurancePolicyRepository
       const expirationDate = new Date();
       expirationDate.setDate(expirationDate.getDate() + daysFromNow);
 
-      const result = await this.database
+      const result = await this.db
         .select({
           id: insurancePolicies.id,
           vehicleId: insurancePolicies.vehicleId,
@@ -90,7 +79,7 @@ export class InsurancePolicyRepository
 
   async markAsInactive(id: string): Promise<InsurancePolicy> {
     try {
-      const result = await this.database
+      const result = await this.db
         .update(insurancePolicies)
         .set({
           isActive: false,

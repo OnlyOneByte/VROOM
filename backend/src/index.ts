@@ -5,23 +5,20 @@ import { csrf } from 'hono/csrf';
 import { logger as honoLogger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
-import { config } from './lib/config';
 import { RATE_LIMITS } from './lib/constants/rate-limits';
+import { config } from './lib/core/config';
 import { activityTrackerMiddleware } from './lib/middleware/activity-tracker';
 import { optionalAuth, requireAuth } from './lib/middleware/auth';
 import { bodyLimit } from './lib/middleware/body-limit';
 import { errorHandler } from './lib/middleware/error-handler';
 import { rateLimiter } from './lib/middleware/rate-limiter';
 import { logger } from './lib/utils/logger';
-import { analytics } from './routes/analytics';
 import { auth } from './routes/auth';
 import { expenses } from './routes/expenses';
 import { financing } from './routes/financing';
 import { insurance } from './routes/insurance';
 import { settings } from './routes/settings';
-import { sharing } from './routes/sharing';
 import { sync } from './routes/sync';
-import { vehicleStats } from './routes/vehicle-stats';
 import { vehicles } from './routes/vehicles';
 
 const app = new Hono();
@@ -120,13 +117,10 @@ app.get('/health', (c) => {
 // API Versioning - Mount v1 routes
 app.route('/api/v1/auth', auth);
 app.route('/api/v1/vehicles', vehicles);
-app.route('/api/v1/vehicles', vehicleStats);
 app.route('/api/v1/financing', financing);
 app.route('/api/v1/expenses', expenses);
 app.route('/api/v1/insurance', insurance);
-app.route('/api/v1/analytics', analytics);
 app.route('/api/v1/settings', settings);
-app.route('/api/v1/sharing', sharing);
 app.route('/api/v1/sync', sync);
 
 // Backward compatibility: Redirect /api/* to /api/v1/* (except /api root)
@@ -174,9 +168,7 @@ app.get('/api', optionalAuth, (c) => {
       financing: '/api/v1/financing',
       expenses: '/api/v1/expenses',
       insurance: '/api/v1/insurance',
-      analytics: '/api/v1/analytics',
       settings: '/api/v1/settings',
-      sharing: '/api/v1/sharing',
       sync: '/api/v1/sync',
     },
     deprecation: {

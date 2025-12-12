@@ -17,18 +17,52 @@ A modern, type-safe backend API built with Bun, Hono, and Drizzle ORM for compre
 ```
 backend/
 ├── src/
-│   ├── db/                 # Database schema, migrations, and utilities
-│   ├── lib/                # Core utilities and services
-│   │   ├── auth/          # Authentication providers and utilities
-│   │   ├── middleware/    # Custom middleware (auth, rate limiting, etc.)
-│   │   ├── repositories/  # Data access layer
-│   │   └── validation/    # Zod schemas and validation utilities
-│   ├── routes/            # API route handlers
-│   ├── types/             # TypeScript type definitions and enums
-│   └── index.ts           # Application entry point
-├── drizzle/               # Database migrations
-├── data/                  # SQLite database files
-└── dist/                  # Build output
+│   ├── db/                      # Database schema, migrations, and utilities
+│   ├── lib/                     # Core utilities and services
+│   │   ├── auth/               # Authentication (Lucia setup)
+│   │   ├── constants/          # Configuration constants
+│   │   │   ├── app-config.ts  # App-level config (database, pagination, session, time)
+│   │   │   ├── sync.ts        # Sync and backup configuration
+│   │   │   ├── validation.ts  # Validation limits
+│   │   │   └── rate-limits.ts # Rate limiting configuration
+│   │   ├── core/              # Core infrastructure
+│   │   │   ├── config.ts      # Environment configuration
+│   │   │   ├── database.ts    # Database service
+│   │   │   └── errors/        # Consolidated error handling
+│   │   │       ├── classes.ts    # Error classes
+│   │   │       ├── handlers.ts   # Error handling logic
+│   │   │       ├── responses.ts  # Response formatting
+│   │   │       └── index.ts      # Unified exports
+│   │   ├── middleware/        # Request/response interceptors
+│   │   ├── repositories/      # Data access layer (simplified)
+│   │   │   ├── base.ts       # BaseRepository with common CRUD
+│   │   │   ├── query-builder.ts # Reusable query patterns
+│   │   │   ├── index.ts      # Direct repository exports
+│   │   │   └── [entity].ts   # Entity-specific repositories
+│   │   ├── services/          # Business logic by domain
+│   │   │   ├── analytics/    # Analytics and calculations
+│   │   │   ├── integrations/ # External services (Google Drive/Sheets)
+│   │   │   └── sync/         # Sync, backup, and restore operations
+│   │   │       ├── backup-service.ts      # Backup creation/parsing/validation
+│   │   │       ├── google-sync.ts         # Google Drive & Sheets sync
+│   │   │       ├── sync-orchestrator.ts   # Sync coordination
+│   │   │       ├── restore/               # Restore operations
+│   │   │       └── tracking/              # Activity & change tracking
+│   │   ├── types/             # Shared type definitions
+│   │   │   ├── api-response.ts # API response types
+│   │   │   ├── sync.ts        # Sync/backup types
+│   │   │   ├── analytics.ts   # Analytics types
+│   │   │   └── database.ts    # Database entity types
+│   │   └── utils/             # Pure utility functions
+│   │       ├── logger.ts      # Singleton logger
+│   │       ├── timeout.ts     # Timeout utilities
+│   │       └── unit-conversions.ts # Unit conversion helpers
+│   ├── routes/                # API route handlers
+│   ├── types/                 # API-specific types and enums
+│   └── index.ts               # Application entry point
+├── drizzle/                   # Database migrations
+├── data/                      # SQLite database files
+└── dist/                      # Build output
 ```
 
 ## 🛠️ Setup & Installation
@@ -193,29 +227,86 @@ backend/
 
 ## 🏗️ Architecture & Design Patterns
 
-### Repository Pattern
-- Abstracted data access layer
-- Consistent CRUD operations
-- Easy testing and mocking
-- Database-agnostic interface
+### Simplified Repository Pattern (No Factory)
+
+The codebase uses a **direct export pattern** instead of a factory pattern for simplicity:
+
+```typescript
+// repositories/index.ts - Direct singleton exports
+export const userRepository = new UserRepository(db);
+export const vehicleRepository = new VehicleRepository(db);
+
+// For testing, classes are also exported
+export { UserRepository, VehicleRepository };
+```
+
+**Why no factory pattern?**
+- No dependency injection framework in use
+- Simpler code with fewer abstractions
+- Direct imports are easier to understand and trace
+- Testing is still possible by exporting classes
+- Reduces boilerplate and complexity
+
+**Repository Features:**
+- Consistent CRUD operations via `BaseRepository`
+- Unified error handling with typed errors
+- `QueryBuilder` for reusable query patterns
+- Comprehensive logging for all operations
+
+### Consolidated Error System
+
+All error handling is centralized in `lib/core/errors/`:
+
+```typescript
+// Organized into three modules:
+errors/
+├── classes.ts    # Error classes (AppError, ValidationError, SyncError, etc.)
+├── handlers.ts   # Error handling logic (handleDatabaseError, etc.)
+├── responses.ts  # Response formatting (createErrorResponse, etc.)
+└── index.ts      # Unified exports
+```
+
+**Benefits:**
+- Single source of truth for error handling
+- Consistent error responses across all endpoints
+- Clear separation: classes, handlers, responses
+- Easy to extend with new error types
+
+### Service Layer Organization
+
+Services are organized by **business domain**:
+
+```
+services/
+├── analytics/      # Analytics calculations and reporting
+├── integrations/   # External service integrations (Google)
+└── sync/          # Sync, backup, restore, and tracking
+    ├── backup-service.ts
+    ├── google-sync.ts
+    ├── sync-orchestrator.ts
+    ├── restore/
+    └── tracking/
+```
+
+**Key Principles:**
+- Domain-driven organization
+- Services depend on repositories (injected via constructor)
+- Orchestrators coordinate multiple services
+- Clear boundaries between domains
 
 ### Middleware Architecture
 - Authentication middleware for protected routes
 - Rate limiting for API protection
-- Error handling with proper HTTP status codes
+- Error handling delegates to `core/errors`
+- Activity tracking delegates to services
 - Request logging and monitoring
 
 ### Type Safety
 - Comprehensive TypeScript types
-- Zod schema validation
+- Zod schema validation in routes
+- Centralized type definitions in `lib/types/`
 - Database schema types from Drizzle
 - API request/response type definitions
-
-### Error Handling
-- Custom error classes with proper HTTP status codes
-- Centralized error handling middleware
-- Development vs production error responses
-- Structured error logging
 
 ## 🔒 Security Features
 
@@ -335,6 +426,63 @@ In production, this is less of an issue because:
 - **TypeScript**: Strict type checking
 - **Hot Reload**: Automatic server restart on changes
 
+## 🔄 Migration Notes for Developers
+
+### Recent Refactoring (Code Consolidation)
+
+The codebase underwent a major consolidation to improve organization and reduce duplication. Here are the key changes:
+
+#### Error Handling
+- **Old**: Errors split across `core/errors.ts`, `utils/error-handler.ts`, `utils/error-response.ts`
+- **New**: Consolidated into `core/errors/` directory with classes, handlers, and responses
+- **Migration**: Update imports to `from '../core/errors'`
+
+#### Repository Pattern
+- **Old**: Factory pattern with `repositories/factory.ts` and `repositories/interfaces.ts`
+- **New**: Direct exports from `repositories/index.ts`
+- **Migration**: 
+  ```typescript
+  // Old
+  import { createRepositories } from './repositories/factory';
+  const repos = createRepositories(db);
+  
+  // New
+  import { userRepository, vehicleRepository } from './repositories';
+  ```
+
+#### Service Organization
+- **Old**: Services scattered, tracking at top level, `services/google/`
+- **New**: Domain-organized under `services/analytics/`, `services/integrations/`, `services/sync/`
+- **Migration**: Update import paths to new locations
+
+#### Constants
+- **Old**: Many small constant files (`database.ts`, `pagination.ts`, `session.ts`, `time.ts`, `backup.ts`)
+- **New**: Merged into `app-config.ts` and `sync.ts`
+- **Migration**:
+  ```typescript
+  // Old
+  import { DEFAULT_PAGE_SIZE } from './constants/pagination';
+  
+  // New
+  import { APP_CONFIG } from './constants/app-config';
+  const pageSize = APP_CONFIG.PAGINATION.DEFAULT_PAGE_SIZE;
+  ```
+
+#### Type Definitions
+- **Old**: Types scattered in service directories
+- **New**: Centralized in `lib/types/` (sync.ts, analytics.ts, database.ts)
+- **Migration**: Import types from `lib/types` instead of service directories
+
+#### Removed Files
+The following files were removed (functionality merged elsewhere):
+- `lib/utils/error-handler.ts` → `lib/core/errors/handlers.ts`
+- `lib/utils/error-response.ts` → `lib/core/errors/responses.ts`
+- `lib/utils/query-builder.ts` → `lib/repositories/query-builder.ts`
+- `lib/repositories/factory.ts` (removed - no longer needed)
+- `lib/repositories/interfaces.ts` (removed - no longer needed)
+- `lib/auth/lucia-provider.ts` → merged into `lib/auth/lucia.ts`
+- Multiple backup/sync files merged into `backup-service.ts` and `google-sync.ts`
+
 ## 📝 Contributing
 
 1. Follow the established code style (enforced by Biome)
@@ -342,6 +490,11 @@ In production, this is less of an issue because:
 3. Update documentation for API changes
 4. Use conventional commit messages
 5. Ensure all checks pass before submitting PRs
+6. When adding new features, follow the established patterns:
+   - Use direct repository exports (no factory)
+   - Organize services by domain
+   - Use centralized error handling from `core/errors`
+   - Add types to `lib/types/` for shared definitions
 
 ## 📄 License
 

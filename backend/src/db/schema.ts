@@ -29,6 +29,7 @@ export const vehicles = sqliteTable('vehicles', {
   vehicleType: text('vehicle_type').notNull().default('gas'), // 'gas' | 'electric' | 'hybrid'
   licensePlate: text('license_plate'),
   nickname: text('nickname'),
+  vin: text('vin'),
   initialMileage: integer('initial_mileage'),
   purchasePrice: real('purchase_price'),
   purchaseDate: integer('purchase_date', { mode: 'timestamp' }),
@@ -115,38 +116,17 @@ export const expenses = sqliteTable('expenses', {
   vehicleId: text('vehicle_id')
     .notNull()
     .references(() => vehicles.id, { onDelete: 'cascade' }),
-  tags: text('tags', { mode: 'json' }).$type<string[]>(), // JSON array of tags (replaces type)
   category: text('category').notNull(), // ExpenseCategory enum values
-  amount: real('amount').notNull(),
-  currency: text('currency').notNull().default('USD'),
+  tags: text('tags', { mode: 'json' }).$type<string[]>(), // JSON array of tags (replaces type)
   date: integer('date', { mode: 'timestamp' }).notNull(),
   mileage: integer('mileage'),
-  volume: real('volume'), // For fuel expenses (gallons or liters)
-  charge: real('charge'), // For electric charging (kWh)
   description: text('description'),
   receiptUrl: text('receipt_url'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-});
-
-// Vehicle Shares table (for sharing vehicles between users)
-export const vehicleShares = sqliteTable('vehicle_shares', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  vehicleId: text('vehicle_id')
-    .notNull()
-    .references(() => vehicles.id, { onDelete: 'cascade' }),
-  ownerId: text('owner_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  sharedWithUserId: text('shared_with_user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  permission: text('permission').notNull().default('view'), // 'view' | 'edit'
-  status: text('status').notNull().default('pending'), // 'pending' | 'accepted' | 'declined'
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  expenseAmount: real('expense_amount').notNull(),
+  fuelAmount: real('fuel_amount'),
+  fuelType: text('fuel_type'),
 });
 
 // User Settings table
@@ -219,9 +199,6 @@ export type NewInsurancePolicy = typeof insurancePolicies.$inferInsert;
 
 export type Expense = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;
-
-export type VehicleShare = typeof vehicleShares.$inferSelect;
-export type NewVehicleShare = typeof vehicleShares.$inferInsert;
 
 export type UserSettings = typeof userSettings.$inferSelect;
 export type NewUserSettings = typeof userSettings.$inferInsert;

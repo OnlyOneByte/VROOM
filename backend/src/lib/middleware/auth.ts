@@ -2,8 +2,8 @@ import type { MiddlewareHandler } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
 import type { AuthUser } from '../auth/lucia';
-import { getLucia } from '../auth/lucia-provider.js';
-import { config } from '../config';
+import { getLucia } from '../auth/lucia';
+import { config } from '../core/config';
 import { logger } from '../utils/logger';
 
 // Extend Hono context to include user

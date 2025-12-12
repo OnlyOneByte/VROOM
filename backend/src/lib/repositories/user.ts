@@ -1,21 +1,13 @@
 import { and, eq } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { inject, injectable } from 'inversify';
 import type { NewUser, User } from '../../db/schema.js';
 import { users } from '../../db/schema.js';
-import { TYPES } from '../di/types.js';
 import { logger } from '../utils/logger';
 import { BaseRepository } from './base.js';
-import type { IUserRepository } from './interfaces.js';
-import { QueryBuilder } from './query-builder.js';
 
-@injectable()
-export class UserRepository extends BaseRepository<User, NewUser> implements IUserRepository {
-  private queryBuilder: QueryBuilder<User>;
-
-  constructor(@inject(TYPES.Database) db: BunSQLiteDatabase<Record<string, unknown>>) {
+export class UserRepository extends BaseRepository<User, NewUser> {
+  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, users);
-    this.queryBuilder = new QueryBuilder(this.database);
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -42,7 +34,7 @@ export class UserRepository extends BaseRepository<User, NewUser> implements IUs
 
   async updateGoogleRefreshToken(id: string, token: string | null): Promise<User> {
     try {
-      const result = await this.database
+      const result = await this.db
         .update(users)
         .set({
           googleRefreshToken: token,

@@ -1,0 +1,153 @@
+import { z } from 'zod';
+import type { Environment } from '../../types/enums';
+
+// Environment schema validation
+const envSchema = z.object({
+  // Server configuration
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: z
+    .string()
+    .default('3001')
+    .transform((val) => {
+      const port = Number(val);
+      if (Number.isNaN(port) || port < 1 || port > 65535) {
+        throw new Error('PORT must be a valid port number (1-65535)');
+      }
+      return port;
+    }),
+  HOST: z.string().default('localhost'),
+
+  // Database configuration
+  DATABASE_URL: z.string().default('./data/vroom.db'),
+
+  // Authentication configuration
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/auth/callback/google'),
+  SESSION_SECRET: z.string().min(32, 'Session secret must be at least 32 characters').optional(),
+
+  // Frontend URL for OAuth redirects
+  FRONTEND_URL: z.string().optional(),
+
+  // CORS origins (comma-separated)
+  CORS_ORIGINS: z
+    .string()
+    .optional()
+    .transform((val) => val?.split(',').map((origin) => origin.trim()) || []),
+
+  // Logging
+  LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
+});
+
+// Parse and validate environment variables
+const parseEnv = () => {
+  try {
+    return envSchema.parse(process.env);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error('❌ Environment validation failed:');
+      error.issues.forEach((err) => {
+        console.error(`  - ${err.path.join('.')}: ${err.message}`);
+      });
+      process.exit(1);
+    }
+    throw error;
+  }
+};
+
+const env = parseEnv();
+
+// Default frontend URL based on environment
+const getDefaultFrontendUrl = (environment: Environment): string => {
+  switch (environment) {
+    case 'production':
+      return 'https://your-domain.com'; // Fallback if FRONTEND_URL not set
+    case 'test':
+      return 'http://localhost:3000';
+    default:
+      return 'http://localhost:5173';
+  }
+};
+
+// Default CORS origins based on environment
+const getDefaultCorsOrigins = (environment: Environment): string[] => {
+  switch (environment) {
+    case 'production':
+      return ['https://your-domain.com']; // Fallback if CORS_ORIGINS not set
+    case 'test':
+      return ['http://localhost:3000'];
+    default:
+      return [
+        'http://localhost:5173',
+        'http://localhost:4173',
+        'http://localhost:3000',
+        'http://localhost:3001',
+      ];
+  }
+};
+
+// Configuration object
+export const config = {
+  env: env.NODE_ENV as Environment,
+
+  server: {
+    port: env.PORT,
+    host: env.HOST,
+  },
+
+  database: {
+    url: env.DATABASE_URL,
+  },
+
+  auth: {
+    google: {
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      redirectUri: env.GOOGLE_REDIRECT_URI,
+    },
+    session: {
+      secret: env.SESSION_SECRET,
+    },
+  },
+
+  frontend: {
+    url: env.FRONTEND_URL || getDefaultFrontendUrl(env.NODE_ENV as Environment),
+  },
+
+  cors: {
+    origins:
+      env.CORS_ORIGINS.length > 0
+        ? env.CORS_ORIGINS
+        : getDefaultCorsOrigins(env.NODE_ENV as Environment),
+  },
+
+  logging: {
+    level: env.LOG_LEVEL,
+  },
+} as const;
+
+// Validate required configuration for production
+export const validateProductionConfig = () => {
+  if (config.env === 'production') {
+    const requiredFields = [
+      { field: 'GOOGLE_CLIENT_ID', value: config.auth.google.clientId },
+      { field: 'GOOGLE_CLIENT_SECRET', value: config.auth.google.clientSecret },
+      { field: 'SESSION_SECRET', value: config.auth.session.secret },
+    ];
+
+    const missing = requiredFields.filter(({ value }) => !value);
+
+    if (missing.length > 0) {
+      console.error('❌ Missing required production configuration:');
+      missing.forEach(({ field }) => {
+        console.error(`  - ${field}`);
+      });
+      process.exit(1);
+    }
+  }
+};
+
+// Run production validation on module load
+// Note: This is a side effect that runs on import. In testing environments,
+// you may want to mock process.env before importing this module.
+validateProductionConfig();

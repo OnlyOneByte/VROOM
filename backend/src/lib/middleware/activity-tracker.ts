@@ -1,23 +1,27 @@
 import type { Context, Next } from 'hono';
-import { recordUserActivity } from '../activity-tracker';
-import { databaseService } from '../database';
-import { SettingsRepository } from '../repositories/settings';
+import { settingsRepository } from '../repositories';
+import { userActivityTracker } from '../services/sync/tracking/user-activity-tracker';
+import { logger } from '../utils/logger';
 
 /**
  * Middleware to automatically track user activity for authenticated requests
+ * This is a thin wrapper that delegates all logic to the UserActivityTracker service
  */
 export const activityTrackerMiddleware = async (c: Context, next: Next) => {
   // Continue with the request
   await next();
 
-  // Record activity after successful request (only for authenticated users)
+  // Delegate to service for activity tracking
   const user = c.get('user');
-  if (user) {
-    // Only track activity for certain endpoints (not for status checks, etc.)
+  if (!user) {
+    return;
+  }
+
+  try {
+    // Determine if this request should be tracked
     const path = c.req.path;
     const method = c.req.method;
 
-    // Track activity for data-modifying operations and main app usage
     const shouldTrack =
       // API endpoints that modify data
       (path.startsWith('/api/') && ['POST', 'PUT', 'DELETE'].includes(method)) ||
@@ -26,21 +30,24 @@ export const activityTrackerMiddleware = async (c: Context, next: Next) => {
       // Auth endpoints (login, refresh)
       path.startsWith('/auth/');
 
-    if (shouldTrack) {
-      // Fetch user settings to get their configured sync preferences
-      const db = databaseService.getDatabase();
-      const settingsRepo = new SettingsRepository(db);
-      const settings = await settingsRepo.getOrCreate(user.id);
-
-      // Only record activity if sync on inactivity is enabled and at least one sync type is enabled
-      const hasSyncEnabled = settings.googleSheetsSyncEnabled || settings.googleDriveBackupEnabled;
-      if (settings.syncOnInactivity && hasSyncEnabled) {
-        recordUserActivity(user.id, {
-          enabled: true,
-          inactivityDelayMinutes: settings.syncInactivityMinutes,
-          autoSyncEnabled: true,
-        });
-      }
+    if (!shouldTrack) {
+      return;
     }
+
+    // Fetch user settings and delegate to service
+    const settings = await settingsRepository.getOrCreate(user.id);
+
+    // Only record activity if sync on inactivity is enabled and at least one sync type is enabled
+    const hasSyncEnabled = settings.googleSheetsSyncEnabled || settings.googleDriveBackupEnabled;
+    if (settings.syncOnInactivity && hasSyncEnabled) {
+      userActivityTracker.recordActivity(user.id, {
+        enabled: true,
+        inactivityDelayMinutes: settings.syncInactivityMinutes,
+        autoSyncEnabled: true,
+      });
+    }
+  } catch (error) {
+    // Log error but don't fail the request
+    logger.error('Activity tracking failed', { userId: user.id, error });
   }
 };

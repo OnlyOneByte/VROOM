@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { appStore } from '$lib/stores/app.js';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import { ArrowLeft, Car, DollarSign, Calculator, Trash2, X, Check } from 'lucide-svelte';
@@ -58,6 +58,7 @@
 		vehicleType: 'gas',
 		licensePlate: '',
 		nickname: '',
+		vin: '',
 		initialMileage: undefined,
 		purchasePrice: undefined,
 		purchaseDate: ''
@@ -154,6 +155,7 @@
 			vehicleType: vehicle.vehicleType,
 			licensePlate: vehicle.licensePlate || '',
 			nickname: vehicle.nickname || '',
+			vin: vehicle.vin || '',
 			initialMileage: vehicle.initialMileage,
 			purchasePrice: vehicle.purchasePrice,
 			purchaseDate: vehicle.purchaseDate
@@ -201,6 +203,16 @@
 
 		if (vehicleForm.year < 1900 || vehicleForm.year > new Date().getFullYear() + 2) {
 			errors['year'] = 'Please enter a valid year';
+		}
+
+		// VIN validation
+		if (vehicleForm.vin && vehicleForm.vin.trim()) {
+			const vinRegex = /^[A-Z0-9]+$/i;
+			if (!vinRegex.test(vehicleForm.vin)) {
+				errors['vin'] = 'VIN must contain only letters and numbers';
+			} else if (vehicleForm.vin.length < 11 || vehicleForm.vin.length > 17) {
+				errors['vin'] = 'VIN must be between 11 and 17 characters';
+			}
 		}
 
 		if (vehicleForm.initialMileage !== undefined && vehicleForm.initialMileage < 0) {
@@ -316,6 +328,20 @@
 		}
 	});
 
+	// Real-time VIN validation
+	$effect(() => {
+		if (errors['vin'] && vehicleForm.vin) {
+			const vinRegex = /^[A-Z0-9]+$/i;
+			if (
+				vinRegex.test(vehicleForm.vin) &&
+				vehicleForm.vin.length >= 11 &&
+				vehicleForm.vin.length <= 17
+			) {
+				delete errors['vin'];
+			}
+		}
+	});
+
 	async function handleSubmit(event: Event) {
 		event.preventDefault();
 		if (!validateVehicleForm() || !validateFinancingForm()) {
@@ -332,6 +358,7 @@
 				year: vehicleForm.year,
 				licensePlate: vehicleForm.licensePlate || undefined,
 				nickname: vehicleForm.nickname || undefined,
+				vin: vehicleForm.vin ? vehicleForm.vin.toUpperCase() : undefined,
 				initialMileage: vehicleForm.initialMileage ?? undefined,
 				purchasePrice: vehicleForm.purchasePrice ?? undefined,
 				purchaseDate: vehicleForm.purchaseDate
@@ -430,6 +457,8 @@
 					type: 'success',
 					message: 'Vehicle updated successfully!'
 				});
+				// Invalidate all data to force reload on the vehicle detail page
+				await invalidateAll();
 				goto(`/vehicles/${vehicleId}`);
 			} else {
 				appStore.addVehicle(savedVehicle);
@@ -604,6 +633,21 @@
 							/>
 							{#if errors['licensePlate']}
 								<FormFieldError id="licensePlate-error">{errors['licensePlate']}</FormFieldError>
+							{/if}
+						</div>
+
+						<div class="space-y-2">
+							<Label for="vin">VIN (Vehicle Identification Number)</Label>
+							<Input
+								id="vin"
+								type="text"
+								placeholder="e.g., 1HGBH41JXMN109186"
+								bind:value={vehicleForm.vin}
+								aria-invalid={!!errors['vin']}
+								aria-describedby={errors['vin'] ? 'vin-error' : undefined}
+							/>
+							{#if errors['vin']}
+								<FormFieldError id="vin-error">{errors['vin']}</FormFieldError>
 							{/if}
 						</div>
 

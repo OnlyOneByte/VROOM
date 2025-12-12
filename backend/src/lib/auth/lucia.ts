@@ -3,8 +3,8 @@ import { Google } from 'arctic';
 import { Lucia, TimeSpan } from 'lucia';
 import type { User } from '../../db/schema';
 import { sessions, users } from '../../db/schema';
-import { config } from '../config';
-import { databaseService } from '../database';
+import { config } from '../core/config';
+import { databaseService } from '../core/database';
 
 // Initialize Drizzle adapter for Lucia
 const db = databaseService.getDatabase();
@@ -67,3 +67,14 @@ interface DatabaseUserAttributes {
 }
 
 export type AuthUser = User;
+
+// Test support functions
+let testLucia: Lucia | null = null;
+
+export function getLucia(): Lucia {
+  return testLucia || lucia;
+}
+
+export function setTestLucia(instance: Lucia | null): void {
+  testLucia = instance;
+}
