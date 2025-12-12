@@ -1,7 +1,7 @@
 /**
  * Central export for all constants
+ *
+ * All constants are now in the merged ../constants.ts file.
+ * This file re-exports them for backward compatibility.
  */
-export * from './app-config';
-export * from './rate-limits';
-export * from './sync';
-export * from './validation';
+export * from '../constants';

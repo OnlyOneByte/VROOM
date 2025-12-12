@@ -4,7 +4,7 @@
  */
 
 import type { Context, Next } from 'hono';
-import { SyncError, SyncErrorCode } from '../core/errors/';
+import { SyncError, SyncErrorCode } from '../core/errors';
 import { logger } from '../utils/logger';
 
 interface IdempotencyRecord {

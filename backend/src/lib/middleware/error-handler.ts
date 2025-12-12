@@ -7,7 +7,7 @@ import {
   handleDatabaseError,
   isAppError,
   ValidationError,
-} from '../core/errors/';
+} from '../core/errors';
 import { logger } from '../utils/logger';
 
 export const errorHandler: ErrorHandler = (err, c) => {

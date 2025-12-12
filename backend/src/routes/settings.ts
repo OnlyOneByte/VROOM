@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { userSettings } from '../db/schema';
 import { VALIDATION_LIMITS } from '../lib/constants';
-import { AppError } from '../lib/core/errors/';
+import { AppError } from '../lib/core/errors';
 import { requireAuth } from '../lib/middleware/auth';
 import { settingsRepository } from '../lib/repositories';
 import { logger } from '../lib/utils/logger';

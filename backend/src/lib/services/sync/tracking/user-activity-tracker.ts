@@ -166,7 +166,7 @@ export class UserActivityTracker {
       logger.info('Auto-sync starting (changes detected)', { userId });
 
       // Call syncOrchestrator.executeSync with syncTypes array
-      const { syncOrchestrator } = await import('../sync-orchestrator');
+      const { syncOrchestrator } = await import('../../sync');
       const results = await syncOrchestrator.executeSync(userId, syncTypes);
 
       // Log results

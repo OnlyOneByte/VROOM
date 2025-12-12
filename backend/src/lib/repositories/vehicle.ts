@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import type { NewVehicle, Vehicle, VehicleWithFinancing } from '../../db/schema.js';
 import { vehicleFinancing, vehicles } from '../../db/schema.js';
-import { DatabaseError, NotFoundError } from '../core/errors/index.js';
+import { DatabaseError, NotFoundError } from '../core/errors';
 import { logger } from '../utils/logger.js';
 import { BaseRepository } from './base.js';
 

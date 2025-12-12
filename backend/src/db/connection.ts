@@ -3,7 +3,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
-import { APP_CONFIG } from '../lib/constants/app-config';
+import { APP_CONFIG } from '../lib/constants';
 import { logger } from '../lib/utils/logger';
 import * as schema from './schema.js';
 

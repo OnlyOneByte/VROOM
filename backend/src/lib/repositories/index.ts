@@ -32,23 +32,25 @@ import { db } from '../../db/connection.js';
 import { BackupRepository } from './backup.js';
 import { BaseRepository } from './base.js';
 import { ExpenseRepository } from './expense.js';
+import { FinancingRepository } from './financing.js';
 import { InsurancePolicyRepository } from './insurancePolicy.js';
 import { SettingsRepository } from './settings.js';
 import { UserRepository } from './user.js';
 import { VehicleRepository } from './vehicle.js';
-import { VehicleFinancingRepository } from './vehicleFinancing.js';
-import { VehicleFinancingPaymentRepository } from './vehicleFinancingPayment.js';
 
 // Export repository instances (singleton pattern)
 // These are the primary exports for production code
 export const userRepository = new UserRepository(db);
 export const vehicleRepository = new VehicleRepository(db);
 export const expenseRepository = new ExpenseRepository(db);
-export const vehicleFinancingRepository = new VehicleFinancingRepository(db);
-export const vehicleFinancingPaymentRepository = new VehicleFinancingPaymentRepository(db);
+export const financingRepository = new FinancingRepository(db);
 export const insurancePolicyRepository = new InsurancePolicyRepository(db);
 export const settingsRepository = new SettingsRepository(db);
 export const backupRepository = new BackupRepository(db);
+
+// Legacy exports for backward compatibility (deprecated)
+export const vehicleFinancingRepository = financingRepository;
+export const vehicleFinancingPaymentRepository = financingRepository;
 
 // Export repository classes for testing purposes
 // Tests can instantiate these with a test database instance
@@ -57,12 +59,15 @@ export {
   UserRepository,
   VehicleRepository,
   ExpenseRepository,
-  VehicleFinancingRepository,
-  VehicleFinancingPaymentRepository,
+  FinancingRepository,
   InsurancePolicyRepository,
   SettingsRepository,
   BackupRepository,
 };
+
+// Legacy exports for backward compatibility (deprecated)
+export { FinancingRepository as VehicleFinancingRepository };
+export { FinancingRepository as VehicleFinancingPaymentRepository };
 
 // Export types
 export type { ExpenseFilters } from './expense.js';

@@ -3,15 +3,15 @@
  */
 
 import { Hono } from 'hono';
-import { RATE_LIMITS } from '../../lib/constants/rate-limits';
+import { RATE_LIMITS } from '../../lib/constants';
 import {
   createSuccessResponse,
   handleSyncError,
   SyncError,
   SyncErrorCode,
-} from '../../lib/core/errors/';
+} from '../../lib/core/errors';
 import { rateLimiter } from '../../lib/middleware/rate-limiter';
-import { syncOrchestrator } from '../../lib/services/sync/sync-orchestrator';
+import { syncOrchestrator } from '../../lib/services/sync';
 import { logger } from '../../lib/utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../lib/utils/timeout';
 

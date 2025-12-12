@@ -7,18 +7,15 @@ import { vehicleFinancing, vehicleFinancingPayments } from '../db/schema';
 import { VALIDATION_LIMITS } from '../lib/constants';
 import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
-import {
-  vehicleFinancingRepository as financingRepository,
-  vehicleFinancingPaymentRepository as paymentRepository,
-  vehicleRepository,
-} from '../lib/repositories';
+import { financingRepository, vehicleRepository } from '../lib/repositories';
 import {
   calculatePaymentBreakdown,
   generateAmortizationSchedule,
   type LoanTerms,
   validateLoanTerms,
-} from '../lib/services/analytics/loan-calculator';
+} from '../lib/services/analytics';
 import { logger } from '../lib/utils/logger';
+import { commonSchemas } from '../lib/utils/validation';
 
 const financing = new Hono();
 
@@ -99,10 +96,6 @@ const financingParamsSchema = z.object({
   financingId: z.string().min(1, 'Financing ID is required'),
 });
 
-const vehicleParamsSchema = z.object({
-  vehicleId: z.string().min(1, 'Vehicle ID is required'),
-});
-
 // Apply authentication and change tracking to all routes
 financing.use('*', requireAuth);
 financing.use('*', trackDataChanges);
@@ -110,7 +103,7 @@ financing.use('*', trackDataChanges);
 // GET /api/vehicles/:vehicleId/financing - Get financing details for a vehicle
 financing.get(
   '/vehicles/:vehicleId/financing',
-  zValidator('param', vehicleParamsSchema),
+  zValidator('param', commonSchemas.vehicleIdParam),
   async (c) => {
     try {
       const user = c.get('user');
@@ -151,7 +144,7 @@ financing.get(
 // POST /api/vehicles/:vehicleId/financing - Create or update financing for a vehicle
 financing.post(
   '/vehicles/:vehicleId/financing',
-  zValidator('param', vehicleParamsSchema),
+  zValidator('param', commonSchemas.vehicleIdParam),
   zValidator('json', createFinancingSchema.omit({ vehicleId: true })),
   async (c) => {
     try {
@@ -307,7 +300,7 @@ financing.post(
       }
 
       // Get payment count to determine payment number
-      const paymentCount = await paymentRepository.getPaymentCount(financingId);
+      const paymentCount = await financingRepository.getPaymentCount(financingId);
       const paymentNumber = paymentCount + 1;
 
       let principalAmount = paymentData.paymentAmount;
@@ -338,7 +331,7 @@ financing.post(
         isScheduled: false,
       };
 
-      const createdPayment = await paymentRepository.create(newPayment);
+      const createdPayment = await financingRepository.createPayment(newPayment);
 
       // Update financing balance
       const updatedFinancing = await financingRepository.updateBalance(
@@ -391,7 +384,7 @@ financing.get('/:financingId/payments', zValidator('param', financingParamsSchem
       throw new HTTPException(404, { message: 'Financing not found' });
     }
 
-    const payments = await paymentRepository.findByFinancingId(financingId);
+    const payments = await financingRepository.findPaymentsByFinancingId(financingId);
 
     return c.json({
       success: true,

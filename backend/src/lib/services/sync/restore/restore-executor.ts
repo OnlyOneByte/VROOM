@@ -5,11 +5,11 @@
 import { eq } from 'drizzle-orm';
 import { vehicles } from '../../../../db/schema';
 import { databaseService } from '../../../core/database';
-import { SyncError, SyncErrorCode } from '../../../core/errors/';
+import { SyncError, SyncErrorCode } from '../../../core/errors';
 import { settingsRepository } from '../../../repositories';
 import { logger } from '../../../utils/logger';
 import { GoogleSheetsService } from '../../integrations/google-sheets';
-import { backupService } from '../backup-service';
+import { backupService } from '../../sync';
 import { type Conflict, ConflictDetector } from './conflict-detector';
 import { DataImporter } from './data-importer';
 
@@ -336,7 +336,7 @@ export class RestoreExecutor {
       const driveService = new GoogleDriveService(user.googleRefreshToken, user.googleRefreshToken);
 
       // Import google sync to list backups
-      const { googleSyncService } = await import('../google-sync');
+      const { googleSyncService } = await import('../../sync');
       const backups = await googleSyncService.listBackupsInDrive(
         driveService,
         settings.googleDriveBackupFolderId

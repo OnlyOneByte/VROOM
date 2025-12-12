@@ -9,10 +9,11 @@ import {
   EXPENSE_CATEGORY_LABELS,
 } from '../db/types';
 import { VALIDATION_LIMITS } from '../lib/constants';
-import { NotFoundError, ValidationError } from '../lib/core/errors/';
+import { NotFoundError, ValidationError } from '../lib/core/errors';
 import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
 import { expenseRepository, vehicleRepository } from '../lib/repositories';
+import { commonSchemas } from '../lib/utils/validation';
 
 const expenses = new Hono();
 
@@ -68,10 +69,6 @@ const createExpenseSchema = baseExpenseSchema.omit({
 });
 
 const updateExpenseSchema = createExpenseSchema.partial();
-
-const expenseParamsSchema = z.object({
-  id: z.string().min(1, 'Expense ID is required'),
-});
 
 const expenseQuerySchema = z.object({
   vehicleId: z.string().optional(),
@@ -239,7 +236,7 @@ expenses.get('/', zValidator('query', expenseQuerySchema), async (c) => {
 });
 
 // GET /api/expenses/:id - Get specific expense
-expenses.get('/:id', zValidator('param', expenseParamsSchema), async (c) => {
+expenses.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
@@ -263,7 +260,7 @@ expenses.get('/:id', zValidator('param', expenseParamsSchema), async (c) => {
 // PUT /api/expenses/:id - Update expense
 expenses.put(
   '/:id',
-  zValidator('param', expenseParamsSchema),
+  zValidator('param', commonSchemas.idParam),
   zValidator('json', updateExpenseSchema),
   async (c) => {
     const user = c.get('user');
@@ -303,7 +300,7 @@ expenses.put(
 );
 
 // DELETE /api/expenses/:id - Delete expense
-expenses.delete('/:id', zValidator('param', expenseParamsSchema), async (c) => {
+expenses.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 

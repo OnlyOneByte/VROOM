@@ -3,19 +3,17 @@
  */
 
 import { Hono } from 'hono';
-import { RATE_LIMITS } from '../../lib/constants/rate-limits';
-import { BACKUP_CONFIG } from '../../lib/constants/sync';
+import { BACKUP_CONFIG, RATE_LIMITS } from '../../lib/constants';
 import {
   createSuccessResponse,
   handleSyncError,
   SyncError,
   SyncErrorCode,
-} from '../../lib/core/errors/';
+} from '../../lib/core/errors';
 import { bodyLimit } from '../../lib/middleware/body-limit';
 import { idempotencyMiddleware } from '../../lib/middleware/idempotency';
 import { rateLimiter } from '../../lib/middleware/rate-limiter';
-import { backupService } from '../../lib/services/sync/backup-service';
-import { syncOrchestrator } from '../../lib/services/sync/sync-orchestrator';
+import { backupService, syncOrchestrator } from '../../lib/services/sync';
 import { logger } from '../../lib/utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../lib/utils/timeout';
 

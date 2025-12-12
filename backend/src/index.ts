@@ -5,7 +5,7 @@ import { csrf } from 'hono/csrf';
 import { logger as honoLogger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
-import { RATE_LIMITS } from './lib/constants/rate-limits';
+import { RATE_LIMITS } from './lib/constants';
 import { config } from './lib/core/config';
 import { activityTrackerMiddleware } from './lib/middleware/activity-tracker';
 import { optionalAuth, requireAuth } from './lib/middleware/auth';

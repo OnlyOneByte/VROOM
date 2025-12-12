@@ -3,18 +3,18 @@
  */
 
 import { Hono } from 'hono';
-import { RATE_LIMITS } from '../../lib/constants/rate-limits';
+import { RATE_LIMITS } from '../../lib/constants';
 import {
   createSuccessResponse,
   handleSyncError,
   SyncError,
   SyncErrorCode,
-} from '../../lib/core/errors/';
+} from '../../lib/core/errors';
 import { requireAuth } from '../../lib/middleware/auth';
 import { idempotencyMiddleware } from '../../lib/middleware/idempotency';
 import { rateLimiter } from '../../lib/middleware/rate-limiter';
 import { settingsRepository } from '../../lib/repositories';
-import { syncOrchestrator } from '../../lib/services/sync/sync-orchestrator';
+import { syncOrchestrator } from '../../lib/services/sync';
 import { changeTracker } from '../../lib/services/sync/tracking/user-activity-tracker';
 import { logger } from '../../lib/utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../lib/utils/timeout';

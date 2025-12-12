@@ -73,13 +73,13 @@ import { checkDatabaseHealth, closeDatabaseConnection, db } from '../../db/conne
 // Import for use in validation functions
 import { VALIDATION_LIMITS } from '../constants';
 import { logger } from '../utils/logger';
-import { ValidationError } from './errors/index.js';
+import { ValidationError } from './errors';
 
 // Export Database type for use in repositories
 export type Database = typeof db;
 
 // Re-export error classes from centralized location
-export { DatabaseError, NotFoundError, ValidationError } from './errors/index.js';
+export { DatabaseError, NotFoundError, ValidationError } from './errors';
 
 // Validation utilities - use Zod schemas instead for better type safety
 // These are kept for backward compatibility but should be migrated to Zod

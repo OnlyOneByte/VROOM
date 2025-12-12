@@ -2,7 +2,7 @@
  * Timeout utility for long-running operations
  */
 
-import { SyncError, SyncErrorCode } from '../core/errors/';
+import { SyncError, SyncErrorCode } from '../core/errors';
 
 /**
  * Wrap a promise with a timeout

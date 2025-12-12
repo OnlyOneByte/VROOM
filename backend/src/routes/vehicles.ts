@@ -4,15 +4,11 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { vehicles as vehiclesTable } from '../db/schema';
 import { VALIDATION_LIMITS } from '../lib/constants';
-import { ConflictError, NotFoundError } from '../lib/core/errors/';
+import { ConflictError, NotFoundError } from '../lib/core/errors';
 import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
-import {
-  expenseRepository,
-  vehicleFinancingRepository as financingRepository,
-  vehicleFinancingPaymentRepository as paymentRepository,
-  vehicleRepository,
-} from '../lib/repositories';
+import { expenseRepository, financingRepository, vehicleRepository } from '../lib/repositories';
+import { commonSchemas } from '../lib/utils/validation';
 import type { ApiResponse } from '../types/api';
 
 const vehicles = new Hono();
@@ -70,10 +66,6 @@ const createVehicleSchema = baseVehicleSchema.omit({
 
 const updateVehicleSchema = createVehicleSchema.partial();
 
-const vehicleParamsSchema = z.object({
-  id: z.string().min(1, 'Vehicle ID is required'),
-});
-
 // Apply authentication and change tracking to all routes
 vehicles.use('*', requireAuth);
 vehicles.use('*', trackDataChanges);
@@ -121,7 +113,7 @@ vehicles.post('/', zValidator('json', createVehicleSchema), async (c) => {
 });
 
 // GET /api/vehicles/:id - Get specific vehicle (with shared access)
-vehicles.get('/:id', zValidator('param', vehicleParamsSchema), async (c) => {
+vehicles.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
@@ -142,7 +134,7 @@ vehicles.get('/:id', zValidator('param', vehicleParamsSchema), async (c) => {
 // PUT /api/vehicles/:id - Update vehicle (with shared access check)
 vehicles.put(
   '/:id',
-  zValidator('param', vehicleParamsSchema),
+  zValidator('param', commonSchemas.idParam),
   zValidator('json', updateVehicleSchema),
   async (c) => {
     const user = c.get('user');
@@ -174,7 +166,7 @@ vehicles.put(
 );
 
 // DELETE /api/vehicles/:id - Delete vehicle
-vehicles.delete('/:id', zValidator('param', vehicleParamsSchema), async (c) => {
+vehicles.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
@@ -193,7 +185,7 @@ vehicles.delete('/:id', zValidator('param', vehicleParamsSchema), async (c) => {
 });
 
 // GET /api/vehicles/:id/financing/payments - Get payment history for vehicle financing
-vehicles.get('/:id/financing/payments', zValidator('param', vehicleParamsSchema), async (c) => {
+vehicles.get('/:id/financing/payments', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
@@ -216,7 +208,7 @@ vehicles.get('/:id/financing/payments', zValidator('param', vehicleParamsSchema)
   }
 
   // Get all payments for the financing, sorted by date descending
-  const payments = await paymentRepository.findByFinancingId(financing.id);
+  const payments = await financingRepository.findPaymentsByFinancingId(financing.id);
 
   return c.json({
     success: true,
@@ -233,7 +225,7 @@ const statsQuerySchema = z.object({
 // GET /api/vehicles/:id/stats - Get vehicle statistics
 vehicles.get(
   '/:id/stats',
-  zValidator('param', vehicleParamsSchema),
+  zValidator('param', commonSchemas.idParam),
   zValidator('query', statsQuerySchema),
   async (c) => {
     const user = c.get('user');

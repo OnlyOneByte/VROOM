@@ -6,7 +6,7 @@ import { HTTPException } from 'hono/http-exception';
 
 import { users } from '../db/schema';
 import { getLucia, google } from '../lib/auth/lucia';
-import { APP_CONFIG } from '../lib/constants/app-config';
+import { APP_CONFIG } from '../lib/constants';
 import { config } from '../lib/core/config';
 import { databaseService } from '../lib/core/database';
 import { logger } from '../lib/utils/logger';
@@ -141,7 +141,7 @@ auth.get('/callback/google', async (c) => {
 
   // Check for existing Google Drive backups and auto-enable if found
   try {
-    const { googleSyncService } = await import('../lib/services/sync/google-sync');
+    const { googleSyncService } = await import('../lib/services/sync');
     const backupCheck = await googleSyncService.checkExistingGoogleDriveBackups(userId);
 
     if (backupCheck.hasBackupFolder && backupCheck.existingBackups.length > 0) {
@@ -226,7 +226,7 @@ auth.get('/me', async (c) => {
       !settings[0].googleDriveBackupEnabled &&
       !settings[0].googleDriveBackupFolderId
     ) {
-      const { googleSyncService } = await import('../lib/services/sync/google-sync');
+      const { googleSyncService } = await import('../lib/services/sync');
       const backupCheck = await googleSyncService.checkExistingGoogleDriveBackups(user.id);
 
       if (backupCheck.hasBackupFolder && backupCheck.existingBackups.length > 0) {

@@ -1,12 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
-import {
-  ConflictError,
-  DatabaseError,
-  NotFoundError,
-  ValidationError,
-} from '../core/errors/index.js';
+import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '../core/errors';
 import { logger } from '../utils/logger.js';
 import { QueryBuilder } from './query-builder.js';
 

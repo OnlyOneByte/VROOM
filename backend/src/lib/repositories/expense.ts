@@ -2,7 +2,7 @@ import { and, desc, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import type { Expense, NewExpense } from '../../db/schema.js';
 import { expenses, vehicles } from '../../db/schema.js';
-import { DatabaseError } from '../core/errors/index.js';
+import { DatabaseError } from '../core/errors';
 import { logger } from '../utils/logger.js';
 import { BaseRepository } from './base.js';
 

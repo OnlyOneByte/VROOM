@@ -9,6 +9,7 @@ import { requireAuth } from '../lib/middleware/auth';
 import { trackDataChanges } from '../lib/middleware/change-tracker';
 import { insurancePolicyRepository, vehicleRepository } from '../lib/repositories';
 import { logger } from '../lib/utils/logger';
+import { commonSchemas } from '../lib/utils/validation';
 
 const insurance = new Hono();
 
@@ -54,10 +55,6 @@ const insurancePolicyParamsSchema = z.object({
   id: z.string().min(1, 'Insurance policy ID is required'),
 });
 
-const vehicleParamsSchema = z.object({
-  id: z.string().min(1, 'Vehicle ID is required'),
-});
-
 // Apply authentication and change tracking to all routes
 insurance.use('*', requireAuth);
 insurance.use('*', trackDataChanges);
@@ -93,7 +90,7 @@ insurance.get('/expiring-soon', async (c) => {
 // POST /api/insurance/vehicles/:id/policies - Create insurance policy for vehicle
 insurance.post(
   '/vehicles/:id/policies',
-  zValidator('param', vehicleParamsSchema),
+  zValidator('param', commonSchemas.idParam),
   zValidator('json', createInsurancePolicySchema),
   async (c) => {
     try {
@@ -145,7 +142,7 @@ insurance.post(
 );
 
 // GET /api/insurance/vehicles/:id/policies - Get vehicle insurance policies
-insurance.get('/vehicles/:id/policies', zValidator('param', vehicleParamsSchema), async (c) => {
+insurance.get('/vehicles/:id/policies', zValidator('param', commonSchemas.idParam), async (c) => {
   try {
     const user = c.get('user');
     const { id: vehicleId } = c.req.valid('param');
