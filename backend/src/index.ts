@@ -5,11 +5,14 @@ import { csrf } from 'hono/csrf';
 import { logger as honoLogger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
-import { routes as authRoutes } from './auth/routes';
+import { routes as authRoutes } from './api/auth/routes';
+import { routes as expenseRoutes } from './api/expenses/routes';
+import { routes as financingRoutes } from './api/financing/routes';
+import { routes as insuranceRoutes } from './api/insurance/routes';
+import { routes as settingsRoutes } from './api/settings/routes';
+import { routes as syncRoutes } from './api/sync/routes';
+import { routes as vehicleRoutes } from './api/vehicles/routes';
 import { CONFIG } from './config';
-import { routes as expenseRoutes } from './expenses/routes';
-import { routes as financingRoutes } from './financing/routes';
-import { routes as insuranceRoutes } from './insurance/routes';
 import {
   activityTracker,
   bodyLimit,
@@ -18,10 +21,7 @@ import {
   rateLimiter,
   requireAuth,
 } from './middleware';
-import { routes as settingsRoutes } from './settings/routes';
-import { routes as syncRoutes } from './sync/routes';
 import { logger } from './utils/logger';
-import { routes as vehicleRoutes } from './vehicles/routes';
 
 const app = new Hono();
 
@@ -37,7 +37,20 @@ app.use(
   })
 );
 
-// Security headers middleware - protects against common web vulnerabilities
+/**
+ * Security Headers Configuration
+ *
+ * Content Security Policy (CSP) is configured for maximum security.
+ *
+ * NOTE: If you add features that require external resources, you may need to adjust:
+ * - imgSrc: Add specific domains for external images (e.g., Google Drive thumbnails)
+ * - connectSrc: Add API domains for external services
+ * - fontSrc: Add CDN domains if using external fonts
+ *
+ * Example for Google Drive integration:
+ *   imgSrc: ["'self'", 'data:', 'https:', 'https://drive.google.com']
+ *   connectSrc: ["'self'", 'https://www.googleapis.com']
+ */
 app.use(
   '*',
   secureHeaders({

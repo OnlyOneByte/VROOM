@@ -15,16 +15,16 @@ import {
   getRequiredBackupFiles,
   TABLE_FILENAME_MAP,
   TABLE_SCHEMA_MAP,
-} from '../config';
-import { getDb } from '../db/connection';
+} from '../../config';
+import { getDb } from '../../db/connection';
 import {
   expenses,
   insurancePolicies,
   vehicleFinancing,
   vehicleFinancingPayments,
   vehicles,
-} from '../db/schema';
-import type { BackupData, BackupMetadata, ParsedBackupData } from '../types';
+} from '../../db/schema';
+import type { BackupData, BackupMetadata, ParsedBackupData } from '../../types';
 
 export interface ValidationResult {
   valid: boolean;

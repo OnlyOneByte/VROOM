@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { getDb } from '../db/connection';
-import type { NewUserSettings, UserSettings } from '../db/schema';
-import { userSettings } from '../db/schema';
+import { getDb } from '../../db/connection';
+import type { NewUserSettings, UserSettings } from '../../db/schema';
+import { userSettings } from '../../db/schema';
 
 export class SettingsRepository {
   constructor(private db: BunSQLiteDatabase<Record<string, unknown>>) {}

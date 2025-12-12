@@ -3,11 +3,11 @@
  */
 
 import { Hono } from 'hono';
-import { CONFIG } from '../config';
-import { createSuccessResponse, handleSyncError, SyncError, SyncErrorCode } from '../errors';
-import { bodyLimit, idempotency, rateLimiter, requireAuth } from '../middleware';
+import { CONFIG } from '../../config';
+import { createSuccessResponse, handleSyncError, SyncError, SyncErrorCode } from '../../errors';
+import { bodyLimit, idempotency, rateLimiter, requireAuth } from '../../middleware';
+import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
 import { settingsRepository } from '../settings/repository';
-import { OPERATION_TIMEOUTS, withTimeout } from '../utils/timeout';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
 import { getDriveServiceForUser } from './google-drive';

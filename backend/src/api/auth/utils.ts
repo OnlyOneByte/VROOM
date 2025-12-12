@@ -8,8 +8,8 @@
 import type { Context } from 'hono';
 import { setCookie } from 'hono/cookie';
 import type { Lucia, Session, User } from 'lucia';
-import { CONFIG } from '../config';
-import { logger } from '../utils/logger';
+import { CONFIG } from '../../config';
+import { logger } from '../../utils/logger';
 
 export interface SessionRefreshResult {
   session: Session;
@@ -58,7 +58,11 @@ export async function validateAndRefreshSession(
     // Create new session first to avoid losing session if creation fails
     const newSession = await lucia.createSession(user.id, {});
 
-    // Update cookie if context is provided
+    // Invalidate old session immediately after creating new one
+    // This prevents having two active sessions if cookie update fails
+    await lucia.invalidateSession(session.id);
+
+    // Update cookie if context is provided (after both DB operations succeed)
     if (c) {
       setCookie(c, lucia.sessionCookieName, newSession.id, {
         path: '/',
@@ -69,9 +73,6 @@ export async function validateAndRefreshSession(
         sameSite: 'Lax',
       });
     }
-
-    // Only invalidate old session after new one is successfully created
-    await lucia.invalidateSession(session.id);
 
     logger.info('Session refreshed', {
       userId: user.id,

@@ -4,17 +4,17 @@
 
 import { eq, inArray } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { getDb } from '../db/connection';
+import { getDb } from '../../db/connection';
 import {
   expenses,
   insurancePolicies,
   vehicleFinancing,
   vehicleFinancingPayments,
   vehicles,
-} from '../db/schema';
-import { SyncError, SyncErrorCode } from '../errors';
+} from '../../db/schema';
+import { SyncError, SyncErrorCode } from '../../errors';
+import type { ParsedBackupData } from '../../types';
 import { settingsRepository } from '../settings/repository';
-import type { ParsedBackupData } from '../types';
 import { backupService } from './backup';
 import { GoogleSheetsService } from './google-sheets';
 
@@ -265,44 +265,44 @@ class RestoreService {
   }
 
   private async insertBackupData(tx: DrizzleTransaction, data: ParsedBackupData): Promise<void> {
+    // Insert data with validation - convertRow handles type conversion
+    // Drizzle will validate against schema during insert
     if (data.vehicles.length > 0) {
-      await tx
-        .insert(vehicles)
-        .values(data.vehicles.map((v) => this.convertRow(v)) as (typeof vehicles.$inferInsert)[]);
+      const convertedVehicles = data.vehicles.map((v) => this.convertRow(v));
+      await tx.insert(vehicles).values(convertedVehicles as (typeof vehicles.$inferInsert)[]);
     }
     if (data.expenses.length > 0) {
-      await tx
-        .insert(expenses)
-        .values(data.expenses.map((e) => this.convertRow(e)) as (typeof expenses.$inferInsert)[]);
+      const convertedExpenses = data.expenses.map((e) => this.convertRow(e));
+      await tx.insert(expenses).values(convertedExpenses as (typeof expenses.$inferInsert)[]);
     }
     if (data.financing.length > 0) {
+      const convertedFinancing = data.financing.map((f) => this.convertRow(f));
       await tx
         .insert(vehicleFinancing)
-        .values(
-          data.financing.map((f) => this.convertRow(f)) as (typeof vehicleFinancing.$inferInsert)[]
-        );
+        .values(convertedFinancing as (typeof vehicleFinancing.$inferInsert)[]);
     }
     if (data.financingPayments.length > 0) {
+      const convertedPayments = data.financingPayments.map((p) => this.convertRow(p));
       await tx
         .insert(vehicleFinancingPayments)
-        .values(
-          data.financingPayments.map((p) =>
-            this.convertRow(p)
-          ) as (typeof vehicleFinancingPayments.$inferInsert)[]
-        );
+        .values(convertedPayments as (typeof vehicleFinancingPayments.$inferInsert)[]);
     }
     if (data.insurance.length > 0) {
+      const convertedInsurance = data.insurance.map((i) => this.convertRow(i));
       await tx
         .insert(insurancePolicies)
-        .values(
-          data.insurance.map((i) => this.convertRow(i)) as (typeof insurancePolicies.$inferInsert)[]
-        );
+        .values(convertedInsurance as (typeof insurancePolicies.$inferInsert)[]);
     }
   }
 
   private convertRow(row: Record<string, unknown>): Record<string, unknown> {
     const converted: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(row)) {
+      // Handle null/undefined values before conversion
+      if (value === null || value === undefined) {
+        converted[key] = null;
+        continue;
+      }
       converted[key] = this.convertValue(String(value), key);
     }
     return converted;
@@ -363,7 +363,7 @@ class RestoreService {
     displayName: string;
     googleRefreshToken: string;
   }> {
-    const { users } = await import('../db/schema');
+    const { users } = await import('../../db/schema');
     const userResults = await this.db.select().from(users).where(eq(users.id, userId)).limit(1);
 
     if (!userResults.length || !userResults[0].googleRefreshToken) {

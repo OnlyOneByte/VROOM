@@ -2,8 +2,8 @@
  * User Activity Tracker - Activity and change tracking for auto-sync
  */
 
-import { getDb } from '../db/connection';
-import { logger } from '../utils/logger';
+import { getDb } from '../../db/connection';
+import { logger } from '../../utils/logger';
 
 export interface UserActivity {
   userId: string;
@@ -12,6 +12,23 @@ export interface UserActivity {
   syncInProgress: boolean;
 }
 
+/**
+ * User Activity Tracker
+ *
+ * IMPORTANT: Activity data is stored in-memory and will be lost on server restart.
+ *
+ * For production deployments:
+ * - Consider persisting activity timestamps to database
+ * - Use Redis for distributed systems
+ * - Implement graceful degradation on restart
+ *
+ * Current implementation is suitable for:
+ * - Development environments
+ * - Single-instance deployments
+ * - Applications where activity tracking reset on restart is acceptable
+ *
+ * Note: lastDataChangeDate is persisted to database via userSettings table
+ */
 export class UserActivityTracker {
   private static instance: UserActivityTracker;
   private userActivities: Map<string, UserActivity> = new Map();
@@ -68,7 +85,7 @@ export class UserActivityTracker {
 
     const db = getDb();
     const { eq } = await import('drizzle-orm');
-    const { userSettings } = await import('../db/schema');
+    const { userSettings } = await import('../../db/schema');
 
     const settings = await db
       .select()
@@ -114,7 +131,7 @@ export class UserActivityTracker {
     try {
       const db = getDb();
       const { eq } = await import('drizzle-orm');
-      const { userSettings } = await import('../db/schema');
+      const { userSettings } = await import('../../db/schema');
       await db
         .update(userSettings)
         .set({ lastDataChangeDate: new Date(), updatedAt: new Date() })
@@ -128,7 +145,7 @@ export class UserActivityTracker {
     try {
       const db = getDb();
       const { eq } = await import('drizzle-orm');
-      const { userSettings } = await import('../db/schema');
+      const { userSettings } = await import('../../db/schema');
       const settings = await db
         .select()
         .from(userSettings)

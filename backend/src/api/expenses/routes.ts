@@ -2,20 +2,20 @@ import { zValidator } from '@hono/zod-validator';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { CONFIG } from '../config';
-import { type Expense, expenses as expensesTable } from '../db/schema';
+import { CONFIG } from '../../config';
+import { type Expense, expenses as expensesTable } from '../../db/schema';
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_DESCRIPTIONS,
   EXPENSE_CATEGORY_LABELS,
-} from '../db/types';
-import { NotFoundError } from '../errors';
-import { changeTracker, requireAuth } from '../middleware';
+} from '../../db/types';
+import { NotFoundError } from '../../errors';
+import { changeTracker, requireAuth } from '../../middleware';
 import {
   commonSchemas,
   validateExpenseOwnership,
   validateFuelExpenseData,
-} from '../utils/validation';
+} from '../../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
 import { expenseRepository } from './repository';
 

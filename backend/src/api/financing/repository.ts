@@ -10,16 +10,16 @@
 
 import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { getDb } from '../db/connection';
+import { getDb } from '../../db/connection';
 import type {
   NewVehicleFinancing,
   NewVehicleFinancingPayment,
   VehicleFinancing,
   VehicleFinancingPayment,
-} from '../db/schema';
-import { vehicleFinancing, vehicleFinancingPayments } from '../db/schema';
-import { logger } from '../utils/logger';
-import { BaseRepository } from '../utils/repository';
+} from '../../db/schema';
+import { vehicleFinancing, vehicleFinancingPayments } from '../../db/schema';
+import { logger } from '../../utils/logger';
+import { BaseRepository } from '../../utils/repository';
 
 export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVehicleFinancing> {
   constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {

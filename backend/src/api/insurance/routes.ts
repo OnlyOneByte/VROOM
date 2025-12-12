@@ -3,12 +3,12 @@ import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
-import { CONFIG } from '../config';
-import { insurancePolicies } from '../db/schema';
-import { changeTracker, requireAuth } from '../middleware';
-import { calculateMonthlyBreakdown } from '../utils/calculations';
-import { logger } from '../utils/logger';
-import { commonSchemas, validateInsuranceOwnership } from '../utils/validation';
+import { CONFIG } from '../../config';
+import { insurancePolicies } from '../../db/schema';
+import { changeTracker, requireAuth } from '../../middleware';
+import { calculateMonthlyBreakdown } from '../../utils/calculations';
+import { logger } from '../../utils/logger';
+import { commonSchemas, validateInsuranceOwnership } from '../../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
 import { insurancePolicyRepository } from './repository';
 

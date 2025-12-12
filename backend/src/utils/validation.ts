@@ -48,12 +48,12 @@ export const validators = {
   /**
    * Optional URL
    */
-  optionalUrl: z.string().url().optional(),
+  optionalUrl: z.string().url({ message: 'Invalid URL format' }).optional(),
 
   /**
    * Email address
    */
-  email: z.string().email('Invalid email address'),
+  email: z.string().email({ message: 'Invalid email address' }),
 
   /**
    * Percentage (0-100)
@@ -124,11 +124,11 @@ export const commonSchemas = {
  */
 
 import { HTTPException } from 'hono/http-exception';
+import { expenseRepository } from '../api/expenses/repository';
+import { financingRepository } from '../api/financing/repository';
+import { insurancePolicyRepository } from '../api/insurance/repository';
+import { vehicleRepository } from '../api/vehicles/repository';
 import type { Expense, InsurancePolicy, Vehicle, VehicleFinancing } from '../db/schema';
-import { expenseRepository } from '../expenses/repository';
-import { financingRepository } from '../financing/repository';
-import { insurancePolicyRepository } from '../insurance/repository';
-import { vehicleRepository } from '../vehicles/repository';
 
 /**
  * Validate that a vehicle belongs to the user

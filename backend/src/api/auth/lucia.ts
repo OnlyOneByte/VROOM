@@ -1,10 +1,10 @@
 import { DrizzleSQLiteAdapter } from '@lucia-auth/adapter-drizzle';
 import { Google } from 'arctic';
 import { Lucia, TimeSpan } from 'lucia';
-import { CONFIG } from '../config';
-import { getDb } from '../db/connection';
-import type { User } from '../db/schema';
-import { sessions, users } from '../db/schema';
+import { CONFIG } from '../../config';
+import { getDb } from '../../db/connection';
+import type { User } from '../../db/schema';
+import { sessions, users } from '../../db/schema';
 
 // Initialize Drizzle adapter for Lucia
 const db = getDb();

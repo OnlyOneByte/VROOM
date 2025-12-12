@@ -1,11 +1,11 @@
 import { and, desc, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { getDb } from '../db/connection';
-import type { Expense, NewExpense } from '../db/schema';
-import { expenses, vehicles } from '../db/schema';
-import { DatabaseError } from '../errors';
-import { logger } from '../utils/logger';
-import { BaseRepository } from '../utils/repository';
+import { getDb } from '../../db/connection';
+import type { Expense, NewExpense } from '../../db/schema';
+import { expenses, vehicles } from '../../db/schema';
+import { DatabaseError } from '../../errors';
+import { logger } from '../../utils/logger';
+import { BaseRepository } from '../../utils/repository';
 
 export interface ExpenseFilters {
   vehicleId?: string;

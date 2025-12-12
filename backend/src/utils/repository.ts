@@ -53,9 +53,10 @@ export abstract class BaseRepository<T, TNew extends Record<string, unknown>> {
   }
 
   async update(id: string, data: Partial<TNew>): Promise<T> {
+    // Only add updatedAt if the table has this column
     const updateData = {
       ...data,
-      updatedAt: new Date(),
+      ...('updatedAt' in this.table ? { updatedAt: new Date() } : {}),
     };
 
     const result = await this.db

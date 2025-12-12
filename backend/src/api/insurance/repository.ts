@@ -1,10 +1,10 @@
 import { and, eq, lte } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { getDb } from '../db/connection';
-import type { InsurancePolicy, NewInsurancePolicy } from '../db/schema';
-import { insurancePolicies, vehicles } from '../db/schema';
-import { logger } from '../utils/logger';
-import { BaseRepository } from '../utils/repository';
+import { getDb } from '../../db/connection';
+import type { InsurancePolicy, NewInsurancePolicy } from '../../db/schema';
+import { insurancePolicies, vehicles } from '../../db/schema';
+import { logger } from '../../utils/logger';
+import { BaseRepository } from '../../utils/repository';
 
 export class InsurancePolicyRepository extends BaseRepository<InsurancePolicy, NewInsurancePolicy> {
   constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {

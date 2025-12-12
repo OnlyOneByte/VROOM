@@ -105,14 +105,6 @@ export interface SuccessResponse<T = unknown> {
 
 export type ApiResponse<T = unknown> = SuccessResponse<T> | ErrorResponse;
 
-export interface LegacyErrorResponse {
-  error: string;
-  message: string;
-  statusCode: number;
-  details?: unknown;
-  stack?: string;
-}
-
 export function createErrorResponse(
   code: string,
   message: string,
@@ -128,30 +120,27 @@ export function createSuccessResponse<T>(data?: T, message?: string): SuccessRes
   return response;
 }
 
-export function formatErrorResponse(
-  error: unknown,
-  includeStack: boolean = false
-): LegacyErrorResponse {
+export function formatErrorResponse(error: unknown, includeStack: boolean = false): ErrorResponse {
   if (isAppError(error)) {
-    return {
-      error: error.constructor.name,
-      message: error.message,
-      statusCode: error.statusCode,
-      details: error.details,
-      stack: includeStack ? error.stack : undefined,
-    };
+    const details = includeStack
+      ? {
+          ...(typeof error.details === 'object' && error.details !== null ? error.details : {}),
+          stack: error.stack,
+        }
+      : error.details;
+
+    return createErrorResponse(error.constructor.name, error.message, details);
   }
 
   if (error instanceof Error) {
-    return {
-      error: 'InternalServerError',
-      message: error.message,
-      statusCode: 500,
-      stack: includeStack ? error.stack : undefined,
-    };
+    return createErrorResponse(
+      'InternalServerError',
+      error.message,
+      includeStack ? { stack: error.stack } : undefined
+    );
   }
 
-  return { error: 'UnknownError', message: 'An unknown error occurred', statusCode: 500 };
+  return createErrorResponse('UnknownError', 'An unknown error occurred');
 }
 
 const ERROR_STATUS_MAP: Record<string, number> = {

@@ -3,10 +3,14 @@ import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
-import { CONFIG } from '../config';
-import { vehicleFinancing, vehicleFinancingPayments } from '../db/schema';
-import { changeTracker, requireAuth } from '../middleware';
-import { commonSchemas, validateFinancingOwnership, validateLoanTerms } from '../utils/validation';
+import { CONFIG } from '../../config';
+import { vehicleFinancing, vehicleFinancingPayments } from '../../db/schema';
+import { changeTracker, requireAuth } from '../../middleware';
+import {
+  commonSchemas,
+  validateFinancingOwnership,
+  validateLoanTerms,
+} from '../../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
 import { financingRepository } from './repository';
 
@@ -38,10 +42,7 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
       CONFIG.validation.financing.maxTermMonths,
       `Term cannot exceed ${CONFIG.validation.financing.maxTermMonths} months`
     ),
-  startDate: z
-    .string()
-    .datetime()
-    .transform((val) => new Date(val)),
+  startDate: z.coerce.date(),
   paymentAmount: z.number().min(0.01, 'Payment amount must be greater than 0'),
   paymentDayOfMonth: z
     .number()
@@ -68,10 +69,7 @@ const createFinancingSchema = baseFinancingSchema.omit({
 
 const basePaymentSchema = createInsertSchema(vehicleFinancingPayments, {
   paymentAmount: z.number().min(0.01, 'Payment amount must be greater than 0'),
-  paymentDate: z
-    .string()
-    .datetime()
-    .transform((val) => new Date(val)),
+  paymentDate: z.coerce.date(),
 });
 
 const financingPaymentSchema = basePaymentSchema.omit({

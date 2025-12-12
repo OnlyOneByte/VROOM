@@ -5,7 +5,7 @@
 import { eq } from 'drizzle-orm';
 import type { OAuth2Client } from 'google-auth-library';
 import { google, type sheets_v4 } from 'googleapis';
-import { getDb } from '../db/connection';
+import { getDb } from '../../db/connection';
 import {
   expenses,
   insurancePolicies,
@@ -13,7 +13,7 @@ import {
   vehicleFinancing,
   vehicleFinancingPayments,
   vehicles,
-} from '../db/schema';
+} from '../../db/schema';
 import { GoogleDriveService } from './google-drive';
 
 export interface SpreadsheetInfo {

@@ -3,15 +3,29 @@ import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
-import { CONFIG } from '../config';
-import { getDb } from '../db/connection';
-import { users } from '../db/schema';
+import { CONFIG } from '../../config';
+import { getDb } from '../../db/connection';
+import { users } from '../../db/schema';
 import { getLucia, google } from './lucia';
 import { validateAndRefreshSession } from './utils';
 
 const routes = new Hono();
 
-// Temporary storage for OAuth state (in production, use Redis or database)
+/**
+ * OAuth State Storage
+ *
+ * IMPORTANT: This is an in-memory store and will be lost on server restart.
+ *
+ * For production deployments:
+ * - Use Redis for distributed systems
+ * - Use database with TTL for single-instance deployments
+ * - Consider encrypted cookies for stateless approach
+ *
+ * Current implementation is suitable for:
+ * - Development environments
+ * - Single-instance deployments with infrequent restarts
+ * - Low-traffic applications where occasional OAuth retry is acceptable
+ */
 const oauthStateStore = new Map<string, { codeVerifier: string; createdAt: number }>();
 
 // Clean up expired states (older than 10 minutes)

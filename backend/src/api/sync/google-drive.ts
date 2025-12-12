@@ -5,8 +5,8 @@
 import { eq } from 'drizzle-orm';
 import type { OAuth2Client } from 'google-auth-library';
 import { type drive_v3, google } from 'googleapis';
-import { getDb } from '../db/connection';
-import { users } from '../db/schema';
+import { getDb } from '../../db/connection';
+import { users } from '../../db/schema';
 
 export interface DriveFolder {
   id: string;
