@@ -3,12 +3,12 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
-import { APP_CONFIG } from '../lib/constants';
-import { logger } from '../lib/utils/logger';
+import { CONFIG } from '../config';
+import { logger } from '../utils/logger';
 import * as schema from './schema.js';
 
 // Database configuration
-const DATABASE_URL = process.env.DATABASE_URL || './data/vroom.db';
+const DATABASE_URL = CONFIG.database.url;
 
 // Ensure data directory exists
 const dbDir = dirname(DATABASE_URL);
@@ -22,17 +22,59 @@ const sqlite = new Database(DATABASE_URL);
 // Enable WAL mode for better performance
 sqlite.run('PRAGMA journal_mode = WAL');
 sqlite.run('PRAGMA synchronous = NORMAL');
-sqlite.run(`PRAGMA cache_size = ${APP_CONFIG.DATABASE.CACHE_SIZE}`);
+sqlite.run(`PRAGMA cache_size = ${CONFIG.database.cacheSize}`);
 sqlite.run('PRAGMA foreign_keys = ON');
 sqlite.run('PRAGMA temp_store = MEMORY');
 
 // Configure WAL auto-checkpoint to prevent data loss during hot reload
 // Checkpoint after 1000 pages (~4MB) - SQLite default, good balance
 // Auto-checkpoint handles most cases, reducing need for manual checkpoints
-sqlite.run(`PRAGMA wal_autocheckpoint = ${APP_CONFIG.DATABASE.WAL_CHECKPOINT_PAGES}`);
+sqlite.run(`PRAGMA wal_autocheckpoint = ${CONFIG.database.walCheckpointPages}`);
 
 // Create Drizzle instance
 export const db = drizzle(sqlite, { schema });
+
+// ============================================================================
+// TEST DATABASE SUPPORT
+// ============================================================================
+
+let testDb: typeof db | null = null;
+
+/**
+ * Set test database instance (for testing only)
+ */
+export function setTestDb(database: typeof db | null): void {
+  testDb = database;
+}
+
+/**
+ * Get the active database instance (test or production)
+ */
+export function getDb(): typeof db {
+  return testDb || db;
+}
+
+// ============================================================================
+// TRANSACTION HELPER
+// ============================================================================
+
+/**
+ * Transaction wrapper for complex operations
+ */
+export async function transaction<T>(
+  callback: (
+    tx: Parameters<typeof db.transaction>[0] extends (tx: infer U) => unknown ? U : never
+  ) => Promise<T>
+): Promise<T> {
+  try {
+    return await getDb().transaction(callback);
+  } catch (error) {
+    logger.error('Transaction failed', { error });
+    throw new Error(
+      `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
 
 // Migration function
 export async function runMigrations() {

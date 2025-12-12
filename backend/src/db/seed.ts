@@ -1,4 +1,4 @@
-import { logger } from '../lib/utils/logger';
+import { logger } from '../utils/logger';
 import { db } from './connection.js';
 import { expenses, insurancePolicies, users, vehicleFinancing, vehicles } from './schema.js';
 

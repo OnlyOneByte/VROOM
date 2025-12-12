@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { logger } from '../lib/utils/logger';
+import { logger } from '../utils/logger';
 import { checkpointWAL, forceCheckpointWAL } from './connection.js';
 
 // Manual checkpoint script

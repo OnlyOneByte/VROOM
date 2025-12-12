@@ -5,21 +5,23 @@ import { csrf } from 'hono/csrf';
 import { logger as honoLogger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
-import { RATE_LIMITS } from './lib/constants';
-import { config } from './lib/core/config';
-import { activityTrackerMiddleware } from './lib/middleware/activity-tracker';
-import { optionalAuth, requireAuth } from './lib/middleware/auth';
-import { bodyLimit } from './lib/middleware/body-limit';
-import { errorHandler } from './lib/middleware/error-handler';
-import { rateLimiter } from './lib/middleware/rate-limiter';
-import { logger } from './lib/utils/logger';
-import { auth } from './routes/auth';
-import { expenses } from './routes/expenses';
-import { financing } from './routes/financing';
-import { insurance } from './routes/insurance';
-import { settings } from './routes/settings';
-import { sync } from './routes/sync';
-import { vehicles } from './routes/vehicles';
+import { routes as authRoutes } from './auth/routes';
+import { CONFIG } from './config';
+import { routes as expenseRoutes } from './expenses/routes';
+import { routes as financingRoutes } from './financing/routes';
+import { routes as insuranceRoutes } from './insurance/routes';
+import {
+  activityTracker,
+  bodyLimit,
+  errorHandler,
+  optionalAuth,
+  rateLimiter,
+  requireAuth,
+} from './middleware';
+import { routes as settingsRoutes } from './settings/routes';
+import { routes as syncRoutes } from './sync/routes';
+import { logger } from './utils/logger';
+import { routes as vehicleRoutes } from './vehicles/routes';
 
 const app = new Hono();
 
@@ -59,7 +61,7 @@ app.use(
 
 // Rate limiting middleware - global rate limiter
 const globalRateLimiter = rateLimiter({
-  ...RATE_LIMITS.GLOBAL,
+  ...CONFIG.rateLimit.global,
   keyGenerator: (c) => {
     const user = c.get('user');
     return user?.id || c.req.header('x-forwarded-for') || 'anonymous';
@@ -72,7 +74,7 @@ app.use('*', globalRateLimiter);
 app.use(
   '*',
   cors({
-    origin: config.cors.origins,
+    origin: CONFIG.cors.origins,
     credentials: true,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
@@ -84,7 +86,7 @@ app.use(
 app.use(
   '*',
   csrf({
-    origin: config.cors.origins,
+    origin: CONFIG.cors.origins,
   })
 );
 
@@ -92,12 +94,12 @@ app.use(
 app.use('*', honoLogger());
 
 // Pretty JSON in development
-if (config.env === 'development') {
+if (CONFIG.env === 'development') {
   app.use('*', prettyJSON());
 }
 
 // Activity tracking middleware (after auth middleware)
-app.use('*', activityTrackerMiddleware);
+app.use('*', activityTracker);
 
 // Health check endpoint with detailed status
 app.get('/health', (c) => {
@@ -105,23 +107,23 @@ app.get('/health', (c) => {
     status: 'ok',
     message: 'VROOM Backend API is running',
     timestamp: new Date().toISOString(),
-    environment: config.env,
+    environment: CONFIG.env,
     version: '1.0.0',
     database: {
       status: 'connected',
-      path: config.database.url,
+      path: CONFIG.database.url,
     },
   });
 });
 
 // API Versioning - Mount v1 routes
-app.route('/api/v1/auth', auth);
-app.route('/api/v1/vehicles', vehicles);
-app.route('/api/v1/financing', financing);
-app.route('/api/v1/expenses', expenses);
-app.route('/api/v1/insurance', insurance);
-app.route('/api/v1/settings', settings);
-app.route('/api/v1/sync', sync);
+app.route('/api/v1/auth', authRoutes);
+app.route('/api/v1/vehicles', vehicleRoutes);
+app.route('/api/v1/financing', financingRoutes);
+app.route('/api/v1/expenses', expenseRoutes);
+app.route('/api/v1/insurance', insuranceRoutes);
+app.route('/api/v1/settings', settingsRoutes);
+app.route('/api/v1/sync', syncRoutes);
 
 // Backward compatibility: Redirect /api/* to /api/v1/* (except /api root)
 app.use('/api/*', async (c, next) => {
@@ -146,7 +148,7 @@ app.get('/api', optionalAuth, (c) => {
     message: 'VROOM Car Tracker API',
     version: '1.0.0',
     apiVersion: 'v1',
-    environment: config.env,
+    environment: CONFIG.env,
     authenticated: !!user,
     user: user
       ? {
@@ -204,9 +206,9 @@ app.notFound((c) => {
   );
 });
 
-logger.startup(`VROOM Backend starting on port ${config.server.port}`);
-logger.startup(`Environment: ${config.env}`);
-logger.startup(`Database: ${config.database.url}`);
+logger.startup(`VROOM Backend starting on port ${CONFIG.server.port}`);
+logger.startup(`Environment: ${CONFIG.env}`);
+logger.startup(`Database: ${CONFIG.database.url}`);
 
 // Periodic WAL checkpoint to ensure data persistence
 // Auto-checkpoint (1000 pages) handles most cases, this is just a safety net
@@ -216,8 +218,10 @@ const checkpointInterval = setInterval(
   () => {
     checkpointWAL();
   },
-  config.env === 'development' ? 5 * 60 * 1000 : 15 * 60 * 1000
-); // 5 minutes in dev, 15 minutes in prod
+  CONFIG.env === 'development'
+    ? CONFIG.database.checkpointIntervalDev
+    : CONFIG.database.checkpointIntervalProd
+);
 
 // Force checkpoint on startup to ensure any previous data is persisted
 forceCheckpointWAL();
@@ -240,7 +244,7 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 export default {
-  port: config.server.port,
+  port: CONFIG.server.port,
   fetch: app.fetch,
   reusePort: true, // Allow port reuse for hot reload
 };
