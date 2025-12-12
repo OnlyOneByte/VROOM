@@ -3,8 +3,8 @@ import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { getDb } from '../db/connection';
 import type { InsurancePolicy, NewInsurancePolicy } from '../db/schema';
 import { insurancePolicies, vehicles } from '../db/schema';
-import { BaseRepository } from '../utils/base-repository';
 import { logger } from '../utils/logger';
+import { BaseRepository } from '../utils/repository';
 
 export class InsurancePolicyRepository extends BaseRepository<InsurancePolicy, NewInsurancePolicy> {
   constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
@@ -26,19 +26,12 @@ export class InsurancePolicyRepository extends BaseRepository<InsurancePolicy, N
   }
 
   async findActiveByVehicleId(vehicleId: string): Promise<InsurancePolicy | null> {
-    try {
-      const whereClause = and(
-        eq(insurancePolicies.vehicleId, vehicleId),
-        eq(insurancePolicies.isActive, true)
-      );
-      if (!whereClause) {
-        throw new Error('Invalid where clause');
-      }
-      return await this.queryBuilder.findOne(insurancePolicies, whereClause);
-    } catch (error) {
-      logger.error('Error finding active insurance policy for vehicle', { vehicleId, error });
-      throw new Error('Failed to find active insurance policy');
-    }
+    const result = await this.db
+      .select()
+      .from(insurancePolicies)
+      .where(and(eq(insurancePolicies.vehicleId, vehicleId), eq(insurancePolicies.isActive, true)))
+      .limit(1);
+    return result[0] || null;
   }
 
   async findExpiringPolicies(userId: string, daysFromNow: number): Promise<InsurancePolicy[]> {

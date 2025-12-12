@@ -18,8 +18,8 @@ import type {
   VehicleFinancingPayment,
 } from '../db/schema';
 import { vehicleFinancing, vehicleFinancingPayments } from '../db/schema';
-import { BaseRepository } from '../utils/base-repository';
 import { logger } from '../utils/logger';
+import { BaseRepository } from '../utils/repository';
 
 export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVehicleFinancing> {
   constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
@@ -31,28 +31,20 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
   // ============================================================================
 
   async findByVehicleId(vehicleId: string): Promise<VehicleFinancing | null> {
-    try {
-      return await this.queryBuilder.findOne(
-        vehicleFinancing,
-        eq(vehicleFinancing.vehicleId, vehicleId)
-      );
-    } catch (error) {
-      logger.error('Error finding financing for vehicle', { vehicleId, error });
-      throw new Error('Failed to find financing for vehicle');
-    }
+    const result = await this.db
+      .select()
+      .from(vehicleFinancing)
+      .where(eq(vehicleFinancing.vehicleId, vehicleId))
+      .limit(1);
+    return result[0] || null;
   }
 
   async findActiveFinancing(): Promise<VehicleFinancing[]> {
-    try {
-      return await this.queryBuilder.findMany(
-        vehicleFinancing,
-        eq(vehicleFinancing.isActive, true),
-        asc(vehicleFinancing.startDate)
-      );
-    } catch (error) {
-      logger.error('Error finding active financing', { error });
-      throw new Error('Failed to find active financing');
-    }
+    return await this.db
+      .select()
+      .from(vehicleFinancing)
+      .where(eq(vehicleFinancing.isActive, true))
+      .orderBy(asc(vehicleFinancing.startDate));
   }
 
   async updateBalance(id: string, newBalance: number): Promise<VehicleFinancing> {

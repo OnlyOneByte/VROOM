@@ -4,8 +4,8 @@ import { getDb } from '../db/connection';
 import type { Expense, NewExpense } from '../db/schema';
 import { expenses, vehicles } from '../db/schema';
 import { DatabaseError } from '../errors';
-import { BaseRepository } from '../utils/base-repository';
 import { logger } from '../utils/logger';
+import { BaseRepository } from '../utils/repository';
 
 export interface ExpenseFilters {
   vehicleId?: string;

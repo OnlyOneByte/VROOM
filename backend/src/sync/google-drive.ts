@@ -464,20 +464,27 @@ export class GoogleDriveService {
 }
 
 /**
- * Create a Google Drive service instance for a user
+ * Get Google refresh token for a user
+ * Shared helper to avoid duplication
  */
-export async function createDriveServiceForUser(userId: string): Promise<GoogleDriveService> {
+async function getUserToken(userId: string): Promise<string> {
   const db = getDb();
-
   const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
   if (!user.length || !user[0].googleRefreshToken) {
     throw new Error('User not found or Google Drive access not available');
   }
 
-  // For now, we'll use the refresh token as access token
-  // In a production app, you'd want to properly refresh the access token
-  return new GoogleDriveService(user[0].googleRefreshToken, user[0].googleRefreshToken);
+  return user[0].googleRefreshToken;
+}
+
+/**
+ * Create a Google Drive service instance for a user
+ * Simplified - uses getUserToken helper
+ */
+export async function createDriveServiceForUser(userId: string): Promise<GoogleDriveService> {
+  const token = await getUserToken(userId);
+  return new GoogleDriveService(token, token);
 }
 
 // ============================================================================

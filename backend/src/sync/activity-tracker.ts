@@ -17,20 +17,9 @@ export interface UserActivity {
   syncInProgress: boolean;
 }
 
-export interface SyncConfig {
-  enabled: boolean;
-  inactivityDelayMinutes: number;
-  autoSyncEnabled: boolean;
-}
-
 export class UserActivityTracker {
   private static instance: UserActivityTracker;
   private userActivities: Map<string, UserActivity> = new Map();
-  private defaultConfig: SyncConfig = {
-    enabled: true,
-    inactivityDelayMinutes: 5,
-    autoSyncEnabled: true,
-  };
 
   private constructor() {}
 
@@ -47,14 +36,9 @@ export class UserActivityTracker {
 
   /**
    * Record user activity and reset inactivity timer
+   * Simplified - takes inactivity delay directly instead of complex config object
    */
-  recordActivity(userId: string, config?: Partial<SyncConfig>): void {
-    const userConfig = { ...this.defaultConfig, ...config };
-
-    if (!userConfig.enabled || !userConfig.autoSyncEnabled) {
-      return;
-    }
-
+  recordActivity(userId: string, inactivityDelayMinutes: number = 5): void {
     const now = new Date();
     const existingActivity = this.userActivities.get(userId);
 
@@ -68,7 +52,7 @@ export class UserActivityTracker {
       () => {
         this.handleInactivity(userId);
       },
-      userConfig.inactivityDelayMinutes * 60 * 1000
+      inactivityDelayMinutes * 60 * 1000
     );
 
     // Update user activity
@@ -81,7 +65,7 @@ export class UserActivityTracker {
 
     logger.debug('Activity recorded for user', {
       userId,
-      inactivityDelayMinutes: userConfig.inactivityDelayMinutes,
+      inactivityDelayMinutes,
     });
   }
 
@@ -229,7 +213,6 @@ export class UserActivityTracker {
   getSyncStatus(userId: string): {
     lastActivity?: Date;
     syncInProgress: boolean;
-    nextSyncIn?: number; // minutes until next auto-sync
   } {
     const activity = this.userActivities.get(userId);
 
@@ -237,18 +220,9 @@ export class UserActivityTracker {
       return { syncInProgress: false };
     }
 
-    let nextSyncIn: number | undefined;
-    if (activity.inactivityTimer && activity.lastActivity) {
-      const timeSinceActivity = Date.now() - activity.lastActivity.getTime();
-      const timeUntilSync =
-        this.defaultConfig.inactivityDelayMinutes * 60 * 1000 - timeSinceActivity;
-      nextSyncIn = Math.max(0, Math.ceil(timeUntilSync / (60 * 1000)));
-    }
-
     return {
       lastActivity: activity.lastActivity,
       syncInProgress: activity.syncInProgress,
-      nextSyncIn,
     };
   }
 
@@ -267,28 +241,27 @@ export class UserActivityTracker {
   }
 
   /**
-   * Update sync configuration for a user
+   * Update inactivity delay for a user
+   * Simplified - just takes the delay in minutes
    */
-  updateSyncConfig(userId: string, config: Partial<SyncConfig>): void {
+  updateInactivityDelay(userId: string, inactivityDelayMinutes: number): void {
     const activity = this.userActivities.get(userId);
 
-    if (activity && config.inactivityDelayMinutes) {
+    if (activity) {
       // Clear existing timer and set new one with updated delay
       if (activity.inactivityTimer) {
         clearTimeout(activity.inactivityTimer);
       }
 
-      if (config.enabled && config.autoSyncEnabled) {
-        const inactivityTimer = setTimeout(
-          () => {
-            this.handleInactivity(userId);
-          },
-          config.inactivityDelayMinutes * 60 * 1000
-        );
+      const inactivityTimer = setTimeout(
+        () => {
+          this.handleInactivity(userId);
+        },
+        inactivityDelayMinutes * 60 * 1000
+      );
 
-        activity.inactivityTimer = inactivityTimer;
-        this.userActivities.set(userId, activity);
-      }
+      activity.inactivityTimer = inactivityTimer;
+      this.userActivities.set(userId, activity);
     }
   }
 
@@ -421,16 +394,6 @@ export class UserActivityTracker {
 
 // Export singleton instance
 export const activityTracker = UserActivityTracker.getInstance();
-
-// Middleware function to record user activity
-export function recordUserActivity(userId: string, config?: Partial<SyncConfig>): void {
-  activityTracker.recordActivity(userId, config);
-}
-
-// Helper function to mark data changed
-
-// Backward compatibility exports
-// Export singleton
 
 // Clean up inactive users every hour
 setInterval(

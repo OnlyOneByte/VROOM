@@ -9,13 +9,30 @@ import { changeTracker, requireAuth } from '../middleware';
 import { logger } from '../utils/logger';
 import { commonSchemas } from '../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
-import {
-  calculatePaymentBreakdown,
-  generateAmortizationSchedule,
-  type LoanTerms,
-  validateLoanTerms,
-} from './calculations';
 import { financingRepository } from './repository';
+
+// Inline validation function (calculations moved to frontend)
+function validateLoanTerms(terms: {
+  principal: number;
+  apr: number;
+  termMonths: number;
+}): string[] {
+  const errors: string[] = [];
+
+  if (terms.principal <= 0) {
+    errors.push('Principal must be greater than 0');
+  }
+
+  if (terms.apr < 0 || terms.apr > 100) {
+    errors.push('APR must be between 0 and 100');
+  }
+
+  if (terms.termMonths <= 0) {
+    errors.push('Term must be at least 1 month');
+  }
+
+  return errors;
+}
 
 const routes = new Hono();
 
@@ -160,16 +177,14 @@ routes.post(
 
       // Validate loan terms if it's a loan
       if (financingData.financingType === 'loan' && financingData.apr !== undefined) {
-        const loanTerms: LoanTerms = {
+        const validationErrors = validateLoanTerms({
           principal: financingData.originalAmount,
           apr: financingData.apr,
           termMonths: financingData.termMonths,
-          startDate: financingData.startDate,
-        };
+        });
 
-        const validationErrors = validateLoanTerms(loanTerms);
         if (validationErrors.length > 0) {
-          logger.error('Loan validation errors', { validationErrors, loanTerms });
+          logger.error('Loan validation errors', { validationErrors });
           throw new HTTPException(400, {
             message: `Invalid loan terms: ${validationErrors.join(', ')}`,
             cause: validationErrors,
@@ -223,56 +238,6 @@ routes.post(
   }
 );
 
-// GET /api/financing/:financingId/schedule - Get amortization schedule (for loans)
-routes.get('/:financingId/schedule', zValidator('param', financingParamsSchema), async (c) => {
-  try {
-    const user = c.get('user');
-    const { financingId } = c.req.valid('param');
-
-    const financingData = await financingRepository.findById(financingId);
-    if (!financingData) {
-      throw new HTTPException(404, { message: 'Financing not found' });
-    }
-
-    // Verify financing belongs to user's vehicle
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, financingData.vehicleId);
-    if (!vehicle) {
-      throw new HTTPException(404, { message: 'Financing not found' });
-    }
-
-    // Only generate amortization schedule for loans
-    if (financingData.financingType !== 'loan' || !financingData.apr) {
-      throw new HTTPException(400, { message: 'Amortization schedule only available for loans' });
-    }
-
-    const loanTerms: LoanTerms = {
-      principal: financingData.originalAmount,
-      apr: financingData.apr,
-      termMonths: financingData.termMonths,
-      startDate: financingData.startDate,
-    };
-
-    const analysis = generateAmortizationSchedule(loanTerms);
-
-    return c.json({
-      success: true,
-      data: {
-        financing: financingData,
-        analysis,
-        schedule: analysis.schedule,
-      },
-    });
-  } catch (error) {
-    logger.error('Error generating amortization schedule', { error });
-
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-
-    throw new HTTPException(500, { message: 'Failed to generate amortization schedule' });
-  }
-});
-
 // POST /api/financing/:financingId/payment - Record a financing payment
 routes.post(
   '/:financingId/payment',
@@ -303,20 +268,10 @@ routes.post(
       const paymentCount = await financingRepository.getPaymentCount(financingId);
       const paymentNumber = paymentCount + 1;
 
-      let principalAmount = paymentData.paymentAmount;
-      let interestAmount = 0;
-
-      // Calculate payment breakdown for loans
-      if (financingRecord.financingType === 'loan' && financingRecord.apr) {
-        const breakdown = calculatePaymentBreakdown(
-          financingRecord.originalAmount,
-          financingRecord.apr,
-          financingRecord.termMonths,
-          paymentNumber
-        );
-        principalAmount = Math.min(breakdown.principalAmount, paymentData.paymentAmount);
-        interestAmount = Math.min(breakdown.interestAmount, paymentData.paymentAmount);
-      }
+      // For payment breakdown, frontend should calculate and send principalAmount and interestAmount
+      // Backend just stores the payment record
+      const principalAmount = paymentData.paymentAmount; // Simplified: treat full payment as principal
+      const interestAmount = 0; // Frontend should calculate and include if needed
 
       // Create payment record
       const newPayment = {

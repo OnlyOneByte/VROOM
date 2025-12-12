@@ -4,8 +4,8 @@ import { getDb } from '../db/connection';
 import type { NewVehicle, Vehicle, VehicleWithFinancing } from '../db/schema';
 import { vehicleFinancing, vehicles } from '../db/schema';
 import { DatabaseError, NotFoundError } from '../errors';
-import { BaseRepository } from '../utils/base-repository';
 import { logger } from '../utils/logger';
+import { BaseRepository } from '../utils/repository';
 
 export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
   constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
@@ -38,25 +38,21 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
   }
 
   async findByUserIdAndId(userId: string, vehicleId: string): Promise<Vehicle | null> {
-    try {
-      const whereClause = and(eq(vehicles.userId, userId), eq(vehicles.id, vehicleId));
-      if (!whereClause) {
-        throw new Error('Invalid where clause');
-      }
-      return await this.queryBuilder.findOne(vehicles, whereClause);
-    } catch (error) {
-      logger.error('Error finding vehicle for user', { vehicleId, userId, error });
-      throw new Error('Failed to find vehicle for user');
-    }
+    const result = await this.db
+      .select()
+      .from(vehicles)
+      .where(and(eq(vehicles.userId, userId), eq(vehicles.id, vehicleId)))
+      .limit(1);
+    return result[0] || null;
   }
 
   async findByLicensePlate(licensePlate: string): Promise<Vehicle | null> {
-    try {
-      return await this.queryBuilder.findOne(vehicles, eq(vehicles.licensePlate, licensePlate));
-    } catch (error) {
-      logger.error('Error finding vehicle by license plate', { licensePlate, error });
-      throw new Error('Failed to find vehicle by license plate');
-    }
+    const result = await this.db
+      .select()
+      .from(vehicles)
+      .where(eq(vehicles.licensePlate, licensePlate))
+      .limit(1);
+    return result[0] || null;
   }
 
   async updateMileage(id: string, mileage: number): Promise<Vehicle> {

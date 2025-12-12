@@ -67,7 +67,8 @@ export class AuthorizationError extends AppError {
 }
 
 /**
- * Alias for AuthorizationError
+ * @deprecated Use AuthorizationError instead
+ * Alias for AuthorizationError - kept for backward compatibility
  */
 export class ForbiddenError extends AuthorizationError {
   constructor(message: string = 'Access forbidden') {
@@ -99,15 +100,6 @@ export class ConflictError extends AppError {
 export class DatabaseError extends AppError {
   constructor(message: string, details?: unknown) {
     super(message, 500, true, details);
-  }
-}
-
-/**
- * External service error (502)
- */
-export class ExternalServiceError extends AppError {
-  constructor(service: string, message: string, details?: unknown) {
-    super(`${service} service error: ${message}`, 502, true, details);
   }
 }
 
@@ -250,11 +242,9 @@ export function createSuccessResponse<T>(data?: T, message?: string): SuccessRes
 
 /**
  * Format error for API response (legacy format)
+ * Used internally by error handler middleware
  */
-export const formatErrorResponse = (
-  error: unknown,
-  includeStack: boolean = false
-): LegacyErrorResponse => {
+function formatErrorResponse(error: unknown, includeStack: boolean = false): LegacyErrorResponse {
   if (isAppError(error)) {
     return {
       error: error.constructor.name,
@@ -279,7 +269,10 @@ export const formatErrorResponse = (
     message: 'An unknown error occurred',
     statusCode: 500,
   };
-};
+}
+
+// Export for middleware use only
+export { formatErrorResponse };
 
 // ============================================================================
 // ERROR HANDLERS
@@ -293,12 +286,11 @@ const ERROR_STATUS_MAP: Record<string, number> = {
   ValidationError: 400,
   AuthenticationError: 401,
   AuthorizationError: 403,
-  ForbiddenError: 403,
+  ForbiddenError: 403, // Deprecated - use AuthorizationError
   NotFoundError: 404,
   ConflictError: 409,
   RateLimitError: 429,
   DatabaseError: 500,
-  ExternalServiceError: 502,
   AppError: 500,
 
   // SyncError codes
@@ -394,26 +386,5 @@ export function handleSyncError(
   return c.json(createErrorResponse(defaultErrorCode, `Failed to ${operation}`, errorMessage), 500);
 }
 
-/**
- * Wrap async route handlers with error handling
- */
-export function withErrorHandling(handler: (c: Context) => Promise<Response>, operation: string) {
-  return async (c: Context): Promise<Response> => {
-    try {
-      return await handler(c);
-    } catch (error) {
-      return handleSyncError(c, error, operation);
-    }
-  };
-}
-
-/**
- * Create a typed error response for specific error codes
- */
-export function createTypedError(
-  code: SyncErrorCode,
-  message: string,
-  details?: unknown
-): ErrorResponse {
-  return createErrorResponse(code, message, details);
-}
+// withErrorHandling removed - was unused
+// createTypedError removed - was unused (use createErrorResponse directly)

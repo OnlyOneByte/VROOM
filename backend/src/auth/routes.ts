@@ -7,6 +7,7 @@ import { CONFIG } from '../config';
 import { getDb } from '../db/connection';
 import { users } from '../db/schema';
 import { getLucia, google } from './lucia';
+import { validateAndRefreshSession } from './utils';
 
 const routes = new Hono();
 
@@ -218,57 +219,22 @@ routes.post('/refresh', async (c) => {
     throw new HTTPException(401, { message: 'No session found' });
   }
 
-  const { session, user } = await lucia.validateSession(sessionId);
+  const result = await validateAndRefreshSession(sessionId, lucia, c);
 
-  if (!session) {
+  if (!result) {
     throw new HTTPException(401, { message: 'Invalid session' });
   }
 
-  // If session is fresh (not close to expiry), return current session
-  const now = new Date();
-  const sessionExpiry = new Date(session.expiresAt);
-  const timeUntilExpiry = sessionExpiry.getTime() - now.getTime();
-
-  if (timeUntilExpiry > CONFIG.auth.session.refreshThreshold) {
-    return c.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        provider: user.provider,
-      },
-      session: {
-        id: session.id,
-        expiresAt: session.expiresAt,
-      },
-    });
-  }
-
-  // Create new session - create first to avoid losing session if creation fails
-  const newSession = await lucia.createSession(user.id, {});
-
-  setCookie(c, lucia.sessionCookieName, newSession.id, {
-    path: '/',
-    secure: CONFIG.env === 'production',
-    httpOnly: true,
-    maxAge: CONFIG.auth.session.cookieMaxAge,
-    expires: newSession.expiresAt,
-    sameSite: 'Lax',
-  });
-
-  // Only invalidate old session after new one is successfully created
-  await lucia.invalidateSession(session.id);
-
   return c.json({
     user: {
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      provider: user.provider,
+      id: result.user.id,
+      email: result.user.email,
+      displayName: result.user.displayName,
+      provider: result.user.provider,
     },
     session: {
-      id: newSession.id,
-      expiresAt: newSession.expiresAt,
+      id: result.session.id,
+      expiresAt: result.session.expiresAt,
     },
   });
 });

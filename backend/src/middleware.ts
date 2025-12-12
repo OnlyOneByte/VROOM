@@ -15,13 +15,13 @@
  */
 
 import type { Context, ErrorHandler, MiddlewareHandler, Next } from 'hono';
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { deleteCookie, getCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
 import type { AuthUser } from './auth/lucia';
 import { getLucia } from './auth/lucia';
+import { validateAndRefreshSession } from './auth/utils';
 import { CONFIG } from './config';
-import { checkpointWAL } from './db/connection';
 import {
   createErrorResponse,
   formatErrorResponse,
@@ -65,9 +65,9 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
       throw new HTTPException(401, { message: 'Authentication required' });
     }
 
-    const { session, user } = await lucia.validateSession(sessionId);
+    const result = await validateAndRefreshSession(sessionId, lucia, c);
 
-    if (!session || !user) {
+    if (!result) {
       // Invalid session, clear cookie
       deleteCookie(c, lucia.sessionCookieName, {
         path: '/',
@@ -79,51 +79,12 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
       throw new HTTPException(401, { message: 'Invalid or expired session' });
     }
 
-    // If session is close to expiry, refresh it
-    const now = new Date();
-    const sessionExpiry = new Date(session.expiresAt);
-    const timeUntilExpiry = sessionExpiry.getTime() - now.getTime();
-    const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-
-    if (timeUntilExpiry < oneDay) {
-      // Refresh session - create new one first to avoid losing session if creation fails
-      try {
-        const newSession = await lucia.createSession(user.id, {});
-
-        setCookie(c, lucia.sessionCookieName, newSession.id, {
-          path: '/',
-          secure: CONFIG.env === 'production',
-          httpOnly: true,
-          maxAge: 60 * 60 * 24 * 30, // 30 days
-          expires: newSession.expiresAt,
-          sameSite: 'Lax',
-        });
-
-        // Only invalidate old session after new one is successfully created
-        await lucia.invalidateSession(session.id);
-
-        // Update session in context
-        c.set('session', {
-          id: newSession.id,
-          expiresAt: newSession.expiresAt,
-        });
-      } catch (error) {
-        logger.warn('Session refresh failed, keeping existing session', { error });
-        // Keep existing session if refresh fails
-        c.set('session', {
-          id: session.id,
-          expiresAt: session.expiresAt,
-        });
-      }
-    } else {
-      c.set('session', {
-        id: session.id,
-        expiresAt: session.expiresAt,
-      });
-    }
-
-    // Set user in context
-    c.set('user', user);
+    // Set session and user in context
+    c.set('session', {
+      id: result.session.id,
+      expiresAt: result.session.expiresAt,
+    });
+    c.set('user', result.user);
 
     return next();
   } catch (error) {
@@ -412,12 +373,8 @@ export function idempotency(options: { required?: boolean } = {}) {
   };
 }
 
-/**
- * Clear idempotency cache (useful for testing)
- */
-export function clearIdempotencyCache(): void {
-  idempotencyStore.clear();
-}
+// clearIdempotencyCache removed - was only used for testing
+// Tests can access idempotencyStore directly if needed
 
 // ============================================================================
 // ERROR HANDLER MIDDLEWARE
@@ -512,17 +469,14 @@ export const activityTracker: MiddlewareHandler = async (c, next) => {
       return;
     }
 
-    // Fetch user settings and delegate to service
+    // Fetch user settings
     const settings = await settingsRepository.getOrCreate(user.id);
 
     // Only record activity if sync on inactivity is enabled and at least one sync type is enabled
     const hasSyncEnabled = settings.googleSheetsSyncEnabled || settings.googleDriveBackupEnabled;
     if (settings.syncOnInactivity && hasSyncEnabled) {
-      userActivityTracker.recordActivity(user.id, {
-        enabled: true,
-        inactivityDelayMinutes: settings.syncInactivityMinutes,
-        autoSyncEnabled: true,
-      });
+      // Simplified - just pass the delay in minutes
+      userActivityTracker.recordActivity(user.id, settings.syncInactivityMinutes);
     }
   } catch (error) {
     // Log error but don't fail the request
@@ -570,22 +524,8 @@ export async function changeTracker(c: Context, next: Next) {
 // ============================================================================
 // CHECKPOINT MIDDLEWARE
 // ============================================================================
+// CHECKPOINT MIDDLEWARE (REMOVED)
+// ============================================================================
 
-/**
- * Middleware to checkpoint WAL after write operations
- * This ensures data is persisted to the main database file
- */
-export const checkpointAfterWrite: MiddlewareHandler = async (c, next) => {
-  await next();
-
-  // Only checkpoint after successful write operations (POST, PUT, DELETE)
-  const method = c.req.method;
-  const isWriteOperation = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
-
-  if (isWriteOperation && c.res.status >= 200 && c.res.status < 300) {
-    // Checkpoint in the background to avoid blocking the response
-    setImmediate(() => {
-      checkpointWAL();
-    });
-  }
-};
+// checkpointAfterWrite middleware removed - was exported but never used
+// Checkpointing is handled automatically by SQLite WAL mode

@@ -38,27 +38,23 @@ export type SharePermission = 'view' | 'edit';
 
 export type ShareStatus = 'pending' | 'accepted' | 'declined';
 
-// Validation functions
-export function isValidExpenseCategory(category: string): category is ExpenseCategory {
-  return EXPENSE_CATEGORIES.includes(category as ExpenseCategory);
+// Generic type guard generator for string union types
+function createEnumGuard<T extends string>(validValues: readonly T[]) {
+  return (value: string): value is T => validValues.includes(value as T);
 }
 
-export function isValidPaymentFrequency(frequency: string): frequency is PaymentFrequency {
-  const validFrequencies: PaymentFrequency[] = ['monthly', 'bi-weekly', 'weekly', 'custom'];
-  return validFrequencies.includes(frequency as PaymentFrequency);
-}
+// Validation functions - generated using createEnumGuard
+export const isValidExpenseCategory = createEnumGuard(EXPENSE_CATEGORIES);
 
-export function isValidPaymentType(type: string): type is PaymentType {
-  const validTypes: PaymentType[] = ['standard', 'extra', 'custom-split'];
-  return validTypes.includes(type as PaymentType);
-}
+export const isValidPaymentFrequency = createEnumGuard([
+  'monthly',
+  'bi-weekly',
+  'weekly',
+  'custom',
+] as const);
 
-export function isValidSharePermission(permission: string): permission is SharePermission {
-  const validPermissions: SharePermission[] = ['view', 'edit'];
-  return validPermissions.includes(permission as SharePermission);
-}
+export const isValidPaymentType = createEnumGuard(['standard', 'extra', 'custom-split'] as const);
 
-export function isValidShareStatus(status: string): status is ShareStatus {
-  const validStatuses: ShareStatus[] = ['pending', 'accepted', 'declined'];
-  return validStatuses.includes(status as ShareStatus);
-}
+export const isValidSharePermission = createEnumGuard(['view', 'edit'] as const);
+
+export const isValidShareStatus = createEnumGuard(['pending', 'accepted', 'declined'] as const);

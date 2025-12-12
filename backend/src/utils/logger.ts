@@ -69,30 +69,7 @@ class Logger {
     }
   }
 
-  // Specialized logging methods
-  http(method: string, path: string, status: number, duration: number, userId?: string): void {
-    const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
-    this[level](`${method} ${path} - ${status}`, { duration, userId });
-  }
-
-  database(operation: string, table: string, duration: number, error?: Error): void {
-    if (error) {
-      this.error(`DB ${operation} on ${table} failed`, { duration, error: error.message });
-    } else {
-      this.debug(`DB ${operation} on ${table}`, { duration });
-    }
-  }
-
-  auth(event: string, userId?: string, success = true): void {
-    const level = success ? 'info' : 'warn';
-    this[level](`Auth: ${event}`, { userId, success });
-  }
-
-  external(service: string, operation: string, success: boolean, duration?: number): void {
-    const level = success ? 'info' : 'error';
-    this[level](`External ${service}: ${operation}`, { success, duration });
-  }
-
+  // Specialized logging methods (kept only the ones that are used)
   startup(message: string, context?: LogContext): void {
     this.info(`🚗 ${message}`, context);
   }
@@ -103,10 +80,6 @@ class Logger {
 
   checkpoint(message: string, context?: LogContext): void {
     this.info(`🔄 ${message}`, context);
-  }
-
-  test(message: string, context?: LogContext): void {
-    this.info(`🧪 ${message}`, context);
   }
 }
 

@@ -1,0 +1,112 @@
+# Implementation Plan
+
+- [x] 1. Simplify and consolidate backend codebase
+  - [x] 1.1 Remove QueryBuilder and simplify repository queries
+    - Delete `utils/query-builder.ts` file entirely
+    - Update all repositories to use direct Drizzle queries instead of QueryBuilder
+    - Remove QueryBuilder instantiation from BaseRepository
+    - _Requirements: 1.2, 1.5_
+  - [x] 1.2 Simplify BaseRepository error handling
+    - Remove try-catch blocks that only log and rethrow
+    - Remove getTableName() helper (not needed without extensive logging)
+    - Keep only essential CRUD operations
+    - Let errors bubble to global error handler
+    - _Requirements: 1.1, 10.1_
+  - [x] 1.3 Consolidate backup repository into sync/backup.ts
+    - Move getUserVehicles, getUserExpenses, etc. methods from BackupRepository into BackupService as private methods
+    - Delete `utils/backup-repository.ts` file
+    - Update imports in sync/backup.ts
+    - _Requirements: 8.2_
+  - [x] 1.4 Move financing calculations to frontend (breaking change)
+    - Document the three functions that frontend needs to copy (in a MIGRATION.md file)
+    - Remove `GET /api/financing/:financingId/schedule` endpoint from routes
+    - Delete `financing/calculations.ts` file
+    - Remove calculation imports from financing/routes.ts
+    - Keep validation logic in routes (validateLoanTerms can stay as inline function)
+    - _Requirements: 5.1_
+  - [x] 1.5 Extract session refresh utility
+    - Create `auth/utils.ts` file
+    - Extract session refresh logic into `validateAndRefreshSession()` function
+    - Update `requireAuth` middleware to use the utility
+    - Update `POST /auth/refresh` route to use the utility
+    - Remove duplicate session refresh code
+    - _Requirements: 3.1_
+  - [x] 1.6 Extract ownership validation helpers
+    - Add `validateVehicleOwnership()` to utils/validation.ts
+    - Add `validateExpenseOwnership()` to utils/validation.ts
+    - Add `validateFinancingOwnership()` to utils/validation.ts
+    - Add `validateInsuranceOwnership()` to utils/validation.ts
+    - Update all route handlers to use these helpers
+    - _Requirements: 2.1, 2.2_
+  - [x] 1.7 Extract vehicle stats calculations
+    - Create `utils/vehicle-stats.ts` file
+    - Move calculateVehicleStats, calculateTotals, calculateMileageStats, calculateAverageMpg from vehicles/routes.ts
+    - Update vehicles/routes.ts to import from utils
+    - _Requirements: 2.3_
+  - [x] 1.8 Consolidate response types
+    - Remove specific response interfaces (VehicleResponse, ExpenseResponse, etc.) from types.ts
+    - Keep only generic ApiResponse<T> interface
+    - Update route handlers to use ApiResponse<Vehicle>, ApiResponse<Expense[]>, etc.
+    - _Requirements: 4.2_
+  - [x] 1.9 Merge duplicate enum definitions
+    - Remove PaymentFrequency, PaymentType, AuthProvider enums from types.ts (keep in db/types.ts)
+    - Remove duplicate type guards from types.ts
+    - Update imports across codebase to use db/types.ts
+    - _Requirements: 4.1_
+  - [x] 1.10 Generate type guards programmatically
+    - Create `createEnumGuard<T>()` helper function in db/types.ts
+    - Replace hand-written type guards with generated ones
+    - Keep the same exports for backward compatibility
+    - _Requirements: 4.3_
+  - [x] 1.11 Simplify activity tracker middleware
+    - Remove complex delegation pattern in activityTracker middleware
+    - Inline activity recording logic directly in middleware
+    - Simplify the UserActivityTracker class (remove unnecessary config passing)
+    - _Requirements: 3.2_
+  - [x] 1.12 Consolidate error handling
+    - Merge ForbiddenError class into AuthorizationError (they're identical)
+    - Remove ExternalServiceError class (unused)
+    - Update imports across codebase
+    - _Requirements: 10.3_
+  - [x] 1.13 Remove unused exports and dead code
+    - Remove `clearIdempotencyCache()` export (only for tests)
+    - Remove `assertApiResponse()` function (never called)
+    - Remove `formatErrorResponse()` export (only used internally)
+    - Remove `withErrorHandling()` function (unused)
+    - Remove `createTypedError()` function (unused)
+    - Remove `checkpointAfterWrite` middleware (exported but never used)
+    - _Requirements: 9.1, 9.2_
+  - [x] 1.14 Simplify logger specialized methods
+    - Remove `http()`, `database()`, `auth()`, `external()` methods from Logger class
+    - Keep `startup()`, `shutdown()`, `checkpoint()` as they're used
+    - Update call sites to use `info()` or `error()` instead
+    - _Requirements: 7.2_
+  - [x] 1.15 Compose validation schemas with reusable validators
+    - Create validator helper functions in utils/validation.ts
+    - Update vehicle, expense, insurance, financing schemas to use validators
+    - Reduce duplication in validation patterns
+    - _Requirements: 6.2_
+  - [x] 1.16 Extract shared validation logic
+    - Move `validateFuelExpenseData()` from expenses/routes.ts to utils/validation.ts
+    - Update both create and update routes to use shared function
+    - _Requirements: 6.3_
+  - [x] 1.17 Simplify sync service factories
+    - Replace `createDriveServiceForUser()` and `createSheetsServiceForUser()` with simpler helpers
+    - Create `getUserToken()` helper function
+    - Update sync routes to use direct service instantiation
+    - _Requirements: 5.2_
+  - [x] 1.18 Rename and reorganize files
+    - Rename `utils/base-repository.ts` to `utils/repository.ts`
+    - Update imports across codebase
+    - _Requirements: 8.3_
+  - [x] 1.19 Clean up imports and remove unused code
+    - Run through all files and remove unused imports
+    - Remove unreachable code paths
+    - Update outdated comments
+    - _Requirements: 9.2, 9.3, 9.4_
+  - [x] 1.20 Final validation and documentation
+    - Run `bun run validate` to ensure no errors
+    - Create MIGRATION.md documenting breaking changes for frontend
+    - Document removed endpoints and required frontend changes
+    - Verify all endpoints still work with manual testing
+    - _Requirements: All_

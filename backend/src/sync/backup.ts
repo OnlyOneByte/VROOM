@@ -8,7 +8,7 @@
 import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
-import { getTableColumns } from 'drizzle-orm';
+import { eq, getTableColumns } from 'drizzle-orm';
 import type { SQLiteTableWithColumns } from 'drizzle-orm/sqlite-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
@@ -20,8 +20,19 @@ import {
   TABLE_SCHEMA_MAP,
 } from '../config';
 import { getDb } from '../db/connection';
+import {
+  type Expense,
+  expenses,
+  type InsurancePolicy,
+  insurancePolicies,
+  type Vehicle,
+  type VehicleFinancing,
+  type VehicleFinancingPayment,
+  vehicleFinancing,
+  vehicleFinancingPayments,
+  vehicles,
+} from '../db/schema';
 import type { BackupData, BackupMetadata, ParsedBackupData } from '../types';
-import { BackupRepository } from '../utils/backup-repository';
 import { logger } from '../utils/logger';
 
 // ============================================================================
@@ -103,14 +114,84 @@ export class BackupService {
   }
 
   /**
+   * Get all vehicles for a user
+   */
+  private async getUserVehicles(userId: string): Promise<Vehicle[]> {
+    const db = getDb();
+    return db.select().from(vehicles).where(eq(vehicles.userId, userId));
+  }
+
+  /**
+   * Get all expenses for a user
+   */
+  private async getUserExpenses(userId: string): Promise<Expense[]> {
+    const db = getDb();
+    const results = await db
+      .select()
+      .from(expenses)
+      .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+      .where(eq(vehicles.userId, userId));
+
+    return results.map((r) => r.expenses);
+  }
+
+  /**
+   * Get all financing for a user
+   */
+  private async getUserFinancing(userId: string): Promise<VehicleFinancing[]> {
+    const db = getDb();
+    const results = await db
+      .select()
+      .from(vehicleFinancing)
+      .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+      .where(eq(vehicles.userId, userId));
+
+    return results.map((r) => r.vehicle_financing);
+  }
+
+  /**
+   * Get all financing payments for a user
+   */
+  private async getUserFinancingPayments(userId: string): Promise<VehicleFinancingPayment[]> {
+    const db = getDb();
+    const results = await db
+      .select()
+      .from(vehicleFinancingPayments)
+      .innerJoin(vehicleFinancing, eq(vehicleFinancingPayments.financingId, vehicleFinancing.id))
+      .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+      .where(eq(vehicles.userId, userId));
+
+    return results.map((r) => r.vehicle_financing_payments);
+  }
+
+  /**
+   * Get all insurance policies for a user
+   */
+  private async getUserInsurance(userId: string): Promise<InsurancePolicy[]> {
+    const db = getDb();
+    const results = await db
+      .select()
+      .from(insurancePolicies)
+      .innerJoin(vehicles, eq(insurancePolicies.vehicleId, vehicles.id))
+      .where(eq(vehicles.userId, userId));
+
+    return results.map((r) => r.insurance_policies);
+  }
+
+  /**
    * Create a complete backup of user data
    */
   async createBackup(userId: string): Promise<BackupData> {
     logger.info('Creating backup', { userId });
 
-    const db = getDb();
-    const repository = new BackupRepository(db);
-    const userData = await repository.getAllUserData(userId);
+    const [userVehicles, userExpenses, userFinancing, userFinancingPayments, userInsurance] =
+      await Promise.all([
+        this.getUserVehicles(userId),
+        this.getUserExpenses(userId),
+        this.getUserFinancing(userId),
+        this.getUserFinancingPayments(userId),
+        this.getUserInsurance(userId),
+      ]);
 
     return {
       metadata: {
@@ -118,7 +199,11 @@ export class BackupService {
         timestamp: new Date().toISOString(),
         userId,
       },
-      ...userData,
+      vehicles: userVehicles,
+      expenses: userExpenses,
+      financing: userFinancing,
+      financingPayments: userFinancingPayments,
+      insurance: userInsurance,
     };
   }
 

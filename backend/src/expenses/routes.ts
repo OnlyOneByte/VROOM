@@ -9,9 +9,9 @@ import {
   EXPENSE_CATEGORY_DESCRIPTIONS,
   EXPENSE_CATEGORY_LABELS,
 } from '../db/types';
-import { NotFoundError, ValidationError } from '../errors';
+import { NotFoundError } from '../errors';
 import { changeTracker, requireAuth } from '../middleware';
-import { commonSchemas } from '../utils/validation';
+import { commonSchemas, validateFuelExpenseData } from '../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
 import { expenseRepository } from './repository';
 
@@ -136,21 +136,7 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
 // Note: With Drizzle JSON mode, tags are automatically parsed/stringified
 // No need for manual JSON.parse/stringify helper functions
 
-/**
- * Validate fuel expense requirements
- * Extracted to reduce complexity in update handler
- */
-function validateFuelExpenseData(
-  category: string,
-  mileage: number | null | undefined,
-  fuelAmount: number | null | undefined
-): void {
-  if (category === 'fuel') {
-    if (!fuelAmount || !mileage) {
-      throw new ValidationError('Fuel expenses require fuelAmount and mileage data');
-    }
-  }
-}
+// validateFuelExpenseData moved to utils/validation.ts
 
 // Helper function to fetch expenses for a vehicle based on query filters
 async function fetchVehicleExpenses(

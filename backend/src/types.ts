@@ -54,18 +54,8 @@ export {
 // ENUMS
 // ============================================================================
 
-export enum PaymentFrequency {
-  MONTHLY = 'monthly',
-  BI_WEEKLY = 'bi-weekly',
-  WEEKLY = 'weekly',
-  CUSTOM = 'custom',
-}
-
-export enum PaymentType {
-  STANDARD = 'standard',
-  EXTRA = 'extra',
-  CUSTOM_SPLIT = 'custom-split',
-}
+// Re-export types from db/types to avoid duplication
+export type { AuthProvider, PaymentFrequency, PaymentType } from './db/types';
 
 export enum Currency {
   USD = 'USD',
@@ -74,10 +64,6 @@ export enum Currency {
   CAD = 'CAD',
   AUD = 'AUD',
   JPY = 'JPY',
-}
-
-export enum AuthProvider {
-  GOOGLE = 'google',
 }
 
 export enum Environment {
@@ -111,9 +97,11 @@ export enum VehicleType {
 // ENUM TYPE GUARDS
 // ============================================================================
 
-export const isPaymentFrequency = (value: string): value is PaymentFrequency => {
-  return Object.values(PaymentFrequency).includes(value as PaymentFrequency);
-};
+// Re-export type guards from db/types
+export {
+  isValidPaymentFrequency as isPaymentFrequency,
+  isValidPaymentType as isPaymentType,
+} from './db/types';
 
 export const isCurrency = (value: string): value is Currency => {
   return Object.values(Currency).includes(value as Currency);
@@ -153,263 +141,8 @@ export interface ApiResponse<T = unknown> {
   count?: number;
 }
 
-export interface AuthResponse {
-  user: {
-    id: string;
-    email: string;
-    displayName: string;
-  };
-  session: {
-    id: string;
-  };
-}
-
-export interface LogoutResponse {
-  message: string;
-}
-
-export interface ExpenseResponse {
-  id: string;
-  tags: string[];
-  category: string;
-  amount: number;
-  vehicleId: string;
-  description?: string;
-  date: Date;
-  mileage?: number;
-  volume?: number;
-  charge?: number;
-}
-
-export interface VehicleResponse {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  licensePlate?: string;
-  nickname?: string;
-  initialMileage?: number;
-  purchasePrice?: number;
-  purchaseDate?: string;
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface InsuranceResponse {
-  id: string;
-  company: string;
-  policyNumber?: string;
-  totalCost: number;
-  monthlyCost: number;
-  startDate: Date;
-  endDate: Date;
-  vehicleId: string;
-  termLengthMonths: number;
-  isActive: boolean;
-}
-
-export interface InsurancePolicyResponse {
-  id: string;
-  company: string;
-  policyNumber: string;
-  totalCost: number;
-  termLengthMonths: number;
-  startDate: string;
-  endDate: string;
-  monthlyCost: number;
-  vehicleId: string;
-  isActive: boolean;
-  daysUntilExpiration?: number;
-  expirationAlert?: {
-    type: string;
-    severity: string;
-    message: string;
-  };
-}
-
-export interface VehicleLoanResponse {
-  id: string;
-  vehicleId: string;
-  financingType: string;
-  provider: string;
-  originalAmount: number;
-  currentBalance: number;
-  apr?: number;
-  termMonths: number;
-  startDate: string;
-  paymentAmount: number;
-  paymentFrequency: string;
-  paymentDayOfMonth?: number;
-  paymentDayOfWeek?: number;
-  residualValue?: number;
-  mileageLimit?: number;
-  excessMileageFee?: number;
-  isActive: boolean;
-  endDate?: string;
-}
-
-export interface LoanPaymentResponse {
-  id: string;
-  financingId: string;
-  paymentAmount: number;
-  paymentNumber: number;
-  principalAmount: number;
-  interestAmount: number;
-  remainingBalance: number;
-  paymentDate: string;
-}
-
-export interface LoanAnalysisResponse {
-  monthlyPayment: number;
-  totalInterest: number;
-  totalPayments: number;
-  payoffDate: string;
-}
-
-export interface LoanScheduleResponse {
-  analysis: LoanAnalysisResponse;
-  schedule: Array<{
-    paymentNumber: number;
-    paymentDate: string;
-    paymentAmount: number;
-    principalAmount: number;
-    interestAmount: number;
-    remainingBalance: number;
-  }>;
-}
-
-export interface ExpenseListResponse {
-  data: ExpenseResponse[];
-  filters: {
-    tags?: string[];
-    category?: string;
-    vehicleId?: string;
-  };
-}
-
-export interface InsuranceBreakdownResponse {
-  breakdown: Array<{
-    cost: number;
-    monthName: string;
-    startDate: Date;
-    endDate: Date;
-  }>;
-}
-
-export interface ExpiringInsuranceResponse {
-  data: Array<{
-    id: string;
-    company: string;
-    daysUntilExpiration: number;
-    expirationAlert: {
-      type: string;
-      severity: string;
-      message: string;
-    };
-  }>;
-  daysAhead: number;
-}
-
-export interface CostBreakdownResponse {
-  policyId?: string;
-  company?: string;
-  totalCost?: number;
-  monthlyCost?: number;
-  categoryBreakdown?: {
-    [category: string]: {
-      cost: number;
-      count: number;
-    };
-  };
-  breakdown?: Array<{
-    month?: number;
-    monthName?: string;
-    cost: number;
-    startDate?: Date;
-    endDate?: Date;
-  }>;
-}
-
-export type ExpenseListApiResponse = Array<{
-  id: string;
-  tags: string[];
-  category: string;
-  amount: number;
-  vehicleId: string;
-  description?: string;
-  date: string;
-  mileage?: number;
-  gallons?: number;
-}>;
-
-export interface ExpenseListApiResponseWithMeta extends ApiResponse<ExpenseListApiResponse> {
-  count: number;
-  filters: {
-    tags?: string[];
-    category?: string;
-    startDate?: string;
-    endDate?: string;
-  };
-}
-
-export interface ExpenseCategoryInfo {
-  value: string;
-  label: string;
-  description: string;
-}
-
-export type ExpenseCategoriesApiResponse = ExpenseCategoryInfo[];
-
-export interface FuelEfficiencyApiResponse {
-  vehicleId: string;
-  totalFuelExpenses: number;
-  averageMPG: number;
-  totalGallons: number;
-  totalMiles: number;
-  averageCostPerGallon: number;
-  averageCostPerMile: number;
-  efficiencyTrend: Array<{
-    date: Date;
-    mpg: number;
-    cost: number;
-    mileage?: number;
-    gallons?: number;
-    costPerGallon?: number;
-  }>;
-  alerts: Array<{
-    type: string;
-    message: string;
-    severity: string;
-    date: Date;
-    currentMPG?: number;
-    averageMPG?: number;
-  }>;
-}
-
-export interface CostPerMileApiResponse {
-  totalCostPerMile: number;
-  categoryBreakdown: {
-    [category: string]: {
-      cost: number;
-      costPerMile: number;
-    };
-  };
-  monthlyTrends: Array<{
-    month: string;
-    cost: number;
-    estimatedMiles: number;
-    costPerMile: number;
-  }>;
-  currentMileage: number;
-  totalMiles: number;
-  totalCost: number;
-}
-
-export interface ExpiringPoliciesResponse {
-  data: InsurancePolicyResponse[];
-  daysAhead: number;
-}
+// Specific response interfaces removed - use ApiResponse<T> with domain types instead
+// Example: ApiResponse<Vehicle>, ApiResponse<Expense[]>, etc.
 
 // ============================================================================
 // ANALYTICS TYPES
@@ -576,16 +309,4 @@ export interface StorageConfig {
 // HELPER FUNCTIONS
 // ============================================================================
 
-/**
- * Helper function to assert API response types
- */
-export function assertApiResponse<T>(data: unknown): asserts data is ApiResponse<T> {
-  if (typeof data !== 'object' || data === null) {
-    throw new Error('Response is not an object');
-  }
-
-  const response = data as Record<string, unknown>;
-  if (typeof response.success !== 'boolean') {
-    throw new Error('Response missing success field');
-  }
-}
+// assertApiResponse removed - was never called
