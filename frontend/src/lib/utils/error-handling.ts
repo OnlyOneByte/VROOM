@@ -1,5 +1,18 @@
 import { appStore } from '$lib/stores/app.js';
 
+/**
+ * Backend error response format
+ * Matches: { success: false, error: { code, message, details } }
+ */
+export interface BackendErrorResponse {
+	success: false;
+	error: {
+		code: string;
+		message: string;
+		details?: unknown;
+	};
+}
+
 export interface AppError {
 	message: string;
 	code?: string | undefined;
@@ -46,6 +59,32 @@ export function isNetworkError(error: unknown): boolean {
 }
 
 /**
+ * Error code to user-friendly message mapping
+ */
+const ERROR_CODE_MESSAGES: Record<string, string> = {
+	VALIDATION_ERROR: 'Please check your input and try again',
+	NOT_FOUND: 'The requested resource was not found',
+	UNAUTHORIZED: 'You need to be logged in to perform this action',
+	FORBIDDEN: 'You do not have permission to perform this action',
+	CONFLICT: 'This resource already exists or conflicts with existing data',
+	RATE_LIMIT_EXCEEDED: 'Too many requests. Please wait a moment and try again',
+	DATABASE_ERROR: 'A database error occurred. Please try again',
+	NETWORK_ERROR: 'Network error. Please check your connection',
+	AUTH_INVALID: 'Your session has expired. Please log in again',
+	SYNC_IN_PROGRESS: 'A sync operation is already in progress',
+	QUOTA_EXCEEDED: 'Storage quota exceeded',
+	PERMISSION_DENIED: 'Permission denied'
+};
+
+/**
+ * Get user-friendly message for error code
+ */
+export function getUserFriendlyMessage(code: string | undefined): string | undefined {
+	if (!code) return undefined;
+	return ERROR_CODE_MESSAGES[code];
+}
+
+/**
  * Enhanced error handling with fallback message support
  * @param error - The error to handle
  * @param fallbackMessage - Optional fallback message if error is not descriptive
@@ -53,8 +92,10 @@ export function isNetworkError(error: unknown): boolean {
  */
 export function handleApiError(error: unknown, fallbackMessage?: string): AppError {
 	if (isVroomError(error)) {
+		// Use user-friendly message if available
+		const friendlyMessage = getUserFriendlyMessage(error.code);
 		return {
-			message: error.message,
+			message: friendlyMessage || error.message,
 			code: error.code,
 			statusCode: error.statusCode,
 			details: error.details
@@ -78,21 +119,61 @@ export function handleApiError(error: unknown, fallbackMessage?: string): AppErr
 	};
 }
 
+/**
+ * Parse backend error response
+ * Handles new format: { success: false, error: { code, message, details } }
+ */
+export function parseBackendError(errorData: unknown): AppError {
+	// Check if it's the new backend error format
+	if (
+		errorData &&
+		typeof errorData === 'object' &&
+		'success' in errorData &&
+		errorData.success === false &&
+		'error' in errorData
+	) {
+		const backendError = errorData as BackendErrorResponse;
+		return {
+			message: backendError.error.message,
+			code: backendError.error.code,
+			details:
+				typeof backendError.error.details === 'object'
+					? (backendError.error.details as Record<string, unknown>)
+					: undefined
+		};
+	}
+
+	// Fallback to old format
+	if (errorData && typeof errorData === 'object' && 'message' in errorData) {
+		return {
+			message: (errorData as { message: string }).message,
+			details: 'details' in errorData ? (errorData.details as Record<string, unknown>) : undefined
+		};
+	}
+
+	return {
+		message: 'An unexpected error occurred'
+	};
+}
+
 // API response error handler
 export async function handleApiResponse(response: Response): Promise<unknown> {
 	if (!response.ok) {
 		let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+		let errorCode = 'API_ERROR';
 		let errorDetails: Record<string, unknown> = {};
 
 		try {
 			const errorData = await response.json();
-			errorMessage = errorData.message || errorMessage;
-			errorDetails = errorData.details || {};
+			const parsedError = parseBackendError(errorData);
+			errorMessage = parsedError.message;
+			errorCode = parsedError.code || errorCode;
+			errorDetails = parsedError.details || {};
 		} catch {
 			// If we can't parse the error response, use the default message
 		}
 
-		throw new VroomError(errorMessage, 'API_ERROR', response.status, errorDetails);
+		throw new VroomError(errorMessage, errorCode, response.status, errorDetails);
 	}
 
 	try {
@@ -134,9 +215,24 @@ export async function withErrorHandling<T>(
 export function handleFormError(error: unknown): Record<string, string> {
 	const appError = handleApiError(error);
 
-	if (appError.statusCode === 400 && appError.details) {
-		// Return field-specific errors for form validation
-		return appError.details as Record<string, string>;
+	// Check for validation errors with field-specific details
+	if (appError.code === 'VALIDATION_ERROR' && appError.details) {
+		// Map error.details to form field errors
+		const fieldErrors: Record<string, string> = {};
+
+		// Handle both object and array formats
+		if (typeof appError.details === 'object' && appError.details !== null) {
+			for (const [field, message] of Object.entries(appError.details)) {
+				if (typeof message === 'string') {
+					fieldErrors[field] = message;
+				}
+			}
+		}
+
+		// If we found field-specific errors, return them
+		if (Object.keys(fieldErrors).length > 0) {
+			return fieldErrors;
+		}
 	}
 
 	// Return general error

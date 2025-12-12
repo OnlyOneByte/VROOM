@@ -109,9 +109,16 @@
 
 							<div class="space-y-2 text-sm">
 								<div class="flex justify-between">
-									<span class="text-gray-600">Type:</span>
-									<span class="font-medium capitalize">{currentConflict.localExpense.type}</span>
+									<span class="text-gray-600">Category:</span>
+									<span class="font-medium capitalize">{currentConflict.localExpense.category}</span
+									>
 								</div>
+								{#if currentConflict.localExpense.tags && currentConflict.localExpense.tags.length > 0}
+									<div class="flex justify-between">
+										<span class="text-gray-600">Tags:</span>
+										<span class="font-medium">{currentConflict.localExpense.tags.join(', ')}</span>
+									</div>
+								{/if}
 								<div class="flex justify-between">
 									<span class="text-gray-600">Amount:</span>
 									<span class="font-medium"

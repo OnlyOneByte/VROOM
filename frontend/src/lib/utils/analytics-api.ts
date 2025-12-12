@@ -1,13 +1,4 @@
-import { authStore } from '$lib/stores/auth';
-import { get } from 'svelte/store';
-
-const API_BASE = import.meta.env['VITE_API_BASE_URL'] || '/api';
-
-interface ApiResponse<T> {
-	success: boolean;
-	data: T;
-	message?: string;
-}
+// Analytics API - Stubbed (backend endpoints removed)
 
 export interface DashboardData {
 	vehicles: Array<{
@@ -90,88 +81,43 @@ export interface TrendData {
 	}>;
 }
 
-async function makeAuthenticatedRequest<T>(url: string): Promise<T> {
-	const authState = get(authStore);
-
-	if (!authState.isAuthenticated || !authState.token) {
-		throw new Error('Not authenticated');
-	}
-
-	const response = await fetch(url, {
-		headers: {
-			Authorization: `Bearer ${authState.token}`,
-			'Content-Type': 'application/json'
-		},
-		credentials: 'include'
-	});
-
-	if (!response.ok) {
-		if (response.status === 401) {
-			// Token might be expired, try to refresh
-			await authStore.refreshToken();
-			throw new Error('Authentication expired, please try again');
-		}
-		throw new Error(`API request failed: ${response.statusText}`);
-	}
-
-	const result: ApiResponse<T> = await response.json();
-
-	if (!result.success) {
-		throw new Error(result.message || 'API request failed');
-	}
-
-	return result.data;
-}
+// NOTE: Analytics endpoints removed from backend - these functions are stubbed
+// TODO: Implement client-side analytics calculations or remove analytics features
 
 export async function getDashboardAnalytics(
-	startDate?: string,
-	endDate?: string,
-	groupBy: 'day' | 'week' | 'month' | 'year' = 'month'
+	_startDate?: string,
+	_endDate?: string,
+	_groupBy: 'day' | 'week' | 'month' | 'year' = 'month'
 ): Promise<DashboardData> {
-	const params = new URLSearchParams();
-	if (startDate) params.append('startDate', startDate);
-	if (endDate) params.append('endDate', endDate);
-	params.append('groupBy', groupBy);
-
-	const url = `${API_BASE}/analytics/dashboard?${params.toString()}`;
-	return makeAuthenticatedRequest<DashboardData>(url);
+	// Stubbed - analytics endpoint removed
+	throw new Error('Analytics endpoint not implemented');
 }
 
 export async function getVehicleAnalytics(
-	vehicleId: string,
-	startDate?: string,
-	endDate?: string,
-	groupBy: 'day' | 'week' | 'month' | 'year' = 'month'
+	_vehicleId: string,
+	_startDate?: string,
+	_endDate?: string,
+	_groupBy: 'day' | 'week' | 'month' | 'year' = 'month'
 ): Promise<VehicleAnalytics> {
-	const params = new URLSearchParams();
-	if (startDate) params.append('startDate', startDate);
-	if (endDate) params.append('endDate', endDate);
-	params.append('groupBy', groupBy);
-
-	const url = `${API_BASE}/analytics/vehicle/${vehicleId}?${params.toString()}`;
-	return makeAuthenticatedRequest<VehicleAnalytics>(url);
+	// Stubbed - analytics endpoint removed
+	throw new Error('Analytics endpoint not implemented');
 }
 
 export async function getTrendData(
-	startDate?: string,
-	endDate?: string,
-	groupBy: 'day' | 'week' | 'month' | 'year' = 'month'
+	_startDate?: string,
+	_endDate?: string,
+	_groupBy: 'day' | 'week' | 'month' | 'year' = 'month'
 ): Promise<TrendData> {
-	const params = new URLSearchParams();
-	if (startDate) params.append('startDate', startDate);
-	if (endDate) params.append('endDate', endDate);
-	params.append('groupBy', groupBy);
-
-	const url = `${API_BASE}/analytics/trends?${params.toString()}`;
-	return makeAuthenticatedRequest<TrendData>(url);
+	// Stubbed - analytics endpoint removed
+	throw new Error('Analytics endpoint not implemented');
 }
 
-export async function getFuelEfficiency(vehicleId: string) {
-	const url = `${API_BASE}/expenses/vehicles/${vehicleId}/fuel-efficiency`;
-	return makeAuthenticatedRequest(url);
+export async function getFuelEfficiency(_vehicleId: string) {
+	// Stubbed - analytics endpoint removed
+	throw new Error('Analytics endpoint not implemented');
 }
 
-export async function getCostPerMile(vehicleId: string) {
-	const url = `${API_BASE}/expenses/vehicles/${vehicleId}/cost-per-mile`;
-	return makeAuthenticatedRequest(url);
+export async function getCostPerMile(_vehicleId: string) {
+	// Stubbed - analytics endpoint removed
+	throw new Error('Analytics endpoint not implemented');
 }

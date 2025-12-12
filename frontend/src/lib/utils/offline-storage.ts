@@ -1,6 +1,8 @@
 import { offlineExpenses, syncStatus } from '$lib/stores/offline';
+import { toBackendExpense } from '$lib/services/api-transformer';
 
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
+const OFFLINE_STORAGE_VERSION = '2.0'; // Incremented for field name migration
 
 export interface OfflineExpense {
 	id: string;
@@ -17,6 +19,7 @@ export interface OfflineExpense {
 	description?: string;
 	timestamp: number;
 	synced: boolean;
+	version?: string; // Storage format version
 }
 
 // Load offline expenses from localStorage
@@ -25,7 +28,18 @@ export function loadOfflineExpenses(): OfflineExpense[] {
 
 	try {
 		const stored = localStorage.getItem(OFFLINE_STORAGE_KEY);
-		return stored ? JSON.parse(stored) : [];
+		if (!stored) return [];
+
+		const expenses: OfflineExpense[] = JSON.parse(stored);
+
+		// Migrate old format expenses to new format if needed
+		return expenses.map(expense => {
+			if (!expense.version || expense.version !== OFFLINE_STORAGE_VERSION) {
+				// Mark as migrated
+				return { ...expense, version: OFFLINE_STORAGE_VERSION };
+			}
+			return expense;
+		});
 	} catch (error) {
 		console.error('Failed to load offline expenses:', error);
 		return [];
@@ -46,13 +60,14 @@ export function saveOfflineExpenses(expenses: OfflineExpense[]): void {
 
 // Add expense to offline queue
 export function addOfflineExpense(
-	expense: Omit<OfflineExpense, 'id' | 'timestamp' | 'synced'>
+	expense: Omit<OfflineExpense, 'id' | 'timestamp' | 'synced' | 'version'>
 ): void {
 	const offlineExpense: OfflineExpense = {
 		...expense,
 		id: `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
 		timestamp: Date.now(),
-		synced: false
+		synced: false,
+		version: OFFLINE_STORAGE_VERSION
 	};
 
 	const currentExpenses = loadOfflineExpenses();
@@ -109,21 +124,23 @@ export async function syncOfflineExpenses(): Promise<void> {
 				continue;
 			}
 
+			// Transform to backend format using API transformer
+			const backendExpense = toBackendExpense({
+				vehicleId: expense.vehicleId,
+				tags: expense.tags || [],
+				category: expense.category,
+				amount: expense.amount,
+				date: expense.date,
+				mileage: expense.mileage,
+				volume: expense.volume,
+				charge: expense.charge,
+				description: expense.description
+			});
+
 			const response = await fetch('/api/v1/expenses', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					vehicleId: expense.vehicleId,
-					tags: expense.tags || [],
-					category: expense.category,
-					amount: expense.amount,
-					currency: expense.currency || 'USD',
-					date: expense.date,
-					mileage: expense.mileage,
-					volume: expense.volume,
-					charge: expense.charge,
-					description: expense.description
-				})
+				body: JSON.stringify(backendExpense)
 			});
 
 			if (response.ok) {

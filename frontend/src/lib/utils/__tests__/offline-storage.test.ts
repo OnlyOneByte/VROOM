@@ -43,7 +43,8 @@ describe('Offline Storage', () => {
 			localStorageMock.getItem.mockReturnValue(JSON.stringify(mockExpenses));
 
 			const expenses = loadOfflineExpenses();
-			expect(expenses).toEqual(mockExpenses);
+			// Expenses should have version field added during migration
+			expect(expenses).toEqual(mockExpenses.map(e => ({ ...e, version: '2.0' })));
 		});
 
 		it('should handle corrupted localStorage data gracefully', () => {
@@ -134,7 +135,7 @@ describe('Offline Storage', () => {
 
 			const savedData = JSON.parse(localStorageMock.setItem.mock.calls[0][1]);
 			expect(savedData).toHaveLength(2);
-			expect(savedData[0]).toEqual(existingExpenses[0]);
+			expect(savedData[0]).toEqual({ ...existingExpenses[0], version: '2.0' });
 			expect(savedData[1]).toMatchObject(newExpenseData);
 		});
 	});

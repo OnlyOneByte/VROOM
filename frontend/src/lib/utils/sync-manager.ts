@@ -1,6 +1,7 @@
 import { writable, get } from 'svelte/store';
 import { isOnline, syncStatus, offlineExpenses } from '$lib/stores/offline';
 import { loadOfflineExpenses, saveOfflineExpenses, type OfflineExpense } from './offline-storage';
+import { toBackendExpense } from '$lib/services/api-transformer';
 
 export interface SyncConflict {
 	id: string;
@@ -217,23 +218,25 @@ class SyncManager {
 			}
 
 			// No conflict, proceed with sync
+			// Transform to backend format using API transformer
+			const backendExpense = toBackendExpense({
+				vehicleId: expense.vehicleId,
+				tags: expense.tags,
+				category: expense.category,
+				amount: expense.amount,
+				date: expense.date,
+				mileage: expense.mileage,
+				volume: expense.volume,
+				charge: expense.charge,
+				description: expense.description
+			});
+
 			const response = await fetch(`/api/v1/expenses`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({
-					vehicleId: expense.vehicleId,
-					tags: expense.tags,
-					category: expense.category,
-					amount: expense.amount,
-					currency: expense.currency || 'USD',
-					date: expense.date,
-					mileage: expense.mileage,
-					volume: expense.volume,
-					charge: expense.charge,
-					description: expense.description
-				})
+				body: JSON.stringify(backendExpense)
 			});
 
 			if (!response.ok) {
@@ -327,21 +330,26 @@ class SyncManager {
 			switch (resolution) {
 				case 'keep_local': {
 					// Force sync the local version
+					// Transform to backend format using API transformer
+					const backendExpense = toBackendExpense({
+						vehicleId: conflict.localExpense.vehicleId,
+						tags: conflict.localExpense.tags,
+						category: conflict.localExpense.category,
+						amount: conflict.localExpense.amount,
+						date: conflict.localExpense.date,
+						mileage: conflict.localExpense.mileage,
+						volume: conflict.localExpense.volume,
+						charge: conflict.localExpense.charge,
+						description: conflict.localExpense.description
+					});
+
 					const response = await fetch(`/api/v1/expenses`, {
 						method: 'POST',
 						headers: {
 							'Content-Type': 'application/json'
 						},
 						body: JSON.stringify({
-							vehicleId: conflict.localExpense.vehicleId,
-							tags: conflict.localExpense.tags,
-							category: conflict.localExpense.category,
-							amount: conflict.localExpense.amount,
-							date: conflict.localExpense.date,
-							mileage: conflict.localExpense.mileage,
-							volume: conflict.localExpense.volume,
-							charge: conflict.localExpense.charge,
-							description: conflict.localExpense.description,
+							...backendExpense,
 							forceOverwrite: true
 						})
 					});

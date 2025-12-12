@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Car, TrendingUp, TrendingDown, Minus } from 'lucide-svelte';
-	import { getFuelEfficiency } from '$lib/utils/analytics-api';
 
 	interface Props {
 		vehicles: Array<{
@@ -27,15 +26,19 @@
 
 			for (const vehicle of vehicles) {
 				try {
-					const fuelData = await getFuelEfficiency(vehicle.id);
-					if (fuelData && typeof fuelData === 'object') {
-						efficiencyData[vehicle.id] = {
-							...fuelData,
-							vehicle,
-							trend: calculateTrend((fuelData as any).trend),
-							rating: calculateEfficiencyRating((fuelData as any).averageMPG)
-						};
-					}
+					// NOTE: Analytics endpoint removed - using mock data
+					const fuelData = {
+						averageMPG: 0,
+						totalGallons: 0,
+						totalMiles: 0,
+						trend: []
+					};
+					efficiencyData[vehicle.id] = {
+						...fuelData,
+						vehicle,
+						trend: [],
+						rating: 'average' as const
+					};
 				} catch (error) {
 					console.warn(`Failed to load fuel data for vehicle ${vehicle.id}:`, error);
 					efficiencyData[vehicle.id] = {
@@ -56,36 +59,6 @@
 		} finally {
 			isLoading = false;
 		}
-	}
-
-	function calculateTrend(trendData: any[]) {
-		if (!trendData || trendData.length < 4) return 'stable';
-
-		const recent = trendData.slice(-3);
-		const older = trendData.slice(-6, -3);
-
-		if (recent.length === 0 || older.length === 0) return 'stable';
-
-		const recentAvg = recent.reduce((sum, d) => sum + d.mpg, 0) / recent.length;
-		const olderAvg = older.reduce((sum, d) => sum + d.mpg, 0) / older.length;
-
-		const change = (recentAvg - olderAvg) / olderAvg;
-
-		if (change > 0.05) return 'improving'; // 5% improvement
-		if (change < -0.05) return 'declining'; // 5% decline
-		return 'stable';
-	}
-
-	function calculateEfficiencyRating(averageMPG: number): string {
-		if (averageMPG === 0) return 'unknown';
-
-		// Simple rating based on MPG ranges
-		// In a real app, this would consider vehicle class, age, etc.
-		if (averageMPG >= 35) return 'excellent';
-		if (averageMPG >= 28) return 'good';
-		if (averageMPG >= 22) return 'average';
-		if (averageMPG >= 18) return 'below-average';
-		return 'poor';
 	}
 
 	function getRatingColor(rating: string): string {

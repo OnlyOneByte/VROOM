@@ -86,18 +86,74 @@ export interface VehicleFormData {
 	purchaseDate?: string;
 }
 
-// Expense types
+/**
+ * Expense type - Frontend representation
+ *
+ * IMPORTANT: Field name mappings with backend:
+ * - Frontend `amount` ↔ Backend `expenseAmount`
+ * - Frontend `volume` ↔ Backend `fuelAmount` (for gas/hybrid vehicles)
+ * - Frontend `charge` ↔ Backend `fuelAmount` (for electric vehicles)
+ *
+ * The API transformation layer handles these mappings automatically.
+ * See: frontend/src/lib/services/api-transformer.ts
+ */
 export interface Expense {
 	id: string;
 	vehicleId: string;
 	tags: string[];
 	category: ExpenseCategory;
+	/** Total expense amount (maps to backend `expenseAmount`) */
 	amount: number;
+	date: string; // ISO date string
+	mileage?: number;
+	/** Fuel volume in gallons/liters (maps to backend `fuelAmount` for gas/hybrid) */
+	volume?: number;
+	/** Electric charge in kWh (maps to backend `fuelAmount` for electric) */
+	charge?: number;
+	fuelType?: string;
+	description?: string;
+	receiptUrl?: string;
+	createdAt: string; // ISO date string
+	updatedAt: string; // ISO date string
+}
+
+/**
+ * Backend expense request format
+ * Used internally by API transformation layer
+ */
+export interface BackendExpenseRequest {
+	vehicleId: string;
+	tags: string[];
+	category: string;
+	/** Backend field name for total expense amount */
+	expenseAmount: number;
 	date: string;
 	mileage?: number;
-	volume?: number; // For fuel
-	charge?: number; // For electric
+	/** Backend unified field for both volume and charge */
+	fuelAmount?: number;
+	fuelType?: string;
 	description?: string;
+	receiptUrl?: string;
+}
+
+/**
+ * Backend expense response format
+ * Used internally by API transformation layer
+ */
+export interface BackendExpenseResponse {
+	id: string;
+	vehicleId: string;
+	tags: string[];
+	category: string;
+	/** Backend field name for total expense amount */
+	expenseAmount: number;
+	date: string;
+	mileage?: number;
+	/** Backend unified field for both volume and charge */
+	fuelAmount?: number;
+	fuelType?: string;
+	description?: string;
+	receiptUrl?: string;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -110,6 +166,20 @@ export interface ExpenseCategoryInfo {
 	value: string;
 	label: string;
 	description: string;
+}
+
+/**
+ * Type guard: Check if an expense object uses backend field names
+ */
+export function hasBackendFieldNames(expense: Record<string, unknown>): boolean {
+	return 'expenseAmount' in expense || 'fuelAmount' in expense;
+}
+
+/**
+ * Type guard: Check if an expense object uses frontend field names
+ */
+export function hasFrontendFieldNames(expense: Record<string, unknown>): boolean {
+	return 'amount' in expense || 'volume' in expense || 'charge' in expense;
 }
 
 // Notification types

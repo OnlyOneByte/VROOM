@@ -113,16 +113,16 @@ export interface Expense {
 	tags: string[]; // Flexible tags
 	category: ExpenseCategory;
 	amount: number;
-	currency: string;
-	date: Date;
+	currency?: string;
+	date: string; // ISO date string
 	mileage?: number;
 	volume?: number; // For fuel expenses (gallons or liters)
 	charge?: number; // For electric charging (kWh)
 	fuelType?: string; // Octane rating or fuel type for fuel expenses
 	description?: string;
 	receiptUrl?: string;
-	createdAt: Date;
-	updatedAt: Date;
+	createdAt: string; // ISO date string
+	updatedAt: string; // ISO date string
 }
 
 export interface InsurancePolicy {

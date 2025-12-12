@@ -6,6 +6,7 @@
 	import { requestBackgroundSync } from '$lib/utils/pwa';
 	import { appStore } from '$lib/stores/app';
 	import { settingsStore } from '$lib/stores/settings';
+	import { expenseApi } from '$lib/services/expense-api';
 	import {
 		Save,
 		ArrowLeft,
@@ -256,7 +257,7 @@
 	async function loadLastFuelExpense() {
 		try {
 			const response = await fetch(
-				`/api/v1/expenses?vehicleId=${formData.vehicleId}&type=fuel&limit=2`,
+				`/api/v1/expenses?vehicleId=${formData.vehicleId}&category=fuel&limit=2`,
 				{
 					credentials: 'include'
 				}
@@ -560,47 +561,24 @@
 			};
 
 			if (isEditMode) {
-				// Update existing expense
-				const response = await fetch(`/api/v1/expenses/${expenseId}`, {
-					method: 'PUT',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					credentials: 'include',
-					body: JSON.stringify(expenseData)
-				});
+				// Update existing expense using API service
+				await expenseApi.updateExpense(expenseId!, expenseData);
 
-				if (response.ok) {
-					appStore.addNotification({
-						type: 'success',
-						message: 'Expense updated successfully'
-					});
-					goto(returnTo);
-				} else {
-					const result = await response.json();
-					throw new Error(result.message || 'Failed to update expense');
-				}
+				appStore.addNotification({
+					type: 'success',
+					message: 'Expense updated successfully'
+				});
+				goto(returnTo);
 			} else {
 				// Create new expense
 				if ($isOnline) {
-					const response = await fetch(`/api/v1/expenses`, {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json'
-						},
-						credentials: 'include',
-						body: JSON.stringify(expenseData)
-					});
+					await expenseApi.createExpense(expenseData);
 
-					if (response.ok) {
-						appStore.addNotification({
-							type: 'success',
-							message: 'Expense added successfully'
-						});
-						goto(returnTo);
-					} else {
-						throw new Error('Failed to save expense');
-					}
+					appStore.addNotification({
+						type: 'success',
+						message: 'Expense added successfully'
+					});
+					goto(returnTo);
 				} else {
 					// Save offline
 					addOfflineExpense({
@@ -683,21 +661,13 @@
 		isDeleting = true;
 
 		try {
-			const response = await fetch(`/api/v1/expenses/${expenseId}`, {
-				method: 'DELETE',
-				credentials: 'include'
-			});
+			await expenseApi.deleteExpense(expenseId);
 
-			if (response.ok) {
-				appStore.addNotification({
-					type: 'success',
-					message: 'Expense deleted successfully'
-				});
-				goto(returnTo);
-			} else {
-				const result = await response.json();
-				throw new Error(result.message || 'Failed to delete expense');
-			}
+			appStore.addNotification({
+				type: 'success',
+				message: 'Expense deleted successfully'
+			});
+			goto(returnTo);
 		} catch (error) {
 			console.error('Failed to delete expense:', error);
 			appStore.addNotification({

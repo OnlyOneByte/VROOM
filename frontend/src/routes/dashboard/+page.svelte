@@ -102,12 +102,21 @@
 				params.append('startDate', startDate.toISOString());
 				params.append('endDate', endDate.toISOString());
 			}
-			const response = await fetch(`/api/v1/analytics/dashboard?${params.toString()}`, {
-				credentials: 'include'
-			});
-			if (!response.ok) throw new Error('Failed to load dashboard data');
-			const result = await response.json();
-			dashboardData = result.data;
+			// NOTE: Analytics endpoint removed - using mock data for now
+			// TODO: Implement client-side analytics or restore backend endpoint
+			dashboardData = {
+				vehicles: [],
+				totalExpenses: 0,
+				monthlyTrends: [],
+				categoryBreakdown: {},
+				fuelEfficiency: {
+					averageMPG: 0,
+					totalVolume: 0,
+					totalFuelCost: 0,
+					averageCostPerGallon: 0
+				},
+				costPerMile: { totalCostPerMile: 0, totalCost: 0, totalMiles: 0 }
+			};
 			await Promise.all([loadVehicleDetails(), loadRecentExpenses()]);
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load dashboard data');

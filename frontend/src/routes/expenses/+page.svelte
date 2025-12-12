@@ -394,7 +394,11 @@
 							</button>
 							<div class="flex-1">
 								<div class="flex items-center gap-2 mb-1">
-									<span class="font-medium text-gray-900 capitalize">{expense.type}</span>
+									<span class="font-medium text-gray-900 capitalize">{expense.category}</span>
+									{#if expense.tags && expense.tags.length > 0}
+										<span class="text-sm text-gray-500">•</span>
+										<span class="text-sm text-gray-600">{expense.tags.join(', ')}</span>
+									{/if}
 									<span class="text-sm text-gray-500">•</span>
 									<span class="text-sm text-gray-600">{expense.date}</span>
 								</div>
@@ -429,7 +433,11 @@
 						>
 							<div class="flex-1">
 								<div class="flex items-center gap-2 mb-1">
-									<span class="font-medium text-gray-900 capitalize">{expense.type}</span>
+									<span class="font-medium text-gray-900 capitalize">{expense.category}</span>
+									{#if expense.tags && expense.tags.length > 0}
+										<span class="text-sm text-gray-500">•</span>
+										<span class="text-sm text-gray-600">{expense.tags.join(', ')}</span>
+									{/if}
 									<span class="text-sm text-gray-500">•</span>
 									<span class="text-sm text-gray-600">{expense.date}</span>
 								</div>
