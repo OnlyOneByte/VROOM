@@ -6,8 +6,9 @@ import { z } from 'zod';
 import { CONFIG } from '../config';
 import { insurancePolicies } from '../db/schema';
 import { changeTracker, requireAuth } from '../middleware';
+import { calculateMonthlyBreakdown } from '../utils/calculations';
 import { logger } from '../utils/logger';
-import { commonSchemas } from '../utils/validation';
+import { commonSchemas, validateInsuranceOwnership } from '../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
 import { insurancePolicyRepository } from './repository';
 
@@ -194,34 +195,10 @@ routes.get('/vehicles/:id/policies', zValidator('param', commonSchemas.idParam),
 
 // GET /api/insurance/:id - Get specific insurance policy
 routes.get('/:id', zValidator('param', insurancePolicyParamsSchema), async (c) => {
-  try {
-    const user = c.get('user');
-    const { id } = c.req.valid('param');
-
-    const policy = await insurancePolicyRepository.findById(id);
-    if (!policy) {
-      throw new HTTPException(404, { message: 'Insurance policy not found' });
-    }
-
-    // Verify the policy belongs to a vehicle owned by the user
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, policy.vehicleId);
-    if (!vehicle) {
-      throw new HTTPException(404, { message: 'Insurance policy not found' });
-    }
-
-    return c.json({
-      success: true,
-      data: policy,
-    });
-  } catch (error) {
-    logger.error('Error fetching insurance policy', { error });
-
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-
-    throw new HTTPException(500, { message: 'Failed to fetch insurance policy' });
-  }
+  const user = c.get('user');
+  const { id } = c.req.valid('param');
+  const policy = await validateInsuranceOwnership(id, user.id);
+  return c.json({ success: true, data: policy });
 });
 
 // PUT /api/insurance/:id - Update insurance policy
@@ -230,93 +207,42 @@ routes.put(
   zValidator('param', insurancePolicyParamsSchema),
   zValidator('json', updateInsurancePolicySchema),
   async (c) => {
-    try {
-      const user = c.get('user');
-      const { id } = c.req.valid('param');
-      const updateData = c.req.valid('json');
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const updateData = c.req.valid('json');
+    const existingPolicy = await validateInsuranceOwnership(id, user.id);
 
-      // Check if policy exists
-      const existingPolicy = await insurancePolicyRepository.findById(id);
-      if (!existingPolicy) {
-        throw new HTTPException(404, { message: 'Insurance policy not found' });
+    if (updateData.startDate || updateData.endDate) {
+      const startDate = updateData.startDate || existingPolicy.startDate;
+      const endDate = updateData.endDate || existingPolicy.endDate;
+      if (endDate <= startDate) {
+        throw new HTTPException(400, { message: 'End date must be after start date' });
       }
-
-      // Verify the policy belongs to a vehicle owned by the user
-      const vehicle = await vehicleRepository.findByUserIdAndId(user.id, existingPolicy.vehicleId);
-      if (!vehicle) {
-        throw new HTTPException(404, { message: 'Insurance policy not found' });
-      }
-
-      // Validate date range if dates are being updated
-      if (updateData.startDate || updateData.endDate) {
-        const startDate = updateData.startDate || existingPolicy.startDate;
-        const endDate = updateData.endDate || existingPolicy.endDate;
-
-        if (endDate <= startDate) {
-          throw new HTTPException(400, { message: 'End date must be after start date' });
-        }
-      }
-
-      // Recalculate monthly cost if total cost or term length changes
-      const finalUpdateData: Record<string, unknown> = { ...updateData };
-      if (updateData.totalCost || updateData.termLengthMonths) {
-        const totalCost = updateData.totalCost || existingPolicy.totalCost;
-        const termLengthMonths = updateData.termLengthMonths || existingPolicy.termLengthMonths;
-        finalUpdateData.monthlyCost = totalCost / termLengthMonths;
-      }
-
-      const updatedPolicy = await insurancePolicyRepository.update(id, finalUpdateData);
-
-      return c.json({
-        success: true,
-        data: updatedPolicy,
-        message: 'Insurance policy updated successfully',
-      });
-    } catch (error) {
-      logger.error('Error updating insurance policy', { error });
-
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-
-      throw new HTTPException(500, { message: 'Failed to update insurance policy' });
     }
+
+    const finalUpdateData: Record<string, unknown> = { ...updateData };
+    if (updateData.totalCost || updateData.termLengthMonths) {
+      const totalCost = updateData.totalCost || existingPolicy.totalCost;
+      const termLengthMonths = updateData.termLengthMonths || existingPolicy.termLengthMonths;
+      finalUpdateData.monthlyCost = totalCost / termLengthMonths;
+    }
+
+    const updatedPolicy = await insurancePolicyRepository.update(id, finalUpdateData);
+    return c.json({
+      success: true,
+      data: updatedPolicy,
+      message: 'Insurance policy updated successfully',
+    });
   }
 );
 
 // DELETE /api/insurance/:id - Delete insurance policy
 routes.delete('/:id', zValidator('param', insurancePolicyParamsSchema), async (c) => {
-  try {
-    const user = c.get('user');
-    const { id } = c.req.valid('param');
-
-    // Check if policy exists
-    const existingPolicy = await insurancePolicyRepository.findById(id);
-    if (!existingPolicy) {
-      throw new HTTPException(404, { message: 'Insurance policy not found' });
-    }
-
-    // Verify the policy belongs to a vehicle owned by the user
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, existingPolicy.vehicleId);
-    if (!vehicle) {
-      throw new HTTPException(404, { message: 'Insurance policy not found' });
-    }
-
-    await insurancePolicyRepository.delete(id);
-
-    return c.json({
-      success: true,
-      message: 'Insurance policy deleted successfully',
-    });
-  } catch (error) {
-    logger.error('Error deleting insurance policy', { error });
-
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-
-    throw new HTTPException(500, { message: 'Failed to delete insurance policy' });
-  }
+  const user = c.get('user');
+  const { id } = c.req.valid('param');
+  await validateInsuranceOwnership(id, user.id);
+  await insurancePolicyRepository.delete(id);
+  return c.json({ success: true, message: 'Insurance policy deleted successfully' });
 });
 
 // GET /api/insurance/:id/monthly-breakdown - Get monthly cost breakdown
@@ -324,95 +250,23 @@ routes.get(
   '/:id/monthly-breakdown',
   zValidator('param', insurancePolicyParamsSchema),
   async (c) => {
-    try {
-      const user = c.get('user');
-      const { id } = c.req.valid('param');
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const policy = await validateInsuranceOwnership(id, user.id);
+    const monthlyBreakdown = calculateMonthlyBreakdown(policy);
 
-      const policy = await insurancePolicyRepository.findById(id);
-      if (!policy) {
-        throw new HTTPException(404, { message: 'Insurance policy not found' });
-      }
-
-      // Verify the policy belongs to a vehicle owned by the user
-      const vehicle = await vehicleRepository.findByUserIdAndId(user.id, policy.vehicleId);
-      if (!vehicle) {
-        throw new HTTPException(404, { message: 'Insurance policy not found' });
-      }
-
-      // Calculate monthly breakdown
-      const monthlyBreakdown = calculateMonthlyBreakdown(policy);
-
-      return c.json({
-        success: true,
-        data: {
-          policyId: policy.id,
-          company: policy.company,
-          totalCost: policy.totalCost,
-          termLengthMonths: policy.termLengthMonths,
-          monthlyCost: policy.monthlyCost,
-          breakdown: monthlyBreakdown,
-        },
-      });
-    } catch (error) {
-      logger.error('Error calculating monthly breakdown', { error });
-
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-
-      throw new HTTPException(500, { message: 'Failed to calculate monthly breakdown' });
-    }
+    return c.json({
+      success: true,
+      data: {
+        policyId: policy.id,
+        company: policy.company,
+        totalCost: policy.totalCost,
+        termLengthMonths: policy.termLengthMonths,
+        monthlyCost: policy.monthlyCost,
+        breakdown: monthlyBreakdown,
+      },
+    });
   }
 );
-
-// Helper function to calculate monthly breakdown
-function calculateMonthlyBreakdown(policy: {
-  startDate: Date;
-  endDate: Date;
-  monthlyCost: number;
-  termLengthMonths: number;
-}) {
-  const startDate = new Date(policy.startDate);
-  const endDate = new Date(policy.endDate);
-  const monthlyCost = policy.monthlyCost;
-
-  const breakdown: {
-    month: number;
-    cost: number;
-    monthName: string;
-    startDate?: string;
-    endDate?: string;
-    isPaid?: boolean;
-    daysInMonth?: number;
-  }[] = [];
-  const currentDate = new Date(startDate);
-  let monthNumber = 1;
-
-  while (currentDate < endDate && monthNumber <= policy.termLengthMonths) {
-    const monthStart = new Date(currentDate);
-    const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-
-    // Adjust for policy end date
-    if (monthEnd > endDate) {
-      monthEnd.setTime(endDate.getTime());
-    }
-
-    breakdown.push({
-      month: monthNumber,
-      monthName: monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-      startDate: monthStart.toISOString().split('T')[0],
-      endDate: monthEnd.toISOString().split('T')[0],
-      cost: Math.round(monthlyCost * 100) / 100,
-      isPaid: monthEnd < new Date(), // Assume past months are paid
-      daysInMonth:
-        Math.ceil((monthEnd.getTime() - monthStart.getTime()) / CONFIG.time.msPerDay) + 1,
-    });
-
-    currentDate.setMonth(currentDate.getMonth() + 1);
-    monthNumber++;
-  }
-
-  return breakdown;
-}
 
 export { routes };

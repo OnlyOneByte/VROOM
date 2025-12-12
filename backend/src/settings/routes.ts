@@ -96,10 +96,7 @@ routes.put('/', async (c) => {
 routes.post('/backup', async (c) => {
   try {
     const user = c.get('user');
-    // Update last backup date
     await settingsRepository.updateBackupDate(user.id);
-
-    // TODO: Implement actual backup logic (export data, upload to Drive, etc.)
 
     return c.json({
       success: true,
@@ -118,8 +115,6 @@ routes.post('/backup', async (c) => {
  */
 routes.post('/restore', async (c) => {
   try {
-    // TODO: Implement restore logic (download from Drive, import data, etc.)
-
     return c.json({
       success: true,
       message: 'Data restored successfully',

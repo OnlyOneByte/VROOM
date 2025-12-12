@@ -232,3 +232,18 @@ export function validateFuelExpenseData(
     }
   }
 }
+
+/**
+ * Validate loan terms
+ */
+export function validateLoanTerms(terms: {
+  principal: number;
+  apr: number;
+  termMonths: number;
+}): string[] {
+  const errors: string[] = [];
+  if (terms.principal <= 0) errors.push('Principal must be greater than 0');
+  if (terms.apr < 0 || terms.apr > 100) errors.push('APR must be between 0 and 100');
+  if (terms.termMonths <= 0) errors.push('Term must be at least 1 month');
+  return errors;
+}

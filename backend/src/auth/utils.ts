@@ -45,7 +45,7 @@ export async function validateAndRefreshSession(
   const timeUntilExpiry = sessionExpiry.getTime() - now.getTime();
 
   // If session is fresh, return as-is
-  if (timeUntilExpiry >= CONFIG.auth.session.refreshThreshold) {
+  if (timeUntilExpiry >= CONFIG.auth.refreshThreshold) {
     return {
       session,
       user,
@@ -64,7 +64,7 @@ export async function validateAndRefreshSession(
         path: '/',
         secure: CONFIG.env === 'production',
         httpOnly: true,
-        maxAge: CONFIG.auth.session.cookieMaxAge,
+        maxAge: CONFIG.auth.cookieMaxAge,
         expires: newSession.expiresAt,
         sameSite: 'Lax',
       });

@@ -103,3 +103,52 @@ export function groupByPeriod(date: Date, period: 'day' | 'week' | 'month' | 'ye
       return d.toISOString().substring(0, 7); // Default to month
   }
 }
+
+/**
+ * Calculate monthly breakdown for insurance policy
+ */
+export function calculateMonthlyBreakdown(policy: {
+  startDate: Date;
+  endDate: Date;
+  monthlyCost: number;
+  termLengthMonths: number;
+}) {
+  const startDate = new Date(policy.startDate);
+  const endDate = new Date(policy.endDate);
+  const breakdown: {
+    month: number;
+    cost: number;
+    monthName: string;
+    startDate?: string;
+    endDate?: string;
+    isPaid?: boolean;
+    daysInMonth?: number;
+  }[] = [];
+  const currentDate = new Date(startDate);
+  let monthNumber = 1;
+
+  while (currentDate < endDate && monthNumber <= policy.termLengthMonths) {
+    const monthStart = new Date(currentDate);
+    const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+
+    if (monthEnd > endDate) {
+      monthEnd.setTime(endDate.getTime());
+    }
+
+    breakdown.push({
+      month: monthNumber,
+      monthName: monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      startDate: monthStart.toISOString().split('T')[0],
+      endDate: monthEnd.toISOString().split('T')[0],
+      cost: Math.round(policy.monthlyCost * 100) / 100,
+      isPaid: monthEnd < new Date(),
+      daysInMonth:
+        Math.ceil((monthEnd.getTime() - monthStart.getTime()) / (24 * 60 * 60 * 1000)) + 1,
+    });
+
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    monthNumber++;
+  }
+
+  return breakdown;
+}

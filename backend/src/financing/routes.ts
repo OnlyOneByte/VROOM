@@ -6,33 +6,9 @@ import { z } from 'zod';
 import { CONFIG } from '../config';
 import { vehicleFinancing, vehicleFinancingPayments } from '../db/schema';
 import { changeTracker, requireAuth } from '../middleware';
-import { logger } from '../utils/logger';
-import { commonSchemas } from '../utils/validation';
+import { commonSchemas, validateFinancingOwnership, validateLoanTerms } from '../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
 import { financingRepository } from './repository';
-
-// Inline validation function (calculations moved to frontend)
-function validateLoanTerms(terms: {
-  principal: number;
-  apr: number;
-  termMonths: number;
-}): string[] {
-  const errors: string[] = [];
-
-  if (terms.principal <= 0) {
-    errors.push('Principal must be greater than 0');
-  }
-
-  if (terms.apr < 0 || terms.apr > 100) {
-    errors.push('APR must be between 0 and 100');
-  }
-
-  if (terms.termMonths <= 0) {
-    errors.push('Term must be at least 1 month');
-  }
-
-  return errors;
-}
 
 const routes = new Hono();
 
@@ -122,39 +98,19 @@ routes.get(
   '/vehicles/:vehicleId/financing',
   zValidator('param', commonSchemas.vehicleIdParam),
   async (c) => {
-    try {
-      const user = c.get('user');
-      const { vehicleId } = c.req.valid('param');
-
-      // Verify vehicle belongs to user
-      const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-      if (!vehicle) {
-        throw new HTTPException(404, { message: 'Vehicle not found' });
-      }
-
-      const financingData = await financingRepository.findByVehicleId(vehicleId);
-
-      if (!financingData) {
-        return c.json({
-          success: true,
-          data: null,
-          message: 'No financing found for this vehicle',
-        });
-      }
-
-      return c.json({
-        success: true,
-        data: financingData,
-      });
-    } catch (error) {
-      logger.error('Error fetching vehicle financing', { error });
-
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-
-      throw new HTTPException(500, { message: 'Failed to fetch vehicle financing' });
+    const user = c.get('user');
+    const { vehicleId } = c.req.valid('param');
+    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
+    if (!vehicle) {
+      throw new HTTPException(404, { message: 'Vehicle not found' });
     }
+
+    const financingData = await financingRepository.findByVehicleId(vehicleId);
+    return c.json({
+      success: true,
+      data: financingData || null,
+      message: financingData ? undefined : 'No financing found for this vehicle',
+    });
   }
 );
 
@@ -164,77 +120,53 @@ routes.post(
   zValidator('param', commonSchemas.vehicleIdParam),
   zValidator('json', createFinancingSchema.omit({ vehicleId: true })),
   async (c) => {
-    try {
-      const user = c.get('user');
-      const { vehicleId } = c.req.valid('param');
-      const financingData = c.req.valid('json');
+    const user = c.get('user');
+    const { vehicleId } = c.req.valid('param');
+    const financingData = c.req.valid('json');
 
-      // Verify vehicle belongs to user
-      const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-      if (!vehicle) {
-        throw new HTTPException(404, { message: 'Vehicle not found' });
-      }
-
-      // Validate loan terms if it's a loan
-      if (financingData.financingType === 'loan' && financingData.apr !== undefined) {
-        const validationErrors = validateLoanTerms({
-          principal: financingData.originalAmount,
-          apr: financingData.apr,
-          termMonths: financingData.termMonths,
-        });
-
-        if (validationErrors.length > 0) {
-          logger.error('Loan validation errors', { validationErrors });
-          throw new HTTPException(400, {
-            message: `Invalid loan terms: ${validationErrors.join(', ')}`,
-            cause: validationErrors,
-          });
-        }
-      }
-
-      // Check if financing already exists for this vehicle
-      const existingFinancing = await financingRepository.findByVehicleId(vehicleId);
-
-      if (existingFinancing) {
-        // Update existing financing
-        const updatedFinancing = await financingRepository.update(existingFinancing.id, {
-          ...financingData,
-          currentBalance: financingData.originalAmount, // Reset balance when updating terms
-        });
-
-        return c.json({
-          success: true,
-          data: updatedFinancing,
-          message: 'Financing updated successfully',
-        });
-      } else {
-        // Create new financing
-        const newFinancing = {
-          ...financingData,
-          vehicleId,
-          currentBalance: financingData.originalAmount,
-        };
-
-        const createdFinancing = await financingRepository.create(newFinancing);
-
-        return c.json(
-          {
-            success: true,
-            data: createdFinancing,
-            message: 'Financing created successfully',
-          },
-          201
-        );
-      }
-    } catch (error) {
-      logger.error('Error creating/updating vehicle financing', { error });
-
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-
-      throw new HTTPException(500, { message: 'Failed to create/update vehicle financing' });
+    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
+    if (!vehicle) {
+      throw new HTTPException(404, { message: 'Vehicle not found' });
     }
+
+    if (financingData.financingType === 'loan' && financingData.apr !== undefined) {
+      const validationErrors = validateLoanTerms({
+        principal: financingData.originalAmount,
+        apr: financingData.apr,
+        termMonths: financingData.termMonths,
+      });
+
+      if (validationErrors.length > 0) {
+        throw new HTTPException(400, {
+          message: `Invalid loan terms: ${validationErrors.join(', ')}`,
+          cause: validationErrors,
+        });
+      }
+    }
+
+    const existingFinancing = await financingRepository.findByVehicleId(vehicleId);
+
+    if (existingFinancing) {
+      const updatedFinancing = await financingRepository.update(existingFinancing.id, {
+        ...financingData,
+        currentBalance: financingData.originalAmount,
+      });
+      return c.json({
+        success: true,
+        data: updatedFinancing,
+        message: 'Financing updated successfully',
+      });
+    }
+
+    const createdFinancing = await financingRepository.create({
+      ...financingData,
+      vehicleId,
+      currentBalance: financingData.originalAmount,
+    });
+    return c.json(
+      { success: true, data: createdFinancing, message: 'Financing created successfully' },
+      201
+    );
   }
 );
 
@@ -244,154 +176,69 @@ routes.post(
   zValidator('param', financingParamsSchema),
   zValidator('json', financingPaymentSchema),
   async (c) => {
-    try {
-      const user = c.get('user');
-      const { financingId } = c.req.valid('param');
-      const paymentData = c.req.valid('json');
+    const user = c.get('user');
+    const { financingId } = c.req.valid('param');
+    const paymentData = c.req.valid('json');
 
-      const financingRecord = await financingRepository.findById(financingId);
-      if (!financingRecord) {
-        throw new HTTPException(404, { message: 'Financing not found' });
-      }
+    const financingRecord = await validateFinancingOwnership(financingId, user.id);
 
-      // Verify financing belongs to user's vehicle
-      const vehicle = await vehicleRepository.findByUserIdAndId(user.id, financingRecord.vehicleId);
-      if (!vehicle) {
-        throw new HTTPException(404, { message: 'Financing not found' });
-      }
-
-      if (!financingRecord.isActive) {
-        throw new HTTPException(400, { message: 'Cannot add payment to inactive financing' });
-      }
-
-      // Get payment count to determine payment number
-      const paymentCount = await financingRepository.getPaymentCount(financingId);
-      const paymentNumber = paymentCount + 1;
-
-      // For payment breakdown, frontend should calculate and send principalAmount and interestAmount
-      // Backend just stores the payment record
-      const principalAmount = paymentData.paymentAmount; // Simplified: treat full payment as principal
-      const interestAmount = 0; // Frontend should calculate and include if needed
-
-      // Create payment record
-      const newPayment = {
-        financingId,
-        paymentDate: paymentData.paymentDate,
-        paymentAmount: paymentData.paymentAmount,
-        principalAmount,
-        interestAmount,
-        remainingBalance: Math.max(0, financingRecord.currentBalance - principalAmount),
-        paymentNumber,
-        paymentType: paymentData.paymentType,
-        isScheduled: false,
-      };
-
-      const createdPayment = await financingRepository.createPayment(newPayment);
-
-      // Update financing balance
-      const updatedFinancing = await financingRepository.updateBalance(
-        financingId,
-        newPayment.remainingBalance
-      );
-
-      // Check if financing is paid off/completed
-      if (newPayment.remainingBalance <= 0.01) {
-        await financingRepository.markAsCompleted(financingId, paymentData.paymentDate);
-      }
-
-      return c.json(
-        {
-          success: true,
-          data: {
-            payment: createdPayment,
-            financing: updatedFinancing,
-          },
-          message: 'Payment recorded successfully',
-        },
-        201
-      );
-    } catch (error) {
-      logger.error('Error recording financing payment', { error });
-
-      if (error instanceof HTTPException) {
-        throw error;
-      }
-
-      throw new HTTPException(500, { message: 'Failed to record financing payment' });
+    if (!financingRecord.isActive) {
+      throw new HTTPException(400, { message: 'Cannot add payment to inactive financing' });
     }
+
+    const paymentCount = await financingRepository.getPaymentCount(financingId);
+    const principalAmount = paymentData.paymentAmount;
+    const remainingBalance = Math.max(0, financingRecord.currentBalance - principalAmount);
+
+    const newPayment = {
+      financingId,
+      paymentDate: paymentData.paymentDate,
+      paymentAmount: paymentData.paymentAmount,
+      principalAmount,
+      interestAmount: 0,
+      remainingBalance,
+      paymentNumber: paymentCount + 1,
+      paymentType: paymentData.paymentType,
+      isScheduled: false,
+    };
+
+    const createdPayment = await financingRepository.createPayment(newPayment);
+    const updatedFinancing = await financingRepository.updateBalance(financingId, remainingBalance);
+
+    if (remainingBalance <= 0.01) {
+      await financingRepository.markAsCompleted(financingId, paymentData.paymentDate);
+    }
+
+    return c.json(
+      {
+        success: true,
+        data: { payment: createdPayment, financing: updatedFinancing },
+        message: 'Payment recorded successfully',
+      },
+      201
+    );
   }
 );
 
 // GET /api/financing/:financingId/payments - Get payment history
 routes.get('/:financingId/payments', zValidator('param', financingParamsSchema), async (c) => {
-  try {
-    const user = c.get('user');
-    const { financingId } = c.req.valid('param');
-
-    const financingRecord = await financingRepository.findById(financingId);
-    if (!financingRecord) {
-      throw new HTTPException(404, { message: 'Financing not found' });
-    }
-
-    // Verify financing belongs to user's vehicle
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, financingRecord.vehicleId);
-    if (!vehicle) {
-      throw new HTTPException(404, { message: 'Financing not found' });
-    }
-
-    const payments = await financingRepository.findPaymentsByFinancingId(financingId);
-
-    return c.json({
-      success: true,
-      data: {
-        financing: financingRecord,
-        payments,
-        paymentCount: payments.length,
-      },
-    });
-  } catch (error) {
-    logger.error('Error fetching financing payments', { error });
-
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-
-    throw new HTTPException(500, { message: 'Failed to fetch financing payments' });
-  }
+  const user = c.get('user');
+  const { financingId } = c.req.valid('param');
+  const financingRecord = await validateFinancingOwnership(financingId, user.id);
+  const payments = await financingRepository.findPaymentsByFinancingId(financingId);
+  return c.json({
+    success: true,
+    data: { financing: financingRecord, payments, paymentCount: payments.length },
+  });
 });
 
 // DELETE /api/financing/:financingId - Delete financing (mark as completed)
 routes.delete('/:financingId', zValidator('param', financingParamsSchema), async (c) => {
-  try {
-    const user = c.get('user');
-    const { financingId } = c.req.valid('param');
-
-    const financingRecord = await financingRepository.findById(financingId);
-    if (!financingRecord) {
-      throw new HTTPException(404, { message: 'Financing not found' });
-    }
-
-    // Verify financing belongs to user's vehicle
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, financingRecord.vehicleId);
-    if (!vehicle) {
-      throw new HTTPException(404, { message: 'Financing not found' });
-    }
-
-    await financingRepository.markAsCompleted(financingId, new Date());
-
-    return c.json({
-      success: true,
-      message: 'Financing marked as completed successfully',
-    });
-  } catch (error) {
-    logger.error('Error deleting financing', { error });
-
-    if (error instanceof HTTPException) {
-      throw error;
-    }
-
-    throw new HTTPException(500, { message: 'Failed to delete financing' });
-  }
+  const user = c.get('user');
+  const { financingId } = c.req.valid('param');
+  await validateFinancingOwnership(financingId, user.id);
+  await financingRepository.markAsCompleted(financingId, new Date());
+  return c.json({ success: true, message: 'Financing marked as completed successfully' });
 });
 
 export { routes };

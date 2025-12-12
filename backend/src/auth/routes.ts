@@ -18,7 +18,7 @@ const oauthStateStore = new Map<string, { codeVerifier: string; createdAt: numbe
 const cleanupExpiredStates = () => {
   const now = Date.now();
   for (const [state, data] of oauthStateStore.entries()) {
-    if (now - data.createdAt > CONFIG.auth.session.oauthStateExpiry) {
+    if (now - data.createdAt > CONFIG.auth.oauthStateExpiry) {
       oauthStateStore.delete(state);
     }
   }
@@ -48,13 +48,10 @@ routes.get('/login/google', async (c) => {
     createdAt: Date.now(),
   });
 
-  // Clean up old states
   cleanupExpiredStates();
-
   return c.redirect(url.toString());
 });
 
-// Google OAuth callback
 routes.get('/callback/google', async (c) => {
   const url = new URL(c.req.url);
   const code = url.searchParams.get('code');
@@ -64,18 +61,14 @@ routes.get('/callback/google', async (c) => {
     throw new HTTPException(400, { message: 'Missing code or state parameter' });
   }
 
-  // Verify state and get code verifier from memory store
   const storedData = oauthStateStore.get(state);
-
   if (!storedData) {
     throw new HTTPException(400, {
-      message: 'Invalid or expired state parameter. Please try logging in again.',
+      message: 'Invalid or expired state. Please try logging in again.',
     });
   }
 
   const { codeVerifier } = storedData;
-
-  // Clean up used state
   oauthStateStore.delete(state);
 
   // Exchange code for tokens
@@ -137,19 +130,15 @@ routes.get('/callback/google', async (c) => {
     }
   }
 
-  // TODO: Check for existing Google Drive backups and auto-enable if found
-  // This requires extracting GoogleSyncService from the old sync.ts file
-
   // Create session
   const lucia = getLucia();
   const session = await lucia.createSession(userId, {});
 
-  // Set session cookie
   setCookie(c, lucia.sessionCookieName, session.id, {
     path: '/',
     secure: CONFIG.env === 'production',
     httpOnly: true,
-    maxAge: CONFIG.auth.session.cookieMaxAge,
+    maxAge: CONFIG.auth.cookieMaxAge,
     expires: session.expiresAt,
     sameSite: 'Lax',
   });
@@ -172,9 +161,6 @@ routes.get('/me', async (c) => {
   if (!session) {
     throw new HTTPException(401, { message: 'Invalid session' });
   }
-
-  // TODO: Check for existing Google Drive backups and auto-enable if found
-  // This requires extracting GoogleSyncService from the old sync.ts file
 
   return c.json({
     user: {
@@ -203,7 +189,7 @@ routes.post('/logout', async (c) => {
     path: '/',
     secure: CONFIG.env === 'production',
     httpOnly: true,
-    maxAge: CONFIG.auth.session.cookieMaxAge,
+    maxAge: CONFIG.auth.cookieMaxAge,
     sameSite: 'Lax',
   });
 

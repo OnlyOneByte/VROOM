@@ -11,7 +11,11 @@ import {
 } from '../db/types';
 import { NotFoundError } from '../errors';
 import { changeTracker, requireAuth } from '../middleware';
-import { commonSchemas, validateFuelExpenseData } from '../utils/validation';
+import {
+  commonSchemas,
+  validateExpenseOwnership,
+  validateFuelExpenseData,
+} from '../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
 import { expenseRepository } from './repository';
 
@@ -225,22 +229,8 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
 routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-
-  const expense = await expenseRepository.findById(id);
-  if (!expense) {
-    throw new NotFoundError('Expense');
-  }
-
-  // Verify the expense belongs to a vehicle owned by the user
-  const vehicle = await vehicleRepository.findByUserIdAndId(user.id, expense.vehicleId);
-  if (!vehicle) {
-    throw new NotFoundError('Expense');
-  }
-
-  return c.json({
-    success: true,
-    data: expense,
-  });
+  const expense = await validateExpenseOwnership(id, user.id);
+  return c.json({ success: true, data: expense });
 });
 
 // PUT /api/expenses/:id - Update expense
@@ -252,20 +242,8 @@ routes.put(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const updateData = c.req.valid('json');
+    const existingExpense = await validateExpenseOwnership(id, user.id);
 
-    // Check if expense exists
-    const existingExpense = await expenseRepository.findById(id);
-    if (!existingExpense) {
-      throw new NotFoundError('Expense');
-    }
-
-    // Verify the expense belongs to a vehicle owned by the user
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, existingExpense.vehicleId);
-    if (!vehicle) {
-      throw new NotFoundError('Expense');
-    }
-
-    // Validate fuel expense requirements with merged data
     const finalCategory =
       updateData.category !== undefined ? updateData.category : existingExpense.category;
     const finalMileage =
@@ -276,12 +254,7 @@ routes.put(
     validateFuelExpenseData(finalCategory, finalMileage, finalFuelAmount);
 
     const updatedExpense = await expenseRepository.update(id, updateData);
-
-    return c.json({
-      success: true,
-      data: updatedExpense,
-      message: 'Expense updated successfully',
-    });
+    return c.json({ success: true, data: updatedExpense, message: 'Expense updated successfully' });
   }
 );
 
@@ -289,25 +262,9 @@ routes.put(
 routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-
-  // Check if expense exists
-  const existingExpense = await expenseRepository.findById(id);
-  if (!existingExpense) {
-    throw new NotFoundError('Expense');
-  }
-
-  // Verify the expense belongs to a vehicle owned by the user
-  const vehicle = await vehicleRepository.findByUserIdAndId(user.id, existingExpense.vehicleId);
-  if (!vehicle) {
-    throw new NotFoundError('Expense');
-  }
-
+  await validateExpenseOwnership(id, user.id);
   await expenseRepository.delete(id);
-
-  return c.json({
-    success: true,
-    message: 'Expense deleted successfully',
-  });
+  return c.json({ success: true, message: 'Expense deleted successfully' });
 });
 
 export { routes };

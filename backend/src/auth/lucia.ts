@@ -33,9 +33,9 @@ export const lucia = new Lucia(adapter, {
 
 // Initialize Google OAuth
 export const google = new Google(
-  CONFIG.auth.google.clientId || '',
-  CONFIG.auth.google.clientSecret || '',
-  CONFIG.auth.google.redirectUri
+  CONFIG.auth.googleClientId || '',
+  CONFIG.auth.googleClientSecret || '',
+  CONFIG.auth.googleRedirectUri
 );
 
 // Type declarations for Lucia

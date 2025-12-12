@@ -1,3 +1,7 @@
+/**
+ * Google Sheets Service - Syncs VROOM data to Google Sheets
+ */
+
 import { eq } from 'drizzle-orm';
 import type { OAuth2Client } from 'google-auth-library';
 import { google, type sheets_v4 } from 'googleapis';
@@ -10,154 +14,13 @@ import {
   vehicleFinancingPayments,
   vehicles,
 } from '../db/schema';
-import { logger } from '../utils/logger';
 import { GoogleDriveService } from './google-drive';
-
-export interface SheetData {
-  range: string;
-  values: (string | number | boolean)[][];
-}
-
-// Type for vehicle data from database (simple select)
-type VehicleData = {
-  id: string;
-  make: string;
-  model: string;
-  year: number;
-  vehicleType: string;
-  licensePlate?: string | null;
-  nickname?: string | null;
-  initialMileage?: number | null;
-  purchasePrice?: number | null;
-  purchaseDate?: Date | null;
-  userId: string;
-  createdAt: Date | null;
-  updatedAt: Date | null;
-};
-
-// Type for expense data from database (joined with vehicles)
-type ExpenseData = {
-  expenses: {
-    id: string;
-    expenseAmount: number;
-    fuelAmount?: number | null;
-    fuelType?: string | null;
-    category: string;
-    tags?: string[] | null;
-    date: Date;
-    description?: string | null;
-    mileage?: number | null;
-    receiptUrl?: string | null;
-    vehicleId: string;
-    createdAt: Date | null;
-    updatedAt: Date | null;
-  };
-  vehicles: {
-    id: string;
-    make: string;
-    model: string;
-    year: number;
-    userId: string;
-  };
-};
-
-// Type for insurance data from database (joined with vehicles)
-type InsuranceData = {
-  insurance_policies: {
-    id: string;
-    company: string;
-    policyNumber: string | null;
-    totalCost: number;
-    startDate: Date;
-    endDate: Date;
-    vehicleId: string;
-    termLengthMonths: number;
-    monthlyCost: number;
-    isActive: boolean;
-    createdAt: Date | null;
-    updatedAt: Date | null;
-  };
-  vehicles: {
-    id: string;
-    make: string;
-    model: string;
-    year: number;
-    userId: string;
-  };
-};
-
-// Type for financing data from database (joined with vehicles)
-type FinancingData = {
-  vehicle_financing: {
-    id: string;
-    financingType: string;
-    provider: string;
-    originalAmount: number;
-    currentBalance: number;
-    apr: number | null;
-    termMonths: number;
-    startDate: Date;
-    vehicleId: string;
-    paymentAmount: number;
-    paymentFrequency: string;
-    paymentDayOfMonth: number | null;
-    paymentDayOfWeek: number | null;
-    residualValue: number | null;
-    mileageLimit: number | null;
-    excessMileageFee: number | null;
-    isActive: boolean;
-    endDate: Date | null;
-    createdAt: Date | null;
-    updatedAt: Date | null;
-  };
-  vehicles: {
-    id: string;
-    make: string;
-    model: string;
-    year: number;
-    userId: string;
-  };
-};
-
-// Type for financing payment data from database (joined with financing and vehicles)
-type FinancingPaymentData = {
-  vehicle_financing_payments: {
-    id: string;
-    paymentAmount: number;
-    paymentDate: Date;
-    principalAmount: number;
-    interestAmount: number;
-    paymentNumber: number;
-    financingId: string;
-    remainingBalance: number;
-    paymentType: string;
-    isScheduled: boolean;
-    createdAt: Date | null;
-    updatedAt: Date | null;
-  };
-  vehicle_financing: {
-    id: string;
-    provider: string;
-    financingType: string;
-    vehicleId: string;
-  };
-  vehicles: {
-    id: string;
-    make: string;
-    model: string;
-    year: number;
-    userId: string;
-  };
-};
 
 export interface SpreadsheetInfo {
   id: string;
   name: string;
   webViewLink: string;
-  sheets: {
-    id: number;
-    title: string;
-  }[];
+  sheets: { id: number; title: string }[];
 }
 
 export class GoogleSheetsService {
@@ -181,195 +44,153 @@ export class GoogleSheetsService {
     this.driveService = new GoogleDriveService(accessToken, refreshToken);
   }
 
-  /**
-   * Create or update the main VROOM data spreadsheet
-   */
   async createOrUpdateVroomSpreadsheet(userId: string, userName: string): Promise<SpreadsheetInfo> {
-    try {
-      // Check if spreadsheet already exists in VROOM folder
-      const folderStructure = await this.driveService.createVroomFolderStructure(userName);
-      const existingSpreadsheet = await this.findVroomSpreadsheet(
-        folderStructure.mainFolder.id,
-        userName
-      );
+    const folderStructure = await this.driveService.createVroomFolderStructure(userName);
+    const existingSpreadsheet = await this.findVroomSpreadsheet(
+      folderStructure.mainFolder.id,
+      userName
+    );
 
-      let spreadsheetId: string;
-      let spreadsheetInfo: SpreadsheetInfo;
-
-      if (existingSpreadsheet) {
-        spreadsheetId = existingSpreadsheet.id;
-        spreadsheetInfo = await this.getSpreadsheetInfo(spreadsheetId);
-      } else {
-        // Create new spreadsheet
-        const spreadsheet = await this.createSpreadsheet(`VROOM Data - ${userName}`);
-        if (!spreadsheet.spreadsheetId) {
-          throw new Error('Failed to create spreadsheet - no ID returned');
-        }
-        spreadsheetId = spreadsheet.spreadsheetId;
-
-        // Move to VROOM folder using Google Drive API directly
-        const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
-        await drive.files.update({
-          fileId: spreadsheetId,
-          addParents: folderStructure.mainFolder.id,
-          removeParents: 'root',
-        });
-
-        spreadsheetInfo = await this.getSpreadsheetInfo(spreadsheetId);
+    let spreadsheetId: string;
+    if (existingSpreadsheet) {
+      spreadsheetId = existingSpreadsheet.id;
+    } else {
+      const spreadsheet = await this.createSpreadsheet(`VROOM Data - ${userName}`);
+      if (!spreadsheet.spreadsheetId) {
+        throw new Error('Failed to create spreadsheet');
       }
+      spreadsheetId = spreadsheet.spreadsheetId;
 
-      // Update spreadsheet with current data
-      await this.updateSpreadsheetWithUserData(spreadsheetId, userId);
-
-      return spreadsheetInfo;
-    } catch (error) {
-      logger.error('Error creating/updating VROOM spreadsheet', { error });
-      throw new Error('Failed to create or update VROOM spreadsheet');
+      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+      await drive.files.update({
+        fileId: spreadsheetId,
+        addParents: folderStructure.mainFolder.id,
+        removeParents: 'root',
+      });
     }
+
+    await this.updateSpreadsheetWithUserData(spreadsheetId, userId);
+    return this.getSpreadsheetInfo(spreadsheetId);
   }
 
-  /**
-   * Find existing VROOM spreadsheet in the main folder
-   */
   private async findVroomSpreadsheet(
     mainFolderId: string,
     userName: string
   ): Promise<{ id: string; name: string } | null> {
-    try {
-      const spreadsheetName = `VROOM Data - ${userName}`;
-      const files = await this.driveService.listFilesInFolder(mainFolderId);
-
-      const found = files.find(
-        (file) =>
-          file.name === spreadsheetName &&
-          file.mimeType === 'application/vnd.google-apps.spreadsheet'
-      );
-
-      return found ? { id: found.id, name: found.name } : null;
-    } catch (error) {
-      logger.error('Error finding VROOM spreadsheet', { error });
-      return null;
-    }
+    const spreadsheetName = `VROOM Data - ${userName}`;
+    const files = await this.driveService.listFilesInFolder(mainFolderId);
+    const found = files.find(
+      (file) =>
+        file.name === spreadsheetName && file.mimeType === 'application/vnd.google-apps.spreadsheet'
+    );
+    return found ? { id: found.id, name: found.name } : null;
   }
 
-  /**
-   * Create a new spreadsheet
-   */
   private async createSpreadsheet(title: string): Promise<sheets_v4.Schema$Spreadsheet> {
-    try {
-      const response = await this.sheets.spreadsheets.create({
-        requestBody: {
-          properties: {
-            title,
-          },
-          sheets: [
-            { properties: { title: 'Vehicles' } },
-            { properties: { title: 'Expenses' } },
-            { properties: { title: 'Insurance Policies' } },
-            { properties: { title: 'Vehicle Financing' } },
-            { properties: { title: 'Vehicle Financing Payments' } },
-          ],
-        },
-      });
-
-      return response.data;
-    } catch (error) {
-      logger.error('Error creating spreadsheet', { error });
-      throw new Error('Failed to create spreadsheet');
-    }
+    const response = await this.sheets.spreadsheets.create({
+      requestBody: {
+        properties: { title },
+        sheets: [
+          { properties: { title: 'Vehicles' } },
+          { properties: { title: 'Expenses' } },
+          { properties: { title: 'Insurance Policies' } },
+          { properties: { title: 'Vehicle Financing' } },
+          { properties: { title: 'Vehicle Financing Payments' } },
+        ],
+      },
+    });
+    return response.data;
   }
 
-  /**
-   * Get spreadsheet information
-   */
   async getSpreadsheetInfo(spreadsheetId: string): Promise<SpreadsheetInfo> {
-    try {
-      const response = await this.sheets.spreadsheets.get({
-        spreadsheetId,
-        fields: 'spreadsheetId,properties,sheets.properties',
-      });
+    const response = await this.sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'spreadsheetId,properties,sheets.properties',
+    });
 
-      const spreadsheet = response.data;
-
-      if (!spreadsheet.spreadsheetId || !spreadsheet.properties?.title) {
-        throw new Error('Invalid spreadsheet data received');
-      }
-
-      return {
-        id: spreadsheet.spreadsheetId,
-        name: spreadsheet.properties.title,
-        webViewLink: `https://docs.google.com/spreadsheets/d/${spreadsheet.spreadsheetId}`,
-        sheets:
-          spreadsheet.sheets?.map((sheet: sheets_v4.Schema$Sheet) => ({
-            id: sheet.properties?.sheetId || 0,
-            title: sheet.properties?.title || 'Untitled',
-          })) || [],
-      };
-    } catch (error) {
-      logger.error('Error getting spreadsheet info', { error });
-      throw new Error('Failed to get spreadsheet information');
+    const spreadsheet = response.data;
+    if (!spreadsheet.spreadsheetId || !spreadsheet.properties?.title) {
+      throw new Error('Invalid spreadsheet data');
     }
+
+    return {
+      id: spreadsheet.spreadsheetId,
+      name: spreadsheet.properties.title,
+      webViewLink: `https://docs.google.com/spreadsheets/d/${spreadsheet.spreadsheetId}`,
+      sheets:
+        spreadsheet.sheets?.map((sheet: sheets_v4.Schema$Sheet) => ({
+          id: sheet.properties?.sheetId || 0,
+          title: sheet.properties?.title || 'Untitled',
+        })) || [],
+    };
   }
 
-  /**
-   * Update spreadsheet with user's current data
-   */
   private async updateSpreadsheetWithUserData(
     spreadsheetId: string,
     userId: string
   ): Promise<void> {
-    try {
-      const db = getDb();
+    const db = getDb();
 
-      // Get user data
-      const [userVehicles, userExpenses, userInsurance, userFinancing, userFinancingPayments] =
-        await Promise.all([
-          db.select().from(vehicles).where(eq(vehicles.userId, userId)),
-          db
-            .select()
-            .from(expenses)
-            .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-            .where(eq(vehicles.userId, userId)),
-          db
-            .select()
-            .from(insurancePolicies)
-            .innerJoin(vehicles, eq(insurancePolicies.vehicleId, vehicles.id))
-            .where(eq(vehicles.userId, userId)),
-          db
-            .select()
-            .from(vehicleFinancing)
-            .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-            .where(eq(vehicles.userId, userId)),
-          db
-            .select()
-            .from(vehicleFinancingPayments)
-            .innerJoin(
-              vehicleFinancing,
-              eq(vehicleFinancingPayments.financingId, vehicleFinancing.id)
-            )
-            .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-            .where(eq(vehicles.userId, userId)),
-        ]);
-
-      // Update each sheet
+    const [userVehicles, userExpenses, userInsurance, userFinancing, userFinancingPayments] =
       await Promise.all([
-        this.updateVehiclesSheet(spreadsheetId, userVehicles),
-        this.updateExpensesSheet(spreadsheetId, userExpenses),
-        this.updateInsurancePoliciesSheet(spreadsheetId, userInsurance),
-        this.updateVehicleFinancingSheet(spreadsheetId, userFinancing),
-        this.updateVehicleFinancingPaymentsSheet(spreadsheetId, userFinancingPayments),
+        db.select().from(vehicles).where(eq(vehicles.userId, userId)),
+        db
+          .select()
+          .from(expenses)
+          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId)),
+        db
+          .select()
+          .from(insurancePolicies)
+          .innerJoin(vehicles, eq(insurancePolicies.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId)),
+        db
+          .select()
+          .from(vehicleFinancing)
+          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId)),
+        db
+          .select()
+          .from(vehicleFinancingPayments)
+          .innerJoin(
+            vehicleFinancing,
+            eq(vehicleFinancingPayments.financingId, vehicleFinancing.id)
+          )
+          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId)),
       ]);
-    } catch (error) {
-      logger.error('Error updating spreadsheet with user data', { error });
-      throw new Error('Failed to update spreadsheet with user data');
-    }
+
+    await Promise.all([
+      this.updateSheet(spreadsheetId, 'Vehicles', userVehicles, this.getVehicleHeaders()),
+      this.updateSheet(
+        spreadsheetId,
+        'Expenses',
+        userExpenses.map((e) => e.expenses),
+        this.getExpenseHeaders()
+      ),
+      this.updateSheet(
+        spreadsheetId,
+        'Insurance Policies',
+        userInsurance.map((i) => i.insurance_policies),
+        this.getInsuranceHeaders()
+      ),
+      this.updateSheet(
+        spreadsheetId,
+        'Vehicle Financing',
+        userFinancing.map((f) => f.vehicle_financing),
+        this.getFinancingHeaders()
+      ),
+      this.updateSheet(
+        spreadsheetId,
+        'Vehicle Financing Payments',
+        userFinancingPayments.map((p) => p.vehicle_financing_payments),
+        this.getPaymentHeaders()
+      ),
+    ]);
   }
 
-  /**
-   * Update Vehicles sheet with all database columns
-   */
-  private async updateVehiclesSheet(spreadsheetId: string, vehicles: VehicleData[]): Promise<void> {
-    const headers = [
+  private getVehicleHeaders() {
+    return [
       'id',
       'userId',
       'make',
@@ -384,85 +205,28 @@ export class GoogleSheetsService {
       'createdAt',
       'updatedAt',
     ];
-
-    const values = [
-      headers,
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data mapping requires checking multiple fields
-      ...vehicles.map((vehicle) => [
-        vehicle.id || '',
-        vehicle.userId || '',
-        vehicle.make || '',
-        vehicle.model || '',
-        vehicle.year || '',
-        vehicle.vehicleType || '',
-        vehicle.licensePlate || '',
-        vehicle.nickname || '',
-        vehicle.initialMileage || '',
-        vehicle.purchasePrice || '',
-        vehicle.purchaseDate ? new Date(vehicle.purchaseDate).toISOString() : '',
-        vehicle.createdAt ? new Date(vehicle.createdAt).toISOString() : '',
-        vehicle.updatedAt ? new Date(vehicle.updatedAt).toISOString() : '',
-      ]),
-    ];
-
-    await this.updateSheetData(spreadsheetId, `Vehicles!A1:M${vehicles.length + 1}`, values);
   }
 
-  /**
-   * Update Expenses sheet with all database columns
-   */
-  private async updateExpensesSheet(spreadsheetId: string, expenses: ExpenseData[]): Promise<void> {
-    const headers = [
+  private getExpenseHeaders() {
+    return [
       'id',
       'vehicleId',
       'tags',
       'category',
-      'amount',
-      'currency',
+      'expenseAmount',
+      'fuelAmount',
+      'fuelType',
       'date',
       'mileage',
-      'volume',
-      'charge',
       'description',
       'receiptUrl',
       'createdAt',
       'updatedAt',
     ];
-
-    const values = [
-      headers,
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data mapping requires checking multiple fields
-      ...expenses.map((exp) => {
-        const expense = exp.expenses;
-        return [
-          expense.id || '',
-          expense.vehicleId || '',
-          expense.tags ? expense.tags.join(', ') : '',
-          expense.category || '',
-          expense.expenseAmount || '',
-          expense.fuelAmount || '',
-          expense.fuelType || '',
-          expense.date ? new Date(expense.date).toISOString() : '',
-          expense.mileage || '',
-          expense.description || '',
-          expense.receiptUrl || '',
-          expense.createdAt ? new Date(expense.createdAt).toISOString() : '',
-          expense.updatedAt ? new Date(expense.updatedAt).toISOString() : '',
-        ];
-      }),
-    ];
-
-    await this.updateSheetData(spreadsheetId, `Expenses!A1:M${expenses.length + 1}`, values);
   }
 
-  /**
-   * Update Insurance Policies sheet with all database columns
-   */
-  private async updateInsurancePoliciesSheet(
-    spreadsheetId: string,
-    insurance: InsuranceData[]
-  ): Promise<void> {
-    const headers = [
+  private getInsuranceHeaders() {
+    return [
       'id',
       'vehicleId',
       'company',
@@ -476,44 +240,10 @@ export class GoogleSheetsService {
       'createdAt',
       'updatedAt',
     ];
-
-    const values = [
-      headers,
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data mapping requires checking multiple fields
-      ...insurance.map((ins) => {
-        const policy = ins.insurance_policies;
-        return [
-          policy.id || '',
-          policy.vehicleId || '',
-          policy.company || '',
-          policy.policyNumber || '',
-          policy.totalCost || '',
-          policy.termLengthMonths || '',
-          policy.startDate ? new Date(policy.startDate).toISOString() : '',
-          policy.endDate ? new Date(policy.endDate).toISOString() : '',
-          policy.monthlyCost || '',
-          policy.isActive ? 'true' : 'false',
-          policy.createdAt ? new Date(policy.createdAt).toISOString() : '',
-          policy.updatedAt ? new Date(policy.updatedAt).toISOString() : '',
-        ];
-      }),
-    ];
-
-    await this.updateSheetData(
-      spreadsheetId,
-      `Insurance Policies!A1:L${insurance.length + 1}`,
-      values
-    );
   }
 
-  /**
-   * Update Vehicle Financing sheet with all database columns
-   */
-  private async updateVehicleFinancingSheet(
-    spreadsheetId: string,
-    financing: FinancingData[]
-  ): Promise<void> {
-    const headers = [
+  private getFinancingHeaders() {
+    return [
       'id',
       'vehicleId',
       'financingType',
@@ -535,52 +265,10 @@ export class GoogleSheetsService {
       'createdAt',
       'updatedAt',
     ];
-
-    const values = [
-      headers,
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data mapping requires checking multiple fields
-      ...financing.map((fin) => {
-        const finData = fin.vehicle_financing;
-        return [
-          finData.id || '',
-          finData.vehicleId || '',
-          finData.financingType || '',
-          finData.provider || '',
-          finData.originalAmount || '',
-          finData.currentBalance || '',
-          finData.apr || '',
-          finData.termMonths || '',
-          finData.startDate ? new Date(finData.startDate).toISOString() : '',
-          finData.paymentAmount || '',
-          finData.paymentFrequency || '',
-          finData.paymentDayOfMonth || '',
-          finData.paymentDayOfWeek || '',
-          finData.residualValue || '',
-          finData.mileageLimit || '',
-          finData.excessMileageFee || '',
-          finData.isActive ? 'true' : 'false',
-          finData.endDate ? new Date(finData.endDate).toISOString() : '',
-          finData.createdAt ? new Date(finData.createdAt).toISOString() : '',
-          finData.updatedAt ? new Date(finData.updatedAt).toISOString() : '',
-        ];
-      }),
-    ];
-
-    await this.updateSheetData(
-      spreadsheetId,
-      `Vehicle Financing!A1:T${financing.length + 1}`,
-      values
-    );
   }
 
-  /**
-   * Update Vehicle Financing Payments sheet with all database columns
-   */
-  private async updateVehicleFinancingPaymentsSheet(
-    spreadsheetId: string,
-    payments: FinancingPaymentData[]
-  ): Promise<void> {
-    const headers = [
+  private getPaymentHeaders() {
+    return [
       'id',
       'financingId',
       'paymentDate',
@@ -594,82 +282,43 @@ export class GoogleSheetsService {
       'createdAt',
       'updatedAt',
     ];
+  }
 
+  private async updateSheet<T extends Record<string, unknown>>(
+    spreadsheetId: string,
+    sheetName: string,
+    data: T[],
+    headers: string[]
+  ): Promise<void> {
     const values = [
       headers,
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data mapping requires checking multiple fields
-      ...payments.map((payment) => {
-        const paymentData = payment.vehicle_financing_payments;
-        return [
-          paymentData.id || '',
-          paymentData.financingId || '',
-          paymentData.paymentDate ? new Date(paymentData.paymentDate).toISOString() : '',
-          paymentData.paymentAmount || '',
-          paymentData.principalAmount || '',
-          paymentData.interestAmount || '',
-          paymentData.remainingBalance || '',
-          paymentData.paymentNumber || '',
-          paymentData.paymentType || '',
-          paymentData.isScheduled ? 'true' : 'false',
-          paymentData.createdAt ? new Date(paymentData.createdAt).toISOString() : '',
-          paymentData.updatedAt ? new Date(paymentData.updatedAt).toISOString() : '',
-        ];
-      }),
+      ...data.map((row) => headers.map((header) => this.formatValue(row[header]))),
     ];
 
-    await this.updateSheetData(
+    await this.sheets.spreadsheets.values.update({
       spreadsheetId,
-      `Vehicle Financing Payments!A1:L${payments.length + 1}`,
-      values
-    );
+      range: `${sheetName}!A1:${String.fromCharCode(64 + headers.length)}${data.length + 1}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values },
+    });
   }
 
-  /**
-   * Update sheet data
-   */
-  private async updateSheetData(
-    spreadsheetId: string,
-    range: string,
-    values: (string | number | boolean)[][]
-  ): Promise<void> {
-    try {
-      await this.sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values,
-        },
-      });
-    } catch (error) {
-      logger.error('Error updating sheet data', { range, error });
-      throw new Error(`Failed to update sheet data for range ${range}`);
-    }
+  private formatValue(value: unknown): string {
+    if (value === null || value === undefined) return '';
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    if (Array.isArray(value)) return value.join(', ');
+    return String(value);
   }
 
-  /**
-   * Read data from a sheet
-   */
   async readSheetData(
     spreadsheetId: string,
     range: string
   ): Promise<(string | number | boolean)[][]> {
-    try {
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range,
-      });
-
-      return response.data.values || [];
-    } catch (error) {
-      logger.error('Error reading sheet data', { range, error });
-      throw new Error(`Failed to read sheet data for range ${range}`);
-    }
+    const response = await this.sheets.spreadsheets.values.get({ spreadsheetId, range });
+    return response.data.values || [];
   }
 
-  /**
-   * Read all data from spreadsheet and parse into BackupData structure
-   */
   async readSpreadsheetData(spreadsheetId: string): Promise<{
     metadata: { version: string; timestamp: string; userId: string };
     vehicles: Record<string, unknown>[];
@@ -678,130 +327,69 @@ export class GoogleSheetsService {
     financingPayments: Record<string, unknown>[];
     insurance: Record<string, unknown>[];
   }> {
-    try {
-      // Read all 5 sheets
-      const [vehiclesData, expensesData, insuranceData, financingData, financingPaymentsData] =
-        await Promise.all([
-          this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
-          this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
-          this.readSheetData(spreadsheetId, 'Insurance Policies!A:Z'),
-          this.readSheetData(spreadsheetId, 'Vehicle Financing!A:Z'),
-          this.readSheetData(spreadsheetId, 'Vehicle Financing Payments!A:Z'),
-        ]);
+    const [vehiclesData, expensesData, insuranceData, financingData, financingPaymentsData] =
+      await Promise.all([
+        this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
+        this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
+        this.readSheetData(spreadsheetId, 'Insurance Policies!A:Z'),
+        this.readSheetData(spreadsheetId, 'Vehicle Financing!A:Z'),
+        this.readSheetData(spreadsheetId, 'Vehicle Financing Payments!A:Z'),
+      ]);
 
-      // Parse vehicles
-      const vehicles = this.parseSheetData(vehiclesData);
+    const vehicles = this.parseSheetData(vehiclesData);
+    const expenses = this.parseSheetData(expensesData);
+    const insurance = this.parseSheetData(insuranceData);
+    const financing = this.parseSheetData(financingData);
+    const financingPayments = this.parseSheetData(financingPaymentsData);
 
-      // Parse expenses
-      const expenses = this.parseSheetData(expensesData);
+    const userId = vehicles.length > 0 ? (vehicles[0].userId as string) : '';
 
-      // Parse insurance
-      const insurance = this.parseSheetData(insuranceData);
-
-      // Parse financing
-      const financing = this.parseSheetData(financingData);
-
-      // Parse financing payments
-      const financingPayments = this.parseSheetData(financingPaymentsData);
-
-      // Extract userId from first vehicle (all data should belong to same user)
-      const userId = vehicles.length > 0 ? (vehicles[0].userId as string) : '';
-
-      return {
-        metadata: {
-          version: '1.0.0',
-          timestamp: new Date().toISOString(),
-          userId,
-        },
-        vehicles,
-        expenses,
-        financing,
-        financingPayments,
-        insurance,
-      };
-    } catch (error) {
-      logger.error('Error reading spreadsheet data', { error });
-      throw new Error('Failed to read spreadsheet data');
-    }
+    return {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId },
+      vehicles,
+      expenses,
+      financing,
+      financingPayments,
+      insurance,
+    };
   }
 
-  /**
-   * Parse sheet data into array of objects
-   * First row is headers, subsequent rows are data
-   */
   private parseSheetData(sheetData: (string | number | boolean)[][]): Record<string, unknown>[] {
-    if (sheetData.length === 0) {
-      return [];
-    }
+    if (sheetData.length === 0) return [];
 
     const headers = sheetData[0] as string[];
     const rows = sheetData.slice(1);
 
     return rows.map((row) => {
       const obj: Record<string, unknown> = {};
-
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Data parsing requires type checking multiple conditions
-      headers.forEach((header, index) => {
-        const value = row[index];
-
-        // Handle empty values
-        if (value === '' || value === null || value === undefined) {
-          obj[header] = null;
-          return;
-        }
-
-        // Parse booleans
-        if (value === 'true' || value === 'false') {
-          obj[header] = value === 'true';
-          return;
-        }
-
-        // Parse numbers
-        if (typeof value === 'number') {
-          obj[header] = value;
-          return;
-        }
-
-        // Try to parse as number if it looks like one
-        if (typeof value === 'string' && !Number.isNaN(Number(value)) && value.trim() !== '') {
-          obj[header] = Number(value);
-          return;
-        }
-
-        // Parse ISO dates
-        if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
-          obj[header] = new Date(value);
-          return;
-        }
-
-        // Default: keep as string
-        obj[header] = value;
-      });
-
+      for (let i = 0; i < headers.length; i++) {
+        obj[headers[i]] = this.parseValue(row[i]);
+      }
       return obj;
     });
   }
+
+  private parseValue(value: string | number | boolean | undefined): unknown {
+    if (value === '' || value === null || value === undefined) return null;
+    if (value === 'true' || value === 'false') return value === 'true';
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      if (!Number.isNaN(Number(value)) && value.trim() !== '') return Number(value);
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) return new Date(value);
+    }
+    return value;
+  }
 }
 
-/**
- * Get Google refresh token for a user
- * Shared helper to avoid duplication
- */
 async function getUserToken(userId: string): Promise<string> {
   const db = getDb();
   const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-
   if (!user.length || !user[0].googleRefreshToken) {
     throw new Error('User not found or Google Sheets access not available');
   }
-
   return user[0].googleRefreshToken;
 }
 
-/**
- * Create a Google Sheets service instance for a user
- * Simplified - uses getUserToken helper
- */
 export async function createSheetsServiceForUser(userId: string): Promise<GoogleSheetsService> {
   const token = await getUserToken(userId);
   return new GoogleSheetsService(token, token);

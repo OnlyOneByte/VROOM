@@ -1,14 +1,9 @@
 /**
- * User Activity Tracker - Unified activity and change tracking
- * Consolidates activity-tracker and change-tracker
+ * User Activity Tracker - Activity and change tracking for auto-sync
  */
 
 import { getDb } from '../db/connection';
 import { logger } from '../utils/logger';
-
-// ============================================================================
-// ACTIVITY TRACKING
-// ============================================================================
 
 export interface UserActivity {
   userId: string;
@@ -30,70 +25,36 @@ export class UserActivityTracker {
     return UserActivityTracker.instance;
   }
 
-  // ============================================================================
-  // ACTIVITY TRACKING METHODS
-  // ============================================================================
-
-  /**
-   * Record user activity and reset inactivity timer
-   * Simplified - takes inactivity delay directly instead of complex config object
-   */
   recordActivity(userId: string, inactivityDelayMinutes: number = 5): void {
-    const now = new Date();
     const existingActivity = this.userActivities.get(userId);
-
-    // Clear existing timer if any
     if (existingActivity?.inactivityTimer) {
       clearTimeout(existingActivity.inactivityTimer);
     }
 
-    // Set new inactivity timer
     const inactivityTimer = setTimeout(
-      () => {
-        this.handleInactivity(userId);
-      },
+      () => this.handleInactivity(userId),
       inactivityDelayMinutes * 60 * 1000
     );
 
-    // Update user activity
     this.userActivities.set(userId, {
       userId,
-      lastActivity: now,
+      lastActivity: new Date(),
       inactivityTimer,
       syncInProgress: existingActivity?.syncInProgress || false,
     });
-
-    logger.debug('Activity recorded for user', {
-      userId,
-      inactivityDelayMinutes,
-    });
   }
 
-  /**
-   * Handle user inactivity - trigger auto-sync
-   */
   private async handleInactivity(userId: string): Promise<void> {
     const activity = this.userActivities.get(userId);
-
-    if (!activity || activity.syncInProgress) {
-      return;
-    }
-
-    logger.info('User inactive, triggering auto-sync', { userId });
+    if (!activity || activity.syncInProgress) return;
 
     try {
-      // Mark sync as in progress
       activity.syncInProgress = true;
       this.userActivities.set(userId, activity);
-
-      // Perform the sync
       await this.performAutoSync(userId);
-
-      logger.info('Auto-sync completed successfully', { userId });
     } catch (error) {
       logger.error('Auto-sync failed', { userId, error });
     } finally {
-      // Mark sync as complete
       if (activity) {
         activity.syncInProgress = false;
         this.userActivities.set(userId, activity);
@@ -101,183 +62,47 @@ export class UserActivityTracker {
     }
   }
 
-  /**
-   * Perform the actual auto-sync operation
-   */
   private async performAutoSync(userId: string): Promise<void> {
-    try {
-      // Check if there are changes since last sync
-      const hasChanges = await this.hasChangesSinceLastSync(userId);
+    const hasChanges = await this.hasChangesSinceLastSync(userId);
+    if (!hasChanges) return;
 
-      if (!hasChanges) {
-        logger.debug('Auto-sync skipped: No changes since last sync', { userId });
-        return;
-      }
+    const db = getDb();
+    const { eq } = await import('drizzle-orm');
+    const { userSettings } = await import('../db/schema');
 
-      // Get user settings to determine enabled sync types
-      const db = getDb();
-      const { eq } = await import('drizzle-orm');
-      const { userSettings } = await import('../db/schema');
+    const settings = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+    if (!settings.length) return;
 
-      const settings = await db
-        .select()
-        .from(userSettings)
-        .where(eq(userSettings.userId, userId))
-        .limit(1);
+    const syncTypes: string[] = [];
+    if (settings[0].googleSheetsSyncEnabled) syncTypes.push('sheets');
+    if (settings[0].googleDriveBackupEnabled) syncTypes.push('backup');
 
-      if (!settings.length) {
-        logger.debug('Auto-sync skipped: No settings found', { userId });
-        return;
-      }
+    if (syncTypes.length === 0) return;
 
-      const userSetting = settings[0];
-
-      // Build syncTypes array based on enabled sync types
-      const syncTypes: string[] = [];
-      if (userSetting.googleSheetsSyncEnabled) {
-        syncTypes.push('sheets');
-      }
-      if (userSetting.googleDriveBackupEnabled) {
-        syncTypes.push('backup');
-      }
-
-      // Skip if no sync types are enabled
-      if (syncTypes.length === 0) {
-        logger.debug('Auto-sync skipped: No sync types enabled', { userId });
-        return;
-      }
-
-      logger.info('Auto-sync starting (changes detected)', { userId });
-
-      // TODO: Implement auto-sync after extracting GoogleSyncService
-      // For now, just log that auto-sync would have triggered
-      logger.info('Auto-sync would trigger here', { userId, syncTypes });
-      logger.info('Auto-sync completed', { userId });
-    } catch (error) {
-      // Handle errors gracefully (log but don't crash)
-      logger.error('Auto-sync operation failed', { userId, error });
-      // Don't re-throw - we want to handle errors gracefully
-    }
+    logger.info('Auto-sync would trigger', { userId, syncTypes });
   }
 
-  /**
-   * Manually trigger sync for a user
-   */
-  async triggerManualSync(userId: string): Promise<{ success: boolean; message: string }> {
+  getSyncStatus(userId: string): { lastActivity?: Date; syncInProgress: boolean } {
     const activity = this.userActivities.get(userId);
-
-    if (activity?.syncInProgress) {
-      return {
-        success: false,
-        message: 'Sync already in progress',
-      };
-    }
-
-    try {
-      // Clear any existing inactivity timer
-      if (activity?.inactivityTimer) {
-        clearTimeout(activity.inactivityTimer);
-      }
-
-      // Mark sync as in progress
-      this.userActivities.set(userId, {
-        userId,
-        lastActivity: new Date(),
-        syncInProgress: true,
-      });
-
-      await this.performAutoSync(userId);
-
-      return {
-        success: true,
-        message: 'Manual sync completed successfully',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `Manual sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      };
-    } finally {
-      // Mark sync as complete
-      const currentActivity = this.userActivities.get(userId);
-      if (currentActivity) {
-        currentActivity.syncInProgress = false;
-        this.userActivities.set(userId, currentActivity);
-      }
-    }
+    return activity
+      ? { lastActivity: activity.lastActivity, syncInProgress: activity.syncInProgress }
+      : { syncInProgress: false };
   }
 
-  /**
-   * Get sync status for a user
-   */
-  getSyncStatus(userId: string): {
-    lastActivity?: Date;
-    syncInProgress: boolean;
-  } {
-    const activity = this.userActivities.get(userId);
-
-    if (!activity) {
-      return { syncInProgress: false };
-    }
-
-    return {
-      lastActivity: activity.lastActivity,
-      syncInProgress: activity.syncInProgress,
-    };
-  }
-
-  /**
-   * Stop tracking activity for a user (e.g., on logout)
-   */
   stopTracking(userId: string): void {
     const activity = this.userActivities.get(userId);
-
     if (activity?.inactivityTimer) {
       clearTimeout(activity.inactivityTimer);
     }
-
     this.userActivities.delete(userId);
-    logger.debug('Stopped activity tracking', { userId });
   }
 
-  /**
-   * Update inactivity delay for a user
-   * Simplified - just takes the delay in minutes
-   */
-  updateInactivityDelay(userId: string, inactivityDelayMinutes: number): void {
-    const activity = this.userActivities.get(userId);
-
-    if (activity) {
-      // Clear existing timer and set new one with updated delay
-      if (activity.inactivityTimer) {
-        clearTimeout(activity.inactivityTimer);
-      }
-
-      const inactivityTimer = setTimeout(
-        () => {
-          this.handleInactivity(userId);
-        },
-        inactivityDelayMinutes * 60 * 1000
-      );
-
-      activity.inactivityTimer = inactivityTimer;
-      this.userActivities.set(userId, activity);
-    }
-  }
-
-  /**
-   * Get all active users being tracked
-   */
-  getActiveUsers(): string[] {
-    return Array.from(this.userActivities.keys());
-  }
-
-  /**
-   * Clean up inactive users (for memory management)
-   */
   cleanupInactiveUsers(maxInactiveHours: number = 24): void {
     const cutoffTime = new Date(Date.now() - maxInactiveHours * 60 * 60 * 1000);
-
     for (const [userId, activity] of this.userActivities.entries()) {
       if (activity.lastActivity < cutoffTime && !activity.syncInProgress) {
         this.stopTracking(userId);
@@ -285,120 +110,43 @@ export class UserActivityTracker {
     }
   }
 
-  // ============================================================================
-  // CHANGE TRACKING METHODS
-  // ============================================================================
-
-  /**
-   * Mark that user data has changed
-   */
   async markDataChanged(userId: string): Promise<void> {
     try {
       const db = getDb();
       const { eq } = await import('drizzle-orm');
       const { userSettings } = await import('../db/schema');
-
       await db
         .update(userSettings)
-        .set({
-          lastDataChangeDate: new Date(),
-          updatedAt: new Date(),
-        })
+        .set({ lastDataChangeDate: new Date(), updatedAt: new Date() })
         .where(eq(userSettings.userId, userId));
-
-      logger.debug('Data change marked', { userId });
     } catch (error) {
       logger.error('Failed to mark data change', { userId, error });
-      // Don't throw - this is a non-critical operation
     }
   }
 
-  /**
-   * Check if user has changes since last sync
-   */
   async hasChangesSinceLastSync(userId: string): Promise<boolean> {
     try {
       const db = getDb();
       const { eq } = await import('drizzle-orm');
       const { userSettings } = await import('../db/schema');
-
       const settings = await db
         .select()
         .from(userSettings)
         .where(eq(userSettings.userId, userId))
         .limit(1);
 
-      if (!settings.length) {
-        // No settings found, assume changes exist
-        return true;
-      }
+      if (!settings.length) return true;
 
       const { lastDataChangeDate, lastSyncDate } = settings[0];
-
-      // If no sync has ever happened, there are changes
-      if (!lastSyncDate) {
-        return true;
-      }
-
-      // If no data change date is recorded, assume changes exist
-      if (!lastDataChangeDate) {
-        return true;
-      }
-
-      // Compare timestamps
+      if (!lastSyncDate || !lastDataChangeDate) return true;
       return lastDataChangeDate > lastSyncDate;
     } catch (error) {
       logger.error('Failed to check changes', { userId, error });
-      // On error, assume changes exist to be safe
       return true;
-    }
-  }
-
-  /**
-   * Get change status for a user
-   */
-  async getChangeStatus(userId: string): Promise<{
-    hasChanges: boolean;
-    lastDataChangeDate?: Date;
-    lastSyncDate?: Date;
-  }> {
-    try {
-      const db = getDb();
-      const { eq } = await import('drizzle-orm');
-      const { userSettings } = await import('../db/schema');
-
-      const settings = await db
-        .select()
-        .from(userSettings)
-        .where(eq(userSettings.userId, userId))
-        .limit(1);
-
-      if (!settings.length) {
-        return { hasChanges: true };
-      }
-
-      const { lastDataChangeDate, lastSyncDate } = settings[0];
-      const hasChanges = await this.hasChangesSinceLastSync(userId);
-
-      return {
-        hasChanges,
-        lastDataChangeDate: lastDataChangeDate || undefined,
-        lastSyncDate: lastSyncDate || undefined,
-      };
-    } catch (error) {
-      logger.error('Failed to get change status', { userId, error });
-      return { hasChanges: true };
     }
   }
 }
 
-// Export singleton instance
 export const activityTracker = UserActivityTracker.getInstance();
 
-// Clean up inactive users every hour
-setInterval(
-  () => {
-    activityTracker.cleanupInactiveUsers();
-  },
-  60 * 60 * 1000
-);
+setInterval(() => activityTracker.cleanupInactiveUsers(), 60 * 60 * 1000);
