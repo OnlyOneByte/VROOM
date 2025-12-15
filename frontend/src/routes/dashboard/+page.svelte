@@ -21,19 +21,17 @@
 	let recentExpenses = $state<any[]>([]);
 
 	let stats = $derived.by(() => {
-		if (!dashboardData) {
-			return { totalVehicles: 0, totalExpenses: 0, monthlyAverage: 0, activeFinancing: 0 };
-		}
-		const monthlyAverage =
-			dashboardData.monthlyTrends.length > 0
-				? dashboardData.monthlyTrends.reduce((sum: number, t: any) => sum + t.amount, 0) /
-					dashboardData.monthlyTrends.length
-				: 0;
+		// Use vehicleDetails for actual vehicle count since analytics endpoint is removed
+		const totalVehicles = vehicleDetails.length;
+		const totalExpenses = vehicleDetails.reduce((sum, v) => sum + (v.totalExpenses || 0), 0);
+		const monthlyAverage = vehicleDetails.reduce((sum, v) => sum + (v.recentExpenses || 0), 0) / 12;
+		const activeFinancing = vehicleDetails.filter(v => v.hasActiveFinancing).length;
+
 		return {
-			totalVehicles: dashboardData.vehicles.length,
-			totalExpenses: dashboardData.totalExpenses,
+			totalVehicles,
+			totalExpenses,
 			monthlyAverage,
-			activeFinancing: vehicleDetails.filter(v => v.hasActiveFinancing).length
+			activeFinancing
 		};
 	});
 
@@ -102,11 +100,14 @@
 				params.append('startDate', startDate.toISOString());
 				params.append('endDate', endDate.toISOString());
 			}
-			// NOTE: Analytics endpoint removed - using mock data for now
-			// TODO: Implement client-side analytics or restore backend endpoint
+			// Load vehicle details and expenses
+			await Promise.all([loadVehicleDetails(), loadRecentExpenses()]);
+
+			// NOTE: Analytics endpoint removed - calculate basic stats from loaded data
+			const totalExpenses = vehicleDetails.reduce((sum, v) => sum + (v.totalExpenses || 0), 0);
 			dashboardData = {
-				vehicles: [],
-				totalExpenses: 0,
+				vehicles: vehicleDetails.map(v => ({ id: v.id, name: v.name, nickname: v.nickname })),
+				totalExpenses,
 				monthlyTrends: [],
 				categoryBreakdown: {},
 				fuelEfficiency: {
@@ -117,7 +118,6 @@
 				},
 				costPerMile: { totalCostPerMile: 0, totalCost: 0, totalMiles: 0 }
 			};
-			await Promise.all([loadVehicleDetails(), loadRecentExpenses()]);
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load dashboard data');
 		}
