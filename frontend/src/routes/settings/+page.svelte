@@ -83,6 +83,13 @@
 			googleSheetsSyncEnabled = settings.googleSheetsSyncEnabled || false;
 			syncInactivityMinutes = settings.syncInactivityMinutes || 5;
 			isInitialized = true;
+
+			// Auto-initialize Drive if backup is enabled but folder is missing
+			if (settings.googleDriveBackupEnabled && !settings.googleDriveBackupFolderId) {
+				settingsStore.initializeDrive().catch(() => {
+					// Silent fail — user can retry via Save
+				});
+			}
 		}
 	});
 
@@ -95,6 +102,18 @@
 				googleDriveBackupEnabled,
 				syncInactivityMinutes
 			});
+
+			// If Google Drive backup was just enabled, initialize the folder structure
+			const hadFolderId = settings?.googleDriveBackupFolderId;
+			if (googleDriveBackupEnabled && !hadFolderId) {
+				try {
+					await settingsStore.initializeDrive();
+				} catch {
+					appStore.showError(
+						'Failed to initialize Google Drive. Make sure your Google account has Drive access.'
+					);
+				}
+			}
 
 			// Update general settings
 			await settingsStore.update({

@@ -30,7 +30,7 @@ export class GoogleDriveService {
   private oauth2Client: OAuth2Client;
   private drive: drive_v3.Drive;
 
-  constructor(accessToken: string, refreshToken?: string) {
+  constructor(refreshToken: string) {
     this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
@@ -38,7 +38,6 @@ export class GoogleDriveService {
     );
 
     this.oauth2Client.setCredentials({
-      access_token: accessToken,
       refresh_token: refreshToken,
     });
 
@@ -276,7 +275,7 @@ async function getUserToken(userId: string): Promise<string> {
 
 export async function createDriveServiceForUser(userId: string): Promise<GoogleDriveService> {
   const token = await getUserToken(userId);
-  return new GoogleDriveService(token, token);
+  return new GoogleDriveService(token);
 }
 
 export async function getDriveServiceForUser(userId: string): Promise<GoogleDriveService> {
@@ -289,5 +288,5 @@ export async function getDriveServiceForUser(userId: string): Promise<GoogleDriv
     throw error;
   }
 
-  return new GoogleDriveService(userInfo[0].googleRefreshToken, userInfo[0].googleRefreshToken);
+  return new GoogleDriveService(userInfo[0].googleRefreshToken);
 }

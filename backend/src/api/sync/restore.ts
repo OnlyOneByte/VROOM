@@ -109,7 +109,7 @@ class RestoreService {
     }
 
     const user = await this.getUserWithToken(userId);
-    const sheetsService = new GoogleSheetsService(user.googleRefreshToken, user.googleRefreshToken);
+    const sheetsService = new GoogleSheetsService(user.googleRefreshToken);
     const sheetData = await sheetsService.readSpreadsheetData(settings.googleSheetsSpreadsheetId);
 
     if (sheetData.metadata.userId !== userId) {
@@ -177,7 +177,7 @@ class RestoreService {
 
       const user = await this.getUserWithToken(userId);
       const { GoogleDriveService } = await import('./google-drive');
-      const driveService = new GoogleDriveService(user.googleRefreshToken, user.googleRefreshToken);
+      const driveService = new GoogleDriveService(user.googleRefreshToken);
 
       const backups = await driveService.listFilesInFolder(settings.googleDriveBackupFolderId);
       const backupFiles = backups

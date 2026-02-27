@@ -28,7 +28,7 @@ export class GoogleSheetsService {
   private sheets: sheets_v4.Sheets;
   private driveService: GoogleDriveService;
 
-  constructor(accessToken: string, refreshToken?: string) {
+  constructor(refreshToken: string) {
     this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
@@ -36,12 +36,11 @@ export class GoogleSheetsService {
     );
 
     this.oauth2Client.setCredentials({
-      access_token: accessToken,
       refresh_token: refreshToken,
     });
 
     this.sheets = google.sheets({ version: 'v4', auth: this.oauth2Client });
-    this.driveService = new GoogleDriveService(accessToken, refreshToken);
+    this.driveService = new GoogleDriveService(refreshToken);
   }
 
   async createOrUpdateVroomSpreadsheet(userId: string, userName: string): Promise<SpreadsheetInfo> {
@@ -392,5 +391,5 @@ async function getUserToken(userId: string): Promise<string> {
 
 export async function createSheetsServiceForUser(userId: string): Promise<GoogleSheetsService> {
   const token = await getUserToken(userId);
-  return new GoogleSheetsService(token, token);
+  return new GoogleSheetsService(token);
 }
