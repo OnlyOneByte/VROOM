@@ -7,6 +7,7 @@
 	import { appStore } from '$lib/stores/app';
 	import { settingsStore } from '$lib/stores/settings';
 	import { expenseApi } from '$lib/services/expense-api';
+	import { vehicleApi } from '$lib/services/vehicle-api';
 	import {
 		Save,
 		ArrowLeft,
@@ -166,13 +167,9 @@
 
 	async function loadVehicles() {
 		try {
-			const response = await fetch('/api/v1/vehicles');
-			if (response.ok) {
-				const result = await response.json();
-				vehicles = result.data || [];
-				if (!isEditMode && vehicles.length > 0 && !formData.vehicleId) {
-					formData.vehicleId = vehicles[0].id;
-				}
+			vehicles = await vehicleApi.getVehicles();
+			if (!isEditMode && vehicles.length > 0 && !formData.vehicleId) {
+				formData.vehicleId = vehicles[0].id;
 			}
 		} catch (error) {
 			console.error('Failed to load vehicles:', error);

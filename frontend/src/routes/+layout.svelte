@@ -17,25 +17,19 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 
+	import { vehicleApi } from '$lib/services/vehicle-api';
+	import type { Vehicle as AppVehicle } from '$lib/types/index.js';
+
 	let { children } = $props();
 
 	let vehiclesLoaded = $state(false);
 
 	async function loadUserVehicles() {
-		// Prevent loading vehicles multiple times
 		if (vehiclesLoaded) return;
-
 		try {
-			const response = await fetch('/api/v1/vehicles', {
-				credentials: 'include'
-			});
-
-			if (response.ok) {
-				const result = await response.json();
-				const vehicles = result.data || [];
-				appStore.setVehicles(vehicles);
-				vehiclesLoaded = true;
-			}
+			const vehicles = await vehicleApi.getVehicles();
+			appStore.setVehicles(vehicles as unknown as AppVehicle[]);
+			vehiclesLoaded = true;
 		} catch (error) {
 			console.error('Failed to load vehicles:', error);
 		}

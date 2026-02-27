@@ -1,5 +1,6 @@
 import { offlineExpenses, syncStatus } from '$lib/stores/offline';
 import { toBackendExpense } from '$lib/services/api-transformer';
+import { apiClient } from '$lib/services/api-client';
 
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
 const OFFLINE_STORAGE_VERSION = '2.0'; // Incremented for field name migration
@@ -137,17 +138,8 @@ export async function syncOfflineExpenses(): Promise<void> {
 				description: expense.description
 			});
 
-			const response = await fetch('/api/v1/expenses', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(backendExpense)
-			});
-
-			if (response.ok) {
-				markExpenseAsSynced(expense.id);
-			} else {
-				throw new Error(`Failed to sync expense ${expense.id}`);
-			}
+			await apiClient.post('/api/v1/expenses', backendExpense);
+			markExpenseAsSynced(expense.id);
 		}
 
 		clearSyncedExpenses();

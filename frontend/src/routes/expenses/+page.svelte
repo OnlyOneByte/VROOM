@@ -17,6 +17,8 @@
 	import { offlineExpenses } from '$lib/stores/offline';
 	import { removeOfflineExpense } from '$lib/utils/offline-storage';
 	import { settingsStore } from '$lib/stores/settings';
+	import { vehicleApi } from '$lib/services/vehicle-api';
+	import { expenseApi } from '$lib/services/expense-api';
 	import type { Expense, Vehicle, ExpenseCategory, ExpenseFilters } from '$lib/types.js';
 
 	// Extended Expense type with vehicle info
@@ -81,28 +83,21 @@
 	async function loadExpenses() {
 		isLoading = true;
 		try {
-			// Load vehicles first to map vehicle info to expenses
-			const vehiclesResponse = await fetch('/api/v1/vehicles');
-			if (vehiclesResponse.ok) {
-				const vehiclesResult = await vehiclesResponse.json();
-				vehicles = vehiclesResult.data || [];
-			}
+			// Load vehicles and expenses in parallel via API services
+			const [loadedVehicles, loadedExpenses] = await Promise.all([
+				vehicleApi.getVehicles(),
+				expenseApi.getAllExpenses()
+			]);
+			vehicles = loadedVehicles;
 
-			// Load all expenses in a single request
-			const expensesResponse = await fetch('/api/v1/expenses');
-			if (expensesResponse.ok) {
-				const expensesResult = await expensesResponse.json();
-				const allExpenses: Expense[] = expensesResult.data || [];
+			// Map vehicle info to each expense
+			expenses = loadedExpenses.map(expense => ({
+				...expense,
+				vehicle: vehicles.find(v => v.id === expense.vehicleId)
+			}));
 
-				// Map vehicle info to each expense
-				expenses = allExpenses.map(expense => ({
-					...expense,
-					vehicle: vehicles.find(v => v.id === expense.vehicleId)
-				}));
-
-				applyFiltersAndSort();
-				calculateSummaryStats();
-			}
+			applyFiltersAndSort();
+			calculateSummaryStats();
 		} catch (error) {
 			console.error('Failed to load expenses:', error);
 		} finally {
