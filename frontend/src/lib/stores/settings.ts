@@ -116,24 +116,6 @@ function createSettingsStore() {
 			}
 		},
 
-		async getSyncStatus() {
-			try {
-				const response = await fetch('/api/v1/sync/status', {
-					credentials: 'include'
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to get sync status');
-				}
-
-				return await response.json();
-			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Failed to get sync status';
-				update(state => ({ ...state, error: errorMessage }));
-				throw error;
-			}
-		},
-
 		async downloadBackup() {
 			try {
 				const response = await fetch('/api/v1/sync/backups/download', {
@@ -212,9 +194,6 @@ function createSettingsStore() {
 				if (!response.ok) {
 					throw new Error('Failed to execute sync');
 				}
-
-				// Reload settings to get updated timestamps
-				await this.load();
 
 				return await response.json();
 			} catch (error) {

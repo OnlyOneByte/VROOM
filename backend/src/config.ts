@@ -147,18 +147,6 @@ export const CONFIG = {
     },
     settings: { maxBackupRetention: 100, maxSyncInactivityMinutes: 30 },
   },
-  time: {
-    millisecondsPerSecond: 1000,
-    secondsPerMinute: 60,
-    minutesPerHour: 60,
-    hoursPerDay: 24,
-    daysPerMonth: 30,
-    msPerMinute: 60 * 1000,
-    msPerHour: 60 * 60 * 1000,
-    msPerDay: 24 * 60 * 60 * 1000,
-    secondsPerHour: 60 * 60,
-    secondsPerDay: 24 * 60 * 60,
-  },
 } as const;
 
 export type RestoreMode = (typeof CONFIG.backup.supportedModes)[number];

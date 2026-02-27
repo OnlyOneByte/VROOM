@@ -76,7 +76,7 @@ routes.use('*', changeTracker);
 routes.get('/', async (c) => {
   const user = c.get('user');
 
-  const userVehicles = await vehicleRepository.findAccessibleVehicles(user.id);
+  const userVehicles = await vehicleRepository.findByUserId(user.id);
 
   const response: ApiResponse<typeof userVehicles> = {
     success: true,

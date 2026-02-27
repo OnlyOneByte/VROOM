@@ -1,6 +1,8 @@
 import type { ExpenseCategory, Expense } from '$lib/types';
 import { Fuel, Wrench, CreditCard, DollarSign } from 'lucide-svelte';
 
+type LucideIcon = typeof Fuel;
+
 // Constants for validation
 export const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
 export const MIN_VALID_MPG = 5;
@@ -23,8 +25,8 @@ export const categoryLabels: Record<ExpenseCategory, string> = {
  * @param category - The expense category
  * @returns Lucide icon component
  */
-export function getCategoryIcon(category: ExpenseCategory): any {
-	const icons: Record<ExpenseCategory, any> = {
+export function getCategoryIcon(category: ExpenseCategory): LucideIcon {
+	const icons: Record<ExpenseCategory, LucideIcon> = {
 		fuel: Fuel,
 		maintenance: Wrench,
 		financial: CreditCard,

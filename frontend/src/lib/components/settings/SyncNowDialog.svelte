@@ -78,29 +78,46 @@
 			</div>
 
 			<!-- Sync Results -->
-			{#if syncResults}
+			{#if syncResults?.data?.results}
 				<div class="border rounded-lg p-4 bg-gray-50">
 					<h4 class="font-medium mb-3">Sync Results</h4>
 					<div class="space-y-2 text-sm">
-						{#if syncResults.results?.sheets}
-							<div class="flex items-center gap-2 text-green-600">
-								<span class="font-medium">✓ Google Sheets:</span>
-								<span>Synced successfully</span>
+						{#if syncResults.data.results.sheets}
+							{@const sheets = syncResults.data.results.sheets}
+							<div
+								class="flex items-center gap-2 {sheets.success ? 'text-green-600' : 'text-red-600'}"
+							>
+								<span class="font-medium">{sheets.success ? '✓' : '✗'} Google Sheets:</span>
+								<span
+									>{sheets.skipped
+										? 'No changes to sync'
+										: sheets.success
+											? 'Synced successfully'
+											: sheets.message || 'Failed'}</span
+								>
 							</div>
 						{/if}
-						{#if syncResults.results?.backup}
-							<div class="flex items-center gap-2 text-green-600">
-								<span class="font-medium">✓ Google Drive:</span>
-								<span>Backup uploaded</span>
+						{#if syncResults.data.results.backup}
+							{@const backup = syncResults.data.results.backup}
+							<div
+								class="flex items-center gap-2 {backup.success ? 'text-green-600' : 'text-red-600'}"
+							>
+								<span class="font-medium">{backup.success ? '✓' : '✗'} Google Drive:</span>
+								<span
+									>{backup.skipped
+										? 'No changes to sync'
+										: backup.success
+											? 'Backup uploaded'
+											: backup.message || 'Failed'}</span
+								>
 							</div>
-						{/if}
-						{#if syncResults.errors}
-							{#each Object.entries(syncResults.errors) as [type, error]}
-								<div class="flex items-center gap-2 text-red-600">
-									<span class="font-medium">✗ {type}:</span>
-									<span>{error}</span>
+							{#if backup.success && backup.deletedOldBackups > 0}
+								<div class="text-xs text-gray-500 pl-5">
+									Cleaned up {backup.deletedOldBackups} old backup{backup.deletedOldBackups > 1
+										? 's'
+										: ''}
 								</div>
-							{/each}
+							{/if}
 						{/if}
 					</div>
 				</div>
@@ -109,9 +126,9 @@
 
 		<Dialog.Footer class="flex gap-2">
 			<Button variant="outline" onclick={() => (open = false)}>
-				{syncResults ? 'Close' : 'Cancel'}
+				{syncResults?.data?.results ? 'Close' : 'Cancel'}
 			</Button>
-			{#if !syncResults}
+			{#if !syncResults?.data?.results}
 				<Button onclick={onSync} disabled={isSyncing || (!syncSheets && !syncBackup)}>
 					{#if isSyncing}
 						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />

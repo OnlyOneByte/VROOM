@@ -4,13 +4,16 @@
 
 import { Hono } from 'hono';
 import { CONFIG } from '../../config';
+import type { UserSettings } from '../../db/schema';
 import { createSuccessResponse, handleSyncError, SyncError, SyncErrorCode } from '../../errors';
 import { bodyLimit, idempotency, rateLimiter, requireAuth } from '../../middleware';
+import { logger } from '../../utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
 import { settingsRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
-import { getDriveServiceForUser } from './google-drive';
+import { createDriveServiceForUser, getDriveServiceForUser } from './google-drive';
+import { createSheetsServiceForUser } from './google-sheets';
 import { restoreService } from './restore';
 
 const routes = new Hono();
@@ -34,9 +37,133 @@ const driveInitRateLimiter = rateLimiter({
   keyGenerator: (c) => c.get('user').id,
 });
 
+// --- Sync helper functions ---
+
+async function performBackupSync(
+  userId: string,
+  settings: UserSettings
+): Promise<Record<string, unknown>> {
+  if (!settings.googleDriveBackupEnabled || !settings.googleDriveBackupFolderId) {
+    return { success: false, message: 'Google Drive backup not configured' };
+  }
+
+  const zipBuffer = await withTimeout(
+    backupService.exportAsZip(userId),
+    OPERATION_TIMEOUTS.BACKUP,
+    'Backup export'
+  );
+
+  const driveService = await getDriveServiceForUser(userId);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const fileName = `vroom-backup-${timestamp}.zip`;
+
+  const uploadedFile = await driveService.uploadFile(
+    fileName,
+    zipBuffer,
+    'application/zip',
+    settings.googleDriveBackupFolderId
+  );
+
+  const deletedCount = await enforceBackupRetention(
+    driveService,
+    settings.googleDriveBackupFolderId,
+    settings.googleDriveBackupRetentionCount || CONFIG.backup.defaultRetentionCount
+  );
+
+  await settingsRepository.updateBackupDate(userId);
+
+  return {
+    success: true,
+    fileId: uploadedFile.id,
+    fileName: uploadedFile.name,
+    deletedOldBackups: deletedCount,
+  };
+}
+
+async function enforceBackupRetention(
+  driveService: Awaited<ReturnType<typeof getDriveServiceForUser>>,
+  folderId: string,
+  retentionCount: number
+): Promise<number> {
+  const existingBackups = await driveService.listFilesInFolder(folderId);
+  const backupFiles = existingBackups
+    .filter((f) => f.name.startsWith('vroom-backup-') && f.name.endsWith('.zip'))
+    .sort((a, b) => (b.modifiedTime || '').localeCompare(a.modifiedTime || ''));
+
+  if (backupFiles.length <= retentionCount) return 0;
+
+  const toDelete = backupFiles.slice(retentionCount);
+  for (const file of toDelete) {
+    try {
+      await driveService.deleteFile(file.id);
+    } catch (deleteError) {
+      logger.warn('Failed to delete old backup', { fileId: file.id, deleteError });
+    }
+  }
+  return toDelete.length;
+}
+
+async function performSheetsSync(
+  userId: string,
+  displayName: string
+): Promise<Record<string, unknown>> {
+  const sheetsService = await createSheetsServiceForUser(userId);
+  const spreadsheetInfo = await withTimeout(
+    sheetsService.createOrUpdateVroomSpreadsheet(userId, displayName),
+    OPERATION_TIMEOUTS.BACKUP,
+    'Sheets sync'
+  );
+
+  await settingsRepository.updateSyncDate(userId, spreadsheetInfo.id);
+
+  return {
+    success: true,
+    spreadsheetId: spreadsheetInfo.id,
+    webViewLink: spreadsheetInfo.webViewLink,
+  };
+}
+
+// --- Route handlers ---
+
 routes.get('/health', async (c) => {
   return c.json({ status: 'healthy', timestamp: new Date().toISOString(), service: 'sync' });
 });
+
+function validateSyncTypes(syncTypes: unknown): string[] {
+  if (!syncTypes || !Array.isArray(syncTypes) || syncTypes.length === 0) {
+    throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'syncTypes must be a non-empty array');
+  }
+
+  const validSyncTypes = ['sheets', 'backup'];
+  const invalidTypes = syncTypes.filter((type: string) => !validSyncTypes.includes(type));
+  if (invalidTypes.length > 0) {
+    throw new SyncError(
+      SyncErrorCode.VALIDATION_ERROR,
+      `Invalid sync types: ${invalidTypes.join(', ')}`
+    );
+  }
+
+  return syncTypes as string[];
+}
+
+async function executeSyncType(
+  syncType: string,
+  userId: string,
+  displayName: string,
+  settings: UserSettings,
+  hasChanges: boolean
+): Promise<Record<string, unknown>> {
+  const noChangeResult = { success: true, message: 'No changes since last sync', skipped: true };
+
+  if (syncType === 'backup') {
+    return hasChanges ? performBackupSync(userId, settings) : noChangeResult;
+  }
+
+  if (!settings.googleSheetsSyncEnabled) {
+    return { success: false, message: 'Google Sheets sync not enabled' };
+  }
+  return hasChanges ? performSheetsSync(userId, displayName) : noChangeResult;
+}
 
 routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) => {
   const user = c.get('user');
@@ -44,37 +171,33 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
 
   try {
     const body = await c.req.json();
-    const syncTypes = body.syncTypes;
-
-    if (!syncTypes || !Array.isArray(syncTypes) || syncTypes.length === 0) {
-      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'syncTypes must be a non-empty array');
-    }
-
-    const validSyncTypes = ['sheets', 'backup'];
-    const invalidTypes = syncTypes.filter((type: string) => !validSyncTypes.includes(type));
-
-    if (invalidTypes.length > 0) {
-      throw new SyncError(
-        SyncErrorCode.VALIDATION_ERROR,
-        `Invalid sync types: ${invalidTypes.join(', ')}`
-      );
-    }
-
+    const syncTypes = validateSyncTypes(body.syncTypes);
     const hasChanges = await activityTracker.hasChangesSinceLastSync(userId);
+    const settings = await settingsRepository.getOrCreate(userId);
     const results: Record<string, unknown> = {};
 
     for (const syncType of syncTypes) {
-      if (syncType === 'backup') {
-        results.backup = { message: 'Backup sync not yet implemented' };
-      } else if (syncType === 'sheets') {
-        results.sheets = { message: 'Sheets sync not yet implemented' };
+      try {
+        results[syncType] = await executeSyncType(
+          syncType,
+          userId,
+          user.displayName,
+          settings,
+          hasChanges
+        );
+      } catch (error) {
+        logger.error(`${syncType} sync failed`, { userId, error });
+        results[syncType] = {
+          success: false,
+          message: error instanceof Error ? error.message : `${syncType} sync failed`,
+        };
       }
     }
 
     return c.json(
       createSuccessResponse(
         { syncTypes, results, hasChanges, timestamp: new Date().toISOString() },
-        'Sync completed successfully'
+        'Sync completed'
       )
     );
   } catch (error) {
@@ -156,8 +279,28 @@ routes.post('/configure', async (c) => {
 });
 
 routes.get('/backups', async (c) => {
+  const user = c.get('user');
   try {
-    return c.json(createSuccessResponse([]));
+    const settings = await settingsRepository.getOrCreate(user.id);
+
+    if (!settings.googleDriveBackupEnabled || !settings.googleDriveBackupFolderId) {
+      return c.json(createSuccessResponse([], 'Google Drive backup not configured'));
+    }
+
+    const driveService = await getDriveServiceForUser(user.id);
+    const files = await driveService.listFilesInFolder(settings.googleDriveBackupFolderId);
+    const backups = files
+      .filter((f) => f.name.startsWith('vroom-backup-') && f.name.endsWith('.zip'))
+      .sort((a, b) => (b.modifiedTime || '').localeCompare(a.modifiedTime || ''))
+      .map((f) => ({
+        fileId: f.id,
+        fileName: f.name,
+        size: f.size,
+        createdTime: f.createdTime,
+        modifiedTime: f.modifiedTime,
+      }));
+
+    return c.json(createSuccessResponse(backups));
   } catch (error) {
     return handleSyncError(c, error, 'list backups');
   }
@@ -215,11 +358,25 @@ routes.delete('/backups/:fileId', async (c) => {
 });
 
 routes.post('/backups/initialize-drive', driveInitRateLimiter, async (c) => {
+  const user = c.get('user');
   try {
+    const driveService = await createDriveServiceForUser(user.id);
+    const folderStructure = await driveService.createVroomFolderStructure(user.displayName);
+
+    await settingsRepository.updateBackupFolderId(user.id, folderStructure.subFolders.backups.id);
+    await settingsRepository.updateSyncConfig(user.id, { googleDriveBackupEnabled: true });
+
     return c.json(
       createSuccessResponse(
-        { message: 'Not yet implemented' },
-        'Google Drive initialization pending'
+        {
+          mainFolder: {
+            id: folderStructure.mainFolder.id,
+            name: folderStructure.mainFolder.name,
+            webViewLink: folderStructure.mainFolder.webViewLink,
+          },
+          backupsFolderId: folderStructure.subFolders.backups.id,
+        },
+        'Google Drive initialized successfully'
       )
     );
   } catch (error) {

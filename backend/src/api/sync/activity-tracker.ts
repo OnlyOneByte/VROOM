@@ -100,7 +100,59 @@ export class UserActivityTracker {
 
     if (syncTypes.length === 0) return;
 
-    logger.info('Auto-sync would trigger', { userId, syncTypes });
+    logger.info('Auto-sync triggered', { userId, syncTypes });
+
+    // Perform backup sync
+    if (syncTypes.includes('backup') && settings[0].googleDriveBackupFolderId) {
+      try {
+        const { backupService } = await import('./backup');
+        const { getDriveServiceForUser } = await import('./google-drive');
+        const { settingsRepository } = await import('../settings/repository');
+
+        const zipBuffer = await backupService.exportAsZip(userId);
+        const driveService = await getDriveServiceForUser(userId);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `vroom-backup-${timestamp}.zip`;
+
+        await driveService.uploadFile(
+          fileName,
+          zipBuffer,
+          'application/zip',
+          settings[0].googleDriveBackupFolderId
+        );
+
+        await settingsRepository.updateBackupDate(userId);
+        logger.info('Auto-sync backup completed', { userId });
+      } catch (error) {
+        logger.error('Auto-sync backup failed', { userId, error });
+      }
+    }
+
+    // Perform sheets sync
+    if (syncTypes.includes('sheets')) {
+      try {
+        const { createSheetsServiceForUser } = await import('./google-sheets');
+        const { settingsRepository } = await import('../settings/repository');
+        const { users: usersTable } = await import('../../db/schema');
+
+        const userResult = await db
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.id, userId))
+          .limit(1);
+        if (userResult.length > 0) {
+          const sheetsService = await createSheetsServiceForUser(userId);
+          const spreadsheetInfo = await sheetsService.createOrUpdateVroomSpreadsheet(
+            userId,
+            userResult[0].displayName
+          );
+          await settingsRepository.updateSyncDate(userId, spreadsheetInfo.id);
+          logger.info('Auto-sync sheets completed', { userId });
+        }
+      } catch (error) {
+        logger.error('Auto-sync sheets failed', { userId, error });
+      }
+    }
   }
 
   getSyncStatus(userId: string): { lastActivity?: Date; syncInProgress: boolean } {

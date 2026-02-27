@@ -369,7 +369,7 @@ describe('Expense Management Integration', () => {
 
 			expect(validateDate('2024-01-15').isValid).toBe(true);
 			expect(validateDate('invalid-date').isValid).toBe(false);
-			expect(validateDate('2025-12-31').isValid).toBe(false);
+			expect(validateDate('2099-12-31').isValid).toBe(false);
 		});
 	});
 

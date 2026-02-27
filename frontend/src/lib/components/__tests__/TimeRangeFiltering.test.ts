@@ -154,7 +154,7 @@ describe('Interactive Time Range Filtering Logic', () => {
 		expect(reversedRange.isValid).toBe(false);
 		expect(reversedRange.errors).toContain('Start date must be before end date');
 
-		const futureDate = validateDateRange('2024-01-01', '2025-12-31');
+		const futureDate = validateDateRange('2024-01-01', '2099-12-31');
 		expect(futureDate.isValid).toBe(false);
 		expect(futureDate.errors).toContain('End date cannot be in the future');
 	});

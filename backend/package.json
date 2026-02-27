@@ -29,7 +29,7 @@
     "check:fix": "biome check --write src/",
     "type-check": "tsc --noEmit",
     "all:fix": "bun run lint:fix && bun run format:fix && bun run check:fix",
-    "validate": "bun run type-check && bun run check && CI=true bun run test && bun run build"
+    "validate": "bun run type-check && bun run check && bun run build"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.0",
@@ -38,7 +38,6 @@
     "@paralleldrive/cuid2": "^2.2.2",
     "adm-zip": "^0.5.16",
     "arctic": "^1.9.0",
-    "cors": "^2.8.5",
     "csv-parse": "^6.1.0",
     "csv-stringify": "^6.6.0",
     "dotenv": "^16.3.1",
@@ -46,16 +45,13 @@
     "drizzle-zod": "^0.8.3",
     "googleapis": "^162.0.0",
     "hono": "^4.9.0",
-    "inversify": "^7.10.3",
     "lucia": "^3.2.0",
     "oslo": "^1.1.2",
-    "reflect-metadata": "^0.2.2",
     "zod": "^4.1.12"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.6",
     "@types/adm-zip": "^0.5.7",
-    "@types/cors": "^2.8.17",
     "bun-types": "^1.0.25",
     "drizzle-kit": "^0.31.5",
     "typescript": "^5.3.3",

@@ -19,15 +19,54 @@ The VROOM backend is a RESTful API built with Hono, Bun, and SQLite. It follows 
 backend/src/
 ├── api/               # API modules (domain logic)
 │   ├── auth/          # Authentication (OAuth, sessions)
+│   │   ├── lucia.ts       # Lucia auth setup
+│   │   ├── routes.ts      # Auth route handlers
+│   │   └── utils.ts       # Auth utilities
 │   ├── expenses/      # Expense tracking module
+│   │   ├── repository.ts  # Expense data access
+│   │   └── routes.ts      # Expense route handlers
 │   ├── financing/     # Vehicle financing module
+│   │   ├── repository.ts  # Financing data access
+│   │   └── routes.ts      # Financing route handlers
 │   ├── insurance/     # Insurance policy module
+│   │   ├── repository.ts  # Insurance data access
+│   │   └── routes.ts      # Insurance route handlers
 │   ├── settings/      # User settings module
+│   │   ├── repository.ts  # Settings data access
+│   │   └── routes.ts      # Settings route handlers
 │   ├── sync/          # Backup/restore and Google integration
+│   │   ├── activity-tracker.ts  # User activity & auto-sync
+│   │   ├── backup.ts           # Backup creation & validation
+│   │   ├── google-drive.ts     # Google Drive file operations
+│   │   ├── google-sheets.ts    # Google Sheets data sync
+│   │   ├── restore.ts          # Data restoration
+│   │   └── routes.ts           # Sync route handlers
 │   └── vehicles/      # Vehicle management module
+│       ├── repository.ts  # Vehicle data access
+│       └── routes.ts      # Vehicle route handlers
 ├── db/                # Database (schema, migrations, connection)
-├── middleware/        # Request middleware (auth, rate limiting, etc.)
+│   ├── checkpoint.ts      # WAL checkpoint utility
+│   ├── connection.ts      # Database connection setup
+│   ├── init.ts            # Database initialization
+│   ├── schema.ts          # Drizzle table definitions
+│   ├── seed.ts            # Sample data seeding
+│   └── types.ts           # Database enums and types
+├── middleware/        # Request middleware
+│   ├── activity.ts        # Activity & change tracking
+│   ├── auth.ts            # Authentication guards
+│   ├── body-limit.ts      # Request size limiting
+│   ├── error-handler.ts   # Global error handler
+│   ├── idempotency.ts     # Duplicate request prevention
+│   ├── index.ts           # Middleware re-exports
+│   └── rate-limit.ts      # Rate limiting
 ├── utils/             # Shared utilities
+│   ├── calculations.ts        # MPG and cost calculations
+│   ├── logger.ts              # Logging utility
+│   ├── repository.ts          # BaseRepository class
+│   ├── timeout.ts             # Async timeout wrapper
+│   ├── unit-conversions.ts    # Unit label helpers
+│   ├── validation.ts          # Ownership validation helpers
+│   └── vehicle-stats.ts       # Vehicle statistics
 ├── config.ts          # Configuration and environment variables
 ├── errors.ts          # Error classes and handlers
 ├── index.ts           # Application entry point
@@ -42,37 +81,38 @@ Each module uses a repository for database operations:
 
 ```typescript
 export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
-  // Custom queries specific to vehicles
-  async findByUserId(userId: string): Promise<Vehicle[]> { }
+  async findByUserId(userId: string): Promise<VehicleWithFinancing[]> { }
 }
 ```
 
-**Benefits:**
-- Consistent database access patterns
-- Easy to test (can mock repositories)
-- Encapsulates database logic
+Repositories are exported as singletons for simplicity:
+
+```typescript
+export const vehicleRepository = new VehicleRepository(getDb());
+```
 
 ### 2. Route Handlers
 
 Routes are organized by resource and follow RESTful conventions:
 
-```typescript
-// GET    /api/vehicles       - List vehicles
-// POST   /api/vehicles       - Create vehicle
-// GET    /api/vehicles/:id   - Get vehicle
-// PUT    /api/vehicles/:id   - Update vehicle
-// DELETE /api/vehicles/:id   - Delete vehicle
+```
+GET    /api/v1/vehicles       - List vehicles
+POST   /api/v1/vehicles       - Create vehicle
+GET    /api/v1/vehicles/:id   - Get vehicle
+PUT    /api/v1/vehicles/:id   - Update vehicle
+DELETE /api/v1/vehicles/:id   - Delete vehicle
 ```
 
 ### 3. Middleware Stack
 
 Middleware is applied in layers:
 
-1. **Security**: CORS, CSRF, secure headers
-2. **Rate Limiting**: Prevent abuse
-3. **Authentication**: Session validation
-4. **Activity Tracking**: For auto-sync
-5. **Error Handling**: Consistent error responses
+1. **Body Limit**: Prevents DoS via large payloads
+2. **Security**: Secure headers, CORS, CSRF
+3. **Rate Limiting**: Prevent abuse
+4. **Authentication**: Session validation
+5. **Activity Tracking**: For auto-sync
+6. **Error Handling**: Consistent error responses
 
 ### 4. Validation
 
@@ -89,130 +129,59 @@ const createVehicleSchema = createInsertSchema(vehiclesTable, {
 
 ### Why SQLite?
 
-- **Simplicity**: Single file database, no server needed
-- **Performance**: Fast for read-heavy workloads
-- **Portability**: Easy to backup and restore
-- **WAL Mode**: Concurrent reads with single writer
+- Single file database, no server needed
+- Fast for read-heavy workloads
+- Easy to backup and restore
+- WAL mode for concurrent reads
 
 ### Why Hono?
 
-- **Lightweight**: Minimal overhead
-- **Fast**: Optimized for Bun runtime
-- **Type-safe**: Excellent TypeScript support
-- **Middleware**: Clean middleware composition
+- Lightweight with minimal overhead
+- Optimized for Bun runtime
+- Excellent TypeScript support
+- Clean middleware composition
 
-### Why Repository Pattern?
+### Why Direct Repository Exports (No DI)?
 
-- **Testability**: Easy to mock for unit tests
-- **Consistency**: Standardized CRUD operations
-- **Flexibility**: Custom queries when needed
+- Simpler code with fewer abstractions
+- Direct imports are easier to trace
+- Testing is still possible by exporting classes
+- Reduces boilerplate and complexity
 
 ## Data Flow
-
-### Request Flow
 
 ```
 Client Request
     ↓
-Security Middleware (CORS, CSRF, Headers)
+Body Limit → Security Headers → CORS → CSRF
     ↓
 Rate Limiting
     ↓
 Authentication (if required)
     ↓
-Route Handler
-    ↓
-Validation (Zod)
-    ↓
-Repository (Database)
+Route Handler → Validation (Zod) → Repository (Database)
     ↓
 Response
 ```
 
-### Error Flow
+## Sync Architecture
+
+The sync module supports two sync targets:
+
+- **Google Drive Backup**: Exports all user data as a ZIP file containing CSV files and uploads to Google Drive. Supports retention policies to auto-delete old backups.
+- **Google Sheets Sync**: Mirrors user data to a Google Sheets spreadsheet for easy viewing/editing.
+
+Auto-sync is triggered by user inactivity (configurable delay). The activity tracker monitors data changes and triggers sync when the user goes idle.
 
 ```
-Error Thrown
+User Activity → Change Tracker marks data changed
     ↓
-Error Handler Middleware
+Inactivity Timer expires
     ↓
-Error Classification
+Activity Tracker checks for changes since last sync
     ↓
-Logging (warn for 4xx, error for 5xx)
-    ↓
-Formatted Response
+Triggers backup and/or sheets sync
 ```
-
-## Module Responsibilities
-
-### Auth Module
-- Google OAuth flow
-- Session management
-- Token refresh
-- User authentication
-
-### Vehicles Module
-- Vehicle CRUD operations
-- Vehicle statistics
-- Fuel efficiency calculations
-- Ownership validation
-
-### Expenses Module
-- Expense tracking
-- Category management
-- Fuel expense validation
-- Date range queries
-
-### Financing Module
-- Loan/lease management
-- Payment tracking
-- Balance calculations
-- Payment schedules
-
-### Insurance Module
-- Policy management
-- Expiration tracking
-- Monthly cost breakdown
-- Active policy queries
-
-### Sync Module
-- Backup creation (ZIP format)
-- Data restoration
-- Google Drive integration
-- Google Sheets sync
-- Conflict detection
-
-### Settings Module
-- User preferences
-- Unit conversions
-- Sync configuration
-- Backup settings
-
-## Security Measures
-
-1. **Authentication**: OAuth 2.0 with Google
-2. **Session Management**: Secure, HTTP-only cookies
-3. **CSRF Protection**: Token-based validation
-4. **Rate Limiting**: Per-user and global limits
-5. **Input Validation**: Zod schema validation
-6. **SQL Injection**: Prevented by Drizzle ORM
-7. **Secure Headers**: CSP, X-Frame-Options, etc.
-
-## Performance Optimizations
-
-1. **Database**:
-   - WAL mode for concurrent reads
-   - Indexed foreign keys
-   - Efficient queries with joins
-
-2. **Caching**:
-   - In-memory rate limit store
-   - Idempotency cache
-   - Activity tracking cache
-
-3. **Connection Pooling**:
-   - Single SQLite connection
-   - Automatic WAL checkpoints
 
 ## Error Handling
 
@@ -226,92 +195,18 @@ AppError (base)
 ├── NotFoundError (404)
 ├── ConflictError (409)
 ├── DatabaseError (500)
-└── RateLimitError (429)
+├── RateLimitError (429)
+└── SyncError (variable status)
 ```
 
-### Error Response Format
+## Module Responsibilities
 
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid request data",
-    "details": { /* optional */ }
-  }
-}
-```
-
-## Testing Strategy
-
-### Unit Tests
-- Repository methods
-- Utility functions
-- Validation logic
-
-### Integration Tests
-- API endpoints
-- Authentication flow
-- Database operations
-
-### Test Database
-- Separate test database
-- Automatic cleanup
-- Isolated test environment
-
-## Deployment Considerations
-
-### Single Instance
-- In-memory stores work fine
-- Simple deployment
-- No distributed concerns
-
-### Multiple Instances
-- Use Redis for:
-  - Rate limiting
-  - OAuth state
-  - Activity tracking
-- Shared database
-- Load balancer
-
-### Environment Variables
-
-Required:
-- `DATABASE_URL`: SQLite database path
-- `GOOGLE_CLIENT_ID`: OAuth client ID
-- `GOOGLE_CLIENT_SECRET`: OAuth client secret
-- `SESSION_SECRET`: Session encryption key
-
-Optional:
-- `PORT`: Server port (default: 3001)
-- `FRONTEND_URL`: Frontend URL for CORS
-- `LOG_LEVEL`: Logging verbosity
-
-## Future Improvements
-
-1. **Service Layer**: Extract complex business logic
-2. **Event System**: Decouple modules with events
-3. **Caching Layer**: Redis for distributed caching
-4. **API Documentation**: OpenAPI/Swagger
-5. **Request Tracing**: Correlation IDs
-6. **Health Checks**: Dependency monitoring
-7. **Metrics**: Prometheus/Grafana
-8. **Background Jobs**: Queue system for async tasks
-
-## Contributing Guidelines
-
-1. **Code Style**: Follow existing patterns
-2. **Type Safety**: Use TypeScript strictly
-3. **Error Handling**: Use custom error classes
-4. **Validation**: Validate all inputs with Zod
-5. **Documentation**: Comment complex logic
-6. **Testing**: Add tests for new features
-7. **Security**: Follow security best practices
-
-## Resources
-
-- [Hono Documentation](https://hono.dev/)
-- [Drizzle ORM](https://orm.drizzle.team/)
-- [Lucia Auth](https://lucia-auth.com/)
-- [Zod Validation](https://zod.dev/)
-- [SQLite Documentation](https://www.sqlite.org/docs.html)
+| Module | Purpose |
+|--------|---------|
+| Auth | Google OAuth flow, session management |
+| Vehicles | Vehicle CRUD, statistics, ownership |
+| Expenses | Expense tracking, fuel calculations |
+| Financing | Loan/lease management, payments |
+| Insurance | Policy management, expiration alerts |
+| Sync | Backup/restore, Google Drive/Sheets |
+| Settings | User preferences, sync configuration |

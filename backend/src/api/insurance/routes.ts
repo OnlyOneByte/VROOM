@@ -159,7 +159,7 @@ routes.get('/vehicles/:id/policies', zValidator('param', commonSchemas.idParam),
     // Add expiration alerts
     const policiesWithAlerts = policies.map((policy) => {
       const daysUntilExpiration = Math.ceil(
-        (new Date(policy.endDate).getTime() - Date.now()) / CONFIG.time.msPerDay
+        (new Date(policy.endDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
       );
 
       return {

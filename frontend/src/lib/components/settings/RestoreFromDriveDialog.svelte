@@ -6,12 +6,11 @@
 	import { LoaderCircle } from 'lucide-svelte';
 
 	interface DriveBackup {
-		id: string;
-		name: string;
+		fileId: string;
+		fileName: string;
 		size: string;
 		createdTime: string;
 		modifiedTime: string;
-		webViewLink: string;
 	}
 
 	interface Props {
@@ -67,15 +66,15 @@
 						{#each driveBackups as backup}
 							<button
 								type="button"
-								onclick={() => onBackupSelect(backup.id)}
+								onclick={() => onBackupSelect(backup.fileId)}
 								class="w-full text-left p-3 rounded border transition-colors {selectedBackupId ===
-								backup.id
+								backup.fileId
 									? 'border-primary-500 bg-primary-50'
 									: 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}"
 							>
 								<div class="flex justify-between items-start">
 									<div class="flex-1">
-										<div class="font-medium text-sm">{backup.name}</div>
+										<div class="font-medium text-sm">{backup.fileName}</div>
 										<div class="text-xs text-gray-500 mt-1">
 											Created: {new Date(backup.createdTime).toLocaleDateString('en-US', {
 												year: 'numeric',
@@ -85,11 +84,13 @@
 												minute: '2-digit'
 											})}
 										</div>
-										<div class="text-xs text-gray-500">
-											Size: {(parseInt(backup.size) / 1024).toFixed(2)} KB
-										</div>
+										{#if backup.size}
+											<div class="text-xs text-gray-500">
+												Size: {(parseInt(backup.size) / 1024).toFixed(2)} KB
+											</div>
+										{/if}
 									</div>
-									{#if selectedBackupId === backup.id}
+									{#if selectedBackupId === backup.fileId}
 										<div class="text-primary-600 text-sm font-medium">Selected</div>
 									{/if}
 								</div>

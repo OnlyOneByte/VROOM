@@ -165,13 +165,14 @@
 		isRestoring = true;
 		try {
 			const result = await settingsStore.uploadBackup(selectedFile, 'preview');
+			const data = result?.data || result;
 
-			if (result.success && result.preview) {
-				restorePreview = result.preview;
+			if (data.success && data.preview) {
+				restorePreview = data.preview;
 			}
 
-			if (result.conflicts && result.conflicts.length > 0) {
-				restoreConflicts = result.conflicts;
+			if (data.conflicts && data.conflicts.length > 0) {
+				restoreConflicts = data.conflicts;
 			}
 		} catch {
 			appStore.showError('Failed to preview backup');
@@ -194,10 +195,11 @@
 		isRestoring = true;
 		try {
 			const result = await settingsStore.uploadBackup(selectedFile, restoreMode);
+			const data = result?.data || result;
 
-			if (result.success) {
-				if (result.imported) {
-					const total = Object.values(result.imported).reduce(
+			if (data.success) {
+				if (data.imported) {
+					const total = Object.values(data.imported).reduce(
 						(sum: number, count) => sum + (count as number),
 						0
 					);
@@ -235,13 +237,10 @@
 	async function loadDriveBackups() {
 		isLoadingBackups = true;
 		try {
-			// First, initialize/check Google Drive folder structure
-			await settingsStore.initializeDrive();
-
-			// Then list available backups
+			// List available backups (initializes Drive if needed)
 			const result = await settingsStore.listBackups();
 			if (result.success && result.data) {
-				driveBackups = result.data.backups || [];
+				driveBackups = Array.isArray(result.data) ? result.data : [];
 			}
 		} catch (error) {
 			const errorMessage =
@@ -261,13 +260,14 @@
 		isRestoring = true;
 		try {
 			const result = await settingsStore.restoreFromDriveBackup(fileId, 'preview');
+			const data = result?.data || result;
 
-			if (result.success && result.preview) {
-				restorePreview = result.preview;
+			if (data.success && data.preview) {
+				restorePreview = data.preview;
 			}
 
-			if (result.conflicts && result.conflicts.length > 0) {
-				restoreConflicts = result.conflicts;
+			if (data.conflicts && data.conflicts.length > 0) {
+				restoreConflicts = data.conflicts;
 			}
 		} catch {
 			appStore.showError('Failed to preview backup');
@@ -290,10 +290,11 @@
 		isRestoring = true;
 		try {
 			const result = await settingsStore.restoreFromDriveBackup(selectedDriveBackup, restoreMode);
+			const data = result?.data || result;
 
-			if (result.success) {
-				if (result.imported) {
-					const total = Object.values(result.imported).reduce(
+			if (data.success) {
+				if (data.imported) {
+					const total = Object.values(data.imported).reduce(
 						(sum: number, count) => sum + (count as number),
 						0
 					);
@@ -327,43 +328,44 @@
 			const result = await settingsStore.executeSync(syncTypes);
 			syncResults = result;
 
-			// Check for errors in results
-			const hasErrors = result.results?.errors && Object.keys(result.results.errors).length > 0;
+			const results = result?.data?.results;
+			if (!results) return;
 
-			if (hasErrors) {
-				// Check if any error is AUTH_INVALID
-				const hasAuthError = Object.values(result.results.errors).some(error =>
-					String(error).includes('re-authenticate')
-				);
+			// Check each sync type result
+			const successMessages: string[] = [];
+			let hasAuthError = false;
 
-				// Show individual error toasts for each sync type that failed
-				Object.entries(result.results.errors).forEach(([type, error]) => {
+			for (const [type, typeResult] of Object.entries(results) as [
+				string,
+				{ success: boolean; message?: string; skipped?: boolean }
+			][]) {
+				if (typeResult.success && !typeResult.skipped) {
 					const typeName = type === 'sheets' ? 'Google Sheets' : 'Google Drive backup';
-					appStore.showError(`${typeName}: ${String(error)}`);
-				});
-
-				// If auth error, show additional message
-				if (hasAuthError) {
-					appStore.showError(
-						'Google Drive access expired. Click "Re-authenticate with Google" below to continue syncing.'
-					);
+					successMessages.push(typeName);
+				} else if (!typeResult.success) {
+					const typeName = type === 'sheets' ? 'Google Sheets' : 'Google Drive backup';
+					appStore.showError(`${typeName}: ${typeResult.message || 'Failed'}`);
+					if (typeResult.message?.includes('re-authenticate')) {
+						hasAuthError = true;
+					}
 				}
 			}
 
-			// Show success messages for successful syncs
-			const messages: string[] = [];
-			if (result.results?.sheets && !result.results?.errors?.sheets) {
-				messages.push('Google Sheets');
-			}
-			if (result.results?.backup && !result.results?.errors?.backup) {
-				messages.push('Google Drive backup');
+			if (hasAuthError) {
+				appStore.showError(
+					'Google Drive access expired. Click "Re-authenticate with Google" below to continue syncing.'
+				);
 			}
 
-			if (messages.length > 0) {
-				appStore.showSuccess(`Successfully synced to ${messages.join(' and ')}`);
+			if (successMessages.length > 0) {
+				appStore.showSuccess(`Successfully synced to ${successMessages.join(' and ')}`);
 			}
+
+			// Refresh sync times and settings
+			await fetchLastSyncTime();
+			await settingsStore.load();
+			isInitialized = false;
 		} catch (error) {
-			// Handle network or other errors
 			const errorMessage = error instanceof Error ? error.message : 'Failed to execute sync';
 			appStore.showError(errorMessage);
 		} finally {

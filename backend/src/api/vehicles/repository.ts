@@ -87,45 +87,11 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
     }
   }
 
-  async findAccessibleVehicles(userId: string): Promise<VehicleWithFinancing[]> {
-    try {
-      // Get vehicles owned by user with financing
-      const ownedVehiclesResult = await this.db
-        .select({
-          vehicle: vehicles,
-          financing: vehicleFinancing,
-        })
-        .from(vehicles)
-        .leftJoin(vehicleFinancing, eq(vehicles.id, vehicleFinancing.vehicleId))
-        .where(eq(vehicles.userId, userId))
-        .orderBy(vehicles.createdAt);
-
-      const ownedVehicles = ownedVehiclesResult.map((row) => ({
-        ...row.vehicle,
-        financing: row.financing || undefined,
-      })) as VehicleWithFinancing[];
-
-      logger.debug('Found accessible vehicles', {
-        userId,
-        ownedCount: ownedVehicles.length,
-      });
-
-      return ownedVehicles;
-    } catch (error) {
-      logger.error('Failed to find accessible vehicles', {
-        userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new DatabaseError(`Failed to find accessible vehicles for user ${userId}`, error);
-    }
-  }
-
   async findByIdWithAccess(
     vehicleId: string,
     userId: string
   ): Promise<VehicleWithFinancing | null> {
     try {
-      // Check if user owns the vehicle
       const ownedVehicle = await this.db
         .select({
           vehicle: vehicles,
@@ -147,7 +113,7 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
       return null;
     } catch (error) {
       logger.error('Error finding vehicle with access for user', { vehicleId, userId, error });
-      throw new Error('Failed to find vehicle with access');
+      throw new DatabaseError('Failed to find vehicle with access', error);
     }
   }
 }

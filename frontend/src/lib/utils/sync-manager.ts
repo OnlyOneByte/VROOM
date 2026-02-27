@@ -209,7 +209,10 @@ class SyncManager {
 			}
 
 			// Validate fuel expense requirements
-			if ((expense.category === 'fuel' && !expense.volume && !expense.charge) || !expense.mileage) {
+			if (
+				expense.category === 'fuel' &&
+				((!expense.volume && !expense.charge) || !expense.mileage)
+			) {
 				return {
 					success: false,
 					error:
