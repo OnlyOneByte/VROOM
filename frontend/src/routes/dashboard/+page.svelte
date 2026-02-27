@@ -19,13 +19,16 @@
 	let dashboardData = $state<any>(null);
 	let vehicleDetails = $state<any[]>([]);
 	let recentExpenses = $state<any[]>([]);
+	let allExpenses = $state<any[]>([]);
 
 	let stats = $derived.by(() => {
-		// Use vehicleDetails for actual vehicle count since analytics endpoint is removed
 		const totalVehicles = vehicleDetails.length;
 		const totalExpenses = vehicleDetails.reduce((sum, v) => sum + (v.totalExpenses || 0), 0);
-		const monthlyAverage = vehicleDetails.reduce((sum, v) => sum + (v.recentExpenses || 0), 0) / 12;
 		const activeFinancing = vehicleDetails.filter(v => v.hasActiveFinancing).length;
+
+		// Calculate monthly average from actual monthly data
+		const monthCount = dashboardData?.monthlyTrends?.length || 0;
+		const monthlyAverage = monthCount > 0 ? totalExpenses / monthCount : 0;
 
 		return {
 			totalVehicles,
@@ -78,10 +81,15 @@
 
 	async function loadDashboardData() {
 		try {
-			const params = new URLSearchParams();
-			params.append('groupBy', 'month');
+			// Load vehicle details and expenses
+			await Promise.all([loadVehicleDetails(), loadAllExpenses()]);
+
+			// Compute analytics client-side from loaded expenses
+			const totalExpenses = vehicleDetails.reduce((sum, v) => sum + (v.totalExpenses || 0), 0);
+
+			// Filter expenses by selected period
+			let filteredExpenses = allExpenses;
 			if (selectedPeriod !== 'all') {
-				const endDate = new Date();
 				const startDate = new Date();
 				switch (selectedPeriod) {
 					case '7d':
@@ -97,19 +105,51 @@
 						startDate.setFullYear(startDate.getFullYear() - 1);
 						break;
 				}
-				params.append('startDate', startDate.toISOString());
-				params.append('endDate', endDate.toISOString());
+				filteredExpenses = allExpenses.filter(e => new Date(e.date) >= startDate);
 			}
-			// Load vehicle details and expenses
-			await Promise.all([loadVehicleDetails(), loadRecentExpenses()]);
 
-			// NOTE: Analytics endpoint removed - calculate basic stats from loaded data
-			const totalExpenses = vehicleDetails.reduce((sum, v) => sum + (v.totalExpenses || 0), 0);
+			// Compute monthly trends
+			const monthlyMap = new Map<string, number>();
+			for (const e of filteredExpenses) {
+				const d = new Date(e.date);
+				const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+				monthlyMap.set(key, (monthlyMap.get(key) || 0) + (e.expenseAmount ?? 0));
+			}
+			const monthlyTrends = Array.from(monthlyMap.entries())
+				.sort(([a], [b]) => a.localeCompare(b))
+				.map(([period, amount]) => ({ period: `${period}-01`, amount }));
+
+			// Compute category breakdown
+			const categoryMap = new Map<string, { amount: number; count: number }>();
+			let filteredTotal = 0;
+			for (const e of filteredExpenses) {
+				const amt = e.expenseAmount ?? 0;
+				filteredTotal += amt;
+				const existing = categoryMap.get(e.category) || { amount: 0, count: 0 };
+				categoryMap.set(e.category, {
+					amount: existing.amount + amt,
+					count: existing.count + 1
+				});
+			}
+			const categoryBreakdown: Record<
+				string,
+				{ amount: number; count: number; percentage: number }
+			> = {};
+			for (const [cat, data] of categoryMap.entries()) {
+				categoryBreakdown[cat] = {
+					...data,
+					percentage: filteredTotal > 0 ? (data.amount / filteredTotal) * 100 : 0
+				};
+			}
+
+			// Load recent expenses for the activity card
+			await loadRecentExpenses();
+
 			dashboardData = {
 				vehicles: vehicleDetails.map(v => ({ id: v.id, name: v.name, nickname: v.nickname })),
 				totalExpenses,
-				monthlyTrends: [],
-				categoryBreakdown: {},
+				monthlyTrends,
+				categoryBreakdown,
 				fuelEfficiency: {
 					averageMPG: 0,
 					totalVolume: 0,
@@ -120,6 +160,17 @@
 			};
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load dashboard data');
+		}
+	}
+
+	async function loadAllExpenses() {
+		try {
+			const response = await fetch('/api/v1/expenses', { credentials: 'include' });
+			if (!response.ok) return;
+			const result = await response.json();
+			allExpenses = result.data || [];
+		} catch (error) {
+			console.error('Failed to load all expenses:', error);
 		}
 	}
 
@@ -151,8 +202,11 @@
 					thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 					const recentExpenses = expenses
 						.filter((e: any) => new Date(e.date) > thirtyDaysAgo)
-						.reduce((sum: number, e: any) => sum + e.amount, 0);
-					const totalExpenses = expenses.reduce((sum: number, e: any) => sum + e.amount, 0);
+						.reduce((sum: number, e: any) => sum + (e.expenseAmount ?? e.amount ?? 0), 0);
+					const totalExpenses = expenses.reduce(
+						(sum: number, e: any) => sum + (e.expenseAmount ?? e.amount ?? 0),
+						0
+					);
 					const lastActivity =
 						expenses.length > 0
 							? new Date(Math.max(...expenses.map((e: any) => new Date(e.date).getTime())))
@@ -200,7 +254,7 @@
 			recentExpenses = expenses
 				.map((e: any) => ({
 					id: e.id,
-					amount: e.amount,
+					amount: e.expenseAmount ?? e.amount ?? 0,
 					category: e.category,
 					date: new Date(e.date),
 					description: e.description,
