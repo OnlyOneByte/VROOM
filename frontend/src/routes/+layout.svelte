@@ -17,6 +17,8 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 
+	import { LoaderCircle } from 'lucide-svelte';
+
 	import { vehicleApi } from '$lib/services/vehicle-api';
 
 	let { children } = $props();
@@ -106,7 +108,7 @@
 	<div class="min-h-screen bg-background flex items-center justify-center">
 		<div class="text-center">
 			<div class="text-6xl mb-4">🚗</div>
-			<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+			<LoaderCircle class="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
 			<p class="text-muted-foreground">Loading VROOM...</p>
 		</div>
 	</div>

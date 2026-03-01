@@ -115,6 +115,11 @@ Routes live in `frontend/src/routes/` and follow SvelteKit file-based routing: `
 - Computed values must use `$derived` / `$derived.by`, not `$state` + manual sync functions. If you find yourself calling an "apply" or "update" function inside `$effect`, it should be `$derived` instead.
 - Memoization caches (`Map`-based) must have a max size to prevent memory leaks. Use LRU eviction or clear on navigation.
 - Stubbed/broken API functions must not be called from UI — show a "coming soon" state instead of catching thrown errors from unimplemented endpoints.
+- Use domain API services (`vehicleApi`, `expenseApi`, `settingsApi`) over raw `apiClient` calls when a service method exists. Only use `apiClient` directly for endpoints not yet covered by a domain service.
+- Never access browser-only APIs (`window`, `document`, `PerformanceObserver`) at module top-level. Guard with `browser` from `$app/environment` or use lazy initialization to avoid SSR crashes.
+- Don't duplicate utility functions across files. Check `$lib/utils/` before adding a new helper (e.g., there should be one `debounce`, not two).
+- Don't duplicate type definitions. Backend API types belong in `api-transformer.ts`; re-export from `$lib/types` if needed, don't copy them.
+- Category color/label maps must stay in sync with the actual category enum (`fuel`, `maintenance`, `financial`, `regulatory`, `enhancement`, `misc`). Don't use stale category names like `insurance`, `parking`, `tolls`.
 
 ## MCP Servers
 

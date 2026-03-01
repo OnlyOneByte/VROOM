@@ -26,14 +26,12 @@
 	let { expenses, isLoading = false }: Props = $props();
 
 	const categoryColors: Record<ExpenseCategory, string> = {
-		fuel: 'bg-blue-100 text-blue-800',
-		maintenance: 'bg-orange-100 text-orange-800',
-		insurance: 'bg-purple-100 text-purple-800',
-		registration: 'bg-green-100 text-green-800',
-		parking: 'bg-yellow-100 text-yellow-800',
-		tolls: 'bg-pink-100 text-pink-800',
-		cleaning: 'bg-cyan-100 text-cyan-800',
-		other: 'bg-gray-100 text-gray-800'
+		fuel: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+		maintenance: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
+		financial: 'bg-green-500/10 text-green-700 dark:text-green-400',
+		regulatory: 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
+		enhancement: 'bg-pink-500/10 text-pink-700 dark:text-pink-400',
+		misc: 'bg-muted text-muted-foreground'
 	};
 </script>
 

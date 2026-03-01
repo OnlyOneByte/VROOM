@@ -653,7 +653,7 @@
 			class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto !z-50"
 		>
 			<div
-				class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-white sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none"
+				class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none"
 			>
 				{#if isEditMode}
 					<Button
@@ -671,7 +671,7 @@
 					type="button"
 					onclick={handleBack}
 					disabled={isSubmitting || isDeleting}
-					class="sm:rounded-full rounded-full !bg-gray-600 hover:!bg-gray-700 !text-white shadow-lg hover:shadow-gray-500/50 transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 !px-5 !border-0 flex-shrink-0"
+					class="sm:rounded-full rounded-full !bg-muted-foreground hover:!bg-muted-foreground/80 !text-background shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 !px-5 !border-0 flex-shrink-0"
 				>
 					<X class="h-5 w-5 sm:mr-2" />
 					<span class="hidden sm:inline font-semibold">Cancel</span>
@@ -733,7 +733,7 @@
 					class="bg-red-600 hover:bg-red-700 text-white"
 				>
 					{#if isDeleting}
-						<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+						<LoaderCircle class="h-4 w-4 animate-spin mr-2" />
 						Deleting...
 					{:else}
 						Delete Expense

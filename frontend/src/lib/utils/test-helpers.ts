@@ -31,13 +31,11 @@ export const mockExpense = {
 	vehicleId: 'test-vehicle-id',
 	amount: 50.0,
 	description: 'Gas fill-up',
-	category: 'operating',
-	type: 'fuel',
+	category: 'fuel',
+	tags: ['fuel'],
 	date: new Date().toISOString(),
 	mileage: 1000,
-	gallons: 12.5,
-	location: 'Shell Station',
-	notes: 'Regular unleaded',
+	volume: 12.5,
 	createdAt: new Date().toISOString(),
 	updatedAt: new Date().toISOString()
 };

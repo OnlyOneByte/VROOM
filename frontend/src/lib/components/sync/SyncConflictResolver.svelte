@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { syncConflicts, syncManager, type SyncConflict } from '$lib/utils/sync-manager';
-	import { TriangleAlert, Check, X, Merge } from 'lucide-svelte';
+	import { TriangleAlert, Check, X, Merge, LoaderCircle } from 'lucide-svelte';
 	import {
 		Dialog,
 		DialogContent,
@@ -243,9 +243,7 @@
 			{#if resolving}
 				<div class="absolute inset-0 bg-background/75 flex items-center justify-center rounded-lg">
 					<div class="flex items-center gap-2">
-						<div
-							class="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"
-						></div>
+						<LoaderCircle class="w-5 h-5 animate-spin text-primary" />
 						<span class="text-muted-foreground">Resolving conflict...</span>
 					</div>
 				</div>

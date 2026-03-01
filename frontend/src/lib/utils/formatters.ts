@@ -62,14 +62,5 @@ export function formatCompactRelativeTime(date: Date | null): string {
 	return `${days}d ago`;
 }
 
-// Debounce utility
-export function debounce<T extends (...args: unknown[]) => unknown>(
-	func: T,
-	wait: number
-): (...args: Parameters<T>) => void {
-	let timeout: ReturnType<typeof setTimeout>;
-	return (...args: Parameters<T>) => {
-		clearTimeout(timeout);
-		timeout = setTimeout(() => func(...args), wait);
-	};
-}
+// Re-export debounce from canonical location
+export { debounce } from './memoize';

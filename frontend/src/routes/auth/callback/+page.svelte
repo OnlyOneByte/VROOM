@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { authStore } from '$lib/stores/auth.js';
+	import { LoaderCircle, Check, X } from 'lucide-svelte';
 
 	let status = $state('processing');
 	let error = $state('');
@@ -69,44 +70,29 @@
 		<div class="card text-center">
 			{#if status === 'processing'}
 				<div class="space-y-4">
-					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+					<LoaderCircle class="h-8 w-8 animate-spin text-primary mx-auto" />
 					<h3 class="text-lg font-medium text-foreground">Completing sign in...</h3>
 					<p class="text-muted-foreground">Please wait while we set up your account</p>
 				</div>
 			{:else if status === 'success'}
 				<div class="space-y-4">
-					<div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-						<svg
-							class="w-5 h-5 text-green-600"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M5 13l4 4L19 7"
-							></path>
-						</svg>
+					<div
+						class="w-8 h-8 bg-green-500/10 rounded-full flex items-center justify-center mx-auto"
+					>
+						<Check class="w-5 h-5 text-green-600" />
 					</div>
-					<h3 class="text-lg font-medium text-green-900">Sign in successful!</h3>
-					<p class="text-green-700">Redirecting to your dashboard...</p>
+					<h3 class="text-lg font-medium text-foreground">Sign in successful!</h3>
+					<p class="text-muted-foreground">Redirecting to your dashboard...</p>
 				</div>
 			{:else if status === 'error'}
 				<div class="space-y-4">
-					<div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mx-auto">
-						<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M6 18L18 6M6 6l12 12"
-							></path>
-						</svg>
+					<div
+						class="w-8 h-8 bg-destructive/10 rounded-full flex items-center justify-center mx-auto"
+					>
+						<X class="w-5 h-5 text-destructive" />
 					</div>
-					<h3 class="text-lg font-medium text-red-900">Sign in failed</h3>
-					<p class="text-red-700 text-sm">
+					<h3 class="text-lg font-medium text-foreground">Sign in failed</h3>
+					<p class="text-destructive text-sm">
 						{error}
 					</p>
 					<button type="button" class="btn btn-primary" onclick={retryAuth}> Try Again </button>

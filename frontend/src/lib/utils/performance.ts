@@ -273,7 +273,9 @@ class WebVitalsMonitor {
 	}
 }
 
-export const webVitalsMonitor = new WebVitalsMonitor();
+import { browser } from '$app/environment';
+
+export const webVitalsMonitor = browser ? new WebVitalsMonitor() : null;
 
 // Bundle size monitoring
 export function logBundleSize(): void {

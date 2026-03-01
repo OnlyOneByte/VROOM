@@ -337,36 +337,9 @@ export interface SettingsFormData {
 	syncInactivityMinutes?: number;
 }
 
-// --- Backend API types (used by api-transformer) ---
-
-export interface BackendExpenseRequest {
-	vehicleId: string;
-	tags: string[];
-	category: string;
-	expenseAmount: number;
-	date: string;
-	mileage?: number;
-	fuelAmount?: number;
-	fuelType?: string;
-	description?: string;
-	receiptUrl?: string;
-}
-
-export interface BackendExpenseResponse {
-	id: string;
-	vehicleId: string;
-	tags: string[];
-	category: string;
-	expenseAmount: number;
-	date: string;
-	mileage?: number;
-	fuelAmount?: number;
-	fuelType?: string;
-	description?: string;
-	receiptUrl?: string;
-	createdAt: string;
-	updatedAt: string;
-}
+// --- Backend API types (re-exported from api-transformer) ---
+// Canonical definitions live in $lib/services/api-transformer.ts
+export type { BackendExpenseRequest, BackendExpenseResponse } from './services/api-transformer.js';
 
 // --- Analytics types ---
 

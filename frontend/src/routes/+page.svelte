@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/auth.js';
 	import { onMount } from 'svelte';
+	import { LoaderCircle } from 'lucide-svelte';
 
 	// Use automatic store subscription
 	let authState = $derived($authStore);
@@ -39,7 +40,7 @@
 >
 	<div class="max-w-md w-full text-center">
 		<div class="text-7xl mb-6">🚗</div>
-		<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+		<LoaderCircle class="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
 		<p class="text-muted-foreground">Loading...</p>
 	</div>
 </div>

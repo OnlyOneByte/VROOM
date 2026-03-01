@@ -354,8 +354,8 @@
 
 			// Update/create vehicle
 			const savedVehicle = isEditMode
-				? await apiClient.put<Vehicle>(`/api/v1/vehicles/${vehicleId}`, vehicleData)
-				: await apiClient.post<Vehicle>('/api/v1/vehicles', vehicleData);
+				? await vehicleApi.updateVehicle(vehicleId!, vehicleData)
+				: await vehicleApi.createVehicle(vehicleData);
 
 			const finalVehicleId = isEditMode ? vehicleId! : savedVehicle.id;
 
@@ -442,7 +442,7 @@
 		isDeleting = true;
 
 		try {
-			await apiClient.delete(`/api/v1/vehicles/${vehicleId}`);
+			await vehicleApi.deleteVehicle(vehicleId!);
 
 			appStore.removeVehicle(vehicleId!);
 			appStore.addNotification({
@@ -757,7 +757,7 @@
 					class="bg-destructive hover:bg-destructive/90"
 				>
 					{#if isDeleting}
-						<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+						<LoaderCircle class="h-4 w-4 animate-spin mr-2" />
 						Deleting...
 					{:else}
 						<Trash2 class="h-4 w-4 mr-2" />

@@ -33,13 +33,13 @@
 			<!-- Compact version for mobile/small spaces -->
 			<button
 				type="button"
-				class="hover:opacity-80 transition-opacity duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-full"
+				class="hover:opacity-80 transition-opacity duration-200 focus:outline-none focus:ring-2 focus:ring-ring rounded-full"
 			>
 				<Avatar class="size-8">
 					{#if user?.photoURL}
 						<AvatarImage src={user.photoURL} alt={user?.displayName || 'User'} />
 					{/if}
-					<AvatarFallback class="bg-primary-100 text-primary-600 text-xs font-medium">
+					<AvatarFallback class="bg-primary/10 text-primary text-xs font-medium">
 						{initials}
 					</AvatarFallback>
 				</Avatar>
@@ -48,21 +48,21 @@
 			<!-- Full version with name and email -->
 			<button
 				type="button"
-				class="flex items-center w-full px-3 py-2 text-left hover:bg-gray-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+				class="flex items-center w-full px-3 py-2 text-left hover:bg-muted rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring"
 			>
 				<Avatar class="size-8 mr-3 flex-shrink-0">
 					{#if user?.photoURL}
 						<AvatarImage src={user.photoURL} alt={user?.displayName || 'User'} />
 					{/if}
-					<AvatarFallback class="bg-primary-100 text-primary-600 text-xs font-medium">
+					<AvatarFallback class="bg-primary/10 text-primary text-xs font-medium">
 						{initials}
 					</AvatarFallback>
 				</Avatar>
 				<div class="flex-1 min-w-0">
-					<p class="text-sm font-medium text-gray-900 truncate">
+					<p class="text-sm font-medium text-foreground truncate">
 						{user?.displayName || 'User'}
 					</p>
-					<p class="text-xs text-gray-500 truncate">
+					<p class="text-xs text-muted-foreground truncate">
 						{user?.email || ''}
 					</p>
 				</div>
@@ -75,10 +75,10 @@
 			<!-- Show user info in dropdown for compact version -->
 			<DropdownMenuLabel>
 				<div class="flex flex-col">
-					<span class="text-sm font-medium text-gray-900 truncate">
+					<span class="text-sm font-medium text-foreground truncate">
 						{user?.displayName || 'User'}
 					</span>
-					<span class="text-xs text-gray-500 truncate">
+					<span class="text-xs text-muted-foreground truncate">
 						{user?.email || ''}
 					</span>
 				</div>

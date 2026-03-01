@@ -239,7 +239,7 @@
 			filters = { ...filters, tags: selectedTags.length > 0 ? selectedTags : undefined };
 		}
 		tagSearchTerm = '';
-		// Keep focus on the input so user can continue adding tags
+		tagSearchFocused = true;
 		tagInputEl?.focus();
 	}
 
@@ -249,10 +249,18 @@
 	}
 
 	function handleTagKeydown(e: KeyboardEvent): void {
-		if (e.key === 'Enter' && tagSuggestions.length > 0) {
+		if (e.key === 'Enter') {
 			e.preventDefault();
-			const firstSuggestion = tagSuggestions[0];
-			if (firstSuggestion) addTag(firstSuggestion);
+			// Try exact match first, then first suggestion
+			const exactMatch = allTags.find(
+				t => !selectedTags.includes(t) && t.toLowerCase() === tagSearchTerm.trim().toLowerCase()
+			);
+			if (exactMatch) {
+				addTag(exactMatch);
+			} else if (tagSuggestions.length > 0) {
+				const firstSuggestion = tagSuggestions[0];
+				if (firstSuggestion) addTag(firstSuggestion);
+			}
 		} else if (e.key === 'Backspace' && !tagSearchTerm && selectedTags.length > 0) {
 			const lastTag = selectedTags[selectedTags.length - 1];
 			if (lastTag) removeTag(lastTag);
@@ -425,7 +433,7 @@
 									bind:this={tagInputEl}
 									bind:value={tagSearchTerm}
 									onfocus={() => (tagSearchFocused = true)}
-									onblur={() => setTimeout(() => (tagSearchFocused = false), 200)}
+									onblur={() => setTimeout(() => (tagSearchFocused = false), 300)}
 									onkeydown={handleTagKeydown}
 									placeholder={selectedTags.length > 0
 										? 'Add more tags...'

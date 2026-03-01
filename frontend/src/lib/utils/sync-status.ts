@@ -23,7 +23,7 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 	const { isOnline, syncStatus, pendingCount, conflictsCount } = params;
 
 	if (!isOnline) {
-		return { color: 'text-red-500', icon: WifiOff, text: 'Offline' };
+		return { color: 'text-destructive', icon: WifiOff, text: 'Offline' };
 	}
 
 	if (conflictsCount > 0) {
@@ -39,7 +39,7 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 	}
 
 	if (syncStatus === 'error') {
-		return { color: 'text-red-500', icon: CircleAlert, text: 'Sync failed' };
+		return { color: 'text-destructive', icon: CircleAlert, text: 'Sync failed' };
 	}
 
 	if (syncStatus === 'success') {

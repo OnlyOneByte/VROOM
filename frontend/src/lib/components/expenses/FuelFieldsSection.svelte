@@ -64,8 +64,8 @@
 	];
 </script>
 
-<div class="p-4 bg-blue-50 rounded-lg space-y-4">
-	<div class="flex items-center gap-2 text-blue-700">
+<div class="p-4 bg-primary/10 rounded-lg space-y-4">
+	<div class="flex items-center gap-2 text-primary">
 		{#if vehicleType === 'electric'}
 			<Zap class="h-5 w-5" />
 			<h3 class="font-medium">Charging Details</h3>
@@ -181,8 +181,8 @@
 
 	{#if showMpgCalculation}
 		{#if calculatedMpg && showVolumeField}
-			<div class="bg-green-50 border border-green-200 rounded-lg p-3">
-				<div class="flex items-center gap-2 text-green-700">
+			<div class="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+				<div class="flex items-center gap-2 text-green-700 dark:text-green-400">
 					<Gauge class="h-4 w-4" />
 					<span class="text-sm font-medium">
 						Calculated: {calculatedMpg}
@@ -190,16 +190,18 @@
 					</span>
 				</div>
 				{#if calculatedMpg < 15}
-					<p class="text-xs text-orange-600 mt-1">
+					<p class="text-xs text-orange-600 dark:text-orange-400 mt-1">
 						⚠️ Low fuel efficiency - consider maintenance check
 					</p>
 				{:else if calculatedMpg > 50}
-					<p class="text-xs text-green-600 mt-1">✅ Excellent fuel efficiency!</p>
+					<p class="text-xs text-green-600 dark:text-green-400 mt-1">
+						✅ Excellent fuel efficiency!
+					</p>
 				{/if}
 			</div>
 		{:else if calculatedEfficiency && showChargeField}
-			<div class="bg-green-50 border border-green-200 rounded-lg p-3">
-				<div class="flex items-center gap-2 text-green-700">
+			<div class="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+				<div class="flex items-center gap-2 text-green-700 dark:text-green-400">
 					<Zap class="h-4 w-4" />
 					<span class="text-sm font-medium">
 						Calculated: {calculatedEfficiency}
@@ -207,9 +209,11 @@
 					</span>
 				</div>
 				{#if calculatedEfficiency < 2}
-					<p class="text-xs text-orange-600 mt-1">⚠️ Low efficiency - check driving conditions</p>
+					<p class="text-xs text-orange-600 dark:text-orange-400 mt-1">
+						⚠️ Low efficiency - check driving conditions
+					</p>
 				{:else if calculatedEfficiency > 4}
-					<p class="text-xs text-green-600 mt-1">✅ Excellent efficiency!</p>
+					<p class="text-xs text-green-600 dark:text-green-400 mt-1">✅ Excellent efficiency!</p>
 				{/if}
 			</div>
 		{/if}

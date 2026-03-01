@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { initializePWA, promptInstall, pwaInstallState } from '$lib/utils/pwa';
 	import { Download, X } from 'lucide-svelte';
+	import { LoaderCircle } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 
@@ -66,9 +67,7 @@
 				<div class="flex gap-2">
 					<Button onclick={handleInstall} disabled={installing} class="flex-1">
 						{#if installing}
-							<div
-								class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"
-							></div>
+							<LoaderCircle class="w-4 h-4 animate-spin mr-2" />
 							Installing...
 						{:else}
 							<Download size={16} class="mr-2" />

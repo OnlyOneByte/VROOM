@@ -15,6 +15,14 @@ export const vehicleApi = {
 		return apiClient.get<Vehicle[]>('/api/v1/vehicles');
 	},
 
+	async createVehicle(data: Partial<Vehicle>): Promise<Vehicle> {
+		return apiClient.post<Vehicle>('/api/v1/vehicles', data);
+	},
+
+	async updateVehicle(vehicleId: string, data: Partial<Vehicle>): Promise<Vehicle> {
+		return apiClient.put<Vehicle>(`/api/v1/vehicles/${vehicleId}`, data);
+	},
+
 	async getVehicleStats(vehicleId: string, period: TimePeriod): Promise<VehicleStats> {
 		return apiClient.get<VehicleStats>(`/api/v1/vehicles/${vehicleId}/stats?period=${period}`);
 	},

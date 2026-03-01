@@ -72,19 +72,11 @@
 						<Icon
 							class="h-5 w-5 {value === category.value ? 'text-primary' : 'text-muted-foreground'}"
 						/>
-						<span
-							class="font-medium text-sm {value === category.value
-								? 'text-foreground'
-								: 'text-foreground'}"
-						>
+						<span class="font-medium text-sm text-foreground">
 							{category.label}
 						</span>
 					</div>
-					<p
-						class="text-xs {value === category.value
-							? 'text-muted-foreground'
-							: 'text-muted-foreground'}"
-					>
+					<p class="text-xs text-muted-foreground">
 						{category.description}
 					</p>
 				</div>
