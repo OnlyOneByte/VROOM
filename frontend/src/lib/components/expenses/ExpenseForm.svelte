@@ -8,21 +8,8 @@
 	import { settingsStore } from '$lib/stores/settings';
 	import { expenseApi } from '$lib/services/expense-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
-	import {
-		Save,
-		ArrowLeft,
-		Fuel,
-		Gauge,
-		Check,
-		X,
-		Trash2,
-		Wrench,
-		CreditCard,
-		FileText,
-		Sparkles,
-		Coffee,
-		Zap
-	} from 'lucide-svelte';
+	import { apiClient } from '$lib/services/api-client';
+	import { Save, ArrowLeft, Gauge, Check, X, Trash2 } from 'lucide-svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
@@ -31,15 +18,12 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { FormFieldError } from '$lib/components/ui/form-field';
+	import CategorySelector from './CategorySelector.svelte';
+	import FuelFieldsSection from './FuelFieldsSection.svelte';
+	import TagInput from './TagInput.svelte';
+	import { validateExpenseField } from './expense-form-validation';
 	import type { ExpenseFormErrors, Vehicle, Expense } from '$lib/types.js';
-	import {
-		getVolumeUnitLabel,
-		getChargeUnitLabel,
-		usesLiquidFuel,
-		usesElectricCharge,
-		getFuelEfficiencyLabel,
-		getElectricEfficiencyLabel
-	} from '$lib/utils/units';
+	import { usesLiquidFuel, usesElectricCharge } from '$lib/utils/units';
 
 	interface Props {
 		expenseId?: string;
@@ -66,23 +50,6 @@
 		description: ''
 	});
 
-	let showCustomFuelType = $state(false);
-
-	// Fuel type options
-	const FUEL_TYPE_OPTIONS = [
-		{ value: '87 (Regular)', label: '87 (Regular)' },
-		{ value: '89 (Mid-Grade)', label: '89 (Mid-Grade)' },
-		{ value: '91 (Premium)', label: '91 (Premium)' },
-		{ value: '93 (Super Premium)', label: '93 (Super Premium)' },
-		{ value: 'Diesel', label: 'Diesel' },
-		{ value: 'Ethanol-Free', label: 'Ethanol-Free' },
-		{ value: 'other', label: 'Other (Custom)' }
-	];
-
-	// Tag input state
-	let tagInput = $state('');
-	let showTagSuggestions = $state(false);
-
 	// Form state
 	let isLoading = $state(!!expenseId);
 	let isSubmitting = $state(false);
@@ -107,46 +74,6 @@
 	let currencyUnit = $derived(settings?.currencyUnit || 'USD');
 
 	// Tag suggestions will be populated from user's previous tags in the future
-	// const commonTags: string[] = [];
-
-	const categories = [
-		{
-			value: 'fuel',
-			label: 'Fuel',
-			description: 'Gas and fuel costs',
-			icon: Fuel
-		},
-		{
-			value: 'maintenance',
-			label: 'Maintenance',
-			description: 'Keeping the car running',
-			icon: Wrench
-		},
-		{
-			value: 'financial',
-			label: 'Financial',
-			description: 'Insurance, loan payment, lease payment, etc',
-			icon: CreditCard
-		},
-		{
-			value: 'regulatory',
-			label: 'Regulatory',
-			description: 'Registration, tickets, inspections, etc',
-			icon: FileText
-		},
-		{
-			value: 'enhancement',
-			label: 'Enhancement',
-			description: 'Optional improvements',
-			icon: Sparkles
-		},
-		{
-			value: 'misc',
-			label: 'Misc Operating Costs',
-			description: 'Tolls, parking, etc.',
-			icon: Coffee
-		}
-	];
 
 	onMount(async () => {
 		await settingsStore.load();
@@ -178,58 +105,37 @@
 
 	async function loadExpense() {
 		try {
-			const response = await fetch(`/api/v1/expenses/${expenseId}`, {
-				credentials: 'include'
-			});
-
-			if (response.ok) {
-				const result = await response.json();
-				originalExpense = result.data;
-
-				if (originalExpense) {
-					formData.vehicleId = originalExpense.vehicleId;
-					formData.tags = originalExpense.tags || [];
-					formData.category = originalExpense.category;
-					formData.amount = originalExpense.amount.toString();
-					// Convert timestamp to local date string (YYYY-MM-DD)
-					const expenseDate = new Date(originalExpense.date);
-					const year = expenseDate.getFullYear();
-					const month = String(expenseDate.getMonth() + 1).padStart(2, '0');
-					const day = String(expenseDate.getDate()).padStart(2, '0');
-					formData.date = `${year}-${month}-${day}`;
-					formData.mileage = originalExpense.mileage?.toString() ?? '';
-					formData.volume = originalExpense.volume?.toString() ?? '';
-					formData.charge = originalExpense.charge?.toString() ?? '';
-					formData.fuelType = originalExpense.fuelType || '';
-					formData.description = originalExpense.description || '';
-
-					// Check if fuel type is a custom value (not in preset options)
-					if (
-						originalExpense?.fuelType &&
-						!FUEL_TYPE_OPTIONS.some(opt => opt.value === originalExpense?.fuelType)
-					) {
-						showCustomFuelType = true;
-					}
-
-					// Set the category label for fuel field detection
-					const selectedCategory = categories.find(c => c.value === originalExpense?.category);
-					if (selectedCategory) {
-						selectedCategoryLabel = selectedCategory.label;
-					}
-				}
-			} else {
-				appStore.addNotification({
-					type: 'error',
-					message: 'Expense not found'
-				});
+			const raw = await apiClient.get<any>(`/api/v1/expenses/${expenseId}`);
+			if (!raw) {
+				appStore.addNotification({ type: 'error', message: 'Expense not found' });
 				goto(returnTo);
+				return;
 			}
+
+			// Transform backend field names to frontend
+			const expense: Expense = {
+				...raw,
+				amount: raw.expenseAmount ?? raw.amount ?? 0,
+				volume: raw.fuelAmount ?? raw.volume,
+				charge: raw.fuelAmount ?? raw.charge
+			};
+			originalExpense = expense;
+
+			formData.vehicleId = expense.vehicleId;
+			formData.tags = expense.tags || [];
+			formData.category = expense.category;
+			formData.amount = expense.amount.toString();
+			const expenseDate = new Date(expense.date);
+			formData.date = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, '0')}-${String(expenseDate.getDate()).padStart(2, '0')}`;
+			formData.mileage = expense.mileage?.toString() ?? '';
+			formData.volume = expense.volume?.toString() ?? '';
+			formData.charge = expense.charge?.toString() ?? '';
+			formData.fuelType = expense.fuelType || '';
+			formData.description = expense.description || '';
+			selectedCategoryLabel = expense.category === 'fuel' ? 'Fuel' : expense.category || '';
 		} catch (error) {
 			console.error('Error loading expense:', error);
-			appStore.addNotification({
-				type: 'error',
-				message: 'Error loading expense'
-			});
+			appStore.addNotification({ type: 'error', message: 'Error loading expense' });
 			goto(returnTo);
 		} finally {
 			isLoading = false;
@@ -238,14 +144,7 @@
 
 	async function loadVehicle() {
 		try {
-			const response = await fetch(`/api/v1/vehicles/${formData.vehicleId}`, {
-				credentials: 'include'
-			});
-
-			if (response.ok) {
-				const result = await response.json();
-				vehicle = result.data;
-			}
+			vehicle = await vehicleApi.getVehicle(formData.vehicleId);
 		} catch (error) {
 			console.error('Error loading vehicle:', error);
 		}
@@ -253,19 +152,11 @@
 
 	async function loadLastFuelExpense() {
 		try {
-			const response = await fetch(
-				`/api/v1/expenses?vehicleId=${formData.vehicleId}&category=fuel&limit=2`,
-				{
-					credentials: 'include'
-				}
-			);
-
-			if (response.ok) {
-				const result = await response.json();
-				if (result.data && result.data.length > 0) {
-					lastFuelExpense = result.data.find((expense: any) => expense.id !== expenseId) || null;
-				}
-			}
+			const expenses = await expenseApi.getExpensesByVehicle(formData.vehicleId);
+			const fuelExpenses = expenses
+				.filter(e => e.category === 'fuel' && e.id !== expenseId)
+				.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+			lastFuelExpense = fuelExpenses[0] || null;
 		} catch (error) {
 			console.error('Error loading last fuel expense:', error);
 		}
@@ -273,14 +164,7 @@
 
 	async function loadAllVehicleExpenses() {
 		try {
-			const response = await fetch(`/api/v1/expenses?vehicleId=${formData.vehicleId}`, {
-				credentials: 'include'
-			});
-
-			if (response.ok) {
-				const result = await response.json();
-				allVehicleExpenses = result.data || [];
-			}
+			allVehicleExpenses = await expenseApi.getExpensesByVehicle(formData.vehicleId);
 		} catch (error) {
 			console.error('Error loading vehicle expenses:', error);
 		}
@@ -289,9 +173,7 @@
 	function selectCategory(categoryValue: string, categoryLabel: string) {
 		formData.category = categoryValue;
 		touched['category'] = true;
-		validateField('category');
-
-		// Store the selected category label for fuel field detection
+		handleBlur('category');
 		selectedCategoryLabel = categoryLabel;
 	}
 
@@ -314,36 +196,6 @@
 	let showChargeField = $derived(
 		showFuelFields && vehicle && usesElectricCharge(vehicle.vehicleType)
 	);
-
-	// Filtered tag suggestions (will be populated from user's previous tags in the future)
-	let filteredSuggestions = $derived<string[]>([]);
-
-	function addTag(tag: string): void {
-		if (tag && !formData.tags.includes(tag) && formData.tags.length < 10) {
-			formData.tags = [...formData.tags, tag.toLowerCase().trim()];
-			tagInput = '';
-			showTagSuggestions = false;
-			touched['tags'] = true;
-		}
-	}
-
-	function removeTag(tag: string): void {
-		formData.tags = formData.tags.filter((t: string) => t !== tag);
-	}
-
-	function handleTagInputKeydown(e: KeyboardEvent): void {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			if (tagInput.trim()) {
-				addTag(tagInput.trim());
-			}
-		} else if (e.key === 'Backspace' && !tagInput && formData.tags.length > 0) {
-			const lastTag = formData.tags[formData.tags.length - 1];
-			if (lastTag) {
-				removeTag(lastTag);
-			}
-		}
-	}
 
 	function handleMileageChange() {
 		if (selectedCategoryLabel === 'Fuel' && formData.mileage && lastFuelExpense?.mileage) {
@@ -375,146 +227,50 @@
 
 	function handleBlur(field: string) {
 		touched[field] = true;
-		validateField(field);
+		const error = validateExpenseField(field, {
+			selectedCategoryLabel,
+			vehicle,
+			volumeUnit,
+			chargeUnit,
+			allVehicleExpenses,
+			expenseId,
+			formData: formData as unknown as Record<string, string | string[]>
+		});
+		if (error) {
+			errors[field] = error;
+		} else {
+			delete errors[field];
+			errors = { ...errors };
+		}
 
-		// If date changes, revalidate mileage since it's date-dependent
 		if (field === 'date' && formData.mileage) {
-			validateField('mileage');
+			handleBlur('mileage');
 		}
-	}
-
-	function validateField(field: string): string | null {
-		if (field === 'tags') {
-			// Tags are now optional
-			return null;
-		}
-
-		const value = formData[field as keyof typeof formData];
-
-		switch (field) {
-			case 'vehicleId':
-				if (!value) return 'Please select a vehicle';
-				break;
-
-			case 'category':
-				if (!value) return 'Please select a category';
-				break;
-
-			case 'amount': {
-				const amount = parseFloat(value as string);
-				if (!value || amount <= 0) return 'Amount must be greater than 0';
-				if (amount > 999999) return 'Amount seems too large';
-				break;
-			}
-			case 'date': {
-				if (!value) return 'Date is required';
-				const selectedDate = new Date(value as string);
-				const today = new Date();
-				if (selectedDate > today) return 'Date cannot be in the future';
-				break;
-			}
-			case 'volume': {
-				if (selectedCategoryLabel === 'Fuel' && vehicle && usesLiquidFuel(vehicle.vehicleType)) {
-					const volume = parseFloat(value as string);
-					const unitLabel = getVolumeUnitLabel(volumeUnit);
-					if (!value || volume <= 0) return `${unitLabel} required for fuel expenses`;
-					if (volume > 1000) return `${unitLabel} seems too large`;
-				}
-				break;
-			}
-			case 'charge': {
-				if (
-					selectedCategoryLabel === 'Fuel' &&
-					vehicle &&
-					usesElectricCharge(vehicle.vehicleType)
-				) {
-					const charge = parseFloat(value as string);
-					const unitLabel = getChargeUnitLabel(chargeUnit);
-					if (!value || charge <= 0) return `${unitLabel} required for charging expenses`;
-					if (charge > 1000) return `${unitLabel} seems too large`;
-				}
-				break;
-			}
-			case 'mileage': {
-				if (selectedCategoryLabel === 'Fuel') {
-					const mileage = parseInt(value as string);
-					if (!value || mileage <= 0) return 'Mileage required for fuel expenses';
-
-					// Check against vehicle's initial mileage
-					if (vehicle?.initialMileage && mileage < vehicle.initialMileage) {
-						return 'Mileage cannot be less than initial mileage';
-					}
-
-					// Date-based validation - use the date string directly (YYYY-MM-DD format)
-					const currentDateStr: string =
-						formData.date || new Date().toISOString().split('T')[0] || '';
-
-					// Filter out the current expense if editing
-					const otherExpenses = allVehicleExpenses.filter(
-						exp => exp.id !== expenseId && exp.mileage != null
-					);
-
-					// Check entries before this date (excluding same day)
-					const entriesBefore = otherExpenses.filter(exp => {
-						const expDate = new Date(exp.date);
-						const expDateStr = `${expDate.getFullYear()}-${String(expDate.getMonth() + 1).padStart(2, '0')}-${String(expDate.getDate()).padStart(2, '0')}`;
-						return expDateStr < currentDateStr;
-					});
-
-					if (entriesBefore.length > 0) {
-						const maxMileageBefore = Math.max(...entriesBefore.map(exp => exp.mileage));
-						if (mileage <= maxMileageBefore) {
-							return `Mileage must be greater than ${maxMileageBefore.toLocaleString()} (from earlier entry)`;
-						}
-					}
-
-					// Check entries after this date (excluding same day)
-					const entriesAfter = otherExpenses.filter(exp => {
-						const expDate = new Date(exp.date);
-						const expDateStr = `${expDate.getFullYear()}-${String(expDate.getMonth() + 1).padStart(2, '0')}-${String(expDate.getDate()).padStart(2, '0')}`;
-						return expDateStr > currentDateStr;
-					});
-
-					if (entriesAfter.length > 0) {
-						const minMileageAfter = Math.min(...entriesAfter.map(exp => exp.mileage));
-						if (mileage >= minMileageAfter) {
-							return `Mileage must be less than ${minMileageAfter.toLocaleString()} (from later entry)`;
-						}
-					}
-				}
-				break;
-			}
-			case 'fuelType': {
-				// Fuel type is optional, but if provided, validate length
-				if (value && (value as string).length > 50) {
-					return 'Fuel type must be 50 characters or less';
-				}
-				break;
-			}
-		}
-		return null;
 	}
 
 	function validateForm(): boolean {
 		errors = {};
-
 		const fields = ['vehicleId', 'category', 'amount', 'date'];
 		if (showFuelFields) {
 			fields.push('mileage');
-			if (showVolumeField) {
-				fields.push('volume');
-			}
-			if (showChargeField) {
-				fields.push('charge');
-			}
+			if (showVolumeField) fields.push('volume');
+			if (showChargeField) fields.push('charge');
 		}
 
-		fields.forEach(field => {
-			const error = validateField(field);
-			if (error) {
-				errors[field] = error;
-			}
-		});
+		const ctx = {
+			selectedCategoryLabel,
+			vehicle,
+			volumeUnit,
+			chargeUnit,
+			allVehicleExpenses,
+			expenseId,
+			formData: formData as unknown as Record<string, string | string[]>
+		};
+
+		for (const field of fields) {
+			const error = validateExpenseField(field, ctx);
+			if (error) errors[field] = error;
+		}
 
 		return Object.keys(errors).length === 0;
 	}
@@ -776,60 +532,12 @@
 			</div>
 
 			<!-- Category Selection (Required) -->
-			<div class="space-y-3">
-				<Label for="category">Category *</Label>
-				<div
-					class="grid grid-cols-2 sm:grid-cols-3 gap-3"
-					role="group"
-					aria-labelledby="category"
-					aria-describedby={touched['category'] && errors['category']
-						? 'category-error'
-						: undefined}
-				>
-					{#each categories as category (category.value)}
-						{@const Icon = category.icon}
-						<button
-							type="button"
-							onclick={() => selectCategory(category.value, category.label)}
-							class="p-4 rounded-lg border-2 transition-all text-left {formData.category ===
-							category.value
-								? 'border-primary-500 bg-primary-50 shadow-md'
-								: 'border-gray-200 hover:border-gray-300 bg-white'} {touched['category'] &&
-							errors['category']
-								? 'border-red-300'
-								: ''}"
-							aria-pressed={formData.category === category.value}
-						>
-							<div class="flex flex-col gap-2">
-								<div class="flex items-center gap-2">
-									<Icon
-										class="h-5 w-5 {formData.category === category.value
-											? 'text-primary-600'
-											: 'text-gray-500'}"
-									/>
-									<span
-										class="font-medium text-sm {formData.category === category.value
-											? 'text-primary-900'
-											: 'text-gray-900'}"
-									>
-										{category.label}
-									</span>
-								</div>
-								<p
-									class="text-xs {formData.category === category.value
-										? 'text-primary-700'
-										: 'text-gray-600'}"
-								>
-									{category.description}
-								</p>
-							</div>
-						</button>
-					{/each}
-				</div>
-				{#if touched['category'] && errors['category']}
-					<FormFieldError id="category-error">{errors['category']}</FormFieldError>
-				{/if}
-			</div>
+			<CategorySelector
+				value={formData.category}
+				error={errors['category']}
+				touched={touched['category']}
+				onSelect={value => selectCategory(value, value)}
+			/>
 
 			<!-- Amount -->
 			<div class="space-y-2">
@@ -904,186 +612,24 @@
 			</div>
 
 			<!-- Fuel-specific fields -->
-			{#if showFuelFields}
-				<div class="p-4 bg-blue-50 rounded-lg space-y-4">
-					<div class="flex items-center gap-2 text-blue-700">
-						{#if vehicle?.vehicleType === 'electric'}
-							<Zap class="h-5 w-5" />
-							<h3 class="font-medium">Charging Details</h3>
-						{:else}
-							<Fuel class="h-5 w-5" />
-							<h3 class="font-medium">Fuel Details</h3>
-						{/if}
-					</div>
-
-					<!-- Volume field for gas/hybrid vehicles -->
-					{#if showVolumeField}
-						<div class="space-y-2">
-							<Label for="volume">{getVolumeUnitLabel(volumeUnit)} *</Label>
-							<Input
-								id="volume"
-								type="number"
-								step="0.001"
-								min="0"
-								bind:value={formData.volume}
-								placeholder="0.000"
-								oninput={handleMileageChange}
-								onblur={() => handleBlur('volume')}
-								aria-invalid={!!(touched['volume'] && errors['volume'])}
-								aria-describedby={touched['volume'] && errors['volume']
-									? 'volume-error'
-									: undefined}
-							/>
-							{#if touched['volume'] && errors['volume']}
-								<FormFieldError id="volume-error">{errors['volume']}</FormFieldError>
-							{/if}
-						</div>
-
-						{#if formData.volume && formData.amount}
-							<div class="text-sm text-gray-600">
-								<strong>Price per {getVolumeUnitLabel(volumeUnit, true)}:</strong> ${(
-									parseFloat(formData.amount) / parseFloat(formData.volume)
-								).toFixed(3)}
-							</div>
-						{/if}
-
-						<!-- Fuel Type field -->
-						<div class="space-y-2">
-							<Label for="fuelType">Fuel Type / Octane</Label>
-							<Select.Root
-								type="single"
-								value={showCustomFuelType ? 'other' : formData.fuelType || ''}
-								onValueChange={v => {
-									if (v === 'other') {
-										showCustomFuelType = true;
-										formData.fuelType = '';
-									} else {
-										showCustomFuelType = false;
-										formData.fuelType = v || '';
-									}
-								}}
-							>
-								<Select.Trigger
-									id="fuelType"
-									class="w-full"
-									aria-invalid={!!(touched['fuelType'] && errors['fuelType'])}
-									aria-describedby={touched['fuelType'] && errors['fuelType']
-										? 'fuelType-error'
-										: undefined}
-								>
-									{#if showCustomFuelType}
-										Other (Custom)
-									{:else if formData.fuelType}
-										{formData.fuelType}
-									{:else}
-										Select fuel type (optional)
-									{/if}
-								</Select.Trigger>
-								<Select.Content>
-									{#each FUEL_TYPE_OPTIONS as option}
-										<Select.Item value={option.value} label={option.label}
-											>{option.label}</Select.Item
-										>
-									{/each}
-								</Select.Content>
-							</Select.Root>
-							{#if touched['fuelType'] && errors['fuelType']}
-								<FormFieldError id="fuelType-error">{errors['fuelType']}</FormFieldError>
-							{/if}
-						</div>
-
-						{#if showCustomFuelType}
-							<div class="space-y-2">
-								<Label for="customFuelType">Custom Fuel Type</Label>
-								<Input
-									id="customFuelType"
-									type="text"
-									placeholder="e.g., E85, E100 Race Fuel"
-									bind:value={formData.fuelType}
-									onblur={() => handleBlur('fuelType')}
-									aria-invalid={!!(touched['fuelType'] && errors['fuelType'])}
-									aria-describedby={touched['fuelType'] && errors['fuelType']
-										? 'fuelType-error'
-										: undefined}
-								/>
-								{#if touched['fuelType'] && errors['fuelType']}
-									<FormFieldError id="fuelType-error">{errors['fuelType']}</FormFieldError>
-								{/if}
-							</div>
-						{/if}
-					{/if}
-
-					<!-- Charge field for electric/hybrid vehicles -->
-					{#if showChargeField}
-						<div class="space-y-2">
-							<Label for="charge">{getChargeUnitLabel(chargeUnit)} *</Label>
-							<Input
-								id="charge"
-								type="number"
-								step="0.01"
-								min="0"
-								bind:value={formData.charge}
-								placeholder="0.00"
-								oninput={handleMileageChange}
-								onblur={() => handleBlur('charge')}
-								aria-invalid={!!(touched['charge'] && errors['charge'])}
-								aria-describedby={touched['charge'] && errors['charge']
-									? 'charge-error'
-									: undefined}
-							/>
-							{#if touched['charge'] && errors['charge']}
-								<FormFieldError id="charge-error">{errors['charge']}</FormFieldError>
-							{/if}
-						</div>
-
-						{#if formData.charge && formData.amount}
-							<div class="text-sm text-gray-600">
-								<strong>Price per {getChargeUnitLabel(chargeUnit, true)}:</strong> ${(
-									parseFloat(formData.amount) / parseFloat(formData.charge)
-								).toFixed(3)}
-							</div>
-						{/if}
-					{/if}
-
-					<!-- Efficiency Calculation -->
-					{#if showMpgCalculation}
-						{#if calculatedMpg && showVolumeField}
-							<div class="bg-green-50 border border-green-200 rounded-lg p-3">
-								<div class="flex items-center gap-2 text-green-700">
-									<Gauge class="h-4 w-4" />
-									<span class="text-sm font-medium">
-										Calculated: {calculatedMpg}
-										{getFuelEfficiencyLabel(distanceUnit, volumeUnit)}
-									</span>
-								</div>
-								{#if calculatedMpg < 15}
-									<p class="text-xs text-orange-600 mt-1">
-										⚠️ Low fuel efficiency - consider maintenance check
-									</p>
-								{:else if calculatedMpg > 50}
-									<p class="text-xs text-green-600 mt-1">✅ Excellent fuel efficiency!</p>
-								{/if}
-							</div>
-						{:else if calculatedEfficiency && showChargeField}
-							<div class="bg-green-50 border border-green-200 rounded-lg p-3">
-								<div class="flex items-center gap-2 text-green-700">
-									<Zap class="h-4 w-4" />
-									<span class="text-sm font-medium">
-										Calculated: {calculatedEfficiency}
-										{getElectricEfficiencyLabel(distanceUnit, chargeUnit)}
-									</span>
-								</div>
-								{#if calculatedEfficiency < 2}
-									<p class="text-xs text-orange-600 mt-1">
-										⚠️ Low efficiency - check driving conditions
-									</p>
-								{:else if calculatedEfficiency > 4}
-									<p class="text-xs text-green-600 mt-1">✅ Excellent efficiency!</p>
-								{/if}
-							</div>
-						{/if}
-					{/if}
-				</div>
+			{#if showFuelFields && vehicle}
+				<FuelFieldsSection
+					vehicleType={vehicle.vehicleType}
+					bind:volume={formData.volume}
+					bind:charge={formData.charge}
+					bind:fuelType={formData.fuelType}
+					amount={formData.amount}
+					{volumeUnit}
+					{chargeUnit}
+					{distanceUnit}
+					{calculatedMpg}
+					{calculatedEfficiency}
+					{showMpgCalculation}
+					{errors}
+					{touched}
+					onBlur={handleBlur}
+					onMileageChange={handleMileageChange}
+				/>
 			{/if}
 
 			<!-- Description -->
@@ -1099,74 +645,7 @@
 			</div>
 
 			<!-- Tags -->
-			<div class="space-y-2">
-				<Label for="tags">Tags (Optional)</Label>
-				<div
-					class="border rounded-lg p-2 min-h-[42px] bg-white {touched['tags'] && errors['tags']
-						? 'border-red-300'
-						: 'border-gray-300'}"
-				>
-					<div class="flex flex-wrap gap-2 items-center">
-						{#each formData.tags as tag}
-							<span
-								class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
-							>
-								{tag}
-								<button
-									type="button"
-									onclick={() => removeTag(tag)}
-									class="hover:text-blue-900"
-									aria-label="Remove {tag} tag"
-								>
-									<svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-										<path
-											fill-rule="evenodd"
-											d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-											clip-rule="evenodd"
-										/>
-									</svg>
-								</button>
-							</span>
-						{/each}
-						<input
-							id="tags"
-							type="text"
-							bind:value={tagInput}
-							onkeydown={handleTagInputKeydown}
-							onfocus={() => (showTagSuggestions = true)}
-							onblur={() => setTimeout(() => (showTagSuggestions = false), 200)}
-							placeholder={formData.tags.length === 0 ? 'Add tags (e.g., fuel, maintenance)' : ''}
-							class="flex-1 min-w-[120px] outline-none bg-transparent"
-							aria-describedby={touched['tags'] && errors['tags'] ? 'tags-error' : undefined}
-						/>
-					</div>
-				</div>
-
-				<!-- Tag Suggestions -->
-				{#if showTagSuggestions && filteredSuggestions.length > 0}
-					<div
-						class="border border-gray-200 rounded-lg shadow-lg bg-white max-h-48 overflow-y-auto"
-					>
-						{#each filteredSuggestions.slice(0, 8) as suggestion}
-							<button
-								type="button"
-								onclick={() => addTag(suggestion)}
-								class="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-							>
-								{suggestion}
-							</button>
-						{/each}
-					</div>
-				{/if}
-
-				<p class="text-xs text-gray-500">
-					Press Enter to add a tag, or click suggestions below. Maximum 10 tags.
-				</p>
-
-				{#if touched['tags'] && errors['tags']}
-					<FormFieldError id="tags-error">{errors['tags']}</FormFieldError>
-				{/if}
-			</div>
+			<TagInput bind:tags={formData.tags} error={errors['tags']} touched={touched['tags']} />
 		</form>
 
 		<!-- Floating Action Bar -->

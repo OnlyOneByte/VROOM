@@ -8,15 +8,15 @@ export interface User {
 	provider: 'google';
 	providerId: string;
 	googleRefreshToken?: string;
-	createdAt: Date;
-	updatedAt: Date;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export type VehicleType = 'gas' | 'electric' | 'hybrid';
 
 export interface Vehicle {
 	id: string;
-	userId: string;
+	userId?: string;
 	make: string;
 	model: string;
 	year: number;
@@ -26,10 +26,10 @@ export interface Vehicle {
 	vin?: string;
 	initialMileage?: number;
 	purchasePrice?: number;
-	purchaseDate?: Date;
+	purchaseDate?: string;
 	financing?: VehicleFinancing;
-	createdAt: Date;
-	updatedAt: Date;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface VehicleFinancing {
@@ -41,20 +41,18 @@ export interface VehicleFinancing {
 	currentBalance: number;
 	apr?: number;
 	termMonths: number;
-	startDate: Date;
+	startDate: string;
 	paymentAmount: number;
 	paymentFrequency: 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 	paymentDayOfMonth?: number;
 	paymentDayOfWeek?: number;
-	// Lease-specific fields
 	residualValue?: number;
 	mileageLimit?: number;
 	excessMileageFee?: number;
-	// Status
 	isActive: boolean;
-	endDate?: Date;
-	createdAt: Date;
-	updatedAt: Date;
+	endDate?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface FinancingPaymentConfig {
@@ -132,18 +130,18 @@ export interface InsurancePolicy {
 	policyNumber?: string;
 	totalCost: number;
 	termLengthMonths: number;
-	startDate: Date;
-	endDate: Date;
+	startDate: string;
+	endDate: string;
 	monthlyCost: number;
 	isActive: boolean;
-	createdAt: Date;
-	updatedAt: Date;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface FinancingPayment {
 	id: string;
 	financingId: string;
-	paymentDate: Date;
+	paymentDate: string;
 	paymentAmount: number;
 	principalAmount: number;
 	interestAmount: number;
@@ -151,8 +149,8 @@ export interface FinancingPayment {
 	paymentNumber: number;
 	paymentType: 'standard' | 'extra' | 'custom-split';
 	isScheduled: boolean;
-	createdAt: Date;
-	updatedAt: Date;
+	createdAt: string;
+	updatedAt: string;
 }
 
 // Alias for consistency with backend naming
@@ -160,7 +158,7 @@ export type VehicleFinancingPayment = FinancingPayment;
 
 export interface FuelEfficiency {
 	vehicleId: string;
-	date: Date;
+	date: string;
 	mpg: number;
 	milesPerMonth: number;
 	costPerMile: number;
@@ -274,4 +272,135 @@ export interface ExpenseFormErrors {
 	fuelType?: string;
 	description?: string;
 	[key: string]: string | undefined;
+}
+
+// --- Store state types ---
+
+export interface Notification {
+	id: string;
+	type: 'success' | 'error' | 'warning' | 'info';
+	message: string;
+	duration?: number;
+	timestamp?: number;
+}
+
+export interface AuthState {
+	user: User | null;
+	isAuthenticated: boolean;
+	isLoading: boolean;
+	error: string | null;
+	token: string | null;
+}
+
+export interface AppState {
+	vehicles: Vehicle[];
+	selectedVehicle: Vehicle | null;
+	notifications: Notification[];
+	isLoading: boolean;
+	isMobileMenuOpen: boolean;
+}
+
+// --- Settings types ---
+
+export interface UserSettings {
+	id: string;
+	userId: string;
+	distanceUnit: DistanceUnit;
+	volumeUnit: VolumeUnit;
+	chargeUnit: ChargeUnit;
+	currencyUnit: string;
+	autoBackupEnabled: boolean;
+	backupFrequency: 'daily' | 'weekly' | 'monthly';
+	lastBackupDate?: string;
+	googleDriveBackupEnabled: boolean;
+	googleDriveBackupFolderId?: string;
+	googleDriveBackupRetentionCount?: number;
+	googleSheetsSyncEnabled?: boolean;
+	googleSheetsSpreadsheetId?: string;
+	syncOnInactivity?: boolean;
+	syncInactivityMinutes?: number;
+	lastSyncDate?: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface SettingsFormData {
+	distanceUnit: DistanceUnit;
+	volumeUnit: VolumeUnit;
+	chargeUnit: ChargeUnit;
+	currencyUnit: string;
+	autoBackupEnabled: boolean;
+	backupFrequency: 'daily' | 'weekly' | 'monthly';
+	googleDriveBackupEnabled: boolean;
+	googleSheetsSyncEnabled?: boolean;
+	syncOnInactivity?: boolean;
+	syncInactivityMinutes?: number;
+}
+
+// --- Backend API types (used by api-transformer) ---
+
+export interface BackendExpenseRequest {
+	vehicleId: string;
+	tags: string[];
+	category: string;
+	expenseAmount: number;
+	date: string;
+	mileage?: number;
+	fuelAmount?: number;
+	fuelType?: string;
+	description?: string;
+	receiptUrl?: string;
+}
+
+export interface BackendExpenseResponse {
+	id: string;
+	vehicleId: string;
+	tags: string[];
+	category: string;
+	expenseAmount: number;
+	date: string;
+	mileage?: number;
+	fuelAmount?: number;
+	fuelType?: string;
+	description?: string;
+	receiptUrl?: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export function hasBackendFieldNames(expense: Record<string, unknown>): boolean {
+	return 'expenseAmount' in expense || 'fuelAmount' in expense;
+}
+
+export function hasFrontendFieldNames(expense: Record<string, unknown>): boolean {
+	return 'amount' in expense || 'volume' in expense || 'charge' in expense;
+}
+
+// --- Analytics types ---
+
+export interface FuelEfficiencyData {
+	averageMPG: number;
+	trend: Array<{
+		period: string;
+		mpg: number;
+		gallons: number;
+		cost: number;
+	}>;
+	totalGallons: number;
+	totalCost: number;
+	efficiency: 'excellent' | 'good' | 'average' | 'poor';
+}
+
+export interface ExpenseAnalytics {
+	totalExpenses: number;
+	monthlyAverage: number;
+	categoryBreakdown: Array<{
+		category: string;
+		amount: number;
+		percentage: number;
+	}>;
+	trends: Array<{
+		period: string;
+		amount: number;
+	}>;
 }

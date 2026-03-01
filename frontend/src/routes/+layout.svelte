@@ -18,7 +18,6 @@
 	import favicon from '$lib/assets/favicon.svg';
 
 	import { vehicleApi } from '$lib/services/vehicle-api';
-	import type { Vehicle as AppVehicle } from '$lib/types/index.js';
 
 	let { children } = $props();
 
@@ -28,7 +27,7 @@
 		if (vehiclesLoaded) return;
 		try {
 			const vehicles = await vehicleApi.getVehicles();
-			appStore.setVehicles(vehicles as unknown as AppVehicle[]);
+			appStore.setVehicles(vehicles);
 			vehiclesLoaded = true;
 		} catch (error) {
 			console.error('Failed to load vehicles:', error);

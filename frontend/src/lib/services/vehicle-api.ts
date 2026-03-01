@@ -1,5 +1,4 @@
-import type { Vehicle, VehicleFinancingPayment } from '$lib/types';
-import type { VehicleStats } from '$lib/types';
+import type { Vehicle, VehicleFinancingPayment, VehicleStats } from '$lib/types';
 import type { TimePeriod } from '$lib/constants/time-periods';
 import { apiClient } from './api-client';
 

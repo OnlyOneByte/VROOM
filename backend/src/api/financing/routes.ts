@@ -63,6 +63,7 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
 
 const createFinancingSchema = baseFinancingSchema.omit({
   id: true,
+  currentBalance: true,
   createdAt: true,
   updatedAt: true,
 });

@@ -1,13 +1,11 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { appStore } from '$lib/stores/app.js';
-	import { formatCurrency } from '$lib/utils/formatters';
-	import { ArrowLeft, Car, DollarSign, Calculator, Trash2, X, Check } from 'lucide-svelte';
+	import { ArrowLeft, Car, Trash2, X, Check } from 'lucide-svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
-	import * as Select from '$lib/components/ui/select';
 	import { FormFieldError } from '$lib/components/ui/form-field';
 	import {
 		Card,
@@ -26,6 +24,7 @@
 		AlertDialogHeader,
 		AlertDialogTitle
 	} from '$lib/components/ui/alert-dialog';
+	import FinancingFormSection from './FinancingFormSection.svelte';
 	import type {
 		Vehicle,
 		VehicleFormData,
@@ -517,13 +516,6 @@
 		}
 	}
 
-	function formatPayoffDate(date: Date): string {
-		return new Intl.DateTimeFormat('en-US', {
-			month: 'long',
-			year: 'numeric'
-		}).format(date);
-	}
-
 	function handleBack() {
 		if (isEditMode) {
 			goto(`/vehicles/${vehicleId}`);
@@ -718,332 +710,14 @@
 			</Card>
 
 			<!-- Financing Information -->
-			<Card>
-				<CardHeader>
-					<div class="flex items-center gap-2">
-						<DollarSign class="h-5 w-5 text-primary" />
-						<CardTitle>Financing Information</CardTitle>
-					</div>
-					<CardDescription>
-						{ownershipType === 'own'
-							? 'This vehicle is owned outright'
-							: ownershipType === 'lease'
-								? 'Lease details and payment information'
-								: 'Loan details and payment information'}
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<!-- Ownership Type Selector -->
-					<div class="mb-6">
-						<Label class="mb-3 block">How do you own this vehicle? *</Label>
-						<div class="grid grid-cols-3 gap-3">
-							<Button
-								type="button"
-								variant={ownershipType === 'own' ? 'default' : 'outline'}
-								onclick={() => (ownershipType = 'own')}
-								class="h-auto py-3"
-							>
-								Own
-							</Button>
-							<Button
-								type="button"
-								variant={ownershipType === 'lease' ? 'default' : 'outline'}
-								onclick={() => (ownershipType = 'lease')}
-								class="h-auto py-3"
-							>
-								Lease
-							</Button>
-							<Button
-								type="button"
-								variant={ownershipType === 'finance' ? 'default' : 'outline'}
-								onclick={() => (ownershipType = 'finance')}
-								class="h-auto py-3"
-							>
-								Finance
-							</Button>
-						</div>
-					</div>
-
-					{#if ownershipType !== 'own'}
-						<div class="space-y-6">
-							<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-								<div class="space-y-2">
-									<Label for="provider">
-										{ownershipType === 'finance' ? 'Lender' : 'Leasing Company'} *
-									</Label>
-									<Input
-										id="provider"
-										type="text"
-										placeholder="e.g., Chase Bank, Toyota Financial"
-										bind:value={financingForm.provider}
-										aria-invalid={!!errors['provider']}
-										aria-describedby={errors['provider'] ? 'provider-error' : undefined}
-										required
-									/>
-									{#if errors['provider']}
-										<FormFieldError id="provider-error">{errors['provider']}</FormFieldError>
-									{/if}
-								</div>
-
-								<div class="space-y-2">
-									<Label for="originalAmount">
-										{isEditMode ? 'Original ' : ''}{ownershipType === 'lease' ? 'Lease' : 'Loan'} Amount
-										*
-									</Label>
-									<Input
-										id="originalAmount"
-										type="number"
-										min="0"
-										step="0.01"
-										placeholder="0.00"
-										bind:value={financingForm.originalAmount}
-										aria-invalid={!!errors['originalAmount']}
-										aria-describedby={errors['originalAmount'] ? 'originalAmount-error' : undefined}
-										required
-									/>
-									{#if errors['originalAmount']}
-										<FormFieldError id="originalAmount-error"
-											>{errors['originalAmount']}</FormFieldError
-										>
-									{/if}
-								</div>
-
-								{#if ownershipType === 'finance'}
-									<div class="space-y-2">
-										<Label for="apr">APR (%) *</Label>
-										<Input
-											id="apr"
-											type="number"
-											min="0"
-											max="50"
-											step="0.01"
-											placeholder="e.g., 4.5"
-											bind:value={financingForm.apr}
-											aria-invalid={!!errors['apr']}
-											aria-describedby={errors['apr'] ? 'apr-error' : undefined}
-											required
-										/>
-										{#if errors['apr']}
-											<FormFieldError id="apr-error">{errors['apr']}</FormFieldError>
-										{/if}
-									</div>
-								{/if}
-
-								<div class="space-y-2">
-									<Label for="termMonths">Term (Months) *</Label>
-									<Select.Root
-										type="single"
-										value={String(financingForm.termMonths)}
-										onValueChange={v => {
-											if (v) {
-												financingForm.termMonths = Number(v);
-											}
-										}}
-									>
-										<Select.Trigger
-											id="termMonths"
-											class="w-full"
-											aria-invalid={!!errors['termMonths']}
-											aria-describedby={errors['termMonths'] ? 'termMonths-error' : undefined}
-										>
-											{financingForm.termMonths} months ({Math.floor(financingForm.termMonths / 12)}
-											years)
-										</Select.Trigger>
-										<Select.Content>
-											<Select.Item value="24" label="24 months (2 years)"
-												>24 months (2 years)</Select.Item
-											>
-											<Select.Item value="36" label="36 months (3 years)"
-												>36 months (3 years)</Select.Item
-											>
-											<Select.Item value="48" label="48 months (4 years)"
-												>48 months (4 years)</Select.Item
-											>
-											<Select.Item value="60" label="60 months (5 years)"
-												>60 months (5 years)</Select.Item
-											>
-											<Select.Item value="72" label="72 months (6 years)"
-												>72 months (6 years)</Select.Item
-											>
-											<Select.Item value="84" label="84 months (7 years)"
-												>84 months (7 years)</Select.Item
-											>
-										</Select.Content>
-									</Select.Root>
-									{#if errors['termMonths']}
-										<FormFieldError id="termMonths-error">{errors['termMonths']}</FormFieldError>
-									{/if}
-								</div>
-
-								<div class="space-y-2">
-									<Label for="startDate">Start Date *</Label>
-									<DatePicker
-										id="startDate"
-										bind:value={financingForm.startDate}
-										placeholder="Select start date"
-										aria-invalid={!!errors['startDate']}
-										aria-describedby={errors['startDate'] ? 'startDate-error' : undefined}
-									/>
-									{#if errors['startDate']}
-										<FormFieldError id="startDate-error">{errors['startDate']}</FormFieldError>
-									{/if}
-								</div>
-
-								<div class="space-y-2">
-									<Label for="dayOfMonth">Payment Day of Month</Label>
-									<Select.Root
-										type="single"
-										value={String(financingForm.dayOfMonth)}
-										onValueChange={v => {
-											if (v) {
-												financingForm.dayOfMonth = Number(v);
-											}
-										}}
-									>
-										<Select.Trigger
-											id="dayOfMonth"
-											class="w-full"
-											aria-invalid={!!errors['dayOfMonth']}
-											aria-describedby={errors['dayOfMonth'] ? 'dayOfMonth-error' : undefined}
-										>
-											{financingForm.dayOfMonth}
-										</Select.Trigger>
-										<Select.Content>
-											{#each Array(28) as _, i}
-												<Select.Item value={String(i + 1)} label={String(i + 1)}
-													>{i + 1}</Select.Item
-												>
-											{/each}
-										</Select.Content>
-									</Select.Root>
-									{#if errors['dayOfMonth']}
-										<FormFieldError id="dayOfMonth-error">{errors['dayOfMonth']}</FormFieldError>
-									{/if}
-								</div>
-
-								{#if ownershipType === 'lease'}
-									<div class="space-y-2">
-										<Label for="residualValue">Residual Value (Buyout Price)</Label>
-										<Input
-											id="residualValue"
-											type="number"
-											min="0"
-											step="0.01"
-											placeholder="0.00"
-											bind:value={financingForm.residualValue}
-										/>
-									</div>
-
-									<div class="space-y-2">
-										<Label for="mileageLimit">Annual Mileage Limit</Label>
-										<Input
-											id="mileageLimit"
-											type="number"
-											min="0"
-											placeholder="e.g., 12000"
-											bind:value={financingForm.mileageLimit}
-										/>
-									</div>
-
-									<div class="space-y-2">
-										<Label for="excessMileageFee">Excess Mileage Fee (per mile)</Label>
-										<Input
-											id="excessMileageFee"
-											type="number"
-											min="0"
-											step="0.01"
-											placeholder="e.g., 0.25"
-											bind:value={financingForm.excessMileageFee}
-										/>
-									</div>
-								{/if}
-							</div>
-
-							<!-- Current Balance Display (Edit Mode Only) -->
-							{#if isEditMode && vehicle?.financing?.currentBalance !== undefined}
-								<Card class="bg-muted/50">
-									<CardHeader>
-										<CardTitle class="text-base">Current Status</CardTitle>
-									</CardHeader>
-									<CardContent>
-										<div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-											<div>
-												<p class="text-muted-foreground">Current Balance</p>
-												<p class="font-semibold text-lg">
-													{formatCurrency(vehicle.financing.currentBalance)}
-												</p>
-											</div>
-											<div>
-												<p class="text-muted-foreground">Original Amount</p>
-												<p class="font-semibold text-lg">
-													{formatCurrency(vehicle.financing.originalAmount)}
-												</p>
-											</div>
-											<div>
-												<p class="text-muted-foreground">Amount Paid</p>
-												<p class="font-semibold text-lg">
-													{formatCurrency(
-														vehicle.financing.originalAmount - vehicle.financing.currentBalance
-													)}
-												</p>
-											</div>
-										</div>
-									</CardContent>
-								</Card>
-							{/if}
-
-							<!-- Amortization Preview (Loans Only) -->
-							{#if amortizationPreview && ownershipType === 'finance'}
-								<Card class="border-primary/20 bg-primary/5">
-									<CardHeader>
-										<div class="flex items-center gap-2">
-											<Calculator class="h-4 w-4 text-primary" />
-											<CardTitle class="text-base">
-												{isEditMode ? 'Updated ' : ''}Loan Calculation Preview
-											</CardTitle>
-										</div>
-									</CardHeader>
-									<CardContent>
-										<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-											<div>
-												<p class="text-muted-foreground font-medium">Monthly Payment</p>
-												<p class="font-semibold text-lg">
-													{formatCurrency(amortizationPreview.monthlyPayment)}
-												</p>
-											</div>
-
-											<div>
-												<p class="text-muted-foreground font-medium">Total Interest</p>
-												<p class="font-semibold">
-													{formatCurrency(amortizationPreview.totalInterest)}
-												</p>
-											</div>
-
-											<div>
-												<p class="text-muted-foreground font-medium">Total Payments</p>
-												<p class="font-semibold">
-													{formatCurrency(amortizationPreview.totalPayments)}
-												</p>
-											</div>
-
-											<div>
-												<p class="text-muted-foreground font-medium">Payoff Date</p>
-												<p class="font-semibold">
-													{formatPayoffDate(amortizationPreview.payoffDate)}
-												</p>
-											</div>
-										</div>
-									</CardContent>
-								</Card>
-							{/if}
-						</div>
-					{:else}
-						<p class="text-muted-foreground text-center py-8">
-							This vehicle is owned outright with no financing or lease.
-						</p>
-					{/if}
-				</CardContent>
-			</Card>
+			<FinancingFormSection
+				bind:ownershipType
+				bind:financingForm
+				{errors}
+				{isEditMode}
+				{vehicle}
+				{amortizationPreview}
+			/>
 		</form>
 
 		<!-- Floating Action Bar -->
