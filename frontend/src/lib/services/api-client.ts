@@ -7,7 +7,13 @@
  * - Response envelope unwrapping (extracts `data` from `{ success, data }`)
  */
 
+import { env } from '$env/dynamic/public';
 import { ApiError } from '$lib/utils/error-handling';
+
+/** Returns the API base URL (e.g. "https://api.vroom.ryang.dev") or empty string for same-origin. */
+export function getApiBaseUrl(): string {
+	return env['PUBLIC_API_URL'] ?? '';
+}
 
 interface ApiOptions {
 	method?: string;
@@ -24,6 +30,7 @@ function toFetchBody(body: unknown): globalThis.BodyInit | undefined {
 
 async function request<T>(url: string, options: ApiOptions = {}): Promise<T> {
 	const { body, headers: customHeaders, method, signal } = options;
+	const fullUrl = url.startsWith('http') ? url : `${getApiBaseUrl()}${url}`;
 
 	const headers: Record<string, string> = {
 		...(customHeaders || {})
@@ -33,7 +40,7 @@ async function request<T>(url: string, options: ApiOptions = {}): Promise<T> {
 		headers['Content-Type'] = 'application/json';
 	}
 
-	const response = await fetch(url, {
+	const response = await fetch(fullUrl, {
 		method,
 		credentials: 'include',
 		headers,
@@ -80,6 +87,8 @@ export const apiClient = {
 		request<T>(url, { ...options, method: 'DELETE' }),
 
 	/** Returns the raw Response (for file downloads, etc.) */
-	raw: (url: string, options: { method?: string; headers?: Record<string, string> } = {}) =>
-		fetch(url, { credentials: 'include', ...options })
+	raw: (url: string, options: { method?: string; headers?: Record<string, string> } = {}) => {
+		const fullUrl = url.startsWith('http') ? url : `${getApiBaseUrl()}${url}`;
+		return fetch(fullUrl, { credentials: 'include', ...options });
+	}
 };

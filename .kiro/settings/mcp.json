@@ -24,7 +24,8 @@
         "new_page",
         "select_page",
         "type_text",
-        "fill"
+        "fill",
+        "list_pages"
       ]
     }
   }

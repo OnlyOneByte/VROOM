@@ -36,7 +36,8 @@ export default defineConfig({
 		globals: true,
 		alias: {
 			$lib: new URL('./src/lib', import.meta.url).pathname,
-			$app: new URL('./node_modules/@sveltejs/kit/src/runtime/app', import.meta.url).pathname
+			$app: new URL('./node_modules/@sveltejs/kit/src/runtime/app', import.meta.url).pathname,
+			'$env/dynamic/public': new URL('./src/test-env-mock.ts', import.meta.url).pathname
 		}
 	},
 	server: {

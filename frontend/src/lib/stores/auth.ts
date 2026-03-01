@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 import type { User, AuthState } from '../types/index.js';
-import { apiClient } from '$lib/services/api-client';
+import { apiClient, getApiBaseUrl } from '$lib/services/api-client';
 
 const initialState: AuthState = {
 	user: null,
@@ -83,7 +83,7 @@ function createAuthStore() {
 
 		// Login with Google OAuth
 		loginWithGoogle: () => {
-			window.location.href = '/api/v1/auth/login/google';
+			window.location.href = `${getApiBaseUrl()}/api/v1/auth/login/google`;
 		},
 
 		// Refresh token
