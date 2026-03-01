@@ -25,6 +25,7 @@
         "select_page",
         "type_text",
         "fill",
+        "list_pages",
         "list_pages"
       ]
     }

@@ -222,9 +222,15 @@ logger.startup(`VROOM Backend starting on port ${CONFIG.server.port}`);
 logger.startup(`Environment: ${CONFIG.env}`);
 logger.startup(`Database: ${CONFIG.database.url}`);
 
-// Periodic WAL checkpoint to ensure data persistence
-// Auto-checkpoint (1000 pages) handles most cases, this is just a safety net
-import { checkpointWAL, forceCheckpointWAL } from './db/connection';
+// Run migrations on startup (idempotent — only applies new migrations)
+import { checkpointWAL, forceCheckpointWAL, runMigrations } from './db/connection';
+
+try {
+  await runMigrations();
+} catch (error) {
+  logger.error('Failed to run migrations on startup', { error });
+  process.exit(1);
+}
 
 const checkpointInterval = setInterval(
   () => {
