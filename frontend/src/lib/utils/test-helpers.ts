@@ -18,6 +18,7 @@ export const mockVehicle = {
 	make: 'Toyota',
 	model: 'Camry',
 	year: 2020,
+	vehicleType: 'gas' as const,
 	licensePlate: 'ABC123',
 	vin: '1HGBH41JXMN109186',
 	purchasePrice: 25000,

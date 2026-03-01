@@ -61,18 +61,18 @@
 
 	let iconBgClass = $derived(
 		urgencyLevel === 'overdue' || urgencyLevel === 'urgent'
-			? 'bg-red-100 dark:bg-red-900/20'
+			? 'bg-destructive/10'
 			: urgencyLevel === 'warning'
-				? 'bg-yellow-100 dark:bg-yellow-900/20'
-				: 'bg-green-100 dark:bg-green-900/20'
+				? 'bg-chart-5/10'
+				: 'bg-chart-2/10'
 	);
 
 	let iconColorClass = $derived(
 		urgencyLevel === 'overdue' || urgencyLevel === 'urgent'
-			? 'text-red-600 dark:text-red-400'
+			? 'text-destructive'
 			: urgencyLevel === 'warning'
-				? 'text-yellow-600 dark:text-yellow-400'
-				: 'text-green-600 dark:text-green-400'
+				? 'text-chart-5'
+				: 'text-chart-2'
 	);
 
 	let badgeVariant = $derived<'default' | 'secondary' | 'destructive' | 'outline'>(

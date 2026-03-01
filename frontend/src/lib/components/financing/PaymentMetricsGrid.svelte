@@ -23,32 +23,32 @@
 	// Determine next payment card styling based on days remaining
 	let nextPaymentColorClass = $derived(
 		daysUntilNextPayment < 0
-			? 'text-red-600 dark:text-red-400'
+			? 'text-destructive'
 			: daysUntilNextPayment <= 3
-				? 'text-red-600 dark:text-red-400'
+				? 'text-destructive'
 				: daysUntilNextPayment <= 7
-					? 'text-yellow-600 dark:text-yellow-400'
-					: 'text-green-600 dark:text-green-400'
+					? 'text-chart-5'
+					: 'text-chart-2'
 	);
 
 	let nextPaymentBgClass = $derived(
 		daysUntilNextPayment < 0
-			? 'bg-red-100 dark:bg-red-900/20'
+			? 'bg-destructive/10'
 			: daysUntilNextPayment <= 3
-				? 'bg-red-100 dark:bg-red-900/20'
+				? 'bg-destructive/10'
 				: daysUntilNextPayment <= 7
-					? 'bg-yellow-100 dark:bg-yellow-900/20'
-					: 'bg-green-100 dark:bg-green-900/20'
+					? 'bg-chart-5/10'
+					: 'bg-chart-2/10'
 	);
 
 	let nextPaymentIconClass = $derived(
 		daysUntilNextPayment < 0
-			? 'text-red-600 dark:text-red-400'
+			? 'text-destructive'
 			: daysUntilNextPayment <= 3
-				? 'text-red-600 dark:text-red-400'
+				? 'text-destructive'
 				: daysUntilNextPayment <= 7
-					? 'text-yellow-600 dark:text-yellow-400'
-					: 'text-green-600 dark:text-green-400'
+					? 'text-chart-5'
+					: 'text-chart-2'
 	);
 
 	// Format next payment status text
@@ -82,8 +82,8 @@
 							{formatCurrency(totalInterestPaid)}
 						</p>
 					</div>
-					<div class="rounded-full bg-orange-100 dark:bg-orange-900/20 p-2" aria-hidden="true">
-						<TrendingUp class="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400" />
+					<div class="rounded-full bg-chart-1/10 p-2" aria-hidden="true">
+						<TrendingUp class="h-4 w-4 sm:h-5 sm:w-5 text-chart-1" />
 					</div>
 				</div>
 			</CardContent>
@@ -102,8 +102,8 @@
 						{formatCurrency(totalAmountPaid)}
 					</p>
 				</div>
-				<div class="rounded-full bg-blue-100 dark:bg-blue-900/20 p-2" aria-hidden="true">
-					<DollarSign class="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+				<div class="rounded-full bg-chart-3/10 p-2" aria-hidden="true">
+					<DollarSign class="h-4 w-4 sm:h-5 sm:w-5 text-chart-3" />
 				</div>
 			</div>
 		</CardContent>
@@ -123,8 +123,8 @@
 						aria-labelledby="payoff-date-label">{formatDate(estimatedPayoffDate)}</time
 					>
 				</div>
-				<div class="rounded-full bg-purple-100 dark:bg-purple-900/20 p-2" aria-hidden="true">
-					<Calendar class="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
+				<div class="rounded-full bg-chart-4/10 p-2" aria-hidden="true">
+					<Calendar class="h-4 w-4 sm:h-5 sm:w-5 text-chart-4" />
 				</div>
 			</div>
 		</CardContent>

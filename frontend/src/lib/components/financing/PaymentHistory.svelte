@@ -141,9 +141,7 @@
 
 									<!-- Payment Card -->
 									<Card
-										class="relative {isExtraPayment
-											? 'border-green-200 dark:border-green-900/50 bg-green-50/50 dark:bg-green-950/20'
-											: ''}"
+										class="relative {isExtraPayment ? 'border-chart-2/20 bg-chart-2/5' : ''}"
 										aria-label="Payment {payment.paymentNumber} on {formatDate(
 											new Date(payment.paymentDate)
 										)}"
@@ -153,7 +151,7 @@
 												<!-- Payment Number Badge -->
 												<div
 													class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm {isExtraPayment
-														? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
+														? 'bg-chart-2/10 text-chart-2'
 														: 'bg-primary/10 text-primary'}"
 													aria-label="Payment number {payment.paymentNumber}"
 												>
@@ -184,11 +182,11 @@
 
 														{#if isExtraPayment}
 															<div
-																class="rounded-full bg-green-100 dark:bg-green-900/40 p-1.5 sm:p-2 flex-shrink-0"
+																class="rounded-full bg-chart-2/10 p-1.5 sm:p-2 flex-shrink-0"
 																aria-label="Extra payment indicator"
 															>
 																<TrendingDown
-																	class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 dark:text-green-400"
+																	class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-chart-2"
 																	aria-hidden="true"
 																/>
 															</div>
@@ -277,9 +275,7 @@
 
 								<!-- Payment Card -->
 								<Card
-									class="relative {isExtraPayment
-										? 'border-green-200 dark:border-green-900/50 bg-green-50/50 dark:bg-green-950/20'
-										: ''}"
+									class="relative {isExtraPayment ? 'border-chart-2/20 bg-chart-2/5' : ''}"
 									aria-label="Payment {payment.paymentNumber} on {formatDate(
 										new Date(payment.paymentDate)
 									)}"
@@ -289,7 +285,7 @@
 											<!-- Payment Number Badge -->
 											<div
 												class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm {isExtraPayment
-													? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
+													? 'bg-chart-2/10 text-chart-2'
 													: 'bg-primary/10 text-primary'}"
 												aria-label="Payment number {payment.paymentNumber}"
 											>
@@ -320,11 +316,11 @@
 
 													{#if isExtraPayment}
 														<div
-															class="rounded-full bg-green-100 dark:bg-green-900/40 p-1.5 sm:p-2 flex-shrink-0"
+															class="rounded-full bg-chart-2/10 p-1.5 sm:p-2 flex-shrink-0"
 															aria-label="Extra payment indicator"
 														>
 															<TrendingDown
-																class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 dark:text-green-400"
+																class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-chart-2"
 																aria-hidden="true"
 															/>
 														</div>

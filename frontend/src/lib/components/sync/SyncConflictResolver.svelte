@@ -67,7 +67,7 @@
 		{#if currentConflict}
 			<DialogHeader>
 				<div class="flex items-center gap-3">
-					<TriangleAlert class="h-6 w-6 text-orange-500" />
+					<TriangleAlert class="h-6 w-6 text-chart-5" />
 					<div>
 						<DialogTitle>Sync Conflict Detected</DialogTitle>
 						<DialogDescription>
@@ -152,9 +152,9 @@
 
 						<!-- Server version -->
 						{#if currentConflict.serverExpense}
-							<div class="border border-green-500/30 rounded-lg p-4">
+							<div class="border border-chart-2/30 rounded-lg p-4">
 								<div class="flex items-center gap-2 mb-3">
-									<div class="w-3 h-3 bg-green-500 rounded-full"></div>
+									<div class="w-3 h-3 bg-chart-2 rounded-full"></div>
 									<h4 class="font-medium">Server Version</h4>
 								</div>
 

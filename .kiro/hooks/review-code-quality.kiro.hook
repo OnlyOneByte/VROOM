@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Code Quality Review",
+  "description": "After any file write, reviews the change against project conventions and code quality rules from the steering files (MainSteering.md and CodeQualityRules.md). Checks for hardcoded colors, raw fetch/apiClient misuse, missing semantic tokens, SSR safety, Svelte 5 runes compliance, and other established standards.",
+  "version": "1",
+  "when": {
+    "type": "postToolUse",
+    "toolTypes": [
+      "write"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the file you just wrote or modified. Check it against ALL of these project rules and flag any violations:\n\n1. Semantic color tokens — no hardcoded Tailwind colors (bg-white, text-gray-900, bg-blue-50, etc.). Use semantic tokens (bg-background, text-foreground, text-muted-foreground, bg-muted, border-border, chart-1 through chart-5).\n2. Domain API services — no raw apiClient calls when a domain service method (vehicleApi, expenseApi, settingsApi) exists.\n3. Loading spinners — use LoaderCircle from lucide-svelte, not custom CSS spinners.\n4. SSR safety — no bare window/document/PerformanceObserver access at module level. Guard with `browser` from $app/environment.\n5. Category maps — must use the actual enum: fuel, maintenance, financial, regulatory, enhancement, misc.\n6. No duplicate utilities — check $lib/utils/ before adding new helpers.\n7. No redundant ternaries where both branches produce the same value.\n8. No duplicate type definitions across files.\n9. FABs must use bg-foreground text-background.\n10. Status colors in utilities must use semantic tokens (text-chart-2, text-destructive, text-chart-5, text-chart-1).\n11. Financing components must use chart-1 through chart-5 tokens for accent colors.\n12. Svelte 5 runes — no $: reactive statements, no class: directives on components, no on: directives, no |modifier syntax, no $app/stores.\n13. No raw fetch() in components/stores — use apiClient or domain services.\n14. No `any` types — use proper types or unknown with type guards.\n15. No console.log debug statements or dead code.\n16. Use shadcn-svelte components, not raw HTML classes like btn, btn-primary, card.\n\nIf you find violations, fix them immediately. If the code is clean, move on silently."
+  }
+}

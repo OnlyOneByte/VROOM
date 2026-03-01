@@ -39,10 +39,10 @@
 	// Determine mileage progress color
 	let mileageProgressColor = $derived(
 		mileageUsagePercentage > 90
-			? 'bg-red-600'
+			? 'bg-destructive'
 			: mileageUsagePercentage > 75
-				? 'bg-yellow-600'
-				: 'bg-green-600'
+				? 'bg-chart-5'
+				: 'bg-chart-2'
 	);
 
 	// Calculate lease end date with error handling

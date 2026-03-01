@@ -80,7 +80,7 @@
 					<div
 						class="w-8 h-8 bg-green-500/10 rounded-full flex items-center justify-center mx-auto"
 					>
-						<Check class="w-5 h-5 text-green-600" />
+						<Check class="w-5 h-5 text-chart-2" />
 					</div>
 					<h3 class="text-lg font-medium text-foreground">Sign in successful!</h3>
 					<p class="text-muted-foreground">Redirecting to your dashboard...</p>

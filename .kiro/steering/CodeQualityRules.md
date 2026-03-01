@@ -142,3 +142,52 @@ export const mockExpense = {
   volume: 12.5,
 };
 ```
+
+## 10. FABs Must Use Semantic Foreground/Background
+
+All floating action buttons must use `bg-foreground text-background`, not hardcoded gray/white or gradient overrides.
+
+```svelte
+// ❌ WRONG — found in vehicles/[id]/+page.svelte
+class="bg-gray-900 hover:bg-gray-800 text-white"
+
+// ❌ WRONG — found in settings/+page.svelte
+class="!bg-gradient-to-r !from-primary-600 !to-primary-700 !text-white"
+
+// ✅ CORRECT — matches dashboard and expenses FABs
+class="bg-foreground hover:bg-foreground/90 text-background"
+```
+
+## 11. Status Colors in Utilities Must Use Semantic Tokens
+
+Utility functions that return color classes (like `sync-status.ts`, `Navigation.svelte` `getSyncStatusInfo`) must use semantic tokens, not raw Tailwind colors.
+
+```typescript
+// ❌ WRONG — found in sync-status.ts, Navigation.svelte
+return { color: 'text-green-500', ... };
+return { color: 'text-red-500', ... };
+return { color: 'text-yellow-500', ... };
+return { color: 'text-orange-500', ... };
+
+// ✅ CORRECT
+return { color: 'text-chart-2', ... };     // success/green
+return { color: 'text-destructive', ... }; // error/red
+return { color: 'text-chart-5', ... };     // warning/yellow
+return { color: 'text-chart-1', ... };     // pending/orange
+```
+
+## 12. Financing Components Must Use Chart Tokens for Accent Colors
+
+`FinancingSummaryHeader`, `PaymentCalculator`, and similar components must not use raw `text-green-600`, `bg-blue-100`, etc. Use `chart-1`–`chart-5` tokens.
+
+```svelte
+// ❌ WRONG — found in FinancingSummaryHeader.svelte
+<div class="bg-blue-100 dark:bg-blue-900/20">
+  <DollarSign class="text-blue-600 dark:text-blue-400" />
+</div>
+
+// ✅ CORRECT
+<div class="bg-chart-3/10">
+  <DollarSign class="text-chart-3" />
+</div>
+```

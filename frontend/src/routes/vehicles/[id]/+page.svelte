@@ -696,8 +696,8 @@
 			fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full
 			sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto
 			flex items-center justify-center gap-2 pl-6 pr-10
-			bg-gray-900 hover:bg-gray-800
-			text-white shadow-2xl hover:shadow-gray-900/50
+			bg-foreground hover:bg-foreground/90
+			text-background shadow-2xl
 			transition-all duration-300 sm:hover:scale-110
 			border-0 group
 		"

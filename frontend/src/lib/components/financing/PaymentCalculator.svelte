@@ -90,8 +90,8 @@
 					aria-label="Payment calculator, {isOpen ? 'expanded' : 'collapsed'}"
 				>
 					<div class="flex items-center gap-2">
-						<div class="rounded-full bg-purple-100 dark:bg-purple-900/20 p-2" aria-hidden="true">
-							<Calculator class="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
+						<div class="rounded-full bg-chart-3/10 p-2" aria-hidden="true">
+							<Calculator class="h-4 w-4 sm:h-5 sm:w-5 text-chart-3" />
 						</div>
 						<CardTitle class="text-base sm:text-lg">Payment Calculator</CardTitle>
 					</div>
@@ -160,20 +160,17 @@
 								aria-label="Extra payment impact"
 							>
 								<!-- New Payoff Date -->
-								<Card
-									class="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/20"
-									role="listitem"
-								>
+								<Card class="border-chart-2/20 bg-chart-2/5" role="listitem">
 									<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
 										<div class="space-y-2">
 											<div
-												class="flex items-center gap-2 text-xs sm:text-sm font-medium text-green-700 dark:text-green-400"
+												class="flex items-center gap-2 text-xs sm:text-sm font-medium text-chart-2"
 											>
 												<Calendar class="h-4 w-4 flex-shrink-0" aria-hidden="true" />
 												<span id="new-payoff-label">New Payoff Date</span>
 											</div>
 											<p
-												class="text-base sm:text-lg font-bold text-green-900 dark:text-green-300 break-words"
+												class="text-base sm:text-lg font-bold text-foreground break-words"
 												aria-labelledby="new-payoff-label"
 											>
 												{formatDate(impact.newPayoffDate)}
@@ -183,20 +180,17 @@
 								</Card>
 
 								<!-- Time Saved -->
-								<Card
-									class="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20"
-									role="listitem"
-								>
+								<Card class="border-chart-3/20 bg-chart-3/5" role="listitem">
 									<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
 										<div class="space-y-2">
 											<div
-												class="flex items-center gap-2 text-xs sm:text-sm font-medium text-blue-700 dark:text-blue-400"
+												class="flex items-center gap-2 text-xs sm:text-sm font-medium text-chart-3"
 											>
 												<TrendingDown class="h-4 w-4 flex-shrink-0" aria-hidden="true" />
 												<span id="time-saved-label">Time Saved</span>
 											</div>
 											<p
-												class="text-base sm:text-lg font-bold text-blue-900 dark:text-blue-300"
+												class="text-base sm:text-lg font-bold text-foreground"
 												aria-labelledby="time-saved-label"
 											>
 												{formatMonthsSaved(impact.monthsSaved)}
@@ -206,20 +200,17 @@
 								</Card>
 
 								<!-- Interest Saved -->
-								<Card
-									class="border-purple-200 bg-purple-50 dark:border-purple-900 dark:bg-purple-950/20"
-									role="listitem"
-								>
+								<Card class="border-chart-4/20 bg-chart-4/5" role="listitem">
 									<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
 										<div class="space-y-2">
 											<div
-												class="flex items-center gap-2 text-xs sm:text-sm font-medium text-purple-700 dark:text-purple-400"
+												class="flex items-center gap-2 text-xs sm:text-sm font-medium text-chart-4"
 											>
 												<DollarSign class="h-4 w-4 flex-shrink-0" aria-hidden="true" />
 												<span id="interest-saved-label">Interest Saved</span>
 											</div>
 											<p
-												class="text-base sm:text-lg font-bold text-purple-900 dark:text-purple-300"
+												class="text-base sm:text-lg font-bold text-foreground"
 												aria-labelledby="interest-saved-label"
 											>
 												{formatCurrency(impact.interestSaved)}
@@ -246,20 +237,17 @@
 							{/if}
 						</div>
 					{:else if extraPaymentInput && debouncedExtraPaymentAmount <= 0}
-						<div
-							class="rounded-lg border border-orange-200 bg-orange-50 p-3 sm:p-4 dark:border-orange-900 dark:bg-orange-950/20"
-							role="alert"
-						>
-							<p class="text-xs sm:text-sm text-orange-700 dark:text-orange-400">
+						<div class="rounded-lg border border-chart-5/20 bg-chart-5/5 p-3 sm:p-4" role="alert">
+							<p class="text-xs sm:text-sm text-chart-5">
 								Please enter a valid extra payment amount greater than $0.
 							</p>
 						</div>
 					{:else if hasCalculationError}
 						<div
-							class="rounded-lg border border-red-200 bg-red-50 p-3 sm:p-4 dark:border-red-900 dark:bg-red-950/20"
+							class="rounded-lg border border-destructive/20 bg-destructive/5 p-3 sm:p-4"
 							role="alert"
 						>
-							<p class="text-xs sm:text-sm text-red-700 dark:text-red-400">
+							<p class="text-xs sm:text-sm text-destructive">
 								Unable to calculate the impact of extra payments. Please check your financing
 								details.
 							</p>

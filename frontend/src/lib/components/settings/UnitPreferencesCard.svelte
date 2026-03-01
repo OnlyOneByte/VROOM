@@ -78,7 +78,7 @@
 				<Fuel class="h-4 w-4" />
 				Fuel Volume Unit
 			</Label>
-			<p class="text-xs text-gray-500">For gas and diesel vehicles</p>
+			<p class="text-xs text-muted-foreground">For gas and diesel vehicles</p>
 			<Select.Root
 				type="single"
 				value={volumeUnit}
@@ -102,7 +102,7 @@
 				<Fuel class="h-4 w-4" />
 				Electric Charge Unit
 			</Label>
-			<p class="text-xs text-gray-500">For electric and hybrid vehicles</p>
+			<p class="text-xs text-muted-foreground">For electric and hybrid vehicles</p>
 			<Select.Root
 				type="single"
 				value={chargeUnit}

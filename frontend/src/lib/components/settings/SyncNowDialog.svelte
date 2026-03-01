@@ -49,7 +49,7 @@
 						<Label for="sync-sheets" class="font-normal cursor-pointer">
 							<div>
 								<div class="font-medium">Google Sheets</div>
-								<div class="text-sm text-gray-500">
+								<div class="text-sm text-muted-foreground">
 									{googleSheetsSyncEnabled
 										? 'Sync data to Google Sheets'
 										: 'Enable Google Sheets sync in settings first'}
@@ -66,7 +66,7 @@
 						<Label for="sync-backup" class="font-normal cursor-pointer">
 							<div>
 								<div class="font-medium">Google Drive Backup</div>
-								<div class="text-sm text-gray-500">
+								<div class="text-sm text-muted-foreground">
 									{googleDriveBackupEnabled
 										? 'Upload backup to Google Drive'
 										: 'Enable Google Drive backup in settings first'}
@@ -79,13 +79,15 @@
 
 			<!-- Sync Results -->
 			{#if syncResults?.data?.results}
-				<div class="border rounded-lg p-4 bg-gray-50">
+				<div class="border rounded-lg p-4 bg-muted">
 					<h4 class="font-medium mb-3">Sync Results</h4>
 					<div class="space-y-2 text-sm">
 						{#if syncResults.data.results.sheets}
 							{@const sheets = syncResults.data.results.sheets}
 							<div
-								class="flex items-center gap-2 {sheets.success ? 'text-green-600' : 'text-red-600'}"
+								class="flex items-center gap-2 {sheets.success
+									? 'text-chart-2'
+									: 'text-destructive'}"
 							>
 								<span class="font-medium">{sheets.success ? '✓' : '✗'} Google Sheets:</span>
 								<span
@@ -100,7 +102,9 @@
 						{#if syncResults.data.results.backup}
 							{@const backup = syncResults.data.results.backup}
 							<div
-								class="flex items-center gap-2 {backup.success ? 'text-green-600' : 'text-red-600'}"
+								class="flex items-center gap-2 {backup.success
+									? 'text-chart-2'
+									: 'text-destructive'}"
 							>
 								<span class="font-medium">{backup.success ? '✓' : '✗'} Google Drive:</span>
 								<span
@@ -112,7 +116,7 @@
 								>
 							</div>
 							{#if backup.success && backup.deletedOldBackups > 0}
-								<div class="text-xs text-gray-500 pl-5">
+								<div class="text-xs text-muted-foreground pl-5">
 									Cleaned up {backup.deletedOldBackups} old backup{backup.deletedOldBackups > 1
 										? 's'
 										: ''}

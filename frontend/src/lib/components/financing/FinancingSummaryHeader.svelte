@@ -18,18 +18,14 @@
 	// Determine progress color based on percentage
 	let progressColor = $derived(
 		progressPercentage > 75
-			? 'text-green-600'
+			? 'text-chart-2'
 			: progressPercentage >= 50
-				? 'text-blue-600'
-				: 'text-orange-600'
+				? 'text-chart-3'
+				: 'text-chart-1'
 	);
 
 	let progressBarClass = $derived(
-		progressPercentage > 75
-			? 'bg-green-600'
-			: progressPercentage >= 50
-				? 'bg-blue-600'
-				: 'bg-orange-600'
+		progressPercentage > 75 ? 'bg-chart-2' : progressPercentage >= 50 ? 'bg-chart-3' : 'bg-chart-1'
 	);
 </script>
 
@@ -98,8 +94,8 @@
 							{formatCurrency(financing.originalAmount)}
 						</p>
 					</div>
-					<div class="rounded-full bg-blue-100 dark:bg-blue-900/20 p-2" aria-hidden="true">
-						<DollarSign class="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+					<div class="rounded-full bg-chart-3/10 p-2" aria-hidden="true">
+						<DollarSign class="h-4 w-4 sm:h-5 sm:w-5 text-chart-3" />
 					</div>
 				</div>
 			</CardContent>
@@ -120,8 +116,8 @@
 							{formatCurrency(financing.currentBalance)}
 						</p>
 					</div>
-					<div class="rounded-full bg-orange-100 dark:bg-orange-900/20 p-2" aria-hidden="true">
-						<Wallet class="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400" />
+					<div class="rounded-full bg-chart-1/10 p-2" aria-hidden="true">
+						<Wallet class="h-4 w-4 sm:h-5 sm:w-5 text-chart-1" />
 					</div>
 				</div>
 			</CardContent>
@@ -139,8 +135,8 @@
 							{formatCurrency(amountPaid)}
 						</p>
 					</div>
-					<div class="rounded-full bg-green-100 dark:bg-green-900/20 p-2" aria-hidden="true">
-						<TrendingUp class="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
+					<div class="rounded-full bg-chart-2/10 p-2" aria-hidden="true">
+						<TrendingUp class="h-4 w-4 sm:h-5 sm:w-5 text-chart-2" />
 					</div>
 				</div>
 			</CardContent>
@@ -163,18 +159,18 @@
 					</div>
 					<div
 						class="rounded-full p-2 {progressPercentage > 75
-							? 'bg-green-100 dark:bg-green-900/20'
+							? 'bg-chart-2/10'
 							: progressPercentage >= 50
-								? 'bg-blue-100 dark:bg-blue-900/20'
-								: 'bg-orange-100 dark:bg-orange-900/20'}"
+								? 'bg-chart-3/10'
+								: 'bg-chart-1/10'}"
 						aria-hidden="true"
 					>
 						<Target
 							class="h-4 w-4 sm:h-5 sm:w-5 {progressPercentage > 75
-								? 'text-green-600 dark:text-green-400'
+								? 'text-chart-2'
 								: progressPercentage >= 50
-									? 'text-blue-600 dark:text-blue-400'
-									: 'text-orange-600 dark:text-orange-400'}"
+									? 'text-chart-3'
+									: 'text-chart-1'}"
 						/>
 					</div>
 				</div>

@@ -44,12 +44,12 @@
 				<Label for="backup-file">Backup File</Label>
 				<Input id="backup-file" type="file" accept=".zip" onchange={onFileSelect} />
 				{#if selectedFile}
-					<p class="text-sm text-gray-600">
+					<p class="text-sm text-muted-foreground">
 						Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
 					</p>
 				{/if}
 				{#if isRestoring && !restorePreview}
-					<div class="flex items-center gap-2 text-sm text-primary-600">
+					<div class="flex items-center gap-2 text-sm text-primary">
 						<LoaderCircle class="h-4 w-4 animate-spin" />
 						<span>Generating preview...</span>
 					</div>
@@ -66,7 +66,7 @@
 							<Label for="mode-replace" class="font-normal cursor-pointer">
 								<div>
 									<div class="font-medium">Replace All</div>
-									<div class="text-sm text-gray-500">
+									<div class="text-sm text-muted-foreground">
 										Delete all existing data and import from backup
 									</div>
 								</div>
@@ -77,7 +77,7 @@
 							<Label for="mode-merge" class="font-normal cursor-not-allowed">
 								<div>
 									<div class="font-medium">Merge (Coming Soon)</div>
-									<div class="text-sm text-gray-500">
+									<div class="text-sm text-muted-foreground">
 										Merge backup data with existing data - currently unavailable
 									</div>
 								</div>
@@ -89,7 +89,7 @@
 
 			<!-- Preview Results -->
 			{#if restorePreview}
-				<div class="border rounded-lg p-4 bg-gray-50">
+				<div class="border rounded-lg p-4 bg-muted">
 					<h4 class="font-medium mb-3">Import Summary</h4>
 					<div class="space-y-2 text-sm">
 						<div class="flex justify-between">
@@ -118,15 +118,15 @@
 
 			<!-- Conflicts -->
 			{#if restoreConflicts.length > 0}
-				<div class="border border-yellow-300 rounded-lg p-4 bg-yellow-50">
-					<h4 class="font-medium mb-3 text-yellow-800">Conflicts Detected</h4>
-					<p class="text-sm text-yellow-700 mb-3">
+				<div class="border border-chart-5/30 rounded-lg p-4 bg-chart-5/5">
+					<h4 class="font-medium mb-3 text-chart-5">Conflicts Detected</h4>
+					<p class="text-sm text-muted-foreground mb-3">
 						{restoreConflicts.length} conflict(s) found. These records exist in both your current data
 						and the backup with different values.
 					</p>
 					<div class="space-y-2 max-h-48 overflow-y-auto">
 						{#each restoreConflicts as conflict}
-							<div class="text-sm bg-white p-2 rounded border">
+							<div class="text-sm bg-background p-2 rounded border">
 								<div class="font-medium">{conflict.table} - ID: {conflict.id}</div>
 							</div>
 						{/each}

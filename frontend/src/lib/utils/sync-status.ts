@@ -28,14 +28,14 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 
 	if (conflictsCount > 0) {
 		return {
-			color: 'text-orange-500',
+			color: 'text-chart-5',
 			icon: CircleAlert,
 			text: `${conflictsCount} conflict${conflictsCount > 1 ? 's' : ''}`
 		};
 	}
 
 	if (syncStatus === 'syncing') {
-		return { color: 'text-yellow-500', icon: RefreshCw, text: 'Syncing...' };
+		return { color: 'text-chart-5', icon: RefreshCw, text: 'Syncing...' };
 	}
 
 	if (syncStatus === 'error') {
@@ -43,16 +43,16 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 	}
 
 	if (syncStatus === 'success') {
-		return { color: 'text-green-500', icon: CircleCheck, text: 'Synced' };
+		return { color: 'text-chart-2', icon: CircleCheck, text: 'Synced' };
 	}
 
 	if (pendingCount > 0) {
 		return {
-			color: 'text-yellow-500',
+			color: 'text-chart-5',
 			icon: Clock,
 			text: `${pendingCount} pending`
 		};
 	}
 
-	return { color: 'text-green-500', icon: Wifi, text: 'Up to date' };
+	return { color: 'text-chart-2', icon: Wifi, text: 'Up to date' };
 }

@@ -95,7 +95,7 @@
 				<div class="flex items-center justify-between">
 					<span class="text-sm text-muted-foreground">Pending sync</span>
 					<div class="flex items-center gap-2">
-						<Clock class="h-4 w-4 text-yellow-500" />
+						<Clock class="h-4 w-4 text-chart-5" />
 						<span class="text-sm font-medium">{pendingCount} expenses</span>
 					</div>
 				</div>
@@ -146,11 +146,11 @@
 					Sync failed. Check your connection and try again.
 				</div>
 			{:else if $syncStatus === 'success'}
-				<div class="text-sm text-green-600 bg-green-500/10 p-2 rounded">
+				<div class="text-sm text-chart-2 bg-chart-2/10 p-2 rounded">
 					All expenses synced successfully.
 				</div>
 			{:else if !$isOnline}
-				<div class="text-sm text-orange-600 bg-orange-500/10 p-2 rounded">
+				<div class="text-sm text-chart-5 bg-chart-5/10 p-2 rounded">
 					You're offline. Expenses will sync when connection is restored.
 				</div>
 			{/if}

@@ -66,7 +66,7 @@
 				<Database class="h-4 w-4" />
 				Manual Backup
 			</Label>
-			<p class="text-sm text-gray-500">Download or upload ZIP files for offline storage</p>
+			<p class="text-sm text-muted-foreground">Download or upload ZIP files for offline storage</p>
 			<div class="flex gap-3">
 				<Button variant="outline" onclick={onBackup} disabled={isBackingUp} class="flex-1">
 					{#if isBackingUp}
@@ -89,7 +89,9 @@
 			<div class="flex items-center justify-between">
 				<div class="space-y-0.5">
 					<Label for="google-drive-backup">Google Drive Backup</Label>
-					<p class="text-sm text-gray-500">Auto-backup files to Google Drive after inactivity</p>
+					<p class="text-sm text-muted-foreground">
+						Auto-backup files to Google Drive after inactivity
+					</p>
 				</div>
 				<Switch id="google-drive-backup" bind:checked={googleDriveBackupEnabled} />
 			</div>
@@ -97,7 +99,7 @@
 			{#if googleDriveBackupEnabled}
 				{#if settings?.lastBackupDate}
 					<div class="pl-6">
-						<p class="text-sm text-gray-600">
+						<p class="text-sm text-muted-foreground">
 							Last backup: <span class="font-medium">{lastBackupText}</span>
 						</p>
 					</div>
@@ -125,7 +127,7 @@
 							<Select.Item value="50" label="50 backups">50 backups</Select.Item>
 						</Select.Content>
 					</Select.Root>
-					<p class="text-xs text-gray-500">Older backups will be automatically deleted</p>
+					<p class="text-xs text-muted-foreground">Older backups will be automatically deleted</p>
 				</div>
 
 				<div class="pl-6">
@@ -140,14 +142,16 @@
 			<div class="flex items-center justify-between">
 				<div class="space-y-0.5">
 					<Label for="sheets-sync">Google Sheets Sync</Label>
-					<p class="text-sm text-gray-500">Auto-sync data to Google Sheets after inactivity</p>
+					<p class="text-sm text-muted-foreground">
+						Auto-sync data to Google Sheets after inactivity
+					</p>
 				</div>
 				<Switch id="sheets-sync" bind:checked={googleSheetsSyncEnabled} />
 			</div>
 
 			{#if googleSheetsSyncEnabled && settings?.lastSyncDate}
 				<div class="pl-6">
-					<p class="text-sm text-gray-600">
+					<p class="text-sm text-muted-foreground">
 						Last sync: <span class="font-medium">
 							{new Date(settings.lastSyncDate).toLocaleDateString('en-US', {
 								year: 'numeric',
@@ -168,7 +172,7 @@
 						<Label for="inactivity-minutes" class="text-base font-semibold">
 							Automatic Sync Settings
 						</Label>
-						<p class="text-sm text-gray-500">
+						<p class="text-sm text-muted-foreground">
 							Automatically sync your data after a period of inactivity.
 						</p>
 					</div>
@@ -195,7 +199,7 @@
 								<Select.Item value="30" label="30 minutes">30 minutes</Select.Item>
 							</Select.Content>
 						</Select.Root>
-						<p class="text-xs text-gray-500">
+						<p class="text-xs text-muted-foreground">
 							Sync will trigger automatically after this period of no activity
 						</p>
 					</div>

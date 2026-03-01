@@ -684,7 +684,7 @@
 										{/if}
 									</div>
 								</div>
-								<Clock class="h-4 w-4 text-orange-500 flex-shrink-0" />
+								<Clock class="h-4 w-4 text-chart-5 flex-shrink-0" />
 							</div>
 						{/each}
 					</div>
@@ -735,7 +735,7 @@
 										{/if}
 									</div>
 								</div>
-								<CircleCheck class="h-4 w-4 text-green-500" />
+								<CircleCheck class="h-4 w-4 text-chart-2" />
 							</div>
 						{/each}
 					</div>

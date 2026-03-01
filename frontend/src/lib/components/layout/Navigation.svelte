@@ -58,12 +58,12 @@
 	let hasConflicts = $derived($syncConflicts.length > 0);
 
 	function getSyncStatusInfo() {
-		if (!$isOnline) return { color: 'text-red-500', icon: WifiOff };
-		if (hasConflicts) return { color: 'text-orange-500', icon: CircleAlert };
-		if ($syncStatus === 'syncing') return { color: 'text-yellow-500', icon: RefreshCw };
-		if ($syncStatus === 'error') return { color: 'text-red-500', icon: CircleAlert };
-		if (pendingCount > 0) return { color: 'text-yellow-500', icon: Clock };
-		return { color: 'text-green-500', icon: Wifi };
+		if (!$isOnline) return { color: 'text-destructive', icon: WifiOff };
+		if (hasConflicts) return { color: 'text-chart-5', icon: CircleAlert };
+		if ($syncStatus === 'syncing') return { color: 'text-chart-5', icon: RefreshCw };
+		if ($syncStatus === 'error') return { color: 'text-destructive', icon: CircleAlert };
+		if (pendingCount > 0) return { color: 'text-chart-5', icon: Clock };
+		return { color: 'text-chart-2', icon: Wifi };
 	}
 </script>
 

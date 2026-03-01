@@ -345,7 +345,7 @@
 
 	{#if isLoading}
 		<div class="flex items-center justify-center py-12">
-			<LoaderCircle class="h-8 w-8 animate-spin text-primary-600" />
+			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
 		</div>
 	{:else}
 		<div class="space-y-6 pb-32 sm:pb-24">
@@ -370,7 +370,7 @@
 	<Button
 		onclick={handleSave}
 		disabled={isSaving}
-		class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto sm:rounded-full rounded-full group !bg-gradient-to-r !from-primary-600 !to-primary-700 hover:!from-primary-700 hover:!to-primary-800 !text-white shadow-2xl hover:shadow-primary-500/50 transition-all duration-300 sm:hover:scale-110 !z-50 h-16 sm:h-16 !pl-6 !pr-10 !border-0 !justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+		class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto sm:rounded-full rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 z-50 h-16 sm:h-16 pl-6 pr-10 border-0 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
 	>
 		{#if isSaving}
 			<LoaderCircle class="h-6 w-6 animate-spin transition-transform duration-300" />
