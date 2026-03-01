@@ -5,6 +5,7 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/ui/empty-state.svelte';
+	import { formatMonthDay, formatDecimalAxis, getXTickCount } from '$lib/utils/chart-formatters';
 
 	// Chart configuration constants
 	const CHART_HEIGHT = 280;
@@ -24,6 +25,8 @@
 	}
 
 	let { data, fuelType, isLoading = false, error = null }: Props = $props();
+
+	let xTickCount = $derived(getXTickCount(data.length));
 
 	// Description based on fuel type
 	let description = $derived(
@@ -78,17 +81,11 @@
 					props={{
 						spline: { strokeWidth: 2 },
 						xAxis: {
-							format: (v: Date) => {
-								return v.toLocaleDateString('en-US', {
-									month: 'short',
-									day: 'numeric'
-								});
-							}
+							ticks: xTickCount,
+							format: formatMonthDay
 						},
 						yAxis: {
-							format: (v: number) => {
-								return v.toFixed(1);
-							}
+							format: formatDecimalAxis
 						}
 					}}
 				>

@@ -5,6 +5,7 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/ui/empty-state.svelte';
+	import { formatMonthDay, formatCurrencyAxis, getXTickCount } from '$lib/utils/chart-formatters';
 
 	// Chart configuration constants
 	const CHART_HEIGHT = 280;
@@ -31,6 +32,9 @@
 	}
 
 	let { data, period, isLoading = false, error = null }: Props = $props();
+
+	// Limit ticks to the number of data points to avoid duplicate labels
+	let xTickCount = $derived(getXTickCount(data.length));
 
 	// Format period label for display
 	let periodLabel = $derived.by(() => {
@@ -92,22 +96,11 @@
 							class: 'fill-primary/20 stroke-primary stroke-2'
 						},
 						xAxis: {
-							format: (v: Date) => {
-								return v.toLocaleDateString('en-US', {
-									month: 'short',
-									day: 'numeric'
-								});
-							}
+							ticks: xTickCount,
+							format: formatMonthDay
 						},
 						yAxis: {
-							format: (v: number) => {
-								return new Intl.NumberFormat('en-US', {
-									style: 'currency',
-									currency: 'USD',
-									minimumFractionDigits: 0,
-									maximumFractionDigits: 0
-								}).format(v);
-							}
+							format: formatCurrencyAxis
 						}
 					}}
 				>

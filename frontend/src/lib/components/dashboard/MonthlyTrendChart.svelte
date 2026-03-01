@@ -6,6 +6,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/ui/empty-state.svelte';
 	import { TrendingUp } from 'lucide-svelte';
+	import { formatMonthYear, formatCurrencyAxis, getXTickCount } from '$lib/utils/chart-formatters';
 
 	const CHART_HEIGHT = 320;
 
@@ -27,6 +28,9 @@
 	}
 
 	let { data, isLoading = false }: Props = $props();
+
+	// Limit ticks to the number of data points to avoid duplicate month labels
+	let xTickCount = $derived(getXTickCount(data.length));
 
 	const series = $derived([
 		{
@@ -65,22 +69,11 @@
 							class: 'fill-primary/20 stroke-primary stroke-2'
 						},
 						xAxis: {
-							format: (v: Date) => {
-								return v.toLocaleDateString('en-US', {
-									month: 'short',
-									year: 'numeric'
-								});
-							}
+							ticks: xTickCount,
+							format: formatMonthYear
 						},
 						yAxis: {
-							format: (v: number) => {
-								return new Intl.NumberFormat('en-US', {
-									style: 'currency',
-									currency: 'USD',
-									minimumFractionDigits: 0,
-									maximumFractionDigits: 0
-								}).format(v);
-							}
+							format: formatCurrencyAxis
 						}
 					}}
 				>
