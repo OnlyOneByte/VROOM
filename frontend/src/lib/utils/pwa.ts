@@ -63,7 +63,7 @@ export async function promptInstall(): Promise<boolean> {
 
 		return false;
 	} catch (error) {
-		console.error('Error prompting PWA install:', error);
+		if (import.meta.env.DEV) console.error('Error prompting PWA install:', error);
 		return false;
 	}
 }
@@ -92,7 +92,7 @@ export function registerServiceWorker(): void {
 			});
 		})
 		.catch(error => {
-			console.error('Service Worker registration failed:', error);
+			if (import.meta.env.DEV) console.error('Service Worker registration failed:', error);
 		});
 }
 
@@ -112,6 +112,6 @@ export async function requestBackgroundSync(tag: string, forceBrowser = false): 
 			).sync.register(tag);
 		}
 	} catch (error) {
-		console.error('Background sync registration failed:', error);
+		if (import.meta.env.DEV) console.error('Background sync registration failed:', error);
 	}
 }

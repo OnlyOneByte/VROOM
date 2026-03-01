@@ -100,7 +100,7 @@
 				if (firstVehicle) formData.vehicleId = firstVehicle.id;
 			}
 		} catch (error) {
-			console.error('Failed to load vehicles:', error);
+			if (import.meta.env.DEV) console.error('Failed to load vehicles:', error);
 		}
 	}
 
@@ -128,7 +128,7 @@
 			formData.description = expense.description || '';
 			selectedCategoryLabel = expense.category === 'fuel' ? 'Fuel' : expense.category || '';
 		} catch (error) {
-			console.error('Error loading expense:', error);
+			if (import.meta.env.DEV) console.error('Error loading expense:', error);
 			appStore.addNotification({ type: 'error', message: 'Error loading expense' });
 			goto(returnTo);
 		} finally {
@@ -140,7 +140,7 @@
 		try {
 			vehicle = await vehicleApi.getVehicle(formData.vehicleId);
 		} catch (error) {
-			console.error('Error loading vehicle:', error);
+			if (import.meta.env.DEV) console.error('Error loading vehicle:', error);
 		}
 	}
 
@@ -152,7 +152,7 @@
 				.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 			lastFuelExpense = fuelExpenses[0] || null;
 		} catch (error) {
-			console.error('Error loading last fuel expense:', error);
+			if (import.meta.env.DEV) console.error('Error loading last fuel expense:', error);
 		}
 	}
 
@@ -160,7 +160,7 @@
 		try {
 			allVehicleExpenses = await expenseApi.getExpensesByVehicle(formData.vehicleId);
 		} catch (error) {
-			console.error('Error loading vehicle expenses:', error);
+			if (import.meta.env.DEV) console.error('Error loading vehicle expenses:', error);
 		}
 	}
 
@@ -351,7 +351,7 @@
 				}
 			}
 		} catch (error) {
-			console.error('Failed to save expense:', error);
+			if (import.meta.env.DEV) console.error('Failed to save expense:', error);
 
 			if (!isEditMode) {
 				// Save offline as fallback for new expenses
@@ -416,7 +416,7 @@
 			});
 			goto(returnTo);
 		} catch (error) {
-			console.error('Failed to delete expense:', error);
+			if (import.meta.env.DEV) console.error('Failed to delete expense:', error);
 			appStore.addNotification({
 				type: 'error',
 				message: 'Failed to delete expense. Please try again.'

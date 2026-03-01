@@ -11,8 +11,8 @@
 		isRestoring: boolean;
 		selectedFile: File | null;
 		restoreMode: 'preview' | 'replace' | 'merge';
-		restorePreview: any;
-		restoreConflicts: any[];
+		restorePreview: Record<string, number | undefined> | null;
+		restoreConflicts: Array<{ table?: string; id?: string; field?: string }>;
 		onFileSelect: (_event: Event) => void;
 		onRestore: () => void;
 	}
@@ -94,23 +94,23 @@
 					<div class="space-y-2 text-sm">
 						<div class="flex justify-between">
 							<span>Vehicles:</span>
-							<span class="font-medium">{restorePreview.vehicles || 0}</span>
+							<span class="font-medium">{restorePreview['vehicles'] || 0}</span>
 						</div>
 						<div class="flex justify-between">
 							<span>Expenses:</span>
-							<span class="font-medium">{restorePreview.expenses || 0}</span>
+							<span class="font-medium">{restorePreview['expenses'] || 0}</span>
 						</div>
 						<div class="flex justify-between">
 							<span>Insurance Policies:</span>
-							<span class="font-medium">{restorePreview.insurance || 0}</span>
+							<span class="font-medium">{restorePreview['insurance'] || 0}</span>
 						</div>
 						<div class="flex justify-between">
 							<span>Vehicle Financing:</span>
-							<span class="font-medium">{restorePreview.financing || 0}</span>
+							<span class="font-medium">{restorePreview['financing'] || 0}</span>
 						</div>
 						<div class="flex justify-between">
 							<span>Financing Payments:</span>
-							<span class="font-medium">{restorePreview.financingPayments || 0}</span>
+							<span class="font-medium">{restorePreview['financingPayments'] || 0}</span>
 						</div>
 					</div>
 				</div>
@@ -127,7 +127,9 @@
 					<div class="space-y-2 max-h-48 overflow-y-auto">
 						{#each restoreConflicts as conflict}
 							<div class="text-sm bg-background p-2 rounded border">
-								<div class="font-medium">{conflict.table} - ID: {conflict.id}</div>
+								<div class="font-medium">
+									{conflict.table ?? conflict.field ?? 'Unknown'} - ID: {conflict.id ?? '-'}
+								</div>
 							</div>
 						{/each}
 					</div>

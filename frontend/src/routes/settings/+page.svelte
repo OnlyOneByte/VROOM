@@ -41,7 +41,7 @@
 	let selectedFile = $state<File | null>(null);
 	let restoreMode = $state<'preview' | 'replace' | 'merge'>('replace');
 	let restorePreview = $state<Record<string, number | undefined> | null>(null);
-	let restoreConflicts = $state<Array<{ field: string; local: unknown; remote: unknown }>>([]);
+	let restoreConflicts = $state<Array<{ table?: string; id?: string; field?: string }>>([]);
 	let syncSheets = $state(true);
 	let syncBackup = $state(true);
 	let syncResults = $state<{
@@ -206,19 +206,14 @@
 		restoreMode = 'replace';
 		isLoadingBackups = true;
 		try {
-			const result = await settingsStore.listBackups();
-			if (result.success && result.data) {
-				const rawBackups = Array.isArray(result.data) ? result.data : [];
-				driveBackups = rawBackups.map(
-					(b: { id: string; name: string; createdTime: string; size: string }) => ({
-						fileId: b.id,
-						fileName: b.name,
-						size: b.size,
-						createdTime: b.createdTime,
-						modifiedTime: b.createdTime
-					})
-				);
-			}
+			const backups = await settingsStore.listBackups();
+			driveBackups = (Array.isArray(backups) ? backups : []).map(b => ({
+				fileId: b.fileId,
+				fileName: b.fileName,
+				size: b.size,
+				createdTime: b.createdTime,
+				modifiedTime: b.modifiedTime
+			}));
 		} catch (error) {
 			appStore.showError(
 				error instanceof Error ? error.message : 'Failed to load backups from Google Drive'

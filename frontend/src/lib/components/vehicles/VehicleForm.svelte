@@ -25,12 +25,10 @@
 		AlertDialogTitle
 	} from '$lib/components/ui/alert-dialog';
 	import FinancingFormSection from './FinancingFormSection.svelte';
-	import { apiClient } from '$lib/services/api-client';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import type {
 		Vehicle,
 		VehicleFormData,
-		VehicleFinancing,
 		FinancingPaymentConfig,
 		VehicleFormErrors,
 		FinancingFormErrors
@@ -108,9 +106,7 @@
 
 			// Fetch financing data separately
 			try {
-				const financingData = await apiClient.get<VehicleFinancing>(
-					`/api/v1/financing/vehicles/${vehicleId}/financing`
-				);
+				const financingData = await vehicleApi.getFinancing(vehicleId!);
 				if (financingData && vehicle) {
 					vehicle.financing = financingData;
 				}
@@ -391,10 +387,7 @@
 				}
 
 				try {
-					await apiClient.post(
-						`/api/v1/financing/vehicles/${finalVehicleId}/financing`,
-						financingData
-					);
+					await vehicleApi.createFinancing(finalVehicleId, financingData);
 				} catch (financingError) {
 					const message =
 						financingError instanceof Error ? financingError.message : 'Unknown error';
@@ -424,7 +417,7 @@
 				goto('/dashboard');
 			}
 		} catch (error) {
-			console.error('Error submitting vehicle:', error);
+			if (import.meta.env.DEV) console.error('Error submitting vehicle:', error);
 			appStore.addNotification({
 				type: 'error',
 				message: `Error ${isEditMode ? 'updating' : 'adding'} vehicle. Please try again.`

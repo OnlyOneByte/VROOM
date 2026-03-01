@@ -262,3 +262,56 @@ Raw class names like `card`, `btn`, `btn-primary` don't exist in this project. U
 // ✅ CORRECT — use Tailwind utilities or Card component
 <form class="rounded-lg border bg-card p-6 space-y-6">
 ```
+
+
+## 18. Replace Deprecated Lucide Icons
+
+Lucide regularly deprecates icon names. Use the current names.
+
+```typescript
+// ❌ WRONG — found in CategoryBreakdownChart.svelte, ExpensesTable.svelte
+import { PieChartIcon, Filter } from 'lucide-svelte';
+
+// ✅ CORRECT
+import { ChartPie, ListFilter } from 'lucide-svelte';
+```
+
+## 19. Chart Color Values Must Use CSS Custom Properties
+
+Utility functions that produce colors for LayerChart/d3 charts must use `hsl(var(--chart-N))` instead of hardcoded hex values. This ensures charts respect the active theme.
+
+```typescript
+// ❌ WRONG — found in expense-helpers.ts getCategoryColorHex()
+const colors = { fuel: '#2563eb', maintenance: '#ea580c' };
+
+// ✅ CORRECT
+const colors = { fuel: 'hsl(var(--chart-1))', maintenance: 'hsl(var(--chart-5))' };
+```
+
+## 20. Avoid `any` in Component Props
+
+Use proper types or `unknown` with type guards. `any` in Props interfaces defeats TypeScript's purpose.
+
+```typescript
+// ❌ WRONG — found in RestoreFromDriveDialog, RestoreFromFileDialog, FinancingCharts
+restorePreview: any;
+restoreConflicts: any[];
+class: (d: any) => string;
+
+// ✅ CORRECT
+restorePreview: Record<string, number | undefined> | null;
+restoreConflicts: Array<{ table: string; id: string }>;
+class: (d: { data: { isPaid: boolean } }) => string;
+```
+
+## 21. Don't Use Non-Existent CSS Classes in Templates
+
+The `card` class doesn't exist in this project. Use Tailwind utilities or shadcn Card component.
+
+```svelte
+// ❌ WRONG — found in vehicles/[id]/+page.svelte expenses tab
+<div class="card space-y-4">
+
+// ✅ CORRECT
+<div class="rounded-lg border bg-card p-6 space-y-4">
+```

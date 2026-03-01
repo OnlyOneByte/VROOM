@@ -98,7 +98,12 @@
 		{/snippet}
 	</Popover.Trigger>
 	<Popover.Content class="w-auto p-0" align="start">
-		<RangeCalendar bind:value={rangeValue} numberOfMonths={2} captionLayout="dropdown" disableDaysOutsideMonth />
+		<RangeCalendar
+			bind:value={rangeValue}
+			numberOfMonths={2}
+			captionLayout="dropdown"
+			class="[&_td:has([data-outside-month])]:p-0 [&_td:has([data-outside-month])]:bg-transparent [&_[data-outside-month]]:invisible"
+		/>
 		{#if rangeValue}
 			<div class="border-t p-2 flex justify-end">
 				<Button variant="ghost" size="sm" onclick={clearRange}>Clear</Button>

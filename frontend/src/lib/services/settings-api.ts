@@ -29,10 +29,16 @@ interface RestoreResult {
 	data?: RestoreResult;
 }
 
-interface BackupListResult {
-	success: boolean;
-	data?: Array<{ id: string; name: string; createdTime: string; size: string }>;
+interface BackupItem {
+	fileId: string;
+	fileName: string;
+	createdTime: string;
+	modifiedTime: string;
+	size: string;
 }
+
+// apiClient unwraps the { success, data } envelope, so we get the array directly
+type BackupListResult = BackupItem[];
 
 interface SyncResult {
 	success: boolean;

@@ -39,46 +39,39 @@ export interface ExtraPaymentImpact {
 	totalSavings: number;
 }
 
-/**
- * Generate an amortization schedule for a loan (internal implementation)
- * @param financing - The vehicle financing object
- * @param paidPaymentCount - Number of payments already made (to mark as paid)
- * @returns Array of amortization entries
- */
+const DEV = import.meta.env.DEV;
+
 function calculateAmortizationScheduleImpl(
 	financing: VehicleFinancing,
 	paidPaymentCount = 0
 ): AmortizationEntry[] {
 	try {
-		// Validate financing data
 		if (!financing) {
-			console.warn('calculateAmortizationSchedule: financing is null or undefined');
+			if (DEV) console.warn('calculateAmortizationSchedule: financing is null or undefined');
 			return [];
 		}
 
-		// Only generate for loans with APR
 		if (financing.financingType !== 'loan' || !financing.apr || financing.apr <= 0) {
 			return [];
 		}
 
-		// Validate required fields
 		if (!financing.originalAmount || financing.originalAmount <= 0) {
-			console.warn('calculateAmortizationSchedule: invalid originalAmount');
+			if (DEV) console.warn('calculateAmortizationSchedule: invalid originalAmount');
 			return [];
 		}
 
 		if (!financing.paymentAmount || financing.paymentAmount <= 0) {
-			console.warn('calculateAmortizationSchedule: invalid paymentAmount');
+			if (DEV) console.warn('calculateAmortizationSchedule: invalid paymentAmount');
 			return [];
 		}
 
 		if (!financing.termMonths || financing.termMonths <= 0) {
-			console.warn('calculateAmortizationSchedule: invalid termMonths');
+			if (DEV) console.warn('calculateAmortizationSchedule: invalid termMonths');
 			return [];
 		}
 
 		if (!financing.startDate) {
-			console.warn('calculateAmortizationSchedule: missing startDate');
+			if (DEV) console.warn('calculateAmortizationSchedule: missing startDate');
 			return [];
 		}
 
@@ -88,23 +81,15 @@ function calculateAmortizationScheduleImpl(
 		let remainingBalance = financing.originalAmount;
 		const startDate = new Date(financing.startDate);
 
-		// Validate start date
 		if (isNaN(startDate.getTime())) {
-			console.warn('calculateAmortizationSchedule: invalid startDate');
+			if (DEV) console.warn('calculateAmortizationSchedule: invalid startDate');
 			return [];
 		}
 
 		for (let i = 1; i <= totalPayments; i++) {
-			// Calculate interest for this period
 			const interestAmount = remainingBalance * monthlyRate;
-
-			// Principal is payment minus interest
 			const principalAmount = Math.min(financing.paymentAmount - interestAmount, remainingBalance);
-
-			// Update remaining balance
 			remainingBalance = Math.max(0, remainingBalance - principalAmount);
-
-			// Calculate payment date
 			const paymentDate = calculatePaymentDate(startDate, i, financing.paymentFrequency);
 
 			schedule.push({
@@ -117,33 +102,22 @@ function calculateAmortizationScheduleImpl(
 				isPaid: i <= paidPaymentCount
 			});
 
-			// Stop if balance is paid off
-			if (remainingBalance === 0) {
-				break;
-			}
+			if (remainingBalance === 0) break;
 		}
 
 		return schedule;
 	} catch (error) {
-		console.error('Error calculating amortization schedule:', error);
+		if (DEV) console.error('Error calculating amortization schedule:', error);
 		return [];
 	}
 }
 
-/**
- * Calculate a specific payment date based on start date and payment number
- * @param startDate - The financing start date
- * @param paymentNumber - Which payment (1-indexed)
- * @param frequency - Payment frequency
- * @returns The calculated payment date
- */
 function calculatePaymentDate(startDate: Date, paymentNumber: number, frequency: string): Date {
 	try {
 		const date = new Date(startDate);
 
-		// Validate date
 		if (isNaN(date.getTime())) {
-			console.warn('calculatePaymentDate: invalid startDate, using current date');
+			if (DEV) console.warn('calculatePaymentDate: invalid startDate, using current date');
 			return new Date();
 		}
 
@@ -158,31 +132,23 @@ function calculatePaymentDate(startDate: Date, paymentNumber: number, frequency:
 				date.setDate(date.getDate() + paymentNumber * 7);
 				break;
 			default:
-				// For custom, default to monthly
 				date.setMonth(date.getMonth() + paymentNumber);
 		}
 
 		return date;
 	} catch (error) {
-		console.error('Error calculating payment date:', error);
+		if (DEV) console.error('Error calculating payment date:', error);
 		return new Date();
 	}
 }
 
-/**
- * Calculate the next payment due date
- * @param financing - The vehicle financing object
- * @param lastPaymentDate - Date of the last payment (optional)
- * @returns The next payment due date
- */
 export function calculateNextPaymentDate(
 	financing: VehicleFinancing,
 	lastPaymentDate?: Date
 ): Date {
 	try {
-		// Validate financing data
 		if (!financing || !financing.startDate) {
-			console.warn('calculateNextPaymentDate: invalid financing data');
+			if (DEV) console.warn('calculateNextPaymentDate: invalid financing data');
 			return new Date();
 		}
 
@@ -190,17 +156,14 @@ export function calculateNextPaymentDate(
 		const today = new Date();
 		const nextDate = new Date(baseDate);
 
-		// Validate dates
 		if (isNaN(nextDate.getTime())) {
-			console.warn('calculateNextPaymentDate: invalid base date');
+			if (DEV) console.warn('calculateNextPaymentDate: invalid base date');
 			return new Date();
 		}
 
-		// Safety counter to prevent infinite loops
 		let iterations = 0;
 		const maxIterations = 1000;
 
-		// Keep adding payment periods until we find a future date
 		while (nextDate <= today && iterations < maxIterations) {
 			switch (financing.paymentFrequency) {
 				case 'monthly':
@@ -219,47 +182,38 @@ export function calculateNextPaymentDate(
 		}
 
 		if (iterations >= maxIterations) {
-			console.warn('calculateNextPaymentDate: max iterations reached');
+			if (DEV) console.warn('calculateNextPaymentDate: max iterations reached');
 			return new Date();
 		}
 
 		return nextDate;
 	} catch (error) {
-		console.error('Error calculating next payment date:', error);
+		if (DEV) console.error('Error calculating next payment date:', error);
 		return new Date();
 	}
 }
 
-/**
- * Calculate the estimated payoff date based on current balance and payment schedule
- * @param financing - The vehicle financing object
- * @returns The estimated payoff date
- */
 export function calculatePayoffDate(financing: VehicleFinancing): Date {
 	try {
-		// Validate financing data
 		if (!financing) {
-			console.warn('calculatePayoffDate: financing is null or undefined');
+			if (DEV) console.warn('calculatePayoffDate: financing is null or undefined');
 			return new Date();
 		}
 
 		if (financing.currentBalance <= 0) {
-			return new Date(); // Already paid off
-		}
-
-		// Validate payment amount
-		if (!financing.paymentAmount || financing.paymentAmount <= 0) {
-			console.warn('calculatePayoffDate: invalid paymentAmount');
 			return new Date();
 		}
 
-		// For leases or loans without APR, use simple division
+		if (!financing.paymentAmount || financing.paymentAmount <= 0) {
+			if (DEV) console.warn('calculatePayoffDate: invalid paymentAmount');
+			return new Date();
+		}
+
 		if (financing.financingType === 'lease' || !financing.apr || financing.apr <= 0) {
 			const paymentsRemaining = Math.ceil(financing.currentBalance / financing.paymentAmount);
 			return calculatePaymentDate(new Date(), paymentsRemaining, financing.paymentFrequency);
 		}
 
-		// For loans with APR, calculate using amortization
 		const monthlyRate = financing.apr / 100 / 12;
 		let balance = financing.currentBalance;
 		let paymentsRemaining = 0;
@@ -268,9 +222,8 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 			const interestAmount = balance * monthlyRate;
 			const principalAmount = Math.min(financing.paymentAmount - interestAmount, balance);
 
-			// Prevent infinite loop if payment doesn't cover interest
 			if (principalAmount <= 0) {
-				console.warn('calculatePayoffDate: payment does not cover interest');
+				if (DEV) console.warn('calculatePayoffDate: payment does not cover interest');
 				return new Date();
 			}
 
@@ -280,68 +233,42 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 
 		return calculatePaymentDate(new Date(), paymentsRemaining, financing.paymentFrequency);
 	} catch (error) {
-		console.error('Error calculating payoff date:', error);
+		if (DEV) console.error('Error calculating payoff date:', error);
 		return new Date();
 	}
 }
 
-/**
- * Generate an amortization schedule for a loan (memoized)
- * @param financing - The vehicle financing object
- * @param paidPaymentCount - Number of payments already made (to mark as paid)
- * @returns Array of amortization entries
- */
 export const calculateAmortizationSchedule = memoizeMulti(calculateAmortizationScheduleImpl);
 
-/**
- * Calculate the impact of making extra payments (internal implementation)
- * @param financing - The vehicle financing object
- * @param extraPaymentAmount - The extra amount to pay per period
- * @returns Impact analysis of the extra payment
- */
 function calculateExtraPaymentImpactImpl(
 	financing: VehicleFinancing,
 	extraPaymentAmount: number
 ): ExtraPaymentImpact {
+	const defaultResult: ExtraPaymentImpact = {
+		extraPaymentAmount,
+		newPayoffDate: new Date(),
+		monthsSaved: 0,
+		interestSaved: 0,
+		totalSavings: 0
+	};
+
 	try {
-		// Validate financing data
 		if (!financing) {
-			console.warn('calculateExtraPaymentImpact: financing is null or undefined');
-			return {
-				extraPaymentAmount,
-				newPayoffDate: new Date(),
-				monthsSaved: 0,
-				interestSaved: 0,
-				totalSavings: 0
-			};
+			if (DEV) console.warn('calculateExtraPaymentImpact: financing is null or undefined');
+			return defaultResult;
 		}
 
-		// Only applicable to loans
 		if (financing.financingType !== 'loan' || !financing.apr || financing.apr <= 0) {
-			return {
-				extraPaymentAmount,
-				newPayoffDate: calculatePayoffDate(financing),
-				monthsSaved: 0,
-				interestSaved: 0,
-				totalSavings: 0
-			};
+			return { ...defaultResult, newPayoffDate: calculatePayoffDate(financing) };
 		}
 
-		// Validate extra payment amount
 		if (extraPaymentAmount <= 0) {
-			return {
-				extraPaymentAmount,
-				newPayoffDate: calculatePayoffDate(financing),
-				monthsSaved: 0,
-				interestSaved: 0,
-				totalSavings: 0
-			};
+			return { ...defaultResult, newPayoffDate: calculatePayoffDate(financing) };
 		}
 
 		const monthlyRate = financing.apr / 100 / 12;
 		const newPaymentAmount = financing.paymentAmount + extraPaymentAmount;
 
-		// Calculate original scenario
 		let originalBalance = financing.currentBalance;
 		let originalMonths = 0;
 		let originalTotalInterest = 0;
@@ -350,9 +277,8 @@ function calculateExtraPaymentImpactImpl(
 			const interestAmount = originalBalance * monthlyRate;
 			const principalAmount = Math.min(financing.paymentAmount - interestAmount, originalBalance);
 
-			// Prevent infinite loop
 			if (principalAmount <= 0) {
-				console.warn('calculateExtraPaymentImpact: payment does not cover interest');
+				if (DEV) console.warn('calculateExtraPaymentImpact: payment does not cover interest');
 				break;
 			}
 
@@ -361,7 +287,6 @@ function calculateExtraPaymentImpactImpl(
 			originalMonths++;
 		}
 
-		// Calculate new scenario with extra payment
 		let newBalance = financing.currentBalance;
 		let newMonths = 0;
 		let newTotalInterest = 0;
@@ -370,9 +295,8 @@ function calculateExtraPaymentImpactImpl(
 			const interestAmount = newBalance * monthlyRate;
 			const principalAmount = Math.min(newPaymentAmount - interestAmount, newBalance);
 
-			// Prevent infinite loop
 			if (principalAmount <= 0) {
-				console.warn('calculateExtraPaymentImpact: new payment does not cover interest');
+				if (DEV) console.warn('calculateExtraPaymentImpact: new payment does not cover interest');
 				break;
 			}
 
@@ -393,60 +317,37 @@ function calculateExtraPaymentImpactImpl(
 			totalSavings: interestSaved
 		};
 	} catch (error) {
-		console.error('Error calculating extra payment impact:', error);
-		return {
-			extraPaymentAmount,
-			newPayoffDate: new Date(),
-			monthsSaved: 0,
-			interestSaved: 0,
-			totalSavings: 0
-		};
+		if (DEV) console.error('Error calculating extra payment impact:', error);
+		return defaultResult;
 	}
 }
 
-/**
- * Calculate the impact of making extra payments (memoized)
- * @param financing - The vehicle financing object
- * @param extraPaymentAmount - The extra amount to pay per period
- * @returns Impact analysis of the extra payment
- */
 export const calculateExtraPaymentImpact = memoizeMulti(calculateExtraPaymentImpactImpl);
 
-/**
- * Calculate lease-specific metrics including mileage projections
- * @param financing - The vehicle financing object (must be a lease)
- * @param currentMileage - Current vehicle mileage
- * @param initialMileage - Initial vehicle mileage at lease start
- * @returns Lease metrics
- */
 export function calculateLeaseMetrics(
 	financing: VehicleFinancing,
 	currentMileage: number | null,
 	initialMileage: number | null
 ): LeaseMetrics | null {
 	try {
-		// Validate financing data
 		if (!financing) {
-			console.warn('calculateLeaseMetrics: financing is null or undefined');
+			if (DEV) console.warn('calculateLeaseMetrics: financing is null or undefined');
 			return null;
 		}
 
-		// Only applicable to leases
 		if (financing.financingType !== 'lease') {
 			return null;
 		}
 
-		// Validate start date
 		if (!financing.startDate) {
-			console.warn('calculateLeaseMetrics: missing startDate');
+			if (DEV) console.warn('calculateLeaseMetrics: missing startDate');
 			return null;
 		}
 
 		const startDate = new Date(financing.startDate);
 
-		// Validate date
 		if (isNaN(startDate.getTime())) {
-			console.warn('calculateLeaseMetrics: invalid startDate');
+			if (DEV) console.warn('calculateLeaseMetrics: invalid startDate');
 			return null;
 		}
 
@@ -454,21 +355,18 @@ export function calculateLeaseMetrics(
 			? new Date(financing.endDate)
 			: new Date(startDate.getTime() + financing.termMonths * 30 * 24 * 60 * 60 * 1000);
 
-		// Validate end date
 		if (isNaN(endDate.getTime())) {
-			console.warn('calculateLeaseMetrics: invalid endDate');
+			if (DEV) console.warn('calculateLeaseMetrics: invalid endDate');
 			return null;
 		}
 
 		const now = new Date();
 
-		// Calculate time metrics
 		const totalDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 		const daysElapsed = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 		const daysRemaining = Math.max(0, totalDays - daysElapsed);
 		const monthsRemaining = Math.max(0, Math.ceil(daysRemaining / 30));
 
-		// Calculate mileage metrics
 		let mileageUsed = 0;
 		let mileageRemaining = financing.mileageLimit || 0;
 		let projectedFinalMileage = currentMileage || 0;
@@ -497,16 +395,11 @@ export function calculateLeaseMetrics(
 			isOverMileage
 		};
 	} catch (error) {
-		console.error('Error calculating lease metrics:', error);
+		if (DEV) console.error('Error calculating lease metrics:', error);
 		return null;
 	}
 }
 
-/**
- * Format payment frequency for display
- * @param frequency - The payment frequency
- * @returns Formatted string
- */
 export function formatPaymentFrequency(frequency: string): string {
 	const frequencyMap: Record<string, string> = {
 		monthly: 'Monthly',
@@ -518,11 +411,6 @@ export function formatPaymentFrequency(frequency: string): string {
 	return frequencyMap[frequency] || frequency;
 }
 
-/**
- * Calculate days until a specific date
- * @param targetDate - The target date
- * @returns Number of days until the date (negative if in the past)
- */
 export function calculateDaysUntil(targetDate: Date): number {
 	const now = new Date();
 	const diffTime = targetDate.getTime() - now.getTime();

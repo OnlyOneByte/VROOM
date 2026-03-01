@@ -21,7 +21,7 @@
 			if (!financing || !financing.originalAmount || !financing.currentBalance) return 0;
 			return Math.max(0, financing.originalAmount - financing.currentBalance);
 		} catch (error) {
-			console.error('Error calculating amount paid:', error);
+			if (import.meta.env.DEV) console.error('Error calculating amount paid:', error);
 			return 0;
 		}
 	});
@@ -31,7 +31,7 @@
 			if (!financing || !financing.originalAmount || financing.originalAmount <= 0) return 0;
 			return (amountPaid / financing.originalAmount) * 100;
 		} catch (error) {
-			console.error('Error calculating progress percentage:', error);
+			if (import.meta.env.DEV) console.error('Error calculating progress percentage:', error);
 			return 0;
 		}
 	});
@@ -41,7 +41,7 @@
 		try {
 			return payments.reduce((sum, payment) => sum + (payment.principalAmount || 0), 0);
 		} catch (error) {
-			console.error('Error calculating principal paid:', error);
+			if (import.meta.env.DEV) console.error('Error calculating principal paid:', error);
 			return 0;
 		}
 	});
@@ -50,7 +50,7 @@
 		try {
 			return payments.reduce((sum, payment) => sum + (payment.interestAmount || 0), 0);
 		} catch (error) {
-			console.error('Error calculating interest paid:', error);
+			if (import.meta.env.DEV) console.error('Error calculating interest paid:', error);
 			return 0;
 		}
 	});
@@ -357,7 +357,7 @@
 					series={amortizationSeries}
 					props={{
 						bars: {
-							class: (d: any) => {
+							class: (d: { data: { isPaid: boolean } }) => {
 								const opacity = d.data.isPaid ? 'opacity-100' : 'opacity-40';
 								return `${opacity}`;
 							}

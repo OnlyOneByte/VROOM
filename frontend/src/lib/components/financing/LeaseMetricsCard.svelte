@@ -20,7 +20,7 @@
 		try {
 			return calculateLeaseMetrics(financing, currentMileage, initialMileage);
 		} catch (error) {
-			console.error('Error calculating lease metrics:', error);
+			if (import.meta.env.DEV) console.error('Error calculating lease metrics:', error);
 			return null;
 		}
 	});
@@ -31,7 +31,7 @@
 			if (!leaseMetrics || !financing.mileageLimit || financing.mileageLimit <= 0) return 0;
 			return Math.min(100, (leaseMetrics.mileageUsed / financing.mileageLimit) * 100);
 		} catch (error) {
-			console.error('Error calculating mileage usage percentage:', error);
+			if (import.meta.env.DEV) console.error('Error calculating mileage usage percentage:', error);
 			return 0;
 		}
 	});
@@ -58,7 +58,7 @@
 			endDate.setMonth(endDate.getMonth() + financing.termMonths);
 			return endDate;
 		} catch (error) {
-			console.error('Error calculating lease end date:', error);
+			if (import.meta.env.DEV) console.error('Error calculating lease end date:', error);
 			return new Date();
 		}
 	});

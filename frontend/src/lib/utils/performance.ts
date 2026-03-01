@@ -27,7 +27,7 @@ class PerformanceMonitor {
 	end(name: string, metadata?: Record<string, unknown>): PerformanceMetrics | null {
 		const startTime = this.measurements.get(name);
 		if (!startTime) {
-			console.warn(`Performance measurement '${name}' was not started`);
+			if (import.meta.env.DEV) console.warn(`Performance measurement '${name}' was not started`);
 			return null;
 		}
 
@@ -47,7 +47,8 @@ class PerformanceMonitor {
 
 		// Log slow operations
 		if (duration > 1000) {
-			console.warn(`Slow operation detected: ${name} took ${duration.toFixed(2)}ms`);
+			if (import.meta.env.DEV)
+				console.warn(`Slow operation detected: ${name} took ${duration.toFixed(2)}ms`);
 		}
 
 		return metric;

@@ -77,9 +77,7 @@
 				</div>
 			{:else if status === 'success'}
 				<div class="space-y-4">
-					<div
-						class="w-8 h-8 bg-green-500/10 rounded-full flex items-center justify-center mx-auto"
-					>
+					<div class="w-8 h-8 bg-chart-2/10 rounded-full flex items-center justify-center mx-auto">
 						<Check class="w-5 h-5 text-chart-2" />
 					</div>
 					<h3 class="text-lg font-medium text-foreground">Sign in successful!</h3>

@@ -142,7 +142,7 @@
 				((financing.originalAmount - financing.currentBalance) / financing.originalAmount) * 100
 			);
 		} catch (error) {
-			console.error('Error calculating progress percentage:', error);
+			if (import.meta.env.DEV) console.error('Error calculating progress percentage:', error);
 			return 0;
 		}
 	});
@@ -151,7 +151,7 @@
 		try {
 			return payments.reduce((sum, payment) => sum + (payment.interestAmount || 0), 0);
 		} catch (error) {
-			console.error('Error calculating total interest paid:', error);
+			if (import.meta.env.DEV) console.error('Error calculating total interest paid:', error);
 			return 0;
 		}
 	});
@@ -162,7 +162,7 @@
 			if (!financing || !financing.isActive) return new Date();
 			return calculatePayoffDate(financing);
 		} catch (error) {
-			console.error('Error calculating payoff date:', error);
+			if (import.meta.env.DEV) console.error('Error calculating payoff date:', error);
 			return new Date();
 		}
 	});
@@ -175,7 +175,7 @@
 				payments.length > 0 && payments[0] ? new Date(payments[0].paymentDate) : undefined;
 			return calculateNextPaymentDate(financing, lastPayment);
 		} catch (error) {
-			console.error('Error calculating next payment date:', error);
+			if (import.meta.env.DEV) console.error('Error calculating next payment date:', error);
 			return new Date();
 		}
 	});
@@ -186,7 +186,7 @@
 			if (!financing || !financing.isActive) return [];
 			return calculateAmortizationSchedule(financing, payments.length);
 		} catch (error) {
-			console.error('Error calculating amortization schedule:', error);
+			if (import.meta.env.DEV) console.error('Error calculating amortization schedule:', error);
 			return [];
 		}
 	});
@@ -258,7 +258,7 @@
 		try {
 			payments = await vehicleApi.getFinancingPayments(vehicleId);
 		} catch (error) {
-			console.error('Error loading payment history:', error);
+			if (import.meta.env.DEV) console.error('Error loading payment history:', error);
 			paymentHistoryError = 'Failed to load payment history. Please try again.';
 			// Don't show notification for payment history errors - show inline error instead
 		} finally {
@@ -404,7 +404,7 @@
 			<!-- Expenses Tab -->
 			<TabsContent value="expenses" class="space-y-6">
 				<!-- Search and Filters -->
-				<div class="card space-y-4">
+				<div class="rounded-lg border bg-card p-6 space-y-4">
 					<!-- Search Bar -->
 					<div class="flex gap-2">
 						<div class="flex-1 relative">

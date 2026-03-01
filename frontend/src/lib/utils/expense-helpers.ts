@@ -302,18 +302,19 @@ export interface CategoryChartData {
 }
 
 /**
- * Get color hex value for category (for charts)
+ * Get color value for category (for charts)
+ * Uses CSS custom properties so charts respect the active theme.
  */
 function getCategoryColorHex(category: ExpenseCategory): string {
 	const colors: Record<ExpenseCategory, string> = {
-		fuel: '#2563eb', // blue-600
-		maintenance: '#ea580c', // orange-600
-		financial: '#16a34a', // green-600
-		regulatory: '#9333ea', // purple-600
-		enhancement: '#db2777', // pink-600
-		misc: '#4b5563' // gray-600
+		fuel: 'hsl(var(--chart-1))',
+		maintenance: 'hsl(var(--chart-5))',
+		financial: 'hsl(var(--chart-2))',
+		regulatory: 'hsl(var(--chart-4))',
+		enhancement: 'hsl(var(--chart-3))',
+		misc: 'hsl(var(--muted-foreground))'
 	};
-	return colors[category] || '#4b5563';
+	return colors[category] || 'hsl(var(--muted-foreground))';
 }
 
 /**

@@ -32,7 +32,7 @@
 			appStore.setVehicles(vehicles);
 			vehiclesLoaded = true;
 		} catch (error) {
-			console.error('Failed to load vehicles:', error);
+			if (import.meta.env.DEV) console.error('Failed to load vehicles:', error);
 		}
 	}
 

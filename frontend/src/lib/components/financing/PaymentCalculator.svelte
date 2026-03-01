@@ -50,7 +50,7 @@
 			if (debouncedExtraPaymentAmount <= 0) return null;
 			return calculateExtraPaymentImpact(financing, debouncedExtraPaymentAmount);
 		} catch (error) {
-			console.error('Error calculating extra payment impact:', error);
+			if (import.meta.env.DEV) console.error('Error calculating extra payment impact:', error);
 			return null;
 		}
 	});

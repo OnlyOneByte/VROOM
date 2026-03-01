@@ -12,7 +12,15 @@
 		syncBackup: boolean;
 		googleSheetsSyncEnabled: boolean;
 		googleDriveBackupEnabled: boolean;
-		syncResults: any;
+		syncResults: {
+			success: boolean;
+			data?: {
+				results: Record<
+					string,
+					{ success: boolean; message?: string; skipped?: boolean; deletedOldBackups?: number }
+				>;
+			};
+		} | null;
 		onSync: () => void;
 	}
 
@@ -82,8 +90,8 @@
 				<div class="border rounded-lg p-4 bg-muted">
 					<h4 class="font-medium mb-3">Sync Results</h4>
 					<div class="space-y-2 text-sm">
-						{#if syncResults.data.results.sheets}
-							{@const sheets = syncResults.data.results.sheets}
+						{#if syncResults.data.results['sheets']}
+							{@const sheets = syncResults.data.results['sheets']}
 							<div
 								class="flex items-center gap-2 {sheets.success
 									? 'text-chart-2'
@@ -99,8 +107,8 @@
 								>
 							</div>
 						{/if}
-						{#if syncResults.data.results.backup}
-							{@const backup = syncResults.data.results.backup}
+						{#if syncResults.data.results['backup']}
+							{@const backup = syncResults.data.results['backup']}
 							<div
 								class="flex items-center gap-2 {backup.success
 									? 'text-chart-2'
@@ -115,9 +123,10 @@
 											: backup.message || 'Failed'}</span
 								>
 							</div>
-							{#if backup.success && backup.deletedOldBackups > 0}
+							{#if backup.success && (backup.deletedOldBackups ?? 0) > 0}
 								<div class="text-xs text-muted-foreground pl-5">
-									Cleaned up {backup.deletedOldBackups} old backup{backup.deletedOldBackups > 1
+									Cleaned up {backup.deletedOldBackups} old backup{(backup.deletedOldBackups ?? 0) >
+									1
 										? 's'
 										: ''}
 								</div>

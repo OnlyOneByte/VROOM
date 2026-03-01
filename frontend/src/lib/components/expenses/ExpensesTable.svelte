@@ -7,7 +7,7 @@
 		Search,
 		Car,
 		LoaderCircle,
-		Filter
+		ListFilter
 	} from 'lucide-svelte';
 	import { settingsStore } from '$lib/stores/settings';
 	import { appStore } from '$lib/stores/app';
@@ -234,7 +234,7 @@
 									>
 										<div class="flex items-center gap-1">
 											{#if categoryFilter}
-												<Filter class="h-3.5 w-3.5 text-primary" />
+												<ListFilter class="h-3.5 w-3.5 text-primary" />
 												{categoryLabels[categoryFilter as ExpenseCategory]}
 											{:else}
 												Category

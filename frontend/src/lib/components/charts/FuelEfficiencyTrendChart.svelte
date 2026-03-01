@@ -37,7 +37,7 @@
 	const chartConfig: Chart.ChartConfig = {
 		efficiency: {
 			label: 'Efficiency',
-			color: 'hsl(142.1 76.2% 36.3%)' // green-600
+			color: 'hsl(var(--chart-2))'
 		}
 	};
 
@@ -46,7 +46,7 @@
 		{
 			key: 'efficiency',
 			label: chartConfig['efficiency']?.label || 'Efficiency',
-			color: chartConfig['efficiency']?.color || 'hsl(142.1 76.2% 36.3%)'
+			color: chartConfig['efficiency']?.color || 'hsl(var(--chart-2))'
 		}
 	]);
 </script>

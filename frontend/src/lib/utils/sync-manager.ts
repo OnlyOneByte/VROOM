@@ -79,7 +79,7 @@ export async function fetchLastSyncTime(): Promise<void> {
 			}
 		}
 	} catch (error) {
-		console.error('Failed to fetch last sync time:', error);
+		if (import.meta.env.DEV) console.error('Failed to fetch last sync time:', error);
 	}
 }
 
@@ -254,7 +254,7 @@ class SyncManager {
 				expenseList.find(existing => expense.tags.some(tag => existing.tags?.includes(tag))) || null
 			);
 		} catch (error) {
-			console.warn('Failed to check for existing expense:', error);
+			if (import.meta.env.DEV) console.warn('Failed to check for existing expense:', error);
 			return null;
 		}
 	}
@@ -298,7 +298,7 @@ class SyncManager {
 				offlineExpenses.set(updatedExpenses);
 			}
 		} catch (error) {
-			console.error('Retry failed for expense:', expense.id, error);
+			if (import.meta.env.DEV) console.error('Retry failed for expense:', expense.id, error);
 		}
 	}
 
@@ -345,7 +345,7 @@ class SyncManager {
 					return await this.resolveConflict(conflict, 'keep_local');
 			}
 		} catch (error) {
-			console.error('Failed to resolve conflict:', error);
+			if (import.meta.env.DEV) console.error('Failed to resolve conflict:', error);
 		}
 
 		return false;

@@ -42,7 +42,7 @@ export function loadOfflineExpenses(): OfflineExpense[] {
 			return expense;
 		});
 	} catch (error) {
-		console.error('Failed to load offline expenses:', error);
+		if (import.meta.env.DEV) console.error('Failed to load offline expenses:', error);
 		return [];
 	}
 }
@@ -55,7 +55,7 @@ export function saveOfflineExpenses(expenses: OfflineExpense[]): void {
 		localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(expenses));
 		offlineExpenses.set(expenses);
 	} catch (error) {
-		console.error('Failed to save offline expenses:', error);
+		if (import.meta.env.DEV) console.error('Failed to save offline expenses:', error);
 	}
 }
 
@@ -119,9 +119,11 @@ export async function syncOfflineExpenses(): Promise<void> {
 				expense.category === 'fuel' &&
 				((!expense.volume && !expense.charge) || !expense.mileage)
 			) {
-				console.warn(
-					`Skipping expense ${expense.id}: Fuel expenses require volume/charge and mileage data`
-				);
+				if (import.meta.env.DEV) {
+					console.warn(
+						`Skipping expense ${expense.id}: Fuel expenses require volume/charge and mileage data`
+					);
+				}
 				continue;
 			}
 
@@ -146,7 +148,7 @@ export async function syncOfflineExpenses(): Promise<void> {
 		syncStatus.set('success');
 		setTimeout(() => syncStatus.set('idle'), 3000);
 	} catch (error) {
-		console.error('Failed to sync offline expenses:', error);
+		if (import.meta.env.DEV) console.error('Failed to sync offline expenses:', error);
 		syncStatus.set('error');
 		setTimeout(() => syncStatus.set('idle'), 5000);
 	}

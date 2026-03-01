@@ -169,7 +169,7 @@
 				vehicle: vehicles.find(v => v.id === expense.vehicleId)
 			}));
 		} catch (error) {
-			console.error('Failed to load expenses:', error);
+			if (import.meta.env.DEV) console.error('Failed to load expenses:', error);
 		} finally {
 			isLoading = false;
 		}

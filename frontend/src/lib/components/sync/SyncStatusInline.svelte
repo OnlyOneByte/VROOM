@@ -46,7 +46,7 @@
 			try {
 				await syncManager.syncAll();
 			} catch (error) {
-				console.error('Manual sync failed:', error);
+				if (import.meta.env.DEV) console.error('Manual sync failed:', error);
 			}
 		}
 	}

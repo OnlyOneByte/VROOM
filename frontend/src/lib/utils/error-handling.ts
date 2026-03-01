@@ -189,7 +189,9 @@ export function handleErrorWithNotification(error: unknown, context?: string): v
 	const appError = handleApiError(error);
 	const message = context ? `${context}: ${appError.message}` : appError.message;
 
-	console.error('Application error:', appError);
+	if (import.meta.env.DEV) {
+		console.error('Application error:', appError);
+	}
 
 	appStore.addNotification({
 		type: 'error',
@@ -280,7 +282,9 @@ export function createErrorBoundary() {
 		catch(err: unknown) {
 			hasError = true;
 			error = handleApiError(err);
-			console.error('Component error boundary caught:', error);
+			if (import.meta.env.DEV) {
+				console.error('Component error boundary caught:', error);
+			}
 		},
 		reset() {
 			hasError = false;

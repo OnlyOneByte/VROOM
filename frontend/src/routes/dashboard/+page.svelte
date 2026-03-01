@@ -105,12 +105,12 @@
 	// Derived: category breakdown chart data
 	let categoryChartData = $derived.by(() => {
 		const colors: Record<string, string> = {
-			fuel: 'hsl(217, 91%, 60%)',
-			maintenance: 'hsl(25, 95%, 53%)',
-			financial: 'hsl(142, 71%, 45%)',
-			regulatory: 'hsl(262, 83%, 58%)',
-			enhancement: 'hsl(330, 81%, 60%)',
-			misc: 'hsl(215, 16%, 47%)'
+			fuel: 'hsl(var(--chart-1))',
+			maintenance: 'hsl(var(--chart-5))',
+			financial: 'hsl(var(--chart-2))',
+			regulatory: 'hsl(var(--chart-4))',
+			enhancement: 'hsl(var(--chart-3))',
+			misc: 'hsl(var(--muted-foreground))'
 		};
 
 		const categoryMap = new Map<string, number>();
@@ -125,7 +125,7 @@
 			name: categoryLabels[category as ExpenseCategory] || category,
 			amount,
 			percentage: total > 0 ? (amount / total) * 100 : 0,
-			color: (colors[category] ?? colors['other']) as string
+			color: (colors[category] ?? colors['misc']) as string
 		}));
 	});
 

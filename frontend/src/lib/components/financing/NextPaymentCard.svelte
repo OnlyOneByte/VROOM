@@ -23,7 +23,7 @@
 			const lastPaymentDate = lastPayment ? new Date(lastPayment.paymentDate) : undefined;
 			return calculateNextPaymentDate(financing, lastPaymentDate);
 		} catch (error) {
-			console.error('Error calculating next payment date:', error);
+			if (import.meta.env.DEV) console.error('Error calculating next payment date:', error);
 			return new Date();
 		}
 	});
@@ -33,7 +33,7 @@
 		try {
 			return calculateDaysUntil(nextPaymentDate);
 		} catch (error) {
-			console.error('Error calculating days until payment:', error);
+			if (import.meta.env.DEV) console.error('Error calculating days until payment:', error);
 			return 0;
 		}
 	});

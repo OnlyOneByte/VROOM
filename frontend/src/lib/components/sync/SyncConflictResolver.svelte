@@ -42,7 +42,7 @@
 				}
 			}
 		} catch (error) {
-			console.error('Failed to resolve conflict:', error);
+			if (import.meta.env.DEV) console.error('Failed to resolve conflict:', error);
 		} finally {
 			resolving = false;
 		}

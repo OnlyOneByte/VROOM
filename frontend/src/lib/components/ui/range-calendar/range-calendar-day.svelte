@@ -15,7 +15,7 @@
 	class={cn(
 		buttonVariants({ variant: 'ghost' }),
 		'size-(--cell-size) flex select-none flex-col items-center justify-center gap-1 whitespace-nowrap p-0 font-normal leading-none',
-		'[&[data-today]:not([data-selected])]:bg-accent [&[data-today]:not([data-selected])]:text-accent-foreground [&[data-today][data-disabled]]:text-muted-foreground data-[range-middle]:rounded-none',
+		'[&[data-today][data-disabled]]:text-muted-foreground data-[range-middle]:rounded-none',
 		// range Start
 		'data-[range-start]:bg-primary dark:data-[range-start]:hover:bg-accent data-[range-start]:text-primary-foreground',
 		// range End
