@@ -284,7 +284,7 @@
 		<Skeleton class="h-64 w-full" />
 	</div>
 {:else}
-	<div class="space-y-6">
+	<div class="space-y-6 pb-24 sm:pb-0">
 		<!-- Header -->
 		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 			<div>
@@ -399,9 +399,10 @@
 							</div>
 						{/if}
 					</div>
-					<div
-						class="border rounded-lg p-2 min-h-[42px] bg-background border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background"
-					>
+					<div class="relative">
+						<div
+							class="border rounded-lg p-2 min-h-[42px] bg-background border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background"
+						>
 						<div class="flex flex-wrap gap-1.5 items-center">
 							{#each selectedTags as tag}
 								<Badge variant="secondary" class="gap-1 pr-1">
@@ -436,7 +437,7 @@
 
 					{#if tagSearchFocused && tagSuggestions.length > 0}
 						<div
-							class="border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto"
+							class="absolute z-50 left-0 right-0 mt-1 border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto"
 						>
 							{#each tagSuggestions.slice(0, 8) as suggestion}
 								<button
@@ -450,6 +451,7 @@
 							{/each}
 						</div>
 					{/if}
+					</div>
 				</div>
 
 				<!-- Clear Filters -->

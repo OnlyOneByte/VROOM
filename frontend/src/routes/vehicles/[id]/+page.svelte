@@ -319,7 +319,7 @@
 		</div>
 	</div>
 {:else if vehicle}
-	<div class="space-y-6">
+	<div class="space-y-6 pb-24 sm:pb-0">
 		<!-- Header -->
 		<VehicleHeader {vehicle} displayName={vehicleDisplayName} />
 
