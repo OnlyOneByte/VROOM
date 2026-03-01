@@ -51,8 +51,8 @@
 		}
 	}
 
-	let inputValue = $state(financing.paymentAmount.toFixed(2));
-	let savedAmount = $state(financing.paymentAmount);
+	let inputValue = $state('');
+	let savedAmount = $state(0);
 	let isSaving = $state(false);
 	let saveError = $state('');
 
@@ -60,7 +60,7 @@
 	let minimumPayment = $derived(calculateMinimumPayment(financing));
 
 	// Debounced input for impact calculations
-	let debouncedInput = $state(financing.paymentAmount);
+	let debouncedInput = $state(0);
 	const updateDebounced = debounce((val: number) => {
 		debouncedInput = val;
 	}, 300);

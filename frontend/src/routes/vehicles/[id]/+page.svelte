@@ -63,7 +63,7 @@
 
 	// Props from page load
 	let { data }: { data: PageData } = $props();
-	const vehicleId = data.vehicleId;
+	let vehicleId = $derived(data.vehicleId);
 
 	// Component state
 	let isLoading = $state(true);

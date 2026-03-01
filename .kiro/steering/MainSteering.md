@@ -37,6 +37,15 @@ Always use `--no-pager` immediately after `git` for commands with large output (
 - `$effect(() => { ... })` for side effects. Never create empty or no-op effects that track nothing.
 - `let { prop = default } = $props()` for component props.
 
+### Handling `state_referenced_locally` Warnings
+
+Svelte warns when a `$props()` or `$derived` value is captured once into `$state()` or a `const` instead of being used reactively. Apply this decision tree:
+
+- If the prop can change during the component's lifetime (e.g., `data` from SvelteKit page load, a bindable parent prop), it's a real bug — use `$derived` instead of `const`.
+- If the prop is stable for the component's lifetime (e.g., `expenseId` or `vehicleId` from a URL param, a one-time config prop), the warning is a false positive — `$state(!!prop)` for initial values is fine.
+- If the value is reset by an `$effect` (e.g., dialog state reset when `open` changes), initialize with a plain default and let the effect handle it.
+- Never "fix" the warning by wrapping in `$derived` when you actually need mutable `$state` — that changes semantics.
+
 ### Forbidden Patterns
 
 - Never use `$:` reactive statements. Use `$derived()` or `$effect()`.
@@ -61,6 +70,7 @@ let doubled = $derived(count * 2);
 - Use shadcn-svelte charts (built on layerchart) for charts. Do not use recharts.
 - Use semantic color tokens (`text-foreground`, `bg-background`, `text-muted-foreground`, `border-input`) instead of hardcoded Tailwind colors (`text-gray-900`, `bg-white`).
 - Use `LoaderCircle` from `lucide-svelte` with `animate-spin` for loading spinners. No custom CSS spinners.
+- Do not modify shadcn-svelte registry components (`$lib/components/ui/`) to fix warnings or lint issues. These are upstream-managed; diverging creates maintenance burden when updating the registry. Tolerate warnings in `ui/` components.
 
 ## Frontend Architecture
 
