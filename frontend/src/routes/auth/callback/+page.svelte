@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { authStore } from '$lib/stores/auth.js';
 
 	let status = $state('processing');
@@ -13,7 +13,7 @@
 	onMount(async () => {
 		try {
 			// Get the current URL parameters
-			const urlParams = new URLSearchParams($page.url.search);
+			const urlParams = new URLSearchParams(page.url.search);
 			const code = urlParams.get('code');
 
 			const errorParam = urlParams.get('error');
@@ -59,21 +59,19 @@
 	<title>Authenticating - VROOM Car Tracker</title>
 </svelte:head>
 
-<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+<div class="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
 	<div class="max-w-md w-full space-y-8">
 		<div class="text-center">
 			<div class="text-6xl mb-4">🚗</div>
-			<h2 class="text-3xl font-bold text-gray-900 mb-2">VROOM Car Tracker</h2>
+			<h2 class="text-3xl font-bold text-foreground mb-2">VROOM Car Tracker</h2>
 		</div>
 
 		<div class="card text-center">
 			{#if status === 'processing'}
 				<div class="space-y-4">
-					<div
-						class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"
-					></div>
-					<h3 class="text-lg font-medium text-gray-900">Completing sign in...</h3>
-					<p class="text-gray-600">Please wait while we set up your account</p>
+					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+					<h3 class="text-lg font-medium text-foreground">Completing sign in...</h3>
+					<p class="text-muted-foreground">Please wait while we set up your account</p>
 				</div>
 			{:else if status === 'success'}
 				<div class="space-y-4">

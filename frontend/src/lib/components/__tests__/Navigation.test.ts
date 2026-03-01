@@ -106,8 +106,13 @@ describe('Navigation Component Logic', () => {
 		let authState = get(authStore);
 		expect(authState.isAuthenticated).toBe(true);
 
-		// Mock successful logout
-		global.fetch = vi.fn().mockResolvedValueOnce({ ok: true });
+		// Mock successful logout (apiClient-compatible response)
+		global.fetch = vi.fn().mockResolvedValueOnce({
+			ok: true,
+			status: 200,
+			headers: new Headers({ 'content-type': 'application/json' }),
+			json: () => Promise.resolve({ success: true, data: null })
+		});
 
 		// Logout
 		await authStore.logout();

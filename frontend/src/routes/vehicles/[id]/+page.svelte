@@ -7,6 +7,7 @@
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
+	import * as Select from '$lib/components/ui/select';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import * as CardFull from '$lib/components/ui/card';
@@ -408,7 +409,7 @@
 					<div class="flex gap-2">
 						<div class="flex-1 relative">
 							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-								<Search class="h-5 w-5 text-gray-400" />
+								<Search class="h-5 w-5 text-muted-foreground" />
 							</div>
 							<Input
 								type="text"
@@ -432,26 +433,45 @@
 
 					<!-- Filter Panel -->
 					{#if showFilters}
-						<div id="expense-filters" class="border-t border-gray-200 pt-4 space-y-4">
+						<div id="expense-filters" class="border-t border-border pt-4 space-y-4">
 							<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 								<!-- Category Filter -->
 								<div>
-									<label for="category-filter" class="block text-sm font-medium text-gray-700 mb-2"
-										>Category</label
+									<label
+										for="category-filter"
+										class="block text-sm font-medium text-muted-foreground mb-2">Category</label
 									>
-									<select id="category-filter" bind:value={filters.category} class="form-input">
-										<option value={undefined}>{COMMON_MESSAGES.ALL_CATEGORIES}</option>
-										{#each Object.entries(categoryLabels) as [value, label]}
-											<option {value}>{label}</option>
-										{/each}
-									</select>
+									<Select.Root
+										type="single"
+										value={filters.category ?? ''}
+										onValueChange={v => {
+											filters.category = v === '' ? undefined : v;
+										}}
+									>
+										<Select.Trigger id="category-filter" class="w-full">
+											{#if filters.category}
+												{categoryLabels[filters.category as import('$lib/types').ExpenseCategory] ||
+													filters.category}
+											{:else}
+												{COMMON_MESSAGES.ALL_CATEGORIES}
+											{/if}
+										</Select.Trigger>
+										<Select.Content>
+											<Select.Item value="" label={COMMON_MESSAGES.ALL_CATEGORIES}
+												>{COMMON_MESSAGES.ALL_CATEGORIES}</Select.Item
+											>
+											{#each Object.entries(categoryLabels) as [value, label]}
+												<Select.Item {value} {label}>{label}</Select.Item>
+											{/each}
+										</Select.Content>
+									</Select.Root>
 								</div>
 
 								<!-- Start Date -->
 								<div>
 									<label
 										for="start-date-filter"
-										class="block text-sm font-medium text-gray-700 mb-2">Start Date</label
+										class="block text-sm font-medium text-muted-foreground mb-2">Start Date</label
 									>
 									<DatePicker
 										id="start-date-filter"
@@ -462,8 +482,9 @@
 
 								<!-- End Date -->
 								<div>
-									<label for="end-date-filter" class="block text-sm font-medium text-gray-700 mb-2"
-										>End Date</label
+									<label
+										for="end-date-filter"
+										class="block text-sm font-medium text-muted-foreground mb-2">End Date</label
 									>
 									<DatePicker
 										id="end-date-filter"

@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import type { User, AuthState } from '../types/index.js';
+import { apiClient } from '$lib/services/api-client';
 
 const initialState: AuthState = {
 	user: null,
@@ -61,35 +62,21 @@ function createAuthStore() {
 			update(state => ({ ...state, isLoading: true }));
 
 			try {
-				const response = await fetch('/api/v1/auth/me', {
-					credentials: 'include'
-				});
-
-				if (response.ok) {
-					const user = await response.json();
-					update(state => ({
-						...state,
-						user,
-						isAuthenticated: true,
-						isLoading: false,
-						error: null
-					}));
-				} else {
-					update(state => ({
-						...state,
-						user: null,
-						isAuthenticated: false,
-						isLoading: false,
-						error: null
-					}));
-				}
-			} catch (error) {
+				const user = await apiClient.get<User>('/api/v1/auth/me');
+				update(state => ({
+					...state,
+					user,
+					isAuthenticated: true,
+					isLoading: false,
+					error: null
+				}));
+			} catch {
 				update(state => ({
 					...state,
 					user: null,
 					isAuthenticated: false,
 					isLoading: false,
-					error: error instanceof Error ? error.message : 'Authentication failed'
+					error: null
 				}));
 			}
 		},
@@ -102,22 +89,13 @@ function createAuthStore() {
 		// Refresh token
 		refreshToken: async () => {
 			try {
-				const response = await fetch('/api/v1/auth/refresh', {
-					method: 'POST',
-					credentials: 'include'
-				});
-
-				if (response.ok) {
-					const data = await response.json();
-					update(state => ({
-						...state,
-						token: data.token,
-						error: null
-					}));
-					return data.token;
-				} else {
-					throw new Error('Token refresh failed');
-				}
+				const data = await apiClient.post<{ token: string }>('/api/v1/auth/refresh');
+				update(state => ({
+					...state,
+					token: data.token,
+					error: null
+				}));
+				return data.token;
 			} catch (error) {
 				update(state => ({
 					...state,
@@ -133,10 +111,7 @@ function createAuthStore() {
 		// Logout
 		logout: async () => {
 			try {
-				await fetch('/api/v1/auth/logout', {
-					method: 'POST',
-					credentials: 'include'
-				});
+				await apiClient.post('/api/v1/auth/logout');
 
 				update(state => ({
 					...state,

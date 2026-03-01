@@ -10,6 +10,7 @@
  */
 export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
 	const cache = new Map<string, R>();
+	const MAX_CACHE_SIZE = 100;
 
 	return (arg: T): R => {
 		const key = JSON.stringify(arg);
@@ -19,6 +20,12 @@ export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
 		}
 
 		const result = fn(arg);
+
+		if (cache.size >= MAX_CACHE_SIZE) {
+			const firstKey = cache.keys().next().value;
+			if (firstKey !== undefined) cache.delete(firstKey);
+		}
+
 		cache.set(key, result);
 		return result;
 	};
@@ -32,6 +39,7 @@ export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function memoizeMulti<T extends any[], R>(fn: (...args: T) => R): (...args: T) => R {
 	const cache = new Map<string, R>();
+	const MAX_CACHE_SIZE = 100;
 
 	return (...args: T): R => {
 		const key = JSON.stringify(args);
@@ -41,6 +49,12 @@ export function memoizeMulti<T extends any[], R>(fn: (...args: T) => R): (...arg
 		}
 
 		const result = fn(...args);
+
+		if (cache.size >= MAX_CACHE_SIZE) {
+			const firstKey = cache.keys().next().value;
+			if (firstKey !== undefined) cache.delete(firstKey);
+		}
+
 		cache.set(key, result);
 		return result;
 	};

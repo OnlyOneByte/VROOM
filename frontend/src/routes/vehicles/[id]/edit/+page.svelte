@@ -1,16 +1,12 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import VehicleForm from '$lib/components/vehicles/VehicleForm.svelte';
 
-	let vehicleId = $derived($page.params.id);
-
-	function getVehicleDisplayName(): string {
-		return 'Vehicle';
-	}
+	let vehicleId = $derived(page.params.id);
 </script>
 
 <svelte:head>
-	<title>Edit {getVehicleDisplayName()} - VROOM Car Tracker</title>
+	<title>Edit Vehicle - VROOM Car Tracker</title>
 	<meta name="description" content="Edit vehicle information" />
 </svelte:head>
 

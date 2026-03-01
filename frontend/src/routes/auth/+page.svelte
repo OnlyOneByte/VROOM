@@ -95,13 +95,13 @@
 		</p>
 
 		<!-- Features Section -->
-		<div class="bg-white rounded-lg shadow-lg p-8 border-2">
+		<div class="bg-card rounded-lg shadow-lg p-8 border-2">
 			<div class="grid gap-6 text-left">
 				<div class="flex items-start gap-4">
 					<div class="text-3xl">🔓</div>
 					<div>
-						<h3 class="font-semibold text-lg text-gray-900 mb-1">Fully Open Source</h3>
-						<p class="text-gray-600">
+						<h3 class="font-semibold text-lg text-foreground mb-1">Fully Open Source</h3>
+						<p class="text-muted-foreground">
 							Make it your own! Fork, customize, and host it yourself with complete control.
 						</p>
 					</div>
@@ -110,8 +110,8 @@
 				<div class="flex items-start gap-4">
 					<div class="text-3xl">📊</div>
 					<div>
-						<h3 class="font-semibold text-lg text-gray-900 mb-1">Open Format CSVs</h3>
-						<p class="text-gray-600">
+						<h3 class="font-semibold text-lg text-foreground mb-1">Open Format CSVs</h3>
+						<p class="text-muted-foreground">
 							All data in standard CSV format. Migrate anywhere, anytime, with zero lock-in.
 						</p>
 					</div>
@@ -120,8 +120,8 @@
 				<div class="flex items-start gap-4">
 					<div class="text-3xl">☁️</div>
 					<div>
-						<h3 class="font-semibold text-lg text-gray-900 mb-1">Direct Google Drive Sync</h3>
-						<p class="text-gray-600">
+						<h3 class="font-semibold text-lg text-foreground mb-1">Direct Google Drive Sync</h3>
+						<p class="text-muted-foreground">
 							Your data can sync directly to your Drive. No proprietary databases to manage.
 						</p>
 					</div>
@@ -130,8 +130,8 @@
 				<div class="flex items-start gap-4">
 					<div class="text-3xl">🔒</div>
 					<div>
-						<h3 class="font-semibold text-lg text-gray-900 mb-1">Privacy First</h3>
-						<p class="text-gray-600">
+						<h3 class="font-semibold text-lg text-foreground mb-1">Privacy First</h3>
+						<p class="text-muted-foreground">
 							No data stored beyond sync. Everything lives with you or in your Google Drive, under
 							your control.
 						</p>

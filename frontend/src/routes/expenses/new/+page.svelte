@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import ExpenseForm from '$lib/components/expenses/ExpenseForm.svelte';
 
-	let returnTo = $derived($page.url.searchParams.get('returnTo') || '/expenses');
-	let preselectedVehicleId = $derived($page.url.searchParams.get('vehicleId'));
+	let returnTo = $derived(page.url.searchParams.get('returnTo') || '/expenses');
+	let preselectedVehicleId = $derived(page.url.searchParams.get('vehicleId'));
 </script>
 
 <svelte:head>

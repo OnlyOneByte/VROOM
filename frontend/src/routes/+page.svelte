@@ -35,11 +35,11 @@
 </svelte:head>
 
 <div
-	class="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 p-4"
+	class="min-h-screen flex items-center justify-center bg-gradient-to-br from-muted to-muted/50 p-4"
 >
 	<div class="max-w-md w-full text-center">
 		<div class="text-7xl mb-6">🚗</div>
-		<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
-		<p class="text-gray-600">Loading...</p>
+		<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+		<p class="text-muted-foreground">Loading...</p>
 	</div>
 </div>

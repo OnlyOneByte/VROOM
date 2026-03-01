@@ -10,6 +10,7 @@
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { apiClient } from '$lib/services/api-client';
 	import { Save, ArrowLeft, Gauge, Check, X, Trash2 } from 'lucide-svelte';
+	import { LoaderCircle } from 'lucide-svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
@@ -55,13 +56,13 @@
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
 	let showDeleteConfirm = $state(false);
-	let vehicles = $state<any[]>([]);
+	let vehicles = $state<Vehicle[]>([]);
 	let errors = $state<ExpenseFormErrors>({});
 	let touched = $state<Record<string, boolean>>({});
 	let originalExpense = $state<Expense | null>(null);
 	let vehicle = $state<Vehicle | null>(null);
-	let lastFuelExpense = $state<any>(null);
-	let allVehicleExpenses = $state<any[]>([]);
+	let lastFuelExpense = $state<Expense | null>(null);
+	let allVehicleExpenses = $state<Expense[]>([]);
 	let showMpgCalculation = $state(false);
 	let calculatedMpg = $state<number | null>(null);
 	let calculatedEfficiency = $state<number | null>(null);
@@ -96,7 +97,8 @@
 		try {
 			vehicles = await vehicleApi.getVehicles();
 			if (!isEditMode && vehicles.length > 0 && !formData.vehicleId) {
-				formData.vehicleId = vehicles[0].id;
+				const firstVehicle = vehicles[0];
+				if (firstVehicle) formData.vehicleId = firstVehicle.id;
 			}
 		} catch (error) {
 			console.error('Failed to load vehicles:', error);
@@ -105,20 +107,18 @@
 
 	async function loadExpense() {
 		try {
-			const raw = await apiClient.get<any>(`/api/v1/expenses/${expenseId}`);
+			const raw = await apiClient.get<
+				import('$lib/services/api-transformer').BackendExpenseResponse
+			>(`/api/v1/expenses/${expenseId}`);
 			if (!raw) {
 				appStore.addNotification({ type: 'error', message: 'Expense not found' });
 				goto(returnTo);
 				return;
 			}
 
-			// Transform backend field names to frontend
-			const expense: Expense = {
-				...raw,
-				amount: raw.expenseAmount ?? raw.amount ?? 0,
-				volume: raw.fuelAmount ?? raw.volume,
-				charge: raw.fuelAmount ?? raw.charge
-			};
+			// Transform backend field names to frontend using the transformer
+			const { fromBackendExpense } = await import('$lib/services/api-transformer');
+			const expense = fromBackendExpense(raw);
 			originalExpense = expense;
 
 			formData.vehicleId = expense.vehicleId;
@@ -445,21 +445,21 @@
 
 {#if isLoading}
 	<div class="flex items-center justify-center py-12">
-		<div class="loading-spinner h-8 w-8"></div>
+		<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
 	</div>
 {:else}
 	<div class="max-w-2xl mx-auto space-y-6">
 		<!-- Header -->
 		<div class="flex items-center gap-4">
-			<button onclick={() => goto(returnTo)} class="p-2 hover:bg-gray-100 rounded-lg">
+			<button onclick={() => goto(returnTo)} class="p-2 hover:bg-muted rounded-lg">
 				<ArrowLeft class="h-5 w-5" />
 			</button>
 
 			<div>
-				<h1 class="text-2xl font-bold text-gray-900">
+				<h1 class="text-2xl font-bold text-foreground">
 					{isEditMode ? 'Edit Expense' : 'Add Expense'}
 				</h1>
-				<p class="text-gray-600">
+				<p class="text-muted-foreground">
 					{#if isEditMode}
 						{getVehicleDisplayName()}
 					{:else if !$isOnline}
@@ -516,12 +516,12 @@
 						{/if}
 					</Select.Trigger>
 					<Select.Content>
-						{#each vehicles as vehicle (vehicle.id)}
-							<Select.Item value={vehicle.id} label="{vehicle.year} {vehicle.make} {vehicle.model}">
-								{vehicle.year}
-								{vehicle.make}
-								{vehicle.model}
-								{#if vehicle.nickname}({vehicle.nickname}){/if}
+						{#each vehicles as v (v.id)}
+							<Select.Item value={v.id} label="{v.year} {v.make} {v.model}">
+								{v.year}
+								{v.make}
+								{v.model}
+								{#if v.nickname}({v.nickname}){/if}
 							</Select.Item>
 						{/each}
 					</Select.Content>
@@ -544,7 +544,7 @@
 				<Label for="amount">Amount *</Label>
 				<div class="relative">
 					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-						<span class="text-gray-500">$</span>
+						<span class="text-muted-foreground">$</span>
 					</div>
 					<Input
 						id="amount"
@@ -586,7 +586,7 @@
 				</Label>
 				<div class="relative">
 					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-						<Gauge class="h-5 w-5 text-gray-400" />
+						<Gauge class="h-5 w-5 text-muted-foreground" />
 					</div>
 					<Input
 						id="mileage"
@@ -602,7 +602,7 @@
 					/>
 				</div>
 				{#if lastFuelExpense?.mileage && formData.tags.includes('fuel')}
-					<p class="text-xs text-gray-600">
+					<p class="text-xs text-muted-foreground">
 						Previous fuel entry: {lastFuelExpense.mileage.toLocaleString()} miles
 					</p>
 				{/if}
@@ -640,7 +640,7 @@
 					bind:value={formData.description}
 					rows={3}
 					placeholder="Add any additional notes..."
-					class="bg-white"
+					class="bg-background"
 				/>
 			</div>
 
@@ -678,13 +678,13 @@
 				</Button>
 
 				<Button
-					type="submit"
+					type="button"
 					onclick={handleSubmit}
 					disabled={isSubmitting || isDeleting}
 					class="sm:rounded-full rounded-full group !bg-gradient-to-r !from-primary-600 !to-primary-700 hover:!from-primary-700 hover:!to-primary-800 !text-white shadow-2xl hover:shadow-primary-500/50 transition-all duration-300 sm:hover:scale-110 h-14 sm:h-14 !px-6 !border-0 flex-1 sm:flex-initial"
 				>
 					{#if isSubmitting}
-						<div class="loading-spinner h-5 w-5 mr-2"></div>
+						<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
 						<span class="font-bold">{isEditMode ? 'Updating' : 'Saving'}...</span>
 					{:else}
 						<Check class="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" />
@@ -706,16 +706,16 @@
 			</AlertDialog.Header>
 
 			{#if originalExpense}
-				<div class="bg-gray-50 rounded-lg p-3">
+				<div class="bg-muted rounded-lg p-3">
 					<div class="flex items-center gap-3">
 						<div class="p-2 rounded-lg bg-red-100 text-red-600">
 							<Save class="h-4 w-4" />
 						</div>
 						<div>
-							<p class="font-medium text-gray-900">
+							<p class="font-medium text-foreground">
 								{originalExpense.description || originalExpense.tags?.join(', ') || 'Expense'}
 							</p>
-							<p class="text-sm text-gray-600">
+							<p class="text-sm text-muted-foreground">
 								${originalExpense.amount.toFixed(2)} on {new Date(
 									originalExpense.date
 								).toLocaleDateString()}
@@ -743,21 +743,3 @@
 		</AlertDialog.Content>
 	</AlertDialog.Root>
 {/if}
-
-<style>
-	.loading-spinner {
-		border: 2px solid #f3f4f6;
-		border-top: 2px solid #3b82f6;
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
-	}
-
-	@keyframes spin {
-		0% {
-			transform: rotate(0deg);
-		}
-		100% {
-			transform: rotate(360deg);
-		}
-	}
-</style>

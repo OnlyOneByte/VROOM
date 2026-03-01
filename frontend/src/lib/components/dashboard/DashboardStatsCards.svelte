@@ -68,7 +68,7 @@
 							<p class="text-2xl font-bold">{stat.value}</p>
 						</div>
 						<div class="p-3 rounded-xl {stat.bgColor}">
-							<svelte:component this={stat.icon} class="h-6 w-6 {stat.color}" />
+							<stat.icon class="h-6 w-6 {stat.color}" />
 						</div>
 					</div>
 				{/if}

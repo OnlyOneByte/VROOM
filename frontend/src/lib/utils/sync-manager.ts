@@ -2,6 +2,7 @@ import { writable, get } from 'svelte/store';
 import { isOnline, syncStatus, offlineExpenses } from '$lib/stores/offline';
 import { loadOfflineExpenses, saveOfflineExpenses, type OfflineExpense } from './offline-storage';
 import { toBackendExpense } from '$lib/services/api-transformer';
+import { apiClient } from '$lib/services/api-client';
 
 export interface SyncConflict {
 	id: string;
@@ -47,38 +48,34 @@ export const googleSheetsSyncEnabled = writable<boolean>(false);
 // Fetch last sync time from server
 export async function fetchLastSyncTime(): Promise<void> {
 	try {
-		const response = await fetch('/api/v1/sync/status', {
-			credentials: 'include'
-		});
+		const result = await apiClient.get<{
+			lastSyncDate?: string;
+			lastBackupDate?: string;
+			googleSheetsSyncEnabled?: boolean;
+			googleDriveBackupEnabled?: boolean;
+		}>('/api/v1/sync/status');
 
-		if (response.ok) {
-			const result = await response.json();
-			if (result.success && result.data) {
-				// Store individual sync times
-				const syncDate = result.data.lastSyncDate ? new Date(result.data.lastSyncDate) : null;
-				const backupDate = result.data.lastBackupDate ? new Date(result.data.lastBackupDate) : null;
+		if (result) {
+			const syncDate = result.lastSyncDate ? new Date(result.lastSyncDate) : null;
+			const backupDate = result.lastBackupDate ? new Date(result.lastBackupDate) : null;
 
-				// Update individual stores
-				lastSheetsSync.set(syncDate);
-				lastBackupTime.set(backupDate);
+			lastSheetsSync.set(syncDate);
+			lastBackupTime.set(backupDate);
 
-				// Update enabled states
-				googleSheetsSyncEnabled.set(result.data.googleSheetsSyncEnabled || false);
-				googleDriveBackupEnabled.set(result.data.googleDriveBackupEnabled || false);
+			googleSheetsSyncEnabled.set(result.googleSheetsSyncEnabled || false);
+			googleDriveBackupEnabled.set(result.googleDriveBackupEnabled || false);
 
-				// For backwards compatibility, set lastSyncTime to most recent
-				let mostRecentSync: Date | null = null;
-				if (syncDate && backupDate) {
-					mostRecentSync = syncDate > backupDate ? syncDate : backupDate;
-				} else if (syncDate) {
-					mostRecentSync = syncDate;
-				} else if (backupDate) {
-					mostRecentSync = backupDate;
-				}
+			let mostRecentSync: Date | null = null;
+			if (syncDate && backupDate) {
+				mostRecentSync = syncDate > backupDate ? syncDate : backupDate;
+			} else if (syncDate) {
+				mostRecentSync = syncDate;
+			} else if (backupDate) {
+				mostRecentSync = backupDate;
+			}
 
-				if (mostRecentSync) {
-					lastSyncTime.set(mostRecentSync);
-				}
+			if (mostRecentSync) {
+				lastSyncTime.set(mostRecentSync);
 			}
 		}
 	} catch (error) {
@@ -234,18 +231,7 @@ class SyncManager {
 				description: expense.description
 			});
 
-			const response = await fetch(`/api/v1/expenses`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(backendExpense)
-			});
-
-			if (!response.ok) {
-				const errorText = await response.text();
-				return { success: false, error: `HTTP ${response.status}: ${errorText}` };
-			}
+			await apiClient.post('/api/v1/expenses', backendExpense);
 
 			return { success: true };
 		} catch (error) {
@@ -257,24 +243,15 @@ class SyncManager {
 		expense: OfflineExpense
 	): Promise<{ date: string; amount: number; tags: string[] } | null> {
 		try {
-			const response = await fetch(
+			const expenses = await apiClient.get<Array<{ date: string; amount: number; tags: string[] }>>(
 				`/api/v1/expenses?vehicleId=${expense.vehicleId}&date=${expense.date}&amount=${expense.amount}`
 			);
 
-			if (!response.ok) return null;
-
-			const result = await response.json();
-			const expenses = Array.isArray(result.data)
-				? result.data
-				: Array.isArray(result)
-					? result
-					: [];
+			const expenseList = Array.isArray(expenses) ? expenses : [];
 
 			// Look for potential duplicates with overlapping tags
 			return (
-				expenses.find((existing: { date: string; amount: number; tags: string[] }) =>
-					expense.tags.some(tag => existing.tags?.includes(tag))
-				) || null
+				expenseList.find(existing => expense.tags.some(tag => existing.tags?.includes(tag))) || null
 			);
 		} catch (error) {
 			console.warn('Failed to check for existing expense:', error);
@@ -333,7 +310,6 @@ class SyncManager {
 			switch (resolution) {
 				case 'keep_local': {
 					// Force sync the local version
-					// Transform to backend format using API transformer
 					const backendExpense = toBackendExpense({
 						vehicleId: conflict.localExpense.vehicleId,
 						tags: conflict.localExpense.tags,
@@ -346,22 +322,16 @@ class SyncManager {
 						description: conflict.localExpense.description
 					});
 
-					const response = await fetch(`/api/v1/expenses`, {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json'
-						},
-						body: JSON.stringify({
+					try {
+						await apiClient.post('/api/v1/expenses', {
 							...backendExpense,
 							forceOverwrite: true
-						})
-					});
-
-					if (response.ok) {
+						});
 						this.markExpenseAsSynced(conflict.localExpense.id);
 						return true;
+					} catch {
+						break;
 					}
-					break;
 				}
 
 				case 'keep_server':

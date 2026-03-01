@@ -1,7 +1,16 @@
 <script lang="ts">
-	import { Pencil, Trash2, ArrowUpDown, DollarSign, Search, Car } from 'lucide-svelte';
+	import {
+		Pencil,
+		Trash2,
+		ArrowUpDown,
+		DollarSign,
+		Search,
+		Car,
+		LoaderCircle
+	} from 'lucide-svelte';
 	import { settingsStore } from '$lib/stores/settings';
 	import { appStore } from '$lib/stores/app';
+	import { expenseApi } from '$lib/services/expense-api';
 	import type { Expense, Vehicle, ExpenseCategory } from '$lib/types';
 	import { getVolumeUnitLabel, getChargeUnitLabel } from '$lib/utils/units';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
@@ -124,30 +133,18 @@
 		isDeleting = true;
 
 		try {
-			const response = await fetch(`/api/v1/expenses/${expenseToDelete.id}`, {
-				method: 'DELETE',
-				credentials: 'include'
+			await expenseApi.deleteExpense(expenseToDelete.id);
+			await onDelete(expenseToDelete);
+
+			appStore.addNotification({
+				type: 'success',
+				message: 'Expense deleted successfully'
 			});
-
-			if (response.ok) {
-				await onDelete(expenseToDelete);
-
-				appStore.addNotification({
-					type: 'success',
-					message: 'Expense deleted successfully'
-				});
-			} else {
-				const result = await response.json();
-				appStore.addNotification({
-					type: 'error',
-					message: result.message || 'Failed to delete expense'
-				});
-			}
 		} catch (error) {
-			console.error('Error deleting expense:', error);
+			const message = error instanceof Error ? error.message : 'Failed to delete expense';
 			appStore.addNotification({
 				type: 'error',
-				message: 'Network error. Please try again.'
+				message
 			});
 		} finally {
 			isDeleting = false;
@@ -400,7 +397,7 @@
 					class="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
 				>
 					{#if isDeleting}
-						<div class="loading-spinner h-4 w-4 mr-2"></div>
+						<LoaderCircle class="h-4 w-4 animate-spin mr-2" />
 						Deleting...
 					{:else}
 						<Trash2 class="h-4 w-4 mr-2" />
@@ -411,21 +408,3 @@
 		</AlertDialogContent>
 	</AlertDialog>
 {/if}
-
-<style>
-	.loading-spinner {
-		border: 2px solid #f3f4f6;
-		border-top: 2px solid #3b82f6;
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
-	}
-
-	@keyframes spin {
-		0% {
-			transform: rotate(0deg);
-		}
-		100% {
-			transform: rotate(360deg);
-		}
-	}
-</style>

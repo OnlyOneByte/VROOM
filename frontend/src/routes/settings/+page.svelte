@@ -40,12 +40,25 @@
 	let showSyncDialog = $state(false);
 	let selectedFile = $state<File | null>(null);
 	let restoreMode = $state<'preview' | 'replace' | 'merge'>('replace');
-	let restorePreview = $state<any>(null);
-	let restoreConflicts = $state<any[]>([]);
+	let restorePreview = $state<Record<string, number | undefined> | null>(null);
+	let restoreConflicts = $state<Array<{ field: string; local: unknown; remote: unknown }>>([]);
 	let syncSheets = $state(true);
 	let syncBackup = $state(true);
-	let syncResults = $state<any>(null);
-	let driveBackups = $state<any[]>([]);
+	let syncResults = $state<{
+		success: boolean;
+		data?: {
+			results: Record<string, { success: boolean; message?: string; skipped?: boolean }>;
+		};
+	} | null>(null);
+	let driveBackups = $state<
+		Array<{
+			fileId: string;
+			fileName: string;
+			size: string;
+			createdTime: string;
+			modifiedTime: string;
+		}>
+	>([]);
 	let isLoadingBackups = $state(false);
 	let selectedDriveBackup = $state<string | null>(null);
 
@@ -169,10 +182,8 @@
 			const result = await settingsStore.uploadBackup(selectedFile, restoreMode);
 			const data = result?.data || result;
 			if (data.success && data.imported) {
-				const total = Object.values(data.imported).reduce(
-					(sum: number, count) => sum + (count as number),
-					0
-				);
+				const imported = data.imported as Record<string, number>;
+				const total = Object.values(imported).reduce((sum, count) => sum + count, 0);
 				appStore.showSuccess(`Successfully restored ${total} records`);
 				showRestoreDialog = false;
 				selectedFile = null;
@@ -197,7 +208,16 @@
 		try {
 			const result = await settingsStore.listBackups();
 			if (result.success && result.data) {
-				driveBackups = Array.isArray(result.data) ? result.data : [];
+				const rawBackups = Array.isArray(result.data) ? result.data : [];
+				driveBackups = rawBackups.map(
+					(b: { id: string; name: string; createdTime: string; size: string }) => ({
+						fileId: b.id,
+						fileName: b.name,
+						size: b.size,
+						createdTime: b.createdTime,
+						modifiedTime: b.createdTime
+					})
+				);
 			}
 		} catch (error) {
 			appStore.showError(
@@ -232,10 +252,8 @@
 			const result = await settingsStore.restoreFromDriveBackup(selectedDriveBackup, restoreMode);
 			const data = result?.data || result;
 			if (data.success && data.imported) {
-				const total = Object.values(data.imported).reduce(
-					(sum: number, count) => sum + (count as number),
-					0
-				);
+				const imported = data.imported as Record<string, number>;
+				const total = Object.values(imported).reduce((sum, count) => sum + count, 0);
 				appStore.showSuccess(`Successfully restored ${total} records`);
 				showDriveRestoreDialog = false;
 				selectedDriveBackup = null;
@@ -318,11 +336,11 @@
 
 <div class="max-w-4xl mx-auto">
 	<div class="mb-6">
-		<h1 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
-			<SettingsIcon class="h-8 w-8 text-primary-600" />
+		<h1 class="text-3xl font-bold text-foreground flex items-center gap-3">
+			<SettingsIcon class="h-8 w-8 text-primary" />
 			Settings
 		</h1>
-		<p class="text-gray-600 mt-2">Manage your preferences and data</p>
+		<p class="text-muted-foreground mt-2">Manage your preferences and data</p>
 	</div>
 
 	{#if isLoading}

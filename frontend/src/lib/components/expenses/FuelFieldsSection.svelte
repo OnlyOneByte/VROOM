@@ -96,7 +96,7 @@
 		</div>
 
 		{#if volume && amount}
-			<div class="text-sm text-gray-600">
+			<div class="text-sm text-muted-foreground">
 				<strong>Price per {getVolumeUnitLabel(volumeUnit, true)}:</strong> ${(
 					parseFloat(amount) / parseFloat(volume)
 				).toFixed(3)}
@@ -171,7 +171,7 @@
 		</div>
 
 		{#if charge && amount}
-			<div class="text-sm text-gray-600">
+			<div class="text-sm text-muted-foreground">
 				<strong>Price per {getChargeUnitLabel(chargeUnit, true)}:</strong> ${(
 					parseFloat(amount) / parseFloat(charge)
 				).toFixed(3)}

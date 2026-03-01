@@ -22,7 +22,7 @@
 		<ArrowLeft class="h-4 w-4" />
 	</Button>
 	<div>
-		<h1 class="text-2xl font-bold text-gray-900">{displayName}</h1>
-		<p class="text-gray-600">{vehicle.year} {vehicle.make} {vehicle.model}</p>
+		<h1 class="text-2xl font-bold text-foreground">{displayName}</h1>
+		<p class="text-muted-foreground">{vehicle.year} {vehicle.make} {vehicle.model}</p>
 	</div>
 </div>

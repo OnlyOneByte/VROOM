@@ -61,26 +61,30 @@
 				type="button"
 				onclick={() => onSelect(category.value)}
 				class="p-4 rounded-lg border-2 transition-all text-left {value === category.value
-					? 'border-primary-500 bg-primary-50 shadow-md'
-					: 'border-gray-200 hover:border-gray-300 bg-white'} {touched && error
-					? 'border-red-300'
+					? 'border-primary bg-primary/5 shadow-md'
+					: 'border-input hover:border-muted-foreground/30 bg-background'} {touched && error
+					? 'border-destructive'
 					: ''}"
 				aria-pressed={value === category.value}
 			>
 				<div class="flex flex-col gap-2">
 					<div class="flex items-center gap-2">
 						<Icon
-							class="h-5 w-5 {value === category.value ? 'text-primary-600' : 'text-gray-500'}"
+							class="h-5 w-5 {value === category.value ? 'text-primary' : 'text-muted-foreground'}"
 						/>
 						<span
 							class="font-medium text-sm {value === category.value
-								? 'text-primary-900'
-								: 'text-gray-900'}"
+								? 'text-foreground'
+								: 'text-foreground'}"
 						>
 							{category.label}
 						</span>
 					</div>
-					<p class="text-xs {value === category.value ? 'text-primary-700' : 'text-gray-600'}">
+					<p
+						class="text-xs {value === category.value
+							? 'text-muted-foreground'
+							: 'text-muted-foreground'}"
+					>
 						{category.description}
 					</p>
 				</div>

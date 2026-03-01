@@ -45,14 +45,14 @@
 <div class="space-y-2">
 	<Label for="tags">Tags (Optional)</Label>
 	<div
-		class="border rounded-lg p-2 min-h-[42px] bg-white {touched && error
+		class="border rounded-lg p-2 min-h-[42px] bg-background {touched && error
 			? 'border-red-300'
-			: 'border-gray-300'}"
+			: 'border-input'}"
 	>
 		<div class="flex flex-wrap gap-2 items-center">
 			{#each tags as tag}
 				<span
-					class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+					class="inline-flex items-center gap-1 px-2 py-1 bg-secondary text-secondary-foreground rounded-full text-sm"
 				>
 					{tag}
 					<button
@@ -86,12 +86,12 @@
 	</div>
 
 	{#if showSuggestions && filteredSuggestions.length > 0}
-		<div class="border border-gray-200 rounded-lg shadow-lg bg-white max-h-48 overflow-y-auto">
+		<div class="border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto">
 			{#each filteredSuggestions.slice(0, 8) as suggestion}
 				<button
 					type="button"
 					onclick={() => addTag(suggestion)}
-					class="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+					class="w-full text-left px-3 py-2 hover:bg-accent text-sm"
 				>
 					{suggestion}
 				</button>
@@ -99,7 +99,7 @@
 		</div>
 	{/if}
 
-	<p class="text-xs text-gray-500">
+	<p class="text-xs text-muted-foreground">
 		Press Enter to add a tag, or click suggestions below. Maximum 10 tags.
 	</p>
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { appStore } from '$lib/stores/app.js';
-	import { ArrowLeft, Car, Trash2, X, Check } from 'lucide-svelte';
+	import { ArrowLeft, Car, Trash2, X, Check, LoaderCircle } from 'lucide-svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
@@ -25,9 +25,12 @@
 		AlertDialogTitle
 	} from '$lib/components/ui/alert-dialog';
 	import FinancingFormSection from './FinancingFormSection.svelte';
+	import { apiClient } from '$lib/services/api-client';
+	import { vehicleApi } from '$lib/services/vehicle-api';
 	import type {
 		Vehicle,
 		VehicleFormData,
+		VehicleFinancing,
 		FinancingPaymentConfig,
 		VehicleFormErrors,
 		FinancingFormErrors
@@ -101,34 +104,18 @@
 	async function loadVehicle() {
 		isLoading = true;
 		try {
-			// Fetch vehicle data
-			const vehicleResponse = await fetch(`/api/v1/vehicles/${vehicleId}`, {
-				credentials: 'include'
-			});
-
-			if (!vehicleResponse.ok) {
-				appStore.addNotification({
-					type: 'error',
-					message: 'Vehicle not found'
-				});
-				goto('/dashboard');
-				return;
-			}
-
-			const vehicleResult = await vehicleResponse.json();
-			vehicle = vehicleResult.data;
+			vehicle = await vehicleApi.getVehicle(vehicleId!);
 
 			// Fetch financing data separately
-			const financingResponse = await fetch(`/api/v1/financing/vehicles/${vehicleId}/financing`, {
-				credentials: 'include'
-			});
-
-			if (financingResponse.ok) {
-				const financingResult = await financingResponse.json();
-				if (financingResult.data && vehicle) {
-					// Attach financing to vehicle object for populateForm
-					vehicle.financing = financingResult.data;
+			try {
+				const financingData = await apiClient.get<VehicleFinancing>(
+					`/api/v1/financing/vehicles/${vehicleId}/financing`
+				);
+				if (financingData && vehicle) {
+					vehicle.financing = financingData;
 				}
+			} catch {
+				// Financing may not exist — that's fine
 			}
 
 			populateForm();
@@ -351,7 +338,7 @@
 
 		try {
 			// Prepare vehicle data (dates as ISO strings, clean up null values)
-			const vehicleData: any = {
+			const vehicleData = {
 				make: vehicleForm.make,
 				model: vehicleForm.model,
 				year: vehicleForm.year,
@@ -365,38 +352,16 @@
 					: undefined
 			};
 
-			console.log('Submitting vehicle data:', vehicleData);
-
 			// Update/create vehicle
-			const vehicleUrl = isEditMode ? `/api/v1/vehicles/${vehicleId}` : '/api/v1/vehicles';
-			const vehicleMethod = isEditMode ? 'PUT' : 'POST';
+			const savedVehicle = isEditMode
+				? await apiClient.put<Vehicle>(`/api/v1/vehicles/${vehicleId}`, vehicleData)
+				: await apiClient.post<Vehicle>('/api/v1/vehicles', vehicleData);
 
-			const vehicleResponse = await fetch(vehicleUrl, {
-				method: vehicleMethod,
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				credentials: 'include',
-				body: JSON.stringify(vehicleData)
-			});
-
-			if (!vehicleResponse.ok) {
-				const errorData = await vehicleResponse.json();
-				console.error('Vehicle update error:', errorData);
-				appStore.addNotification({
-					type: 'error',
-					message: errorData.message || `Failed to ${isEditMode ? 'update' : 'add'} vehicle`
-				});
-				return;
-			}
-
-			const savedVehicleResponse = await vehicleResponse.json();
-			const savedVehicle = savedVehicleResponse.data || savedVehicleResponse;
 			const finalVehicleId = isEditMode ? vehicleId! : savedVehicle.id;
 
 			// Handle financing data separately if provided
 			if (ownershipType !== 'own' && financingForm.provider.trim() && financingForm.startDate) {
-				const financingData: any = {
+				const financingData: Record<string, unknown> = {
 					financingType: financingForm.financingType,
 					provider: financingForm.provider,
 					originalAmount: Number(financingForm.originalAmount),
@@ -409,42 +374,33 @@
 
 				// Add APR for loans
 				if (financingForm.financingType === 'loan') {
-					financingData.apr = Number(financingForm.apr);
+					financingData['apr'] = Number(financingForm.apr);
 				}
 
 				// Add lease-specific fields
 				if (financingForm.financingType === 'lease') {
 					if (financingForm.residualValue !== undefined) {
-						financingData.residualValue = Number(financingForm.residualValue);
+						financingData['residualValue'] = Number(financingForm.residualValue);
 					}
 					if (financingForm.mileageLimit !== undefined) {
-						financingData.mileageLimit = Number(financingForm.mileageLimit);
+						financingData['mileageLimit'] = Number(financingForm.mileageLimit);
 					}
 					if (financingForm.excessMileageFee !== undefined) {
-						financingData.excessMileageFee = Number(financingForm.excessMileageFee);
+						financingData['excessMileageFee'] = Number(financingForm.excessMileageFee);
 					}
 				}
 
-				console.log('Submitting financing data:', financingData);
-
-				const financingResponse = await fetch(
-					`/api/v1/financing/vehicles/${finalVehicleId}/financing`,
-					{
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json'
-						},
-						credentials: 'include',
-						body: JSON.stringify(financingData)
-					}
-				);
-
-				if (!financingResponse.ok) {
-					const errorData = await financingResponse.json();
-					console.error('Financing submission error:', errorData);
+				try {
+					await apiClient.post(
+						`/api/v1/financing/vehicles/${finalVehicleId}/financing`,
+						financingData
+					);
+				} catch (financingError) {
+					const message =
+						financingError instanceof Error ? financingError.message : 'Unknown error';
 					appStore.addNotification({
 						type: 'warning',
-						message: `Vehicle saved but financing failed: ${errorData.message || 'Unknown error'}`
+						message: `Vehicle saved but financing failed: ${message}`
 					});
 				}
 			}
@@ -486,29 +442,19 @@
 		isDeleting = true;
 
 		try {
-			const response = await fetch(`/api/v1/vehicles/${vehicleId}`, {
-				method: 'DELETE',
-				credentials: 'include'
-			});
+			await apiClient.delete(`/api/v1/vehicles/${vehicleId}`);
 
-			if (response.ok) {
-				appStore.removeVehicle(vehicleId!);
-				appStore.addNotification({
-					type: 'success',
-					message: 'Vehicle deleted successfully'
-				});
-				goto('/dashboard');
-			} else {
-				const errorData = await response.json();
-				appStore.addNotification({
-					type: 'error',
-					message: errorData.message || 'Failed to delete vehicle'
-				});
-			}
-		} catch {
+			appStore.removeVehicle(vehicleId!);
+			appStore.addNotification({
+				type: 'success',
+				message: 'Vehicle deleted successfully'
+			});
+			goto('/dashboard');
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Failed to delete vehicle';
 			appStore.addNotification({
 				type: 'error',
-				message: 'Error deleting vehicle. Please try again.'
+				message
 			});
 		} finally {
 			isDeleting = false;
@@ -527,7 +473,7 @@
 
 {#if isLoading}
 	<div class="flex items-center justify-center py-12">
-		<div class="loading-spinner h-8 w-8"></div>
+		<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
 	</div>
 {:else}
 	<div class="space-y-6">
@@ -752,14 +698,14 @@
 				</Button>
 
 				<Button
-					type="submit"
+					type="button"
 					size="lg"
 					onclick={handleSubmit}
 					disabled={isSubmitting || isDeleting}
 					class="rounded-full group shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 px-6 flex-1 sm:flex-initial"
 				>
 					{#if isSubmitting}
-						<div class="loading-spinner h-5 w-5 mr-2"></div>
+						<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
 						<span class="font-bold">{isEditMode ? 'Updating' : 'Adding'}...</span>
 					{:else}
 						<Check class="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" />
