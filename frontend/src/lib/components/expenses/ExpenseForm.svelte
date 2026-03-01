@@ -173,17 +173,22 @@
 
 	let selectedCategoryLabel = $state('');
 
-	// Watch vehicle changes
+	// Reload vehicle data when vehicle selection changes (not on initial mount — onMount handles that)
+	let previousVehicleId = $state('');
 	$effect(() => {
-		if (formData.vehicleId) {
-			loadVehicle();
-			loadLastFuelExpense();
-			loadAllVehicleExpenses();
+		if (formData.vehicleId && formData.vehicleId !== previousVehicleId) {
+			previousVehicleId = formData.vehicleId;
+			// Skip if this is the initial load (onMount handles it)
+			if (vehicle !== null || !isLoading) {
+				loadVehicle();
+				loadLastFuelExpense();
+				loadAllVehicleExpenses();
+			}
 		}
 	});
 
 	// Show fuel-specific fields when Fuel category is selected
-	let showFuelFields = $derived(selectedCategoryLabel === 'Fuel');
+	let showFuelFields = $derived(formData.category === 'fuel');
 
 	// Determine which fuel type fields to show based on vehicle type
 	let showVolumeField = $derived(showFuelFields && vehicle && usesLiquidFuel(vehicle.vehicleType));
@@ -192,7 +197,7 @@
 	);
 
 	function handleMileageChange() {
-		if (selectedCategoryLabel === 'Fuel' && formData.mileage && lastFuelExpense?.mileage) {
+		if (formData.category === 'fuel' && formData.mileage && lastFuelExpense?.mileage) {
 			const milesDriven = parseInt(formData.mileage) - lastFuelExpense.mileage;
 
 			if (milesDriven > 0) {
@@ -223,6 +228,7 @@
 		touched[field] = true;
 		const error = validateExpenseField(field, {
 			selectedCategoryLabel,
+			category: formData.category,
 			vehicle,
 			volumeUnit,
 			chargeUnit,
@@ -253,6 +259,7 @@
 
 		const ctx = {
 			selectedCategoryLabel,
+			category: formData.category,
 			vehicle,
 			volumeUnit,
 			chargeUnit,

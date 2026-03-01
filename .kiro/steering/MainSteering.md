@@ -129,6 +129,8 @@ Routes live in `frontend/src/routes/` and follow SvelteKit file-based routing: `
 - Never use `!important` (`!`) prefix on Tailwind classes applied to shadcn `Button` — use `variant` props or pass classes normally.
 - Use `border-destructive` for validation error borders, not `border-red-300`.
 - Guard `console.error` in production error handlers with `import.meta.env.DEV`.
+- Don't use display labels (e.g., `'Fuel'`) for logic comparisons — use the raw enum/category value (e.g., `'fuel'`). Labels can drift from values and cause silent bugs.
+- Don't use `$effect` to fire async data-loading functions on reactive state that `onMount` already loads. This causes duplicate API calls. Track previous values or use explicit change handlers instead.
 
 ## MCP Servers
 

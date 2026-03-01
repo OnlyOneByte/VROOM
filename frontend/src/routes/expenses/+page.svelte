@@ -403,54 +403,54 @@
 						<div
 							class="border rounded-lg p-2 min-h-[42px] bg-background border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background"
 						>
-						<div class="flex flex-wrap gap-1.5 items-center">
-							{#each selectedTags as tag}
-								<Badge variant="secondary" class="gap-1 pr-1">
-									{tag}
-									<button
-										type="button"
-										onclick={() => removeTag(tag)}
-										class="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5"
-										aria-label="Remove tag {tag}"
-									>
-										<X class="h-3 w-3" />
-									</button>
-								</Badge>
-							{/each}
-							<div class="flex items-center gap-1.5 flex-1 min-w-[120px]">
-								<Tag class="h-4 w-4 text-muted-foreground flex-shrink-0" />
-								<input
-									bind:this={tagInputEl}
-									bind:value={tagSearchTerm}
-									onkeydown={handleTagKeydown}
-									onfocus={() => (tagSearchFocused = true)}
-									onblur={() => setTimeout(() => (tagSearchFocused = false), 200)}
-									placeholder={selectedTags.length > 0
-										? 'Add more tags...'
-										: 'Search and add tags...'}
-									class="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-									aria-label="Search tags"
-								/>
+							<div class="flex flex-wrap gap-1.5 items-center">
+								{#each selectedTags as tag}
+									<Badge variant="secondary" class="gap-1 pr-1">
+										{tag}
+										<button
+											type="button"
+											onclick={() => removeTag(tag)}
+											class="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5"
+											aria-label="Remove tag {tag}"
+										>
+											<X class="h-3 w-3" />
+										</button>
+									</Badge>
+								{/each}
+								<div class="flex items-center gap-1.5 flex-1 min-w-[120px]">
+									<Tag class="h-4 w-4 text-muted-foreground flex-shrink-0" />
+									<input
+										bind:this={tagInputEl}
+										bind:value={tagSearchTerm}
+										onkeydown={handleTagKeydown}
+										onfocus={() => (tagSearchFocused = true)}
+										onblur={() => setTimeout(() => (tagSearchFocused = false), 200)}
+										placeholder={selectedTags.length > 0
+											? 'Add more tags...'
+											: 'Search and add tags...'}
+										class="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+										aria-label="Search tags"
+									/>
+								</div>
 							</div>
 						</div>
-					</div>
 
-					{#if tagSearchFocused && tagSuggestions.length > 0}
-						<div
-							class="absolute z-50 left-0 right-0 mt-1 border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto"
-						>
-							{#each tagSuggestions.slice(0, 8) as suggestion}
-								<button
-									type="button"
-									onclick={() => addTag(suggestion)}
-									class="flex w-full items-center gap-2 px-3 py-2 hover:bg-accent text-sm"
-								>
-									<Tag class="h-3.5 w-3.5 text-muted-foreground" />
-									{suggestion}
-								</button>
-							{/each}
-						</div>
-					{/if}
+						{#if tagSearchFocused && tagSuggestions.length > 0}
+							<div
+								class="absolute z-50 left-0 right-0 mt-1 border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto"
+							>
+								{#each tagSuggestions.slice(0, 8) as suggestion}
+									<button
+										type="button"
+										onclick={() => addTag(suggestion)}
+										class="flex w-full items-center gap-2 px-3 py-2 hover:bg-accent text-sm"
+									>
+										<Tag class="h-3.5 w-3.5 text-muted-foreground" />
+										{suggestion}
+									</button>
+								{/each}
+							</div>
+						{/if}
 					</div>
 				</div>
 

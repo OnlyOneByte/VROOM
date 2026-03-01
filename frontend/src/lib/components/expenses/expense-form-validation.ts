@@ -7,7 +7,8 @@ import {
 import type { Vehicle, VolumeUnit, ChargeUnit } from '$lib/types';
 
 interface ValidationContext {
-	selectedCategoryLabel: string;
+	selectedCategoryLabel: string; // Kept for backwards compat, but prefer checking category value directly
+	category: string;
 	vehicle: Vehicle | null;
 	volumeUnit: VolumeUnit;
 	chargeUnit: ChargeUnit;
@@ -44,11 +45,7 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 			break;
 		}
 		case 'volume': {
-			if (
-				ctx.selectedCategoryLabel === 'Fuel' &&
-				ctx.vehicle &&
-				usesLiquidFuel(ctx.vehicle.vehicleType)
-			) {
+			if (ctx.category === 'fuel' && ctx.vehicle && usesLiquidFuel(ctx.vehicle.vehicleType)) {
 				const volume = parseFloat(value as string);
 				const unitLabel = getVolumeUnitLabel(ctx.volumeUnit);
 				if (!value || volume <= 0) return `${unitLabel} required for fuel expenses`;
@@ -57,11 +54,7 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 			break;
 		}
 		case 'charge': {
-			if (
-				ctx.selectedCategoryLabel === 'Fuel' &&
-				ctx.vehicle &&
-				usesElectricCharge(ctx.vehicle.vehicleType)
-			) {
+			if (ctx.category === 'fuel' && ctx.vehicle && usesElectricCharge(ctx.vehicle.vehicleType)) {
 				const charge = parseFloat(value as string);
 				const unitLabel = getChargeUnitLabel(ctx.chargeUnit);
 				if (!value || charge <= 0) return `${unitLabel} required for charging expenses`;
@@ -83,7 +76,7 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 }
 
 function validateMileage(value: string, ctx: ValidationContext): string | null {
-	if (ctx.selectedCategoryLabel !== 'Fuel') return null;
+	if (ctx.category !== 'fuel') return null;
 
 	const mileage = parseInt(value);
 	if (!value || mileage <= 0) return 'Mileage required for fuel expenses';

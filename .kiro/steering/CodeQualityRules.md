@@ -315,3 +315,50 @@ The `card` class doesn't exist in this project. Use Tailwind utilities or shadcn
 // ✅ CORRECT
 <div class="rounded-lg border bg-card p-6 space-y-4">
 ```
+
+## 22. Don't Use Display Labels for Logic Comparisons
+
+Never compare against display labels (e.g., `'Fuel'`) for conditional logic. Use the raw category/enum value instead. Display labels can drift from values and cause silent bugs.
+
+```typescript
+// ❌ WRONG — found in ExpenseForm.svelte, expense-form-validation.ts
+let showFuelFields = $derived(selectedCategoryLabel === 'Fuel');
+if (ctx.selectedCategoryLabel === 'Fuel') { ... }
+
+// ✅ CORRECT — compare against the actual data value
+let showFuelFields = $derived(formData.category === 'fuel');
+if (ctx.category === 'fuel') { ... }
+```
+
+## 23. Don't Use `$effect` for Async Data Loading on Reactive State
+
+`$effect` that watches reactive state and fires async functions (API calls) will re-fire on every change, including initial mount — causing duplicate requests when `onMount` already loads the same data.
+
+```svelte
+// ❌ WRONG — found in ExpenseForm.svelte
+$effect(() => {
+  if (formData.vehicleId) {
+    loadVehicle();           // Also called in onMount!
+    loadLastFuelExpense();   // Duplicate API call
+  }
+});
+
+// ✅ CORRECT — track previous value, skip initial load
+let previousVehicleId = $state('');
+$effect(() => {
+  if (formData.vehicleId && formData.vehicleId !== previousVehicleId) {
+    previousVehicleId = formData.vehicleId;
+    if (!isLoading) {  // Skip during initial mount
+      loadVehicle();
+      loadLastFuelExpense();
+    }
+  }
+});
+
+// ✅ ALSO CORRECT — use an explicit change handler instead of $effect
+function handleVehicleChange(newId: string) {
+  formData.vehicleId = newId;
+  loadVehicle();
+  loadLastFuelExpense();
+}
+```
