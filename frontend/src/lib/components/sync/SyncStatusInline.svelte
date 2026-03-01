@@ -12,6 +12,7 @@
 	} from '$lib/utils/sync-manager';
 	import { RefreshCw, CircleAlert, Clock, Wifi, WifiOff } from 'lucide-svelte';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 	import { formatCompactRelativeTime } from '$lib/utils/formatters';
 	import { getSyncStatusInfo } from '$lib/utils/sync-status';
 
@@ -31,7 +32,6 @@
 	onMount(() => {
 		syncManager.setupAutoSync();
 
-		// Refresh last sync time every 30 seconds
 		const interval = setInterval(() => {
 			if ($isOnline) {
 				fetchLastSyncTime();
@@ -52,9 +52,8 @@
 	}
 </script>
 
-<div class="border-t border-gray-200 pt-3 space-y-2">
+<div class="border-t border-border pt-3 space-y-2">
 	{#if isExpanded}
-		<!-- Expanded view with all details -->
 		<div class="px-3 space-y-2">
 			<!-- Status header -->
 			<div class="flex items-center justify-between">
@@ -70,13 +69,10 @@
 
 			<!-- Connection status -->
 			<div class="flex items-center justify-between text-xs">
-				<span class="text-gray-500">Connection</span>
+				<span class="text-muted-foreground">Connection</span>
 				{#snippet connectionStatus()}
 					{@const ConnectionIcon = $isOnline ? Wifi : WifiOff}
-					<Badge
-						variant={$isOnline ? 'default' : 'destructive'}
-						class="text-xs px-2 py-0.5 gap-1 {$isOnline ? 'bg-green-600 border-transparent' : ''}"
-					>
+					<Badge variant={$isOnline ? 'default' : 'destructive'} class="text-xs px-2 py-0.5 gap-1">
 						<ConnectionIcon class="h-3 w-3" />
 						<span>{$isOnline ? 'Online' : 'Offline'}</span>
 					</Badge>
@@ -87,11 +83,8 @@
 			<!-- Pending expenses -->
 			{#if pendingCount > 0}
 				<div class="flex items-center justify-between text-xs">
-					<span class="text-gray-500">Pending</span>
-					<Badge
-						variant="secondary"
-						class="text-xs px-2 py-0.5 gap-1 bg-yellow-500 text-white border-transparent"
-					>
+					<span class="text-muted-foreground">Pending</span>
+					<Badge variant="secondary" class="text-xs px-2 py-0.5 gap-1">
 						<Clock class="h-3 w-3" />
 						<span>{pendingCount}</span>
 					</Badge>
@@ -101,11 +94,8 @@
 			<!-- Conflicts -->
 			{#if $syncConflicts.length > 0}
 				<div class="flex items-center justify-between text-xs">
-					<span class="text-gray-500">Conflicts</span>
-					<Badge
-						variant="secondary"
-						class="text-xs px-2 py-0.5 gap-1 bg-orange-500 text-white border-transparent"
-					>
+					<span class="text-muted-foreground">Conflicts</span>
+					<Badge variant="destructive" class="text-xs px-2 py-0.5 gap-1">
 						<CircleAlert class="h-3 w-3" />
 						<span>{$syncConflicts.length}</span>
 					</Badge>
@@ -115,29 +105,30 @@
 			<!-- Last backup (Google Drive) -->
 			{#if $googleDriveBackupEnabled}
 				<div class="flex items-center justify-between text-xs">
-					<span class="text-gray-500">Last backup</span>
-					<span class="text-gray-700">{formatCompactRelativeTime($lastBackupTime)}</span>
+					<span class="text-muted-foreground">Last backup</span>
+					<span class="text-foreground">{formatCompactRelativeTime($lastBackupTime)}</span>
 				</div>
 			{/if}
 
 			<!-- Last sync (Google Sheets) -->
 			{#if $googleSheetsSyncEnabled}
 				<div class="flex items-center justify-between text-xs">
-					<span class="text-gray-500">Last sync</span>
-					<span class="text-gray-700">{formatCompactRelativeTime($lastSheetsSync)}</span>
+					<span class="text-muted-foreground">Last sync</span>
+					<span class="text-foreground">{formatCompactRelativeTime($lastSheetsSync)}</span>
 				</div>
 			{/if}
 
 			<!-- Sync button -->
 			{#if $isOnline && pendingCount > 0}
-				<button
+				<Button
+					size="sm"
 					onclick={handleManualSync}
 					disabled={$syncStatus === 'syncing'}
-					class="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1.5"
+					class="w-full h-7 text-xs"
 				>
-					<RefreshCw class="h-3 w-3 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
+					<RefreshCw class="h-3 w-3 mr-1.5 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
 					{$syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now'}
-				</button>
+				</Button>
 			{/if}
 		</div>
 	{:else}
@@ -150,7 +141,7 @@
 					{#if pendingCount > 0}
 						<Badge
 							variant="secondary"
-							class="absolute -top-1 -right-1 bg-yellow-500 text-white text-[10px] font-bold h-3.5 w-3.5 p-0 flex items-center justify-center border-transparent"
+							class="absolute -top-1 -right-1 text-[10px] font-bold h-3.5 w-3.5 p-0 flex items-center justify-center"
 						>
 							{pendingCount > 9 ? '9+' : pendingCount}
 						</Badge>

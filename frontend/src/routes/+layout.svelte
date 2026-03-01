@@ -4,13 +4,13 @@
 	import { authStore } from '$lib/stores/auth.js';
 	import { appStore } from '$lib/stores/app.js';
 	import { handleRouteProtection } from '$lib/utils/auth.js';
-	import Navigation from '$lib/components/Navigation.svelte';
+	import Navigation from '$lib/components/layout/Navigation.svelte';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import { toast } from 'svelte-sonner';
-	import OfflineIndicator from '$lib/components/OfflineIndicator.svelte';
+	import OfflineIndicator from '$lib/components/sync/OfflineIndicator.svelte';
 	import { NOTIFICATION_LIMITS } from '$lib/constants/limits';
-	import PWAInstallPrompt from '$lib/components/PWAInstallPrompt.svelte';
-	import SyncConflictResolver from '$lib/components/SyncConflictResolver.svelte';
+	import PWAInstallPrompt from '$lib/components/layout/PWAInstallPrompt.svelte';
+	import SyncConflictResolver from '$lib/components/sync/SyncConflictResolver.svelte';
 	import { registerServiceWorker } from '$lib/utils/pwa';
 	import { loadOfflineExpenses } from '$lib/utils/offline-storage';
 	import { offlineExpenses } from '$lib/stores/offline';
@@ -103,23 +103,21 @@
 
 {#if authState.isLoading}
 	<!-- Loading screen -->
-	<div class="min-h-screen bg-gray-50 flex items-center justify-center">
+	<div class="min-h-screen bg-background flex items-center justify-center">
 		<div class="text-center">
 			<div class="text-6xl mb-4">🚗</div>
-			<div
-				class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"
-			></div>
-			<p class="text-gray-600">Loading VROOM...</p>
+			<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+			<p class="text-muted-foreground">Loading VROOM...</p>
 		</div>
 	</div>
 {:else if isAuthPage}
 	<!-- Auth pages without navigation -->
-	<main class="min-h-screen bg-gray-50">
+	<main class="min-h-screen bg-background">
 		{@render children?.()}
 	</main>
 {:else if showNavigation}
 	<!-- Main app layout with navigation -->
-	<div class="min-h-screen bg-gray-50">
+	<div class="min-h-screen bg-background">
 		<Navigation />
 
 		<main class="lg:pl-20 transition-all duration-300">
@@ -130,7 +128,7 @@
 	</div>
 {:else}
 	<!-- Fallback layout -->
-	<main class="min-h-screen bg-gray-50">
+	<main class="min-h-screen bg-background">
 		{@render children?.()}
 	</main>
 {/if}

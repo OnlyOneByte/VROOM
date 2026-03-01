@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { TriangleAlert, TrendingDown, TrendingUp, Fuel } from 'lucide-svelte';
 	import { getFuelEfficiency } from '$lib/utils/analytics-api';
-	import FuelEfficiencyChart from '$lib/components/charts/FuelEfficiencyChart.svelte';
 
 	interface Props {
 		vehicleId: string;
@@ -294,15 +293,6 @@
 				<div class="text-sm text-gray-600">Latest MPG</div>
 			</div>
 		</div>
-
-		<!-- Fuel Efficiency Chart -->
-		<FuelEfficiencyChart
-			data={fuelData.trend}
-			title="Fuel Efficiency Trends"
-			averageMPG={fuelData.averageMPG}
-			width={1000}
-			height={400}
-		/>
 
 		<!-- Comparative Analysis -->
 		{#if fuelData.trend.length >= 6}

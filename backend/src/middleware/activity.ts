@@ -23,8 +23,7 @@ export const activityTracker: MiddlewareHandler = async (c, next) => {
     const path = c.req.path;
     const method = c.req.method;
     const shouldTrack =
-      (path.startsWith('/api/') && ['POST', 'PUT', 'DELETE'].includes(method)) ||
-      (path.startsWith('/api/') && method === 'GET' && !path.includes('/status')) ||
+      (path.startsWith('/api/') && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) ||
       path.startsWith('/auth/');
 
     if (!shouldTrack) return;

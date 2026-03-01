@@ -12,6 +12,8 @@
 	} from '$lib/utils/sync-manager';
 	import { Wifi, WifiOff, RefreshCw, CircleAlert, Clock } from 'lucide-svelte';
 	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
+	import { Button } from '$lib/components/ui/button';
+	import { Badge } from '$lib/components/ui/badge';
 	import { formatCompactRelativeTime } from '$lib/utils/formatters';
 	import { getSyncStatusInfo } from '$lib/utils/sync-status';
 
@@ -29,10 +31,8 @@
 	);
 
 	onMount(() => {
-		// Setup auto-sync
 		syncManager.setupAutoSync();
 
-		// Refresh last sync time every 30 seconds
 		const interval = setInterval(() => {
 			if ($isOnline) {
 				fetchLastSyncTime();
@@ -64,7 +64,7 @@
 			{@const StatusIcon = statusInfo.icon}
 			<button
 				{...props}
-				class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors {statusInfo.color}"
+				class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent transition-colors {statusInfo.color}"
 			>
 				<StatusIcon class="h-4 w-4 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
 				<span class="text-sm font-medium">{statusInfo.text}</span>
@@ -76,26 +76,24 @@
 		<div class="space-y-4">
 			<!-- Connection status -->
 			<div class="flex items-center justify-between">
-				<span class="text-sm text-gray-600">Connection</span>
+				<span class="text-sm text-muted-foreground">Connection</span>
 				{#if $isOnline}
-					{@const ConnectionIcon = Wifi}
-					<div class="flex items-center gap-2 text-green-600">
-						<ConnectionIcon class="h-4 w-4" />
-						<span class="text-sm font-medium">Online</span>
-					</div>
+					<Badge variant="default" class="gap-1">
+						<Wifi class="h-3 w-3" />
+						Online
+					</Badge>
 				{:else}
-					{@const ConnectionIcon = WifiOff}
-					<div class="flex items-center gap-2 text-red-600">
-						<ConnectionIcon class="h-4 w-4" />
-						<span class="text-sm font-medium">Offline</span>
-					</div>
+					<Badge variant="destructive" class="gap-1">
+						<WifiOff class="h-3 w-3" />
+						Offline
+					</Badge>
 				{/if}
 			</div>
 
 			<!-- Pending expenses -->
 			{#if pendingCount > 0}
 				<div class="flex items-center justify-between">
-					<span class="text-sm text-gray-600">Pending sync</span>
+					<span class="text-sm text-muted-foreground">Pending sync</span>
 					<div class="flex items-center gap-2">
 						<Clock class="h-4 w-4 text-yellow-500" />
 						<span class="text-sm font-medium">{pendingCount} expenses</span>
@@ -106,8 +104,8 @@
 			<!-- Conflicts -->
 			{#if $syncConflicts.length > 0}
 				<div class="flex items-center justify-between">
-					<span class="text-sm text-gray-600">Conflicts</span>
-					<div class="flex items-center gap-2 text-orange-600">
+					<span class="text-sm text-muted-foreground">Conflicts</span>
+					<div class="flex items-center gap-2 text-destructive">
 						<CircleAlert class="h-4 w-4" />
 						<span class="text-sm font-medium">{$syncConflicts.length} need resolution</span>
 					</div>
@@ -117,8 +115,8 @@
 			<!-- Last backup (Google Drive) -->
 			{#if $googleDriveBackupEnabled}
 				<div class="flex items-center justify-between">
-					<span class="text-sm text-gray-600">Last backup</span>
-					<span class="text-sm font-medium text-gray-900">
+					<span class="text-sm text-muted-foreground">Last backup</span>
+					<span class="text-sm font-medium">
 						{formatCompactRelativeTime($lastBackupTime)}
 					</span>
 				</div>
@@ -127,8 +125,8 @@
 			<!-- Last sync (Google Sheets) -->
 			{#if $googleSheetsSyncEnabled}
 				<div class="flex items-center justify-between">
-					<span class="text-sm text-gray-600">Last sync</span>
-					<span class="text-sm font-medium text-gray-900">
+					<span class="text-sm text-muted-foreground">Last sync</span>
+					<span class="text-sm font-medium">
 						{formatCompactRelativeTime($lastSheetsSync)}
 					</span>
 				</div>
@@ -136,27 +134,23 @@
 
 			<!-- Sync button -->
 			{#if $isOnline && pendingCount > 0}
-				<button
-					onclick={handleSyncClick}
-					disabled={$syncStatus === 'syncing'}
-					class="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
-				>
-					<RefreshCw class="h-4 w-4 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
+				<Button onclick={handleSyncClick} disabled={$syncStatus === 'syncing'} class="w-full">
+					<RefreshCw class="h-4 w-4 mr-2 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
 					{$syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now'}
-				</button>
+				</Button>
 			{/if}
 
 			<!-- Status message -->
 			{#if $syncStatus === 'error'}
-				<div class="text-sm text-red-600 bg-red-50 p-2 rounded">
+				<div class="text-sm text-destructive bg-destructive/10 p-2 rounded">
 					Sync failed. Check your connection and try again.
 				</div>
 			{:else if $syncStatus === 'success'}
-				<div class="text-sm text-green-600 bg-green-50 p-2 rounded">
+				<div class="text-sm text-green-600 bg-green-500/10 p-2 rounded">
 					All expenses synced successfully.
 				</div>
 			{:else if !$isOnline}
-				<div class="text-sm text-orange-600 bg-orange-50 p-2 rounded">
+				<div class="text-sm text-orange-600 bg-orange-500/10 p-2 rounded">
 					You're offline. Expenses will sync when connection is restored.
 				</div>
 			{/if}

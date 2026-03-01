@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { authStore } from '$lib/stores/auth.js';
 	import { House, Receipt, ChartColumn, Settings, Menu, LogOut, User, MapPin } from 'lucide-svelte';
-	import SyncStatusInline from './SyncStatusInline.svelte';
+	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
 	import { syncStatus, isOnline, offlineExpenses } from '$lib/stores/offline';
 	import { syncConflicts } from '$lib/utils/sync-manager';
 	import { Wifi, WifiOff, RefreshCw, CircleAlert, Clock } from 'lucide-svelte';
@@ -68,11 +68,11 @@
 </script>
 
 <!-- Mobile menu button -->
-<div class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200">
+<div class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b border-border">
 	<div class="flex items-center justify-between px-4 py-3">
 		<div class="flex items-center gap-3">
 			<span class="text-2xl">🚗</span>
-			<span class="font-bold text-gray-900">VROOM</span>
+			<span class="font-bold text-foreground">VROOM</span>
 		</div>
 
 		<div class="flex items-center gap-3">
@@ -85,7 +85,7 @@
 					{#if pendingCount > 0}
 						<Badge
 							variant="secondary"
-							class="absolute -top-1 -right-1 bg-yellow-500 text-white text-[10px] font-bold h-3.5 w-3.5 p-0 flex items-center justify-center border-transparent"
+							class="absolute -top-1 -right-1 text-[10px] font-bold h-3.5 w-3.5 p-0 flex items-center justify-center"
 							aria-label="{pendingCount} pending items"
 						>
 							{pendingCount > 9 ? '9+' : pendingCount}
@@ -97,17 +97,17 @@
 
 			<Sheet bind:open={mobileMenuOpen}>
 				<SheetTrigger
-					class="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+					class="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
 					aria-label="Open navigation menu"
 				>
 					<Menu class="h-6 w-6" />
 				</SheetTrigger>
 				<SheetContent side="left" class="w-64 p-0 flex flex-col">
-					<SheetHeader class="px-6 pt-6 pb-4 border-b border-gray-200">
+					<SheetHeader class="px-6 pt-6 pb-4 border-b border-border">
 						<SheetTitle>
 							<div class="flex items-center">
 								<span class="text-2xl">🚗</span>
-								<span class="ml-3 text-xl font-bold text-gray-900">VROOM</span>
+								<span class="ml-3 text-xl font-bold text-foreground">VROOM</span>
 							</div>
 						</SheetTitle>
 					</SheetHeader>
@@ -119,17 +119,19 @@
 								{@const IconComponent = item.icon}
 								<a
 									href={item.href}
-									class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200 {isActive(
-										item.href
-									)
-										? 'bg-primary-100 text-primary-700'
-										: 'text-gray-700 hover:bg-gray-100'}"
+									class={cn(
+										'group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200',
+										isActive(item.href)
+											? 'bg-primary/10 text-primary'
+											: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+									)}
 									onclick={closeMobileMenu}
 								>
 									<IconComponent
-										class="mr-3 h-5 w-5 flex-shrink-0 {isActive(item.href)
-											? 'text-primary-600'
-											: 'text-gray-500'}"
+										class={cn(
+											'mr-3 h-5 w-5 flex-shrink-0',
+											isActive(item.href) ? 'text-primary' : 'text-muted-foreground'
+										)}
 									/>
 									{item.name}
 								</a>
@@ -139,23 +141,24 @@
 
 					<!-- Mobile User menu -->
 					<div class="flex-shrink-0 px-3 pb-4">
-						<!-- Mobile User Navigation -->
 						<div class="space-y-1">
 							{#each userNavigation as item (item.href)}
 								{@const IconComponent = item.icon}
 								<a
 									href={item.href}
-									class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200 {isActive(
-										item.href
-									)
-										? 'bg-primary-100 text-primary-700'
-										: 'text-gray-700 hover:bg-gray-100'}"
+									class={cn(
+										'group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200',
+										isActive(item.href)
+											? 'bg-primary/10 text-primary'
+											: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+									)}
 									onclick={closeMobileMenu}
 								>
 									<IconComponent
-										class="mr-3 h-5 w-5 flex-shrink-0 {isActive(item.href)
-											? 'text-primary-600'
-											: 'text-gray-500'}"
+										class={cn(
+											'mr-3 h-5 w-5 flex-shrink-0',
+											isActive(item.href) ? 'text-primary' : 'text-muted-foreground'
+										)}
 									/>
 									{item.name}
 								</a>
@@ -164,16 +167,16 @@
 
 						<button
 							type="button"
-							class="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100 transition-colors duration-200 mt-2"
+							class="w-full flex items-center px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-accent-foreground transition-colors duration-200 mt-2"
 							onclick={handleLogout}
 						>
-							<LogOut class="mr-3 h-5 w-5 text-gray-500" />
+							<LogOut class="mr-3 h-5 w-5 text-muted-foreground" />
 							Sign out
 						</button>
 					</div>
 
 					<!-- Mobile Sync Status -->
-					<div class="flex-shrink-0 px-3 pb-4">
+					<div class="flex-shrink-0 px-3 pb-4 border-t border-border pt-3">
 						<SyncStatusInline isExpanded={true} />
 					</div>
 				</SheetContent>

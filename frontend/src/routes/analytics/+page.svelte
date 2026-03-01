@@ -10,13 +10,12 @@
 	import { appStore } from '$lib/stores/app';
 	import { settingsStore } from '$lib/stores/settings';
 	import { getVolumeUnitLabel } from '$lib/utils/units';
-	import CostTrendChart from '$lib/components/charts/CostTrendChart.svelte';
-	import CategoryBreakdownChart from '$lib/components/charts/CategoryBreakdownChart.svelte';
-	import MultiTrendChart from '$lib/components/charts/MultiTrendChart.svelte';
 	import EfficiencyAlerts from '$lib/components/analytics/EfficiencyAlerts.svelte';
 	import VehicleEfficiencySummary from '$lib/components/analytics/VehicleEfficiencySummary.svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
-	import { ScrollArea } from '$lib/components/ui/scroll-area';
+	import { Button } from '$lib/components/ui/button';
+	import * as Card from '$lib/components/ui/card';
+	import EmptyState from '$lib/components/ui/empty-state.svelte';
 
 	let dashboardData: DashboardData | null = $state(null);
 	let trendData: TrendData | null = $state(null);
@@ -65,10 +64,6 @@
 		} catch (err) {
 			console.error('Error loading analytics data:', err);
 			error = err instanceof Error ? err.message : 'Failed to load analytics data';
-			appStore.addNotification({
-				type: 'error',
-				message: 'Failed to load analytics data. Please try again.'
-			});
 		} finally {
 			isLoading = false;
 		}
@@ -88,7 +83,7 @@
 	function exportData() {
 		if (!dashboardData) return;
 
-		const exportData = {
+		const exportPayload = {
 			summary: {
 				totalExpenses: dashboardData.totalExpenses,
 				vehicles: dashboardData.vehicles,
@@ -102,7 +97,7 @@
 			trends: trendData
 		};
 
-		const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+		const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
@@ -128,261 +123,225 @@
 	<!-- Header -->
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
 		<div>
-			<h1 class="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
-			<p class="text-gray-600">Visualize your spending patterns and trends</p>
+			<h1 class="text-2xl font-bold tracking-tight">Analytics Dashboard</h1>
+			<p class="text-muted-foreground">Visualize your spending patterns and trends</p>
 		</div>
 
 		<div class="flex items-center space-x-2 mt-4 sm:mt-0">
-			<button
-				onclick={loadAnalyticsData}
-				disabled={isLoading}
-				class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-			>
+			<Button variant="outline" onclick={loadAnalyticsData} disabled={isLoading}>
 				<RefreshCw class="h-4 w-4 mr-2 {isLoading ? 'animate-spin' : ''}" />
 				Refresh
-			</button>
+			</Button>
 
-			<button
-				onclick={exportData}
-				disabled={!dashboardData}
-				class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-			>
+			<Button onclick={exportData} disabled={!dashboardData}>
 				<Download class="h-4 w-4 mr-2" />
 				Export
-			</button>
+			</Button>
 		</div>
 	</div>
 
 	<!-- Filters -->
-	<div class="bg-white p-4 rounded-lg shadow border">
-		<div class="flex items-center space-x-2 mb-4">
-			<ListFilter class="h-5 w-5 text-gray-400" />
-			<h3 class="text-lg font-medium text-gray-900">Filters</h3>
-		</div>
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="flex items-center gap-2">
+				<ListFilter class="h-5 w-5 text-muted-foreground" />
+				Filters
+			</Card.Title>
+		</Card.Header>
+		<Card.Content>
+			<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+				<div>
+					<label for="startDate" class="block text-sm font-medium text-muted-foreground mb-1">
+						Start Date
+					</label>
+					<DatePicker id="startDate" bind:value={startDate} placeholder="Select start date" />
+				</div>
 
-		<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-			<div>
-				<label for="startDate" class="block text-sm font-medium text-gray-700 mb-1">
-					Start Date
-				</label>
-				<DatePicker id="startDate" bind:value={startDate} placeholder="Select start date" />
-			</div>
+				<div>
+					<label for="endDate" class="block text-sm font-medium text-muted-foreground mb-1">
+						End Date
+					</label>
+					<DatePicker id="endDate" bind:value={endDate} placeholder="Select end date" />
+				</div>
 
-			<div>
-				<label for="endDate" class="block text-sm font-medium text-gray-700 mb-1"> End Date </label>
-				<DatePicker id="endDate" bind:value={endDate} placeholder="Select end date" />
-			</div>
+				<div>
+					<label for="groupBy" class="block text-sm font-medium text-muted-foreground mb-1">
+						Group By
+					</label>
+					<select
+						id="groupBy"
+						bind:value={groupBy}
+						onchange={handleFilterChange}
+						class="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-ring focus:ring-1 focus:ring-ring"
+					>
+						<option value="day">Daily</option>
+						<option value="week">Weekly</option>
+						<option value="month">Monthly</option>
+						<option value="year">Yearly</option>
+					</select>
+				</div>
 
-			<div>
-				<label for="groupBy" class="block text-sm font-medium text-gray-700 mb-1"> Group By </label>
-				<select
-					id="groupBy"
-					bind:value={groupBy}
-					onchange={handleFilterChange}
-					class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-				>
-					<option value="day">Daily</option>
-					<option value="week">Weekly</option>
-					<option value="month">Monthly</option>
-					<option value="year">Yearly</option>
-				</select>
+				<div>
+					<label for="vehicle" class="block text-sm font-medium text-muted-foreground mb-1">
+						Vehicle
+					</label>
+					<select
+						id="vehicle"
+						bind:value={selectedVehicle}
+						onchange={handleFilterChange}
+						class="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-ring focus:ring-1 focus:ring-ring"
+					>
+						<option value="all">All Vehicles</option>
+						{#if dashboardData?.vehicles}
+							{#each dashboardData.vehicles as vehicle}
+								<option value={vehicle.id}>
+									{vehicle.nickname || vehicle.name}
+								</option>
+							{/each}
+						{/if}
+					</select>
+				</div>
 			</div>
-
-			<div>
-				<label for="vehicle" class="block text-sm font-medium text-gray-700 mb-1"> Vehicle </label>
-				<select
-					id="vehicle"
-					bind:value={selectedVehicle}
-					onchange={handleFilterChange}
-					class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-				>
-					<option value="all">All Vehicles</option>
-					{#if dashboardData?.vehicles}
-						{#each dashboardData.vehicles as vehicle}
-							<option value={vehicle.id}>
-								{vehicle.nickname || vehicle.name}
-							</option>
-						{/each}
-					{/if}
-				</select>
-			</div>
-		</div>
-	</div>
+		</Card.Content>
+	</Card.Root>
 
 	{#if isLoading}
-		<!-- Loading state -->
 		<div class="flex items-center justify-center h-64">
 			<div class="text-center">
-				<RefreshCw class="h-8 w-8 text-blue-500 animate-spin mx-auto mb-4" />
-				<p class="text-gray-600">Loading analytics data...</p>
+				<RefreshCw class="h-8 w-8 text-primary animate-spin mx-auto mb-4" />
+				<p class="text-muted-foreground">Loading analytics data...</p>
 			</div>
 		</div>
 	{:else if error}
-		<!-- Error state -->
-		<div class="bg-red-50 border border-red-200 rounded-lg p-6">
-			<div class="flex items-center">
-				<div class="text-red-400 text-2xl mr-3">⚠️</div>
-				<div>
-					<h3 class="text-lg font-medium text-red-800">Error Loading Analytics</h3>
-					<p class="text-red-700">{error}</p>
-					<button
-						onclick={loadAnalyticsData}
-						class="mt-2 text-sm text-red-600 hover:text-red-500 underline"
-					>
-						Try again
-					</button>
-				</div>
-			</div>
-		</div>
+		<EmptyState>
+			{#snippet title()}
+				Error Loading Analytics
+			{/snippet}
+			{#snippet description()}
+				{error}
+			{/snippet}
+			{#snippet action()}
+				<Button variant="outline" onclick={loadAnalyticsData}>Try again</Button>
+			{/snippet}
+		</EmptyState>
 	{:else if !dashboardData}
-		<!-- No data state -->
-		<div class="text-center py-12">
-			<div class="text-gray-400 text-6xl mb-4">📊</div>
-			<h3 class="text-lg font-medium text-gray-900 mb-2">No Data Available</h3>
-			<p class="text-gray-600">Start by adding some vehicles and expenses to see your analytics.</p>
-		</div>
+		<EmptyState>
+			{#snippet title()}
+				No Data Available
+			{/snippet}
+			{#snippet description()}
+				Start by adding some vehicles and expenses to see your analytics.
+			{/snippet}
+		</EmptyState>
 	{:else}
 		<!-- Summary Cards -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-			<div class="bg-white p-6 rounded-lg shadow border">
-				<div class="flex items-center">
-					<div class="text-3xl mr-3">💰</div>
-					<div>
-						<p class="text-sm font-medium text-gray-600">Total Expenses</p>
-						<p class="text-2xl font-bold text-gray-900">
-							${dashboardData.totalExpenses.toFixed(2)}
-						</p>
+			<Card.Root>
+				<Card.Content class="p-6">
+					<div class="flex items-center">
+						<div class="text-3xl mr-3">💰</div>
+						<div>
+							<p class="text-sm font-medium text-muted-foreground">Total Expenses</p>
+							<p class="text-2xl font-bold">${dashboardData.totalExpenses.toFixed(2)}</p>
+						</div>
 					</div>
-				</div>
-			</div>
+				</Card.Content>
+			</Card.Root>
 
-			<div class="bg-white p-6 rounded-lg shadow border">
-				<div class="flex items-center">
-					<div class="text-3xl mr-3">⛽</div>
-					<div>
-						<p class="text-sm font-medium text-gray-600">Average MPG</p>
-						<p class="text-2xl font-bold text-gray-900">
-							{dashboardData.fuelEfficiency.averageMPG.toFixed(1)}
-						</p>
+			<Card.Root>
+				<Card.Content class="p-6">
+					<div class="flex items-center">
+						<div class="text-3xl mr-3">⛽</div>
+						<div>
+							<p class="text-sm font-medium text-muted-foreground">Average MPG</p>
+							<p class="text-2xl font-bold">
+								{dashboardData.fuelEfficiency.averageMPG.toFixed(1)}
+							</p>
+						</div>
 					</div>
-				</div>
-			</div>
+				</Card.Content>
+			</Card.Root>
 
-			<div class="bg-white p-6 rounded-lg shadow border">
-				<div class="flex items-center">
-					<div class="text-3xl mr-3">🛣️</div>
-					<div>
-						<p class="text-sm font-medium text-gray-600">Cost per Mile</p>
-						<p class="text-2xl font-bold text-gray-900">
-							${dashboardData.costPerMile.totalCostPerMile.toFixed(3)}
-						</p>
+			<Card.Root>
+				<Card.Content class="p-6">
+					<div class="flex items-center">
+						<div class="text-3xl mr-3">🛣️</div>
+						<div>
+							<p class="text-sm font-medium text-muted-foreground">Cost per Mile</p>
+							<p class="text-2xl font-bold">
+								${dashboardData.costPerMile.totalCostPerMile.toFixed(3)}
+							</p>
+						</div>
 					</div>
-				</div>
-			</div>
+				</Card.Content>
+			</Card.Root>
 
-			<div class="bg-white p-6 rounded-lg shadow border">
-				<div class="flex items-center">
-					<div class="text-3xl mr-3">🚗</div>
-					<div>
-						<p class="text-sm font-medium text-gray-600">Vehicles</p>
-						<p class="text-2xl font-bold text-gray-900">{dashboardData.vehicles.length}</p>
+			<Card.Root>
+				<Card.Content class="p-6">
+					<div class="flex items-center">
+						<div class="text-3xl mr-3">🚗</div>
+						<div>
+							<p class="text-sm font-medium text-muted-foreground">Vehicles</p>
+							<p class="text-2xl font-bold">{dashboardData.vehicles.length}</p>
+						</div>
 					</div>
-				</div>
-			</div>
-		</div>
-
-		<!-- Charts Grid -->
-		<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-			<!-- Cost Trends -->
-			<div class="xl:col-span-2">
-				<ScrollArea class="w-full" orientation="horizontal">
-					<CostTrendChart
-						data={dashboardData.monthlyTrends}
-						title="Monthly Cost Trends"
-						width={1200}
-						height={400}
-					/>
-				</ScrollArea>
-			</div>
-
-			<!-- Category Breakdown -->
-			<ScrollArea class="w-full" orientation="horizontal">
-				<CategoryBreakdownChart
-					data={dashboardData.categoryBreakdown}
-					title="Expense Categories"
-					width={600}
-					height={400}
-				/>
-			</ScrollArea>
-
-			<!-- Multi-Trend Chart -->
-			{#if trendData}
-				<ScrollArea class="w-full" orientation="horizontal">
-					<MultiTrendChart
-						costData={trendData.costTrends}
-						milesData={trendData.milesTrends}
-						costPerMileData={trendData.costPerMileTrends}
-						title="Multi-Metric Analysis"
-						width={600}
-						height={400}
-					/>
-				</ScrollArea>
-			{/if}
+				</Card.Content>
+			</Card.Root>
 		</div>
 
 		<!-- Fuel Efficiency Monitoring Section -->
 		{#if dashboardData.vehicles.length > 0}
 			<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-				<!-- Efficiency Alerts -->
 				<EfficiencyAlerts vehicles={dashboardData.vehicles} />
-
-				<!-- Vehicle Efficiency Summary -->
 				<VehicleEfficiencySummary vehicles={dashboardData.vehicles} />
 			</div>
 		{/if}
 
 		<!-- Fuel Efficiency Section -->
 		{#if dashboardData.fuelEfficiency.totalVolume > 0}
-			<div class="bg-white p-6 rounded-lg shadow border">
-				<h3 class="text-lg font-semibold text-gray-900 mb-4">Fleet Fuel Efficiency Summary</h3>
+			<Card.Root>
+				<Card.Header>
+					<Card.Title>Fleet Fuel Efficiency Summary</Card.Title>
+				</Card.Header>
+				<Card.Content>
+					<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+						<div class="text-center">
+							<div class="text-2xl font-bold text-green-600">
+								{dashboardData.fuelEfficiency.averageMPG.toFixed(1)}
+							</div>
+							<div class="text-sm text-muted-foreground">Average Efficiency</div>
+						</div>
 
-				<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-					<div class="text-center">
-						<div class="text-2xl font-bold text-green-600">
-							{dashboardData.fuelEfficiency.averageMPG.toFixed(1)}
+						<div class="text-center">
+							<div class="text-2xl font-bold text-blue-600">
+								{dashboardData.fuelEfficiency.totalVolume.toFixed(1)}
+							</div>
+							<div class="text-sm text-muted-foreground">
+								Total {getVolumeUnitLabel($settingsStore.settings?.volumeUnit || 'gallons_us')}
+							</div>
 						</div>
-						<div class="text-sm text-gray-600">Average Efficiency</div>
-					</div>
 
-					<div class="text-center">
-						<div class="text-2xl font-bold text-blue-600">
-							{dashboardData.fuelEfficiency.totalVolume.toFixed(1)}
+						<div class="text-center">
+							<div class="text-2xl font-bold text-purple-600">
+								${dashboardData.fuelEfficiency.totalFuelCost.toFixed(2)}
+							</div>
+							<div class="text-sm text-muted-foreground">Total Fuel Cost</div>
 						</div>
-						<div class="text-sm text-gray-600">
-							Total {getVolumeUnitLabel($settingsStore.settings?.volumeUnit || 'gallons_us')}
-						</div>
-					</div>
 
-					<div class="text-center">
-						<div class="text-2xl font-bold text-purple-600">
-							${dashboardData.fuelEfficiency.totalFuelCost.toFixed(2)}
-						</div>
-						<div class="text-sm text-gray-600">Total Fuel Cost</div>
-					</div>
-
-					<div class="text-center">
-						<div class="text-2xl font-bold text-orange-600">
-							${dashboardData.fuelEfficiency.averageCostPerGallon.toFixed(2)}
-						</div>
-						<div class="text-sm text-gray-600">
-							Avg Cost/{getVolumeUnitLabel(
-								$settingsStore.settings?.volumeUnit || 'gallons_us',
-								true
-							)}
+						<div class="text-center">
+							<div class="text-2xl font-bold text-orange-600">
+								${dashboardData.fuelEfficiency.averageCostPerGallon.toFixed(2)}
+							</div>
+							<div class="text-sm text-muted-foreground">
+								Avg Cost/{getVolumeUnitLabel(
+									$settingsStore.settings?.volumeUnit || 'gallons_us',
+									true
+								)}
+							</div>
 						</div>
 					</div>
-				</div>
-			</div>
+				</Card.Content>
+			</Card.Root>
 		{/if}
 	{/if}
 </div>

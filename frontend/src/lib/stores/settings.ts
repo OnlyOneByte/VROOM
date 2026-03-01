@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import type { UserSettings } from '../types/index.js';
+import { settingsApi } from '$lib/services/settings-api';
 
 interface SettingsState {
 	settings: UserSettings | null;
@@ -16,32 +17,22 @@ const initialState: SettingsState = {
 function createSettingsStore() {
 	const { subscribe, set, update } = writable<SettingsState>(initialState);
 
+	function handleError(error: unknown): string {
+		return error instanceof Error ? error.message : 'An unexpected error occurred';
+	}
+
 	return {
 		subscribe,
 
 		async load() {
 			update(state => ({ ...state, isLoading: true, error: null }));
-
 			try {
-				const response = await fetch('/api/v1/settings', {
-					credentials: 'include'
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to load settings');
-				}
-
-				const result = await response.json();
-				update(state => ({
-					...state,
-					settings: result.data,
-					isLoading: false
-				}));
+				const settings = await settingsApi.getSettings();
+				update(state => ({ ...state, settings, isLoading: false }));
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Failed to load settings';
 				update(state => ({
 					...state,
-					error: errorMessage,
+					error: handleError(error),
 					isLoading: false
 				}));
 			}
@@ -49,36 +40,13 @@ function createSettingsStore() {
 
 		async update(updates: Partial<UserSettings>) {
 			update(state => ({ ...state, isLoading: true, error: null }));
-
 			try {
-				const response = await fetch('/api/v1/settings', {
-					method: 'PUT',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					credentials: 'include',
-					body: JSON.stringify(updates)
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to update settings');
-				}
-
-				const result = await response.json();
-				update(state => ({
-					...state,
-					settings: result.data,
-					isLoading: false
-				}));
-
-				return result.data;
+				const settings = await settingsApi.updateSettings(updates);
+				update(state => ({ ...state, settings, isLoading: false }));
+				return settings;
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Failed to update settings';
-				update(state => ({
-					...state,
-					error: errorMessage,
-					isLoading: false
-				}));
+				const msg = handleError(error);
+				update(state => ({ ...state, error: msg, isLoading: false }));
 				throw error;
 			}
 		},
@@ -89,44 +57,20 @@ function createSettingsStore() {
 			syncInactivityMinutes?: number;
 		}) {
 			try {
-				const response = await fetch('/api/v1/sync/configure', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					credentials: 'include',
-					body: JSON.stringify(config)
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to configure sync settings');
-				}
-
-				const result = await response.json();
-
-				// Reload settings to get updated values
+				const result = await settingsApi.configureSyncSettings(config);
 				await this.load();
-
 				return result;
 			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : 'Failed to configure sync settings';
-				update(state => ({ ...state, error: errorMessage }));
+				update(state => ({ ...state, error: handleError(error) }));
 				throw error;
 			}
 		},
 
 		async downloadBackup() {
 			try {
-				const response = await fetch('/api/v1/sync/backups/download', {
-					credentials: 'include'
-				});
+				const response = await settingsApi.downloadBackup();
+				if (!response.ok) throw new Error('Failed to download backup');
 
-				if (!response.ok) {
-					throw new Error('Failed to download backup');
-				}
-
-				// Download the file
 				const blob = await response.blob();
 				const url = window.URL.createObjectURL(blob);
 				const a = document.createElement('a');
@@ -137,139 +81,70 @@ function createSettingsStore() {
 				window.URL.revokeObjectURL(url);
 				document.body.removeChild(a);
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Failed to download backup';
-				update(state => ({ ...state, error: errorMessage }));
+				update(state => ({ ...state, error: handleError(error) }));
 				throw error;
 			}
 		},
 
 		async uploadBackup(file: File, mode: 'preview' | 'replace' | 'merge' = 'preview') {
 			try {
-				const formData = new FormData();
-				formData.append('file', file);
-				formData.append('mode', mode);
-
-				// Generate idempotency key for this operation
 				const idempotencyKey = `restore-${mode}-${file.name}-${file.size}-${Date.now()}`;
+				const result = await settingsApi.uploadBackup(file, mode, idempotencyKey);
 
-				const response = await fetch('/api/v1/sync/restore/from-backup', {
-					method: 'POST',
-					credentials: 'include',
-					headers: {
-						'Idempotency-Key': idempotencyKey
-					},
-					body: formData
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to upload backup');
-				}
-
-				const result = await response.json();
-
-				// Reload settings if restore was successful
-				if (mode !== 'preview' && result.success) {
+				if (mode !== 'preview') {
 					await this.load();
 				}
-
 				return result;
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Failed to upload backup';
-				update(state => ({ ...state, error: errorMessage }));
+				update(state => ({ ...state, error: handleError(error) }));
 				throw error;
 			}
 		},
 
 		async executeSync(syncTypes: ('sheets' | 'backup')[]) {
 			try {
-				const response = await fetch('/api/v1/sync', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					credentials: 'include',
-					body: JSON.stringify({ syncTypes })
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to execute sync');
-				}
-
-				return await response.json();
+				return await settingsApi.executeSync(syncTypes);
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Failed to execute sync';
-				update(state => ({ ...state, error: errorMessage }));
+				update(state => ({ ...state, error: handleError(error) }));
 				throw error;
 			}
 		},
 
 		async initializeDrive() {
 			try {
-				const response = await fetch('/api/v1/sync/backups/initialize-drive', {
-					method: 'POST',
-					credentials: 'include'
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to initialize Google Drive');
-				}
-
-				const result = await response.json();
-
-				// Reload settings to get updated folder IDs
+				const result = await settingsApi.initializeDrive();
 				await this.load();
-
 				return result;
 			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : 'Failed to initialize Google Drive';
-				update(state => ({ ...state, error: errorMessage }));
+				update(state => ({ ...state, error: handleError(error) }));
 				throw error;
 			}
 		},
 
 		async listBackups() {
 			try {
-				const response = await fetch('/api/v1/sync/backups', {
-					credentials: 'include'
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to list backups');
-				}
-
-				return await response.json();
+				return await settingsApi.listBackups();
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Failed to list backups';
-				update(state => ({ ...state, error: errorMessage }));
+				update(state => ({ ...state, error: handleError(error) }));
 				throw error;
 			}
 		},
 
 		async downloadBackupFromDrive(fileId: string) {
 			try {
-				const response = await fetch(`/api/v1/sync/backups/${fileId}/download`, {
-					credentials: 'include'
-				});
+				const response = await settingsApi.downloadBackupFromDrive(fileId);
+				if (!response.ok) throw new Error('Failed to download backup from Drive');
 
-				if (!response.ok) {
-					throw new Error('Failed to download backup from Drive');
-				}
-
-				// Download the file
 				const blob = await response.blob();
 				const url = window.URL.createObjectURL(blob);
 				const a = document.createElement('a');
 				a.href = url;
 
-				// Extract filename from Content-Disposition header if available
 				const contentDisposition = response.headers.get('Content-Disposition');
 				let fileName = 'backup.zip';
 				if (contentDisposition) {
 					const matches = /filename="([^"]+)"/.exec(contentDisposition);
-					if (matches && matches[1]) {
-						fileName = matches[1];
-					}
+					if (matches?.[1]) fileName = matches[1];
 				}
 
 				a.download = fileName;
@@ -278,9 +153,7 @@ function createSettingsStore() {
 				window.URL.revokeObjectURL(url);
 				document.body.removeChild(a);
 			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : 'Failed to download backup from Drive';
-				update(state => ({ ...state, error: errorMessage }));
+				update(state => ({ ...state, error: handleError(error) }));
 				throw error;
 			}
 		},
@@ -290,90 +163,45 @@ function createSettingsStore() {
 			mode: 'preview' | 'replace' | 'merge' = 'preview'
 		) {
 			try {
-				// First download the file
-				const response = await fetch(`/api/v1/sync/backups/${fileId}/download`, {
-					credentials: 'include'
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to download backup from Drive');
-				}
+				const response = await settingsApi.downloadBackupFromDrive(fileId);
+				if (!response.ok) throw new Error('Failed to download backup from Drive');
 
 				const blob = await response.blob();
-
-				// Extract filename from Content-Disposition header if available
 				const contentDisposition = response.headers.get('Content-Disposition');
 				let fileName = 'backup.zip';
 				if (contentDisposition) {
 					const matches = /filename="([^"]+)"/.exec(contentDisposition);
-					if (matches && matches[1]) {
-						fileName = matches[1];
-					}
+					if (matches?.[1]) fileName = matches[1];
 				}
 
-				// Create a File object from the blob
 				const file = new File([blob], fileName, { type: 'application/zip' });
-
-				// Use the existing uploadBackup method to restore
 				return await this.uploadBackup(file, mode);
 			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : 'Failed to restore from Drive backup';
-				update(state => ({ ...state, error: errorMessage }));
+				update(state => ({ ...state, error: handleError(error) }));
 				throw error;
 			}
 		},
 
 		async deleteBackup(fileId: string) {
 			try {
-				const response = await fetch(`/api/v1/sync/backups/${fileId}`, {
-					method: 'DELETE',
-					credentials: 'include'
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to delete backup');
-				}
-
-				return await response.json();
+				return await settingsApi.deleteBackup(fileId);
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Failed to delete backup';
-				update(state => ({ ...state, error: errorMessage }));
+				update(state => ({ ...state, error: handleError(error) }));
 				throw error;
 			}
 		},
 
 		async restoreFromSheets(mode: 'preview' | 'replace' | 'merge' = 'preview') {
 			try {
-				// Generate idempotency key for this operation
 				const idempotencyKey = `restore-sheets-${mode}-${Date.now()}`;
+				const result = await settingsApi.restoreFromSheets(mode, idempotencyKey);
 
-				const response = await fetch('/api/v1/sync/restore/from-sheets', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'Idempotency-Key': idempotencyKey
-					},
-					credentials: 'include',
-					body: JSON.stringify({ mode })
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to restore from sheets');
-				}
-
-				const result = await response.json();
-
-				// Reload settings if restore was successful
-				if (mode !== 'preview' && result.success) {
+				if (mode !== 'preview') {
 					await this.load();
 				}
-
 				return result;
 			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : 'Failed to restore from sheets';
-				update(state => ({ ...state, error: errorMessage }));
+				update(state => ({ ...state, error: handleError(error) }));
 				throw error;
 			}
 		},

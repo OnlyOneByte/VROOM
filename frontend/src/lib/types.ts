@@ -368,14 +368,6 @@ export interface BackendExpenseResponse {
 	updatedAt: string;
 }
 
-export function hasBackendFieldNames(expense: Record<string, unknown>): boolean {
-	return 'expenseAmount' in expense || 'fuelAmount' in expense;
-}
-
-export function hasFrontendFieldNames(expense: Record<string, unknown>): boolean {
-	return 'amount' in expense || 'volume' in expense || 'charge' in expense;
-}
-
 // --- Analytics types ---
 
 export interface FuelEfficiencyData {

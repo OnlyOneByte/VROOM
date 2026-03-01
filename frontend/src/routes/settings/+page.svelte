@@ -148,7 +148,7 @@
 					const result = await settingsStore.uploadBackup(selectedFile, 'preview');
 					const data = result?.data || result;
 					if (data.success && data.preview) restorePreview = data.preview;
-					if (data.conflicts?.length > 0) restoreConflicts = data.conflicts;
+					if (data.conflicts && data.conflicts.length > 0) restoreConflicts = data.conflicts;
 				} catch {
 					appStore.showError('Failed to preview backup');
 				} finally {
@@ -217,7 +217,7 @@
 			const result = await settingsStore.restoreFromDriveBackup(fileId, 'preview');
 			const data = result?.data || result;
 			if (data.success && data.preview) restorePreview = data.preview;
-			if (data.conflicts?.length > 0) restoreConflicts = data.conflicts;
+			if (data.conflicts && data.conflicts.length > 0) restoreConflicts = data.conflicts;
 		} catch {
 			appStore.showError('Failed to preview backup');
 		} finally {
