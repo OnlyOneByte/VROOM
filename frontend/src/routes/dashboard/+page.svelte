@@ -107,12 +107,10 @@
 		const colors: Record<string, string> = {
 			fuel: 'hsl(217, 91%, 60%)',
 			maintenance: 'hsl(25, 95%, 53%)',
-			insurance: 'hsl(262, 83%, 58%)',
-			registration: 'hsl(142, 71%, 45%)',
-			parking: 'hsl(48, 96%, 53%)',
-			tolls: 'hsl(330, 81%, 60%)',
-			cleaning: 'hsl(189, 94%, 43%)',
-			other: 'hsl(215, 16%, 47%)'
+			financial: 'hsl(142, 71%, 45%)',
+			regulatory: 'hsl(262, 83%, 58%)',
+			enhancement: 'hsl(330, 81%, 60%)',
+			misc: 'hsl(215, 16%, 47%)'
 		};
 
 		const categoryMap = new Map<string, number>();
@@ -225,7 +223,7 @@
 
 <Button
 	href="/vehicles/new"
-	class="fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto flex items-center justify-center gap-2 pl-6 pr-10 bg-gray-900 hover:bg-gray-800 text-white shadow-2xl hover:shadow-gray-900/50 transition-all duration-300 sm:hover:scale-110 border-0 group"
+	class="fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto flex items-center justify-center gap-2 pl-6 pr-10 bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 border-0 group"
 	aria-label="Add vehicle"
 >
 	<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />

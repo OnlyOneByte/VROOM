@@ -48,8 +48,8 @@
 				<Card.Title>Monthly Expense Trends</Card.Title>
 				<Card.Description>Spending over time</Card.Description>
 			</div>
-			<div class="p-2 rounded-lg bg-primary-50">
-				<TrendingUp class="h-5 w-5 text-primary-600" />
+			<div class="p-2 rounded-lg bg-primary/10">
+				<TrendingUp class="h-5 w-5 text-primary" />
 			</div>
 		</div>
 	</Card.Header>

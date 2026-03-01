@@ -38,8 +38,8 @@
 				<Card.Title>Fleet Overview</Card.Title>
 				<Card.Description>Quick view of all your vehicles</Card.Description>
 			</div>
-			<div class="p-2 rounded-lg bg-green-50">
-				<Car class="h-5 w-5 text-green-600" />
+			<div class="p-2 rounded-lg bg-chart-2/10">
+				<Car class="h-5 w-5 text-chart-2" />
 			</div>
 		</div>
 	</Card.Header>

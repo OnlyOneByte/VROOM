@@ -38,8 +38,8 @@
 				<Card.Title>Your Fleet</Card.Title>
 				<Card.Description>Click on a vehicle to view details</Card.Description>
 			</div>
-			<div class="p-2 rounded-lg bg-green-50">
-				<Car class="h-5 w-5 text-green-600" />
+			<div class="p-2 rounded-lg bg-chart-2/10">
+				<Car class="h-5 w-5 text-chart-2" />
 			</div>
 		</div>
 	</Card.Header>
@@ -73,16 +73,16 @@
 								>
 									<!-- Image Placeholder -->
 									<div
-										class="relative h-40 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center overflow-hidden"
+										class="relative h-40 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden"
 									>
 										<div
-											class="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-purple-400/20 group-hover:scale-110 transition-transform duration-300"
+											class="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 group-hover:scale-110 transition-transform duration-300"
 										></div>
-										<ImageIcon class="h-16 w-16 text-blue-300 relative z-10" />
+										<ImageIcon class="h-16 w-16 text-muted-foreground/40 relative z-10" />
 										{#if vehicle.hasActiveFinancing}
 											<Badge
 												variant="secondary"
-												class="absolute top-3 right-3 z-20 bg-white/90 backdrop-blur-sm"
+												class="absolute top-3 right-3 z-20 bg-background/90 backdrop-blur-sm"
 											>
 												Financed
 											</Badge>
@@ -150,11 +150,11 @@
 				{#if vehicles.length > 1}
 					<Carousel.Previous
 						variant="ghost"
-						class="left-2 md:left-4 bg-white/90 hover:bg-white shadow-md"
+						class="left-2 md:left-4 bg-background/90 hover:bg-background shadow-md"
 					/>
 					<Carousel.Next
 						variant="ghost"
-						class="right-2 md:right-4 bg-white/90 hover:bg-white shadow-md"
+						class="right-2 md:right-4 bg-background/90 hover:bg-background shadow-md"
 					/>
 				{/if}
 			</Carousel.Root>

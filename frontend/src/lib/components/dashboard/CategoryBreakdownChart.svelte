@@ -41,8 +41,8 @@
 				<Card.Title>Expense by Category</Card.Title>
 				<Card.Description>Distribution across all vehicles</Card.Description>
 			</div>
-			<div class="p-2 rounded-lg bg-blue-50">
-				<PieChartIcon class="h-5 w-5 text-blue-600" />
+			<div class="p-2 rounded-lg bg-chart-1/10">
+				<PieChartIcon class="h-5 w-5 text-chart-1" />
 			</div>
 		</div>
 	</Card.Header>

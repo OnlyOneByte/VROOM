@@ -13,6 +13,14 @@ import { apiClient } from './api-client';
  * (backend `expenseAmount`/`fuelAmount` ↔ frontend `amount`/`volume`/`charge`)
  */
 export const expenseApi = {
+	async getExpense(
+		expenseId: string,
+		vehicleType?: 'gas' | 'electric' | 'hybrid'
+	): Promise<Expense> {
+		const data = await apiClient.get<BackendExpenseResponse>(`/api/v1/expenses/${expenseId}`);
+		return fromBackendExpense(data, vehicleType);
+	},
+
 	async getExpensesByVehicle(
 		vehicleId: string,
 		vehicleType?: 'gas' | 'electric' | 'hybrid'

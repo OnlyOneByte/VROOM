@@ -40,14 +40,14 @@ export function getCategoryIcon(category: ExpenseCategory): LucideIcon {
 // Get color classes for expense category
 export function getCategoryColor(category: ExpenseCategory): string {
 	const colors: Record<ExpenseCategory, string> = {
-		fuel: 'text-blue-600 bg-blue-100',
-		maintenance: 'text-orange-600 bg-orange-100',
-		financial: 'text-green-600 bg-green-100',
-		regulatory: 'text-purple-600 bg-purple-100',
-		enhancement: 'text-pink-600 bg-pink-100',
-		misc: 'text-gray-600 bg-gray-100'
+		fuel: 'text-chart-1 bg-chart-1/10',
+		maintenance: 'text-chart-5 bg-chart-5/10',
+		financial: 'text-chart-2 bg-chart-2/10',
+		regulatory: 'text-chart-4 bg-chart-4/10',
+		enhancement: 'text-chart-3 bg-chart-3/10',
+		misc: 'text-muted-foreground bg-muted'
 	};
-	return colors[category] || 'text-gray-600 bg-gray-100';
+	return colors[category] || 'text-muted-foreground bg-muted';
 }
 
 // Expense trend data interface

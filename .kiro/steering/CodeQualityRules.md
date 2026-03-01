@@ -34,19 +34,23 @@ Semantic token cheat sheet:
 - `text-blue-700` → `text-primary`
 - `bg-green-50` → `bg-green-500/10` (status colors are acceptable as `color/opacity`)
 - `bg-red-50` → `bg-destructive/10`
+- For distinct accent colors in stat cards/charts, use `chart-1` through `chart-5` tokens (e.g., `text-chart-1`, `bg-chart-2/10`)
+- `bg-gray-900 text-white` (FABs) → `bg-foreground text-background`
 
 ## 2. Use Domain API Services Over Raw `apiClient`
 
 When a domain service method exists, use it. Only use `apiClient` directly for endpoints not covered by a service.
 
 ```typescript
-// ❌ WRONG — found in VehicleForm.svelte
+// ❌ WRONG — found in VehicleForm.svelte, ExpenseForm.svelte
 await apiClient.put<Vehicle>(`/api/v1/vehicles/${vehicleId}`, vehicleData);
-await apiClient.delete(`/api/v1/vehicles/${vehicleId}`);
+await apiClient.get<BackendExpenseResponse>(`/api/v1/expenses/${expenseId}`);
 
-// ✅ CORRECT — vehicleApi already has these methods
+// ✅ CORRECT — domain services already have these methods
 import { vehicleApi } from '$lib/services/vehicle-api';
+import { expenseApi } from '$lib/services/expense-api';
 await vehicleApi.deleteVehicle(vehicleId);
+await expenseApi.getExpense(expenseId);
 ```
 
 ## 3. Use `LoaderCircle` for All Loading Spinners

@@ -29,13 +29,13 @@
 </svelte:head>
 
 <div
-	class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4"
+	class="min-h-screen flex items-center justify-center bg-gradient-to-br from-muted to-muted/50 p-4"
 >
 	<div class="w-full max-w-2xl space-y-8">
 		<!-- Logo and Title -->
 		<div class="text-center space-y-2">
 			<div
-				class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-700 rounded-3xl shadow-lg mb-4"
+				class="inline-flex items-center justify-center w-20 h-20 bg-primary rounded-3xl shadow-lg mb-4"
 			>
 				<span class="text-5xl">🚗</span>
 			</div>

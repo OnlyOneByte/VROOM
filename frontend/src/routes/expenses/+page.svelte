@@ -126,29 +126,29 @@
 			label: EXPENSE_MESSAGES.TOTAL_EXPENSES,
 			value: formatCurrency(summaryStats.totalAmount),
 			icon: DollarSign,
-			color: 'text-primary-600',
-			bgColor: 'bg-primary-50'
+			color: 'text-primary',
+			bgColor: 'bg-primary/10'
 		},
 		{
 			label: EXPENSE_MESSAGES.TOTAL_COUNT,
 			value: summaryStats.expenseCount.toString(),
 			icon: FileText,
-			color: 'text-blue-600',
-			bgColor: 'bg-blue-50'
+			color: 'text-chart-1',
+			bgColor: 'bg-chart-1/10'
 		},
 		{
 			label: EXPENSE_MESSAGES.MONTHLY_AVERAGE,
 			value: formatCurrency(summaryStats.monthlyAverage),
 			icon: TrendingUp,
-			color: 'text-green-600',
-			bgColor: 'bg-green-50'
+			color: 'text-chart-2',
+			bgColor: 'bg-chart-2/10'
 		},
 		{
 			label: EXPENSE_MESSAGES.LAST_EXPENSE,
 			value: summaryStats.lastExpenseDate ? formatDate(summaryStats.lastExpenseDate) : 'None',
 			icon: Calendar,
-			color: 'text-orange-600',
-			bgColor: 'bg-orange-50'
+			color: 'text-chart-5',
+			bgColor: 'bg-chart-5/10'
 		}
 	]);
 
@@ -307,8 +307,8 @@
 						<CardNs.Title>Search & Filters</CardNs.Title>
 						<CardNs.Description>Find and filter your expenses</CardNs.Description>
 					</div>
-					<div class="p-2 rounded-lg bg-purple-50">
-						<Search class="h-5 w-5 text-purple-600" />
+					<div class="p-2 rounded-lg bg-accent">
+						<Search class="h-5 w-5 text-accent-foreground" />
 					</div>
 				</div>
 			</CardNs.Header>
@@ -561,8 +561,8 @@
 				<CardNs.Header class="pb-0">
 					<CollapsibleTrigger class="flex items-center justify-between w-full">
 						<div class="flex items-center gap-3">
-							<div class="p-2 rounded-lg bg-blue-50">
-								<TrendingUp class="h-5 w-5 text-blue-600" />
+							<div class="p-2 rounded-lg bg-chart-1/10">
+								<TrendingUp class="h-5 w-5 text-chart-1" />
 							</div>
 							<div class="text-left">
 								<CardNs.Title>Expense Overview</CardNs.Title>
@@ -645,8 +645,8 @@
 							</CardNs.Title>
 							<CardNs.Description>These expenses are waiting to be synced</CardNs.Description>
 						</div>
-						<div class="p-2 rounded-lg bg-orange-50">
-							<Clock class="h-5 w-5 text-orange-600" />
+						<div class="p-2 rounded-lg bg-chart-5/10">
+							<Clock class="h-5 w-5 text-chart-5" />
 						</div>
 					</div>
 				</CardNs.Header>
@@ -654,7 +654,7 @@
 					<div class="space-y-3">
 						{#each pendingExpenses as expense}
 							<div
-								class="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-lg"
+								class="flex items-center gap-3 p-3 bg-chart-5/10 border border-chart-5/20 rounded-lg"
 							>
 								<button
 									onclick={() => removeOfflineExpense(expense.id)}
@@ -703,8 +703,8 @@
 							</CardNs.Title>
 							<CardNs.Description>Successfully synced to the server</CardNs.Description>
 						</div>
-						<div class="p-2 rounded-lg bg-green-50">
-							<CircleCheck class="h-5 w-5 text-green-600" />
+						<div class="p-2 rounded-lg bg-chart-2/10">
+							<CircleCheck class="h-5 w-5 text-chart-2" />
 						</div>
 					</div>
 				</CardNs.Header>
@@ -712,7 +712,7 @@
 					<div class="space-y-3">
 						{#each syncedExpenses.slice(0, DISPLAY_LIMITS.RECENT_SYNCED_EXPENSES) as expense}
 							<div
-								class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+								class="flex items-center justify-between p-3 bg-chart-2/10 border border-chart-2/20 rounded-lg"
 							>
 								<div class="flex-1">
 									<div class="flex items-center gap-2 mb-1">
@@ -751,8 +751,8 @@
 						<CardNs.Title>Expenses ({filteredExpenses.length})</CardNs.Title>
 						<CardNs.Description>All recorded expenses</CardNs.Description>
 					</div>
-					<div class="p-2 rounded-lg bg-primary-50">
-						<DollarSign class="h-5 w-5 text-primary-600" />
+					<div class="p-2 rounded-lg bg-primary/10">
+						<DollarSign class="h-5 w-5 text-primary" />
 					</div>
 				</div>
 			</CardNs.Header>
@@ -789,8 +789,8 @@
 			fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full
 			sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto
 			flex items-center justify-center gap-2 pl-6 pr-10
-			bg-gray-900 hover:bg-gray-800
-			text-white shadow-2xl hover:shadow-gray-900/50
+			bg-foreground hover:bg-foreground/90
+			text-background shadow-2xl
 			transition-all duration-300 sm:hover:scale-110
 			border-0 group
 		"

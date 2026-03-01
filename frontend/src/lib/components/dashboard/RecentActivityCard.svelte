@@ -26,11 +26,11 @@
 	let { expenses, isLoading = false }: Props = $props();
 
 	const categoryColors: Record<ExpenseCategory, string> = {
-		fuel: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
-		maintenance: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
-		financial: 'bg-green-500/10 text-green-700 dark:text-green-400',
-		regulatory: 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
-		enhancement: 'bg-pink-500/10 text-pink-700 dark:text-pink-400',
+		fuel: 'bg-chart-1/10 text-chart-1',
+		maintenance: 'bg-chart-5/10 text-chart-5',
+		financial: 'bg-chart-2/10 text-chart-2',
+		regulatory: 'bg-chart-4/10 text-chart-4',
+		enhancement: 'bg-chart-3/10 text-chart-3',
 		misc: 'bg-muted text-muted-foreground'
 	};
 </script>
@@ -42,8 +42,8 @@
 				<Card.Title>Recent Activity</Card.Title>
 				<Card.Description>Latest expenses across all vehicles</Card.Description>
 			</div>
-			<div class="p-2 rounded-lg bg-purple-50">
-				<Clock class="h-5 w-5 text-purple-600" />
+			<div class="p-2 rounded-lg bg-accent">
+				<Clock class="h-5 w-5 text-accent-foreground" />
 			</div>
 		</div>
 	</Card.Header>

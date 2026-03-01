@@ -224,7 +224,7 @@ export function createSkipLink(targetId: string, text = 'Skip to main content'):
 	skipLink.href = `#${targetId}`;
 	skipLink.textContent = text;
 	skipLink.className =
-		'sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 bg-primary-600 text-white p-2 z-50';
+		'sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 bg-primary text-primary-foreground p-2 z-50';
 
 	return skipLink;
 }

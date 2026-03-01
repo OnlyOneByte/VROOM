@@ -8,7 +8,6 @@
 	import { settingsStore } from '$lib/stores/settings';
 	import { expenseApi } from '$lib/services/expense-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { apiClient } from '$lib/services/api-client';
 	import { Save, ArrowLeft, Gauge, Check, X, Trash2 } from 'lucide-svelte';
 	import { LoaderCircle } from 'lucide-svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
@@ -107,18 +106,13 @@
 
 	async function loadExpense() {
 		try {
-			const raw = await apiClient.get<
-				import('$lib/services/api-transformer').BackendExpenseResponse
-			>(`/api/v1/expenses/${expenseId}`);
-			if (!raw) {
+			const expense = await expenseApi.getExpense(expenseId!);
+			if (!expense) {
 				appStore.addNotification({ type: 'error', message: 'Expense not found' });
 				goto(returnTo);
 				return;
 			}
 
-			// Transform backend field names to frontend using the transformer
-			const { fromBackendExpense } = await import('$lib/services/api-transformer');
-			const expense = fromBackendExpense(raw);
 			originalExpense = expense;
 
 			formData.vehicleId = expense.vehicleId;
@@ -463,7 +457,7 @@
 					{#if isEditMode}
 						{getVehicleDisplayName()}
 					{:else if !$isOnline}
-						<span class="text-orange-600">Offline mode - will sync when online</span>
+						<span class="text-chart-5">Offline mode - will sync when online</span>
 					{:else}
 						Track a new vehicle expense
 					{/if}
@@ -660,7 +654,7 @@
 						type="button"
 						onclick={confirmDelete}
 						disabled={isDeleting || isSubmitting}
-						class="sm:rounded-full rounded-full !bg-red-600 hover:!bg-red-700 !text-white shadow-lg hover:shadow-red-500/50 transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 !px-5 !border-0 flex-shrink-0"
+						class="sm:rounded-full rounded-full !bg-destructive hover:!bg-destructive/90 !text-destructive-foreground shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 !px-5 !border-0 flex-shrink-0"
 					>
 						<Trash2 class="h-5 w-5 sm:mr-2" />
 						<span class="hidden sm:inline font-semibold">Delete</span>
@@ -681,7 +675,7 @@
 					type="button"
 					onclick={handleSubmit}
 					disabled={isSubmitting || isDeleting}
-					class="sm:rounded-full rounded-full group !bg-gradient-to-r !from-primary-600 !to-primary-700 hover:!from-primary-700 hover:!to-primary-800 !text-white shadow-2xl hover:shadow-primary-500/50 transition-all duration-300 sm:hover:scale-110 h-14 sm:h-14 !px-6 !border-0 flex-1 sm:flex-initial"
+					class="sm:rounded-full rounded-full group !bg-primary hover:!bg-primary/90 !text-primary-foreground shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 sm:h-14 !px-6 !border-0 flex-1 sm:flex-initial"
 				>
 					{#if isSubmitting}
 						<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
@@ -708,7 +702,7 @@
 			{#if originalExpense}
 				<div class="bg-muted rounded-lg p-3">
 					<div class="flex items-center gap-3">
-						<div class="p-2 rounded-lg bg-red-100 text-red-600">
+						<div class="p-2 rounded-lg bg-destructive/10 text-destructive">
 							<Save class="h-4 w-4" />
 						</div>
 						<div>
@@ -730,7 +724,7 @@
 				<AlertDialog.Action
 					onclick={handleDelete}
 					disabled={isDeleting}
-					class="bg-red-600 hover:bg-red-700 text-white"
+					class="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
 				>
 					{#if isDeleting}
 						<LoaderCircle class="h-4 w-4 animate-spin mr-2" />

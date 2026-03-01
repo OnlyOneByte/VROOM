@@ -30,14 +30,13 @@ export const vehicleSchema = z.object({
 // Expense validation schemas
 export const expenseSchema = z.object({
 	amount: positiveNumberSchema('Amount'),
-	description: requiredStringSchema('Description'),
 	category: requiredStringSchema('Category'),
-	type: requiredStringSchema('Type'),
 	date: z.string().min(1, 'Date is required'),
 	mileage: z.number().min(0, 'Mileage cannot be negative').optional(),
-	gallons: z.number().positive('Gallons must be positive').optional(),
-	location: z.string().optional(),
-	notes: z.string().optional()
+	volume: z.number().positive('Volume must be positive').optional(),
+	charge: z.number().positive('Charge must be positive').optional(),
+	fuelType: z.string().optional(),
+	description: z.string().optional()
 });
 
 // Financing validation schemas

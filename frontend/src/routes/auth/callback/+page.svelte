@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import { authStore } from '$lib/stores/auth.js';
 	import { LoaderCircle, Check, X } from 'lucide-svelte';
+	import { Button } from '$lib/components/ui/button';
 
 	let status = $state('processing');
 	let error = $state('');
@@ -67,7 +68,7 @@
 			<h2 class="text-3xl font-bold text-foreground mb-2">VROOM Car Tracker</h2>
 		</div>
 
-		<div class="card text-center">
+		<div class="rounded-lg border bg-card p-6 text-center">
 			{#if status === 'processing'}
 				<div class="space-y-4">
 					<LoaderCircle class="h-8 w-8 animate-spin text-primary mx-auto" />
@@ -95,7 +96,7 @@
 					<p class="text-destructive text-sm">
 						{error}
 					</p>
-					<button type="button" class="btn btn-primary" onclick={retryAuth}> Try Again </button>
+					<Button onclick={retryAuth}>Try Again</Button>
 				</div>
 			{/if}
 		</div>

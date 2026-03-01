@@ -25,29 +25,29 @@
 			label: 'Total Vehicles',
 			value: totalVehicles.toString(),
 			icon: Car,
-			color: 'text-primary-600',
-			bgColor: 'bg-primary-50'
+			color: 'text-primary',
+			bgColor: 'bg-primary/10'
 		},
 		{
 			label: 'Total Expenses',
 			value: formatCurrency(totalExpenses),
 			icon: DollarSign,
-			color: 'text-blue-600',
-			bgColor: 'bg-blue-50'
+			color: 'text-chart-1',
+			bgColor: 'bg-chart-1/10'
 		},
 		{
 			label: 'Monthly Average',
 			value: formatCurrency(monthlyAverage),
 			icon: TrendingUp,
-			color: 'text-green-600',
-			bgColor: 'bg-green-50'
+			color: 'text-chart-2',
+			bgColor: 'bg-chart-2/10'
 		},
 		{
 			label: 'Active Financing',
 			value: activeFinancing.toString(),
 			icon: CreditCard,
-			color: 'text-orange-600',
-			bgColor: 'bg-orange-50'
+			color: 'text-chart-5',
+			bgColor: 'bg-chart-5/10'
 		}
 	]);
 </script>

@@ -120,6 +120,7 @@ Routes live in `frontend/src/routes/` and follow SvelteKit file-based routing: `
 - Don't duplicate utility functions across files. Check `$lib/utils/` before adding a new helper (e.g., there should be one `debounce`, not two).
 - Don't duplicate type definitions. Backend API types belong in `api-transformer.ts`; re-export from `$lib/types` if needed, don't copy them.
 - Category color/label maps must stay in sync with the actual category enum (`fuel`, `maintenance`, `financial`, `regulatory`, `enhancement`, `misc`). Don't use stale category names like `insurance`, `parking`, `tolls`.
+- Never use non-existent CSS classes like `btn`, `btn-primary`, or `card`. Use shadcn-svelte `Button` component and `Card` components instead. For raw container styling, use Tailwind utilities like `rounded-lg border bg-card p-6`.
 
 ## MCP Servers
 
