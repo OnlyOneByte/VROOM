@@ -12,23 +12,20 @@ export type {
   NewUserSettings,
   NewVehicle,
   NewVehicleFinancing,
-  NewVehicleFinancingPayment,
   Session,
   User,
   UserSettings,
   Vehicle,
   VehicleFinancing,
-  VehicleFinancingPayment,
   VehicleWithFinancing,
 } from './db/schema';
 
-export type { AuthProvider, ExpenseCategory, PaymentFrequency, PaymentType } from './db/types';
+export type { AuthProvider, ExpenseCategory, PaymentFrequency } from './db/types';
 export {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_DESCRIPTIONS,
   EXPENSE_CATEGORY_LABELS,
   isValidPaymentFrequency as isPaymentFrequency,
-  isValidPaymentType as isPaymentType,
 } from './db/types';
 
 export enum Currency {
@@ -103,7 +100,6 @@ export interface BackupData {
   vehicles: import('./db/schema').Vehicle[];
   expenses: import('./db/schema').Expense[];
   financing: import('./db/schema').VehicleFinancing[];
-  financingPayments: import('./db/schema').VehicleFinancingPayment[];
   insurance: import('./db/schema').InsurancePolicy[];
 }
 
@@ -112,6 +108,5 @@ export interface ParsedBackupData {
   vehicles: Record<string, unknown>[];
   expenses: Record<string, unknown>[];
   financing: Record<string, unknown>[];
-  financingPayments: Record<string, unknown>[];
   insurance: Record<string, unknown>[];
 }

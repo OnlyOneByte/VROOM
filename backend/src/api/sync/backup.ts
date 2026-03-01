@@ -17,13 +17,7 @@ import {
   TABLE_SCHEMA_MAP,
 } from '../../config';
 import { getDb } from '../../db/connection';
-import {
-  expenses,
-  insurancePolicies,
-  vehicleFinancing,
-  vehicleFinancingPayments,
-  vehicles,
-} from '../../db/schema';
+import { expenses, insurancePolicies, vehicleFinancing, vehicles } from '../../db/schema';
 import type { BackupData, BackupMetadata, ParsedBackupData } from '../../types';
 
 export interface ValidationResult {
@@ -69,45 +63,33 @@ export class BackupService {
 
   async createBackup(userId: string): Promise<BackupData> {
     const db = getDb();
-    const [userVehicles, userExpenses, userFinancing, userFinancingPayments, userInsurance] =
-      await Promise.all([
-        db.select().from(vehicles).where(eq(vehicles.userId, userId)),
-        db
-          .select()
-          .from(expenses)
-          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId))
-          .then((r) => r.map((x) => x.expenses)),
-        db
-          .select()
-          .from(vehicleFinancing)
-          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId))
-          .then((r) => r.map((x) => x.vehicle_financing)),
-        db
-          .select()
-          .from(vehicleFinancingPayments)
-          .innerJoin(
-            vehicleFinancing,
-            eq(vehicleFinancingPayments.financingId, vehicleFinancing.id)
-          )
-          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId))
-          .then((r) => r.map((x) => x.vehicle_financing_payments)),
-        db
-          .select()
-          .from(insurancePolicies)
-          .innerJoin(vehicles, eq(insurancePolicies.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId))
-          .then((r) => r.map((x) => x.insurance_policies)),
-      ]);
+    const [userVehicles, userExpenses, userFinancing, userInsurance] = await Promise.all([
+      db.select().from(vehicles).where(eq(vehicles.userId, userId)),
+      db
+        .select()
+        .from(expenses)
+        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+        .where(eq(vehicles.userId, userId))
+        .then((r) => r.map((x) => x.expenses)),
+      db
+        .select()
+        .from(vehicleFinancing)
+        .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+        .where(eq(vehicles.userId, userId))
+        .then((r) => r.map((x) => x.vehicle_financing)),
+      db
+        .select()
+        .from(insurancePolicies)
+        .innerJoin(vehicles, eq(insurancePolicies.vehicleId, vehicles.id))
+        .where(eq(vehicles.userId, userId))
+        .then((r) => r.map((x) => x.insurance_policies)),
+    ]);
 
     return {
       metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId },
       vehicles: userVehicles,
       expenses: userExpenses,
       financing: userFinancing,
-      financingPayments: userFinancingPayments,
       insurance: userInsurance,
     };
   }
@@ -241,7 +223,6 @@ export class BackupService {
   private validateReferentialIntegrity(backup: ParsedBackupData): string[] {
     const errors: string[] = [];
     const vehicleIds = new Set(backup.vehicles.map((v) => String(v.id)));
-    const financingIds = new Set(backup.financing.map((f) => String(f.id)));
 
     for (const expense of backup.expenses) {
       if (!vehicleIds.has(String(expense.vehicleId))) {
@@ -252,12 +233,6 @@ export class BackupService {
     for (const financing of backup.financing) {
       if (!vehicleIds.has(String(financing.vehicleId))) {
         errors.push(`Financing ${financing.id} references non-existent vehicle`);
-      }
-    }
-
-    for (const payment of backup.financingPayments) {
-      if (!financingIds.has(String(payment.financingId))) {
-        errors.push(`Payment ${payment.id} references non-existent financing`);
       }
     }
 

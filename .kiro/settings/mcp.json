@@ -16,7 +16,15 @@
         "click",
         "list_console_messages",
         "emulate",
-        "evaluate_script"
+        "evaluate_script",
+        "list_pages",
+        "wait_for",
+        "fill_form",
+        "press_key",
+        "new_page",
+        "select_page",
+        "type_text",
+        "fill"
       ]
     }
   }

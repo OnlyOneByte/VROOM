@@ -10,7 +10,6 @@ import type { ApiResponse } from '../../types';
 import { commonSchemas } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
-import { financingRepository } from '../financing/repository';
 import { vehicleRepository } from './repository';
 
 const routes = new Hono();
@@ -183,39 +182,6 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   return c.json({
     success: true,
     message: 'Vehicle deleted successfully',
-  });
-});
-
-// GET /api/vehicles/:id/financing/payments - Get payment history for vehicle financing
-routes.get('/:id/financing/payments', zValidator('param', commonSchemas.idParam), async (c) => {
-  const user = c.get('user');
-  const { id } = c.req.valid('param');
-
-  // Check if vehicle exists and user has access
-  const vehicle = await vehicleRepository.findByIdWithAccess(id, user.id);
-  if (!vehicle) {
-    throw new NotFoundError('Vehicle');
-  }
-
-  // Get financing for the vehicle
-  const financing = await financingRepository.findByVehicleId(id);
-  if (!financing) {
-    // No financing exists, return empty array
-    return c.json({
-      success: true,
-      data: [],
-      count: 0,
-      message: 'No financing found for this vehicle',
-    });
-  }
-
-  // Get all payments for the financing, sorted by date descending
-  const payments = await financingRepository.findPaymentsByFinancingId(financing.id);
-
-  return c.json({
-    success: true,
-    data: payments,
-    count: payments.length,
   });
 });
 

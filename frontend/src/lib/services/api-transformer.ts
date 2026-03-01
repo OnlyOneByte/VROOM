@@ -22,6 +22,7 @@ export interface BackendExpenseRequest {
 	fuelType?: string;
 	description?: string;
 	receiptUrl?: string;
+	isFinancingPayment?: boolean;
 }
 
 /**
@@ -39,6 +40,7 @@ export interface BackendExpenseResponse {
 	fuelType?: string;
 	description?: string;
 	receiptUrl?: string;
+	isFinancingPayment?: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -78,6 +80,9 @@ export function toBackendExpense(
 	if (frontendExpense.receiptUrl) {
 		backendExpense.receiptUrl = frontendExpense.receiptUrl;
 	}
+	if (frontendExpense.isFinancingPayment !== undefined) {
+		backendExpense.isFinancingPayment = frontendExpense.isFinancingPayment;
+	}
 
 	return backendExpense;
 }
@@ -100,6 +105,7 @@ export function fromBackendExpense(
 		category: backendExpense.category,
 		amount: backendExpense.expenseAmount, // expenseAmount → amount
 		date: backendExpense.date,
+		isFinancingPayment: backendExpense.isFinancingPayment ?? false,
 		createdAt: backendExpense.createdAt,
 		updatedAt: backendExpense.updatedAt
 	};

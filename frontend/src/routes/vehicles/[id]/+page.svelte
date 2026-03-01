@@ -20,10 +20,9 @@
 	import FuelEfficiencyStatsCard from '$lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
 	import PeriodSelector from '$lib/components/vehicles/PeriodSelector.svelte';
 	import EmptyState from '$lib/components/ui/empty-state.svelte';
-	import FinancingSummaryHeader from '$lib/components/financing/FinancingSummaryHeader.svelte';
 	import PaymentMetricsGrid from '$lib/components/financing/PaymentMetricsGrid.svelte';
 	import FinancingCharts from '$lib/components/financing/FinancingCharts.svelte';
-	import PaymentCalculator from '$lib/components/financing/PaymentCalculator.svelte';
+	import PaymentPlannerDialog from '$lib/components/financing/PaymentPlannerDialog.svelte';
 	import PaymentHistory from '$lib/components/financing/PaymentHistory.svelte';
 	import NextPaymentCard from '$lib/components/financing/NextPaymentCard.svelte';
 	import LeaseMetricsCard from '$lib/components/financing/LeaseMetricsCard.svelte';
@@ -50,15 +49,15 @@
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import {
 		calculateAmortizationSchedule,
-		calculateNextPaymentDate,
-		calculatePayoffDate
+		calculatePayoffDate,
+		derivePaymentEntries
 	} from '$lib/utils/financing-calculations';
 	import type {
 		Vehicle,
 		Expense,
 		ExpenseFilters,
 		VehicleStats,
-		VehicleFinancingPayment
+		DerivedPaymentEntry
 	} from '$lib/types.js';
 	import type { PageData } from './$types';
 
@@ -72,12 +71,15 @@
 	let isLoadingPayments = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 	let expenses = $state<Expense[]>([]);
-	let payments = $state<VehicleFinancingPayment[]>([]);
+	let payments = $state<DerivedPaymentEntry[]>([]);
 	let activeTab = $state('overview');
 	let vehicleStatsData = $state<VehicleStats | null>(null);
 	let selectedStatsPeriod = $state<TimePeriod>('all');
 	let paymentHistoryError = $state<string | null>(null);
 	let hasAttemptedPaymentLoad = $state(false);
+
+	// Payment planner dialog state
+	let showPaymentPlanner = $state(false);
 
 	// Filters and search
 	let searchTerm = $state('');
@@ -152,6 +154,15 @@
 		}
 	});
 
+	let totalPrincipalPaid = $derived.by(() => {
+		try {
+			return payments.reduce((sum, payment) => sum + (payment.principalAmount || 0), 0);
+		} catch (error) {
+			if (import.meta.env.DEV) console.error('Error calculating total principal paid:', error);
+			return 0;
+		}
+	});
+
 	let estimatedPayoffDate = $derived.by(() => {
 		try {
 			const financing = vehicle?.financing;
@@ -159,19 +170,6 @@
 			return calculatePayoffDate(financing);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error calculating payoff date:', error);
-			return new Date();
-		}
-	});
-
-	let nextPaymentDate = $derived.by(() => {
-		try {
-			const financing = vehicle?.financing;
-			if (!financing || !financing.isActive) return new Date();
-			const lastPayment =
-				payments.length > 0 && payments[0] ? new Date(payments[0].paymentDate) : undefined;
-			return calculateNextPaymentDate(financing, lastPayment);
-		} catch (error) {
-			if (import.meta.env.DEV) console.error('Error calculating next payment date:', error);
 			return new Date();
 		}
 	});
@@ -252,11 +250,12 @@
 		hasAttemptedPaymentLoad = true;
 
 		try {
-			payments = await vehicleApi.getFinancingPayments(vehicleId);
+			const allExpenses = await expenseApi.getExpensesByVehicle(vehicleId, vehicle?.vehicleType);
+			const financingExpenses = allExpenses.filter(e => e.isFinancingPayment === true);
+			payments = derivePaymentEntries(financingExpenses, vehicle.financing);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading payment history:', error);
 			paymentHistoryError = 'Failed to load payment history. Please try again.';
-			// Don't show notification for payment history errors - show inline error instead
 		} finally {
 			isLoadingPayments = false;
 		}
@@ -275,6 +274,12 @@
 
 	function handlePeriodChange(period: TimePeriod) {
 		selectedStatsPeriod = period;
+	}
+
+	async function handlePaymentAmountChange(newAmount: number) {
+		if (!vehicle?.financing) return;
+		await vehicleApi.updatePaymentAmount(vehicle.financing.id, newAmount);
+		vehicle.financing.paymentAmount = newAmount;
 	}
 </script>
 
@@ -448,9 +453,36 @@
 			<!-- Finance Tab -->
 			<TabsContent value="loan" class="space-y-4 sm:space-y-6">
 				{#if vehicle.financing?.isActive}
-					<!-- Financing Summary Header -->
+					<!-- Next Payment Card (top of page with Record Payment button) -->
 					{#if vehicle.financing.originalAmount && vehicle.financing.originalAmount > 0}
-						<FinancingSummaryHeader financing={vehicle.financing} {progressPercentage} />
+						<!-- Next Payment Card with integrated progress -->
+						{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
+							<NextPaymentCard
+								financing={vehicle.financing}
+								lastPayment={payments.length > 0 ? payments[0] : undefined}
+								recordPaymentHref="/expenses/new?vehicleId={vehicleId}&category=financial&isFinancingPayment=true&amount={vehicle
+									.financing.paymentAmount}&returnTo=/vehicles/{vehicleId}"
+								{progressPercentage}
+								onChangePayment={() => (showPaymentPlanner = true)}
+							/>
+						{/if}
+
+						<!-- Payment Metrics Grid -->
+						{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
+							<PaymentMetricsGrid
+								financing={vehicle.financing}
+								{totalInterestPaid}
+								{totalPrincipalPaid}
+								{estimatedPayoffDate}
+								paymentsCount={payments.length}
+								{amortizationSchedule}
+								mileageUsed={Math.max(
+									0,
+									(vehicleStatsData?.currentMileage ?? vehicle.initialMileage ?? 0) -
+										(vehicle.initialMileage ?? 0)
+								)}
+							/>
+						{/if}
 					{:else}
 						<Alert variant="destructive">
 							<AlertCircle class="h-4 w-4" />
@@ -462,30 +494,12 @@
 						</Alert>
 					{/if}
 
-					<!-- Payment Metrics Grid -->
-					{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
-						<PaymentMetricsGrid
-							financing={vehicle.financing}
-							{totalInterestPaid}
-							{estimatedPayoffDate}
-							{nextPaymentDate}
-						/>
-					{/if}
-
-					<!-- Next Payment Card (Prominent) -->
-					{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
-						<NextPaymentCard
-							financing={vehicle.financing}
-							lastPayment={payments.length > 0 ? payments[0] : undefined}
-						/>
-					{/if}
-
 					<!-- Lease Metrics (if applicable) -->
 					{#if vehicle.financing.financingType === 'lease'}
 						<LeaseMetricsCard
 							financing={vehicle.financing}
-							currentMileage={vehicle.initialMileage || null}
-							initialMileage={vehicle.initialMileage || null}
+							currentMileage={vehicleStatsData?.currentMileage ?? vehicle.initialMileage ?? null}
+							initialMileage={vehicle.initialMileage ?? null}
 						/>
 					{/if}
 
@@ -501,14 +515,16 @@
 						</Alert>
 					{/if}
 
-					<!-- Charts Section - Responsive Grid -->
-					<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-						<FinancingCharts financing={vehicle.financing} {payments} {amortizationSchedule} />
-					</div>
+					<!-- Amortization Schedule (full width) -->
+					<FinancingCharts financing={vehicle.financing} {amortizationSchedule} />
 
-					<!-- Payment Calculator (Loans only) -->
+					<!-- Payment Planner Dialog (Loans only) -->
 					{#if vehicle.financing.financingType === 'loan'}
-						<PaymentCalculator financing={vehicle.financing} />
+						<PaymentPlannerDialog
+							financing={vehicle.financing}
+							bind:open={showPaymentPlanner}
+							onPaymentAmountSaved={handlePaymentAmountChange}
+						/>
 					{/if}
 
 					<!-- Payment History Loading State -->

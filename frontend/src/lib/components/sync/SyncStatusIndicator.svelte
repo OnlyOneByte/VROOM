@@ -5,6 +5,7 @@
 		syncManager,
 		lastBackupTime,
 		lastSheetsSync,
+		lastDataChangeTime,
 		googleDriveBackupEnabled,
 		googleSheetsSyncEnabled,
 		syncConflicts,
@@ -112,22 +113,22 @@
 				</div>
 			{/if}
 
-			<!-- Last backup (Google Drive) -->
-			{#if $googleDriveBackupEnabled}
+			<!-- Last backup & sync (combined) -->
+			{#if $googleDriveBackupEnabled || $googleSheetsSyncEnabled}
 				<div class="flex items-center justify-between">
-					<span class="text-sm text-muted-foreground">Last backup</span>
+					<span class="text-sm text-muted-foreground">Last backup & sync</span>
 					<span class="text-sm font-medium">
-						{formatCompactRelativeTime($lastBackupTime)}
+						{formatCompactRelativeTime($lastBackupTime ?? $lastSheetsSync)}
 					</span>
 				</div>
 			{/if}
 
-			<!-- Last sync (Google Sheets) -->
-			{#if $googleSheetsSyncEnabled}
+			<!-- Last change -->
+			{#if $lastDataChangeTime}
 				<div class="flex items-center justify-between">
-					<span class="text-sm text-muted-foreground">Last sync</span>
+					<span class="text-sm text-muted-foreground">Last change</span>
 					<span class="text-sm font-medium">
-						{formatCompactRelativeTime($lastSheetsSync)}
+						{formatCompactRelativeTime($lastDataChangeTime)}
 					</span>
 				</div>
 			{/if}

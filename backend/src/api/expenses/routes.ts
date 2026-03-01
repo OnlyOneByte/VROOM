@@ -9,13 +9,19 @@ import {
   EXPENSE_CATEGORY_DESCRIPTIONS,
   EXPENSE_CATEGORY_LABELS,
 } from '../../db/types';
-import { NotFoundError } from '../../errors';
+import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import {
   commonSchemas,
   validateExpenseOwnership,
   validateFuelExpenseData,
 } from '../../utils/validation';
+import {
+  handleFinancingOnCreate,
+  handleFinancingOnDelete,
+  handleFinancingOnUpdate,
+} from '../financing/hooks';
+import { financingRepository } from '../financing/repository';
 import { vehicleRepository } from '../vehicles/repository';
 import { expenseRepository } from './repository';
 
@@ -64,6 +70,7 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
       }
     }, 'Receipt URL must be valid')
     .optional(),
+  isFinancingPayment: z.boolean().optional().default(false),
 });
 
 const createExpenseSchema = baseExpenseSchema.omit({
@@ -122,15 +129,28 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     throw new NotFoundError('Vehicle');
   }
 
+  // Validate: reject financing payment if vehicle has no active financing
+  if (expenseData.isFinancingPayment) {
+    const financing = await financingRepository.findByVehicleId(expenseData.vehicleId);
+    if (!financing || !financing.isActive) {
+      throw new ValidationError('Vehicle has no active financing');
+    }
+  }
+
   // Validate fuel expense requirements
   validateFuelExpenseData(expenseData.category, expenseData.mileage, expenseData.fuelAmount);
 
   const createdExpense = await expenseRepository.create(expenseData);
 
+  // Adjust financing balance if this is a financing payment
+  const updatedFinancing = await handleFinancingOnCreate(createdExpense);
+
   return c.json(
     {
       success: true,
-      data: createdExpense,
+      data: updatedFinancing
+        ? { expense: createdExpense, financing: updatedFinancing }
+        : createdExpense,
       message: 'Expense created successfully',
     },
     201
@@ -253,8 +273,17 @@ routes.put(
 
     validateFuelExpenseData(finalCategory, finalMileage, finalFuelAmount);
 
+    // Adjust financing balance if financing involvement changed
+    const updatedFinancing = await handleFinancingOnUpdate(existingExpense, updateData);
+
     const updatedExpense = await expenseRepository.update(id, updateData);
-    return c.json({ success: true, data: updatedExpense, message: 'Expense updated successfully' });
+    return c.json({
+      success: true,
+      data: updatedFinancing
+        ? { expense: updatedExpense, financing: updatedFinancing }
+        : updatedExpense,
+      message: 'Expense updated successfully',
+    });
   }
 );
 
@@ -262,7 +291,11 @@ routes.put(
 routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  await validateExpenseOwnership(id, user.id);
+  const expense = await validateExpenseOwnership(id, user.id);
+
+  // Reverse financing balance adjustment before deleting
+  await handleFinancingOnDelete(expense);
+
   await expenseRepository.delete(id);
   return c.json({ success: true, message: 'Expense deleted successfully' });
 });

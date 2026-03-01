@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense } from '../../db/schema';
@@ -155,6 +155,22 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     } catch (error) {
       logger.error('Error getting monthly totals for vehicle', { vehicleId, year, error });
       throw new DatabaseError('Failed to get monthly totals', error);
+    }
+  }
+
+  async findFinancingByVehicleId(vehicleId: string): Promise<Expense[]> {
+    try {
+      return await this.db
+        .select()
+        .from(expenses)
+        .where(and(eq(expenses.vehicleId, vehicleId), eq(expenses.isFinancingPayment, true)))
+        .orderBy(asc(expenses.date));
+    } catch (error) {
+      logger.error('Failed to find financing expenses for vehicle', {
+        vehicleId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to find financing expenses', error);
     }
   }
 }

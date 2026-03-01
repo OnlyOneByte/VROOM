@@ -5,13 +5,7 @@
 import { eq, inArray } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { getDb } from '../../db/connection';
-import {
-  expenses,
-  insurancePolicies,
-  vehicleFinancing,
-  vehicleFinancingPayments,
-  vehicles,
-} from '../../db/schema';
+import { expenses, insurancePolicies, vehicleFinancing, vehicles } from '../../db/schema';
 import { SyncError, SyncErrorCode } from '../../errors';
 import type { ParsedBackupData } from '../../types';
 import { settingsRepository } from '../settings/repository';
@@ -33,7 +27,6 @@ export interface ImportSummary {
   vehicles: number;
   expenses: number;
   financing: number;
-  financingPayments: number;
   insurance: number;
 }
 
@@ -74,7 +67,6 @@ class RestoreService {
       vehicles: parsedBackup.vehicles.length,
       expenses: parsedBackup.expenses.length,
       financing: parsedBackup.financing.length,
-      financingPayments: parsedBackup.financingPayments.length,
       insurance: parsedBackup.insurance.length,
     };
 
@@ -129,7 +121,6 @@ class RestoreService {
       vehicles: sheetData.vehicles.length,
       expenses: sheetData.expenses.length,
       financing: sheetData.financing.length,
-      financingPayments: sheetData.financingPayments.length,
       insurance: sheetData.insurance.length,
     };
 
@@ -216,11 +207,6 @@ class RestoreService {
       { data: data.vehicles, table: vehicles, name: 'vehicles' },
       { data: data.expenses, table: expenses, name: 'expenses' },
       { data: data.financing, table: vehicleFinancing, name: 'vehicle_financing' },
-      {
-        data: data.financingPayments,
-        table: vehicleFinancingPayments,
-        name: 'vehicle_financing_payments',
-      },
       { data: data.insurance, table: insurancePolicies, name: 'insurance_policies' },
     ];
 
@@ -248,18 +234,6 @@ class RestoreService {
     const vehicleIds = userVehicles.map((v: { id: string }) => v.id);
     await tx.delete(expenses).where(inArray(expenses.vehicleId, vehicleIds));
     await tx.delete(insurancePolicies).where(inArray(insurancePolicies.vehicleId, vehicleIds));
-
-    const financingRecords = await tx
-      .select()
-      .from(vehicleFinancing)
-      .where(inArray(vehicleFinancing.vehicleId, vehicleIds));
-    if (financingRecords.length > 0) {
-      const financingIds = financingRecords.map((f: { id: string }) => f.id);
-      await tx
-        .delete(vehicleFinancingPayments)
-        .where(inArray(vehicleFinancingPayments.financingId, financingIds));
-    }
-
     await tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, vehicleIds));
     await tx.delete(vehicles).where(eq(vehicles.userId, userId));
   }
@@ -280,12 +254,6 @@ class RestoreService {
       await tx
         .insert(vehicleFinancing)
         .values(convertedFinancing as (typeof vehicleFinancing.$inferInsert)[]);
-    }
-    if (data.financingPayments.length > 0) {
-      const convertedPayments = data.financingPayments.map((p) => this.convertRow(p));
-      await tx
-        .insert(vehicleFinancingPayments)
-        .values(convertedPayments as (typeof vehicleFinancingPayments.$inferInsert)[]);
     }
     if (data.insurance.length > 0) {
       const convertedInsurance = data.insurance.map((i) => this.convertRow(i));

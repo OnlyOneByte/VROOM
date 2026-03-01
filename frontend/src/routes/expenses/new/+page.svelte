@@ -4,6 +4,11 @@
 
 	let returnTo = $derived(page.url.searchParams.get('returnTo') || '/expenses');
 	let preselectedVehicleId = $derived(page.url.searchParams.get('vehicleId'));
+	let preselectedCategory = $derived(page.url.searchParams.get('category'));
+	let preselectedIsFinancingPayment = $derived(
+		page.url.searchParams.get('isFinancingPayment') === 'true'
+	);
+	let preselectedAmount = $derived(page.url.searchParams.get('amount'));
 </script>
 
 <svelte:head>
@@ -11,4 +16,10 @@
 	<meta name="description" content="Add a new vehicle expense" />
 </svelte:head>
 
-<ExpenseForm {returnTo} {preselectedVehicleId} />
+<ExpenseForm
+	{returnTo}
+	{preselectedVehicleId}
+	{preselectedCategory}
+	{preselectedIsFinancingPayment}
+	{preselectedAmount}
+/>

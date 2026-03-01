@@ -219,6 +219,7 @@ routes.get('/status', async (c) => {
         syncInactivityMinutes: settings.syncInactivityMinutes,
         lastSyncDate: settings.lastSyncDate,
         lastBackupDate: settings.lastBackupDate,
+        lastDataChangeDate: settings.lastDataChangeDate,
         googleSheetsSpreadsheetId: settings.googleSheetsSpreadsheetId,
         googleDriveBackupFolderId: settings.googleDriveBackupFolderId,
         ...syncStatus,

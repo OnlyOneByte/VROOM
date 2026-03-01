@@ -67,6 +67,24 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
       - "io.portainer.accesscontrol.teams=vroom"
 
+  # Cloudflare Tunnel for secure public access (free HTTPS, no port forwarding)
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: vroom-tunnel
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - vroom-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
   # Optional: Watchtower for automatic updates
   watchtower:
     image: containrrr/watchtower:latest

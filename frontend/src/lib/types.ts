@@ -66,6 +66,16 @@ export interface FinancingPaymentConfig {
 	}[];
 }
 
+// DerivedPaymentEntry: computed from a financing Expense + VehicleFinancing config
+export interface DerivedPaymentEntry {
+	expense: Expense; // The underlying expense
+	paymentNumber: number; // Derived from position in sorted list
+	remainingBalance: number; // Derived: originalAmount - cumulative payments
+	principalAmount: number; // From amortization schedule for this payment number
+	interestAmount: number; // From amortization schedule for this payment number
+	paymentType: 'standard' | 'extra'; // Inferred from amount vs scheduled payment
+}
+
 // Common tag suggestions (not enforced)
 export const COMMON_EXPENSE_TAGS = [
 	'fuel',
@@ -119,6 +129,7 @@ export interface Expense {
 	fuelType?: string; // Octane rating or fuel type for fuel expenses
 	description?: string;
 	receiptUrl?: string;
+	isFinancingPayment: boolean; // true if this expense is a financing payment
 	createdAt: string; // ISO date string
 	updatedAt: string; // ISO date string
 }
@@ -137,24 +148,6 @@ export interface InsurancePolicy {
 	createdAt: string;
 	updatedAt: string;
 }
-
-export interface FinancingPayment {
-	id: string;
-	financingId: string;
-	paymentDate: string;
-	paymentAmount: number;
-	principalAmount: number;
-	interestAmount: number;
-	remainingBalance: number;
-	paymentNumber: number;
-	paymentType: 'standard' | 'extra' | 'custom-split';
-	isScheduled: boolean;
-	createdAt: string;
-	updatedAt: string;
-}
-
-// Alias for consistency with backend naming
-export type VehicleFinancingPayment = FinancingPayment;
 
 export interface FuelEfficiency {
 	vehicleId: string;

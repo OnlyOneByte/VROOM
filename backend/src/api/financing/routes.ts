@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { vehicleFinancing, vehicleFinancingPayments } from '../../db/schema';
+import { vehicleFinancing } from '../../db/schema';
 import { changeTracker, requireAuth } from '../../middleware';
 import {
   commonSchemas,
@@ -64,22 +64,6 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
 const createFinancingSchema = baseFinancingSchema.omit({
   id: true,
   currentBalance: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-const basePaymentSchema = createInsertSchema(vehicleFinancingPayments, {
-  paymentAmount: z.number().min(0.01, 'Payment amount must be greater than 0'),
-  paymentDate: z.coerce.date(),
-});
-
-const financingPaymentSchema = basePaymentSchema.omit({
-  id: true,
-  financingId: true,
-  principalAmount: true,
-  interestAmount: true,
-  remainingBalance: true,
-  paymentNumber: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -169,67 +153,33 @@ routes.post(
   }
 );
 
-// POST /api/financing/:financingId/payment - Record a financing payment
-routes.post(
-  '/:financingId/payment',
+// PATCH /api/financing/:financingId/payment-amount - Update scheduled payment amount
+routes.patch(
+  '/:financingId/payment-amount',
   zValidator('param', financingParamsSchema),
-  zValidator('json', financingPaymentSchema),
+  zValidator(
+    'json',
+    z.object({
+      paymentAmount: z.number().min(0.01, 'Payment amount must be greater than 0'),
+    })
+  ),
   async (c) => {
     const user = c.get('user');
     const { financingId } = c.req.valid('param');
-    const paymentData = c.req.valid('json');
+    const { paymentAmount } = c.req.valid('json');
+    await validateFinancingOwnership(financingId, user.id);
 
-    const financingRecord = await validateFinancingOwnership(financingId, user.id);
-
-    if (!financingRecord.isActive) {
-      throw new HTTPException(400, { message: 'Cannot add payment to inactive financing' });
-    }
-
-    const paymentCount = await financingRepository.getPaymentCount(financingId);
-    const principalAmount = paymentData.paymentAmount;
-    const remainingBalance = Math.max(0, financingRecord.currentBalance - principalAmount);
-
-    const newPayment = {
-      financingId,
-      paymentDate: paymentData.paymentDate,
-      paymentAmount: paymentData.paymentAmount,
-      principalAmount,
-      interestAmount: 0,
-      remainingBalance,
-      paymentNumber: paymentCount + 1,
-      paymentType: paymentData.paymentType,
-      isScheduled: false,
-    };
-
-    const createdPayment = await financingRepository.createPayment(newPayment);
-    const updatedFinancing = await financingRepository.updateBalance(financingId, remainingBalance);
-
-    if (remainingBalance <= 0.01) {
-      await financingRepository.markAsCompleted(financingId, paymentData.paymentDate);
-    }
-
-    return c.json(
-      {
-        success: true,
-        data: { payment: createdPayment, financing: updatedFinancing },
-        message: 'Payment recorded successfully',
-      },
-      201
-    );
+    const updated = await financingRepository.update(financingId, {
+      paymentAmount,
+      updatedAt: new Date(),
+    });
+    return c.json({
+      success: true,
+      data: updated,
+      message: 'Payment amount updated successfully',
+    });
   }
 );
-
-// GET /api/financing/:financingId/payments - Get payment history
-routes.get('/:financingId/payments', zValidator('param', financingParamsSchema), async (c) => {
-  const user = c.get('user');
-  const { financingId } = c.req.valid('param');
-  const financingRecord = await validateFinancingOwnership(financingId, user.id);
-  const payments = await financingRepository.findPaymentsByFinancingId(financingId);
-  return c.json({
-    success: true,
-    data: { financing: financingRecord, payments, paymentCount: payments.length },
-  });
-});
 
 // DELETE /api/financing/:financingId - Delete financing (mark as completed)
 routes.delete('/:financingId', zValidator('param', financingParamsSchema), async (c) => {

@@ -1,4 +1,4 @@
-import type { VehicleFinancing } from '$lib/types';
+import type { DerivedPaymentEntry, Expense, VehicleFinancing } from '$lib/types';
 import { memoizeMulti } from './memoize';
 
 /**
@@ -209,7 +209,18 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 			return new Date();
 		}
 
-		if (financing.financingType === 'lease' || !financing.apr || financing.apr <= 0) {
+		if (financing.financingType === 'lease') {
+			// Leases have a fixed end date based on start + term
+			const startDate = new Date(financing.startDate);
+			if (!isNaN(startDate.getTime())) {
+				const endDate = new Date(startDate);
+				endDate.setMonth(endDate.getMonth() + financing.termMonths);
+				return endDate;
+			}
+			return new Date();
+		}
+
+		if (!financing.apr || financing.apr <= 0) {
 			const paymentsRemaining = Math.ceil(financing.currentBalance / financing.paymentAmount);
 			return calculatePaymentDate(new Date(), paymentsRemaining, financing.paymentFrequency);
 		}
@@ -415,4 +426,74 @@ export function calculateDaysUntil(targetDate: Date): number {
 	const now = new Date();
 	const diffTime = targetDate.getTime() - now.getTime();
 	return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+/**
+ * Calculate the minimum monthly payment for a loan using the standard amortization formula:
+ * M = P * [r(1+r)^n] / [(1+r)^n - 1]
+ * Returns null for leases or loans without APR (minimum = paymentAmount in those cases).
+ */
+export function calculateMinimumPayment(financing: VehicleFinancing): number | null {
+	if (financing.financingType !== 'loan' || !financing.apr || financing.apr <= 0) {
+		return null;
+	}
+
+	if (
+		!financing.originalAmount ||
+		financing.originalAmount <= 0 ||
+		!financing.termMonths ||
+		financing.termMonths <= 0
+	) {
+		return null;
+	}
+
+	const monthlyRate = financing.apr / 100 / 12;
+	const n = financing.termMonths;
+	const factor = Math.pow(1 + monthlyRate, n);
+	const minimumPayment = (financing.originalAmount * (monthlyRate * factor)) / (factor - 1);
+
+	return Math.round(minimumPayment * 100) / 100;
+}
+
+/**
+ * Derives payment entries from financing expenses and vehicle financing config.
+ * Sorts expenses by date ascending, assigns sequential payment numbers,
+ * computes remaining balances, and looks up principal/interest from amortization schedule.
+ */
+export function derivePaymentEntries(
+	expenses: Expense[],
+	financing: VehicleFinancing
+): DerivedPaymentEntry[] {
+	const sorted = [...expenses].sort(
+		(a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+	);
+
+	const isLoanWithApr =
+		financing.financingType === 'loan' && financing.apr != null && financing.apr > 0;
+
+	const schedule = isLoanWithApr ? calculateAmortizationSchedule(financing, sorted.length) : [];
+
+	let cumulativeAmount = 0;
+
+	return sorted.map((expense, index) => {
+		cumulativeAmount += expense.amount;
+		const paymentNumber = index + 1;
+		const remainingBalance = Math.max(0, financing.originalAmount - cumulativeAmount);
+
+		const scheduleEntry = schedule[index];
+		const principalAmount =
+			isLoanWithApr && scheduleEntry ? scheduleEntry.principalAmount : expense.amount;
+		const interestAmount = isLoanWithApr && scheduleEntry ? scheduleEntry.interestAmount : 0;
+
+		const paymentType: 'extra' | 'standard' =
+			expense.amount > financing.paymentAmount ? 'extra' : 'standard';
+
+		return {
+			expense,
+			paymentNumber,
+			remainingBalance,
+			principalAmount,
+			interestAmount,
+			paymentType
+		};
+	});
 }

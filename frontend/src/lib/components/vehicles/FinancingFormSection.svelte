@@ -128,7 +128,9 @@
 
 					<div class="space-y-2">
 						<Label for="originalAmount">
-							{isEditMode ? 'Original ' : ''}{ownershipType === 'lease' ? 'Lease' : 'Loan'} Amount *
+							{isEditMode ? 'Original ' : ''}{ownershipType === 'lease'
+								? 'Total Lease Obligation'
+								: 'Loan Amount'} *
 						</Label>
 						<Input
 							id="originalAmount"
@@ -221,6 +223,27 @@
 							</Select.Content>
 						</Select.Root>
 					</div>
+
+					<!-- Monthly Payment (for leases — loans auto-calculate this) -->
+					{#if ownershipType === 'lease'}
+						<div class="space-y-2">
+							<Label for="paymentAmount">Monthly Payment *</Label>
+							<Input
+								id="paymentAmount"
+								type="number"
+								min="0.01"
+								step="0.01"
+								placeholder="e.g., 350.00"
+								bind:value={financingForm.paymentAmount}
+								aria-invalid={!!errors['paymentAmount']}
+								aria-describedby={errors['paymentAmount'] ? 'paymentAmount-error' : undefined}
+								required
+							/>
+							{#if errors['paymentAmount']}
+								<FormFieldError id="paymentAmount-error">{errors['paymentAmount']}</FormFieldError>
+							{/if}
+						</div>
+					{/if}
 
 					{#if ownershipType === 'lease'}
 						<div class="space-y-2">

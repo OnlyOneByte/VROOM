@@ -4,10 +4,10 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import { Receipt, TrendingDown, DollarSign } from 'lucide-svelte';
-	import type { VehicleFinancingPayment, VehicleFinancing } from '$lib/types';
+	import type { DerivedPaymentEntry, VehicleFinancing } from '$lib/types';
 
 	interface Props {
-		payments: VehicleFinancingPayment[];
+		payments: DerivedPaymentEntry[];
 		financing: VehicleFinancing;
 	}
 
@@ -16,7 +16,7 @@
 	// Sort payments with most recent first
 	let sortedPayments = $derived(
 		[...payments].sort(
-			(a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+			(a, b) => new Date(b.expense.date).getTime() - new Date(a.expense.date).getTime()
 		)
 	);
 
@@ -125,7 +125,7 @@
 							role="list"
 							aria-label="Payment history timeline"
 						>
-							{#each visiblePayments as payment, index (payment.id)}
+							{#each visiblePayments as payment, index (payment.expense.id)}
 								{@const actualIndex = visibleRange.start + index}
 								{@const badge = getPaymentTypeBadge(payment.paymentType)}
 								{@const isExtraPayment = payment.paymentType === 'extra'}
@@ -143,7 +143,7 @@
 									<Card
 										class="relative {isExtraPayment ? 'border-chart-2/20 bg-chart-2/5' : ''}"
 										aria-label="Payment {payment.paymentNumber} on {formatDate(
-											new Date(payment.paymentDate)
+											new Date(payment.expense.date)
 										)}"
 									>
 										<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
@@ -166,9 +166,9 @@
 															<div class="flex flex-wrap items-center gap-2 mb-1">
 																<time
 																	class="text-xs sm:text-sm font-medium text-muted-foreground"
-																	datetime={new Date(payment.paymentDate).toISOString()}
+																	datetime={new Date(payment.expense.date).toISOString()}
 																>
-																	{formatDate(new Date(payment.paymentDate))}
+																	{formatDate(new Date(payment.expense.date))}
 																</time>
 																<Badge variant={badge.variant} class="text-xs">{badge.label}</Badge>
 															</div>
@@ -176,7 +176,7 @@
 																class="text-xl sm:text-2xl font-bold break-words"
 																aria-label="Payment amount"
 															>
-																{formatCurrency(payment.paymentAmount)}
+																{formatCurrency(payment.expense.amount)}
 															</div>
 														</div>
 
@@ -205,11 +205,11 @@
 																	class="flex items-center gap-1.5 text-xs text-muted-foreground"
 																>
 																	<DollarSign class="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-																	<span id="principal-{payment.id}">Principal</span>
+																	<span id="principal-{payment.expense.id}">Principal</span>
 																</div>
 																<div
 																	class="text-xs sm:text-sm font-semibold"
-																	aria-labelledby="principal-{payment.id}"
+																	aria-labelledby="principal-{payment.expense.id}"
 																>
 																	{formatCurrency(payment.principalAmount)}
 																</div>
@@ -219,11 +219,11 @@
 																	class="flex items-center gap-1.5 text-xs text-muted-foreground"
 																>
 																	<DollarSign class="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-																	<span id="interest-{payment.id}">Interest</span>
+																	<span id="interest-{payment.expense.id}">Interest</span>
 																</div>
 																<div
 																	class="text-xs sm:text-sm font-semibold"
-																	aria-labelledby="interest-{payment.id}"
+																	aria-labelledby="interest-{payment.expense.id}"
 																>
 																	{formatCurrency(payment.interestAmount)}
 																</div>
@@ -235,12 +235,13 @@
 													<div
 														class="pt-2 sm:pt-3 border-t border-border flex items-center justify-between text-xs sm:text-sm"
 													>
-														<span class="text-muted-foreground" id="remaining-balance-{payment.id}"
-															>Remaining Balance</span
+														<span
+															class="text-muted-foreground"
+															id="remaining-balance-{payment.expense.id}">Remaining Balance</span
 														>
 														<span
 															class="font-semibold"
-															aria-labelledby="remaining-balance-{payment.id}"
+															aria-labelledby="remaining-balance-{payment.expense.id}"
 															>{formatCurrency(payment.remainingBalance)}</span
 														>
 													</div>
@@ -260,7 +261,7 @@
 					aria-labelledby="payment-history-heading"
 				>
 					<div class="space-y-3 sm:space-y-4" role="list" aria-label="Payment history timeline">
-						{#each visiblePayments as payment, index (payment.id)}
+						{#each visiblePayments as payment, index (payment.expense.id)}
 							{@const badge = getPaymentTypeBadge(payment.paymentType)}
 							{@const isExtraPayment = payment.paymentType === 'extra'}
 
@@ -277,7 +278,7 @@
 								<Card
 									class="relative {isExtraPayment ? 'border-chart-2/20 bg-chart-2/5' : ''}"
 									aria-label="Payment {payment.paymentNumber} on {formatDate(
-										new Date(payment.paymentDate)
+										new Date(payment.expense.date)
 									)}"
 								>
 									<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
@@ -300,9 +301,9 @@
 														<div class="flex flex-wrap items-center gap-2 mb-1">
 															<time
 																class="text-xs sm:text-sm font-medium text-muted-foreground"
-																datetime={new Date(payment.paymentDate).toISOString()}
+																datetime={new Date(payment.expense.date).toISOString()}
 															>
-																{formatDate(new Date(payment.paymentDate))}
+																{formatDate(new Date(payment.expense.date))}
 															</time>
 															<Badge variant={badge.variant} class="text-xs">{badge.label}</Badge>
 														</div>
@@ -310,7 +311,7 @@
 															class="text-xl sm:text-2xl font-bold break-words"
 															aria-label="Payment amount"
 														>
-															{formatCurrency(payment.paymentAmount)}
+															{formatCurrency(payment.expense.amount)}
 														</div>
 													</div>
 
@@ -337,11 +338,11 @@
 														<div class="space-y-1">
 															<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
 																<DollarSign class="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-																<span id="principal-{payment.id}">Principal</span>
+																<span id="principal-{payment.expense.id}">Principal</span>
 															</div>
 															<div
 																class="text-xs sm:text-sm font-semibold"
-																aria-labelledby="principal-{payment.id}"
+																aria-labelledby="principal-{payment.expense.id}"
 															>
 																{formatCurrency(payment.principalAmount)}
 															</div>
@@ -349,11 +350,11 @@
 														<div class="space-y-1">
 															<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
 																<DollarSign class="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-																<span id="interest-{payment.id}">Interest</span>
+																<span id="interest-{payment.expense.id}">Interest</span>
 															</div>
 															<div
 																class="text-xs sm:text-sm font-semibold"
-																aria-labelledby="interest-{payment.id}"
+																aria-labelledby="interest-{payment.expense.id}"
 															>
 																{formatCurrency(payment.interestAmount)}
 															</div>
@@ -365,12 +366,13 @@
 												<div
 													class="pt-2 sm:pt-3 border-t border-border flex items-center justify-between text-xs sm:text-sm"
 												>
-													<span class="text-muted-foreground" id="remaining-balance-{payment.id}"
-														>Remaining Balance</span
+													<span
+														class="text-muted-foreground"
+														id="remaining-balance-{payment.expense.id}">Remaining Balance</span
 													>
 													<span
 														class="font-semibold"
-														aria-labelledby="remaining-balance-{payment.id}"
+														aria-labelledby="remaining-balance-{payment.expense.id}"
 														>{formatCurrency(payment.remainingBalance)}</span
 													>
 												</div>

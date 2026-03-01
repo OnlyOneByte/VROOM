@@ -41,17 +41,19 @@
 		onReauthenticate
 	}: Props = $props();
 
-	let lastBackupText = $derived(
-		settings?.lastBackupDate
-			? new Date(settings.lastBackupDate).toLocaleDateString('en-US', {
-					year: 'numeric',
-					month: 'short',
-					day: 'numeric',
-					hour: '2-digit',
-					minute: '2-digit'
-				})
-			: 'Never'
-	);
+	let lastBackupText = $derived.by(() => {
+		const backupDate = settings?.lastBackupDate;
+		const syncDate = settings?.lastSyncDate;
+		const dateStr = backupDate ?? syncDate;
+		if (!dateStr) return 'Never';
+		return new Date(dateStr).toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	});
 </script>
 
 <Card>
@@ -97,10 +99,10 @@
 			</div>
 
 			{#if googleDriveBackupEnabled}
-				{#if settings?.lastBackupDate}
+				{#if settings?.lastBackupDate || settings?.lastSyncDate}
 					<div class="pl-6">
 						<p class="text-sm text-muted-foreground">
-							Last backup: <span class="font-medium">{lastBackupText}</span>
+							Last backup & sync: <span class="font-medium">{lastBackupText}</span>
 						</p>
 					</div>
 				{/if}
@@ -148,22 +150,6 @@
 				</div>
 				<Switch id="sheets-sync" bind:checked={googleSheetsSyncEnabled} />
 			</div>
-
-			{#if googleSheetsSyncEnabled && settings?.lastSyncDate}
-				<div class="pl-6">
-					<p class="text-sm text-muted-foreground">
-						Last sync: <span class="font-medium">
-							{new Date(settings.lastSyncDate).toLocaleDateString('en-US', {
-								year: 'numeric',
-								month: 'short',
-								day: 'numeric',
-								hour: '2-digit',
-								minute: '2-digit'
-							})}
-						</span>
-					</p>
-				</div>
-			{/if}
 
 			<!-- Auto-Sync Settings -->
 			{#if googleDriveBackupEnabled || googleSheetsSyncEnabled}

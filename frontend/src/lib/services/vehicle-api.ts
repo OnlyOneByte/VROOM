@@ -1,4 +1,4 @@
-import type { Vehicle, VehicleFinancing, VehicleFinancingPayment, VehicleStats } from '$lib/types';
+import type { Vehicle, VehicleFinancing, VehicleStats } from '$lib/types';
 import type { TimePeriod } from '$lib/constants/time-periods';
 import { apiClient } from './api-client';
 
@@ -31,12 +31,6 @@ export const vehicleApi = {
 		await apiClient.delete('/api/v1/vehicles/' + vehicleId);
 	},
 
-	async getFinancingPayments(vehicleId: string): Promise<VehicleFinancingPayment[]> {
-		return apiClient.get<VehicleFinancingPayment[]>(
-			`/api/v1/vehicles/${vehicleId}/financing/payments`
-		);
-	},
-
 	async getFinancing(vehicleId: string): Promise<VehicleFinancing | null> {
 		try {
 			return await apiClient.get<VehicleFinancing>(
@@ -55,5 +49,11 @@ export const vehicleApi = {
 			`/api/v1/financing/vehicles/${vehicleId}/financing`,
 			data
 		);
+	},
+
+	async updatePaymentAmount(financingId: string, paymentAmount: number): Promise<VehicleFinancing> {
+		return apiClient.patch<VehicleFinancing>(`/api/v1/financing/${financingId}/payment-amount`, {
+			paymentAmount
+		});
 	}
 };

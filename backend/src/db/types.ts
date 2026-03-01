@@ -30,8 +30,6 @@ export const EXPENSE_CATEGORY_DESCRIPTIONS: Record<ExpenseCategory, string> = {
 
 export type PaymentFrequency = 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 
-export type PaymentType = 'standard' | 'extra' | 'custom-split';
-
 export type AuthProvider = 'google';
 
 export type SharePermission = 'view' | 'edit';
@@ -52,8 +50,6 @@ export const isValidPaymentFrequency = createEnumGuard([
   'weekly',
   'custom',
 ] as const);
-
-export const isValidPaymentType = createEnumGuard(['standard', 'extra', 'custom-split'] as const);
 
 export const isValidSharePermission = createEnumGuard(['view', 'edit'] as const);
 

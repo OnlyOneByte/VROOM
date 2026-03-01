@@ -73,6 +73,9 @@ export const apiClient = {
 	put: <T>(url: string, body?: unknown, options?: ApiOptions) =>
 		request<T>(url, { ...options, method: 'PUT', body }),
 
+	patch: <T>(url: string, body?: unknown, options?: ApiOptions) =>
+		request<T>(url, { ...options, method: 'PATCH', body }),
+
 	delete: <T>(url: string, options?: ApiOptions) =>
 		request<T>(url, { ...options, method: 'DELETE' }),
 

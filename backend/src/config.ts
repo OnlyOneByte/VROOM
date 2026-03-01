@@ -4,13 +4,7 @@
 
 import type { SQLiteTableWithColumns } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
-import {
-  expenses,
-  insurancePolicies,
-  vehicleFinancing,
-  vehicleFinancingPayments,
-  vehicles,
-} from './db/schema';
+import { expenses, insurancePolicies, vehicleFinancing, vehicles } from './db/schema';
 import type { Environment } from './types';
 
 const envSchema = z.object({
@@ -156,7 +150,6 @@ export const TABLE_SCHEMA_MAP: Record<string, SQLiteTableWithColumns<any>> = {
   vehicles,
   expenses,
   financing: vehicleFinancing,
-  financingPayments: vehicleFinancingPayments,
   insurance: insurancePolicies,
 };
 
@@ -164,7 +157,6 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   vehicles: 'vehicles.csv',
   expenses: 'expenses.csv',
   financing: 'vehicle_financing.csv',
-  financingPayments: 'vehicle_financing_payments.csv',
   insurance: 'insurance.csv',
 };
 

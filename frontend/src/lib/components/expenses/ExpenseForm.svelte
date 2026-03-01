@@ -21,6 +21,7 @@
 	import FuelFieldsSection from './FuelFieldsSection.svelte';
 	import TagInput from './TagInput.svelte';
 	import { validateExpenseField } from './expense-form-validation';
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import type { ExpenseFormErrors, Vehicle, Expense } from '$lib/types.js';
 	import { usesLiquidFuel, usesElectricCharge } from '$lib/utils/units';
 
@@ -28,9 +29,19 @@
 		expenseId?: string;
 		returnTo?: string;
 		preselectedVehicleId?: string | null;
+		preselectedCategory?: string | null;
+		preselectedIsFinancingPayment?: boolean;
+		preselectedAmount?: string | null;
 	}
 
-	let { expenseId, returnTo = '/expenses', preselectedVehicleId = null }: Props = $props();
+	let {
+		expenseId,
+		returnTo = '/expenses',
+		preselectedVehicleId = null,
+		preselectedCategory = null,
+		preselectedIsFinancingPayment = false,
+		preselectedAmount = null
+	}: Props = $props();
 
 	// Determine if we're in edit mode
 	let isEditMode = $derived(!!expenseId);
@@ -46,7 +57,8 @@
 		volume: '',
 		charge: '',
 		fuelType: '',
-		description: ''
+		description: '',
+		isFinancingPayment: false
 	});
 
 	// Form state
@@ -80,14 +92,28 @@
 
 		if (isEditMode && expenseId) {
 			await loadExpense();
-		} else if (preselectedVehicleId) {
-			formData.vehicleId = preselectedVehicleId;
+		} else {
+			if (preselectedVehicleId) {
+				formData.vehicleId = preselectedVehicleId;
+			}
+			if (preselectedCategory) {
+				formData.category = preselectedCategory;
+			}
+			if (preselectedAmount) {
+				formData.amount = preselectedAmount;
+			}
 		}
 
 		if (formData.vehicleId) {
 			await loadVehicle();
 			await loadLastFuelExpense();
 			await loadAllVehicleExpenses();
+		}
+
+		// Set financing payment flag AFTER vehicle is loaded so the $effect
+		// for vehicle changes has already fired and won't reset it
+		if (!isEditMode && preselectedIsFinancingPayment) {
+			formData.isFinancingPayment = true;
 		}
 	});
 
@@ -125,6 +151,7 @@
 			formData.charge = expense.charge?.toString() ?? '';
 			formData.fuelType = expense.fuelType || '';
 			formData.description = expense.description || '';
+			formData.isFinancingPayment = expense.isFinancingPayment ?? false;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading expense:', error);
 			appStore.addNotification({ type: 'error', message: 'Error loading expense' });
@@ -166,6 +193,11 @@
 		formData.category = categoryValue;
 		touched['category'] = true;
 		handleBlur('category');
+
+		// Reset financing payment flag when switching away from financial category
+		if (categoryValue !== 'financial') {
+			formData.isFinancingPayment = false;
+		}
 	}
 
 	// Reload vehicle data when vehicle selection changes (not on initial mount — onMount handles that)
@@ -175,6 +207,8 @@
 			previousVehicleId = formData.vehicleId;
 			// Skip if this is the initial load (onMount handles it)
 			if (vehicle !== null || !isLoading) {
+				// Reset financing flag when switching vehicles (new vehicle may not have financing)
+				formData.isFinancingPayment = false;
 				loadVehicle();
 				loadLastFuelExpense();
 				loadAllVehicleExpenses();
@@ -184,6 +218,11 @@
 
 	// Show fuel-specific fields when Fuel category is selected
 	let showFuelFields = $derived(formData.category === 'fuel');
+
+	// Show financing checkbox when category is 'financial' AND vehicle has active financing
+	let showFinancingCheckbox = $derived(
+		formData.category === 'financial' && vehicle?.financing?.isActive === true
+	);
 
 	// Determine which fuel type fields to show based on vehicle type
 	let showVolumeField = $derived(showFuelFields && vehicle && usesLiquidFuel(vehicle.vehicleType));
@@ -304,7 +343,8 @@
 				charge: formData.charge ? parseFloat(formData.charge) : undefined,
 				fuelType: formData.fuelType || undefined,
 				description: formData.description || undefined,
-				currency: currencyUnit
+				currency: currencyUnit,
+				isFinancingPayment: formData.isFinancingPayment
 			};
 
 			if (isEditMode) {
@@ -532,6 +572,16 @@
 				touched={touched['category']}
 				onSelect={selectCategory}
 			/>
+
+			<!-- Financing Payment Checkbox -->
+			{#if showFinancingCheckbox}
+				<div class="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
+					<Checkbox id="isFinancingPayment" bind:checked={formData.isFinancingPayment} />
+					<Label for="isFinancingPayment" class="cursor-pointer text-sm font-medium leading-none">
+						Apply as payment towards financing
+					</Label>
+				</div>
+			{/if}
 
 			<!-- Amount -->
 			<div class="space-y-2">

@@ -42,6 +42,7 @@ export const syncConflicts = writable<SyncConflict[]>([]);
 export const lastSyncTime = writable<Date | null>(null);
 export const lastBackupTime = writable<Date | null>(null);
 export const lastSheetsSync = writable<Date | null>(null);
+export const lastDataChangeTime = writable<Date | null>(null);
 export const googleDriveBackupEnabled = writable<boolean>(false);
 export const googleSheetsSyncEnabled = writable<boolean>(false);
 
@@ -51,6 +52,7 @@ export async function fetchLastSyncTime(): Promise<void> {
 		const result = await apiClient.get<{
 			lastSyncDate?: string;
 			lastBackupDate?: string;
+			lastDataChangeDate?: string;
 			googleSheetsSyncEnabled?: boolean;
 			googleDriveBackupEnabled?: boolean;
 		}>('/api/v1/sync/status');
@@ -58,9 +60,11 @@ export async function fetchLastSyncTime(): Promise<void> {
 		if (result) {
 			const syncDate = result.lastSyncDate ? new Date(result.lastSyncDate) : null;
 			const backupDate = result.lastBackupDate ? new Date(result.lastBackupDate) : null;
+			const changeDate = result.lastDataChangeDate ? new Date(result.lastDataChangeDate) : null;
 
 			lastSheetsSync.set(syncDate);
 			lastBackupTime.set(backupDate);
+			lastDataChangeTime.set(changeDate);
 
 			googleSheetsSyncEnabled.set(result.googleSheetsSyncEnabled || false);
 			googleDriveBackupEnabled.set(result.googleDriveBackupEnabled || false);

@@ -68,26 +68,6 @@ export const vehicleFinancing = sqliteTable('vehicle_financing', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
-// Vehicle Financing Payment Records
-export const vehicleFinancingPayments = sqliteTable('vehicle_financing_payments', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  financingId: text('financing_id')
-    .notNull()
-    .references(() => vehicleFinancing.id, { onDelete: 'cascade' }),
-  paymentDate: integer('payment_date', { mode: 'timestamp' }).notNull(),
-  paymentAmount: real('payment_amount').notNull(),
-  principalAmount: real('principal_amount').notNull(),
-  interestAmount: real('interest_amount').notNull(), // 0 for leases
-  remainingBalance: real('remaining_balance').notNull(),
-  paymentNumber: integer('payment_number').notNull(),
-  paymentType: text('payment_type').notNull().default('standard'), // 'standard' | 'extra' | 'custom-split'
-  isScheduled: integer('is_scheduled', { mode: 'boolean' }).notNull().default(false),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-});
-
 // Insurance Policy table
 export const insurancePolicies = sqliteTable('insurance_policies', {
   id: text('id')
@@ -127,6 +107,7 @@ export const expenses = sqliteTable('expenses', {
   expenseAmount: real('expense_amount').notNull(),
   fuelAmount: real('fuel_amount'),
   fuelType: text('fuel_type'),
+  isFinancingPayment: integer('is_financing_payment', { mode: 'boolean' }).notNull().default(false),
 });
 
 // User Settings table
@@ -190,9 +171,6 @@ export type VehicleWithFinancing = Vehicle & {
 
 export type VehicleFinancing = typeof vehicleFinancing.$inferSelect;
 export type NewVehicleFinancing = typeof vehicleFinancing.$inferInsert;
-
-export type VehicleFinancingPayment = typeof vehicleFinancingPayments.$inferSelect;
-export type NewVehicleFinancingPayment = typeof vehicleFinancingPayments.$inferInsert;
 
 export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
 export type NewInsurancePolicy = typeof insurancePolicies.$inferInsert;
