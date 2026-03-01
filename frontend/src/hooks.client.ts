@@ -39,7 +39,9 @@ export const handleFetch: HandleFetch = async ({ request, fetch }) => {
 
 // Optional: Handle client-side errors
 export const handleError: HandleClientError = ({ error, event }) => {
-	console.error('Client error:', error, event);
+	if (import.meta.env.DEV) {
+		console.error('Client error:', error, event);
+	}
 
 	return {
 		message: 'An unexpected error occurred'

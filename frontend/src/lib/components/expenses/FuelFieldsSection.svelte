@@ -181,7 +181,7 @@
 
 	{#if showMpgCalculation}
 		{#if calculatedMpg && showVolumeField}
-			<div class="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+			<div class="bg-chart-2/10 border border-chart-2/20 rounded-lg p-3">
 				<div class="flex items-center gap-2 text-chart-2">
 					<Gauge class="h-4 w-4" />
 					<span class="text-sm font-medium">
@@ -198,7 +198,7 @@
 				{/if}
 			</div>
 		{:else if calculatedEfficiency && showChargeField}
-			<div class="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+			<div class="bg-chart-2/10 border border-chart-2/20 rounded-lg p-3">
 				<div class="flex items-center gap-2 text-chart-2">
 					<Zap class="h-4 w-4" />
 					<span class="text-sm font-medium">

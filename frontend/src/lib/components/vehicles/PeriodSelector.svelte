@@ -1,5 +1,6 @@
 <script lang="ts">
 	import * as Select from '$lib/components/ui/select';
+	import { LoaderCircle } from 'lucide-svelte';
 	import { PERIOD_OPTIONS, isValidPeriod, type TimePeriod } from '$lib/constants/time-periods';
 
 	interface Props {
@@ -26,9 +27,7 @@
 		<Select.Trigger class="w-[180px]" disabled={isLoading} aria-label="Select time period">
 			<span class="flex items-center gap-2">
 				{#if isLoading}
-					<span
-						class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"
-					></span>
+					<LoaderCircle class="h-4 w-4 animate-spin" />
 				{/if}
 				{selectedPeriodOption?.label || 'Select period'}
 			</span>

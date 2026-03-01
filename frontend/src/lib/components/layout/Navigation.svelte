@@ -5,7 +5,7 @@
 	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
 	import { syncStatus, isOnline, offlineExpenses } from '$lib/stores/offline';
 	import { syncConflicts } from '$lib/utils/sync-manager';
-	import { Wifi, WifiOff, RefreshCw, CircleAlert, Clock } from 'lucide-svelte';
+	import { getSyncStatusInfo } from '$lib/utils/sync-status';
 	import { Badge } from '$lib/components/ui/badge';
 	import {
 		Sheet,
@@ -55,16 +55,15 @@
 
 	// Mobile sync status helpers
 	let pendingCount = $derived($offlineExpenses.filter(expense => !expense.synced).length);
-	let hasConflicts = $derived($syncConflicts.length > 0);
 
-	function getSyncStatusInfo() {
-		if (!$isOnline) return { color: 'text-destructive', icon: WifiOff };
-		if (hasConflicts) return { color: 'text-chart-5', icon: CircleAlert };
-		if ($syncStatus === 'syncing') return { color: 'text-chart-5', icon: RefreshCw };
-		if ($syncStatus === 'error') return { color: 'text-destructive', icon: CircleAlert };
-		if (pendingCount > 0) return { color: 'text-chart-5', icon: Clock };
-		return { color: 'text-chart-2', icon: Wifi };
-	}
+	let syncStatusInfo = $derived(
+		getSyncStatusInfo({
+			isOnline: $isOnline,
+			syncStatus: $syncStatus,
+			pendingCount,
+			conflictsCount: $syncConflicts.length
+		})
+	);
 </script>
 
 <!-- Mobile menu button -->
@@ -78,9 +77,8 @@
 		<div class="flex items-center gap-3">
 			<!-- Mobile sync status icon -->
 			{#snippet mobileStatusIcon()}
-				{@const statusInfo = getSyncStatusInfo()}
-				{@const StatusIcon = statusInfo.icon}
-				<div class="{statusInfo.color} relative" role="status" aria-label="Sync status">
+				{@const StatusIcon = syncStatusInfo.icon}
+				<div class="{syncStatusInfo.color} relative" role="status" aria-label="Sync status">
 					<StatusIcon class="h-5 w-5 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
 					{#if pendingCount > 0}
 						<Badge

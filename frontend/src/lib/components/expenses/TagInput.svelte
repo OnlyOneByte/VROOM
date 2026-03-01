@@ -46,7 +46,7 @@
 	<Label for="tags">Tags (Optional)</Label>
 	<div
 		class="border rounded-lg p-2 min-h-[42px] bg-background {touched && error
-			? 'border-red-300'
+			? 'border-destructive'
 			: 'border-input'}"
 	>
 		<div class="flex flex-wrap gap-2 items-center">

@@ -191,3 +191,74 @@ return { color: 'text-chart-1', ... };     // pending/orange
   <DollarSign class="text-chart-3" />
 </div>
 ```
+
+## 13. Never Use `!important` Overrides on shadcn Button
+
+Pass classes normally or use `variant` props. The `!` prefix fights the component's own styles and breaks theming.
+
+```svelte
+// ❌ WRONG — found in ExpenseForm.svelte FABs
+<Button class="!bg-primary hover:!bg-primary/90 !text-primary-foreground !px-6 !border-0">
+
+// ✅ CORRECT — use variant or pass classes without !important
+<Button variant="destructive" class="rounded-full shadow-lg h-14 px-5">
+<Button class="bg-foreground hover:bg-foreground/90 text-background h-14 px-6">
+```
+
+## 14. Use `border-destructive` for Validation Error Borders
+
+Don't use hardcoded `border-red-300` for form error states. Use the semantic `border-destructive` token.
+
+```svelte
+// ❌ WRONG — found in TagInput.svelte, ExpenseForm.svelte
+class="border {error ? 'border-red-300' : 'border-input'}"
+
+// ✅ CORRECT
+class="border {error ? 'border-destructive' : 'border-input'}"
+```
+
+## 15. Don't Duplicate Shared Utility Logic in Components
+
+If a utility function exists in `$lib/utils/`, import it instead of reimplementing the same logic inline.
+
+```typescript
+// ❌ WRONG — found in Navigation.svelte (duplicated sync-status.ts logic)
+function getSyncStatusInfo() {
+  if (!$isOnline) return { color: 'text-destructive', icon: WifiOff };
+  // ... same logic as sync-status.ts
+}
+
+// ✅ CORRECT — import from the canonical source
+import { getSyncStatusInfo } from '$lib/utils/sync-status';
+let statusInfo = $derived(getSyncStatusInfo({ isOnline: $isOnline, ... }));
+```
+
+## 16. Guard `console.error` in Client Error Handlers
+
+Production error handlers should not unconditionally log to console. Guard with `import.meta.env.DEV`.
+
+```typescript
+// ❌ WRONG — found in hooks.client.ts
+export const handleError: HandleClientError = ({ error, event }) => {
+  console.error('Client error:', error, event);
+};
+
+// ✅ CORRECT
+export const handleError: HandleClientError = ({ error, event }) => {
+  if (import.meta.env.DEV) {
+    console.error('Client error:', error, event);
+  }
+};
+```
+
+## 17. Don't Use Non-Existent CSS Classes
+
+Raw class names like `card`, `btn`, `btn-primary` don't exist in this project. Use shadcn components or Tailwind utilities.
+
+```svelte
+// ❌ WRONG — found in ExpenseForm.svelte
+<form class="card space-y-6">
+
+// ✅ CORRECT — use Tailwind utilities or Card component
+<form class="rounded-lg border bg-card p-6 space-y-6">
+```

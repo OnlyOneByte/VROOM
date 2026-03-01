@@ -7,7 +7,14 @@
 	} from '$lib/components/ui/collapsible';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { Calculator, ChevronDown, Calendar, TrendingDown, DollarSign } from 'lucide-svelte';
+	import {
+		Calculator,
+		ChevronDown,
+		Calendar,
+		TrendingDown,
+		DollarSign,
+		LoaderCircle
+	} from 'lucide-svelte';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import { calculateExtraPaymentImpact } from '$lib/utils/financing-calculations';
 	import { debounce } from '$lib/utils/memoize';
@@ -137,10 +144,7 @@
 							<div class="h-px bg-border"></div>
 							<div class="flex items-center justify-center py-8">
 								<div class="flex items-center gap-2 text-sm text-muted-foreground">
-									<div
-										class="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
-										aria-hidden="true"
-									></div>
+									<LoaderCircle class="h-4 w-4 animate-spin" aria-hidden="true" />
 									<span>Calculating...</span>
 								</div>
 							</div>

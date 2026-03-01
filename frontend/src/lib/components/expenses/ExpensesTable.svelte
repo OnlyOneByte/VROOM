@@ -6,7 +6,8 @@
 		DollarSign,
 		Search,
 		Car,
-		LoaderCircle
+		LoaderCircle,
+		Filter
 	} from 'lucide-svelte';
 	import { settingsStore } from '$lib/stores/settings';
 	import { appStore } from '$lib/stores/app';
@@ -45,6 +46,7 @@
 		EmptyMedia,
 		EmptyTitle
 	} from '$lib/components/ui/empty';
+	import * as Select from '$lib/components/ui/select';
 
 	interface Props {
 		expenses: Expense[];
@@ -80,15 +82,24 @@
 	let sortBy = $state<'date' | 'amount' | 'type'>('date');
 	let sortOrder = $state<'asc' | 'desc'>('desc');
 
+	// Category filter state
+	let categoryFilter = $state<string>('');
+
 	// Delete modal state
 	let showDeleteModal = $state(false);
 	let expenseToDelete = $state<Expense | null>(null);
 	let isDeleting = $state(false);
 
-	// Sorted expenses
+	// Filtered and sorted expenses
 	let sortedExpenses = $derived.by(() => {
-		const sorted = [...expenses];
-		sorted.sort((a, b) => {
+		let filtered = [...expenses];
+
+		// Apply category filter
+		if (categoryFilter) {
+			filtered = filtered.filter(e => e.category === categoryFilter);
+		}
+
+		filtered.sort((a, b) => {
 			let comparison = 0;
 
 			switch (sortBy) {
@@ -110,7 +121,7 @@
 			return sortOrder === 'asc' ? comparison : -comparison;
 		});
 
-		return sorted;
+		return filtered;
 	});
 
 	function handleSort(newSortBy: typeof sortBy) {
@@ -210,7 +221,34 @@
 							{#if showVehicleColumn}
 								<TableHead class="w-[180px]">Vehicle</TableHead>
 							{/if}
-							<TableHead class="w-[140px]">Category</TableHead>
+							<TableHead class="w-[140px]">
+								<Select.Root
+									type="single"
+									value={categoryFilter}
+									onValueChange={v => {
+										categoryFilter = v;
+									}}
+								>
+									<Select.Trigger
+										class="h-8 px-2 -ml-2 border-none shadow-none hover:bg-muted font-medium text-muted-foreground"
+									>
+										<div class="flex items-center gap-1">
+											{#if categoryFilter}
+												<Filter class="h-3.5 w-3.5 text-primary" />
+												{categoryLabels[categoryFilter as ExpenseCategory]}
+											{:else}
+												Category
+											{/if}
+										</div>
+									</Select.Trigger>
+									<Select.Content>
+										<Select.Item value="" label="All Categories">All Categories</Select.Item>
+										{#each Object.entries(categoryLabels) as [value, label]}
+											<Select.Item {value} {label}>{label}</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							</TableHead>
 							<TableHead class="w-[200px]">
 								<Button
 									variant="ghost"

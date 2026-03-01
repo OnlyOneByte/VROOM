@@ -7,7 +7,6 @@
 		Calendar,
 		DollarSign,
 		Search,
-		ListFilter,
 		FileText,
 		TrendingUp,
 		X,
@@ -31,7 +30,7 @@
 	import { extractUniqueTags } from '$lib/utils/expense-filters';
 	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '$lib/constants/messages';
 	import { DISPLAY_LIMITS } from '$lib/constants/limits';
-	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import DateRangePicker from '$lib/components/ui/date-range-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
@@ -70,8 +69,7 @@
 		return allTags.filter(t => !selectedTags.includes(t) && t.toLowerCase().includes(term));
 	});
 
-	// Collapsible state for filter sections
-	let basicFiltersOpen = $state(false);
+	// Collapsible state
 	let overviewOpen = $state(false);
 
 	// Summary stats
@@ -198,10 +196,6 @@
 			);
 		}
 
-		if (filters.category) {
-			filtered = filtered.filter(expense => expense.category === filters.category);
-		}
-
 		if (filters.tags && filters.tags.length > 0) {
 			if (tagMatchMode === 'all') {
 				filtered = filtered.filter(expense =>
@@ -302,13 +296,18 @@
 		<!-- Search, Vehicle & Filters (moved to top) -->
 		<CardNs.Root>
 			<CardNs.Header>
-				<div class="flex items-center justify-between">
+				<div class="flex items-center justify-between gap-3">
 					<div>
 						<CardNs.Title>Search & Filters</CardNs.Title>
 						<CardNs.Description>Find and filter your expenses</CardNs.Description>
 					</div>
-					<div class="p-2 rounded-lg bg-accent">
-						<Search class="h-5 w-5 text-accent-foreground" />
+					<div class="flex items-center gap-2">
+						<DateRangePicker
+							bind:startValue={filters.startDate}
+							bind:endValue={filters.endDate}
+							placeholder="Date range"
+							class="w-auto"
+						/>
 					</div>
 				</div>
 			</CardNs.Header>
@@ -400,26 +399,16 @@
 							</div>
 						{/if}
 					</div>
-					<div class="relative">
-						<div
-							class="flex flex-wrap items-center gap-1.5 min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
-							role="combobox"
-							tabindex="-1"
-							aria-expanded={tagSearchFocused && tagSuggestions.length > 0}
-							aria-controls="tag-suggestions-list"
-							onclick={() => tagInputEl?.focus()}
-							onkeydown={e => {
-								if (e.key === 'Enter' || e.key === ' ') tagInputEl?.focus();
-							}}
-						>
+					<div
+						class="border rounded-lg p-2 min-h-[42px] bg-background border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background"
+					>
+						<div class="flex flex-wrap gap-1.5 items-center">
 							{#each selectedTags as tag}
 								<Badge variant="secondary" class="gap-1 pr-1">
 									{tag}
 									<button
-										onclick={e => {
-											e.stopPropagation();
-											removeTag(tag);
-										}}
+										type="button"
+										onclick={() => removeTag(tag)}
 										class="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5"
 										aria-label="Remove tag {tag}"
 									>
@@ -432,9 +421,9 @@
 								<input
 									bind:this={tagInputEl}
 									bind:value={tagSearchTerm}
-									onfocus={() => (tagSearchFocused = true)}
-									onblur={() => setTimeout(() => (tagSearchFocused = false), 300)}
 									onkeydown={handleTagKeydown}
+									onfocus={() => (tagSearchFocused = true)}
+									onblur={() => setTimeout(() => (tagSearchFocused = false), 200)}
 									placeholder={selectedTags.length > 0
 										? 'Add more tags...'
 										: 'Search and add tags...'}
@@ -443,108 +432,28 @@
 								/>
 							</div>
 						</div>
-
-						{#if tagSearchFocused && tagSuggestions.length > 0}
-							<div
-								class="absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md"
-								role="listbox"
-								id="tag-suggestions-list"
-							>
-								{#each tagSuggestions.slice(0, 8) as suggestion}
-									<button
-										onmousedown={e => {
-											e.preventDefault();
-											addTag(suggestion);
-										}}
-										class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
-										role="option"
-										aria-selected={false}
-									>
-										<Tag class="h-3.5 w-3.5 text-muted-foreground" />
-										{suggestion}
-									</button>
-								{/each}
-							</div>
-						{/if}
 					</div>
-				</div>
 
-				<!-- Category and Date Filters -->
-				<div class="border-t divide-y">
-					<Collapsible bind:open={basicFiltersOpen}>
-						<CollapsibleTrigger
-							class="flex items-center justify-between w-full py-3 hover:bg-muted/50 transition-colors rounded-lg px-2"
+					{#if tagSearchFocused && tagSuggestions.length > 0}
+						<div
+							class="border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto"
 						>
-							<div class="flex items-center gap-2">
-								<ListFilter class="h-4 w-4 text-muted-foreground" />
-								<span class="font-medium">Category & Date Filters</span>
-							</div>
-							<ChevronDown
-								class="h-4 w-4 text-muted-foreground transition-transform duration-200 {basicFiltersOpen
-									? 'rotate-180'
-									: ''}"
-							/>
-						</CollapsibleTrigger>
-						<CollapsibleContent>
-							<div class="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4 px-2">
-								<div>
-									<label
-										for="category-filter"
-										class="block text-sm font-medium text-muted-foreground mb-2">Category</label
-									>
-									<Select.Root
-										type="single"
-										value={filters.category ?? ''}
-										onValueChange={v => {
-											filters.category = v === '' ? undefined : (v as ExpenseCategory);
-										}}
-									>
-										<Select.Trigger id="category-filter" class="w-full">
-											{#if filters.category}
-												{categoryLabels[filters.category]}
-											{:else}
-												{COMMON_MESSAGES.ALL_CATEGORIES}
-											{/if}
-										</Select.Trigger>
-										<Select.Content>
-											<Select.Item value="" label={COMMON_MESSAGES.ALL_CATEGORIES}
-												>{COMMON_MESSAGES.ALL_CATEGORIES}</Select.Item
-											>
-											{#each Object.entries(categoryLabels) as [value, label]}
-												<Select.Item {value} {label}>{label}</Select.Item>
-											{/each}
-										</Select.Content>
-									</Select.Root>
-								</div>
-								<div>
-									<label
-										for="start-date-filter"
-										class="block text-sm font-medium text-muted-foreground mb-2">Start Date</label
-									>
-									<DatePicker
-										id="start-date-filter"
-										bind:value={filters.startDate}
-										placeholder="Select start date"
-									/>
-								</div>
-								<div>
-									<label
-										for="end-date-filter"
-										class="block text-sm font-medium text-muted-foreground mb-2">End Date</label
-									>
-									<DatePicker
-										id="end-date-filter"
-										bind:value={filters.endDate}
-										placeholder="Select end date"
-									/>
-								</div>
-							</div>
-						</CollapsibleContent>
-					</Collapsible>
+							{#each tagSuggestions.slice(0, 8) as suggestion}
+								<button
+									type="button"
+									onclick={() => addTag(suggestion)}
+									class="flex w-full items-center gap-2 px-3 py-2 hover:bg-accent text-sm"
+								>
+									<Tag class="h-3.5 w-3.5 text-muted-foreground" />
+									{suggestion}
+								</button>
+							{/each}
+						</div>
+					{/if}
 				</div>
 
 				<!-- Clear Filters -->
-				{#if searchTerm || selectedVehicleId || filters.category || selectedTags.length > 0 || filters.startDate || filters.endDate}
+				{#if searchTerm || selectedVehicleId || selectedTags.length > 0 || filters.startDate || filters.endDate}
 					<div class="flex justify-end pt-2">
 						<Button variant="outline" size="sm" onclick={clearFilters}>
 							<X class="h-4 w-4 mr-2" />

@@ -51,12 +51,12 @@
 
 	let cardBorderClass = $derived(
 		urgencyLevel === 'overdue'
-			? 'border-red-500 dark:border-red-400'
+			? 'border-destructive'
 			: urgencyLevel === 'urgent'
-				? 'border-red-400 dark:border-red-500'
+				? 'border-destructive'
 				: urgencyLevel === 'warning'
-					? 'border-yellow-500 dark:border-yellow-400'
-					: 'border-green-500 dark:border-green-400'
+					? 'border-chart-5'
+					: 'border-chart-2'
 	);
 
 	let iconBgClass = $derived(

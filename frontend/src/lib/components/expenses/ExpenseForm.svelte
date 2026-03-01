@@ -471,7 +471,7 @@
 				e.preventDefault();
 				handleSubmit();
 			}}
-			class="card space-y-6"
+			class="rounded-lg border bg-card p-6 space-y-6"
 		>
 			<!-- Vehicle Selection -->
 			<div class="space-y-2">
@@ -489,7 +489,7 @@
 				>
 					<Select.Trigger
 						id="vehicle"
-						class="w-full {touched['vehicleId'] && errors['vehicleId'] ? 'border-red-300' : ''}"
+						class="w-full {touched['vehicleId'] && errors['vehicleId'] ? 'border-destructive' : ''}"
 						aria-invalid={!!(touched['vehicleId'] && errors['vehicleId'])}
 						aria-describedby={touched['vehicleId'] && errors['vehicleId']
 							? 'vehicleId-error'
@@ -644,7 +644,7 @@
 
 		<!-- Floating Action Bar -->
 		<div
-			class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto !z-50"
+			class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto z-50"
 		>
 			<div
 				class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none"
@@ -652,9 +652,10 @@
 				{#if isEditMode}
 					<Button
 						type="button"
+						variant="destructive"
 						onclick={confirmDelete}
 						disabled={isDeleting || isSubmitting}
-						class="sm:rounded-full rounded-full !bg-destructive hover:!bg-destructive/90 !text-destructive-foreground shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 !px-5 !border-0 flex-shrink-0"
+						class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
 					>
 						<Trash2 class="h-5 w-5 sm:mr-2" />
 						<span class="hidden sm:inline font-semibold">Delete</span>
@@ -663,9 +664,10 @@
 
 				<Button
 					type="button"
+					variant="outline"
 					onclick={handleBack}
 					disabled={isSubmitting || isDeleting}
-					class="sm:rounded-full rounded-full !bg-muted-foreground hover:!bg-muted-foreground/80 !text-background shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 !px-5 !border-0 flex-shrink-0"
+					class="sm:rounded-full rounded-full bg-muted-foreground hover:bg-muted-foreground/80 text-background shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
 				>
 					<X class="h-5 w-5 sm:mr-2" />
 					<span class="hidden sm:inline font-semibold">Cancel</span>
@@ -675,7 +677,7 @@
 					type="button"
 					onclick={handleSubmit}
 					disabled={isSubmitting || isDeleting}
-					class="sm:rounded-full rounded-full group !bg-primary hover:!bg-primary/90 !text-primary-foreground shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 sm:h-14 !px-6 !border-0 flex-1 sm:flex-initial"
+					class="sm:rounded-full rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 sm:h-14 px-6 border-0 flex-1 sm:flex-initial"
 				>
 					{#if isSubmitting}
 						<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
