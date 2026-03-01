@@ -15,7 +15,8 @@
         "take_snapshot",
         "click",
         "list_console_messages",
-        "emulate"
+        "emulate",
+        "evaluate_script"
       ]
     }
   }

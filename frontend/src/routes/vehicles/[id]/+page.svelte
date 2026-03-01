@@ -2,17 +2,15 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { SvelteDate } from 'svelte/reactivity';
-	import { Plus, Search, ListFilter, X, FileText, CreditCard, AlertCircle } from 'lucide-svelte';
-	import DatePicker from '$lib/components/ui/date-picker.svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
+	import { Plus, FileText, CreditCard, AlertCircle } from 'lucide-svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
-	import * as Select from '$lib/components/ui/select';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import * as CardFull from '$lib/components/ui/card';
 	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
 	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
+	import ExpenseSearchFilters from '$lib/components/expenses/ExpenseSearchFilters.svelte';
 	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
 	import FuelEfficiencyTrendChart from '$lib/components/charts/FuelEfficiencyTrendChart.svelte';
 	import CategoryPieChart from '$lib/components/charts/CategoryPieChart.svelte';
@@ -34,8 +32,7 @@
 		prepareFuelEfficiencyData,
 		prepareCategoryChartData,
 		filterExpensesByPeriod,
-		groupExpensesByCategory,
-		categoryLabels
+		groupExpensesByCategory
 	} from '$lib/utils/expense-helpers';
 	import {
 		filterExpenses,
@@ -76,7 +73,6 @@
 	let vehicle = $state<Vehicle | null>(null);
 	let expenses = $state<Expense[]>([]);
 	let payments = $state<VehicleFinancingPayment[]>([]);
-	let showFilters = $state(false);
 	let activeTab = $state('overview');
 	let vehicleStatsData = $state<VehicleStats | null>(null);
 	let selectedStatsPeriod = $state<TimePeriod>('all');
@@ -403,106 +399,13 @@
 
 			<!-- Expenses Tab -->
 			<TabsContent value="expenses" class="space-y-6">
-				<!-- Search and Filters -->
-				<div class="rounded-lg border bg-card p-6 space-y-4">
-					<!-- Search Bar -->
-					<div class="flex gap-2">
-						<div class="flex-1 relative">
-							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-								<Search class="h-5 w-5 text-muted-foreground" />
-							</div>
-							<Input
-								type="text"
-								bind:value={searchTerm}
-								placeholder={COMMON_MESSAGES.SEARCH_EXPENSES}
-								class="pl-10 w-full"
-								aria-label="Search expenses"
-							/>
-						</div>
-						<Button
-							variant="outline"
-							onclick={() => (showFilters = !showFilters)}
-							aria-label="Toggle filters"
-							aria-expanded={showFilters}
-							aria-controls="expense-filters"
-						>
-							<ListFilter class="h-4 w-4 mr-2" />
-							{COMMON_MESSAGES.FILTERS}
-						</Button>
-					</div>
-
-					<!-- Filter Panel -->
-					{#if showFilters}
-						<div id="expense-filters" class="border-t border-border pt-4 space-y-4">
-							<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-								<!-- Category Filter -->
-								<div>
-									<label
-										for="category-filter"
-										class="block text-sm font-medium text-muted-foreground mb-2">Category</label
-									>
-									<Select.Root
-										type="single"
-										value={filters.category ?? ''}
-										onValueChange={v => {
-											filters.category = v === '' ? undefined : v;
-										}}
-									>
-										<Select.Trigger id="category-filter" class="w-full">
-											{#if filters.category}
-												{categoryLabels[filters.category as import('$lib/types').ExpenseCategory] ||
-													filters.category}
-											{:else}
-												{COMMON_MESSAGES.ALL_CATEGORIES}
-											{/if}
-										</Select.Trigger>
-										<Select.Content>
-											<Select.Item value="" label={COMMON_MESSAGES.ALL_CATEGORIES}
-												>{COMMON_MESSAGES.ALL_CATEGORIES}</Select.Item
-											>
-											{#each Object.entries(categoryLabels) as [value, label]}
-												<Select.Item {value} {label}>{label}</Select.Item>
-											{/each}
-										</Select.Content>
-									</Select.Root>
-								</div>
-
-								<!-- Start Date -->
-								<div>
-									<label
-										for="start-date-filter"
-										class="block text-sm font-medium text-muted-foreground mb-2">Start Date</label
-									>
-									<DatePicker
-										id="start-date-filter"
-										bind:value={filters.startDate}
-										placeholder="Select start date"
-									/>
-								</div>
-
-								<!-- End Date -->
-								<div>
-									<label
-										for="end-date-filter"
-										class="block text-sm font-medium text-muted-foreground mb-2">End Date</label
-									>
-									<DatePicker
-										id="end-date-filter"
-										bind:value={filters.endDate}
-										placeholder="Select end date"
-									/>
-								</div>
-							</div>
-
-							<div class="flex justify-end">
-								<Button variant="outline" onclick={clearFilters} aria-label="Clear all filters">
-									<X class="h-4 w-4 mr-2" />
-									{COMMON_MESSAGES.CLEAR_FILTERS}
-								</Button>
-							</div>
-						</div>
-					{/if}
-				</div>
+				<ExpenseSearchFilters
+					{searchTerm}
+					bind:filters
+					{expenses}
+					onSearchChange={v => (searchTerm = v)}
+					onClearFilters={clearFilters}
+				/>
 
 				<!-- Expense List -->
 				<CardFull.Root>

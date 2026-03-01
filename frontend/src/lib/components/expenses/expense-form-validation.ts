@@ -7,7 +7,6 @@ import {
 import type { Vehicle, VolumeUnit, ChargeUnit } from '$lib/types';
 
 interface ValidationContext {
-	selectedCategoryLabel: string; // Kept for backwards compat, but prefer checking category value directly
 	category: string;
 	vehicle: Vehicle | null;
 	volumeUnit: VolumeUnit;

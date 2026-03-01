@@ -8,8 +8,7 @@
 	import { settingsStore } from '$lib/stores/settings';
 	import { expenseApi } from '$lib/services/expense-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { Save, ArrowLeft, Gauge, Check, X, Trash2 } from 'lucide-svelte';
-	import { LoaderCircle } from 'lucide-svelte';
+	import { Save, ArrowLeft, Gauge, Check, X, Trash2, LoaderCircle } from 'lucide-svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
@@ -126,7 +125,6 @@
 			formData.charge = expense.charge?.toString() ?? '';
 			formData.fuelType = expense.fuelType || '';
 			formData.description = expense.description || '';
-			selectedCategoryLabel = expense.category === 'fuel' ? 'Fuel' : expense.category || '';
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading expense:', error);
 			appStore.addNotification({ type: 'error', message: 'Error loading expense' });
@@ -164,14 +162,11 @@
 		}
 	}
 
-	function selectCategory(categoryValue: string, categoryLabel: string) {
+	function selectCategory(categoryValue: string) {
 		formData.category = categoryValue;
 		touched['category'] = true;
 		handleBlur('category');
-		selectedCategoryLabel = categoryLabel;
 	}
-
-	let selectedCategoryLabel = $state('');
 
 	// Reload vehicle data when vehicle selection changes (not on initial mount — onMount handles that)
 	let previousVehicleId = $state('');
@@ -227,7 +222,6 @@
 	function handleBlur(field: string) {
 		touched[field] = true;
 		const error = validateExpenseField(field, {
-			selectedCategoryLabel,
 			category: formData.category,
 			vehicle,
 			volumeUnit,
@@ -258,7 +252,6 @@
 		}
 
 		const ctx = {
-			selectedCategoryLabel,
 			category: formData.category,
 			vehicle,
 			volumeUnit,
@@ -537,7 +530,7 @@
 				value={formData.category}
 				error={errors['category']}
 				touched={touched['category']}
-				onSelect={value => selectCategory(value, value)}
+				onSelect={selectCategory}
 			/>
 
 			<!-- Amount -->

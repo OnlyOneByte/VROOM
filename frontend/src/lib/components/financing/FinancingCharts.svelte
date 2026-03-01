@@ -6,6 +6,7 @@
 	import type { VehicleFinancing, VehicleFinancingPayment } from '$lib/types';
 	import type { AmortizationEntry } from '$lib/utils/financing-calculations';
 	import { formatCurrency } from '$lib/utils/formatters';
+	import { formatCurrencyAxis } from '$lib/utils/chart-formatters';
 
 	interface Props {
 		financing: VehicleFinancing;
@@ -60,12 +61,12 @@
 		{
 			name: 'Paid',
 			value: amountPaid,
-			fill: 'hsl(var(--chart-1))'
+			fill: 'var(--chart-1)'
 		},
 		{
 			name: 'Remaining',
 			value: financing.currentBalance,
-			fill: 'hsl(var(--chart-5))'
+			fill: 'var(--chart-5)'
 		}
 	]);
 
@@ -79,17 +80,17 @@
 			{
 				name: 'Principal Paid',
 				value: principalPaid,
-				fill: 'hsl(var(--chart-2))'
+				fill: 'var(--chart-2)'
 			},
 			{
 				name: 'Interest Paid',
 				value: interestPaid,
-				fill: 'hsl(var(--chart-3))'
+				fill: 'var(--chart-3)'
 			},
 			{
 				name: 'Remaining Balance',
 				value: financing.currentBalance,
-				fill: 'hsl(var(--chart-5))'
+				fill: 'var(--chart-5)'
 			}
 		];
 	});
@@ -98,19 +99,19 @@
 	const chartConfig: ChartConfig = {
 		paid: {
 			label: 'Paid',
-			color: 'hsl(var(--chart-1))'
+			color: 'var(--chart-1)'
 		},
 		remaining: {
 			label: 'Remaining',
-			color: 'hsl(var(--chart-5))'
+			color: 'var(--chart-5)'
 		},
 		principal: {
 			label: 'Principal',
-			color: 'hsl(var(--chart-2))'
+			color: 'var(--chart-2)'
 		},
 		interest: {
 			label: 'Interest',
-			color: 'hsl(var(--chart-3))'
+			color: 'var(--chart-3)'
 		}
 	};
 
@@ -189,12 +190,12 @@
 		{
 			key: 'principal',
 			label: 'Principal',
-			color: 'hsl(var(--chart-2))'
+			color: 'var(--chart-2)'
 		},
 		{
 			key: 'interest',
 			label: 'Interest',
-			color: 'hsl(var(--chart-3))'
+			color: 'var(--chart-3)'
 		}
 	]);
 
@@ -202,11 +203,11 @@
 	const amortizationChartConfig: ChartConfig = {
 		principal: {
 			label: 'Principal',
-			color: 'hsl(var(--chart-2))'
+			color: 'var(--chart-2)'
 		},
 		interest: {
 			label: 'Interest',
-			color: 'hsl(var(--chart-3))'
+			color: 'var(--chart-3)'
 		}
 	};
 </script>
@@ -285,7 +286,7 @@
 				<div class="flex items-center gap-2">
 					<div
 						class="h-3 w-3 rounded-sm flex-shrink-0"
-						style="background-color: hsl(var(--chart-1))"
+						style="background-color: var(--chart-1)"
 						aria-hidden="true"
 					></div>
 					<span class="text-muted-foreground">Amount Paid</span>
@@ -296,7 +297,7 @@
 				<div class="flex items-center gap-2">
 					<div
 						class="h-3 w-3 rounded-sm flex-shrink-0"
-						style="background-color: hsl(var(--chart-5))"
+						style="background-color: var(--chart-5)"
 						aria-hidden="true"
 					></div>
 					<span class="text-muted-foreground">Remaining Balance</span>
@@ -310,7 +311,7 @@
 						<div class="flex items-center gap-2">
 							<div
 								class="h-3 w-3 rounded-sm flex-shrink-0"
-								style="background-color: hsl(var(--chart-2))"
+								style="background-color: var(--chart-2)"
 								aria-hidden="true"
 							></div>
 							<span class="text-muted-foreground">Principal Paid</span>
@@ -321,7 +322,7 @@
 						<div class="flex items-center gap-2">
 							<div
 								class="h-3 w-3 rounded-sm flex-shrink-0"
-								style="background-color: hsl(var(--chart-3))"
+								style="background-color: var(--chart-3)"
 								aria-hidden="true"
 							></div>
 							<span class="text-muted-foreground">Interest Paid</span>
@@ -341,8 +342,35 @@
 			<CardTitle class="text-base sm:text-lg" id="amortization-chart-title"
 				>Amortization Schedule</CardTitle
 			>
+			<p class="text-xs sm:text-sm text-muted-foreground">
+				Payment breakdown per month — principal vs interest
+			</p>
 		</CardHeader>
 		<CardContent class="p-4 sm:p-6">
+			<!-- Legend (above chart so x-axis labels are unobstructed) -->
+			<div
+				class="mb-3 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm"
+				role="list"
+				aria-label="Amortization chart legend"
+			>
+				<div class="flex items-center gap-2" role="listitem">
+					<div
+						class="h-3 w-3 rounded-sm flex-shrink-0"
+						style="background-color: var(--chart-2)"
+						aria-hidden="true"
+					></div>
+					<span class="text-muted-foreground">Principal</span>
+				</div>
+				<div class="flex items-center gap-2" role="listitem">
+					<div
+						class="h-3 w-3 rounded-sm flex-shrink-0"
+						style="background-color: var(--chart-3)"
+						aria-hidden="true"
+					></div>
+					<span class="text-muted-foreground">Interest</span>
+				</div>
+			</div>
+
 			<ChartContainer
 				config={amortizationChartConfig}
 				class="h-[250px] sm:h-[300px] w-full"
@@ -357,23 +385,16 @@
 					series={amortizationSeries}
 					props={{
 						bars: {
-							class: (d: { data: { isPaid: boolean } }) => {
-								const opacity = d.data.isPaid ? 'opacity-100' : 'opacity-40';
-								return `${opacity}`;
-							}
+							stroke: 'none'
 						},
 						xAxis: {
-							format: (v: number) => `#${v}`
+							ticks: Math.min(amortizationChartData.length, 8),
+							format: (v: number) => `#${v}`,
+							label: 'Payment Number'
 						},
 						yAxis: {
-							format: (v: number) => {
-								return new Intl.NumberFormat('en-US', {
-									style: 'currency',
-									currency: 'USD',
-									minimumFractionDigits: 0,
-									maximumFractionDigits: 0
-								}).format(v);
-							}
+							format: formatCurrencyAxis,
+							label: 'Amount ($)'
 						}
 					}}
 				>
@@ -388,37 +409,6 @@
 				Stacked bar chart showing amortization schedule with {amortizationSchedule.length} payments.
 				Each bar shows the breakdown of principal and interest for each payment. Completed payments are
 				shown at full opacity, future payments are dimmed.
-			</div>
-
-			<!-- Legend -->
-			<div
-				class="mt-4 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm"
-				role="list"
-				aria-label="Amortization chart legend"
-			>
-				<div class="flex items-center gap-2" role="listitem">
-					<div
-						class="h-3 w-3 rounded-sm flex-shrink-0"
-						style="background-color: hsl(var(--chart-2))"
-						aria-hidden="true"
-					></div>
-					<span class="text-muted-foreground">Principal</span>
-				</div>
-				<div class="flex items-center gap-2" role="listitem">
-					<div
-						class="h-3 w-3 rounded-sm flex-shrink-0"
-						style="background-color: hsl(var(--chart-3))"
-						aria-hidden="true"
-					></div>
-					<span class="text-muted-foreground">Interest</span>
-				</div>
-				<div class="flex items-center gap-2" role="listitem">
-					<div
-						class="h-3 w-3 rounded-sm flex-shrink-0 opacity-40 bg-muted"
-						aria-hidden="true"
-					></div>
-					<span class="text-muted-foreground">Future Payments</span>
-				</div>
 			</div>
 		</CardContent>
 	</Card>

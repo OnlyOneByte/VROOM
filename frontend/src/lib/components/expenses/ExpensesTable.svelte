@@ -169,7 +169,7 @@
 	}
 </script>
 
-{#if sortedExpenses.length === 0}
+{#if expenses.length === 0}
 	<Empty>
 		<EmptyHeader>
 			<EmptyMedia>
@@ -280,105 +280,113 @@
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{#each sortedExpenses as expense (expense.id)}
-							{@const IconComponent = getCategoryIcon(expense.category)}
-							{@const vehicle = getVehicleForExpense(expense)}
-							<TableRow class="group">
-								<TableCell class="font-medium text-muted-foreground">
-									{formatDate(new Date(expense.date))}
+						{#if sortedExpenses.length === 0}
+							<TableRow>
+								<TableCell colspan={showVehicleColumn ? 7 : 6} class="h-24 text-center">
+									<p class="text-muted-foreground">No expenses match this category filter.</p>
 								</TableCell>
-								{#if showVehicleColumn}
+							</TableRow>
+						{:else}
+							{#each sortedExpenses as expense (expense.id)}
+								{@const IconComponent = getCategoryIcon(expense.category)}
+								{@const vehicle = getVehicleForExpense(expense)}
+								<TableRow class="group">
+									<TableCell class="font-medium text-muted-foreground">
+										{formatDate(new Date(expense.date))}
+									</TableCell>
+									{#if showVehicleColumn}
+										<TableCell>
+											<div class="flex items-center gap-2">
+												<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
+												<span class="truncate">
+													{vehicle ? getVehicleDisplayName(vehicle) : 'Unknown'}
+												</span>
+											</div>
+										</TableCell>
+									{/if}
 									<TableCell>
 										<div class="flex items-center gap-2">
-											<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
-											<span class="truncate">
-												{vehicle ? getVehicleDisplayName(vehicle) : 'Unknown'}
-											</span>
+											<div
+												class="p-1.5 rounded-lg {getCategoryColor(expense.category)} flex-shrink-0"
+											>
+												<IconComponent class="h-4 w-4" />
+											</div>
+											<span class="whitespace-nowrap"
+												>{categoryLabels[expense.category as ExpenseCategory]}</span
+											>
 										</div>
 									</TableCell>
-								{/if}
-								<TableCell>
-									<div class="flex items-center gap-2">
+									<TableCell>
+										<div class="flex flex-wrap gap-1">
+											{#each expense.tags || [] as tag}
+												<Badge variant="secondary" class="font-normal">
+													{tag}
+												</Badge>
+											{/each}
+										</div>
+									</TableCell>
+									<TableCell>
+										<div class="truncate text-foreground">
+											{expense.description || '-'}
+										</div>
+										{#if expense.mileage || expense.volume || expense.charge}
+											<div class="text-xs text-muted-foreground mt-1 whitespace-nowrap">
+												{#if expense.mileage}
+													{expense.mileage.toLocaleString()} mi
+												{/if}
+												{#if expense.mileage && (expense.volume || expense.charge)}
+													•
+												{/if}
+												{#if expense.volume}
+													{expense.volume}
+													{getVolumeUnitLabel(
+														$settingsStore.settings?.volumeUnit || 'gallons_us',
+														true
+													)}
+												{/if}
+												{#if expense.charge}
+													{expense.charge}
+													{getChargeUnitLabel($settingsStore.settings?.chargeUnit || 'kwh', true)}
+												{/if}
+											</div>
+										{/if}
+									</TableCell>
+									<TableCell class="text-right font-semibold whitespace-nowrap">
+										{formatCurrency(expense.amount)}
+									</TableCell>
+									<TableCell class="text-right">
 										<div
-											class="p-1.5 rounded-lg {getCategoryColor(expense.category)} flex-shrink-0"
+											class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
 										>
-											<IconComponent class="h-4 w-4" />
-										</div>
-										<span class="whitespace-nowrap"
-											>{categoryLabels[expense.category as ExpenseCategory]}</span
-										>
-									</div>
-								</TableCell>
-								<TableCell>
-									<div class="flex flex-wrap gap-1">
-										{#each expense.tags || [] as tag}
-											<Badge variant="secondary" class="font-normal">
-												{tag}
-											</Badge>
-										{/each}
-									</div>
-								</TableCell>
-								<TableCell>
-									<div class="truncate text-foreground">
-										{expense.description || '-'}
-									</div>
-									{#if expense.mileage || expense.volume || expense.charge}
-										<div class="text-xs text-muted-foreground mt-1 whitespace-nowrap">
-											{#if expense.mileage}
-												{expense.mileage.toLocaleString()} mi
-											{/if}
-											{#if expense.mileage && (expense.volume || expense.charge)}
-												•
-											{/if}
-											{#if expense.volume}
-												{expense.volume}
-												{getVolumeUnitLabel(
-													$settingsStore.settings?.volumeUnit || 'gallons_us',
-													true
-												)}
-											{/if}
-											{#if expense.charge}
-												{expense.charge}
-												{getChargeUnitLabel($settingsStore.settings?.chargeUnit || 'kwh', true)}
-											{/if}
-										</div>
-									{/if}
-								</TableCell>
-								<TableCell class="text-right font-semibold whitespace-nowrap">
-									{formatCurrency(expense.amount)}
-								</TableCell>
-								<TableCell class="text-right">
-									<div
-										class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-									>
-										<Button
-											variant="ghost"
-											size="icon"
-											class="h-8 w-8"
-											href="/expenses/{expense.id}/edit?returnTo={returnTo}"
-											title="Edit expense"
-											onclick={e => e.stopPropagation()}
-										>
-											<Pencil class="h-4 w-4" />
-										</Button>
-										{#if onDelete}
 											<Button
 												variant="ghost"
 												size="icon"
-												class="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-												onclick={e => {
-													e.stopPropagation();
-													confirmDelete(expense);
-												}}
-												title="Delete expense"
+												class="h-8 w-8"
+												href="/expenses/{expense.id}/edit?returnTo={returnTo}"
+												title="Edit expense"
+												onclick={e => e.stopPropagation()}
 											>
-												<Trash2 class="h-4 w-4" />
+												<Pencil class="h-4 w-4" />
 											</Button>
-										{/if}
-									</div>
-								</TableCell>
-							</TableRow>
-						{/each}
+											{#if onDelete}
+												<Button
+													variant="ghost"
+													size="icon"
+													class="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+													onclick={e => {
+														e.stopPropagation();
+														confirmDelete(expense);
+													}}
+													title="Delete expense"
+												>
+													<Trash2 class="h-4 w-4" />
+												</Button>
+											{/if}
+										</div>
+									</TableCell>
+								</TableRow>
+							{/each}
+						{/if}
 					</TableBody>
 				</Table>
 			</div>
