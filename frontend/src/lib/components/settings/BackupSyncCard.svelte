@@ -69,7 +69,7 @@
 				Manual Backup
 			</Label>
 			<p class="text-sm text-muted-foreground">Download or upload ZIP files for offline storage</p>
-			<div class="flex gap-3">
+			<div class="flex flex-col sm:flex-row gap-3">
 				<Button variant="outline" onclick={onBackup} disabled={isBackingUp} class="flex-1">
 					{#if isBackingUp}
 						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
