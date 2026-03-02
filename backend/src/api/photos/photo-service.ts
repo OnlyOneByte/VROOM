@@ -5,8 +5,8 @@ import { getDriveServiceForUser } from '../sync/google-drive';
 import { resolveEntityDriveFolder, validateEntityOwnership } from './helpers';
 import { photoRepository } from './photo-repository';
 
-/** Accepted image MIME types for photo uploads */
-export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+/** Accepted MIME types for photo/document uploads */
+export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
 /** Maximum file size in bytes (10 MB) */
 export const MAX_FILE_SIZE = 10_485_760;
@@ -26,7 +26,7 @@ export async function uploadPhotoForEntity(
   await validateEntityOwnership(entityType, entityId, userId);
 
   if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-    throw new AppError('Only JPEG, PNG, and WebP images are allowed', 400);
+    throw new AppError('Only JPEG, PNG, WebP images and PDF files are allowed', 400);
   }
   if (file.size > MAX_FILE_SIZE) {
     throw new AppError('Photo must be under 10MB', 413);

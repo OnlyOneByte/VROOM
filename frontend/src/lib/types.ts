@@ -134,19 +134,80 @@ export interface Expense {
 	updatedAt: string; // ISO date string
 }
 
-export interface InsurancePolicy {
-	id: string;
-	vehicleId: string;
-	company: string;
+// --- Insurance types ---
+
+export interface PolicyDetails {
 	policyNumber?: string;
-	totalCost: number;
-	termLengthMonths: number;
+	coverageDescription?: string;
+	deductibleAmount?: number;
+	coverageLimit?: number;
+	agentName?: string;
+	agentPhone?: string;
+	agentEmail?: string;
+}
+
+export interface FinanceDetails {
+	totalCost?: number;
+	monthlyCost?: number;
+	premiumFrequency?: string;
+	paymentAmount?: number;
+}
+
+export interface PolicyTerm {
+	id: string;
 	startDate: string;
 	endDate: string;
-	monthlyCost: number;
+	policyDetails: PolicyDetails;
+	financeDetails: FinanceDetails;
+}
+
+export interface InsurancePolicy {
+	id: string;
+	company: string;
 	isActive: boolean;
+	currentTermStart?: string;
+	currentTermEnd?: string;
+	terms: PolicyTerm[];
+	notes?: string;
+	vehicleIds: string[];
 	createdAt: string;
 	updatedAt: string;
+}
+
+export interface CreatePolicyRequest {
+	company: string;
+	vehicleIds: string[];
+	terms: {
+		id: string;
+		startDate: string;
+		endDate: string;
+		policyDetails?: PolicyDetails;
+		financeDetails?: FinanceDetails;
+	}[];
+	notes?: string;
+	isActive?: boolean;
+}
+
+export interface UpdatePolicyRequest {
+	company?: string;
+	vehicleIds?: string[];
+	notes?: string;
+	isActive?: boolean;
+}
+
+export interface CreateTermRequest {
+	id: string;
+	startDate: string;
+	endDate: string;
+	policyDetails?: PolicyDetails;
+	financeDetails?: FinanceDetails;
+}
+
+export interface UpdateTermRequest {
+	startDate?: string;
+	endDate?: string;
+	policyDetails?: PolicyDetails;
+	financeDetails?: FinanceDetails;
 }
 
 export interface FuelEfficiency {

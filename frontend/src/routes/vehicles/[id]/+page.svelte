@@ -28,6 +28,7 @@
 	import PaymentHistory from '$lib/components/financing/PaymentHistory.svelte';
 	import NextPaymentCard from '$lib/components/financing/NextPaymentCard.svelte';
 	import LeaseMetricsCard from '$lib/components/financing/LeaseMetricsCard.svelte';
+	import InsuranceTab from '$lib/components/insurance/InsuranceTab.svelte';
 	import {
 		prepareExpenseTrendData,
 		prepareFuelEfficiencyData,
@@ -384,6 +385,9 @@
 			<TabsContent value="overview" class="space-y-6">
 				<!-- Vehicle Information Card -->
 				<VehicleInfoCard {vehicle} />
+
+				<!-- Insurance Summary -->
+				<InsuranceTab {vehicleId} />
 
 				{#if expenses.length === 0}
 					<!-- No Expenses Empty State -->

@@ -17,7 +17,13 @@ import {
   TABLE_SCHEMA_MAP,
 } from '../../config';
 import { getDb } from '../../db/connection';
-import { expenses, insurancePolicies, vehicleFinancing, vehicles } from '../../db/schema';
+import {
+  expenses,
+  insurancePolicies,
+  insurancePolicyVehicles,
+  vehicleFinancing,
+  vehicles,
+} from '../../db/schema';
 import type { BackupData, BackupMetadata, ParsedBackupData } from '../../types';
 
 export interface ValidationResult {
@@ -103,7 +109,11 @@ export class BackupService {
       db
         .select()
         .from(insurancePolicies)
-        .innerJoin(vehicles, eq(insurancePolicies.vehicleId, vehicles.id))
+        .innerJoin(
+          insurancePolicyVehicles,
+          eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
+        )
+        .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
         .where(eq(vehicles.userId, userId))
         .then((r) => r.map((x) => x.insurance_policies)),
     ]);
@@ -270,8 +280,10 @@ export class BackupService {
     }
 
     for (const insurance of backup.insurance) {
-      if (!vehicleIds.has(String(insurance.vehicleId))) {
-        errors.push(`Insurance ${insurance.id} references non-existent vehicle`);
+      // New schema: insurance policies don't have a direct vehicleId
+      // They link to vehicles via the junction table, so skip vehicleId check here
+      if (!insurance.id) {
+        errors.push('Insurance policy missing id');
       }
     }
 

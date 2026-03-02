@@ -72,8 +72,10 @@ describe('Property 6: MIME Type Validation', () => {
     );
   });
 
-  test('allowed set contains exactly image/jpeg, image/png, image/webp', () => {
-    expect(new Set(ALLOWED_MIME_TYPES)).toEqual(new Set(['image/jpeg', 'image/png', 'image/webp']));
+  test('allowed set contains exactly image/jpeg, image/png, image/webp, application/pdf', () => {
+    expect(new Set(ALLOWED_MIME_TYPES)).toEqual(
+      new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+    );
   });
 });
 
