@@ -36,7 +36,7 @@ export function formatRelativeTime(date: Date | string | null): string {
 	if (!date) return 'Never';
 
 	const dateObj = typeof date === 'string' ? new Date(date) : date;
-	const days = Math.floor((Date.now() - dateObj.getTime()) / (1000 * 60 * 60 * 24));
+	const days = Math.max(0, Math.floor((Date.now() - dateObj.getTime()) / (1000 * 60 * 60 * 24)));
 
 	if (days === 0) return 'Today';
 	if (days === 1) return 'Yesterday';
@@ -51,7 +51,7 @@ export function formatCompactRelativeTime(date: Date | null): string {
 	if (!date) return 'Never';
 
 	const now = new Date();
-	const diff = now.getTime() - date.getTime();
+	const diff = Math.max(0, now.getTime() - date.getTime());
 	const minutes = Math.floor(diff / 60000);
 	const hours = Math.floor(minutes / 60);
 	const days = Math.floor(hours / 24);
