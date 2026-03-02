@@ -83,7 +83,9 @@ export async function runMigrations() {
     migrate(db, { migrationsFolder: './drizzle' });
     logger.info('Database migrations completed successfully');
   } catch (error) {
-    logger.error('Migration failed', { error });
+    const message = error instanceof Error ? error.message : String(error);
+    const cause = error instanceof Error && 'cause' in error ? error.cause : undefined;
+    logger.error('Migration failed', { error: message, cause });
     throw error;
   }
 }

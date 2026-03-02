@@ -228,8 +228,17 @@ import { checkpointWAL, forceCheckpointWAL, runMigrations } from './db/connectio
 try {
   await runMigrations();
 } catch (error) {
-  logger.error('Failed to run migrations on startup', { error });
-  process.exit(1);
+  // Log the full error for debugging but don't crash if tables already exist
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  if (errorMessage.includes('already exists')) {
+    logger.info('Database tables already exist, skipping migrations');
+  } else {
+    logger.error('Failed to run migrations on startup', {
+      error,
+      message: errorMessage,
+    });
+    process.exit(1);
+  }
 }
 
 const checkpointInterval = setInterval(
