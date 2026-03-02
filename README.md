@@ -109,7 +109,7 @@ These docs are also compatible with [GitHub Wiki](https://docs.github.com/en/com
 - 💰 Financing and insurance management
 - 🔐 Google OAuth authentication
 - 💾 Google Drive backup + Google Sheets sync
-- 🐳 Docker-ready self-hosting
+- � Docker-ready self-hosting
 
 ## Contributing
 

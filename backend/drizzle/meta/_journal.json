@@ -8,6 +8,13 @@
       "when": 1772408521243,
       "tag": "0000_jittery_adam_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1772415177496,
+      "tag": "0001_cold_grandmaster",
+      "breakpoints": true
     }
   ]
 }

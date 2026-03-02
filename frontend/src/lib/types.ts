@@ -362,3 +362,17 @@ export interface ExpenseAnalytics {
 		amount: number;
 	}>;
 }
+
+export interface Photo {
+	id: string;
+	entityType: string;
+	entityId: string;
+	driveFileId: string;
+	fileName: string;
+	mimeType: string;
+	fileSize: number;
+	webViewLink?: string;
+	isCover: boolean;
+	sortOrder: number;
+	createdAt: string;
+}
