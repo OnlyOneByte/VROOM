@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { SvelteDate } from 'svelte/reactivity';
-	import { Plus, FileText, CreditCard, AlertCircle } from 'lucide-svelte';
+	import { Plus, FileText, CreditCard, CircleAlert } from 'lucide-svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -15,6 +15,8 @@
 	import FuelEfficiencyTrendChart from '$lib/components/charts/FuelEfficiencyTrendChart.svelte';
 	import CategoryPieChart from '$lib/components/charts/CategoryPieChart.svelte';
 	import VehicleHeader from '$lib/components/vehicles/VehicleHeader.svelte';
+	import VehiclePhotoGallery from '$lib/components/vehicles/VehiclePhotoGallery.svelte';
+	import PhotoUploadDialog from '$lib/components/vehicles/PhotoUploadDialog.svelte';
 	import VehicleInfoCard from '$lib/components/vehicles/VehicleInfoCard.svelte';
 	import ExpenseOverviewCard from '$lib/components/vehicles/ExpenseOverviewCard.svelte';
 	import FuelEfficiencyStatsCard from '$lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
@@ -57,7 +59,8 @@
 		Expense,
 		ExpenseFilters,
 		VehicleStats,
-		DerivedPaymentEntry
+		DerivedPaymentEntry,
+		Photo
 	} from '$lib/types.js';
 	import type { PageData } from './$types';
 
@@ -80,6 +83,10 @@
 
 	// Payment planner dialog state
 	let showPaymentPlanner = $state(false);
+
+	// Photos state
+	let vehiclePhotos = $state<Photo[]>([]);
+	let showUploadDialog = $state(false);
 
 	// Filters and search
 	let searchTerm = $state('');
@@ -129,6 +136,12 @@
 	let vehicleDisplayName = $derived(
 		vehicle ? vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}` : ''
 	);
+
+	let coverPhotoUrl = $derived.by(() => {
+		const cover = vehiclePhotos.find(p => p.isCover);
+		if (!cover) return null;
+		return vehicleApi.getPhotoThumbnailUrl(vehicleId, cover.id);
+	});
 
 	// Financing derived state with error handling
 	let progressPercentage = $derived.by(() => {
@@ -187,7 +200,7 @@
 
 	// Load data on mount
 	onMount(async () => {
-		await Promise.all([loadVehicle(), loadExpenses()]);
+		await Promise.all([loadVehicle(), loadExpenses(), loadPhotos()]);
 		// Load stats after initial data is loaded
 		if (vehicle && expenses.length > 0) {
 			await loadVehicleStats();
@@ -281,6 +294,39 @@
 		await vehicleApi.updatePaymentAmount(vehicle.financing.id, newAmount);
 		vehicle.financing.paymentAmount = newAmount;
 	}
+
+	async function loadPhotos() {
+		try {
+			vehiclePhotos = await vehicleApi.getPhotos(vehicleId);
+		} catch (error) {
+			handleErrorWithNotification(error, 'Failed to load photos');
+		}
+	}
+
+	function handlePhotoUploadComplete(photo: Photo) {
+		vehiclePhotos = [...vehiclePhotos, photo];
+	}
+
+	async function handleDeletePhoto(photoId: string) {
+		try {
+			await vehicleApi.deletePhoto(vehicleId, photoId);
+			vehiclePhotos = vehiclePhotos.filter(p => p.id !== photoId);
+		} catch (error) {
+			handleErrorWithNotification(error, 'Failed to delete photo');
+		}
+	}
+
+	async function handleSetCover(photoId: string) {
+		try {
+			const updated = await vehicleApi.setCoverPhoto(vehicleId, photoId);
+			vehiclePhotos = vehiclePhotos.map(p => ({
+				...p,
+				isCover: p.id === updated.id
+			}));
+		} catch (error) {
+			handleErrorWithNotification(error, 'Failed to set cover photo');
+		}
+	}
 </script>
 
 <svelte:head>
@@ -322,13 +368,14 @@
 {:else if vehicle}
 	<div class="space-y-6 pb-24 sm:pb-0">
 		<!-- Header -->
-		<VehicleHeader {vehicle} displayName={vehicleDisplayName} />
+		<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
 
 		<!-- Tabs Navigation -->
 		<Tabs bind:value={activeTab} class="space-y-6">
-			<TabsList class="grid w-full grid-cols-4">
+			<TabsList class="grid w-full grid-cols-5">
 				<TabsTrigger value="overview">Overview</TabsTrigger>
 				<TabsTrigger value="expenses">Expenses</TabsTrigger>
+				<TabsTrigger value="photos">Photos</TabsTrigger>
 				<TabsTrigger value="maintenance">Reminders</TabsTrigger>
 				<TabsTrigger value="loan">Finance</TabsTrigger>
 			</TabsList>
@@ -435,6 +482,17 @@
 				</CardFull.Root>
 			</TabsContent>
 
+			<!-- Photos Tab -->
+			<TabsContent value="photos" class="space-y-6">
+				<VehiclePhotoGallery
+					{vehicleId}
+					photos={vehiclePhotos}
+					onUpload={() => (showUploadDialog = true)}
+					onDelete={handleDeletePhoto}
+					onSetCover={handleSetCover}
+				/>
+			</TabsContent>
+
 			<!-- Maintenance Tab -->
 			<TabsContent value="maintenance" class="space-y-6">
 				<EmptyState>
@@ -485,7 +543,7 @@
 						{/if}
 					{:else}
 						<Alert variant="destructive">
-							<AlertCircle class="h-4 w-4" />
+							<CircleAlert class="h-4 w-4" />
 							<AlertTitle>Invalid Financing Data</AlertTitle>
 							<AlertDescription>
 								The financing information for this vehicle is incomplete or invalid. Please update
@@ -506,7 +564,7 @@
 					<!-- Missing APR Warning (for loans) -->
 					{#if vehicle.financing.financingType === 'loan' && (!vehicle.financing.apr || vehicle.financing.apr <= 0)}
 						<Alert>
-							<AlertCircle class="h-4 w-4" />
+							<CircleAlert class="h-4 w-4" />
 							<AlertTitle>APR Not Set</AlertTitle>
 							<AlertDescription>
 								The APR (Annual Percentage Rate) is not set for this loan. Some features like the
@@ -551,7 +609,7 @@
 					{:else if paymentHistoryError}
 						<!-- Payment History Error -->
 						<Alert variant="destructive">
-							<AlertCircle class="h-4 w-4" />
+							<CircleAlert class="h-4 w-4" />
 							<AlertTitle>Error Loading Payment History</AlertTitle>
 							<AlertDescription>
 								{paymentHistoryError}
@@ -588,6 +646,13 @@
 				{/if}
 			</TabsContent>
 		</Tabs>
+
+		<PhotoUploadDialog
+			bind:open={showUploadDialog}
+			{vehicleId}
+			onClose={() => (showUploadDialog = false)}
+			onUploadComplete={handlePhotoUploadComplete}
+		/>
 	</div>
 {:else}
 	<!-- Vehicle Not Found State -->

@@ -10,6 +10,8 @@ import type { ApiResponse } from '../../types';
 import { commonSchemas } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
+import { deleteAllPhotosForEntity } from '../photos/photo-service';
+import { photoRoutes } from './photo-routes';
 import { vehicleRepository } from './repository';
 
 const routes = new Hono();
@@ -70,6 +72,9 @@ const updateVehicleSchema = createVehicleSchema.partial();
 // Apply authentication and change tracking to all routes
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
+
+// Mount photo sub-router
+routes.route('/:vehicleId/photos', photoRoutes);
 
 // GET /api/vehicles - List user's vehicles (including shared)
 routes.get('/', async (c) => {
@@ -176,6 +181,9 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   if (!existingVehicle) {
     throw new NotFoundError('Vehicle');
   }
+
+  // Cascade delete all photos (Drive + DB) before removing the vehicle
+  await deleteAllPhotosForEntity('vehicle', id, user.id);
 
   await vehicleRepository.delete(id);
 

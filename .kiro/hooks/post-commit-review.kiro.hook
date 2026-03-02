@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Post-Commit Code Quality Review",
+  "description": "After a git commit, reviews the committed code for quality issues including Svelte 5 runes patterns, shadcn-svelte usage, Drizzle ORM patterns, project steering conventions, and general code hygiene.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run `git --no-pager diff HEAD~1 HEAD --name-only` to get the list of changed files in the last commit, then `git --no-pager diff HEAD~1 HEAD` to see the full diff. Review the committed changes for code quality issues including:\n\n1. **Svelte 5 runes compliance**: No `$:` reactive statements, no `on:` directives, no `class:` on components, using `$derived` over `$state` + manual sync, no `$app/stores`, proper `$props()` usage.\n2. **shadcn-svelte usage**: Using registry components from `$lib/components/ui/`, semantic color tokens instead of hardcoded colors, no `!important` on Button, no raw CSS classes like `btn` or `card`.\n3. **Backend patterns**: Drizzle ORM usage, proper repository/routes separation, Biome-compatible code style.\n4. **Code hygiene**: No `any` types, no raw `fetch()` in components/stores, no unused imports, no `console.log` debug statements, no duplicated utilities, proper TypeScript types, guarding browser-only APIs for SSR.\n5. **Project conventions**: API calls through `apiClient` or domain services, types in `$lib/types/`, constants in `$lib/constants/`, proper FAB styling, semantic color tokens for status indicators and financing components.\n6. **General quality**: Clean code, no dead code, proper error handling, no floating promises, consistent naming.\n\nReport findings grouped by file with severity (error/warning/suggestion). If everything looks good, say so briefly."
+  }
+}

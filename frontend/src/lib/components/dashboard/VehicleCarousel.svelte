@@ -17,6 +17,7 @@
 		totalExpenses: number;
 		lastActivity: Date | null;
 		hasActiveFinancing: boolean;
+		coverPhotoUrl?: string | null;
 	}
 
 	interface Props {
@@ -71,14 +72,22 @@
 									tabindex={0}
 									onkeydown={e => e.key === 'Enter' && handleVehicleClick(vehicle.id)}
 								>
-									<!-- Image Placeholder -->
+									<!-- Image area -->
 									<div
 										class="relative h-40 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden"
 									>
-										<div
-											class="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 group-hover:scale-110 transition-transform duration-300"
-										></div>
-										<ImageIcon class="h-16 w-16 text-muted-foreground/40 relative z-10" />
+										{#if vehicle.coverPhotoUrl}
+											<img
+												src={vehicle.coverPhotoUrl}
+												alt={vehicle.name}
+												class="absolute inset-0 h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
+											/>
+										{:else}
+											<div
+												class="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20 group-hover:scale-110 transition-transform duration-300"
+											></div>
+											<ImageIcon class="h-16 w-16 text-muted-foreground/40 relative z-10" />
+										{/if}
 										{#if vehicle.hasActiveFinancing}
 											<Badge
 												variant="secondary"

@@ -11,6 +11,27 @@ export interface BeforeInstallPromptEvent extends Event {
 
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
 
+export type PwaPlatform = 'ios' | 'android' | 'desktop';
+
+export interface PlatformInfo {
+	platform: PwaPlatform;
+	isIOS: boolean;
+	isAndroid: boolean;
+	isChromium: boolean;
+}
+
+export function getPlatformInfo(): PlatformInfo {
+	if (!browser) return { platform: 'desktop', isIOS: false, isAndroid: false, isChromium: false };
+	const ua = navigator.userAgent;
+	const isIOS =
+		/iPad|iPhone|iPod/.test(ua) ||
+		(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+	const isAndroid = /Android/.test(ua);
+	const isChromium = /Chrome|Chromium|Edg/.test(ua) && !/OPR/.test(ua);
+	const platform: PwaPlatform = isIOS ? 'ios' : isAndroid ? 'android' : 'desktop';
+	return { platform, isIOS, isAndroid, isChromium };
+}
+
 // PWA installation state
 export const pwaInstallState = {
 	canInstall: false,
@@ -66,34 +87,6 @@ export async function promptInstall(): Promise<boolean> {
 		if (import.meta.env.DEV) console.error('Error prompting PWA install:', error);
 		return false;
 	}
-}
-
-// Register service worker for background sync
-export function registerServiceWorker(): void {
-	if (!browser || !('serviceWorker' in navigator)) {
-		return;
-	}
-
-	navigator.serviceWorker
-		.register('/sw.js')
-		.then(registration => {
-			if (import.meta.env.DEV) {
-				console.log('Service Worker registered:', registration);
-			}
-
-			// Listen for messages from service worker
-			navigator.serviceWorker.addEventListener('message', event => {
-				if (event.data && event.data.type === 'SYNC_COMPLETE') {
-					// Handle sync completion
-					if (import.meta.env.DEV) {
-						console.log('Background sync completed');
-					}
-				}
-			});
-		})
-		.catch(error => {
-			if (import.meta.env.DEV) console.error('Service Worker registration failed:', error);
-		});
 }
 
 // Request background sync

@@ -12,7 +12,7 @@
 	import { categoryLabels } from '$lib/utils/expense-helpers';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { expenseApi } from '$lib/services/expense-api';
-	import type { Vehicle, Expense, ExpenseCategory } from '$lib/types';
+	import type { Vehicle, Expense, ExpenseCategory, Photo } from '$lib/types';
 	import type { TimePeriod } from '$lib/constants/time-periods';
 
 	let isLoading = $state(true);
@@ -21,6 +21,7 @@
 	// Raw data — fetched once
 	let vehicles = $state<Vehicle[]>([]);
 	let allExpenses = $state<Expense[]>([]);
+	let vehiclePhotosMap = $state<Map<string, Photo[]>>(new Map());
 
 	// Derived: vehicle overview cards
 	let vehicleOverviews = $derived.by(() => {
@@ -38,6 +39,12 @@
 					? new Date(Math.max(...vExpenses.map(e => new Date(e.date).getTime())))
 					: null;
 
+			const photos = vehiclePhotosMap.get(v.id) || [];
+			const coverPhoto = photos.find(p => p.isCover);
+			const coverPhotoUrl = coverPhoto
+				? vehicleApi.getPhotoThumbnailUrl(v.id, coverPhoto.id)
+				: null;
+
 			return {
 				id: v.id,
 				name: `${v.year} ${v.make} ${v.model}`,
@@ -45,7 +52,8 @@
 				recentExpenses,
 				totalExpenses,
 				lastActivity,
-				hasActiveFinancing: v.financing?.isActive || false
+				hasActiveFinancing: v.financing?.isActive || false,
+				coverPhotoUrl
 			};
 		});
 	});
@@ -160,6 +168,19 @@
 			]);
 			vehicles = loadedVehicles;
 			allExpenses = loadedExpenses;
+
+			// Load photos for all vehicles in parallel
+			const photoResults = await Promise.allSettled(
+				loadedVehicles.map(v => vehicleApi.getPhotos(v.id))
+			);
+			const photosMap = new Map<string, Photo[]>();
+			loadedVehicles.forEach((v, i) => {
+				const result = photoResults[i];
+				if (result && result.status === 'fulfilled') {
+					photosMap.set(v.id, result.value);
+				}
+			});
+			vehiclePhotosMap = photosMap;
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load dashboard data');
 		}

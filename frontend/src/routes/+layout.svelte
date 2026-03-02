@@ -11,7 +11,7 @@
 	import { NOTIFICATION_LIMITS } from '$lib/constants/limits';
 	import PWAInstallPrompt from '$lib/components/layout/PWAInstallPrompt.svelte';
 	import SyncConflictResolver from '$lib/components/sync/SyncConflictResolver.svelte';
-	import { registerServiceWorker } from '$lib/utils/pwa';
+	import { pwaInfo } from 'virtual:pwa-info';
 	import { loadOfflineExpenses } from '$lib/utils/offline-storage';
 	import { offlineExpenses } from '$lib/stores/offline';
 	import '../app.css';
@@ -39,10 +39,26 @@
 	const shownNotifications = new Set<string>();
 	let previousNotificationIds = new Set<string>();
 
-	onMount(() => {
+	let webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
+
+	onMount(async () => {
 		authStore.initialize();
-		registerServiceWorker();
 		offlineExpenses.set(loadOfflineExpenses());
+
+		if (pwaInfo) {
+			const pwaRegister: typeof import('virtual:pwa-register') = await import(
+				'virtual:pwa-register'
+			);
+			pwaRegister.registerSW({
+				immediate: true,
+				onRegistered(r: ServiceWorkerRegistration | undefined) {
+					if (import.meta.env.DEV) console.log('SW Registered:', r);
+				},
+				onRegisterError(error: unknown) {
+					if (import.meta.env.DEV) console.error('SW registration error', error);
+				}
+			});
+		}
 	});
 
 	let authState = $derived($authStore);
@@ -101,6 +117,8 @@
 	<link rel="icon" href={favicon} />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<meta name="theme-color" content="#2563eb" />
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -- PWA manifest link from @vite-pwa/sveltekit -->
+	{@html webManifestLink}
 </svelte:head>
 
 {#if authState.isLoading}

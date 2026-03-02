@@ -1,33 +1,24 @@
-# VROOM Car Tracker - TODO List
+# VROOM Car Tracker - TODO
 
+## UI / UX
 
-## UI Reworks
-- [x] Rework Vehicle specific analytics page
-- [x] Dashboard rework, using charts/components from shadcnui
-- [x] Vehicle page Form rework
-- [x] Expenses table rework
-- [x] Finance Information in car
-- [ ] Expense Form rework
-    - Fix tags
-- [ ] Expenses page rework, specifically using dashboard components from shadcnui
-- [ ] Analytics Buildout
-- [ ] Menu sync time doesn't show right after enabling backup/sync until page refresh
+- [ ] Expense Form — tag input refinements
+- [ ] Analytics page buildout (currently stub/placeholder)
+- [ ] Sync status time doesn't refresh in menu after enabling backup until page reload
+- [ ] Insurance management UI (backend API exists, no frontend page)
+- [ ] Dark mode toggle
 
 ## Features
-- [x] Add VIN input to vehicle
-- [x] Update GAS to include gas type (octane)
-- [ ] Skip mpg calculation (missed fillup) 
-- [ ] Google Sheets integration fix
-- [ ] Comprehensive insurance information
-- [ ] Vehicle sharing
-- [ ] Dark Mode switch
 
+- [ ] Skip MPG calculation for missed fill-ups
+- [ ] Vehicle sharing (types defined, no routes or UI yet)
+- [ ] Split expenses across multiple vehicles
+- [ ] Import from other car cost trackers via CSV — Fuelly, Fuelio, Drivvo, Simply Auto, Road Trip, Spritmonitor, aCar, Car Expenses
 
-## Deployment ready 
-- [ ] Deployment into OCI
-- [ ] Cloudflare setup
-- [ ] Redis integration (?)
+## Infrastructure
 
+- [ ] Redis for rate-limiting / idempotency in multi-instance deployments
 
-Maybes
-- [ ] Allow splitting expenses across multiple vehicles (?)
+## Long Term
+
+- [ ] Receipt / invoice photo-based auto-fill (OCR → expense fields)

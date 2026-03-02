@@ -1,6 +1,6 @@
-import type { Vehicle, VehicleFinancing, VehicleStats } from '$lib/types';
+import type { Photo, Vehicle, VehicleFinancing, VehicleStats } from '$lib/types';
 import type { TimePeriod } from '$lib/constants/time-periods';
-import { apiClient } from './api-client';
+import { apiClient, getApiBaseUrl } from './api-client';
 
 /**
  * Vehicle API service
@@ -55,5 +55,27 @@ export const vehicleApi = {
 		return apiClient.patch<VehicleFinancing>(`/api/v1/financing/${financingId}/payment-amount`, {
 			paymentAmount
 		});
+	},
+
+	async getPhotos(vehicleId: string): Promise<Photo[]> {
+		return apiClient.get<Photo[]>(`/api/v1/vehicles/${vehicleId}/photos`);
+	},
+
+	async uploadPhoto(vehicleId: string, file: File): Promise<Photo> {
+		const formData = new FormData();
+		formData.append('photo', file);
+		return apiClient.post<Photo>(`/api/v1/vehicles/${vehicleId}/photos`, formData);
+	},
+
+	async setCoverPhoto(vehicleId: string, photoId: string): Promise<Photo> {
+		return apiClient.put<Photo>(`/api/v1/vehicles/${vehicleId}/photos/${photoId}/cover`);
+	},
+
+	async deletePhoto(vehicleId: string, photoId: string): Promise<void> {
+		await apiClient.delete(`/api/v1/vehicles/${vehicleId}/photos/${photoId}`);
+	},
+
+	getPhotoThumbnailUrl(vehicleId: string, photoId: string): string {
+		return `${getApiBaseUrl()}/api/v1/vehicles/${vehicleId}/photos/${photoId}/thumbnail`;
 	}
 };

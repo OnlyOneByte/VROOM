@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
 	initializePWA,
 	promptInstall,
-	registerServiceWorker,
 	requestBackgroundSync,
 	pwaInstallState,
 	type BeforeInstallPromptEvent
@@ -117,59 +116,6 @@ describe('PWA Utils', () => {
 			// For now, we'll test the error case
 			const result = await promptInstall();
 			expect(result).toBe(false);
-		});
-	});
-
-	describe('registerServiceWorker', () => {
-		it('should register service worker when supported', () => {
-			registerServiceWorker();
-
-			expect(mockServiceWorker.register).toHaveBeenCalledWith('/sw.js');
-		});
-
-		it('should handle service worker registration failure', async () => {
-			const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-			mockServiceWorker.register.mockRejectedValue(new Error('Registration failed'));
-
-			registerServiceWorker();
-
-			// Wait for promise to resolve
-			await new Promise(resolve => setTimeout(resolve, 0));
-
-			expect(consoleError).toHaveBeenCalledWith(
-				'Service Worker registration failed:',
-				expect.any(Error)
-			);
-
-			consoleError.mockRestore();
-		});
-
-		it('should set up message listener for service worker', async () => {
-			mockServiceWorker.register.mockResolvedValue({
-				addEventListener: vi.fn()
-			});
-
-			registerServiceWorker();
-
-			// Wait for the promise to resolve
-			await new Promise(resolve => setTimeout(resolve, 0));
-
-			expect(mockServiceWorker.addEventListener).toHaveBeenCalledWith(
-				'message',
-				expect.any(Function)
-			);
-		});
-
-		it('should not register when service worker not supported', () => {
-			// Remove service worker support
-			Object.defineProperty(window, 'navigator', {
-				value: {},
-				writable: true
-			});
-
-			registerServiceWorker();
-
-			expect(mockServiceWorker.register).not.toHaveBeenCalled();
 		});
 	});
 
