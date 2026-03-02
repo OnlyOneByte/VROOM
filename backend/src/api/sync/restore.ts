@@ -4,12 +4,13 @@
 
 import { eq, inArray } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import { TABLE_SCHEMA_MAP } from '../../config';
 import { getDb } from '../../db/connection';
 import { expenses, insurancePolicies, vehicleFinancing, vehicles } from '../../db/schema';
 import { SyncError, SyncErrorCode } from '../../errors';
 import type { ParsedBackupData } from '../../types';
 import { settingsRepository } from '../settings/repository';
-import { backupService } from './backup';
+import { backupService, coerceRow } from './backup';
 import { GoogleSheetsService } from './google-sheets';
 
 type DrizzleTransaction = Parameters<
@@ -103,6 +104,17 @@ class RestoreService {
     const user = await this.getUserWithToken(userId);
     const sheetsService = new GoogleSheetsService(user.googleRefreshToken);
     const sheetData = await sheetsService.readSpreadsheetData(settings.googleSheetsSpreadsheetId);
+
+    // Coerce Sheets data using schema-aware column types
+    for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
+      const data = sheetData[key as keyof typeof sheetData];
+      if (Array.isArray(data)) {
+        // biome-ignore lint/suspicious/noExplicitAny: Dynamic key assignment on parsed backup data
+        (sheetData as Record<string, any>)[key] = data.map((row: Record<string, unknown>) =>
+          coerceRow(row, table)
+        );
+      }
+    }
 
     if (sheetData.metadata.userId !== userId) {
       throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Spreadsheet belongs to different user');
@@ -239,91 +251,23 @@ class RestoreService {
   }
 
   private async insertBackupData(tx: DrizzleTransaction, data: ParsedBackupData): Promise<void> {
-    // Insert data with validation - convertRow handles type conversion
-    // Drizzle will validate against schema during insert
+    // Data is already coerced by coerceRow (ZIP path via parseZipBackup, Sheets path via restoreFromSheets)
     if (data.vehicles.length > 0) {
-      const convertedVehicles = data.vehicles.map((v) => this.convertRow(v));
-      await tx.insert(vehicles).values(convertedVehicles as (typeof vehicles.$inferInsert)[]);
+      await tx.insert(vehicles).values(data.vehicles as (typeof vehicles.$inferInsert)[]);
     }
     if (data.expenses.length > 0) {
-      const convertedExpenses = data.expenses.map((e) => this.convertRow(e));
-      await tx.insert(expenses).values(convertedExpenses as (typeof expenses.$inferInsert)[]);
+      await tx.insert(expenses).values(data.expenses as (typeof expenses.$inferInsert)[]);
     }
     if (data.financing.length > 0) {
-      const convertedFinancing = data.financing.map((f) => this.convertRow(f));
       await tx
         .insert(vehicleFinancing)
-        .values(convertedFinancing as (typeof vehicleFinancing.$inferInsert)[]);
+        .values(data.financing as (typeof vehicleFinancing.$inferInsert)[]);
     }
     if (data.insurance.length > 0) {
-      const convertedInsurance = data.insurance.map((i) => this.convertRow(i));
       await tx
         .insert(insurancePolicies)
-        .values(convertedInsurance as (typeof insurancePolicies.$inferInsert)[]);
+        .values(data.insurance as (typeof insurancePolicies.$inferInsert)[]);
     }
-  }
-
-  private convertRow(row: Record<string, unknown>): Record<string, unknown> {
-    const converted: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(row)) {
-      // Handle null/undefined values before conversion
-      if (value === null || value === undefined) {
-        converted[key] = null;
-        continue;
-      }
-      converted[key] = this.convertValue(String(value), key);
-    }
-    return converted;
-  }
-
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Type conversion requires checking multiple field patterns
-  private convertValue(value: string, field: string): unknown {
-    if (value === '' || value === 'null' || value === 'undefined' || value === 'NULL') return null;
-
-    if (field.endsWith('At') || field.endsWith('Date') || field === 'date') {
-      const date = new Date(value);
-      return Number.isNaN(date.getTime()) ? null : date;
-    }
-
-    if (field.startsWith('is') || field === 'isActive' || field === 'isScheduled') {
-      return value === 'true' || value === '1' || value === 'TRUE';
-    }
-
-    if (
-      field.includes('amount') ||
-      field.includes('Amount') ||
-      field.includes('price') ||
-      field.includes('Price') ||
-      field.includes('cost') ||
-      field.includes('Cost') ||
-      field.includes('balance') ||
-      field.includes('Balance') ||
-      field === 'apr' ||
-      field === 'volume' ||
-      field === 'charge' ||
-      field === 'mileage' ||
-      field === 'initialMileage' ||
-      field === 'mileageLimit' ||
-      field === 'excessMileageFee' ||
-      field === 'residualValue'
-    ) {
-      const num = Number.parseFloat(value);
-      return Number.isNaN(num) ? null : num;
-    }
-
-    if (
-      field === 'year' ||
-      field === 'termMonths' ||
-      field === 'termLengthMonths' ||
-      field === 'paymentNumber' ||
-      field === 'paymentDayOfMonth' ||
-      field === 'paymentDayOfWeek'
-    ) {
-      const num = Number.parseInt(value, 10);
-      return Number.isNaN(num) ? null : num;
-    }
-
-    return value;
   }
 
   private async getUserWithToken(userId: string): Promise<{

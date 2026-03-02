@@ -8,7 +8,7 @@ import { stringify } from 'csv-stringify/sync';
 import { eq, getTableColumns } from 'drizzle-orm';
 import type { SQLiteTableWithColumns } from 'drizzle-orm/sqlite-core';
 import { createInsertSchema } from 'drizzle-zod';
-import { z } from 'zod';
+import type { z } from 'zod';
 import {
   CONFIG,
   getBackupTableKeys,
@@ -25,35 +25,58 @@ export interface ValidationResult {
   errors: string[];
 }
 
-const flexibleTimestamp = (optional = false, nullable = false) => {
-  let schema = z
-    .union([z.string(), z.date()])
-    .transform((val) => (typeof val === 'string' ? new Date(val) : val));
-  // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for union with null
-  if (nullable) schema = z.union([schema, z.null()]) as any;
-  return optional ? schema.optional() : schema;
-};
-
-function generateTimestampOverrides(
-  // biome-ignore lint/suspicious/noExplicitAny: Generic table type
-  table: SQLiteTableWithColumns<any>
-): Record<string, z.ZodTypeAny> {
-  const columns = getTableColumns(table);
-  const overrides: Record<string, z.ZodTypeAny> = {};
-  for (const [columnName, column] of Object.entries(columns)) {
-    // biome-ignore lint/suspicious/noExplicitAny: Drizzle column type is not fully exposed
-    const col = column as any;
-    if (col.columnType === 'SQLiteInteger' && col.config?.mode === 'timestamp') {
-      overrides[columnName] = flexibleTimestamp(col.notNull === false || col.hasDefault, false);
-    }
-  }
-  return overrides;
-}
-
 // biome-ignore lint/suspicious/noExplicitAny: Zod schema type is complex
 const TABLE_SCHEMAS: Record<string, z.ZodObject<any>> = {};
 for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
-  TABLE_SCHEMAS[key] = createInsertSchema(table, generateTimestampOverrides(table));
+  TABLE_SCHEMAS[key] = createInsertSchema(table);
+}
+
+/**
+ * Schema-aware row coercion using Drizzle column metadata.
+ * Converts string values from CSV/Sheets into proper JS types (Date, boolean, number, JSON).
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Column type coercion requires checking multiple SQLite column types
+export function coerceRow(
+  row: Record<string, unknown>,
+  // biome-ignore lint/suspicious/noExplicitAny: Generic table type from Drizzle
+  table: SQLiteTableWithColumns<any>
+): Record<string, unknown> {
+  const columns = getTableColumns(table);
+  const coerced: Record<string, unknown> = { ...row };
+
+  for (const [columnName, column] of Object.entries(columns)) {
+    const val = coerced[columnName];
+    if (val === undefined || val === null) continue;
+    const strVal = String(val);
+    if (strVal === '' || strVal === 'null' || strVal === 'NULL' || strVal === 'undefined') {
+      coerced[columnName] = null;
+      continue;
+    }
+
+    // biome-ignore lint/suspicious/noExplicitAny: Drizzle column type is not fully exposed
+    const col = column as any;
+
+    if (col.columnType === 'SQLiteTimestamp') {
+      const date = new Date(strVal);
+      coerced[columnName] = Number.isNaN(date.getTime()) ? null : date;
+    } else if (col.columnType === 'SQLiteBoolean') {
+      coerced[columnName] = strVal === 'true' || strVal === '1' || strVal === 'TRUE';
+    } else if (col.columnType === 'SQLiteTextJson') {
+      try {
+        coerced[columnName] = JSON.parse(strVal);
+      } catch {
+        coerced[columnName] = null;
+      }
+    } else if (col.columnType === 'SQLiteInteger') {
+      const num = Number.parseInt(strVal, 10);
+      coerced[columnName] = Number.isNaN(num) ? null : num;
+    } else if (col.columnType === 'SQLiteReal') {
+      const num = Number.parseFloat(strVal);
+      coerced[columnName] = Number.isNaN(num) ? null : num;
+    }
+  }
+
+  return coerced;
 }
 
 export class BackupService {
@@ -159,8 +182,11 @@ export class BackupService {
 
     const parsedData: ParsedBackupData = { metadata } as ParsedBackupData;
     for (const [key, filename] of Object.entries(TABLE_FILENAME_MAP)) {
+      const table = TABLE_SCHEMA_MAP[key];
+      const rawRows = getCSVData(filename);
+      const coercedRows = table ? rawRows.map((row) => this.coerceCSVRow(row, table)) : rawRows;
       // biome-ignore lint/suspicious/noExplicitAny: Dynamic key assignment
-      parsedData[key as keyof ParsedBackupData] = getCSVData(filename) as any;
+      parsedData[key as keyof ParsedBackupData] = coercedRows as any;
     }
 
     return parsedData;
@@ -176,6 +202,13 @@ export class BackupService {
       escape: '"',
       quote: '"',
     }) as Record<string, string>[];
+  }
+  private coerceCSVRow(
+    row: Record<string, unknown>,
+    // biome-ignore lint/suspicious/noExplicitAny: Generic table type from Drizzle
+    table: SQLiteTableWithColumns<any>
+  ): Record<string, unknown> {
+    return coerceRow(row, table);
   }
 
   validateBackupData(backup: ParsedBackupData): ValidationResult {
