@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // User table
 export const users = sqliteTable('users', {
@@ -183,3 +183,30 @@ export type NewUserSettings = typeof userSettings.$inferInsert;
 
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
+
+// Photos table (polymorphic: entityType + entityId)
+export const photos = sqliteTable(
+  'photos',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    entityType: text('entity_type').notNull(),
+    entityId: text('entity_id').notNull(),
+    driveFileId: text('drive_file_id').notNull(),
+    fileName: text('file_name').notNull(),
+    mimeType: text('mime_type').notNull(),
+    fileSize: integer('file_size').notNull(),
+    webViewLink: text('web_view_link'),
+    isCover: integer('is_cover', { mode: 'boolean' }).notNull().default(false),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    entityIdx: index('photos_entity_idx').on(table.entityType, table.entityId),
+  })
+);
+
+export type Photo = typeof photos.$inferSelect;
+export type NewPhoto = typeof photos.$inferInsert;
+export type PhotoEntityType = 'vehicle' | 'expense' | 'trip';

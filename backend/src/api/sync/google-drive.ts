@@ -96,7 +96,7 @@ export class GoogleDriveService {
     };
   }
 
-  private async findFolder(name: string, parentId?: string): Promise<DriveFolder | null> {
+  async findFolder(name: string, parentId?: string): Promise<DriveFolder | null> {
     const query = parentId
       ? `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
       : `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;

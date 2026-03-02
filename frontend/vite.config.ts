@@ -1,29 +1,44 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
-import { VitePWA } from 'vite-plugin-pwa';
+import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 
 export default defineConfig({
 	plugins: [
 		sveltekit(),
-		VitePWA({
+		SvelteKitPWA({
 			registerType: 'autoUpdate',
 			workbox: {
-				globPatterns: ['**/*.{js,css,html,ico,png,svg}']
+				globPatterns: ['client/**/*.{js,css,ico,png,svg,webp,webmanifest}']
 			},
 			manifest: {
 				name: 'VROOM Car Tracker',
 				short_name: 'VROOM',
-				description: 'Track your vehicle expenses and analyze costs with offline support',
-				theme_color: '#1f2937',
-				background_color: '#ffffff',
-				display: 'standalone',
-				scope: '/',
+				id: '/',
+				description: 'Track your vehicle expenses and analyze costs with VROOM Car Tracker',
 				start_url: '/',
+				scope: '/',
+				display: 'standalone',
+				background_color: '#ffffff',
+				theme_color: '#2563eb',
+				orientation: 'portrait-primary',
 				icons: [
 					{
-						src: '/favicon.svg',
-						sizes: 'any',
-						type: 'image/svg+xml'
+						src: '/icon-192.png',
+						sizes: '192x192',
+						type: 'image/png',
+						purpose: 'any'
+					},
+					{
+						src: '/icon-512.png',
+						sizes: '512x512',
+						type: 'image/png',
+						purpose: 'any'
+					},
+					{
+						src: '/icon-512-maskable.png',
+						sizes: '512x512',
+						type: 'image/png',
+						purpose: 'maskable'
 					}
 				]
 			}

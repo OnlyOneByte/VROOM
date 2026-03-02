@@ -2,6 +2,7 @@
 	import { TriangleAlert, RefreshCw } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { goto } from '$app/navigation';
 
 	interface Props {
 		/** Error object if an error occurred */
@@ -23,6 +24,10 @@
 			// Default behavior: reload the page
 			window.location.reload();
 		}
+	}
+
+	function handleGoToDashboard() {
+		goto('/dashboard');
 	}
 </script>
 
@@ -57,9 +62,7 @@
 						<RefreshCw class="h-4 w-4 mr-2" />
 						Try Again
 					</Button>
-					<Button variant="outline" onclick={() => (window.location.href = '/dashboard')}>
-						Go to Dashboard
-					</Button>
+					<Button variant="outline" onclick={handleGoToDashboard}>Go to Dashboard</Button>
 				</div>
 			</CardContent>
 		</Card>
