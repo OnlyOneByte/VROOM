@@ -20,6 +20,7 @@
 	import { LoaderCircle } from 'lucide-svelte';
 
 	import { vehicleApi } from '$lib/services/vehicle-api';
+	import { themeStore } from '$lib/stores/theme';
 
 	let { children } = $props();
 
@@ -42,6 +43,7 @@
 	let webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
 	onMount(async () => {
+		themeStore.initialize();
 		authStore.initialize();
 		offlineExpenses.set(loadOfflineExpenses());
 
