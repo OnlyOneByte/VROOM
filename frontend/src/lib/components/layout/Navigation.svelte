@@ -67,7 +67,9 @@
 </script>
 
 <!-- Mobile menu button -->
-<div class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b border-border">
+<div
+	class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b border-border pt-[env(safe-area-inset-top)]"
+>
 	<div class="flex items-center justify-between px-4 py-3">
 		<div class="flex items-center gap-3">
 			<span class="text-2xl">🚗</span>
@@ -303,5 +305,5 @@
 	</div>
 </div>
 
-<!-- Mobile content padding -->
-<div class="lg:hidden h-16"></div>
+<!-- Mobile content padding — accounts for fixed top bar + safe area -->
+<div class="lg:hidden h-16 pt-[env(safe-area-inset-top)]"></div>
