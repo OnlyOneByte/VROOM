@@ -6,7 +6,14 @@ import { eq } from 'drizzle-orm';
 import type { OAuth2Client } from 'google-auth-library';
 import { google, type sheets_v4 } from 'googleapis';
 import { getDb } from '../../db/connection';
-import { expenses, insurancePolicies, users, vehicleFinancing, vehicles } from '../../db/schema';
+import {
+  expenses,
+  insurancePolicies,
+  insurancePolicyVehicles,
+  users,
+  vehicleFinancing,
+  vehicles,
+} from '../../db/schema';
 import { GoogleDriveService } from './google-drive';
 
 export interface SpreadsheetInfo {
@@ -132,7 +139,11 @@ export class GoogleSheetsService {
       db
         .select()
         .from(insurancePolicies)
-        .innerJoin(vehicles, eq(insurancePolicies.vehicleId, vehicles.id))
+        .innerJoin(
+          insurancePolicyVehicles,
+          eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
+        )
+        .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
         .where(eq(vehicles.userId, userId)),
       db
         .select()
@@ -204,15 +215,12 @@ export class GoogleSheetsService {
   private getInsuranceHeaders() {
     return [
       'id',
-      'vehicleId',
       'company',
-      'policyNumber',
-      'totalCost',
-      'termLengthMonths',
-      'startDate',
-      'endDate',
-      'monthlyCost',
       'isActive',
+      'currentTermStart',
+      'currentTermEnd',
+      'terms',
+      'notes',
       'createdAt',
       'updatedAt',
     ];

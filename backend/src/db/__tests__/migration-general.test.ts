@@ -44,6 +44,7 @@ describe('Migrations: General', () => {
     const expectedTables = [
       'expenses',
       'insurance_policies',
+      'insurance_policy_vehicles',
       'photos',
       'sessions',
       'user_settings',

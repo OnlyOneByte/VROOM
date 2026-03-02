@@ -190,7 +190,7 @@ export async function validateFinancingOwnership(
 }
 
 /**
- * Validate that insurance policy belongs to the user (via vehicle ownership)
+ * Validate that insurance policy belongs to the user (via junction table → vehicle ownership)
  * @throws HTTPException(404) if insurance not found or doesn't belong to user
  */
 export async function validateInsuranceOwnership(
@@ -202,9 +202,18 @@ export async function validateInsuranceOwnership(
     throw new HTTPException(404, { message: 'Insurance policy not found' });
   }
 
-  // Verify the insurance's vehicle belongs to the user
-  const vehicle = await vehicleRepository.findByUserIdAndId(userId, insurance.vehicleId);
-  if (!vehicle) {
+  // Verify the user owns at least one vehicle linked to this policy via junction table
+  const vehicleIds = await insurancePolicyRepository.getVehicleIds(insuranceId);
+  let ownsLinkedVehicle = false;
+  for (const vid of vehicleIds) {
+    const vehicle = await vehicleRepository.findByUserIdAndId(userId, vid);
+    if (vehicle) {
+      ownsLinkedVehicle = true;
+      break;
+    }
+  }
+
+  if (!ownsLinkedVehicle) {
     throw new HTTPException(404, { message: 'Insurance policy not found' });
   }
 

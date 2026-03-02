@@ -11,7 +11,7 @@
 
 ### Dark Mode
 
-- [ ] Dark mode toggle
+- [x] Dark mode toggle
 
 ### Fuel Tracking
 
@@ -26,10 +26,15 @@
 - [ ] Enrich policy schema: coverage type (liability/collision/comprehensive/full), deductible amount, coverage limit, premium frequency (monthly/quarterly/semi-annual/annual)
 - [ ] Document storage: upload & retrieve proof-of-insurance cards and policy PDFs per policy (integrate with existing photo/file infrastructure)
 - [ ] Renewal tracking: link renewal policies to their predecessor, surface cost-over-time trends
-- [ ] Configurable renewal reminders: user-set alert windows (e.g. 30/14/7 days before expiry), stored as preferences
-- [ ] Cost history & comparison: side-by-side view of consecutive policy periods per vehicle showing premium delta and coverage changes
 - [ ] Insurance dashboard page: list active/expired policies per vehicle, quick-access document viewer, upcoming renewal alerts
 - [ ] Policy-to-expense linking: auto-generate or link expense records (category `insurance`) when a policy is created/renewed; foreign key from expense → policy
+  - [ ] How to split cost between multiple cars (?)
+
+### UI Misc & bugs
+- [ ] Common upload/take picture dialog popup. use props
+- [ ] Verify backup max count is deleting old backups
+- [ ] Verify sheets sync is cahnging when schema changes (and working)
+
 
 ### Total Cost of Ownership (TCO)
 
