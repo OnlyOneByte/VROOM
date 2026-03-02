@@ -58,7 +58,8 @@
 		charge: '',
 		fuelType: '',
 		description: '',
-		isFinancingPayment: false
+		isFinancingPayment: false,
+		missedFillup: false
 	});
 
 	// Form state
@@ -152,6 +153,7 @@
 			formData.fuelType = expense.fuelType || '';
 			formData.description = expense.description || '';
 			formData.isFinancingPayment = expense.isFinancingPayment ?? false;
+			formData.missedFillup = expense.missedFillup ?? false;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading expense:', error);
 			appStore.addNotification({ type: 'error', message: 'Error loading expense' });
@@ -344,7 +346,8 @@
 				fuelType: formData.fuelType || undefined,
 				description: formData.description || undefined,
 				currency: currencyUnit,
-				isFinancingPayment: formData.isFinancingPayment
+				isFinancingPayment: formData.isFinancingPayment,
+				missedFillup: formData.missedFillup
 			};
 
 			if (isEditMode) {
@@ -662,13 +665,14 @@
 					bind:volume={formData.volume}
 					bind:charge={formData.charge}
 					bind:fuelType={formData.fuelType}
+					bind:missedFillup={formData.missedFillup}
 					amount={formData.amount}
 					{volumeUnit}
 					{chargeUnit}
 					{distanceUnit}
 					{calculatedMpg}
 					{calculatedEfficiency}
-					{showMpgCalculation}
+					showMpgCalculation={showMpgCalculation && !formData.missedFillup}
 					{errors}
 					{touched}
 					onBlur={handleBlur}

@@ -101,6 +101,31 @@ bun test src/db/__tests__/migration-general.test.ts src/db/__tests__/migration-0
 
 They also run as part of `bun run validate`.
 
+## Backup / Restore / Sync Impact
+
+Schema changes affect the backup, restore, and Google Sheets sync pipeline. When adding or modifying tables or columns, check and update these files:
+
+| File | What to update |
+|---|---|
+| `backend/src/config.ts` | Add new tables to `TABLE_SCHEMA_MAP` and `TABLE_FILENAME_MAP`. If the table may be absent in older backups, add its filename to `OPTIONAL_BACKUP_FILES`. |
+| `backend/src/types.ts` | Add the new data field to `BackupData` and `ParsedBackupData` interfaces. |
+| `backend/src/api/sync/backup.ts` | Export the new table's data in `createBackup()`. Add CSV column output in `exportAsZip()`. Validate referential integrity in `validateReferentialIntegrity()`. |
+| `backend/src/api/sync/restore.ts` | Insert the new table's data in `insertBackupData()`. Delete it in `deleteUserData()` if applicable. Update `ImportSummary` type. |
+| `backend/src/api/sync/google-sheets.ts` | Add headers function, new sheet in `createSpreadsheet()`, export in `updateSpreadsheetWithUserData()`, read in `readSpreadsheetData()`. |
+
+### Column type considerations
+
+- `NOT NULL` boolean columns (e.g., `missedFillup`, `isFinancingPayment`): CSV empty values are coerced to `false` by `coerceRow()`. If you add a new `NOT NULL` boolean column, verify that `coerceRow` handles it — the generic `SQLiteBoolean` branch already does this, but confirm with a backup round-trip test.
+- `NOT NULL` columns with defaults: Drizzle's `createInsertSchema()` may not accept `null` even if the DB column has a default. Ensure `coerceRow` produces a valid value, not `null`, for these columns.
+- JSON columns: `coerceRow` parses JSON strings. If you add a new JSON column, ensure the backup CSV serializes it as a JSON string (not `[object Object]`).
+
+### Testing
+
+Backup round-trip tests live in `backend/src/api/sync/__tests__/backup.test.ts`. When adding new tables or columns, add tests that verify:
+- `coerceRow` produces valid values for the new column types (especially NOT NULL booleans and JSON)
+- `validateBackupData` accepts properly coerced rows
+- `validateBackupData` rejects rows with invalid data for the new columns
+
 ## Production Considerations
 
 - Both local and prod run `runMigrations()` on startup. New migrations deploy automatically with the next container build.

@@ -101,9 +101,9 @@ function createSettingsStore() {
 			}
 		},
 
-		async executeSync(syncTypes: ('sheets' | 'backup')[]) {
+		async executeSync(syncTypes: ('sheets' | 'backup')[], force = false) {
 			try {
-				return await settingsApi.executeSync(syncTypes);
+				return await settingsApi.executeSync(syncTypes, force);
 			} catch (error) {
 				update(state => ({ ...state, error: handleError(error) }));
 				throw error;

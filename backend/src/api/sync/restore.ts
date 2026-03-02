@@ -35,6 +35,7 @@ export interface ImportSummary {
   expenses: number;
   financing: number;
   insurance: number;
+  insurancePolicyVehicles: number;
 }
 
 export interface RestoreResponse {
@@ -75,6 +76,7 @@ class RestoreService {
       expenses: parsedBackup.expenses.length,
       financing: parsedBackup.financing.length,
       insurance: parsedBackup.insurance.length,
+      insurancePolicyVehicles: parsedBackup.insurancePolicyVehicles?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -140,6 +142,7 @@ class RestoreService {
       expenses: sheetData.expenses.length,
       financing: sheetData.financing.length,
       insurance: sheetData.insurance.length,
+      insurancePolicyVehicles: sheetData.insurancePolicyVehicles?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -275,6 +278,11 @@ class RestoreService {
       await tx
         .insert(insurancePolicies)
         .values(data.insurance as (typeof insurancePolicies.$inferInsert)[]);
+    }
+    if (data.insurancePolicyVehicles?.length > 0) {
+      await tx
+        .insert(insurancePolicyVehicles)
+        .values(data.insurancePolicyVehicles as (typeof insurancePolicyVehicles.$inferInsert)[]);
     }
   }
 

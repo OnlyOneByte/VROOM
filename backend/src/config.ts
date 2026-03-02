@@ -183,8 +183,14 @@ export function getBackupTableKeys(): string[] {
   return Object.keys(TABLE_SCHEMA_MAP);
 }
 
+// Files that may be absent in older backups (pre-migration)
+const OPTIONAL_BACKUP_FILES = new Set(['insurance_policy_vehicles.csv']);
+
 export function getRequiredBackupFiles(): string[] {
-  return ['metadata.json', ...Object.values(TABLE_FILENAME_MAP)];
+  return [
+    'metadata.json',
+    ...Object.values(TABLE_FILENAME_MAP).filter((f) => !OPTIONAL_BACKUP_FILES.has(f)),
+  ];
 }
 
 export const validateProductionConfig = () => {

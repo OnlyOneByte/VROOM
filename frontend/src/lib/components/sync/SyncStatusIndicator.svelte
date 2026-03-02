@@ -113,10 +113,10 @@
 				</div>
 			{/if}
 
-			<!-- Last backup & sync (combined) -->
+			<!-- Last backup -->
 			{#if $googleDriveBackupEnabled || $googleSheetsSyncEnabled}
 				<div class="flex items-center justify-between">
-					<span class="text-sm text-muted-foreground">Last backup & sync</span>
+					<span class="text-sm text-muted-foreground">Last backup</span>
 					<span class="text-sm font-medium">
 						{formatCompactRelativeTime($lastBackupTime ?? $lastSheetsSync)}
 					</span>

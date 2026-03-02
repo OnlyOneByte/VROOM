@@ -1,5 +1,8 @@
 # VROOM Car Tracker
 
+![Frontend Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OnlyOneByte/VROOM/coverage-badges/frontend-coverage.json)
+![Backend Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OnlyOneByte/VROOM/coverage-badges/backend-coverage.json)
+
 VROOM (Vehicle Record & Organization Of Maintenance) — a modern, self-hostable car cost tracking and visualization web app with mobile-first design and comprehensive expense analytics.
 
 ## Why VROOM?
