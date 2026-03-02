@@ -16,6 +16,25 @@ self.addEventListener('activate', event => {
 	event.waitUntil(self.clients.claim());
 });
 
+// Fetch event — network-first strategy for navigation, passthrough for everything else
+self.addEventListener('fetch', event => {
+	// Only handle same-origin requests
+	if (!event.request.url.startsWith(self.location.origin)) return;
+
+	// Let navigation requests fall through to the network
+	if (event.request.mode === 'navigate') {
+		event.respondWith(
+			fetch(event.request).catch(
+				() => caches.match('/') || new Response('Offline', { status: 503 })
+			)
+		);
+		return;
+	}
+
+	// All other requests: network passthrough (no caching for now)
+	return;
+});
+
 // Background sync event
 self.addEventListener('sync', event => {
 	console.log('Background sync triggered:', event.tag);
