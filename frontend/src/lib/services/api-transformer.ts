@@ -23,6 +23,7 @@ export interface BackendExpenseRequest {
 	description?: string;
 	receiptUrl?: string;
 	isFinancingPayment?: boolean;
+	missedFillup?: boolean;
 }
 
 /**
@@ -41,6 +42,7 @@ export interface BackendExpenseResponse {
 	description?: string;
 	receiptUrl?: string;
 	isFinancingPayment?: boolean;
+	missedFillup?: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -83,6 +85,9 @@ export function toBackendExpense(
 	if (frontendExpense.isFinancingPayment !== undefined) {
 		backendExpense.isFinancingPayment = frontendExpense.isFinancingPayment;
 	}
+	if (frontendExpense.missedFillup !== undefined) {
+		backendExpense.missedFillup = frontendExpense.missedFillup;
+	}
 
 	return backendExpense;
 }
@@ -106,6 +111,7 @@ export function fromBackendExpense(
 		amount: backendExpense.expenseAmount, // expenseAmount → amount
 		date: backendExpense.date,
 		isFinancingPayment: backendExpense.isFinancingPayment ?? false,
+		missedFillup: backendExpense.missedFillup ?? false,
 		createdAt: backendExpense.createdAt,
 		updatedAt: backendExpense.updatedAt
 	};

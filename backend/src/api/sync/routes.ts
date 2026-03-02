@@ -39,8 +39,35 @@ const driveInitRateLimiter = rateLimiter({
 
 // --- Sync helper functions ---
 
+/**
+ * Validates that the stored backup folder still exists in Google Drive.
+ * If the user deleted the folder, re-creates the full VROOM folder structure
+ * and updates the stored folder ID in settings.
+ * Returns the valid backup folder ID.
+ */
+async function ensureBackupFolder(
+  userId: string,
+  displayName: string,
+  settings: UserSettings
+): Promise<{ folderId: string; driveService: Awaited<ReturnType<typeof getDriveServiceForUser>> }> {
+  const driveService = await getDriveServiceForUser(userId);
+  const storedFolderId = settings.googleDriveBackupFolderId;
+
+  if (storedFolderId && (await driveService.folderExists(storedFolderId))) {
+    return { folderId: storedFolderId, driveService };
+  }
+
+  logger.warn('Backup folder missing or deleted, re-creating folder structure', { userId });
+  const folderStructure = await driveService.createVroomFolderStructure(displayName);
+  const newFolderId = folderStructure.subFolders.backups.id;
+  await settingsRepository.updateBackupFolderId(userId, newFolderId);
+
+  return { folderId: newFolderId, driveService };
+}
+
 async function performBackupSync(
   userId: string,
+  displayName: string,
   settings: UserSettings
 ): Promise<Record<string, unknown>> {
   if (!settings.googleDriveBackupEnabled || !settings.googleDriveBackupFolderId) {
@@ -53,7 +80,7 @@ async function performBackupSync(
     'Backup export'
   );
 
-  const driveService = await getDriveServiceForUser(userId);
+  const { folderId, driveService } = await ensureBackupFolder(userId, displayName, settings);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const fileName = `vroom-backup-${timestamp}.zip`;
 
@@ -61,12 +88,12 @@ async function performBackupSync(
     fileName,
     zipBuffer,
     'application/zip',
-    settings.googleDriveBackupFolderId
+    folderId
   );
 
   const deletedCount = await enforceBackupRetention(
     driveService,
-    settings.googleDriveBackupFolderId,
+    folderId,
     settings.googleDriveBackupRetentionCount || CONFIG.backup.defaultRetentionCount
   );
 
@@ -156,7 +183,7 @@ async function executeSyncType(
   const noChangeResult = { success: true, message: 'No changes since last sync', skipped: true };
 
   if (syncType === 'backup') {
-    return hasChanges ? performBackupSync(userId, settings) : noChangeResult;
+    return hasChanges ? performBackupSync(userId, displayName, settings) : noChangeResult;
   }
 
   if (!settings.googleSheetsSyncEnabled) {
@@ -172,7 +199,8 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
   try {
     const body = await c.req.json();
     const syncTypes = validateSyncTypes(body.syncTypes);
-    const hasChanges = await activityTracker.hasChangesSinceLastSync(userId);
+    const force = body.force === true;
+    const hasChanges = force || (await activityTracker.hasChangesSinceLastSync(userId));
     const settings = await settingsRepository.getOrCreate(userId);
     const results: Record<string, unknown> = {};
 
@@ -288,8 +316,12 @@ routes.get('/backups', async (c) => {
       return c.json(createSuccessResponse([], 'Google Drive backup not configured'));
     }
 
-    const driveService = await getDriveServiceForUser(user.id);
-    const files = await driveService.listFilesInFolder(settings.googleDriveBackupFolderId);
+    const { folderId, driveService } = await ensureBackupFolder(
+      user.id,
+      user.displayName,
+      settings
+    );
+    const files = await driveService.listFilesInFolder(folderId);
     const backups = files
       .filter((f) => f.name.startsWith('vroom-backup-') && f.name.endsWith('.zip'))
       .sort((a, b) => (b.modifiedTime || '').localeCompare(a.modifiedTime || ''))

@@ -38,6 +38,11 @@ export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
     const current = sortedExpenses[i];
     const previous = sortedExpenses[i - 1];
 
+    // Skip pairs affected by missed fill-ups
+    if (current.missedFillup || previous.missedFillup) {
+      continue;
+    }
+
     if (current.mileage && previous.mileage && current.fuelAmount) {
       const miles = current.mileage - previous.mileage;
       const mpg = calculateMPG(miles, current.fuelAmount);

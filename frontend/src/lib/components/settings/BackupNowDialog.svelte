@@ -39,14 +39,14 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="max-w-lg">
 		<Dialog.Header>
-			<Dialog.Title>Sync Now</Dialog.Title>
-			<Dialog.Description>Choose which sync operations to perform</Dialog.Description>
+			<Dialog.Title>Backup Now</Dialog.Title>
+			<Dialog.Description>Choose which backup operations to perform</Dialog.Description>
 		</Dialog.Header>
 
 		<div class="space-y-4 py-4">
-			<!-- Sync Type Selection -->
+			<!-- Backup Type Selection -->
 			<div class="space-y-3">
-				<Label>Sync Types</Label>
+				<Label>Backup Types</Label>
 				<div class="space-y-3">
 					<div class="flex items-center space-x-2">
 						<Checkbox
@@ -59,8 +59,8 @@
 								<div class="font-medium">Google Sheets</div>
 								<div class="text-sm text-muted-foreground">
 									{googleSheetsSyncEnabled
-										? 'Sync data to Google Sheets'
-										: 'Enable Google Sheets sync in settings first'}
+										? 'Backup data to Google Sheets'
+										: 'Enable Google Sheets backup in settings first'}
 								</div>
 							</div>
 						</Label>
@@ -73,7 +73,7 @@
 						/>
 						<Label for="sync-backup" class="font-normal cursor-pointer">
 							<div>
-								<div class="font-medium">Google Drive Backup</div>
+								<div class="font-medium">Google Drive</div>
 								<div class="text-sm text-muted-foreground">
 									{googleDriveBackupEnabled
 										? 'Upload backup to Google Drive'
@@ -85,10 +85,10 @@
 				</div>
 			</div>
 
-			<!-- Sync Results -->
+			<!-- Backup Results -->
 			{#if syncResults?.data?.results}
 				<div class="border rounded-lg p-4 bg-muted">
-					<h4 class="font-medium mb-3">Sync Results</h4>
+					<h4 class="font-medium mb-3">Backup Results</h4>
 					<div class="space-y-2 text-sm">
 						{#if syncResults.data.results['sheets']}
 							{@const sheets = syncResults.data.results['sheets']}
@@ -100,9 +100,9 @@
 								<span class="font-medium">{sheets.success ? '✓' : '✗'} Google Sheets:</span>
 								<span
 									>{sheets.skipped
-										? 'No changes to sync'
+										? 'No changes to backup'
 										: sheets.success
-											? 'Synced successfully'
+											? 'Backed up successfully'
 											: sheets.message || 'Failed'}</span
 								>
 							</div>
@@ -117,7 +117,7 @@
 								<span class="font-medium">{backup.success ? '✓' : '✗'} Google Drive:</span>
 								<span
 									>{backup.skipped
-										? 'No changes to sync'
+										? 'No changes to backup'
 										: backup.success
 											? 'Backup uploaded'
 											: backup.message || 'Failed'}</span
@@ -145,10 +145,10 @@
 				<Button onclick={onSync} disabled={isSyncing || (!syncSheets && !syncBackup)}>
 					{#if isSyncing}
 						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-						Syncing...
+						Backing up...
 					{:else}
 						<RefreshCw class="mr-2 h-4 w-4" />
-						Sync Now
+						Backup Now
 					{/if}
 				</Button>
 			{/if}

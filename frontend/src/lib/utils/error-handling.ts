@@ -43,8 +43,13 @@ export class VroomError extends Error {
  * API-specific error class for HTTP errors
  */
 export class ApiError extends VroomError {
-	constructor(message: string, statusCode: number, details?: Record<string, unknown>) {
-		super(message, 'API_ERROR', statusCode, details);
+	constructor(
+		message: string,
+		statusCode: number,
+		details?: Record<string, unknown>,
+		backendCode?: string
+	) {
+		super(message, backendCode || 'API_ERROR', statusCode, details);
 		this.name = 'ApiError';
 	}
 }

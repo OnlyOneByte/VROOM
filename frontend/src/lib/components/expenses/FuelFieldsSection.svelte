@@ -4,6 +4,7 @@
 	import Label from '$lib/components/ui/label/label.svelte';
 	import * as Select from '$lib/components/ui/select';
 	import { FormFieldError } from '$lib/components/ui/form-field';
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import {
 		getVolumeUnitLabel,
 		getChargeUnitLabel,
@@ -17,6 +18,7 @@
 		volume: string;
 		charge: string;
 		fuelType: string;
+		missedFillup: boolean;
 		amount: string;
 		volumeUnit: VolumeUnit;
 		chargeUnit: ChargeUnit;
@@ -35,6 +37,7 @@
 		volume = $bindable(),
 		charge = $bindable(),
 		fuelType = $bindable(),
+		missedFillup = $bindable(),
 		amount,
 		volumeUnit,
 		chargeUnit,
@@ -214,4 +217,17 @@
 			</div>
 		{/if}
 	{/if}
+
+	<!-- Missed fill-up checkbox -->
+	<div class="flex items-center gap-3 rounded-lg border bg-muted/50 p-3">
+		<Checkbox id="missedFillup" bind:checked={missedFillup} />
+		<div>
+			<label for="missedFillup" class="cursor-pointer text-sm font-medium leading-none">
+				Missed previous fill-up
+			</label>
+			<p class="text-xs text-muted-foreground mt-1">
+				Skip this entry in fuel efficiency calculations
+			</p>
+		</div>
+	</div>
 </div>

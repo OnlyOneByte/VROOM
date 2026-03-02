@@ -159,7 +159,7 @@
 	async function handleDelete(docId: string) {
 		try {
 			await insuranceApi.deleteDocument(policyId, docId);
-			documents = documents.filter((d) => d.id !== docId);
+			documents = documents.filter(d => d.id !== docId);
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to delete document');
 		}
@@ -238,7 +238,7 @@
 </div>
 
 <!-- Upload Dialog -->
-<Dialog.Root bind:open={showUploadDialog} onOpenChange={(isOpen) => !isOpen && handleDialogClose()}>
+<Dialog.Root bind:open={showUploadDialog} onOpenChange={isOpen => !isOpen && handleDialogClose()}>
 	<Dialog.Content class="sm:max-w-lg">
 		<Dialog.Header>
 			<Dialog.Title>Upload Documents</Dialog.Title>
@@ -276,7 +276,9 @@
 				ondragleave={handleDragLeave}
 				ondrop={handleDrop}
 				onclick={() => fileInputEl?.click()}
-				onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputEl?.click(); }}
+				onkeydown={e => {
+					if (e.key === 'Enter' || e.key === ' ') fileInputEl?.click();
+				}}
 			>
 				<ImagePlus class="mb-2 h-8 w-8 text-muted-foreground" />
 				<p class="text-sm text-muted-foreground">
@@ -309,7 +311,9 @@
 			{#if selectedFiles.length > 0}
 				<div class="space-y-2 max-h-40 overflow-y-auto">
 					{#each selectedFiles as file, i (file.name + i)}
-						<div class="flex items-center justify-between rounded-md border border-border px-3 py-2">
+						<div
+							class="flex items-center justify-between rounded-md border border-border px-3 py-2"
+						>
 							<div class="flex items-center gap-2 min-w-0">
 								<FileText class="h-4 w-4 shrink-0 text-muted-foreground" />
 								<div class="min-w-0">
