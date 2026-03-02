@@ -23,17 +23,19 @@
 
 ### Insurance — Core Policy Management
 
-- [ ] Enrich policy schema: coverage type (liability/collision/comprehensive/full), deductible amount, coverage limit, premium frequency (monthly/quarterly/semi-annual/annual)
-- [ ] Document storage: upload & retrieve proof-of-insurance cards and policy PDFs per policy (integrate with existing photo/file infrastructure)
+- [x] Core insurance policy information
+- [x] Document storage: upload & retrieve proof-of-insurance cards and policy PDFs per policy (integrate with existing photo/file infrastructure)
 - [ ] Renewal tracking: link renewal policies to their predecessor, surface cost-over-time trends
-- [ ] Insurance dashboard page: list active/expired policies per vehicle, quick-access document viewer, upcoming renewal alerts
+- [x] Insurance dashboard page: list active/expired policies per vehicle, quick-access document viewer, upcoming renewal alerts
 - [ ] Policy-to-expense linking: auto-generate or link expense records (category `insurance`) when a policy is created/renewed; foreign key from expense → policy
   - [ ] How to split cost between multiple cars (?)
+  - [ ] Manage terms where covered cars are different
 
 ### UI Misc & bugs
 - [ ] Common upload/take picture dialog popup. use props
 - [ ] Verify backup max count is deleting old backups
 - [ ] Verify sheets sync is cahnging when schema changes (and working)
+
 
 
 ### Total Cost of Ownership (TCO)
