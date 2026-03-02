@@ -262,6 +262,22 @@ export class GoogleDriveService {
 
     return response.data as DriveFile;
   }
+
+  /**
+   * Check whether a folder ID still exists and is not trashed.
+   * Returns true if the folder is accessible, false if deleted/trashed/missing.
+   */
+  async folderExists(folderId: string): Promise<boolean> {
+    try {
+      const response = await this.drive.files.get({
+        fileId: folderId,
+        fields: 'id, trashed',
+      });
+      return !!response.data.id && !response.data.trashed;
+    } catch {
+      return false;
+    }
+  }
 }
 
 async function getUserToken(userId: string): Promise<string> {

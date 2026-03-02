@@ -93,6 +93,7 @@ export class GoogleSheetsService {
           { properties: { title: 'Vehicles' } },
           { properties: { title: 'Expenses' } },
           { properties: { title: 'Insurance Policies' } },
+          { properties: { title: 'Insurance Policy Vehicles' } },
           { properties: { title: 'Vehicle Financing' } },
         ],
       },
@@ -123,13 +124,38 @@ export class GoogleSheetsService {
     };
   }
 
+  private async ensureRequiredSheets(spreadsheetId: string): Promise<void> {
+    const requiredSheets = [
+      'Vehicles',
+      'Expenses',
+      'Insurance Policies',
+      'Insurance Policy Vehicles',
+      'Vehicle Financing',
+    ];
+    const info = await this.getSpreadsheetInfo(spreadsheetId);
+    const existingTitles = new Set(info.sheets.map((s) => s.title));
+    const missing = requiredSheets.filter((name) => !existingTitles.has(name));
+
+    if (missing.length > 0) {
+      await this.sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: missing.map((title) => ({
+            addSheet: { properties: { title } },
+          })),
+        },
+      });
+    }
+  }
+
   private async updateSpreadsheetWithUserData(
     spreadsheetId: string,
     userId: string
   ): Promise<void> {
+    await this.ensureRequiredSheets(spreadsheetId);
     const db = getDb();
 
-    const [userVehicles, userExpenses, userInsurance, userFinancing] = await Promise.all([
+    const [userVehicles, userExpenses, userInsuranceJoined, userFinancing] = await Promise.all([
       db.select().from(vehicles).where(eq(vehicles.userId, userId)),
       db
         .select()
@@ -152,6 +178,18 @@ export class GoogleSheetsService {
         .where(eq(vehicles.userId, userId)),
     ]);
 
+    // Deduplicate insurance policies (join produces one row per vehicle)
+    const seenPolicyIds = new Set<string>();
+    const userInsurance = [];
+    const userInsurancePolicyVehicles = [];
+    for (const row of userInsuranceJoined) {
+      if (!seenPolicyIds.has(row.insurance_policies.id)) {
+        seenPolicyIds.add(row.insurance_policies.id);
+        userInsurance.push(row.insurance_policies);
+      }
+      userInsurancePolicyVehicles.push(row.insurance_policy_vehicles);
+    }
+
     await Promise.all([
       this.updateSheet(spreadsheetId, 'Vehicles', userVehicles, this.getVehicleHeaders()),
       this.updateSheet(
@@ -163,8 +201,14 @@ export class GoogleSheetsService {
       this.updateSheet(
         spreadsheetId,
         'Insurance Policies',
-        userInsurance.map((i) => i.insurance_policies),
+        userInsurance,
         this.getInsuranceHeaders()
+      ),
+      this.updateSheet(
+        spreadsheetId,
+        'Insurance Policy Vehicles',
+        userInsurancePolicyVehicles,
+        this.getInsurancePolicyVehiclesHeaders()
       ),
       this.updateSheet(
         spreadsheetId,
@@ -203,6 +247,7 @@ export class GoogleSheetsService {
       'fuelAmount',
       'fuelType',
       'isFinancingPayment',
+      'missedFillup',
       'date',
       'mileage',
       'description',
@@ -224,6 +269,10 @@ export class GoogleSheetsService {
       'createdAt',
       'updatedAt',
     ];
+  }
+
+  private getInsurancePolicyVehiclesHeaders() {
+    return ['policyId', 'vehicleId'];
   }
 
   private getFinancingHeaders() {
@@ -257,6 +306,12 @@ export class GoogleSheetsService {
     data: T[],
     headers: string[]
   ): Promise<void> {
+    // Clear existing data before writing to remove stale rows
+    await this.sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range: `${sheetName}!A:Z`,
+    });
+
     const values = [
       headers,
       ...data.map((row) => headers.map((header) => this.formatValue(row[header]))),
@@ -274,7 +329,7 @@ export class GoogleSheetsService {
     if (value === null || value === undefined) return '';
     if (value instanceof Date) return value.toISOString();
     if (typeof value === 'boolean') return value ? 'true' : 'false';
-    if (Array.isArray(value)) return value.join(', ');
+    if (typeof value === 'object') return JSON.stringify(value);
     return String(value);
   }
 
@@ -292,17 +347,21 @@ export class GoogleSheetsService {
     expenses: Record<string, unknown>[];
     financing: Record<string, unknown>[];
     insurance: Record<string, unknown>[];
+    insurancePolicyVehicles: Record<string, unknown>[];
   }> {
-    const [vehiclesData, expensesData, insuranceData, financingData] = await Promise.all([
-      this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
-      this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
-      this.readSheetData(spreadsheetId, 'Insurance Policies!A:Z'),
-      this.readSheetData(spreadsheetId, 'Vehicle Financing!A:Z'),
-    ]);
+    const [vehiclesData, expensesData, insuranceData, insurancePolicyVehiclesData, financingData] =
+      await Promise.all([
+        this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
+        this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
+        this.readSheetData(spreadsheetId, 'Insurance Policies!A:Z'),
+        this.readSheetData(spreadsheetId, 'Insurance Policy Vehicles!A:Z'),
+        this.readSheetData(spreadsheetId, 'Vehicle Financing!A:Z'),
+      ]);
 
     const vehicles = this.parseSheetData(vehiclesData);
     const expenses = this.parseSheetData(expensesData);
     const insurance = this.parseSheetData(insuranceData);
+    const insurancePolicyVehicles = this.parseSheetData(insurancePolicyVehiclesData);
     const financing = this.parseSheetData(financingData);
 
     const userId = vehicles.length > 0 ? (vehicles[0].userId as string) : '';
@@ -313,6 +372,7 @@ export class GoogleSheetsService {
       expenses,
       financing,
       insurance,
+      insurancePolicyVehicles,
     };
   }
 

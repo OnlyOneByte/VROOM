@@ -20,7 +20,7 @@
 	let editingPolicy = $state<InsurancePolicy | null>(null);
 
 	// Build a map of vehicleId → display name for showing on policy cards
-	let vehicleNameMap = $derived(new Map(vehicles.map((v) => [v.id, getVehicleDisplayName(v)])));
+	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
 	onMount(async () => {
 		await loadData();

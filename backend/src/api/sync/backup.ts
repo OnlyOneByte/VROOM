@@ -51,16 +51,23 @@ export function coerceRow(
   const coerced: Record<string, unknown> = { ...row };
 
   for (const [columnName, column] of Object.entries(columns)) {
-    const val = coerced[columnName];
-    if (val === undefined || val === null) continue;
-    const strVal = String(val);
-    if (strVal === '' || strVal === 'null' || strVal === 'NULL' || strVal === 'undefined') {
-      coerced[columnName] = null;
-      continue;
-    }
-
     // biome-ignore lint/suspicious/noExplicitAny: Drizzle column type is not fully exposed
     const col = column as any;
+    const val = coerced[columnName];
+
+    if (val === undefined || val === null) {
+      // Boolean NOT NULL columns default to false instead of being skipped
+      if (col.columnType === 'SQLiteBoolean') {
+        coerced[columnName] = false;
+      }
+      continue;
+    }
+    const strVal = String(val);
+    if (strVal === '' || strVal === 'null' || strVal === 'NULL' || strVal === 'undefined') {
+      // Boolean NOT NULL columns default to false instead of null
+      coerced[columnName] = col.columnType === 'SQLiteBoolean' ? false : null;
+      continue;
+    }
 
     if (col.columnType === 'SQLiteTimestamp') {
       const date = new Date(strVal);
@@ -79,6 +86,9 @@ export function coerceRow(
     } else if (col.columnType === 'SQLiteReal') {
       const num = Number.parseFloat(strVal);
       coerced[columnName] = Number.isNaN(num) ? null : num;
+    } else if (col.columnType === 'SQLiteText') {
+      // Google Sheets may return numeric-looking text values (e.g., license plates) as numbers
+      coerced[columnName] = strVal;
     }
   }
 
@@ -92,7 +102,7 @@ export class BackupService {
 
   async createBackup(userId: string): Promise<BackupData> {
     const db = getDb();
-    const [userVehicles, userExpenses, userFinancing, userInsurance] = await Promise.all([
+    const [userVehicles, userExpenses, userFinancing, userInsuranceJoined] = await Promise.all([
       db.select().from(vehicles).where(eq(vehicles.userId, userId)),
       db
         .select()
@@ -114,9 +124,20 @@ export class BackupService {
           eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
         )
         .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId))
-        .then((r) => r.map((x) => x.insurance_policies)),
+        .where(eq(vehicles.userId, userId)),
     ]);
+
+    // Deduplicate insurance policies (join produces one row per vehicle)
+    const seenPolicyIds = new Set<string>();
+    const userInsurance = [];
+    const userInsurancePolicyVehicles = [];
+    for (const row of userInsuranceJoined) {
+      if (!seenPolicyIds.has(row.insurance_policies.id)) {
+        seenPolicyIds.add(row.insurance_policies.id);
+        userInsurance.push(row.insurance_policies);
+      }
+      userInsurancePolicyVehicles.push(row.insurance_policy_vehicles);
+    }
 
     return {
       metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId },
@@ -124,6 +145,7 @@ export class BackupService {
       expenses: userExpenses,
       financing: userFinancing,
       insurance: userInsurance,
+      insurancePolicyVehicles: userInsurancePolicyVehicles,
     };
   }
 
@@ -266,6 +288,7 @@ export class BackupService {
   private validateReferentialIntegrity(backup: ParsedBackupData): string[] {
     const errors: string[] = [];
     const vehicleIds = new Set(backup.vehicles.map((v) => String(v.id)));
+    const policyIds = new Set(backup.insurance.map((i) => String(i.id)));
 
     for (const expense of backup.expenses) {
       if (!vehicleIds.has(String(expense.vehicleId))) {
@@ -280,10 +303,17 @@ export class BackupService {
     }
 
     for (const insurance of backup.insurance) {
-      // New schema: insurance policies don't have a direct vehicleId
-      // They link to vehicles via the junction table, so skip vehicleId check here
       if (!insurance.id) {
         errors.push('Insurance policy missing id');
+      }
+    }
+
+    for (const junction of backup.insurancePolicyVehicles ?? []) {
+      if (!policyIds.has(String(junction.policyId))) {
+        errors.push(`Insurance junction references non-existent policy ${junction.policyId}`);
+      }
+      if (!vehicleIds.has(String(junction.vehicleId))) {
+        errors.push(`Insurance junction references non-existent vehicle ${junction.vehicleId}`);
       }
     }
 

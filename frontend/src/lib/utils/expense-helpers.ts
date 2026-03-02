@@ -245,6 +245,11 @@ export function prepareFuelEfficiencyData(expenses: Expense[]): FuelEfficiencyDa
 			continue;
 		}
 
+		// Skip pairs affected by missed fill-ups
+		if (current.missedFillup || previous.missedFillup) {
+			continue;
+		}
+
 		// Both must have mileage
 		if (!current.mileage || !previous.mileage) {
 			continue;

@@ -130,6 +130,7 @@ export interface Expense {
 	description?: string;
 	receiptUrl?: string;
 	isFinancingPayment: boolean; // true if this expense is a financing payment
+	missedFillup?: boolean; // true if user missed logging a previous fill-up
 	createdAt: string; // ISO date string
 	updatedAt: string; // ISO date string
 }
@@ -271,6 +272,7 @@ export interface ExpenseFormData {
 	charge?: number | undefined; // For electric
 	fuelType?: string; // Octane rating or fuel type for fuel expenses
 	description?: string;
+	missedFillup?: boolean;
 }
 
 // Store types for Svelte stores - moved to types/index.ts

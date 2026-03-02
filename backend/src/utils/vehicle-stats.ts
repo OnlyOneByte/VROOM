@@ -13,6 +13,7 @@ export interface FuelExpense {
   fuelType: string | null;
   date: Date;
   expenseAmount: number;
+  missedFillup: boolean;
 }
 
 export interface VehicleStats {
@@ -121,6 +122,11 @@ function calculateAverageMpg(expensesWithMileage: FuelExpense[]): number | null 
   for (let i = 1; i < expensesWithMileage.length; i++) {
     const current = expensesWithMileage[i];
     const previous = expensesWithMileage[i - 1];
+
+    // Skip pairs affected by missed fill-ups
+    if (current.missedFillup || previous.missedFillup) {
+      continue;
+    }
 
     if (current.mileage && previous.mileage && current.fuelAmount) {
       const milesDriven = current.mileage - previous.mileage;

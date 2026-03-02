@@ -50,13 +50,21 @@ async function request<T>(url: string, options: ApiOptions = {}): Promise<T> {
 
 	if (!response.ok) {
 		let message = `Request failed with status ${response.status}`;
+		let code: string | undefined;
+		let details: Record<string, unknown> | undefined;
 		try {
 			const errorBody = await response.json();
 			message = errorBody.error?.message || errorBody.message || message;
+			code = errorBody.error?.code;
+			if (errorBody.error?.details) {
+				details = Array.isArray(errorBody.error.details)
+					? { validationErrors: errorBody.error.details }
+					: (errorBody.error.details as Record<string, unknown>);
+			}
 		} catch {
 			// ignore parse errors
 		}
-		throw new ApiError(message, response.status);
+		throw new ApiError(message, response.status, details, code);
 	}
 
 	// Handle empty responses (204, etc.)

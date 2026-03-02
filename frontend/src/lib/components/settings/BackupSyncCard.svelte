@@ -23,7 +23,8 @@
 		onBackup: () => void;
 		onRestoreClick: () => void;
 		onRestoreFromDriveClick: () => void;
-		onSyncNowClick: () => void;
+		onRestoreFromSheetsClick: () => void;
+		onBackupNowClick: () => void;
 		onReauthenticate: () => void;
 	}
 
@@ -37,16 +38,27 @@
 		onBackup,
 		onRestoreClick,
 		onRestoreFromDriveClick,
-		onSyncNowClick,
+		onRestoreFromSheetsClick,
+		onBackupNowClick,
 		onReauthenticate
 	}: Props = $props();
 
 	let lastBackupText = $derived.by(() => {
-		const backupDate = settings?.lastBackupDate;
-		const syncDate = settings?.lastSyncDate;
-		const dateStr = backupDate ?? syncDate;
+		const dateStr = settings?.lastBackupDate;
 		if (!dateStr) return 'Never';
 		return new Date(dateStr).toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	});
+
+	let lastSheetsBackupText = $derived.by(() => {
+		const syncDate = settings?.lastSyncDate;
+		if (!syncDate) return 'Never';
+		return new Date(syncDate).toLocaleDateString('en-US', {
 			year: 'numeric',
 			month: 'short',
 			day: 'numeric',
@@ -58,8 +70,10 @@
 
 <Card>
 	<CardHeader>
-		<CardTitle>Data Backups & Sync</CardTitle>
-		<CardDescription>Manage manual backups and automatic sync to Google Drive</CardDescription>
+		<CardTitle>Data Backups</CardTitle>
+		<CardDescription
+			>Manage manual backups and automatic backups to Google Drive & Sheets</CardDescription
+		>
 	</CardHeader>
 	<CardContent class="space-y-6">
 		<!-- Manual Backup Actions -->
@@ -102,7 +116,7 @@
 				{#if settings?.lastBackupDate || settings?.lastSyncDate}
 					<div class="pl-6">
 						<p class="text-sm text-muted-foreground">
-							Last backup & sync: <span class="font-medium">{lastBackupText}</span>
+							Last backup: <span class="font-medium">{lastBackupText}</span>
 						</p>
 					</div>
 				{/if}
@@ -140,31 +154,48 @@
 				</div>
 			{/if}
 
-			<!-- Google Sheets Sync -->
+			<!-- Backup to Google Sheets -->
 			<div class="flex items-center justify-between">
 				<div class="space-y-0.5">
-					<Label for="sheets-sync">Google Sheets Sync</Label>
+					<Label for="sheets-sync">Backup to Google Sheets</Label>
 					<p class="text-sm text-muted-foreground">
-						Auto-sync data to Google Sheets after inactivity
+						Auto-backup data to Google Sheets after inactivity
 					</p>
 				</div>
 				<Switch id="sheets-sync" bind:checked={googleSheetsSyncEnabled} />
 			</div>
 
-			<!-- Auto-Sync Settings -->
+			{#if googleSheetsSyncEnabled}
+				{#if settings?.lastSyncDate}
+					<div class="pl-6">
+						<p class="text-sm text-muted-foreground">
+							Last backup: <span class="font-medium">{lastSheetsBackupText}</span>
+						</p>
+					</div>
+				{/if}
+
+				<div class="pl-6">
+					<Button variant="outline" onclick={onRestoreFromSheetsClick} class="w-full">
+						<Upload class="mr-2 h-4 w-4" />
+						Restore from Google Sheets
+					</Button>
+				</div>
+			{/if}
+
+			<!-- Auto-Backup Settings -->
 			{#if googleDriveBackupEnabled || googleSheetsSyncEnabled}
 				<div class="border-t pt-6 space-y-4">
 					<div class="space-y-1">
 						<Label for="inactivity-minutes" class="text-base font-semibold">
-							Automatic Sync Settings
+							Automatic Backup Settings
 						</Label>
 						<p class="text-sm text-muted-foreground">
-							Automatically sync your data after a period of inactivity.
+							Automatically backup your data after a period of inactivity.
 						</p>
 					</div>
 
 					<div class="space-y-2">
-						<Label for="inactivity-minutes" class="text-sm">Trigger sync after inactivity</Label>
+						<Label for="inactivity-minutes" class="text-sm">Trigger backup after inactivity</Label>
 						<Select.Root
 							type="single"
 							value={syncInactivityMinutes.toString()}
@@ -186,16 +217,16 @@
 							</Select.Content>
 						</Select.Root>
 						<p class="text-xs text-muted-foreground">
-							Sync will trigger automatically after this period of no activity
+							Backup will trigger automatically after this period of no activity
 						</p>
 					</div>
 
 					<div class="space-y-2">
 						<Label class="text-sm">Manual Actions</Label>
 						<div class="space-y-2">
-							<Button variant="outline" onclick={onSyncNowClick} class="w-full">
+							<Button variant="outline" onclick={onBackupNowClick} class="w-full">
 								<RefreshCw class="mr-2 h-4 w-4" />
-								Sync Now
+								Backup Now
 							</Button>
 							<Button variant="outline" onclick={onReauthenticate} class="w-full">
 								<RefreshCw class="mr-2 h-4 w-4" />

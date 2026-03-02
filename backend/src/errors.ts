@@ -190,15 +190,22 @@ export function handleSyncError(
   defaultErrorCode = 'OPERATION_FAILED'
 ): Response {
   const userId = c.get('user')?.id || 'unknown';
+
+  if (isSyncError(error)) {
+    logger.error(`${operation} failed`, {
+      userId,
+      error: error.message,
+      code: error.code,
+      details: error.details,
+    });
+    const status = ERROR_STATUS_MAP[error.code] || 500;
+    return c.json(createErrorResponse(error.code, error.message, error.details), status as never);
+  }
+
   logger.error(`${operation} failed`, {
     userId,
     error: error instanceof Error ? error.message : 'Unknown error',
   });
-
-  if (isSyncError(error)) {
-    const status = ERROR_STATUS_MAP[error.code] || 500;
-    return c.json(createErrorResponse(error.code, error.message, error.details), status as never);
-  }
 
   if (error && typeof error === 'object' && 'code' in error) {
     const syncError = error as { code: string; message: string; details?: unknown };

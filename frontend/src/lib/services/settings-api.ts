@@ -64,8 +64,8 @@ export const settingsApi = {
 		return apiClient.post<ApiEnvelope>('/api/v1/sync/configure', config);
 	},
 
-	async executeSync(syncTypes: ('sheets' | 'backup')[]): Promise<SyncResult> {
-		return apiClient.post<SyncResult>('/api/v1/sync', { syncTypes });
+	async executeSync(syncTypes: ('sheets' | 'backup')[], force = false): Promise<SyncResult> {
+		return apiClient.post<SyncResult>('/api/v1/sync', { syncTypes, force });
 	},
 
 	async initializeDrive(): Promise<ApiEnvelope> {

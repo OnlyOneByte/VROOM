@@ -17,7 +17,7 @@
 
 	function getVehicleNames(policy: InsurancePolicy): string[] {
 		return policy.vehicleIds
-			.map((id) => vehicleNameMap.get(id))
+			.map(id => vehicleNameMap.get(id))
 			.filter((name): name is string => !!name);
 	}
 </script>
@@ -27,7 +27,13 @@
 		<div class="space-y-3">
 			<h4 class="text-sm font-medium text-muted-foreground">Active Policies</h4>
 			{#each grouped.active as policy (policy.id)}
-				<PolicyCard {policy} vehicleNames={getVehicleNames(policy)} {onEdit} {onDelete} {onRefresh} />
+				<PolicyCard
+					{policy}
+					vehicleNames={getVehicleNames(policy)}
+					{onEdit}
+					{onDelete}
+					{onRefresh}
+				/>
 			{/each}
 		</div>
 	{/if}
@@ -36,7 +42,13 @@
 		<div class="space-y-3">
 			<h4 class="text-sm font-medium text-muted-foreground">Inactive Policies</h4>
 			{#each grouped.inactive as policy (policy.id)}
-				<PolicyCard {policy} vehicleNames={getVehicleNames(policy)} {onEdit} {onDelete} {onRefresh} />
+				<PolicyCard
+					{policy}
+					vehicleNames={getVehicleNames(policy)}
+					{onEdit}
+					{onDelete}
+					{onRefresh}
+				/>
 			{/each}
 		</div>
 	{/if}

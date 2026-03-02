@@ -15,7 +15,7 @@
 
 ### Fuel Tracking
 
-- [ ] Skip MPG calculation for missed fill-ups
+- [x] Skip MPG calculation for missed fill-ups
 
 ### Mileage / Odometer
 
@@ -33,8 +33,13 @@
 
 ### UI Misc & bugs
 - [ ] Common upload/take picture dialog popup. use props
+- [x] Force sync (ignore if changed)
+- [ ] Insurance add popup - maybe should be page instead of popup? qq
 - [ ] Verify backup max count is deleting old backups
-- [ ] Verify sheets sync is cahnging when schema changes (and working)
+- [x] Verify sheets sync is cahnging when schema changes (and working)
+- [ ] EV and PHEV charging tracking
+- [ ] Custom folder for sheets backups (multi sheet backup)
+- [ ] Custom folder path for all info.
 
 
 

@@ -49,6 +49,11 @@ export default defineConfig({
 		environment: 'happy-dom',
 		setupFiles: ['src/test-setup.ts'],
 		globals: true,
+		coverage: {
+			provider: 'v8',
+			reporter: ['text', 'json-summary'],
+			reportsDirectory: './coverage'
+		},
 		alias: {
 			$lib: new URL('./src/lib', import.meta.url).pathname,
 			$app: new URL('./node_modules/@sveltejs/kit/src/runtime/app', import.meta.url).pathname,
