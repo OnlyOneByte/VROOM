@@ -1,6 +1,13 @@
 import { logger } from '../utils/logger';
 import { db } from './connection.js';
-import { expenses, insurancePolicies, users, vehicleFinancing, vehicles } from './schema.js';
+import {
+  expenses,
+  insurancePolicies,
+  insurancePolicyVehicles,
+  users,
+  vehicleFinancing,
+  vehicles,
+} from './schema.js';
 
 // Sample data for development and testing
 export async function seedDatabase() {
@@ -68,28 +75,49 @@ export async function seedDatabase() {
       paymentDayOfMonth: 15,
     });
 
-    // Create sample insurance policies
-    await db.insert(insurancePolicies).values([
-      {
-        vehicleId: vehicle1.id,
+    // Create sample insurance policies with new multi-term schema
+    const [policy1] = await db
+      .insert(insurancePolicies)
+      .values({
         company: 'State Farm',
-        policyNumber: 'SF123456789',
-        totalCost: 1200,
-        termLengthMonths: 6,
-        startDate: new Date('2024-01-01'),
-        endDate: new Date('2024-06-30'),
-        monthlyCost: 200, // 1200 / 6
-      },
-      {
-        vehicleId: vehicle2.id,
+        isActive: true,
+        currentTermStart: new Date('2024-01-01'),
+        currentTermEnd: new Date('2024-06-30'),
+        terms: [
+          {
+            id: 'term-sf-1',
+            startDate: '2024-01-01',
+            endDate: '2024-06-30',
+            policyDetails: { policyNumber: 'SF123456789' },
+            financeDetails: { totalCost: 1200, monthlyCost: 200 },
+          },
+        ],
+      })
+      .returning();
+
+    const [policy2] = await db
+      .insert(insurancePolicies)
+      .values({
         company: 'Geico',
-        policyNumber: 'GE987654321',
-        totalCost: 900,
-        termLengthMonths: 6,
-        startDate: new Date('2024-01-01'),
-        endDate: new Date('2024-06-30'),
-        monthlyCost: 150, // 900 / 6
-      },
+        isActive: true,
+        currentTermStart: new Date('2024-01-01'),
+        currentTermEnd: new Date('2024-06-30'),
+        terms: [
+          {
+            id: 'term-ge-1',
+            startDate: '2024-01-01',
+            endDate: '2024-06-30',
+            policyDetails: { policyNumber: 'GE987654321' },
+            financeDetails: { totalCost: 900, monthlyCost: 150 },
+          },
+        ],
+      })
+      .returning();
+
+    // Link policies to vehicles via junction table
+    await db.insert(insurancePolicyVehicles).values([
+      { policyId: policy1.id, vehicleId: vehicle1.id },
+      { policyId: policy2.id, vehicleId: vehicle2.id },
     ]);
 
     // Create sample expenses
@@ -178,6 +206,7 @@ export async function clearDatabase() {
 
     // Delete in reverse order of dependencies
     await db.delete(expenses);
+    await db.delete(insurancePolicyVehicles);
     await db.delete(insurancePolicies);
     await db.delete(vehicleFinancing);
     await db.delete(vehicles);

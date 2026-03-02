@@ -6,7 +6,13 @@ import { eq, inArray } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { TABLE_SCHEMA_MAP } from '../../config';
 import { getDb } from '../../db/connection';
-import { expenses, insurancePolicies, vehicleFinancing, vehicles } from '../../db/schema';
+import {
+  expenses,
+  insurancePolicies,
+  insurancePolicyVehicles,
+  vehicleFinancing,
+  vehicles,
+} from '../../db/schema';
 import { SyncError, SyncErrorCode } from '../../errors';
 import type { ParsedBackupData } from '../../types';
 import { settingsRepository } from '../settings/repository';
@@ -245,7 +251,9 @@ class RestoreService {
 
     const vehicleIds = userVehicles.map((v: { id: string }) => v.id);
     await tx.delete(expenses).where(inArray(expenses.vehicleId, vehicleIds));
-    await tx.delete(insurancePolicies).where(inArray(insurancePolicies.vehicleId, vehicleIds));
+    await tx
+      .delete(insurancePolicyVehicles)
+      .where(inArray(insurancePolicyVehicles.vehicleId, vehicleIds));
     await tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, vehicleIds));
     await tx.delete(vehicles).where(eq(vehicles.userId, userId));
   }

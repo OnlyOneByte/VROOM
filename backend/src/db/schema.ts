@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // User table
 export const users = sqliteTable('users', {
@@ -33,6 +33,7 @@ export const vehicles = sqliteTable('vehicles', {
   initialMileage: integer('initial_mileage'),
   purchasePrice: real('purchase_price'),
   purchaseDate: integer('purchase_date', { mode: 'timestamp' }),
+  currentInsurancePolicyId: text('current_insurance_policy_id'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
@@ -68,25 +69,58 @@ export const vehicleFinancing = sqliteTable('vehicle_financing', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
+// PolicyTerm type for the terms JSON column
+export interface PolicyTerm {
+  id: string;
+  startDate: string;
+  endDate: string;
+  policyDetails: {
+    policyNumber?: string;
+    coverageDescription?: string;
+    deductibleAmount?: number;
+    coverageLimit?: number;
+    agentName?: string;
+    agentPhone?: string;
+    agentEmail?: string;
+  };
+  financeDetails: {
+    totalCost?: number;
+    monthlyCost?: number;
+    premiumFrequency?: string;
+    paymentAmount?: number;
+  };
+}
+
 // Insurance Policy table
 export const insurancePolicies = sqliteTable('insurance_policies', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => createId()),
-  vehicleId: text('vehicle_id')
-    .notNull()
-    .references(() => vehicles.id, { onDelete: 'cascade' }),
   company: text('company').notNull(),
-  policyNumber: text('policy_number'),
-  totalCost: real('total_cost').notNull(),
-  termLengthMonths: integer('term_length_months').notNull(), // e.g., 6 for 6-month terms
-  startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
-  endDate: integer('end_date', { mode: 'timestamp' }).notNull(),
-  monthlyCost: real('monthly_cost').notNull(), // Calculated: totalCost / termLengthMonths
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  currentTermStart: integer('current_term_start', { mode: 'timestamp' }),
+  currentTermEnd: integer('current_term_end', { mode: 'timestamp' }),
+  terms: text('terms', { mode: 'json' }).$type<PolicyTerm[]>().notNull().default([]),
+  notes: text('notes'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
+
+// Insurance Policy ↔ Vehicles junction table
+export const insurancePolicyVehicles = sqliteTable(
+  'insurance_policy_vehicles',
+  {
+    policyId: text('policy_id')
+      .notNull()
+      .references(() => insurancePolicies.id, { onDelete: 'cascade' }),
+    vehicleId: text('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id, { onDelete: 'cascade' }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.policyId, table.vehicleId] }),
+  })
+);
 
 // Expense table
 export const expenses = sqliteTable('expenses', {
@@ -108,6 +142,9 @@ export const expenses = sqliteTable('expenses', {
   fuelAmount: real('fuel_amount'),
   fuelType: text('fuel_type'),
   isFinancingPayment: integer('is_financing_payment', { mode: 'boolean' }).notNull().default(false),
+  insurancePolicyId: text('insurance_policy_id'),
+  insuranceTermId: text('insurance_term_id'),
+  missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
 });
 
 // User Settings table
@@ -175,6 +212,9 @@ export type NewVehicleFinancing = typeof vehicleFinancing.$inferInsert;
 export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
 export type NewInsurancePolicy = typeof insurancePolicies.$inferInsert;
 
+export type InsurancePolicyVehicle = typeof insurancePolicyVehicles.$inferSelect;
+export type NewInsurancePolicyVehicle = typeof insurancePolicyVehicles.$inferInsert;
+
 export type Expense = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;
 
@@ -209,4 +249,4 @@ export const photos = sqliteTable(
 
 export type Photo = typeof photos.$inferSelect;
 export type NewPhoto = typeof photos.$inferInsert;
-export type PhotoEntityType = 'vehicle' | 'expense' | 'trip';
+export type PhotoEntityType = 'vehicle' | 'expense' | 'trip' | 'insurance_policy';

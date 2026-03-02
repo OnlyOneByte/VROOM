@@ -8,6 +8,7 @@ import { routes as authRoutes } from './api/auth/routes';
 import { routes as expenseRoutes } from './api/expenses/routes';
 import { routes as financingRoutes } from './api/financing/routes';
 import { routes as insuranceRoutes } from './api/insurance/routes';
+import { routes as photoRoutes } from './api/photos/routes';
 import { routes as settingsRoutes } from './api/settings/routes';
 import { routes as syncRoutes } from './api/sync/routes';
 import { routes as vehicleRoutes } from './api/vehicles/routes';
@@ -134,6 +135,7 @@ app.route('/api/v1/vehicles', vehicleRoutes);
 app.route('/api/v1/financing', financingRoutes);
 app.route('/api/v1/expenses', expenseRoutes);
 app.route('/api/v1/insurance', insuranceRoutes);
+app.route('/api/v1/photos', photoRoutes);
 app.route('/api/v1/settings', settingsRoutes);
 app.route('/api/v1/sync', syncRoutes);
 

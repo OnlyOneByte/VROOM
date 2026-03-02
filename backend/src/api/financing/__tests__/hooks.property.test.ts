@@ -94,6 +94,9 @@ function makeExpense(vehicleId: string, amount: number, index: number): Expense 
     receiptUrl: null,
     fuelAmount: null,
     fuelType: null,
+    insurancePolicyId: null,
+    insuranceTermId: null,
+    missedFillup: false,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

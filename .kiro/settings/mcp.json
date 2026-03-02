@@ -28,7 +28,8 @@
         "list_pages",
         "list_pages",
         "list_network_requests",
-        "get_network_request"
+        "get_network_request",
+        "list_pages"
       ]
     }
   }

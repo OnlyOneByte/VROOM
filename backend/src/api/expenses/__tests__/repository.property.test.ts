@@ -41,6 +41,9 @@ function makeExpense(overrides: {
     receiptUrl: null,
     fuelAmount: null,
     fuelType: null,
+    insurancePolicyId: null,
+    insuranceTermId: null,
+    missedFillup: false,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

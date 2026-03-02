@@ -4,7 +4,13 @@
 
 import type { SQLiteTableWithColumns } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
-import { expenses, insurancePolicies, vehicleFinancing, vehicles } from './db/schema';
+import {
+  expenses,
+  insurancePolicies,
+  insurancePolicyVehicles,
+  vehicleFinancing,
+  vehicles,
+} from './db/schema';
 import type { Environment } from './types';
 
 const envSchema = z.object({
@@ -129,7 +135,18 @@ export const CONFIG = {
       tagMaxLength: 50,
       fuelTypeMaxLength: 50,
     },
-    insurance: { companyMaxLength: 100, policyNumberMaxLength: 50, maxTermMonths: 24 },
+    insurance: {
+      companyMaxLength: 100,
+      policyNumberMaxLength: 50,
+      maxTermMonths: 24,
+      maxTerms: 50,
+      notesMaxLength: 2000,
+      coverageDescriptionMaxLength: 500,
+      agentNameMaxLength: 100,
+      agentPhoneMaxLength: 30,
+      agentEmailMaxLength: 100,
+      premiumFrequencyMaxLength: 50,
+    },
     financing: {
       providerMaxLength: 100,
       maxApr: 50,
@@ -151,13 +168,15 @@ export const TABLE_SCHEMA_MAP: Record<string, SQLiteTableWithColumns<any>> = {
   expenses,
   financing: vehicleFinancing,
   insurance: insurancePolicies,
+  insurancePolicyVehicles: insurancePolicyVehicles,
 };
 
 export const TABLE_FILENAME_MAP: Record<string, string> = {
   vehicles: 'vehicles.csv',
   expenses: 'expenses.csv',
   financing: 'vehicle_financing.csv',
-  insurance: 'insurance.csv',
+  insurance: 'insurance_policies.csv',
+  insurancePolicyVehicles: 'insurance_policy_vehicles.csv',
 };
 
 export function getBackupTableKeys(): string[] {

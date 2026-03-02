@@ -1,4 +1,5 @@
 import { NotFoundError, ValidationError } from '../../errors';
+import { insurancePolicyRepository } from '../insurance/repository';
 import type { GoogleDriveService } from '../sync/google-drive';
 import { vehicleRepository } from '../vehicles/repository';
 
@@ -16,6 +17,21 @@ export async function validateEntityOwnership(
     case 'vehicle': {
       const vehicle = await vehicleRepository.findByUserIdAndId(userId, entityId);
       if (!vehicle) throw new NotFoundError('Vehicle');
+      break;
+    }
+    case 'insurance_policy': {
+      const policy = await insurancePolicyRepository.findById(entityId);
+      if (!policy) throw new NotFoundError('Insurance policy');
+
+      let ownsLinkedVehicle = false;
+      for (const vid of policy.vehicleIds) {
+        const vehicle = await vehicleRepository.findByUserIdAndId(userId, vid);
+        if (vehicle) {
+          ownsLinkedVehicle = true;
+          break;
+        }
+      }
+      if (!ownsLinkedVehicle) throw new NotFoundError('Insurance policy');
       break;
     }
     default:
@@ -50,6 +66,19 @@ export async function resolveEntityDriveFolder(
       }
 
       const newFolder = await driveService.createFolder(vehicleFolderName, photosFolderId);
+      return newFolder.id;
+    }
+    case 'insurance_policy': {
+      const folderStructure = await driveService.createVroomFolderStructure(userName);
+      const mainFolderId = folderStructure.mainFolder.id;
+
+      const insuranceFolderName = 'Insurance Documents';
+      const existingFolder = await driveService.findFolder(insuranceFolderName, mainFolderId);
+      if (existingFolder) {
+        return existingFolder.id;
+      }
+
+      const newFolder = await driveService.createFolder(insuranceFolderName, mainFolderId);
       return newFolder.id;
     }
     default:

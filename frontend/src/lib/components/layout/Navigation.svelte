@@ -4,6 +4,7 @@
 	import {
 		House,
 		Receipt,
+		Shield,
 		ChartColumn,
 		Settings,
 		Menu,
@@ -38,6 +39,7 @@
 	const navigation = [
 		{ name: 'Dashboard', href: '/dashboard', icon: House },
 		{ name: 'Expenses', href: '/expenses', icon: Receipt },
+		{ name: 'Insurance', href: '/insurance', icon: Shield },
 		{ name: 'Analytics', href: '/analytics', icon: ChartColumn },
 		{ name: 'Trips', href: '/trips', icon: MapPin }
 	];
