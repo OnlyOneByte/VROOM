@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Load Steering Before Task",
+  "description": "Before starting a spec task, reminds the agent to review relevant steering files for the files about to be modified, ensuring project conventions are followed from the start.",
+  "version": "1",
+  "when": {
+    "type": "preTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Before starting this task, identify which files you'll be modifying. Read the relevant steering files from .kiro/steering/ for those file types:\n- MainSteering.md — always relevant (project conventions, Svelte 5 runes, UI components, architecture)\n- CodeQualityRules.md — if modifying frontend/ files\n- DatabaseMigrations.md — if modifying backend/src/db/schema.ts\n- BackupRestore.md — if modifying backend/src/api/sync/backup.ts or restore.ts\n- PWA.md — if modifying service worker, manifest, or PWA utilities\n- Testing.md — if writing or modifying tests\n- APIConventions.md — if modifying backend/src/api/ files\n- SveltePatterns.md — if modifying .svelte files\n\nKeep these rules in mind throughout the task execution. Do not summarize them back — just internalize and proceed."
+  }
+}

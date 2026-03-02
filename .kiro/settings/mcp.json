@@ -31,6 +31,42 @@
         "get_network_request",
         "list_pages"
       ]
+    },
+
+    "svelte": {
+      "command": "npx",
+      "args": ["-y", "@sveltejs/mcp@latest", "--typescript"],
+      "env": {
+        "npm_config_registry": "https://registry.npmjs.org"
+      },
+      "disabled": false,
+      "autoApprove": ["get_documentation", "svelte_autofixer"]
+    },
+
+    "shadcn-svelte": {
+      "command": "npx",
+      "args": ["-y", "@binsarjr/shadcn-svelte-mcp@latest"],
+      "env": {
+        "npm_config_registry": "https://registry.npmjs.org"
+      },
+      "disabled": false,
+      "autoApprove": ["list_components", "get_component", "get_component_demo", "list_blocks", "get_block"]
+    },
+
+    "playwright": {
+      "command": "npx",
+      "env": {
+        "npm_config_registry": "https://registry.npmjs.org"
+      },
+      "args": ["-y", "@playwright/mcp@latest"],
+      "disabled": false
+    },
+
+    "sqlite": {
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "--db-path", "backend/data/vroom.db"],
+      "disabled": false,
+      "autoApprove": ["read_query", "list_tables", "describe_table"]
     }
   }
 }

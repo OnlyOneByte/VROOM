@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Migration Reminder on Schema Change",
+  "description": "When backend/src/db/schema.ts is edited, reminds the agent to generate a migration, review the SQL, create a migration test, and update backup/restore if a new table was added.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "backend/src/db/schema.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The database schema was modified. Follow the Database Migration SOP:\n\n1. Run `bun run db:generate` from the backend/ directory to generate a migration.\n2. Review the generated SQL file in backend/drizzle/ to confirm it matches your intent. Watch for unintended DROP TABLE operations.\n3. Create a migration test file `backend/src/db/__tests__/migration-000N.test.ts` following the pattern in DatabaseMigrations.md steering.\n4. Update the expected tables list in `migration-general.test.ts` if a new table was added.\n5. If a new table was added, update `TABLE_SCHEMA_MAP` and `TABLE_FILENAME_MAP` in `backend/src/config.ts`, and update backup/restore files.\n6. Run the migration tests: `bun test src/db/__tests__/migration-general.test.ts src/db/__tests__/migration-000N.test.ts`\n\nDo not skip any of these steps."
+  }
+}

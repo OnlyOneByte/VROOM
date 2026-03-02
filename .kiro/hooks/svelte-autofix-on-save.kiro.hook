@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Svelte MCP Autofix on Save",
+  "description": "When a .svelte file is edited by the agent, runs the Svelte MCP autofixer tool to catch Svelte 5 runes issues, deprecated syntax, and common mistakes. Delegates to the MCP tool rather than manual checking.",
+  "version": "2",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.svelte"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A Svelte component was just saved. If the Svelte MCP autofixer tool (mcp_svelte_svelte_autofixer) is available, read the file content and run the autofixer with desired_svelte_version=5. Fix any issues it reports.\n\nIf the MCP tool is not available, do a quick manual scan for these critical Svelte 5 issues only:\n- $: reactive statements (use $derived/$effect)\n- on: event directives (use onclick/onchange)\n- export let props (use $props())\n- $app/stores imports (use $app/state)\n\nFix violations silently. If clean, move on without comment."
+  }
+}

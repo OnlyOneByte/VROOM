@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Validate After Task",
+  "description": "After completing a spec task, runs fix and validate in each modified subfolder (backend and/or frontend) to catch lint, format, type, and test errors before moving on.",
+  "version": "1",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The spec task is complete. Now run validation in each subfolder you modified:\n\n- If you modified backend/ files: run `bun run all:fix` then `bun run validate` from the backend/ directory. Fix any errors.\n- If you modified frontend/ files: run `npm run all:fix` then `npm run validate` from the frontend/ directory. Fix any errors.\n\nDo not skip this step. Fix all errors and warnings before marking the task as done."
+  }
+}
