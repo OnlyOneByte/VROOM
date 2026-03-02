@@ -5,6 +5,7 @@
 	import { Settings as SettingsIcon, Save, LoaderCircle } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import UnitPreferencesCard from '$lib/components/settings/UnitPreferencesCard.svelte';
+	import ThemeCard from '$lib/components/settings/ThemeCard.svelte';
 	import PWAInstallCard from '$lib/components/settings/PWAInstallCard.svelte';
 	import BackupSyncCard from '$lib/components/settings/BackupSyncCard.svelte';
 	import SyncNowDialog from '$lib/components/settings/SyncNowDialog.svelte';
@@ -345,6 +346,8 @@
 		</div>
 	{:else}
 		<div class="space-y-6 pb-32 sm:pb-24">
+			<ThemeCard />
+
 			<UnitPreferencesCard bind:distanceUnit bind:volumeUnit bind:chargeUnit bind:currencyUnit />
 
 			<PWAInstallCard />

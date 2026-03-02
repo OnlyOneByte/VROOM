@@ -18,6 +18,15 @@
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover" class="safe-top safe-bottom">
+		<script>
+			(function () {
+				var theme = localStorage.getItem('vroom-theme-preference') || 'system';
+				var isDark =
+					theme === 'dark' ||
+					(theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+				if (isDark) document.documentElement.classList.add('dark');
+			})();
+		</script>
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>
