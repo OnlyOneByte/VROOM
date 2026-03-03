@@ -10,7 +10,6 @@
 		editTermId?: string | null;
 		editPolicyId?: string | null;
 		onEdit: (_policy: InsurancePolicy) => void;
-		onDelete: (_policyId: string) => void;
 		onRefresh: () => Promise<void>;
 	}
 
@@ -21,7 +20,6 @@
 		editTermId = null,
 		editPolicyId = null,
 		onEdit,
-		onDelete,
 		onRefresh
 	}: Props = $props();
 
@@ -45,7 +43,6 @@
 					{vehicles}
 					autoEditTermId={editPolicyId === policy.id ? editTermId : null}
 					{onEdit}
-					{onDelete}
 					{onRefresh}
 				/>
 			{/each}
@@ -62,7 +59,6 @@
 					{vehicles}
 					autoEditTermId={editPolicyId === policy.id ? editTermId : null}
 					{onEdit}
-					{onDelete}
 					{onRefresh}
 				/>
 			{/each}

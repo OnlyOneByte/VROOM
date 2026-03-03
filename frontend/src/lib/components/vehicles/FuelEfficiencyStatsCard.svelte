@@ -3,8 +3,8 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Button } from '$lib/components/ui/button';
-	import StatCardDual from '$lib/components/ui/stat-card-dual.svelte';
-	import EmptyState from '$lib/components/ui/empty-state.svelte';
+	import StatCardDual from '$lib/components/common/stat-card-dual.svelte';
+	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { settingsStore } from '$lib/stores/settings';
 	import {
 		getVolumeUnitLabel,

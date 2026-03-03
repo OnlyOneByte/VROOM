@@ -6,7 +6,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/ui/empty-state.svelte';
+	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { formatCurrency, formatRelativeTime } from '$lib/utils/formatters';
 
 	interface VehicleOverview {

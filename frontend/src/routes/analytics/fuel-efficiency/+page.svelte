@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { ArrowLeft, Fuel } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
-	import EmptyState from '$lib/components/ui/empty-state.svelte';
+	import EmptyState from '$lib/components/common/empty-state.svelte';
 </script>
 
 <svelte:head>

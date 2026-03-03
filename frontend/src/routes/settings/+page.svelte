@@ -9,9 +9,7 @@
 	import PWAInstallCard from '$lib/components/settings/PWAInstallCard.svelte';
 	import BackupSyncCard from '$lib/components/settings/BackupSyncCard.svelte';
 	import BackupNowDialog from '$lib/components/settings/BackupNowDialog.svelte';
-	import RestoreFromFileDialog from '$lib/components/settings/RestoreFromFileDialog.svelte';
-	import RestoreFromDriveDialog from '$lib/components/settings/RestoreFromDriveDialog.svelte';
-	import RestoreFromSheetsDialog from '$lib/components/settings/RestoreFromSheetsDialog.svelte';
+	import RestoreDialog from '$lib/components/settings/RestoreDialog.svelte';
 	import { fetchLastSyncTime } from '$lib/utils/sync-manager';
 	import { settingsApi } from '$lib/services/settings-api';
 	import { isVroomError } from '$lib/utils/error-handling';
@@ -455,26 +453,28 @@
 		{/if}
 	</Button>
 
-	<RestoreFromFileDialog
+	<RestoreDialog
 		bind:open={showRestoreDialog}
+		source="file"
 		{isRestoring}
-		{selectedFile}
 		bind:restoreMode
 		{restorePreview}
 		{restoreConflicts}
+		{selectedFile}
 		onFileSelect={handleFileSelect}
 		onRestore={handleRestoreExecute}
 	/>
 
-	<RestoreFromDriveDialog
+	<RestoreDialog
 		bind:open={showDriveRestoreDialog}
-		{isLoadingBackups}
+		source="drive"
 		{isRestoring}
-		{driveBackups}
-		selectedBackupId={selectedDriveBackup}
 		bind:restoreMode
 		{restorePreview}
 		{restoreConflicts}
+		{isLoadingBackups}
+		{driveBackups}
+		selectedBackupId={selectedDriveBackup}
 		onBackupSelect={handleDriveBackupSelect}
 		onRestore={handleDriveRestoreExecute}
 	/>
@@ -490,8 +490,9 @@
 		onSync={handleBackupExecute}
 	/>
 
-	<RestoreFromSheetsDialog
+	<RestoreDialog
 		bind:open={showSheetsRestoreDialog}
+		source="sheets"
 		{isRestoring}
 		bind:restoreMode={sheetsRestoreMode}
 		restorePreview={sheetsRestorePreview}

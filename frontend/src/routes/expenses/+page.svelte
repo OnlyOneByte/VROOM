@@ -30,7 +30,7 @@
 	import { extractUniqueTags } from '$lib/utils/expense-filters';
 	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '$lib/constants/messages';
 	import { DISPLAY_LIMITS } from '$lib/constants/limits';
-	import DateRangePicker from '$lib/components/ui/date-range-picker.svelte';
+	import DateRangePicker from '$lib/components/common/date-range-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
@@ -404,7 +404,7 @@
 							class="border rounded-lg p-2 min-h-[42px] bg-background border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background"
 						>
 							<div class="flex flex-wrap gap-1.5 items-center">
-								{#each selectedTags as tag}
+								{#each selectedTags as tag (tag)}
 									<Badge variant="secondary" class="gap-1 pr-1">
 										{tag}
 										<button
@@ -439,7 +439,7 @@
 							<div
 								class="absolute z-50 left-0 right-0 mt-1 border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto"
 							>
-								{#each tagSuggestions.slice(0, 8) as suggestion}
+								{#each tagSuggestions.slice(0, 8) as suggestion (suggestion)}
 									<button
 										type="button"
 										onclick={() => addTag(suggestion)}
@@ -494,7 +494,7 @@
 					<CardNs.Content class="space-y-6">
 						<!-- Stats Grid -->
 						<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-							{#each statCards as stat}
+							{#each statCards as stat (stat.label)}
 								<div class="p-3 sm:p-4 rounded-lg border">
 									<div class="flex items-center gap-2">
 										<div class="p-2 rounded-xl {stat.bgColor} shrink-0">
@@ -519,13 +519,15 @@
 									</p>
 								</div>
 								<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-									{#each Object.entries(summaryStats.categoryTotals) as [category, amount]}
+									{#each Object.entries(summaryStats.categoryTotals) as [category, amount] (category)}
 										{@const IconComponent = getCategoryIcon(category as ExpenseCategory)}
-										<div
-											class="p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-										>
+										<div class="p-3 rounded-lg border hover:bg-muted/50 transition-colors">
 											<div class="flex items-center gap-2">
-												<div class="p-1.5 rounded-lg {getCategoryColor(category as ExpenseCategory)} shrink-0">
+												<div
+													class="p-1.5 rounded-lg {getCategoryColor(
+														category as ExpenseCategory
+													)} shrink-0"
+												>
 													<IconComponent class="h-3.5 w-3.5" />
 												</div>
 												<span class="text-xs sm:text-sm font-medium">
@@ -563,7 +565,7 @@
 				</CardNs.Header>
 				<CardNs.Content>
 					<div class="space-y-3">
-						{#each pendingExpenses as expense}
+						{#each pendingExpenses as expense (expense.id)}
 							<div
 								class="flex items-center gap-3 p-3 bg-chart-5/10 border border-chart-5/20 rounded-lg"
 							>
@@ -621,7 +623,7 @@
 				</CardNs.Header>
 				<CardNs.Content>
 					<div class="space-y-3">
-						{#each syncedExpenses.slice(0, DISPLAY_LIMITS.RECENT_SYNCED_EXPENSES) as expense}
+						{#each syncedExpenses.slice(0, DISPLAY_LIMITS.RECENT_SYNCED_EXPENSES) as expense (expense.id)}
 							<div
 								class="flex items-center justify-between p-3 bg-chart-2/10 border border-chart-2/20 rounded-lg"
 							>

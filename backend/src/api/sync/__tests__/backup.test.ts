@@ -10,7 +10,13 @@ import { describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { TABLE_SCHEMA_MAP } from '../../../config';
-import { expenses, insurancePolicies, vehicleFinancing, vehicles } from '../../../db/schema';
+import {
+  expenses,
+  insurancePolicies,
+  photos,
+  vehicleFinancing,
+  vehicles,
+} from '../../../db/schema';
 import type { ParsedBackupData } from '../../../types';
 import { backupService, coerceRow } from '../backup';
 
@@ -121,6 +127,18 @@ describe('coerceRow: Boolean columns', () => {
     const row = buildMinimalStringRow(insurancePolicies, { isActive: '' });
     const result = coerceRow(row, insurancePolicies);
     expect(result.isActive).toBe(false);
+  });
+
+  test('boolean handling works on photos.isCover', () => {
+    const row = buildMinimalStringRow(photos, { isCover: '' });
+    const result = coerceRow(row, photos);
+    expect(result.isCover).toBe(false);
+  });
+
+  test('photos.isCover "true" coerces to true', () => {
+    const row = buildMinimalStringRow(photos, { isCover: 'true' });
+    const result = coerceRow(row, photos);
+    expect(result.isCover).toBe(true);
   });
 });
 
@@ -285,9 +303,36 @@ describe('validateBackupData: acceptance', () => {
       insurance: [],
       insurancePolicyVehicles: [],
       expenseGroups: [],
+      photos: [],
     };
     // Fix vehicleId reference
     (backup.expenses[0] as Record<string, unknown>).vehicleId = backup.vehicles[0].id;
+
+    const result = backupService.validateBackupData(backup);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  test('valid backup with photos passes validation', () => {
+    const vehicle = coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles);
+    const photo = coerceRow(
+      buildMinimalStringRow(photos, {
+        entityType: 'vehicle',
+        entityId: vehicle.id as string,
+        isCover: 'true',
+      }),
+      photos
+    );
+    const backup: ParsedBackupData = {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      vehicles: [vehicle],
+      expenses: [],
+      financing: [],
+      insurance: [],
+      insurancePolicyVehicles: [],
+      expenseGroups: [],
+      photos: [photo],
+    };
 
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(true);
@@ -309,6 +354,7 @@ describe('validateBackupData: referential integrity', () => {
       insurance: [],
       insurancePolicyVehicles: [],
       expenseGroups: [],
+      photos: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -325,6 +371,7 @@ describe('validateBackupData: referential integrity', () => {
       insurance: [],
       insurancePolicyVehicles: [{ policyId: 'ghost', vehicleId: v.id as string }],
       expenseGroups: [],
+      photos: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -341,10 +388,51 @@ describe('validateBackupData: referential integrity', () => {
       insurance: [ins],
       insurancePolicyVehicles: [{ policyId: ins.id as string, vehicleId: 'ghost' }],
       expenseGroups: [],
+      photos: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('non-existent vehicle'))).toBe(true);
+  });
+
+  test('photo referencing non-existent vehicle fails', () => {
+    const photo = coerceRow(
+      buildMinimalStringRow(photos, { entityType: 'vehicle', entityId: 'ghost' }),
+      photos
+    );
+    const backup: ParsedBackupData = {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      vehicles: [],
+      expenses: [],
+      financing: [],
+      insurance: [],
+      insurancePolicyVehicles: [],
+      expenseGroups: [],
+      photos: [photo],
+    };
+    const result = backupService.validateBackupData(backup);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('non-existent vehicle'))).toBe(true);
+  });
+
+  test('photo with unknown entity type fails', () => {
+    const photo = coerceRow(
+      buildMinimalStringRow(photos, { entityType: 'unknown_type', entityId: 'some-id' }),
+      photos
+    );
+    const backup: ParsedBackupData = {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      vehicles: [],
+      expenses: [],
+      financing: [],
+      insurance: [],
+      insurancePolicyVehicles: [],
+      expenseGroups: [],
+      photos: [photo],
+    };
+    const result = backupService.validateBackupData(backup);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('unknown entity type'))).toBe(true);
   });
 });
 
@@ -354,7 +442,14 @@ describe('validateBackupData: referential integrity', () => {
 
 describe('TABLE_SCHEMA_MAP coverage', () => {
   test('all expected backup tables are registered', () => {
-    const expected = ['vehicles', 'expenses', 'financing', 'insurance', 'insurancePolicyVehicles'];
+    const expected = [
+      'vehicles',
+      'expenses',
+      'financing',
+      'insurance',
+      'insurancePolicyVehicles',
+      'photos',
+    ];
     for (const key of expected) {
       expect(TABLE_SCHEMA_MAP[key]).toBeDefined();
     }

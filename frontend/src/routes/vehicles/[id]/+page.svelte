@@ -21,7 +21,7 @@
 	import ExpenseOverviewCard from '$lib/components/vehicles/ExpenseOverviewCard.svelte';
 	import FuelEfficiencyStatsCard from '$lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
 	import PeriodSelector from '$lib/components/vehicles/PeriodSelector.svelte';
-	import EmptyState from '$lib/components/ui/empty-state.svelte';
+	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import PaymentMetricsGrid from '$lib/components/financing/PaymentMetricsGrid.svelte';
 	import FinancingCharts from '$lib/components/financing/FinancingCharts.svelte';
 	import PaymentPlannerDialog from '$lib/components/financing/PaymentPlannerDialog.svelte';

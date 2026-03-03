@@ -5,7 +5,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as CardNs from '$lib/components/ui/card';
 	import * as Select from '$lib/components/ui/select';
-	import DateRangePicker from '$lib/components/ui/date-range-picker.svelte';
+	import DateRangePicker from '$lib/components/common/date-range-picker.svelte';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { extractUniqueTags } from '$lib/utils/expense-filters';
 	import { COMMON_MESSAGES } from '$lib/constants/messages';

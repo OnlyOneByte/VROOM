@@ -105,6 +105,7 @@ export interface BackupData {
   insurance: import('./db/schema').InsurancePolicy[];
   insurancePolicyVehicles: import('./db/schema').InsurancePolicyVehicle[];
   expenseGroups: import('./db/schema').ExpenseGroup[];
+  photos: import('./db/schema').Photo[];
 }
 
 export interface ParsedBackupData {
@@ -115,4 +116,5 @@ export interface ParsedBackupData {
   insurance: Record<string, unknown>[];
   insurancePolicyVehicles: Record<string, unknown>[];
   expenseGroups: Record<string, unknown>[];
+  photos: Record<string, unknown>[];
 }

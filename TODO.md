@@ -51,7 +51,21 @@
   - [ ] Change to be / instead of /auth
 - [ ] First opening/loading - car zooming past screen animation (idea)
 - [ ] Odometer log on the vehicle detail page (track readings over time, show mileage-over-time chart)
-- [ ] Split expense show better
+- [x] Split expense show better
+- [x] Expenses table to concat details col first
+- [x] Policy term level delete
+- [x] Policy Term card
+- [x] Chart card padding on left against axis (dashboard page)
+- [x] Photos refs not restoring on backup/restore
+  - [x] Backup photos with ZIP option toggle (placeholder)
+  - [ ] Backup photos with ZIP (functionality)
+- [x] Better option for the expense table in mobile
+- [x] Remove financing payments from restore preview
+- [x] Combine the restore dialogs into a single one
+- [x] Google drive restore dialog too tall (how to cut off)
+- [x] Clean up UI (components/ui has custom components) -> moved to components/common
+- [x] Photos not showing in prod env (CORS?)
+
 
 ## P1 — Should Have
 

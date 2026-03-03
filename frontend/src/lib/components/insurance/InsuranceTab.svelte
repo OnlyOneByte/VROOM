@@ -3,7 +3,7 @@
 	import { onMount } from 'svelte';
 	import { Shield, Plus, LoaderCircle, CircleAlert } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
-	import EmptyState from '$lib/components/ui/empty-state.svelte';
+	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import PolicyList from './PolicyList.svelte';
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
@@ -43,15 +43,6 @@
 
 	function handleEditPolicy(policy: InsurancePolicy) {
 		goto(`/insurance/${policy.id}/edit?returnTo=/vehicles/${vehicleId}`);
-	}
-
-	async function handleDeletePolicy(policyId: string) {
-		try {
-			await insuranceApi.deletePolicy(policyId);
-			policies = policies.filter(p => p.id !== policyId);
-		} catch (err) {
-			handleErrorWithNotification(err, 'Failed to delete policy');
-		}
 	}
 </script>
 
@@ -95,11 +86,6 @@
 			</Button>
 		</div>
 
-		<PolicyList
-			{policies}
-			onEdit={handleEditPolicy}
-			onDelete={handleDeletePolicy}
-			onRefresh={loadData}
-		/>
+		<PolicyList {policies} onEdit={handleEditPolicy} onRefresh={loadData} />
 	</div>
 {/if}
