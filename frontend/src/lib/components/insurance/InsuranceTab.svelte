@@ -1,14 +1,13 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { Shield, Plus, LoaderCircle, CircleAlert } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import EmptyState from '$lib/components/ui/empty-state.svelte';
 	import PolicyList from './PolicyList.svelte';
-	import PolicyForm from './PolicyForm.svelte';
 	import { insuranceApi } from '$lib/services/insurance-api';
-	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import type { InsurancePolicy, Vehicle } from '$lib/types';
+	import type { InsurancePolicy } from '$lib/types';
 
 	interface Props {
 		vehicleId: string;
@@ -17,11 +16,8 @@
 	let { vehicleId }: Props = $props();
 
 	let policies = $state<InsurancePolicy[]>([]);
-	let vehicles = $state<Vehicle[]>([]);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
-	let showPolicyForm = $state(false);
-	let editingPolicy = $state<InsurancePolicy | null>(null);
 
 	onMount(async () => {
 		await loadData();
@@ -31,12 +27,7 @@
 		isLoading = true;
 		error = null;
 		try {
-			const [policiesData, vehiclesData] = await Promise.all([
-				insuranceApi.getPoliciesForVehicle(vehicleId),
-				vehicleApi.getVehicles()
-			]);
-			policies = policiesData;
-			vehicles = vehiclesData;
+			policies = await insuranceApi.getPoliciesForVehicle(vehicleId);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to load insurance policies';
 			error = message;
@@ -47,13 +38,11 @@
 	}
 
 	function handleAddPolicy() {
-		editingPolicy = null;
-		showPolicyForm = true;
+		goto(`/insurance/new?vehicleId=${vehicleId}&returnTo=/vehicles/${vehicleId}`);
 	}
 
 	function handleEditPolicy(policy: InsurancePolicy) {
-		editingPolicy = policy;
-		showPolicyForm = true;
+		goto(`/insurance/${policy.id}/edit?returnTo=/vehicles/${vehicleId}`);
 	}
 
 	async function handleDeletePolicy(policyId: string) {
@@ -63,12 +52,6 @@
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to delete policy');
 		}
-	}
-
-	async function handlePolicySuccess() {
-		showPolicyForm = false;
-		editingPolicy = null;
-		await loadData();
 	}
 </script>
 
@@ -120,11 +103,3 @@
 		/>
 	</div>
 {/if}
-
-<PolicyForm
-	bind:open={showPolicyForm}
-	{vehicleId}
-	policy={editingPolicy}
-	{vehicles}
-	onSuccess={handlePolicySuccess}
-/>

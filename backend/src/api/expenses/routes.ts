@@ -24,6 +24,7 @@ import {
 import { financingRepository } from '../financing/repository';
 import { vehicleRepository } from '../vehicles/repository';
 import { expenseRepository } from './repository';
+import { createSplitExpenseSchema, updateSplitSchema } from './validation';
 
 const routes = new Hono();
 
@@ -105,6 +106,67 @@ const expenseQuerySchema = z.object({
 // Apply authentication and change tracking to all routes
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
+
+// ===========================================================================
+// Split expense routes (must be before /:id to avoid path conflicts)
+// ===========================================================================
+
+// POST /api/expenses/split — Create expense group + materialized children
+routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) => {
+  const user = c.get('user');
+  const data = c.req.valid('json');
+
+  const result = await expenseRepository.createExpenseGroup(data, user.id);
+
+  return c.json(
+    {
+      success: true,
+      data: result,
+      message: 'Split expense created successfully',
+    },
+    201
+  );
+});
+
+// PUT /api/expenses/split/:id — Update split config, regenerate children
+routes.put(
+  '/split/:id',
+  zValidator('param', commonSchemas.idParam),
+  zValidator('json', updateSplitSchema),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const data = c.req.valid('json');
+
+    const result = await expenseRepository.updateExpenseGroup(id, data, user.id);
+
+    return c.json({
+      success: true,
+      data: result,
+      message: 'Split expense updated successfully',
+    });
+  }
+);
+
+// GET /api/expenses/split/:id — Get group with children
+routes.get('/split/:id', zValidator('param', commonSchemas.idParam), async (c) => {
+  const user = c.get('user');
+  const { id } = c.req.valid('param');
+
+  const result = await expenseRepository.getExpenseGroup(id, user.id);
+
+  return c.json({ success: true, data: result });
+});
+
+// DELETE /api/expenses/split/:id — Delete group (cascade children)
+routes.delete('/split/:id', zValidator('param', commonSchemas.idParam), async (c) => {
+  const user = c.get('user');
+  const { id } = c.req.valid('param');
+
+  await expenseRepository.deleteExpenseGroup(id, user.id);
+
+  return c.json({ success: true, message: 'Split expense deleted successfully' });
+});
 
 // GET /api/expenses/categories - Get expense categories
 routes.get('/categories', async (c) => {

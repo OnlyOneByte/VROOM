@@ -1,7 +1,35 @@
+import { eq } from 'drizzle-orm';
+import { getDb } from '../../db/connection';
+import { expenseGroups, expenses } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { insurancePolicyRepository } from '../insurance/repository';
 import type { GoogleDriveService } from '../sync/google-drive';
 import { vehicleRepository } from '../vehicles/repository';
+
+async function validateExpenseOwnership(entityId: string, userId: string): Promise<void> {
+  const db = getDb();
+  const expenseRows = await db
+    .select({ vehicleId: expenses.vehicleId })
+    .from(expenses)
+    .where(eq(expenses.id, entityId))
+    .limit(1);
+  const expense = expenseRows[0];
+  if (!expense) throw new NotFoundError('Expense');
+  const vehicle = await vehicleRepository.findByUserIdAndId(userId, expense.vehicleId);
+  if (!vehicle) throw new NotFoundError('Expense');
+}
+
+async function validateExpenseGroupOwnership(entityId: string, userId: string): Promise<void> {
+  const db = getDb();
+  const groupRows = await db
+    .select({ userId: expenseGroups.userId })
+    .from(expenseGroups)
+    .where(eq(expenseGroups.id, entityId))
+    .limit(1);
+  const group = groupRows[0];
+  if (!group) throw new NotFoundError('Expense group');
+  if (group.userId !== userId) throw new NotFoundError('Expense group');
+}
 
 /**
  * Validates that the authenticated user owns the entity referenced by entityType + entityId.
@@ -32,6 +60,14 @@ export async function validateEntityOwnership(
         }
       }
       if (!ownsLinkedVehicle) throw new NotFoundError('Insurance policy');
+      break;
+    }
+    case 'expense': {
+      await validateExpenseOwnership(entityId, userId);
+      break;
+    }
+    case 'expense_group': {
+      await validateExpenseGroupOwnership(entityId, userId);
       break;
     }
     default:
@@ -79,6 +115,20 @@ export async function resolveEntityDriveFolder(
       }
 
       const newFolder = await driveService.createFolder(insuranceFolderName, mainFolderId);
+      return newFolder.id;
+    }
+    case 'expense':
+    case 'expense_group': {
+      const folderStructure = await driveService.createVroomFolderStructure(userName);
+      const mainFolderId = folderStructure.mainFolder.id;
+
+      const expenseFolderName = 'ExpensePhotos';
+      const existingFolder = await driveService.findFolder(expenseFolderName, mainFolderId);
+      if (existingFolder) {
+        return existingFolder.id;
+      }
+
+      const newFolder = await driveService.createFolder(expenseFolderName, mainFolderId);
       return newFolder.id;
     }
     default:

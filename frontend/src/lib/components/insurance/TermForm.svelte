@@ -7,16 +7,28 @@
 	import { Button } from '$lib/components/ui/button';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Separator } from '$lib/components/ui/separator';
+	import { Checkbox } from '$lib/components/ui/checkbox';
+	import * as Select from '$lib/components/ui/select';
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import { prefillFromPreviousTerm } from '$lib/utils/insurance';
-	import type { PolicyTerm, PolicyDetails, FinanceDetails } from '$lib/types';
+	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import SplitConfigEditor from '$lib/components/expenses/SplitConfigEditor.svelte';
+	import type {
+		PolicyTerm,
+		PolicyDetails,
+		FinanceDetails,
+		Vehicle,
+		TermCoverageRow
+	} from '$lib/types';
 
 	interface Props {
 		open: boolean;
 		policyId: string;
 		term?: PolicyTerm | null;
 		previousTerm?: PolicyTerm | null;
+		vehicles?: Vehicle[];
+		termVehicleCoverage?: TermCoverageRow[];
 		onSuccess: () => void;
 	}
 
@@ -25,6 +37,8 @@
 		policyId,
 		term = null,
 		previousTerm = null,
+		vehicles = [],
+		termVehicleCoverage = [],
 		onSuccess
 	}: Props = $props();
 
@@ -56,6 +70,51 @@
 		paymentAmount?: string;
 	}
 	let errors = $state<TermFormErrors>({});
+
+	// Vehicle coverage state
+	let selectedVehicleIds = $state<string[]>([]);
+	let splitMethod = $state<'even' | 'absolute' | 'percentage'>('even');
+	let splitAllocations = $state<Array<{ vehicleId: string; amount?: number; percentage?: number }>>(
+		[]
+	);
+
+	let splitVehicles = $derived(vehicles.filter(v => selectedVehicleIds.includes(v.id)));
+	let parsedTotalCost = $derived(parseFloat(totalCost) || 0);
+	let showSplitEditor = $derived(parsedTotalCost > 0 && selectedVehicleIds.length >= 2);
+
+	function toggleVehicle(id: string) {
+		if (selectedVehicleIds.includes(id)) {
+			selectedVehicleIds = selectedVehicleIds.filter(v => v !== id);
+		} else {
+			selectedVehicleIds = [...selectedVehicleIds, id];
+		}
+		resetAllocationsForMethod(splitMethod);
+	}
+
+	function handleSplitMethodChange(method: 'even' | 'absolute' | 'percentage') {
+		splitMethod = method;
+		resetAllocationsForMethod(method);
+	}
+
+	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
+		if (method === 'even') {
+			splitAllocations = [];
+		} else if (method === 'absolute') {
+			splitAllocations = selectedVehicleIds.map(id => ({ vehicleId: id, amount: 0 }));
+		} else {
+			const pct = selectedVehicleIds.length > 0 ? 100 / selectedVehicleIds.length : 0;
+			splitAllocations = selectedVehicleIds.map(id => ({
+				vehicleId: id,
+				percentage: Math.round(pct * 10) / 10
+			}));
+		}
+	}
+
+	function handleAllocationsChange(
+		allocs: Array<{ vehicleId: string; amount?: number; percentage?: number }>
+	) {
+		splitAllocations = allocs;
+	}
 
 	// Populate form fields from a term source
 	function populateFromTerm(source: PolicyTerm) {
@@ -96,11 +155,16 @@
 
 		errors = {};
 		isSaving = false;
+		splitMethod = 'even';
+		splitAllocations = [];
 
 		if (term) {
 			startDate = term.startDate.split('T')[0] ?? term.startDate;
 			endDate = term.endDate.split('T')[0] ?? term.endDate;
 			populateFromTerm(term);
+			// Populate vehicle coverage from termVehicleCoverage
+			const termCoverage = termVehicleCoverage.filter(tc => tc.termId === term.id);
+			selectedVehicleIds = termCoverage.map(tc => tc.vehicleId);
 		} else if (previousTerm) {
 			resetFormFields();
 			const prefill = prefillFromPreviousTerm(previousTerm);
@@ -112,8 +176,12 @@
 			// Dates should be blank for renewal — user enters new dates
 			startDate = '';
 			endDate = '';
+			// Carry over vehicle coverage from previous term
+			const prevCoverage = termVehicleCoverage.filter(tc => tc.termId === previousTerm.id);
+			selectedVehicleIds = prevCoverage.map(tc => tc.vehicleId);
 		} else {
 			resetFormFields();
+			selectedVehicleIds = [];
 		}
 	});
 
@@ -160,9 +228,7 @@
 	function buildFinanceDetails(): FinanceDetails {
 		const details: FinanceDetails = {};
 		if (totalCost) details.totalCost = Number(totalCost);
-		if (monthlyCost) details.monthlyCost = Number(monthlyCost);
-		if (premiumFrequency.trim()) details.premiumFrequency = premiumFrequency.trim();
-		if (paymentAmount) details.paymentAmount = Number(paymentAmount);
+		if (premiumFrequency) details.premiumFrequency = premiumFrequency;
 		return details;
 	}
 
@@ -171,12 +237,19 @@
 
 		isSaving = true;
 		try {
+			const vehicleCoverage = {
+				vehicleIds: selectedVehicleIds,
+				splitMethod: splitMethod !== 'even' ? splitMethod : undefined,
+				allocations: splitMethod !== 'even' ? splitAllocations : undefined
+			};
+
 			if (isEdit && term) {
 				await insuranceApi.updateTerm(policyId, term.id, {
 					startDate,
 					endDate,
 					policyDetails: buildPolicyDetails(),
-					financeDetails: buildFinanceDetails()
+					financeDetails: buildFinanceDetails(),
+					vehicleCoverage
 				});
 			} else {
 				await insuranceApi.addTerm(policyId, {
@@ -184,7 +257,8 @@
 					startDate,
 					endDate,
 					policyDetails: buildPolicyDetails(),
-					financeDetails: buildFinanceDetails()
+					financeDetails: buildFinanceDetails(),
+					vehicleCoverage
 				});
 			}
 			onSuccess();
@@ -303,6 +377,36 @@
 				</div>
 
 				<Separator />
+				<h4 class="text-sm font-medium text-foreground">Vehicle Coverage</h4>
+
+				{#if vehicles.length > 0}
+					<div class="rounded-md border border-input p-3 space-y-2">
+						{#each vehicles as v (v.id)}
+							<label class="flex items-center gap-2 cursor-pointer">
+								<Checkbox
+									checked={selectedVehicleIds.includes(v.id)}
+									onCheckedChange={() => toggleVehicle(v.id)}
+								/>
+								<span class="text-sm text-foreground">{getVehicleDisplayName(v)}</span>
+							</label>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">No vehicles available.</p>
+				{/if}
+
+				{#if showSplitEditor}
+					<SplitConfigEditor
+						vehicles={splitVehicles}
+						totalAmount={parsedTotalCost}
+						{splitMethod}
+						allocations={splitAllocations}
+						onMethodChange={handleSplitMethodChange}
+						onAllocationsChange={handleAllocationsChange}
+					/>
+				{/if}
+
+				<Separator />
 				<h4 class="text-sm font-medium text-foreground">Finance Details</h4>
 
 				<div class="grid grid-cols-2 gap-3">
@@ -321,39 +425,25 @@
 						{/if}
 					</div>
 					<div class="space-y-2">
-						<Label for="tf-monthly-cost">Monthly Cost ($)</Label>
-						<Input
-							id="tf-monthly-cost"
-							type="number"
-							step="0.01"
-							min="0"
-							bind:value={monthlyCost}
-							class={errors.monthlyCost ? 'border-destructive' : ''}
-						/>
-						{#if errors.monthlyCost}
-							<p class="text-xs text-destructive">{errors.monthlyCost}</p>
-						{/if}
-					</div>
-				</div>
-
-				<div class="grid grid-cols-2 gap-3">
-					<div class="space-y-2">
 						<Label for="tf-frequency">Premium Frequency</Label>
-						<Input id="tf-frequency" placeholder="e.g. Monthly" bind:value={premiumFrequency} />
-					</div>
-					<div class="space-y-2">
-						<Label for="tf-payment-amount">Payment Amount ($)</Label>
-						<Input
-							id="tf-payment-amount"
-							type="number"
-							step="0.01"
-							min="0"
-							bind:value={paymentAmount}
-							class={errors.paymentAmount ? 'border-destructive' : ''}
-						/>
-						{#if errors.paymentAmount}
-							<p class="text-xs text-destructive">{errors.paymentAmount}</p>
-						{/if}
+						<Select.Root
+							type="single"
+							value={premiumFrequency}
+							onValueChange={v => {
+								premiumFrequency = v ?? '';
+							}}
+						>
+							<Select.Trigger id="tf-frequency" class="w-full">
+								{premiumFrequency || 'Select frequency'}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="Monthly" label="Monthly">Monthly</Select.Item>
+								<Select.Item value="Quarterly" label="Quarterly">Quarterly</Select.Item>
+								<Select.Item value="Semi-Annual" label="Semi-Annual">Semi-Annual</Select.Item>
+								<Select.Item value="Annual" label="Annual">Annual</Select.Item>
+								<Select.Item value="One-Time" label="One-Time">One-Time</Select.Item>
+							</Select.Content>
+						</Select.Root>
 					</div>
 				</div>
 			</div>

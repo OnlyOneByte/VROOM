@@ -1,4 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
+import { relations } from 'drizzle-orm';
 import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // User table
@@ -106,21 +107,50 @@ export const insurancePolicies = sqliteTable('insurance_policies', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
-// Insurance Policy ↔ Vehicles junction table
+// Insurance Policy ↔ Vehicles junction table (per-term coverage)
 export const insurancePolicyVehicles = sqliteTable(
   'insurance_policy_vehicles',
   {
     policyId: text('policy_id')
       .notNull()
       .references(() => insurancePolicies.id, { onDelete: 'cascade' }),
+    termId: text('term_id').notNull(),
     vehicleId: text('vehicle_id')
       .notNull()
       .references(() => vehicles.id, { onDelete: 'cascade' }),
   },
   (table) => ({
-    pk: primaryKey({ columns: [table.policyId, table.vehicleId] }),
+    pk: primaryKey({ columns: [table.policyId, table.termId, table.vehicleId] }),
   })
 );
+
+// Split config type for expense groups
+export type SplitConfig =
+  | { method: 'even'; vehicleIds: string[] }
+  | { method: 'absolute'; allocations: Array<{ vehicleId: string; amount: number }> }
+  | { method: 'percentage'; allocations: Array<{ vehicleId: string; percentage: number }> };
+
+// Expense Groups table (cross-vehicle cost allocation containers)
+export const expenseGroups = sqliteTable('expense_groups', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  splitConfig: text('split_config', { mode: 'json' }).$type<SplitConfig>().notNull(),
+  category: text('category').notNull(),
+  tags: text('tags', { mode: 'json' }).$type<string[]>(),
+  date: integer('date', { mode: 'timestamp' }).notNull(),
+  description: text('description'),
+  totalAmount: real('total_amount').notNull(),
+  // No FK constraint — insurance delete handler nullifies these via application logic
+  // to preserve expense groups as historical records
+  insurancePolicyId: text('insurance_policy_id'),
+  insuranceTermId: text('insurance_term_id'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
 
 // Expense table
 export const expenses = sqliteTable('expenses', {
@@ -145,6 +175,9 @@ export const expenses = sqliteTable('expenses', {
   insurancePolicyId: text('insurance_policy_id'),
   insuranceTermId: text('insurance_term_id'),
   missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
+  expenseGroupId: text('expense_group_id').references(() => expenseGroups.id, {
+    onDelete: 'cascade',
+  }),
 });
 
 // User Settings table
@@ -194,6 +227,20 @@ export const sessions = sqliteTable('sessions', {
   expiresAt: integer('expires_at').notNull(),
 });
 
+// Drizzle relations for expense groups
+export const expenseGroupsRelations = relations(expenseGroups, ({ one, many }) => ({
+  user: one(users, { fields: [expenseGroups.userId], references: [users.id] }),
+  children: many(expenses),
+}));
+
+export const expensesRelations = relations(expenses, ({ one }) => ({
+  vehicle: one(vehicles, { fields: [expenses.vehicleId], references: [vehicles.id] }),
+  expenseGroup: one(expenseGroups, {
+    fields: [expenses.expenseGroupId],
+    references: [expenseGroups.id],
+  }),
+}));
+
 // Export types for use in application
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -214,6 +261,9 @@ export type NewInsurancePolicy = typeof insurancePolicies.$inferInsert;
 
 export type InsurancePolicyVehicle = typeof insurancePolicyVehicles.$inferSelect;
 export type NewInsurancePolicyVehicle = typeof insurancePolicyVehicles.$inferInsert;
+
+export type ExpenseGroup = typeof expenseGroups.$inferSelect;
+export type NewExpenseGroup = typeof expenseGroups.$inferInsert;
 
 export type Expense = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;
@@ -249,4 +299,4 @@ export const photos = sqliteTable(
 
 export type Photo = typeof photos.$inferSelect;
 export type NewPhoto = typeof photos.$inferInsert;
-export type PhotoEntityType = 'vehicle' | 'expense' | 'trip' | 'insurance_policy';
+export type PhotoEntityType = 'vehicle' | 'expense' | 'trip' | 'insurance_policy' | 'expense_group';

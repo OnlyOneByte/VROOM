@@ -1,3 +1,10 @@
+import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+
+// Drizzle transaction type — shared across repositories and services
+export type DrizzleTransaction = Parameters<
+  Parameters<BunSQLiteDatabase<Record<string, unknown>>['transaction']>[0]
+>[0];
+
 // Expense Categories - Single source of truth
 export const EXPENSE_CATEGORIES = [
   'fuel',

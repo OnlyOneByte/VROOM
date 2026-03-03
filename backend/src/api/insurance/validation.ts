@@ -35,6 +35,22 @@ export const financeDetailsSchema = z
   .optional()
   .default({});
 
+// --- Term vehicle coverage schema ---
+
+export const termVehicleCoverageSchema = z.object({
+  vehicleIds: z.array(z.string().min(1)).min(1, 'At least one vehicle required'),
+  splitMethod: z.enum(['even', 'absolute', 'percentage']).optional().default('even'),
+  allocations: z
+    .array(
+      z.object({
+        vehicleId: z.string().min(1),
+        amount: z.number().min(0).optional(),
+        percentage: z.number().min(0).max(100).optional(),
+      })
+    )
+    .optional(),
+});
+
 // --- Term schemas ---
 
 export const policyTermSchema = z
@@ -49,24 +65,35 @@ export const policyTermSchema = z
     message: 'End date must be after start date',
   });
 
+const createPolicyTermSchema = z
+  .object({
+    id: z.string().min(1),
+    startDate: z.coerce.date(),
+    endDate: z.coerce.date(),
+    policyDetails: policyDetailsSchema,
+    financeDetails: financeDetailsSchema,
+    vehicleCoverage: termVehicleCoverageSchema,
+  })
+  .refine((data) => data.endDate > data.startDate, {
+    message: 'End date must be after start date',
+  });
+
 // --- Policy CRUD schemas ---
 
 export const createPolicySchema = z.object({
   company: z.string().min(1, 'Company is required').max(ins.companyMaxLength),
-  vehicleIds: z.array(z.string().min(1)).min(1, 'At least one vehicle is required'),
-  terms: z.array(policyTermSchema).min(1, 'At least one term is required'),
+  terms: z.array(createPolicyTermSchema).min(1, 'At least one term is required'),
   notes: z.string().max(ins.notesMaxLength).optional(),
   isActive: z.boolean().optional().default(true),
 });
 
 export const updatePolicySchema = z.object({
   company: z.string().min(1, 'Company is required').max(ins.companyMaxLength).optional(),
-  vehicleIds: z.array(z.string().min(1)).min(1, 'At least one vehicle is required').optional(),
   notes: z.string().max(ins.notesMaxLength).optional(),
   isActive: z.boolean().optional(),
 });
 
-export const addTermSchema = policyTermSchema;
+export const addTermSchema = createPolicyTermSchema;
 
 export const updateTermSchema = z
   .object({
@@ -74,6 +101,7 @@ export const updateTermSchema = z
     endDate: z.coerce.date().optional(),
     policyDetails: policyDetailsSchema,
     financeDetails: financeDetailsSchema,
+    vehicleCoverage: termVehicleCoverageSchema.optional(),
   })
   .refine(
     (data) => {

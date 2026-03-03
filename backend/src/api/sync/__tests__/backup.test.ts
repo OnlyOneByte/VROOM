@@ -276,6 +276,7 @@ describe('validateBackupData: acceptance', () => {
             vehicleId: 'test-id',
             missedFillup: '',
             isFinancingPayment: '',
+            expenseGroupId: '',
           }),
           expenses
         ),
@@ -283,6 +284,7 @@ describe('validateBackupData: acceptance', () => {
       financing: [],
       insurance: [],
       insurancePolicyVehicles: [],
+      expenseGroups: [],
     };
     // Fix vehicleId reference
     (backup.expenses[0] as Record<string, unknown>).vehicleId = backup.vehicles[0].id;
@@ -306,6 +308,7 @@ describe('validateBackupData: referential integrity', () => {
       financing: [],
       insurance: [],
       insurancePolicyVehicles: [],
+      expenseGroups: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -321,6 +324,7 @@ describe('validateBackupData: referential integrity', () => {
       financing: [],
       insurance: [],
       insurancePolicyVehicles: [{ policyId: 'ghost', vehicleId: v.id as string }],
+      expenseGroups: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -336,6 +340,7 @@ describe('validateBackupData: referential integrity', () => {
       financing: [],
       insurance: [ins],
       insurancePolicyVehicles: [{ policyId: ins.id as string, vehicleId: 'ghost' }],
+      expenseGroups: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);

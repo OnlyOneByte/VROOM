@@ -4,8 +4,10 @@
 
 export type {
   Expense,
+  ExpenseGroup,
   InsurancePolicy,
   NewExpense,
+  NewExpenseGroup,
   NewInsurancePolicy,
   NewSession,
   NewUser,
@@ -102,6 +104,7 @@ export interface BackupData {
   financing: import('./db/schema').VehicleFinancing[];
   insurance: import('./db/schema').InsurancePolicy[];
   insurancePolicyVehicles: import('./db/schema').InsurancePolicyVehicle[];
+  expenseGroups: import('./db/schema').ExpenseGroup[];
 }
 
 export interface ParsedBackupData {
@@ -111,4 +114,5 @@ export interface ParsedBackupData {
   financing: Record<string, unknown>[];
   insurance: Record<string, unknown>[];
   insurancePolicyVehicles: Record<string, unknown>[];
+  expenseGroups: Record<string, unknown>[];
 }

@@ -9,11 +9,9 @@
 		LoaderCircle,
 		ListFilter
 	} from 'lucide-svelte';
-	import { settingsStore } from '$lib/stores/settings';
 	import { appStore } from '$lib/stores/app';
 	import { expenseApi } from '$lib/services/expense-api';
 	import type { Expense, Vehicle, ExpenseCategory } from '$lib/types';
-	import { getVolumeUnitLabel, getChargeUnitLabel } from '$lib/utils/units';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import { categoryLabels, getCategoryIcon, getCategoryColor } from '$lib/utils/expense-helpers';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
@@ -47,6 +45,28 @@
 		EmptyTitle
 	} from '$lib/components/ui/empty';
 	import * as Select from '$lib/components/ui/select';
+	import SplitExpenseBadge from './SplitExpenseBadge.svelte';
+	import { ChevronRight } from 'lucide-svelte';
+
+	// Types for grouped display
+	interface ExpenseRow {
+		type: 'standalone';
+		expense: Expense;
+	}
+
+	interface GroupRow {
+		type: 'group';
+		groupId: string;
+		totalAmount: number;
+		category: string;
+		date: string;
+		description: string | undefined;
+		tags: string[];
+		vehicleNames: string[];
+		children: Expense[];
+	}
+
+	type DisplayRow = ExpenseRow | GroupRow;
 
 	interface Props {
 		expenses: Expense[];
@@ -123,6 +143,78 @@
 
 		return filtered;
 	});
+
+	// Group expenses: children with same expenseGroupId become collapsible groups
+	let tableRows = $derived.by((): DisplayRow[] => {
+		const grouped = new Map<string, Expense[]>();
+		const standalone: Expense[] = [];
+
+		for (const expense of sortedExpenses) {
+			if (expense.expenseGroupId) {
+				const existing = grouped.get(expense.expenseGroupId);
+				if (existing) {
+					existing.push(expense);
+				} else {
+					grouped.set(expense.expenseGroupId, [expense]);
+				}
+			} else {
+				standalone.push(expense);
+			}
+		}
+
+		const rows: DisplayRow[] = [];
+
+		// Add standalone expenses
+		for (const expense of standalone) {
+			rows.push({ type: 'standalone' as const, expense });
+		}
+
+		// Add group rows
+		for (const [groupId, children] of grouped) {
+			const first = children[0];
+			if (!first) continue;
+			const totalAmount = Math.round(children.reduce((sum, c) => sum + c.amount, 0) * 100) / 100;
+			const vehicleNameSet = new Set<string>();
+			for (const child of children) {
+				const v = vehicles.find(vh => vh.id === child.vehicleId);
+				if (v) vehicleNameSet.add(getVehicleDisplayName(v));
+			}
+			rows.push({
+				type: 'group' as const,
+				groupId,
+				totalAmount,
+				category: first.category,
+				date: first.date,
+				description: first.description,
+				tags: first.tags || [],
+				vehicleNames: [...vehicleNameSet],
+				children
+			});
+		}
+
+		// Sort combined rows by date
+		rows.sort((a, b) => {
+			const dateA = a.type === 'standalone' ? a.expense.date : a.date;
+			const dateB = b.type === 'standalone' ? b.expense.date : b.date;
+			const comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
+			return sortOrder === 'asc' ? comparison : -comparison;
+		});
+
+		return rows;
+	});
+
+	// Expand state for groups
+	let expandedGroups = $state(new Set<string>());
+
+	function toggleGroup(groupId: string) {
+		const next = new Set(expandedGroups);
+		if (next.has(groupId)) {
+			next.delete(groupId);
+		} else {
+			next.add(groupId);
+		}
+		expandedGroups = next;
+	}
 
 	function handleSort(newSortBy: typeof sortBy) {
 		if (sortBy === newSortBy) {
@@ -243,7 +335,7 @@
 									</Select.Trigger>
 									<Select.Content>
 										<Select.Item value="" label="All Categories">All Categories</Select.Item>
-										{#each Object.entries(categoryLabels) as [value, label]}
+										{#each Object.entries(categoryLabels) as [value, label] (value)}
 											<Select.Item {value} {label}>{label}</Select.Item>
 										{/each}
 									</Select.Content>
@@ -280,111 +372,216 @@
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{#if sortedExpenses.length === 0}
+						{#if tableRows.length === 0}
 							<TableRow>
 								<TableCell colspan={showVehicleColumn ? 7 : 6} class="h-24 text-center">
 									<p class="text-muted-foreground">No expenses match this category filter.</p>
 								</TableCell>
 							</TableRow>
 						{:else}
-							{#each sortedExpenses as expense (expense.id)}
-								{@const IconComponent = getCategoryIcon(expense.category)}
-								{@const vehicle = getVehicleForExpense(expense)}
-								<TableRow class="group">
-									<TableCell class="font-medium text-muted-foreground">
-										{formatDate(new Date(expense.date))}
-									</TableCell>
-									{#if showVehicleColumn}
+							{#each tableRows as row (row.type === 'standalone' ? row.expense.id : row.groupId)}
+								{#if row.type === 'standalone'}
+									{@const expense = row.expense}
+									{@const IconComponent = getCategoryIcon(expense.category)}
+									{@const vehicle = getVehicleForExpense(expense)}
+									<TableRow class="group">
+										<TableCell class="font-medium text-muted-foreground">
+											{formatDate(new Date(expense.date))}
+										</TableCell>
+										{#if showVehicleColumn}
+											<TableCell>
+												<div class="flex items-center gap-2">
+													<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
+													<span class="truncate">
+														{vehicle ? getVehicleDisplayName(vehicle) : 'Unknown'}
+													</span>
+												</div>
+											</TableCell>
+										{/if}
 										<TableCell>
 											<div class="flex items-center gap-2">
-												<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
-												<span class="truncate">
-													{vehicle ? getVehicleDisplayName(vehicle) : 'Unknown'}
-												</span>
+												<div
+													class="p-1.5 rounded-lg {getCategoryColor(
+														expense.category
+													)} flex-shrink-0"
+												>
+													<IconComponent class="h-4 w-4" />
+												</div>
+												<span class="whitespace-nowrap"
+													>{categoryLabels[expense.category as ExpenseCategory]}</span
+												>
 											</div>
 										</TableCell>
-									{/if}
-									<TableCell>
-										<div class="flex items-center gap-2">
+										<TableCell>
+											<div class="flex flex-wrap gap-1">
+												{#each expense.tags || [] as tag (tag)}
+													<Badge variant="secondary" class="font-normal">{tag}</Badge>
+												{/each}
+											</div>
+										</TableCell>
+										<TableCell>
+											<div class="truncate text-foreground">{expense.description || '-'}</div>
+										</TableCell>
+										<TableCell class="text-right font-semibold whitespace-nowrap">
+											{formatCurrency(expense.amount)}
+										</TableCell>
+										<TableCell class="text-right">
 											<div
-												class="p-1.5 rounded-lg {getCategoryColor(expense.category)} flex-shrink-0"
+												class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
 											>
-												<IconComponent class="h-4 w-4" />
-											</div>
-											<span class="whitespace-nowrap"
-												>{categoryLabels[expense.category as ExpenseCategory]}</span
-											>
-										</div>
-									</TableCell>
-									<TableCell>
-										<div class="flex flex-wrap gap-1">
-											{#each expense.tags || [] as tag}
-												<Badge variant="secondary" class="font-normal">
-													{tag}
-												</Badge>
-											{/each}
-										</div>
-									</TableCell>
-									<TableCell>
-										<div class="truncate text-foreground">
-											{expense.description || '-'}
-										</div>
-										{#if expense.mileage || expense.volume || expense.charge}
-											<div class="text-xs text-muted-foreground mt-1 whitespace-nowrap">
-												{#if expense.mileage}
-													{expense.mileage.toLocaleString()} mi
-												{/if}
-												{#if expense.mileage && (expense.volume || expense.charge)}
-													•
-												{/if}
-												{#if expense.volume}
-													{expense.volume}
-													{getVolumeUnitLabel(
-														$settingsStore.settings?.volumeUnit || 'gallons_us',
-														true
-													)}
-												{/if}
-												{#if expense.charge}
-													{expense.charge}
-													{getChargeUnitLabel($settingsStore.settings?.chargeUnit || 'kwh', true)}
-												{/if}
-											</div>
-										{/if}
-									</TableCell>
-									<TableCell class="text-right font-semibold whitespace-nowrap">
-										{formatCurrency(expense.amount)}
-									</TableCell>
-									<TableCell class="text-right">
-										<div
-											class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-										>
-											<Button
-												variant="ghost"
-												size="icon"
-												class="h-8 w-8"
-												href="/expenses/{expense.id}/edit?returnTo={returnTo}"
-												title="Edit expense"
-												onclick={e => e.stopPropagation()}
-											>
-												<Pencil class="h-4 w-4" />
-											</Button>
-											{#if onDelete}
 												<Button
 													variant="ghost"
 													size="icon"
-													class="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-													onclick={e => {
-														e.stopPropagation();
-														confirmDelete(expense);
-													}}
-													title="Delete expense"
+													class="h-8 w-8"
+													href="/expenses/{expense.id}/edit?returnTo={returnTo}"
+													title="Edit expense"
+													onclick={e => e.stopPropagation()}
 												>
-													<Trash2 class="h-4 w-4" />
+													<Pencil class="h-4 w-4" />
 												</Button>
-											{/if}
-										</div>
-									</TableCell>
-								</TableRow>
+												{#if onDelete}
+													<Button
+														variant="ghost"
+														size="icon"
+														class="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+														onclick={e => {
+															e.stopPropagation();
+															confirmDelete(expense);
+														}}
+														title="Delete expense"
+													>
+														<Trash2 class="h-4 w-4" />
+													</Button>
+												{/if}
+											</div>
+										</TableCell>
+									</TableRow>
+								{:else}
+									{@const IconComponent = getCategoryIcon(row.category)}
+									{@const isExpanded = expandedGroups.has(row.groupId)}
+									<!-- Group parent row -->
+									<TableRow
+										class="group cursor-pointer hover:bg-muted/50"
+										onclick={() => toggleGroup(row.groupId)}
+									>
+										<TableCell class="font-medium text-muted-foreground">
+											<div class="flex items-center gap-1.5">
+												<ChevronRight
+													class="h-4 w-4 text-muted-foreground transition-transform duration-200 flex-shrink-0 {isExpanded
+														? 'rotate-90'
+														: ''}"
+												/>
+												{formatDate(new Date(row.date))}
+											</div>
+										</TableCell>
+										{#if showVehicleColumn}
+											<TableCell>
+												<div class="flex items-center gap-2">
+													<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
+													<span class="truncate text-sm">
+														{row.vehicleNames.join(', ')}
+													</span>
+												</div>
+											</TableCell>
+										{/if}
+										<TableCell>
+											<div class="flex items-center gap-2">
+												<div
+													class="p-1.5 rounded-lg {getCategoryColor(row.category)} flex-shrink-0"
+												>
+													<IconComponent class="h-4 w-4" />
+												</div>
+												<span class="whitespace-nowrap"
+													>{categoryLabels[row.category as ExpenseCategory]}</span
+												>
+											</div>
+										</TableCell>
+										<TableCell>
+											<div class="flex flex-wrap gap-1">
+												{#each row.tags as tag (tag)}
+													<Badge variant="secondary" class="font-normal">{tag}</Badge>
+												{/each}
+											</div>
+										</TableCell>
+										<TableCell>
+											<div class="truncate text-foreground">{row.description || '-'}</div>
+										</TableCell>
+										<TableCell class="text-right font-semibold whitespace-nowrap">
+											<div class="flex items-center justify-end gap-1.5">
+												{formatCurrency(row.totalAmount)}
+												<SplitExpenseBadge />
+											</div>
+										</TableCell>
+										<TableCell class="text-right">
+											<div
+												class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+											>
+												<Button
+													variant="ghost"
+													size="icon"
+													class="h-8 w-8"
+													href="/expenses/{row.children[0]?.id}/edit?returnTo={returnTo}"
+													title="Edit split expense"
+													onclick={e => e.stopPropagation()}
+												>
+													<Pencil class="h-4 w-4" />
+												</Button>
+												{#if onDelete}
+													{@const isInsuranceLinked = row.tags.includes('insurance')}
+													<Button
+														variant="ghost"
+														size="icon"
+														class="h-8 w-8 {isInsuranceLinked
+															? 'text-muted-foreground/40 cursor-not-allowed'
+															: 'text-destructive hover:text-destructive hover:bg-destructive/10'}"
+														onclick={e => {
+															e.stopPropagation();
+															if (!isInsuranceLinked && row.children[0]) {
+																confirmDelete(row.children[0]);
+															}
+														}}
+														disabled={isInsuranceLinked}
+														title={isInsuranceLinked
+															? 'Delete the insurance policy to remove this expense'
+															: 'Delete expense'}
+													>
+														<Trash2 class="h-4 w-4" />
+													</Button>
+												{/if}
+											</div>
+										</TableCell>
+									</TableRow>
+									<!-- Expanded child rows -->
+									{#if isExpanded}
+										{#each row.children as child (child.id)}
+											{@const childVehicle = getVehicleForExpense(child)}
+											<TableRow class="bg-muted/30">
+												<TableCell class="pl-8 text-xs text-muted-foreground">
+													{formatDate(new Date(child.date))}
+												</TableCell>
+												{#if showVehicleColumn}
+													<TableCell>
+														<div class="flex items-center gap-2 pl-4">
+															<Car class="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+															<span class="truncate text-sm text-muted-foreground">
+																{childVehicle ? getVehicleDisplayName(childVehicle) : 'Unknown'}
+															</span>
+														</div>
+													</TableCell>
+												{/if}
+												<TableCell></TableCell>
+												<TableCell></TableCell>
+												<TableCell></TableCell>
+												<TableCell
+													class="text-right text-sm text-muted-foreground whitespace-nowrap"
+												>
+													{formatCurrency(child.amount)}
+												</TableCell>
+												<TableCell></TableCell>
+											</TableRow>
+										{/each}
+									{/if}
+								{/if}
 							{/each}
 						{/if}
 					</TableBody>
@@ -423,7 +620,7 @@
 							</p>
 							{#if expenseToDelete.tags && expenseToDelete.tags.length > 0}
 								<div class="flex flex-wrap gap-1 mt-2">
-									{#each expenseToDelete.tags as tag}
+									{#each expenseToDelete.tags as tag (tag)}
 										<Badge variant="secondary" class="font-normal">
 											{tag}
 										</Badge>

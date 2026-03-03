@@ -235,5 +235,8 @@ export const validPolicyInputArb = (vehicleIds: string[]) =>
     })
     .map((input) => ({
       ...input,
-      vehicleIds: vehicleIds.length > 0 ? vehicleIds : ['v-fallback'],
+      terms: input.terms.map((t) => ({
+        ...t,
+        vehicleCoverage: { vehicleIds },
+      })),
     }));

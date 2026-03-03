@@ -1,17 +1,29 @@
 <script lang="ts">
 	import PolicyCard from './PolicyCard.svelte';
 	import { groupPoliciesByActive } from '$lib/utils/insurance';
-	import type { InsurancePolicy } from '$lib/types';
+	import type { InsurancePolicy, Vehicle } from '$lib/types';
 
 	interface Props {
 		policies: InsurancePolicy[];
 		vehicleNameMap?: Map<string, string>;
+		vehicles?: Vehicle[];
+		editTermId?: string | null;
+		editPolicyId?: string | null;
 		onEdit: (_policy: InsurancePolicy) => void;
 		onDelete: (_policyId: string) => void;
 		onRefresh: () => Promise<void>;
 	}
 
-	let { policies, vehicleNameMap = new Map(), onEdit, onDelete, onRefresh }: Props = $props();
+	let {
+		policies,
+		vehicleNameMap = new Map(),
+		vehicles = [],
+		editTermId = null,
+		editPolicyId = null,
+		onEdit,
+		onDelete,
+		onRefresh
+	}: Props = $props();
 
 	let grouped = $derived(groupPoliciesByActive(policies));
 
@@ -30,6 +42,8 @@
 				<PolicyCard
 					{policy}
 					vehicleNames={getVehicleNames(policy)}
+					{vehicles}
+					autoEditTermId={editPolicyId === policy.id ? editTermId : null}
 					{onEdit}
 					{onDelete}
 					{onRefresh}
@@ -45,6 +59,8 @@
 				<PolicyCard
 					{policy}
 					vehicleNames={getVehicleNames(policy)}
+					{vehicles}
+					autoEditTermId={editPolicyId === policy.id ? editTermId : null}
 					{onEdit}
 					{onDelete}
 					{onRefresh}

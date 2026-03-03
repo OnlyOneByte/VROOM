@@ -116,8 +116,8 @@ export async function seedDatabase() {
 
     // Link policies to vehicles via junction table
     await db.insert(insurancePolicyVehicles).values([
-      { policyId: policy1.id, vehicleId: vehicle1.id },
-      { policyId: policy2.id, vehicleId: vehicle2.id },
+      { policyId: policy1.id, termId: 'term-sf-1', vehicleId: vehicle1.id },
+      { policyId: policy2.id, termId: 'term-ge-1', vehicleId: vehicle2.id },
     ]);
 
     // Create sample expenses

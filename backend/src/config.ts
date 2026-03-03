@@ -5,6 +5,7 @@
 import type { SQLiteTableWithColumns } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import {
+  expenseGroups,
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
@@ -169,6 +170,7 @@ export const TABLE_SCHEMA_MAP: Record<string, SQLiteTableWithColumns<any>> = {
   financing: vehicleFinancing,
   insurance: insurancePolicies,
   insurancePolicyVehicles: insurancePolicyVehicles,
+  expenseGroups: expenseGroups,
 };
 
 export const TABLE_FILENAME_MAP: Record<string, string> = {
@@ -177,6 +179,7 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   financing: 'vehicle_financing.csv',
   insurance: 'insurance_policies.csv',
   insurancePolicyVehicles: 'insurance_policy_vehicles.csv',
+  expenseGroups: 'expense_groups.csv',
 };
 
 export function getBackupTableKeys(): string[] {
@@ -184,7 +187,7 @@ export function getBackupTableKeys(): string[] {
 }
 
 // Files that may be absent in older backups (pre-migration)
-const OPTIONAL_BACKUP_FILES = new Set(['insurance_policy_vehicles.csv']);
+const OPTIONAL_BACKUP_FILES = new Set(['insurance_policy_vehicles.csv', 'expense_groups.csv']);
 
 export function getRequiredBackupFiles(): string[] {
   return [

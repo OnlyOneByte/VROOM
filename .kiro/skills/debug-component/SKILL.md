@@ -14,6 +14,48 @@ Before starting, verify:
 2. Backend is running on port 3001
 3. Frontend dev server is running on port 5173
 
+### Launching Chrome with Remote Debugging
+
+If Chrome isn't running with debugging enabled, launch it. There are two options:
+
+**Option A: Relaunch Chrome (simplest, requires quitting Chrome first)**
+
+The user must quit Chrome first (Cmd+Q), then launch:
+
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222 \
+  --user-data-dir="$HOME/Library/Application Support/Google/Chrome" \
+  --no-first-run --no-default-browser-check --profile-directory=Default
+```
+
+Use `controlBashProcess` with action `start` since this is a long-running process.
+
+**Option B: Copy profile and run a second instance (keeps existing Chrome open)**
+
+This copies the user's Chrome profile so their Google login and cookies are available without closing their main browser:
+
+```bash
+# 1. Copy the profile
+mkdir -p /tmp/chrome-debug-profile
+rsync -a --quiet ~/Library/Application\ Support/Google/Chrome/Default/ /tmp/chrome-debug-profile/Default/
+cp ~/Library/Application\ Support/Google/Chrome/Local\ State /tmp/chrome-debug-profile/Local\ State
+
+# 2. Launch Chrome with the copied profile (use controlBashProcess start)
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222 \
+  --user-data-dir=/tmp/chrome-debug-profile \
+  --no-first-run --no-default-browser-check --profile-directory=Default
+```
+
+**Verify the connection:**
+
+```bash
+curl -s http://127.0.0.1:9222/json/version | head -5
+```
+
+Or use `mcp_chrome_devtools_list_pages` — if it returns without error, the connection is live.
+
 ## Workflow
 
 ### Step 1: Verify Services Are Running

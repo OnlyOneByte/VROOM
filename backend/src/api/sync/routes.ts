@@ -94,7 +94,7 @@ async function performBackupSync(
   const deletedCount = await enforceBackupRetention(
     driveService,
     folderId,
-    settings.googleDriveBackupRetentionCount || CONFIG.backup.defaultRetentionCount
+    settings.googleDriveBackupRetentionCount ?? CONFIG.backup.defaultRetentionCount
   );
 
   await settingsRepository.updateBackupDate(userId);

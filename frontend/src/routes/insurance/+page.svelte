@@ -1,11 +1,12 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { Shield, Plus, CircleAlert } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/ui/empty-state.svelte';
 	import PolicyList from '$lib/components/insurance/PolicyList.svelte';
-	import PolicyForm from '$lib/components/insurance/PolicyForm.svelte';
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
@@ -16,14 +17,33 @@
 	let vehicles = $state<Vehicle[]>([]);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
-	let showPolicyForm = $state(false);
-	let editingPolicy = $state<InsurancePolicy | null>(null);
+
+	// Deep-link query params for auto-opening a term edit (captured once, cleared after use)
+	let editTermId = $state<string | null>(null);
+	let editPolicyId = $state<string | null>(null);
 
 	// Build a map of vehicleId → display name for showing on policy cards
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
 	onMount(async () => {
+		// Capture deep-link params before loading
+		editTermId = page.url.searchParams.get('editTerm');
+		editPolicyId = page.url.searchParams.get('policy');
+		// Clear URL params immediately using page.url (already available from $app/state)
+		if (editTermId || editPolicyId) {
+			const url = new URL(page.url);
+			url.searchParams.delete('editTerm');
+			url.searchParams.delete('policy');
+			history.replaceState(history.state, '', url.pathname);
+		}
 		await loadData();
+		// Clear deep-link params after a tick so PolicyCard has time to read them
+		if (editTermId || editPolicyId) {
+			setTimeout(() => {
+				editTermId = null;
+				editPolicyId = null;
+			}, 100);
+		}
 	});
 
 	async function loadData() {
@@ -46,13 +66,11 @@
 	}
 
 	function handleAddPolicy() {
-		editingPolicy = null;
-		showPolicyForm = true;
+		goto('/insurance/new');
 	}
 
 	function handleEditPolicy(policy: InsurancePolicy) {
-		editingPolicy = policy;
-		showPolicyForm = true;
+		goto(`/insurance/${policy.id}/edit`);
 	}
 
 	async function handleDeletePolicy(policyId: string) {
@@ -62,12 +80,6 @@
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to delete policy');
 		}
-	}
-
-	async function handlePolicySuccess() {
-		showPolicyForm = false;
-		editingPolicy = null;
-		await loadData();
 	}
 </script>
 
@@ -136,6 +148,9 @@
 			<PolicyList
 				{policies}
 				{vehicleNameMap}
+				{vehicles}
+				{editTermId}
+				{editPolicyId}
 				onEdit={handleEditPolicy}
 				onDelete={handleDeletePolicy}
 				onRefresh={loadData}
@@ -161,11 +176,3 @@
 		<span class="font-bold text-lg">New Policy</span>
 	</Button>
 {/if}
-
-<PolicyForm
-	bind:open={showPolicyForm}
-	vehicleId=""
-	policy={editingPolicy}
-	{vehicles}
-	onSuccess={handlePolicySuccess}
-/>
