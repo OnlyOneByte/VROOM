@@ -43,6 +43,7 @@ export interface BackendExpenseResponse {
 	receiptUrl?: string;
 	isFinancingPayment?: boolean;
 	missedFillup?: boolean;
+	expenseGroupId?: string; // Non-null means this is a split child expense
 	createdAt: string;
 	updatedAt: string;
 }
@@ -135,6 +136,9 @@ export function fromBackendExpense(
 	}
 	if (backendExpense.description) {
 		frontendExpense.description = backendExpense.description;
+	}
+	if (backendExpense.expenseGroupId) {
+		frontendExpense.expenseGroupId = backendExpense.expenseGroupId;
 	}
 
 	return frontendExpense;

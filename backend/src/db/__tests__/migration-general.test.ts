@@ -42,6 +42,7 @@ describe('Migrations: General', () => {
 
     const tables = getTables(db);
     const expectedTables = [
+      'expense_groups',
       'expenses',
       'insurance_policies',
       'insurance_policy_vehicles',

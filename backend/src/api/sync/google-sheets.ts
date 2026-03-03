@@ -7,6 +7,7 @@ import type { OAuth2Client } from 'google-auth-library';
 import { google, type sheets_v4 } from 'googleapis';
 import { getDb } from '../../db/connection';
 import {
+  expenseGroups,
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
@@ -92,6 +93,7 @@ export class GoogleSheetsService {
         sheets: [
           { properties: { title: 'Vehicles' } },
           { properties: { title: 'Expenses' } },
+          { properties: { title: 'Expense Groups' } },
           { properties: { title: 'Insurance Policies' } },
           { properties: { title: 'Insurance Policy Vehicles' } },
           { properties: { title: 'Vehicle Financing' } },
@@ -128,6 +130,7 @@ export class GoogleSheetsService {
     const requiredSheets = [
       'Vehicles',
       'Expenses',
+      'Expense Groups',
       'Insurance Policies',
       'Insurance Policy Vehicles',
       'Vehicle Financing',
@@ -155,28 +158,30 @@ export class GoogleSheetsService {
     await this.ensureRequiredSheets(spreadsheetId);
     const db = getDb();
 
-    const [userVehicles, userExpenses, userInsuranceJoined, userFinancing] = await Promise.all([
-      db.select().from(vehicles).where(eq(vehicles.userId, userId)),
-      db
-        .select()
-        .from(expenses)
-        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId)),
-      db
-        .select()
-        .from(insurancePolicies)
-        .innerJoin(
-          insurancePolicyVehicles,
-          eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
-        )
-        .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId)),
-      db
-        .select()
-        .from(vehicleFinancing)
-        .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId)),
-    ]);
+    const [userVehicles, userExpenses, userInsuranceJoined, userFinancing, userExpenseGroups] =
+      await Promise.all([
+        db.select().from(vehicles).where(eq(vehicles.userId, userId)),
+        db
+          .select()
+          .from(expenses)
+          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId)),
+        db
+          .select()
+          .from(insurancePolicies)
+          .innerJoin(
+            insurancePolicyVehicles,
+            eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
+          )
+          .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId)),
+        db
+          .select()
+          .from(vehicleFinancing)
+          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId)),
+        db.select().from(expenseGroups).where(eq(expenseGroups.userId, userId)),
+      ]);
 
     // Deduplicate insurance policies (join produces one row per vehicle)
     const seenPolicyIds = new Set<string>();
@@ -197,6 +202,12 @@ export class GoogleSheetsService {
         'Expenses',
         userExpenses.map((e) => e.expenses),
         this.getExpenseHeaders()
+      ),
+      this.updateSheet(
+        spreadsheetId,
+        'Expense Groups',
+        userExpenseGroups,
+        this.getExpenseGroupsHeaders()
       ),
       this.updateSheet(
         spreadsheetId,
@@ -241,6 +252,7 @@ export class GoogleSheetsService {
     return [
       'id',
       'vehicleId',
+      'expenseGroupId',
       'tags',
       'category',
       'expenseAmount',
@@ -272,7 +284,24 @@ export class GoogleSheetsService {
   }
 
   private getInsurancePolicyVehiclesHeaders() {
-    return ['policyId', 'vehicleId'];
+    return ['policyId', 'termId', 'vehicleId'];
+  }
+
+  private getExpenseGroupsHeaders() {
+    return [
+      'id',
+      'userId',
+      'splitConfig',
+      'category',
+      'tags',
+      'date',
+      'description',
+      'totalAmount',
+      'insurancePolicyId',
+      'insuranceTermId',
+      'createdAt',
+      'updatedAt',
+    ];
   }
 
   private getFinancingHeaders() {
@@ -348,21 +377,30 @@ export class GoogleSheetsService {
     financing: Record<string, unknown>[];
     insurance: Record<string, unknown>[];
     insurancePolicyVehicles: Record<string, unknown>[];
+    expenseGroups: Record<string, unknown>[];
   }> {
-    const [vehiclesData, expensesData, insuranceData, insurancePolicyVehiclesData, financingData] =
-      await Promise.all([
-        this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
-        this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
-        this.readSheetData(spreadsheetId, 'Insurance Policies!A:Z'),
-        this.readSheetData(spreadsheetId, 'Insurance Policy Vehicles!A:Z'),
-        this.readSheetData(spreadsheetId, 'Vehicle Financing!A:Z'),
-      ]);
+    const [
+      vehiclesData,
+      expensesData,
+      insuranceData,
+      insurancePolicyVehiclesData,
+      financingData,
+      expenseGroupsData,
+    ] = await Promise.all([
+      this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
+      this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
+      this.readSheetData(spreadsheetId, 'Insurance Policies!A:Z'),
+      this.readSheetData(spreadsheetId, 'Insurance Policy Vehicles!A:Z'),
+      this.readSheetData(spreadsheetId, 'Vehicle Financing!A:Z'),
+      this.readSheetData(spreadsheetId, 'Expense Groups!A:Z'),
+    ]);
 
     const vehicles = this.parseSheetData(vehiclesData);
     const expenses = this.parseSheetData(expensesData);
     const insurance = this.parseSheetData(insuranceData);
     const insurancePolicyVehicles = this.parseSheetData(insurancePolicyVehiclesData);
     const financing = this.parseSheetData(financingData);
+    const expenseGroups = this.parseSheetData(expenseGroupsData);
 
     const userId = vehicles.length > 0 ? (vehicles[0].userId as string) : '';
 
@@ -373,6 +411,7 @@ export class GoogleSheetsService {
       financing,
       insurance,
       insurancePolicyVehicles,
+      expenseGroups,
     };
   }
 

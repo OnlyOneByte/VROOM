@@ -45,7 +45,8 @@
       "disabled": false,
       "autoApprove": [
         "get_documentation",
-        "svelte_autofixer"
+        "svelte_autofixer",
+        "svelte-autofixer"
       ]
     },
     "shadcn-svelte": {
@@ -63,7 +64,9 @@
         "get_component",
         "get_component_demo",
         "list_blocks",
-        "get_block"
+        "get_block",
+        "search_components",
+        "search_examples"
       ]
     },
     "playwright": {

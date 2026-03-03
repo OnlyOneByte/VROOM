@@ -15,8 +15,8 @@
 	import FuelEfficiencyTrendChart from '$lib/components/charts/FuelEfficiencyTrendChart.svelte';
 	import CategoryPieChart from '$lib/components/charts/CategoryPieChart.svelte';
 	import VehicleHeader from '$lib/components/vehicles/VehicleHeader.svelte';
-	import VehiclePhotoGallery from '$lib/components/vehicles/VehiclePhotoGallery.svelte';
-	import PhotoUploadDialog from '$lib/components/vehicles/PhotoUploadDialog.svelte';
+	import VehiclePhotoCarousel from '$lib/components/vehicles/VehiclePhotoCarousel.svelte';
+	import MediaCaptureDialog from '$lib/components/shared/MediaCaptureDialog.svelte';
 	import VehicleInfoCard from '$lib/components/vehicles/VehicleInfoCard.svelte';
 	import ExpenseOverviewCard from '$lib/components/vehicles/ExpenseOverviewCard.svelte';
 	import FuelEfficiencyStatsCard from '$lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
@@ -40,7 +40,7 @@
 		filterExpenses,
 		hasActiveFilters as checkActiveFilters
 	} from '$lib/utils/expense-filters';
-	import { COMMON_MESSAGES, VEHICLE_MESSAGES, MAINTENANCE_MESSAGES } from '$lib/constants/messages';
+	import { COMMON_MESSAGES, VEHICLE_MESSAGES } from '$lib/constants/messages';
 	import {
 		DAYS_IN_RECENT_PERIOD,
 		MONTHS_IN_AVERAGE_PERIOD,
@@ -355,7 +355,7 @@
 
 			<!-- Stats Grid Skeleton -->
 			<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-				{#each Array(4) as _}
+				{#each Array(4) as _, i (i)}
 					<Card>
 						<CardContent class="p-6 space-y-2">
 							<Skeleton class="h-4 w-24" />
@@ -373,11 +373,9 @@
 
 		<!-- Tabs Navigation -->
 		<Tabs bind:value={activeTab} class="space-y-6">
-			<TabsList class="grid w-full grid-cols-5">
+			<TabsList class="grid w-full grid-cols-3">
 				<TabsTrigger value="overview">Overview</TabsTrigger>
 				<TabsTrigger value="expenses">Expenses</TabsTrigger>
-				<TabsTrigger value="photos">Photos</TabsTrigger>
-				<TabsTrigger value="maintenance">Reminders</TabsTrigger>
 				<TabsTrigger value="loan">Finance</TabsTrigger>
 			</TabsList>
 
@@ -385,6 +383,15 @@
 			<TabsContent value="overview" class="space-y-6">
 				<!-- Vehicle Information Card -->
 				<VehicleInfoCard {vehicle} />
+
+				<!-- Photo Carousel -->
+				<VehiclePhotoCarousel
+					{vehicleId}
+					photos={vehiclePhotos}
+					onUpload={() => (showUploadDialog = true)}
+					onDelete={handleDeletePhoto}
+					onSetCover={handleSetCover}
+				/>
 
 				<!-- Insurance Summary -->
 				<InsuranceTab {vehicleId} />
@@ -486,32 +493,6 @@
 				</CardFull.Root>
 			</TabsContent>
 
-			<!-- Photos Tab -->
-			<TabsContent value="photos" class="space-y-6">
-				<VehiclePhotoGallery
-					{vehicleId}
-					photos={vehiclePhotos}
-					onUpload={() => (showUploadDialog = true)}
-					onDelete={handleDeletePhoto}
-					onSetCover={handleSetCover}
-				/>
-			</TabsContent>
-
-			<!-- Maintenance Tab -->
-			<TabsContent value="maintenance" class="space-y-6">
-				<EmptyState>
-					{#snippet icon()}
-						<FileText class="h-12 w-12 text-muted-foreground mb-4" />
-					{/snippet}
-					{#snippet title()}
-						{MAINTENANCE_MESSAGES.COMING_SOON}
-					{/snippet}
-					{#snippet description()}
-						{MAINTENANCE_MESSAGES.COMING_SOON_DESC}
-					{/snippet}
-				</EmptyState>
-			</TabsContent>
-
 			<!-- Finance Tab -->
 			<TabsContent value="loan" class="space-y-4 sm:space-y-6">
 				{#if vehicle.financing?.isActive}
@@ -597,7 +578,7 @@
 									<Skeleton class="h-5 w-32" />
 								</div>
 								<div class="space-y-3">
-									{#each Array(3) as _}
+									{#each Array(3) as _, i (i)}
 										<div class="flex gap-4">
 											<Skeleton class="h-12 w-12 rounded-full" />
 											<div class="flex-1 space-y-2">
@@ -651,11 +632,13 @@
 			</TabsContent>
 		</Tabs>
 
-		<PhotoUploadDialog
+		<MediaCaptureDialog
 			bind:open={showUploadDialog}
-			{vehicleId}
+			title="Upload Vehicle Photos"
+			description="Upload or capture photos of your vehicle (JPEG, PNG, WebP up to 10MB)"
+			onUpload={file => vehicleApi.uploadPhoto(vehicleId, file)}
+			onUploadComplete={result => handlePhotoUploadComplete(result as Photo)}
 			onClose={() => (showUploadDialog = false)}
-			onUploadComplete={handlePhotoUploadComplete}
 		/>
 	</div>
 {:else}
