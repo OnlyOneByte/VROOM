@@ -2,7 +2,7 @@
  * Restore Service - Handles data restoration from backups and Google Sheets
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { TABLE_SCHEMA_MAP } from '../../config';
 import { getDb } from '../../db/connection';
@@ -11,6 +11,7 @@ import {
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
+  photos,
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
@@ -38,6 +39,7 @@ export interface ImportSummary {
   insurance: number;
   insurancePolicyVehicles: number;
   expenseGroups: number;
+  photos: number;
 }
 
 export interface RestoreResponse {
@@ -80,6 +82,7 @@ class RestoreService {
       insurance: parsedBackup.insurance.length,
       insurancePolicyVehicles: parsedBackup.insurancePolicyVehicles?.length ?? 0,
       expenseGroups: parsedBackup.expenseGroups?.length ?? 0,
+      photos: parsedBackup.photos?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -147,6 +150,7 @@ class RestoreService {
       insurance: sheetData.insurance.length,
       insurancePolicyVehicles: sheetData.insurancePolicyVehicles?.length ?? 0,
       expenseGroups: sheetData.expenseGroups?.length ?? 0,
+      photos: sheetData.photos?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -233,6 +237,7 @@ class RestoreService {
       { data: data.expenses, table: expenses, name: 'expenses' },
       { data: data.financing, table: vehicleFinancing, name: 'vehicle_financing' },
       { data: data.insurance, table: insurancePolicies, name: 'insurance_policies' },
+      { data: data.photos ?? [], table: photos, name: 'photos' },
     ];
 
     for (const { data: items, table, name } of tables) {
@@ -256,11 +261,64 @@ class RestoreService {
     const userVehicles = await tx.select().from(vehicles).where(eq(vehicles.userId, userId));
     if (userVehicles.length === 0) {
       // Still delete expense groups even if no vehicles (groups are user-level)
+      const userGroups = await tx
+        .select()
+        .from(expenseGroups)
+        .where(eq(expenseGroups.userId, userId));
+      // Delete photos for expense groups before deleting the groups
+      for (const group of userGroups) {
+        await tx
+          .delete(photos)
+          .where(and(eq(photos.entityType, 'expense_group'), eq(photos.entityId, group.id)));
+      }
       await tx.delete(expenseGroups).where(eq(expenseGroups.userId, userId));
       return;
     }
 
     const vehicleIds = userVehicles.map((v: { id: string }) => v.id);
+
+    // Collect expense IDs and expense group IDs for photo deletion
+    const userExpenses = await tx
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(inArray(expenses.vehicleId, vehicleIds));
+    const expenseIds = userExpenses.map((e) => e.id);
+
+    const userGroups = await tx
+      .select({ id: expenseGroups.id })
+      .from(expenseGroups)
+      .where(eq(expenseGroups.userId, userId));
+    const groupIds = userGroups.map((g) => g.id);
+
+    // Collect insurance policy IDs for photo deletion
+    const userPolicyVehicles = await tx
+      .select({ policyId: insurancePolicyVehicles.policyId })
+      .from(insurancePolicyVehicles)
+      .where(inArray(insurancePolicyVehicles.vehicleId, vehicleIds));
+    const policyIds = [...new Set(userPolicyVehicles.map((pv) => pv.policyId))];
+
+    // Delete photos for all entity types
+    if (vehicleIds.length > 0) {
+      await tx
+        .delete(photos)
+        .where(and(eq(photos.entityType, 'vehicle'), inArray(photos.entityId, vehicleIds)));
+    }
+    if (expenseIds.length > 0) {
+      await tx
+        .delete(photos)
+        .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, expenseIds)));
+    }
+    if (policyIds.length > 0) {
+      await tx
+        .delete(photos)
+        .where(and(eq(photos.entityType, 'insurance_policy'), inArray(photos.entityId, policyIds)));
+    }
+    if (groupIds.length > 0) {
+      await tx
+        .delete(photos)
+        .where(and(eq(photos.entityType, 'expense_group'), inArray(photos.entityId, groupIds)));
+    }
+
     await tx.delete(expenses).where(inArray(expenses.vehicleId, vehicleIds));
     await tx
       .delete(insurancePolicyVehicles)
@@ -298,6 +356,10 @@ class RestoreService {
       await tx
         .insert(insurancePolicyVehicles)
         .values(data.insurancePolicyVehicles as (typeof insurancePolicyVehicles.$inferInsert)[]);
+    }
+    // Insert photos AFTER all entity tables so entityId references are valid
+    if (data.photos?.length > 0) {
+      await tx.insert(photos).values(data.photos as (typeof photos.$inferInsert)[]);
     }
   }
 

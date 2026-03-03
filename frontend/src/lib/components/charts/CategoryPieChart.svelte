@@ -3,7 +3,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/ui/empty-state.svelte';
+	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import type { ExpenseCategory } from '$lib/types';
 

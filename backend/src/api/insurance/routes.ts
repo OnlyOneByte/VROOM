@@ -164,4 +164,13 @@ routes.put(
   }
 );
 
+// DELETE /api/v1/insurance/:id/terms/:termId — delete term
+routes.delete('/:id/terms/:termId', zValidator('param', termParamsSchema), async (c) => {
+  const user = c.get('user');
+  const { id, termId } = c.req.valid('param');
+  await validateInsuranceOwnership(id, user.id);
+  const policy = await insurancePolicyRepository.deleteTerm(id, termId, user.id);
+  return c.json({ success: true, data: policy, message: 'Term deleted successfully' });
+});
+
 export { routes };

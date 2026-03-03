@@ -2,7 +2,7 @@
  * Google Sheets Service - Syncs VROOM data to Google Sheets
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { OAuth2Client } from 'google-auth-library';
 import { google, type sheets_v4 } from 'googleapis';
 import { getDb } from '../../db/connection';
@@ -11,6 +11,7 @@ import {
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
+  photos,
   users,
   vehicleFinancing,
   vehicles,
@@ -97,6 +98,7 @@ export class GoogleSheetsService {
           { properties: { title: 'Insurance Policies' } },
           { properties: { title: 'Insurance Policy Vehicles' } },
           { properties: { title: 'Vehicle Financing' } },
+          { properties: { title: 'Photos' } },
         ],
       },
     });
@@ -134,6 +136,7 @@ export class GoogleSheetsService {
       'Insurance Policies',
       'Insurance Policy Vehicles',
       'Vehicle Financing',
+      'Photos',
     ];
     const info = await this.getSpreadsheetInfo(spreadsheetId);
     const existingTitles = new Set(info.sheets.map((s) => s.title));
@@ -195,6 +198,19 @@ export class GoogleSheetsService {
       userInsurancePolicyVehicles.push(row.insurance_policy_vehicles);
     }
 
+    // Query photos for all user-owned entities
+    const vehicleIds = userVehicles.map((v) => v.id);
+    const expenseIds = userExpenses.map((e) => e.expenses.id);
+    const policyIds = [...seenPolicyIds];
+    const expenseGroupIds = userExpenseGroups.map((g) => g.id);
+
+    const userPhotos = await this.queryUserPhotos(db, {
+      vehicleIds,
+      expenseIds,
+      policyIds,
+      expenseGroupIds,
+    });
+
     await Promise.all([
       this.updateSheet(spreadsheetId, 'Vehicles', userVehicles, this.getVehicleHeaders()),
       this.updateSheet(
@@ -227,6 +243,7 @@ export class GoogleSheetsService {
         userFinancing.map((f) => f.vehicle_financing),
         this.getFinancingHeaders()
       ),
+      this.updateSheet(spreadsheetId, 'Photos', userPhotos, this.getPhotoHeaders()),
     ]);
   }
 
@@ -329,6 +346,52 @@ export class GoogleSheetsService {
     ];
   }
 
+  private getPhotoHeaders() {
+    return [
+      'id',
+      'entityType',
+      'entityId',
+      'driveFileId',
+      'fileName',
+      'mimeType',
+      'fileSize',
+      'webViewLink',
+      'isCover',
+      'sortOrder',
+      'createdAt',
+    ];
+  }
+
+  private async queryUserPhotos(
+    db: ReturnType<typeof getDb>,
+    entityIds: {
+      vehicleIds: string[];
+      expenseIds: string[];
+      policyIds: string[];
+      expenseGroupIds: string[];
+    }
+  ) {
+    const allPhotos = [];
+
+    const entityQueries: { type: string; ids: string[] }[] = [
+      { type: 'vehicle', ids: entityIds.vehicleIds },
+      { type: 'expense', ids: entityIds.expenseIds },
+      { type: 'insurance_policy', ids: entityIds.policyIds },
+      { type: 'expense_group', ids: entityIds.expenseGroupIds },
+    ];
+
+    for (const { type, ids } of entityQueries) {
+      if (ids.length === 0) continue;
+      const rows = await db
+        .select()
+        .from(photos)
+        .where(and(eq(photos.entityType, type), inArray(photos.entityId, ids)));
+      allPhotos.push(...rows);
+    }
+
+    return allPhotos;
+  }
+
   private async updateSheet<T extends Record<string, unknown>>(
     spreadsheetId: string,
     sheetName: string,
@@ -378,6 +441,7 @@ export class GoogleSheetsService {
     insurance: Record<string, unknown>[];
     insurancePolicyVehicles: Record<string, unknown>[];
     expenseGroups: Record<string, unknown>[];
+    photos: Record<string, unknown>[];
   }> {
     const [
       vehiclesData,
@@ -386,6 +450,7 @@ export class GoogleSheetsService {
       insurancePolicyVehiclesData,
       financingData,
       expenseGroupsData,
+      photosData,
     ] = await Promise.all([
       this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
       this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
@@ -393,6 +458,7 @@ export class GoogleSheetsService {
       this.readSheetData(spreadsheetId, 'Insurance Policy Vehicles!A:Z'),
       this.readSheetData(spreadsheetId, 'Vehicle Financing!A:Z'),
       this.readSheetData(spreadsheetId, 'Expense Groups!A:Z'),
+      this.readSheetData(spreadsheetId, 'Photos!A:Z').catch(() => []),
     ]);
 
     const vehicles = this.parseSheetData(vehiclesData);
@@ -401,6 +467,7 @@ export class GoogleSheetsService {
     const insurancePolicyVehicles = this.parseSheetData(insurancePolicyVehiclesData);
     const financing = this.parseSheetData(financingData);
     const expenseGroups = this.parseSheetData(expenseGroupsData);
+    const photos = this.parseSheetData(photosData);
 
     const userId = vehicles.length > 0 ? (vehicles[0].userId as string) : '';
 
@@ -412,6 +479,7 @@ export class GoogleSheetsService {
       insurance,
       insurancePolicyVehicles,
       expenseGroups,
+      photos,
     };
   }
 

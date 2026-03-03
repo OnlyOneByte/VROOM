@@ -29,7 +29,8 @@
         "list_pages",
         "list_network_requests",
         "get_network_request",
-        "list_pages"
+        "list_pages",
+        "handle_dialog"
       ]
     },
     "svelte": {
@@ -46,7 +47,8 @@
       "autoApprove": [
         "get_documentation",
         "svelte_autofixer",
-        "svelte-autofixer"
+        "svelte-autofixer",
+        "get-documentation"
       ]
     },
     "shadcn-svelte": {
@@ -66,7 +68,8 @@
         "list_blocks",
         "get_block",
         "search_components",
-        "search_examples"
+        "search_examples",
+        "search_knowledge"
       ]
     },
     "playwright": {
