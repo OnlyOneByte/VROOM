@@ -495,16 +495,16 @@
 						<!-- Stats Grid -->
 						<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
 							{#each statCards as stat}
-								<div class="flex items-center justify-between p-4 rounded-lg border">
-									<div class="space-y-1">
-										<p class="text-sm font-medium text-muted-foreground">
+								<div class="p-3 sm:p-4 rounded-lg border">
+									<div class="flex items-center gap-2">
+										<div class="p-2 rounded-xl {stat.bgColor} shrink-0">
+											<stat.icon class="h-4 w-4 sm:h-5 sm:w-5 {stat.color}" />
+										</div>
+										<p class="text-xs sm:text-sm font-medium text-muted-foreground">
 											{stat.label}
 										</p>
-										<p class="text-xl font-bold">{stat.value}</p>
 									</div>
-									<div class="p-2.5 rounded-xl {stat.bgColor}">
-										<stat.icon class="h-5 w-5 {stat.color}" />
-									</div>
+									<p class="text-lg sm:text-xl font-bold mt-2">{stat.value}</p>
 								</div>
 							{/each}
 						</div>
@@ -522,19 +522,19 @@
 									{#each Object.entries(summaryStats.categoryTotals) as [category, amount]}
 										{@const IconComponent = getCategoryIcon(category as ExpenseCategory)}
 										<div
-											class="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+											class="p-3 rounded-lg border hover:bg-muted/50 transition-colors"
 										>
 											<div class="flex items-center gap-2">
-												<div class="p-2 rounded-lg {getCategoryColor(category as ExpenseCategory)}">
-													<IconComponent class="h-4 w-4" />
+												<div class="p-1.5 rounded-lg {getCategoryColor(category as ExpenseCategory)} shrink-0">
+													<IconComponent class="h-3.5 w-3.5" />
 												</div>
-												<span class="text-sm font-medium">
+												<span class="text-xs sm:text-sm font-medium">
 													{categoryLabels[category as ExpenseCategory]}
 												</span>
 											</div>
-											<span class="text-sm font-bold">
+											<p class="text-sm font-bold mt-1.5">
 												{formatCurrency(amount)}
-											</span>
+											</p>
 										</div>
 									{/each}
 								</div>
