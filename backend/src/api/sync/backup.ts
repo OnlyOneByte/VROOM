@@ -18,6 +18,7 @@ import {
 } from '../../config';
 import { getDb } from '../../db/connection';
 import {
+  expenseGroups,
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
@@ -102,30 +103,32 @@ export class BackupService {
 
   async createBackup(userId: string): Promise<BackupData> {
     const db = getDb();
-    const [userVehicles, userExpenses, userFinancing, userInsuranceJoined] = await Promise.all([
-      db.select().from(vehicles).where(eq(vehicles.userId, userId)),
-      db
-        .select()
-        .from(expenses)
-        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId))
-        .then((r) => r.map((x) => x.expenses)),
-      db
-        .select()
-        .from(vehicleFinancing)
-        .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId))
-        .then((r) => r.map((x) => x.vehicle_financing)),
-      db
-        .select()
-        .from(insurancePolicies)
-        .innerJoin(
-          insurancePolicyVehicles,
-          eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
-        )
-        .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId)),
-    ]);
+    const [userVehicles, userExpenses, userFinancing, userInsuranceJoined, userExpenseGroups] =
+      await Promise.all([
+        db.select().from(vehicles).where(eq(vehicles.userId, userId)),
+        db
+          .select()
+          .from(expenses)
+          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId))
+          .then((r) => r.map((x) => x.expenses)),
+        db
+          .select()
+          .from(vehicleFinancing)
+          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId))
+          .then((r) => r.map((x) => x.vehicle_financing)),
+        db
+          .select()
+          .from(insurancePolicies)
+          .innerJoin(
+            insurancePolicyVehicles,
+            eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
+          )
+          .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId)),
+        db.select().from(expenseGroups).where(eq(expenseGroups.userId, userId)),
+      ]);
 
     // Deduplicate insurance policies (join produces one row per vehicle)
     const seenPolicyIds = new Set<string>();
@@ -146,6 +149,7 @@ export class BackupService {
       financing: userFinancing,
       insurance: userInsurance,
       insurancePolicyVehicles: userInsurancePolicyVehicles,
+      expenseGroups: userExpenseGroups,
     };
   }
 
@@ -286,29 +290,65 @@ export class BackupService {
   }
 
   private validateReferentialIntegrity(backup: ParsedBackupData): string[] {
-    const errors: string[] = [];
     const vehicleIds = new Set(backup.vehicles.map((v) => String(v.id)));
     const policyIds = new Set(backup.insurance.map((i) => String(i.id)));
+    const expenseGroupIds = new Set((backup.expenseGroups ?? []).map((g) => String(g.id)));
 
-    for (const expense of backup.expenses) {
+    return [
+      ...this.validateExpenseRefs(backup.expenses, vehicleIds, expenseGroupIds),
+      ...this.validateFinancingRefs(backup.financing, vehicleIds),
+      ...this.validateInsuranceRefs(backup.insurance),
+      ...this.validateJunctionRefs(backup.insurancePolicyVehicles ?? [], policyIds, vehicleIds),
+    ];
+  }
+
+  private validateExpenseRefs(
+    expenseList: Record<string, unknown>[],
+    vehicleIds: Set<string>,
+    expenseGroupIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const expense of expenseList) {
       if (!vehicleIds.has(String(expense.vehicleId))) {
         errors.push(`Expense ${expense.id} references non-existent vehicle`);
       }
+      if (expense.expenseGroupId && !expenseGroupIds.has(String(expense.expenseGroupId))) {
+        errors.push(`Expense ${expense.id} references non-existent expense group`);
+      }
     }
+    return errors;
+  }
 
-    for (const financing of backup.financing) {
+  private validateFinancingRefs(
+    financingList: Record<string, unknown>[],
+    vehicleIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const financing of financingList) {
       if (!vehicleIds.has(String(financing.vehicleId))) {
         errors.push(`Financing ${financing.id} references non-existent vehicle`);
       }
     }
+    return errors;
+  }
 
-    for (const insurance of backup.insurance) {
+  private validateInsuranceRefs(insuranceList: Record<string, unknown>[]): string[] {
+    const errors: string[] = [];
+    for (const insurance of insuranceList) {
       if (!insurance.id) {
         errors.push('Insurance policy missing id');
       }
     }
+    return errors;
+  }
 
-    for (const junction of backup.insurancePolicyVehicles ?? []) {
+  private validateJunctionRefs(
+    junctionList: Record<string, unknown>[],
+    policyIds: Set<string>,
+    vehicleIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const junction of junctionList) {
       if (!policyIds.has(String(junction.policyId))) {
         errors.push(`Insurance junction references non-existent policy ${junction.policyId}`);
       }
@@ -316,7 +356,6 @@ export class BackupService {
         errors.push(`Insurance junction references non-existent vehicle ${junction.vehicleId}`);
       }
     }
-
     return errors;
   }
 

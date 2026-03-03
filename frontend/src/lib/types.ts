@@ -100,6 +100,32 @@ export const COMMON_EXPENSE_TAGS = [
 	'emergency',
 	'routine'
 ] as const;
+// --- Expense splitting types ---
+
+export type SplitConfig =
+	| { method: 'even'; vehicleIds: string[] }
+	| { method: 'absolute'; allocations: Array<{ vehicleId: string; amount: number }> }
+	| { method: 'percentage'; allocations: Array<{ vehicleId: string; percentage: number }> };
+
+export interface ExpenseGroup {
+	id: string;
+	userId: string;
+	splitConfig: SplitConfig;
+	category: string;
+	tags?: string[];
+	date: string;
+	description?: string;
+	totalAmount: number;
+	insurancePolicyId?: string;
+	insuranceTermId?: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface ExpenseGroupWithChildren {
+	group: ExpenseGroup;
+	children: Expense[];
+}
 
 // ExpenseCategory is fetched from the backend API
 // See /api/expenses/categories endpoint
@@ -131,6 +157,7 @@ export interface Expense {
 	receiptUrl?: string;
 	isFinancingPayment: boolean; // true if this expense is a financing payment
 	missedFillup?: boolean; // true if user missed logging a previous fill-up
+	expenseGroupId?: string; // FK to expense_groups — non-null means this is a split child
 	createdAt: string; // ISO date string
 	updatedAt: string; // ISO date string
 }
@@ -162,6 +189,17 @@ export interface PolicyTerm {
 	financeDetails: FinanceDetails;
 }
 
+export interface TermVehicleCoverage {
+	vehicleIds: string[];
+	splitMethod?: 'even' | 'absolute' | 'percentage';
+	allocations?: Array<{ vehicleId: string; amount?: number; percentage?: number }>;
+}
+
+export interface TermCoverageRow {
+	termId: string;
+	vehicleId: string;
+}
+
 export interface InsurancePolicy {
 	id: string;
 	company: string;
@@ -171,19 +209,20 @@ export interface InsurancePolicy {
 	terms: PolicyTerm[];
 	notes?: string;
 	vehicleIds: string[];
+	termVehicleCoverage: TermCoverageRow[];
 	createdAt: string;
 	updatedAt: string;
 }
 
 export interface CreatePolicyRequest {
 	company: string;
-	vehicleIds: string[];
 	terms: {
 		id: string;
 		startDate: string;
 		endDate: string;
 		policyDetails?: PolicyDetails;
 		financeDetails?: FinanceDetails;
+		vehicleCoverage: TermVehicleCoverage;
 	}[];
 	notes?: string;
 	isActive?: boolean;
@@ -191,7 +230,6 @@ export interface CreatePolicyRequest {
 
 export interface UpdatePolicyRequest {
 	company?: string;
-	vehicleIds?: string[];
 	notes?: string;
 	isActive?: boolean;
 }
@@ -202,6 +240,7 @@ export interface CreateTermRequest {
 	endDate: string;
 	policyDetails?: PolicyDetails;
 	financeDetails?: FinanceDetails;
+	vehicleCoverage: TermVehicleCoverage;
 }
 
 export interface UpdateTermRequest {
@@ -209,6 +248,7 @@ export interface UpdateTermRequest {
 	endDate?: string;
 	policyDetails?: PolicyDetails;
 	financeDetails?: FinanceDetails;
+	vehicleCoverage?: TermVehicleCoverage;
 }
 
 export interface FuelEfficiency {

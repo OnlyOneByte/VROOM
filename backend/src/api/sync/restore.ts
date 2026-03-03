@@ -7,6 +7,7 @@ import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { TABLE_SCHEMA_MAP } from '../../config';
 import { getDb } from '../../db/connection';
 import {
+  expenseGroups,
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
@@ -36,6 +37,7 @@ export interface ImportSummary {
   financing: number;
   insurance: number;
   insurancePolicyVehicles: number;
+  expenseGroups: number;
 }
 
 export interface RestoreResponse {
@@ -77,6 +79,7 @@ class RestoreService {
       financing: parsedBackup.financing.length,
       insurance: parsedBackup.insurance.length,
       insurancePolicyVehicles: parsedBackup.insurancePolicyVehicles?.length ?? 0,
+      expenseGroups: parsedBackup.expenseGroups?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -143,6 +146,7 @@ class RestoreService {
       financing: sheetData.financing.length,
       insurance: sheetData.insurance.length,
       insurancePolicyVehicles: sheetData.insurancePolicyVehicles?.length ?? 0,
+      expenseGroups: sheetData.expenseGroups?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -250,7 +254,11 @@ class RestoreService {
 
   private async deleteUserData(tx: DrizzleTransaction, userId: string): Promise<void> {
     const userVehicles = await tx.select().from(vehicles).where(eq(vehicles.userId, userId));
-    if (userVehicles.length === 0) return;
+    if (userVehicles.length === 0) {
+      // Still delete expense groups even if no vehicles (groups are user-level)
+      await tx.delete(expenseGroups).where(eq(expenseGroups.userId, userId));
+      return;
+    }
 
     const vehicleIds = userVehicles.map((v: { id: string }) => v.id);
     await tx.delete(expenses).where(inArray(expenses.vehicleId, vehicleIds));
@@ -258,6 +266,7 @@ class RestoreService {
       .delete(insurancePolicyVehicles)
       .where(inArray(insurancePolicyVehicles.vehicleId, vehicleIds));
     await tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, vehicleIds));
+    await tx.delete(expenseGroups).where(eq(expenseGroups.userId, userId));
     await tx.delete(vehicles).where(eq(vehicles.userId, userId));
   }
 
@@ -265,6 +274,12 @@ class RestoreService {
     // Data is already coerced by coerceRow (ZIP path via parseZipBackup, Sheets path via restoreFromSheets)
     if (data.vehicles.length > 0) {
       await tx.insert(vehicles).values(data.vehicles as (typeof vehicles.$inferInsert)[]);
+    }
+    // Insert expense groups BEFORE expenses (expenses.expenseGroupId FK references expense_groups)
+    if (data.expenseGroups?.length > 0) {
+      await tx
+        .insert(expenseGroups)
+        .values(data.expenseGroups as (typeof expenseGroups.$inferInsert)[]);
     }
     if (data.expenses.length > 0) {
       await tx.insert(expenses).values(data.expenses as (typeof expenses.$inferInsert)[]);

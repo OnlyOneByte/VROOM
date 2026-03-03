@@ -8,44 +8,7 @@
 - [ ] Integrate existing analytics components (EfficiencyAlerts, FuelEfficiencyMonitor, VehicleEfficiencySummary) into the analytics page
 - [ ] Cross-vehicle cost comparison and trends
 - [ ] Fuel price tracking: log price-per-gallon with fill-ups, show price trends over time
-
-### Dark Mode
-
-- [x] Dark mode toggle
-
-### Fuel Tracking
-
-- [x] Skip MPG calculation for missed fill-ups
-
-### Mileage / Odometer
-
-- [ ] Odometer log on the vehicle detail page (track readings over time, show mileage-over-time chart)
-
-### Insurance — Core Policy Management
-
-- [x] Core insurance policy information
-- [x] Document storage: upload & retrieve proof-of-insurance cards and policy PDFs per policy (integrate with existing photo/file infrastructure)
-- [ ] Renewal tracking: link renewal policies to their predecessor, surface cost-over-time trends
-- [x] Insurance dashboard page: list active/expired policies per vehicle, quick-access document viewer, upcoming renewal alerts
-- [ ] Policy-to-expense linking: auto-generate or link expense records (category `insurance`) when a policy is created/renewed; foreign key from expense → policy
-  - [ ] How to split cost between multiple cars (?)
-  - [ ] Manage terms where covered cars are different
-
-### UI Misc & bugs
-- [ ] Common upload/take picture dialog popup. use props
-- [x] Force sync (ignore if changed)
-- [ ] Insurance add popup - maybe should be page instead of popup? qq
-- [ ] Verify backup max count is deleting old backups
-- [x] Verify sheets sync is cahnging when schema changes (and working)
-- [ ] EV and PHEV charging tracking
-- [ ] Custom folder for sheets backups (multi sheet backup)
-- [ ] Custom folder path for all info.
-
-
-
-### Total Cost of Ownership (TCO)
-
-- [ ] TCO calculator: aggregate purchase price + financing interest + insurance + fuel + maintenance into a single $/mile and $/month figure
+- [ ] TCO (Total Cost of Ownership) calculator: aggregate purchase price + financing interest + insurance + fuel + maintenance into a single $/mile and $/month figure
 - [ ] TCO dashboard card on vehicle detail page
 - [ ] TCO trend over time (monthly/quarterly breakdown)
 
@@ -55,6 +18,40 @@
 - [ ] Health score badge/indicator on vehicle cards and detail page
 - [ ] Year-end summary: annual report card with total spent, cost breakdown by category, MPG trends, biggest expense, year-over-year comparison
 - [ ] Shareable year-end summary (exportable image or link)
+
+### Insurance — Core Policy Management
+
+- [x] Core insurance policy information
+- [x] Document storage: upload & retrieve proof-of-insurance cards and policy PDFs per policy (integrate with existing photo/file infrastructure)
+- [x] Insurance dashboard page: list active/expired policies per vehicle, quick-access document viewer, upcoming renewal alerts
+- [x] Policy-to-expense linking: auto-generate or link expense records (category `insurance`) when a policy is created/renewed; foreign key from expense → policy
+  - [x] How to split cost between multiple cars (?)
+  - [x] Manage terms where covered cars are different
+- [x] Insurance input autofill on renew click
+- [x] Insurance input frequency dropdown rather than free text entry
+- [x] Policy level edit and delete buttom move
+
+### UI Misc & bugs
+- [x] Force sync (ignore if changed)
+- [X] Insurance add popup - maybe should be page instead of popup? qq
+- [x] Verify backup max count is deleting old backups
+- [x] Verify sheets sync is cahnging when schema changes (and working)
+- [x] Dark mode toggle
+- [x] Skip MPG calculation for missed fill-ups
+- [x] Multi-vehicle expenses (expense splitting WF)
+- [x] Common upload/take picture dialog popup. use props
+- [X] Expense level photos
+- [x] Move car photos into overview tab (remove photos only tab)
+- [x] Remove Reminders tab from car
+- [ ] EV and PHEV charging tracking
+- [ ] Custom folder for sheets backups (multi sheet backup)
+- [ ] Custom folder path for all info.
+- [ ] Auth/login page re-write
+  - [ ] New logo/icon assets to use
+  - [ ] Change to be / instead of /auth
+- [ ] First opening/loading - car zooming past screen animation (idea)
+- [ ] Odometer log on the vehicle detail page (track readings over time, show mileage-over-time chart)
+- [ ] Split expense show better
 
 ## P1 — Should Have
 

@@ -173,22 +173,35 @@ export class GoogleDriveService {
   }
 
   async listFilesInFolder(folderId: string): Promise<DriveFile[]> {
-    const response = await this.drive.files.list({
-      q: `'${folderId}' in parents and trashed=false`,
-      fields: 'files(id, name, mimeType, parents, webViewLink, size, createdTime, modifiedTime)',
-      orderBy: 'modifiedTime desc',
-    });
+    const allFiles: DriveFile[] = [];
+    let pageToken: string | undefined;
 
-    return (response.data.files || []).map((file) => ({
-      id: file.id || '',
-      name: file.name || '',
-      mimeType: file.mimeType || '',
-      parents: file.parents,
-      webViewLink: file.webViewLink,
-      size: file.size,
-      createdTime: file.createdTime,
-      modifiedTime: file.modifiedTime,
-    })) as DriveFile[];
+    do {
+      const response = await this.drive.files.list({
+        q: `'${folderId}' in parents and trashed=false`,
+        fields:
+          'nextPageToken, files(id, name, mimeType, parents, webViewLink, size, createdTime, modifiedTime)',
+        orderBy: 'modifiedTime desc',
+        pageSize: 100,
+        pageToken,
+      });
+
+      const files = (response.data.files || []).map((file) => ({
+        id: file.id || '',
+        name: file.name || '',
+        mimeType: file.mimeType || '',
+        parents: file.parents,
+        webViewLink: file.webViewLink,
+        size: file.size,
+        createdTime: file.createdTime,
+        modifiedTime: file.modifiedTime,
+      })) as DriveFile[];
+
+      allFiles.push(...files);
+      pageToken = response.data.nextPageToken ?? undefined;
+    } while (pageToken);
+
+    return allFiles;
   }
 
   async getFolderPermissions(folderId: string): Promise<drive_v3.Schema$Permission[]> {

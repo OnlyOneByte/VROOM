@@ -8,7 +8,17 @@
 	import { settingsStore } from '$lib/stores/settings';
 	import { expenseApi } from '$lib/services/expense-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { Save, ArrowLeft, Gauge, Check, X, Trash2, LoaderCircle } from 'lucide-svelte';
+	import {
+		Save,
+		ArrowLeft,
+		Gauge,
+		Check,
+		X,
+		Trash2,
+		LoaderCircle,
+		GitBranch,
+		Shield
+	} from 'lucide-svelte';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
@@ -20,9 +30,15 @@
 	import CategorySelector from './CategorySelector.svelte';
 	import FuelFieldsSection from './FuelFieldsSection.svelte';
 	import TagInput from './TagInput.svelte';
+	import ExpensePhotoSection from './ExpensePhotoSection.svelte';
+	import PendingPhotoPreview from './PendingPhotoPreview.svelte';
+	import SplitCostSheet from './SplitCostSheet.svelte';
 	import { validateExpenseField } from './expense-form-validation';
 	import { Checkbox } from '$lib/components/ui/checkbox';
-	import type { ExpenseFormErrors, Vehicle, Expense } from '$lib/types.js';
+	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import { formatCurrency } from '$lib/utils/formatters';
+	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import type { ExpenseFormErrors, Vehicle, Expense, SplitConfig } from '$lib/types.js';
 	import { usesLiquidFuel, usesElectricCharge } from '$lib/utils/units';
 
 	interface Props {
@@ -77,6 +93,37 @@
 	let showMpgCalculation = $state(false);
 	let calculatedMpg = $state<number | null>(null);
 	let calculatedEfficiency = $state<number | null>(null);
+
+	// Split expense state (create mode only)
+	let isSplit = $state(false);
+	let splitMethod = $state<'even' | 'absolute' | 'percentage'>('even');
+	let splitAllocations = $state<Array<{ vehicleId: string; amount?: number; percentage?: number }>>(
+		[]
+	);
+	let selectedVehicleIds = $state<string[]>([]);
+
+	// Group edit mode — when editing a child expense, we load the parent group
+	let isGroupEditMode = $state(false);
+	let groupId = $state<string | null>(null);
+	let showSplitSheet = $state(false);
+
+	// Insurance-managed mode — read-only, links to policy page
+	let isInsuranceManaged = $state(false);
+	let insurancePolicyId = $state<string | null>(null);
+	let insuranceTermId = $state<string | null>(null);
+
+	// Pending photo files for create mode (uploaded after expense is saved)
+	let pendingFiles = $state<File[]>([]);
+
+	let parsedTotalAmount = $derived(parseFloat(formData.amount) || 0);
+
+	// Split summary for compact display
+	let splitSummaryText = $derived.by(() => {
+		if (!isSplit || selectedVehicleIds.length < 2) return '';
+		const methodLabel =
+			splitMethod === 'even' ? 'Even' : splitMethod === 'absolute' ? 'Fixed' : 'Percentage';
+		return `${methodLabel} split across ${selectedVehicleIds.length} vehicles`;
+	});
 
 	// Get user settings for units
 	let settings = $derived($settingsStore.settings);
@@ -140,6 +187,61 @@
 			}
 
 			originalExpense = expense;
+
+			// Switch to group edit mode if this is a child of a split group
+			if (expense.expenseGroupId) {
+				groupId = expense.expenseGroupId;
+				try {
+					const groupData = await expenseApi.getSplitExpense(expense.expenseGroupId);
+					const group = groupData.group;
+
+					// Check if this is insurance-managed
+					if (group.insurancePolicyId) {
+						isInsuranceManaged = true;
+						insurancePolicyId = group.insurancePolicyId;
+						insuranceTermId = group.insuranceTermId ?? null;
+						// Still populate form data for read-only display
+						formData.category = group.category;
+						formData.amount = group.totalAmount.toString();
+						formData.tags = group.tags || [];
+						const groupDate = new Date(group.date);
+						formData.date = `${groupDate.getFullYear()}-${String(groupDate.getMonth() + 1).padStart(2, '0')}-${String(groupDate.getDate()).padStart(2, '0')}`;
+						formData.description = group.description || '';
+						isLoading = false;
+						return;
+					}
+
+					// User-created split — enter group edit mode
+					isGroupEditMode = true;
+					formData.category = group.category;
+					formData.amount = group.totalAmount.toString();
+					formData.tags = group.tags || [];
+					const groupDate = new Date(group.date);
+					formData.date = `${groupDate.getFullYear()}-${String(groupDate.getMonth() + 1).padStart(2, '0')}-${String(groupDate.getDate()).padStart(2, '0')}`;
+					formData.description = group.description || '';
+
+					// Set up split state from group config
+					isSplit = true;
+					splitMethod = group.splitConfig.method;
+					if (group.splitConfig.method === 'even') {
+						selectedVehicleIds = group.splitConfig.vehicleIds;
+						splitAllocations = group.splitConfig.vehicleIds.map(id => ({ vehicleId: id }));
+					} else {
+						selectedVehicleIds = group.splitConfig.allocations.map(a => a.vehicleId);
+						splitAllocations = group.splitConfig.allocations;
+					}
+				} catch (err) {
+					if (import.meta.env.DEV) console.error('Failed to load split group:', err);
+					appStore.addNotification({
+						type: 'error',
+						message: 'Failed to load split expense group'
+					});
+					goto(returnTo);
+					return;
+				}
+				isLoading = false;
+				return;
+			}
 
 			formData.vehicleId = expense.vehicleId;
 			formData.tags = expense.tags || [];
@@ -285,7 +387,9 @@
 
 	function validateForm(): boolean {
 		errors = {};
-		const fields = ['vehicleId', 'category', 'amount', 'date'];
+		const fields: string[] = isGroupEditMode
+			? ['category', 'amount', 'date']
+			: ['vehicleId', 'category', 'amount', 'date'];
 		if (showFuelFields) {
 			fields.push('mileage');
 			if (showVolumeField) fields.push('volume');
@@ -350,7 +454,20 @@
 				missedFillup: formData.missedFillup
 			};
 
-			if (isEditMode) {
+			if (isGroupEditMode && groupId) {
+				// Update split expense group
+				const splitConfig = buildSplitConfig();
+				await expenseApi.updateSplitExpense(groupId, {
+					splitConfig,
+					totalAmount: parseFloat(formData.amount)
+				});
+
+				appStore.addNotification({
+					type: 'success',
+					message: 'Split expense updated successfully'
+				});
+				goto(returnTo);
+			} else if (isEditMode) {
 				// Update existing expense using API service
 				await expenseApi.updateExpense(expenseId!, expenseData);
 
@@ -359,10 +476,31 @@
 					message: 'Expense updated successfully'
 				});
 				goto(returnTo);
+			} else if (isSplit && selectedVehicleIds.length >= 2) {
+				// Create split expense group
+				const splitConfig = buildSplitConfig();
+				const result = await expenseApi.createSplitExpense({
+					splitConfig,
+					category: formData.category,
+					tags: formData.tags.length > 0 ? formData.tags : undefined,
+					date: dateISO,
+					description: formData.description || undefined,
+					totalAmount: parseFloat(formData.amount)
+				});
+
+				await uploadPendingPhotos('expense_group', result.group.id);
+
+				appStore.addNotification({
+					type: 'success',
+					message: 'Split expense created successfully'
+				});
+				goto(returnTo);
 			} else {
 				// Create new expense
 				if ($isOnline) {
-					await expenseApi.createExpense(expenseData);
+					const created = await expenseApi.createExpense(expenseData);
+
+					await uploadPendingPhotos('expense', created.id);
 
 					appStore.addNotification({
 						type: 'success',
@@ -474,15 +612,196 @@
 		goto(returnTo);
 	}
 
-	function getVehicleDisplayName(): string {
-		if (!vehicle) return '';
-		return vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+	async function uploadPendingPhotos(
+		entityType: 'expense' | 'expense_group',
+		entityId: string
+	): Promise<void> {
+		if (pendingFiles.length === 0) return;
+		let failCount = 0;
+		for (const file of pendingFiles) {
+			try {
+				await expenseApi.uploadPhoto(entityType, entityId, file);
+			} catch {
+				failCount++;
+			}
+		}
+		if (failCount > 0) {
+			appStore.addNotification({
+				type: 'warning',
+				message: `${failCount} photo${failCount > 1 ? 's' : ''} failed to upload. You can re-upload in edit mode.`
+			});
+		}
+		pendingFiles = [];
+	}
+
+	function handleSplitToggle(checked: boolean) {
+		isSplit = checked;
+		if (checked) {
+			// Populate with currently selected vehicle
+			if (formData.vehicleId) {
+				selectedVehicleIds = [formData.vehicleId];
+			}
+			splitMethod = 'even';
+			splitAllocations = [];
+		} else {
+			// Reset to single vehicle mode
+			if (selectedVehicleIds.length > 0) {
+				const firstId = selectedVehicleIds[0];
+				if (firstId) formData.vehicleId = firstId;
+			}
+			selectedVehicleIds = [];
+			splitMethod = 'even';
+			splitAllocations = [];
+		}
+	}
+
+	function handleMethodChange(method: 'even' | 'absolute' | 'percentage') {
+		splitMethod = method;
+		resetAllocationsForMethod(method);
+	}
+
+	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
+		if (method === 'even') {
+			splitAllocations = [];
+		} else if (method === 'absolute') {
+			splitAllocations = selectedVehicleIds.map(id => ({ vehicleId: id, amount: 0 }));
+		} else {
+			const pct = selectedVehicleIds.length > 0 ? 100 / selectedVehicleIds.length : 0;
+			splitAllocations = selectedVehicleIds.map(id => ({
+				vehicleId: id,
+				percentage: Math.round(pct * 10) / 10
+			}));
+		}
+	}
+
+	function handleAllocationsChange(
+		allocs: Array<{ vehicleId: string; amount?: number; percentage?: number }>
+	) {
+		splitAllocations = allocs;
+	}
+
+	function buildSplitConfig(): SplitConfig {
+		if (splitMethod === 'even') {
+			return { method: 'even', vehicleIds: selectedVehicleIds };
+		} else if (splitMethod === 'absolute') {
+			return {
+				method: 'absolute',
+				allocations: splitAllocations.map(a => ({
+					vehicleId: a.vehicleId,
+					amount: a.amount ?? 0
+				}))
+			};
+		} else {
+			return {
+				method: 'percentage',
+				allocations: splitAllocations.map(a => ({
+					vehicleId: a.vehicleId,
+					percentage: a.percentage ?? 0
+				}))
+			};
+		}
 	}
 </script>
 
 {#if isLoading}
 	<div class="flex items-center justify-center py-12">
 		<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+	</div>
+{:else if isInsuranceManaged}
+	<div class="max-w-2xl mx-auto space-y-6">
+		<!-- Header -->
+		<div class="flex items-center gap-4">
+			<button onclick={() => goto(returnTo)} class="p-2 hover:bg-muted rounded-lg">
+				<ArrowLeft class="h-5 w-5" />
+			</button>
+			<div>
+				<h1 class="text-2xl font-bold text-foreground">Insurance Expense</h1>
+				<p class="text-muted-foreground">This expense is managed by an insurance policy</p>
+			</div>
+		</div>
+
+		<!-- Insurance managed banner -->
+		<div class="flex items-start gap-3 rounded-lg border border-border bg-muted/50 p-4">
+			<Shield class="mt-0.5 h-5 w-5 shrink-0 text-chart-3" />
+			<div class="min-w-0 flex-1">
+				<p class="text-sm font-medium text-foreground">Managed by insurance policy</p>
+				<p class="mt-1 text-xs text-muted-foreground">
+					This expense was automatically created from an insurance term. To change the amount or
+					split, edit the insurance policy term.
+				</p>
+				{#if insurancePolicyId}
+					<Button
+						variant="outline"
+						size="sm"
+						class="mt-3"
+						onclick={() => {
+							const params = new URLSearchParams();
+							if (insurancePolicyId) params.set('policy', insurancePolicyId);
+							if (insuranceTermId) params.set('editTerm', insuranceTermId);
+							goto(`/insurance?${params.toString()}`);
+						}}
+					>
+						<Shield class="mr-2 h-4 w-4" />
+						Edit Insurance Term
+					</Button>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Read-only expense details -->
+		<div class="rounded-lg border bg-card p-6 space-y-4">
+			<div class="grid grid-cols-2 gap-4 text-sm">
+				<div>
+					<p class="text-muted-foreground">Category</p>
+					<p class="font-medium text-foreground">
+						{categoryLabels[formData.category as keyof typeof categoryLabels] ?? formData.category}
+					</p>
+				</div>
+				<div>
+					<p class="text-muted-foreground">Total Amount</p>
+					<p class="font-medium text-foreground">
+						{formatCurrency(parseFloat(formData.amount) || 0)}
+					</p>
+				</div>
+				<div>
+					<p class="text-muted-foreground">Date</p>
+					<p class="font-medium text-foreground">
+						{new Date(formData.date || '').toLocaleDateString()}
+					</p>
+				</div>
+				{#if formData.description}
+					<div>
+						<p class="text-muted-foreground">Description</p>
+						<p class="font-medium text-foreground">{formData.description}</p>
+					</div>
+				{/if}
+			</div>
+			{#if formData.tags.length > 0}
+				<div>
+					<p class="text-sm text-muted-foreground">Tags</p>
+					<div class="mt-1 flex flex-wrap gap-1">
+						{#each formData.tags as tag (tag)}
+							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground">{tag}</span>
+						{/each}
+					</div>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Photos (read-only but can still view) -->
+		{#if groupId}
+			<div class="rounded-lg border bg-card p-6">
+				<ExpensePhotoSection entityType="expense_group" entityId={groupId} />
+			</div>
+		{/if}
+
+		<!-- Back button -->
+		<div class="flex justify-center">
+			<Button variant="outline" onclick={() => goto(returnTo)}>
+				<ArrowLeft class="mr-2 h-4 w-4" />
+				Back to Expenses
+			</Button>
+		</div>
 	</div>
 {:else}
 	<div class="max-w-2xl mx-auto space-y-6">
@@ -494,11 +813,19 @@
 
 			<div>
 				<h1 class="text-2xl font-bold text-foreground">
-					{isEditMode ? 'Edit Expense' : 'Add Expense'}
+					{isGroupEditMode ? 'Edit Split Expense' : isEditMode ? 'Edit Expense' : 'Add Expense'}
 				</h1>
 				<p class="text-muted-foreground">
-					{#if isEditMode}
-						{getVehicleDisplayName()}
+					{#if isGroupEditMode && selectedVehicleIds.length > 0}
+						{selectedVehicleIds
+							.map(id => {
+								const v = vehicles.find(veh => veh.id === id);
+								return v ? getVehicleDisplayName(v) : '';
+							})
+							.filter(Boolean)
+							.join(', ')}
+					{:else if isEditMode}
+						{getVehicleDisplayName(vehicle)}
 					{:else if !$isOnline}
 						<span class="text-chart-5">Offline mode - will sync when online</span>
 					{:else}
@@ -516,57 +843,116 @@
 			}}
 			class="rounded-lg border bg-card p-6 space-y-6"
 		>
-			<!-- Vehicle Selection -->
-			<div class="space-y-2">
-				<Label for="vehicle">Vehicle *</Label>
-				<Select.Root
-					type="single"
-					value={formData.vehicleId}
-					onValueChange={v => {
-						if (v) {
-							formData.vehicleId = v;
-							touched['vehicleId'] = true;
-							handleBlur('vehicleId');
-						}
-					}}
-				>
-					<Select.Trigger
-						id="vehicle"
-						class="w-full {touched['vehicleId'] && errors['vehicleId'] ? 'border-destructive' : ''}"
-						aria-invalid={!!(touched['vehicleId'] && errors['vehicleId'])}
-						aria-describedby={touched['vehicleId'] && errors['vehicleId']
-							? 'vehicleId-error'
-							: undefined}
+			<!-- Vehicle Selection / Split Summary -->
+			{#if isSplit && selectedVehicleIds.length >= 2}
+				<!-- Split configured: show tappable summary instead of vehicle dropdown -->
+				<div class="space-y-2">
+					<Label>Vehicle *</Label>
+					<button
+						type="button"
+						onclick={() => (showSplitSheet = true)}
+						class="flex w-full items-center justify-between rounded-lg border border-border bg-muted/50 px-4 py-3 text-left transition-colors hover:bg-muted"
 					>
-						{#if formData.vehicleId}
-							{@const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId)}
-							{#if selectedVehicle}
-								{selectedVehicle.year}
-								{selectedVehicle.make}
-								{selectedVehicle.model}
-								{#if selectedVehicle.nickname}({selectedVehicle.nickname}){/if}
-							{:else}
-								Select a vehicle
-							{/if}
-						{:else}
-							Select a vehicle
+						<div class="flex items-center gap-2 min-w-0">
+							<GitBranch class="h-4 w-4 shrink-0 text-muted-foreground" />
+							<div class="min-w-0">
+								<p class="text-sm font-medium text-foreground">{splitSummaryText}</p>
+								<p class="truncate text-xs text-muted-foreground">
+									{selectedVehicleIds
+										.map(id => {
+											const v = vehicles.find(veh => veh.id === id);
+											return v ? getVehicleDisplayName(v) : id;
+										})
+										.join(', ')}
+								</p>
+							</div>
+						</div>
+						<span class="shrink-0 text-xs text-muted-foreground">Edit</span>
+					</button>
+					{#if !isEditMode}
+						<button
+							type="button"
+							onclick={() => handleSplitToggle(false)}
+							class="text-xs text-muted-foreground underline hover:text-foreground"
+						>
+							Remove split
+						</button>
+					{/if}
+				</div>
+			{:else}
+				<!-- Normal single vehicle selector + split button inline -->
+				<div class="space-y-2">
+					<Label for="vehicle">Vehicle *</Label>
+					<div class="flex gap-2">
+						<Select.Root
+							type="single"
+							value={formData.vehicleId}
+							onValueChange={v => {
+								if (v) {
+									formData.vehicleId = v;
+									touched['vehicleId'] = true;
+									handleBlur('vehicleId');
+								}
+							}}
+						>
+							<Select.Trigger
+								id="vehicle"
+								class="w-full {touched['vehicleId'] && errors['vehicleId']
+									? 'border-destructive'
+									: ''}"
+								aria-invalid={!!(touched['vehicleId'] && errors['vehicleId'])}
+								aria-describedby={touched['vehicleId'] && errors['vehicleId']
+									? 'vehicleId-error'
+									: undefined}
+							>
+								{#if formData.vehicleId}
+									{@const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId)}
+									{#if selectedVehicle}
+										{selectedVehicle.year}
+										{selectedVehicle.make}
+										{selectedVehicle.model}
+										{#if selectedVehicle.nickname}({selectedVehicle.nickname}){/if}
+									{:else}
+										Select a vehicle
+									{/if}
+								{:else}
+									Select a vehicle
+								{/if}
+							</Select.Trigger>
+							<Select.Content>
+								{#each vehicles as v (v.id)}
+									<Select.Item value={v.id} label="{v.year} {v.make} {v.model}">
+										{v.year}
+										{v.make}
+										{v.model}
+										{#if v.nickname}({v.nickname}){/if}
+									</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+						{#if (!isEditMode || isGroupEditMode) && vehicles.length >= 2}
+							<Button
+								type="button"
+								variant="outline"
+								size="icon"
+								class="shrink-0"
+								onclick={() => {
+									if (!isSplit) {
+										handleSplitToggle(true);
+									}
+									showSplitSheet = true;
+								}}
+								aria-label="Split cost across vehicles"
+							>
+								<GitBranch class="h-4 w-4" />
+							</Button>
 						{/if}
-					</Select.Trigger>
-					<Select.Content>
-						{#each vehicles as v (v.id)}
-							<Select.Item value={v.id} label="{v.year} {v.make} {v.model}">
-								{v.year}
-								{v.make}
-								{v.model}
-								{#if v.nickname}({v.nickname}){/if}
-							</Select.Item>
-						{/each}
-					</Select.Content>
-				</Select.Root>
-				{#if touched['vehicleId'] && errors['vehicleId']}
-					<FormFieldError id="vehicleId-error">{errors['vehicleId']}</FormFieldError>
-				{/if}
-			</div>
+					</div>
+					{#if touched['vehicleId'] && errors['vehicleId']}
+						<FormFieldError id="vehicleId-error">{errors['vehicleId']}</FormFieldError>
+					{/if}
+				</div>
+			{/if}
 
 			<!-- Category Selection (Required) -->
 			<CategorySelector
@@ -694,6 +1080,19 @@
 
 			<!-- Tags -->
 			<TagInput bind:tags={formData.tags} error={errors['tags']} touched={touched['tags']} />
+
+			<!-- Photos & Receipts -->
+			{#if isGroupEditMode && groupId}
+				<ExpensePhotoSection entityType="expense_group" entityId={groupId} />
+			{:else if isEditMode && expenseId}
+				<ExpensePhotoSection entityType="expense" entityId={expenseId} />
+			{:else}
+				<PendingPhotoPreview
+					files={pendingFiles}
+					onAdd={file => (pendingFiles = [...pendingFiles, file])}
+					onRemove={i => (pendingFiles = pendingFiles.filter((_, idx) => idx !== i))}
+				/>
+			{/if}
 		</form>
 
 		<!-- Floating Action Bar -->
@@ -792,4 +1191,21 @@
 			</AlertDialog.Footer>
 		</AlertDialog.Content>
 	</AlertDialog.Root>
+
+	<!-- Split Cost Sheet -->
+	<SplitCostSheet
+		bind:open={showSplitSheet}
+		{vehicles}
+		{selectedVehicleIds}
+		{splitMethod}
+		allocations={splitAllocations}
+		totalAmount={parsedTotalAmount}
+		onVehicleIdsChange={ids => {
+			selectedVehicleIds = ids;
+			resetAllocationsForMethod(splitMethod);
+		}}
+		onMethodChange={handleMethodChange}
+		onAllocationsChange={handleAllocationsChange}
+		onClose={() => (showSplitSheet = false)}
+	/>
 {/if}

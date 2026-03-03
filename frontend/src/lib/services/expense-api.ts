@@ -1,11 +1,11 @@
-import type { Expense } from '$lib/types';
+import type { Expense, ExpenseGroupWithChildren, Photo, SplitConfig } from '$lib/types';
 import {
 	fromBackendExpense,
 	fromBackendExpenses,
 	toBackendExpense,
 	type BackendExpenseResponse
 } from './api-transformer';
-import { apiClient } from './api-client';
+import { apiClient, getApiBaseUrl } from './api-client';
 
 /**
  * Expense API service
@@ -62,5 +62,67 @@ export const expenseApi = {
 
 	async deleteExpense(expenseId: string): Promise<void> {
 		await apiClient.delete(`/api/v1/expenses/${expenseId}`);
+	},
+
+	// --- Photo methods (delegate to generic photo endpoints) ---
+
+	async getPhotos(entityType: 'expense' | 'expense_group', entityId: string): Promise<Photo[]> {
+		return apiClient.get<Photo[]>(`/api/v1/photos/${entityType}/${entityId}`);
+	},
+
+	async uploadPhoto(
+		entityType: 'expense' | 'expense_group',
+		entityId: string,
+		file: File
+	): Promise<Photo> {
+		const formData = new FormData();
+		formData.append('photo', file);
+		return apiClient.post<Photo>(`/api/v1/photos/${entityType}/${entityId}`, formData);
+	},
+
+	async deletePhoto(
+		entityType: 'expense' | 'expense_group',
+		entityId: string,
+		photoId: string
+	): Promise<void> {
+		await apiClient.delete(`/api/v1/photos/${entityType}/${entityId}/${photoId}`);
+	},
+
+	getPhotoThumbnailUrl(
+		entityType: 'expense' | 'expense_group',
+		entityId: string,
+		photoId: string
+	): string {
+		return `${getApiBaseUrl()}/api/v1/photos/${entityType}/${entityId}/${photoId}/thumbnail`;
+	},
+
+	// --- Split expense (expense group) methods ---
+
+	async createSplitExpense(data: {
+		splitConfig: SplitConfig;
+		category: string;
+		tags?: string[];
+		date: string;
+		description?: string;
+		totalAmount: number;
+		insurancePolicyId?: string;
+		insuranceTermId?: string;
+	}): Promise<ExpenseGroupWithChildren> {
+		return apiClient.post<ExpenseGroupWithChildren>('/api/v1/expenses/split', data);
+	},
+
+	async updateSplitExpense(
+		groupId: string,
+		data: { splitConfig: SplitConfig; totalAmount?: number }
+	): Promise<ExpenseGroupWithChildren> {
+		return apiClient.put<ExpenseGroupWithChildren>(`/api/v1/expenses/split/${groupId}`, data);
+	},
+
+	async getSplitExpense(groupId: string): Promise<ExpenseGroupWithChildren> {
+		return apiClient.get<ExpenseGroupWithChildren>(`/api/v1/expenses/split/${groupId}`);
+	},
+
+	async deleteSplitExpense(groupId: string): Promise<void> {
+		await apiClient.delete(`/api/v1/expenses/split/${groupId}`);
 	}
 };

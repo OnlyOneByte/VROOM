@@ -93,6 +93,7 @@ const arbInsurancePolicy: fc.Arbitrary<InsurancePolicy> = fc
 			isActive,
 			terms,
 			vehicleIds: [`vehicle-${idCounter}`],
+			termVehicleCoverage: [],
 			createdAt: new Date().toISOString(),
 			updatedAt: new Date().toISOString()
 		};

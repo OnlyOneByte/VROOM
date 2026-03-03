@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { PolicyTerm } from '../../db/schema';
 import { changeTracker, requireAuth } from '../../middleware';
 import { validateInsuranceOwnership } from '../../utils/validation';
+import type { TermVehicleCoverage } from './repository';
 import { insurancePolicyRepository } from './repository';
 import {
   addTermSchema,
@@ -30,6 +31,7 @@ const vehiclePoliciesParamSchema = z.object({
 /**
  * Convert Zod-coerced Date objects in a term back to ISO strings
  * so they match the PolicyTerm interface expected by the repository.
+ * Preserves vehicleCoverage for per-term vehicle assignment.
  */
 function toStorableTerm(term: {
   id: string;
@@ -37,12 +39,13 @@ function toStorableTerm(term: {
   endDate: Date;
   policyDetails?: Record<string, unknown>;
   financeDetails?: Record<string, unknown>;
-}): PolicyTerm {
+  vehicleCoverage: TermVehicleCoverage;
+}): PolicyTerm & { vehicleCoverage: TermVehicleCoverage } {
   return {
     ...term,
     startDate: term.startDate.toISOString(),
     endDate: term.endDate.toISOString(),
-  } as PolicyTerm;
+  } as PolicyTerm & { vehicleCoverage: TermVehicleCoverage };
 }
 
 // Apply authentication and change tracking to all routes
@@ -149,11 +152,12 @@ routes.put(
     const user = c.get('user');
     const { id, termId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
-    const { startDate, endDate, ...rest } = c.req.valid('json');
-    const converted: Partial<PolicyTerm> = {
+    const { startDate, endDate, vehicleCoverage, ...rest } = c.req.valid('json');
+    const converted: Partial<PolicyTerm> & { vehicleCoverage?: TermVehicleCoverage } = {
       ...rest,
       ...(startDate && { startDate: startDate.toISOString() }),
       ...(endDate && { endDate: endDate.toISOString() }),
+      ...(vehicleCoverage && { vehicleCoverage }),
     };
     const policy = await insurancePolicyRepository.updateTerm(id, termId, converted, user.id);
     return c.json({ success: true, data: policy, message: 'Term updated successfully' });

@@ -44,6 +44,7 @@ function makeExpense(overrides: {
     insurancePolicyId: null,
     insuranceTermId: null,
     missedFillup: false,
+    expenseGroupId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
