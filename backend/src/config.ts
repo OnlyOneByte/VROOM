@@ -9,6 +9,7 @@ import {
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
+  photos,
   vehicleFinancing,
   vehicles,
 } from './db/schema';
@@ -171,6 +172,7 @@ export const TABLE_SCHEMA_MAP: Record<string, SQLiteTableWithColumns<any>> = {
   insurance: insurancePolicies,
   insurancePolicyVehicles: insurancePolicyVehicles,
   expenseGroups: expenseGroups,
+  photos: photos,
 };
 
 export const TABLE_FILENAME_MAP: Record<string, string> = {
@@ -180,6 +182,7 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   insurance: 'insurance_policies.csv',
   insurancePolicyVehicles: 'insurance_policy_vehicles.csv',
   expenseGroups: 'expense_groups.csv',
+  photos: 'photos.csv',
 };
 
 export function getBackupTableKeys(): string[] {
@@ -187,7 +190,11 @@ export function getBackupTableKeys(): string[] {
 }
 
 // Files that may be absent in older backups (pre-migration)
-const OPTIONAL_BACKUP_FILES = new Set(['insurance_policy_vehicles.csv', 'expense_groups.csv']);
+const OPTIONAL_BACKUP_FILES = new Set([
+  'insurance_policy_vehicles.csv',
+  'expense_groups.csv',
+  'photos.csv',
+]);
 
 export function getRequiredBackupFiles(): string[] {
   return [

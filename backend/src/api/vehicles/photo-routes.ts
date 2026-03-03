@@ -60,6 +60,7 @@ photoRoutes.get('/:photoId/thumbnail', async (c) => {
     headers: {
       'Content-Type': mimeType,
       'Cache-Control': 'private, max-age=3600',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
     },
   });
 });

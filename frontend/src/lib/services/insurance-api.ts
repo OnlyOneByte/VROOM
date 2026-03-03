@@ -49,6 +49,10 @@ export const insuranceApi = {
 		return apiClient.put<InsurancePolicy>(`/api/v1/insurance/${policyId}/terms/${termId}`, data);
 	},
 
+	async deleteTerm(policyId: string, termId: string): Promise<InsurancePolicy> {
+		return apiClient.delete<InsurancePolicy>(`/api/v1/insurance/${policyId}/terms/${termId}`);
+	},
+
 	async getExpiringPolicies(days?: number): Promise<InsurancePolicy[]> {
 		const query = days !== undefined ? `?days=${days}` : '';
 		return apiClient.get<InsurancePolicy[]>(`/api/v1/insurance/expiring-soon${query}`);

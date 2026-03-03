@@ -808,6 +808,112 @@ export class InsurancePolicyRepository {
   }
 
   /**
+   * Delete a specific term from a policy's terms JSON array.
+   * Removes junction rows, nullifies expense FKs, and clears vehicle references for the term.
+   */
+  async deleteTerm(
+    policyId: string,
+    termId: string,
+    userId: string
+  ): Promise<InsurancePolicyWithVehicles> {
+    try {
+      return await this.db.transaction(async (tx) => {
+        const existing = await tx
+          .select()
+          .from(insurancePolicies)
+          .where(eq(insurancePolicies.id, policyId))
+          .limit(1);
+
+        if (existing.length === 0) {
+          throw new NotFoundError('Insurance policy');
+        }
+
+        const policy = existing[0];
+        const currentTerms = (policy.terms ?? []) as PolicyTerm[];
+        const termIndex = currentTerms.findIndex((t) => t.id === termId);
+        if (termIndex === -1) {
+          throw new NotFoundError('Term');
+        }
+
+        // Get vehicle IDs for this term before removing junction rows
+        const termVehicleRows = await tx
+          .select({ vehicleId: insurancePolicyVehicles.vehicleId })
+          .from(insurancePolicyVehicles)
+          .where(
+            and(
+              eq(insurancePolicyVehicles.policyId, policyId),
+              eq(insurancePolicyVehicles.termId, termId)
+            )
+          );
+        const termVehicleIds = termVehicleRows.map((r) => r.vehicleId);
+
+        // Remove the term from the array
+        const updatedTerms = currentTerms.filter((t) => t.id !== termId);
+        const { currentTermStart, currentTermEnd } = syncDenormalizedFields(updatedTerms);
+
+        // Update policy
+        const updatedResult = await tx
+          .update(insurancePolicies)
+          .set({
+            terms: updatedTerms,
+            currentTermStart,
+            currentTermEnd,
+            updatedAt: new Date(),
+          })
+          .where(eq(insurancePolicies.id, policyId))
+          .returning();
+
+        // Delete junction rows for this term
+        await tx
+          .delete(insurancePolicyVehicles)
+          .where(
+            and(
+              eq(insurancePolicyVehicles.policyId, policyId),
+              eq(insurancePolicyVehicles.termId, termId)
+            )
+          );
+
+        // Nullify expense FK references for this term
+        await tx
+          .update(expenses)
+          .set({
+            insurancePolicyId: null,
+            insuranceTermId: null,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(eq(expenses.insurancePolicyId, policyId), eq(expenses.insuranceTermId, termId))
+          );
+
+        // Delete expense groups for this term
+        await tx
+          .delete(expenseGroups)
+          .where(
+            and(
+              eq(expenseGroups.insurancePolicyId, policyId),
+              eq(expenseGroups.insuranceTermId, termId)
+            )
+          );
+
+        // Clear vehicle references if no longer covered by other terms
+        await this.clearRemovedVehicleRefs(tx, policyId, termVehicleIds, []);
+
+        const termCoverage = await this.getTermVehicleCoverage(tx, policyId);
+        const vehicleIds = getLatestTermVehicleIds(updatedTerms, termCoverage);
+        return { ...updatedResult[0], vehicleIds, termVehicleCoverage: termCoverage };
+      });
+    } catch (error) {
+      if (error instanceof NotFoundError) throw error;
+      logger.error('Failed to delete term from insurance policy', {
+        policyId,
+        termId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to delete term from insurance policy', error);
+    }
+  }
+
+  /**
    * Delete a policy. Clears currentInsurancePolicyId on vehicles and nullifies expense FKs.
    * Junction rows are cascade-deleted by the DB.
    */

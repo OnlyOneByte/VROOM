@@ -3,7 +3,7 @@
 	import { appStore } from '$lib/stores/app.js';
 	import { ArrowLeft, Car, Trash2, X, Check, LoaderCircle } from 'lucide-svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
 	import { FormFieldError } from '$lib/components/ui/form-field';

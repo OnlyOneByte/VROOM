@@ -19,7 +19,7 @@
 		GitBranch,
 		Shield
 	} from 'lucide-svelte';
-	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -589,7 +589,12 @@
 		isDeleting = true;
 
 		try {
-			await expenseApi.deleteExpense(expenseId);
+			// For insurance-managed expenses, delete the parent group (cascades children)
+			if (isInsuranceManaged && groupId) {
+				await expenseApi.deleteSplitExpense(groupId);
+			} else {
+				await expenseApi.deleteExpense(expenseId);
+			}
 
 			appStore.addNotification({
 				type: 'success',
@@ -796,10 +801,18 @@
 		{/if}
 
 		<!-- Back button -->
-		<div class="flex justify-center">
+		<div class="flex justify-center gap-3">
 			<Button variant="outline" onclick={() => goto(returnTo)}>
 				<ArrowLeft class="mr-2 h-4 w-4" />
 				Back to Expenses
+			</Button>
+			<Button
+				variant="destructive"
+				onclick={() => (showDeleteConfirm = true)}
+				disabled={isDeleting}
+			>
+				<Trash2 class="mr-2 h-4 w-4" />
+				Force Delete
 			</Button>
 		</div>
 	</div>
@@ -1144,54 +1157,6 @@
 		</div>
 	</div>
 
-	<!-- Delete Confirmation AlertDialog -->
-	<AlertDialog.Root bind:open={showDeleteConfirm}>
-		<AlertDialog.Content>
-			<AlertDialog.Header>
-				<AlertDialog.Title>Delete Expense</AlertDialog.Title>
-				<AlertDialog.Description>
-					Are you sure you want to delete this expense? This action cannot be undone.
-				</AlertDialog.Description>
-			</AlertDialog.Header>
-
-			{#if originalExpense}
-				<div class="bg-muted rounded-lg p-3">
-					<div class="flex items-center gap-3">
-						<div class="p-2 rounded-lg bg-destructive/10 text-destructive">
-							<Save class="h-4 w-4" />
-						</div>
-						<div>
-							<p class="font-medium text-foreground">
-								{originalExpense.description || originalExpense.tags?.join(', ') || 'Expense'}
-							</p>
-							<p class="text-sm text-muted-foreground">
-								${originalExpense.amount.toFixed(2)} on {new Date(
-									originalExpense.date
-								).toLocaleDateString()}
-							</p>
-						</div>
-					</div>
-				</div>
-			{/if}
-
-			<AlertDialog.Footer>
-				<AlertDialog.Cancel disabled={isDeleting}>Cancel</AlertDialog.Cancel>
-				<AlertDialog.Action
-					onclick={handleDelete}
-					disabled={isDeleting}
-					class="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-				>
-					{#if isDeleting}
-						<LoaderCircle class="h-4 w-4 animate-spin mr-2" />
-						Deleting...
-					{:else}
-						Delete Expense
-					{/if}
-				</AlertDialog.Action>
-			</AlertDialog.Footer>
-		</AlertDialog.Content>
-	</AlertDialog.Root>
-
 	<!-- Split Cost Sheet -->
 	<SplitCostSheet
 		bind:open={showSplitSheet}
@@ -1209,3 +1174,56 @@
 		onClose={() => (showSplitSheet = false)}
 	/>
 {/if}
+
+<!-- Delete Confirmation AlertDialog (outside if/else so it works in all modes) -->
+<AlertDialog.Root bind:open={showDeleteConfirm}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Expense</AlertDialog.Title>
+			<AlertDialog.Description>
+				{#if isInsuranceManaged && groupId}
+					This will delete the insurance expense group and all its child expenses. This action
+					cannot be undone.
+				{:else}
+					Are you sure you want to delete this expense? This action cannot be undone.
+				{/if}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+
+		{#if originalExpense}
+			<div class="bg-muted rounded-lg p-3">
+				<div class="flex items-center gap-3">
+					<div class="p-2 rounded-lg bg-destructive/10 text-destructive">
+						<Save class="h-4 w-4" />
+					</div>
+					<div>
+						<p class="font-medium text-foreground">
+							{originalExpense.description || originalExpense.tags?.join(', ') || 'Expense'}
+						</p>
+						<p class="text-sm text-muted-foreground">
+							${originalExpense.amount.toFixed(2)} on {new Date(
+								originalExpense.date
+							).toLocaleDateString()}
+						</p>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={isDeleting}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action
+				onclick={handleDelete}
+				disabled={isDeleting}
+				class="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+			>
+				{#if isDeleting}
+					<LoaderCircle class="h-4 w-4 animate-spin mr-2" />
+					Deleting...
+				{:else}
+					Delete Expense
+				{/if}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

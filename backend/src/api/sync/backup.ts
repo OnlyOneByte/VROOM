@@ -5,7 +5,7 @@
 import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
-import { eq, getTableColumns } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { SQLiteTableWithColumns } from 'drizzle-orm/sqlite-core';
 import { createInsertSchema } from 'drizzle-zod';
 import type { z } from 'zod';
@@ -22,6 +22,7 @@ import {
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
+  photos,
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
@@ -142,6 +143,19 @@ export class BackupService {
       userInsurancePolicyVehicles.push(row.insurance_policy_vehicles);
     }
 
+    // Collect all entity IDs to query photos for all user-owned entities
+    const vehicleIds = userVehicles.map((v) => v.id);
+    const expenseIds = userExpenses.map((e) => e.id);
+    const policyIds = [...seenPolicyIds];
+    const expenseGroupIds = userExpenseGroups.map((g) => g.id);
+
+    const userPhotos = await this.queryUserPhotos(db, {
+      vehicleIds,
+      expenseIds,
+      policyIds,
+      expenseGroupIds,
+    });
+
     return {
       metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId },
       vehicles: userVehicles,
@@ -150,7 +164,43 @@ export class BackupService {
       insurance: userInsurance,
       insurancePolicyVehicles: userInsurancePolicyVehicles,
       expenseGroups: userExpenseGroups,
+      photos: userPhotos,
     };
+  }
+
+  /**
+   * Query all photos belonging to a user's entities.
+   * Photos use a polymorphic entityType/entityId pattern with no userId column,
+   * so we query by each entity type's IDs separately.
+   */
+  private async queryUserPhotos(
+    db: ReturnType<typeof getDb>,
+    entityIds: {
+      vehicleIds: string[];
+      expenseIds: string[];
+      policyIds: string[];
+      expenseGroupIds: string[];
+    }
+  ) {
+    const allPhotos = [];
+
+    const entityQueries: { type: string; ids: string[] }[] = [
+      { type: 'vehicle', ids: entityIds.vehicleIds },
+      { type: 'expense', ids: entityIds.expenseIds },
+      { type: 'insurance_policy', ids: entityIds.policyIds },
+      { type: 'expense_group', ids: entityIds.expenseGroupIds },
+    ];
+
+    for (const { type, ids } of entityQueries) {
+      if (ids.length === 0) continue;
+      const rows = await db
+        .select()
+        .from(photos)
+        .where(and(eq(photos.entityType, type), inArray(photos.entityId, ids)));
+      allPhotos.push(...rows);
+    }
+
+    return allPhotos;
   }
 
   async exportAsZip(userId: string): Promise<Buffer> {
@@ -293,12 +343,19 @@ export class BackupService {
     const vehicleIds = new Set(backup.vehicles.map((v) => String(v.id)));
     const policyIds = new Set(backup.insurance.map((i) => String(i.id)));
     const expenseGroupIds = new Set((backup.expenseGroups ?? []).map((g) => String(g.id)));
+    const expenseIds = new Set(backup.expenses.map((e) => String(e.id)));
 
     return [
       ...this.validateExpenseRefs(backup.expenses, vehicleIds, expenseGroupIds),
       ...this.validateFinancingRefs(backup.financing, vehicleIds),
       ...this.validateInsuranceRefs(backup.insurance),
       ...this.validateJunctionRefs(backup.insurancePolicyVehicles ?? [], policyIds, vehicleIds),
+      ...this.validatePhotoRefs(backup.photos ?? [], {
+        vehicleIds,
+        expenseIds,
+        policyIds,
+        expenseGroupIds,
+      }),
     ];
   }
 
@@ -354,6 +411,37 @@ export class BackupService {
       }
       if (!vehicleIds.has(String(junction.vehicleId))) {
         errors.push(`Insurance junction references non-existent vehicle ${junction.vehicleId}`);
+      }
+    }
+    return errors;
+  }
+
+  private validatePhotoRefs(
+    photoList: Record<string, unknown>[],
+    entityIds: {
+      vehicleIds: Set<string>;
+      expenseIds: Set<string>;
+      policyIds: Set<string>;
+      expenseGroupIds: Set<string>;
+    }
+  ): string[] {
+    const errors: string[] = [];
+    const entityTypeToIds: Record<string, Set<string>> = {
+      vehicle: entityIds.vehicleIds,
+      expense: entityIds.expenseIds,
+      insurance_policy: entityIds.policyIds,
+      expense_group: entityIds.expenseGroupIds,
+    };
+
+    for (const photo of photoList) {
+      const entityType = String(photo.entityType);
+      const entityId = String(photo.entityId);
+      const idSet = entityTypeToIds[entityType];
+
+      if (!idSet) {
+        errors.push(`Photo ${photo.id} has unknown entity type: ${entityType}`);
+      } else if (!idSet.has(entityId)) {
+        errors.push(`Photo ${photo.id} references non-existent ${entityType} ${entityId}`);
       }
     }
     return errors;

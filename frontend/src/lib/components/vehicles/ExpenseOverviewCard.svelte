@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { DollarSign } from 'lucide-svelte';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import StatCard from '$lib/components/ui/stat-card.svelte';
+	import StatCard from '$lib/components/common/stat-card.svelte';
 	import { formatCurrency } from '$lib/utils/formatters';
 
 	interface LocalStats {

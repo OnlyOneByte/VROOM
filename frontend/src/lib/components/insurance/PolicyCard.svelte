@@ -1,22 +1,16 @@
 <script lang="ts">
-	import {
-		ChevronDown,
-		ChevronUp,
-		Pencil,
-		Trash2,
-		Building2,
-		Calendar,
-		RefreshCw
-	} from 'lucide-svelte';
+	import { ChevronDown, ChevronUp, Building2, Settings } from 'lucide-svelte';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
+	import PolicyTermCard from './PolicyTermCard.svelte';
 	import ExpirationAlert from './ExpirationAlert.svelte';
 	import TermHistory from './TermHistory.svelte';
 	import TermForm from './TermForm.svelte';
 	import DocumentViewer from './DocumentViewer.svelte';
 	import { getLatestTerm } from '$lib/utils/insurance';
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
+	import { insuranceApi } from '$lib/services/insurance-api';
+	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import type { InsurancePolicy, Vehicle } from '$lib/types';
 
 	interface Props {
@@ -25,7 +19,7 @@
 		vehicles?: Vehicle[];
 		autoEditTermId?: string | null;
 		onEdit: (_policy: InsurancePolicy) => void;
-		onDelete: (_policyId: string) => void;
+		onDelete?: (_policyId: string) => void;
 		onRefresh: () => Promise<void>;
 	}
 
@@ -35,19 +29,12 @@
 		vehicles = [],
 		autoEditTermId = null,
 		onEdit,
-		onDelete,
 		onRefresh
 	}: Props = $props();
 
 	let expanded = $state(false);
 	let latestTerm = $derived(getLatestTerm(policy.terms));
 	let pastTerms = $derived(policy.terms.filter(t => t.id !== latestTerm?.id));
-
-	function handleDelete() {
-		if (confirm(`Delete policy from ${policy.company}? This cannot be undone.`)) {
-			onDelete(policy.id);
-		}
-	}
 
 	let showTermForm = $state(false);
 	let editingTerm = $state<import('$lib/types').PolicyTerm | null>(null);
@@ -87,150 +74,63 @@
 		await onRefresh();
 	}
 
-	function getTermVehicleNames(termId: string): string {
-		if (!policy.termVehicleCoverage || vehicles.length === 0) return '';
-		return policy.termVehicleCoverage
-			.filter(tc => tc.termId === termId)
-			.map(tv => {
-				const v = vehicles.find(vh => vh.id === tv.vehicleId);
-				return v ? v.nickname || `${v.year} ${v.make} ${v.model}` : tv.vehicleId;
-			})
-			.join(', ');
+	async function handleDeleteTerm(term: import('$lib/types').PolicyTerm) {
+		try {
+			await insuranceApi.deleteTerm(policy.id, term.id);
+			await onRefresh();
+		} catch (error) {
+			handleErrorWithNotification(error, 'Failed to delete term');
+		}
 	}
 </script>
 
 <Card class={!policy.isActive ? 'opacity-70' : ''}>
 	<CardContent class="p-4">
-		<!-- Header row -->
-		<div class="flex items-start justify-between gap-3">
-			<div class="flex items-start gap-3 min-w-0 flex-1">
+		<!-- Policy header: company + settings/delete -->
+		<div class="flex items-center justify-between gap-2">
+			<div class="flex items-center gap-2.5 min-w-0">
 				<div class="flex-shrink-0 rounded-full bg-primary/10 p-2">
 					<Building2 class="h-4 w-4 text-primary" />
 				</div>
-				<div class="min-w-0 flex-1">
-					<div class="flex flex-wrap items-center gap-2">
-						<h4 class="text-sm font-semibold text-foreground truncate">{policy.company}</h4>
-						{#if !policy.isActive}
-							<Badge variant="secondary">Inactive</Badge>
-						{/if}
-						{#if policy.isActive && policy.currentTermEnd}
-							<ExpirationAlert currentTermEnd={policy.currentTermEnd} />
-						{/if}
-					</div>
-
-					{#if latestTerm}
-						<div class="mt-1 space-y-0.5">
-							{#if latestTerm.policyDetails.policyNumber}
-								<p class="text-xs text-muted-foreground">
-									Policy #{latestTerm.policyDetails.policyNumber}
-								</p>
-							{/if}
-							{#if policy.currentTermStart && policy.currentTermEnd}
-								<p class="text-xs text-muted-foreground">
-									{formatDate(policy.currentTermStart)} – {formatDate(policy.currentTermEnd)}
-								</p>
-							{/if}
-							{#if vehicleNames.length > 0}
-								<p class="text-xs text-muted-foreground">
-									{vehicleNames.join(', ')}
-								</p>
-							{/if}
-						</div>
+				<div class="min-w-0">
+					<h4 class="text-sm font-semibold text-foreground truncate">{policy.company}</h4>
+					{#if latestTerm?.policyDetails.policyNumber}
+						<p class="text-xs text-muted-foreground">
+							Policy #{latestTerm.policyDetails.policyNumber}
+						</p>
 					{/if}
 				</div>
 			</div>
-
-			<!-- Cost summary + policy actions -->
-			<div class="flex-shrink-0 flex items-start gap-2">
-				<div class="text-right">
-					{#if latestTerm?.financeDetails.totalCost !== undefined}
-						<p class="text-sm font-semibold text-foreground">
-							{formatCurrency(latestTerm.financeDetails.totalCost)}
-						</p>
-						<p class="text-xs text-muted-foreground">total</p>
-					{/if}
-					{#if latestTerm?.financeDetails.monthlyCost !== undefined}
-						<p class="text-xs text-muted-foreground">
-							{formatCurrency(latestTerm.financeDetails.monthlyCost)}/mo
-						</p>
-					{/if}
-				</div>
-				<div class="flex items-center gap-0.5 ml-1">
-					<Button
-						variant="ghost"
-						size="icon"
-						class="h-7 w-7"
-						onclick={() => onEdit(policy)}
-						title="Edit policy"
-					>
-						<Pencil class="h-3.5 w-3.5" />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon"
-						class="h-7 w-7 text-destructive hover:text-destructive"
-						onclick={handleDelete}
-						title="Delete policy"
-					>
-						<Trash2 class="h-3.5 w-3.5" />
-					</Button>
-				</div>
+			<div class="flex items-center gap-0.5 shrink-0">
+				{#if !policy.isActive}
+					<Badge variant="secondary">Inactive</Badge>
+				{/if}
+				{#if policy.isActive && policy.currentTermEnd}
+					<ExpirationAlert currentTermEnd={policy.currentTermEnd} />
+				{/if}
+				<Button
+					variant="ghost"
+					size="icon"
+					class="h-7 w-7"
+					onclick={() => onEdit(policy)}
+					title="Policy settings"
+				>
+					<Settings class="h-3.5 w-3.5" />
+				</Button>
 			</div>
 		</div>
 
-		<!-- Current term (always visible) -->
+		<!-- Current term card -->
 		{#if latestTerm}
-			<div class="mt-3 border-t border-border pt-3">
-				<div class="rounded-md border border-primary/30 bg-primary/5 p-3">
-					<div class="flex items-start justify-between gap-2">
-						<div class="min-w-0 flex-1">
-							<div class="flex flex-wrap items-center gap-2">
-								<div class="flex items-center gap-1 text-xs text-muted-foreground">
-									<Calendar class="h-3 w-3" />
-									{formatDate(latestTerm.startDate)} – {formatDate(latestTerm.endDate)}
-								</div>
-								<Badge variant="secondary" class="text-xs">Current</Badge>
-							</div>
-
-							<div class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-								{#if latestTerm.financeDetails.totalCost !== undefined}
-									<span>Total: {formatCurrency(latestTerm.financeDetails.totalCost)}</span>
-								{/if}
-								{#if latestTerm.policyDetails.policyNumber}
-									<span>#{latestTerm.policyDetails.policyNumber}</span>
-								{/if}
-							</div>
-
-							{#if latestTerm.policyDetails.coverageDescription}
-								<p class="mt-1 text-xs text-muted-foreground truncate">
-									{latestTerm.policyDetails.coverageDescription}
-								</p>
-							{/if}
-
-							{#if getTermVehicleNames(latestTerm.id)}
-								<p class="mt-1 text-xs text-muted-foreground">
-									{getTermVehicleNames(latestTerm.id)}
-								</p>
-							{/if}
-						</div>
-
-						<div class="flex items-center gap-1 shrink-0">
-							<Button
-								variant="ghost"
-								size="sm"
-								class="h-7 text-xs"
-								onclick={() => handleEditTerm(latestTerm)}
-							>
-								<Pencil class="mr-1 h-3 w-3" />
-								Edit
-							</Button>
-							<Button variant="outline" size="sm" class="h-7 text-xs" onclick={handleRenew}>
-								<RefreshCw class="mr-1 h-3 w-3" />
-								Renew
-							</Button>
-						</div>
-					</div>
-				</div>
+			<div class="mt-3">
+				<PolicyTermCard
+					term={latestTerm}
+					isCurrent={true}
+					{vehicleNames}
+					onEdit={handleEditTerm}
+					onDelete={handleDeleteTerm}
+					onRenew={handleRenew}
+				/>
 			</div>
 		{/if}
 
@@ -270,6 +170,7 @@
 					{vehicles}
 					termVehicleCoverage={policy.termVehicleCoverage}
 					{onRefresh}
+					onDeleteTerm={handleDeleteTerm}
 				/>
 			</div>
 		{/if}

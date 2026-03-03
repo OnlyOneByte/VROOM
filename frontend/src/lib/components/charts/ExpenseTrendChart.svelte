@@ -4,7 +4,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/ui/empty-state.svelte';
+	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { formatMonthDay, formatCurrencyAxis, getXTickCount } from '$lib/utils/chart-formatters';
 
 	// Chart configuration constants
@@ -91,6 +91,7 @@
 					xScale={scaleTime()}
 					y="amount"
 					{series}
+					padding={{ top: 4, left: 48, bottom: 20, right: 4 }}
 					props={{
 						area: {
 							class: 'fill-primary/20 stroke-primary stroke-2'

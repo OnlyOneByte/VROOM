@@ -4,7 +4,7 @@
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
 	import * as Select from '$lib/components/ui/select';
-	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import { FormFieldError } from '$lib/components/ui/form-field';
 	import {
 		Card,

@@ -47,6 +47,7 @@
 	import * as Select from '$lib/components/ui/select';
 	import SplitExpenseBadge from './SplitExpenseBadge.svelte';
 	import { ChevronRight } from 'lucide-svelte';
+	import { IsMobile } from '$lib/hooks/is-mobile.svelte';
 
 	// Types for grouped display
 	interface ExpenseRow {
@@ -97,6 +98,8 @@
 		onClearFilters,
 		hasActiveFilters = false
 	}: Props = $props();
+
+	const isMobile = new IsMobile();
 
 	// Sorting state
 	let sortBy = $state<'date' | 'amount' | 'type'>('date');
@@ -206,6 +209,13 @@
 	// Expand state for groups
 	let expandedGroups = $state(new Set<string>());
 
+	// Mobile: selected row for showing actions
+	let selectedRowId = $state<string | null>(null);
+
+	function selectRow(id: string) {
+		selectedRowId = selectedRowId === id ? null : id;
+	}
+
 	function toggleGroup(groupId: string) {
 		const next = new Set(expandedGroups);
 		if (next.has(groupId)) {
@@ -290,7 +300,260 @@
 			{/if}
 		</EmptyContent>
 	</Empty>
+{:else if isMobile.current}
+	<!-- Mobile: compact card-style rows -->
+	<div class="rounded-md border bg-card">
+		<!-- Mobile sort/filter toolbar -->
+		<div class="flex items-center gap-2 border-b px-3 py-2">
+			<Select.Root
+				type="single"
+				value={categoryFilter}
+				onValueChange={v => {
+					categoryFilter = v;
+				}}
+			>
+				<Select.Trigger
+					class="h-8 px-2 border-none shadow-none hover:bg-muted font-medium text-muted-foreground text-xs"
+				>
+					<div class="flex items-center gap-1">
+						{#if categoryFilter}
+							<ListFilter class="h-3 w-3 text-primary" />
+							{categoryLabels[categoryFilter as ExpenseCategory]}
+						{:else}
+							<ListFilter class="h-3 w-3" />
+							Category
+						{/if}
+					</div>
+				</Select.Trigger>
+				<Select.Content>
+					<Select.Item value="" label="All Categories">All Categories</Select.Item>
+					{#each Object.entries(categoryLabels) as [value, label] (value)}
+						<Select.Item {value} {label}>{label}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
+
+			<div class="ml-auto flex items-center gap-1">
+				<Button
+					variant="ghost"
+					size="sm"
+					onclick={() => handleSort('date')}
+					class="h-8 px-2 text-xs"
+				>
+					Date
+					{#if sortBy === 'date'}
+						<ArrowUpDown class="ml-1 h-3 w-3" />
+					{/if}
+				</Button>
+				<Button
+					variant="ghost"
+					size="sm"
+					onclick={() => handleSort('amount')}
+					class="h-8 px-2 text-xs"
+				>
+					Amount
+					{#if sortBy === 'amount'}
+						<ArrowUpDown class="ml-1 h-3 w-3" />
+					{/if}
+				</Button>
+			</div>
+		</div>
+
+		<!-- Mobile rows -->
+		<div class="divide-y">
+			{#if tableRows.length === 0}
+				<div class="py-8 text-center">
+					<p class="text-muted-foreground text-sm">No expenses match this category filter.</p>
+				</div>
+			{:else}
+				{#each tableRows as row (row.type === 'standalone' ? row.expense.id : row.groupId)}
+					{#if row.type === 'standalone'}
+						{@const expense = row.expense}
+						{@const IconComponent = getCategoryIcon(expense.category)}
+						{@const vehicle = getVehicleForExpense(expense)}
+						{@const isSelected = selectedRowId === expense.id}
+						<button
+							type="button"
+							class="flex items-start gap-3 px-3 py-3 w-full text-left transition-colors {isSelected
+								? 'bg-muted/50'
+								: ''}"
+							onclick={() => selectRow(expense.id)}
+						>
+							<div
+								class="mt-0.5 p-1.5 rounded-lg {getCategoryColor(expense.category)} flex-shrink-0"
+							>
+								<IconComponent class="h-4 w-4" />
+							</div>
+							<div class="flex-1 min-w-0">
+								<div class="flex items-start justify-between gap-2">
+									<p class="text-sm font-medium text-foreground truncate">
+										{expense.tags?.join(', ') ||
+											categoryLabels[expense.category as ExpenseCategory]}
+									</p>
+									<span class="text-sm font-semibold text-foreground whitespace-nowrap">
+										{formatCurrency(expense.amount)}
+									</span>
+								</div>
+								<div
+									class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground"
+								>
+									<span>{formatDate(new Date(expense.date))}</span>
+									{#if showVehicleColumn && vehicle}
+										<span>·</span>
+										<span class="truncate">{getVehicleDisplayName(vehicle)}</span>
+									{/if}
+									<span>·</span>
+									<span>{categoryLabels[expense.category as ExpenseCategory]}</span>
+								</div>
+								{#if expense.tags && expense.tags.length > 0}
+									<div class="flex flex-wrap gap-1 mt-1.5">
+										{#each expense.tags as tag (tag)}
+											<Badge variant="secondary" class="font-normal text-xs px-1.5 py-0"
+												>{tag}</Badge
+											>
+										{/each}
+									</div>
+								{/if}
+								{#if isSelected}
+									<div class="flex items-center justify-end gap-1 mt-2">
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-7 px-2 text-xs"
+											href="/expenses/{expense.id}/edit?returnTo={returnTo}"
+											onclick={e => e.stopPropagation()}
+										>
+											<Pencil class="h-3.5 w-3.5 mr-1" />
+											Edit
+										</Button>
+										{#if onDelete}
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+												onclick={e => {
+													e.stopPropagation();
+													confirmDelete(expense);
+												}}
+											>
+												<Trash2 class="h-3.5 w-3.5 mr-1" />
+												Delete
+											</Button>
+										{/if}
+									</div>
+								{/if}
+							</div>
+						</button>
+					{:else}
+						{@const IconComponent = getCategoryIcon(row.category)}
+						{@const isSelected = selectedRowId === row.groupId}
+						<!-- Group parent row (mobile) -->
+						<div
+							class="flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors {isSelected
+								? 'bg-muted/50'
+								: ''}"
+							role="button"
+							tabindex="0"
+							onclick={() => selectRow(row.groupId)}
+							onkeydown={e => {
+								if (e.key === 'Enter' || e.key === ' ') selectRow(row.groupId);
+							}}
+						>
+							<div class="mt-0.5 p-1.5 rounded-lg {getCategoryColor(row.category)} flex-shrink-0">
+								<IconComponent class="h-4 w-4" />
+							</div>
+							<div class="flex-1 min-w-0">
+								<div class="flex items-center justify-between gap-2">
+									<p class="text-sm font-medium text-foreground truncate">
+										{row.tags?.join(', ') || categoryLabels[row.category as ExpenseCategory]}
+									</p>
+									<span
+										class="text-sm font-semibold text-foreground whitespace-nowrap flex-shrink-0"
+									>
+										{formatCurrency(row.totalAmount)}
+									</span>
+								</div>
+								<div
+									class="flex items-center flex-wrap gap-1.5 mt-0.5 text-xs text-muted-foreground"
+								>
+									<SplitExpenseBadge />
+									<span>·</span>
+									<span>{formatDate(new Date(row.date))}</span>
+									{#if showVehicleColumn && row.vehicleNames.length > 0}
+										<span>·</span>
+										<span class="truncate">{row.vehicleNames.join(', ')}</span>
+									{/if}
+									<span>·</span>
+									<span>{categoryLabels[row.category as ExpenseCategory]}</span>
+								</div>
+								{#if isSelected}
+									<div class="flex items-center justify-end gap-1 mt-2">
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-7 px-2 text-xs"
+											href="/expenses/{row.children[0]?.id}/edit?returnTo={returnTo}"
+											onclick={e => e.stopPropagation()}
+										>
+											<Pencil class="h-3.5 w-3.5 mr-1" />
+											Edit
+										</Button>
+										{#if onDelete}
+											{@const isInsuranceLinked = row.tags.includes('insurance')}
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-2 text-xs {isInsuranceLinked
+													? 'text-muted-foreground/40 cursor-not-allowed'
+													: 'text-destructive hover:text-destructive hover:bg-destructive/10'}"
+												onclick={e => {
+													e.stopPropagation();
+													if (!isInsuranceLinked && row.children[0]) {
+														confirmDelete(row.children[0]);
+													}
+												}}
+												disabled={isInsuranceLinked}
+												title={isInsuranceLinked
+													? 'Delete the insurance policy to remove this expense'
+													: 'Delete expense'}
+											>
+												<Trash2 class="h-3.5 w-3.5 mr-1" />
+												Delete
+											</Button>
+										{/if}
+									</div>
+								{/if}
+							</div>
+						</div>
+						<!-- Children visible when selected (mobile) -->
+						{#if isSelected}
+							{#each row.children as child (child.id)}
+								{@const childVehicle = getVehicleForExpense(child)}
+								<div class="flex items-center gap-3 pl-10 pr-3 py-2 bg-muted/30">
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center justify-between gap-2">
+											<span class="text-xs text-muted-foreground truncate">
+												{#if showVehicleColumn && childVehicle}
+													{getVehicleDisplayName(childVehicle)}
+												{:else}
+													{formatDate(new Date(child.date))}
+												{/if}
+											</span>
+											<span class="text-sm text-muted-foreground whitespace-nowrap">
+												{formatCurrency(child.amount)}
+											</span>
+										</div>
+									</div>
+								</div>
+							{/each}
+						{/if}
+					{/if}
+				{/each}
+			{/if}
+		</div>
+	</div>
 {:else}
+	<!-- Desktop: full table -->
 	<div class="rounded-md border bg-card">
 		<ScrollArea class="h-[{scrollHeight}] w-full" orientation="both">
 			<div class="min-w-[800px]">

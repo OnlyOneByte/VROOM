@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { UserCircle } from 'lucide-svelte';
+	import { CircleUser } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
-	import EmptyState from '$lib/components/ui/empty-state.svelte';
+	import EmptyState from '$lib/components/common/empty-state.svelte';
 </script>
 
 <svelte:head>
@@ -17,7 +17,7 @@
 
 	<EmptyState>
 		{#snippet icon()}
-			<UserCircle class="h-12 w-12 text-muted-foreground mb-4" />
+			<CircleUser class="h-12 w-12 text-muted-foreground mb-4" />
 		{/snippet}
 		{#snippet title()}
 			Profile Coming Soon

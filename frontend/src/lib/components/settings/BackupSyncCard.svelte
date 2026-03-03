@@ -98,6 +98,15 @@
 					Upload Backup
 				</Button>
 			</div>
+			<div class="flex items-center justify-between opacity-50">
+				<div class="space-y-0.5">
+					<Label for="backup-photos">Include photos in ZIP backup</Label>
+					<p class="text-sm text-muted-foreground">
+						Embed photo files in the backup archive (coming soon)
+					</p>
+				</div>
+				<Switch id="backup-photos" checked={false} disabled />
+			</div>
 		</div>
 
 		<div class="border-t pt-6 space-y-6">
