@@ -53,24 +53,22 @@
 </script>
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-	{#each stats as stat}
+	{#each stats as stat (stat.label)}
 		<Card>
-			<CardContent class="p-6">
+			<CardContent class="p-4 sm:p-6">
 				{#if isLoading}
 					<div class="space-y-3">
 						<Skeleton class="h-4 w-24" />
 						<Skeleton class="h-8 w-32" />
 					</div>
 				{:else}
-					<div class="flex items-center justify-between">
-						<div class="space-y-1">
-							<p class="text-sm font-medium text-muted-foreground">{stat.label}</p>
-							<p class="text-2xl font-bold">{stat.value}</p>
+					<div class="flex items-center gap-2">
+						<div class="p-2 sm:p-3 rounded-xl {stat.bgColor} shrink-0">
+							<stat.icon class="h-4 w-4 sm:h-5 sm:w-5 {stat.color}" />
 						</div>
-						<div class="p-3 rounded-xl {stat.bgColor}">
-							<stat.icon class="h-6 w-6 {stat.color}" />
-						</div>
+						<p class="text-xs sm:text-sm font-medium text-muted-foreground">{stat.label}</p>
 					</div>
+					<p class="text-xl sm:text-2xl font-bold mt-2">{stat.value}</p>
 				{/if}
 			</CardContent>
 		</Card>
