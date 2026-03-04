@@ -415,6 +415,7 @@ export interface UserSettings {
 	googleDriveBackupEnabled: boolean;
 	googleDriveBackupFolderId?: string;
 	googleDriveBackupRetentionCount?: number;
+	googleDriveCustomFolderName?: string | null;
 	googleSheetsSyncEnabled?: boolean;
 	googleSheetsSpreadsheetId?: string;
 	syncOnInactivity?: boolean;

@@ -85,14 +85,14 @@ export async function resolveEntityDriveFolder(
   driveService: GoogleDriveService,
   entityType: string,
   entityId: string,
-  userName: string
+  folderName: string
 ): Promise<string> {
   switch (entityType) {
     case 'vehicle': {
       const vehicle = await vehicleRepository.findById(entityId);
       if (!vehicle) throw new NotFoundError('Vehicle');
 
-      const folderStructure = await driveService.createVroomFolderStructure(userName);
+      const folderStructure = await driveService.createVroomFolderStructure(folderName);
       const photosFolderId = folderStructure.subFolders.photos.id;
 
       const vehicleFolderName = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
@@ -105,7 +105,7 @@ export async function resolveEntityDriveFolder(
       return newFolder.id;
     }
     case 'insurance_policy': {
-      const folderStructure = await driveService.createVroomFolderStructure(userName);
+      const folderStructure = await driveService.createVroomFolderStructure(folderName);
       const mainFolderId = folderStructure.mainFolder.id;
 
       const insuranceFolderName = 'Insurance Documents';
@@ -119,7 +119,7 @@ export async function resolveEntityDriveFolder(
     }
     case 'expense':
     case 'expense_group': {
-      const folderStructure = await driveService.createVroomFolderStructure(userName);
+      const folderStructure = await driveService.createVroomFolderStructure(folderName);
       const mainFolderId = folderStructure.mainFolder.id;
 
       const expenseFolderName = 'ExpensePhotos';

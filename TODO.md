@@ -44,11 +44,10 @@
 - [x] Move car photos into overview tab (remove photos only tab)
 - [x] Remove Reminders tab from car
 - [X] EV and PHEV charging tracking
-- [ ] Custom folder names
+- [x] Custom folder names
 - [x] Auth/login page re-write
   - [ ] New logo/icon assets to use
   - [x] Change to be / instead of /auth
-- [ ] First opening/loading - car zooming past screen animation (idea)
 - [ ] Odometer log on the vehicle detail page (track readings over time, show mileage-over-time chart)
 - [x] Split expense show better
 - [x] Expenses table to concat details col first
@@ -64,6 +63,7 @@
 - [x] Google drive restore dialog too tall (how to cut off)
 - [x] Clean up UI (components/ui has custom components) -> moved to components/common
 - [x] Photos not showing in prod env (CORS?)
+- [ ] First opening/loading - car zooming past screen animation (idea)
 
 
 ## P1 — Should Have
@@ -73,7 +73,6 @@
 - [ ] Claims tracking: date, claim type (collision/theft/weather/vandalism/other), description, status (filed/in-progress/settled/denied), payout amount, fault designation (at-fault/not-at-fault/shared), linked policy
 - [ ] Claim document uploads: attach photos, police reports, repair estimates to a claim record
 - [ ] Multi-vehicle bundle support: group policies under a shared bundle with discount percentage, reflect per-vehicle adjusted cost
-- [ ] Provider/agent contacts: agent name, phone, email, claims hotline stored per policy
 
 ### Insurance — Extra
 
@@ -99,6 +98,10 @@
 - [ ] Define recurring expenses (insurance premiums, loan payments, parking passes) with frequency
 - [ ] Auto-create expense records each period based on templates
 - [ ] Dashboard indicator for upcoming recurring expenses
+
+### Misc P1
+- [ ] Playwright E2E Tests
+
 
 ## P2 — Nice to Have
 

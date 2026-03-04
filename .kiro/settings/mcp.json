@@ -30,7 +30,8 @@
         "list_network_requests",
         "get_network_request",
         "list_pages",
-        "handle_dialog"
+        "handle_dialog",
+        "upload_file"
       ]
     },
     "svelte": {
@@ -94,7 +95,14 @@
       "autoApprove": [
         "read_query",
         "list_tables",
-        "describe_table"
+        "describe_table",
+        "write_query",
+        "write_query",
+        "write_query",
+        "write_query",
+        "write_query",
+        "write_query",
+        "write_query"
       ]
     }
   }

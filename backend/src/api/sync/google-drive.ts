@@ -44,7 +44,7 @@ export class GoogleDriveService {
     this.drive = google.drive({ version: 'v3', auth: this.oauth2Client });
   }
 
-  async createVroomFolderStructure(userName: string): Promise<{
+  async createVroomFolderStructure(folderName: string): Promise<{
     mainFolder: DriveFolder;
     subFolders: {
       receipts: DriveFolder;
@@ -53,13 +53,13 @@ export class GoogleDriveService {
       backups: DriveFolder;
     };
   }> {
-    const existingFolder = await this.findFolder(`VROOM Car Tracker - ${userName}`);
+    const existingFolder = await this.findFolder(folderName);
     if (existingFolder) {
       const subFolders = await this.getOrCreateSubFolders(existingFolder.id);
       return { mainFolder: existingFolder, subFolders };
     }
 
-    const mainFolder = await this.createFolder(`VROOM Car Tracker - ${userName}`);
+    const mainFolder = await this.createFolder(folderName);
     const subFolders = await this.getOrCreateSubFolders(mainFolder.id);
     return { mainFolder, subFolders };
   }
@@ -274,6 +274,14 @@ export class GoogleDriveService {
     }
 
     return response.data as DriveFile;
+  }
+
+  /** Rename an existing Drive folder (best-effort). */
+  async renameFolder(folderId: string, newName: string): Promise<void> {
+    await this.drive.files.update({
+      fileId: folderId,
+      requestBody: { name: newName },
+    });
   }
 
   /**

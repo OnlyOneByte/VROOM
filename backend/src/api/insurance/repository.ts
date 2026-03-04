@@ -814,7 +814,7 @@ export class InsurancePolicyRepository {
   async deleteTerm(
     policyId: string,
     termId: string,
-    userId: string
+    _userId: string
   ): Promise<InsurancePolicyWithVehicles> {
     try {
       return await this.db.transaction(async (tx) => {
