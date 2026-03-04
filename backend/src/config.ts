@@ -9,6 +9,7 @@ import {
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
+  odometerEntries,
   photos,
   vehicleFinancing,
   vehicles,
@@ -173,6 +174,7 @@ export const TABLE_SCHEMA_MAP: Record<string, SQLiteTableWithColumns<any>> = {
   insurancePolicyVehicles: insurancePolicyVehicles,
   expenseGroups: expenseGroups,
   photos: photos,
+  odometer: odometerEntries,
 };
 
 export const TABLE_FILENAME_MAP: Record<string, string> = {
@@ -183,6 +185,7 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   insurancePolicyVehicles: 'insurance_policy_vehicles.csv',
   expenseGroups: 'expense_groups.csv',
   photos: 'photos.csv',
+  odometer: 'odometer_entries.csv',
 };
 
 export function getBackupTableKeys(): string[] {
@@ -194,6 +197,7 @@ const OPTIONAL_BACKUP_FILES = new Set([
   'insurance_policy_vehicles.csv',
   'expense_groups.csv',
   'photos.csv',
+  'odometer_entries.csv',
 ]);
 
 export function getRequiredBackupFiles(): string[] {

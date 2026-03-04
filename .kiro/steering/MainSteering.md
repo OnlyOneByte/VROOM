@@ -118,7 +118,7 @@ Routes live in `frontend/src/routes/` and follow SvelteKit file-based routing: `
 ## Code Hygiene
 
 - Floating action buttons (FABs) must use `bg-foreground text-background` — never `bg-gray-900 text-white` or `!text-white` with gradient overrides.
-- Pages with FABs must add `pb-24 sm:pb-0` to the main content wrapper so the full-width mobile FAB doesn't cover bottom content.
+- Pages with FABs must add `pb-24` to the main content wrapper so the FAB doesn't cover bottom content on any screen size.
 - Status-indicator colors (`text-green-500`, `text-orange-500`, etc.) in utility functions must use semantic tokens (`text-chart-2`, `text-destructive`, `text-chart-5`) so they adapt to dark mode.
 - Financing/payment components must use `chart-1`–`chart-5` tokens for accent colors, not raw `text-green-600`, `bg-blue-100`, etc.
 - Never use `!important` overrides on shadcn `Button` — pass classes normally or use `variant` props.

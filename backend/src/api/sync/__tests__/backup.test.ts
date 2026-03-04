@@ -14,6 +14,7 @@ import { TABLE_SCHEMA_MAP } from '../../../config';
 import {
   expenses,
   insurancePolicies,
+  odometerEntries,
   photos,
   vehicleFinancing,
   vehicles,
@@ -305,6 +306,7 @@ describe('validateBackupData: acceptance', () => {
       insurancePolicyVehicles: [],
       expenseGroups: [],
       photos: [],
+      odometer: [],
     };
     // Fix vehicleId reference
     (backup.expenses[0] as Record<string, unknown>).vehicleId = backup.vehicles[0].id;
@@ -333,6 +335,7 @@ describe('validateBackupData: acceptance', () => {
       insurancePolicyVehicles: [],
       expenseGroups: [],
       photos: [photo],
+      odometer: [],
     };
 
     const result = backupService.validateBackupData(backup);
@@ -356,6 +359,7 @@ describe('validateBackupData: referential integrity', () => {
       insurancePolicyVehicles: [],
       expenseGroups: [],
       photos: [],
+      odometer: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -373,6 +377,7 @@ describe('validateBackupData: referential integrity', () => {
       insurancePolicyVehicles: [{ policyId: 'ghost', vehicleId: v.id as string }],
       expenseGroups: [],
       photos: [],
+      odometer: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -390,6 +395,7 @@ describe('validateBackupData: referential integrity', () => {
       insurancePolicyVehicles: [{ policyId: ins.id as string, vehicleId: 'ghost' }],
       expenseGroups: [],
       photos: [],
+      odometer: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -410,6 +416,7 @@ describe('validateBackupData: referential integrity', () => {
       insurancePolicyVehicles: [],
       expenseGroups: [],
       photos: [photo],
+      odometer: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -430,10 +437,80 @@ describe('validateBackupData: referential integrity', () => {
       insurancePolicyVehicles: [],
       expenseGroups: [],
       photos: [photo],
+      odometer: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('unknown entity type'))).toBe(true);
+  });
+
+  test('odometer entry referencing non-existent vehicle fails', () => {
+    const entry = coerceRow(
+      buildMinimalStringRow(odometerEntries, { vehicleId: 'ghost' }),
+      odometerEntries
+    );
+    const backup: ParsedBackupData = {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      vehicles: [],
+      expenses: [],
+      financing: [],
+      insurance: [],
+      insurancePolicyVehicles: [],
+      expenseGroups: [],
+      photos: [],
+      odometer: [entry],
+    };
+    const result = backupService.validateBackupData(backup);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('non-existent vehicle'))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// coerceRow: Odometer entry columns
+// ---------------------------------------------------------------------------
+
+describe('coerceRow: Odometer entry columns', () => {
+  test('integer odometer string coerces to number', () => {
+    const row = buildMinimalStringRow(odometerEntries, { odometer: '98765' });
+    const result = coerceRow(row, odometerEntries);
+    expect(result.odometer).toBe(98765);
+  });
+
+  test('nullable text note coerces correctly when present', () => {
+    const row = buildMinimalStringRow(odometerEntries, { note: 'Oil change visit' });
+    const result = coerceRow(row, odometerEntries);
+    expect(result.note).toBe('Oil change visit');
+  });
+
+  test('empty note coerces to null', () => {
+    const row = buildMinimalStringRow(odometerEntries, { note: '' });
+    const result = coerceRow(row, odometerEntries);
+    expect(result.note).toBeNull();
+  });
+
+  test('nullable linkedEntityType coerces correctly when present', () => {
+    const row = buildMinimalStringRow(odometerEntries, { linkedEntityType: 'expense' });
+    const result = coerceRow(row, odometerEntries);
+    expect(result.linkedEntityType).toBe('expense');
+  });
+
+  test('empty linkedEntityType coerces to null', () => {
+    const row = buildMinimalStringRow(odometerEntries, { linkedEntityType: '' });
+    const result = coerceRow(row, odometerEntries);
+    expect(result.linkedEntityType).toBeNull();
+  });
+
+  test('nullable linkedEntityId coerces correctly when present', () => {
+    const row = buildMinimalStringRow(odometerEntries, { linkedEntityId: 'exp-123' });
+    const result = coerceRow(row, odometerEntries);
+    expect(result.linkedEntityId).toBe('exp-123');
+  });
+
+  test('empty linkedEntityId coerces to null', () => {
+    const row = buildMinimalStringRow(odometerEntries, { linkedEntityId: '' });
+    const result = coerceRow(row, odometerEntries);
+    expect(result.linkedEntityId).toBeNull();
   });
 });
 
@@ -450,6 +527,7 @@ describe('TABLE_SCHEMA_MAP coverage', () => {
       'insurance',
       'insurancePolicyVehicles',
       'photos',
+      'odometer',
     ];
     for (const key of expected) {
       expect(TABLE_SCHEMA_MAP[key]).toBeDefined();
@@ -528,6 +606,7 @@ describe('Property 9: Backup round-trip for tracking flags', () => {
           insurancePolicyVehicles: [],
           expenseGroups: [],
           photos: [],
+          odometer: [],
         };
 
         const result = backupService.validateBackupData(backup);

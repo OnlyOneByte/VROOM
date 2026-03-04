@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { get } from 'svelte/store';
-import { authStore } from '../auth.js';
+import { authStore } from '../auth.svelte';
 import type { User } from '../../types/index.js';
 
 // Mock fetch — apiClient uses fetch internally
@@ -63,34 +62,29 @@ describe('Auth Store', () => {
 
 	describe('Initial State', () => {
 		it('has correct initial state', () => {
-			const state = get(authStore);
-			expect(state).toEqual({
-				user: null,
-				isAuthenticated: false,
-				isLoading: true,
-				error: null,
-				token: null
-			});
+			expect(authStore.user).toBe(null);
+			expect(authStore.isAuthenticated).toBe(false);
+			expect(authStore.isLoading).toBe(true);
+			expect(authStore.error).toBe(null);
+			expect(authStore.token).toBe(null);
 		});
 	});
 
 	describe('setUser', () => {
 		it('sets user and updates authentication state', () => {
 			authStore.setUser(mockUser, 'test-token');
-			const state = get(authStore);
-			expect(state.user).toEqual(mockUser);
-			expect(state.isAuthenticated).toBe(true);
-			expect(state.isLoading).toBe(false);
-			expect(state.error).toBe(null);
-			expect(state.token).toBe('test-token');
+			expect(authStore.user).toEqual(mockUser);
+			expect(authStore.isAuthenticated).toBe(true);
+			expect(authStore.isLoading).toBe(false);
+			expect(authStore.error).toBe(null);
+			expect(authStore.token).toBe('test-token');
 		});
 
 		it('sets user without token', () => {
 			authStore.setUser(mockUser);
-			const state = get(authStore);
-			expect(state.user).toEqual(mockUser);
-			expect(state.isAuthenticated).toBe(true);
-			expect(state.token).toBe(null);
+			expect(authStore.user).toEqual(mockUser);
+			expect(authStore.isAuthenticated).toBe(true);
+			expect(authStore.token).toBe(null);
 		});
 	});
 
@@ -98,36 +92,34 @@ describe('Auth Store', () => {
 		it('clears user and resets authentication state', () => {
 			authStore.setUser(mockUser, 'test-token');
 			authStore.clearUser();
-			const state = get(authStore);
-			expect(state.user).toBe(null);
-			expect(state.isAuthenticated).toBe(false);
-			expect(state.isLoading).toBe(false);
-			expect(state.error).toBe(null);
-			expect(state.token).toBe(null);
+			expect(authStore.user).toBe(null);
+			expect(authStore.isAuthenticated).toBe(false);
+			expect(authStore.isLoading).toBe(false);
+			expect(authStore.error).toBe(null);
+			expect(authStore.token).toBe(null);
 		});
 	});
 
 	describe('setLoading', () => {
 		it('updates loading state', () => {
 			authStore.setLoading(false);
-			expect(get(authStore).isLoading).toBe(false);
+			expect(authStore.isLoading).toBe(false);
 			authStore.setLoading(true);
-			expect(get(authStore).isLoading).toBe(true);
+			expect(authStore.isLoading).toBe(true);
 		});
 	});
 
 	describe('setError', () => {
 		it('sets error and stops loading', () => {
 			authStore.setError('Test error');
-			const state = get(authStore);
-			expect(state.error).toBe('Test error');
-			expect(state.isLoading).toBe(false);
+			expect(authStore.error).toBe('Test error');
+			expect(authStore.isLoading).toBe(false);
 		});
 
 		it('clears error when set to null', () => {
 			authStore.setError('Test error');
 			authStore.setError(null);
-			expect(get(authStore).error).toBe(null);
+			expect(authStore.error).toBe(null);
 		});
 	});
 
@@ -137,11 +129,10 @@ describe('Auth Store', () => {
 
 			await authStore.initialize();
 
-			const state = get(authStore);
-			expect(state.user).toEqual(mockUser);
-			expect(state.isAuthenticated).toBe(true);
-			expect(state.isLoading).toBe(false);
-			expect(state.error).toBe(null);
+			expect(authStore.user).toEqual(mockUser);
+			expect(authStore.isAuthenticated).toBe(true);
+			expect(authStore.isLoading).toBe(false);
+			expect(authStore.error).toBe(null);
 		});
 
 		it('handles invalid session gracefully', async () => {
@@ -149,10 +140,9 @@ describe('Auth Store', () => {
 
 			await authStore.initialize();
 
-			const state = get(authStore);
-			expect(state.user).toBe(null);
-			expect(state.isAuthenticated).toBe(false);
-			expect(state.isLoading).toBe(false);
+			expect(authStore.user).toBe(null);
+			expect(authStore.isAuthenticated).toBe(false);
+			expect(authStore.isLoading).toBe(false);
 		});
 
 		it('handles network errors', async () => {
@@ -160,10 +150,9 @@ describe('Auth Store', () => {
 
 			await authStore.initialize();
 
-			const state = get(authStore);
-			expect(state.user).toBe(null);
-			expect(state.isAuthenticated).toBe(false);
-			expect(state.isLoading).toBe(false);
+			expect(authStore.user).toBe(null);
+			expect(authStore.isAuthenticated).toBe(false);
+			expect(authStore.isLoading).toBe(false);
 		});
 	});
 
@@ -182,9 +171,8 @@ describe('Auth Store', () => {
 			const result = await authStore.refreshToken();
 
 			expect(result).toBe(newToken);
-			const state = get(authStore);
-			expect(state.token).toBe(newToken);
-			expect(state.error).toBe(null);
+			expect(authStore.token).toBe(newToken);
+			expect(authStore.error).toBe(null);
 		});
 
 		it('handles refresh failure', async () => {
@@ -192,10 +180,9 @@ describe('Auth Store', () => {
 
 			await expect(authStore.refreshToken()).rejects.toThrow();
 
-			const state = get(authStore);
-			expect(state.user).toBe(null);
-			expect(state.isAuthenticated).toBe(false);
-			expect(state.token).toBe(null);
+			expect(authStore.user).toBe(null);
+			expect(authStore.isAuthenticated).toBe(false);
+			expect(authStore.token).toBe(null);
 		});
 	});
 
@@ -206,34 +193,26 @@ describe('Auth Store', () => {
 
 			await authStore.logout();
 
-			const state = get(authStore);
-			expect(state.user).toBe(null);
-			expect(state.isAuthenticated).toBe(false);
-			expect(state.isLoading).toBe(false);
-			expect(state.error).toBe(null);
-			expect(state.token).toBe(null);
+			expect(authStore.user).toBe(null);
+			expect(authStore.isAuthenticated).toBe(false);
+			expect(authStore.isLoading).toBe(false);
+			expect(authStore.error).toBe(null);
+			expect(authStore.token).toBe(null);
 		});
 	});
 
 	describe('Store Reactivity', () => {
-		it('notifies subscribers of state changes', () => {
-			const states: unknown[] = [];
-			const unsubscribe = authStore.subscribe(state => {
-				states.push({ ...state });
-			});
-
-			expect(states).toHaveLength(1);
-
+		it('reflects state changes immediately', () => {
 			authStore.setUser(mockUser);
-			expect(states).toHaveLength(2);
+			expect(authStore.user).toEqual(mockUser);
+			expect(authStore.isAuthenticated).toBe(true);
 
 			authStore.setError('Test error');
-			expect(states).toHaveLength(3);
+			expect(authStore.error).toBe('Test error');
 
 			authStore.clearUser();
-			expect(states).toHaveLength(4);
-
-			unsubscribe();
+			expect(authStore.user).toBe(null);
+			expect(authStore.isAuthenticated).toBe(false);
 		});
 	});
 });

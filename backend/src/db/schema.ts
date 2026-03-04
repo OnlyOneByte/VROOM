@@ -277,6 +277,39 @@ export type NewUserSettings = typeof userSettings.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
 
+export type OdometerEntry = typeof odometerEntries.$inferSelect;
+export type NewOdometerEntry = typeof odometerEntries.$inferInsert;
+
+// Odometer Entries table (manual readings + expense-linked auto-entries)
+export const odometerEntries = sqliteTable(
+  'odometer_entries',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    vehicleId: text('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    odometer: integer('odometer').notNull(),
+    recordedAt: integer('recorded_at', { mode: 'timestamp' }).notNull(),
+    note: text('note'),
+    linkedEntityType: text('linked_entity_type'),
+    linkedEntityId: text('linked_entity_id'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    vehicleDateIdx: index('odometer_vehicle_date_idx').on(table.vehicleId, table.recordedAt),
+    linkedEntityIdx: index('odometer_linked_entity_idx').on(
+      table.linkedEntityType,
+      table.linkedEntityId
+    ),
+  })
+);
+
 // Photos table (polymorphic: entityType + entityId)
 export const photos = sqliteTable(
   'photos',
@@ -302,4 +335,10 @@ export const photos = sqliteTable(
 
 export type Photo = typeof photos.$inferSelect;
 export type NewPhoto = typeof photos.$inferInsert;
-export type PhotoEntityType = 'vehicle' | 'expense' | 'trip' | 'insurance_policy' | 'expense_group';
+export type PhotoEntityType =
+  | 'vehicle'
+  | 'expense'
+  | 'trip'
+  | 'insurance_policy'
+  | 'expense_group'
+  | 'odometer_entry';

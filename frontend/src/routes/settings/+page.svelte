@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { settingsStore } from '$lib/stores/settings.js';
-	import { appStore } from '$lib/stores/app.js';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { appStore } from '$lib/stores/app.svelte';
 	import { Settings as SettingsIcon, Save, LoaderCircle } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import UnitPreferencesCard from '$lib/components/settings/UnitPreferencesCard.svelte';
@@ -27,8 +27,8 @@
 	}
 
 	// Derive state directly from store
-	let settings = $derived($settingsStore.settings);
-	let isLoading = $derived($settingsStore.isLoading);
+	let settings = $derived(settingsStore.settings);
+	let isLoading = $derived(settingsStore.isLoading);
 
 	let isSaving = $state(false);
 	let isBackingUp = $state(false);

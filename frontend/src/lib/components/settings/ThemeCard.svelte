@@ -8,10 +8,10 @@
 		CardHeader,
 		CardTitle
 	} from '$lib/components/ui/card';
-	import { themeStore, type ThemePreference } from '$lib/stores/theme';
+	import { themeStore, type ThemePreference } from '$lib/stores/theme.svelte';
 	import { cn } from '$lib/utils';
 
-	let currentTheme = $derived($themeStore);
+	let currentTheme = $derived(themeStore.current);
 
 	const options: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
 		{ value: 'light', label: 'Light', icon: Sun },

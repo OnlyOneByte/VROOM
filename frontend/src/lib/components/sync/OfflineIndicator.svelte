@@ -1,21 +1,23 @@
 <script lang="ts">
-	import { isOnline, syncStatus, offlineExpenses } from '$lib/stores/offline';
+	import { onlineStatus, syncState, offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { syncOfflineExpenses } from '$lib/utils/offline-storage';
 	import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert } from 'lucide-svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 
-	let pendingCount = $derived($offlineExpenses.filter(expense => !expense.synced).length);
+	let pendingCount = $derived(
+		offlineExpenseQueue.current.filter(expense => !expense.synced).length
+	);
 
 	async function handleSync() {
-		if ($isOnline && pendingCount > 0) {
+		if (onlineStatus.current && pendingCount > 0) {
 			await syncOfflineExpenses();
 		}
 	}
 </script>
 
 <div class="fixed top-4 right-4 z-50">
-	{#if !$isOnline}
+	{#if !onlineStatus.current}
 		<Badge variant="destructive" class="px-3 py-2 shadow-lg text-sm gap-2">
 			<WifiOff size={16} />
 			<span class="font-medium">Offline</span>
@@ -25,7 +27,7 @@
 				</Badge>
 			{/if}
 		</Badge>
-	{:else if $syncStatus === 'syncing'}
+	{:else if syncState.current === 'syncing'}
 		<Badge
 			variant="secondary"
 			class="px-3 py-2 shadow-lg text-sm gap-2 bg-primary text-primary-foreground border-transparent"
@@ -33,12 +35,12 @@
 			<RefreshCw size={16} class="animate-spin" />
 			<span class="font-medium">Syncing...</span>
 		</Badge>
-	{:else if $syncStatus === 'success'}
+	{:else if syncState.current === 'success'}
 		<Badge variant="default" class="px-3 py-2 shadow-lg text-sm gap-2 border-transparent">
 			<CircleCheck size={16} />
 			<span class="font-medium">Synced</span>
 		</Badge>
-	{:else if $syncStatus === 'error'}
+	{:else if syncState.current === 'error'}
 		<Badge variant="destructive" class="px-3 py-2 shadow-lg text-sm gap-2">
 			<CircleAlert size={16} />
 			<span class="font-medium">Sync failed</span>

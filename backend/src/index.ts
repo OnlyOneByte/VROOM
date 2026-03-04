@@ -4,10 +4,12 @@ import { csrf } from 'hono/csrf';
 import { logger as honoLogger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
+import { routes as analyticsRoutes } from './api/analytics/routes';
 import { routes as authRoutes } from './api/auth/routes';
 import { routes as expenseRoutes } from './api/expenses/routes';
 import { routes as financingRoutes } from './api/financing/routes';
 import { routes as insuranceRoutes } from './api/insurance/routes';
+import { routes as odometerRoutes } from './api/odometer/routes';
 import { routes as photoRoutes } from './api/photos/routes';
 import { routes as settingsRoutes } from './api/settings/routes';
 import { routes as syncRoutes } from './api/sync/routes';
@@ -136,9 +138,11 @@ app.route('/api/v1/vehicles', vehicleRoutes);
 app.route('/api/v1/financing', financingRoutes);
 app.route('/api/v1/expenses', expenseRoutes);
 app.route('/api/v1/insurance', insuranceRoutes);
+app.route('/api/v1/odometer', odometerRoutes);
 app.route('/api/v1/photos', photoRoutes);
 app.route('/api/v1/settings', settingsRoutes);
 app.route('/api/v1/sync', syncRoutes);
+app.route('/api/v1/analytics', analyticsRoutes);
 
 // Backward compatibility: Redirect /api/* to /api/v1/* (except /api root)
 app.use('/api/*', async (c, next) => {

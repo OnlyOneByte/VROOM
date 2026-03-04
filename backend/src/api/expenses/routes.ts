@@ -3,7 +3,7 @@ import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { type Expense, expenses as expensesTable } from '../../db/schema';
+import { expenses as expensesTable } from '../../db/schema';
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_DESCRIPTIONS,
@@ -22,6 +22,11 @@ import {
   handleFinancingOnUpdate,
 } from '../financing/hooks';
 import { financingRepository } from '../financing/repository';
+import {
+  handleOdometerOnExpenseCreate,
+  handleOdometerOnExpenseDelete,
+  handleOdometerOnExpenseUpdate,
+} from '../odometer/hooks';
 import { vehicleRepository } from '../vehicles/repository';
 import { expenseRepository } from './repository';
 import { createSplitExpenseSchema, updateSplitSchema } from './validation';
@@ -180,6 +185,58 @@ routes.get('/categories', async (c) => {
   });
 });
 
+// ===========================================================================
+// Summary route (must be before /:id to avoid path conflicts)
+// ===========================================================================
+
+// GET /api/expenses/vehicle-stats - Per-vehicle expense stats (dashboard)
+routes.get(
+  '/vehicle-stats',
+  zValidator(
+    'query',
+    z.object({
+      recentDays: z
+        .string()
+        .transform((v) => parseInt(v, 10))
+        .pipe(z.number().int().min(1).max(365))
+        .optional(),
+    })
+  ),
+  async (c) => {
+    const user = c.get('user');
+    const { recentDays } = c.req.valid('query');
+    const stats = await expenseRepository.getPerVehicleStats(user.id, recentDays);
+    return c.json({ success: true, data: stats });
+  }
+);
+
+const summaryQuerySchema = z.object({
+  vehicleId: z.string().optional(),
+  period: z.enum(['7d', '30d', '90d', '1y', 'all']).optional().default('all'),
+});
+
+// GET /api/expenses/summary - Get expense summary aggregations
+routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
+  const user = c.get('user');
+  const { vehicleId, period } = c.req.valid('query');
+
+  // If vehicleId provided, verify user owns the vehicle
+  if (vehicleId) {
+    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
+    if (!vehicle) {
+      throw new NotFoundError('Vehicle');
+    }
+  }
+
+  const summary = await expenseRepository.getSummary({
+    userId: user.id,
+    vehicleId,
+    period,
+  });
+
+  return c.json({ success: true, data: summary });
+});
+
 // POST /api/expenses - Create a new expense
 routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const user = c.get('user');
@@ -212,6 +269,9 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   // Adjust financing balance if this is a financing payment
   const updatedFinancing = await handleFinancingOnCreate(createdExpense);
 
+  // Auto-create linked odometer entry if expense has mileage
+  await handleOdometerOnExpenseCreate(createdExpense, user.id);
+
   return c.json(
     {
       success: true,
@@ -229,86 +289,44 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
 
 // validateFuelExpenseData moved to utils/validation.ts
 
-// Helper function to fetch expenses for a vehicle based on query filters
-async function fetchVehicleExpenses(
-  vehicleId: string,
-  query: {
-    startDate?: Date;
-    endDate?: Date;
-    tags?: string[];
-    category?: string;
-  }
-): Promise<Expense[]> {
-  const expenses = await expenseRepository.find({
-    vehicleId,
-    category: query.category,
-    startDate: query.startDate,
-    endDate: query.endDate,
-  });
-
-  // Filter by tags if specified
-  if (query.tags && query.tags.length > 0) {
-    return expenses.filter((expense) => query.tags?.some((tag) => expense.tags?.includes(tag)));
-  }
-
-  return expenses;
-}
-
 // GET /api/expenses - Get all expenses for the user (with optional vehicle filter)
 routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
   const user = c.get('user');
   const query = c.req.valid('query');
 
-  // Get all user vehicles
-  const userVehicles = await vehicleRepository.findByUserId(user.id);
-  const vehicleIds = userVehicles.map((v) => v.id);
-
-  if (vehicleIds.length === 0) {
-    return c.json({
-      success: true,
-      data: [],
-      count: 0,
-    });
-  }
-
-  let allExpenses: Expense[] = [];
-
-  // If vehicleId filter is provided, only get expenses for that vehicle
+  // If vehicleId filter is provided, verify user owns the vehicle
   if (query.vehicleId) {
-    // Verify user owns this vehicle
-    if (!vehicleIds.includes(query.vehicleId)) {
+    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, query.vehicleId);
+    if (!vehicle) {
       throw new NotFoundError('Vehicle');
     }
-
-    allExpenses = await fetchVehicleExpenses(query.vehicleId, query);
-  } else {
-    // Get expenses for all user vehicles
-    const expensePromises = vehicleIds.map((vehicleId) => fetchVehicleExpenses(vehicleId, query));
-    const expenseArrays = await Promise.all(expensePromises);
-    allExpenses = expenseArrays.flat();
   }
 
-  // Sort by date (newest first)
-  allExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const { data, totalCount } = await expenseRepository.findPaginated({
+    userId: user.id,
+    vehicleId: query.vehicleId,
+    category: query.category,
+    startDate: query.startDate,
+    endDate: query.endDate,
+    tags: query.tags,
+    limit: query.limit,
+    offset: query.offset,
+  });
 
-  // Apply pagination if specified
-  if (query.limit || query.offset) {
-    const offset = query.offset || 0;
-    const limit = query.limit || 50;
-    allExpenses = allExpenses.slice(offset, offset + limit);
-  }
+  const limit = Math.min(
+    query.limit ?? CONFIG.pagination.defaultPageSize,
+    CONFIG.pagination.maxPageSize
+  );
+  const offset = query.offset ?? 0;
+  const hasMore = offset + data.length < totalCount;
 
   return c.json({
     success: true,
-    data: allExpenses,
-    count: allExpenses.length,
-    filters: {
-      vehicleId: query.vehicleId,
-      tags: query.tags,
-      category: query.category,
-      startDate: query.startDate,
-      endDate: query.endDate,
-    },
+    data,
+    totalCount,
+    limit,
+    offset,
+    hasMore,
   });
 });
 
@@ -345,6 +363,9 @@ routes.put(
     // Adjust financing balance if financing involvement changed
     const updatedFinancing = await handleFinancingOnUpdate(existingExpense, updateData);
 
+    // Auto-manage linked odometer entry based on mileage changes
+    await handleOdometerOnExpenseUpdate(existingExpense, updateData, user.id);
+
     const updatedExpense = await expenseRepository.update(id, updateData);
     return c.json({
       success: true,
@@ -364,6 +385,9 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   // Reverse financing balance adjustment before deleting
   await handleFinancingOnDelete(expense);
+
+  // Delete linked odometer entry if expense has mileage
+  await handleOdometerOnExpenseDelete(expense);
 
   await expenseRepository.delete(id);
   return c.json({ success: true, message: 'Expense deleted successfully' });

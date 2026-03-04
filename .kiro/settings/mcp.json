@@ -31,7 +31,12 @@
         "get_network_request",
         "list_pages",
         "handle_dialog",
-        "upload_file"
+        "upload_file",
+        "performance_start_trace",
+        "performance_stop_trace",
+        "performance_analyze_insight",
+        "performance_analyze_insight",
+        "performance_analyze_insight"
       ]
     },
     "svelte": {

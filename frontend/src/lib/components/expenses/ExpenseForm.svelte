@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { isOnline } from '$lib/stores/offline';
+	import { onlineStatus } from '$lib/stores/offline.svelte';
 	import { addOfflineExpense } from '$lib/utils/offline-storage';
 	import { requestBackgroundSync } from '$lib/utils/pwa';
-	import { appStore } from '$lib/stores/app';
-	import { settingsStore } from '$lib/stores/settings';
+	import { appStore } from '$lib/stores/app.svelte';
+	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { expenseApi } from '$lib/services/expense-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import {
@@ -126,7 +126,7 @@
 	});
 
 	// Get user settings for units
-	let settings = $derived($settingsStore.settings);
+	let settings = $derived(settingsStore.settings);
 	let volumeUnit = $derived(settings?.volumeUnit || 'gallons_us');
 	let chargeUnit = $derived(settings?.chargeUnit || 'kwh');
 	let distanceUnit = $derived(settings?.distanceUnit || 'miles');
@@ -275,11 +275,13 @@
 
 	async function loadLastFuelExpense() {
 		try {
-			const expenses = await expenseApi.getExpensesByVehicle(formData.vehicleId);
-			const fuelExpenses = expenses
-				.filter(e => e.category === 'fuel' && e.id !== expenseId)
-				.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-			lastFuelExpense = fuelExpenses[0] || null;
+			// Fetch the most recent fuel expenses server-side; grab 2 in case one is the current expense
+			const result = await expenseApi.getExpensesByVehicle(formData.vehicleId, {
+				limit: 2,
+				category: 'fuel'
+			});
+			const fuelExpenses = result.data.filter((e: { id: string }) => e.id !== expenseId);
+			lastFuelExpense = fuelExpenses[0] ?? null;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading last fuel expense:', error);
 		}
@@ -287,7 +289,8 @@
 
 	async function loadAllVehicleExpenses() {
 		try {
-			allVehicleExpenses = await expenseApi.getExpensesByVehicle(formData.vehicleId);
+			const result = await expenseApi.getExpensesByVehicle(formData.vehicleId, { limit: 100 });
+			allVehicleExpenses = result.data;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading vehicle expenses:', error);
 		}
@@ -495,7 +498,7 @@
 				goto(returnTo);
 			} else {
 				// Create new expense
-				if ($isOnline) {
+				if (onlineStatus.current) {
 					const created = await expenseApi.createExpense(expenseData);
 
 					await uploadPendingPhotos('expense', created.id);
@@ -837,7 +840,7 @@
 							.join(', ')}
 					{:else if isEditMode}
 						{getVehicleDisplayName(vehicle)}
-					{:else if !$isOnline}
+					{:else if !onlineStatus.current}
 						<span class="text-chart-5">Offline mode - will sync when online</span>
 					{:else}
 						Track a new vehicle expense

@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { authStore } from '$lib/stores/auth.js';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { LoaderCircle, ArrowLeft } from 'lucide-svelte';
 
 	let isLoading = $state(false);
 
-	let authState = $derived($authStore);
+	const authState = authStore;
 
 	// Redirect if already authenticated
 	$effect(() => {

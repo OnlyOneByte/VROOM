@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { authStore } from '$lib/stores/auth.js';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import { LogOut, Settings } from 'lucide-svelte';
 	import { Avatar, AvatarFallback, AvatarImage } from '$lib/components/ui/avatar';
 	import {

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { authStore } from '$lib/stores/auth.js';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import { LoaderCircle } from 'lucide-svelte';
 
 	let { children } = $props();
 
-	let authState = $derived($authStore);
+	const authState = authStore;
 
 	$effect(() => {
 		if (!authState.isLoading && !authState.isAuthenticated) {

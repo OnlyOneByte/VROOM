@@ -1,1 +1,0 @@
-ALTER TABLE `user_settings` ADD `google_drive_custom_folder_name` text;

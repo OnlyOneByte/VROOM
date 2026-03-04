@@ -5,7 +5,6 @@
  * across different endpoints and reduce route handler complexity.
  */
 
-import type { Expense } from '../db/schema';
 import { isElectricFuelType } from '../db/types';
 import { calculateAverageMilesPerKwh } from './calculations';
 
@@ -105,7 +104,7 @@ export function calculateVehicleStats(
 
   // Calculate electric efficiency (mi/kWh) — gated by trackCharging
   if (trackCharging) {
-    stats.averageMilesPerKwh = calculateAverageMilesPerKwh(chargeGroup as unknown as Expense[]);
+    stats.averageMilesPerKwh = calculateAverageMilesPerKwh(chargeGroup);
   }
 
   return stats;

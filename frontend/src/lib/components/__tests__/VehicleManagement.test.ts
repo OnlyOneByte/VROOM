@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { get } from 'svelte/store';
-import { appStore } from '../../stores/app.js';
-import { authStore } from '../../stores/auth.js';
+import { appStore } from '../../stores/app.svelte';
+import { authStore } from '../../stores/auth.svelte';
 import type { Vehicle, User, VehicleFormData } from '../../types/index.js';
 
 // Mock $app/navigation
@@ -130,7 +129,7 @@ describe('Vehicle Management Components', () => {
 			appStore.setVehicles(vehicles);
 			appStore.setLoading(false);
 
-			const appState = get(appStore);
+			const appState = appStore;
 			expect(appState.vehicles).toHaveLength(3);
 			expect(appState.vehicles[0]?.make).toBe('Toyota');
 			expect(appState.vehicles[0]?.model).toBe('Camry');
@@ -162,7 +161,7 @@ describe('Vehicle Management Components', () => {
 				appStore.setLoading(false);
 			}
 
-			const appState = get(appStore);
+			const appState = appStore;
 			expect(appState.notifications).toHaveLength(1);
 			expect(appState.notifications[0]?.type).toBe('error');
 			expect(appState.isLoading).toBe(false);
@@ -534,18 +533,15 @@ describe('Vehicle Management Components', () => {
 	describe('Responsive Behavior', () => {
 		it('handles mobile menu state correctly', () => {
 			// Test initial state
-			let appState = get(appStore);
-			expect(appState.isMobileMenuOpen).toBe(false);
+			expect(appStore.isMobileMenuOpen).toBe(false);
 
 			// Test toggle
 			appStore.toggleMobileMenu();
-			appState = get(appStore);
-			expect(appState.isMobileMenuOpen).toBe(true);
+			expect(appStore.isMobileMenuOpen).toBe(true);
 
 			// Test close
 			appStore.closeMobileMenu();
-			appState = get(appStore);
-			expect(appState.isMobileMenuOpen).toBe(false);
+			expect(appStore.isMobileMenuOpen).toBe(false);
 		});
 
 		it('provides responsive CSS classes for different screen sizes', () => {

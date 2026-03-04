@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3353d0cd-4e92-4c65-bc69-e7e6efaa77f6",
+  "id": "consolidated-0004-odometer",
   "prevId": "0a8ac7c9-0e3e-4d6f-b1f5-c49da46d1b1b",
   "tables": {
     "expense_groups": {
@@ -419,6 +419,130 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "odometer_entries": {
+      "name": "odometer_entries",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "vehicle_id": {
+          "name": "vehicle_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "odometer": {
+          "name": "odometer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "linked_entity_type": {
+          "name": "linked_entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "linked_entity_id": {
+          "name": "linked_entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "odometer_vehicle_date_idx": {
+          "name": "odometer_vehicle_date_idx",
+          "columns": [
+            "vehicle_id",
+            "recorded_at"
+          ],
+          "isUnique": false
+        },
+        "odometer_linked_entity_idx": {
+          "name": "odometer_linked_entity_idx",
+          "columns": [
+            "linked_entity_type",
+            "linked_entity_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "odometer_entries_vehicle_id_vehicles_id_fk": {
+          "name": "odometer_entries_vehicle_id_vehicles_id_fk",
+          "tableFrom": "odometer_entries",
+          "tableTo": "vehicles",
+          "columnsFrom": [
+            "vehicle_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "odometer_entries_user_id_users_id_fk": {
+          "name": "odometer_entries_user_id_users_id_fk",
+          "tableFrom": "odometer_entries",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "photos": {
       "name": "photos",
       "columns": {
@@ -656,6 +780,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": 10
+        },
+        "google_drive_custom_folder_name": {
+          "name": "google_drive_custom_folder_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "google_sheets_sync_enabled": {
           "name": "google_sheets_sync_enabled",

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { get } from 'svelte/store';
-import { authStore } from '../../stores/auth.js';
+import { authStore } from '../../stores/auth.svelte';
 import type { User } from '../../types/index.js';
 import { goto } from '$app/navigation';
 
@@ -35,36 +34,36 @@ describe('ProtectedRoute Logic', () => {
 	it('determines correct state when authentication is loading', () => {
 		authStore.setLoading(true);
 
-		const authState = get(authStore);
-		expect(authState.isLoading).toBe(true);
-		expect(authState.isAuthenticated).toBe(false);
+		// Direct property access
+		expect(authStore.isLoading).toBe(true);
+		expect(authStore.isAuthenticated).toBe(false);
 
 		// Should show loading, not redirect
-		const shouldRedirect = !authState.isLoading && !authState.isAuthenticated;
+		const shouldRedirect = !authStore.isLoading && !authStore.isAuthenticated;
 		expect(shouldRedirect).toBe(false);
 	});
 
 	it('allows access when user is authenticated', () => {
 		authStore.setUser(mockUser);
 
-		const authState = get(authStore);
-		expect(authState.isAuthenticated).toBe(true);
-		expect(authState.isLoading).toBe(false);
+		// Direct property access
+		expect(authStore.isAuthenticated).toBe(true);
+		expect(authStore.isLoading).toBe(false);
 
 		// Should allow access, not redirect
-		const shouldRedirect = !authState.isLoading && !authState.isAuthenticated;
+		const shouldRedirect = !authStore.isLoading && !authStore.isAuthenticated;
 		expect(shouldRedirect).toBe(false);
 	});
 
 	it('triggers redirect when user is not authenticated and not loading', () => {
 		authStore.clearUser();
 
-		const authState = get(authStore);
-		expect(authState.isAuthenticated).toBe(false);
-		expect(authState.isLoading).toBe(false);
+		// Direct property access
+		expect(authStore.isAuthenticated).toBe(false);
+		expect(authStore.isLoading).toBe(false);
 
 		// Should redirect to auth
-		const shouldRedirect = !authState.isLoading && !authState.isAuthenticated;
+		const shouldRedirect = !authStore.isLoading && !authStore.isAuthenticated;
 		expect(shouldRedirect).toBe(true);
 
 		// Simulate the redirect logic
@@ -78,53 +77,38 @@ describe('ProtectedRoute Logic', () => {
 	it('does not redirect when still loading', () => {
 		authStore.setLoading(true);
 
-		const authState = get(authStore);
-		expect(authState.isLoading).toBe(true);
+		// Direct property access
+		expect(authStore.isLoading).toBe(true);
 
 		// Should not redirect when loading
-		const shouldRedirect = !authState.isLoading && !authState.isAuthenticated;
+		const shouldRedirect = !authStore.isLoading && !authStore.isAuthenticated;
 		expect(shouldRedirect).toBe(false);
 		expect(goto).not.toHaveBeenCalled();
 	});
 
 	it('handles authentication state transitions correctly', () => {
-		const states: { isLoading: boolean; isAuthenticated: boolean; shouldRedirect: boolean }[] = [];
-
-		const unsubscribe = authStore.subscribe(state => {
-			const shouldRedirect = !state.isLoading && !state.isAuthenticated;
-			states.push({
-				isLoading: state.isLoading,
-				isAuthenticated: state.isAuthenticated,
-				shouldRedirect
-			});
-		});
-
 		// Initial loading state
-		expect(states[0]?.isLoading).toBe(true);
-		expect(states[0]?.shouldRedirect).toBe(false);
+		expect(authStore.isLoading).toBe(true);
 
 		// Authenticate user
 		authStore.setUser(mockUser);
-		expect(states[1]?.isAuthenticated).toBe(true);
-		expect(states[1]?.shouldRedirect).toBe(false);
+		expect(authStore.isAuthenticated).toBe(true);
+		expect(authStore.isLoading).toBe(false);
 
 		// Log out user
 		authStore.clearUser();
-		expect(states[2]?.isAuthenticated).toBe(false);
-		expect(states[2]?.isLoading).toBe(false);
-		expect(states[2]?.shouldRedirect).toBe(true);
-
-		unsubscribe();
+		expect(authStore.isAuthenticated).toBe(false);
+		expect(authStore.isLoading).toBe(false);
 	});
 
 	it('provides correct loading UI state', () => {
 		authStore.setLoading(true);
 
-		const authState = get(authStore);
+		// Direct property access
 		const uiState = {
-			showLoading: authState.isLoading,
-			showContent: authState.isAuthenticated && !authState.isLoading,
-			showRedirect: !authState.isLoading && !authState.isAuthenticated
+			showLoading: authStore.isLoading,
+			showContent: authStore.isAuthenticated && !authStore.isLoading,
+			showRedirect: !authStore.isLoading && !authStore.isAuthenticated
 		};
 
 		expect(uiState.showLoading).toBe(true);
@@ -135,11 +119,11 @@ describe('ProtectedRoute Logic', () => {
 	it('provides correct authenticated UI state', () => {
 		authStore.setUser(mockUser);
 
-		const authState = get(authStore);
+		// Direct property access
 		const uiState = {
-			showLoading: authState.isLoading,
-			showContent: authState.isAuthenticated && !authState.isLoading,
-			showRedirect: !authState.isLoading && !authState.isAuthenticated
+			showLoading: authStore.isLoading,
+			showContent: authStore.isAuthenticated && !authStore.isLoading,
+			showRedirect: !authStore.isLoading && !authStore.isAuthenticated
 		};
 
 		expect(uiState.showLoading).toBe(false);
@@ -150,11 +134,11 @@ describe('ProtectedRoute Logic', () => {
 	it('provides correct unauthenticated UI state', () => {
 		authStore.clearUser();
 
-		const authState = get(authStore);
+		// Direct property access
 		const uiState = {
-			showLoading: authState.isLoading,
-			showContent: authState.isAuthenticated && !authState.isLoading,
-			showRedirect: !authState.isLoading && !authState.isAuthenticated
+			showLoading: authStore.isLoading,
+			showContent: authStore.isAuthenticated && !authStore.isLoading,
+			showRedirect: !authStore.isLoading && !authStore.isAuthenticated
 		};
 
 		expect(uiState.showLoading).toBe(false);

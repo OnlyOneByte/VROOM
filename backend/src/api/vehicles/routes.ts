@@ -215,7 +215,11 @@ routes.get(
     }
 
     // Get all fuel expenses for this vehicle
-    const fuelExpenses = await expenseRepository.find({ vehicleId: id, category: 'fuel' });
+    const fuelExpenses = await expenseRepository.findAll({
+      vehicleId: id,
+      userId: user.id,
+      category: 'fuel',
+    });
 
     // Filter by time period
     const now = new Date();

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { syncManager, syncConfig, type SyncConflict } from '../sync-manager';
-import { isOnline, syncStatus } from '../../stores/offline';
+import { onlineStatus, syncState } from '../../stores/offline.svelte';
 import type { OfflineExpense } from '../offline-storage';
 
 // Mock fetch (apiClient uses fetch internally)
@@ -35,20 +35,20 @@ function apiError(status: number, message = 'Error') {
 describe('Sync Manager', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		isOnline.set(true);
-		syncStatus.set('idle');
+		onlineStatus.current = true;
+		syncState.current = 'idle';
 
-		syncConfig.set({
+		syncConfig.current = {
 			maxRetries: 3,
 			retryDelay: 100,
 			batchSize: 10,
 			conflictResolution: 'ask_user'
-		});
+		};
 	});
 
 	describe('syncAll', () => {
 		it('should throw error when offline', async () => {
-			isOnline.set(false);
+			onlineStatus.current = false;
 			await expect(syncManager.syncAll()).rejects.toThrow('Cannot sync while offline');
 		});
 

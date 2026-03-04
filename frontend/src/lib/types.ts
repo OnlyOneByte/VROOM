@@ -484,3 +484,52 @@ export interface Photo {
 	sortOrder: number;
 	createdAt: string;
 }
+
+export interface OdometerEntry {
+	id: string;
+	vehicleId: string;
+	odometer: number;
+	recordedAt: string;
+	note?: string;
+	linkedEntityType?: string;
+	linkedEntityId?: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface PaginatedOdometerResponse {
+	data: OdometerEntry[];
+	totalCount: number;
+	limit: number;
+	offset: number;
+	hasMore: boolean;
+}
+
+// --- Paginated response types ---
+
+export interface PaginatedResponse<T> {
+	data: T[];
+	totalCount: number;
+	limit: number;
+	offset: number;
+	hasMore: boolean;
+}
+
+// --- Expense summary types (mirrors backend ExpenseSummary) ---
+
+export interface ExpenseSummary {
+	totalAmount: number;
+	expenseCount: number;
+	monthlyAverage: number;
+	recentAmount: number;
+	categoryBreakdown: Array<{ category: string; amount: number; count: number }>;
+	monthlyTrend: Array<{ period: string; amount: number; count: number }>;
+}
+
+// --- Analytics types (mirrors backend FuelEfficiencyPoint) ---
+
+export interface FuelEfficiencyPoint {
+	date: string;
+	efficiency: number;
+	mileage: number;
+}

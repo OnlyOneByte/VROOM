@@ -17,8 +17,8 @@
 	let resolving = $state(false);
 
 	$effect(() => {
-		if ($syncConflicts.length > 0 && !showModal) {
-			currentConflict = $syncConflicts[0] ?? null;
+		if (syncConflicts.current.length > 0 && !showModal) {
+			currentConflict = syncConflicts.current[0] ?? null;
 			showModal = true;
 		}
 	});
@@ -32,8 +32,8 @@
 			const success = await syncManager.resolveConflict(currentConflict, resolution);
 
 			if (success) {
-				const remaining = $syncConflicts.filter(c => c.id !== currentConflict!.id);
-				syncConflicts.set(remaining);
+				const remaining = syncConflicts.current.filter(c => c.id !== currentConflict!.id);
+				syncConflicts.current = remaining;
 
 				if (remaining.length > 0) {
 					currentConflict = remaining[0] ?? null;
@@ -71,10 +71,8 @@
 					<div>
 						<DialogTitle>Sync Conflict Detected</DialogTitle>
 						<DialogDescription>
-							{$syncConflicts.length} conflict{$syncConflicts.length !== 1 ? 's' : ''} need{$syncConflicts.length ===
-							1
-								? 's'
-								: ''} resolution
+							{syncConflicts.current.length} conflict{syncConflicts.current.length !== 1 ? 's' : ''}
+							need{syncConflicts.current.length === 1 ? 's' : ''} resolution
 						</DialogDescription>
 					</div>
 				</div>

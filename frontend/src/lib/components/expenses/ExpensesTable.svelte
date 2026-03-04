@@ -7,9 +7,11 @@
 		Search,
 		Car,
 		LoaderCircle,
-		ListFilter
+		ListFilter,
+		ChevronLeft,
+		ChevronRight
 	} from 'lucide-svelte';
-	import { appStore } from '$lib/stores/app';
+	import { appStore } from '$lib/stores/app.svelte';
 	import { expenseApi } from '$lib/services/expense-api';
 	import type { Expense, Vehicle, ExpenseCategory } from '$lib/types';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
@@ -46,7 +48,6 @@
 	} from '$lib/components/ui/empty';
 	import * as Select from '$lib/components/ui/select';
 	import SplitExpenseBadge from './SplitExpenseBadge.svelte';
-	import { ChevronRight } from 'lucide-svelte';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte';
 
 	// Types for grouped display
@@ -82,6 +83,11 @@
 		scrollHeight?: string;
 		onClearFilters?: () => void;
 		hasActiveFilters?: boolean;
+		totalCount?: number;
+		currentOffset?: number;
+		pageSize?: number;
+		isLoadingPage?: boolean;
+		onPageChange?: (_offset: number) => void;
 	}
 
 	let {
@@ -96,8 +102,22 @@
 		emptyActionHref = '/expenses/new',
 		scrollHeight = '600px',
 		onClearFilters,
-		hasActiveFilters = false
+		hasActiveFilters = false,
+		totalCount,
+		currentOffset = 0,
+		pageSize = 20,
+		isLoadingPage = false,
+		onPageChange
 	}: Props = $props();
+
+	// Pagination derived values
+	let showPagination = $derived(totalCount !== undefined && onPageChange !== undefined);
+	let currentPage = $derived(Math.floor(currentOffset / pageSize) + 1);
+	let totalPages = $derived(totalCount !== undefined ? Math.ceil(totalCount / pageSize) : 1);
+	let isPrevDisabled = $derived(currentOffset === 0);
+	let isNextDisabled = $derived(
+		totalCount !== undefined ? currentOffset + pageSize >= totalCount : true
+	);
 
 	const isMobile = new IsMobile();
 
@@ -847,6 +867,38 @@
 				</TableBody>
 			</Table>
 		</ScrollArea>
+	</div>
+{/if}
+
+<!-- Pagination Footer -->
+{#if showPagination}
+	<div class="flex items-center justify-between border-t px-4 py-3">
+		<p class="text-sm text-muted-foreground">
+			Page {currentPage} of {totalPages}
+		</p>
+		<div class="flex items-center gap-2">
+			{#if isLoadingPage}
+				<LoaderCircle class="h-4 w-4 animate-spin text-muted-foreground" />
+			{/if}
+			<Button
+				variant="outline"
+				size="sm"
+				disabled={isPrevDisabled || isLoadingPage}
+				onclick={() => onPageChange?.(currentOffset - pageSize)}
+			>
+				<ChevronLeft class="h-4 w-4" />
+				Previous
+			</Button>
+			<Button
+				variant="outline"
+				size="sm"
+				disabled={isNextDisabled || isLoadingPage}
+				onclick={() => onPageChange?.(currentOffset + pageSize)}
+			>
+				Next
+				<ChevronRight class="h-4 w-4" />
+			</Button>
+		</div>
 	</div>
 {/if}
 

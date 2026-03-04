@@ -1,11 +1,89 @@
-import type { Expense, ExpenseGroupWithChildren, Photo, SplitConfig } from '$lib/types';
+import type {
+	Expense,
+	ExpenseGroupWithChildren,
+	ExpenseSummary,
+	PaginatedResponse,
+	Photo,
+	SplitConfig
+} from '$lib/types';
 import {
 	fromBackendExpense,
-	fromBackendExpenses,
 	toBackendExpense,
 	type BackendExpenseResponse
 } from './api-transformer';
 import { apiClient, getApiBaseUrl } from './api-client';
+import { ApiError } from '$lib/utils/error-handling';
+
+/** Convenience alias for a paginated response of transformed frontend Expenses. */
+export type PaginatedExpenseResponse = PaginatedResponse<Expense>;
+
+/** Parameters accepted by paginated expense list methods. */
+export interface ExpenseListParams {
+	limit?: number;
+	offset?: number;
+	category?: string;
+	startDate?: string;
+	endDate?: string;
+	tags?: string[];
+	period?: string;
+}
+
+/** Parameters accepted by the expense summary endpoint. */
+export interface ExpenseSummaryParams {
+	vehicleId?: string;
+	period?: string;
+}
+
+/**
+ * Build a URLSearchParams from expense list params + optional vehicleId.
+ */
+function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string): string {
+	const query = new URLSearchParams();
+	if (vehicleId) query.set('vehicleId', vehicleId);
+	if (params?.limit) query.set('limit', String(params.limit));
+	if (params?.offset) query.set('offset', String(params.offset));
+	if (params?.category) query.set('category', params.category);
+	if (params?.startDate) query.set('startDate', params.startDate);
+	if (params?.endDate) query.set('endDate', params.endDate);
+	if (params?.period) query.set('period', params.period);
+	if (params?.tags?.length) {
+		for (const tag of params.tags) {
+			query.append('tags', tag);
+		}
+	}
+	return query.toString();
+}
+
+/**
+ * Fetch a paginated expense response using apiClient.raw() so we keep
+ * the pagination metadata (totalCount, limit, offset, hasMore) that
+ * apiClient.get() would strip during envelope unwrapping.
+ */
+async function fetchPaginatedExpenses(url: string): Promise<PaginatedExpenseResponse> {
+	const response = await apiClient.raw(`${getApiBaseUrl()}${url}`, { method: 'GET' });
+
+	if (!response.ok) {
+		let message = `Request failed with status ${response.status}`;
+		try {
+			const errorBody = await response.json();
+			message = errorBody.error?.message || errorBody.message || message;
+		} catch {
+			// ignore parse errors
+		}
+		throw new ApiError(message, response.status);
+	}
+
+	const result = await response.json();
+	const backendData = (result.data ?? []) as BackendExpenseResponse[];
+
+	return {
+		data: backendData.map(fromBackendExpense),
+		totalCount: result.totalCount as number,
+		limit: result.limit as number,
+		offset: result.offset as number,
+		hasMore: result.hasMore as boolean
+	};
+}
 
 /**
  * Expense API service
@@ -18,18 +96,39 @@ export const expenseApi = {
 		return fromBackendExpense(data);
 	},
 
-	async getExpensesByVehicle(vehicleId: string): Promise<Expense[]> {
-		const data = await apiClient.get<BackendExpenseResponse[]>(
-			`/api/v1/expenses?vehicleId=${vehicleId}`
-		);
-		if (!Array.isArray(data)) return [];
-		return data.map(expense => fromBackendExpense(expense));
+	async getExpensesByVehicle(
+		vehicleId: string,
+		params?: ExpenseListParams
+	): Promise<PaginatedExpenseResponse> {
+		const qs = buildExpenseQuery(params, vehicleId);
+		return fetchPaginatedExpenses(`/api/v1/expenses${qs ? `?${qs}` : ''}`);
 	},
 
-	async getAllExpenses(): Promise<Expense[]> {
-		const data = await apiClient.get<BackendExpenseResponse[]>('/api/v1/expenses');
-		if (!Array.isArray(data)) return [];
-		return fromBackendExpenses(data);
+	async getAllExpenses(params?: ExpenseListParams): Promise<PaginatedExpenseResponse> {
+		const qs = buildExpenseQuery(params);
+		return fetchPaginatedExpenses(`/api/v1/expenses${qs ? `?${qs}` : ''}`);
+	},
+
+	async getExpenseSummary(params?: ExpenseSummaryParams): Promise<ExpenseSummary> {
+		const query = new URLSearchParams();
+		if (params?.vehicleId) query.set('vehicleId', params.vehicleId);
+		if (params?.period) query.set('period', params.period);
+		const qs = query.toString();
+		return apiClient.get<ExpenseSummary>(`/api/v1/expenses/summary${qs ? `?${qs}` : ''}`);
+	},
+
+	async getVehicleStats(recentDays?: number): Promise<
+		Array<{
+			vehicleId: string;
+			totalAmount: number;
+			recentAmount: number;
+			lastExpenseDate: string | null;
+		}>
+	> {
+		const query = new URLSearchParams();
+		if (recentDays) query.set('recentDays', String(recentDays));
+		const qs = query.toString();
+		return apiClient.get(`/api/v1/expenses/vehicle-stats${qs ? `?${qs}` : ''}`);
 	},
 
 	async createExpense(

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
-	import { SvelteDate } from 'svelte/reactivity';
+	import { onMount, type Component } from 'svelte';
 	import { Plus, FileText, CreditCard, CircleAlert } from 'lucide-svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
@@ -28,27 +27,25 @@
 	import PaymentHistory from '$lib/components/financing/PaymentHistory.svelte';
 	import NextPaymentCard from '$lib/components/financing/NextPaymentCard.svelte';
 	import LeaseMetricsCard from '$lib/components/financing/LeaseMetricsCard.svelte';
-	import InsuranceTab from '$lib/components/insurance/InsuranceTab.svelte';
+	import OdometerTab from '$lib/components/vehicles/OdometerTab.svelte';
+	// Lazy-loaded InsuranceTab — only import when overview tab has been viewed
+	let InsuranceTab = $state<Component<{ vehicleId: string }> | null>(null);
+	let hasLoadedInsurance = $state(false);
 	import {
-		prepareExpenseTrendData,
-		prepareFuelEfficiencyData,
-		prepareCategoryChartData,
-		filterExpensesByPeriod,
-		groupExpensesByCategory
+		categoryLabels,
+		getCategoryColorHex,
+		type CategoryChartData
 	} from '$lib/utils/expense-helpers';
 	import {
 		filterExpenses,
 		hasActiveFilters as checkActiveFilters
 	} from '$lib/utils/expense-filters';
 	import { COMMON_MESSAGES, VEHICLE_MESSAGES } from '$lib/constants/messages';
-	import {
-		DAYS_IN_RECENT_PERIOD,
-		MONTHS_IN_AVERAGE_PERIOD,
-		type TimePeriod
-	} from '$lib/constants/time-periods';
+	import { type TimePeriod } from '$lib/constants/time-periods';
 	import { SCROLL_HEIGHTS } from '$lib/constants/ui';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { expenseApi } from '$lib/services/expense-api';
+	import { analyticsApi } from '$lib/services/analytics-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import {
 		calculateAmortizationSchedule,
@@ -61,7 +58,10 @@
 		ExpenseFilters,
 		VehicleStats,
 		DerivedPaymentEntry,
-		Photo
+		Photo,
+		ExpenseSummary,
+		FuelEfficiencyPoint,
+		ExpenseCategory
 	} from '$lib/types.js';
 	import type { PageData } from './$types';
 
@@ -74,13 +74,24 @@
 	let isLoadingStats = $state(false);
 	let isLoadingPayments = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
-	let expenses = $state<Expense[]>([]);
 	let payments = $state<DerivedPaymentEntry[]>([]);
 	let activeTab = $state('overview');
 	let vehicleStatsData = $state<VehicleStats | null>(null);
 	let selectedStatsPeriod = $state<TimePeriod>('all');
 	let paymentHistoryError = $state<string | null>(null);
 	let hasAttemptedPaymentLoad = $state(false);
+
+	// Server-provided summary and fuel efficiency data
+	let summary = $state<ExpenseSummary | null>(null);
+	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
+
+	// Paginated expenses state (for Expenses tab)
+	let expenses = $state<Expense[]>([]);
+	let currentOffset = $state(0);
+	let pageSize = $state(20);
+	let totalCount = $state(0);
+	let isLoadingPage = $state(false);
+	let hasLoadedExpensesTab = $state(false);
 
 	// Payment planner dialog state
 	let showPaymentPlanner = $state(false);
@@ -93,46 +104,54 @@
 	let searchTerm = $state('');
 	let filters = $state<ExpenseFilters>({});
 
-	// Derived state for charts and stats
-	let expenseTrendData = $derived(prepareExpenseTrendData(expenses, selectedStatsPeriod));
-	let fuelEfficiencyData = $derived(prepareFuelEfficiencyData(expenses));
-	let periodFilteredExpenses = $derived(filterExpensesByPeriod(expenses, selectedStatsPeriod));
-	let periodExpensesByCategory = $derived(groupExpensesByCategory(periodFilteredExpenses));
-	let categoryChartData = $derived(prepareCategoryChartData(periodExpensesByCategory));
+	// Derived chart data from server summary
+	let expenseTrendData = $derived.by(() => {
+		if (!summary?.monthlyTrend.length) return [];
+		return summary.monthlyTrend.map(item => ({
+			date: new Date(item.period + '-01'),
+			amount: item.amount,
+			count: item.count
+		}));
+	});
 
-	// Filtered expenses based on search and filters
+	let fuelEfficiencyData = $derived.by(() => {
+		return fuelEfficiencyPoints.map(point => ({
+			date: new Date(point.date),
+			efficiency: point.efficiency,
+			mileage: point.mileage
+		}));
+	});
+
+	let categoryChartData = $derived.by((): CategoryChartData[] => {
+		if (!summary?.categoryBreakdown.length) return [];
+		const total = summary.categoryBreakdown.reduce((sum, item) => sum + item.amount, 0);
+		if (total === 0) return [];
+		return summary.categoryBreakdown
+			.map(item => ({
+				category: item.category as ExpenseCategory,
+				name: categoryLabels[item.category as ExpenseCategory] || item.category,
+				amount: item.amount,
+				percentage: (item.amount / total) * 100,
+				color: getCategoryColorHex(item.category as ExpenseCategory)
+			}))
+			.sort((a, b) => b.amount - a.amount);
+	});
+
+	// Stats for ExpenseOverviewCard from server summary
+	let localStats = $derived({
+		totalExpenses: summary?.totalAmount ?? 0,
+		recentExpenses: summary?.recentAmount ?? 0,
+		monthlyAverage: summary?.monthlyAverage ?? 0
+	});
+
+	// Whether the overview has any expense data (from summary)
+	let hasExpenseData = $derived((summary?.expenseCount ?? 0) > 0);
+
+	// Filtered expenses based on search and filters (client-side on current page)
 	let filteredExpenses = $derived(filterExpenses(expenses, searchTerm, filters));
 
 	// Check if any filters are active
 	let hasActiveFilters = $derived(checkActiveFilters(searchTerm, filters));
-
-	// Local stats for quick calculations (complementary to API stats)
-	let localStats = $derived.by(() => {
-		const recentPeriodDate = new SvelteDate();
-		recentPeriodDate.setDate(recentPeriodDate.getDate() - DAYS_IN_RECENT_PERIOD);
-
-		const recentExpenses = expenses.filter(e => new Date(e.date) > recentPeriodDate);
-		const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
-		const recentAmount = recentExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-		// Calculate monthly average
-		const averagePeriodDate = new SvelteDate();
-		averagePeriodDate.setMonth(averagePeriodDate.getMonth() - MONTHS_IN_AVERAGE_PERIOD);
-		const recentExpensesYear = expenses.filter(
-			expense => new Date(expense.date) >= averagePeriodDate
-		);
-		const monthlyAverage =
-			recentExpensesYear.length > 0
-				? recentExpensesYear.reduce((sum, expense) => sum + expense.amount, 0) /
-					MONTHS_IN_AVERAGE_PERIOD
-				: 0;
-
-		return {
-			totalExpenses: totalAmount,
-			recentExpenses: recentAmount,
-			monthlyAverage
-		};
-	});
 
 	let vehicleDisplayName = $derived(
 		vehicle ? vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}` : ''
@@ -199,20 +218,46 @@
 		}
 	});
 
-	// Load data on mount
+	// Lazy-load InsuranceTab when overview tab is active and page has loaded
+	$effect(() => {
+		if (!isLoading && !hasLoadedInsurance && activeTab === 'overview') {
+			hasLoadedInsurance = true;
+			import('$lib/components/insurance/InsuranceTab.svelte').then(m => {
+				InsuranceTab = m.default;
+			});
+		}
+	});
+
+	// Load data on mount — vehicle, photos, summary, and fuel efficiency in parallel
 	onMount(async () => {
-		await Promise.all([loadVehicle(), loadExpenses(), loadPhotos()]);
+		await Promise.all([loadVehicle(), loadPhotos(), loadSummary(), loadFuelEfficiency()]);
 		// Load stats after initial data is loaded
-		if (vehicle && expenses.length > 0) {
+		if (vehicle) {
 			await loadVehicleStats();
 		}
 		isLoading = false;
 	});
 
-	// Reload stats when period changes
+	// Reload stats when period changes (skip initial — onMount already loads)
+	let previousStatsPeriod = $state<TimePeriod | null>(null);
 	$effect(() => {
-		if (!isLoading && selectedStatsPeriod) {
-			loadVehicleStats();
+		if (
+			!isLoading &&
+			selectedStatsPeriod &&
+			previousStatsPeriod !== null &&
+			selectedStatsPeriod !== previousStatsPeriod
+		) {
+			void loadVehicleStats();
+			void loadSummary();
+		}
+		previousStatsPeriod = selectedStatsPeriod;
+	});
+
+	// Load expenses tab data when tab becomes active for the first time
+	$effect(() => {
+		if (activeTab === 'expenses' && !hasLoadedExpensesTab && !isLoading) {
+			hasLoadedExpensesTab = true;
+			void fetchExpensesPage(0);
 		}
 	});
 
@@ -237,11 +282,43 @@
 		}
 	}
 
-	async function loadExpenses() {
+	async function loadSummary() {
+		isLoadingStats = true;
 		try {
-			expenses = await expenseApi.getExpensesByVehicle(vehicleId);
+			summary = await expenseApi.getExpenseSummary({
+				vehicleId,
+				period: selectedStatsPeriod
+			});
+		} catch (error) {
+			handleErrorWithNotification(error, 'Failed to load expense summary');
+		} finally {
+			isLoadingStats = false;
+		}
+	}
+
+	async function loadFuelEfficiency() {
+		try {
+			const result = await analyticsApi.getFuelEfficiency({ vehicleId });
+			fuelEfficiencyPoints = result.fuelEfficiencyTrend;
+		} catch (error) {
+			handleErrorWithNotification(error, 'Failed to load fuel efficiency data');
+		}
+	}
+
+	async function fetchExpensesPage(offset: number) {
+		isLoadingPage = true;
+		try {
+			const result = await expenseApi.getExpensesByVehicle(vehicleId, {
+				limit: pageSize,
+				offset
+			});
+			expenses = result.data;
+			totalCount = result.totalCount;
+			currentOffset = offset;
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load expenses');
+		} finally {
+			isLoadingPage = false;
 		}
 	}
 
@@ -264,8 +341,12 @@
 		hasAttemptedPaymentLoad = true;
 
 		try {
-			const allExpenses = await expenseApi.getExpensesByVehicle(vehicleId);
-			const financingExpenses = allExpenses.filter(e => e.isFinancingPayment === true);
+			// Fetch financing expenses via paginated API with high limit
+			const result = await expenseApi.getExpensesByVehicle(vehicleId, {
+				limit: 100,
+				category: 'financial'
+			});
+			const financingExpenses = result.data.filter(e => e.isFinancingPayment === true);
 			payments = derivePaymentEntries(financingExpenses, vehicle.financing);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading payment history:', error);
@@ -275,10 +356,13 @@
 		}
 	}
 
-	async function handleDeleteExpense(deletedExpense: Expense) {
-		expenses = expenses.filter(e => e.id !== deletedExpense.id);
-		// Reload stats after deletion
-		await loadVehicleStats();
+	async function handleDeleteExpense(_deletedExpense: Expense) {
+		// Re-fetch current page, summary, and fuel efficiency after deletion
+		await Promise.all([fetchExpensesPage(currentOffset), loadSummary(), loadFuelEfficiency()]);
+	}
+
+	function handlePageChange(offset: number) {
+		fetchExpensesPage(offset);
 	}
 
 	function clearFilters() {
@@ -367,16 +451,17 @@
 		</div>
 	</div>
 {:else if vehicle}
-	<div class="space-y-6 pb-24 sm:pb-0">
+	<div class="space-y-6 pb-24">
 		<!-- Header -->
 		<VehicleHeader {vehicle} displayName={vehicleDisplayName} {coverPhotoUrl} />
 
 		<!-- Tabs Navigation -->
 		<Tabs bind:value={activeTab} class="space-y-6">
-			<TabsList class="grid w-full grid-cols-3">
+			<TabsList class="grid w-full grid-cols-4">
 				<TabsTrigger value="overview">Overview</TabsTrigger>
 				<TabsTrigger value="expenses">Expenses</TabsTrigger>
 				<TabsTrigger value="loan">Finance</TabsTrigger>
+				<TabsTrigger value="odometer">Odometer</TabsTrigger>
 			</TabsList>
 
 			<!-- Overview Tab -->
@@ -393,10 +478,12 @@
 					onSetCover={handleSetCover}
 				/>
 
-				<!-- Insurance Summary -->
-				<InsuranceTab {vehicleId} />
+				<!-- Insurance Summary (lazy-loaded) -->
+				{#if InsuranceTab}
+					<InsuranceTab {vehicleId} />
+				{/if}
 
-				{#if expenses.length === 0}
+				{#if !hasExpenseData}
 					<!-- No Expenses Empty State -->
 					<EmptyState>
 						{#snippet icon()}
@@ -448,7 +535,7 @@
 							<FuelEfficiencyTrendChart
 								data={fuelEfficiencyData}
 								fuelType={vehicle.vehicleType || 'gas'}
-								isLoading={isLoadingStats}
+								isLoading={false}
 							/>
 						{/if}
 					</div>
@@ -473,7 +560,7 @@
 				<!-- Expense List -->
 				<CardFull.Root>
 					<CardFull.Header>
-						<CardFull.Title>All Expenses ({filteredExpenses.length})</CardFull.Title>
+						<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
 					</CardFull.Header>
 					<CardFull.Content>
 						<ExpensesTable
@@ -488,9 +575,19 @@
 							scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
 							onClearFilters={clearFilters}
 							{hasActiveFilters}
+							{totalCount}
+							{currentOffset}
+							{pageSize}
+							{isLoadingPage}
+							onPageChange={handlePageChange}
 						/>
 					</CardFull.Content>
 				</CardFull.Root>
+			</TabsContent>
+
+			<!-- Odometer Tab -->
+			<TabsContent value="odometer" class="space-y-6">
+				<OdometerTab {vehicleId} />
 			</TabsContent>
 
 			<!-- Finance Tab -->

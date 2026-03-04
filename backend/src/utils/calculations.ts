@@ -7,6 +7,17 @@
 
 import type { Expense } from '../db/schema';
 
+/**
+ * Minimal shape required by efficiency calculations.
+ * Both Expense (full DB row) and FuelExpense (lightweight stats type) satisfy this.
+ */
+export interface EfficiencyExpense {
+  mileage: number | null;
+  fuelAmount: number | null;
+  missedFillup: boolean;
+  date: Date | string;
+}
+
 // ============================================================================
 // FUEL EFFICIENCY CALCULATIONS
 // ============================================================================
@@ -73,7 +84,7 @@ export function calculateMilesPerKwh(miles: number, kwh: number): number {
  * Calculate average mi/kWh from a series of charge expenses
  * Uses consecutive mileage readings to determine miles driven between charges
  */
-export function calculateAverageMilesPerKwh(chargeExpenses: Expense[]): number | null {
+export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[]): number | null {
   if (chargeExpenses.length < 2) {
     return null;
   }

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { get } from 'svelte/store';
-import { isOnline, syncStatus, offlineExpenses } from '../../stores/offline';
+import { onlineStatus, syncState, offlineExpenseQueue } from '../../stores/offline.svelte';
 import { syncOfflineExpenses } from '../../utils/offline-storage';
 
 // Mock the sync function
@@ -13,34 +12,34 @@ describe('OfflineIndicator Store Logic', () => {
 		vi.clearAllMocks();
 
 		// Reset stores to default state
-		isOnline.set(true);
-		syncStatus.set('idle');
-		offlineExpenses.set([]);
+		onlineStatus.current = true;
+		syncState.current = 'idle';
+		offlineExpenseQueue.current = [];
 	});
 
 	it('should have correct initial state', () => {
-		expect(get(isOnline)).toBe(true);
-		expect(get(syncStatus)).toBe('idle');
-		expect(get(offlineExpenses)).toEqual([]);
+		expect(onlineStatus.current).toBe(true);
+		expect(syncState.current).toBe('idle');
+		expect(offlineExpenseQueue.current).toEqual([]);
 	});
 
 	it('should update online status', () => {
-		isOnline.set(false);
-		expect(get(isOnline)).toBe(false);
+		onlineStatus.current = false;
+		expect(onlineStatus.current).toBe(false);
 
-		isOnline.set(true);
-		expect(get(isOnline)).toBe(true);
+		onlineStatus.current = true;
+		expect(onlineStatus.current).toBe(true);
 	});
 
 	it('should update sync status', () => {
-		syncStatus.set('syncing');
-		expect(get(syncStatus)).toBe('syncing');
+		syncState.current = 'syncing';
+		expect(syncState.current).toBe('syncing');
 
-		syncStatus.set('success');
-		expect(get(syncStatus)).toBe('success');
+		syncState.current = 'success';
+		expect(syncState.current).toBe('success');
 
-		syncStatus.set('error');
-		expect(get(syncStatus)).toBe('error');
+		syncState.current = 'error';
+		expect(syncState.current).toBe('error');
 	});
 
 	it('should manage offline expenses', () => {
@@ -58,8 +57,8 @@ describe('OfflineIndicator Store Logic', () => {
 			}
 		];
 
-		offlineExpenses.set(expenses);
-		expect(get(offlineExpenses)).toEqual(expenses);
+		offlineExpenseQueue.current = expenses;
+		expect(offlineExpenseQueue.current).toEqual(expenses);
 	});
 
 	it('should calculate pending count correctly', () => {
@@ -88,8 +87,8 @@ describe('OfflineIndicator Store Logic', () => {
 			}
 		];
 
-		offlineExpenses.set(expenses);
-		const pendingCount = get(offlineExpenses).filter(expense => !expense.synced).length;
+		offlineExpenseQueue.current = expenses;
+		const pendingCount = offlineExpenseQueue.current.filter(expense => !expense.synced).length;
 		expect(pendingCount).toBe(1);
 	});
 

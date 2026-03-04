@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { authStore } from '$lib/stores/auth.js';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import {
@@ -14,7 +14,7 @@
 		Lock
 	} from 'lucide-svelte';
 
-	let authState = $derived($authStore);
+	const authState = authStore;
 	let visible = $state(false);
 
 	onMount(() => {

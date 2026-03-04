@@ -15,16 +15,16 @@
 		Receipt,
 		Tag
 	} from 'lucide-svelte';
-	import { offlineExpenses } from '$lib/stores/offline';
+	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { removeOfflineExpense } from '$lib/utils/offline-storage';
-	import { settingsStore } from '$lib/stores/settings';
+	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { expenseApi } from '$lib/services/expense-api';
-	import type { Expense, Vehicle, ExpenseCategory, ExpenseFilters } from '$lib/types.js';
+	import type { Expense, Vehicle, ExpenseCategory, ExpenseSummary } from '$lib/types';
 
 	// Extended Expense type with vehicle info
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
-	import { formatCurrency, formatDate } from '$lib/utils/formatters';
+	import { formatCurrency } from '$lib/utils/formatters';
 	import { categoryLabels, getCategoryIcon, getCategoryColor } from '$lib/utils/expense-helpers';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { extractUniqueTags } from '$lib/utils/expense-filters';
@@ -49,11 +49,24 @@
 	let isLoading = $state(true);
 	let expenses = $state<ExpenseWithVehicle[]>([]);
 	let vehicles = $state<Vehicle[]>([]);
+	let summary = $state<ExpenseSummary | null>(null);
+
+	// Pagination state
+	let currentOffset = $state(0);
+	let pageSize = $state(20);
+	let totalCount = $state(0);
+	let isLoadingPage = $state(false);
 
 	// Filters and search
 	let searchTerm = $state('');
 	let selectedVehicleId = $state<string | undefined>(undefined);
-	let filters = $state<ExpenseFilters>({});
+	let selectedCategory = $state<string | undefined>(undefined);
+	let startDate = $state<string | undefined>(undefined);
+	let endDate = $state<string | undefined>(undefined);
+
+	// Track previous date values to detect changes from the DateRangePicker binding
+	let prevStartDate = $state<string | undefined>(undefined);
+	let prevEndDate = $state<string | undefined>(undefined);
 
 	// Tag filter state
 	let selectedTags = $state<string[]>([]);
@@ -72,49 +85,8 @@
 	// Collapsible state
 	let overviewOpen = $state(false);
 
-	// Summary stats
-	let summaryStats = $derived.by(() => {
-		const expensesToCalculate = selectedVehicleId
-			? expenses.filter(e => e.vehicleId === selectedVehicleId)
-			: expenses;
-
-		const totalAmount = expensesToCalculate.reduce((sum, expense) => sum + expense.amount, 0);
-		const categoryTotals = expensesToCalculate.reduce(
-			(acc, expense) => {
-				acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
-				return acc;
-			},
-			{} as Record<string, number>
-		);
-
-		const twelveMonthsAgo = new Date();
-		twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-		const recentExpenses = expensesToCalculate.filter(
-			expense => new Date(expense.date) >= twelveMonthsAgo
-		);
-		const monthlyAverage =
-			recentExpenses.length > 0
-				? recentExpenses.reduce((sum, expense) => sum + expense.amount, 0) / 12
-				: 0;
-
-		const lastExpenseDate =
-			expensesToCalculate.length > 0
-				? new Date(
-						Math.max(...expensesToCalculate.map(expense => new Date(expense.date).getTime()))
-					)
-				: null;
-
-		return {
-			totalAmount,
-			expenseCount: expensesToCalculate.length,
-			categoryTotals,
-			monthlyAverage,
-			lastExpenseDate
-		};
-	});
-
-	let pendingExpenses = $derived($offlineExpenses.filter(expense => !expense.synced));
-	let syncedExpenses = $derived($offlineExpenses.filter(expense => expense.synced));
+	let pendingExpenses = $derived(offlineExpenseQueue.current.filter(expense => !expense.synced));
+	let syncedExpenses = $derived(offlineExpenseQueue.current.filter(expense => expense.synced));
 
 	// Get all unique tags from expenses
 	let allTags = $derived(extractUniqueTags(expenses));
@@ -122,115 +94,147 @@
 	const statCards = $derived([
 		{
 			label: EXPENSE_MESSAGES.TOTAL_EXPENSES,
-			value: formatCurrency(summaryStats.totalAmount),
+			value: formatCurrency(summary?.totalAmount ?? 0),
 			icon: DollarSign,
 			color: 'text-primary',
 			bgColor: 'bg-primary/10'
 		},
 		{
 			label: EXPENSE_MESSAGES.TOTAL_COUNT,
-			value: summaryStats.expenseCount.toString(),
+			value: (summary?.expenseCount ?? 0).toString(),
 			icon: FileText,
 			color: 'text-chart-1',
 			bgColor: 'bg-chart-1/10'
 		},
 		{
 			label: EXPENSE_MESSAGES.MONTHLY_AVERAGE,
-			value: formatCurrency(summaryStats.monthlyAverage),
+			value: formatCurrency(summary?.monthlyAverage ?? 0),
 			icon: TrendingUp,
 			color: 'text-chart-2',
 			bgColor: 'bg-chart-2/10'
 		},
 		{
 			label: EXPENSE_MESSAGES.LAST_EXPENSE,
-			value: summaryStats.lastExpenseDate ? formatDate(summaryStats.lastExpenseDate) : 'None',
+			value: formatCurrency(summary?.recentAmount ?? 0),
 			icon: Calendar,
 			color: 'text-chart-5',
 			bgColor: 'bg-chart-5/10'
 		}
 	]);
 
-	onMount(async () => {
-		await settingsStore.load();
-		await loadExpenses();
+	// Detect date range changes from the DateRangePicker binding (after initial load)
+	$effect(() => {
+		const s = startDate;
+		const e = endDate;
+		if (isLoading) return; // skip during initial mount
+		if (s !== prevStartDate || e !== prevEndDate) {
+			prevStartDate = s;
+			prevEndDate = e;
+			handleFilterChange();
+		}
 	});
 
-	async function loadExpenses() {
-		isLoading = true;
-		try {
-			const [loadedVehicles, loadedExpenses] = await Promise.all([
-				vehicleApi.getVehicles(),
-				expenseApi.getAllExpenses()
-			]);
-			vehicles = loadedVehicles;
+	onMount(async () => {
+		await settingsStore.load();
+		const loadedVehicles = await vehicleApi.getVehicles();
+		vehicles = loadedVehicles;
+		await fetchPageAndSummary();
+		isLoading = false;
+	});
 
-			expenses = loadedExpenses.map(expense => ({
+	/** Build the params object for the current filter state. */
+	function buildListParams(offset: number) {
+		return {
+			limit: pageSize,
+			offset,
+			...(selectedVehicleId && { vehicleId: selectedVehicleId }),
+			...(selectedCategory && { category: selectedCategory }),
+			...(startDate && { startDate }),
+			...(endDate && { endDate }),
+			...(selectedTags.length > 0 && { tags: selectedTags })
+		};
+	}
+
+	/** Build summary params from current filter state. */
+	function buildSummaryParams() {
+		return {
+			...(selectedVehicleId && { vehicleId: selectedVehicleId })
+		};
+	}
+
+	/** Fetch a page of expenses and the summary in parallel. */
+	async function fetchPageAndSummary(offset = 0) {
+		isLoadingPage = true;
+		try {
+			const [pageResult, summaryResult] = await Promise.all([
+				expenseApi.getAllExpenses(buildListParams(offset)),
+				expenseApi.getExpenseSummary(buildSummaryParams())
+			]);
+
+			expenses = pageResult.data.map(expense => ({
 				...expense,
 				vehicle: vehicles.find(v => v.id === expense.vehicleId)
 			}));
+			totalCount = pageResult.totalCount;
+			currentOffset = offset;
+			summary = summaryResult;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load expenses:', error);
 		} finally {
-			isLoading = false;
+			isLoadingPage = false;
 		}
 	}
 
-	// Derived: filtered expenses based on all filter state
-	let filteredExpenses = $derived.by(() => {
-		let filtered = [...expenses];
-
-		if (selectedVehicleId) {
-			filtered = filtered.filter(expense => expense.vehicleId === selectedVehicleId);
+	/** Fetch only the current page (used for pagination navigation). */
+	async function fetchPage(offset: number) {
+		isLoadingPage = true;
+		try {
+			const pageResult = await expenseApi.getAllExpenses(buildListParams(offset));
+			expenses = pageResult.data.map(expense => ({
+				...expense,
+				vehicle: vehicles.find(v => v.id === expense.vehicleId)
+			}));
+			totalCount = pageResult.totalCount;
+			currentOffset = offset;
+		} catch (error) {
+			if (import.meta.env.DEV) console.error('Failed to load expenses page:', error);
+		} finally {
+			isLoadingPage = false;
 		}
+	}
 
-		if (searchTerm.trim()) {
-			const term = searchTerm.toLowerCase();
-			filtered = filtered.filter(
-				expense =>
-					expense.description?.toLowerCase().includes(term) ||
-					expense.category.toLowerCase().includes(term) ||
-					expense.amount.toString().includes(term) ||
-					expense.vehicle?.make?.toLowerCase().includes(term) ||
-					expense.vehicle?.model?.toLowerCase().includes(term) ||
-					expense.vehicle?.nickname?.toLowerCase().includes(term)
-			);
-		}
+	/** Called when any filter changes — reset to page 0 and re-fetch both. */
+	function handleFilterChange() {
+		currentOffset = 0;
+		fetchPageAndSummary(0);
+	}
 
-		if (filters.tags && filters.tags.length > 0) {
-			if (tagMatchMode === 'all') {
-				filtered = filtered.filter(expense =>
-					filters.tags!.every(tag => expense.tags?.includes(tag))
-				);
-			} else {
-				filtered = filtered.filter(expense =>
-					filters.tags!.some(tag => expense.tags?.includes(tag))
-				);
-			}
-		}
+	function handleVehicleChange(v: string) {
+		selectedVehicleId = v === '' ? undefined : v;
+		handleFilterChange();
+	}
 
-		if (filters.startDate) {
-			filtered = filtered.filter(expense => new Date(expense.date) >= new Date(filters.startDate!));
-		}
-		if (filters.endDate) {
-			filtered = filtered.filter(expense => new Date(expense.date) <= new Date(filters.endDate!));
-		}
-
-		return filtered;
-	});
+	function handlePageChange(offset: number) {
+		fetchPage(offset);
+	}
 
 	function clearFilters() {
 		searchTerm = '';
 		tagSearchTerm = '';
 		tagMatchMode = 'any';
 		selectedVehicleId = undefined;
+		selectedCategory = undefined;
 		selectedTags = [];
-		filters = {};
+		startDate = undefined;
+		endDate = undefined;
+		currentOffset = 0;
+		fetchPageAndSummary(0);
 	}
 
 	function addTag(tag: string): void {
 		if (!selectedTags.includes(tag)) {
 			selectedTags = [...selectedTags, tag];
-			filters = { ...filters, tags: selectedTags.length > 0 ? selectedTags : undefined };
+			handleFilterChange();
 		}
 		tagSearchTerm = '';
 		tagSearchFocused = true;
@@ -239,13 +243,12 @@
 
 	function removeTag(tag: string): void {
 		selectedTags = selectedTags.filter(t => t !== tag);
-		filters = { ...filters, tags: selectedTags.length > 0 ? selectedTags : undefined };
+		handleFilterChange();
 	}
 
 	function handleTagKeydown(e: KeyboardEvent): void {
 		if (e.key === 'Enter') {
 			e.preventDefault();
-			// Try exact match first, then first suggestion
 			const exactMatch = allTags.find(
 				t => !selectedTags.includes(t) && t.toLowerCase() === tagSearchTerm.trim().toLowerCase()
 			);
@@ -264,9 +267,25 @@
 		}
 	}
 
-	async function handleDeleteExpense(deletedExpense: ExpenseWithVehicle) {
-		expenses = expenses.filter(e => e.id !== deletedExpense.id);
+	async function handleDeleteExpense(_deletedExpense: ExpenseWithVehicle) {
+		// Re-fetch current page and summary after deletion
+		await fetchPageAndSummary(currentOffset);
 	}
+
+	// Client-side search filter (applied on top of server-paginated data)
+	let displayExpenses = $derived.by(() => {
+		if (!searchTerm.trim()) return expenses;
+		const term = searchTerm.toLowerCase();
+		return expenses.filter(
+			expense =>
+				expense.description?.toLowerCase().includes(term) ||
+				expense.category.toLowerCase().includes(term) ||
+				expense.amount.toString().includes(term) ||
+				expense.vehicle?.make?.toLowerCase().includes(term) ||
+				expense.vehicle?.model?.toLowerCase().includes(term) ||
+				expense.vehicle?.nickname?.toLowerCase().includes(term)
+		);
+	});
 </script>
 
 <svelte:head>
@@ -284,7 +303,7 @@
 		<Skeleton class="h-64 w-full" />
 	</div>
 {:else}
-	<div class="space-y-6 pb-24 sm:pb-0">
+	<div class="space-y-6 pb-24">
 		<!-- Header -->
 		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 			<div>
@@ -293,7 +312,7 @@
 			</div>
 		</div>
 
-		<!-- Search, Vehicle & Filters (moved to top) -->
+		<!-- Search, Vehicle & Filters -->
 		<CardNs.Root>
 			<CardNs.Header>
 				<div class="flex items-center justify-between gap-3">
@@ -303,8 +322,8 @@
 					</div>
 					<div class="flex items-center gap-2">
 						<DateRangePicker
-							bind:startValue={filters.startDate}
-							bind:endValue={filters.endDate}
+							bind:startValue={startDate}
+							bind:endValue={endDate}
 							placeholder="Date range"
 							class="w-auto"
 						/>
@@ -329,9 +348,7 @@
 						<Select.Root
 							type="single"
 							value={selectedVehicleId ?? ''}
-							onValueChange={v => {
-								selectedVehicleId = v === '' ? undefined : v;
-							}}
+							onValueChange={handleVehicleChange}
 						>
 							<Select.Trigger class="w-full">
 								<div class="flex items-center gap-2">
@@ -455,7 +472,7 @@
 				</div>
 
 				<!-- Clear Filters -->
-				{#if searchTerm || selectedVehicleId || selectedTags.length > 0 || filters.startDate || filters.endDate}
+				{#if searchTerm || selectedVehicleId || selectedTags.length > 0 || startDate || endDate}
 					<div class="flex justify-end pt-2">
 						<Button variant="outline" size="sm" onclick={clearFilters}>
 							<X class="h-4 w-4 mr-2" />
@@ -478,8 +495,8 @@
 							<div class="text-left">
 								<CardNs.Title>Expense Overview</CardNs.Title>
 								<CardNs.Description>
-									{formatCurrency(summaryStats.totalAmount)} across {summaryStats.expenseCount}
-									expense{summaryStats.expenseCount !== 1 ? 's' : ''}
+									{formatCurrency(summary?.totalAmount ?? 0)} across {summary?.expenseCount ?? 0}
+									expense{(summary?.expenseCount ?? 0) !== 1 ? 's' : ''}
 								</CardNs.Description>
 							</div>
 						</div>
@@ -510,7 +527,7 @@
 						</div>
 
 						<!-- Category Breakdown -->
-						{#if Object.keys(summaryStats.categoryTotals).length > 0}
+						{#if summary && summary.categoryBreakdown.length > 0}
 							<div class="space-y-3">
 								<div class="flex items-center gap-2">
 									<Receipt class="h-4 w-4 text-muted-foreground" />
@@ -519,23 +536,23 @@
 									</p>
 								</div>
 								<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-									{#each Object.entries(summaryStats.categoryTotals) as [category, amount] (category)}
-										{@const IconComponent = getCategoryIcon(category as ExpenseCategory)}
+									{#each summary.categoryBreakdown as item (item.category)}
+										{@const IconComponent = getCategoryIcon(item.category as ExpenseCategory)}
 										<div class="p-3 rounded-lg border hover:bg-muted/50 transition-colors">
 											<div class="flex items-center gap-2">
 												<div
 													class="p-1.5 rounded-lg {getCategoryColor(
-														category as ExpenseCategory
+														item.category as ExpenseCategory
 													)} shrink-0"
 												>
 													<IconComponent class="h-3.5 w-3.5" />
 												</div>
 												<span class="text-xs sm:text-sm font-medium">
-													{categoryLabels[category as ExpenseCategory]}
+													{categoryLabels[item.category as ExpenseCategory]}
 												</span>
 											</div>
 											<p class="text-sm font-bold mt-1.5">
-												{formatCurrency(amount)}
+												{formatCurrency(item.amount)}
 											</p>
 										</div>
 									{/each}
@@ -661,7 +678,7 @@
 			<CardNs.Header>
 				<div class="flex items-center justify-between">
 					<div>
-						<CardNs.Title>Expenses ({filteredExpenses.length})</CardNs.Title>
+						<CardNs.Title>Expenses ({totalCount})</CardNs.Title>
 						<CardNs.Description>All recorded expenses</CardNs.Description>
 					</div>
 					<div class="p-2 rounded-lg bg-primary/10">
@@ -671,7 +688,7 @@
 			</CardNs.Header>
 			<CardNs.Content>
 				<ExpensesTable
-					expenses={filteredExpenses}
+					expenses={displayExpenses}
 					{vehicles}
 					showVehicleColumn={true}
 					returnTo="/expenses"
@@ -685,11 +702,16 @@
 					hasActiveFilters={!!(
 						searchTerm ||
 						selectedVehicleId ||
-						filters.category ||
+						selectedCategory ||
 						selectedTags.length > 0 ||
-						filters.startDate ||
-						filters.endDate
+						startDate ||
+						endDate
 					)}
+					{totalCount}
+					{currentOffset}
+					{pageSize}
+					{isLoadingPage}
+					onPageChange={handlePageChange}
 				/>
 			</CardNs.Content>
 		</CardNs.Root>

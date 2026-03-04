@@ -1,4 +1,4 @@
-import { appStore } from '$lib/stores/app.js';
+import { appStore } from '$lib/stores/app.svelte';
 
 /**
  * Backend error response format

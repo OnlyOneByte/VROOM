@@ -1,4 +1,4 @@
-import { offlineExpenses, syncStatus } from '$lib/stores/offline';
+import { offlineExpenseQueue, syncState } from '$lib/stores/offline.svelte';
 import { toBackendExpense } from '$lib/services/api-transformer';
 import { apiClient } from '$lib/services/api-client';
 
@@ -53,7 +53,7 @@ export function saveOfflineExpenses(expenses: OfflineExpense[]): void {
 
 	try {
 		localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(expenses));
-		offlineExpenses.set(expenses);
+		offlineExpenseQueue.current = expenses;
 	} catch (error) {
 		if (import.meta.env.DEV) console.error('Failed to save offline expenses:', error);
 	}
@@ -110,7 +110,7 @@ export async function syncOfflineExpenses(): Promise<void> {
 
 	if (pendingExpenses.length === 0) return;
 
-	syncStatus.set('syncing');
+	syncState.current = 'syncing';
 
 	try {
 		for (const expense of pendingExpenses) {
@@ -145,11 +145,11 @@ export async function syncOfflineExpenses(): Promise<void> {
 		}
 
 		clearSyncedExpenses();
-		syncStatus.set('success');
-		setTimeout(() => syncStatus.set('idle'), 3000);
+		syncState.current = 'success';
+		setTimeout(() => (syncState.current = 'idle'), 3000);
 	} catch (error) {
 		if (import.meta.env.DEV) console.error('Failed to sync offline expenses:', error);
-		syncStatus.set('error');
-		setTimeout(() => syncStatus.set('idle'), 5000);
+		syncState.current = 'error';
+		setTimeout(() => (syncState.current = 'idle'), 5000);
 	}
 }

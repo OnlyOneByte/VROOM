@@ -1,53 +1,49 @@
-import { writable } from 'svelte/store';
 import type { UserSettings } from '../types/index.js';
 import { settingsApi } from '$lib/services/settings-api';
 
-interface SettingsState {
-	settings: UserSettings | null;
-	isLoading: boolean;
-	error: string | null;
+function handleError(error: unknown): string {
+	return error instanceof Error ? error.message : 'An unexpected error occurred';
 }
 
-const initialState: SettingsState = {
-	settings: null,
-	isLoading: false,
-	error: null
-};
-
 function createSettingsStore() {
-	const { subscribe, set, update } = writable<SettingsState>(initialState);
-
-	function handleError(error: unknown): string {
-		return error instanceof Error ? error.message : 'An unexpected error occurred';
-	}
+	let settings = $state<UserSettings | null>(null);
+	let isLoading = $state(false);
+	let error = $state<string | null>(null);
 
 	return {
-		subscribe,
+		get settings() {
+			return settings;
+		},
+		get isLoading() {
+			return isLoading;
+		},
+		get error() {
+			return error;
+		},
 
 		async load() {
-			update(state => ({ ...state, isLoading: true, error: null }));
+			isLoading = true;
+			error = null;
 			try {
-				const settings = await settingsApi.getSettings();
-				update(state => ({ ...state, settings, isLoading: false }));
-			} catch (error) {
-				update(state => ({
-					...state,
-					error: handleError(error),
-					isLoading: false
-				}));
+				settings = await settingsApi.getSettings();
+				isLoading = false;
+			} catch (err) {
+				error = handleError(err);
+				isLoading = false;
 			}
 		},
 
 		async update(updates: Partial<UserSettings>) {
-			update(state => ({ ...state, isLoading: true, error: null }));
+			isLoading = true;
+			error = null;
 			try {
-				const settings = await settingsApi.updateSettings(updates);
-				update(state => ({ ...state, settings, isLoading: false }));
+				settings = await settingsApi.updateSettings(updates);
+				isLoading = false;
 				return settings;
-			} catch (error) {
-				const msg = handleError(error);
-				update(state => ({ ...state, error: msg, isLoading: false }));
-				throw error;
+			} catch (err) {
+				error = handleError(err);
+				isLoading = false;
+				throw err;
 			}
 		},
 
@@ -60,9 +56,9 @@ function createSettingsStore() {
 				const result = await settingsApi.configureSyncSettings(config);
 				await this.load();
 				return result;
-			} catch (error) {
-				update(state => ({ ...state, error: handleError(error) }));
-				throw error;
+			} catch (err) {
+				error = handleError(err);
+				throw err;
 			}
 		},
 
@@ -80,9 +76,9 @@ function createSettingsStore() {
 				a.click();
 				window.URL.revokeObjectURL(url);
 				document.body.removeChild(a);
-			} catch (error) {
-				update(state => ({ ...state, error: handleError(error) }));
-				throw error;
+			} catch (err) {
+				error = handleError(err);
+				throw err;
 			}
 		},
 
@@ -95,18 +91,18 @@ function createSettingsStore() {
 					await this.load();
 				}
 				return result;
-			} catch (error) {
-				update(state => ({ ...state, error: handleError(error) }));
-				throw error;
+			} catch (err) {
+				error = handleError(err);
+				throw err;
 			}
 		},
 
 		async executeSync(syncTypes: ('sheets' | 'backup')[], force = false) {
 			try {
 				return await settingsApi.executeSync(syncTypes, force);
-			} catch (error) {
-				update(state => ({ ...state, error: handleError(error) }));
-				throw error;
+			} catch (err) {
+				error = handleError(err);
+				throw err;
 			}
 		},
 
@@ -115,18 +111,18 @@ function createSettingsStore() {
 				const result = await settingsApi.initializeDrive();
 				await this.load();
 				return result;
-			} catch (error) {
-				update(state => ({ ...state, error: handleError(error) }));
-				throw error;
+			} catch (err) {
+				error = handleError(err);
+				throw err;
 			}
 		},
 
 		async listBackups() {
 			try {
 				return await settingsApi.listBackups();
-			} catch (error) {
-				update(state => ({ ...state, error: handleError(error) }));
-				throw error;
+			} catch (err) {
+				error = handleError(err);
+				throw err;
 			}
 		},
 
@@ -152,9 +148,9 @@ function createSettingsStore() {
 				a.click();
 				window.URL.revokeObjectURL(url);
 				document.body.removeChild(a);
-			} catch (error) {
-				update(state => ({ ...state, error: handleError(error) }));
-				throw error;
+			} catch (err) {
+				error = handleError(err);
+				throw err;
 			}
 		},
 
@@ -176,18 +172,18 @@ function createSettingsStore() {
 
 				const file = new File([blob], fileName, { type: 'application/zip' });
 				return await this.uploadBackup(file, mode);
-			} catch (error) {
-				update(state => ({ ...state, error: handleError(error) }));
-				throw error;
+			} catch (err) {
+				error = handleError(err);
+				throw err;
 			}
 		},
 
 		async deleteBackup(fileId: string) {
 			try {
 				return await settingsApi.deleteBackup(fileId);
-			} catch (error) {
-				update(state => ({ ...state, error: handleError(error) }));
-				throw error;
+			} catch (err) {
+				error = handleError(err);
+				throw err;
 			}
 		},
 
@@ -200,14 +196,16 @@ function createSettingsStore() {
 					await this.load();
 				}
 				return result;
-			} catch (error) {
-				update(state => ({ ...state, error: handleError(error) }));
-				throw error;
+			} catch (err) {
+				error = handleError(err);
+				throw err;
 			}
 		},
 
 		reset() {
-			set(initialState);
+			settings = null;
+			isLoading = false;
+			error = null;
 		}
 	};
 }

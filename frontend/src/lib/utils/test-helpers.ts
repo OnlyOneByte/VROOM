@@ -112,7 +112,7 @@ export function renderWithMocks(
 ) {
 	// Mock stores if needed
 	if (options?.authState) {
-		vi.doMock('$lib/stores/auth.js', () => ({
+		vi.doMock('$lib/stores/auth.svelte', () => ({
 			authStore: {
 				subscribe: (callback: (state: unknown) => void) => {
 					callback(options.authState);

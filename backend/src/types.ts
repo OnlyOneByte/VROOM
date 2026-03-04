@@ -106,6 +106,7 @@ export interface BackupData {
   insurancePolicyVehicles: import('./db/schema').InsurancePolicyVehicle[];
   expenseGroups: import('./db/schema').ExpenseGroup[];
   photos: import('./db/schema').Photo[];
+  odometer: import('./db/schema').OdometerEntry[];
 }
 
 export interface ParsedBackupData {
@@ -117,4 +118,5 @@ export interface ParsedBackupData {
   insurancePolicyVehicles: Record<string, unknown>[];
   expenseGroups: Record<string, unknown>[];
   photos: Record<string, unknown>[];
+  odometer: Record<string, unknown>[];
 }

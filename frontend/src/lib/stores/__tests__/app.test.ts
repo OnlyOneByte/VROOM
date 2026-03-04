@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { get } from 'svelte/store';
-import { appStore } from '../app.js';
+import { appStore } from '../app.svelte';
 import type { Vehicle, Notification } from '../../types/index.js';
 
 // Mock vehicle data
@@ -53,14 +52,11 @@ describe('App Store', () => {
 
 	describe('Initial State', () => {
 		it('has correct initial state', () => {
-			const state = get(appStore);
-			expect(state).toEqual({
-				vehicles: [],
-				selectedVehicle: null,
-				notifications: [],
-				isLoading: false,
-				isMobileMenuOpen: false
-			});
+			expect(appStore.vehicles).toEqual([]);
+			expect(appStore.selectedVehicle).toBe(null);
+			expect(appStore.isMobileMenuOpen).toBe(false);
+			expect(appStore.isLoading).toBe(false);
+			expect(appStore.notifications).toEqual([]);
 		});
 	});
 
@@ -69,16 +65,16 @@ describe('App Store', () => {
 			const vehicles = [mockVehicle, mockVehicle2];
 			appStore.setVehicles(vehicles);
 
-			const state = get(appStore);
-			expect(state.vehicles).toEqual(vehicles);
+			// Direct property access on runes store
+			expect(appStore.vehicles).toEqual(vehicles);
 		});
 
 		it('adds a vehicle', () => {
 			appStore.addVehicle(mockVehicle);
 
-			const state = get(appStore);
-			expect(state.vehicles).toHaveLength(1);
-			expect(state.vehicles[0]).toEqual(mockVehicle);
+			// Direct property access on runes store
+			expect(appStore.vehicles).toHaveLength(1);
+			expect(appStore.vehicles[0]).toEqual(mockVehicle);
 		});
 
 		it('updates a vehicle', () => {
@@ -87,41 +83,41 @@ describe('App Store', () => {
 			const updatedVehicle = { ...mockVehicle, nickname: 'Updated Car' };
 			appStore.updateVehicle(mockVehicle.id, updatedVehicle);
 
-			const state = get(appStore);
-			expect(state.vehicles[0]?.nickname).toBe('Updated Car');
+			// Direct property access on runes store
+			expect(appStore.vehicles[0]?.nickname).toBe('Updated Car');
 		});
 
 		it('removes a vehicle', () => {
 			appStore.setVehicles([mockVehicle, mockVehicle2]);
 			appStore.removeVehicle(mockVehicle.id);
 
-			const state = get(appStore);
-			expect(state.vehicles).toHaveLength(1);
-			expect(state.vehicles[0]?.id).toBe(mockVehicle2.id);
+			// Direct property access on runes store
+			expect(appStore.vehicles).toHaveLength(1);
+			expect(appStore.vehicles[0]?.id).toBe(mockVehicle2.id);
 		});
 
 		it('clears all vehicles', () => {
 			appStore.setVehicles([mockVehicle, mockVehicle2]);
 			appStore.clearVehicles();
 
-			const state = get(appStore);
-			expect(state.vehicles).toHaveLength(0);
+			// Direct property access on runes store
+			expect(appStore.vehicles).toHaveLength(0);
 		});
 
 		it('selects a vehicle', () => {
 			appStore.setVehicles([mockVehicle, mockVehicle2]);
 			appStore.selectVehicle(mockVehicle.id);
 
-			const state = get(appStore);
-			expect(state.selectedVehicle).toEqual(mockVehicle);
+			// Direct property access on runes store
+			expect(appStore.selectedVehicle).toEqual(mockVehicle);
 		});
 
 		it('clears selected vehicle when vehicle not found', () => {
 			appStore.setVehicles([mockVehicle]);
 			appStore.selectVehicle('nonexistent');
 
-			const state = get(appStore);
-			expect(state.selectedVehicle).toBe(null);
+			// Direct property access on runes store
+			expect(appStore.selectedVehicle).toBe(null);
 		});
 
 		it('clears selected vehicle', () => {
@@ -129,8 +125,8 @@ describe('App Store', () => {
 			appStore.selectVehicle(mockVehicle.id);
 			appStore.clearSelectedVehicle();
 
-			const state = get(appStore);
-			expect(state.selectedVehicle).toBe(null);
+			// Direct property access on runes store
+			expect(appStore.selectedVehicle).toBe(null);
 		});
 	});
 
@@ -138,9 +134,9 @@ describe('App Store', () => {
 		it('adds a notification', () => {
 			appStore.addNotification(mockNotification);
 
-			const state = get(appStore);
-			expect(state.notifications).toHaveLength(1);
-			expect(state.notifications[0]).toMatchObject({
+			// Direct property access on runes store
+			expect(appStore.notifications).toHaveLength(1);
+			expect(appStore.notifications[0]).toMatchObject({
 				type: mockNotification.type,
 				message: mockNotification.message,
 				duration: mockNotification.duration
@@ -150,15 +146,15 @@ describe('App Store', () => {
 		it('removes a notification', () => {
 			appStore.addNotification(mockNotification);
 
-			const state = get(appStore);
-			const notificationId = state.notifications[0]?.id;
+			// Direct property access on runes store
+			const notificationId = appStore.notifications[0]?.id;
 
 			if (notificationId) {
 				appStore.removeNotification(notificationId);
 			}
 
-			const updatedState = get(appStore);
-			expect(updatedState.notifications).toHaveLength(0);
+			// Direct property access on runes store
+			expect(appStore.notifications).toHaveLength(0);
 		});
 
 		it('clears all notifications', () => {
@@ -166,44 +162,44 @@ describe('App Store', () => {
 			appStore.addNotification({ ...mockNotification, message: 'Second notification' });
 			appStore.clearNotifications();
 
-			const state = get(appStore);
-			expect(state.notifications).toHaveLength(0);
+			// Direct property access on runes store
+			expect(appStore.notifications).toHaveLength(0);
 		});
 
 		it('shows success notification', () => {
 			appStore.showSuccess('Success message');
 
-			const state = get(appStore);
-			expect(state.notifications).toHaveLength(1);
-			expect(state.notifications[0]?.type).toBe('success');
-			expect(state.notifications[0]?.message).toBe('Success message');
+			// Direct property access on runes store
+			expect(appStore.notifications).toHaveLength(1);
+			expect(appStore.notifications[0]?.type).toBe('success');
+			expect(appStore.notifications[0]?.message).toBe('Success message');
 		});
 
 		it('shows error notification', () => {
 			appStore.showError('Error message');
 
-			const state = get(appStore);
-			expect(state.notifications).toHaveLength(1);
-			expect(state.notifications[0]?.type).toBe('error');
-			expect(state.notifications[0]?.message).toBe('Error message');
+			// Direct property access on runes store
+			expect(appStore.notifications).toHaveLength(1);
+			expect(appStore.notifications[0]?.type).toBe('error');
+			expect(appStore.notifications[0]?.message).toBe('Error message');
 		});
 
 		it('shows warning notification', () => {
 			appStore.showWarning('Warning message');
 
-			const state = get(appStore);
-			expect(state.notifications).toHaveLength(1);
-			expect(state.notifications[0]?.type).toBe('warning');
-			expect(state.notifications[0]?.message).toBe('Warning message');
+			// Direct property access on runes store
+			expect(appStore.notifications).toHaveLength(1);
+			expect(appStore.notifications[0]?.type).toBe('warning');
+			expect(appStore.notifications[0]?.message).toBe('Warning message');
 		});
 
 		it('shows info notification', () => {
 			appStore.showInfo('Info message');
 
-			const state = get(appStore);
-			expect(state.notifications).toHaveLength(1);
-			expect(state.notifications[0]?.type).toBe('info');
-			expect(state.notifications[0]?.message).toBe('Info message');
+			// Direct property access on runes store
+			expect(appStore.notifications).toHaveLength(1);
+			expect(appStore.notifications[0]?.type).toBe('info');
+			expect(appStore.notifications[0]?.message).toBe('Info message');
 		});
 	});
 
@@ -211,13 +207,13 @@ describe('App Store', () => {
 		it('sets loading state', () => {
 			appStore.setLoading(true);
 
-			const state = get(appStore);
-			expect(state.isLoading).toBe(true);
+			// Direct property access on runes store
+			expect(appStore.isLoading).toBe(true);
 
 			appStore.setLoading(false);
 
-			const updatedState = get(appStore);
-			expect(updatedState.isLoading).toBe(false);
+			// Direct property access on runes store
+			expect(appStore.isLoading).toBe(false);
 		});
 	});
 
@@ -225,63 +221,48 @@ describe('App Store', () => {
 		it('toggles mobile menu', () => {
 			appStore.toggleMobileMenu();
 
-			const state = get(appStore);
-			expect(state.isMobileMenuOpen).toBe(true);
+			// Direct property access on runes store
+			expect(appStore.isMobileMenuOpen).toBe(true);
 
 			appStore.toggleMobileMenu();
 
-			const updatedState = get(appStore);
-			expect(updatedState.isMobileMenuOpen).toBe(false);
+			// Direct property access on runes store
+			expect(appStore.isMobileMenuOpen).toBe(false);
 		});
 
 		it('opens mobile menu', () => {
 			appStore.openMobileMenu();
 
-			const state = get(appStore);
-			expect(state.isMobileMenuOpen).toBe(true);
+			// Direct property access on runes store
+			expect(appStore.isMobileMenuOpen).toBe(true);
 		});
 
 		it('closes mobile menu', () => {
 			appStore.openMobileMenu();
 			appStore.closeMobileMenu();
 
-			const state = get(appStore);
-			expect(state.isMobileMenuOpen).toBe(false);
+			// Direct property access on runes store
+			expect(appStore.isMobileMenuOpen).toBe(false);
 		});
 	});
 
 	describe('Store Reactivity', () => {
-		it('notifies subscribers of state changes', () => {
-			const states: any[] = [];
-
-			const unsubscribe = appStore.subscribe(state => {
-				states.push({ ...state });
-			});
-
-			// Initial state
-			expect(states).toHaveLength(1);
-
+		it('reflects state changes immediately', () => {
 			// Add vehicle
 			appStore.addVehicle(mockVehicle);
-			expect(states).toHaveLength(2);
-			expect(states[1].vehicles).toHaveLength(1);
+			expect(appStore.vehicles).toHaveLength(1);
 
 			// Set loading
 			appStore.setLoading(true);
-			expect(states).toHaveLength(3);
-			expect(states[2].isLoading).toBe(true);
+			expect(appStore.isLoading).toBe(true);
 
 			// Toggle mobile menu
 			appStore.toggleMobileMenu();
-			expect(states).toHaveLength(4);
-			expect(states[3].isMobileMenuOpen).toBe(true);
+			expect(appStore.isMobileMenuOpen).toBe(true);
 
 			// Add notification
 			appStore.showSuccess('Test');
-			expect(states).toHaveLength(5);
-			expect(states[4].notifications).toHaveLength(1);
-
-			unsubscribe();
+			expect(appStore.notifications).toHaveLength(1);
 		});
 	});
 
@@ -297,10 +278,10 @@ describe('App Store', () => {
 			const updatedVehicle = { ...mockVehicle, nickname: 'Updated' };
 			appStore.updateVehicle(mockVehicle.id, updatedVehicle);
 
-			const state = get(appStore);
-			expect(state.vehicles).toHaveLength(2);
-			expect(state.selectedVehicle?.nickname).toBe('Updated');
-			expect(state.vehicles.find(v => v.id === mockVehicle.id)?.nickname).toBe('Updated');
+			// Direct property access on runes store
+			expect(appStore.vehicles).toHaveLength(2);
+			expect(appStore.selectedVehicle?.nickname).toBe('Updated');
+			expect(appStore.vehicles.find(v => v.id === mockVehicle.id)?.nickname).toBe('Updated');
 		});
 
 		it('clears selected vehicle when it is removed', () => {
@@ -310,9 +291,9 @@ describe('App Store', () => {
 			// Remove the selected vehicle
 			appStore.removeVehicle(mockVehicle.id);
 
-			const state = get(appStore);
-			expect(state.vehicles).toHaveLength(1);
-			expect(state.selectedVehicle).toBe(null);
+			// Direct property access on runes store
+			expect(appStore.vehicles).toHaveLength(1);
+			expect(appStore.selectedVehicle).toBe(null);
 		});
 
 		it('maintains selected vehicle when other vehicles are removed', () => {
@@ -322,9 +303,9 @@ describe('App Store', () => {
 			// Remove a different vehicle
 			appStore.removeVehicle(mockVehicle2.id);
 
-			const state = get(appStore);
-			expect(state.vehicles).toHaveLength(1);
-			expect(state.selectedVehicle?.id).toBe(mockVehicle.id);
+			// Direct property access on runes store
+			expect(appStore.vehicles).toHaveLength(1);
+			expect(appStore.selectedVehicle?.id).toBe(mockVehicle.id);
 		});
 	});
 });

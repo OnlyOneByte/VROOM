@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { authStore } from '$lib/stores/auth.js';
-	import { appStore } from '$lib/stores/app.js';
+	import { authStore } from '$lib/stores/auth.svelte';
+	import { appStore } from '$lib/stores/app.svelte';
 	import { handleRouteProtection } from '$lib/utils/auth.js';
 	import Navigation from '$lib/components/layout/Navigation.svelte';
 	import { Toaster } from '$lib/components/ui/sonner';
@@ -13,14 +13,14 @@
 	import SyncConflictResolver from '$lib/components/sync/SyncConflictResolver.svelte';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import { loadOfflineExpenses } from '$lib/utils/offline-storage';
-	import { offlineExpenses } from '$lib/stores/offline';
+	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 
 	import { LoaderCircle } from 'lucide-svelte';
 
 	import { vehicleApi } from '$lib/services/vehicle-api';
-	import { themeStore } from '$lib/stores/theme';
+	import { themeStore } from '$lib/stores/theme.svelte';
 
 	let { children } = $props();
 
@@ -45,7 +45,7 @@
 	onMount(async () => {
 		themeStore.initialize();
 		authStore.initialize();
-		offlineExpenses.set(loadOfflineExpenses());
+		offlineExpenseQueue.current = loadOfflineExpenses();
 
 		if (pwaInfo) {
 			const pwaRegister: typeof import('virtual:pwa-register') = await import(
@@ -63,8 +63,10 @@
 		}
 	});
 
-	let authState = $derived($authStore);
-	let appState = $derived($appStore);
+	const authState = authStore;
+	let appState = $derived({
+		notifications: appStore.notifications
+	});
 	let currentPath = $derived(page.url.pathname);
 	let showNavigation = $derived(authState.isAuthenticated && !authState.isLoading);
 	let isAuthPage = $derived(currentPath.startsWith('/auth'));
