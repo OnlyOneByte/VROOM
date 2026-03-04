@@ -6,7 +6,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { TrendingUp } from 'lucide-svelte';
-	import { formatMonthYear, formatCurrencyAxis, getXTickCount } from '$lib/utils/chart-formatters';
+	import { formatMonthShort, formatCurrencyAxis, getXTickCount } from '$lib/utils/chart-formatters';
 
 	const CHART_HEIGHT = 320;
 
@@ -71,7 +71,7 @@
 						},
 						xAxis: {
 							ticks: xTickCount,
-							format: formatMonthYear
+							format: formatMonthShort
 						},
 						yAxis: {
 							format: formatCurrencyAxis
