@@ -5,7 +5,7 @@ version: '3.8'
 services:
   # Backend service with Bun (production)
   backend:
-    image: ghcr.io/${GITHUB_REPOSITORY}/backend:latest
+    image: ghcr.io/onlyonebyte/vroom/backend:latest
     container_name: vroom-backend
     ports:
       - "${BACKEND_PORT:-3001}:3001"
@@ -24,7 +24,6 @@ services:
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
       - FRONTEND_URL=${FRONTEND_URL}
       - SESSION_SECRET=${SESSION_SECRET}
-      - GOOGLE_DRIVE_API_KEY=${GOOGLE_DRIVE_API_KEY}
       - CORS_ORIGINS=${CORS_ORIGINS}
       - LOG_LEVEL=${LOG_LEVEL:-warn}
     restart: unless-stopped
@@ -42,7 +41,7 @@ services:
 
   # Frontend service with SvelteKit (production)
   frontend:
-    image: ghcr.io/${GITHUB_REPOSITORY}/frontend:latest
+    image: ghcr.io/onlyonebyte/vroom/frontend:latest
     container_name: vroom-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:3000"

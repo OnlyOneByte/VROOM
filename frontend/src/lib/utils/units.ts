@@ -5,6 +5,29 @@
 import type { DistanceUnit, VolumeUnit, ChargeUnit, VehicleType } from '$lib/types';
 
 /**
+ * Electric fuel types — duplicated from backend/src/db/types.ts since frontend
+ * and backend can't share code directly. Keep in sync with backend.
+ */
+export const ELECTRIC_FUEL_TYPES = [
+	'Electric',
+	'Level 1 (Home)',
+	'Level 2 (AC)',
+	'DC Fast Charging'
+] as const;
+
+/**
+ * Check if a fuelType value indicates an electric charging type.
+ * Used by the API transformer to decide fuelAmount → volume vs charge mapping.
+ */
+export function isElectricFuelType(fuelType: string | null | undefined): boolean {
+	return (
+		fuelType !== null &&
+		fuelType !== undefined &&
+		ELECTRIC_FUEL_TYPES.includes(fuelType as (typeof ELECTRIC_FUEL_TYPES)[number])
+	);
+}
+
+/**
  * Get display label for distance unit
  */
 export function getDistanceUnitLabel(unit: DistanceUnit, short = false): string {
@@ -35,20 +58,6 @@ export function getChargeUnitLabel(unit: ChargeUnit, short = false): string {
 		kwh: { short: 'kWh', long: 'kWh' }
 	};
 	return short ? labels[unit].short : labels[unit].long;
-}
-
-/**
- * Check if vehicle type uses liquid fuel
- */
-export function usesLiquidFuel(vehicleType: VehicleType): boolean {
-	return vehicleType === 'gas' || vehicleType === 'hybrid';
-}
-
-/**
- * Check if vehicle type uses electric charge
- */
-export function usesElectricCharge(vehicleType: VehicleType): boolean {
-	return vehicleType === 'electric' || vehicleType === 'hybrid';
 }
 
 /**

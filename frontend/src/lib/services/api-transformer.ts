@@ -7,6 +7,7 @@
  */
 
 import type { Expense } from '$lib/types';
+import { isElectricFuelType } from '$lib/utils/units';
 
 /**
  * Backend expense request format (what we send to the API)
@@ -63,11 +64,15 @@ export function toBackendExpense(
 		date: frontendExpense.date || new Date().toISOString()
 	};
 
-	// Map volume or charge to fuelAmount
-	if (frontendExpense.volume !== undefined && frontendExpense.volume !== null) {
-		backendExpense.fuelAmount = frontendExpense.volume;
-	} else if (frontendExpense.charge !== undefined && frontendExpense.charge !== null) {
-		backendExpense.fuelAmount = frontendExpense.charge;
+	// Map volume or charge to fuelAmount based on fuelType
+	if (isElectricFuelType(frontendExpense.fuelType)) {
+		if (frontendExpense.charge !== undefined && frontendExpense.charge !== null) {
+			backendExpense.fuelAmount = frontendExpense.charge;
+		}
+	} else {
+		if (frontendExpense.volume !== undefined && frontendExpense.volume !== null) {
+			backendExpense.fuelAmount = frontendExpense.volume;
+		}
 	}
 
 	// Optional fields
@@ -95,15 +100,11 @@ export function toBackendExpense(
 
 /**
  * Transform backend expense response to frontend format
- * Maps: expenseAmount → amount, fuelAmount → volume or charge (based on vehicle type)
+ * Maps: expenseAmount → amount, fuelAmount → volume or charge (based on fuelType)
  *
- * Note: For proper charge vs volume mapping, vehicle type should be provided.
- * If not provided, defaults to mapping fuelAmount → volume.
+ * Uses isElectricFuelType(fuelType) as the sole discriminator — no vehicleType needed.
  */
-export function fromBackendExpense(
-	backendExpense: BackendExpenseResponse,
-	vehicleType?: 'gas' | 'electric' | 'hybrid'
-): Expense {
+export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expense {
 	const frontendExpense: Expense = {
 		id: backendExpense.id,
 		vehicleId: backendExpense.vehicleId,
@@ -117,12 +118,11 @@ export function fromBackendExpense(
 		updatedAt: backendExpense.updatedAt
 	};
 
-	// Map fuelAmount to volume or charge based on vehicle type
+	// Map fuelAmount to volume or charge based on fuelType
 	if (backendExpense.fuelAmount !== undefined && backendExpense.fuelAmount !== null) {
-		if (vehicleType === 'electric') {
+		if (isElectricFuelType(backendExpense.fuelType)) {
 			frontendExpense.charge = backendExpense.fuelAmount;
 		} else {
-			// Default to volume for gas/hybrid or unknown vehicle types
 			frontendExpense.volume = backendExpense.fuelAmount;
 		}
 	}
@@ -147,14 +147,8 @@ export function fromBackendExpense(
 /**
  * Transform array of backend expenses to frontend format
  */
-export function fromBackendExpenses(
-	backendExpenses: BackendExpenseResponse[],
-	vehicleTypeMap?: Map<string, 'gas' | 'electric' | 'hybrid'>
-): Expense[] {
-	return backendExpenses.map(expense => {
-		const vehicleType = vehicleTypeMap?.get(expense.vehicleId);
-		return fromBackendExpense(expense, vehicleType);
-	});
+export function fromBackendExpenses(backendExpenses: BackendExpenseResponse[]): Expense[] {
+	return backendExpenses.map(expense => fromBackendExpense(expense));
 }
 
 /**

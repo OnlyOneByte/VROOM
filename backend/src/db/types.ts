@@ -18,7 +18,7 @@ export const EXPENSE_CATEGORIES = [
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
 export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
-  fuel: 'Fuel',
+  fuel: 'Fuel & Charging',
   maintenance: 'Maintenance',
   financial: 'Financial',
   regulatory: 'Regulatory',
@@ -27,7 +27,7 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 };
 
 export const EXPENSE_CATEGORY_DESCRIPTIONS: Record<ExpenseCategory, string> = {
-  fuel: 'Fuel and gas costs',
+  fuel: 'Fuel, gas, and electric charging costs',
   maintenance: 'Keeping the car running (oil, repairs, tires)',
   financial: 'Loans, insurance',
   regulatory: 'Government-required (registration, inspection, tickets)',
@@ -61,3 +61,18 @@ export const isValidPaymentFrequency = createEnumGuard([
 export const isValidSharePermission = createEnumGuard(['view', 'edit'] as const);
 
 export const isValidShareStatus = createEnumGuard(['pending', 'accepted', 'declined'] as const);
+
+// Electric fuel types — single source of truth for determining charging vs fuel expenses
+export const ELECTRIC_FUEL_TYPES = [
+  'Electric',
+  'Level 1 (Home)',
+  'Level 2 (AC)',
+  'DC Fast Charging',
+] as const;
+
+export function isElectricFuelType(fuelType: string | null): boolean {
+  return (
+    fuelType !== null &&
+    ELECTRIC_FUEL_TYPES.includes(fuelType as (typeof ELECTRIC_FUEL_TYPES)[number])
+  );
+}

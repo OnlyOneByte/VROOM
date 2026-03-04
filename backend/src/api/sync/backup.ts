@@ -58,15 +58,16 @@ export function coerceRow(
     const val = coerced[columnName];
 
     if (val === undefined || val === null) {
-      // Boolean NOT NULL columns default to false instead of being skipped
+      // Missing column (undefined) on NOT NULL boolean: use schema default (e.g., trackFuel defaults to true)
+      // Explicit null: also use schema default for NOT NULL booleans
       if (col.columnType === 'SQLiteBoolean') {
-        coerced[columnName] = false;
+        coerced[columnName] = val === undefined ? (col.default ?? false) : false;
       }
       continue;
     }
     const strVal = String(val);
     if (strVal === '' || strVal === 'null' || strVal === 'NULL' || strVal === 'undefined') {
-      // Boolean NOT NULL columns default to false instead of null
+      // Empty/null-like string values: boolean defaults to false (value was present but empty)
       coerced[columnName] = col.columnType === 'SQLiteBoolean' ? false : null;
       continue;
     }

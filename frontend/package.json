@@ -45,6 +45,7 @@
 		"@vitest/coverage-v8": "^3.2.4",
 		"@vitest/ui": "^3.2.4",
 		"autoprefixer": "^10.4.21",
+		"bits-ui": "^2.16.2",
 		"clsx": "^2.1.1",
 		"embla-carousel-svelte": "^8.6.0",
 		"eslint": "^9.18.0",
@@ -73,7 +74,6 @@
 	"dependencies": {
 		"@tailwindcss/forms": "^0.5.10",
 		"@tailwindcss/postcss": "^4.1.14",
-		"bits-ui": "^2.11.7",
 		"d3": "^7.9.0",
 		"lucide-svelte": "^0.545.0",
 		"recharts": "^3.3.0",

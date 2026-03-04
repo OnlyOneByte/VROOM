@@ -22,9 +22,9 @@ export function handleRouteProtection(
 ) {
 	if (isLoading) return;
 
-	// Handle root path
-	if (pathname === '/') {
-		goto(isAuthenticated ? '/dashboard' : '/auth');
+	// Handle root path — only redirect authenticated users to dashboard
+	if (pathname === '/' && isAuthenticated) {
+		goto('/dashboard');
 		return;
 	}
 

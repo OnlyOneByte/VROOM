@@ -28,6 +28,8 @@ export const vehicles = sqliteTable('vehicles', {
   model: text('model').notNull(),
   year: integer('year').notNull(),
   vehicleType: text('vehicle_type').notNull().default('gas'), // 'gas' | 'electric' | 'hybrid'
+  trackFuel: integer('track_fuel', { mode: 'boolean' }).notNull().default(true),
+  trackCharging: integer('track_charging', { mode: 'boolean' }).notNull().default(false),
   licensePlate: text('license_plate'),
   nickname: text('nickname'),
   vin: text('vin'),

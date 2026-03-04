@@ -9,6 +9,7 @@
 import { describe, expect, test } from 'bun:test';
 import { getTableColumns } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
+import fc from 'fast-check';
 import { TABLE_SCHEMA_MAP } from '../../../config';
 import {
   expenses,
@@ -453,5 +454,105 @@ describe('TABLE_SCHEMA_MAP coverage', () => {
     for (const key of expected) {
       expect(TABLE_SCHEMA_MAP[key]).toBeDefined();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Property 9: Backup round-trip for tracking flags
+// **Validates: Requirements 6.1, 6.2**
+// ---------------------------------------------------------------------------
+
+describe('Property 9: Backup round-trip for tracking flags', () => {
+  /** Map boolean to CSV string representations that a backup might produce. */
+  const boolStringArb = fc.constantFrom('true', 'false', '1', '0', 'TRUE', 'FALSE');
+
+  test('coerceRow preserves arbitrary trackFuel/trackCharging boolean values from CSV strings', () => {
+    fc.assert(
+      fc.property(boolStringArb, boolStringArb, (trackFuelStr, trackChargingStr) => {
+        const expectedTrackFuel =
+          trackFuelStr === 'true' || trackFuelStr === '1' || trackFuelStr === 'TRUE';
+        const expectedTrackCharging =
+          trackChargingStr === 'true' || trackChargingStr === '1' || trackChargingStr === 'TRUE';
+
+        const row = buildMinimalStringRow(vehicles, {
+          trackFuel: trackFuelStr,
+          trackCharging: trackChargingStr,
+        });
+        const coerced = coerceRow(row, vehicles);
+
+        expect(coerced.trackFuel).toBe(expectedTrackFuel);
+        expect(coerced.trackCharging).toBe(expectedTrackCharging);
+      }),
+      { numRuns: 200 }
+    );
+  });
+
+  test('coerced vehicle with tracking flags passes Zod insert schema validation', () => {
+    fc.assert(
+      fc.property(boolStringArb, boolStringArb, (trackFuelStr, trackChargingStr) => {
+        const row = buildMinimalStringRow(vehicles, {
+          trackFuel: trackFuelStr,
+          trackCharging: trackChargingStr,
+        });
+        const coerced = coerceRow(row, vehicles);
+        const schema = createInsertSchema(vehicles);
+        const result = schema.safeParse(coerced);
+
+        if (!result.success) {
+          const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`);
+          throw new Error(`Vehicle validation failed:\n${issues.join('\n')}`);
+        }
+        expect(result.success).toBe(true);
+      }),
+      { numRuns: 200 }
+    );
+  });
+
+  test('coerced vehicle with tracking flags passes validateBackupData', () => {
+    fc.assert(
+      fc.property(boolStringArb, boolStringArb, (trackFuelStr, trackChargingStr) => {
+        const vehicle = coerceRow(
+          buildMinimalStringRow(vehicles, {
+            userId: 'u1',
+            trackFuel: trackFuelStr,
+            trackCharging: trackChargingStr,
+          }),
+          vehicles
+        );
+        const backup: ParsedBackupData = {
+          metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+          vehicles: [vehicle],
+          expenses: [],
+          financing: [],
+          insurance: [],
+          insurancePolicyVehicles: [],
+          expenseGroups: [],
+          photos: [],
+        };
+
+        const result = backupService.validateBackupData(backup);
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
+      }),
+      { numRuns: 200 }
+    );
+  });
+
+  test('older backups missing trackFuel/trackCharging get correct defaults', () => {
+    // Simulate an older backup row that lacks the tracking flag columns entirely
+    const row = buildMinimalStringRow(vehicles, { userId: 'u1' });
+    delete (row as Record<string, unknown>).trackFuel;
+    delete (row as Record<string, unknown>).trackCharging;
+
+    const coerced = coerceRow(row, vehicles);
+
+    // Schema defaults: trackFuel=true, trackCharging=false
+    expect(coerced.trackFuel).toBe(true);
+    expect(coerced.trackCharging).toBe(false);
+
+    // Must still pass validation
+    const schema = createInsertSchema(vehicles);
+    const result = schema.safeParse(coerced);
+    expect(result.success).toBe(true);
   });
 });

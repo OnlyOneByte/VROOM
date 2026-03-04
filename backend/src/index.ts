@@ -69,6 +69,7 @@ app.use(
     xContentTypeOptions: 'nosniff',
     referrerPolicy: 'strict-origin-when-cross-origin',
     strictTransportSecurity: 'max-age=31536000; includeSubDomains',
+    crossOriginResourcePolicy: 'cross-origin',
   })
 );
 

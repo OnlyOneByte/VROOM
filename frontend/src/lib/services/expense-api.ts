@@ -13,31 +13,23 @@ import { apiClient, getApiBaseUrl } from './api-client';
  * (backend `expenseAmount`/`fuelAmount` ↔ frontend `amount`/`volume`/`charge`)
  */
 export const expenseApi = {
-	async getExpense(
-		expenseId: string,
-		vehicleType?: 'gas' | 'electric' | 'hybrid'
-	): Promise<Expense> {
+	async getExpense(expenseId: string): Promise<Expense> {
 		const data = await apiClient.get<BackendExpenseResponse>(`/api/v1/expenses/${expenseId}`);
-		return fromBackendExpense(data, vehicleType);
+		return fromBackendExpense(data);
 	},
 
-	async getExpensesByVehicle(
-		vehicleId: string,
-		vehicleType?: 'gas' | 'electric' | 'hybrid'
-	): Promise<Expense[]> {
+	async getExpensesByVehicle(vehicleId: string): Promise<Expense[]> {
 		const data = await apiClient.get<BackendExpenseResponse[]>(
 			`/api/v1/expenses?vehicleId=${vehicleId}`
 		);
 		if (!Array.isArray(data)) return [];
-		return data.map(expense => fromBackendExpense(expense, vehicleType));
+		return data.map(expense => fromBackendExpense(expense));
 	},
 
-	async getAllExpenses(
-		vehicleTypeMap?: Map<string, 'gas' | 'electric' | 'hybrid'>
-	): Promise<Expense[]> {
+	async getAllExpenses(): Promise<Expense[]> {
 		const data = await apiClient.get<BackendExpenseResponse[]>('/api/v1/expenses');
 		if (!Array.isArray(data)) return [];
-		return fromBackendExpenses(data, vehicleTypeMap);
+		return fromBackendExpenses(data);
 	},
 
 	async createExpense(

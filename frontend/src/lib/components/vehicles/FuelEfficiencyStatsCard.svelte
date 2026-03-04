@@ -31,7 +31,10 @@
 	let { vehicleId, vehicleStatsData, isLoadingStats, selectedStatsPeriod }: Props = $props();
 
 	// Derived state
-	let hasFuelData = $derived(vehicleStatsData && vehicleStatsData.fuelExpenseCount > 0);
+	let hasFuelData = $derived(
+		vehicleStatsData &&
+			(vehicleStatsData.fuelExpenseCount > 0 || vehicleStatsData.chargeExpenseCount > 0)
+	);
 	let settings = $derived($settingsStore.settings);
 	let distanceUnit = $derived(settings?.distanceUnit || 'miles');
 	let volumeUnit = $derived(settings?.volumeUnit || 'gallons_us');
@@ -49,7 +52,7 @@
 		</CardHeader>
 		<CardContent>
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-				{#each Array(3) as _}
+				{#each Array(3) as _, i (i)}
 					<div class="flex flex-col p-4 rounded-lg border bg-card">
 						<div class="flex items-start justify-between gap-4">
 							<div class="flex-1 space-y-1">
@@ -105,8 +108,8 @@
 						value={vehicleStatsData.totalChargeConsumed.toFixed(1)}
 						unit={getChargeUnitLabel(chargeUnit, true)}
 						secondaryLabel="Total Charge Cost"
-						secondaryValue={formatCurrency(vehicleStatsData.totalFuelCost)}
-						secondaryUnit="{vehicleStatsData.fuelExpenseCount} charges"
+						secondaryValue={formatCurrency(vehicleStatsData.totalChargeCost)}
+						secondaryUnit="{vehicleStatsData.chargeExpenseCount} charges"
 					/>
 				{/if}
 

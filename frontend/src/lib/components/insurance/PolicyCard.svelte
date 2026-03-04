@@ -105,7 +105,7 @@
 				{#if !policy.isActive}
 					<Badge variant="secondary">Inactive</Badge>
 				{/if}
-				{#if policy.isActive && policy.currentTermEnd}
+				{#if policy.currentTermEnd}
 					<ExpirationAlert currentTermEnd={policy.currentTermEnd} />
 				{/if}
 				<Button

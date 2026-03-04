@@ -13,14 +13,14 @@
 	let isUrgent = $derived(daysRemaining <= 7);
 </script>
 
-{#if expiring}
+{#if daysRemaining <= 0}
+	<Badge variant="outline" class="text-destructive border-destructive">Expired</Badge>
+{:else if expiring}
 	<Badge
 		variant="outline"
 		class={isUrgent ? 'text-destructive border-destructive' : 'text-chart-5 border-chart-5'}
 	>
-		{#if daysRemaining <= 0}
-			Expired
-		{:else if daysRemaining === 1}
+		{#if daysRemaining === 1}
 			Expires tomorrow
 		{:else}
 			{daysRemaining} days left

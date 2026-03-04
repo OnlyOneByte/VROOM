@@ -1,9 +1,4 @@
-import {
-	getVolumeUnitLabel,
-	getChargeUnitLabel,
-	usesLiquidFuel,
-	usesElectricCharge
-} from '$lib/utils/units';
+import { getVolumeUnitLabel, getChargeUnitLabel, isElectricFuelType } from '$lib/utils/units';
 import type { Vehicle, VolumeUnit, ChargeUnit } from '$lib/types';
 
 interface ValidationContext {
@@ -44,7 +39,10 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 			break;
 		}
 		case 'volume': {
-			if (ctx.category === 'fuel' && ctx.vehicle && usesLiquidFuel(ctx.vehicle.vehicleType)) {
+			if (
+				ctx.category === 'fuel' &&
+				!isElectricFuelType((ctx.formData['fuelType'] as string) || null)
+			) {
 				const volume = parseFloat(value as string);
 				const unitLabel = getVolumeUnitLabel(ctx.volumeUnit);
 				if (!value || volume <= 0) return `${unitLabel} required for fuel expenses`;
@@ -53,7 +51,10 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 			break;
 		}
 		case 'charge': {
-			if (ctx.category === 'fuel' && ctx.vehicle && usesElectricCharge(ctx.vehicle.vehicleType)) {
+			if (
+				ctx.category === 'fuel' &&
+				isElectricFuelType((ctx.formData['fuelType'] as string) || null)
+			) {
 				const charge = parseFloat(value as string);
 				const unitLabel = getChargeUnitLabel(ctx.chargeUnit);
 				if (!value || charge <= 0) return `${unitLabel} required for charging expenses`;
