@@ -1,24 +1,34 @@
-import { writable, get } from 'svelte/store';
-import { isOnline, syncStatus, offlineExpenses } from '$lib/stores/offline';
+import { onlineStatus, syncState, offlineExpenseQueue } from '$lib/stores/offline.svelte';
+import {
+	syncConfig,
+	syncConflicts,
+	lastSyncTime,
+	lastBackupTime,
+	lastSheetsSync,
+	lastDataChangeTime,
+	googleDriveBackupEnabled,
+	googleSheetsSyncEnabled,
+	syncQueue,
+	type SyncConflict,
+	type SyncConfig
+} from './sync-state.svelte';
 import { loadOfflineExpenses, saveOfflineExpenses, type OfflineExpense } from './offline-storage';
 import { toBackendExpense } from '$lib/services/api-transformer';
 import { apiClient } from '$lib/services/api-client';
 
-export interface SyncConflict {
-	id: string;
-	localExpense: OfflineExpense;
-	serverExpense?: {
-		date: string;
-		amount: number;
-		tags: string[];
-		category?: string;
-		description?: string;
-		volume?: number;
-		charge?: number;
-	};
-	conflictType: 'duplicate' | 'modified' | 'deleted';
-	resolution?: 'keep_local' | 'keep_server' | 'merge';
-}
+// Re-export types and state for consumers
+export type { SyncConflict, SyncConfig };
+export {
+	syncConfig,
+	syncConflicts,
+	syncQueue,
+	lastSyncTime,
+	lastBackupTime,
+	lastSheetsSync,
+	lastDataChangeTime,
+	googleDriveBackupEnabled,
+	googleSheetsSyncEnabled
+};
 
 export interface SyncResult {
 	success: boolean;
@@ -27,24 +37,6 @@ export interface SyncResult {
 	conflicts: SyncConflict[];
 	errors: string[];
 }
-
-// Sync configuration
-export const syncConfig = writable({
-	maxRetries: 3,
-	retryDelay: 1000, // ms
-	batchSize: 10,
-	conflictResolution: 'ask_user' as 'ask_user' | 'keep_local' | 'keep_server'
-});
-
-// Sync queue and status
-export const syncQueue = writable<OfflineExpense[]>([]);
-export const syncConflicts = writable<SyncConflict[]>([]);
-export const lastSyncTime = writable<Date | null>(null);
-export const lastBackupTime = writable<Date | null>(null);
-export const lastSheetsSync = writable<Date | null>(null);
-export const lastDataChangeTime = writable<Date | null>(null);
-export const googleDriveBackupEnabled = writable<boolean>(false);
-export const googleSheetsSyncEnabled = writable<boolean>(false);
 
 // Fetch last sync time from server
 export async function fetchLastSyncTime(): Promise<void> {
@@ -62,12 +54,11 @@ export async function fetchLastSyncTime(): Promise<void> {
 			const backupDate = result.lastBackupDate ? new Date(result.lastBackupDate) : null;
 			const changeDate = result.lastDataChangeDate ? new Date(result.lastDataChangeDate) : null;
 
-			lastSheetsSync.set(syncDate);
-			lastBackupTime.set(backupDate);
-			lastDataChangeTime.set(changeDate);
-
-			googleSheetsSyncEnabled.set(result.googleSheetsSyncEnabled || false);
-			googleDriveBackupEnabled.set(result.googleDriveBackupEnabled || false);
+			lastSheetsSync.current = syncDate;
+			lastBackupTime.current = backupDate;
+			lastDataChangeTime.current = changeDate;
+			googleSheetsSyncEnabled.current = result.googleSheetsSyncEnabled || false;
+			googleDriveBackupEnabled.current = result.googleDriveBackupEnabled || false;
 
 			let mostRecentSync: Date | null = null;
 			if (syncDate && backupDate) {
@@ -79,7 +70,7 @@ export async function fetchLastSyncTime(): Promise<void> {
 			}
 
 			if (mostRecentSync) {
-				lastSyncTime.set(mostRecentSync);
+				lastSyncTime.current = mostRecentSync;
 			}
 		}
 	} catch (error) {
@@ -97,31 +88,30 @@ class SyncManager {
 			throw new Error('Sync already in progress');
 		}
 
-		if (!get(isOnline)) {
+		if (!onlineStatus.current) {
 			throw new Error('Cannot sync while offline');
 		}
 
 		this.syncInProgress = true;
-		syncStatus.set('syncing');
+		syncState.current = 'syncing';
 
 		try {
 			const pendingExpenses = this.getPendingExpenses();
 			const result = await this.syncExpenses(pendingExpenses);
 
 			if (result.success && result.conflicts.length === 0) {
-				lastSyncTime.set(new Date());
-				syncStatus.set('success');
+				lastSyncTime.current = new Date();
+				syncState.current = 'success';
 			} else if (result.conflicts.length > 0) {
-				syncConflicts.set(result.conflicts);
-				syncStatus.set('error');
+				syncConflicts.current = result.conflicts;
+				syncState.current = 'error';
 			} else {
-				syncStatus.set('error');
+				syncState.current = 'error';
 			}
 
-			// Reset status after delay
 			setTimeout(() => {
-				if (get(syncStatus) !== 'syncing') {
-					syncStatus.set('idle');
+				if (syncState.current !== 'syncing') {
+					syncState.current = 'idle';
 				}
 			}, 3000);
 
@@ -144,9 +134,8 @@ class SyncManager {
 			errors: []
 		};
 
-		const config = get(syncConfig);
+		const config = syncConfig.current;
 
-		// Process in batches
 		for (let i = 0; i < expenses.length; i += config.batchSize) {
 			const batch = expenses.slice(i, i + config.batchSize);
 
@@ -164,17 +153,15 @@ class SyncManager {
 						result.failed++;
 						result.errors.push(syncResult.error || 'Unknown error');
 
-						// Handle retry logic
 						const retries = this.retryCount.get(expense.id) || 0;
 						if (retries < config.maxRetries) {
 							this.retryCount.set(expense.id, retries + 1);
-							// Schedule retry
 							setTimeout(
 								() => {
 									this.retrySingleExpense(expense);
 								},
 								config.retryDelay * Math.pow(2, retries)
-							); // Exponential backoff
+							);
 						}
 					}
 				} catch (error) {
@@ -194,22 +181,18 @@ class SyncManager {
 		error?: string;
 	}> {
 		try {
-			// Check for existing expense (conflict detection)
 			const existingExpense = await this.checkForExistingExpense(expense);
 
 			if (existingExpense) {
-				// Conflict detected
 				const conflict: SyncConflict = {
 					id: expense.id,
 					localExpense: expense,
 					serverExpense: existingExpense,
 					conflictType: this.determineConflictType(expense, existingExpense)
 				};
-
 				return { success: false, conflict };
 			}
 
-			// Validate fuel expense requirements
 			if (
 				expense.category === 'fuel' &&
 				((!expense.volume && !expense.charge) || !expense.mileage)
@@ -221,8 +204,6 @@ class SyncManager {
 				};
 			}
 
-			// No conflict, proceed with sync
-			// Transform to backend format using API transformer
 			const backendExpense = toBackendExpense({
 				vehicleId: expense.vehicleId,
 				tags: expense.tags,
@@ -236,7 +217,6 @@ class SyncManager {
 			});
 
 			await apiClient.post('/api/v1/expenses', backendExpense);
-
 			return { success: true };
 		} catch (error) {
 			return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -250,10 +230,7 @@ class SyncManager {
 			const expenses = await apiClient.get<Array<{ date: string; amount: number; tags: string[] }>>(
 				`/api/v1/expenses?vehicleId=${expense.vehicleId}&date=${expense.date}&amount=${expense.amount}`
 			);
-
 			const expenseList = Array.isArray(expenses) ? expenses : [];
-
-			// Look for potential duplicates with overlapping tags
 			return (
 				expenseList.find(existing => expense.tags.some(tag => existing.tags?.includes(tag))) || null
 			);
@@ -270,7 +247,6 @@ class SyncManager {
 		const tagsMatch = local.tags.some(tag => server.tags?.includes(tag));
 		const amountMatch = Math.abs(local.amount - server.amount) < 0.01;
 		const dateMatch = local.date === server.date;
-
 		return amountMatch && tagsMatch && dateMatch ? 'duplicate' : 'modified';
 	}
 
@@ -283,23 +259,17 @@ class SyncManager {
 	}
 
 	private async retrySingleExpense(expense: OfflineExpense): Promise<void> {
-		if (!get(isOnline)) {
-			return;
-		}
+		if (!onlineStatus.current) return;
 
 		try {
 			const result = await this.syncSingleExpense(expense);
-
 			if (result.success) {
 				this.markExpenseAsSynced(expense.id);
 				this.retryCount.delete(expense.id);
-
-				// Update UI
-				const currentExpenses = get(offlineExpenses);
-				const updatedExpenses = currentExpenses.map(e =>
+				const currentExpenses = offlineExpenseQueue.current;
+				offlineExpenseQueue.current = currentExpenses.map(e =>
 					e.id === expense.id ? { ...e, synced: true } : e
 				);
-				offlineExpenses.set(updatedExpenses);
 			}
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Retry failed for expense:', expense.id, error);
@@ -313,7 +283,6 @@ class SyncManager {
 		try {
 			switch (resolution) {
 				case 'keep_local': {
-					// Force sync the local version
 					const backendExpense = toBackendExpense({
 						vehicleId: conflict.localExpense.vehicleId,
 						tags: conflict.localExpense.tags,
@@ -325,7 +294,6 @@ class SyncManager {
 						charge: conflict.localExpense.charge,
 						description: conflict.localExpense.description
 					});
-
 					try {
 						await apiClient.post('/api/v1/expenses', {
 							...backendExpense,
@@ -337,21 +305,15 @@ class SyncManager {
 						break;
 					}
 				}
-
 				case 'keep_server':
-					// Mark local as synced without uploading
 					this.markExpenseAsSynced(conflict.localExpense.id);
 					return true;
-
 				case 'merge':
-					// For now, merge means keep local with server's ID
-					// In a real implementation, this would be more sophisticated
 					return await this.resolveConflict(conflict, 'keep_local');
 			}
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to resolve conflict:', error);
 		}
-
 		return false;
 	}
 
@@ -365,31 +327,27 @@ class SyncManager {
 		return this.retryCount.get(expenseId) || 0;
 	}
 
-	// Auto-sync when coming online
 	setupAutoSync(): void {
-		if (this.autoSyncSetup) {
-			return;
-		}
-
+		if (this.autoSyncSetup) return;
 		this.autoSyncSetup = true;
 
-		// Fetch initial last sync time
 		fetchLastSyncTime();
 
-		isOnline.subscribe(async online => {
-			if (online && !this.syncInProgress) {
-				// Refresh last sync time when coming online
-				fetchLastSyncTime();
-
-				const pendingExpenses = this.getPendingExpenses();
-				if (pendingExpenses.length > 0) {
-					// Wait a bit for network to stabilize
-					setTimeout(() => {
-						this.syncAll().catch(console.error);
-					}, 2000);
+		if (typeof window !== 'undefined') {
+			window.addEventListener('online', () => {
+				if (!this.syncInProgress) {
+					fetchLastSyncTime();
+					const pendingExpenses = this.getPendingExpenses();
+					if (pendingExpenses.length > 0) {
+						setTimeout(() => {
+							this.syncAll().catch(error => {
+								if (import.meta.env.DEV) console.error('Auto-sync failed:', error);
+							});
+						}, 2000);
+					}
 				}
-			}
-		});
+			});
+		}
 	}
 }
 

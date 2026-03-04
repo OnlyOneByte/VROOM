@@ -1,6 +1,7 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import type {
   Expense,
@@ -23,20 +24,69 @@ export interface ExpenseFilters {
   endDate?: Date;
 }
 
+export interface PaginatedExpenseFilters extends ExpenseFilters {
+  limit?: number;
+  offset?: number;
+  tags?: string[];
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  totalCount: number;
+}
+
+export interface ExpenseSummaryFilters {
+  userId: string;
+  vehicleId?: string;
+  period?: '7d' | '30d' | '90d' | '1y' | 'all';
+}
+
+export interface ExpenseSummary {
+  totalAmount: number;
+  expenseCount: number;
+  monthlyAverage: number;
+  recentAmount: number;
+  categoryBreakdown: Array<{ category: string; amount: number; count: number }>;
+  monthlyTrend: Array<{ period: string; amount: number; count: number }>;
+}
+
+/**
+ * Compute monthly average using the calendar span between the first and last
+ * months in the trend, so months with zero expenses still count.
+ */
+function computeMonthlyAverage(
+  totalAmount: number,
+  monthlyTrend: Array<{ period: string }>
+): number {
+  if (monthlyTrend.length === 0) return 0;
+  const firstMonth = monthlyTrend[0]?.period;
+  const lastMonth = monthlyTrend[monthlyTrend.length - 1]?.period;
+  if (!firstMonth || !lastMonth) return 0;
+  const [firstYear, firstMon] = firstMonth.split('-').map(Number) as [number, number];
+  const [lastYear, lastMon] = lastMonth.split('-').map(Number) as [number, number];
+  const calendarMonths = (lastYear - firstYear) * 12 + (lastMon - firstMon) + 1;
+  return totalAmount / Math.max(calendarMonths, 1);
+}
+
 export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
     super(db, expenses);
   }
 
   /**
-   * Unified find method with optional filters
-   * Replaces: findByVehicleId, findByUserId, findByCategory, findByVehicleIdAndDateRange, etc.
+   * Paginated find with SQL-level filtering, LIMIT/OFFSET, and totalCount.
+   * Always joins with vehicles for userId ownership.
    */
-  async find(filters: ExpenseFilters = {}): Promise<Expense[]> {
+  async findPaginated(filters: PaginatedExpenseFilters): Promise<PaginatedResult<Expense>> {
     try {
+      const limit = Math.min(
+        filters.limit ?? CONFIG.pagination.defaultPageSize,
+        CONFIG.pagination.maxPageSize
+      );
+      const offset = filters.offset ?? 0;
+
       const conditions: SQL[] = [];
 
-      // Build WHERE conditions based on provided filters
       if (filters.vehicleId) {
         conditions.push(eq(expenses.vehicleId, filters.vehicleId));
       }
@@ -53,21 +103,80 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         conditions.push(lte(expenses.date, filters.endDate));
       }
 
-      // If userId is provided, we need to join with vehicles table
-      if (filters.userId) {
-        const result = await this.db
-          .select()
-          .from(expenses)
-          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-          .where(and(eq(vehicles.userId, filters.userId), ...conditions))
-          .orderBy(desc(expenses.date));
-
-        return result.map((row) => row.expenses);
+      // SQL-level tag filtering using json_each
+      if (filters.tags?.length) {
+        for (const tag of filters.tags) {
+          conditions.push(
+            sql`EXISTS (SELECT 1 FROM json_each(${expenses.tags}) WHERE json_each.value = ${tag})`
+          );
+        }
       }
 
-      // Simple query without join
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-      return await this.db.select().from(expenses).where(whereClause).orderBy(desc(expenses.date));
+      // Always join with vehicles for userId ownership
+      const baseWhere = and(eq(vehicles.userId, filters.userId ?? ''), ...conditions);
+
+      const [countResult] = await this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(expenses)
+        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+        .where(baseWhere);
+
+      const totalCount = countResult?.count ?? 0;
+
+      const data = await this.db
+        .select({ expenses })
+        .from(expenses)
+        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+        .where(baseWhere)
+        .orderBy(desc(expenses.date))
+        .limit(limit)
+        .offset(offset);
+
+      return {
+        data: data.map((r) => r.expenses),
+        totalCount,
+      };
+    } catch (error) {
+      logger.error('Failed to find paginated expenses', {
+        filters,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to find paginated expenses', error);
+    }
+  }
+
+  /**
+   * Unpaginated find for internal callers that need all matching expenses.
+   * Always joins with vehicles for userId ownership.
+   */
+  async findAll(filters: ExpenseFilters): Promise<Expense[]> {
+    try {
+      const conditions: SQL[] = [];
+
+      if (filters.vehicleId) {
+        conditions.push(eq(expenses.vehicleId, filters.vehicleId));
+      }
+
+      if (filters.category) {
+        conditions.push(eq(expenses.category, filters.category));
+      }
+
+      if (filters.startDate) {
+        conditions.push(gte(expenses.date, filters.startDate));
+      }
+
+      if (filters.endDate) {
+        conditions.push(lte(expenses.date, filters.endDate));
+      }
+
+      const result = await this.db
+        .select({ expenses })
+        .from(expenses)
+        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+        .where(and(eq(vehicles.userId, filters.userId ?? ''), ...conditions))
+        .orderBy(desc(expenses.date));
+
+      return result.map((row) => row.expenses);
     } catch (error) {
       logger.error('Failed to find expenses', {
         filters,
@@ -181,6 +290,177 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       throw new DatabaseError('Failed to find financing expenses', error);
     }
   }
+
+  /**
+   * Returns per-vehicle expense stats (total, recent amount, last expense date)
+   * in a single query. Used by the dashboard to avoid N+1 API calls.
+   */
+  async getPerVehicleStats(
+    userId: string,
+    recentDays = 30
+  ): Promise<
+    Array<{
+      vehicleId: string;
+      totalAmount: number;
+      recentAmount: number;
+      lastExpenseDate: string | null;
+    }>
+  > {
+    try {
+      const recentCutoffSec = Math.floor((Date.now() - recentDays * 24 * 60 * 60 * 1000) / 1000);
+      const rows = await this.db
+        .select({
+          vehicleId: expenses.vehicleId,
+          totalAmount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
+          recentAmount: sql<number>`COALESCE(SUM(CASE WHEN ${expenses.date} >= ${recentCutoffSec} THEN ${expenses.expenseAmount} ELSE 0 END), 0)`,
+          lastExpenseDate: sql<string>`MAX(datetime(${expenses.date}, 'unixepoch'))`,
+        })
+        .from(expenses)
+        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+        .where(eq(vehicles.userId, userId))
+        .groupBy(expenses.vehicleId);
+
+      return rows.map((r) => ({
+        vehicleId: r.vehicleId,
+        totalAmount: Number(r.totalAmount) || 0,
+        recentAmount: Number(r.recentAmount) || 0,
+        lastExpenseDate: r.lastExpenseDate ?? null,
+      }));
+    } catch (error) {
+      logger.error('Failed to get per-vehicle stats', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to get per-vehicle stats', error);
+    }
+  }
+
+  /**
+   * Returns aggregated expense summary: totals, category breakdown, monthly trend, and recent spend.
+   * All queries join with vehicles for userId ownership.
+   */
+  async getSummary(filters: ExpenseSummaryFilters): Promise<ExpenseSummary> {
+    try {
+      const periodConditions: SQL[] = [eq(vehicles.userId, filters.userId)];
+
+      if (filters.vehicleId) {
+        periodConditions.push(eq(expenses.vehicleId, filters.vehicleId));
+      }
+
+      // Build date filter based on period
+      const period = filters.period ?? 'all';
+      if (period !== 'all') {
+        const now = new Date();
+        let startDate: Date;
+        switch (period) {
+          case '7d':
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case '30d':
+            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            break;
+          case '90d':
+            startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+            break;
+          case '1y':
+            startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+            break;
+          default:
+            startDate = new Date(0);
+        }
+        periodConditions.push(gte(expenses.date, startDate));
+      }
+
+      const periodWhere = and(...periodConditions);
+
+      // Recent amount conditions: always last 30 days, ignoring period filter
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const recentConditions: SQL[] = [
+        eq(vehicles.userId, filters.userId),
+        gte(expenses.date, thirtyDaysAgo),
+      ];
+      if (filters.vehicleId) {
+        recentConditions.push(eq(expenses.vehicleId, filters.vehicleId));
+      }
+      const recentWhere = and(...recentConditions);
+
+      const [totals, categoryBreakdown, monthlyTrend, recentTotals] = await Promise.all([
+        // Total amount and count
+        this.db
+          .select({
+            totalAmount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
+            expenseCount: sql<number>`count(*)`,
+          })
+          .from(expenses)
+          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+          .where(periodWhere),
+
+        // Category breakdown
+        this.db
+          .select({
+            category: expenses.category,
+            amount: sql<number>`SUM(${expenses.expenseAmount})`,
+            count: sql<number>`count(*)`,
+          })
+          .from(expenses)
+          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+          .where(periodWhere)
+          .groupBy(expenses.category),
+
+        // Monthly trend
+        this.db
+          .select({
+            period: sql<string>`strftime('%Y-%m', datetime(${expenses.date}, 'unixepoch'))`.as(
+              'period'
+            ),
+            amount: sql<number>`SUM(${expenses.expenseAmount})`,
+            count: sql<number>`count(*)`,
+          })
+          .from(expenses)
+          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+          .where(periodWhere)
+          .groupBy(sql`strftime('%Y-%m', datetime(${expenses.date}, 'unixepoch'))`)
+          .orderBy(sql`strftime('%Y-%m', datetime(${expenses.date}, 'unixepoch'))`),
+
+        // Recent amount (last 30 days, always computed regardless of period)
+        this.db
+          .select({
+            amount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
+          })
+          .from(expenses)
+          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+          .where(recentWhere),
+      ]);
+
+      const totalAmount = Number(totals[0]?.totalAmount) || 0;
+      const expenseCount = Number(totals[0]?.expenseCount) || 0;
+      const monthlyAverage = computeMonthlyAverage(totalAmount, monthlyTrend);
+
+      return {
+        totalAmount,
+        expenseCount,
+        monthlyAverage,
+        recentAmount: Number(recentTotals[0]?.amount) || 0,
+        categoryBreakdown: categoryBreakdown.map((row) => ({
+          category: row.category,
+          amount: Number(row.amount) || 0,
+          count: Number(row.count) || 0,
+        })),
+        monthlyTrend: monthlyTrend.map((row) => ({
+          period: row.period,
+          amount: Number(row.amount) || 0,
+          count: Number(row.count) || 0,
+        })),
+      };
+    } catch (error) {
+      logger.error('Failed to get expense summary', {
+        filters,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to get expense summary', error);
+    }
+  }
+
   // ===========================================================================
   // Expense Group Methods
   // ===========================================================================

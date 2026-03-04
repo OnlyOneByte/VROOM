@@ -3,7 +3,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import StatCard from '$lib/components/common/stat-card.svelte';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { settingsStore } from '$lib/stores/settings';
+	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import type { Vehicle } from '$lib/types';
@@ -77,21 +77,21 @@
 
 					{#if vehicle.financing.mileageLimit}
 						<StatCard
-							label="Annual {$settingsStore.settings?.distanceUnit === 'kilometers'
+							label="Annual {settingsStore.settings?.distanceUnit === 'kilometers'
 								? 'Distance'
 								: 'Mileage'} Limit"
 							value={vehicle.financing.mileageLimit.toLocaleString()}
-							unit={getDistanceUnitLabel($settingsStore.settings?.distanceUnit || 'miles', false)}
+							unit={getDistanceUnitLabel(settingsStore.settings?.distanceUnit || 'miles', false)}
 						/>
 					{/if}
 
 					{#if vehicle.financing.excessMileageFee}
 						<StatCard
-							label="Excess {$settingsStore.settings?.distanceUnit === 'kilometers'
+							label="Excess {settingsStore.settings?.distanceUnit === 'kilometers'
 								? 'Distance'
 								: 'Mileage'} Fee"
 							value={formatCurrency(vehicle.financing.excessMileageFee)}
-							unit="/{getDistanceUnitLabel($settingsStore.settings?.distanceUnit || 'miles', true)}"
+							unit="/{getDistanceUnitLabel(settingsStore.settings?.distanceUnit || 'miles', true)}"
 						/>
 					{/if}
 				{/if}

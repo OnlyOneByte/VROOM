@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { authStore } from '$lib/stores/auth.js';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import {
 		House,
 		Receipt,
@@ -14,9 +14,9 @@
 		Sun,
 		Moon
 	} from 'lucide-svelte';
-	import { themeStore } from '$lib/stores/theme';
+	import { themeStore } from '$lib/stores/theme.svelte';
 	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
-	import { syncStatus, isOnline, offlineExpenses } from '$lib/stores/offline';
+	import { syncState, onlineStatus, offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { syncConflicts } from '$lib/utils/sync-manager';
 	import { getSyncStatusInfo } from '$lib/utils/sync-status';
 	import { Badge } from '$lib/components/ui/badge';
@@ -69,20 +69,22 @@
 	let isDesktopSidebarExpanded = $state(false);
 
 	// Mobile sync status helpers
-	let pendingCount = $derived($offlineExpenses.filter(expense => !expense.synced).length);
+	let pendingCount = $derived(
+		offlineExpenseQueue.current.filter(expense => !expense.synced).length
+	);
 
 	let syncStatusInfo = $derived(
 		getSyncStatusInfo({
-			isOnline: $isOnline,
-			syncStatus: $syncStatus,
+			isOnline: onlineStatus.current,
+			syncStatus: syncState.current,
 			pendingCount,
-			conflictsCount: $syncConflicts.length
+			conflictsCount: syncConflicts.current.length
 		})
 	);
 
 	let isDark = $derived(
-		$themeStore === 'dark' ||
-			($themeStore === 'system' &&
+		themeStore.current === 'dark' ||
+			(themeStore.current === 'system' &&
 				browser &&
 				window.matchMedia('(prefers-color-scheme: dark)').matches)
 	);
@@ -107,7 +109,7 @@
 			{#snippet mobileStatusIcon()}
 				{@const StatusIcon = syncStatusInfo.icon}
 				<div class="{syncStatusInfo.color} relative" role="status" aria-label="Sync status">
-					<StatusIcon class="h-5 w-5 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
+					<StatusIcon class="h-5 w-5 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
 					{#if pendingCount > 0}
 						<Badge
 							variant="secondary"

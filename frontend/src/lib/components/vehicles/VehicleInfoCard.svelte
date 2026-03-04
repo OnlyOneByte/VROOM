@@ -2,7 +2,7 @@
 	import { Car, Settings } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { settingsStore } from '$lib/stores/settings';
+	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import type { Vehicle } from '$lib/types';
@@ -62,7 +62,7 @@
 					<p class="text-sm font-medium text-muted-foreground">Initial Mileage</p>
 					<p class="text-base font-semibold">
 						{vehicle.initialMileage.toLocaleString()}
-						{getDistanceUnitLabel($settingsStore.settings?.distanceUnit || 'miles', true)}
+						{getDistanceUnitLabel(settingsStore.settings?.distanceUnit || 'miles', true)}
 					</p>
 				</div>
 			{/if}

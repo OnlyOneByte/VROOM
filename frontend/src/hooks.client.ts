@@ -12,8 +12,8 @@ export const handleFetch: HandleFetch = async ({ request, fetch }) => {
 		isRedirecting = true;
 
 		// Import stores dynamically to avoid circular dependencies
-		const { authStore } = await import('$lib/stores/auth');
-		const { appStore } = await import('$lib/stores/app');
+		const { authStore } = await import('$lib/stores/auth.svelte');
+		const { appStore } = await import('$lib/stores/app.svelte');
 
 		// Clear auth state
 		authStore.clearUser();

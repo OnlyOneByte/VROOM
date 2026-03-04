@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { syncStatus, isOnline, offlineExpenses } from '$lib/stores/offline';
+	import { syncState, onlineStatus, offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import {
 		syncManager,
 		lastBackupTime,
@@ -19,14 +19,16 @@
 
 	let { isExpanded = true } = $props();
 
-	let pendingCount = $derived($offlineExpenses.filter(expense => !expense.synced).length);
+	let pendingCount = $derived(
+		offlineExpenseQueue.current.filter(expense => !expense.synced).length
+	);
 
 	let statusInfo = $derived(
 		getSyncStatusInfo({
-			isOnline: $isOnline,
-			syncStatus: $syncStatus,
+			isOnline: onlineStatus.current,
+			syncStatus: syncState.current,
 			pendingCount,
-			conflictsCount: $syncConflicts.length
+			conflictsCount: syncConflicts.current.length
 		})
 	);
 
@@ -34,7 +36,7 @@
 		syncManager.setupAutoSync();
 
 		const interval = setInterval(() => {
-			if ($isOnline) {
+			if (onlineStatus.current) {
 				fetchLastSyncTime();
 			}
 		}, 30000);
@@ -43,7 +45,7 @@
 	});
 
 	async function handleManualSync() {
-		if ($isOnline && pendingCount > 0) {
+		if (onlineStatus.current && pendingCount > 0) {
 			try {
 				await syncManager.syncAll();
 			} catch (error) {
@@ -61,7 +63,7 @@
 				{#snippet statusHeader()}
 					{@const StatusIcon = statusInfo.icon}
 					<div class="flex items-center gap-2 {statusInfo.color}">
-						<StatusIcon class="h-4 w-4 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
+						<StatusIcon class="h-4 w-4 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
 						<span class="text-xs font-medium">{statusInfo.text}</span>
 					</div>
 				{/snippet}
@@ -71,14 +73,17 @@
 			<!-- Connection status -->
 			<div class="flex items-center justify-between text-xs">
 				<span class="text-muted-foreground">Connection</span>
-				{#snippet connectionStatus()}
-					{@const ConnectionIcon = $isOnline ? Wifi : WifiOff}
-					<Badge variant={$isOnline ? 'default' : 'destructive'} class="text-xs px-2 py-0.5 gap-1">
+				{#snippet connectionStatusSnippet()}
+					{@const ConnectionIcon = onlineStatus.current ? Wifi : WifiOff}
+					<Badge
+						variant={onlineStatus.current ? 'default' : 'destructive'}
+						class="text-xs px-2 py-0.5 gap-1"
+					>
 						<ConnectionIcon class="h-3 w-3" />
-						<span>{$isOnline ? 'Online' : 'Offline'}</span>
+						<span>{onlineStatus.current ? 'Online' : 'Offline'}</span>
 					</Badge>
 				{/snippet}
-				{@render connectionStatus()}
+				{@render connectionStatusSnippet()}
 			</div>
 
 			<!-- Pending expenses -->
@@ -93,44 +98,48 @@
 			{/if}
 
 			<!-- Conflicts -->
-			{#if $syncConflicts.length > 0}
+			{#if syncConflicts.current.length > 0}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-muted-foreground">Conflicts</span>
 					<Badge variant="destructive" class="text-xs px-2 py-0.5 gap-1">
 						<CircleAlert class="h-3 w-3" />
-						<span>{$syncConflicts.length}</span>
+						<span>{syncConflicts.current.length}</span>
 					</Badge>
 				</div>
 			{/if}
 
 			<!-- Last backup -->
-			{#if $googleDriveBackupEnabled || $googleSheetsSyncEnabled}
+			{#if googleDriveBackupEnabled.current || googleSheetsSyncEnabled.current}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-muted-foreground">Last backup</span>
 					<span class="text-foreground"
-						>{formatCompactRelativeTime($lastBackupTime ?? $lastSheetsSync)}</span
+						>{formatCompactRelativeTime(lastBackupTime.current ?? lastSheetsSync.current)}</span
 					>
 				</div>
 			{/if}
 
 			<!-- Last change -->
-			{#if $lastDataChangeTime}
+			{#if lastDataChangeTime.current}
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-muted-foreground">Last change</span>
-					<span class="text-foreground">{formatCompactRelativeTime($lastDataChangeTime)}</span>
+					<span class="text-foreground"
+						>{formatCompactRelativeTime(lastDataChangeTime.current)}</span
+					>
 				</div>
 			{/if}
 
 			<!-- Sync button -->
-			{#if $isOnline && pendingCount > 0}
+			{#if onlineStatus.current && pendingCount > 0}
 				<Button
 					size="sm"
 					onclick={handleManualSync}
-					disabled={$syncStatus === 'syncing'}
+					disabled={syncState.current === 'syncing'}
 					class="w-full h-7 text-xs"
 				>
-					<RefreshCw class="h-3 w-3 mr-1.5 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
-					{$syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now'}
+					<RefreshCw
+						class="h-3 w-3 mr-1.5 {syncState.current === 'syncing' ? 'animate-spin' : ''}"
+					/>
+					{syncState.current === 'syncing' ? 'Syncing...' : 'Sync Now'}
 				</Button>
 			{/if}
 		</div>
@@ -140,7 +149,7 @@
 			{@const StatusIcon = statusInfo.icon}
 			<div class="flex justify-center px-3">
 				<div class="{statusInfo.color} relative" title={statusInfo.text}>
-					<StatusIcon class="h-5 w-5 {$syncStatus === 'syncing' ? 'animate-spin' : ''}" />
+					<StatusIcon class="h-5 w-5 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
 					{#if pendingCount > 0}
 						<Badge
 							variant="secondary"

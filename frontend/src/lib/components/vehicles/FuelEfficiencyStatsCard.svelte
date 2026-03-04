@@ -5,7 +5,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import StatCardDual from '$lib/components/common/stat-card-dual.svelte';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { settingsStore } from '$lib/stores/settings';
+	import { settingsStore } from '$lib/stores/settings.svelte';
 	import {
 		getVolumeUnitLabel,
 		getChargeUnitLabel,
@@ -35,7 +35,7 @@
 		vehicleStatsData &&
 			(vehicleStatsData.fuelExpenseCount > 0 || vehicleStatsData.chargeExpenseCount > 0)
 	);
-	let settings = $derived($settingsStore.settings);
+	let settings = $derived(settingsStore.settings);
 	let distanceUnit = $derived(settings?.distanceUnit || 'miles');
 	let volumeUnit = $derived(settings?.volumeUnit || 'gallons_us');
 	let chargeUnit = $derived(settings?.chargeUnit || 'kwh');
