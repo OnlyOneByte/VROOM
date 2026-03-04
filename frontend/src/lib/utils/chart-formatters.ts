@@ -15,6 +15,11 @@ export function formatMonthYear(date: Date): string {
 	return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
+/** Format a date as 3-letter month abbreviation (e.g. "Jan", "Feb", "Mar") */
+export function formatMonthShort(date: Date): string {
+	return date.toLocaleDateString('en-US', { month: 'short' });
+}
+
 /** Format a date as "Jan 15" */
 export function formatMonthDay(date: Date): string {
 	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
