@@ -28,16 +28,15 @@
 
 	let xTickCount = $derived(getXTickCount(data.length));
 
-	// Description based on fuel type
-	let description = $derived(
-		fuelType === 'electric' ? 'Electric efficiency over time' : 'Fuel efficiency over time'
-	);
+	// Title and unit label based on fuel type
+	let title = $derived(fuelType === 'electric' ? 'Electric Efficiency' : 'Fuel Efficiency');
+	let unitLabel = $derived(fuelType === 'electric' ? 'mi/kWh' : 'MPG');
 
 	// Chart configuration for shadcn styling
 	const chartConfig: Chart.ChartConfig = {
 		efficiency: {
 			label: 'Efficiency',
-			color: 'hsl(var(--chart-2))'
+			color: 'var(--chart-2)'
 		}
 	};
 
@@ -46,15 +45,15 @@
 		{
 			key: 'efficiency',
 			label: chartConfig['efficiency']?.label || 'Efficiency',
-			color: chartConfig['efficiency']?.color || 'hsl(var(--chart-2))'
+			color: chartConfig['efficiency']?.color || 'var(--chart-2)'
 		}
 	]);
 </script>
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title>Fuel Efficiency Trends</Card.Title>
-		<Card.Description>{description}</Card.Description>
+		<Card.Title>{title}</Card.Title>
+		<Card.Description>Measured in {unitLabel}</Card.Description>
 	</Card.Header>
 	<Card.Content>
 		{#if isLoading}
@@ -80,7 +79,7 @@
 					{series}
 					padding={{ top: 4, left: 48, bottom: 20, right: 4 }}
 					props={{
-						spline: { strokeWidth: 2 },
+						spline: { class: 'stroke-chart-2 stroke-2' },
 						xAxis: {
 							ticks: xTickCount,
 							format: formatMonthDay

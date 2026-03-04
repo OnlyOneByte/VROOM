@@ -6,6 +6,8 @@ import { userSettings } from '../../db/schema';
 import { AppError } from '../../errors';
 import { requireAuth } from '../../middleware';
 import { logger } from '../../utils/logger';
+import { resolveVroomFolderName } from '../sync/folder-name';
+import { getDriveServiceForUser } from '../sync/google-drive';
 import { settingsRepository } from './repository';
 
 const routes = new Hono();
@@ -24,6 +26,18 @@ const baseSettingsSchema = createInsertSchema(userSettings, {
     .number()
     .min(1)
     .max(CONFIG.validation.settings.maxSyncInactivityMinutes)
+    .optional(),
+  googleDriveCustomFolderName: z
+    .string()
+    .max(255, 'Folder name must be 255 characters or fewer')
+    .refine((s) => !s.includes('/') && !s.includes('\\'), {
+      message: 'Folder name must not contain / or \\',
+    })
+    .transform((s) => {
+      const trimmed = s.trim();
+      return trimmed.length === 0 ? null : trimmed;
+    })
+    .nullable()
     .optional(),
 });
 
@@ -74,6 +88,29 @@ routes.put('/', async (c) => {
 
     // Update settings
     const updatedSettings = await settingsRepository.update(user.id, updates);
+
+    // Best-effort rename of existing Drive folder when custom name changes
+    if ('googleDriveCustomFolderName' in updates && updatedSettings.googleDriveBackupFolderId) {
+      try {
+        const newFolderName = resolveVroomFolderName(
+          updatedSettings.googleDriveCustomFolderName,
+          user.displayName
+        );
+        const driveService = await getDriveServiceForUser(user.id);
+        const backupMeta = await driveService.getFileMetadata(
+          updatedSettings.googleDriveBackupFolderId
+        );
+        const parentId = backupMeta.parents?.[0];
+        if (parentId) {
+          await driveService.renameFolder(parentId, newFolderName);
+        }
+      } catch (renameError) {
+        logger.warn('Best-effort Drive folder rename failed', {
+          userId: user.id,
+          error: renameError instanceof Error ? renameError.message : String(renameError),
+        });
+      }
+    }
 
     return c.json({
       success: true,

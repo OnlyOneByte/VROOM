@@ -45,18 +45,21 @@ export class GoogleSheetsService {
     this.driveService = new GoogleDriveService(refreshToken);
   }
 
-  async createOrUpdateVroomSpreadsheet(userId: string, userName: string): Promise<SpreadsheetInfo> {
-    const folderStructure = await this.driveService.createVroomFolderStructure(userName);
+  async createOrUpdateVroomSpreadsheet(
+    userId: string,
+    folderName: string
+  ): Promise<SpreadsheetInfo> {
+    const folderStructure = await this.driveService.createVroomFolderStructure(folderName);
     const existingSpreadsheet = await this.findVroomSpreadsheet(
       folderStructure.mainFolder.id,
-      userName
+      folderName
     );
 
     let spreadsheetId: string;
     if (existingSpreadsheet) {
       spreadsheetId = existingSpreadsheet.id;
     } else {
-      const spreadsheet = await this.createSpreadsheet(`VROOM Data - ${userName}`);
+      const spreadsheet = await this.createSpreadsheet(`VROOM Data - ${folderName}`);
       if (!spreadsheet.spreadsheetId) {
         throw new Error('Failed to create spreadsheet');
       }

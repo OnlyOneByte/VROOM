@@ -312,14 +312,14 @@ export interface CategoryChartData {
  */
 function getCategoryColorHex(category: ExpenseCategory): string {
 	const colors: Record<ExpenseCategory, string> = {
-		fuel: 'hsl(var(--chart-1))',
-		maintenance: 'hsl(var(--chart-5))',
-		financial: 'hsl(var(--chart-2))',
-		regulatory: 'hsl(var(--chart-4))',
-		enhancement: 'hsl(var(--chart-3))',
-		misc: 'hsl(var(--muted-foreground))'
+		fuel: 'var(--chart-1)',
+		maintenance: 'var(--chart-5)',
+		financial: 'var(--chart-2)',
+		regulatory: 'var(--chart-4)',
+		enhancement: 'var(--chart-3)',
+		misc: 'var(--muted-foreground)'
 	};
-	return colors[category] || 'hsl(var(--muted-foreground))';
+	return colors[category] || 'var(--muted-foreground)';
 }
 
 /**

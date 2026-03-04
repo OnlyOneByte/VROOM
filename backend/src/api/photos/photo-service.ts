@@ -20,7 +20,7 @@ export async function uploadPhotoForEntity(
   entityType: string,
   entityId: string,
   userId: string,
-  userName: string,
+  folderName: string,
   file: File
 ): Promise<Photo> {
   await validateEntityOwnership(entityType, entityId, userId);
@@ -33,7 +33,7 @@ export async function uploadPhotoForEntity(
   }
 
   const driveService = await getDriveServiceForUser(userId);
-  const folderId = await resolveEntityDriveFolder(driveService, entityType, entityId, userName);
+  const folderId = await resolveEntityDriveFolder(driveService, entityType, entityId, folderName);
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const driveFile = await driveService.uploadFile(file.name, buffer, file.type, folderId);

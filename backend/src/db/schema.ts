@@ -207,6 +207,7 @@ export const userSettings = sqliteTable('user_settings', {
   googleDriveBackupRetentionCount: integer('google_drive_backup_retention_count')
     .notNull()
     .default(10), // Number of backups to keep in Google Drive
+  googleDriveCustomFolderName: text('google_drive_custom_folder_name'),
   // Sync preferences (for Google Sheets mirroring)
   googleSheetsSyncEnabled: integer('google_sheets_sync_enabled', { mode: 'boolean' })
     .notNull()

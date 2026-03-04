@@ -46,6 +46,7 @@
 	let backupFrequency = $state<'daily' | 'weekly' | 'monthly'>('weekly');
 	let googleDriveBackupEnabled = $state(false);
 	let googleDriveBackupRetentionCount = $state(10);
+	let googleDriveCustomFolderName = $state('');
 	let googleSheetsSyncEnabled = $state(false);
 	let syncInactivityMinutes = $state(5);
 
@@ -97,6 +98,7 @@
 			backupFrequency = settings.backupFrequency;
 			googleDriveBackupEnabled = settings.googleDriveBackupEnabled;
 			googleDriveBackupRetentionCount = settings.googleDriveBackupRetentionCount || 10;
+			googleDriveCustomFolderName = settings.googleDriveCustomFolderName || '';
 			googleSheetsSyncEnabled = settings.googleSheetsSyncEnabled || false;
 			syncInactivityMinutes = settings.syncInactivityMinutes || 5;
 			isInitialized = true;
@@ -135,7 +137,8 @@
 				currencyUnit,
 				autoBackupEnabled,
 				backupFrequency,
-				googleDriveBackupRetentionCount
+				googleDriveBackupRetentionCount,
+				googleDriveCustomFolderName: googleDriveCustomFolderName || null
 			});
 
 			await fetchLastSyncTime();
@@ -427,6 +430,7 @@
 				{isBackingUp}
 				bind:googleDriveBackupEnabled
 				bind:googleDriveBackupRetentionCount
+				bind:googleDriveCustomFolderName
 				bind:googleSheetsSyncEnabled
 				bind:syncInactivityMinutes
 				onBackup={handleBackup}
