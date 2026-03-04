@@ -12,6 +12,7 @@ import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
 import { settingsRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
+import { resolveVroomFolderName } from './folder-name';
 import { createDriveServiceForUser, getDriveServiceForUser } from './google-drive';
 import { createSheetsServiceForUser } from './google-sheets';
 import { restoreService } from './restore';
@@ -58,7 +59,8 @@ async function ensureBackupFolder(
   }
 
   logger.warn('Backup folder missing or deleted, re-creating folder structure', { userId });
-  const folderStructure = await driveService.createVroomFolderStructure(displayName);
+  const folderName = resolveVroomFolderName(settings.googleDriveCustomFolderName, displayName);
+  const folderStructure = await driveService.createVroomFolderStructure(folderName);
   const newFolderId = folderStructure.subFolders.backups.id;
   await settingsRepository.updateBackupFolderId(userId, newFolderId);
 
@@ -132,11 +134,13 @@ async function enforceBackupRetention(
 
 async function performSheetsSync(
   userId: string,
-  displayName: string
+  displayName: string,
+  settings: UserSettings
 ): Promise<Record<string, unknown>> {
   const sheetsService = await createSheetsServiceForUser(userId);
+  const folderName = resolveVroomFolderName(settings.googleDriveCustomFolderName, displayName);
   const spreadsheetInfo = await withTimeout(
-    sheetsService.createOrUpdateVroomSpreadsheet(userId, displayName),
+    sheetsService.createOrUpdateVroomSpreadsheet(userId, folderName),
     OPERATION_TIMEOUTS.BACKUP,
     'Sheets sync'
   );
@@ -189,7 +193,7 @@ async function executeSyncType(
   if (!settings.googleSheetsSyncEnabled) {
     return { success: false, message: 'Google Sheets sync not enabled' };
   }
-  return hasChanges ? performSheetsSync(userId, displayName) : noChangeResult;
+  return hasChanges ? performSheetsSync(userId, displayName, settings) : noChangeResult;
 }
 
 routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) => {
@@ -393,8 +397,13 @@ routes.delete('/backups/:fileId', async (c) => {
 routes.post('/backups/initialize-drive', driveInitRateLimiter, async (c) => {
   const user = c.get('user');
   try {
+    const settings = await settingsRepository.getOrCreate(user.id);
+    const folderName = resolveVroomFolderName(
+      settings.googleDriveCustomFolderName,
+      user.displayName
+    );
     const driveService = await createDriveServiceForUser(user.id);
-    const folderStructure = await driveService.createVroomFolderStructure(user.displayName);
+    const folderStructure = await driveService.createVroomFolderStructure(folderName);
 
     await settingsRepository.updateBackupFolderId(user.id, folderStructure.subFolders.backups.id);
     await settingsRepository.updateSyncConfig(user.id, { googleDriveBackupEnabled: true });

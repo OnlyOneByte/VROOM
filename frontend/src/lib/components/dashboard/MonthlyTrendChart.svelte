@@ -13,7 +13,7 @@
 	const chartConfig: Chart.ChartConfig = {
 		amount: {
 			label: 'Amount',
-			color: 'hsl(var(--primary))'
+			color: 'var(--primary)'
 		}
 	};
 
@@ -36,7 +36,7 @@
 		{
 			key: 'amount',
 			label: chartConfig['amount']?.label || 'Amount',
-			color: chartConfig['amount']?.color || 'hsl(var(--primary))'
+			color: chartConfig['amount']?.color || 'var(--primary)'
 		}
 	]);
 </script>
