@@ -62,6 +62,7 @@
 - [x] Photos not showing in prod env (CORS?)
 - [ ] First opening/loading - car zooming past screen animation (idea)
 - [x] Expense API pagination (expense page slow with lots of expenses)
+- [ ] Generalize categories (?) user selectable?
 
 
 ## P1 — Should Have

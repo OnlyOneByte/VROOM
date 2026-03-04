@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { get } from 'svelte/store';
-import { authStore } from '../../stores/auth.js';
-import { appStore } from '../../stores/app.js';
+import { authStore } from '../../stores/auth.svelte';
+import { appStore } from '../../stores/app.svelte';
 import type { User } from '../../types/index.js';
 
 // Mock $app/stores
@@ -50,31 +49,28 @@ describe('Navigation Component Logic', () => {
 
 	it('manages authentication state correctly', () => {
 		// Initially not authenticated
-		let authState = get(authStore);
-		expect(authState.isAuthenticated).toBe(false);
+		// Direct property access
+		expect(authStore.isAuthenticated).toBe(false);
 
 		// Set user
 		authStore.setUser(mockUser);
-		authState = get(authStore);
-		expect(authState.isAuthenticated).toBe(true);
-		expect(authState.user?.displayName).toBe('Test User');
-		expect(authState.user?.email).toBe('test@example.com');
+		// Refresh reference
+		expect(authStore.isAuthenticated).toBe(true);
+		expect(authStore.user?.displayName).toBe('Test User');
+		expect(authStore.user?.email).toBe('test@example.com');
 	});
 
 	it('manages mobile menu state correctly', () => {
 		// Initially closed
-		let appState = get(appStore);
-		expect(appState.isMobileMenuOpen).toBe(false);
+		expect(appStore.isMobileMenuOpen).toBe(false);
 
 		// Toggle open
 		appStore.toggleMobileMenu();
-		appState = get(appStore);
-		expect(appState.isMobileMenuOpen).toBe(true);
+		expect(appStore.isMobileMenuOpen).toBe(true);
 
 		// Close
 		appStore.closeMobileMenu();
-		appState = get(appStore);
-		expect(appState.isMobileMenuOpen).toBe(false);
+		expect(appStore.isMobileMenuOpen).toBe(false);
 	});
 
 	it('determines active navigation correctly', () => {
@@ -103,8 +99,8 @@ describe('Navigation Component Logic', () => {
 	it('handles logout functionality', async () => {
 		// Set authenticated user
 		authStore.setUser(mockUser);
-		let authState = get(authStore);
-		expect(authState.isAuthenticated).toBe(true);
+		// Direct property access
+		expect(authStore.isAuthenticated).toBe(true);
 
 		// Mock successful logout (apiClient-compatible response)
 		global.fetch = vi.fn().mockResolvedValueOnce({
@@ -116,9 +112,9 @@ describe('Navigation Component Logic', () => {
 
 		// Logout
 		await authStore.logout();
-		authState = get(authStore);
-		expect(authState.isAuthenticated).toBe(false);
-		expect(authState.user).toBe(null);
+		// Refresh reference
+		expect(authStore.isAuthenticated).toBe(false);
+		expect(authStore.user).toBe(null);
 	});
 
 	it('provides correct navigation items', () => {
@@ -158,36 +154,25 @@ describe('Navigation Component Logic', () => {
 
 	it('manages user display information', () => {
 		authStore.setUser(mockUser);
-		const authState = get(authStore);
+		// Direct property access
 
-		const displayName = authState.user?.displayName || 'User';
-		const email = authState.user?.email || '';
+		const displayName = authStore.user?.displayName || 'User';
+		const email = authStore.user?.email || '';
 
 		expect(displayName).toBe('Test User');
 		expect(email).toBe('test@example.com');
 	});
 
 	it('handles navigation state changes', () => {
-		const states: any[] = [];
-
-		const unsubscribe = authStore.subscribe(state => {
-			states.push({ isAuthenticated: state.isAuthenticated });
-		});
-
 		// Initial state
-		expect(states).toHaveLength(1);
-		expect(states[0].isAuthenticated).toBe(false);
+		expect(authStore.isAuthenticated).toBe(false);
 
 		// Authenticate
 		authStore.setUser(mockUser);
-		expect(states).toHaveLength(2);
-		expect(states[1].isAuthenticated).toBe(true);
+		expect(authStore.isAuthenticated).toBe(true);
 
 		// Logout
 		authStore.clearUser();
-		expect(states).toHaveLength(3);
-		expect(states[2].isAuthenticated).toBe(false);
-
-		unsubscribe();
+		expect(authStore.isAuthenticated).toBe(false);
 	});
 });

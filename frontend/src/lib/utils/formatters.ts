@@ -1,11 +1,10 @@
 // Centralized formatting utilities
-import { get } from 'svelte/store';
-import { settingsStore } from '$lib/stores/settings';
+import { settingsStore } from '$lib/stores/settings.svelte';
 
 // Currency formatting - uses user's currency setting from store
 export function formatCurrency(amount: number, currency?: string): string {
 	// If currency not provided, get from settings store
-	const currencyToUse = currency || get(settingsStore).settings?.currencyUnit || 'USD';
+	const currencyToUse = currency || settingsStore.settings?.currencyUnit || 'USD';
 
 	return new Intl.NumberFormat('en-US', {
 		style: 'currency',

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { authStore } from '$lib/stores/auth.js';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import { LoaderCircle, Check, X } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 
@@ -10,7 +10,7 @@
 	let error = $state('');
 
 	// Use automatic store subscription
-	let authState = $derived($authStore);
+	const authState = authStore;
 
 	onMount(async () => {
 		try {

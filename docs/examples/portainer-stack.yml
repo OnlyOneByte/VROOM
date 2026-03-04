@@ -41,7 +41,6 @@ services:
       - vroom-network
     labels:
       io.portainer.accesscontrol.teams: vroom
-      com.centurylinklabs.watchtower.enable: "true"
 
   frontend:
     image: ghcr.io/onlyonebyte/vroom/frontend:latest
@@ -66,7 +65,6 @@ services:
       - vroom-network
     labels:
       io.portainer.accesscontrol.teams: vroom
-      com.centurylinklabs.watchtower.enable: "true"
 
 volumes:
   vroom-data:

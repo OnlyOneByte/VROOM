@@ -13,7 +13,7 @@ Complete guide for deploying and self-hosting VROOM.
 
 Example compose files and environment configuration are in [`docs/examples/`](examples/):
 
-- `docker-compose.yml` — production compose with healthchecks, Watchtower, Cloudflare Tunnel
+- `docker-compose.yml` — production compose with healthchecks, Cloudflare Tunnel
 - `portainer-stack.yml` — simplified stack for Portainer deployment
 - `.env.example` — environment variable template
 
@@ -209,13 +209,24 @@ The production compose file includes a `cloudflared` service. Set `CLOUDFLARE_TU
 
 ## Auto-Updates
 
-Enable Watchtower for automatic container updates:
+Set up a cron job to automatically check for new images and restart containers:
 
 ```bash
-docker-compose -f docker-compose.yml --profile auto-update up -d
+# Create the update script
+cat > /home/ubuntu/vroom-update.sh << 'EOF'
+#!/bin/bash
+cd /path/to/vroom
+docker compose -f docs/examples/docker-compose.yml pull --quiet
+docker compose -f docs/examples/docker-compose.yml up -d --remove-orphans
+docker image prune -af --filter "until=168h"
+EOF
+chmod +x /home/ubuntu/vroom-update.sh
+
+# Run hourly via cron
+(crontab -l 2>/dev/null; echo "0 * * * * /home/ubuntu/vroom-update.sh >> /var/log/vroom-update.log 2>&1") | crontab -
 ```
 
-Watchtower checks for new images hourly and restarts containers automatically.
+The script pulls the latest images, restarts only containers with updated images, and cleans up old images older than 7 days.
 
 ## Database Management
 
@@ -255,7 +266,7 @@ docker-compose -f docker-compose.yml exec backend bun run db:push
 |---|---|---|
 | Home lab / Raspberry Pi 4 | Free | Full control, need to manage networking |
 | VPS (DigitalOcean, Linode, Vultr, Hetzner) | $5–10/mo | Reliable, easy remote access |
-| Oracle Cloud Free Tier | Free forever | 2 AMD VMs, 200GB storage |
+| [Oracle Cloud Free Tier](oci/README.md) | Free forever | ARM VM with 4 OCPUs + 24GB RAM, 200GB storage — [full guide](oci/README.md) |
 | Synology/QNAP NAS | Free (existing hardware) | Docker via Package Center |
 
 ## Maintenance

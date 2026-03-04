@@ -74,7 +74,9 @@
 	let folderNameError = $derived(
 		googleDriveCustomFolderName && /[/\\]/.test(googleDriveCustomFolderName)
 			? 'Folder name must not contain / or \\'
-			: null
+			: googleDriveCustomFolderName && googleDriveCustomFolderName.length > 255
+				? 'Folder name must be 255 characters or fewer'
+				: null
 	);
 
 	let anyCloudEnabled = $derived(googleDriveBackupEnabled || googleSheetsSyncEnabled);

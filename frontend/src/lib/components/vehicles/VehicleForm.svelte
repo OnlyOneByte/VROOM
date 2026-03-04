@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
-	import { appStore } from '$lib/stores/app.js';
+	import { appStore } from '$lib/stores/app.svelte';
 	import { ArrowLeft, Car, Trash2, X, Check, LoaderCircle, Fuel, Zap } from 'lucide-svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import DatePicker from '$lib/components/common/date-picker.svelte';
@@ -701,24 +701,16 @@
 					<div class="mt-6 space-y-2">
 						<Label class="text-sm font-medium text-foreground">Energy Tracking</Label>
 						<div class="flex items-center gap-4">
-							<button
-								type="button"
-								class="flex items-center gap-1.5 cursor-pointer"
-								onclick={() => (trackFuel = !trackFuel)}
-							>
-								<Switch id="trackFuel" checked={trackFuel} />
+							<label for="trackFuel" class="flex items-center gap-1.5 cursor-pointer">
+								<Switch id="trackFuel" bind:checked={trackFuel} />
 								<Fuel class="h-3.5 w-3.5 text-muted-foreground" />
 								<span class="text-sm">Fuel</span>
-							</button>
-							<button
-								type="button"
-								class="flex items-center gap-1.5 cursor-pointer"
-								onclick={() => (trackCharging = !trackCharging)}
-							>
-								<Switch id="trackCharging" checked={trackCharging} />
+							</label>
+							<label for="trackCharging" class="flex items-center gap-1.5 cursor-pointer">
+								<Switch id="trackCharging" bind:checked={trackCharging} />
 								<Zap class="h-3.5 w-3.5 text-muted-foreground" />
 								<span class="text-sm">Charging</span>
-							</button>
+							</label>
 						</div>
 					</div>
 				</CardContent>

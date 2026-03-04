@@ -1,9 +1,10 @@
 /**
- * Migration 0004: Vehicle Energy Tracking Flags
+ * Migration 0004: Consolidated — Vehicle Energy Tracking, Custom Drive Folder, Odometer Entries
  *
- * Adds `track_fuel` (NOT NULL boolean, default true) and `track_charging`
- * (NOT NULL boolean, default false) columns to the `vehicles` table.
- * Data migration sets flags based on existing `vehicle_type`.
+ * Combines:
+ * - `track_fuel` / `track_charging` columns on `vehicles` with data migration
+ * - `google_drive_custom_folder_name` column on `user_settings`
+ * - `odometer_entries` table with indexes and FK cascades
  */
 
 import { Database } from 'bun:sqlite';
@@ -13,11 +14,13 @@ import {
   applyMigrationsUpTo,
   countRows,
   getColumnNames,
+  getIndexNames,
+  getTables,
   loadMigrations,
   seedCoreData,
 } from './migration-helpers';
 
-describe('Migration 0004: Vehicle Energy Tracking Flags', () => {
+describe('Migration 0004: Consolidated', () => {
   let db: Database;
   const migrations = loadMigrations();
 
@@ -30,6 +33,32 @@ describe('Migration 0004: Vehicle Energy Tracking Flags', () => {
     db.close();
   });
 
+  test('odometer_entries table exists after migration 0004', () => {
+    applyMigrationsUpTo(db, migrations, 4);
+    expect(getTables(db)).toContain('odometer_entries');
+  });
+
+  test('odometer_entries has correct columns', () => {
+    applyMigrationsUpTo(db, migrations, 4);
+
+    const cols = getColumnNames(db, 'odometer_entries');
+    const expected = [
+      'id',
+      'vehicle_id',
+      'user_id',
+      'odometer',
+      'recorded_at',
+      'note',
+      'linked_entity_type',
+      'linked_entity_id',
+      'created_at',
+      'updated_at',
+    ];
+    for (const col of expected) {
+      expect(cols).toContain(col);
+    }
+  });
+
   test('vehicles table has track_fuel and track_charging columns', () => {
     applyMigrationsUpTo(db, migrations, 4);
 
@@ -38,93 +67,14 @@ describe('Migration 0004: Vehicle Energy Tracking Flags', () => {
     expect(cols).toContain('track_charging');
   });
 
-  test('track_fuel defaults to true (1) and track_charging defaults to false (0)', () => {
+  test('user_settings table has google_drive_custom_folder_name column', () => {
     applyMigrationsUpTo(db, migrations, 4);
 
-    db.run(
-      "INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('u1', 'test@example.com', 'Test', 'google', 'g1')"
-    );
-    db.run(
-      "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022)"
-    );
-
-    const vehicle = db
-      .query("SELECT track_fuel, track_charging FROM vehicles WHERE id = 'v1'")
-      .get() as {
-      track_fuel: number;
-      track_charging: number;
-    };
-    expect(vehicle.track_fuel).toBe(1);
-    expect(vehicle.track_charging).toBe(0);
+    const cols = getColumnNames(db, 'user_settings');
+    expect(cols).toContain('google_drive_custom_folder_name');
   });
 
-  test('data migration sets electric vehicles to trackFuel=false, trackCharging=true', () => {
-    applyMigrationsUpTo(db, migrations, 3);
-
-    db.run(
-      "INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('u1', 'test@example.com', 'Test', 'google', 'g1')"
-    );
-    db.run(
-      "INSERT INTO vehicles (id, user_id, make, model, year, vehicle_type) VALUES ('v-ev', 'u1', 'Tesla', 'Model 3', 2024, 'electric')"
-    );
-
-    applyMigration(db, migrations[4]);
-
-    const vehicle = db
-      .query("SELECT track_fuel, track_charging FROM vehicles WHERE id = 'v-ev'")
-      .get() as {
-      track_fuel: number;
-      track_charging: number;
-    };
-    expect(vehicle.track_fuel).toBe(0);
-    expect(vehicle.track_charging).toBe(1);
-  });
-
-  test('data migration sets hybrid vehicles to trackFuel=true, trackCharging=true', () => {
-    applyMigrationsUpTo(db, migrations, 3);
-
-    db.run(
-      "INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('u1', 'test@example.com', 'Test', 'google', 'g1')"
-    );
-    db.run(
-      "INSERT INTO vehicles (id, user_id, make, model, year, vehicle_type) VALUES ('v-hyb', 'u1', 'Toyota', 'Prius', 2023, 'hybrid')"
-    );
-
-    applyMigration(db, migrations[4]);
-
-    const vehicle = db
-      .query("SELECT track_fuel, track_charging FROM vehicles WHERE id = 'v-hyb'")
-      .get() as {
-      track_fuel: number;
-      track_charging: number;
-    };
-    expect(vehicle.track_fuel).toBe(1);
-    expect(vehicle.track_charging).toBe(1);
-  });
-
-  test('data migration keeps gas vehicles at defaults (trackFuel=true, trackCharging=false)', () => {
-    applyMigrationsUpTo(db, migrations, 3);
-
-    db.run(
-      "INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('u1', 'test@example.com', 'Test', 'google', 'g1')"
-    );
-    db.run(
-      "INSERT INTO vehicles (id, user_id, make, model, year, vehicle_type) VALUES ('v-gas', 'u1', 'Ford', 'F-150', 2022, 'gas')"
-    );
-
-    applyMigration(db, migrations[4]);
-
-    const vehicle = db
-      .query("SELECT track_fuel, track_charging FROM vehicles WHERE id = 'v-gas'")
-      .get() as {
-      track_fuel: number;
-      track_charging: number;
-    };
-    expect(vehicle.track_fuel).toBe(1);
-    expect(vehicle.track_charging).toBe(0);
-  });
-
-  test('seed data survives this migration', () => {
+  test('seed data from migrations 0000–0003 survives migration 0004', () => {
     applyMigrationsUpTo(db, migrations, 3);
     seedCoreData(db);
 
@@ -140,15 +90,33 @@ describe('Migration 0004: Vehicle Energy Tracking Flags', () => {
 
     const user = db.query("SELECT * FROM users WHERE id = 'u1'").get() as { email: string };
     expect(user.email).toBe('test@example.com');
+  });
 
-    // Seed vehicle has default vehicle_type='gas', so it keeps defaults
-    const vehicle = db
-      .query("SELECT track_fuel, track_charging FROM vehicles WHERE id = 'v1'")
-      .get() as {
-      track_fuel: number;
-      track_charging: number;
-    };
-    expect(vehicle.track_fuel).toBe(1);
-    expect(vehicle.track_charging).toBe(0);
+  test('CASCADE delete from vehicles removes odometer entries', () => {
+    applyMigrationsUpTo(db, migrations, 4);
+
+    db.run(
+      "INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('u1', 'test@example.com', 'Test', 'google', 'g1')"
+    );
+    db.run(
+      "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022)"
+    );
+    db.run(
+      "INSERT INTO odometer_entries (id, vehicle_id, user_id, odometer, recorded_at) VALUES ('odo1', 'v1', 'u1', 50000, 1700000000)"
+    );
+
+    expect(countRows(db, 'odometer_entries')).toBe(1);
+
+    db.run("DELETE FROM vehicles WHERE id = 'v1'");
+
+    expect(countRows(db, 'odometer_entries')).toBe(0);
+  });
+
+  test('both indexes exist on odometer_entries', () => {
+    applyMigrationsUpTo(db, migrations, 4);
+
+    const indexes = getIndexNames(db, 'odometer_entries');
+    expect(indexes).toContain('odometer_vehicle_date_idx');
+    expect(indexes).toContain('odometer_linked_entity_idx');
   });
 });

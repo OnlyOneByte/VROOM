@@ -1,5 +1,5 @@
 import { goto } from '$app/navigation';
-import { authStore } from '$lib/stores/auth.js';
+import { authStore } from '$lib/stores/auth.svelte';
 
 // Protected routes that require authentication
 export const protectedRoutes = ['/dashboard', '/vehicles', '/expenses', '/analytics', '/settings'];
@@ -41,17 +41,29 @@ export function handleRouteProtection(
 }
 
 export function requireAuth(): Promise<boolean> {
+	// With runes store, check state directly
+	if (!authStore.isLoading) {
+		if (!authStore.isAuthenticated) {
+			goto('/auth');
+			return Promise.resolve(false);
+		}
+		return Promise.resolve(true);
+	}
+
+	// If still loading, poll until resolved
 	return new Promise(resolve => {
-		const unsubscribe = authStore.subscribe(({ isAuthenticated, isLoading }) => {
-			if (!isLoading) {
-				unsubscribe();
-				if (!isAuthenticated) {
+		const check = () => {
+			if (!authStore.isLoading) {
+				if (!authStore.isAuthenticated) {
 					goto('/auth');
 					resolve(false);
 				} else {
 					resolve(true);
 				}
+			} else {
+				setTimeout(check, 50);
 			}
-		});
+		};
+		check();
 	});
 }

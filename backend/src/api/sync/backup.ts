@@ -22,6 +22,7 @@ import {
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
+  odometerEntries,
   photos,
   vehicleFinancing,
   vehicles,
@@ -105,32 +106,44 @@ export class BackupService {
 
   async createBackup(userId: string): Promise<BackupData> {
     const db = getDb();
-    const [userVehicles, userExpenses, userFinancing, userInsuranceJoined, userExpenseGroups] =
-      await Promise.all([
-        db.select().from(vehicles).where(eq(vehicles.userId, userId)),
-        db
-          .select()
-          .from(expenses)
-          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId))
-          .then((r) => r.map((x) => x.expenses)),
-        db
-          .select()
-          .from(vehicleFinancing)
-          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId))
-          .then((r) => r.map((x) => x.vehicle_financing)),
-        db
-          .select()
-          .from(insurancePolicies)
-          .innerJoin(
-            insurancePolicyVehicles,
-            eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
-          )
-          .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
-          .where(eq(vehicles.userId, userId)),
-        db.select().from(expenseGroups).where(eq(expenseGroups.userId, userId)),
-      ]);
+    const [
+      userVehicles,
+      userExpenses,
+      userFinancing,
+      userInsuranceJoined,
+      userExpenseGroups,
+      userOdometer,
+    ] = await Promise.all([
+      db.select().from(vehicles).where(eq(vehicles.userId, userId)),
+      db
+        .select()
+        .from(expenses)
+        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
+        .where(eq(vehicles.userId, userId))
+        .then((r) => r.map((x) => x.expenses)),
+      db
+        .select()
+        .from(vehicleFinancing)
+        .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+        .where(eq(vehicles.userId, userId))
+        .then((r) => r.map((x) => x.vehicle_financing)),
+      db
+        .select()
+        .from(insurancePolicies)
+        .innerJoin(
+          insurancePolicyVehicles,
+          eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
+        )
+        .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
+        .where(eq(vehicles.userId, userId)),
+      db.select().from(expenseGroups).where(eq(expenseGroups.userId, userId)),
+      db
+        .select()
+        .from(odometerEntries)
+        .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
+        .where(eq(vehicles.userId, userId))
+        .then((r) => r.map((x) => x.odometer_entries)),
+    ]);
 
     // Deduplicate insurance policies (join produces one row per vehicle)
     const seenPolicyIds = new Set<string>();
@@ -149,12 +162,14 @@ export class BackupService {
     const expenseIds = userExpenses.map((e) => e.id);
     const policyIds = [...seenPolicyIds];
     const expenseGroupIds = userExpenseGroups.map((g) => g.id);
+    const odometerEntryIds = userOdometer.map((o) => o.id);
 
     const userPhotos = await this.queryUserPhotos(db, {
       vehicleIds,
       expenseIds,
       policyIds,
       expenseGroupIds,
+      odometerEntryIds,
     });
 
     return {
@@ -165,6 +180,7 @@ export class BackupService {
       insurance: userInsurance,
       insurancePolicyVehicles: userInsurancePolicyVehicles,
       expenseGroups: userExpenseGroups,
+      odometer: userOdometer,
       photos: userPhotos,
     };
   }
@@ -181,6 +197,7 @@ export class BackupService {
       expenseIds: string[];
       policyIds: string[];
       expenseGroupIds: string[];
+      odometerEntryIds: string[];
     }
   ) {
     const allPhotos = [];
@@ -190,6 +207,7 @@ export class BackupService {
       { type: 'expense', ids: entityIds.expenseIds },
       { type: 'insurance_policy', ids: entityIds.policyIds },
       { type: 'expense_group', ids: entityIds.expenseGroupIds },
+      { type: 'odometer_entry', ids: entityIds.odometerEntryIds },
     ];
 
     for (const { type, ids } of entityQueries) {
@@ -345,17 +363,20 @@ export class BackupService {
     const policyIds = new Set(backup.insurance.map((i) => String(i.id)));
     const expenseGroupIds = new Set((backup.expenseGroups ?? []).map((g) => String(g.id)));
     const expenseIds = new Set(backup.expenses.map((e) => String(e.id)));
+    const odometerIds = new Set((backup.odometer ?? []).map((o) => String(o.id)));
 
     return [
       ...this.validateExpenseRefs(backup.expenses, vehicleIds, expenseGroupIds),
       ...this.validateFinancingRefs(backup.financing, vehicleIds),
       ...this.validateInsuranceRefs(backup.insurance),
       ...this.validateJunctionRefs(backup.insurancePolicyVehicles ?? [], policyIds, vehicleIds),
+      ...this.validateOdometerRefs(backup.odometer ?? [], vehicleIds),
       ...this.validatePhotoRefs(backup.photos ?? [], {
         vehicleIds,
         expenseIds,
         policyIds,
         expenseGroupIds,
+        odometerIds,
       }),
     ];
   }
@@ -417,6 +438,19 @@ export class BackupService {
     return errors;
   }
 
+  private validateOdometerRefs(
+    odometerList: Record<string, unknown>[],
+    vehicleIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const entry of odometerList) {
+      if (!vehicleIds.has(String(entry.vehicleId))) {
+        errors.push(`Odometer entry ${entry.id} references non-existent vehicle`);
+      }
+    }
+    return errors;
+  }
+
   private validatePhotoRefs(
     photoList: Record<string, unknown>[],
     entityIds: {
@@ -424,6 +458,7 @@ export class BackupService {
       expenseIds: Set<string>;
       policyIds: Set<string>;
       expenseGroupIds: Set<string>;
+      odometerIds: Set<string>;
     }
   ): string[] {
     const errors: string[] = [];
@@ -432,6 +467,7 @@ export class BackupService {
       expense: entityIds.expenseIds,
       insurance_policy: entityIds.policyIds,
       expense_group: entityIds.expenseGroupIds,
+      odometer_entry: entityIds.odometerIds,
     };
 
     for (const photo of photoList) {

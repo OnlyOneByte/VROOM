@@ -9,150 +9,91 @@
 	import VehicleCarousel from '$lib/components/dashboard/VehicleCarousel.svelte';
 	import PeriodSelector from '$lib/components/vehicles/PeriodSelector.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import { categoryLabels, getCategoryColorHex } from '$lib/utils/expense-helpers';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { expenseApi } from '$lib/services/expense-api';
-	import type { Vehicle, Expense, ExpenseCategory, Photo } from '$lib/types';
+	import type { Vehicle, Expense, ExpenseCategory, ExpenseSummary, Photo } from '$lib/types';
 	import type { TimePeriod } from '$lib/constants/time-periods';
 
 	let isLoading = $state(true);
 	let selectedPeriod = $state<TimePeriod>('all');
 
-	// Raw data — fetched once
+	// Raw data
 	let vehicles = $state<Vehicle[]>([]);
-	let allExpenses = $state<Expense[]>([]);
+	let allTimeSummary = $state<ExpenseSummary | null>(null);
+	let periodSummary = $state<ExpenseSummary | null>(null);
+	let recentExpensesList = $state<Expense[]>([]);
 	let vehiclePhotosMap = $state<Map<string, Photo[]>>(new Map());
+	let vehicleStatsMap = $state<
+		Map<string, { totalAmount: number; recentAmount: number; lastActivity: Date | null }>
+	>(new Map());
 
-	// Derived: vehicle overview cards
+	// Derived: vehicle overview cards with per-vehicle expense stats
 	let vehicleOverviews = $derived.by(() => {
-		const thirtyDaysAgo = new Date();
-		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
 		return vehicles.map(v => {
-			const vExpenses = allExpenses.filter(e => e.vehicleId === v.id);
-			const recentExpenses = vExpenses
-				.filter(e => new Date(e.date) > thirtyDaysAgo)
-				.reduce((sum, e) => sum + e.amount, 0);
-			const totalExpenses = vExpenses.reduce((sum, e) => sum + e.amount, 0);
-			const lastActivity =
-				vExpenses.length > 0
-					? new Date(Math.max(...vExpenses.map(e => new Date(e.date).getTime())))
-					: null;
-
 			const photos = vehiclePhotosMap.get(v.id) || [];
 			const coverPhoto = photos.find(p => p.isCover);
 			const coverPhotoUrl = coverPhoto
 				? vehicleApi.getPhotoThumbnailUrl(v.id, coverPhoto.id)
 				: null;
+			const vStats = vehicleStatsMap.get(v.id);
 
 			return {
 				id: v.id,
 				name: `${v.year} ${v.make} ${v.model}`,
 				nickname: v.nickname,
-				recentExpenses,
-				totalExpenses,
-				lastActivity,
+				recentExpenses: vStats?.recentAmount ?? 0,
+				totalExpenses: vStats?.totalAmount ?? 0,
+				lastActivity: vStats?.lastActivity ?? null,
 				hasActiveFinancing: v.financing?.isActive || false,
 				coverPhotoUrl
 			};
 		});
 	});
 
-	// Derived: filtered expenses based on selected period
-	let filteredExpenses = $derived.by(() => {
-		if (selectedPeriod === 'all') return allExpenses;
-		const startDate = new Date();
-		switch (selectedPeriod) {
-			case '7d':
-				startDate.setDate(startDate.getDate() - 7);
-				break;
-			case '30d':
-				startDate.setDate(startDate.getDate() - 30);
-				break;
-			case '90d':
-				startDate.setDate(startDate.getDate() - 90);
-				break;
-			case '1y':
-				startDate.setFullYear(startDate.getFullYear() - 1);
-				break;
-		}
-		return allExpenses.filter(e => new Date(e.date) >= startDate);
-	});
+	// Derived: stats for cards — always uses all-time data, unaffected by period selector
+	let stats = $derived.by(() => ({
+		totalVehicles: vehicles.length,
+		totalExpenses: allTimeSummary?.totalAmount ?? 0,
+		monthlyAverage: allTimeSummary?.monthlyAverage ?? 0,
+		activeFinancing: vehicles.filter(v => v.financing?.isActive).length
+	}));
 
-	// Derived: stats cards
-	let stats = $derived.by(() => {
-		const totalVehicles = vehicles.length;
-		const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-		const activeFinancing = vehicles.filter(v => v.financing?.isActive).length;
-
-		// Monthly average from unique months in filtered data
-		const months = new Set(
-			filteredExpenses.map(e => {
-				const d = new Date(e.date);
-				return `${d.getFullYear()}-${d.getMonth()}`;
-			})
-		);
-		const monthlyAverage = months.size > 0 ? totalExpenses / months.size : 0;
-
-		return { totalVehicles, totalExpenses, monthlyAverage, activeFinancing };
-	});
-
-	// Derived: monthly trend chart data
+	// Derived: monthly trend chart data from period-filtered summary
 	let trendChartData = $derived.by(() => {
-		const monthlyMap = new Map<string, number>();
-		for (const e of filteredExpenses) {
-			const d = new Date(e.date);
-			const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-			monthlyMap.set(key, (monthlyMap.get(key) || 0) + e.amount);
-		}
-		return Array.from(monthlyMap.entries())
-			.sort(([a], [b]) => a.localeCompare(b))
-			.map(([period, amount]) => ({ date: new Date(`${period}-01`), amount }));
-	});
-
-	// Derived: category breakdown chart data
-	let categoryChartData = $derived.by(() => {
-		const colors: Record<string, string> = {
-			fuel: 'var(--chart-1)',
-			maintenance: 'var(--chart-5)',
-			financial: 'var(--chart-2)',
-			regulatory: 'var(--chart-4)',
-			enhancement: 'var(--chart-3)',
-			misc: 'var(--muted-foreground)'
-		};
-
-		const categoryMap = new Map<string, number>();
-		let total = 0;
-		for (const e of filteredExpenses) {
-			total += e.amount;
-			categoryMap.set(e.category, (categoryMap.get(e.category) || 0) + e.amount);
-		}
-
-		return Array.from(categoryMap.entries()).map(([category, amount]) => ({
-			category,
-			name: categoryLabels[category as ExpenseCategory] || category,
-			amount,
-			percentage: total > 0 ? (amount / total) * 100 : 0,
-			color: (colors[category] ?? colors['misc']) as string
+		if (!periodSummary?.monthlyTrend) return [];
+		return periodSummary.monthlyTrend.map(t => ({
+			date: new Date(`${t.period}-01`),
+			amount: t.amount
 		}));
 	});
 
-	// Derived: recent activity
+	// Derived: category breakdown chart data from period-filtered summary
+	let categoryChartData = $derived.by(() => {
+		if (!periodSummary?.categoryBreakdown) return [];
+		const total = periodSummary.categoryBreakdown.reduce((sum, c) => sum + c.amount, 0);
+		return periodSummary.categoryBreakdown.map(c => ({
+			category: c.category as ExpenseCategory,
+			name: categoryLabels[c.category as ExpenseCategory] || c.category,
+			amount: c.amount,
+			percentage: total > 0 ? (c.amount / total) * 100 : 0,
+			color: getCategoryColorHex(c.category as ExpenseCategory)
+		}));
+	});
+
+	// Derived: recent activity with vehicle names
 	let recentExpenses = $derived.by(() => {
 		const vehicleMap = new Map(
 			vehicles.map(v => [v.id, v.nickname || `${v.year} ${v.make} ${v.model}`])
 		);
-		return [...allExpenses]
-			.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-			.slice(0, 5)
-			.map(e => ({
-				id: e.id,
-				amount: e.amount,
-				category: e.category,
-				date: new Date(e.date),
-				description: e.description,
-				vehicleName: vehicleMap.get(e.vehicleId) || 'Unknown Vehicle'
-			}));
+		return recentExpensesList.map(e => ({
+			id: e.id,
+			amount: e.amount,
+			category: e.category,
+			date: new Date(e.date),
+			description: e.description,
+			vehicleName: vehicleMap.get(e.vehicleId) || 'Unknown Vehicle'
+		}));
 	});
 
 	onMount(async () => {
@@ -162,32 +103,61 @@
 
 	async function loadDashboardData() {
 		try {
-			const [loadedVehicles, loadedExpenses] = await Promise.all([
+			const [loadedVehicles, allTimeData, periodData, recentResponse] = await Promise.all([
 				vehicleApi.getVehicles(),
-				expenseApi.getAllExpenses()
+				expenseApi.getExpenseSummary({ period: 'all' }),
+				selectedPeriod !== 'all'
+					? expenseApi.getExpenseSummary({ period: selectedPeriod })
+					: Promise.resolve(null),
+				expenseApi.getAllExpenses({ limit: 5 })
 			]);
 			vehicles = loadedVehicles;
-			allExpenses = loadedExpenses;
+			allTimeSummary = allTimeData;
+			periodSummary = periodData ?? allTimeData;
+			recentExpensesList = recentResponse.data;
 
-			// Load photos for all vehicles in parallel
-			const photoResults = await Promise.allSettled(
-				loadedVehicles.map(v => vehicleApi.getPhotos(v.id))
-			);
+			// Load photos and per-vehicle stats in parallel (single query for all vehicles)
+			const [photoResults, vehicleStats] = await Promise.all([
+				Promise.allSettled(loadedVehicles.map(v => vehicleApi.getPhotos(v.id))),
+				expenseApi.getVehicleStats()
+			]);
+
 			const photosMap = new Map<string, Photo[]>();
+			const statsMap = new Map<
+				string,
+				{ totalAmount: number; recentAmount: number; lastActivity: Date | null }
+			>();
 			loadedVehicles.forEach((v, i) => {
-				const result = photoResults[i];
-				if (result && result.status === 'fulfilled') {
-					photosMap.set(v.id, result.value);
+				const photoResult = photoResults[i];
+				if (photoResult && photoResult.status === 'fulfilled') {
+					photosMap.set(v.id, photoResult.value);
 				}
 			});
+			for (const vs of vehicleStats) {
+				statsMap.set(vs.vehicleId, {
+					totalAmount: vs.totalAmount,
+					recentAmount: vs.recentAmount,
+					lastActivity: vs.lastExpenseDate ? new Date(vs.lastExpenseDate) : null
+				});
+			}
 			vehiclePhotosMap = photosMap;
+			vehicleStatsMap = statsMap;
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load dashboard data');
 		}
 	}
 
-	function handlePeriodChange(period: TimePeriod) {
+	async function handlePeriodChange(period: TimePeriod) {
 		selectedPeriod = period;
+		try {
+			if (period === 'all' && allTimeSummary) {
+				periodSummary = allTimeSummary;
+			} else {
+				periodSummary = await expenseApi.getExpenseSummary({ period });
+			}
+		} catch (error) {
+			handleErrorWithNotification(error, 'Failed to load expense summary');
+		}
 	}
 </script>
 
@@ -196,7 +166,7 @@
 	<meta name="description" content="Your vehicle expense dashboard" />
 </svelte:head>
 
-<div class="space-y-6 pb-24 sm:pb-0">
+<div class="space-y-6 pb-24">
 	<!-- Header -->
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 		<div>

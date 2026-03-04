@@ -11,6 +11,7 @@ import {
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
+  odometerEntries,
   photos,
   vehicleFinancing,
   vehicles,
@@ -39,6 +40,7 @@ export interface ImportSummary {
   insurance: number;
   insurancePolicyVehicles: number;
   expenseGroups: number;
+  odometer: number;
   photos: number;
 }
 
@@ -82,6 +84,7 @@ class RestoreService {
       insurance: parsedBackup.insurance.length,
       insurancePolicyVehicles: parsedBackup.insurancePolicyVehicles?.length ?? 0,
       expenseGroups: parsedBackup.expenseGroups?.length ?? 0,
+      odometer: parsedBackup.odometer?.length ?? 0,
       photos: parsedBackup.photos?.length ?? 0,
     };
 
@@ -150,6 +153,7 @@ class RestoreService {
       insurance: sheetData.insurance.length,
       insurancePolicyVehicles: sheetData.insurancePolicyVehicles?.length ?? 0,
       expenseGroups: sheetData.expenseGroups?.length ?? 0,
+      odometer: sheetData.odometer?.length ?? 0,
       photos: sheetData.photos?.length ?? 0,
     };
 
@@ -297,6 +301,13 @@ class RestoreService {
       .where(inArray(insurancePolicyVehicles.vehicleId, vehicleIds));
     const policyIds = [...new Set(userPolicyVehicles.map((pv) => pv.policyId))];
 
+    // Collect odometer entry IDs for photo deletion
+    const userOdometerEntries = await tx
+      .select({ id: odometerEntries.id })
+      .from(odometerEntries)
+      .where(inArray(odometerEntries.vehicleId, vehicleIds));
+    const odometerEntryIds = userOdometerEntries.map((o) => o.id);
+
     // Delete photos for all entity types
     if (vehicleIds.length > 0) {
       await tx
@@ -318,8 +329,17 @@ class RestoreService {
         .delete(photos)
         .where(and(eq(photos.entityType, 'expense_group'), inArray(photos.entityId, groupIds)));
     }
+    if (odometerEntryIds.length > 0) {
+      await tx
+        .delete(photos)
+        .where(
+          and(eq(photos.entityType, 'odometer_entry'), inArray(photos.entityId, odometerEntryIds))
+        );
+    }
 
     await tx.delete(expenses).where(inArray(expenses.vehicleId, vehicleIds));
+    // Delete odometer entries before vehicles (FK constraint)
+    await tx.delete(odometerEntries).where(inArray(odometerEntries.vehicleId, vehicleIds));
     await tx
       .delete(insurancePolicyVehicles)
       .where(inArray(insurancePolicyVehicles.vehicleId, vehicleIds));
@@ -341,6 +361,12 @@ class RestoreService {
     }
     if (data.expenses.length > 0) {
       await tx.insert(expenses).values(data.expenses as (typeof expenses.$inferInsert)[]);
+    }
+    // Insert odometer entries AFTER expenses (linked_entity_id may reference expense IDs)
+    if (data.odometer?.length > 0) {
+      await tx
+        .insert(odometerEntries)
+        .values(data.odometer as (typeof odometerEntries.$inferInsert)[]);
     }
     if (data.financing.length > 0) {
       await tx

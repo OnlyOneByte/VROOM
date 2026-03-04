@@ -46,6 +46,7 @@ describe('Migrations: General', () => {
       'expenses',
       'insurance_policies',
       'insurance_policy_vehicles',
+      'odometer_entries',
       'photos',
       'sessions',
       'user_settings',

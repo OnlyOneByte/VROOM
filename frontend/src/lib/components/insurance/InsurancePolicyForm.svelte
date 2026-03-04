@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { appStore } from '$lib/stores/app';
+	import { appStore } from '$lib/stores/app.svelte';
 	import { ArrowLeft, Shield, Trash2, X, Check, LoaderCircle } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
