@@ -111,7 +111,3 @@ Thumbs.db
 # Drizzle (keep backend migrations, ignore frontend drizzle if any)
 frontend/drizzle/
 backend/COMPREHENSIVE_IMPROVEMENT_PLAN.md
-
-
-# Screenshots folder for UI testing
-screenshots/
