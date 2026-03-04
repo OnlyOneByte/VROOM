@@ -10,6 +10,8 @@ const mockVehicle: Vehicle = {
 	model: 'Camry',
 	year: 2020,
 	vehicleType: 'gas' as const,
+	trackFuel: true,
+	trackCharging: false,
 	licensePlate: 'ABC123',
 	nickname: 'My Car',
 	initialMileage: 50000,
@@ -25,6 +27,8 @@ const mockVehicle2: Vehicle = {
 	model: 'Civic',
 	year: 2019,
 	vehicleType: 'gas' as const,
+	trackFuel: true,
+	trackCharging: false,
 	licensePlate: 'XYZ789',
 	createdAt: '2024-01-01T00:00:00Z',
 	updatedAt: '2024-01-01T00:00:00Z'

@@ -68,6 +68,7 @@
 	let currentPath = $derived(page.url.pathname);
 	let showNavigation = $derived(authState.isAuthenticated && !authState.isLoading);
 	let isAuthPage = $derived(currentPath.startsWith('/auth'));
+	let isHomePage = $derived(currentPath === '/');
 
 	$effect(() => {
 		if (authState.isAuthenticated && !authState.isLoading) {
@@ -132,8 +133,8 @@
 			<p class="text-muted-foreground">Loading VROOM...</p>
 		</div>
 	</div>
-{:else if isAuthPage}
-	<!-- Auth pages without navigation -->
+{:else if isAuthPage || isHomePage}
+	<!-- Auth and home pages without navigation -->
 	<main class="min-h-screen bg-background">
 		{@render children?.()}
 	</main>

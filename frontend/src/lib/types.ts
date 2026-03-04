@@ -1,6 +1,8 @@
 // Shared types for VROOM Car Tracker Frontend
 // These types mirror the backend types for consistency
 
+export type VehicleType = 'gas' | 'electric' | 'hybrid';
+
 export interface User {
 	id: string;
 	email: string;
@@ -12,8 +14,6 @@ export interface User {
 	updatedAt: string;
 }
 
-export type VehicleType = 'gas' | 'electric' | 'hybrid';
-
 export interface Vehicle {
 	id: string;
 	userId?: string;
@@ -21,6 +21,8 @@ export interface Vehicle {
 	model: string;
 	year: number;
 	vehicleType: VehicleType;
+	trackFuel: boolean;
+	trackCharging: boolean;
 	licensePlate?: string;
 	nickname?: string;
 	vin?: string;
@@ -269,8 +271,10 @@ export interface VehicleStats {
 	averageMpg: number | null;
 	averageMilesPerKwh: number | null;
 	totalFuelCost: number;
+	totalChargeCost: number;
 	costPerMile: number | null;
 	fuelExpenseCount: number;
+	chargeExpenseCount: number;
 }
 
 // Frontend-specific types

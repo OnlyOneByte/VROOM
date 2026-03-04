@@ -19,6 +19,8 @@ export const mockVehicle = {
 	model: 'Camry',
 	year: 2020,
 	vehicleType: 'gas' as const,
+	trackFuel: true,
+	trackCharging: false,
 	licensePlate: 'ABC123',
 	vin: '1HGBH41JXMN109186',
 	purchasePrice: 25000,

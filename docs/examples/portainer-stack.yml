@@ -12,7 +12,7 @@ version: '3.8'
 
 services:
   backend:
-    image: ghcr.io/${GITHUB_REPOSITORY}/backend:latest
+    image: ghcr.io/onlyonebyte/vroom/backend:latest
     container_name: vroom-backend
     ports:
       - "${BACKEND_PORT:-3001}:3001"
@@ -28,7 +28,6 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
       FRONTEND_URL: ${FRONTEND_URL}
       SESSION_SECRET: ${SESSION_SECRET}
-      GOOGLE_DRIVE_API_KEY: ${GOOGLE_DRIVE_API_KEY:-}
       CORS_ORIGINS: ${CORS_ORIGINS}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
     restart: unless-stopped
@@ -45,7 +44,7 @@ services:
       com.centurylinklabs.watchtower.enable: "true"
 
   frontend:
-    image: ghcr.io/${GITHUB_REPOSITORY}/frontend:latest
+    image: ghcr.io/onlyonebyte/vroom/frontend:latest
     container_name: vroom-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
@@ -99,5 +98,4 @@ networks:
 # 
 # BACKEND_PORT=3001
 # FRONTEND_PORT=3000
-# GOOGLE_DRIVE_API_KEY=your_google_drive_api_key
 # LOG_LEVEL=warn

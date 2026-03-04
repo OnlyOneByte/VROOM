@@ -12,7 +12,7 @@ export const MAX_VALID_MI_KWH = 10;
 
 // Category labels
 export const categoryLabels: Record<ExpenseCategory, string> = {
-	fuel: 'Fuel',
+	fuel: 'Fuel & Charging',
 	maintenance: 'Maintenance',
 	financial: 'Financial',
 	regulatory: 'Regulatory',

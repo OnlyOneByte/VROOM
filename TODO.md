@@ -43,12 +43,11 @@
 - [X] Expense level photos
 - [x] Move car photos into overview tab (remove photos only tab)
 - [x] Remove Reminders tab from car
-- [ ] EV and PHEV charging tracking
-- [ ] Custom folder for sheets backups (multi sheet backup)
-- [ ] Custom folder path for all info.
-- [ ] Auth/login page re-write
+- [X] EV and PHEV charging tracking
+- [ ] Custom folder names
+- [x] Auth/login page re-write
   - [ ] New logo/icon assets to use
-  - [ ] Change to be / instead of /auth
+  - [x] Change to be / instead of /auth
 - [ ] First opening/loading - car zooming past screen animation (idea)
 - [ ] Odometer log on the vehicle detail page (track readings over time, show mileage-over-time chart)
 - [x] Split expense show better

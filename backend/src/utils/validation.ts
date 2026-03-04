@@ -224,20 +224,26 @@ export async function validateInsuranceOwnership(
  * Shared Validation Logic
  */
 
+import { isElectricFuelType } from '../db/types';
 import { ValidationError } from '../errors';
 
 /**
  * Validate fuel expense requirements
- * Fuel expenses must have both fuelAmount and mileage data
+ * Fuel expenses must have both fuelAmount and mileage data.
+ * Error messages differ based on fuelType (electric vs fuel terminology).
  */
 export function validateFuelExpenseData(
   category: string,
   mileage: number | null | undefined,
-  fuelAmount: number | null | undefined
+  fuelAmount: number | null | undefined,
+  fuelType: string | null | undefined
 ): void {
   if (category === 'fuel') {
     if (!fuelAmount || !mileage) {
-      throw new ValidationError('Fuel expenses require fuelAmount and mileage data');
+      if (isElectricFuelType(fuelType ?? null)) {
+        throw new ValidationError('Charging expenses require charge amount (kWh) and mileage data');
+      }
+      throw new ValidationError('Fuel expenses require fuel amount and mileage data');
     }
   }
 }

@@ -249,7 +249,12 @@ routes.get(
     );
 
     // Calculate statistics
-    const stats = calculateVehicleStats(sortedExpenses, vehicle.initialMileage || 0);
+    const stats = calculateVehicleStats(
+      sortedExpenses,
+      vehicle.initialMileage || 0,
+      vehicle.trackFuel,
+      vehicle.trackCharging
+    );
 
     return c.json({
       success: true,

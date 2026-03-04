@@ -3,11 +3,10 @@
 	import { authStore } from '$lib/stores/auth.js';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import { LoaderCircle } from 'lucide-svelte';
+	import { LoaderCircle, ArrowLeft } from 'lucide-svelte';
 
 	let isLoading = $state(false);
 
-	// Use automatic store subscription
 	let authState = $derived($authStore);
 
 	// Redirect if already authenticated
@@ -24,14 +23,20 @@
 </script>
 
 <svelte:head>
-	<title>Login - VROOM Car Tracker</title>
+	<title>Sign In - VROOM Car Tracker</title>
 	<meta name="description" content="Sign in to track your vehicle expenses" />
 </svelte:head>
 
 <div
 	class="min-h-screen flex items-center justify-center bg-gradient-to-br from-muted to-muted/50 p-4"
 >
-	<div class="w-full max-w-2xl space-y-8">
+	<div class="w-full max-w-md space-y-6">
+		<!-- Back to home -->
+		<Button variant="ghost" size="sm" class="text-muted-foreground" onclick={() => goto('/')}>
+			<ArrowLeft class="mr-1 h-4 w-4" />
+			Back to home
+		</Button>
+
 		<!-- Logo and Title -->
 		<div class="text-center space-y-2">
 			<div
@@ -39,17 +44,13 @@
 			>
 				<span class="text-5xl">🚗</span>
 			</div>
-			<h1 class="text-4xl font-bold tracking-tight">VROOM Car Tracker</h1>
-			<p class="text-muted-foreground text-lg">Vehicle Record & Organization Of Maintenance</p>
+			<h1 class="text-3xl font-bold tracking-tight text-foreground">Welcome back</h1>
+			<p class="text-muted-foreground">Sign in to continue to your dashboard</p>
 		</div>
 
 		<!-- Auth Card -->
 		<Card.Root class="border-2">
-			<Card.Header class="space-y-1 text-center">
-				<Card.Title class="text-2xl">Welcome back</Card.Title>
-				<Card.Description>Sign in to continue to your dashboard</Card.Description>
-			</Card.Header>
-			<Card.Content class="space-y-4">
+			<Card.Content class="pt-6 space-y-4">
 				<Button
 					variant="outline"
 					size="lg"
@@ -91,53 +92,7 @@
 
 		<!-- Footer -->
 		<p class="text-center text-sm text-muted-foreground">
-			No account needed • Sign in with Google to get started
+			No account needed · Sign in with Google to get started
 		</p>
-
-		<!-- Features Section -->
-		<div class="bg-card rounded-lg shadow-lg p-8 border-2">
-			<div class="grid gap-6 text-left">
-				<div class="flex items-start gap-4">
-					<div class="text-3xl">🔓</div>
-					<div>
-						<h3 class="font-semibold text-lg text-foreground mb-1">Fully Open Source</h3>
-						<p class="text-muted-foreground">
-							Make it your own! Fork, customize, and host it yourself with complete control.
-						</p>
-					</div>
-				</div>
-
-				<div class="flex items-start gap-4">
-					<div class="text-3xl">📊</div>
-					<div>
-						<h3 class="font-semibold text-lg text-foreground mb-1">Open Format CSVs</h3>
-						<p class="text-muted-foreground">
-							All data in standard CSV format. Migrate anywhere, anytime, with zero lock-in.
-						</p>
-					</div>
-				</div>
-
-				<div class="flex items-start gap-4">
-					<div class="text-3xl">☁️</div>
-					<div>
-						<h3 class="font-semibold text-lg text-foreground mb-1">Direct Google Drive Sync</h3>
-						<p class="text-muted-foreground">
-							Your data can sync directly to your Drive. No proprietary databases to manage.
-						</p>
-					</div>
-				</div>
-
-				<div class="flex items-start gap-4">
-					<div class="text-3xl">🔒</div>
-					<div>
-						<h3 class="font-semibold text-lg text-foreground mb-1">Privacy First</h3>
-						<p class="text-muted-foreground">
-							No data stored beyond sync. Everything lives with you or in your Google Drive, under
-							your control.
-						</p>
-					</div>
-				</div>
-			</div>
-		</div>
 	</div>
 </div>

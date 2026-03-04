@@ -264,7 +264,7 @@
 		hasAttemptedPaymentLoad = true;
 
 		try {
-			const allExpenses = await expenseApi.getExpensesByVehicle(vehicleId, vehicle?.vehicleType);
+			const allExpenses = await expenseApi.getExpensesByVehicle(vehicleId);
 			const financingExpenses = allExpenses.filter(e => e.isFinancingPayment === true);
 			payments = derivePaymentEntries(financingExpenses, vehicle.financing);
 		} catch (error) {
