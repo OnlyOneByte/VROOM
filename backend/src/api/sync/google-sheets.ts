@@ -255,6 +255,8 @@ export class GoogleSheetsService {
       'model',
       'year',
       'vehicleType',
+      'trackFuel',
+      'trackCharging',
       'licensePlate',
       'nickname',
       'initialMileage',

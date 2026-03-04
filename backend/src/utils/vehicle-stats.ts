@@ -5,6 +5,10 @@
  * across different endpoints and reduce route handler complexity.
  */
 
+import type { Expense } from '../db/schema';
+import { isElectricFuelType } from '../db/types';
+import { calculateAverageMilesPerKwh } from './calculations';
+
 // Helper types for vehicle stats calculations
 export interface FuelExpense {
   id: string;
@@ -24,16 +28,23 @@ export interface VehicleStats {
   averageMpg: number | null;
   averageMilesPerKwh: number | null;
   totalFuelCost: number;
+  totalChargeCost: number;
   costPerMile: number | null;
   fuelExpenseCount: number;
+  chargeExpenseCount: number;
 }
 
 /**
- * Calculate comprehensive vehicle statistics from fuel expenses
+ * Calculate comprehensive vehicle statistics from fuel expenses.
+ *
+ * Splits expenses into fuel-group and charge-group using isElectricFuelType,
+ * then computes efficiency metrics gated by the tracking flags.
  */
 export function calculateVehicleStats(
   fuelExpenses: FuelExpense[],
-  initialMileage: number
+  initialMileage: number,
+  trackFuel = true,
+  trackCharging = false
 ): VehicleStats {
   const stats: VehicleStats = {
     totalMileage: 0,
@@ -43,55 +54,74 @@ export function calculateVehicleStats(
     averageMpg: null,
     averageMilesPerKwh: null,
     totalFuelCost: 0,
+    totalChargeCost: 0,
     costPerMile: null,
-    fuelExpenseCount: fuelExpenses.length,
+    fuelExpenseCount: 0,
+    chargeExpenseCount: 0,
   };
 
   if (fuelExpenses.length === 0) {
     return stats;
   }
 
-  // Calculate totals
-  const totals = calculateTotals(fuelExpenses);
-  stats.totalFuelConsumed = totals.fuelAmount;
-  stats.totalChargeConsumed = 0; // Deprecated - keeping for backward compatibility
-  stats.totalFuelCost = totals.cost;
+  // Split expenses into fuel-group and charge-group by fuelType
+  const fuelGroup: FuelExpense[] = [];
+  const chargeGroup: FuelExpense[] = [];
 
-  // Get expenses with mileage data
+  for (const expense of fuelExpenses) {
+    if (isElectricFuelType(expense.fuelType)) {
+      chargeGroup.push(expense);
+    } else {
+      fuelGroup.push(expense);
+    }
+  }
+
+  // Calculate totals split by group
+  stats.totalFuelConsumed = sumFuelAmount(fuelGroup);
+  stats.totalChargeConsumed = sumFuelAmount(chargeGroup);
+  stats.totalFuelCost = fuelGroup.reduce((sum, e) => sum + e.expenseAmount, 0);
+  stats.totalChargeCost = chargeGroup.reduce((sum, e) => sum + e.expenseAmount, 0);
+  stats.fuelExpenseCount = fuelGroup.length;
+  stats.chargeExpenseCount = chargeGroup.length;
+
+  // Get all expenses with mileage data (for mileage stats)
   const expensesWithMileage = fuelExpenses.filter(
     (e) => e.mileage !== null && e.mileage !== undefined
   );
 
+  const totalEnergyCost = stats.totalFuelCost + stats.totalChargeCost;
+
   if (expensesWithMileage.length > 0) {
-    calculateMileageStats(stats, expensesWithMileage, initialMileage, totals.cost);
+    calculateMileageStats(stats, expensesWithMileage, initialMileage, totalEnergyCost);
   }
 
-  // Calculate efficiency metrics
-  if (totals.fuelAmount > 0 && expensesWithMileage.length >= 2) {
-    stats.averageMpg = calculateAverageMpg(expensesWithMileage);
+  // Calculate fuel efficiency (MPG) — gated by trackFuel
+  if (trackFuel) {
+    const fuelWithMileage = fuelGroup.filter((e) => e.mileage !== null && e.mileage !== undefined);
+    if (stats.totalFuelConsumed > 0 && fuelWithMileage.length >= 2) {
+      stats.averageMpg = calculateAverageMpg(fuelWithMileage);
+    }
+  }
+
+  // Calculate electric efficiency (mi/kWh) — gated by trackCharging
+  if (trackCharging) {
+    stats.averageMilesPerKwh = calculateAverageMilesPerKwh(chargeGroup as unknown as Expense[]);
   }
 
   return stats;
 }
 
 /**
- * Calculate total fuel amount and cost from expenses
+ * Sum fuelAmount values for a group of expenses
  */
-function calculateTotals(expenses: FuelExpense[]): {
-  fuelAmount: number;
-  cost: number;
-} {
-  let fuelAmount = 0;
-  let cost = 0;
-
+function sumFuelAmount(expenses: FuelExpense[]): number {
+  let total = 0;
   for (const expense of expenses) {
     if (expense.fuelAmount) {
-      fuelAmount += expense.fuelAmount;
+      total += expense.fuelAmount;
     }
-    cost += expense.expenseAmount;
   }
-
-  return { fuelAmount, cost };
+  return total;
 }
 
 /**

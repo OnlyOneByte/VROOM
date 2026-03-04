@@ -11,12 +11,19 @@ Complete guide for deploying and self-hosting VROOM.
 
 ## Quick Start (Docker Compose)
 
+Example compose files and environment configuration are in [`docs/examples/`](examples/):
+
+- `docker-compose.yml` — production compose with healthchecks, Watchtower, Cloudflare Tunnel
+- `portainer-stack.yml` — simplified stack for Portainer deployment
+- `.env.example` — environment variable template
+
 ```bash
 git clone https://github.com/OnlyOneByte/vroom.git
 cd vroom
-cp .env.example .env
+cp docs/examples/docker-compose.yml docker-compose.yml
+cp docs/examples/.env.example .env
 # Edit .env with your configuration (see Environment Variables below)
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.yml up -d
 ```
 
 - Frontend: `http://localhost:3000`
@@ -41,7 +48,6 @@ docker-compose -f docker-compose.prod.yml up -d
 
 | Variable | Default | Description |
 |---|---|---|
-| `GITHUB_REPOSITORY` | — | `user/repo` for GHCR image pulls |
 | `BACKEND_PORT` | `3001` | Backend port |
 | `FRONTEND_PORT` | `3000` | Frontend port |
 | `DATABASE_URL` | `/app/data/vroom.db` | SQLite database path |
@@ -52,7 +58,6 @@ docker-compose -f docker-compose.prod.yml up -d
 ### Example Production `.env`
 
 ```env
-GITHUB_REPOSITORY=OnlyOneByte/vroom
 GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your_secret
 GOOGLE_REDIRECT_URI=https://yourdomain.com/api/v1/auth/callback/google
@@ -67,13 +72,22 @@ DATA_PATH=/var/vroom/data
 ## Google OAuth Setup
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → create a project
-2. Enable **Google+ API** (required), **Google Drive API** and **Google Sheets API** (optional, for backup)
-3. Configure OAuth consent screen → External → add your email as test user
-4. Create OAuth 2.0 credentials → Web application:
+2. Navigate to APIs & Services → Library and enable:
+   - **Google Drive API** — required for backup and photo storage
+   - **Google Sheets API** — required for Google Sheets mirroring/restore
+3. Navigate to APIs & Services → OAuth consent screen:
+   - User Type: External
+   - Add your email as a test user
+   - Add scopes: `email`, `profile`, `openid`, `drive` (full Drive access is needed to create folders and upload files)
+4. Navigate to APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID:
+   - Application type: Web application
    - Authorized redirect URIs: `https://yourdomain.com/api/v1/auth/callback/google`
-5. Copy Client ID and Secret into `.env`
+   - Copy Client ID → `GOOGLE_CLIENT_ID`
+   - Copy Client Secret → `GOOGLE_CLIENT_SECRET`
 
-For personal self-hosting, the "unverified app" warning is normal — click Advanced → Continue.
+All Drive and Sheets access is handled through the OAuth token — no separate API key is needed.
+
+For personal self-hosting, the app will show an "unverified app" warning — click Advanced → Continue. This is normal for apps not submitted for Google verification.
 
 ## Deployment Options
 
@@ -82,16 +96,16 @@ For personal self-hosting, the "unverified app" warning is normal — click Adva
 The CI/CD pipeline publishes images to GitHub Container Registry on every push to `main`:
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.yml up -d
 ```
 
-Images: `ghcr.io/<repo>/backend:latest` and `ghcr.io/<repo>/frontend:latest`
+Images: `ghcr.io/onlyonebyte/vroom/backend:latest` and `ghcr.io/onlyonebyte/vroom/frontend:latest`
 
 ### Build from Source
 
 ```bash
-docker-compose -f docker-compose.prod.yml build
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.yml build
+docker-compose -f docker-compose.yml up -d
 ```
 
 ### Manual (No Docker)
@@ -110,11 +124,16 @@ npm run build
 node build
 ```
 
-### Portainer
+### Portainer Stack
 
-1. Install Portainer: `docker run -d -p 9000:9000 --restart=always -v /var/run/docker.sock:/var/run/docker.sock portainer/portainer-ce:latest`
-2. Open `http://your-server:9000`
-3. Stacks → Add Stack → upload `docker-compose.prod.yml` → add env vars → Deploy
+A ready-to-use Portainer stack file is at [`docs/examples/portainer-stack.yml`](examples/portainer-stack.yml).
+
+1. Open Portainer → Stacks → Add Stack
+2. Paste the contents of `portainer-stack.yml` or upload it directly
+3. Add the required environment variables (see [Environment Variables](#environment-variables))
+4. Deploy the stack
+
+The stack includes optional services for Cloudflare Tunnel and auto-updates (Tugtainer) — remove them if not needed.
 
 ## Reverse Proxy + SSL
 
@@ -193,7 +212,7 @@ The production compose file includes a `cloudflared` service. Set `CLOUDFLARE_TU
 Enable Watchtower for automatic container updates:
 
 ```bash
-docker-compose -f docker-compose.prod.yml --profile auto-update up -d
+docker-compose -f docker-compose.yml --profile auto-update up -d
 ```
 
 Watchtower checks for new images hourly and restarts containers automatically.
@@ -215,9 +234,9 @@ VROOM also supports automatic backup to Google Drive (ZIP of CSVs) and Google Sh
 ### Restore
 
 ```bash
-docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.yml down
 cp ./backups/vroom-backup.db $DATA_PATH/vroom.db
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.yml up -d
 ```
 
 Or restore from Google Sheets via Settings → Backup → Restore.
@@ -227,7 +246,7 @@ Or restore from Google Sheets via Settings → Backup → Restore.
 Migrations run automatically on server startup. To run manually:
 
 ```bash
-docker-compose -f docker-compose.prod.yml exec backend bun run db:push
+docker-compose -f docker-compose.yml exec backend bun run db:push
 ```
 
 ## Hosting Platforms
@@ -244,7 +263,7 @@ docker-compose -f docker-compose.prod.yml exec backend bun run db:push
 ### Health Checks
 
 ```bash
-docker-compose -f docker-compose.prod.yml ps
+docker-compose -f docker-compose.yml ps
 curl http://localhost:3001/health
 docker stats vroom-backend vroom-frontend
 ```
@@ -252,15 +271,15 @@ docker stats vroom-backend vroom-frontend
 ### Logs
 
 ```bash
-docker-compose -f docker-compose.prod.yml logs -f backend
-docker-compose -f docker-compose.prod.yml logs --tail=100 frontend
+docker-compose -f docker-compose.yml logs -f backend
+docker-compose -f docker-compose.yml logs --tail=100 frontend
 ```
 
 ### Updates
 
 ```bash
-docker-compose -f docker-compose.prod.yml pull
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.yml pull
+docker-compose -f docker-compose.yml up -d
 docker image prune -a  # clean old images
 ```
 

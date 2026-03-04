@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { appStore } from '$lib/stores/app.js';
-	import { ArrowLeft, Car, Trash2, X, Check, LoaderCircle } from 'lucide-svelte';
+	import { ArrowLeft, Car, Trash2, X, Check, LoaderCircle, Fuel, Zap } from 'lucide-svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
+	import { Switch } from '$lib/components/ui/switch';
+	import * as Select from '$lib/components/ui/select';
 	import { FormFieldError } from '$lib/components/ui/form-field';
 	import {
 		Card,
@@ -28,6 +30,7 @@
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import type {
 		Vehicle,
+		VehicleType,
 		VehicleFormData,
 		FinancingPaymentConfig,
 		VehicleFormErrors,
@@ -50,6 +53,10 @@
 	let showDeleteConfirm = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
 
+	// Energy tracking flags
+	let trackFuel = $state(true);
+	let trackCharging = $state(false);
+
 	// Form data
 	let vehicleForm = $state<VehicleFormData>({
 		make: '',
@@ -63,6 +70,21 @@
 		purchasePrice: undefined,
 		purchaseDate: ''
 	});
+
+	function handleVehicleTypeChange(newType: string) {
+		vehicleForm.vehicleType = newType as VehicleType;
+		// Auto-set tracking defaults based on vehicle type
+		if (newType === 'gas') {
+			trackFuel = true;
+			trackCharging = false;
+		} else if (newType === 'electric') {
+			trackFuel = false;
+			trackCharging = true;
+		} else if (newType === 'hybrid') {
+			trackFuel = true;
+			trackCharging = true;
+		}
+	}
 
 	let ownershipType = $state<'own' | 'lease' | 'finance'>('own');
 
@@ -144,6 +166,10 @@
 				? new Date(vehicle.purchaseDate).toISOString().split('T')[0]
 				: ''
 		};
+
+		// Set tracking flags from vehicle data
+		trackFuel = vehicle.trackFuel;
+		trackCharging = vehicle.trackCharging;
 
 		if (vehicle.financing?.isActive) {
 			// Set ownership type based on financing type
@@ -338,6 +364,9 @@
 				make: vehicleForm.make,
 				model: vehicleForm.model,
 				year: vehicleForm.year,
+				vehicleType: vehicleForm.vehicleType,
+				trackFuel,
+				trackCharging,
 				licensePlate: vehicleForm.licensePlate || undefined,
 				nickname: vehicleForm.nickname || undefined,
 				vin: vehicleForm.vin ? vehicleForm.vin.toUpperCase() : undefined,
@@ -643,6 +672,53 @@
 							{#if errors['purchaseDate']}
 								<FormFieldError id="purchaseDate-error">{errors['purchaseDate']}</FormFieldError>
 							{/if}
+						</div>
+
+						<div class="space-y-2">
+							<Label for="vehicleType">Vehicle Type</Label>
+							<Select.Root
+								type="single"
+								value={vehicleForm.vehicleType}
+								onValueChange={handleVehicleTypeChange}
+							>
+								<Select.Trigger id="vehicleType" class="w-full">
+									{vehicleForm.vehicleType === 'gas'
+										? 'Gas'
+										: vehicleForm.vehicleType === 'electric'
+											? 'Electric'
+											: 'Hybrid'}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="gas" label="Gas">Gas</Select.Item>
+									<Select.Item value="electric" label="Electric">Electric</Select.Item>
+									<Select.Item value="hybrid" label="Hybrid">Hybrid</Select.Item>
+								</Select.Content>
+							</Select.Root>
+						</div>
+					</div>
+
+					<!-- Energy Tracking Preferences -->
+					<div class="mt-6 space-y-2">
+						<Label class="text-sm font-medium text-foreground">Energy Tracking</Label>
+						<div class="flex items-center gap-4">
+							<button
+								type="button"
+								class="flex items-center gap-1.5 cursor-pointer"
+								onclick={() => (trackFuel = !trackFuel)}
+							>
+								<Switch id="trackFuel" checked={trackFuel} />
+								<Fuel class="h-3.5 w-3.5 text-muted-foreground" />
+								<span class="text-sm">Fuel</span>
+							</button>
+							<button
+								type="button"
+								class="flex items-center gap-1.5 cursor-pointer"
+								onclick={() => (trackCharging = !trackCharging)}
+							>
+								<Switch id="trackCharging" checked={trackCharging} />
+								<Zap class="h-3.5 w-3.5 text-muted-foreground" />
+								<span class="text-sm">Charging</span>
+							</button>
 						</div>
 					</div>
 				</CardContent>

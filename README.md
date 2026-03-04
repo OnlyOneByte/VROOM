@@ -5,6 +5,8 @@
 
 VROOM (Vehicle Record & Organization Of Maintenance) — a modern, self-hostable car cost tracking and visualization web app with mobile-first design and comprehensive expense analytics.
 
+> ⚠️ **This project is under rapid development.** Features, APIs, and database schemas may change between releases. Back up your data regularly via Google Drive sync. If you're self-hosting, pin to a specific image tag rather than `latest` for stability.
+
 ## Why VROOM?
 
 - **Open Source** — fork, customize, and host it yourself with full control over your data
@@ -51,8 +53,9 @@ npm run dev             # http://localhost:5173
 ### Docker (Production)
 
 ```bash
-cp .env.example .env    # configure all required env vars
-docker-compose -f docker-compose.prod.yml up -d
+cp docs/examples/.env.example .env    # configure all required env vars
+cp docs/examples/docker-compose.yml .
+docker-compose -f docker-compose.yml up -d
 # Frontend: http://localhost:3000
 # Backend:  http://localhost:3001
 ```
@@ -87,8 +90,7 @@ vroom/
 │   │   └── routes/           # SvelteKit file-based routing
 │   └── e2e/                  # Playwright E2E tests
 ├── docs/                 # Documentation (wiki-compatible)
-├── docker-compose.yml    # Development compose
-├── docker-compose.prod.yml # Production compose
+│   └── examples/         # Docker Compose, Portainer stack, .env template
 └── .github/workflows/    # CI/CD pipeline
 ```
 

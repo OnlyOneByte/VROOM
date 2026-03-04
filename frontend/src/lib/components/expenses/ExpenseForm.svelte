@@ -39,7 +39,7 @@
 	import { formatCurrency } from '$lib/utils/formatters';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
 	import type { ExpenseFormErrors, Vehicle, Expense, SplitConfig } from '$lib/types.js';
-	import { usesLiquidFuel, usesElectricCharge } from '$lib/utils/units';
+	import { isElectricFuelType } from '$lib/utils/units';
 
 	interface Props {
 		expenseId?: string;
@@ -328,26 +328,24 @@
 		formData.category === 'financial' && vehicle?.financing?.isActive === true
 	);
 
-	// Determine which fuel type fields to show based on vehicle type
-	let showVolumeField = $derived(showFuelFields && vehicle && usesLiquidFuel(vehicle.vehicleType));
-	let showChargeField = $derived(
-		showFuelFields && vehicle && usesElectricCharge(vehicle.vehicleType)
-	);
+	// Determine which energy field to require based on the selected fuelType
+	let showVolumeField = $derived(showFuelFields && !isElectricFuelType(formData.fuelType));
+	let showChargeField = $derived(showFuelFields && isElectricFuelType(formData.fuelType));
 
 	function handleMileageChange() {
 		if (formData.category === 'fuel' && formData.mileage && lastFuelExpense?.mileage) {
 			const milesDriven = parseInt(formData.mileage) - lastFuelExpense.mileage;
 
 			if (milesDriven > 0) {
-				// Calculate fuel efficiency for liquid fuel vehicles
-				if (formData.volume && vehicle && usesLiquidFuel(vehicle.vehicleType)) {
-					calculatedMpg = Math.round((milesDriven / parseFloat(formData.volume)) * 100) / 100;
-					showMpgCalculation = true;
-				}
-				// Calculate electric efficiency for electric vehicles
-				else if (formData.charge && vehicle && usesElectricCharge(vehicle.vehicleType)) {
+				// Calculate efficiency based on fuelType
+				if (isElectricFuelType(formData.fuelType) && formData.charge) {
 					calculatedEfficiency =
 						Math.round((milesDriven / parseFloat(formData.charge)) * 100) / 100;
+					calculatedMpg = null;
+					showMpgCalculation = true;
+				} else if (!isElectricFuelType(formData.fuelType) && formData.volume) {
+					calculatedMpg = Math.round((milesDriven / parseFloat(formData.volume)) * 100) / 100;
+					calculatedEfficiency = null;
 					showMpgCalculation = true;
 				} else {
 					calculatedMpg = null;
@@ -985,6 +983,21 @@
 				</div>
 			{/if}
 
+			<!-- Date -->
+			<div class="space-y-2">
+				<Label for="date">Date *</Label>
+				<DatePicker
+					id="date"
+					bind:value={formData.date}
+					placeholder="Select date"
+					aria-invalid={!!(touched['date'] && errors['date'])}
+					aria-describedby={touched['date'] && errors['date'] ? 'date-error' : undefined}
+				/>
+				{#if touched['date'] && errors['date']}
+					<FormFieldError id="date-error">{errors['date']}</FormFieldError>
+				{/if}
+			</div>
+
 			<!-- Amount -->
 			<div class="space-y-2">
 				<Label for="amount">Amount *</Label>
@@ -1007,21 +1020,6 @@
 				</div>
 				{#if touched['amount'] && errors['amount']}
 					<FormFieldError id="amount-error">{errors['amount']}</FormFieldError>
-				{/if}
-			</div>
-
-			<!-- Date -->
-			<div class="space-y-2">
-				<Label for="date">Date *</Label>
-				<DatePicker
-					id="date"
-					bind:value={formData.date}
-					placeholder="Select date"
-					aria-invalid={!!(touched['date'] && errors['date'])}
-					aria-describedby={touched['date'] && errors['date'] ? 'date-error' : undefined}
-				/>
-				{#if touched['date'] && errors['date']}
-					<FormFieldError id="date-error">{errors['date']}</FormFieldError>
 				{/if}
 			</div>
 
@@ -1060,7 +1058,8 @@
 			<!-- Fuel-specific fields -->
 			{#if showFuelFields && vehicle}
 				<FuelFieldsSection
-					vehicleType={vehicle.vehicleType}
+					trackFuel={vehicle.trackFuel}
+					trackCharging={vehicle.trackCharging}
 					bind:volume={formData.volume}
 					bind:charge={formData.charge}
 					bind:fuelType={formData.fuelType}

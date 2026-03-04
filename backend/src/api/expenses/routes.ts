@@ -200,7 +200,12 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   }
 
   // Validate fuel expense requirements
-  validateFuelExpenseData(expenseData.category, expenseData.mileage, expenseData.fuelAmount);
+  validateFuelExpenseData(
+    expenseData.category,
+    expenseData.mileage,
+    expenseData.fuelAmount,
+    expenseData.fuelType
+  );
 
   const createdExpense = await expenseRepository.create(expenseData);
 
@@ -332,8 +337,10 @@ routes.put(
       updateData.mileage !== undefined ? updateData.mileage : existingExpense.mileage;
     const finalFuelAmount =
       updateData.fuelAmount !== undefined ? updateData.fuelAmount : existingExpense.fuelAmount;
+    const finalFuelType =
+      updateData.fuelType !== undefined ? updateData.fuelType : existingExpense.fuelType;
 
-    validateFuelExpenseData(finalCategory, finalMileage, finalFuelAmount);
+    validateFuelExpenseData(finalCategory, finalMileage, finalFuelAmount, finalFuelType);
 
     // Adjust financing balance if financing involvement changed
     const updatedFinancing = await handleFinancingOnUpdate(existingExpense, updateData);

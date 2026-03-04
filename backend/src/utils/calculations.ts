@@ -62,6 +62,63 @@ export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
   return sum / mpgValues.length;
 }
 
+/**
+ * Calculate mi/kWh (Miles Per Kilowatt-Hour) from miles driven and energy consumed
+ */
+export function calculateMilesPerKwh(miles: number, kwh: number): number {
+  return kwh > 0 ? miles / kwh : 0;
+}
+
+/**
+ * Calculate average mi/kWh from a series of charge expenses
+ * Uses consecutive mileage readings to determine miles driven between charges
+ */
+export function calculateAverageMilesPerKwh(chargeExpenses: Expense[]): number | null {
+  if (chargeExpenses.length < 2) {
+    return null;
+  }
+
+  // Sort by date to ensure chronological order
+  const sortedExpenses = [...chargeExpenses].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  // Need at least 2 expenses with mileage data
+  const withMileage = sortedExpenses.filter((e) => e.mileage != null);
+  if (withMileage.length < 2) {
+    return null;
+  }
+
+  const milesPerKwhValues: number[] = [];
+
+  for (let i = 1; i < sortedExpenses.length; i++) {
+    const current = sortedExpenses[i];
+    const previous = sortedExpenses[i - 1];
+
+    // Skip pairs affected by missed fill-ups
+    if (current.missedFillup || previous.missedFillup) {
+      continue;
+    }
+
+    if (current.mileage && previous.mileage && current.fuelAmount) {
+      const miles = current.mileage - previous.mileage;
+      const milesPerKwh = calculateMilesPerKwh(miles, current.fuelAmount);
+
+      // Filter out unrealistic values (negative miles or > 10 mi/kWh)
+      if (milesPerKwh > 0 && milesPerKwh < 10) {
+        milesPerKwhValues.push(milesPerKwh);
+      }
+    }
+  }
+
+  if (milesPerKwhValues.length === 0) {
+    return null;
+  }
+
+  const sum = milesPerKwhValues.reduce((acc, val) => acc + val, 0);
+  return sum / milesPerKwhValues.length;
+}
+
 // ============================================================================
 // COST CALCULATIONS
 // ============================================================================
