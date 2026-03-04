@@ -14,6 +14,20 @@ VROOM (Vehicle Record & Organization Of Maintenance) — a modern, self-hostable
 - **Google Drive Integration** — your data syncs directly to your Google Drive
 - **Privacy First** — no third-party data storage; everything lives on your server and your Drive
 
+## Screenshots
+
+| Dashboard | Analytics |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Analytics](docs/screenshots/analytics.png) |
+
+| Vehicle Detail | Expenses |
+|---|---|
+| ![Vehicle Detail](docs/screenshots/vehicle-detail.png) | ![Expenses](docs/screenshots/expenses.png) |
+
+| Insurance | Mobile View |
+|---|---|
+| ![Insurance](docs/screenshots/insurance.png) | ![Mobile Dashboard](docs/screenshots/dashboard-mobile.png) |
+
 ## Tech Stack
 
 | Layer | Technologies |

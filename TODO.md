@@ -2,22 +2,19 @@
 
 ## P0 — Must Have
 
-### Analytics Page
-
+### Analytics Page (Gamification & Engagement)
 - [ ] Build out the analytics route with real content (currently a stub/placeholder)
-- [ ] Integrate existing analytics components (EfficiencyAlerts, FuelEfficiencyMonitor, VehicleEfficiencySummary) into the analytics page
-- [ ] Cross-vehicle cost comparison and trends
-- [ ] Fuel price tracking: log price-per-gallon with fill-ups, show price trends over time
-- [ ] TCO (Total Cost of Ownership) calculator: aggregate purchase price + financing interest + insurance + fuel + maintenance into a single $/mile and $/month figure
-- [ ] TCO dashboard card on vehicle detail page
-- [ ] TCO trend over time (monthly/quarterly breakdown)
-
-### Gamification & Engagement
-
 - [ ] Vehicle health score: composite score based on maintenance regularity, mileage intervals, insurance coverage status
 - [ ] Health score badge/indicator on vehicle cards and detail page
 - [ ] Year-end summary: annual report card with total spent, cost breakdown by category, MPG trends, biggest expense, year-over-year comparison
+- [ ] Integrate existing analytics components (EfficiencyAlerts, FuelEfficiencyMonitor, VehicleEfficiencySummary) into the analytics page
+- [ ] TCO (Total Cost of Ownership) calculator: aggregate purchase price + financing interest + insurance + fuel + maintenance into a single $/mile and $/month figure
+- [ ] TCO dashboard card on vehicle detail page
+- [ ] TCO trend over time (monthly/quarterly breakdown)
+- [x] Fuel price tracking: log price-per-gallon with fill-ups, show price trends over time
+
 - [ ] Shareable year-end summary (exportable image or link)
+  - This is a big one, proably gonna spend a full day on just this.
 
 ### Insurance — Core Policy Management
 
@@ -48,7 +45,7 @@
 - [x] Auth/login page re-write
   - [ ] New logo/icon assets to use
   - [x] Change to be / instead of /auth
-- [ ] Odometer log on the vehicle detail page (track readings over time, show mileage-over-time chart)
+- [x] Odometer log on the vehicle detail page (track readings over time, show mileage-over-time chart)
 - [x] Split expense show better
 - [x] Expenses table to concat details col first
 - [x] Policy term level delete
@@ -64,6 +61,7 @@
 - [x] Clean up UI (components/ui has custom components) -> moved to components/common
 - [x] Photos not showing in prod env (CORS?)
 - [ ] First opening/loading - car zooming past screen animation (idea)
+- [x] Expense API pagination (expense page slow with lots of expenses)
 
 
 ## P1 — Should Have
