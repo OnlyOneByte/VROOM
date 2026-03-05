@@ -14,20 +14,28 @@
 	}
 }
 
-.chart-line-animated .lc-path {
+/* Pre-animation: hide lines and dots until the animation class is added */
+.chart-line-animate-ready .lc-path {
 	stroke-dasharray: 5000;
 	stroke-dashoffset: 5000;
+}
+
+.chart-line-animate-ready circle {
+	opacity: 0;
+}
+
+/* When animated class is added, trigger the draw-in */
+.chart-line-animate-ready.chart-line-animated .lc-path {
 	animation: stroke-draw 2s ease-out forwards;
 }
 
-.chart-line-animated circle {
-	opacity: 0;
+.chart-line-animate-ready.chart-line-animated circle {
 	animation: points-fade-in 0.5s ease-out forwards;
 	animation-delay: 1.5s;
 }
 
 /* Area fill should not use stroke-dash */
-.chart-line-animated .lc-area {
+.chart-line-animate-ready .lc-area {
 	stroke-dasharray: unset;
 	stroke-dashoffset: unset;
 	animation: none;

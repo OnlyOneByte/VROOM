@@ -4,6 +4,8 @@
 	import { onMount } from 'svelte';
 	import { Shield, Plus, CircleAlert } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
+	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
+	import PageHeader from '$lib/components/common/page-header.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import PolicyList from '$lib/components/insurance/PolicyList.svelte';
@@ -90,10 +92,10 @@
 	</div>
 {:else if error}
 	<div class="space-y-6">
-		<div>
-			<h1 class="text-3xl font-bold tracking-tight">Insurance</h1>
-			<p class="text-muted-foreground mt-1">Manage your insurance policies across all vehicles</p>
-		</div>
+		<PageHeader
+			title="Insurance"
+			description="Manage your insurance policies across all vehicles"
+		/>
 		<div class="rounded-lg border border-destructive bg-destructive/10 p-6">
 			<div class="flex items-center gap-2 text-sm text-destructive">
 				<CircleAlert class="h-5 w-5 shrink-0" />
@@ -105,16 +107,14 @@
 {:else}
 	<div class="space-y-6 pb-24">
 		<!-- Header -->
-		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-			<div>
-				<h1 class="text-3xl font-bold tracking-tight">Insurance</h1>
-				<p class="text-muted-foreground mt-1">Manage your insurance policies across all vehicles</p>
-			</div>
-			<Button class="hidden sm:flex" onclick={handleAddPolicy}>
-				<Plus class="mr-2 h-4 w-4" />
-				New Policy
-			</Button>
-		</div>
+		<PageHeader title="Insurance" description="Manage your insurance policies across all vehicles">
+			{#snippet actions()}
+				<Button class="hidden sm:flex" onclick={handleAddPolicy}>
+					<Plus class="mr-2 h-4 w-4" />
+					New Policy
+				</Button>
+			{/snippet}
+		</PageHeader>
 
 		{#if policies.length === 0}
 			<EmptyState>
@@ -149,20 +149,9 @@
 	</div>
 
 	<!-- Floating Action Button (mobile) -->
-	<Button
-		class="
-			fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full
-			sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto
-			flex items-center justify-center gap-2 pl-6 pr-10
-			bg-foreground hover:bg-foreground/90
-			text-background shadow-2xl
-			transition-all duration-300 sm:hover:scale-110
-			border-0 group
-		"
-		aria-label="New insurance policy"
+	<FloatingActionButton
 		onclick={handleAddPolicy}
-	>
-		<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
-		<span class="font-bold text-lg">New Policy</span>
-	</Button>
+		label="New Policy"
+		ariaLabel="New insurance policy"
+	/>
 {/if}

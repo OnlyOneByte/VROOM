@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import {
-		Plus,
 		Clock,
 		CircleCheck,
 		Calendar,
@@ -37,6 +36,9 @@
 	import * as CardNs from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
+	import { StatCardGrid } from '$lib/components/charts';
+	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
+	import PageHeader from '$lib/components/common/page-header.svelte';
 
 	import {
 		Collapsible,
@@ -96,29 +98,25 @@
 			label: EXPENSE_MESSAGES.TOTAL_EXPENSES,
 			value: formatCurrency(summary?.totalAmount ?? 0),
 			icon: DollarSign,
-			color: 'text-primary',
-			bgColor: 'bg-primary/10'
+			iconColor: 'primary'
 		},
 		{
 			label: EXPENSE_MESSAGES.TOTAL_COUNT,
 			value: (summary?.expenseCount ?? 0).toString(),
 			icon: FileText,
-			color: 'text-chart-1',
-			bgColor: 'bg-chart-1/10'
+			iconColor: 'chart-1'
 		},
 		{
 			label: EXPENSE_MESSAGES.MONTHLY_AVERAGE,
 			value: formatCurrency(summary?.monthlyAverage ?? 0),
 			icon: TrendingUp,
-			color: 'text-chart-2',
-			bgColor: 'bg-chart-2/10'
+			iconColor: 'chart-2'
 		},
 		{
 			label: EXPENSE_MESSAGES.LAST_EXPENSE,
 			value: formatCurrency(summary?.recentAmount ?? 0),
 			icon: Calendar,
-			color: 'text-chart-5',
-			bgColor: 'bg-chart-5/10'
+			iconColor: 'chart-5'
 		}
 	]);
 
@@ -305,12 +303,10 @@
 {:else}
 	<div class="space-y-6 pb-24">
 		<!-- Header -->
-		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-			<div>
-				<h1 class="text-3xl font-bold tracking-tight">All Expenses</h1>
-				<p class="text-muted-foreground mt-1">Track and categorize expenses across all vehicles</p>
-			</div>
-		</div>
+		<PageHeader
+			title="All Expenses"
+			description="Track and categorize expenses across all vehicles"
+		/>
 
 		<!-- Search, Vehicle & Filters -->
 		<CardNs.Root>
@@ -510,21 +506,7 @@
 				<CollapsibleContent>
 					<CardNs.Content class="space-y-6">
 						<!-- Stats Grid -->
-						<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-							{#each statCards as stat (stat.label)}
-								<div class="p-3 sm:p-4 rounded-lg border">
-									<div class="flex items-center gap-2">
-										<div class="p-2 rounded-xl {stat.bgColor} shrink-0">
-											<stat.icon class="h-4 w-4 sm:h-5 sm:w-5 {stat.color}" />
-										</div>
-										<p class="text-xs sm:text-sm font-medium text-muted-foreground">
-											{stat.label}
-										</p>
-									</div>
-									<p class="text-lg sm:text-xl font-bold mt-2">{stat.value}</p>
-								</div>
-							{/each}
-						</div>
+						<StatCardGrid items={statCards} columns={4} />
 
 						<!-- Category Breakdown -->
 						{#if summary && summary.categoryBreakdown.length > 0}
@@ -718,20 +700,9 @@
 	</div>
 
 	<!-- Floating Action Button -->
-	<Button
+	<FloatingActionButton
 		href="/expenses/new"
-		class="
-			fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full
-			sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto
-			flex items-center justify-center gap-2 pl-6 pr-10
-			bg-foreground hover:bg-foreground/90
-			text-background shadow-2xl
-			transition-all duration-300 sm:hover:scale-110
-			border-0 group
-		"
-		aria-label="Add expense"
-	>
-		<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
-		<span class="font-bold text-lg">{COMMON_MESSAGES.ADD_EXPENSE}</span>
-	</Button>
+		label={COMMON_MESSAGES.ADD_EXPENSE}
+		ariaLabel="Add expense"
+	/>
 {/if}

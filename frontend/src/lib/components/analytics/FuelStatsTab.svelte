@@ -339,7 +339,7 @@
 		</div>
 
 		<!-- Fuel Charts -->
-		<FuelCharts {fuelStats} />
+		<FuelCharts {fuelStats} dayOfWeekPatterns={fuelAdvanced?.dayOfWeekPatterns} />
 
 		<!-- Advanced Charts -->
 		{#if fuelAdvanced}

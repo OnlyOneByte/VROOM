@@ -42,28 +42,3 @@ export function getCategoryColor(category: ExpenseCategory): string {
 	};
 	return colors[category] || 'text-muted-foreground bg-muted';
 }
-
-// Category chart data interface
-export interface CategoryChartData {
-	category: ExpenseCategory;
-	name: string;
-	amount: number;
-	percentage: number;
-	color: string;
-}
-
-/**
- * Get color value for category (for charts)
- * Uses CSS custom properties so charts respect the active theme.
- */
-export function getCategoryColorHex(category: ExpenseCategory): string {
-	const colors: Record<ExpenseCategory, string> = {
-		fuel: 'var(--chart-1)',
-		maintenance: 'var(--chart-5)',
-		financial: 'var(--chart-2)',
-		regulatory: 'var(--chart-4)',
-		enhancement: 'var(--chart-3)',
-		misc: 'var(--muted-foreground)'
-	};
-	return colors[category] || 'var(--muted-foreground)';
-}

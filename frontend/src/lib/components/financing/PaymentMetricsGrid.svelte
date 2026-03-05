@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Card, CardContent } from '$lib/components/ui/card';
+	import { StatCardGrid } from '$lib/components/charts';
 	import { Banknote, Calendar, TrendingUp, Hash, DollarSign, TriangleAlert } from 'lucide-svelte';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import type { VehicleFinancing } from '$lib/types.js';
@@ -56,171 +56,78 @@
 	);
 
 	let overageCost = $derived(excessMiles * (financing.excessMileageFee ?? 0));
+
+	let metricItems = $derived.by(() => {
+		const items: Array<{
+			label: string;
+			value: string | number;
+			icon: typeof TrendingUp;
+			iconColor: string;
+			subtitle: string;
+		}> = [];
+
+		if (isLoanWithApr) {
+			items.push({
+				label: 'Principal vs Interest',
+				value: formatCurrency(totalPrincipalPaid),
+				subtitle: `+ ${formatCurrency(totalInterestPaid)} interest`,
+				icon: TrendingUp,
+				iconColor: 'chart-1'
+			});
+		}
+
+		items.push({
+			label: 'Payments Made',
+			value: paymentsCount,
+			subtitle: `of ${financing.termMonths} scheduled`,
+			icon: Hash,
+			iconColor: 'chart-3'
+		});
+
+		items.push({
+			label: financing.financingType === 'lease' ? 'Lease End Date' : 'Estimated Payoff',
+			value: formatDate(estimatedPayoffDate),
+			subtitle: `${remainingMonths} month${remainingMonths !== 1 ? 's' : ''} remaining`,
+			icon: Calendar,
+			iconColor: 'chart-4'
+		});
+
+		if (isLoanWithApr) {
+			items.push({
+				label: 'Total Cost of Loan',
+				value: formatCurrency(totalCostOfLoan),
+				subtitle: `${interestPercentage}% over principal`,
+				icon: Banknote,
+				iconColor: 'chart-5'
+			});
+		}
+
+		if (financing.financingType === 'lease' && financing.residualValue) {
+			items.push({
+				label: 'Residual Value (Buyout)',
+				value: formatCurrency(financing.residualValue),
+				subtitle: 'End-of-lease purchase option',
+				icon: DollarSign,
+				iconColor: 'chart-5'
+			});
+		}
+
+		if (
+			financing.financingType === 'lease' &&
+			financing.mileageLimit &&
+			financing.excessMileageFee
+		) {
+			items.push({
+				label: 'Mileage Overage',
+				value: excessMiles > 0 ? formatCurrency(overageCost) : '$0.00',
+				subtitle: `${excessMiles > 0 ? `${excessMiles.toLocaleString()} mi over` : 'Within limit'} · $${financing.excessMileageFee.toFixed(2)}/mi`,
+				icon: TriangleAlert,
+				iconColor: excessMiles > 0 ? 'destructive' : 'chart-2'
+			});
+		}
+
+		return items;
+	});
 </script>
 
-<div
-	class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
-	role="list"
-	aria-label="Payment metrics"
->
-	<!-- Principal vs Interest (loans only) -->
-	{#if isLoanWithApr}
-		<Card role="listitem">
-			<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
-				<div class="flex items-start justify-between">
-					<div class="space-y-1">
-						<p
-							class="text-xs sm:text-sm font-medium text-muted-foreground"
-							id="principal-interest-label"
-						>
-							Principal vs Interest
-						</p>
-						<p
-							class="text-xl sm:text-2xl font-bold text-chart-2"
-							aria-labelledby="principal-interest-label"
-						>
-							{formatCurrency(totalPrincipalPaid)}
-						</p>
-						<p class="text-xs text-muted-foreground">
-							+ {formatCurrency(totalInterestPaid)} interest
-						</p>
-					</div>
-					<div class="rounded-full bg-chart-1/10 p-2" aria-hidden="true">
-						<TrendingUp class="h-4 w-4 sm:h-5 sm:w-5 text-chart-1" />
-					</div>
-				</div>
-			</CardContent>
-		</Card>
-	{/if}
-
-	<!-- Payments Made -->
-	<Card role="listitem">
-		<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
-			<div class="flex items-start justify-between">
-				<div class="space-y-1">
-					<p class="text-xs sm:text-sm font-medium text-muted-foreground" id="payments-count-label">
-						Payments Made
-					</p>
-					<p class="text-xl sm:text-2xl font-bold" aria-labelledby="payments-count-label">
-						{paymentsCount}
-					</p>
-					<p class="text-xs text-muted-foreground">
-						of {financing.termMonths} scheduled
-					</p>
-				</div>
-				<div class="rounded-full bg-chart-3/10 p-2" aria-hidden="true">
-					<Hash class="h-4 w-4 sm:h-5 sm:w-5 text-chart-3" />
-				</div>
-			</div>
-		</CardContent>
-	</Card>
-
-	<!-- Estimated Payoff Date / Lease End Date + Remaining Term -->
-	<Card role="listitem">
-		<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
-			<div class="flex items-start justify-between">
-				<div class="space-y-1">
-					<p class="text-xs sm:text-sm font-medium text-muted-foreground" id="payoff-date-label">
-						{financing.financingType === 'lease' ? 'Lease End Date' : 'Estimated Payoff'}
-					</p>
-					<time
-						class="text-lg sm:text-2xl font-bold break-words block"
-						datetime={estimatedPayoffDate.toISOString()}
-						aria-labelledby="payoff-date-label">{formatDate(estimatedPayoffDate)}</time
-					>
-					<p class="text-xs text-muted-foreground">
-						{remainingMonths} month{remainingMonths !== 1 ? 's' : ''} remaining
-					</p>
-				</div>
-				<div class="rounded-full bg-chart-4/10 p-2" aria-hidden="true">
-					<Calendar class="h-4 w-4 sm:h-5 sm:w-5 text-chart-4" />
-				</div>
-			</div>
-		</CardContent>
-	</Card>
-
-	<!-- Total Cost of Loan (loans with APR only) -->
-	{#if isLoanWithApr}
-		<Card role="listitem">
-			<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
-				<div class="flex items-start justify-between">
-					<div class="space-y-1">
-						<p class="text-xs sm:text-sm font-medium text-muted-foreground" id="total-cost-label">
-							Total Cost of Loan
-						</p>
-						<p class="text-xl sm:text-2xl font-bold" aria-labelledby="total-cost-label">
-							{formatCurrency(totalCostOfLoan)}
-						</p>
-						<p class="text-xs text-muted-foreground">
-							{interestPercentage}% over principal
-						</p>
-					</div>
-					<div class="rounded-full bg-chart-5/10 p-2" aria-hidden="true">
-						<Banknote class="h-4 w-4 sm:h-5 sm:w-5 text-chart-5" />
-					</div>
-				</div>
-			</CardContent>
-		</Card>
-	{/if}
-
-	<!-- Residual Value (leases only) -->
-	{#if financing.financingType === 'lease' && financing.residualValue}
-		<Card role="listitem">
-			<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
-				<div class="flex items-start justify-between">
-					<div class="space-y-1">
-						<p
-							class="text-xs sm:text-sm font-medium text-muted-foreground"
-							id="residual-value-label"
-						>
-							Residual Value (Buyout)
-						</p>
-						<p class="text-xl sm:text-2xl font-bold" aria-labelledby="residual-value-label">
-							{formatCurrency(financing.residualValue)}
-						</p>
-						<p class="text-xs text-muted-foreground">End-of-lease purchase option</p>
-					</div>
-					<div class="rounded-full bg-chart-5/10 p-2" aria-hidden="true">
-						<DollarSign class="h-4 w-4 sm:h-5 sm:w-5 text-chart-5" />
-					</div>
-				</div>
-			</CardContent>
-		</Card>
-	{/if}
-
-	<!-- Mileage Overage (leases with mileage limit and excess fee) -->
-	{#if financing.financingType === 'lease' && financing.mileageLimit && financing.excessMileageFee}
-		<Card role="listitem">
-			<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
-				<div class="flex items-start justify-between">
-					<div class="space-y-1">
-						<p
-							class="text-xs sm:text-sm font-medium text-muted-foreground"
-							id="mileage-overage-label"
-						>
-							Mileage Overage
-						</p>
-						<p
-							class="text-xl sm:text-2xl font-bold {excessMiles > 0 ? 'text-destructive' : ''}"
-							aria-labelledby="mileage-overage-label"
-						>
-							{excessMiles > 0 ? formatCurrency(overageCost) : '$0.00'}
-						</p>
-						<p class="text-xs text-muted-foreground">
-							{excessMiles > 0 ? `${excessMiles.toLocaleString()} mi over` : 'Within limit'}
-							· ${financing.excessMileageFee.toFixed(2)}/mi
-						</p>
-					</div>
-					<div
-						class="rounded-full {excessMiles > 0 ? 'bg-destructive/10' : 'bg-chart-2/10'} p-2"
-						aria-hidden="true"
-					>
-						<TriangleAlert
-							class="h-4 w-4 sm:h-5 sm:w-5 {excessMiles > 0 ? 'text-destructive' : 'text-chart-2'}"
-						/>
-					</div>
-				</div>
-			</CardContent>
-		</Card>
-	{/if}
-</div>
+<StatCardGrid items={metricItems} columns={4} />

@@ -1,0 +1,19 @@
+/* Bar chart entrance animation: grow up from bottom */
+@keyframes chart-grow-up {
+	from {
+		clip-path: inset(100% 0 0 0);
+	}
+	to {
+		clip-path: inset(0 0 0 0);
+	}
+}
+
+/* Pre-animation: clip bars until the animation class is added */
+.chart-bar-animate-ready .lc-bars-g {
+	clip-path: inset(100% 0 0 0);
+}
+
+/* When animated class is added, trigger the grow-up */
+.chart-bar-animate-ready.chart-bar-animated .lc-bars-g {
+	animation: chart-grow-up 1s ease-out forwards;
+}

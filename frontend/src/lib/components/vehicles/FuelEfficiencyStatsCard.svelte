@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { Gauge, Plus } from 'lucide-svelte';
-	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Button } from '$lib/components/ui/button';
-	import StatCardDual from '$lib/components/common/stat-card-dual.svelte';
+	import { StatCardGrid } from '$lib/components/charts';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import {
@@ -40,107 +38,96 @@
 	let volumeUnit = $derived(settings?.volumeUnit || 'gallons_us');
 	let chargeUnit = $derived(settings?.chargeUnit || 'kwh');
 	let isKilometers = $derived(distanceUnit === 'kilometers');
+
+	let statItems = $derived.by(() => {
+		if (!vehicleStatsData || !hasFuelData) return [];
+
+		const items: {
+			label: string;
+			value: string | number;
+			unit?: string;
+			secondaryLabel?: string;
+			secondaryValue?: string | number;
+			secondaryUnit?: string;
+		}[] = [];
+
+		if (vehicleStatsData.currentMileage !== null) {
+			items.push({
+				label: `Current ${isKilometers ? 'Odometer' : 'Mileage'}`,
+				value: vehicleStatsData.currentMileage.toLocaleString(),
+				unit: getDistanceUnitLabel(distanceUnit, false),
+				secondaryLabel: `${isKilometers ? 'Distance' : 'Miles'} Driven`,
+				secondaryValue: vehicleStatsData.totalMileage.toLocaleString(),
+				secondaryUnit: selectedStatsPeriod === 'all' ? 'lifetime' : `in ${selectedStatsPeriod}`
+			});
+		}
+
+		if (vehicleStatsData.totalFuelConsumed > 0) {
+			items.push({
+				label: 'Fuel Consumed',
+				value: vehicleStatsData.totalFuelConsumed.toFixed(1),
+				unit: getVolumeUnitLabel(volumeUnit, true),
+				secondaryLabel: 'Total Fuel Cost',
+				secondaryValue: formatCurrency(vehicleStatsData.totalFuelCost),
+				secondaryUnit: `${vehicleStatsData.fuelExpenseCount} fill-ups`
+			});
+		}
+
+		if (vehicleStatsData.totalChargeConsumed > 0) {
+			items.push({
+				label: 'Charge Consumed',
+				value: vehicleStatsData.totalChargeConsumed.toFixed(1),
+				unit: getChargeUnitLabel(chargeUnit, true),
+				secondaryLabel: 'Total Charge Cost',
+				secondaryValue: formatCurrency(vehicleStatsData.totalChargeCost),
+				secondaryUnit: `${vehicleStatsData.chargeExpenseCount} charges`
+			});
+		}
+
+		if (vehicleStatsData.averageMpg !== null) {
+			items.push({
+				label: `Average ${getFuelEfficiencyLabel(distanceUnit, volumeUnit)}`,
+				value: vehicleStatsData.averageMpg.toFixed(1),
+				unit: 'fuel efficiency',
+				secondaryLabel: `Cost per ${getDistanceUnitLabel(distanceUnit, true)}`,
+				secondaryValue:
+					vehicleStatsData.costPerMile !== null
+						? formatCurrency(vehicleStatsData.costPerMile)
+						: 'N/A',
+				secondaryUnit: 'fuel only'
+			});
+		}
+
+		if (vehicleStatsData.averageMilesPerKwh !== null) {
+			items.push({
+				label: 'Efficiency',
+				value: vehicleStatsData.averageMilesPerKwh.toFixed(2),
+				unit: getElectricEfficiencyLabel(distanceUnit, chargeUnit),
+				secondaryLabel: `Cost per ${getDistanceUnitLabel(distanceUnit, true)}`,
+				secondaryValue:
+					vehicleStatsData.costPerMile !== null
+						? formatCurrency(vehicleStatsData.costPerMile)
+						: 'N/A',
+				secondaryUnit: 'charge only'
+			});
+		}
+
+		return items;
+	});
 </script>
 
-{#if isLoadingStats}
-	<Card>
-		<CardHeader>
-			<CardTitle class="flex items-center gap-2">
-				<Gauge class="h-5 w-5" />
-				Mileage & Fuel Statistics
-			</CardTitle>
-		</CardHeader>
-		<CardContent>
-			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-				{#each Array(3) as _, i (i)}
-					<div class="flex flex-col p-4 rounded-lg border bg-card">
-						<div class="flex items-start justify-between gap-4">
-							<div class="flex-1 space-y-1">
-								<Skeleton class="h-4 w-24" />
-								<Skeleton class="h-8 w-20" />
-							</div>
-							<div class="w-px bg-border self-stretch my-1"></div>
-							<div class="flex-1 space-y-1">
-								<Skeleton class="h-4 w-20" />
-								<Skeleton class="h-8 w-16" />
-							</div>
-						</div>
-					</div>
-				{/each}
-			</div>
-		</CardContent>
-	</Card>
-{:else if hasFuelData && vehicleStatsData}
-	<Card>
-		<CardHeader>
-			<CardTitle class="flex items-center gap-2">
-				<Gauge class="h-5 w-5" />
-				Mileage & Fuel Statistics
-			</CardTitle>
-		</CardHeader>
-		<CardContent>
-			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-				{#if vehicleStatsData.currentMileage !== null}
-					<StatCardDual
-						label="Current {isKilometers ? 'Odometer' : 'Mileage'}"
-						value={vehicleStatsData.currentMileage.toLocaleString()}
-						unit={getDistanceUnitLabel(distanceUnit, false)}
-						secondaryLabel="{isKilometers ? 'Distance' : 'Miles'} Driven"
-						secondaryValue={vehicleStatsData.totalMileage.toLocaleString()}
-						secondaryUnit={selectedStatsPeriod === 'all' ? 'lifetime' : `in ${selectedStatsPeriod}`}
-					/>
-				{/if}
-
-				{#if vehicleStatsData.totalFuelConsumed > 0}
-					<StatCardDual
-						label="Fuel Consumed"
-						value={vehicleStatsData.totalFuelConsumed.toFixed(1)}
-						unit={getVolumeUnitLabel(volumeUnit, true)}
-						secondaryLabel="Total Fuel Cost"
-						secondaryValue={formatCurrency(vehicleStatsData.totalFuelCost)}
-						secondaryUnit="{vehicleStatsData.fuelExpenseCount} fill-ups"
-					/>
-				{/if}
-
-				{#if vehicleStatsData.totalChargeConsumed > 0}
-					<StatCardDual
-						label="Charge Consumed"
-						value={vehicleStatsData.totalChargeConsumed.toFixed(1)}
-						unit={getChargeUnitLabel(chargeUnit, true)}
-						secondaryLabel="Total Charge Cost"
-						secondaryValue={formatCurrency(vehicleStatsData.totalChargeCost)}
-						secondaryUnit="{vehicleStatsData.chargeExpenseCount} charges"
-					/>
-				{/if}
-
-				{#if vehicleStatsData.averageMpg !== null}
-					<StatCardDual
-						label="Average {getFuelEfficiencyLabel(distanceUnit, volumeUnit)}"
-						value={vehicleStatsData.averageMpg.toFixed(1)}
-						unit="fuel efficiency"
-						secondaryLabel="Cost per {getDistanceUnitLabel(distanceUnit, true)}"
-						secondaryValue={vehicleStatsData.costPerMile !== null
-							? formatCurrency(vehicleStatsData.costPerMile)
-							: 'N/A'}
-						secondaryUnit="fuel only"
-					/>
-				{/if}
-
-				{#if vehicleStatsData.averageMilesPerKwh !== null}
-					<StatCardDual
-						label="Efficiency"
-						value={vehicleStatsData.averageMilesPerKwh.toFixed(2)}
-						unit={getElectricEfficiencyLabel(distanceUnit, chargeUnit)}
-						secondaryLabel="Cost per {getDistanceUnitLabel(distanceUnit, true)}"
-						secondaryValue={vehicleStatsData.costPerMile !== null
-							? formatCurrency(vehicleStatsData.costPerMile)
-							: 'N/A'}
-						secondaryUnit="charge only"
-					/>
-				{/if}
-			</div>
-		</CardContent>
-	</Card>
+{#if hasFuelData || isLoadingStats}
+	<div class="space-y-3">
+		<div class="flex items-center gap-2">
+			<Gauge class="h-5 w-5" />
+			<h3 class="text-lg font-semibold">Mileage & Fuel Statistics</h3>
+		</div>
+		<StatCardGrid
+			items={isLoadingStats ? Array(3).fill({ label: '', value: '' }) : statItems}
+			columns={3}
+			isLoading={isLoadingStats}
+		/>
+	</div>
 {:else if vehicleStatsData}
 	<EmptyState>
 		{#snippet icon()}

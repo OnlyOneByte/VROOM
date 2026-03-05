@@ -1,14 +1,23 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { LoaderCircle, CircleAlert, ChartBar } from 'lucide-svelte';
+	import {
+		LoaderCircle,
+		CircleAlert,
+		ChartBar,
+		Car,
+		DollarSign,
+		Activity,
+		TrendingUp
+	} from 'lucide-svelte';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
-	import QuickStats from '$lib/components/analytics/QuickStats.svelte';
+	import { StatCardGrid } from '$lib/components/charts';
 	import FuelStatsTab from '$lib/components/analytics/FuelStatsTab.svelte';
 	import CrossVehicleTab from '$lib/components/analytics/CrossVehicleTab.svelte';
 	import PerVehicleTab from '$lib/components/analytics/PerVehicleTab.svelte';
 	import YearEndTab from '$lib/components/analytics/YearEndTab.svelte';
 	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
+	import { formatCurrency } from '$lib/utils/formatters';
 	import type { QuickStatsResponse } from '$lib/types';
 
 	let quickStats = $state<QuickStatsResponse | null>(null);
@@ -27,6 +36,37 @@
 			isLoadingQuickStats = false;
 		}
 	}
+
+	let quickStatsItems = $derived(
+		quickStats
+			? [
+					{
+						label: 'Total Vehicles',
+						value: quickStats.vehicleCount,
+						icon: Car,
+						iconColor: 'primary'
+					},
+					{
+						label: 'YTD Spending',
+						value: formatCurrency(quickStats.ytdSpending),
+						icon: DollarSign,
+						iconColor: 'chart-1'
+					},
+					{
+						label: 'Avg MPG',
+						value: quickStats.avgMpg != null ? quickStats.avgMpg.toFixed(1) : 'N/A',
+						icon: Activity,
+						iconColor: 'chart-2'
+					},
+					{
+						label: 'Fleet Health',
+						value: quickStats.fleetHealthScore,
+						icon: TrendingUp,
+						iconColor: 'chart-5'
+					}
+				]
+			: []
+	);
 
 	onMount(() => {
 		loadQuickStats();
@@ -65,7 +105,7 @@
 			<Button onclick={loadQuickStats}>Retry</Button>
 		</div>
 	{:else if quickStats}
-		<QuickStats data={quickStats} />
+		<StatCardGrid items={quickStatsItems} columns={4} />
 	{/if}
 
 	<!-- Tabs -->

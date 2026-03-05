@@ -1,15 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Plus, TrendingUp, ChartPie } from 'lucide-svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { TrendingUp, ChartPie } from 'lucide-svelte';
+	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
+	import PageHeader from '$lib/components/common/page-header.svelte';
 	import DashboardStatsCards from '$lib/components/dashboard/DashboardStatsCards.svelte';
 	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
-	import CategoryPieChart from '$lib/components/charts/CategoryPieChart.svelte';
+	import { AppPieChart } from '$lib/components/charts';
 	import RecentActivityCard from '$lib/components/dashboard/RecentActivityCard.svelte';
 	import VehicleCarousel from '$lib/components/dashboard/VehicleCarousel.svelte';
 	import PeriodSelector from '$lib/components/vehicles/PeriodSelector.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import { categoryLabels, getCategoryColorHex } from '$lib/utils/expense-helpers';
+	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import { getCategoryColor as getCategoryChartColor } from '$lib/utils/chart-colors';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { expenseApi } from '$lib/services/expense-api';
 	import type { Vehicle, Expense, ExpenseCategory, ExpenseSummary, Photo } from '$lib/types';
@@ -73,11 +75,11 @@
 		if (!periodSummary?.categoryBreakdown) return [];
 		const total = periodSummary.categoryBreakdown.reduce((sum, c) => sum + c.amount, 0);
 		return periodSummary.categoryBreakdown.map(c => ({
-			category: c.category as ExpenseCategory,
-			name: categoryLabels[c.category as ExpenseCategory] || c.category,
-			amount: c.amount,
+			key: c.category,
+			label: categoryLabels[c.category as ExpenseCategory] || c.category,
+			value: c.amount,
 			percentage: total > 0 ? (c.amount / total) * 100 : 0,
-			color: getCategoryColorHex(c.category as ExpenseCategory)
+			color: getCategoryChartColor(c.category)
 		}));
 	});
 
@@ -168,18 +170,12 @@
 
 <div class="space-y-6 pb-24">
 	<!-- Header -->
-	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-		<div>
-			<h1 class="text-3xl font-bold tracking-tight">Dashboard</h1>
-			<p class="text-muted-foreground mt-1">
-				{#if stats.totalVehicles > 0}
-					Overview of your {stats.totalVehicles} vehicle{stats.totalVehicles !== 1 ? 's' : ''}
-				{:else}
-					Welcome! Get started by adding your first vehicle
-				{/if}
-			</p>
-		</div>
-	</div>
+	<PageHeader
+		title="Dashboard"
+		description={stats.totalVehicles > 0
+			? `Overview of your ${stats.totalVehicles} vehicle${stats.totalVehicles !== 1 ? 's' : ''}`
+			: 'Welcome! Get started by adding your first vehicle'}
+	/>
 
 	<!-- Stats Cards -->
 	<DashboardStatsCards
@@ -208,11 +204,16 @@
 					<TrendingUp class="h-5 w-5 text-primary" />
 				{/snippet}
 			</ExpenseTrendChart>
-			<CategoryPieChart data={categoryChartData} {isLoading}>
+			<AppPieChart
+				title="Expense by Category"
+				description="Distribution across all vehicles"
+				data={categoryChartData}
+				{isLoading}
+			>
 				{#snippet icon()}
 					<ChartPie class="h-5 w-5 text-chart-1" />
 				{/snippet}
-			</CategoryPieChart>
+			</AppPieChart>
 		</div>
 
 		<!-- Recent Activity -->
@@ -220,11 +221,4 @@
 	{/if}
 </div>
 
-<Button
-	href="/vehicles/new"
-	class="fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto flex items-center justify-center gap-2 pl-6 pr-10 bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 border-0 group"
-	aria-label="Add vehicle"
->
-	<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
-	<span class="font-bold text-lg">Add Vehicle</span>
-</Button>
+<FloatingActionButton href="/vehicles/new" label="Add Vehicle" />

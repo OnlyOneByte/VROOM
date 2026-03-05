@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount, type Component } from 'svelte';
 	import { Plus, FileText, CreditCard, CircleAlert } from 'lucide-svelte';
+	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -12,7 +13,7 @@
 	import ExpenseSearchFilters from '$lib/components/expenses/ExpenseSearchFilters.svelte';
 	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
 	import FuelEfficiencyTrendChart from '$lib/components/charts/FuelEfficiencyTrendChart.svelte';
-	import CategoryPieChart from '$lib/components/charts/CategoryPieChart.svelte';
+	import { AppPieChart } from '$lib/components/charts';
 	import VehicleHeader from '$lib/components/vehicles/VehicleHeader.svelte';
 	import VehiclePhotoCarousel from '$lib/components/vehicles/VehiclePhotoCarousel.svelte';
 	import MediaCaptureDialog from '$lib/components/shared/MediaCaptureDialog.svelte';
@@ -31,11 +32,8 @@
 	// Lazy-loaded InsuranceTab — only import when overview tab has been viewed
 	let InsuranceTab = $state<Component<{ vehicleId: string }> | null>(null);
 	let hasLoadedInsurance = $state(false);
-	import {
-		categoryLabels,
-		getCategoryColorHex,
-		type CategoryChartData
-	} from '$lib/utils/expense-helpers';
+	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import { getCategoryColor as getCategoryChartColor } from '$lib/utils/chart-colors';
 	import {
 		filterExpenses,
 		hasActiveFilters as checkActiveFilters
@@ -122,19 +120,19 @@
 		}));
 	});
 
-	let categoryChartData = $derived.by((): CategoryChartData[] => {
+	let categoryChartData = $derived.by(() => {
 		if (!summary?.categoryBreakdown.length) return [];
 		const total = summary.categoryBreakdown.reduce((sum, item) => sum + item.amount, 0);
 		if (total === 0) return [];
 		return summary.categoryBreakdown
 			.map(item => ({
-				category: item.category as ExpenseCategory,
-				name: categoryLabels[item.category as ExpenseCategory] || item.category,
-				amount: item.amount,
+				key: item.category,
+				label: categoryLabels[item.category as ExpenseCategory] || item.category,
+				value: item.amount,
 				percentage: (item.amount / total) * 100,
-				color: getCategoryColorHex(item.category as ExpenseCategory)
+				color: getCategoryChartColor(item.category)
 			}))
-			.sort((a, b) => b.amount - a.amount);
+			.sort((a, b) => b.value - a.value);
 	});
 
 	// Stats for ExpenseOverviewCard from server summary
@@ -544,7 +542,12 @@
 
 					<!-- Expenses by Category with Pie Chart -->
 					{#if categoryChartData.length > 0}
-						<CategoryPieChart data={categoryChartData} isLoading={isLoadingStats} />
+						<AppPieChart
+							title="Expense by Category"
+							description="Distribution across all vehicles"
+							data={categoryChartData}
+							isLoading={isLoadingStats}
+						/>
 					{/if}
 				{/if}
 			</TabsContent>
@@ -760,20 +763,9 @@
 
 <!-- Floating Action Button -->
 {#if vehicle}
-	<Button
+	<FloatingActionButton
 		href="/expenses/new?vehicleId={vehicleId}&returnTo=/vehicles/{vehicleId}"
-		class="
-			fixed bottom-4 left-4 right-4 z-50 h-16 rounded-full
-			sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto
-			flex items-center justify-center gap-2 pl-6 pr-10
-			bg-foreground hover:bg-foreground/90
-			text-background shadow-2xl
-			transition-all duration-300 sm:hover:scale-110
-			border-0 group
-		"
-		aria-label="Add expense"
-	>
-		<Plus class="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
-		<span class="font-bold text-lg">{COMMON_MESSAGES.ADD_EXPENSE}</span>
-	</Button>
+		label={COMMON_MESSAGES.ADD_EXPENSE}
+		ariaLabel="Add expense"
+	/>
 {/if}

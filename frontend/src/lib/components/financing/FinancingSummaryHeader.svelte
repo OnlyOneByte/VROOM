@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Progress } from '$lib/components/ui/progress';
 	import { Card, CardContent } from '$lib/components/ui/card';
+	import { StatCardGrid } from '$lib/components/charts';
 	import { DollarSign, TrendingUp, Wallet, Target } from 'lucide-svelte';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import type { VehicleFinancing } from '$lib/types';
@@ -27,6 +28,38 @@
 	let progressBarClass = $derived(
 		progressPercentage > 75 ? 'bg-chart-2' : progressPercentage >= 50 ? 'bg-chart-3' : 'bg-chart-1'
 	);
+
+	// Dynamic icon color for progress card based on percentage
+	let progressIconColor = $derived(
+		progressPercentage > 75 ? 'chart-2' : progressPercentage >= 50 ? 'chart-3' : 'chart-1'
+	);
+
+	let metricItems = $derived([
+		{
+			label: 'Original Amount',
+			value: formatCurrency(financing.originalAmount),
+			icon: DollarSign,
+			iconColor: 'chart-3'
+		},
+		{
+			label: 'Current Balance',
+			value: formatCurrency(financing.currentBalance),
+			icon: Wallet,
+			iconColor: 'chart-1'
+		},
+		{
+			label: 'Amount Paid',
+			value: formatCurrency(amountPaid),
+			icon: TrendingUp,
+			iconColor: 'chart-2'
+		},
+		{
+			label: 'Progress',
+			value: `${Math.round(progressPercentage)}%`,
+			icon: Target,
+			iconColor: progressIconColor
+		}
+	]);
 </script>
 
 <div class="space-y-4 sm:space-y-6">
@@ -74,107 +107,5 @@
 	</Card>
 
 	<!-- Metrics Grid -->
-	<div
-		class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
-		role="list"
-		aria-label="Financing metrics"
-	>
-		<!-- Original Amount -->
-		<Card role="listitem">
-			<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
-				<div class="flex items-start justify-between">
-					<div class="space-y-1">
-						<p
-							class="text-xs sm:text-sm font-medium text-muted-foreground"
-							id="original-amount-label"
-						>
-							Original Amount
-						</p>
-						<p class="text-xl sm:text-2xl font-bold" aria-labelledby="original-amount-label">
-							{formatCurrency(financing.originalAmount)}
-						</p>
-					</div>
-					<div class="rounded-full bg-chart-3/10 p-2" aria-hidden="true">
-						<DollarSign class="h-4 w-4 sm:h-5 sm:w-5 text-chart-3" />
-					</div>
-				</div>
-			</CardContent>
-		</Card>
-
-		<!-- Current Balance -->
-		<Card role="listitem">
-			<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
-				<div class="flex items-start justify-between">
-					<div class="space-y-1">
-						<p
-							class="text-xs sm:text-sm font-medium text-muted-foreground"
-							id="current-balance-label"
-						>
-							Current Balance
-						</p>
-						<p class="text-xl sm:text-2xl font-bold" aria-labelledby="current-balance-label">
-							{formatCurrency(financing.currentBalance)}
-						</p>
-					</div>
-					<div class="rounded-full bg-chart-1/10 p-2" aria-hidden="true">
-						<Wallet class="h-4 w-4 sm:h-5 sm:w-5 text-chart-1" />
-					</div>
-				</div>
-			</CardContent>
-		</Card>
-
-		<!-- Amount Paid -->
-		<Card role="listitem">
-			<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
-				<div class="flex items-start justify-between">
-					<div class="space-y-1">
-						<p class="text-xs sm:text-sm font-medium text-muted-foreground" id="amount-paid-label">
-							Amount Paid
-						</p>
-						<p class="text-xl sm:text-2xl font-bold" aria-labelledby="amount-paid-label">
-							{formatCurrency(amountPaid)}
-						</p>
-					</div>
-					<div class="rounded-full bg-chart-2/10 p-2" aria-hidden="true">
-						<TrendingUp class="h-4 w-4 sm:h-5 sm:w-5 text-chart-2" />
-					</div>
-				</div>
-			</CardContent>
-		</Card>
-
-		<!-- Progress Percentage -->
-		<Card role="listitem">
-			<CardContent class="p-4 sm:pt-6 sm:px-6 sm:pb-6">
-				<div class="flex items-start justify-between">
-					<div class="space-y-1">
-						<p class="text-xs sm:text-sm font-medium text-muted-foreground" id="progress-label">
-							Progress
-						</p>
-						<p
-							class="text-xl sm:text-2xl font-bold {progressColor}"
-							aria-labelledby="progress-label"
-						>
-							{Math.round(progressPercentage)}%
-						</p>
-					</div>
-					<div
-						class="rounded-full p-2 {progressPercentage > 75
-							? 'bg-chart-2/10'
-							: progressPercentage >= 50
-								? 'bg-chart-3/10'
-								: 'bg-chart-1/10'}"
-						aria-hidden="true"
-					>
-						<Target
-							class="h-4 w-4 sm:h-5 sm:w-5 {progressPercentage > 75
-								? 'text-chart-2'
-								: progressPercentage >= 50
-									? 'text-chart-3'
-									: 'text-chart-1'}"
-						/>
-					</div>
-				</div>
-			</CardContent>
-		</Card>
-	</div>
+	<StatCardGrid items={metricItems} columns={4} />
 </div>

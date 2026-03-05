@@ -1,12 +1,9 @@
 <script lang="ts">
-	import '$lib/components/analytics/line-chart-animations.css';
-	import { animateOnView } from '$lib/utils/animate-on-view';
+	import './line-chart-animations.css';
 	import { LineChart } from 'layerchart';
 	import { scaleTime } from 'd3-scale';
-	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import EmptyState from '$lib/components/common/empty-state.svelte';
+	import ChartCard from './ChartCard.svelte';
 	import {
 		formatDecimalAxis,
 		CHART_PADDING,
@@ -36,6 +33,7 @@
 	// Title and unit label based on fuel type
 	let title = $derived(fuelType === 'electric' ? 'Electric Efficiency' : 'Fuel Efficiency');
 	let unitLabel = $derived(fuelType === 'electric' ? 'mi/kWh' : 'MPG');
+	let description = $derived(`Measured in ${unitLabel}`);
 
 	// Chart configuration for shadcn styling
 	const chartConfig: Chart.ChartConfig = {
@@ -55,60 +53,36 @@
 	]);
 </script>
 
-<Card.Root>
-	<Card.Header>
-		<Card.Title>{title}</Card.Title>
-		<Card.Description>Measured in {unitLabel}</Card.Description>
-	</Card.Header>
-	<Card.Content>
-		{#if isLoading}
-			<Skeleton class="h-[{CHART_HEIGHT}px] w-full" />
-		{:else if error}
-			<div class="h-[{CHART_HEIGHT}px]">
-				<EmptyState class="h-full">
-					{#snippet title()}
-						Failed to load chart
-					{/snippet}
-					{#snippet description()}
-						{error}
-					{/snippet}
-				</EmptyState>
-			</div>
-		{:else if data.length >= MIN_DATA_POINTS}
-			<div use:animateOnView={'chart-line-animated'}>
-				<Chart.Container config={chartConfig} class="h-[{CHART_HEIGHT}px] w-full">
-					<LineChart
-						{data}
-						x="date"
-						xScale={scaleTime()}
-						y="efficiency"
-						{series}
-						padding={CHART_PADDING}
-						props={{
-							...TREND_LINE_PROPS,
-							xAxis: monthlyXAxisProps(data.length),
-							yAxis: {
-								format: formatDecimalAxis
-							}
-						}}
-					>
-						{#snippet tooltip()}
-							<Chart.Tooltip hideLabel />
-						{/snippet}
-					</LineChart>
-				</Chart.Container>
-			</div>
-		{:else}
-			<div class="h-[{CHART_HEIGHT}px]">
-				<EmptyState class="h-full">
-					{#snippet title()}
-						Insufficient fuel data
-					{/snippet}
-					{#snippet description()}
-						Add at least 2 fuel entries with mileage and volume to calculate efficiency
-					{/snippet}
-				</EmptyState>
-			</div>
-		{/if}
-	</Card.Content>
-</Card.Root>
+<ChartCard
+	{title}
+	{description}
+	{isLoading}
+	{error}
+	isEmpty={data.length < MIN_DATA_POINTS}
+	emptyTitle="Insufficient fuel data"
+	emptyDescription="Add at least 2 fuel entries with mileage and volume to calculate efficiency"
+	height={CHART_HEIGHT}
+	animationClass="chart-line-animated"
+>
+	<Chart.Container config={chartConfig} class="h-[{CHART_HEIGHT}px] w-full">
+		<LineChart
+			{data}
+			x="date"
+			xScale={scaleTime()}
+			y="efficiency"
+			{series}
+			padding={CHART_PADDING}
+			props={{
+				...TREND_LINE_PROPS,
+				xAxis: monthlyXAxisProps(data.length),
+				yAxis: {
+					format: formatDecimalAxis
+				}
+			}}
+		>
+			{#snippet tooltip()}
+				<Chart.Tooltip hideLabel />
+			{/snippet}
+		</LineChart>
+	</Chart.Container>
+</ChartCard>

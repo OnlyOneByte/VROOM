@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { CreditCard } from 'lucide-svelte';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import StatCard from '$lib/components/common/stat-card.svelte';
+	import { StatCard } from '$lib/components/charts';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { getDistanceUnitLabel } from '$lib/utils/units';

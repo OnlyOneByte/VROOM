@@ -1,9 +1,5 @@
 <script lang="ts">
-	import '$lib/components/analytics/line-chart-animations.css';
-	import { animateOnView } from '$lib/utils/animate-on-view';
 	import { onMount } from 'svelte';
-	import { LineChart } from 'layerchart';
-	import { scaleTime } from 'd3-scale';
 	import {
 		Plus,
 		LoaderCircle,
@@ -16,16 +12,12 @@
 	} from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import * as Chart from '$lib/components/ui/chart';
+	import type { ChartConfig } from '$lib/components/ui/chart';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import { AppLineChart } from '$lib/components/charts';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { odometerApi } from '$lib/services/odometer-api';
 	import { formatDate, formatNumber } from '$lib/utils/formatters';
-	import {
-		CHART_PADDING_WIDE,
-		TREND_LINE_PROPS,
-		monthlyXAxisProps
-	} from '$lib/utils/chart-formatters';
 	import type { OdometerEntry, PaginatedOdometerResponse } from '$lib/types';
 
 	const PAGE_SIZE = 20;
@@ -64,7 +56,7 @@
 			.sort((a, b) => a.date.getTime() - b.date.getTime())
 	);
 
-	const chartConfig: Chart.ChartConfig = {
+	const chartConfig: ChartConfig = {
 		odometer: {
 			label: 'Odometer',
 			color: 'var(--chart-1)'
@@ -191,37 +183,17 @@
 
 		<!-- Mileage Over Time Chart -->
 		{#if chartData.length >= MIN_CHART_POINTS}
-			<Card.Root>
-				<Card.Header>
-					<Card.Title>Mileage Over Time</Card.Title>
-					<Card.Description>Odometer readings plotted by date</Card.Description>
-				</Card.Header>
-				<Card.Content>
-					<div use:animateOnView={'chart-line-animated'}>
-						<Chart.Container config={chartConfig} class="h-[280px] w-full">
-							<LineChart
-								data={chartData}
-								x="date"
-								xScale={scaleTime()}
-								y="odometer"
-								{series}
-								padding={CHART_PADDING_WIDE}
-								props={{
-									...TREND_LINE_PROPS,
-									xAxis: monthlyXAxisProps(chartData.length),
-									yAxis: {
-										format: (v: number) => formatNumber(v, 0)
-									}
-								}}
-							>
-								{#snippet tooltip()}
-									<Chart.Tooltip hideLabel />
-								{/snippet}
-							</LineChart>
-						</Chart.Container>
-					</div>
-				</Card.Content>
-			</Card.Root>
+			<AppLineChart
+				title="Mileage Over Time"
+				description="Odometer readings plotted by date"
+				data={chartData}
+				x="date"
+				y="odometer"
+				{series}
+				config={chartConfig}
+				height={280}
+				yAxisFormat={v => formatNumber(v, 0)}
+			/>
 		{/if}
 
 		<!-- Entries List -->
