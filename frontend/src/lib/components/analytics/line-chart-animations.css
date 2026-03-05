@@ -1,0 +1,34 @@
+/* Line chart entrance animation: stroke draws in left-to-right, then dots appear */
+@keyframes stroke-draw {
+	to {
+		stroke-dashoffset: 0;
+	}
+}
+
+@keyframes points-fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+.chart-line-animated .lc-path {
+	stroke-dasharray: 5000;
+	stroke-dashoffset: 5000;
+	animation: stroke-draw 2s ease-out forwards;
+}
+
+.chart-line-animated circle {
+	opacity: 0;
+	animation: points-fade-in 0.5s ease-out forwards;
+	animation-delay: 1.5s;
+}
+
+/* Area fill should not use stroke-dash */
+.chart-line-animated .lc-area {
+	stroke-dasharray: unset;
+	stroke-dashoffset: unset;
+	animation: none;
+}

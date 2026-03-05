@@ -25,6 +25,7 @@ sqlite.run('PRAGMA synchronous = NORMAL');
 sqlite.run(`PRAGMA cache_size = ${CONFIG.database.cacheSize}`);
 sqlite.run('PRAGMA foreign_keys = ON');
 sqlite.run('PRAGMA temp_store = MEMORY');
+sqlite.run(`PRAGMA busy_timeout = ${CONFIG.database.queryTimeout}`);
 
 // Configure WAL auto-checkpoint to prevent data loss during hot reload
 // Checkpoint after 1000 pages (~4MB) - SQLite default, good balance

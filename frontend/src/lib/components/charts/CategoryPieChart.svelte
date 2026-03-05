@@ -1,48 +1,66 @@
 <script lang="ts">
-	import { Arc, PieChart } from 'layerchart';
+	import '$lib/components/analytics/pie-chart-animations.css';
+	import { animateOnView } from '$lib/utils/animate-on-view';
+	import { PieChart } from 'layerchart';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { formatCurrency } from '$lib/utils/formatters';
-	import type { ExpenseCategory } from '$lib/types';
+	import type { Snippet } from 'svelte';
 
-	interface CategoryChartData {
-		category: ExpenseCategory;
-		name: string;
+	interface CategoryData {
+		category: string;
+		name?: string;
+		label?: string;
 		amount: number;
 		percentage: number;
 		color: string;
 	}
 
 	interface Props {
-		data: CategoryChartData[];
+		data: CategoryData[];
+		title?: string;
+		description?: string;
 		isLoading?: boolean;
 		error?: string | null;
+		icon?: Snippet;
 	}
 
-	let { data, isLoading = false, error = null }: Props = $props();
+	let {
+		data,
+		title = 'Expense by Category',
+		description = 'Distribution across all vehicles',
+		isLoading = false,
+		error = null,
+		icon
+	}: Props = $props();
 
-	// Chart configuration for shadcn styling
 	let chartConfig = $derived.by(() => {
 		const config: Chart.ChartConfig = {};
-		data.forEach(item => {
-			config[item.category] = {
-				label: item.name,
-				color: item.color
-			};
-		});
+		for (const item of data) {
+			const displayName = item.name ?? item.label ?? item.category;
+			config[item.category] = { label: displayName, color: item.color };
+		}
 		return config;
 	});
 </script>
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title>Expense Distribution</Card.Title>
-		<Card.Description>Breakdown by category</Card.Description>
+		<div class="flex items-center justify-between">
+			<div>
+				<Card.Title>{title}</Card.Title>
+				<Card.Description>{description}</Card.Description>
+			</div>
+			{#if icon}
+				<div class="rounded-lg bg-chart-1/10 p-2">
+					{@render icon()}
+				</div>
+			{/if}
+		</div>
 	</Card.Header>
 	<Card.Content class="flex flex-col md:flex-row gap-6">
-		<!-- Pie Chart -->
 		<div class="flex-1 flex items-center justify-center">
 			{#if isLoading}
 				<Skeleton class="h-[250px] w-full max-w-[250px]" />
@@ -58,68 +76,56 @@
 					</EmptyState>
 				</div>
 			{:else if data.length > 0}
-				<Chart.Container
-					config={chartConfig}
+				<div
+					use:animateOnView={'chart-pie-animated'}
 					class="mx-auto aspect-square max-h-[250px] w-full max-w-[250px]"
 				>
-					<PieChart
-						{data}
-						key="category"
-						value="amount"
-						cRange={data.map(d => d.color)}
-						c="color"
-						props={{
-							pie: {
-								innerRadius: 60,
-								outerRadius: 120,
-								padAngle: 0.02,
-								cornerRadius: 4
-							}
-						}}
-					>
-						{#snippet tooltip()}
-							<Chart.Tooltip hideLabel />
-						{/snippet}
-						{#snippet arc({ props })}
-							<Arc {...props} />
-						{/snippet}
-					</PieChart>
-				</Chart.Container>
+					<Chart.Container config={chartConfig} class="h-full w-full">
+						<PieChart
+							{data}
+							key="category"
+							value="amount"
+							label="name"
+							cRange={data.map(d => d.color)}
+							innerRadius={60}
+							outerRadius={120}
+							padAngle={0.02}
+							cornerRadius={4}
+						>
+							{#snippet tooltip()}
+								<Chart.Tooltip hideLabel />
+							{/snippet}
+						</PieChart>
+					</Chart.Container>
+				</div>
 			{:else}
 				<div class="h-[250px] w-full">
 					<EmptyState class="h-full">
 						{#snippet title()}
-							No expense data available
+							No data available
 						{/snippet}
 						{#snippet description()}
-							Add expenses to see distribution
+							Add expenses to see breakdown
 						{/snippet}
 					</EmptyState>
 				</div>
 			{/if}
 		</div>
 
-		<!-- Legend/Summary -->
-		<div class="flex-1 space-y-1.5 min-w-0" role="list" aria-label="Expense categories">
-			{#each data as category (category.category)}
-				<div
-					class="flex items-center justify-between p-2 rounded-lg"
-					role="listitem"
-					aria-label="Category {category.name}: {formatCurrency(
-						category.amount
-					)}, {category.percentage.toFixed(1)}%"
-				>
+		<div class="flex-1 space-y-1.5 min-w-0" role="list" aria-label="Categories">
+			{#each data as item (item.category)}
+				<div class="flex items-center justify-between rounded-lg p-2" role="listitem">
 					<div class="flex items-center gap-2">
 						<div
-							class="w-3 h-3 rounded-full"
-							style:background-color={category.color}
+							class="h-3 w-3 rounded-full"
+							style:background-color={item.color}
 							aria-hidden="true"
 						></div>
-						<span class="text-sm font-medium">{category.name}</span>
+						<span class="text-sm font-medium">{item.name ?? item.label ?? item.category}</span>
 					</div>
 					<div class="text-right">
-						<div class="text-sm font-bold">{formatCurrency(category.amount)}</div>
-						<div class="text-xs text-muted-foreground">{category.percentage.toFixed(1)}%</div>
+						<div class="text-sm font-bold">{formatCurrency(item.amount)}</div>
+						<div class="text-xs text-muted-foreground">{item.percentage.toFixed(1)}%</div>
 					</div>
 				</div>
 			{/each}

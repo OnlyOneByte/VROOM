@@ -1,4 +1,6 @@
 <script lang="ts">
+	import '$lib/components/analytics/line-chart-animations.css';
+	import { animateOnView } from '$lib/utils/animate-on-view';
 	import { onMount } from 'svelte';
 	import { LineChart } from 'layerchart';
 	import { scaleTime } from 'd3-scale';
@@ -19,7 +21,11 @@
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { odometerApi } from '$lib/services/odometer-api';
 	import { formatDate, formatNumber } from '$lib/utils/formatters';
-	import { formatMonthDay, getXTickCount } from '$lib/utils/chart-formatters';
+	import {
+		CHART_PADDING_WIDE,
+		TREND_LINE_PROPS,
+		monthlyXAxisProps
+	} from '$lib/utils/chart-formatters';
 	import type { OdometerEntry, PaginatedOdometerResponse } from '$lib/types';
 
 	const PAGE_SIZE = 20;
@@ -57,8 +63,6 @@
 			}))
 			.sort((a, b) => a.date.getTime() - b.date.getTime())
 	);
-
-	let xTickCount = $derived(getXTickCount(chartData.length));
 
 	const chartConfig: Chart.ChartConfig = {
 		odometer: {
@@ -193,30 +197,29 @@
 					<Card.Description>Odometer readings plotted by date</Card.Description>
 				</Card.Header>
 				<Card.Content>
-					<Chart.Container config={chartConfig} class="h-[280px] w-full">
-						<LineChart
-							data={chartData}
-							x="date"
-							xScale={scaleTime()}
-							y="odometer"
-							{series}
-							padding={{ top: 4, left: 56, bottom: 20, right: 4 }}
-							props={{
-								spline: { class: 'stroke-chart-1 stroke-2' },
-								xAxis: {
-									ticks: xTickCount,
-									format: formatMonthDay
-								},
-								yAxis: {
-									format: (v: number) => formatNumber(v, 0)
-								}
-							}}
-						>
-							{#snippet tooltip()}
-								<Chart.Tooltip hideLabel />
-							{/snippet}
-						</LineChart>
-					</Chart.Container>
+					<div use:animateOnView={'chart-line-animated'}>
+						<Chart.Container config={chartConfig} class="h-[280px] w-full">
+							<LineChart
+								data={chartData}
+								x="date"
+								xScale={scaleTime()}
+								y="odometer"
+								{series}
+								padding={CHART_PADDING_WIDE}
+								props={{
+									...TREND_LINE_PROPS,
+									xAxis: monthlyXAxisProps(chartData.length),
+									yAxis: {
+										format: (v: number) => formatNumber(v, 0)
+									}
+								}}
+							>
+								{#snippet tooltip()}
+									<Chart.Tooltip hideLabel />
+								{/snippet}
+							</LineChart>
+						</Chart.Container>
+					</div>
 				</Card.Content>
 			</Card.Root>
 		{/if}

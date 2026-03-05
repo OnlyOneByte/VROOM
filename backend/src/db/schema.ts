@@ -17,29 +17,35 @@ export const users = sqliteTable('users', {
 });
 
 // Vehicle table
-export const vehicles = sqliteTable('vehicles', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  make: text('make').notNull(),
-  model: text('model').notNull(),
-  year: integer('year').notNull(),
-  vehicleType: text('vehicle_type').notNull().default('gas'), // 'gas' | 'electric' | 'hybrid'
-  trackFuel: integer('track_fuel', { mode: 'boolean' }).notNull().default(true),
-  trackCharging: integer('track_charging', { mode: 'boolean' }).notNull().default(false),
-  licensePlate: text('license_plate'),
-  nickname: text('nickname'),
-  vin: text('vin'),
-  initialMileage: integer('initial_mileage'),
-  purchasePrice: real('purchase_price'),
-  purchaseDate: integer('purchase_date', { mode: 'timestamp' }),
-  currentInsurancePolicyId: text('current_insurance_policy_id'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-});
+export const vehicles = sqliteTable(
+  'vehicles',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    make: text('make').notNull(),
+    model: text('model').notNull(),
+    year: integer('year').notNull(),
+    vehicleType: text('vehicle_type').notNull().default('gas'), // 'gas' | 'electric' | 'hybrid'
+    trackFuel: integer('track_fuel', { mode: 'boolean' }).notNull().default(true),
+    trackCharging: integer('track_charging', { mode: 'boolean' }).notNull().default(false),
+    licensePlate: text('license_plate'),
+    nickname: text('nickname'),
+    vin: text('vin'),
+    initialMileage: integer('initial_mileage'),
+    purchasePrice: real('purchase_price'),
+    purchaseDate: integer('purchase_date', { mode: 'timestamp' }),
+    currentInsurancePolicyId: text('current_insurance_policy_id'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    userIdIdx: index('vehicles_user_id_idx').on(table.userId),
+  })
+);
 
 // Vehicle Financing table (loans, leases, or owned vehicles)
 export const vehicleFinancing = sqliteTable('vehicle_financing', {
@@ -155,32 +161,47 @@ export const expenseGroups = sqliteTable('expense_groups', {
 });
 
 // Expense table
-export const expenses = sqliteTable('expenses', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  vehicleId: text('vehicle_id')
-    .notNull()
-    .references(() => vehicles.id, { onDelete: 'cascade' }),
-  category: text('category').notNull(), // ExpenseCategory enum values
-  tags: text('tags', { mode: 'json' }).$type<string[]>(), // JSON array of tags (replaces type)
-  date: integer('date', { mode: 'timestamp' }).notNull(),
-  mileage: integer('mileage'),
-  description: text('description'),
-  receiptUrl: text('receipt_url'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  expenseAmount: real('expense_amount').notNull(),
-  fuelAmount: real('fuel_amount'),
-  fuelType: text('fuel_type'),
-  isFinancingPayment: integer('is_financing_payment', { mode: 'boolean' }).notNull().default(false),
-  insurancePolicyId: text('insurance_policy_id'),
-  insuranceTermId: text('insurance_term_id'),
-  missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
-  expenseGroupId: text('expense_group_id').references(() => expenseGroups.id, {
-    onDelete: 'cascade',
-  }),
-});
+export const expenses = sqliteTable(
+  'expenses',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    vehicleId: text('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id, { onDelete: 'cascade' }),
+    category: text('category').notNull(), // ExpenseCategory enum values
+    tags: text('tags', { mode: 'json' }).$type<string[]>(), // JSON array of tags (replaces type)
+    date: integer('date', { mode: 'timestamp' }).notNull(),
+    mileage: integer('mileage'),
+    description: text('description'),
+    receiptUrl: text('receipt_url'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    expenseAmount: real('expense_amount').notNull(),
+    fuelAmount: real('fuel_amount'),
+    fuelType: text('fuel_type'),
+    isFinancingPayment: integer('is_financing_payment', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    insurancePolicyId: text('insurance_policy_id'),
+    insuranceTermId: text('insurance_term_id'),
+    missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
+    expenseGroupId: text('expense_group_id').references(() => expenseGroups.id, {
+      onDelete: 'cascade',
+    }),
+  },
+  (table) => ({
+    vehicleDateIdx: index('expenses_vehicle_date_idx').on(table.vehicleId, table.date),
+    vehicleCategoryDateIdx: index('expenses_vehicle_category_date_idx').on(
+      table.vehicleId,
+      table.category,
+      table.date
+    ),
+    expenseGroupIdx: index('expenses_group_idx').on(table.expenseGroupId),
+    categoryDateIdx: index('expenses_category_date_idx').on(table.category, table.date),
+  })
+);
 
 // User Settings table
 export const userSettings = sqliteTable('user_settings', {
