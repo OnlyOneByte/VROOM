@@ -1,11 +1,10 @@
 <script lang="ts">
-	import '$lib/components/analytics/pie-chart-animations.css';
-	import '$lib/components/analytics/line-chart-animations.css';
-	import '$lib/components/analytics/bar-chart-animations.css';
+	import '$lib/components/charts/pie-chart-animations.css';
+	import '$lib/components/charts/bar-chart-animations.css';
 	import { animateOnView } from '$lib/utils/animate-on-view';
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { BarChart, LineChart, PieChart } from 'layerchart';
+	import { BarChart, PieChart } from 'layerchart';
 	import {
 		LoaderCircle,
 		CircleAlert,
@@ -20,43 +19,44 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
 	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
+	import { AppLineChart, AppBarChart, AppPieChart, StatCardGrid } from '$lib/components/charts';
+	import {
+		CATEGORY_COLORS,
+		CATEGORY_LABELS,
+		CHART_COLORS,
+		buildChartConfig
+	} from '$lib/utils/chart-colors';
 	import type { CrossVehicleResponse, FinancingResponse, InsuranceResponse } from '$lib/types';
 	import { formatCurrency } from '$lib/utils/formatters';
-	import {
-		formatCurrencyAxis,
-		CHART_PADDING,
-		TREND_LINE_PROPS,
-		monthlyXAxisProps
-	} from '$lib/utils/chart-formatters';
-
-	function parseMonthToDate(month: string): Date {
-		const [y, m] = month.split('-');
-		return new Date(Number(y), Number(m) - 1, 1);
-	}
-
-	const categoryColors: Record<string, string> = {
-		fuel: 'var(--chart-1)',
-		maintenance: 'var(--chart-2)',
-		financial: 'var(--chart-3)',
-		regulatory: 'var(--chart-4)',
-		enhancement: 'var(--chart-5)',
-		misc: 'var(--primary)'
-	};
-
-	const categoryLabels: Record<string, string> = {
-		fuel: 'Fuel',
-		maintenance: 'Maintenance',
-		financial: 'Financial',
-		regulatory: 'Regulatory',
-		enhancement: 'Enhancement',
-		misc: 'Misc'
-	};
+	import { formatCurrencyAxis, parseMonthToDate } from '$lib/utils/chart-formatters';
 
 	let crossVehicle = $state<CrossVehicleResponse | null>(null);
 	let financing = $state<FinancingResponse | null>(null);
 	let insurance = $state<InsuranceResponse | null>(null);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
+
+	// Visibility-gated rendering for inline financing pie chart
+	let typeDistChartEl = $state<HTMLDivElement | undefined>();
+	let typeDistVisible = $state(false);
+
+	$effect(() => {
+		const el = typeDistChartEl;
+		if (!el) return;
+		const observer = new IntersectionObserver(
+			entries => {
+				for (const entry of entries) {
+					if (entry.isIntersecting) {
+						typeDistVisible = true;
+						observer.disconnect();
+					}
+				}
+			},
+			{ threshold: 0.1 }
+		);
+		observer.observe(el);
+		return () => observer.disconnect();
+	});
 
 	async function loadData() {
 		try {
@@ -90,21 +90,15 @@
 	);
 
 	// --- Section 2: Expense Breakdown Pie ---
-	let pieData = $derived(
+	let appPieData = $derived(
 		(crossVehicle?.expenseByCategory ?? []).map(c => ({
-			...c,
-			color: categoryColors[c.category] ?? 'var(--primary)',
-			label: categoryLabels[c.category] ?? c.category
+			key: c.category,
+			label: CATEGORY_LABELS[c.category] ?? c.category,
+			value: c.amount,
+			color: CATEGORY_COLORS[c.category] ?? 'var(--primary)',
+			percentage: c.percentage
 		}))
 	);
-
-	let pieChartConfig = $derived.by(() => {
-		const config: Chart.ChartConfig = {};
-		for (const item of pieData) {
-			config[item.category] = { label: item.label, color: item.color };
-		}
-		return config;
-	});
 
 	// --- Section 3: Vehicle Cost Comparison Bar ---
 	let costBarData = $derived(crossVehicle?.vehicleCostComparison ?? []);
@@ -116,14 +110,6 @@
 	const costBarSeries = [{ key: 'totalCost', label: 'Total Cost', color: 'var(--chart-1)' }];
 
 	// --- Section 3b: Fuel Efficiency Comparison ---
-	const CHART_COLORS = [
-		'var(--chart-1)',
-		'var(--chart-2)',
-		'var(--chart-3)',
-		'var(--chart-4)',
-		'var(--chart-5)'
-	] as const;
-
 	let fuelEffVehicleNames = $derived.by(() => {
 		const names = new SvelteSet<string>();
 		for (const month of crossVehicle?.fuelEfficiencyComparison ?? []) {
@@ -151,17 +137,11 @@
 		fuelEffVehicleNames.map((name, i) => ({
 			key: name,
 			label: name,
-			color: CHART_COLORS[i % CHART_COLORS.length]
+			color: CHART_COLORS[i % CHART_COLORS.length] ?? 'var(--chart-1)'
 		}))
 	);
 
-	let fuelEffConfig = $derived.by(() => {
-		const config: Chart.ChartConfig = {};
-		for (const s of fuelEffSeries) {
-			config[s.key] = { label: s.label, color: s.color };
-		}
-		return config;
-	});
+	let fuelEffConfig = $derived(buildChartConfig(fuelEffSeries));
 
 	// --- Section 4: Financing ---
 	let loanBreakdownData = $derived(
@@ -207,6 +187,34 @@
 		return 'outline';
 	}
 
+	// Financing summary stat card items
+	let financingSummaryItems = $derived.by(() => {
+		if (!financing) return [];
+		const s = financing.summary;
+		return [
+			{
+				label: 'Total Monthly Payments',
+				value: formatCurrency(s.totalMonthlyPayments),
+				subtitle: '/month'
+			},
+			{
+				label: 'Remaining Balance',
+				value: formatCurrency(s.remainingBalance),
+				subtitle: 'across all vehicles'
+			},
+			{
+				label: 'Interest Paid YTD',
+				value: formatCurrency(s.interestPaidYtd),
+				subtitle: 'on loans'
+			},
+			{
+				label: 'Active Financing',
+				value: String(s.activeCount),
+				subtitle: `${s.loanCount} loan${s.loanCount !== 1 ? 's' : ''}, ${s.leaseCount} lease${s.leaseCount !== 1 ? 's' : ''}`
+			}
+		];
+	});
+
 	// --- Section 5: Insurance ---
 	let premiumTrendData = $derived(
 		(insurance?.monthlyPremiumTrend ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
@@ -227,6 +235,29 @@
 	const carrierSeries = [
 		{ key: 'annualPremium', label: 'Annual Premium', color: 'var(--chart-4)' }
 	];
+
+	// Insurance summary stat card items
+	let insuranceSummaryItems = $derived.by(() => {
+		if (!insurance) return [];
+		const s = insurance.summary;
+		return [
+			{
+				label: 'Total Monthly Premiums',
+				value: formatCurrency(s.totalMonthlyPremiums),
+				subtitle: '/month'
+			},
+			{
+				label: 'Total Annual Premiums',
+				value: formatCurrency(s.totalAnnualPremiums),
+				subtitle: '/year'
+			},
+			{
+				label: 'Active Policies',
+				value: String(s.activePoliciesCount),
+				subtitle: 'vehicles insured'
+			}
+		];
+	});
 
 	// Insurance cost analysis
 	let avgCostPerVehicle = $derived.by(() => {
@@ -268,63 +299,16 @@
 
 		<!-- Section 2: Expense by Category + Vehicle Cost Comparison (2-col grid) -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-			<!-- Expense by Category -->
-			{#if pieData.length > 0}
-				<Card.Root class="p-4 sm:p-6">
-					<div class="space-y-4">
-						<div>
-							<h3 class="font-semibold text-sm sm:text-base">Expense by Category</h3>
-							<p class="text-xs sm:text-sm text-muted-foreground">
-								Distribution across all vehicles
-							</p>
-						</div>
-						<div
-							use:animateOnView={'chart-pie-animated'}
-							class="mx-auto aspect-square max-h-[250px] w-full max-w-[250px]"
-						>
-							<Chart.Container config={pieChartConfig} class="h-full w-full">
-								<PieChart
-									data={pieData}
-									key="category"
-									value="amount"
-									label="name"
-									cRange={pieData.map(d => d.color)}
-									innerRadius={60}
-									outerRadius={100}
-									padAngle={0.02}
-									cornerRadius={4}
-								>
-									{#snippet tooltip()}
-										<Chart.Tooltip hideLabel />
-									{/snippet}
-								</PieChart>
-							</Chart.Container>
-						</div>
-						<div class="space-y-2" role="list" aria-label="Expense categories">
-							{#each pieData as category (category.category)}
-								<div class="flex items-center justify-between" role="listitem">
-									<div class="flex items-center gap-2">
-										<div
-											class="w-3 h-3 rounded-full"
-											style:background-color={category.color}
-											aria-hidden="true"
-										></div>
-										<span class="text-sm">{category.label}</span>
-									</div>
-									<div class="text-right">
-										<p class="font-semibold">{formatCurrency(category.amount)}</p>
-										<p class="text-xs text-muted-foreground">
-											{category.percentage.toFixed(1)}%
-										</p>
-									</div>
-								</div>
-							{/each}
-						</div>
-					</div>
-				</Card.Root>
+			<!-- Expense by Category (migrated to AppPieChart) -->
+			{#if appPieData.length > 0}
+				<AppPieChart
+					title="Expense by Category"
+					description="Distribution across all vehicles"
+					data={appPieData}
+				/>
 			{/if}
 
-			<!-- Vehicle Cost Comparison -->
+			<!-- Vehicle Cost Comparison (kept manual — has cost-per-mile list) -->
 			{#if costBarData.length > 0}
 				<Card.Root class="p-4 sm:p-6">
 					<div class="space-y-4">
@@ -332,7 +316,7 @@
 							<h3 class="font-semibold text-sm sm:text-base">Vehicle Cost Comparison</h3>
 							<p class="text-xs sm:text-sm text-muted-foreground">Total costs by vehicle</p>
 						</div>
-						<div use:animateOnView={'chart-bar-animated'}>
+						<div class="chart-bar-animate-ready" use:animateOnView={'chart-bar-animated'}>
 							<Chart.Container config={costBarConfig} class="h-[250px] sm:h-[300px] w-full">
 								<BarChart
 									data={costBarData}
@@ -343,7 +327,7 @@
 									props={{
 										bars: { stroke: 'none' },
 										xAxis: {
-											ticks: costBarData.length,
+											ticks: costBarData.map(d => d.vehicleName),
 											format: (v: string) => {
 												if (typeof v !== 'string') return '';
 												return v.length > 20 ? v.slice(0, 18) + '…' : v;
@@ -375,54 +359,18 @@
 			{/if}
 		</div>
 
-		<!-- Section 3: Fuel Efficiency Comparison -->
+		<!-- Section 3: Fuel Efficiency Comparison (migrated to AppLineChart) -->
 		{#if fuelEffData.length > 0}
-			<Card.Root class="p-4 sm:p-6">
-				<div class="space-y-4">
-					<div>
-						<h3 class="font-semibold text-sm sm:text-base">Fuel Efficiency Comparison</h3>
-						<p class="text-xs sm:text-sm text-muted-foreground">MPG trends across all vehicles</p>
-					</div>
-					<div use:animateOnView={'chart-line-animated'}>
-						<Chart.Container config={fuelEffConfig} class="h-[250px] sm:h-[300px] w-full">
-							<LineChart
-								data={fuelEffData}
-								x="date"
-								y={fuelEffVehicleNames}
-								series={fuelEffSeries}
-								padding={CHART_PADDING}
-								props={{
-									...TREND_LINE_PROPS,
-									xAxis: monthlyXAxisProps(fuelEffData.length),
-									yAxis: {
-										format: (v: number) => `${v.toFixed(0)} MPG`
-									}
-								}}
-							>
-								{#snippet tooltip()}
-									<Chart.Tooltip hideLabel />
-								{/snippet}
-							</LineChart>
-						</Chart.Container>
-					</div>
-					<div
-						class="flex flex-wrap items-center justify-center gap-4 text-sm"
-						role="list"
-						aria-label="Fuel efficiency legend"
-					>
-						{#each fuelEffSeries as s (s.key)}
-							<div class="flex items-center gap-2" role="listitem">
-								<div
-									class="h-3 w-3 rounded-sm"
-									style="background-color: {s.color}"
-									aria-hidden="true"
-								></div>
-								<span class="text-muted-foreground">{s.label}</span>
-							</div>
-						{/each}
-					</div>
-				</div>
-			</Card.Root>
+			<AppLineChart
+				title="Fuel Efficiency Comparison"
+				description="MPG trends across all vehicles"
+				data={fuelEffData}
+				x="date"
+				y={fuelEffVehicleNames}
+				series={fuelEffSeries}
+				config={fuelEffConfig}
+				yAxisFormat={v => `${v.toFixed(0)} MPG`}
+			/>
 		{/if}
 
 		<!-- Section 4: Financing Overview -->
@@ -431,49 +379,10 @@
 			<h2 class="text-xl font-bold">Financing Overview</h2>
 		</div>
 
-		<!-- Financing Summary Cards -->
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-			<Card.Root class="p-4 sm:p-6">
-				<div class="space-y-1">
-					<p class="text-xs sm:text-sm text-muted-foreground">Total Monthly Payments</p>
-					<p class="text-xl sm:text-2xl font-bold">
-						{formatCurrency(financing.summary.totalMonthlyPayments)}
-					</p>
-					<p class="text-xs text-muted-foreground">/month</p>
-				</div>
-			</Card.Root>
-			<Card.Root class="p-4 sm:p-6">
-				<div class="space-y-1">
-					<p class="text-xs sm:text-sm text-muted-foreground">Remaining Balance</p>
-					<p class="text-xl sm:text-2xl font-bold">
-						{formatCurrency(financing.summary.remainingBalance)}
-					</p>
-					<p class="text-xs text-muted-foreground">across all vehicles</p>
-				</div>
-			</Card.Root>
-			<Card.Root class="p-4 sm:p-6">
-				<div class="space-y-1">
-					<p class="text-xs sm:text-sm text-muted-foreground">Interest Paid YTD</p>
-					<p class="text-xl sm:text-2xl font-bold text-destructive">
-						{formatCurrency(financing.summary.interestPaidYtd)}
-					</p>
-					<p class="text-xs text-muted-foreground">on loans</p>
-				</div>
-			</Card.Root>
-			<Card.Root class="p-4 sm:p-6">
-				<div class="space-y-1">
-					<p class="text-xs sm:text-sm text-muted-foreground">Active Financing</p>
-					<p class="text-xl sm:text-2xl font-bold">{financing.summary.activeCount}</p>
-					<p class="text-xs text-muted-foreground">
-						{financing.summary.loanCount} loan{financing.summary.loanCount !== 1 ? 's' : ''}, {financing
-							.summary.leaseCount}
-						lease{financing.summary.leaseCount !== 1 ? 's' : ''}
-					</p>
-				</div>
-			</Card.Root>
-		</div>
+		<!-- Financing Summary Cards (migrated to StatCardGrid) -->
+		<StatCardGrid items={financingSummaryItems} columns={4} />
 
-		<!-- Vehicle Financing Details (card-based like Figma) -->
+		<!-- Vehicle Financing Details (kept manual — card list) -->
 		{#if financing.vehicleDetails.length > 0}
 			<Card.Root class="p-4 sm:p-6">
 				<div class="space-y-4">
@@ -549,63 +458,20 @@
 
 		<!-- Financing Charts: 2-col grid -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-			<!-- Loan Payment Breakdown -->
+			<!-- Loan Payment Breakdown (migrated to AppBarChart) -->
 			{#if hasLoanBreakdown}
-				<Card.Root class="p-4 sm:p-6">
-					<div class="space-y-4">
-						<div>
-							<h3 class="font-semibold text-sm sm:text-base">Loan Payment Breakdown</h3>
-							<p class="text-xs sm:text-sm text-muted-foreground">
-								Interest vs Principal over time
-							</p>
-						</div>
-						<div use:animateOnView={'chart-bar-animated'}>
-							<Chart.Container config={loanChartConfig} class="h-[250px] sm:h-[300px] w-full">
-								<BarChart
-									data={loanBreakdownData}
-									x="date"
-									y={['principal', 'interest']}
-									series={loanSeries}
-									padding={CHART_PADDING}
-									props={{
-										bars: { stroke: 'none' },
-										xAxis: monthlyXAxisProps(loanBreakdownData.length),
-										yAxis: { format: formatCurrencyAxis }
-									}}
-								>
-									{#snippet tooltip()}
-										<Chart.Tooltip hideLabel />
-									{/snippet}
-								</BarChart>
-							</Chart.Container>
-						</div>
-						<div
-							class="flex flex-wrap items-center justify-center gap-4 text-sm"
-							role="list"
-							aria-label="Loan breakdown legend"
-						>
-							<div class="flex items-center gap-2" role="listitem">
-								<div
-									class="h-3 w-3 rounded-sm"
-									style="background-color: var(--chart-2)"
-									aria-hidden="true"
-								></div>
-								<span class="text-muted-foreground">Principal</span>
-							</div>
-							<div class="flex items-center gap-2" role="listitem">
-								<div
-									class="h-3 w-3 rounded-sm"
-									style="background-color: var(--chart-3)"
-									aria-hidden="true"
-								></div>
-								<span class="text-muted-foreground">Interest</span>
-							</div>
-						</div>
-					</div>
-				</Card.Root>
+				<AppBarChart
+					title="Loan Payment Breakdown"
+					description="Interest vs Principal over time"
+					data={loanBreakdownData}
+					x="date"
+					y={['principal', 'interest']}
+					series={loanSeries}
+					config={loanChartConfig}
+				/>
 			{/if}
 
-			<!-- Financing Type Distribution -->
+			<!-- Financing Type Distribution (kept manual — legend shows vehicle count) -->
 			{#if typeDistData.length > 0}
 				<Card.Root class="p-4 sm:p-6">
 					<div class="space-y-4">
@@ -614,26 +480,39 @@
 							<p class="text-xs sm:text-sm text-muted-foreground">Value by financing type</p>
 						</div>
 						<div
-							use:animateOnView={'chart-pie-animated'}
-							class="mx-auto aspect-square max-h-[250px] w-full max-w-[250px]"
+							bind:this={typeDistChartEl}
+							class="chart-pie-animate-ready chart-pie-animated mx-auto aspect-square max-h-[250px] w-full max-w-[250px] overflow-hidden"
 						>
-							<Chart.Container config={typeDistConfig} class="h-full w-full">
-								<PieChart
-									data={typeDistData}
-									key="type"
-									value="value"
-									label="type"
-									cRange={typeDistData.map(d => d.color)}
-									innerRadius={60}
-									outerRadius={100}
-									padAngle={0.02}
-									cornerRadius={4}
+							{#if typeDistVisible}
+								<Chart.Container
+									config={typeDistConfig}
+									class="aspect-square h-full w-full overflow-hidden"
 								>
-									{#snippet tooltip()}
-										<Chart.Tooltip hideLabel />
-									{/snippet}
-								</PieChart>
-							</Chart.Container>
+									<PieChart
+										data={typeDistData}
+										key="type"
+										value="value"
+										label="type"
+										cRange={typeDistData.map(d => d.color)}
+										innerRadius={0.5}
+										padAngle={0.02}
+										cornerRadius={4}
+										props={{
+											pie: {
+												motion: {
+													type: 'tween',
+													duration: 800,
+													easing: (t: number) => 1 - Math.pow(1 - t, 3)
+												}
+											}
+										}}
+									>
+										{#snippet tooltip()}
+											<Chart.Tooltip hideLabel />
+										{/snippet}
+									</PieChart>
+								</Chart.Container>
+							{/if}
 						</div>
 						<div class="space-y-1.5" role="list" aria-label="Financing types">
 							{#each typeDistData as item (item.type)}
@@ -665,38 +544,10 @@
 			<h2 class="text-xl font-bold">Insurance Overview</h2>
 		</div>
 
-		<!-- Insurance Summary Cards -->
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-			<Card.Root class="p-4 sm:p-6">
-				<div class="space-y-1">
-					<p class="text-xs sm:text-sm text-muted-foreground">Total Monthly Premiums</p>
-					<p class="text-xl sm:text-2xl font-bold">
-						{formatCurrency(insurance.summary.totalMonthlyPremiums)}
-					</p>
-					<p class="text-xs text-muted-foreground">/month</p>
-				</div>
-			</Card.Root>
-			<Card.Root class="p-4 sm:p-6">
-				<div class="space-y-1">
-					<p class="text-xs sm:text-sm text-muted-foreground">Total Annual Premiums</p>
-					<p class="text-xl sm:text-2xl font-bold">
-						{formatCurrency(insurance.summary.totalAnnualPremiums)}
-					</p>
-					<p class="text-xs text-muted-foreground">/year</p>
-				</div>
-			</Card.Root>
-			<Card.Root class="p-4 sm:p-6">
-				<div class="space-y-1">
-					<p class="text-xs sm:text-sm text-muted-foreground">Active Policies</p>
-					<p class="text-xl sm:text-2xl font-bold">
-						{insurance.summary.activePoliciesCount}
-					</p>
-					<p class="text-xs text-muted-foreground">vehicles insured</p>
-				</div>
-			</Card.Root>
-		</div>
+		<!-- Insurance Summary Cards (migrated to StatCardGrid) -->
+		<StatCardGrid items={insuranceSummaryItems} columns={3} />
 
-		<!-- Insurance Coverage Details (card-based like Figma) -->
+		<!-- Insurance Coverage Details (kept manual — card list) -->
 		{#if insurance.vehicleDetails.length > 0}
 			<Card.Root class="p-4 sm:p-6">
 				<div class="space-y-4">
@@ -745,74 +596,38 @@
 
 		<!-- Insurance Charts: 2-col grid -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-			<!-- Monthly Premium Trend -->
+			<!-- Monthly Premium Trends (migrated to AppLineChart) -->
 			{#if premiumTrendData.length > 0}
-				<Card.Root class="p-4 sm:p-6">
-					<div class="space-y-4">
-						<div>
-							<h3 class="font-semibold text-sm sm:text-base">Monthly Premium Trends</h3>
-							<p class="text-xs sm:text-sm text-muted-foreground">
-								Total insurance costs over time
-							</p>
-						</div>
-						<div use:animateOnView={'chart-line-animated'}>
-							<Chart.Container config={premiumChartConfig} class="h-[250px] sm:h-[300px] w-full">
-								<LineChart
-									data={premiumTrendData}
-									x="date"
-									y="premiums"
-									series={premiumSeries}
-									padding={CHART_PADDING}
-									props={{
-										...TREND_LINE_PROPS,
-										xAxis: monthlyXAxisProps(premiumTrendData.length),
-										yAxis: { format: formatCurrencyAxis }
-									}}
-								>
-									{#snippet tooltip()}
-										<Chart.Tooltip hideLabel />
-									{/snippet}
-								</LineChart>
-							</Chart.Container>
-						</div>
-					</div>
-				</Card.Root>
+				<AppLineChart
+					title="Monthly Premium Trends"
+					description="Total insurance costs over time"
+					data={premiumTrendData}
+					x="date"
+					y="premiums"
+					series={premiumSeries}
+					config={premiumChartConfig}
+				/>
 			{/if}
 
-			<!-- Cost by Carrier -->
+			<!-- Cost by Carrier (migrated to AppBarChart) -->
 			{#if carrierData.length > 0}
-				<Card.Root class="p-4 sm:p-6">
-					<div class="space-y-4">
-						<div>
-							<h3 class="font-semibold text-sm sm:text-base">Cost by Insurance Carrier</h3>
-							<p class="text-xs sm:text-sm text-muted-foreground">Annual premium comparison</p>
-						</div>
-						<div use:animateOnView={'chart-bar-animated'}>
-							<Chart.Container config={carrierChartConfig} class="h-[250px] sm:h-[300px] w-full">
-								<BarChart
-									data={carrierData}
-									x="carrier"
-									y="annualPremium"
-									series={carrierSeries}
-									padding={{ top: 4, left: 48, bottom: 20, right: 4 }}
-									props={{
-										bars: { stroke: 'none' },
-										xAxis: { ticks: carrierData.length },
-										yAxis: { format: formatCurrencyAxis }
-									}}
-								>
-									{#snippet tooltip()}
-										<Chart.Tooltip hideLabel />
-									{/snippet}
-								</BarChart>
-							</Chart.Container>
-						</div>
-					</div>
-				</Card.Root>
+				<AppBarChart
+					title="Cost by Insurance Carrier"
+					description="Annual premium comparison"
+					data={carrierData}
+					x="carrier"
+					y="annualPremium"
+					series={carrierSeries}
+					config={carrierChartConfig}
+					xAxisProps={{
+						ticks: carrierData.map(d => d.carrier),
+						format: (v: string) => (typeof v === 'string' ? v : String(v))
+					}}
+				/>
 			{/if}
 		</div>
 
-		<!-- Insurance Cost Analysis -->
+		<!-- Insurance Cost Analysis (kept manual — custom colored backgrounds) -->
 		<Card.Root class="p-4 sm:p-6 border-chart-4/30">
 			<div class="space-y-3">
 				<div class="flex items-center gap-2">
