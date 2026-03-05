@@ -209,7 +209,14 @@
 					<span>🚗</span>
 					<span>VROOM — Vehicle Record & Organization Of Maintenance</span>
 				</div>
-				<p class="text-sm text-muted-foreground">Open source. Self-hostable. Yours.</p>
+				<div class="flex items-center gap-4 text-sm text-muted-foreground">
+					<a href="/privacypolicy" class="hover:text-foreground transition-colors">Privacy Policy</a
+					>
+					<a href="/termsofservice" class="hover:text-foreground transition-colors"
+						>Terms of Service</a
+					>
+					<span>Open source. Self-hostable. Yours.</span>
+				</div>
 			</div>
 		</div>
 	</div>

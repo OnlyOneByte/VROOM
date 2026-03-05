@@ -3,6 +3,8 @@
  * Centralizes formatting logic to avoid duplication across chart components.
  */
 
+import { curveMonotoneX } from 'd3-shape';
+
 const currencyFormatter = new Intl.NumberFormat('en-US', {
 	style: 'currency',
 	currency: 'USD',
@@ -30,6 +32,18 @@ export function formatCurrencyAxis(value: number): string {
 	return currencyFormatter.format(value);
 }
 
+const centsCurrencyFormatter = new Intl.NumberFormat('en-US', {
+	style: 'currency',
+	currency: 'USD',
+	minimumFractionDigits: 2,
+	maximumFractionDigits: 2
+});
+
+/** Format small currency values (e.g. cost per mile: $0.05) with 2 decimal places */
+export function formatCentsAxis(value: number): string {
+	return centsCurrencyFormatter.format(value);
+}
+
 /** Format a number with fixed decimal places for Y-axis labels */
 export function formatDecimalAxis(value: number, decimals = 1): string {
 	return value.toFixed(decimals);
@@ -43,3 +57,59 @@ export function formatDecimalAxis(value: number, decimals = 1): string {
 export function getXTickCount(dataLength: number, maxTicks = 6): number {
 	return Math.min(dataLength, maxTicks);
 }
+
+// ---------------------------------------------------------------------------
+// Shared chart style presets
+// ---------------------------------------------------------------------------
+
+/** Standard chart padding used across all chart types. */
+export const CHART_PADDING = { top: 4, left: 48, bottom: 20, right: 4 } as const;
+
+/** Wider left padding for charts with long y-axis labels (e.g. odometer "35,000"). */
+export const CHART_PADDING_WIDE = { top: 4, left: 56, bottom: 20, right: 4 } as const;
+
+/** Smooth curve for line/area charts — gives a natural, curvy appearance. */
+export const SMOOTH_CURVE = curveMonotoneX;
+
+/**
+ * Format a Date value as 3-letter month for x-axis ticks.
+ * Handles unknown input from layerchart axis callbacks.
+ */
+export function formatMonthTick(value: unknown): string {
+	if (!(value instanceof Date) || isNaN(value.getTime())) return '';
+	return value.toLocaleDateString('en-US', { month: 'short' });
+}
+
+/**
+ * Format a Date value as "Mon D" for x-axis ticks on date-level charts.
+ * Handles unknown input from layerchart axis callbacks.
+ */
+export function formatDateTick(value: unknown): string {
+	if (!(value instanceof Date) || isNaN(value.getTime())) return '';
+	return value.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/**
+ * Build standard x-axis props for monthly time series charts.
+ * Shows 3-letter month labels, auto-limits tick count to avoid crowding.
+ */
+export function monthlyXAxisProps(dataLength: number) {
+	return {
+		ticks: getXTickCount(dataLength, 12),
+		format: formatMonthTick
+	};
+}
+
+/**
+ * Shared spline (line) props for smooth trend lines with dots.
+ * Apply via `props: { ...TREND_LINE_PROPS }` on LineChart components.
+ */
+export const TREND_LINE_PROPS = {
+	spline: {
+		curve: SMOOTH_CURVE
+	},
+	points: {
+		r: 4,
+		class: 'fill-background stroke-2'
+	}
+} as const;

@@ -1,73 +1,65 @@
 <script lang="ts">
-	import { AreaChart } from 'layerchart';
-	import { scaleTime } from 'd3-scale';
+	import '$lib/components/analytics/line-chart-animations.css';
+	import { animateOnView } from '$lib/utils/animate-on-view';
+	import { LineChart } from 'layerchart';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { formatMonthDay, formatCurrencyAxis, getXTickCount } from '$lib/utils/chart-formatters';
+	import {
+		formatCurrencyAxis,
+		CHART_PADDING,
+		TREND_LINE_PROPS,
+		monthlyXAxisProps
+	} from '$lib/utils/chart-formatters';
+	import type { Snippet } from 'svelte';
 
-	// Chart configuration constants
-	const CHART_HEIGHT = 280;
+	const CHART_HEIGHT = 300;
 
-	// Chart configuration for shadcn styling
 	const chartConfig: Chart.ChartConfig = {
-		amount: {
-			label: 'Amount',
-			color: 'var(--primary)'
-		}
+		amount: { label: 'Amount', color: 'var(--primary)' }
 	};
 
-	interface ExpenseTrendData {
+	interface TrendData {
 		date: Date;
 		amount: number;
-		count: number;
+		[key: string]: unknown;
 	}
 
 	interface Props {
-		data: ExpenseTrendData[];
-		period: string;
+		data: TrendData[];
+		title?: string;
+		description?: string;
 		isLoading?: boolean;
 		error?: string | null;
+		icon?: Snippet;
 	}
 
-	let { data, period, isLoading = false, error = null }: Props = $props();
+	let {
+		data,
+		title = 'Expense Trends',
+		description = 'Spending over time',
+		isLoading = false,
+		error = null,
+		icon
+	}: Props = $props();
 
-	// Limit ticks to the number of data points to avoid duplicate labels
-	let xTickCount = $derived(getXTickCount(data.length));
-
-	// Format period label for display
-	let periodLabel = $derived.by(() => {
-		switch (period) {
-			case '7d':
-				return 'Last 7 Days';
-			case '30d':
-				return 'Last 30 Days';
-			case '90d':
-				return 'Last 90 Days';
-			case '1y':
-				return 'Last Year';
-			case 'all':
-				return 'All Time';
-			default:
-				return period;
-		}
-	});
-
-	// Series configuration for the chart
-	const series = $derived([
-		{
-			key: 'amount',
-			label: chartConfig['amount']?.label || 'Amount',
-			color: chartConfig['amount']?.color || 'var(--primary)'
-		}
-	]);
+	const series = [{ key: 'amount', label: 'Amount', color: 'var(--primary)' }];
 </script>
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title>Expense Trends</Card.Title>
-		<Card.Description>{periodLabel}</Card.Description>
+		<div class="flex items-center justify-between">
+			<div>
+				<Card.Title>{title}</Card.Title>
+				<Card.Description>{description}</Card.Description>
+			</div>
+			{#if icon}
+				<div class="rounded-lg bg-primary/10 p-2">
+					{@render icon()}
+				</div>
+			{/if}
+		</div>
 	</Card.Header>
 	<Card.Content>
 		{#if isLoading}
@@ -84,32 +76,26 @@
 				</EmptyState>
 			</div>
 		{:else if data.length > 0}
-			<Chart.Container config={chartConfig} class="h-[{CHART_HEIGHT}px] w-full">
-				<AreaChart
-					{data}
-					x="date"
-					xScale={scaleTime()}
-					y="amount"
-					{series}
-					padding={{ top: 4, left: 48, bottom: 20, right: 4 }}
-					props={{
-						area: {
-							class: 'fill-primary/20 stroke-primary stroke-2'
-						},
-						xAxis: {
-							ticks: xTickCount,
-							format: formatMonthDay
-						},
-						yAxis: {
-							format: formatCurrencyAxis
-						}
-					}}
-				>
-					{#snippet tooltip()}
-						<Chart.Tooltip hideLabel />
-					{/snippet}
-				</AreaChart>
-			</Chart.Container>
+			<div use:animateOnView={'chart-line-animated'}>
+				<Chart.Container config={chartConfig} class="h-[{CHART_HEIGHT}px] w-full">
+					<LineChart
+						{data}
+						x="date"
+						y="amount"
+						{series}
+						padding={CHART_PADDING}
+						props={{
+							...TREND_LINE_PROPS,
+							xAxis: monthlyXAxisProps(data.length),
+							yAxis: { format: formatCurrencyAxis }
+						}}
+					>
+						{#snippet tooltip()}
+							<Chart.Tooltip hideLabel />
+						{/snippet}
+					</LineChart>
+				</Chart.Container>
+			</div>
 		{:else}
 			<div class="h-[{CHART_HEIGHT}px]">
 				<EmptyState class="h-full">

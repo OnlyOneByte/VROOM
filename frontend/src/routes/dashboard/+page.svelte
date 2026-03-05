@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Plus } from 'lucide-svelte';
+	import { Plus, TrendingUp, ChartPie } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import DashboardStatsCards from '$lib/components/dashboard/DashboardStatsCards.svelte';
-	import MonthlyTrendChart from '$lib/components/dashboard/MonthlyTrendChart.svelte';
-	import CategoryBreakdownChart from '$lib/components/dashboard/CategoryBreakdownChart.svelte';
+	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
+	import CategoryPieChart from '$lib/components/charts/CategoryPieChart.svelte';
 	import RecentActivityCard from '$lib/components/dashboard/RecentActivityCard.svelte';
 	import VehicleCarousel from '$lib/components/dashboard/VehicleCarousel.svelte';
 	import PeriodSelector from '$lib/components/vehicles/PeriodSelector.svelte';
@@ -203,8 +203,16 @@
 	<!-- Charts Row -->
 	{#if stats.totalVehicles > 0}
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			<MonthlyTrendChart data={trendChartData} {isLoading} />
-			<CategoryBreakdownChart data={categoryChartData} {isLoading} />
+			<ExpenseTrendChart data={trendChartData} title="Monthly Expense Trends" {isLoading}>
+				{#snippet icon()}
+					<TrendingUp class="h-5 w-5 text-primary" />
+				{/snippet}
+			</ExpenseTrendChart>
+			<CategoryPieChart data={categoryChartData} {isLoading}>
+				{#snippet icon()}
+					<ChartPie class="h-5 w-5 text-chart-1" />
+				{/snippet}
+			</CategoryPieChart>
 		</div>
 
 		<!-- Recent Activity -->

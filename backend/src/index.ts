@@ -84,6 +84,9 @@ const globalRateLimiter = rateLimiter({
   },
 });
 
+// Optional auth - sets user context if session cookie present (before rate limiter so it can key by user)
+app.use('*', optionalAuth);
+
 app.use('*', globalRateLimiter);
 
 // CORS middleware with environment-based origins

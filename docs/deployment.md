@@ -72,13 +72,14 @@ DATA_PATH=/var/vroom/data
 ## Google OAuth Setup
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → create a project
-2. Navigate to APIs & Services → Library and enable:
+2. Navigate to APIs & Services → Library, search under Google Enterprise API, and enable:
    - **Google Drive API** — required for backup and photo storage
    - **Google Sheets API** — required for Google Sheets mirroring/restore
-3. Navigate to APIs & Services → OAuth consent screen:
-   - User Type: External
-   - Add your email as a test user
-   - Add scopes: `email`, `profile`, `openid`, `drive` (full Drive access is needed to create folders and upload files)
+3. Navigate to APIs & Services → OAuth consent screen → Data Access tab and add the following scopes:
+   - `../auth/drive.file` — See, edit, create, and delete only the specific Google Drive files you use with this app
+   - `../auth/drive.appdata` — See, create, and delete its own configuration data in your Google Drive
+   - `../auth/drive.install` — Connect itself to your Google Drive
+   - `../auth/spreadsheets` — See, edit, create, and delete all your Google Sheets spreadsheets (sensitive scope)
 4. Navigate to APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID:
    - Application type: Web application
    - Authorized redirect URIs: `https://yourdomain.com/api/v1/auth/callback/google`
@@ -88,6 +89,25 @@ DATA_PATH=/var/vroom/data
 All Drive and Sheets access is handled through the OAuth token — no separate API key is needed.
 
 For personal self-hosting, the app will show an "unverified app" warning — click Advanced → Continue. This is normal for apps not submitted for Google verification.
+
+### Optional: Branding & Verification
+
+If you want to remove the "unverified app" warning or publish your instance for others, you'll need to configure branding and submit for Google verification.
+
+1. Navigate to APIs & Services → OAuth consent screen → Branding tab:
+   - App name: your app name (e.g., "VROOM")
+   - User support email: your email address
+   - App logo: upload a logo (optional, but required for verification)
+   - App home page: `https://yourdomain.com`
+   - App privacy policy link: `https://yourdomain.com/privacy`
+   - App terms of service link: `https://yourdomain.com/terms`
+   - Developer contact email: your email address
+2. Under Audience, set User Type to External if you want anyone with a Google account to log in, or Internal if you're on a Google Workspace org and want to restrict to your org.
+3. If you added sensitive scopes (like `spreadsheets`), Google requires verification before the "unverified app" warning is removed for external users. Submit for verification from the OAuth consent screen — this can take several days to weeks.
+
+VROOM includes built-in `/privacypolicy` and `/termsofservice` pages that you can customize. They ship with reasonable defaults for a self-hosted open-source project. Edit them at:
+- `frontend/src/routes/privacypolicy/+page.svelte`
+- `frontend/src/routes/termsofservice/+page.svelte`
 
 ## Deployment Options
 
@@ -144,12 +164,6 @@ yourdomain.com {
     handle /api/* {
         reverse_proxy localhost:3001
     }
-    handle /auth/* {
-        reverse_proxy localhost:3001
-    }
-    handle /health {
-        reverse_proxy localhost:3001
-    }
     handle {
         reverse_proxy localhost:3000
     }
@@ -182,16 +196,6 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    location /auth {
-        proxy_pass http://localhost:3001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location /health {
-        proxy_pass http://localhost:3001;
-    }
-
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
@@ -203,9 +207,59 @@ server {
 }
 ```
 
-### Cloudflare Tunnel
+### Cloudflare Tunnel (Recommended for Home Hosting)
 
-The production compose file includes a `cloudflared` service. Set `CLOUDFLARE_TUNNEL_TOKEN` in `.env` and the tunnel starts automatically — no port forwarding or SSL config needed.
+Cloudflare Tunnel lets you expose your local VROOM instance to the internet without opening ports, configuring a static IP, or managing SSL certificates. Your home IP stays hidden. Tunnels are included on Cloudflare's free plan.
+
+#### Prerequisites
+
+- A domain (e.g., `myvroom.xyz`) added to Cloudflare with nameservers pointed to Cloudflare
+- A free [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) account
+
+#### 1. Create the Tunnel
+
+1. Go to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → Networks → Tunnels → Create a tunnel
+2. Choose "Cloudflared" as the connector type
+3. Name it (e.g., `vroom`)
+4. Copy the tunnel token — this becomes your `CLOUDFLARE_TUNNEL_TOKEN` env var
+5. Skip the connector install step — the Docker Compose `cloudflared` service handles this
+
+#### 2. Configure Public Hostnames
+
+Add two path-based routes so everything runs on a single domain. All backend routes (auth, API, sync) live under `/api/*`, so you only need two entries:
+
+| Subdomain | Domain | Path | Service |
+|---|---|---|---|
+| *(empty)* | `myvroom.xyz` | `/api/*` | `http://backend:3001` |
+| *(empty)* | `myvroom.xyz` | `/*` | `http://frontend:3000` |
+
+Order matters — the `/api/*` route must come before the catch-all `/*`.
+
+> **Why only two routes?** Auth callbacks go through `/api/v1/auth/callback/google`, which is already covered by the `/api/*` rule. The `/health` endpoint is only used by Docker's internal healthcheck (runs inside the container) and doesn't need external exposure. The `/auth` path in the browser is a SvelteKit client-side route, handled by the frontend catch-all.
+
+> The service hostnames (`backend`, `frontend`) reference the Docker Compose service names. Cloudflared runs in the same Docker network and resolves them automatically.
+
+#### 3. DNS
+
+Cloudflare automatically creates a CNAME record for your domain pointing to the tunnel when you add the public hostname. You don't need to manually create DNS records. If you have existing A/AAAA records for the root domain, delete them to avoid conflicts.
+
+#### 4. Environment Variables
+
+```env
+CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoiYWJj...your_token_here
+GOOGLE_REDIRECT_URI=https://myvroom.xyz/api/v1/auth/callback/google
+FRONTEND_URL=https://myvroom.xyz
+CORS_ORIGINS=https://myvroom.xyz
+PUBLIC_API_URL=https://myvroom.xyz
+```
+
+#### 5. Deploy
+
+```bash
+docker-compose up -d
+```
+
+The `cloudflared` container establishes an outbound-only connection to Cloudflare's edge network. Cloudflare handles TLS termination, DDoS protection, and routing. No port forwarding, no firewall changes, no SSL cert management needed.
 
 ## Auto-Updates
 

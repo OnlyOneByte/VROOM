@@ -526,7 +526,9 @@
 						<!-- Expense Trend Chart -->
 						<ExpenseTrendChart
 							data={expenseTrendData}
-							period={selectedStatsPeriod}
+							description={selectedStatsPeriod === 'all'
+								? 'All Time'
+								: `Last ${selectedStatsPeriod}`}
 							isLoading={isLoadingStats}
 						/>
 

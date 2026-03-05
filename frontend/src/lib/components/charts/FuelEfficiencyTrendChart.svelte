@@ -1,11 +1,18 @@
 <script lang="ts">
+	import '$lib/components/analytics/line-chart-animations.css';
+	import { animateOnView } from '$lib/utils/animate-on-view';
 	import { LineChart } from 'layerchart';
 	import { scaleTime } from 'd3-scale';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
-	import { formatMonthDay, formatDecimalAxis, getXTickCount } from '$lib/utils/chart-formatters';
+	import {
+		formatDecimalAxis,
+		CHART_PADDING,
+		TREND_LINE_PROPS,
+		monthlyXAxisProps
+	} from '$lib/utils/chart-formatters';
 
 	// Chart configuration constants
 	const CHART_HEIGHT = 280;
@@ -25,8 +32,6 @@
 	}
 
 	let { data, fuelType, isLoading = false, error = null }: Props = $props();
-
-	let xTickCount = $derived(getXTickCount(data.length));
 
 	// Title and unit label based on fuel type
 	let title = $derived(fuelType === 'electric' ? 'Electric Efficiency' : 'Fuel Efficiency');
@@ -70,30 +75,29 @@
 				</EmptyState>
 			</div>
 		{:else if data.length >= MIN_DATA_POINTS}
-			<Chart.Container config={chartConfig} class="h-[{CHART_HEIGHT}px] w-full">
-				<LineChart
-					{data}
-					x="date"
-					xScale={scaleTime()}
-					y="efficiency"
-					{series}
-					padding={{ top: 4, left: 48, bottom: 20, right: 4 }}
-					props={{
-						spline: { class: 'stroke-chart-2 stroke-2' },
-						xAxis: {
-							ticks: xTickCount,
-							format: formatMonthDay
-						},
-						yAxis: {
-							format: formatDecimalAxis
-						}
-					}}
-				>
-					{#snippet tooltip()}
-						<Chart.Tooltip hideLabel />
-					{/snippet}
-				</LineChart>
-			</Chart.Container>
+			<div use:animateOnView={'chart-line-animated'}>
+				<Chart.Container config={chartConfig} class="h-[{CHART_HEIGHT}px] w-full">
+					<LineChart
+						{data}
+						x="date"
+						xScale={scaleTime()}
+						y="efficiency"
+						{series}
+						padding={CHART_PADDING}
+						props={{
+							...TREND_LINE_PROPS,
+							xAxis: monthlyXAxisProps(data.length),
+							yAxis: {
+								format: formatDecimalAxis
+							}
+						}}
+					>
+						{#snippet tooltip()}
+							<Chart.Tooltip hideLabel />
+						{/snippet}
+					</LineChart>
+				</Chart.Container>
+			</div>
 		{:else}
 			<div class="h-[{CHART_HEIGHT}px]">
 				<EmptyState class="h-full">
