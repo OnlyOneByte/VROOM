@@ -533,3 +533,246 @@ export interface FuelEfficiencyPoint {
 	efficiency: number;
 	mileage: number;
 }
+
+// --- Analytics Dashboard Response Types ---
+
+export interface QuickStatsResponse {
+	vehicleCount: number;
+	ytdSpending: number;
+	avgMpg: number | null;
+	fleetHealthScore: number;
+}
+
+export interface FuelStatsResponse {
+	fillups: {
+		currentYear: number;
+		previousYear: number;
+		currentMonth: number;
+		previousMonth: number;
+	};
+	gallons: {
+		currentYear: number;
+		previousYear: number;
+		currentMonth: number;
+		previousMonth: number;
+	};
+	fuelConsumption: {
+		avgMpg: number | null;
+		bestMpg: number | null;
+		worstMpg: number | null;
+	};
+	fillupDetails: {
+		avgVolume: number | null;
+		minVolume: number | null;
+		maxVolume: number | null;
+	};
+	averageCost: {
+		perFillup: number | null;
+		bestCostPerMile: number | null;
+		worstCostPerMile: number | null;
+		avgCostPerDay: number | null;
+	};
+	distance: {
+		totalMiles: number;
+		avgPerDay: number | null;
+		avgPerMonth: number | null;
+	};
+	monthlyConsumption: Array<{ month: string; mpg: number; gallons: number }>;
+	gasPriceHistory: Array<{ date: string; fuelType: string; pricePerGallon: number }>;
+	fillupCostByVehicle: Array<{
+		month: string;
+		vehicleId: string;
+		vehicleName: string;
+		avgCost: number;
+	}>;
+	odometerProgression: Array<{
+		month: string;
+		vehicleId: string;
+		vehicleName: string;
+		mileage: number;
+	}>;
+	costPerMile: Array<{
+		month: string;
+		vehicleId: string;
+		vehicleName: string;
+		costPerMile: number;
+	}>;
+}
+
+export interface FuelAdvancedResponse {
+	maintenanceTimeline: Array<{
+		service: string;
+		lastServiceDate: string;
+		nextDueDate: string;
+		daysRemaining: number;
+		status: 'good' | 'warning' | 'overdue';
+	}>;
+	seasonalEfficiency: Array<{
+		season: string;
+		avgMpg: number;
+		fillupCount: number;
+	}>;
+	vehicleRadar: Array<{
+		vehicleId: string;
+		vehicleName: string;
+		fuelEfficiency: number;
+		maintenanceCost: number;
+		reliability: number;
+		annualCost: number;
+		mileage: number;
+	}>;
+	dayOfWeekPatterns: Array<{
+		day: string;
+		fillupCount: number;
+		avgCost: number;
+		avgGallons: number;
+	}>;
+	monthlyCostHeatmap: Array<{
+		month: string;
+		fuel: number;
+		maintenance: number;
+		financial: number;
+		regulatory: number;
+		enhancement: number;
+		misc: number;
+	}>;
+	fillupIntervals: Array<{
+		intervalLabel: string;
+		count: number;
+	}>;
+}
+
+export interface CrossVehicleResponse {
+	monthlyExpenseTrends: Array<{ month: string; amount: number }>;
+	expenseByCategory: Array<{
+		category: string;
+		amount: number;
+		percentage: number;
+	}>;
+	vehicleCostComparison: Array<{
+		vehicleId: string;
+		vehicleName: string;
+		totalCost: number;
+		costPerMile: number | null;
+	}>;
+	fuelEfficiencyComparison: Array<{
+		month: string;
+		vehicles: Array<{ vehicleId: string; vehicleName: string; mpg: number }>;
+	}>;
+}
+
+export interface FinancingResponse {
+	summary: {
+		totalMonthlyPayments: number;
+		remainingBalance: number;
+		interestPaidYtd: number;
+		activeCount: number;
+		loanCount: number;
+		leaseCount: number;
+	};
+	vehicleDetails: Array<{
+		vehicleId: string;
+		vehicleName: string;
+		financingType: 'loan' | 'lease' | 'own';
+		monthlyPayment: number;
+		remainingBalance: number;
+		apr: number | null;
+		interestPaid: number;
+		monthsRemaining: number;
+	}>;
+	monthlyTimeline: Array<{
+		month: string;
+		vehicles: Array<{ vehicleId: string; vehicleName: string; amount: number }>;
+	}>;
+	typeDistribution: Array<{
+		type: string;
+		value: number;
+		count: number;
+	}>;
+	loanBreakdown: Array<{
+		month: string;
+		interest: number;
+		principal: number;
+	}>;
+}
+
+export interface InsuranceResponse {
+	summary: {
+		totalMonthlyPremiums: number;
+		totalAnnualPremiums: number;
+		activePoliciesCount: number;
+	};
+	vehicleDetails: Array<{
+		vehicleId: string;
+		vehicleName: string;
+		carrier: string;
+		monthlyPremium: number;
+		annualPremium: number;
+		deductible: number | null;
+		coverageType: string | null;
+	}>;
+	monthlyPremiumTrend: Array<{ month: string; premiums: number }>;
+	costByCarrier: Array<{ carrier: string; annualPremium: number; vehicleCount: number }>;
+}
+
+export interface VehicleHealthResponse {
+	vehicleId: string;
+	vehicleName: string;
+	overallScore: number;
+	maintenanceRegularity: number;
+	mileageIntervalAdherence: number;
+	insuranceCoverage: number;
+}
+
+export interface VehicleTCOResponse {
+	vehicleId: string;
+	vehicleName: string;
+	purchasePrice: number | null;
+	financingInterest: number;
+	insuranceCost: number;
+	fuelCost: number;
+	maintenanceCost: number;
+	otherCosts: number;
+	totalCost: number;
+	ownershipMonths: number;
+	totalMiles: number;
+	costPerMile: number | null;
+	costPerMonth: number;
+	monthlyTrend: Array<{
+		month: string;
+		financing: number;
+		insurance: number;
+		fuel: number;
+		maintenance: number;
+	}>;
+}
+
+export interface VehicleExpensesResponse {
+	maintenanceCosts: Array<{ month: string; cost: number }>;
+	fuelEfficiencyAndCost: Array<{ month: string; mpg: number | null; cost: number }>;
+	expenseBreakdown: Array<{ category: string; amount: number }>;
+}
+
+export interface YearEndResponse {
+	year: number;
+	totalSpent: number;
+	categoryBreakdown: Array<{
+		category: string;
+		amount: number;
+		percentage: number;
+	}>;
+	mpgTrend: Array<{ month: string; mpg: number }>;
+	biggestExpense: {
+		description: string;
+		amount: number;
+		date: string;
+	} | null;
+	previousYearComparison: {
+		totalSpent: number;
+		percentageChange: number;
+	} | null;
+	vehicleCount: number;
+	totalMiles: number;
+	avgMpg: number | null;
+	costPerMile: number | null;
+}

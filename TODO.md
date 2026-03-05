@@ -1,23 +1,38 @@
 # VROOM Car Tracker - TODO
 
-## P0 — Must Have
-
+## Big Milestone features
 ### Analytics Page (Gamification & Engagement)
-- [ ] Build out the analytics route with real content (currently a stub/placeholder)
-- [ ] Vehicle health score: composite score based on maintenance regularity, mileage intervals, insurance coverage status
-- [ ] Health score badge/indicator on vehicle cards and detail page
-- [ ] Year-end summary: annual report card with total spent, cost breakdown by category, MPG trends, biggest expense, year-over-year comparison
-- [ ] Integrate existing analytics components (EfficiencyAlerts, FuelEfficiencyMonitor, VehicleEfficiencySummary) into the analytics page
-- [ ] TCO (Total Cost of Ownership) calculator: aggregate purchase price + financing interest + insurance + fuel + maintenance into a single $/mile and $/month figure
-- [ ] TCO dashboard card on vehicle detail page
-- [ ] TCO trend over time (monthly/quarterly breakdown)
+- [x] Build out the analytics route with real content (currently a stub/placeholder)
+- [x] Vehicle health score: composite score based on maintenance regularity, mileage intervals, insurance coverage status
+- [x] Health score badge/indicator on vehicle cards and detail page
+- [x] Year-end summary: annual report card with total spent, cost breakdown by category, MPG trends, biggest expense, year-over-year comparison
+- [x] Integrate existing analytics components (EfficiencyAlerts, FuelEfficiencyMonitor, VehicleEfficiencySummary) into the analytics page
+- [x] TCO (Total Cost of Ownership) calculator: aggregate purchase price + financing interest + insurance + fuel + maintenance into a single $/mile and $/month figure
+- [x] TCO dashboard card on vehicle detail page
+- [x] TCO trend over time (monthly/quarterly breakdown)
+- [x] Cost forecasting: "at your current rate, this vehicle will cost $X over the next 12 months"
 - [x] Fuel price tracking: log price-per-gallon with fill-ups, show price trends over time
-
+- [ ] Rename chart component
+- [ ] Standardize Monthly Trend Chart formatting.c
 - [ ] Shareable year-end summary (exportable image or link)
   - This is a big one, proably gonna spend a full day on just this.
 
-### Insurance — Core Policy Management
+### Reminders, Recurring, and Templates
+- [ ] Quick-add widget: streamlined "just filled up" flow (gallons, price, mileage — three taps)
+- [ ] Pre-built templates for common maintenance schedules by vehicle type (put under profile for management)
+- [ ] Maintenance schedule engine: define service intervals by mileage and/or time (oil change, tire rotation, brake inspection, etc.)
+- [ ] Reminders when a service is due based on current mileage + last service date
+- [ ] Define recurring expenses (insurance premiums, loan payments, parking passes) with frequency
+- [ ] Auto-create expense records each period based on templates
+- [ ] Dashboard indicator for upcoming recurring expenses
 
+### Sharing & Multi-Household
+- [ ] Vehicle sharing: invite another user to view or edit a specific vehicle (schema, routes, UI — types already defined)
+- [ ] Household view: aggregate costs across shared vehicles for a combined spending overview
+- [ ] Shared expense log: expenses entered by any authorized user appear on the vehicle's timeline
+- [ ] Permission levels: view-only vs. edit access per shared vehicle
+
+### Insurance Tracking
 - [x] Core insurance policy information
 - [x] Document storage: upload & retrieve proof-of-insurance cards and policy PDFs per policy (integrate with existing photo/file infrastructure)
 - [x] Insurance dashboard page: list active/expired policies per vehicle, quick-access document viewer, upcoming renewal alerts
@@ -27,8 +42,45 @@
 - [x] Insurance input autofill on renew click
 - [x] Insurance input frequency dropdown rather than free text entry
 - [x] Policy level edit and delete buttom move
+- [ ] Claims tracking: date, claim type (collision/theft/weather/vandalism/other), description, status (filed/in-progress/settled/denied), payout amount, fault designation (at-fault/not-at-fault/shared), linked policy
+- [ ] Claim document uploads: attach photos, police reports, repair estimates to a claim record
 
-### UI Misc & bugs
+### Productionalization must haves
+- [x] (Performance) Expenses table add keys
+- [ ] Build out profile page
+- [ ] Abstract out photo provider, allow users to choose backend
+  - [ ] notify users that they must set up images for image storage in settings
+  - [ ] Add more photo backend support
+- [ ] Let users know on settings page that auto-backups do not include image
+- [ ] More OAuth Providers. Can link more than one account.
+- [ ] Abstract out backup storage provider.
+    - [ ] Backup to more than one google account
+- [ ] PWA Icons - new icons throughout
+- [ ] First opening/loading - car zooming past screen animation (idea)
+- [ ] Global units from selections in profile (ensure its used app wide)
+- [ ] Guided setup tour (setup storage/etc)
+- [ ] Per car units (?)
+- [ ] Unit test coverage on backend
+- [ ] Unit test coverage on frontend
+- [ ] E2E Playwright tests
+- [ ] Google Cloud Console
+- [ ] Assets required
+  - [ ] Create one high-quality source image (SVG preferred, or PNG ≥ 512×512, square)
+  - [ ] Install `@vite-pwa/assets-generator` as devDep in `frontend/`
+  - [ ] Add `pwa-assets.config.ts` in `frontend/` using `minimal2023Preset` — this auto-generates:
+    - Transparent favicons: 64×64, 192×192, 512×512
+    - Maskable icon: 512×512 (with safe-zone padding)
+    - Apple touch icon: 180×180 (solid background)
+  - [ ] Add `"generate-pwa-assets": "pwa-assets-generator"` script to `frontend/package.json`
+  - [ ] Run `npm run generate-pwa-assets` — output goes to `frontend/static/`
+  - [ ] Wire generated icons into `manifest.json` `icons` array (or use `@vite-pwa/sveltekit` for auto-injection)
+  - [ ] Add `<link rel="apple-touch-icon">` in `app.html` pointing to the generated apple touch icon
+  - [ ] Set `theme_color` and `background_color` in manifest to match VROOM branding
+  - [ ] (Optional) Add install screenshots manually — not generated by the tool
+    - Narrow: ~1080×1920 (`"form_factor": "narrow"`) → `frontend/static/screenshots/`
+    - Wide: ~1920×1080 (`"form_factor": "wide"`) → `frontend/static/screenshots/`
+
+## Small Features, Bugs, UI, Misc
 - [x] Force sync (ignore if changed)
 - [X] Insurance add popup - maybe should be page instead of popup? qq
 - [x] Verify backup max count is deleting old backups
@@ -60,68 +112,14 @@
 - [x] Google drive restore dialog too tall (how to cut off)
 - [x] Clean up UI (components/ui has custom components) -> moved to components/common
 - [x] Photos not showing in prod env (CORS?)
-- [ ] First opening/loading - car zooming past screen animation (idea)
 - [x] Expense API pagination (expense page slow with lots of expenses)
-- [ ] Generalize categories (?) user selectable?
-
-
-## P1 — Should Have
-
-### Insurance — Claims & Bundling
-
-- [ ] Claims tracking: date, claim type (collision/theft/weather/vandalism/other), description, status (filed/in-progress/settled/denied), payout amount, fault designation (at-fault/not-at-fault/shared), linked policy
-- [ ] Claim document uploads: attach photos, police reports, repair estimates to a claim record
-- [ ] Multi-vehicle bundle support: group policies under a shared bundle with discount percentage, reflect per-vehicle adjusted cost
-
-### Insurance — Extra
-
-- [ ] Coverage gap detection: flag date ranges where a vehicle had no active policy
-- [ ] Rate comparison notes: free-text field per policy for jotting down competing quotes during renewal shopping
-- [ ] Payment schedule tracking: map individual premium payments against a policy term (or link to expense records by date range)
-
-### Maintenance Schedule
-
-- [ ] Maintenance schedule engine: define service intervals by mileage and/or time (oil change, tire rotation, brake inspection, etc.)
-- [ ] Reminders when a service is due based on current mileage + last service date
-- [ ] Pre-built templates for common maintenance schedules by vehicle type
-
-### Sharing & Multi-Household
-
-- [ ] Vehicle sharing: invite another user to view or edit a specific vehicle (schema, routes, UI — types already defined)
-- [ ] Household view: aggregate costs across shared vehicles for a combined spending overview
-- [ ] Shared expense log: expenses entered by any authorized user appear on the vehicle's timeline
-- [ ] Permission levels: view-only vs. edit access per shared vehicle
-
-### Recurring Expense Templates
-
-- [ ] Define recurring expenses (insurance premiums, loan payments, parking passes) with frequency
-- [ ] Auto-create expense records each period based on templates
-- [ ] Dashboard indicator for upcoming recurring expenses
-
-### Misc P1
-- [ ] Playwright E2E Tests
-
-
-## P2 — Nice to Have
-
-### UI / UX
-
-- [ ] Sync status time doesn't refresh in menu after enabling backup until page reload
-- [ ] Quick-add widget: streamlined "just filled up" flow (gallons, price, mileage — three taps)
-
-### Features
-
-- [ ] Split expenses across multiple vehicles
 - [ ] Import from other car cost trackers via CSV — Fuelly, Fuelio, Drivvo, Simply Auto, Road Trip, Spritmonitor, aCar, Car Expenses
-- [ ] Vehicle comparison: side-by-side cost comparison between your vehicles
-- [ ] Cost forecasting: "at your current rate, this vehicle will cost $X over the next 12 months"
+- [ ] Sync status time doesn't refresh in menu after enabling backup until page reload
 
-### Infrastructure
-
-- [ ] Redis for rate-limiting / idempotency in multi-instance deployments
-
-### Long Term Considerations
-
+## Long Term Considerations
 - [ ] Receipt / invoice photo-based auto-fill (OCR → expense fields)
 - [ ] Anonymous cost benchmarks: opt-in aggregated data to show how your costs compare to similar vehicles
-- [ ] Service shop directory: save mechanic/dealer/tire shop contacts, link expenses to shops, track spend per shop
+
+### Scaling concerns
+- [ ] Redis for rate-limiting / idempotency in multi-instance deployments
+- [ ] Abstract out to other backend storage (postgresql, nosql?)
