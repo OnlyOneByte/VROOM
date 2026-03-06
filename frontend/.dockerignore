@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Development files
+*.log
+*.md
+.env
+.env.*
+!.env.example
+
+# Test files
+src/**/*.test.ts
+src/**/*.spec.ts
+src/**/__tests__/
+
+# Build artifacts
+build/
+.svelte-kit/
+dist/
+*.tsbuildinfo
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Documentation
+README.md
+docs/
+
+# Misc
+.DS_Store
+Thumbs.db
