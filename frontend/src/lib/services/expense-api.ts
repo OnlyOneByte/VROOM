@@ -12,8 +12,7 @@ import {
 	toBackendExpense,
 	type BackendExpenseResponse
 } from './api-transformer';
-import { apiClient, getApiBaseUrl } from './api-client';
-import { ApiError } from '$lib/utils/error-handling';
+import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 
 /** Convenience alias for a paginated response of transformed frontend Expenses. */
 export type PaginatedExpenseResponse = PaginatedResponse<Expense>;
@@ -56,33 +55,16 @@ function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string): stri
 }
 
 /**
- * Fetch a paginated expense response using apiClient.raw() so we keep
- * the pagination metadata (totalCount, limit, offset, hasMore) that
- * apiClient.get() would strip during envelope unwrapping.
+ * Fetch a paginated expense response using apiClient.getPaginated() so we keep
+ * the pagination metadata that apiClient.get() would strip during envelope unwrapping.
+ * Transforms backend expense fields to frontend format.
  */
 async function fetchPaginatedExpenses(url: string): Promise<PaginatedExpenseResponse> {
-	const response = await apiClient.raw(`${getApiBaseUrl()}${url}`, { method: 'GET' });
-
-	if (!response.ok) {
-		let message = `Request failed with status ${response.status}`;
-		try {
-			const errorBody = await response.json();
-			message = errorBody.error?.message || errorBody.message || message;
-		} catch {
-			// ignore parse errors
-		}
-		throw new ApiError(message, response.status);
-	}
-
-	const result = await response.json();
-	const backendData = (result.data ?? []) as BackendExpenseResponse[];
+	const result = await apiClient.getPaginated<BackendExpenseResponse>(url);
 
 	return {
-		data: backendData.map(fromBackendExpense),
-		totalCount: result.totalCount as number,
-		limit: result.limit as number,
-		offset: result.offset as number,
-		hasMore: result.hasMore as boolean
+		data: result.data.map(fromBackendExpense),
+		pagination: result.pagination
 	};
 }
 
@@ -158,8 +140,14 @@ export const expenseApi = {
 
 	// --- Photo methods (delegate to generic photo endpoints) ---
 
-	async getPhotos(entityType: 'expense' | 'expense_group', entityId: string): Promise<Photo[]> {
-		return apiClient.get<Photo[]>(`/api/v1/photos/${entityType}/${entityId}`);
+	async getPhotos(
+		entityType: 'expense' | 'expense_group',
+		entityId: string,
+		params?: { limit?: number; offset?: number }
+	): Promise<PaginatedResponse<Photo>> {
+		return apiClient.getPaginated<Photo>(
+			withPagination(`/api/v1/photos/${entityType}/${entityId}`, params)
+		);
 	},
 
 	async uploadPhoto(

@@ -2,11 +2,12 @@ import type {
 	CreatePolicyRequest,
 	CreateTermRequest,
 	InsurancePolicy,
+	PaginatedResponse,
 	Photo,
 	UpdatePolicyRequest,
 	UpdateTermRequest
 } from '$lib/types';
-import { apiClient, getApiBaseUrl } from './api-client';
+import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 
 /**
  * Insurance API service
@@ -60,8 +61,13 @@ export const insuranceApi = {
 
 	// --- Document methods (delegate to photo endpoints) ---
 
-	async getDocuments(policyId: string): Promise<Photo[]> {
-		return apiClient.get<Photo[]>(`/api/v1/photos/insurance_policy/${policyId}`);
+	async getDocuments(
+		policyId: string,
+		params?: { limit?: number; offset?: number }
+	): Promise<PaginatedResponse<Photo>> {
+		return apiClient.getPaginated<Photo>(
+			withPagination(`/api/v1/photos/insurance_policy/${policyId}`, params)
+		);
 	},
 
 	async uploadDocument(policyId: string, file: File, termId?: string): Promise<Photo> {

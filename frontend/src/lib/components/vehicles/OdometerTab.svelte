@@ -20,7 +20,7 @@
 	import { formatDate, formatNumber } from '$lib/utils/formatters';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { settingsStore } from '$lib/stores/settings.svelte';
-	import type { OdometerEntry, PaginatedOdometerResponse, UnitPreferences } from '$lib/types';
+	import type { OdometerEntry, PaginatedResponse, UnitPreferences } from '$lib/types';
 
 	const PAGE_SIZE = 20;
 	const MIN_CHART_POINTS = 2;
@@ -87,13 +87,13 @@
 		isPageLoading = true;
 		error = null;
 		try {
-			const response: PaginatedOdometerResponse = await odometerApi.getEntries(vehicleId, {
+			const response: PaginatedResponse<OdometerEntry> = await odometerApi.getEntries(vehicleId, {
 				limit: PAGE_SIZE,
 				offset: newOffset
 			});
 			entries = response.data;
-			totalCount = response.totalCount;
-			offset = response.offset;
+			totalCount = response.pagination.totalCount;
+			offset = response.pagination.offset;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load odometer entries';
 		} finally {

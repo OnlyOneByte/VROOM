@@ -11,7 +11,8 @@
 		ChevronRight,
 		CodeXml,
 		FileSpreadsheet,
-		Lock
+		Lock,
+		Smartphone
 	} from 'lucide-svelte';
 
 	const authState = authStore;
@@ -158,8 +159,19 @@
 					</div>
 					<h3 class="text-lg font-semibold text-foreground">Privacy First</h3>
 					<p class="text-muted-foreground text-sm">
-						No tracking, no ads, no data harvesting. Everything lives with you or in your Google
-						Drive, under your control.
+						No tracking, no ads, no data harvesting. Self-host your own instance and your data never
+						leaves your server.
+					</p>
+				</div>
+
+				<div class="rounded-xl border border-border bg-card p-6 space-y-3">
+					<div class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-chart-2/10">
+						<Smartphone class="h-5 w-5 text-chart-2" />
+					</div>
+					<h3 class="text-lg font-semibold text-foreground">Install as an App</h3>
+					<p class="text-muted-foreground text-sm">
+						VROOM is a Progressive Web App. Install it on your phone or desktop for a native-like
+						experience with offline support.
 					</p>
 				</div>
 

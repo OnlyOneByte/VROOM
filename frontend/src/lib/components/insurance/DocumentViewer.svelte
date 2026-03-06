@@ -27,7 +27,8 @@
 	async function loadDocuments() {
 		isLoading = true;
 		try {
-			documents = await insuranceApi.getDocuments(policyId);
+			const docsResult = await insuranceApi.getDocuments(policyId);
+			documents = docsResult.data;
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to load documents');
 		} finally {

@@ -25,7 +25,8 @@
 	async function loadPhotos() {
 		isLoading = true;
 		try {
-			photos = await expenseApi.getPhotos(entityType, entityId);
+			const photosResult = await expenseApi.getPhotos(entityType, entityId);
+			photos = photosResult.data;
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to load photos');
 		} finally {

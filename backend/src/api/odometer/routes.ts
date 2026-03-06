@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
 import { odometerRepository } from './repository';
@@ -58,14 +59,7 @@ routes.get(
       offset
     );
 
-    return c.json({
-      success: true,
-      data,
-      totalCount,
-      limit,
-      offset,
-      hasMore: offset + data.length < totalCount,
-    });
+    return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
   }
 );
 

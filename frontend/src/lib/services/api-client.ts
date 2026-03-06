@@ -79,6 +79,61 @@ async function request<T>(url: string, options: ApiOptions = {}): Promise<T> {
 	return result.data !== undefined ? result.data : result;
 }
 
+/**
+ * Like `request`, but returns the full JSON body without unwrapping the
+ * `data` field. Used for paginated endpoints where we need `{ data, pagination }`.
+ */
+async function requestFull<T>(url: string, options: ApiOptions = {}): Promise<T> {
+	const { body, headers: customHeaders, method, signal } = options;
+	const fullUrl = url.startsWith('http') ? url : `${getApiBaseUrl()}${url}`;
+
+	const headers: Record<string, string> = {
+		...(customHeaders || {})
+	};
+
+	if (body && !(body instanceof FormData)) {
+		headers['Content-Type'] = 'application/json';
+	}
+
+	const response = await fetch(fullUrl, {
+		method,
+		credentials: 'include',
+		headers,
+		signal,
+		body: toFetchBody(body)
+	});
+
+	if (!response.ok) {
+		let message = `Request failed with status ${response.status}`;
+		let code: string | undefined;
+		let details: Record<string, unknown> | undefined;
+		try {
+			const errorBody = await response.json();
+			message = errorBody.error?.message || errorBody.message || message;
+			code = errorBody.error?.code;
+			if (errorBody.error?.details) {
+				details = Array.isArray(errorBody.error.details)
+					? { validationErrors: errorBody.error.details }
+					: (errorBody.error.details as Record<string, unknown>);
+			}
+		} catch {
+			// ignore parse errors
+		}
+		throw new ApiError(message, response.status, details, code);
+	}
+
+	return response.json();
+}
+
+/** Append limit/offset query params to a URL path. */
+export function withPagination(url: string, params?: { limit?: number; offset?: number }): string {
+	const query = new URLSearchParams();
+	if (params?.limit !== undefined) query.set('limit', String(params.limit));
+	if (params?.offset !== undefined) query.set('offset', String(params.offset));
+	const qs = query.toString();
+	return qs ? `${url}?${qs}` : url;
+}
+
 export const apiClient = {
 	get: <T>(url: string, options?: ApiOptions) => request<T>(url, { ...options, method: 'GET' }),
 
@@ -98,5 +153,16 @@ export const apiClient = {
 	raw: (url: string, options: { method?: string; headers?: Record<string, string> } = {}) => {
 		const fullUrl = url.startsWith('http') ? url : `${getApiBaseUrl()}${url}`;
 		return fetch(fullUrl, { credentials: 'include', ...options });
-	}
+	},
+
+	/**
+	 * GET a paginated endpoint and return the full envelope (data + pagination).
+	 * Unlike `get()`, this does NOT unwrap the `data` field — it returns the
+	 * complete `{ data, pagination }` response so callers keep metadata.
+	 */
+	getPaginated: <T>(url: string, options?: ApiOptions) =>
+		requestFull<{
+			data: T[];
+			pagination: { totalCount: number; limit: number; offset: number; hasMore: boolean };
+		}>(url, { ...options, method: 'GET' })
 };
