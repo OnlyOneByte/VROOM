@@ -13,7 +13,14 @@ const NON_ELECTRIC_FUEL_TYPES = [
 	'Other (Custom)'
 ] as const;
 
-const CATEGORIES = ['fuel', 'maintenance', 'financial', 'regulatory', 'enhancement', 'misc'];
+const CATEGORIES = [
+	'fuel',
+	'maintenance',
+	'financial',
+	'regulatory',
+	'enhancement',
+	'misc'
+] as const;
 
 /**
  * Property 1: Transformer round-trip preservation

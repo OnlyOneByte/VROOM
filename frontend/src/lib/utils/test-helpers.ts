@@ -40,6 +40,7 @@ export const mockExpense = {
 	date: new Date().toISOString(),
 	mileage: 1000,
 	volume: 12.5,
+	isFinancingPayment: false,
 	createdAt: new Date().toISOString(),
 	updatedAt: new Date().toISOString()
 };

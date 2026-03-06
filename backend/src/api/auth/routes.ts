@@ -177,15 +177,18 @@ routes.get('/me', async (c) => {
   }
 
   return c.json({
-    user: {
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      provider: user.provider,
-    },
-    session: {
-      id: session.id,
-      expiresAt: session.expiresAt,
+    success: true,
+    data: {
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        provider: user.provider,
+      },
+      session: {
+        id: session.id,
+        expiresAt: session.expiresAt,
+      },
     },
   });
 });
@@ -207,7 +210,7 @@ routes.post('/logout', async (c) => {
     sameSite: 'Lax',
   });
 
-  return c.json({ message: 'Logged out successfully' });
+  return c.json({ success: true, message: 'Logged out successfully' });
 });
 
 // Refresh session (extend session if valid)
@@ -226,15 +229,18 @@ routes.post('/refresh', async (c) => {
   }
 
   return c.json({
-    user: {
-      id: result.user.id,
-      email: result.user.email,
-      displayName: result.user.displayName,
-      provider: result.user.provider,
-    },
-    session: {
-      id: result.session.id,
-      expiresAt: result.session.expiresAt,
+    success: true,
+    data: {
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        provider: result.user.provider,
+      },
+      session: {
+        id: result.session.id,
+        expiresAt: result.session.expiresAt,
+      },
     },
   });
 });

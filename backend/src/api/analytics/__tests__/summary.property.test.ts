@@ -89,12 +89,12 @@ describe('Property 2: Summary data equivalence', () => {
             expect(Math.abs(summary.quickStats.ytdSpending - quickStats.ytdSpending)).toBeLessThan(
               0.01
             );
-            if (quickStats.avgMpg === null) {
-              expect(summary.quickStats.avgMpg).toBeNull();
+            if (quickStats.avgEfficiency === null) {
+              expect(summary.quickStats.avgEfficiency).toBeNull();
             } else {
-              expect(summary.quickStats.avgMpg).not.toBeNull();
+              expect(summary.quickStats.avgEfficiency).not.toBeNull();
               expect(
-                Math.abs((summary.quickStats.avgMpg as number) - quickStats.avgMpg)
+                Math.abs((summary.quickStats.avgEfficiency as number) - quickStats.avgEfficiency)
               ).toBeLessThan(0.001);
             }
 

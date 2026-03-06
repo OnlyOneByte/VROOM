@@ -6,7 +6,7 @@
  * backend (expenseAmount, fuelAmount).
  */
 
-import type { Expense } from '$lib/types';
+import type { Expense, ExpenseCategory } from '$lib/types';
 import { isElectricFuelType } from '$lib/utils/units';
 
 /**
@@ -54,7 +54,11 @@ export interface BackendExpenseResponse {
  * Maps: amount → expenseAmount, volume → fuelAmount, charge → fuelAmount
  */
 export function toBackendExpense(
-	frontendExpense: Partial<Expense> & { vehicleId: string; category: string; amount: number }
+	frontendExpense: Partial<Expense> & {
+		vehicleId: string;
+		category: ExpenseCategory;
+		amount: number;
+	}
 ): BackendExpenseRequest {
 	const backendExpense: BackendExpenseRequest = {
 		vehicleId: frontendExpense.vehicleId,
@@ -109,7 +113,7 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 		id: backendExpense.id,
 		vehicleId: backendExpense.vehicleId,
 		tags: backendExpense.tags || [],
-		category: backendExpense.category,
+		category: backendExpense.category as ExpenseCategory,
 		amount: backendExpense.expenseAmount, // expenseAmount → amount
 		date: backendExpense.date,
 		isFinancingPayment: backendExpense.isFinancingPayment ?? false,

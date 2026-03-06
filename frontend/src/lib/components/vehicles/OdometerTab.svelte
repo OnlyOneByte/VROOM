@@ -18,12 +18,19 @@
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { odometerApi } from '$lib/services/odometer-api';
 	import { formatDate, formatNumber } from '$lib/utils/formatters';
-	import type { OdometerEntry, PaginatedOdometerResponse } from '$lib/types';
+	import { getDistanceUnitLabel } from '$lib/utils/units';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import type { OdometerEntry, PaginatedOdometerResponse, UnitPreferences } from '$lib/types';
 
 	const PAGE_SIZE = 20;
 	const MIN_CHART_POINTS = 2;
 
-	let { vehicleId }: { vehicleId: string } = $props();
+	let { vehicleId, unitPreferences }: { vehicleId: string; unitPreferences?: UnitPreferences } =
+		$props();
+
+	// Resolve distance label from vehicle unitPreferences, falling back to global settings
+	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
+	let distLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
 	// State
 	let entries = $state<OdometerEntry[]>([]);
@@ -228,7 +235,8 @@
 								<div class="min-w-0">
 									<div class="flex items-center gap-2">
 										<span class="font-semibold text-foreground">
-											{formatOdometer(entry.odometer)} mi
+											{formatOdometer(entry.odometer)}
+											{distLabel}
 										</span>
 										{#if entry.linkedEntityType}
 											<span
@@ -331,7 +339,7 @@
 			<Dialog.Description>
 				Are you sure you want to delete this odometer reading
 				{#if deletingEntry}
-					({formatOdometer(deletingEntry.odometer)} mi)?
+					({formatOdometer(deletingEntry.odometer)} {distLabel})?
 				{:else}
 					?
 				{/if}

@@ -45,7 +45,7 @@ const mockExpenses = [
 		id: '1',
 		vehicleId: 'vehicle-1',
 		type: 'fuel',
-		category: 'operating',
+		category: 'fuel',
 		amount: 45.5,
 		date: '2024-01-15',
 		gallons: 12.0,
@@ -66,8 +66,8 @@ const mockExpenses = [
 	{
 		id: '3',
 		vehicleId: 'vehicle-2',
-		type: 'parking',
-		category: 'operating',
+		type: 'misc',
+		category: 'misc',
 		amount: 8.0,
 		date: '2024-01-12',
 		description: 'Downtown parking',
@@ -106,12 +106,11 @@ describe('Expense Management Integration', () => {
 				return expenses.filter(expense => expense.category === category);
 			};
 
-			const operatingExpenses = filterByCategory(mockExpenses, 'operating');
+			const operatingExpenses = filterByCategory(mockExpenses, 'fuel');
 			const maintenanceExpenses = filterByCategory(mockExpenses, 'maintenance');
 
-			expect(operatingExpenses).toHaveLength(2);
+			expect(operatingExpenses).toHaveLength(1);
 			expect(operatingExpenses[0].type).toBe('fuel');
-			expect(operatingExpenses[1].type).toBe('parking');
 
 			expect(maintenanceExpenses).toHaveLength(1);
 			expect(maintenanceExpenses[0].type).toBe('maintenance');
@@ -177,7 +176,7 @@ describe('Expense Management Integration', () => {
 
 			const parkingResults = searchByDescription(mockExpenses, 'parking');
 			expect(parkingResults).toHaveLength(1);
-			expect(parkingResults[0].type).toBe('parking');
+			expect(parkingResults[0].type).toBe('misc');
 		});
 
 		it('searches expenses by type', () => {
@@ -205,8 +204,8 @@ describe('Expense Management Integration', () => {
 				);
 			};
 
-			const operatingResults = combinedSearch(mockExpenses, 'operating');
-			expect(operatingResults).toHaveLength(2);
+			const fuelResults = combinedSearch(mockExpenses, 'fuel');
+			expect(fuelResults).toHaveLength(1);
 
 			const amountResults = combinedSearch(mockExpenses, '45.5');
 			expect(amountResults).toHaveLength(1);
@@ -273,7 +272,7 @@ describe('Expense Management Integration', () => {
 			const ascendingSort = sortByType(mockExpenses, true);
 			expect(ascendingSort[0].type).toBe('fuel');
 			expect(ascendingSort[1].type).toBe('maintenance');
-			expect(ascendingSort[2].type).toBe('parking');
+			expect(ascendingSort[2].type).toBe('misc');
 		});
 	});
 

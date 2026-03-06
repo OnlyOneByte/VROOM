@@ -26,18 +26,28 @@ interface RateLimitEntry {
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 // Cleanup expired entries periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore.entries()) {
-    if (entry.resetTime < now) rateLimitStore.delete(key);
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+function ensureCleanupTimer(): void {
+  if (cleanupTimer) return;
+  cleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of rateLimitStore.entries()) {
+      if (entry.resetTime < now) rateLimitStore.delete(key);
+    }
+  }, CONFIG.rateLimit.cleanupInterval);
+  // Allow the process to exit even if the timer is still running
+  if (cleanupTimer && typeof cleanupTimer === 'object' && 'unref' in cleanupTimer) {
+    cleanupTimer.unref();
   }
-}, CONFIG.rateLimit.cleanupInterval);
+}
 
 /**
  * Rate limiter middleware factory
  * Creates a rate limiter with specified configuration
  */
 export function rateLimiter(config: RateLimitConfig) {
+  ensureCleanupTimer();
   return async (c: Context, next: Next) => {
     const key = config.keyGenerator(c);
     const now = Date.now();

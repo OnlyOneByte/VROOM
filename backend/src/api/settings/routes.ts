@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { userSettings } from '../../db/schema';
 import { AppError } from '../../errors';
-import { requireAuth } from '../../middleware';
+import { changeTracker, requireAuth } from '../../middleware';
+import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../types';
 import { logger } from '../../utils/logger';
 import { resolveVroomFolderName } from '../sync/folder-name';
 import { getDriveServiceForUser } from '../sync/google-drive';
@@ -12,8 +13,25 @@ import { settingsRepository } from './repository';
 
 const routes = new Hono();
 
-// Apply auth middleware to all routes
+// Apply auth and change tracking middleware to all routes
 routes.use('*', requireAuth);
+routes.use('*', changeTracker);
+
+// Zod schema for unitPreferences enum validation
+const unitPreferencesSchema = z.object({
+  distanceUnit: z.enum(DistanceUnit, {
+    message: "Invalid distanceUnit: must be 'miles' or 'kilometers'",
+  }),
+  volumeUnit: z.enum(VolumeUnit, {
+    message: "Invalid volumeUnit: must be 'gallons_us', 'gallons_uk', or 'liters'",
+  }),
+  chargeUnit: z.enum(ChargeUnit, {
+    message: "Invalid chargeUnit: must be 'kwh'",
+  }),
+});
+
+// Partial version for update (each field optional)
+const partialUnitPreferencesSchema = unitPreferencesSchema.partial();
 
 // Validation schemas derived from db schema
 const baseSettingsSchema = createInsertSchema(userSettings, {
@@ -50,6 +68,10 @@ const updateSettingsSchema = baseSettingsSchema
     lastDataChangeDate: true,
     createdAt: true,
     updatedAt: true,
+    unitPreferences: true,
+  })
+  .extend({
+    unitPreferences: partialUnitPreferencesSchema.optional(),
   })
   .partial();
 
@@ -84,10 +106,19 @@ routes.put('/', async (c) => {
     const updates = updateSettingsSchema.parse(body);
 
     // Ensure settings exist first
-    await settingsRepository.getOrCreate(user.id);
+    const existingSettings = await settingsRepository.getOrCreate(user.id);
+
+    // Merge partial unitPreferences with existing values
+    const { unitPreferences: partialUnitPrefs, ...restUpdates } = updates;
+    const mergedUnitPreferences: UnitPreferences | undefined = partialUnitPrefs
+      ? { ...existingSettings.unitPreferences, ...partialUnitPrefs }
+      : undefined;
 
     // Update settings
-    const updatedSettings = await settingsRepository.update(user.id, updates);
+    const updatedSettings = await settingsRepository.update(user.id, {
+      ...restUpdates,
+      ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
+    });
 
     // Best-effort rename of existing Drive folder when custom name changes
     if ('googleDriveCustomFolderName' in updates && updatedSettings.googleDriveBackupFolderId) {

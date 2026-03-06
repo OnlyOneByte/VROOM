@@ -17,10 +17,13 @@ interface IdempotencyRecord {
 class IdempotencyStore {
   private store = new Map<string, IdempotencyRecord>();
   private readonly TTL = 24 * 60 * 60 * 1000; // 24 hours
+  private readonly MAX_SIZE = 10000;
 
   set(key: string, response: unknown, status: number): void {
+    if (this.store.size >= this.MAX_SIZE) {
+      this.cleanup();
+    }
     this.store.set(key, { response, timestamp: Date.now(), status });
-    this.cleanup();
   }
 
   get(key: string): IdempotencyRecord | undefined {

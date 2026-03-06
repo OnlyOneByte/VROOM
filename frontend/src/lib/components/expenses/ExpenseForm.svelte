@@ -38,8 +38,14 @@
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
-	import type { ExpenseFormErrors, Vehicle, Expense, SplitConfig } from '$lib/types.js';
-	import { isElectricFuelType } from '$lib/utils/units';
+	import type {
+		ExpenseCategory,
+		ExpenseFormErrors,
+		Vehicle,
+		Expense,
+		SplitConfig
+	} from '$lib/types.js';
+	import { isElectricFuelType, getDistanceUnitLabel } from '$lib/utils/units';
 
 	interface Props {
 		expenseId?: string;
@@ -127,10 +133,14 @@
 
 	// Get user settings for units
 	let settings = $derived(settingsStore.settings);
-	let volumeUnit = $derived(settings?.volumeUnit || 'gallons_us');
-	let chargeUnit = $derived(settings?.chargeUnit || 'kwh');
-	let distanceUnit = $derived(settings?.distanceUnit || 'miles');
+	let volumeUnit = $derived(settings?.unitPreferences?.volumeUnit || 'gallons_us');
+	let chargeUnit = $derived(settings?.unitPreferences?.chargeUnit || 'kwh');
+	let distanceUnit = $derived(settings?.unitPreferences?.distanceUnit || 'miles');
 	let currencyUnit = $derived(settings?.currencyUnit || 'USD');
+
+	// Resolve distance label from vehicle unitPreferences, falling back to global settings
+	let effectiveDistanceUnit = $derived(vehicle?.unitPreferences?.distanceUnit ?? distanceUnit);
+	let distLabel = $derived(getDistanceUnitLabel(effectiveDistanceUnit, false));
 
 	// Tag suggestions will be populated from user's previous tags in the future
 
@@ -442,7 +452,7 @@
 			const expenseData = {
 				vehicleId: formData.vehicleId,
 				tags: formData.tags,
-				category: formData.category,
+				category: formData.category as ExpenseCategory,
 				amount: parseFloat(formData.amount),
 				date: dateISO,
 				mileage: formData.mileage ? parseInt(formData.mileage) : undefined,
@@ -482,7 +492,7 @@
 				const splitConfig = buildSplitConfig();
 				const result = await expenseApi.createSplitExpense({
 					splitConfig,
-					category: formData.category,
+					category: formData.category as ExpenseCategory,
 					tags: formData.tags.length > 0 ? formData.tags : undefined,
 					date: dateISO,
 					description: formData.description || undefined,
@@ -818,7 +828,7 @@
 		</div>
 	</div>
 {:else}
-	<div class="max-w-2xl mx-auto space-y-6">
+	<div class="max-w-2xl mx-auto space-y-6 pb-32 sm:pb-24">
 		<!-- Header -->
 		<div class="flex items-center gap-4">
 			<button onclick={() => goto(returnTo)} class="p-2 hover:bg-muted rounded-lg">
@@ -1050,7 +1060,8 @@
 				</div>
 				{#if lastFuelExpense?.mileage && formData.tags.includes('fuel')}
 					<p class="text-xs text-muted-foreground">
-						Previous fuel entry: {lastFuelExpense.mileage.toLocaleString()} miles
+						Previous fuel entry: {lastFuelExpense.mileage.toLocaleString()}
+						{distLabel.toLowerCase()}
 					</p>
 				{/if}
 				{#if touched['mileage'] && errors['mileage']}

@@ -9,7 +9,13 @@
 		parseMonthToDate
 	} from '$lib/utils/chart-formatters';
 	import * as Chart from '$lib/components/ui/chart';
-	import type { FuelStatsResponse, FuelAdvancedResponse } from '$lib/types';
+	import type { FuelStatsResponse, FuelAdvancedResponse, UnitsMetadata } from '$lib/types';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import {
+		getFuelEfficiencyLabel,
+		getLongFormLabel,
+		getCostPerDistanceLabel
+	} from '$lib/utils/units';
 
 	interface Props {
 		fuelStats: FuelStatsResponse;
@@ -18,14 +24,25 @@
 
 	let { fuelStats, dayOfWeekPatterns }: Props = $props();
 
-	// --- 1. Fuel Consumption (MPG + Gallons) ---
+	// Resolve units from response metadata, falling back to global settings
+	let units: UnitsMetadata = $derived(fuelStats.units ?? settingsStore.unitPreferences);
+
+	// Dynamic labels
+	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
+	let volumeLabel = $derived(getLongFormLabel(units.volumeUnit));
+	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
+	let pricePerVolumeDesc = $derived(
+		`Price per ${getLongFormLabel(units.volumeUnit).toLowerCase()} by fuel type over time`
+	);
+
+	// --- 1. Fuel Consumption (Efficiency + Volume) ---
 	let consumptionData = $derived(
 		fuelStats.monthlyConsumption.map(d => ({ ...d, date: parseMonthToDate(d.month) }))
 	);
 
 	let consumptionSeries = $derived([
-		{ key: 'mpg', label: 'MPG', color: CHART_COLORS[0] as string },
-		{ key: 'gallons', label: 'Gallons', color: CHART_COLORS[1] as string }
+		{ key: 'efficiency', label: efficiencyLabel, color: CHART_COLORS[0] as string },
+		{ key: 'volume', label: volumeLabel, color: CHART_COLORS[1] as string }
 	]);
 
 	let consumptionConfig = $derived(buildChartConfig(consumptionSeries));
@@ -39,7 +56,7 @@
 			if (!byDate.has(item.date))
 				byDate.set(item.date, { dateStr: item.date, date: parseDateString(item.date) });
 			const row = byDate.get(item.date)!;
-			row[item.fuelType] = item.pricePerGallon;
+			row[item.fuelType] = item.pricePerVolume;
 		}
 		return Array.from(byDate.values()).sort((a, b) =>
 			String(a['dateStr']).localeCompare(String(b['dateStr']))
@@ -112,16 +129,16 @@
 
 	let odometerConfig = $derived(buildChartConfig(odometerSeries));
 
-	// --- 5. Cost per Mile ---
-	let cpmVehicleNames = $derived([...new Set(fuelStats.costPerMile.map(d => d.vehicleName))]);
+	// --- 5. Cost per Distance ---
+	let cpmVehicleNames = $derived([...new Set(fuelStats.costPerDistance.map(d => d.vehicleName))]);
 
 	let costPerMileData = $derived.by(() => {
 		const byMonth = new Map<string, Record<string, number | string | Date>>();
-		for (const item of fuelStats.costPerMile) {
+		for (const item of fuelStats.costPerDistance) {
 			if (!byMonth.has(item.month))
 				byMonth.set(item.month, { month: item.month, date: parseMonthToDate(item.month) });
 			const row = byMonth.get(item.month)!;
-			row[item.vehicleName] = item.costPerMile;
+			row[item.vehicleName] = item.costPerDistance;
 		}
 		return Array.from(byMonth.values()).sort((a, b) =>
 			String(a['month']).localeCompare(String(b['month']))
@@ -157,10 +174,10 @@
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 		<AppLineChart
 			title="Fuel Consumption"
-			description="Monthly MPG and gallons used"
+			description="Monthly {efficiencyLabel} and {volumeLabel.toLowerCase()} used"
 			data={consumptionData}
 			x="date"
-			y={['mpg', 'gallons']}
+			y={['efficiency', 'volume']}
 			series={consumptionSeries}
 			config={consumptionConfig}
 			yAxisFormat={formatDecimalAxis}
@@ -168,7 +185,7 @@
 
 		<AppLineChart
 			title="Gas Price on Fill-up"
-			description="Price per gallon by fuel type over time"
+			description={pricePerVolumeDesc}
 			data={gasPriceData}
 			x="date"
 			y={gasPriceFuelTypes}
@@ -178,7 +195,7 @@
 		/>
 	</div>
 
-	<!-- Row 2: Fill-up Cost by Vehicle + Cost per Mile -->
+	<!-- Row 2: Fill-up Cost by Vehicle + Cost per Distance -->
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 		<AppLineChart
 			title="Fill-up Cost by Vehicle"
@@ -191,8 +208,8 @@
 		/>
 
 		<AppLineChart
-			title="Cost per Mile"
-			description="Cost per mile trend by vehicle"
+			title={costPerDistLabel}
+			description="{costPerDistLabel} trend by vehicle"
 			data={costPerMileData}
 			x="date"
 			y={cpmVehicleNames}

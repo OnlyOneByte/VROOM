@@ -1,5 +1,6 @@
 import type { User } from '../types/index.js';
 import { apiClient, getApiBaseUrl } from '$lib/services/api-client';
+import { browser } from '$app/environment';
 
 function createAuthStore() {
 	let user = $state<User | null>(null);
@@ -67,7 +68,9 @@ function createAuthStore() {
 		},
 
 		loginWithGoogle() {
-			window.location.href = `${getApiBaseUrl()}/api/v1/auth/login/google`;
+			if (browser) {
+				window.location.href = `${getApiBaseUrl()}/api/v1/auth/login/google`;
+			}
 		},
 
 		async refreshToken() {

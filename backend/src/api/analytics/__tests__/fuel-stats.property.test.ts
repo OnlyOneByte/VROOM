@@ -198,9 +198,9 @@ describe('Property 17: MPG computation from consecutive expenses', () => {
 
           const result = await repo.getFuelStats(user.id, yearToRange(2024));
 
-          // The avgMpg should equal the computed MPG since there's only one pair
-          if (result.fuelConsumption.avgMpg != null) {
-            expect(Math.abs(result.fuelConsumption.avgMpg - expectedMpg)).toBeLessThan(0.01);
+          // The avgEfficiency should equal the computed efficiency since there's only one pair
+          if (result.fuelConsumption.avgEfficiency != null) {
+            expect(Math.abs(result.fuelConsumption.avgEfficiency - expectedMpg)).toBeLessThan(0.01);
           }
         }
       ),
@@ -265,7 +265,7 @@ describe('Property 8: Monthly arrays bounded to 12 entries', () => {
 // **Validates: Requirement 4.7**
 // ---------------------------------------------------------------------------
 describe('Property 18: Gas price always positive', () => {
-  test('all gasPriceHistory entries have positive pricePerGallon', async () => {
+  test('all gasPriceHistory entries have positive pricePerVolume', async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 10 }), async (expenseCount) => {
         testDb.sqlite.close();
@@ -307,7 +307,7 @@ describe('Property 18: Gas price always positive', () => {
         const result = await repo.getFuelStats(user.id, yearToRange(2024));
 
         for (const entry of result.gasPriceHistory) {
-          expect(entry.pricePerGallon).toBeGreaterThan(0);
+          expect(entry.pricePerVolume).toBeGreaterThan(0);
         }
       }),
       { numRuns: 200 }

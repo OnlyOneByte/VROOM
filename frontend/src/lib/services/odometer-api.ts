@@ -75,6 +75,18 @@ export const odometerApi = {
 	async uploadPhoto(entryId: string, file: File): Promise<Photo> {
 		const formData = new FormData();
 		formData.append('photo', file);
-		return apiClient.post(`/api/v1/photos/odometer_entry/${entryId}`, formData);
+		return apiClient.post<Photo>(`/api/v1/photos/odometer_entry/${entryId}`, formData);
+	},
+
+	async getPhotos(entryId: string): Promise<Photo[]> {
+		return apiClient.get<Photo[]>(`/api/v1/photos/odometer_entry/${entryId}`);
+	},
+
+	async deletePhoto(entryId: string, photoId: string): Promise<void> {
+		await apiClient.delete(`/api/v1/photos/odometer_entry/${entryId}/${photoId}`);
+	},
+
+	getPhotoThumbnailUrl(entryId: string, photoId: string): string {
+		return `${getApiBaseUrl()}/api/v1/photos/odometer_entry/${entryId}/${photoId}/thumbnail`;
 	}
 };

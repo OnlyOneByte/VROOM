@@ -20,7 +20,7 @@ const mockPendingExpenses = [
 		id: 'offline-1',
 		vehicleId: '1',
 		type: 'fuel',
-		category: 'operating',
+		category: 'fuel',
 		amount: 45.5,
 		date: '2024-01-15',
 		gallons: 12.0,
@@ -46,8 +46,8 @@ const mockSyncedExpenses = [
 	{
 		id: 'offline-3',
 		vehicleId: '1',
-		type: 'parking',
-		category: 'operating',
+		type: 'misc',
+		category: 'misc',
 		amount: 8.0,
 		date: '2024-01-12',
 		description: 'Downtown parking',
@@ -210,7 +210,7 @@ describe('Expense List Logic', () => {
 
 			expect(capitalizeType('fuel')).toBe('Fuel');
 			expect(capitalizeType('maintenance')).toBe('Maintenance');
-			expect(capitalizeType('parking')).toBe('Parking');
+			expect(capitalizeType('misc')).toBe('Misc');
 		});
 
 		it('formats expense dates', () => {
@@ -290,23 +290,23 @@ describe('Expense List Logic', () => {
 			const getMobileLayoutClasses = () => {
 				return {
 					header: 'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4',
-					button: 'btn btn-primary inline-flex items-center gap-2',
-					card: 'p-3 bg-orange-50 border border-orange-200 rounded-lg'
+					button: 'inline-flex items-center gap-2',
+					card: 'p-3 bg-chart-1/10 border border-border rounded-lg'
 				};
 			};
 
 			const classes = getMobileLayoutClasses();
 			expect(classes.header).toContain('flex-col sm:flex-row');
-			expect(classes.button).toContain('btn');
+			expect(classes.button).toContain('inline-flex');
 			expect(classes.card).toContain('p-3');
 		});
 
 		it('manages touch-friendly button sizing', () => {
 			const getTouchButtonSize = (size: 'sm' | 'md' | 'lg') => {
 				const sizes = {
-					sm: 'btn-sm min-h-[44px]',
-					md: 'btn min-h-[48px]',
-					lg: 'btn-lg min-h-[52px]'
+					sm: 'h-9 min-h-[44px]',
+					md: 'h-10 min-h-[48px]',
+					lg: 'h-11 min-h-[52px]'
 				};
 				return sizes[size];
 			};
@@ -330,16 +330,16 @@ describe('Expense List Logic', () => {
 		it('provides visual feedback states', () => {
 			const getButtonFeedbackClasses = (state: 'idle' | 'hover' | 'active' | 'disabled') => {
 				const states = {
-					idle: 'btn-primary',
-					hover: 'btn-primary hover:bg-blue-600',
-					active: 'btn-primary active:bg-blue-700',
-					disabled: 'btn-primary disabled:bg-blue-300'
+					idle: 'bg-primary text-primary-foreground',
+					hover: 'bg-primary text-primary-foreground hover:bg-primary/90',
+					active: 'bg-primary text-primary-foreground active:bg-primary/80',
+					disabled: 'bg-primary text-primary-foreground disabled:bg-muted'
 				};
 				return states[state];
 			};
 
-			expect(getButtonFeedbackClasses('hover')).toContain('hover:bg-blue-600');
-			expect(getButtonFeedbackClasses('disabled')).toContain('disabled:bg-blue-300');
+			expect(getButtonFeedbackClasses('hover')).toContain('hover:bg-primary/90');
+			expect(getButtonFeedbackClasses('disabled')).toContain('disabled:bg-muted');
 		});
 	});
 

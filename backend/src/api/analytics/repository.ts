@@ -6,12 +6,14 @@ import {
   insurancePolicies,
   insurancePolicyVehicles,
   type PolicyTerm,
+  userSettings,
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
-import { DatabaseError } from '../../errors';
+import { DatabaseError, ValidationError } from '../../errors';
+import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import {
-  buildCostPerMileChart,
+  buildCostPerDistanceChart,
   buildDayOfWeekPatterns,
   buildExpenseByCategory,
   buildFillupCostByVehicle,
@@ -23,7 +25,6 @@ import {
   buildMonthlyConsumption,
   buildMonthlyCostHeatmap,
   buildMonthlyExpenseTrends,
-  buildMpgTrend,
   buildSeasonalEfficiency,
   buildTCOMonthlyTrend,
   buildVehicleExpenseBreakdown,
@@ -41,9 +42,11 @@ import {
   type FuelRow,
   findBiggestExpense,
   type GeneralExpenseRow,
+  groupByVehicle,
   toMonthKey,
 } from '../../utils/analytics-charts';
 import { logger } from '../../utils/logger';
+import { convertDistance, convertEfficiency } from '../../utils/unit-conversions';
 
 export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
 
@@ -54,8 +57,9 @@ export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
 export interface QuickStatsData {
   vehicleCount: number;
   ytdSpending: number;
-  avgMpg: number | null;
+  avgEfficiency: number | null;
   fleetHealthScore: number;
+  units: { distanceUnit: string; volumeUnit: string; chargeUnit: string };
 }
 
 export interface FuelStatsData {
@@ -65,16 +69,16 @@ export interface FuelStatsData {
     currentMonth: number;
     previousMonth: number;
   };
-  gallons: {
+  volume: {
     currentYear: number;
     previousYear: number;
     currentMonth: number;
     previousMonth: number;
   };
   fuelConsumption: {
-    avgMpg: number | null;
-    bestMpg: number | null;
-    worstMpg: number | null;
+    avgEfficiency: number | null;
+    bestEfficiency: number | null;
+    worstEfficiency: number | null;
   };
   fillupDetails: {
     avgVolume: number | null;
@@ -83,17 +87,17 @@ export interface FuelStatsData {
   };
   averageCost: {
     perFillup: number | null;
-    bestCostPerMile: number | null;
-    worstCostPerMile: number | null;
+    bestCostPerDistance: number | null;
+    worstCostPerDistance: number | null;
     avgCostPerDay: number | null;
   };
   distance: {
-    totalMiles: number;
+    totalDistance: number;
     avgPerDay: number | null;
     avgPerMonth: number | null;
   };
-  monthlyConsumption: Array<{ month: string; mpg: number; gallons: number }>;
-  gasPriceHistory: Array<{ date: string; fuelType: string; pricePerGallon: number }>;
+  monthlyConsumption: Array<{ month: string; efficiency: number; volume: number }>;
+  gasPriceHistory: Array<{ date: string; fuelType: string; pricePerVolume: number }>;
   fillupCostByVehicle: Array<{
     month: string;
     vehicleId: string;
@@ -106,11 +110,11 @@ export interface FuelStatsData {
     vehicleName: string;
     mileage: number;
   }>;
-  costPerMile: Array<{
+  costPerDistance: Array<{
     month: string;
     vehicleId: string;
     vehicleName: string;
-    costPerMile: number;
+    costPerDistance: number;
   }>;
 }
 
@@ -122,7 +126,7 @@ export interface FuelAdvancedData {
     daysRemaining: number;
     status: 'good' | 'warning' | 'overdue';
   }>;
-  seasonalEfficiency: Array<{ season: string; avgMpg: number; fillupCount: number }>;
+  seasonalEfficiency: Array<{ season: string; avgEfficiency: number; fillupCount: number }>;
   vehicleRadar: Array<{
     vehicleId: string;
     vehicleName: string;
@@ -136,7 +140,7 @@ export interface FuelAdvancedData {
     day: string;
     fillupCount: number;
     avgCost: number;
-    avgGallons: number;
+    avgVolume: number;
   }>;
   monthlyCostHeatmap: Array<{
     month: string;
@@ -157,12 +161,13 @@ export interface CrossVehicleData {
     vehicleId: string;
     vehicleName: string;
     totalCost: number;
-    costPerMile: number | null;
+    costPerDistance: number | null;
   }>;
   fuelEfficiencyComparison: Array<{
     month: string;
-    vehicles: Array<{ vehicleId: string; vehicleName: string; mpg: number }>;
+    vehicles: Array<{ vehicleId: string; vehicleName: string; efficiency: number }>;
   }>;
+  units: { distanceUnit: string; volumeUnit: string; chargeUnit: string };
 }
 
 export interface FinancingData {
@@ -231,8 +236,8 @@ export interface VehicleTCOData {
   otherCosts: number;
   totalCost: number;
   ownershipMonths: number;
-  totalMiles: number;
-  costPerMile: number | null;
+  totalDistance: number;
+  costPerDistance: number | null;
   costPerMonth: number;
   monthlyTrend: Array<{
     month: string;
@@ -245,7 +250,7 @@ export interface VehicleTCOData {
 
 export interface VehicleExpensesData {
   maintenanceCosts: Array<{ month: string; cost: number }>;
-  fuelEfficiencyAndCost: Array<{ month: string; mpg: number | null; cost: number }>;
+  fuelEfficiencyAndCost: Array<{ month: string; efficiency: number | null; cost: number }>;
   expenseBreakdown: Array<{ category: string; amount: number }>;
 }
 
@@ -253,13 +258,14 @@ export interface YearEndData {
   year: number;
   totalSpent: number;
   categoryBreakdown: Array<{ category: string; amount: number; percentage: number }>;
-  mpgTrend: Array<{ month: string; mpg: number }>;
+  efficiencyTrend: Array<{ month: string; efficiency: number }>;
   biggestExpense: { description: string; amount: number; date: string } | null;
   previousYearComparison: { totalSpent: number; percentageChange: number } | null;
   vehicleCount: number;
-  totalMiles: number;
-  avgMpg: number | null;
-  costPerMile: number | null;
+  totalDistance: number;
+  avgEfficiency: number | null;
+  costPerDistance: number | null;
+  units: { distanceUnit: string; volumeUnit: string; chargeUnit: string };
 }
 
 interface DateRange {
@@ -301,6 +307,202 @@ export class AnalyticsRepository {
       this.vehicleNameCache.clear();
     }
     this.vehicleNameCache.set(cacheKey, { data, timestamp: now });
+  }
+
+  /** Read the user's global unit preferences from user_settings. */
+  async getUserUnits(userId: string): Promise<UnitPreferences> {
+    try {
+      const rows = await this.db
+        .select({ unitPreferences: userSettings.unitPreferences })
+        .from(userSettings)
+        .where(eq(userSettings.userId, userId))
+        .limit(1);
+
+      const row = rows[0];
+      if (!row) return { ...DEFAULT_UNIT_PREFERENCES };
+
+      const parsed = parseUnitPreferences(row.unitPreferences);
+      return parsed ?? { ...DEFAULT_UNIT_PREFERENCES };
+    } catch (error) {
+      throw new DatabaseError('Failed to read user unit preferences', error);
+    }
+  }
+
+  /** Read a vehicle's unit preferences. */
+  async getVehicleUnits(vehicleId: string): Promise<UnitPreferences> {
+    try {
+      const rows = await this.db
+        .select({ unitPreferences: vehicles.unitPreferences })
+        .from(vehicles)
+        .where(eq(vehicles.id, vehicleId))
+        .limit(1);
+
+      const row = rows[0];
+      if (!row) return { ...DEFAULT_UNIT_PREFERENCES };
+
+      const parsed = parseUnitPreferences(row.unitPreferences);
+      return parsed ?? { ...DEFAULT_UNIT_PREFERENCES };
+    } catch (error) {
+      throw new DatabaseError('Failed to read vehicle unit preferences', error);
+    }
+  }
+
+  /** Read all vehicle unit preferences for a user, keyed by vehicleId. */
+  async getAllVehicleUnits(userId: string): Promise<Map<string, UnitPreferences>> {
+    try {
+      const rows = await this.db
+        .select({ id: vehicles.id, unitPreferences: vehicles.unitPreferences })
+        .from(vehicles)
+        .where(eq(vehicles.userId, userId));
+
+      const result = new Map<string, UnitPreferences>();
+      for (const row of rows) {
+        const parsed = parseUnitPreferences(row.unitPreferences);
+        if (!parsed) {
+          throw new ValidationError(`Vehicle ${row.id} has invalid unit preferences`);
+        }
+        result.set(row.id, parsed);
+      }
+      return result;
+    } catch (error) {
+      if (error instanceof ValidationError) throw error;
+      throw new DatabaseError('Failed to read vehicle unit preferences', error);
+    }
+  }
+
+  /**
+   * Check whether all vehicles in the map share the same units as the target.
+   * When true, no conversion is needed — raw values can be aggregated directly.
+   */
+  private allVehiclesMatchUnits(
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    target: UnitPreferences
+  ): boolean {
+    for (const units of vehicleUnitsMap.values()) {
+      if (
+        units.distanceUnit !== target.distanceUnit ||
+        units.volumeUnit !== target.volumeUnit ||
+        units.chargeUnit !== target.chargeUnit
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Compute per-vehicle efficiency values, converting each to the target unit system.
+   * Iterates fuel rows grouped by vehicle, computes efficiency from consecutive pairs,
+   * and converts to the target units when skipConversion is false.
+   */
+  private computeConvertedEfficiencyValues(
+    fuelRows: FuelExpenseRow[],
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences,
+    skipConversion: boolean
+  ): number[] {
+    const values: number[] = [];
+    for (const [vehicleId, rows] of groupByVehicle(fuelRows)) {
+      const vUnits = vehicleUnitsMap.get(vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+      for (let i = 1; i < rows.length; i++) {
+        const current = rows[i];
+        const previous = rows[i - 1];
+        if (!current || !previous) continue;
+        const point = computeEfficiencyPoint(current, previous);
+        if (!point) continue;
+
+        values.push(
+          skipConversion
+            ? point.efficiency
+            : convertEfficiency(
+                point.efficiency,
+                vUnits.distanceUnit,
+                vUnits.volumeUnit,
+                targetUnits.distanceUnit,
+                targetUnits.volumeUnit
+              )
+        );
+      }
+    }
+    return values;
+  }
+
+  /**
+   * Compute per-vehicle total distance, converting each to the target unit system.
+   * Groups mileage readings by vehicle, computes max-min range, and converts.
+   */
+  private computeConvertedTotalDistance(
+    fuelRows: FuelExpenseRow[],
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences,
+    skipConversion: boolean
+  ): number {
+    const vehicleMileages = new Map<string, number[]>();
+    for (const row of fuelRows) {
+      if (row.mileage == null) continue;
+      const arr = vehicleMileages.get(row.vehicleId) ?? [];
+      arr.push(row.mileage);
+      vehicleMileages.set(row.vehicleId, arr);
+    }
+    let total = 0;
+    for (const [vId, mileages] of vehicleMileages) {
+      if (mileages.length < 2) continue;
+      let distance = Math.max(...mileages) - Math.min(...mileages);
+      if (!skipConversion && distance > 0) {
+        const vUnits = vehicleUnitsMap.get(vId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+        distance = convertDistance(distance, vUnits.distanceUnit, targetUnits.distanceUnit);
+      }
+      total += distance;
+    }
+    return total;
+  }
+
+  /**
+   * Build monthly MPG trend with per-vehicle unit conversion (max 12 entries).
+   * Same logic as buildEfficiencyTrend but converts each vehicle's efficiency values first.
+   */
+  private buildConvertedEfficiencyTrend(
+    fuelRows: FuelExpenseRow[],
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences,
+    skipConversion: boolean
+  ): Array<{ month: string; efficiency: number }> {
+    const monthMap = new Map<string, { effSum: number; effCount: number }>();
+
+    for (const [vehicleId, rows] of groupByVehicle(fuelRows)) {
+      const vUnits = vehicleUnitsMap.get(vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+      for (let i = 1; i < rows.length; i++) {
+        const current = rows[i];
+        const previous = rows[i - 1];
+        if (!current || !previous) continue;
+        const point = computeEfficiencyPoint(current, previous);
+        if (!point) continue;
+
+        const converted = skipConversion
+          ? point.efficiency
+          : convertEfficiency(
+              point.efficiency,
+              vUnits.distanceUnit,
+              vUnits.volumeUnit,
+              targetUnits.distanceUnit,
+              targetUnits.volumeUnit
+            );
+
+        const month = toMonthKey(new Date(point.date));
+        const entry = monthMap.get(month) ?? { effSum: 0, effCount: 0 };
+        entry.effSum += converted;
+        entry.effCount++;
+        monthMap.set(month, entry);
+      }
+    }
+
+    return Array.from(monthMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(0, 12)
+      .map(([month, data]) => ({
+        month,
+        efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
+      }));
   }
 
   /** Build a map of vehicleId → display name for a user's vehicles. */
@@ -823,7 +1025,6 @@ export class AnalyticsRepository {
   /** Compute quick stats: vehicle count, YTD spending, avg MPG, fleet health. */
   async getQuickStats(userId: string, range: DateRange): Promise<QuickStatsData> {
     try {
-      // 1. Get vehicles with insurance policy IDs in one query
       const vehicleRows = await this.db
         .select({
           id: vehicles.id,
@@ -834,29 +1035,42 @@ export class AnalyticsRepository {
 
       const vehicleCount = vehicleRows.length;
 
-      // 2. Get all expenses for the range and fuel efficiency in parallel
-      const [allExpenses, fuelRows] = await Promise.all([
+      const [allExpenses, fuelRows, userUnits, vehicleUnitsMap] = await Promise.all([
         this.queryAllExpenses(userId, range),
         this.queryFuelExpenses(userId, range),
+        this.getUserUnits(userId),
+        this.getAllVehicleUnits(userId),
       ]);
 
       const ytdSpending = allExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
-      const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
-        if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
-        const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
-        const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
-        return aTime - bTime;
-      });
-      const { mpgValues } = computeMpgAndCostPerMile(fuelRowsByVehicle);
-      const avgMpg =
-        mpgValues.length > 0 ? mpgValues.reduce((a, b) => a + b, 0) / mpgValues.length : null;
+      const skipConversion = this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits);
+      const convertedEfficiencyValues = this.computeConvertedEfficiencyValues(
+        fuelRows,
+        vehicleUnitsMap,
+        userUnits,
+        skipConversion
+      );
+      const avgEfficiency =
+        convertedEfficiencyValues.length > 0
+          ? convertedEfficiencyValues.reduce((a, b) => a + b, 0) / convertedEfficiencyValues.length
+          : null;
 
-      // 3. Compute fleet health score in batch (no N+1)
       const fleetHealthScore =
         vehicleCount > 0 ? await this.computeFleetHealthScore(vehicleRows) : 0;
 
-      return { vehicleCount, ytdSpending, avgMpg, fleetHealthScore };
+      return {
+        vehicleCount,
+        ytdSpending,
+        avgEfficiency,
+        fleetHealthScore,
+        units: {
+          distanceUnit: userUnits.distanceUnit,
+          volumeUnit: userUnits.volumeUnit,
+          chargeUnit: userUnits.chargeUnit,
+        },
+      };
     } catch (error) {
+      if (error instanceof ValidationError) throw error;
       logger.error('Failed to compute quick stats', {
         userId,
         range,
@@ -1025,7 +1239,7 @@ export class AnalyticsRepository {
     );
 
     const mileages = fuelRows.filter((r) => r.mileage != null).map((r) => r.mileage as number);
-    const totalMiles = mileages.length >= 2 ? Math.max(...mileages) - Math.min(...mileages) : 0;
+    const totalDistance = mileages.length >= 2 ? Math.max(...mileages) - Math.min(...mileages) : 0;
     const daysSoFar = Math.max(
       1,
       Math.ceil(
@@ -1033,9 +1247,10 @@ export class AnalyticsRepository {
       )
     );
     const distance = {
-      totalMiles,
-      avgPerDay: totalMiles > 0 ? totalMiles / daysSoFar : null,
-      avgPerMonth: totalMiles > 0 ? totalMiles / Math.max(1, Math.ceil(daysSoFar / 30)) : null,
+      totalDistance,
+      avgPerDay: totalDistance > 0 ? totalDistance / daysSoFar : null,
+      avgPerMonth:
+        totalDistance > 0 ? totalDistance / Math.max(1, Math.ceil(daysSoFar / 30)) : null,
     };
 
     return {
@@ -1045,7 +1260,7 @@ export class AnalyticsRepository {
         currentMonth: currentMonthFillups,
         previousMonth: prevMonthFillups,
       },
-      gallons: {
+      volume: {
         currentYear: currentYearGallons,
         previousYear: previousYearGallons,
         currentMonth: currentMonthGallons,
@@ -1059,7 +1274,7 @@ export class AnalyticsRepository {
       gasPriceHistory: buildGasPriceHistory(fuelRows),
       fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap),
       odometerProgression: this.buildOdometerProgression(fuelRows, vehicleNameMap),
-      costPerMile: buildCostPerMileChart(fuelRowsByVehicle, vehicleNameMap),
+      costPerDistance: buildCostPerDistanceChart(fuelRowsByVehicle, vehicleNameMap),
     };
   }
 
@@ -1122,12 +1337,19 @@ export class AnalyticsRepository {
   /** Compute cross-vehicle analytics: trends, category breakdown, comparisons. */
   async getCrossVehicle(userId: string, range: DateRange): Promise<CrossVehicleData> {
     try {
-      const [vehicleNameMap, allExpenses, fuelRows] = await Promise.all([
-        this.queryVehicleNameMap(userId),
-        this.queryAllExpenses(userId, range),
-        this.queryFuelExpenses(userId, range),
-      ]);
+      const [vehicleNameMap, allExpenses, fuelRows, userUnits, vehicleUnitsMap] = await Promise.all(
+        [
+          this.queryVehicleNameMap(userId),
+          this.queryAllExpenses(userId, range),
+          this.queryFuelExpenses(userId, range),
+          this.getUserUnits(userId),
+          this.getAllVehicleUnits(userId),
+        ]
+      );
 
+      const skipConversion = this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits);
+
+      // Accumulate per-vehicle cost and mileage data
       const vehicleCosts = new Map<
         string,
         { total: number; maxMileage: number; minMileage: number }
@@ -1145,28 +1367,55 @@ export class AnalyticsRepository {
         }
         vehicleCosts.set(row.vehicleId, entry);
       }
+
+      // Convert per-vehicle distance to user's global units before computing costPerDistance
       const vehicleCostComparison = [...vehicleNameMap.entries()].map(([vId, vName]) => {
         const data = vehicleCosts.get(vId);
         const totalCost = data?.total ?? 0;
-        const totalMiles =
+        let totalDist =
           data && data.maxMileage > 0 && data.minMileage < Number.POSITIVE_INFINITY
             ? data.maxMileage - data.minMileage
             : 0;
+
+        if (!skipConversion && totalDist > 0) {
+          const vUnits = vehicleUnitsMap.get(vId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+          totalDist = convertDistance(totalDist, vUnits.distanceUnit, userUnits.distanceUnit);
+        }
+
         return {
           vehicleId: vId,
           vehicleName: vName,
           totalCost,
-          costPerMile: totalMiles > 0 ? totalCost / totalMiles : null,
+          costPerDistance: totalDist > 0 ? totalCost / totalDist : null,
         };
       });
+
+      // Build fuel efficiency comparison with per-vehicle conversion
+      let fuelEfficiencyComparison: CrossVehicleData['fuelEfficiencyComparison'];
+      if (skipConversion) {
+        fuelEfficiencyComparison = buildFuelEfficiencyComparison(fuelRows, vehicleNameMap);
+      } else {
+        fuelEfficiencyComparison = this.buildConvertedFuelEfficiencyComparison(
+          fuelRows,
+          vehicleNameMap,
+          vehicleUnitsMap,
+          userUnits
+        );
+      }
 
       return {
         monthlyExpenseTrends: buildMonthlyExpenseTrends(allExpenses),
         expenseByCategory: buildExpenseByCategory(allExpenses),
         vehicleCostComparison,
-        fuelEfficiencyComparison: buildFuelEfficiencyComparison(fuelRows, vehicleNameMap),
+        fuelEfficiencyComparison,
+        units: {
+          distanceUnit: userUnits.distanceUnit,
+          volumeUnit: userUnits.volumeUnit,
+          chargeUnit: userUnits.chargeUnit,
+        },
       };
     } catch (error) {
+      if (error instanceof ValidationError) throw error;
       logger.error('Failed to compute cross-vehicle analytics', {
         userId,
         range,
@@ -1174,6 +1423,64 @@ export class AnalyticsRepository {
       });
       throw new DatabaseError('Failed to compute cross-vehicle analytics', error);
     }
+  }
+
+  /**
+   * Build fuel efficiency comparison with per-vehicle unit conversion.
+   * Same logic as buildFuelEfficiencyComparison but converts each vehicle's
+   * efficiency values to the user's global units before aggregation.
+   */
+  private buildConvertedFuelEfficiencyComparison(
+    fuelRows: FuelExpenseRow[],
+    vehicleNameMap: Map<string, string>,
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    userUnits: UnitPreferences
+  ): CrossVehicleData['fuelEfficiencyComparison'] {
+    const byVehicle = groupByVehicle(fuelRows);
+
+    // Compute monthly efficiency per vehicle, converting to user's global units
+    const monthVehicleEff = new Map<string, Map<string, { sum: number; count: number }>>();
+    for (const [vId, rows] of byVehicle) {
+      const vUnits = vehicleUnitsMap.get(vId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+      for (let i = 1; i < rows.length; i++) {
+        const current = rows[i];
+        const previous = rows[i - 1];
+        if (!current || !previous) continue;
+        const point = computeEfficiencyPoint(current, previous);
+        if (!point) continue;
+
+        const converted = convertEfficiency(
+          point.efficiency,
+          vUnits.distanceUnit,
+          vUnits.volumeUnit,
+          userUnits.distanceUnit,
+          userUnits.volumeUnit
+        );
+
+        const month = toMonthKey(new Date(point.date));
+        if (!monthVehicleEff.has(month)) monthVehicleEff.set(month, new Map());
+        const vehicleMap = monthVehicleEff.get(month) as Map<
+          string,
+          { sum: number; count: number }
+        >;
+        const entry = vehicleMap.get(vId) ?? { sum: 0, count: 0 };
+        entry.sum += converted;
+        entry.count++;
+        vehicleMap.set(vId, entry);
+      }
+    }
+
+    return Array.from(monthVehicleEff.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-24)
+      .map(([month, vehicleMap]) => ({
+        month,
+        vehicles: Array.from(vehicleMap.entries()).map(([vId, data]) => ({
+          vehicleId: vId,
+          vehicleName: vehicleNameMap.get(vId) ?? 'Unknown',
+          efficiency: data.count > 0 ? data.sum / data.count : 0,
+        })),
+      }));
   }
 
   /** Compute financing analytics: summary, vehicle details, timeline. */
@@ -1417,7 +1724,8 @@ export class AnalyticsRepository {
       const mileages = detailedExpenses
         .filter((r) => r.mileage != null)
         .map((r) => r.mileage as number);
-      const totalMiles = mileages.length >= 2 ? Math.max(...mileages) - Math.min(...mileages) : 0;
+      const totalDistance =
+        mileages.length >= 2 ? Math.max(...mileages) - Math.min(...mileages) : 0;
 
       return {
         vehicleId,
@@ -1426,8 +1734,8 @@ export class AnalyticsRepository {
         ...costs,
         totalCost,
         ownershipMonths,
-        totalMiles,
-        costPerMile: totalMiles > 0 ? totalCost / totalMiles : null,
+        totalDistance,
+        costPerDistance: totalDistance > 0 ? totalCost / totalDistance : null,
         costPerMonth: totalCost / ownershipMonths,
         monthlyTrend: buildTCOMonthlyTrend(detailedExpenses),
       };
@@ -1476,41 +1784,63 @@ export class AnalyticsRepository {
         start: Math.floor(yearStart.getTime() / 1000),
         end: Math.floor(yearEnd.getTime() / 1000),
       };
-      const [vehicleNameMap, allExpenses, fuelRows, prevTotalSpent] = await Promise.all([
-        this.queryVehicleNameMap(userId),
-        this.queryAllExpenses(userId, yearRange),
-        this.queryFuelExpenses(userId, yearRange),
-        this.queryTotalSpending(userId, year - 1),
-      ]);
+      const [vehicleNameMap, allExpenses, fuelRows, prevTotalSpent, userUnits, vehicleUnitsMap] =
+        await Promise.all([
+          this.queryVehicleNameMap(userId),
+          this.queryAllExpenses(userId, yearRange),
+          this.queryFuelExpenses(userId, yearRange),
+          this.queryTotalSpending(userId, year - 1),
+          this.getUserUnits(userId),
+          this.getAllVehicleUnits(userId),
+        ]);
 
       const totalSpent = allExpenses.reduce((s, e) => s + e.expenseAmount, 0);
+      const skipConversion = this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits);
 
-      const mileages = fuelRows.filter((r) => r.mileage != null).map((r) => r.mileage as number);
-      const totalMiles = mileages.length >= 2 ? Math.max(...mileages) - Math.min(...mileages) : 0;
-      // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
-      const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
-        if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
-        const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
-        const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
-        return aTime - bTime;
-      });
-      const { mpgValues } = computeMpgAndCostPerMile(fuelRowsByVehicle);
-      const avgMpg =
-        mpgValues.length > 0 ? mpgValues.reduce((a, b) => a + b, 0) / mpgValues.length : null;
+      const totalDistance = this.computeConvertedTotalDistance(
+        fuelRows,
+        vehicleUnitsMap,
+        userUnits,
+        skipConversion
+      );
+
+      const convertedEfficiencyValues = this.computeConvertedEfficiencyValues(
+        fuelRows,
+        vehicleUnitsMap,
+        userUnits,
+        skipConversion
+      );
+      const avgEfficiency =
+        convertedEfficiencyValues.length > 0
+          ? convertedEfficiencyValues.reduce((a, b) => a + b, 0) / convertedEfficiencyValues.length
+          : null;
+
+      const efficiencyTrend = this.buildConvertedEfficiencyTrend(
+        fuelRows,
+        vehicleUnitsMap,
+        userUnits,
+        skipConversion
+      );
 
       return {
         year,
         totalSpent,
         categoryBreakdown: buildExpenseByCategory(allExpenses),
-        mpgTrend: buildMpgTrend(fuelRowsByVehicle),
+        efficiencyTrend,
         biggestExpense: findBiggestExpense(allExpenses),
         previousYearComparison: computePreviousYearComparison(totalSpent, prevTotalSpent),
         vehicleCount: vehicleNameMap.size,
-        totalMiles,
-        avgMpg,
-        costPerMile: totalMiles > 0 ? totalSpent / totalMiles : null,
+        totalDistance,
+        avgEfficiency,
+        costPerDistance: totalDistance > 0 ? totalSpent / totalDistance : null,
+        units: {
+          distanceUnit: userUnits.distanceUnit,
+          volumeUnit: userUnits.volumeUnit,
+          chargeUnit: userUnits.chargeUnit,
+        },
       };
     } catch (error) {
+      if (error instanceof ValidationError) throw error;
       logger.error('Failed to compute year-end summary', {
         userId,
         year,
@@ -1527,7 +1857,15 @@ export class AnalyticsRepository {
         end: range.start,
       };
 
-      const [vehicleNameMap, vehicleRows, allExpenses, fuelRows, prevYearAgg] = await Promise.all([
+      const [
+        vehicleNameMap,
+        vehicleRows,
+        allExpenses,
+        fuelRows,
+        prevYearAgg,
+        userUnits,
+        vehicleUnitsMap,
+      ] = await Promise.all([
         this.queryVehicleNameMap(userId),
         this.db
           .select({
@@ -1539,6 +1877,8 @@ export class AnalyticsRepository {
         this.queryAllExpenses(userId, range),
         this.queryFuelExpenses(userId, range),
         this.queryFuelAggregates(userId, prevRange),
+        this.getUserUnits(userId),
+        this.getAllVehicleUnits(userId),
       ]);
 
       const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
@@ -1548,10 +1888,18 @@ export class AnalyticsRepository {
         return aTime - bTime;
       });
 
-      // Build quickStats from pre-fetched data (same logic as getQuickStats)
-      const { mpgValues } = computeMpgAndCostPerMile(fuelRowsByVehicle);
-      const avgMpg =
-        mpgValues.length > 0 ? mpgValues.reduce((a, b) => a + b, 0) / mpgValues.length : null;
+      // Build quickStats with per-vehicle unit conversion
+      const skipConversion = this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits);
+      const convertedEfficiencyValues = this.computeConvertedEfficiencyValues(
+        fuelRows,
+        vehicleUnitsMap,
+        userUnits,
+        skipConversion
+      );
+      const avgEfficiency =
+        convertedEfficiencyValues.length > 0
+          ? convertedEfficiencyValues.reduce((a, b) => a + b, 0) / convertedEfficiencyValues.length
+          : null;
       const ytdSpending = allExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
       const fleetHealthScore =
         vehicleRows.length > 0 ? await this.computeFleetHealthScore(vehicleRows) : 0;
@@ -1559,8 +1907,13 @@ export class AnalyticsRepository {
       const quickStats: QuickStatsData = {
         vehicleCount: vehicleRows.length,
         ytdSpending,
-        avgMpg,
+        avgEfficiency,
         fleetHealthScore,
+        units: {
+          distanceUnit: userUnits.distanceUnit,
+          volumeUnit: userUnits.volumeUnit,
+          chargeUnit: userUnits.chargeUnit,
+        },
       };
 
       const fuelStats = this.buildFuelStatsFromData(
@@ -1579,6 +1932,7 @@ export class AnalyticsRepository {
 
       return { quickStats, fuelStats, fuelAdvanced };
     } catch (error) {
+      if (error instanceof ValidationError) throw error;
       logger.error('Failed to compute analytics summary', {
         userId,
         range,

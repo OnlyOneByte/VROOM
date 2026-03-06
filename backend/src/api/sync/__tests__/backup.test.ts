@@ -635,3 +635,99 @@ describe('Property 9: Backup round-trip for tracking flags', () => {
     expect(result.success).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// coerceRow: unitPreferences JSON round-trip on vehicles
+// **Validates: Requirements 9.5, 10.1**
+// ---------------------------------------------------------------------------
+
+describe('coerceRow: unitPreferences JSON column on vehicles', () => {
+  test('valid unitPreferences JSON string is parsed correctly', () => {
+    const prefs = JSON.stringify({
+      distanceUnit: 'kilometers',
+      volumeUnit: 'liters',
+      chargeUnit: 'kwh',
+    });
+    const row = buildMinimalStringRow(vehicles, { unitPreferences: prefs });
+    const result = coerceRow(row, vehicles);
+    expect(result.unitPreferences).toEqual({
+      distanceUnit: 'kilometers',
+      volumeUnit: 'liters',
+      chargeUnit: 'kwh',
+    });
+  });
+
+  test('default unitPreferences JSON string is parsed correctly', () => {
+    const prefs = JSON.stringify({
+      distanceUnit: 'miles',
+      volumeUnit: 'gallons_us',
+      chargeUnit: 'kwh',
+    });
+    const row = buildMinimalStringRow(vehicles, { unitPreferences: prefs });
+    const result = coerceRow(row, vehicles);
+    expect(result.unitPreferences).toEqual({
+      distanceUnit: 'miles',
+      volumeUnit: 'gallons_us',
+      chargeUnit: 'kwh',
+    });
+  });
+
+  test('coerced vehicle with unitPreferences passes Zod validation', () => {
+    const prefs = JSON.stringify({
+      distanceUnit: 'kilometers',
+      volumeUnit: 'gallons_uk',
+      chargeUnit: 'kwh',
+    });
+    const row = buildMinimalStringRow(vehicles, { unitPreferences: prefs, userId: 'u1' });
+    const coerced = coerceRow(row, vehicles);
+    const schema = createInsertSchema(vehicles);
+    const result = schema.safeParse(coerced);
+    expect(result.success).toBe(true);
+  });
+
+  test('older backup missing unitPreferences column gets schema default', () => {
+    const row = buildMinimalStringRow(vehicles, { userId: 'u1' });
+    delete (row as Record<string, unknown>).unitPreferences;
+
+    const coerced = coerceRow(row, vehicles);
+
+    // unitPreferences is undefined — Drizzle will use the schema default on insert
+    // The Zod schema from createInsertSchema should accept undefined for columns with defaults
+    const schema = createInsertSchema(vehicles);
+    const result = schema.safeParse(coerced);
+    expect(result.success).toBe(true);
+  });
+
+  test('coerced vehicle with unitPreferences passes validateBackupData', () => {
+    const prefs = JSON.stringify({
+      distanceUnit: 'kilometers',
+      volumeUnit: 'liters',
+      chargeUnit: 'kwh',
+    });
+    const vehicle = coerceRow(
+      buildMinimalStringRow(vehicles, { userId: 'u1', unitPreferences: prefs }),
+      vehicles
+    );
+    const backup: ParsedBackupData = {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      vehicles: [vehicle],
+      expenses: [],
+      financing: [],
+      insurance: [],
+      insurancePolicyVehicles: [],
+      expenseGroups: [],
+      photos: [],
+      odometer: [],
+    };
+
+    const result = backupService.validateBackupData(backup);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  test('invalid unitPreferences JSON coerces to null', () => {
+    const row = buildMinimalStringRow(vehicles, { unitPreferences: '{broken-json' });
+    const result = coerceRow(row, vehicles);
+    expect(result.unitPreferences).toBeNull();
+  });
+});

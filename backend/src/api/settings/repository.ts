@@ -3,6 +3,7 @@ import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { getDb } from '../../db/connection';
 import type { NewUserSettings, UserSettings } from '../../db/schema';
 import { userSettings } from '../../db/schema';
+import { DEFAULT_UNIT_PREFERENCES } from '../../types';
 
 export class SettingsRepository {
   constructor(private db: BunSQLiteDatabase<Record<string, unknown>>) {}
@@ -29,9 +30,7 @@ export class SettingsRepository {
     // Create default settings
     const newSettings: NewUserSettings = {
       userId,
-      distanceUnit: 'miles',
-      volumeUnit: 'gallons_us',
-      chargeUnit: 'kwh',
+      unitPreferences: DEFAULT_UNIT_PREFERENCES,
       currencyUnit: 'USD',
       autoBackupEnabled: false,
       backupFrequency: 'weekly',

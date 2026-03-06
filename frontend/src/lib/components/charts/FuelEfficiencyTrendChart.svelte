@@ -10,6 +10,9 @@
 		TREND_LINE_PROPS,
 		monthlyXAxisProps
 	} from '$lib/utils/chart-formatters';
+	import { getFuelEfficiencyLabel, getElectricEfficiencyLabel } from '$lib/utils/units';
+	import type { UnitPreferences } from '$lib/types';
+	import { settingsStore } from '$lib/stores/settings.svelte';
 
 	// Chart configuration constants
 	const CHART_HEIGHT = 280;
@@ -24,15 +27,22 @@
 	interface Props {
 		data: FuelEfficiencyData[];
 		fuelType: 'gas' | 'diesel' | 'electric' | 'hybrid';
+		unitPreferences?: UnitPreferences;
 		isLoading?: boolean;
 		error?: string | null;
 	}
 
-	let { data, fuelType, isLoading = false, error = null }: Props = $props();
+	let { data, fuelType, unitPreferences, isLoading = false, error = null }: Props = $props();
+
+	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 
 	// Title and unit label based on fuel type
 	let title = $derived(fuelType === 'electric' ? 'Electric Efficiency' : 'Fuel Efficiency');
-	let unitLabel = $derived(fuelType === 'electric' ? 'mi/kWh' : 'MPG');
+	let unitLabel = $derived(
+		fuelType === 'electric'
+			? getElectricEfficiencyLabel(units.distanceUnit, units.chargeUnit)
+			: getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit)
+	);
 	let description = $derived(`Measured in ${unitLabel}`);
 
 	// Chart configuration for shadcn styling

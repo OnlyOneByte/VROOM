@@ -16,6 +16,8 @@
 		VehicleExpensesResponse
 	} from '$lib/types';
 	import { formatCurrency } from '$lib/utils/formatters';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { getCostPerDistanceLabel, getDistanceUnitLabel } from '$lib/utils/units';
 
 	let vehicles = $state<Vehicle[]>([]);
 	let selectedVehicleId = $state<string>('');
@@ -78,6 +80,11 @@
 
 	let selectedVehicle = $derived(vehicles.find(v => v.id === selectedVehicleId));
 
+	// Dynamic unit labels — per-vehicle view uses selected vehicle's unit preferences
+	let units = $derived(selectedVehicle?.unitPreferences ?? settingsStore.unitPreferences);
+	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
+	let distLongLabel = $derived(getDistanceUnitLabel(units.distanceUnit));
+
 	// --- Health Score ---
 	function getScoreColor(score: number): string {
 		if (score >= 70) return 'text-chart-2';
@@ -97,11 +104,11 @@
 		return [
 			{ label: 'Total Cost', value: formatCurrency(tco.totalCost) },
 			{
-				label: 'Cost per Mile',
-				value: tco.costPerMile != null ? formatCurrency(tco.costPerMile) : 'N/A'
+				label: costPerDistLabel,
+				value: tco.costPerDistance != null ? formatCurrency(tco.costPerDistance) : 'N/A'
 			},
 			{ label: 'Cost per Month', value: formatCurrency(tco.costPerMonth) },
-			{ label: 'Total Miles', value: tco.totalMiles.toLocaleString() }
+			{ label: `Total ${distLongLabel}`, value: tco.totalDistance.toLocaleString() }
 		];
 	});
 

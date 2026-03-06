@@ -1,6 +1,8 @@
 import { offlineExpenseQueue, syncState } from '$lib/stores/offline.svelte';
 import { toBackendExpense } from '$lib/services/api-transformer';
 import { apiClient } from '$lib/services/api-client';
+import { browser } from '$app/environment';
+import type { ExpenseCategory } from '$lib/types';
 
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
 const OFFLINE_STORAGE_VERSION = '2.0'; // Incremented for field name migration
@@ -10,7 +12,7 @@ export interface OfflineExpense {
 	vehicleId: string;
 	type?: string; // Deprecated, kept for backwards compatibility
 	tags: string[]; // New flexible tags
-	category: string;
+	category: string; // Stored as string from user input; validated at sync time
 	amount: number;
 	currency?: string;
 	date: string;
@@ -25,7 +27,7 @@ export interface OfflineExpense {
 
 // Load offline expenses from localStorage
 export function loadOfflineExpenses(): OfflineExpense[] {
-	if (typeof window === 'undefined') return [];
+	if (!browser) return [];
 
 	try {
 		const stored = localStorage.getItem(OFFLINE_STORAGE_KEY);
@@ -49,7 +51,7 @@ export function loadOfflineExpenses(): OfflineExpense[] {
 
 // Save offline expenses to localStorage
 export function saveOfflineExpenses(expenses: OfflineExpense[]): void {
-	if (typeof window === 'undefined') return;
+	if (!browser) return;
 
 	try {
 		localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(expenses));
@@ -131,7 +133,7 @@ export async function syncOfflineExpenses(): Promise<void> {
 			const backendExpense = toBackendExpense({
 				vehicleId: expense.vehicleId,
 				tags: expense.tags || [],
-				category: expense.category,
+				category: expense.category as ExpenseCategory,
 				amount: expense.amount,
 				date: expense.date,
 				mileage: expense.mileage,

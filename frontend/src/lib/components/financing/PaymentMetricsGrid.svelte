@@ -2,7 +2,9 @@
 	import { StatCardGrid } from '$lib/components/charts';
 	import { Banknote, Calendar, TrendingUp, Hash, DollarSign, TriangleAlert } from 'lucide-svelte';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import type { VehicleFinancing } from '$lib/types.js';
+	import { getDistanceUnitLabel } from '$lib/utils/units';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import type { VehicleFinancing, UnitPreferences } from '$lib/types.js';
 	import type { AmortizationEntry } from '$lib/utils/financing-calculations';
 
 	interface Props {
@@ -13,6 +15,7 @@
 		paymentsCount: number;
 		amortizationSchedule?: AmortizationEntry[];
 		mileageUsed?: number;
+		unitPreferences?: UnitPreferences;
 	}
 
 	let {
@@ -22,8 +25,13 @@
 		estimatedPayoffDate,
 		paymentsCount,
 		amortizationSchedule = [],
-		mileageUsed = 0
+		mileageUsed = 0,
+		unitPreferences
 	}: Props = $props();
+
+	// Resolve distance label from vehicle unitPreferences, falling back to global settings
+	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
+	let distLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
 	let isLoanWithApr = $derived(
 		financing.financingType === 'loan' && financing.apr != null && financing.apr > 0
@@ -120,7 +128,7 @@
 			items.push({
 				label: 'Mileage Overage',
 				value: excessMiles > 0 ? formatCurrency(overageCost) : '$0.00',
-				subtitle: `${excessMiles > 0 ? `${excessMiles.toLocaleString()} mi over` : 'Within limit'} · $${financing.excessMileageFee.toFixed(2)}/mi`,
+				subtitle: `${excessMiles > 0 ? `${excessMiles.toLocaleString()} ${distLabel} over` : 'Within limit'} · $${financing.excessMileageFee.toFixed(2)}/${distLabel}`,
 				icon: TriangleAlert,
 				iconColor: excessMiles > 0 ? 'destructive' : 'chart-2'
 			});

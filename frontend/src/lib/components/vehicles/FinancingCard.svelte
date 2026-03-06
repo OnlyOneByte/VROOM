@@ -77,21 +77,21 @@
 
 					{#if vehicle.financing.mileageLimit}
 						<StatCard
-							label="Annual {settingsStore.settings?.distanceUnit === 'kilometers'
+							label="Annual {settingsStore.unitPreferences.distanceUnit === 'kilometers'
 								? 'Distance'
 								: 'Mileage'} Limit"
 							value={vehicle.financing.mileageLimit.toLocaleString()}
-							unit={getDistanceUnitLabel(settingsStore.settings?.distanceUnit || 'miles', false)}
+							unit={getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, false)}
 						/>
 					{/if}
 
 					{#if vehicle.financing.excessMileageFee}
 						<StatCard
-							label="Excess {settingsStore.settings?.distanceUnit === 'kilometers'
+							label="Excess {settingsStore.unitPreferences.distanceUnit === 'kilometers'
 								? 'Distance'
 								: 'Mileage'} Fee"
 							value={formatCurrency(vehicle.financing.excessMileageFee)}
-							unit="/{getDistanceUnitLabel(settingsStore.settings?.distanceUnit || 'miles', true)}"
+							unit="/{getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, true)}"
 						/>
 					{/if}
 				{/if}

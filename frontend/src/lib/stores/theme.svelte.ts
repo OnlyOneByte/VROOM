@@ -30,6 +30,7 @@ function applyTheme(preference: ThemePreference) {
 
 function createThemeStore() {
 	let current = $state<ThemePreference>(getStoredPreference());
+	let initialized = false;
 
 	return {
 		get current() {
@@ -37,6 +38,9 @@ function createThemeStore() {
 		},
 
 		initialize() {
+			if (initialized) return;
+			initialized = true;
+
 			const preference = getStoredPreference();
 			applyTheme(preference);
 			current = preference;

@@ -23,29 +23,32 @@ const mockGet = vi.mocked(apiClient.get);
 const mockQuickStats: QuickStatsResponse = {
 	vehicleCount: 3,
 	ytdSpending: 4500.5,
-	avgMpg: 28.3,
-	fleetHealthScore: 85
+	avgEfficiency: 28.3,
+	fleetHealthScore: 85,
+	units: { distanceUnit: 'miles', volumeUnit: 'gallons_us', chargeUnit: 'kwh' }
 };
 
 const mockFuelStats: FuelStatsResponse = {
 	fillups: { currentYear: 48, previousYear: 52, currentMonth: 4, previousMonth: 5 },
-	gallons: { currentYear: 600, previousYear: 650, currentMonth: 50, previousMonth: 55 },
-	fuelConsumption: { avgMpg: 28.3, bestMpg: 35.1, worstMpg: 22.0 },
+	volume: { currentYear: 600, previousYear: 650, currentMonth: 50, previousMonth: 55 },
+	fuelConsumption: { avgEfficiency: 28.3, bestEfficiency: 35.1, worstEfficiency: 22.0 },
 	fillupDetails: { avgVolume: 12.5, minVolume: 8.0, maxVolume: 18.0 },
 	averageCost: {
 		perFillup: 45.0,
-		bestCostPerMile: 0.08,
-		worstCostPerMile: 0.15,
+		bestCostPerDistance: 0.08,
+		worstCostPerDistance: 0.15,
 		avgCostPerDay: 12.3
 	},
-	distance: { totalMiles: 17000, avgPerDay: 46.6, avgPerMonth: 1416.7 },
-	monthlyConsumption: [{ month: '2024-01', mpg: 28.5, gallons: 50 }],
-	gasPriceHistory: [{ date: '2024-01-15', fuelType: '87 (Regular)', pricePerGallon: 3.45 }],
+	distance: { totalDistance: 17000, avgPerDay: 46.6, avgPerMonth: 1416.7 },
+	monthlyConsumption: [{ month: '2024-01', efficiency: 28.5, volume: 50 }],
+	gasPriceHistory: [{ date: '2024-01-15', fuelType: '87 (Regular)', pricePerVolume: 3.45 }],
 	fillupCostByVehicle: [{ month: '2024-01', vehicleId: 'v1', vehicleName: 'Civic', avgCost: 42.0 }],
 	odometerProgression: [
 		{ month: '2024-01', vehicleId: 'v1', vehicleName: 'Civic', mileage: 55000 }
 	],
-	costPerMile: [{ month: '2024-01', vehicleId: 'v1', vehicleName: 'Civic', costPerMile: 0.1 }]
+	costPerDistance: [
+		{ month: '2024-01', vehicleId: 'v1', vehicleName: 'Civic', costPerDistance: 0.1 }
+	]
 };
 
 const mockFuelAdvanced: FuelAdvancedResponse = {
@@ -58,7 +61,7 @@ const mockFuelAdvanced: FuelAdvancedResponse = {
 			status: 'good'
 		}
 	],
-	seasonalEfficiency: [{ season: 'Winter', avgMpg: 26.0, fillupCount: 12 }],
+	seasonalEfficiency: [{ season: 'Winter', avgEfficiency: 26.0, fillupCount: 12 }],
 	vehicleRadar: [
 		{
 			vehicleId: 'v1',
@@ -70,7 +73,7 @@ const mockFuelAdvanced: FuelAdvancedResponse = {
 			mileage: 75
 		}
 	],
-	dayOfWeekPatterns: [{ day: 'Monday', fillupCount: 8, avgCost: 44.0, avgGallons: 12.0 }],
+	dayOfWeekPatterns: [{ day: 'Monday', fillupCount: 8, avgCost: 44.0, avgVolume: 12.0 }],
 	monthlyCostHeatmap: [
 		{
 			month: '2024-01',

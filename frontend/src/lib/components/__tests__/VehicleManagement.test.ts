@@ -18,6 +18,10 @@ vi.mock('$app/stores', () => ({
 	}
 }));
 
+vi.mock('$app/state', () => ({
+	page: { params: { id: 'test-vehicle-id' }, url: { pathname: '/vehicles' } }
+}));
+
 // Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -678,7 +682,7 @@ describe('Vehicle Management Components', () => {
 					id: '1',
 					vehicleId: '1',
 					type: 'fuel' as const,
-					category: 'operating' as const,
+					category: 'fuel' as const,
 					amount: 50,
 					date: '2024-01-15',
 					mileage: 51000,
@@ -691,7 +695,7 @@ describe('Vehicle Management Components', () => {
 					id: '2',
 					vehicleId: '1',
 					type: 'fuel' as const,
-					category: 'operating' as const,
+					category: 'fuel' as const,
 					amount: 45,
 					date: '2024-01-20',
 					mileage: 51300,

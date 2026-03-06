@@ -1,6 +1,8 @@
 import { createId } from '@paralleldrive/cuid2';
 import { relations } from 'drizzle-orm';
 import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import type { UnitPreferences } from '../types';
+import { DEFAULT_UNIT_PREFERENCES } from '../types';
 
 // User table
 export const users = sqliteTable('users', {
@@ -39,6 +41,10 @@ export const vehicles = sqliteTable(
     purchasePrice: real('purchase_price'),
     purchaseDate: integer('purchase_date', { mode: 'timestamp' }),
     currentInsurancePolicyId: text('current_insurance_policy_id'),
+    unitPreferences: text('unit_preferences', { mode: 'json' })
+      .$type<UnitPreferences>()
+      .notNull()
+      .default(DEFAULT_UNIT_PREFERENCES),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
@@ -212,10 +218,11 @@ export const userSettings = sqliteTable('user_settings', {
     .notNull()
     .unique()
     .references(() => users.id, { onDelete: 'cascade' }),
-  // Unit preferences
-  distanceUnit: text('distance_unit').notNull().default('miles'), // 'miles' | 'kilometers'
-  volumeUnit: text('volume_unit').notNull().default('gallons_us'), // 'gallons_us' | 'gallons_uk' | 'liters'
-  chargeUnit: text('charge_unit').notNull().default('kwh'), // 'kwh' (for electric vehicles)
+  // Unit preferences (consolidated JSON column)
+  unitPreferences: text('unit_preferences', { mode: 'json' })
+    .$type<UnitPreferences>()
+    .notNull()
+    .default(DEFAULT_UNIT_PREFERENCES),
   currencyUnit: text('currency_unit').notNull().default('USD'),
   // Backup preferences (for data dumps)
   autoBackupEnabled: integer('auto_backup_enabled', { mode: 'boolean' }).notNull().default(false),

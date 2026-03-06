@@ -27,6 +27,7 @@ import {
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
+import { ValidationError } from '../../errors';
 import type { BackupData, BackupMetadata, ParsedBackupData } from '../../types';
 
 export interface ValidationResult {
@@ -249,12 +250,17 @@ export class BackupService {
       const row: Record<string, unknown> = {};
       for (const col of columns) {
         const value = item[col];
-        row[col] =
-          value === null || value === undefined
-            ? ''
-            : value instanceof Date
-              ? value.toISOString()
-              : value;
+        if (value === null || value === undefined) {
+          row[col] = '';
+        } else if (value instanceof Date) {
+          row[col] = value.toISOString();
+        } else if (typeof value === 'object') {
+          // JSON columns (unitPreferences, terms, tags, splitConfig, etc.)
+          // must be serialized as JSON strings, not [object Object]
+          row[col] = JSON.stringify(value);
+        } else {
+          row[col] = value;
+        }
       }
       return row;
     });
@@ -269,12 +275,12 @@ export class BackupService {
     const missingFiles = getRequiredBackupFiles().filter((file) => !fileNames.includes(file));
 
     if (missingFiles.length > 0) {
-      throw new Error(`Missing required files: ${missingFiles.join(', ')}`);
+      throw new ValidationError(`Missing required files: ${missingFiles.join(', ')}`);
     }
 
     const metadataEntry = zip.getEntry('metadata.json');
     if (!metadataEntry) {
-      throw new Error('metadata.json not found');
+      throw new ValidationError('metadata.json not found in backup archive');
     }
 
     const metadata = JSON.parse(metadataEntry.getData().toString('utf-8')) as BackupMetadata;

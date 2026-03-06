@@ -62,7 +62,6 @@
 	// Filters and search
 	let searchTerm = $state('');
 	let selectedVehicleId = $state<string | undefined>(undefined);
-	let selectedCategory = $state<string | undefined>(undefined);
 	let startDate = $state<string | undefined>(undefined);
 	let endDate = $state<string | undefined>(undefined);
 
@@ -146,7 +145,6 @@
 			limit: pageSize,
 			offset,
 			...(selectedVehicleId && { vehicleId: selectedVehicleId }),
-			...(selectedCategory && { category: selectedCategory }),
 			...(startDate && { startDate }),
 			...(endDate && { endDate }),
 			...(selectedTags.length > 0 && { tags: selectedTags })
@@ -221,7 +219,6 @@
 		tagSearchTerm = '';
 		tagMatchMode = 'any';
 		selectedVehicleId = undefined;
-		selectedCategory = undefined;
 		selectedTags = [];
 		startDate = undefined;
 		endDate = undefined;
@@ -684,7 +681,6 @@
 					hasActiveFilters={!!(
 						searchTerm ||
 						selectedVehicleId ||
-						selectedCategory ||
 						selectedTags.length > 0 ||
 						startDate ||
 						endDate

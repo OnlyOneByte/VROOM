@@ -11,7 +11,7 @@ vi.mock('$lib/utils/charts', () => ({
 
 describe('Category Breakdown Chart Logic', () => {
 	const mockCategoryData = {
-		operating: { amount: 1500.5, count: 25, percentage: 45.2 },
+		fuel: { amount: 1500.5, count: 25, percentage: 45.2 },
 		maintenance: { amount: 800.25, count: 12, percentage: 24.1 },
 		financial: { amount: 650.0, count: 8, percentage: 19.6 },
 		regulatory: { amount: 200.75, count: 5, percentage: 6.0 },
@@ -46,7 +46,7 @@ describe('Category Breakdown Chart Logic', () => {
 
 		expect(chartData).toHaveLength(5);
 		expect(chartData[0]).toEqual({
-			category: 'Operating',
+			category: 'Fuel',
 			amount: 1500.5,
 			count: 25,
 			percentage: 45.2
@@ -63,14 +63,14 @@ describe('Category Breakdown Chart Logic', () => {
 		const testData = {
 			fuel: { amount: 100, count: 5, percentage: 50 },
 			'oil-change': { amount: 50, count: 2, percentage: 25 },
-			insurance: { amount: 50, count: 1, percentage: 25 }
+			financial: { amount: 50, count: 1, percentage: 25 }
 		};
 
 		const chartData = convertDataObjectToArray(testData);
 
 		expect(chartData[0]?.category).toBe('Fuel');
 		expect(chartData[1]?.category).toBe('Oil-change');
-		expect(chartData[2]?.category).toBe('Insurance');
+		expect(chartData[2]?.category).toBe('Financial');
 	});
 
 	it('should calculate category totals correctly', () => {
@@ -100,7 +100,7 @@ describe('Category Breakdown Chart Logic', () => {
 		const chartData = convertDataObjectToArray(mockCategoryData);
 		const sorted = sortByAmount(chartData);
 
-		expect(sorted[0].category).toBe('Operating'); // $1500.50
+		expect(sorted[0].category).toBe('Fuel'); // $1500.50
 		expect(sorted[1].category).toBe('Maintenance'); // $800.25
 		expect(sorted[4].category).toBe('Enhancement'); // $175.00
 	});
@@ -114,7 +114,7 @@ describe('Category Breakdown Chart Logic', () => {
 		const top3 = getTopCategories(mockCategoryData, 3);
 
 		expect(top3).toHaveLength(3);
-		expect(top3[0]?.category).toBe('Operating');
+		expect(top3[0]?.category).toBe('Fuel');
 		expect(top3[1]?.category).toBe('Maintenance');
 		expect(top3[2]?.category).toBe('Financial');
 	});

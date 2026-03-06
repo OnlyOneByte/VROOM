@@ -90,9 +90,9 @@
 
 	$effect(() => {
 		if (settings && !isInitialized) {
-			distanceUnit = settings.distanceUnit;
-			volumeUnit = settings.volumeUnit;
-			chargeUnit = settings.chargeUnit;
+			distanceUnit = settings.unitPreferences.distanceUnit;
+			volumeUnit = settings.unitPreferences.volumeUnit;
+			chargeUnit = settings.unitPreferences.chargeUnit;
 			currencyUnit = settings.currencyUnit;
 			autoBackupEnabled = settings.autoBackupEnabled;
 			backupFrequency = settings.backupFrequency;
@@ -131,9 +131,11 @@
 			}
 
 			await settingsStore.update({
-				distanceUnit,
-				volumeUnit,
-				chargeUnit,
+				unitPreferences: {
+					distanceUnit,
+					volumeUnit,
+					chargeUnit
+				},
 				currencyUnit,
 				autoBackupEnabled,
 				backupFrequency,

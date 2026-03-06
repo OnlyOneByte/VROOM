@@ -20,6 +20,8 @@
 		buildChartConfig
 	} from '$lib/utils/chart-colors';
 	import type { FuelAdvancedResponse } from '$lib/types';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { getFuelEfficiencyLabel } from '$lib/utils/units';
 
 	interface Props {
 		fuelAdvanced: FuelAdvancedResponse;
@@ -28,8 +30,13 @@
 	let { fuelAdvanced }: Props = $props();
 
 	// --- 2. Seasonal Efficiency ---
-	const seasonalSeries = [{ key: 'avgMpg', label: 'Avg MPG', color: CHART_COLORS[0] as string }];
-	const seasonalConfig = buildChartConfig(seasonalSeries);
+	let units = $derived(settingsStore.unitPreferences);
+	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
+
+	let seasonalSeries = $derived([
+		{ key: 'avgEfficiency', label: `Avg ${efficiencyLabel}`, color: CHART_COLORS[0] as string }
+	]);
+	let seasonalConfig = $derived(buildChartConfig(seasonalSeries));
 
 	// --- 3. Vehicle Performance Comparison (Radar) ---
 	const radarMetrics = [
@@ -115,10 +122,10 @@
 		<!-- Seasonal Efficiency → AppBarChart -->
 		<AppBarChart
 			title="Seasonal Efficiency"
-			description="Average MPG by season"
+			description="Average {efficiencyLabel} by season"
 			data={fuelAdvanced.seasonalEfficiency}
 			x="season"
-			y="avgMpg"
+			y="avgEfficiency"
 			series={seasonalSeries}
 			config={seasonalConfig}
 			yAxisFormat={formatDecimalAxis}

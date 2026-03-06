@@ -32,8 +32,8 @@ export function isElectricFuelType(fuelType: string | null | undefined): boolean
  */
 export function getDistanceUnitLabel(unit: DistanceUnit, short = false): string {
 	const labels: Record<DistanceUnit, { short: string; long: string }> = {
-		miles: { short: 'mi', long: 'miles' },
-		kilometers: { short: 'km', long: 'kilometers' }
+		miles: { short: 'mi', long: 'Miles' },
+		kilometers: { short: 'km', long: 'Kilometers' }
 	};
 	return short ? labels[unit].short : labels[unit].long;
 }
@@ -91,4 +91,26 @@ export function getVehicleTypeLabel(vehicleType: VehicleType): string {
 		hybrid: 'Hybrid'
 	};
 	return labels[vehicleType];
+}
+
+/**
+ * Get cost-per-distance label (e.g., "Cost/mi", "Cost/km")
+ */
+export function getCostPerDistanceLabel(distanceUnit: DistanceUnit): string {
+	return `Cost/${getDistanceUnitLabel(distanceUnit, true)}`;
+}
+
+/**
+ * Get long-form label for card titles (e.g., "Miles", "Kilometers", "Gallons (US)", "Liters", "kWh")
+ */
+export function getLongFormLabel(unit: DistanceUnit | VolumeUnit | ChargeUnit): string {
+	const labels: Record<DistanceUnit | VolumeUnit | ChargeUnit, string> = {
+		miles: 'Miles',
+		kilometers: 'Kilometers',
+		gallons_us: 'Gallons (US)',
+		gallons_uk: 'Gallons (UK)',
+		liters: 'Liters',
+		kwh: 'kWh'
+	};
+	return labels[unit];
 }

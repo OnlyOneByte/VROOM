@@ -280,6 +280,7 @@ export const webVitalsMonitor = browser ? new WebVitalsMonitor() : null;
 
 // Bundle size monitoring
 export function logBundleSize(): void {
+	if (!browser) return;
 	if ('performance' in window && 'getEntriesByType' in performance) {
 		const resources = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
 		const jsResources = resources.filter(resource => resource.name.endsWith('.js'));
@@ -308,6 +309,7 @@ export function logBundleSize(): void {
 
 // Memory usage monitoring
 export function getMemoryUsage(): { used: number; total: number; percentage: number } | null {
+	if (!browser) return null;
 	if ('memory' in performance) {
 		const memory = (performance as { memory: { usedJSHeapSize: number; totalJSHeapSize: number } })
 			.memory;

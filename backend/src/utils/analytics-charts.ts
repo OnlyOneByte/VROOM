@@ -144,7 +144,7 @@ export function normalizeDate(d: Date | number | null): Date | null {
 }
 
 /** Group fuel expense rows by vehicleId. */
-function groupByVehicle(rows: FuelExpenseRow[]): Map<string, FuelExpenseRow[]> {
+export function groupByVehicle(rows: FuelExpenseRow[]): Map<string, FuelExpenseRow[]> {
   const byVehicle = new Map<string, FuelExpenseRow[]>();
   for (const row of rows) {
     const arr = byVehicle.get(row.vehicleId) ?? [];
@@ -194,27 +194,27 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
 /** Build monthly consumption chart data from fuel rows. */
 export function buildMonthlyConsumption(
   rows: FuelExpenseRow[]
-): Array<{ month: string; mpg: number; gallons: number }> {
-  const map = new Map<string, { mpgSum: number; mpgCount: number; gallons: number }>();
+): Array<{ month: string; efficiency: number; volume: number }> {
+  const map = new Map<string, { effSum: number; effCount: number; volume: number }>();
 
   for (const row of rows) {
     const d = normalizeDate(row.date);
     if (!d) continue;
     const key = toMonthKey(d);
-    const entry = map.get(key) ?? { mpgSum: 0, mpgCount: 0, gallons: 0 };
-    entry.gallons += row.fuelAmount ?? 0;
+    const entry = map.get(key) ?? { effSum: 0, effCount: 0, volume: 0 };
+    entry.volume += row.fuelAmount ?? 0;
     map.set(key, entry);
   }
 
-  // Add MPG data from consecutive pairs within each vehicle group
+  // Add efficiency data from consecutive pairs within each vehicle group
   forEachVehiclePair(rows, (current, previous) => {
     const point = computeEfficiencyPoint(current, previous);
     if (!point) return;
     const key = toMonthKey(new Date(point.date));
     const entry = map.get(key);
     if (entry) {
-      entry.mpgSum += point.efficiency;
-      entry.mpgCount++;
+      entry.effSum += point.efficiency;
+      entry.effCount++;
     }
   });
 
@@ -223,15 +223,15 @@ export function buildMonthlyConsumption(
     .slice(0, 12)
     .map(([month, data]) => ({
       month,
-      mpg: data.mpgCount > 0 ? data.mpgSum / data.mpgCount : 0,
-      gallons: data.gallons,
+      efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
+      volume: data.volume,
     }));
 }
 
 /** Build gas price history from fuel rows. */
 export function buildGasPriceHistory(
   rows: FuelExpenseRow[]
-): Array<{ date: string; fuelType: string; pricePerGallon: number }> {
+): Array<{ date: string; fuelType: string; pricePerVolume: number }> {
   return rows
     .filter(
       (r) => r.fuelAmount != null && r.fuelAmount > 0 && r.expenseAmount > 0 && r.date != null
@@ -239,7 +239,7 @@ export function buildGasPriceHistory(
     .map((r) => ({
       date: r.date instanceof Date ? r.date.toISOString() : String(r.date),
       fuelType: r.fuelType ?? 'Regular',
-      pricePerGallon: r.expenseAmount / (r.fuelAmount as number),
+      pricePerVolume: r.expenseAmount / (r.fuelAmount as number),
     }))
     .slice(-100); // Cap to last 100 entries
 }
@@ -273,17 +273,18 @@ export function buildFillupCostByVehicle(
     .slice(-120); // Cap to last 12 months of data (up to 10 vehicles)
 }
 
-/** Compute fuel consumption metrics (avg/best/worst MPG) from MPG values. */
-export function computeFuelConsumptionMetrics(mpgValues: number[]): {
-  avgMpg: number | null;
-  bestMpg: number | null;
-  worstMpg: number | null;
+/** Compute fuel consumption metrics (avg/best/worst efficiency) from efficiency values. */
+export function computeFuelConsumptionMetrics(efficiencyValues: number[]): {
+  avgEfficiency: number | null;
+  bestEfficiency: number | null;
+  worstEfficiency: number | null;
 } {
-  if (mpgValues.length === 0) return { avgMpg: null, bestMpg: null, worstMpg: null };
+  if (efficiencyValues.length === 0)
+    return { avgEfficiency: null, bestEfficiency: null, worstEfficiency: null };
   return {
-    avgMpg: mpgValues.reduce((a, b) => a + b, 0) / mpgValues.length,
-    bestMpg: Math.max(...mpgValues),
-    worstMpg: Math.min(...mpgValues),
+    avgEfficiency: efficiencyValues.reduce((a, b) => a + b, 0) / efficiencyValues.length,
+    bestEfficiency: Math.max(...efficiencyValues),
+    worstEfficiency: Math.min(...efficiencyValues),
   };
 }
 
@@ -296,8 +297,8 @@ export function computeAverageCosts(
   now: Date
 ): {
   perFillup: number | null;
-  bestCostPerMile: number | null;
-  worstCostPerMile: number | null;
+  bestCostPerDistance: number | null;
+  worstCostPerDistance: number | null;
   avgCostPerDay: number | null;
 } {
   const withCost = fuelRows.filter((r) => r.expenseAmount > 0);
@@ -312,8 +313,8 @@ export function computeAverageCosts(
   const totalSpending = withCost.reduce((s, r) => s + r.expenseAmount, 0);
   return {
     perFillup,
-    bestCostPerMile: costPerMileValues.length > 0 ? Math.min(...costPerMileValues) : null,
-    worstCostPerMile: costPerMileValues.length > 0 ? Math.max(...costPerMileValues) : null,
+    bestCostPerDistance: costPerMileValues.length > 0 ? Math.min(...costPerMileValues) : null,
+    worstCostPerDistance: costPerMileValues.length > 0 ? Math.max(...costPerMileValues) : null,
     avgCostPerDay: withCost.length > 0 ? totalSpending / daysSoFar : null,
   };
 }
@@ -340,11 +341,11 @@ function accumulateCostPerMile(
   }
 }
 
-/** Build cost per mile chart data from consecutive fuel expense pairs. */
-export function buildCostPerMileChart(
+/** Build cost per distance chart data from consecutive fuel expense pairs. */
+export function buildCostPerDistanceChart(
   rows: FuelExpenseRow[],
   vehicleNameMap: Map<string, string>
-): Array<{ month: string; vehicleId: string; vehicleName: string; costPerMile: number }> {
+): Array<{ month: string; vehicleId: string; vehicleName: string; costPerDistance: number }> {
   const map = new Map<string, { totalCost: number; totalMiles: number }>();
 
   for (const vehicleRows of groupByVehicle(rows).values()) {
@@ -359,7 +360,7 @@ export function buildCostPerMileChart(
         month,
         vehicleId: vId,
         vehicleName: vehicleNameMap.get(vId) ?? 'Unknown',
-        costPerMile: data.totalCost / data.totalMiles,
+        costPerDistance: data.totalCost / data.totalMiles,
       };
     })
     .sort((a, b) => a.month.localeCompare(b.month))
@@ -458,10 +459,10 @@ export function buildMaintenanceTimeline(
   return timeline.sort((a, b) => a.daysRemaining - b.daysRemaining).slice(0, 50);
 }
 
-/** Add MPG data from consecutive fuel pairs to season data map. */
-export function addSeasonalMpgData(
+/** Add efficiency data from consecutive fuel pairs to season data map. */
+export function addSeasonalEfficiencyData(
   fuelRows: FuelExpenseRow[],
-  seasonData: Map<string, { mpgSum: number; mpgCount: number; fillupCount: number }>
+  seasonData: Map<string, { effSum: number; effCount: number; fillupCount: number }>
 ): void {
   for (const vehicleRows of groupByVehicle(fuelRows).values()) {
     for (let i = 1; i < vehicleRows.length; i++) {
@@ -474,8 +475,8 @@ export function addSeasonalMpgData(
       const season = SEASON_MAP[d.getMonth()] ?? 'Winter';
       const entry = seasonData.get(season);
       if (entry) {
-        entry.mpgSum += point.efficiency;
-        entry.mpgCount++;
+        entry.effSum += point.efficiency;
+        entry.effCount++;
       }
     }
   }
@@ -484,25 +485,25 @@ export function addSeasonalMpgData(
 /** Build seasonal efficiency from fuel expense rows. */
 export function buildSeasonalEfficiency(
   fuelRows: FuelExpenseRow[]
-): Array<{ season: string; avgMpg: number; fillupCount: number }> {
-  const seasonData = new Map<string, { mpgSum: number; mpgCount: number; fillupCount: number }>();
+): Array<{ season: string; avgEfficiency: number; fillupCount: number }> {
+  const seasonData = new Map<string, { effSum: number; effCount: number; fillupCount: number }>();
 
   for (const row of fuelRows) {
     const d = normalizeDate(row.date);
     if (!d) continue;
     const season = SEASON_MAP[d.getMonth()] ?? 'Winter';
-    const entry = seasonData.get(season) ?? { mpgSum: 0, mpgCount: 0, fillupCount: 0 };
+    const entry = seasonData.get(season) ?? { effSum: 0, effCount: 0, fillupCount: 0 };
     entry.fillupCount++;
     seasonData.set(season, entry);
   }
 
-  addSeasonalMpgData(fuelRows, seasonData);
+  addSeasonalEfficiencyData(fuelRows, seasonData);
 
   return ['Winter', 'Spring', 'Summer', 'Fall'].map((season) => {
     const data = seasonData.get(season);
     return {
       season,
-      avgMpg: data && data.mpgCount > 0 ? data.mpgSum / data.mpgCount : 0,
+      avgEfficiency: data && data.effCount > 0 ? data.effSum / data.effCount : 0,
       fillupCount: data?.fillupCount ?? 0,
     };
   });
@@ -650,7 +651,7 @@ export function buildVehicleRadar(
 /** Build day-of-week patterns from fuel expenses. */
 export function buildDayOfWeekPatterns(
   fuelRows: FuelExpenseRow[]
-): Array<{ day: string; fillupCount: number; avgCost: number; avgGallons: number }> {
+): Array<{ day: string; fillupCount: number; avgCost: number; avgVolume: number }> {
   const dayData = new Map<string, { count: number; totalCost: number; totalGallons: number }>();
 
   for (const row of fuelRows) {
@@ -670,7 +671,7 @@ export function buildDayOfWeekPatterns(
       day,
       fillupCount: data?.count ?? 0,
       avgCost: data && data.count > 0 ? data.totalCost / data.count : 0,
-      avgGallons: data && data.count > 0 ? data.totalGallons / data.count : 0,
+      avgVolume: data && data.count > 0 ? data.totalGallons / data.count : 0,
     };
   });
 }
@@ -902,7 +903,7 @@ export function accumulateFuelRow(
 /** Build fuel efficiency and cost by month for a vehicle. */
 export function buildFuelEfficiencyAndCost(
   fuelRows: GeneralExpenseRow[]
-): Array<{ month: string; mpg: number | null; cost: number }> {
+): Array<{ month: string; efficiency: number | null; cost: number }> {
   const monthData = new Map<
     string,
     { totalCost: number; totalGallons: number; totalMiles: number; count: number }
@@ -925,7 +926,7 @@ export function buildFuelEfficiencyAndCost(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, data]) => ({
       month,
-      mpg: data.totalGallons > 0 ? data.totalMiles / data.totalGallons : null,
+      efficiency: data.totalGallons > 0 ? data.totalMiles / data.totalGallons : null,
       cost: data.totalCost,
     }));
 }
@@ -988,7 +989,7 @@ export function buildFuelEfficiencyComparison(
   vehicleNameMap: Map<string, string>
 ): Array<{
   month: string;
-  vehicles: Array<{ vehicleId: string; vehicleName: string; mpg: number }>;
+  vehicles: Array<{ vehicleId: string; vehicleName: string; efficiency: number }>;
 }> {
   // Group fuel rows by vehicle
   const byVehicle = new Map<string, FuelExpenseRow[]>();
@@ -998,15 +999,15 @@ export function buildFuelEfficiencyComparison(
     byVehicle.set(row.vehicleId, arr);
   }
 
-  // Compute monthly MPG per vehicle
-  const monthVehicleMpg = new Map<string, Map<string, { sum: number; count: number }>>();
+  // Compute monthly efficiency per vehicle
+  const monthVehicleEff = new Map<string, Map<string, { sum: number; count: number }>>();
   for (const [vId, rows] of byVehicle) {
     for (let i = 1; i < rows.length; i++) {
       const point = computeEfficiencyPoint(rows[i] as FuelRow, rows[i - 1] as FuelRow);
       if (!point) continue;
       const month = toMonthKey(new Date(point.date));
-      if (!monthVehicleMpg.has(month)) monthVehicleMpg.set(month, new Map());
-      const vehicleMap = monthVehicleMpg.get(month) as Map<string, { sum: number; count: number }>;
+      if (!monthVehicleEff.has(month)) monthVehicleEff.set(month, new Map());
+      const vehicleMap = monthVehicleEff.get(month) as Map<string, { sum: number; count: number }>;
       const entry = vehicleMap.get(vId) ?? { sum: 0, count: 0 };
       entry.sum += point.efficiency;
       entry.count++;
@@ -1014,7 +1015,7 @@ export function buildFuelEfficiencyComparison(
     }
   }
 
-  return Array.from(monthVehicleMpg.entries())
+  return Array.from(monthVehicleEff.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .slice(-24) // Cap to last 24 months
     .map(([month, vehicleMap]) => ({
@@ -1022,14 +1023,16 @@ export function buildFuelEfficiencyComparison(
       vehicles: Array.from(vehicleMap.entries()).map(([vId, data]) => ({
         vehicleId: vId,
         vehicleName: vehicleNameMap.get(vId) ?? 'Unknown',
-        mpg: data.count > 0 ? data.sum / data.count : 0,
+        efficiency: data.count > 0 ? data.sum / data.count : 0,
       })),
     }));
 }
 
-/** Build monthly MPG trend from fuel expense rows (max 12 entries). */
-export function buildMpgTrend(fuelRows: FuelExpenseRow[]): Array<{ month: string; mpg: number }> {
-  const monthMap = new Map<string, { mpgSum: number; mpgCount: number }>();
+/** Build monthly efficiency trend from fuel expense rows (max 12 entries). */
+export function buildEfficiencyTrend(
+  fuelRows: FuelExpenseRow[]
+): Array<{ month: string; efficiency: number }> {
+  const monthMap = new Map<string, { effSum: number; effCount: number }>();
 
   for (const vehicleRows of groupByVehicle(fuelRows).values()) {
     for (let i = 1; i < vehicleRows.length; i++) {
@@ -1039,9 +1042,9 @@ export function buildMpgTrend(fuelRows: FuelExpenseRow[]): Array<{ month: string
       const point = computeEfficiencyPoint(current, previous);
       if (!point) continue;
       const month = toMonthKey(new Date(point.date));
-      const entry = monthMap.get(month) ?? { mpgSum: 0, mpgCount: 0 };
-      entry.mpgSum += point.efficiency;
-      entry.mpgCount++;
+      const entry = monthMap.get(month) ?? { effSum: 0, effCount: 0 };
+      entry.effSum += point.efficiency;
+      entry.effCount++;
       monthMap.set(month, entry);
     }
   }
@@ -1051,7 +1054,7 @@ export function buildMpgTrend(fuelRows: FuelExpenseRow[]): Array<{ month: string
     .slice(0, 12)
     .map(([month, data]) => ({
       month,
-      mpg: data.mpgCount > 0 ? data.mpgSum / data.mpgCount : 0,
+      efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
     }));
 }
 
