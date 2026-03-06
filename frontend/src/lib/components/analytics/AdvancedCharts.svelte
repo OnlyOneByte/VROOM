@@ -2,6 +2,7 @@
 	import '$lib/components/charts/line-chart-animations.css';
 	import '$lib/components/charts/bar-chart-animations.css';
 	import { animateOnView } from '$lib/utils/animate-on-view';
+	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
 
 	import { LineChart } from 'layerchart';
 
@@ -88,6 +89,10 @@
 		return value.toLocaleDateString('en-US', { month: 'short' });
 	}
 
+	// Visibility gate for the radar chart (bypasses ChartCard, uses LayerChart directly)
+	// Uses synchronous MutationObserver + offsetParent check instead of async IO.
+	let radarGate = createVisibilityWatch();
+
 	let heatmapData = $derived(
 		fuelAdvanced.monthlyCostHeatmap.map(d => ({ ...d, date: parseMonthToDate(d.month) }))
 	);
@@ -131,64 +136,68 @@
 			</Card.Header>
 			<Card.Content>
 				{#if fuelAdvanced.vehicleRadar.length > 0}
-					<div class="chart-line-animate-ready" use:animateOnView={'chart-line-animated'}>
-						<Chart.Container
-							config={radarConfig}
-							class="mx-auto aspect-square max-h-[300px] w-full"
-						>
-							<LineChart
-								data={radarData}
-								series={radarVehicleSeries}
-								radial
-								x="metric"
-								xScale={scaleBand()}
-								padding={16}
-								props={{
-									spline: {
-										curve: curveLinearClosed,
-										fillOpacity: 0.2,
-										motion: 'tween'
-									},
-									xAxis: {
-										tickLength: 0
-									},
-									yAxis: {
-										format: () => ''
-									},
-									grid: {
-										radialY: 'linear'
-									},
-									tooltip: {
-										context: {
-											mode: 'voronoi'
-										}
-									},
-									highlight: {
-										lines: false
-									}
-								}}
-							>
-								{#snippet tooltip()}
-									<Chart.Tooltip />
-								{/snippet}
-							</LineChart>
-						</Chart.Container>
-					</div>
-					<div
-						class="mt-3 flex flex-wrap items-center justify-center gap-4 text-sm"
-						role="list"
-						aria-label="Vehicle legend"
-					>
-						{#each radarVehicleSeries as s (s.key)}
-							<div class="flex items-center gap-2" role="listitem">
-								<div
-									class="h-3 w-3 rounded-sm"
-									style="background-color: {s.color}"
-									aria-hidden="true"
-								></div>
-								<span class="text-muted-foreground">{s.label}</span>
+					<div bind:this={radarGate.el} style="min-height: 300px">
+						{#if radarGate.visible}
+							<div class="chart-line-animate-ready" use:animateOnView={'chart-line-animated'}>
+								<Chart.Container
+									config={radarConfig}
+									class="mx-auto aspect-square max-h-[300px] w-full"
+								>
+									<LineChart
+										data={radarData}
+										series={radarVehicleSeries}
+										radial
+										x="metric"
+										xScale={scaleBand()}
+										padding={16}
+										props={{
+											spline: {
+												curve: curveLinearClosed,
+												fillOpacity: 0.2,
+												motion: 'tween'
+											},
+											xAxis: {
+												tickLength: 0
+											},
+											yAxis: {
+												format: () => ''
+											},
+											grid: {
+												radialY: 'linear'
+											},
+											tooltip: {
+												context: {
+													mode: 'voronoi'
+												}
+											},
+											highlight: {
+												lines: false
+											}
+										}}
+									>
+										{#snippet tooltip()}
+											<Chart.Tooltip />
+										{/snippet}
+									</LineChart>
+								</Chart.Container>
 							</div>
-						{/each}
+							<div
+								class="mt-3 flex flex-wrap items-center justify-center gap-4 text-sm"
+								role="list"
+								aria-label="Vehicle legend"
+							>
+								{#each radarVehicleSeries as s (s.key)}
+									<div class="flex items-center gap-2" role="listitem">
+										<div
+											class="h-3 w-3 rounded-sm"
+											style="background-color: {s.color}"
+											aria-hidden="true"
+										></div>
+										<span class="text-muted-foreground">{s.label}</span>
+									</div>
+								{/each}
+							</div>
+						{/if}
 					</div>
 				{:else}
 					<p class="text-sm text-muted-foreground text-center py-8">

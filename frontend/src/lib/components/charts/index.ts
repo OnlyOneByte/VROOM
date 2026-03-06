@@ -21,3 +21,6 @@ export {
 	buildChartConfig,
 	buildCategoryPieData
 } from '$lib/utils/chart-colors';
+
+// Shared types
+export type { AnyIcon } from './types';

@@ -1,12 +1,18 @@
 # Portainer Stack Configuration for VROOM Car Tracker
-# This file is optimized for deployment via Portainer UI
-# 
-# Instructions:
-# 1. In Portainer, go to Stacks → Add Stack
+#
+# Deploy via Portainer UI:
+# 1. Portainer → Stacks → Add Stack
 # 2. Name: vroom-production
-# 3. Upload this file or paste its contents
-# 4. Add environment variables (see below)
+# 3. Paste this file or use "Upload" / "Repository"
+# 4. Add environment variables (see bottom of file)
 # 5. Deploy the stack
+#
+# Cloudflare Tunnel setup:
+# After deploying, configure public hostnames in Cloudflare Zero Trust dashboard:
+#   /api/*  →  http://vroom-backend:3001
+#   /*      →  http://vroom-frontend:3000
+# Use Docker service names (not localhost) because cloudflared runs
+# inside the same Docker network as the other containers.
 
 version: '3.8'
 
@@ -28,6 +34,7 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
       FRONTEND_URL: ${FRONTEND_URL}
       SESSION_SECRET: ${SESSION_SECRET}
+      GOOGLE_DRIVE_API_KEY: ${GOOGLE_DRIVE_API_KEY:-}
       CORS_ORIGINS: ${CORS_ORIGINS}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
     restart: unless-stopped
@@ -40,7 +47,7 @@ services:
     networks:
       - vroom-network
     labels:
-      io.portainer.accesscontrol.teams: vroom
+      - "com.centurylinklabs.watchtower.enable=true"
 
   frontend:
     image: ghcr.io/onlyonebyte/vroom/frontend:latest
@@ -59,12 +66,42 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    depends_on:
-      - backend
     networks:
       - vroom-network
     labels:
-      io.portainer.accesscontrol.teams: vroom
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Cloudflare Tunnel — exposes the stack to the internet without port forwarding.
+  # Requires a tunnel token from Cloudflare Zero Trust → Networks → Tunnels.
+  # IMPORTANT: In the tunnel's public hostname config, use Docker service names:
+  #   /api/*  →  http://vroom-backend:3001
+  #   /*      →  http://vroom-frontend:3000
+  # Do NOT use localhost — cloudflared runs in its own container.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: vroom-tunnel
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    restart: unless-stopped
+    networks:
+      - vroom-network
+
+  # Tugtainer — lightweight container auto-updater (checks hourly).
+  # Pulls new images for containers with the watchtower label enabled.
+  # Remove this service if you prefer manual updates.
+  tugtainer:
+    image: quenary/tugtainer:latest
+    container_name: vroom-tugtainer
+    ports:
+      - "${TUGTAINER_PORT:-3002}:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      SCHEDULE: "0 */1 * * *"
+    restart: unless-stopped
+    networks:
+      - vroom-network
 
 volumes:
   vroom-data:
@@ -75,25 +112,24 @@ networks:
     driver: bridge
 
 # ============================================================================
-# REQUIRED ENVIRONMENT VARIABLES (Add in Portainer UI)
+# REQUIRED ENVIRONMENT VARIABLES (Add in Portainer UI → Environment variables)
 # ============================================================================
-# 
-# GITHUB_REPOSITORY=your-username/vroom
-# 
+#
 # GOOGLE_CLIENT_ID=your_google_client_id
 # GOOGLE_CLIENT_SECRET=your_google_client_secret
-# GOOGLE_REDIRECT_URI=https://yourdomain.com/auth/callback/google
-# 
-# FRONTEND_URL=https://yourdomain.com
+# GOOGLE_REDIRECT_URI=https://yourdomain.com/api/v1/auth/callback/google
 # SESSION_SECRET=your_secure_session_secret_at_least_32_chars
-# 
+# FRONTEND_URL=https://yourdomain.com
 # CORS_ORIGINS=https://yourdomain.com
-# PUBLIC_API_URL=https://api.yourdomain.com
-# 
+# PUBLIC_API_URL=https://yourdomain.com
+# CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...your_tunnel_token
+#
 # ============================================================================
 # OPTIONAL ENVIRONMENT VARIABLES
 # ============================================================================
-# 
-# BACKEND_PORT=3001
-# FRONTEND_PORT=3000
-# LOG_LEVEL=warn
+#
+# GOOGLE_DRIVE_API_KEY=          # For Google Drive backup features
+# BACKEND_PORT=3001              # Host port for backend
+# FRONTEND_PORT=3000             # Host port for frontend
+# TUGTAINER_PORT=3002            # Host port for Tugtainer dashboard
+# LOG_LEVEL=warn                 # error, warn, info, debug

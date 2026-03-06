@@ -1,13 +1,23 @@
 <script lang="ts">
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import type { SvelteComponent, Component } from 'svelte';
+	import type { AnyIcon } from './types';
 
-	// Lucide-svelte v0.x exports Svelte 4 class components (SvelteComponentTyped)
-	// which aren't assignable to Svelte 5's function-based Component type.
-	// Use a union to accept both legacy class constructors and modern components.
+	// Tailwind purges classes at build time by scanning for complete strings.
+	// Dynamic interpolation like `bg-${token}/10` won't be detected, so we
+	// map each token to its full class pair up-front.
+	const ICON_COLOR_MAP: Record<string, { bg: string; text: string }> = {
+		primary: { bg: 'bg-primary/10', text: 'text-primary' },
+		'chart-1': { bg: 'bg-chart-1/10', text: 'text-chart-1' },
+		'chart-2': { bg: 'bg-chart-2/10', text: 'text-chart-2' },
+		'chart-3': { bg: 'bg-chart-3/10', text: 'text-chart-3' },
+		'chart-4': { bg: 'bg-chart-4/10', text: 'text-chart-4' },
+		'chart-5': { bg: 'bg-chart-5/10', text: 'text-chart-5' },
+		destructive: { bg: 'bg-destructive/10', text: 'text-destructive' },
+		muted: { bg: 'bg-muted', text: 'text-muted-foreground' }
+	};
 
-	type AnyIcon = Component<Record<string, unknown>> | (new (..._args: any[]) => SvelteComponent);
+	const DEFAULT_ICON_CLASSES: { bg: string; text: string } = ICON_COLOR_MAP['primary']!;
 
 	interface Props {
 		label: string;
@@ -38,6 +48,11 @@
 	}: Props = $props();
 
 	let hasDual = $derived(secondaryLabel !== undefined && secondaryValue !== undefined);
+	let iconClasses = $derived(
+		iconColor in ICON_COLOR_MAP
+			? (ICON_COLOR_MAP[iconColor] as { bg: string; text: string })
+			: DEFAULT_ICON_CLASSES
+	);
 </script>
 
 <Card class={className}>
@@ -75,8 +90,8 @@
 			<div class="flex items-center gap-2">
 				{#if icon}
 					{@const Icon = icon}
-					<div class="p-2 sm:p-3 rounded-xl bg-{iconColor}/10 shrink-0">
-						<Icon class="h-4 w-4 sm:h-5 sm:w-5 text-{iconColor}" />
+					<div class="p-2 sm:p-3 rounded-xl {iconClasses.bg} shrink-0">
+						<Icon class="h-4 w-4 sm:h-5 sm:w-5 {iconClasses.text}" />
 					</div>
 				{/if}
 				<p class="text-xs sm:text-sm font-medium text-muted-foreground">{label}</p>

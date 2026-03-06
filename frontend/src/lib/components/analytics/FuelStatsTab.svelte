@@ -19,10 +19,22 @@
 	import FuelCharts from './FuelCharts.svelte';
 	import AdvancedCharts from './AdvancedCharts.svelte';
 
-	let fuelStats = $state<FuelStatsResponse | null>(null);
-	let fuelAdvanced = $state<FuelAdvancedResponse | null>(null);
-	let isLoading = $state(true);
+	let {
+		fuelStats: fuelStatsProp = null,
+		fuelAdvanced: fuelAdvancedProp = null
+	}: {
+		fuelStats?: FuelStatsResponse | null;
+		fuelAdvanced?: FuelAdvancedResponse | null;
+	} = $props();
+
+	let localFuelStats = $state<FuelStatsResponse | null>(null);
+	let localFuelAdvanced = $state<FuelAdvancedResponse | null>(null);
+	let internalLoading = $state(true);
 	let error = $state<string | null>(null);
+
+	let fuelStats = $derived(fuelStatsProp ?? localFuelStats);
+	let fuelAdvanced = $derived(fuelAdvancedProp ?? localFuelAdvanced);
+	let isLoading = $derived((!fuelStats || !fuelAdvanced) && internalLoading);
 
 	function pctChange(current: number, previous: number): number | null {
 		if (previous === 0) return null;
@@ -31,24 +43,26 @@
 
 	async function loadData() {
 		try {
-			isLoading = true;
+			internalLoading = true;
 			error = null;
 			const range = getDefaultDateRange();
 			const [stats, advanced] = await Promise.all([
 				analyticsApi.getFuelStats(range),
 				analyticsApi.getFuelAdvanced(range)
 			]);
-			fuelStats = stats;
-			fuelAdvanced = advanced;
+			localFuelStats = stats;
+			localFuelAdvanced = advanced;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load fuel stats';
 		} finally {
-			isLoading = false;
+			internalLoading = false;
 		}
 	}
 
 	onMount(() => {
-		loadData();
+		if (!fuelStatsProp || !fuelAdvancedProp) {
+			loadData();
+		}
 	});
 </script>
 

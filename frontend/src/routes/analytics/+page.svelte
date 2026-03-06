@@ -13,29 +13,30 @@
 	import { Button } from '$lib/components/ui/button';
 	import { StatCardGrid } from '$lib/components/charts';
 	import FuelStatsTab from '$lib/components/analytics/FuelStatsTab.svelte';
-	import CrossVehicleTab from '$lib/components/analytics/CrossVehicleTab.svelte';
-	import PerVehicleTab from '$lib/components/analytics/PerVehicleTab.svelte';
-	import YearEndTab from '$lib/components/analytics/YearEndTab.svelte';
 	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
 	import { formatCurrency } from '$lib/utils/formatters';
-	import type { QuickStatsResponse } from '$lib/types';
+	import type { AnalyticsSummaryResponse } from '$lib/types';
 
-	let quickStats = $state<QuickStatsResponse | null>(null);
-	let isLoadingQuickStats = $state(true);
-	let quickStatsError = $state<string | null>(null);
+	let summary = $state<AnalyticsSummaryResponse | null>(null);
+	let isLoading = $state(true);
+	let error = $state<string | null>(null);
 	let activeTab = $state('fuel-stats');
 
-	async function loadQuickStats() {
+	async function loadSummary() {
 		try {
-			isLoadingQuickStats = true;
-			quickStatsError = null;
-			quickStats = await analyticsApi.getQuickStats(getDefaultDateRange());
+			isLoading = true;
+			error = null;
+			summary = await analyticsApi.getSummary(getDefaultDateRange());
 		} catch (e) {
-			quickStatsError = e instanceof Error ? e.message : 'Failed to load quick stats';
+			error = e instanceof Error ? e.message : 'Failed to load analytics';
 		} finally {
-			isLoadingQuickStats = false;
+			isLoading = false;
 		}
 	}
+
+	let quickStats = $derived(summary?.quickStats ?? null);
+	let fuelStats = $derived(summary?.fuelStats ?? null);
+	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
 	let quickStatsItems = $derived(
 		quickStats
@@ -69,7 +70,7 @@
 	);
 
 	onMount(() => {
-		loadQuickStats();
+		loadSummary();
 	});
 </script>
 
@@ -91,18 +92,18 @@
 	</div>
 
 	<!-- Quick Stats -->
-	{#if isLoadingQuickStats}
+	{#if isLoading}
 		<div class="flex justify-center p-8">
 			<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 		</div>
-	{:else if quickStatsError}
+	{:else if error}
 		<div class="rounded-lg border bg-card p-6">
 			<div class="mb-4 flex items-center gap-3 text-destructive">
 				<CircleAlert class="h-5 w-5" />
 				<p class="font-medium">Failed to load analytics</p>
 			</div>
-			<p class="mb-4 text-sm text-muted-foreground">{quickStatsError}</p>
-			<Button onclick={loadQuickStats}>Retry</Button>
+			<p class="mb-4 text-sm text-muted-foreground">{error}</p>
+			<Button onclick={loadSummary}>Retry</Button>
 		</div>
 	{:else if quickStats}
 		<StatCardGrid items={quickStatsItems} columns={4} />
@@ -117,20 +118,40 @@
 			<Tabs.Trigger value="year-end">Year-End</Tabs.Trigger>
 		</Tabs.List>
 
-		<Tabs.Content value="fuel-stats">
-			<FuelStatsTab />
-		</Tabs.Content>
-
-		<Tabs.Content value="cross-vehicle">
-			<CrossVehicleTab />
-		</Tabs.Content>
-
-		<Tabs.Content value="per-vehicle">
-			<PerVehicleTab />
-		</Tabs.Content>
-
-		<Tabs.Content value="year-end">
-			<YearEndTab />
-		</Tabs.Content>
+		{#if activeTab === 'fuel-stats'}
+			<Tabs.Content value="fuel-stats">
+				<FuelStatsTab {fuelStats} {fuelAdvanced} />
+			</Tabs.Content>
+		{:else if activeTab === 'cross-vehicle'}
+			<Tabs.Content value="cross-vehicle">
+				{#await import('$lib/components/analytics/CrossVehicleTab.svelte')}
+					<div class="flex justify-center p-8">
+						<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+					</div>
+				{:then { default: CrossVehicleTab }}
+					<CrossVehicleTab />
+				{/await}
+			</Tabs.Content>
+		{:else if activeTab === 'per-vehicle'}
+			<Tabs.Content value="per-vehicle">
+				{#await import('$lib/components/analytics/PerVehicleTab.svelte')}
+					<div class="flex justify-center p-8">
+						<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+					</div>
+				{:then { default: PerVehicleTab }}
+					<PerVehicleTab />
+				{/await}
+			</Tabs.Content>
+		{:else if activeTab === 'year-end'}
+			<Tabs.Content value="year-end">
+				{#await import('$lib/components/analytics/YearEndTab.svelte')}
+					<div class="flex justify-center p-8">
+						<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+					</div>
+				{:then { default: YearEndTab }}
+					<YearEndTab />
+				{/await}
+			</Tabs.Content>
+		{/if}
 	</Tabs.Root>
 </div>

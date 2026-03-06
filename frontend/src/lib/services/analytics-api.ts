@@ -9,8 +9,10 @@ import type {
 	VehicleHealthResponse,
 	VehicleTCOResponse,
 	VehicleExpensesResponse,
-	YearEndResponse
+	YearEndResponse,
+	AnalyticsSummaryResponse
 } from '$lib/types';
+import { ApiError } from '$lib/utils/error-handling';
 import { apiClient } from './api-client';
 
 /** Parameters accepted by the fuel efficiency endpoint. */
@@ -122,5 +124,29 @@ export const analyticsApi = {
 		return apiClient.get<YearEndResponse>(
 			`/api/v1/analytics/year-end${buildQuery({ year: params?.year })}`
 		);
+	},
+
+	async getSummary(params: {
+		startDate: number;
+		endDate: number;
+	}): Promise<AnalyticsSummaryResponse> {
+		try {
+			return await apiClient.get<AnalyticsSummaryResponse>(
+				`/api/v1/analytics/summary${buildQuery({ startDate: params.startDate, endDate: params.endDate })}`
+			);
+		} catch (error: unknown) {
+			// Only fall back to individual endpoints for 404 (endpoint not deployed yet)
+			// or network errors. Other errors (401, 500, etc.) should propagate.
+			const is404 = error instanceof ApiError && error.statusCode === 404;
+			const isNetworkError = error instanceof TypeError;
+			if (!is404 && !isNetworkError) throw error;
+
+			const [quickStats, fuelStats, fuelAdvanced] = await Promise.all([
+				analyticsApi.getQuickStats(params),
+				analyticsApi.getFuelStats(params),
+				analyticsApi.getFuelAdvanced(params)
+			]);
+			return { quickStats, fuelStats, fuelAdvanced };
+		}
 	}
 };
