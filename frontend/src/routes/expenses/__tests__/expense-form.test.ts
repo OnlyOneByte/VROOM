@@ -14,6 +14,10 @@ vi.mock('$app/stores', () => ({
 	}
 }));
 
+vi.mock('$app/state', () => ({
+	page: { url: { pathname: '/expenses/new' } }
+}));
+
 // Mock offline storage utilities
 vi.mock('$lib/utils/offline-storage', () => ({
 	addOfflineExpense: vi.fn(),
@@ -196,10 +200,10 @@ describe('Expense Form Logic', () => {
 	describe('Form Logic', () => {
 		it('auto-selects category when expense type is chosen', () => {
 			const expenseTypes = [
-				{ value: 'fuel', label: 'Fuel', category: 'operating' },
+				{ value: 'fuel', label: 'Fuel', category: 'fuel' },
 				{ value: 'maintenance', label: 'Maintenance', category: 'maintenance' },
-				{ value: 'insurance', label: 'Insurance', category: 'financial' },
-				{ value: 'registration', label: 'Registration', category: 'regulatory' }
+				{ value: 'financial', label: 'Financial', category: 'financial' },
+				{ value: 'regulatory', label: 'Regulatory', category: 'regulatory' }
 			];
 
 			const autoSelectCategory = (type: string) => {
@@ -207,10 +211,10 @@ describe('Expense Form Logic', () => {
 				return selectedType ? selectedType.category : '';
 			};
 
-			expect(autoSelectCategory('fuel')).toBe('operating');
+			expect(autoSelectCategory('fuel')).toBe('fuel');
 			expect(autoSelectCategory('maintenance')).toBe('maintenance');
-			expect(autoSelectCategory('insurance')).toBe('financial');
-			expect(autoSelectCategory('registration')).toBe('regulatory');
+			expect(autoSelectCategory('financial')).toBe('financial');
+			expect(autoSelectCategory('regulatory')).toBe('regulatory');
 		});
 
 		it('determines when to show fuel-specific fields', () => {
@@ -220,7 +224,7 @@ describe('Expense Form Logic', () => {
 
 			expect(shouldShowFuelFields('fuel')).toBe(true);
 			expect(shouldShowFuelFields('maintenance')).toBe(false);
-			expect(shouldShowFuelFields('insurance')).toBe(false);
+			expect(shouldShowFuelFields('financial')).toBe(false);
 		});
 
 		it('calculates price per gallon for fuel expenses', () => {
@@ -278,7 +282,7 @@ describe('Expense Form Logic', () => {
 			const formData = {
 				vehicleId: '1',
 				type: 'fuel',
-				category: 'operating',
+				category: 'fuel',
 				amount: '50.00',
 				date: '2024-01-15',
 				mileage: '75000',
@@ -314,7 +318,7 @@ describe('Expense Form Logic', () => {
 			const expenseData = {
 				vehicleId: '1',
 				type: 'fuel',
-				category: 'operating',
+				category: 'fuel',
 				amount: 50.0,
 				date: '2024-01-15'
 			};
@@ -397,7 +401,7 @@ describe('Expense Form Logic', () => {
 		it('manages validation error states', () => {
 			const manageErrorState = (fieldName: string, hasError: boolean) => {
 				return {
-					className: hasError ? 'border-red-300' : 'border-gray-300',
+					className: hasError ? 'border-destructive' : 'border-input',
 					ariaInvalid: hasError,
 					ariaDescribedBy: hasError ? `${fieldName}-error` : undefined
 				};
@@ -406,9 +410,9 @@ describe('Expense Form Logic', () => {
 			const errorState = manageErrorState('vehicle', true);
 			const validState = manageErrorState('vehicle', false);
 
-			expect(errorState.className).toBe('border-red-300');
+			expect(errorState.className).toBe('border-destructive');
 			expect(errorState.ariaInvalid).toBe(true);
-			expect(validState.className).toBe('border-gray-300');
+			expect(validState.className).toBe('border-input');
 			expect(validState.ariaInvalid).toBe(false);
 		});
 

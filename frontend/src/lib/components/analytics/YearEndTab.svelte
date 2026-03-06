@@ -20,6 +20,12 @@
 	import type { YearEndResponse } from '$lib/types';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import { formatDecimalAxis, parseMonthToDate } from '$lib/utils/chart-formatters';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import {
+		getFuelEfficiencyLabel,
+		getDistanceUnitLabel,
+		getCostPerDistanceLabel
+	} from '$lib/utils/units';
 
 	const currentYear = new Date().getFullYear();
 	const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -53,16 +59,24 @@
 		loadData(selectedYear);
 	});
 
+	// Dynamic unit labels — year-end view uses global unit preferences
+	let units = $derived(yearEnd?.units ?? settingsStore.unitPreferences);
+	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
+	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
+	let distLongLabel = $derived(getDistanceUnitLabel(units.distanceUnit));
+
 	// --- Category Breakdown Pie ---
 	let pieData = $derived(buildCategoryPieData(yearEnd?.categoryBreakdown ?? []));
 
-	// --- MPG Trend Line ---
-	let mpgTrendData = $derived(
-		(yearEnd?.mpgTrend ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
+	// --- Efficiency Trend Line ---
+	let effTrendData = $derived(
+		(yearEnd?.efficiencyTrend ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
 	);
 
-	const mpgTrendSeries = [{ key: 'mpg', label: 'MPG', color: 'var(--chart-1)' }];
-	const mpgTrendConfig = buildChartConfig(mpgTrendSeries);
+	let effTrendSeries = $derived([
+		{ key: 'efficiency', label: efficiencyLabel, color: 'var(--chart-1)' }
+	]);
+	let effTrendConfig = $derived(buildChartConfig(effTrendSeries));
 
 	// --- Key Metrics ---
 </script>
@@ -121,15 +135,15 @@
 						: undefined
 				},
 				{
-					label: 'Avg MPG',
-					value: yearEnd.avgMpg != null ? yearEnd.avgMpg.toFixed(1) : 'N/A',
+					label: `Avg ${efficiencyLabel}`,
+					value: yearEnd.avgEfficiency != null ? yearEnd.avgEfficiency.toFixed(1) : 'N/A',
 					icon: Fuel,
 					iconColor: 'chart-2',
 					subtitle: 'Across all vehicles'
 				},
 				{
-					label: 'Cost per Mile',
-					value: yearEnd.costPerMile != null ? formatCurrency(yearEnd.costPerMile) : 'N/A',
+					label: costPerDistLabel,
+					value: yearEnd.costPerDistance != null ? formatCurrency(yearEnd.costPerDistance) : 'N/A',
 					icon: Wrench,
 					iconColor: 'chart-3',
 					subtitle: 'Total operating cost'
@@ -139,7 +153,7 @@
 					value: yearEnd.vehicleCount,
 					icon: CircleAlert,
 					iconColor: 'chart-4',
-					subtitle: `${yearEnd.totalMiles.toLocaleString()} total miles`
+					subtitle: `${yearEnd.totalDistance.toLocaleString()} total ${distLongLabel.toLowerCase()}`
 				}
 			]}
 			columns={4}
@@ -150,15 +164,15 @@
 			<!-- Category Breakdown (Pie Chart) -->
 			<AppPieChart title="Expense Breakdown" description="Spending by category" data={pieData} />
 
-			<!-- MPG Trend (Line Chart) -->
+			<!-- Efficiency Trend (Line Chart) -->
 			<AppLineChart
-				title="MPG Trend"
+				title="{efficiencyLabel} Trend"
 				description="Fuel efficiency over the year"
-				data={mpgTrendData}
+				data={effTrendData}
 				x="date"
-				y="mpg"
-				series={mpgTrendSeries}
-				config={mpgTrendConfig}
+				y="efficiency"
+				series={effTrendSeries}
+				config={effTrendConfig}
 				yAxisFormat={formatDecimalAxis}
 			/>
 		</div>

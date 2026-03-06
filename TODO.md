@@ -53,14 +53,16 @@
 - [ ] Build out profile page
 - [ ] Let users know on settings page that auto-backups do not include image
 - [ ] Global units from selections in profile (ensure its used app wide)
+  - [ ] Per car units (?)
 - [ ] More OAuth Providers. Can link more than one account.
 - [ ] Abstract out backup storage provider.
     - [ ] Backup to more than one google account
 - [ ] PWA Icons - new icons throughout
 - [ ] First opening/loading - car zooming past screen animation (idea)
-
+- [ ] Admin/Management page.
+  - [ ] Overall dashboard (number of expenses, users, cars)
+  - [ ] Management - delete/remove/block user.
 - [ ] Guided setup tour (setup storage/etc)
-- [ ] Per car units (?)
 - [ ] Unit test coverage on backend
 - [ ] Unit test coverage on frontend
 - [ ] E2E Playwright tests

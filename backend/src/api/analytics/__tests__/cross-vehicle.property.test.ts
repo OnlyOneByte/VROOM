@@ -5,8 +5,8 @@
  * For any non-empty set of expenses, category breakdown percentages sum to ~100 (±0.1 tolerance).
  * **Validates: Requirements 6.3, 12.3**
  *
- * Property 5: Cost per mile formula
- * Cost per mile = totalCost / totalMiles when totalMiles > 0, null otherwise.
+ * Property 5: Cost per distance formula
+ * Cost per distance = totalCost / totalDistance when totalDistance > 0, null otherwise.
  * **Validates: Requirements 6.4, 10.3**
  *
  * Property 23: Unfinanced vehicles classified as own
@@ -147,8 +147,8 @@ describe('Property 4: Category percentages sum to 100', () => {
 // Property 5: Cost per mile formula
 // **Validates: Requirements 6.4, 10.3**
 // ---------------------------------------------------------------------------
-describe('Property 5: Cost per mile formula', () => {
-  test('costPerMile = totalCost / totalMiles when totalMiles > 0, null otherwise', async () => {
+describe('Property 5: Cost per distance formula', () => {
+  test('costPerDistance = totalCost / totalDistance when totalDistance > 0, null otherwise', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 1, max: 3 }),
@@ -161,8 +161,8 @@ describe('Property 5: Cost per mile formula', () => {
           const result = await repo.getCrossVehicle(userId, yearToRange(TEST_YEAR));
 
           for (const vc of result.vehicleCostComparison) {
-            if (vc.costPerMile !== null) {
-              expect(vc.costPerMile).toBeGreaterThan(0);
+            if (vc.costPerDistance !== null) {
+              expect(vc.costPerDistance).toBeGreaterThan(0);
             }
           }
         }

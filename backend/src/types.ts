@@ -77,6 +77,46 @@ export const isChargeUnit = (value: string): value is ChargeUnit =>
 export const isVehicleType = (value: string): value is VehicleType =>
   Object.values(VehicleType).includes(value as VehicleType);
 
+export interface UnitPreferences {
+  distanceUnit: DistanceUnit;
+  volumeUnit: VolumeUnit;
+  chargeUnit: ChargeUnit;
+}
+
+export const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
+  distanceUnit: DistanceUnit.MILES,
+  volumeUnit: VolumeUnit.GALLONS_US,
+  chargeUnit: ChargeUnit.KWH,
+};
+
+/**
+ * Validates that a value is a valid UnitPreferences object with all required keys
+ * containing valid enum members. Returns the validated object or null if invalid.
+ */
+export function parseUnitPreferences(value: unknown): UnitPreferences | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const obj = value as Record<string, unknown>;
+
+  if (typeof obj.distanceUnit !== 'string' || !isDistanceUnit(obj.distanceUnit)) {
+    return null;
+  }
+  if (typeof obj.volumeUnit !== 'string' || !isVolumeUnit(obj.volumeUnit)) {
+    return null;
+  }
+  if (typeof obj.chargeUnit !== 'string' || !isChargeUnit(obj.chargeUnit)) {
+    return null;
+  }
+
+  return {
+    distanceUnit: obj.distanceUnit,
+    volumeUnit: obj.volumeUnit,
+    chargeUnit: obj.chargeUnit,
+  };
+}
+
 export interface ApiError {
   code: string;
   message: string;

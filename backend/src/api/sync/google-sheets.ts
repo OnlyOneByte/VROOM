@@ -17,6 +17,7 @@ import {
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
+import { SyncError, SyncErrorCode } from '../../errors';
 import { GoogleDriveService } from './google-drive';
 
 export interface SpreadsheetInfo {
@@ -62,7 +63,10 @@ export class GoogleSheetsService {
     } else {
       const spreadsheet = await this.createSpreadsheet(`VROOM Data - ${folderName}`);
       if (!spreadsheet.spreadsheetId) {
-        throw new Error('Failed to create spreadsheet');
+        throw new SyncError(
+          SyncErrorCode.NETWORK_ERROR,
+          'Failed to create spreadsheet in Google Sheets'
+        );
       }
       spreadsheetId = spreadsheet.spreadsheetId;
 
@@ -118,7 +122,10 @@ export class GoogleSheetsService {
 
     const spreadsheet = response.data;
     if (!spreadsheet.spreadsheetId || !spreadsheet.properties?.title) {
-      throw new Error('Invalid spreadsheet data');
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        'Invalid spreadsheet data returned from Google Sheets'
+      );
     }
 
     return {
@@ -220,12 +227,14 @@ export class GoogleSheetsService {
     const expenseIds = userExpenses.map((e) => e.expenses.id);
     const policyIds = [...seenPolicyIds];
     const expenseGroupIds = userExpenseGroups.map((g) => g.id);
+    const odometerEntryIds = userOdometer.map((o) => o.odometer_entries.id);
 
     const userPhotos = await this.queryUserPhotos(db, {
       vehicleIds,
       expenseIds,
       policyIds,
       expenseGroupIds,
+      odometerEntryIds,
     });
 
     await Promise.all([
@@ -285,6 +294,7 @@ export class GoogleSheetsService {
       'initialMileage',
       'purchasePrice',
       'purchaseDate',
+      'unitPreferences',
       'createdAt',
       'updatedAt',
     ];
@@ -409,6 +419,7 @@ export class GoogleSheetsService {
       expenseIds: string[];
       policyIds: string[];
       expenseGroupIds: string[];
+      odometerEntryIds: string[];
     }
   ) {
     const allPhotos = [];
@@ -418,6 +429,7 @@ export class GoogleSheetsService {
       { type: 'expense', ids: entityIds.expenseIds },
       { type: 'insurance_policy', ids: entityIds.policyIds },
       { type: 'expense_group', ids: entityIds.expenseGroupIds },
+      { type: 'odometer_entry', ids: entityIds.odometerEntryIds },
     ];
 
     for (const { type, ids } of entityQueries) {
@@ -559,7 +571,10 @@ async function getUserToken(userId: string): Promise<string> {
   const db = getDb();
   const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user.length || !user[0].googleRefreshToken) {
-    throw new Error('User not found or Google Sheets access not available');
+    throw new SyncError(
+      SyncErrorCode.AUTH_INVALID,
+      'User not found or Google Sheets access not available'
+    );
   }
   return user[0].googleRefreshToken;
 }

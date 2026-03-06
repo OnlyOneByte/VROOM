@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { PolicyTerm } from '../../db/schema';
 import { changeTracker, requireAuth } from '../../middleware';
-import { validateInsuranceOwnership } from '../../utils/validation';
+import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
 import type { TermVehicleCoverage } from './repository';
 import { insurancePolicyRepository } from './repository';
 import {
@@ -72,7 +72,9 @@ routes.get(
   '/vehicles/:vehicleId/policies',
   zValidator('param', vehiclePoliciesParamSchema),
   async (c) => {
+    const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
+    await validateVehicleOwnership(vehicleId, user.id);
     const policies = await insurancePolicyRepository.findByVehicleId(vehicleId);
     return c.json({ success: true, data: policies, count: policies.length });
   }

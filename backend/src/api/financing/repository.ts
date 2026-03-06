@@ -10,6 +10,7 @@ import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { getDb } from '../../db/connection';
 import type { NewVehicleFinancing, VehicleFinancing } from '../../db/schema';
 import { vehicleFinancing } from '../../db/schema';
+import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
@@ -51,13 +52,14 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
         .returning();
 
       if (result.length === 0) {
-        throw new Error(`Vehicle financing with id ${id} not found`);
+        throw new NotFoundError('Vehicle financing');
       }
 
       return result[0];
     } catch (error) {
+      if (error instanceof NotFoundError) throw error;
       logger.error('Error updating balance for financing', { id, error });
-      throw new Error('Failed to update financing balance');
+      throw new DatabaseError('Failed to update financing balance', error);
     }
   }
 
@@ -75,13 +77,14 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
         .returning();
 
       if (result.length === 0) {
-        throw new Error(`Vehicle financing with id ${id} not found`);
+        throw new NotFoundError('Vehicle financing');
       }
 
       return result[0];
     } catch (error) {
+      if (error instanceof NotFoundError) throw error;
       logger.error('Error marking financing as completed', { id, error });
-      throw new Error('Failed to mark financing as completed');
+      throw new DatabaseError('Failed to mark financing as completed', error);
     }
   }
 }

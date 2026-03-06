@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { CONFIG } from '../config';
+import { DatabaseError } from '../errors';
 import { logger } from '../utils/logger';
 import * as schema from './schema.js';
 
@@ -70,10 +71,9 @@ export async function transaction<T>(
   try {
     return await getDb().transaction(callback);
   } catch (error) {
-    logger.error('Transaction failed', { error });
-    throw new Error(
-      `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
+    const message = `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    logger.error(message, { error });
+    throw new DatabaseError(message, error);
   }
 }
 
@@ -97,7 +97,7 @@ export function checkDatabaseHealth(): boolean {
     const result = sqlite.query('SELECT 1 as health').get() as { health: number } | null;
     return result?.health === 1;
   } catch (error) {
-    console.error('Database health check failed:', error);
+    logger.error('Database health check failed', { error });
     return false;
   }
 }
@@ -114,12 +114,12 @@ export function checkpointWAL(): void {
 
     // Only log if there was actual work done
     if (result && result.checkpointed > 0) {
-      console.log(
+      logger.info(
         `WAL checkpoint completed: ${result.checkpointed} pages written, ${result.log} pages in WAL`
       );
     }
   } catch (error) {
-    console.error('WAL checkpoint failed:', error);
+    logger.error('WAL checkpoint failed', { error });
   }
 }
 
@@ -135,10 +135,10 @@ export function forceCheckpointWAL(): void {
 
     // Only log if there was actual work done
     if (result && result.checkpointed > 0) {
-      console.log(`Forced WAL checkpoint completed: ${result.checkpointed} pages written`);
+      logger.info(`Forced WAL checkpoint completed: ${result.checkpointed} pages written`);
     }
   } catch (error) {
-    console.error('Forced WAL checkpoint failed:', error);
+    logger.error('Forced WAL checkpoint failed', { error });
   }
 }
 
@@ -146,9 +146,9 @@ export function forceCheckpointWAL(): void {
 export function closeDatabaseConnection() {
   try {
     sqlite.close();
-    console.log('Database connection closed');
+    logger.info('Database connection closed');
   } catch (error) {
-    console.error('Error closing database connection:', error);
+    logger.error('Error closing database connection', { error });
   }
 }
 

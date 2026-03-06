@@ -60,7 +60,7 @@
 		type: 'group';
 		groupId: string;
 		totalAmount: number;
-		category: string;
+		category: ExpenseCategory;
 		date: string;
 		description: string | undefined;
 		tags: string[];

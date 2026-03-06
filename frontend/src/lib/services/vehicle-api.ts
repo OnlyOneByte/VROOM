@@ -43,7 +43,7 @@ export const vehicleApi = {
 
 	async createFinancing(
 		vehicleId: string,
-		data: Record<string, unknown>
+		data: Partial<Omit<VehicleFinancing, 'id' | 'vehicleId' | 'createdAt' | 'updatedAt'>>
 	): Promise<VehicleFinancing> {
 		return apiClient.post<VehicleFinancing>(
 			`/api/v1/financing/vehicles/${vehicleId}/financing`,
@@ -55,6 +55,10 @@ export const vehicleApi = {
 		return apiClient.patch<VehicleFinancing>(`/api/v1/financing/${financingId}/payment-amount`, {
 			paymentAmount
 		});
+	},
+
+	async deleteFinancing(financingId: string): Promise<void> {
+		await apiClient.delete(`/api/v1/financing/${financingId}`);
 	},
 
 	async getPhotos(vehicleId: string): Promise<Photo[]> {

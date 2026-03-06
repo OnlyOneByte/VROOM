@@ -1,5 +1,6 @@
 import type {
 	Expense,
+	ExpenseCategory,
 	ExpenseGroupWithChildren,
 	ExpenseSummary,
 	PaginatedResponse,
@@ -132,7 +133,7 @@ export const expenseApi = {
 	},
 
 	async createExpense(
-		expense: Partial<Expense> & { vehicleId: string; category: string; amount: number }
+		expense: Partial<Expense> & { vehicleId: string; category: ExpenseCategory; amount: number }
 	): Promise<Expense> {
 		const backendExpense = toBackendExpense(expense);
 		const data = await apiClient.post<BackendExpenseResponse>('/api/v1/expenses', backendExpense);
@@ -141,7 +142,7 @@ export const expenseApi = {
 
 	async updateExpense(
 		expenseId: string,
-		expense: Partial<Expense> & { vehicleId: string; category: string; amount: number }
+		expense: Partial<Expense> & { vehicleId: string; category: ExpenseCategory; amount: number }
 	): Promise<Expense> {
 		const backendExpense = toBackendExpense(expense);
 		const data = await apiClient.put<BackendExpenseResponse>(
@@ -191,7 +192,7 @@ export const expenseApi = {
 
 	async createSplitExpense(data: {
 		splitConfig: SplitConfig;
-		category: string;
+		category: ExpenseCategory;
 		tags?: string[];
 		date: string;
 		description?: string;

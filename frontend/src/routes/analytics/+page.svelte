@@ -15,6 +15,8 @@
 	import FuelStatsTab from '$lib/components/analytics/FuelStatsTab.svelte';
 	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
 	import { formatCurrency } from '$lib/utils/formatters';
+	import { getFuelEfficiencyLabel } from '$lib/utils/units';
+	import { settingsStore } from '$lib/stores/settings.svelte';
 	import type { AnalyticsSummaryResponse } from '$lib/types';
 
 	let summary = $state<AnalyticsSummaryResponse | null>(null);
@@ -38,6 +40,12 @@
 	let fuelStats = $derived(summary?.fuelStats ?? null);
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
+	// Dynamic unit labels — quick stats uses global unit preferences
+	let units = $derived(quickStats?.units ?? settingsStore.unitPreferences);
+	let efficiencyLabel = $derived(
+		`Avg ${getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit)}`
+	);
+
 	let quickStatsItems = $derived(
 		quickStats
 			? [
@@ -54,8 +62,8 @@
 						iconColor: 'chart-1'
 					},
 					{
-						label: 'Avg MPG',
-						value: quickStats.avgMpg != null ? quickStats.avgMpg.toFixed(1) : 'N/A',
+						label: efficiencyLabel,
+						value: quickStats.avgEfficiency != null ? quickStats.avgEfficiency.toFixed(1) : 'N/A',
 						icon: Activity,
 						iconColor: 'chart-2'
 					},

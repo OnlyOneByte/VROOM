@@ -3,15 +3,22 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { Gauge } from 'lucide-svelte';
 	import { calculateLeaseMetrics } from '$lib/utils/financing-calculations';
-	import type { VehicleFinancing } from '$lib/types';
+	import { getDistanceUnitLabel } from '$lib/utils/units';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import type { VehicleFinancing, UnitPreferences } from '$lib/types';
 
 	interface Props {
 		financing: VehicleFinancing;
 		currentMileage: number | null;
 		initialMileage?: number | null;
+		unitPreferences?: UnitPreferences;
 	}
 
-	let { financing, currentMileage, initialMileage = null }: Props = $props();
+	let { financing, currentMileage, initialMileage = null, unitPreferences }: Props = $props();
+
+	// Resolve distance label from vehicle unitPreferences, falling back to global settings
+	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
+	let distLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
 	let leaseMetrics = $derived.by(() => {
 		try {
@@ -56,7 +63,8 @@
 					<span class="text-muted-foreground">
 						{leaseMetrics.mileageUsed.toLocaleString()}
 						<span class="text-muted-foreground/60">
-							/ {financing.mileageLimit.toLocaleString()} mi
+							/ {financing.mileageLimit.toLocaleString()}
+							{distLabel}
 						</span>
 					</span>
 					<span class="font-medium">{Math.round(mileageUsagePercentage)}%</span>
@@ -77,7 +85,9 @@
 					Odometer: <span class="font-medium text-foreground"
 						>{currentOdometer.toLocaleString()}</span
 					>
-					<span class="text-muted-foreground/60">/ {limitOdometer.toLocaleString()} mi</span>
+					<span class="text-muted-foreground/60"
+						>/ {limitOdometer.toLocaleString()} {distLabel}</span
+					>
 				</span>
 				<span class="font-medium text-foreground">
 					{leaseMetrics.mileageRemaining.toLocaleString()} left

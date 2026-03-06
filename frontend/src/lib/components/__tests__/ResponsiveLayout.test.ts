@@ -294,7 +294,7 @@ describe('Responsive Layout', () => {
 			const container = document.createElement('div');
 			container.innerHTML = `
 				<button 
-					class="focus:ring-2 focus:ring-blue-500 focus:outline-none p-2 md:p-3 lg:p-4"
+					class="focus:ring-2 focus:ring-ring focus:outline-none p-2 md:p-3 lg:p-4"
 					data-testid="accessible-button"
 					aria-label="Accessible button"
 				>
@@ -302,8 +302,8 @@ describe('Responsive Layout', () => {
 				</button>
 				<nav aria-label="Main navigation" data-testid="accessible-nav">
 					<ul class="space-y-2 md:space-y-0 md:space-x-4 md:flex">
-						<li><a href="#" class="block p-2 hover:bg-gray-100">Link 1</a></li>
-						<li><a href="#" class="block p-2 hover:bg-gray-100">Link 2</a></li>
+						<li><a href="#" class="block p-2 hover:bg-muted">Link 1</a></li>
+						<li><a href="#" class="block p-2 hover:bg-muted">Link 2</a></li>
 					</ul>
 				</nav>
 			`;

@@ -7,6 +7,7 @@ import type { OAuth2Client } from 'google-auth-library';
 import { type drive_v3, google } from 'googleapis';
 import { getDb } from '../../db/connection';
 import { users } from '../../db/schema';
+import { SyncError, SyncErrorCode } from '../../errors';
 
 export interface DriveFolder {
   id: string;
@@ -135,7 +136,7 @@ export class GoogleDriveService {
     });
 
     if (!response.data) {
-      throw new Error('Failed to create folder');
+      throw new SyncError(SyncErrorCode.NETWORK_ERROR, 'Failed to create folder in Google Drive');
     }
 
     return response.data as DriveFolder;
@@ -245,7 +246,7 @@ export class GoogleDriveService {
     });
 
     if (!response.data) {
-      throw new Error('Failed to upload file');
+      throw new SyncError(SyncErrorCode.NETWORK_ERROR, 'Failed to upload file to Google Drive');
     }
 
     return response.data as DriveFile;
@@ -270,7 +271,10 @@ export class GoogleDriveService {
     });
 
     if (!response.data) {
-      throw new Error('Failed to get file metadata');
+      throw new SyncError(
+        SyncErrorCode.NETWORK_ERROR,
+        'Failed to get file metadata from Google Drive'
+      );
     }
 
     return response.data as DriveFile;
@@ -305,7 +309,10 @@ async function getUserToken(userId: string): Promise<string> {
   const db = getDb();
   const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user.length || !user[0].googleRefreshToken) {
-    throw new Error('User not found or Google Drive access not available');
+    throw new SyncError(
+      SyncErrorCode.AUTH_INVALID,
+      'User not found or Google Drive access not available'
+    );
   }
   return user[0].googleRefreshToken;
 }
@@ -320,9 +327,10 @@ export async function getDriveServiceForUser(userId: string): Promise<GoogleDriv
   const userInfo = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
   if (!userInfo.length || !userInfo[0].googleRefreshToken) {
-    const error = new Error('Google Drive access not available. Please re-authenticate.');
-    (error as Error & { code: string }).code = 'AUTH_INVALID';
-    throw error;
+    throw new SyncError(
+      SyncErrorCode.AUTH_INVALID,
+      'Google Drive access not available. Please re-authenticate.'
+    );
   }
 
   return new GoogleDriveService(userInfo[0].googleRefreshToken);
