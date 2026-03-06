@@ -69,28 +69,26 @@
 	animationClass="chart-line-animated"
 	class={className}
 >
-	{#snippet children()}
-		<Chart.Container {config} class="h-full w-full">
-			<AreaChart
-				{data}
-				{x}
-				{y}
-				{series}
-				{seriesLayout}
-				padding={CHART_PADDING}
-				props={{
-					area: { curve: SMOOTH_CURVE, opacity: 0.3 },
-					xAxis: resolvedXAxisProps,
-					yAxis: { format: yAxisFormat }
-				}}
-			>
-				{#snippet tooltip()}
-					<Chart.Tooltip hideLabel />
-				{/snippet}
-			</AreaChart>
-		</Chart.Container>
-		{#if series.length > 1}
-			<ChartLegend items={series} class="mt-3 justify-center" />
-		{/if}
-	{/snippet}
+	<Chart.Container {config} class="h-full w-full">
+		<AreaChart
+			{data}
+			{x}
+			{y}
+			{series}
+			{seriesLayout}
+			padding={CHART_PADDING}
+			props={{
+				area: { curve: SMOOTH_CURVE, opacity: 0.3 },
+				xAxis: resolvedXAxisProps,
+				yAxis: { format: yAxisFormat }
+			}}
+		>
+			{#snippet tooltip()}
+				<Chart.Tooltip hideLabel />
+			{/snippet}
+		</AreaChart>
+	</Chart.Container>
+	{#if series.length > 1}
+		<ChartLegend items={series} class="mt-3 justify-center" />
+	{/if}
 </ChartCard>

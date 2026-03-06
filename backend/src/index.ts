@@ -80,7 +80,7 @@ const globalRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.global,
   keyGenerator: (c) => {
     const user = c.get('user');
-    return user?.id || c.req.header('x-forwarded-for') || 'anonymous';
+    return `global:${user?.id || c.req.header('x-forwarded-for') || 'anonymous'}`;
   },
 });
 

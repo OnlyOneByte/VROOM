@@ -642,6 +642,12 @@ export interface FuelAdvancedResponse {
 	}>;
 }
 
+export interface AnalyticsSummaryResponse {
+	quickStats: QuickStatsResponse;
+	fuelStats: FuelStatsResponse;
+	fuelAdvanced: FuelAdvancedResponse;
+}
+
 export interface CrossVehicleResponse {
 	monthlyExpenseTrends: Array<{ month: string; amount: number }>;
 	expenseByCategory: Array<{

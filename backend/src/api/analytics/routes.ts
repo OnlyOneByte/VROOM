@@ -45,6 +45,14 @@ export const yearVehicleQuerySchema = z.object({
 // Apply auth middleware to all analytics routes
 routes.use('*', requireAuth);
 
+// GET /api/v1/analytics/summary
+routes.get('/summary', zValidator('query', dateRangeQuerySchema), async (c) => {
+  const user = c.get('user');
+  const { startDate, endDate } = c.req.valid('query');
+  const data = await analyticsRepository.getSummary(user.id, { start: startDate, end: endDate });
+  return c.json({ success: true, data });
+});
+
 // GET /api/v1/analytics/quick-stats
 routes.get('/quick-stats', zValidator('query', dateRangeQuerySchema), async (c) => {
   const user = c.get('user');

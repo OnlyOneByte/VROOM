@@ -269,6 +269,12 @@ interface DateRange {
 
 export type { DateRange };
 
+export interface AnalyticsSummaryData {
+  quickStats: QuickStatsData;
+  fuelStats: FuelStatsData;
+  fuelAdvanced: FuelAdvancedData;
+}
+
 // ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
@@ -939,31 +945,6 @@ export class AnalyticsRepository {
         this.queryFuelExpenses(userId, range, vehicleId),
         this.queryFuelAggregates(userId, prevRange, vehicleId),
       ]);
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      const rangeStartDate = new Date(range.start * 1000);
-      const rangeEndDate = new Date(range.end * 1000);
-
-      const toDate = (r: FuelExpenseRow) =>
-        r.date instanceof Date ? r.date : new Date(r.date as unknown as number);
-      const currentYearFillups = fuelRows.length;
-      const previousYearFillups = prevYearAgg.count;
-      const currentMonthFillups = fuelRows.filter(
-        (r) => toDate(r).getMonth() === currentMonth
-      ).length;
-      const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-      const prevMonthFillups = fuelRows.filter((r) => toDate(r).getMonth() === prevMonth).length;
-
-      const sumGallons = (rows: FuelExpenseRow[]) =>
-        rows.reduce((s, r) => s + (r.fuelAmount ?? 0), 0);
-      const currentYearGallons = sumGallons(fuelRows);
-      const previousYearGallons = prevYearAgg.totalGallons;
-      const currentMonthGallons = sumGallons(
-        fuelRows.filter((r) => toDate(r).getMonth() === currentMonth)
-      );
-      const prevMonthGallons = sumGallons(
-        fuelRows.filter((r) => toDate(r).getMonth() === prevMonth)
-      );
 
       // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
       const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
@@ -973,63 +954,13 @@ export class AnalyticsRepository {
         return aTime - bTime;
       });
 
-      const { mpgValues, costPerMileValues } = computeMpgAndCostPerMile(fuelRowsByVehicle);
-      const fuelConsumption = computeFuelConsumptionMetrics(mpgValues);
-
-      const volumes = fuelRows
-        .filter((r) => r.fuelAmount != null && r.fuelAmount > 0)
-        .map((r) => r.fuelAmount as number);
-      const fillupDetails = {
-        avgVolume: volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : null,
-        minVolume: volumes.length > 0 ? Math.min(...volumes) : null,
-        maxVolume: volumes.length > 0 ? Math.max(...volumes) : null,
-      };
-
-      const averageCost = computeAverageCosts(
+      return this.buildFuelStatsFromData(
         fuelRows,
-        costPerMileValues,
-        rangeStartDate,
-        rangeEndDate,
-        now
+        fuelRowsByVehicle,
+        vehicleNameMap,
+        range,
+        prevYearAgg
       );
-
-      const mileages = fuelRows.filter((r) => r.mileage != null).map((r) => r.mileage as number);
-      const totalMiles = mileages.length >= 2 ? Math.max(...mileages) - Math.min(...mileages) : 0;
-      const daysSoFar = Math.max(
-        1,
-        Math.ceil(
-          (Math.min(now.getTime(), rangeEndDate.getTime()) - rangeStartDate.getTime()) / 86400000
-        )
-      );
-      const distance = {
-        totalMiles,
-        avgPerDay: totalMiles > 0 ? totalMiles / daysSoFar : null,
-        avgPerMonth: totalMiles > 0 ? totalMiles / Math.max(1, Math.ceil(daysSoFar / 30)) : null,
-      };
-
-      return {
-        fillups: {
-          currentYear: currentYearFillups,
-          previousYear: previousYearFillups,
-          currentMonth: currentMonthFillups,
-          previousMonth: prevMonthFillups,
-        },
-        gallons: {
-          currentYear: currentYearGallons,
-          previousYear: previousYearGallons,
-          currentMonth: currentMonthGallons,
-          previousMonth: prevMonthGallons,
-        },
-        fuelConsumption,
-        fillupDetails,
-        averageCost,
-        distance,
-        monthlyConsumption: buildMonthlyConsumption(fuelRowsByVehicle),
-        gasPriceHistory: buildGasPriceHistory(fuelRows),
-        fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap),
-        odometerProgression: this.buildOdometerProgression(fuelRows, vehicleNameMap),
-        costPerMile: buildCostPerMileChart(fuelRowsByVehicle, vehicleNameMap),
-      };
     } catch (error) {
       logger.error('Failed to compute fuel stats', {
         userId,
@@ -1039,6 +970,97 @@ export class AnalyticsRepository {
       });
       throw new DatabaseError('Failed to compute fuel stats', error);
     }
+  }
+
+  /** Build fuel stats from pre-fetched data without querying the DB. */
+  private buildFuelStatsFromData(
+    fuelRows: FuelExpenseRow[],
+    fuelRowsByVehicle: FuelExpenseRow[],
+    vehicleNameMap: Map<string, string>,
+    range: DateRange,
+    prevYearAgg: { count: number; totalGallons: number }
+  ): FuelStatsData {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const rangeStartDate = new Date(range.start * 1000);
+    const rangeEndDate = new Date(range.end * 1000);
+
+    const toDate = (r: FuelExpenseRow) =>
+      r.date instanceof Date ? r.date : new Date(r.date as unknown as number);
+    const currentYearFillups = fuelRows.length;
+    const previousYearFillups = prevYearAgg.count;
+    const currentMonthFillups = fuelRows.filter(
+      (r) => toDate(r).getMonth() === currentMonth
+    ).length;
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevMonthFillups = fuelRows.filter((r) => toDate(r).getMonth() === prevMonth).length;
+
+    const sumGallons = (rows: FuelExpenseRow[]) =>
+      rows.reduce((s, r) => s + (r.fuelAmount ?? 0), 0);
+    const currentYearGallons = sumGallons(fuelRows);
+    const previousYearGallons = prevYearAgg.totalGallons;
+    const currentMonthGallons = sumGallons(
+      fuelRows.filter((r) => toDate(r).getMonth() === currentMonth)
+    );
+    const prevMonthGallons = sumGallons(fuelRows.filter((r) => toDate(r).getMonth() === prevMonth));
+
+    const { mpgValues, costPerMileValues } = computeMpgAndCostPerMile(fuelRowsByVehicle);
+    const fuelConsumption = computeFuelConsumptionMetrics(mpgValues);
+
+    const volumes = fuelRows
+      .filter((r) => r.fuelAmount != null && r.fuelAmount > 0)
+      .map((r) => r.fuelAmount as number);
+    const fillupDetails = {
+      avgVolume: volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : null,
+      minVolume: volumes.length > 0 ? Math.min(...volumes) : null,
+      maxVolume: volumes.length > 0 ? Math.max(...volumes) : null,
+    };
+
+    const averageCost = computeAverageCosts(
+      fuelRows,
+      costPerMileValues,
+      rangeStartDate,
+      rangeEndDate,
+      now
+    );
+
+    const mileages = fuelRows.filter((r) => r.mileage != null).map((r) => r.mileage as number);
+    const totalMiles = mileages.length >= 2 ? Math.max(...mileages) - Math.min(...mileages) : 0;
+    const daysSoFar = Math.max(
+      1,
+      Math.ceil(
+        (Math.min(now.getTime(), rangeEndDate.getTime()) - rangeStartDate.getTime()) / 86400000
+      )
+    );
+    const distance = {
+      totalMiles,
+      avgPerDay: totalMiles > 0 ? totalMiles / daysSoFar : null,
+      avgPerMonth: totalMiles > 0 ? totalMiles / Math.max(1, Math.ceil(daysSoFar / 30)) : null,
+    };
+
+    return {
+      fillups: {
+        currentYear: currentYearFillups,
+        previousYear: previousYearFillups,
+        currentMonth: currentMonthFillups,
+        previousMonth: prevMonthFillups,
+      },
+      gallons: {
+        currentYear: currentYearGallons,
+        previousYear: previousYearGallons,
+        currentMonth: currentMonthGallons,
+        previousMonth: prevMonthGallons,
+      },
+      fuelConsumption,
+      fillupDetails,
+      averageCost,
+      distance,
+      monthlyConsumption: buildMonthlyConsumption(fuelRowsByVehicle),
+      gasPriceHistory: buildGasPriceHistory(fuelRows),
+      fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap),
+      odometerProgression: this.buildOdometerProgression(fuelRows, vehicleNameMap),
+      costPerMile: buildCostPerMileChart(fuelRowsByVehicle, vehicleNameMap),
+    };
   }
 
   /** Compute fuel advanced analytics: maintenance timeline, radar, heatmap, etc. */
@@ -1053,7 +1075,7 @@ export class AnalyticsRepository {
         this.queryFuelExpenses(userId, range, vehicleId),
         this.queryAllExpenses(userId, range, vehicleId),
       ]);
-      const maintenanceRows = allExpenses.filter((e) => e.category === 'maintenance');
+
       // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
       const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
         if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
@@ -1061,14 +1083,13 @@ export class AnalyticsRepository {
         const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
         return aTime - bTime;
       });
-      return {
-        maintenanceTimeline: buildMaintenanceTimeline(maintenanceRows, new Date()),
-        seasonalEfficiency: buildSeasonalEfficiency(fuelRowsByVehicle),
-        vehicleRadar: buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap),
-        dayOfWeekPatterns: buildDayOfWeekPatterns(fuelRows),
-        monthlyCostHeatmap: buildMonthlyCostHeatmap(allExpenses),
-        fillupIntervals: buildFillupIntervals(fuelRows),
-      };
+
+      return this.buildFuelAdvancedFromData(
+        fuelRows,
+        fuelRowsByVehicle,
+        allExpenses,
+        vehicleNameMap
+      );
     } catch (error) {
       logger.error('Failed to compute fuel advanced analytics', {
         userId,
@@ -1078,6 +1099,24 @@ export class AnalyticsRepository {
       });
       throw new DatabaseError('Failed to compute fuel advanced analytics', error);
     }
+  }
+
+  /** Build fuel advanced analytics from pre-fetched data without querying the DB. */
+  private buildFuelAdvancedFromData(
+    fuelRows: FuelExpenseRow[],
+    fuelRowsByVehicle: FuelExpenseRow[],
+    allExpenses: GeneralExpenseRow[],
+    vehicleNameMap: Map<string, string>
+  ): FuelAdvancedData {
+    const maintenanceRows = allExpenses.filter((e) => e.category === 'maintenance');
+    return {
+      maintenanceTimeline: buildMaintenanceTimeline(maintenanceRows, new Date()),
+      seasonalEfficiency: buildSeasonalEfficiency(fuelRowsByVehicle),
+      vehicleRadar: buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap),
+      dayOfWeekPatterns: buildDayOfWeekPatterns(fuelRows),
+      monthlyCostHeatmap: buildMonthlyCostHeatmap(allExpenses),
+      fillupIntervals: buildFillupIntervals(fuelRows),
+    };
   }
 
   /** Compute cross-vehicle analytics: trends, category breakdown, comparisons. */
@@ -1478,6 +1517,74 @@ export class AnalyticsRepository {
         error: error instanceof Error ? error.message : String(error),
       });
       throw new DatabaseError('Failed to compute year-end summary', error);
+    }
+  }
+
+  async getSummary(userId: string, range: DateRange): Promise<AnalyticsSummaryData> {
+    try {
+      const prevRange: DateRange = {
+        start: range.start - (range.end - range.start),
+        end: range.start,
+      };
+
+      const [vehicleNameMap, vehicleRows, allExpenses, fuelRows, prevYearAgg] = await Promise.all([
+        this.queryVehicleNameMap(userId),
+        this.db
+          .select({
+            id: vehicles.id,
+            currentInsurancePolicyId: vehicles.currentInsurancePolicyId,
+          })
+          .from(vehicles)
+          .where(eq(vehicles.userId, userId)),
+        this.queryAllExpenses(userId, range),
+        this.queryFuelExpenses(userId, range),
+        this.queryFuelAggregates(userId, prevRange),
+      ]);
+
+      const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
+        if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
+        const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
+        const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
+        return aTime - bTime;
+      });
+
+      // Build quickStats from pre-fetched data (same logic as getQuickStats)
+      const { mpgValues } = computeMpgAndCostPerMile(fuelRowsByVehicle);
+      const avgMpg =
+        mpgValues.length > 0 ? mpgValues.reduce((a, b) => a + b, 0) / mpgValues.length : null;
+      const ytdSpending = allExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
+      const fleetHealthScore =
+        vehicleRows.length > 0 ? await this.computeFleetHealthScore(vehicleRows) : 0;
+
+      const quickStats: QuickStatsData = {
+        vehicleCount: vehicleRows.length,
+        ytdSpending,
+        avgMpg,
+        fleetHealthScore,
+      };
+
+      const fuelStats = this.buildFuelStatsFromData(
+        fuelRows,
+        fuelRowsByVehicle,
+        vehicleNameMap,
+        range,
+        prevYearAgg
+      );
+      const fuelAdvanced = this.buildFuelAdvancedFromData(
+        fuelRows,
+        fuelRowsByVehicle,
+        allExpenses,
+        vehicleNameMap
+      );
+
+      return { quickStats, fuelStats, fuelAdvanced };
+    } catch (error) {
+      logger.error('Failed to compute analytics summary', {
+        userId,
+        range,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to compute analytics summary', error);
     }
   }
 }

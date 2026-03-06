@@ -76,10 +76,10 @@ DATA_PATH=/var/vroom/data
    - **Google Drive API** — required for backup and photo storage
    - **Google Sheets API** — required for Google Sheets mirroring/restore
 3. Navigate to APIs & Services → OAuth consent screen → Data Access tab and add the following scopes:
+   - `openid` — Authenticate users via OpenID Connect
+   - `../auth/userinfo.email` — See your primary Google Account email address
+   - `../auth/userinfo.profile` — See your personal info, including any personal info you've made publicly available
    - `../auth/drive.file` — See, edit, create, and delete only the specific Google Drive files you use with this app
-   - `../auth/drive.appdata` — See, create, and delete its own configuration data in your Google Drive
-   - `../auth/drive.install` — Connect itself to your Google Drive
-   - `../auth/spreadsheets` — See, edit, create, and delete all your Google Sheets spreadsheets (sensitive scope)
 4. Navigate to APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID:
    - Application type: Web application
    - Authorized redirect URIs: `https://yourdomain.com/api/v1/auth/callback/google`
@@ -103,7 +103,7 @@ If you want to remove the "unverified app" warning or publish your instance for 
    - App terms of service link: `https://yourdomain.com/terms`
    - Developer contact email: your email address
 2. Under Audience, set User Type to External if you want anyone with a Google account to log in, or Internal if you're on a Google Workspace org and want to restrict to your org.
-3. If you added sensitive scopes (like `spreadsheets`), Google requires verification before the "unverified app" warning is removed for external users. Submit for verification from the OAuth consent screen — this can take several days to weeks.
+3. Since VROOM only requests the `drive.file` scope (non-sensitive), Google verification is not required. The "unverified app" warning still appears for apps not submitted for verification, but you can click Advanced → Continue.
 
 VROOM includes built-in `/privacypolicy` and `/termsofservice` pages that you can customize. They ship with reasonable defaults for a self-hosted open-source project. Edit them at:
 - `frontend/src/routes/privacypolicy/+page.svelte`
@@ -146,14 +146,15 @@ node build
 
 ### Portainer Stack
 
-A ready-to-use Portainer stack file is at [`docs/examples/portainer-stack.yml`](examples/portainer-stack.yml).
+A ready-to-use Portainer stack file is at [`docs/examples/portainer-stack.yml`](examples/portainer-stack.yml). It includes the backend, frontend, Cloudflare Tunnel, and Tugtainer (auto-updater).
 
 1. Open Portainer → Stacks → Add Stack
-2. Paste the contents of `portainer-stack.yml` or upload it directly
-3. Add the required environment variables (see [Environment Variables](#environment-variables))
-4. Deploy the stack
+2. Name: `vroom-production`
+3. Paste the contents of `portainer-stack.yml` or upload it directly
+4. Under "Environment variables", add all required variables (see [Environment Variables](#environment-variables))
+5. Deploy the stack
 
-The stack includes optional services for Cloudflare Tunnel and auto-updates (Tugtainer) — remove them if not needed.
+After deploying, configure the Cloudflare Tunnel public hostnames — see [Cloudflare Tunnel](#cloudflare-tunnel-recommended-for-home-hosting) below. The cloudflared and Tugtainer services are optional — remove them from the stack if not needed.
 
 ## Reverse Proxy + SSL
 
@@ -230,14 +231,14 @@ Add two path-based routes so everything runs on a single domain. All backend rou
 
 | Subdomain | Domain | Path | Service |
 |---|---|---|---|
-| *(empty)* | `myvroom.xyz` | `/api/*` | `http://backend:3001` |
-| *(empty)* | `myvroom.xyz` | `/*` | `http://frontend:3000` |
+| *(empty)* | `myvroom.xyz` | `/api/*` | `http://vroom-backend:3001` |
+| *(empty)* | `myvroom.xyz` | `/*` | `http://vroom-frontend:3000` |
 
 Order matters — the `/api/*` route must come before the catch-all `/*`.
 
-> **Why only two routes?** Auth callbacks go through `/api/v1/auth/callback/google`, which is already covered by the `/api/*` rule. The `/health` endpoint is only used by Docker's internal healthcheck (runs inside the container) and doesn't need external exposure. The `/auth` path in the browser is a SvelteKit client-side route, handled by the frontend catch-all.
+> **Container names, not localhost.** The service URLs must use Docker container names (`vroom-backend`, `vroom-frontend`), not `localhost`. Cloudflared runs in its own container — `localhost` inside that container refers to itself, not the other services. Since all containers share the `vroom-network` bridge network, Docker DNS resolves container names automatically.
 
-> The service hostnames (`backend`, `frontend`) reference the Docker Compose service names. Cloudflared runs in the same Docker network and resolves them automatically.
+> **Why only two routes?** Auth callbacks go through `/api/v1/auth/callback/google`, which is already covered by the `/api/*` rule. The `/health` endpoint is only used by Docker's internal healthcheck (runs inside the container) and doesn't need external exposure. The `/auth` path in the browser is a SvelteKit client-side route, handled by the frontend catch-all.
 
 #### 3. DNS
 

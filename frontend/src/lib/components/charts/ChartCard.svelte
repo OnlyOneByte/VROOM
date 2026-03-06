@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { animateOnView } from '$lib/utils/animate-on-view';
+	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
@@ -36,6 +37,17 @@
 	}: Props = $props();
 
 	let placeholderHeight = $derived(height ?? 300);
+
+	// Gate chart rendering until the container is visible with positive dimensions.
+	// Charts in inactive tabs (bits-ui uses `hidden` attribute → display:none) or
+	// below the fold mount into 0×0 containers, causing LayerChart to compute
+	// negative internal widths and emit zero-dimension warnings.
+	//
+	// Uses synchronous visibility detection via offsetParent + MutationObserver
+	// on the hidden ancestor. Unlike IntersectionObserver (async callbacks),
+	// MutationObserver fires synchronously when the `hidden` attribute is
+	// removed, so the visibility flag flips before Svelte renders children.
+	let gate = createVisibilityWatch();
 
 	// The "ready" class hides chart content before the animation fires,
 	// preventing a flash of the fully-drawn chart on tab switch / scroll-in.
@@ -86,12 +98,18 @@
 					{/snippet}
 				</EmptyState>
 			</div>
-		{:else if animationClass}
-			<div class={readyClass} use:animateOnView={animationClass}>
-				{@render children()}
-			</div>
 		{:else}
-			{@render children()}
+			<div bind:this={gate.el} style="min-height: {placeholderHeight}px">
+				{#if gate.visible}
+					{#if animationClass}
+						<div class={readyClass} use:animateOnView={animationClass}>
+							{@render children()}
+						</div>
+					{:else}
+						{@render children()}
+					{/if}
+				{/if}
+			</div>
 		{/if}
 	</Card.Content>
 </Card.Root>

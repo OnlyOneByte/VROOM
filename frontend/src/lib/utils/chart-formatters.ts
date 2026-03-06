@@ -116,6 +116,6 @@ export const TREND_LINE_PROPS = {
 
 /** Parse a "YYYY-MM" month string into a Date (1st of that month). */
 export function parseMonthToDate(month: string): Date {
-	const [y, m] = month.split('-');
-	return new Date(Number(y), Number(m) - 1, 1);
+	const parts = month.split('-');
+	return new Date(Number(parts[0] ?? '0'), Number(parts[1] ?? '1') - 1, 1);
 }
