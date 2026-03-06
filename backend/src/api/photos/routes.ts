@@ -1,6 +1,9 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { AppError, NotFoundError } from '../../errors';
 import { requireAuth } from '../../middleware';
+import { buildPaginatedResponse } from '../../utils/pagination';
+import { commonSchemas } from '../../utils/validation';
 import { settingsRepository } from '../settings/repository';
 import { resolveVroomFolderName } from '../sync/folder-name';
 import {
@@ -19,14 +22,15 @@ const routes = new Hono();
 routes.use('*', requireAuth);
 
 // GET /photos/:entityType/:entityId — List photos for an entity
-routes.get('/:entityType/:entityId', async (c) => {
+routes.get('/:entityType/:entityId', zValidator('query', commonSchemas.pagination), async (c) => {
   const entityType = c.req.param('entityType');
   const entityId = c.req.param('entityId');
   if (!entityType || !entityId) throw new NotFoundError('Entity');
 
+  const { limit, offset } = c.req.valid('query');
   const user = c.get('user');
-  const photos = await listPhotosForEntity(entityType, entityId, user.id);
-  return c.json({ success: true, data: photos });
+  const result = await listPhotosForEntity(entityType, entityId, user.id, { limit, offset });
+  return c.json(buildPaginatedResponse(result.data, result.totalCount, limit, offset));
 });
 
 // POST /photos/:entityType/:entityId — Upload photo for an entity

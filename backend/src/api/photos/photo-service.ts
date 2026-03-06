@@ -1,6 +1,7 @@
 import type { Photo } from '../../db/schema';
 import { AppError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
+import type { PaginatedResult } from '../../utils/pagination';
 import { getDriveServiceForUser } from '../sync/google-drive';
 import { resolveEntityDriveFolder, validateEntityOwnership } from './helpers';
 import { photoRepository } from './photo-repository';
@@ -59,15 +60,21 @@ export async function uploadPhotoForEntity(
 }
 
 /**
- * List all photos for an entity, ordered by sortOrder then createdAt.
+ * List photos for an entity with pagination, ordered by sortOrder then createdAt.
  */
 export async function listPhotosForEntity(
   entityType: string,
   entityId: string,
-  userId: string
-): Promise<Photo[]> {
+  userId: string,
+  pagination: { limit: number; offset: number }
+): Promise<PaginatedResult<Photo>> {
   await validateEntityOwnership(entityType, entityId, userId);
-  return photoRepository.findByEntity(entityType, entityId);
+  return photoRepository.findByEntityPaginated(
+    entityType,
+    entityId,
+    pagination.limit,
+    pagination.offset
+  );
 }
 
 /**

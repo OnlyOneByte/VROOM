@@ -1,8 +1,9 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { getDb, transaction } from '../../db/connection';
 import { type NewPhoto, type Photo, photos } from '../../db/schema';
 import { NotFoundError } from '../../errors';
+import type { PaginatedResult } from '../../utils/pagination';
 
 /**
  * Generic PhotoRepository — entity-agnostic data access for the photos table.
@@ -18,6 +19,29 @@ export class PhotoRepository {
       .from(photos)
       .where(and(eq(photos.entityType, entityType), eq(photos.entityId, entityId)))
       .orderBy(asc(photos.sortOrder), asc(photos.createdAt));
+  }
+
+  async findByEntityPaginated(
+    entityType: string,
+    entityId: string,
+    limit: number,
+    offset: number
+  ): Promise<PaginatedResult<Photo>> {
+    const whereClause = and(eq(photos.entityType, entityType), eq(photos.entityId, entityId));
+
+    const [countResult, data] = await Promise.all([
+      this.db.select({ count: sql<number>`count(*)` }).from(photos).where(whereClause),
+      this.db
+        .select()
+        .from(photos)
+        .where(whereClause)
+        .orderBy(asc(photos.sortOrder), asc(photos.createdAt))
+        .limit(limit)
+        .offset(offset),
+    ]);
+
+    const totalCount = countResult[0]?.count ?? 0;
+    return { data, totalCount };
   }
 
   async findById(photoId: string): Promise<Photo | null> {

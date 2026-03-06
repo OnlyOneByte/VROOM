@@ -507,8 +507,7 @@ export interface OdometerEntry {
 	updatedAt: string;
 }
 
-export interface PaginatedOdometerResponse {
-	data: OdometerEntry[];
+export interface PaginationMeta {
 	totalCount: number;
 	limit: number;
 	offset: number;
@@ -519,10 +518,7 @@ export interface PaginatedOdometerResponse {
 
 export interface PaginatedResponse<T> {
 	data: T[];
-	totalCount: number;
-	limit: number;
-	offset: number;
-	hasMore: boolean;
+	pagination: PaginationMeta;
 }
 
 // --- Expense summary types (mirrors backend ExpenseSummary) ---

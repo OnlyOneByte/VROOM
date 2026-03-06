@@ -11,6 +11,7 @@ import {
 } from '../../db/types';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { buildPaginatedResponse } from '../../utils/pagination';
 import {
   commonSchemas,
   validateExpenseOwnership,
@@ -318,16 +319,8 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
     CONFIG.pagination.maxPageSize
   );
   const offset = query.offset ?? 0;
-  const hasMore = offset + data.length < totalCount;
 
-  return c.json({
-    success: true,
-    data,
-    totalCount,
-    limit,
-    offset,
-    hasMore,
-  });
+  return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
 });
 
 // GET /api/expenses/:id - Get specific expense
