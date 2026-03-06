@@ -7,10 +7,8 @@ WORKDIR /app
 # Copy package files and npmrc
 COPY package*.json .npmrc ./
 
-# Install dependencies with workaround for npm optional dependencies bug
-RUN rm -rf node_modules package-lock.json && \
-    npm install && \
-    npm install --frozen-lockfile
+# Install all dependencies (including devDependencies for the build)
+RUN npm ci
 
 # Copy source code
 COPY . .
