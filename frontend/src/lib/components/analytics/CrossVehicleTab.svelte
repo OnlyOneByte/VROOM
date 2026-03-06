@@ -2,6 +2,7 @@
 	import '$lib/components/charts/pie-chart-animations.css';
 	import '$lib/components/charts/bar-chart-animations.css';
 	import { animateOnView } from '$lib/utils/animate-on-view';
+	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { BarChart, PieChart } from 'layerchart';
@@ -20,12 +21,7 @@
 	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
 	import ExpenseTrendChart from '$lib/components/charts/ExpenseTrendChart.svelte';
 	import { AppLineChart, AppBarChart, AppPieChart, StatCardGrid } from '$lib/components/charts';
-	import {
-		CATEGORY_COLORS,
-		CATEGORY_LABELS,
-		CHART_COLORS,
-		buildChartConfig
-	} from '$lib/utils/chart-colors';
+	import { CHART_COLORS, buildChartConfig, buildCategoryPieData } from '$lib/utils/chart-colors';
 	import type { CrossVehicleResponse, FinancingResponse, InsuranceResponse } from '$lib/types';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import { formatCurrencyAxis, parseMonthToDate } from '$lib/utils/chart-formatters';
@@ -36,27 +32,12 @@
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
-	// Visibility-gated rendering for inline financing pie chart
-	let typeDistChartEl = $state<HTMLDivElement | undefined>();
-	let typeDistVisible = $state(false);
-
-	$effect(() => {
-		const el = typeDistChartEl;
-		if (!el) return;
-		const observer = new IntersectionObserver(
-			entries => {
-				for (const entry of entries) {
-					if (entry.isIntersecting) {
-						typeDistVisible = true;
-						observer.disconnect();
-					}
-				}
-			},
-			{ threshold: 0.1 }
-		);
-		observer.observe(el);
-		return () => observer.disconnect();
-	});
+	// Visibility-gated rendering for inline charts that bypass ChartCard.
+	// Charts in hidden tabs (bits-ui `hidden` attr → display:none) mount into
+	// 0×0 containers, causing LayerChart negative-dimension warnings.
+	// Uses synchronous MutationObserver + offsetParent check instead of async IO.
+	let costBarGate = createVisibilityWatch();
+	let typeDistGate = createVisibilityWatch();
 
 	async function loadData() {
 		try {
@@ -90,15 +71,7 @@
 	);
 
 	// --- Section 2: Expense Breakdown Pie ---
-	let appPieData = $derived(
-		(crossVehicle?.expenseByCategory ?? []).map(c => ({
-			key: c.category,
-			label: CATEGORY_LABELS[c.category] ?? c.category,
-			value: c.amount,
-			color: CATEGORY_COLORS[c.category] ?? 'var(--primary)',
-			percentage: c.percentage
-		}))
-	);
+	let appPieData = $derived(buildCategoryPieData(crossVehicle?.expenseByCategory ?? []));
 
 	// --- Section 3: Vehicle Cost Comparison Bar ---
 	let costBarData = $derived(crossVehicle?.vehicleCostComparison ?? []);
@@ -317,30 +290,34 @@
 							<p class="text-xs sm:text-sm text-muted-foreground">Total costs by vehicle</p>
 						</div>
 						<div class="chart-bar-animate-ready" use:animateOnView={'chart-bar-animated'}>
-							<Chart.Container config={costBarConfig} class="h-[250px] sm:h-[300px] w-full">
-								<BarChart
-									data={costBarData}
-									x="vehicleName"
-									y="totalCost"
-									series={costBarSeries}
-									padding={{ top: 4, left: 48, bottom: 40, right: 4 }}
-									props={{
-										bars: { stroke: 'none' },
-										xAxis: {
-											ticks: costBarData.map(d => d.vehicleName),
-											format: (v: string) => {
-												if (typeof v !== 'string') return '';
-												return v.length > 20 ? v.slice(0, 18) + '…' : v;
-											}
-										},
-										yAxis: { format: formatCurrencyAxis }
-									}}
-								>
-									{#snippet tooltip()}
-										<Chart.Tooltip hideLabel />
-									{/snippet}
-								</BarChart>
-							</Chart.Container>
+							<div bind:this={costBarGate.el} style="min-height: 250px">
+								{#if costBarGate.visible}
+									<Chart.Container config={costBarConfig} class="h-[250px] sm:h-[300px] w-full">
+										<BarChart
+											data={costBarData}
+											x="vehicleName"
+											y="totalCost"
+											series={costBarSeries}
+											padding={{ top: 4, left: 48, bottom: 40, right: 4 }}
+											props={{
+												bars: { stroke: 'none' },
+												xAxis: {
+													ticks: costBarData.map(d => d.vehicleName),
+													format: (v: string) => {
+														if (typeof v !== 'string') return '';
+														return v.length > 20 ? v.slice(0, 18) + '…' : v;
+													}
+												},
+												yAxis: { format: formatCurrencyAxis }
+											}}
+										>
+											{#snippet tooltip()}
+												<Chart.Tooltip hideLabel />
+											{/snippet}
+										</BarChart>
+									</Chart.Container>
+								{/if}
+							</div>
 						</div>
 						<div class="space-y-2 pt-4 border-t border-border">
 							{#each costBarData as vehicle (vehicle.vehicleId)}
@@ -480,10 +457,10 @@
 							<p class="text-xs sm:text-sm text-muted-foreground">Value by financing type</p>
 						</div>
 						<div
-							bind:this={typeDistChartEl}
+							bind:this={typeDistGate.el}
 							class="chart-pie-animate-ready chart-pie-animated mx-auto aspect-square max-h-[250px] w-full max-w-[250px] overflow-hidden"
 						>
-							{#if typeDistVisible}
+							{#if typeDistGate.visible}
 								<Chart.Container
 									config={typeDistConfig}
 									class="aspect-square h-full w-full overflow-hidden"

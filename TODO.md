@@ -12,8 +12,8 @@
 - [x] TCO trend over time (monthly/quarterly breakdown)
 - [x] Cost forecasting: "at your current rate, this vehicle will cost $X over the next 12 months"
 - [x] Fuel price tracking: log price-per-gallon with fill-ups, show price trends over time
-- [ ] Rename chart component
-- [ ] Standardize Monthly Trend Chart formatting.c
+- [x] Rename chart component
+- [x] Standardize Monthly Trend Chart formatting
 - [ ] Shareable year-end summary (exportable image or link)
   - This is a big one, proably gonna spend a full day on just this.
 
@@ -47,23 +47,24 @@
 
 ### Productionalization must haves
 - [x] (Performance) Expenses table add keys
-- [ ] Build out profile page
 - [ ] Abstract out photo provider, allow users to choose backend
   - [ ] notify users that they must set up images for image storage in settings
   - [ ] Add more photo backend support
+- [ ] Build out profile page
 - [ ] Let users know on settings page that auto-backups do not include image
+- [ ] Global units from selections in profile (ensure its used app wide)
 - [ ] More OAuth Providers. Can link more than one account.
 - [ ] Abstract out backup storage provider.
     - [ ] Backup to more than one google account
 - [ ] PWA Icons - new icons throughout
 - [ ] First opening/loading - car zooming past screen animation (idea)
-- [ ] Global units from selections in profile (ensure its used app wide)
+
 - [ ] Guided setup tour (setup storage/etc)
 - [ ] Per car units (?)
 - [ ] Unit test coverage on backend
 - [ ] Unit test coverage on frontend
 - [ ] E2E Playwright tests
-- [ ] Google Cloud Console
+- [x] Google Cloud Console created
 - [ ] Assets required
   - [ ] Create one high-quality source image (SVG preferred, or PNG ≥ 512×512, square)
   - [ ] Install `@vite-pwa/assets-generator` as devDep in `frontend/`

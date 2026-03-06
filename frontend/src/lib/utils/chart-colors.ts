@@ -4,6 +4,15 @@
  * maps in AdvancedCharts, CrossVehicleTab, PerVehicleTab, YearEndTab, etc.
  */
 
+/** The six expense categories used throughout the app. */
+export type ExpenseCategory =
+	| 'fuel'
+	| 'maintenance'
+	| 'financial'
+	| 'regulatory'
+	| 'enhancement'
+	| 'misc';
+
 /** Semantic chart color CSS custom properties (var(--chart-1) through var(--chart-5)). */
 export const CHART_COLORS = [
 	'var(--chart-1)',
@@ -13,8 +22,13 @@ export const CHART_COLORS = [
 	'var(--chart-5)'
 ] as const;
 
-/** Category → chart color mapping for pie charts, heatmaps, and legends. */
-export const CATEGORY_COLORS: Record<string, string> = {
+/**
+ * Category → chart color mapping for pie charts, heatmaps, and legends.
+ * Typed against ExpenseCategory to catch stale/missing keys at compile time.
+ * Also widened to `Record<string, string>` so callers can pass arbitrary keys
+ * through the fallback functions without casting.
+ */
+export const CATEGORY_COLORS: Record<ExpenseCategory, string> & Record<string, string> = {
 	fuel: 'var(--chart-1)',
 	maintenance: 'var(--chart-2)',
 	financial: 'var(--chart-3)',
@@ -24,7 +38,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
 };
 
 /** Category → display label mapping. */
-export const CATEGORY_LABELS: Record<string, string> = {
+export const CATEGORY_LABELS: Record<ExpenseCategory, string> & Record<string, string> = {
 	fuel: 'Fuel',
 	maintenance: 'Maintenance',
 	financial: 'Financial',

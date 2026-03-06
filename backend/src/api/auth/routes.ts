@@ -47,7 +47,7 @@ routes.get('/login/google', async (c) => {
       'openid',
       'profile',
       'email',
-      'https://www.googleapis.com/auth/drive', // For Google Drive integration (full access needed to create folders)
+      'https://www.googleapis.com/auth/drive.file', // Access only files created by this app
     ],
   });
 

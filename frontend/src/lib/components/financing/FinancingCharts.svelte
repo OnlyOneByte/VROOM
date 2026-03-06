@@ -3,6 +3,7 @@
 	import { ChartContainer, ChartTooltip } from '$lib/components/ui/chart';
 	import type { ChartConfig } from '$lib/components/ui/chart';
 	import { BarChart } from 'layerchart';
+	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
 	import type { VehicleFinancing } from '$lib/types';
 	import type { AmortizationEntry } from '$lib/utils/financing-calculations';
 	import { formatCurrencyAxis } from '$lib/utils/chart-formatters';
@@ -13,6 +14,10 @@
 	}
 
 	let { financing, amortizationSchedule = [] }: Props = $props();
+
+	// Visibility gate: this chart bypasses ChartCard and uses ChartContainer
+	// directly. Without a gate, it renders into 0×0 containers in hidden tabs.
+	let chartGate = createVisibilityWatch();
 
 	// Show amortization chart only for loans with APR > 0
 	let showAmortizationChart = $derived(
@@ -135,38 +140,42 @@
 				</div>
 			</div>
 
-			<ChartContainer
-				config={amortizationChartConfig}
-				class="h-[250px] sm:h-[300px] w-full pl-6"
-				role="img"
-				aria-labelledby="amortization-chart-title"
-				aria-describedby="amortization-chart-desc"
-			>
-				<BarChart
-					data={amortizationChartData}
-					x="paymentNumber"
-					y={['principal', 'interest']}
-					series={amortizationSeries}
-					props={{
-						bars: {
-							stroke: 'none'
-						},
-						xAxis: {
-							ticks: Math.min(amortizationChartData.length, 8),
-							format: (v: number) => `#${v}`,
-							label: 'Payment Number'
-						},
-						yAxis: {
-							format: formatCurrencyAxis,
-							label: 'Amount ($)'
-						}
-					}}
-				>
-					{#snippet tooltip()}
-						<ChartTooltip hideLabel />
-					{/snippet}
-				</BarChart>
-			</ChartContainer>
+			<div bind:this={chartGate.el} style="min-height: 300px">
+				{#if chartGate.visible}
+					<ChartContainer
+						config={amortizationChartConfig}
+						class="h-[250px] sm:h-[300px] w-full pl-6"
+						role="img"
+						aria-labelledby="amortization-chart-title"
+						aria-describedby="amortization-chart-desc"
+					>
+						<BarChart
+							data={amortizationChartData}
+							x="paymentNumber"
+							y={['principal', 'interest']}
+							series={amortizationSeries}
+							props={{
+								bars: {
+									stroke: 'none'
+								},
+								xAxis: {
+									ticks: Math.min(amortizationChartData.length, 8),
+									format: (v: number) => `#${v}`,
+									label: 'Payment Number'
+								},
+								yAxis: {
+									format: formatCurrencyAxis,
+									label: 'Amount ($)'
+								}
+							}}
+						>
+							{#snippet tooltip()}
+								<ChartTooltip hideLabel />
+							{/snippet}
+						</BarChart>
+					</ChartContainer>
+				{/if}
+			</div>
 
 			<div id="amortization-chart-desc" class="sr-only">
 				Stacked bar chart showing amortization schedule with {amortizationSchedule.length} payments.

@@ -1,12 +1,6 @@
 <script lang="ts">
 	import StatCard from './StatCard.svelte';
-	import type { SvelteComponent, Component } from 'svelte';
-
-	// Lucide-svelte v0.x exports Svelte 4 class components (SvelteComponentTyped)
-	// which aren't assignable to Svelte 5's function-based Component type.
-	// Use a union to accept both legacy class constructors and modern components.
-
-	type AnyIcon = Component<Record<string, unknown>> | (new (..._args: any[]) => SvelteComponent);
+	import type { AnyIcon } from './types';
 
 	export interface StatCardItem {
 		label: string;

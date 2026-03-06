@@ -23,19 +23,19 @@ routes.use('*', requireAuth);
 
 const syncRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.sync,
-  keyGenerator: (c) => c.get('user').id,
+  keyGenerator: (c) => `sync:${c.get('user').id}`,
 });
 const backupRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.backup,
-  keyGenerator: (c) => c.get('user').id,
+  keyGenerator: (c) => `backup:${c.get('user').id}`,
 });
 const restoreRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.restore,
-  keyGenerator: (c) => c.get('user').id,
+  keyGenerator: (c) => `restore:${c.get('user').id}`,
 });
 const driveInitRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.driveInit,
-  keyGenerator: (c) => c.get('user').id,
+  keyGenerator: (c) => `driveInit:${c.get('user').id}`,
 });
 
 // --- Sync helper functions ---

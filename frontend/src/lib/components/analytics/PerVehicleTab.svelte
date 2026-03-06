@@ -8,7 +8,7 @@
 	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { AppPieChart, StatCardGrid } from '$lib/components/charts';
-	import { CATEGORY_COLORS, CATEGORY_LABELS } from '$lib/utils/chart-colors';
+	import { buildCategoryPieData } from '$lib/utils/chart-colors';
 	import type {
 		Vehicle,
 		VehicleHealthResponse,
@@ -30,9 +30,6 @@
 		try {
 			isLoadingVehicles = true;
 			vehicles = await vehicleApi.getVehicles();
-			if (vehicles.length === 1) {
-				selectedVehicleId = vehicles[0]!.id;
-			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load vehicles';
 		} finally {
@@ -62,6 +59,7 @@
 	function handleVehicleChange(value: string | undefined) {
 		if (value) {
 			selectedVehicleId = value;
+			loadVehicleData(value);
 		}
 	}
 
@@ -69,11 +67,12 @@
 		loadVehicles();
 	});
 
-	let shouldLoadData = $derived(selectedVehicleId && !isLoadingVehicles);
-
+	// After vehicles load, auto-select the first vehicle
 	$effect(() => {
-		if (shouldLoadData && selectedVehicleId) {
-			loadVehicleData(selectedVehicleId);
+		if (!isLoadingVehicles && vehicles.length > 0 && !selectedVehicleId) {
+			const id = vehicles[0]!.id;
+			selectedVehicleId = id;
+			void loadVehicleData(id);
 		}
 	});
 
@@ -107,18 +106,7 @@
 	});
 
 	// --- Expense Category Breakdown → AppPieChart ---
-	let expensePieData = $derived(
-		(expenses?.expenseBreakdown ?? []).map(c => ({
-			key: c.category,
-			label: CATEGORY_LABELS[c.category] ?? c.category,
-			value: c.amount,
-			color: CATEGORY_COLORS[c.category] ?? 'var(--primary)',
-			percentage:
-				expenses && expenses.expenseBreakdown.length > 0
-					? (c.amount / expenses.expenseBreakdown.reduce((sum, item) => sum + item.amount, 0)) * 100
-					: 0
-		}))
-	);
+	let expensePieData = $derived(buildCategoryPieData(expenses?.expenseBreakdown ?? []));
 </script>
 
 {#if isLoadingVehicles}

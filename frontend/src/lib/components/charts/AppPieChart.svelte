@@ -2,6 +2,7 @@
 	import { PieChart } from 'layerchart';
 	import * as Chart from '$lib/components/ui/chart';
 	import ChartCard from './ChartCard.svelte';
+	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import type { Snippet } from 'svelte';
 
@@ -47,36 +48,16 @@
 
 	// Gate PieChart rendering until the container is visible in the viewport.
 	// The SVG motion tween (endAngle sweep from 0→2π) fires at mount time,
-	// so we must delay mounting until the user can see it. Uses $effect (not
-	// onMount) because the container lives inside ChartCard's children slot
-	// which only renders after async data loads.
-	let chartContainer: HTMLDivElement | undefined = $state();
-	let isVisible = $state(false);
-
-	$effect(() => {
-		const el = chartContainer;
-		if (!el) return;
-		const observer = new IntersectionObserver(
-			entries => {
-				for (const entry of entries) {
-					if (entry.isIntersecting) {
-						isVisible = true;
-						observer.disconnect();
-					}
-				}
-			},
-			{ threshold: 0.1 }
-		);
-		observer.observe(el);
-		return () => observer.disconnect();
-	});
+	// so we must delay mounting until the user can see it. Uses synchronous
+	// MutationObserver + offsetParent check instead of async IntersectionObserver.
+	let pieGate = createVisibilityWatch();
 </script>
 
 <ChartCard {title} {description} {isLoading} {error} {isEmpty} {icon} class={className}>
 	<div class="flex flex-col md:flex-row gap-6">
-		<div class="flex-1 flex items-center justify-center overflow-hidden" bind:this={chartContainer}>
+		<div class="flex-1 flex items-center justify-center overflow-hidden" bind:this={pieGate.el}>
 			<div class="mx-auto aspect-square max-h-[250px] w-full max-w-[250px]">
-				{#if isVisible}
+				{#if pieGate.visible}
 					<Chart.Container config={chartConfig} class="aspect-square h-full w-full overflow-hidden">
 						<PieChart
 							{data}
