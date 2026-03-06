@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+bun.lockb
+
+# Development files
+*.log
+*.md
+.env
+.env.*
+!.env.example
+
+# Test files
+src/test/
+*.test.ts
+*.spec.ts
+test-*.db
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Documentation
+README.md
+TODO.md
+docs/
+
+# Database files (will be mounted as volume)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Misc
+.DS_Store
+Thumbs.db

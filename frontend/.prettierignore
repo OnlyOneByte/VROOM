@@ -1,0 +1,17 @@
+# Build outputs
+.svelte-kit/
+build/
+dist/
+
+# Dependencies
+node_modules/
+
+# Generated files
+package-lock.json
+*.lock
+
+# Environment files
+.env*
+
+# Logs
+*.log
