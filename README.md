@@ -2,6 +2,7 @@
 
 ![Frontend Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OnlyOneByte/VROOM/coverage-badges/frontend-coverage.json)
 ![Backend Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OnlyOneByte/VROOM/coverage-badges/backend-coverage.json)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20VROOM-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/onemorebyte)
 
 VROOM (Vehicle Record & Organization Of Maintenance) — a modern, self-hostable car cost tracking and visualization web app with mobile-first design and comprehensive expense analytics.
 
@@ -20,13 +21,9 @@ VROOM (Vehicle Record & Organization Of Maintenance) — a modern, self-hostable
 |---|---|
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Analytics](docs/screenshots/analytics.png) |
 
-| Vehicle Detail | Expenses |
+| Vehicle Detail | Insurance |
 |---|---|
-| ![Vehicle Detail](docs/screenshots/vehicle-detail.png) | ![Expenses](docs/screenshots/expenses.png) |
-
-| Insurance | Mobile View |
-|---|---|
-| ![Insurance](docs/screenshots/insurance.png) | ![Mobile Dashboard](docs/screenshots/dashboard-mobile.png) |
+| ![Vehicle Detail](docs/screenshots/vehicle-detail.png) | ![Insurance](docs/screenshots/insurance.png) |
 
 ## Tech Stack
 
@@ -139,6 +136,12 @@ These docs are also compatible with [GitHub Wiki](https://docs.github.com/en/com
    - Backend: `bun run all:fix && bun run validate`
    - Frontend: `npm run all:fix && npm run validate`
 5. Open a pull request
+
+## Support
+
+If VROOM is useful to you, consider buying me a coffee:
+
+[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/onemorebyte)
 
 ## License
 
