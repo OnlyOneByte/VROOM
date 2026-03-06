@@ -1,5 +1,8 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { AppError, NotFoundError } from '../../errors';
+import { buildPaginatedResponse } from '../../utils/pagination';
+import { commonSchemas } from '../../utils/validation';
 import {
   deletePhotoForEntity,
   getPhotoThumbnailForEntity,
@@ -37,13 +40,14 @@ photoRoutes.post('/', async (c) => {
 });
 
 // GET / — List photos
-photoRoutes.get('/', async (c) => {
+photoRoutes.get('/', zValidator('query', commonSchemas.pagination), async (c) => {
   const vehicleId = c.req.param('vehicleId');
   if (!vehicleId) throw new NotFoundError('Vehicle');
 
+  const { limit, offset } = c.req.valid('query');
   const user = c.get('user');
-  const photos = await listPhotosForEntity('vehicle', vehicleId, user.id);
-  return c.json({ success: true, data: photos });
+  const result = await listPhotosForEntity('vehicle', vehicleId, user.id, { limit, offset });
+  return c.json(buildPaginatedResponse(result.data, result.totalCount, limit, offset));
 });
 
 // GET /:photoId/thumbnail — Proxy thumbnail

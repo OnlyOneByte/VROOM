@@ -132,7 +132,7 @@
 			loadedVehicles.forEach((v, i) => {
 				const photoResult = photoResults[i];
 				if (photoResult && photoResult.status === 'fulfilled') {
-					photosMap.set(v.id, photoResult.value);
+					photosMap.set(v.id, photoResult.value.data);
 				}
 			});
 			for (const vs of vehicleStats) {

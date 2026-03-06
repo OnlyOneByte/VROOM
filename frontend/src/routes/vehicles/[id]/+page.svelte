@@ -311,7 +311,7 @@
 				offset
 			});
 			expenses = result.data;
-			totalCount = result.totalCount;
+			totalCount = result.pagination.totalCount;
 			currentOffset = offset;
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load expenses');
@@ -380,7 +380,8 @@
 
 	async function loadPhotos() {
 		try {
-			vehiclePhotos = await vehicleApi.getPhotos(vehicleId);
+			const photosResult = await vehicleApi.getPhotos(vehicleId);
+			vehiclePhotos = photosResult.data;
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load photos');
 		}

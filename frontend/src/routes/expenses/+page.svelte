@@ -171,7 +171,7 @@
 				...expense,
 				vehicle: vehicles.find(v => v.id === expense.vehicleId)
 			}));
-			totalCount = pageResult.totalCount;
+			totalCount = pageResult.pagination.totalCount;
 			currentOffset = offset;
 			summary = summaryResult;
 		} catch (error) {
@@ -190,7 +190,7 @@
 				...expense,
 				vehicle: vehicles.find(v => v.id === expense.vehicleId)
 			}));
-			totalCount = pageResult.totalCount;
+			totalCount = pageResult.pagination.totalCount;
 			currentOffset = offset;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load expenses page:', error);

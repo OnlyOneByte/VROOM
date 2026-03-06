@@ -1,6 +1,6 @@
-import type { Photo, Vehicle, VehicleFinancing, VehicleStats } from '$lib/types';
+import type { PaginatedResponse, Photo, Vehicle, VehicleFinancing, VehicleStats } from '$lib/types';
 import type { TimePeriod } from '$lib/constants/time-periods';
-import { apiClient, getApiBaseUrl } from './api-client';
+import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 
 /**
  * Vehicle API service
@@ -61,8 +61,13 @@ export const vehicleApi = {
 		await apiClient.delete(`/api/v1/financing/${financingId}`);
 	},
 
-	async getPhotos(vehicleId: string): Promise<Photo[]> {
-		return apiClient.get<Photo[]>(`/api/v1/vehicles/${vehicleId}/photos`);
+	async getPhotos(
+		vehicleId: string,
+		params?: { limit?: number; offset?: number }
+	): Promise<PaginatedResponse<Photo>> {
+		return apiClient.getPaginated<Photo>(
+			withPagination(`/api/v1/vehicles/${vehicleId}/photos`, params)
+		);
 	},
 
 	async uploadPhoto(vehicleId: string, file: File): Promise<Photo> {

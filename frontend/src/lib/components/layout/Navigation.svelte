@@ -9,12 +9,8 @@
 		Settings,
 		Menu,
 		LogOut,
-		User,
-		MapPin,
-		Sun,
-		Moon
+		MapPin
 	} from 'lucide-svelte';
-	import { themeStore } from '$lib/stores/theme.svelte';
 	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
 	import { syncState, onlineStatus, offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { syncConflicts } from '$lib/utils/sync-manager';
@@ -29,7 +25,6 @@
 	} from '$lib/components/ui/sheet';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { cn } from '$lib/utils';
-	import { browser } from '$app/environment';
 
 	let mobileMenuOpen = $state(false);
 
@@ -44,10 +39,7 @@
 		{ name: 'Trips', href: '/trips', icon: MapPin }
 	];
 
-	const userNavigation = [
-		{ name: 'Profile', href: '/profile', icon: User },
-		{ name: 'Settings', href: '/settings', icon: Settings }
-	];
+	const userNavigation = [{ name: 'Settings', href: '/settings', icon: Settings }];
 
 	function isActive(href: string): boolean {
 		if (href === '/dashboard') {
@@ -81,17 +73,6 @@
 			conflictsCount: syncConflicts.current.length
 		})
 	);
-
-	let isDark = $derived(
-		themeStore.current === 'dark' ||
-			(themeStore.current === 'system' &&
-				browser &&
-				window.matchMedia('(prefers-color-scheme: dark)').matches)
-	);
-
-	function toggleTheme() {
-		themeStore.setPreference(isDark ? 'light' : 'dark');
-	}
 </script>
 
 <!-- Mobile menu button -->
@@ -192,20 +173,6 @@
 								</a>
 							{/each}
 						</div>
-
-						<button
-							type="button"
-							class="w-full flex items-center px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-accent-foreground transition-colors duration-200 mt-2"
-							onclick={toggleTheme}
-						>
-							{#if isDark}
-								<Sun class="mr-3 h-5 w-5 text-muted-foreground" />
-								Light Mode
-							{:else}
-								<Moon class="mr-3 h-5 w-5 text-muted-foreground" />
-								Dark Mode
-							{/if}
-						</button>
 
 						<button
 							type="button"
@@ -320,31 +287,6 @@
 					</a>
 				{/each}
 			</div>
-
-			<button
-				type="button"
-				class={cn(
-					'w-full flex items-center px-3 py-2 text-sm font-medium rounded-md',
-					'transition-colors duration-200 mt-2',
-					'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-					'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-					!isDesktopSidebarExpanded && 'justify-center'
-				)}
-				onclick={toggleTheme}
-				title={!isDesktopSidebarExpanded ? (isDark ? 'Light mode' : 'Dark mode') : ''}
-			>
-				{#if isDark}
-					<Sun class={cn('h-5 w-5 text-muted-foreground', isDesktopSidebarExpanded && 'mr-3')} />
-					{#if isDesktopSidebarExpanded}
-						<span class="whitespace-nowrap">Light Mode</span>
-					{/if}
-				{:else}
-					<Moon class={cn('h-5 w-5 text-muted-foreground', isDesktopSidebarExpanded && 'mr-3')} />
-					{#if isDesktopSidebarExpanded}
-						<span class="whitespace-nowrap">Dark Mode</span>
-					{/if}
-				{/if}
-			</button>
 
 			<button
 				type="button"
