@@ -156,7 +156,7 @@
 										radial
 										x="metric"
 										xScale={scaleBand()}
-										padding={16}
+										padding={{ top: 16, right: 16, bottom: 16, left: 16 }}
 										props={{
 											spline: {
 												curve: curveLinearClosed,

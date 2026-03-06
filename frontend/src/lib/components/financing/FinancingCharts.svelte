@@ -178,8 +178,8 @@
 			</div>
 
 			<div id="amortization-chart-desc" class="sr-only">
-				Stacked bar chart showing amortization schedule with {amortizationSchedule.length} payments.
-				Each bar shows the breakdown of principal and interest for each payment.
+				Stacked bar chart showing amortization schedule with {amortizationSchedule.length} payments. Each
+				bar shows the breakdown of principal and interest for each payment.
 			</div>
 		</CardContent>
 	</Card>
