@@ -30,6 +30,7 @@ export interface Vehicle {
 	purchasePrice?: number;
 	purchaseDate?: string;
 	financing?: VehicleFinancing;
+	unitPreferences?: UnitPreferences;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -129,9 +130,14 @@ export interface ExpenseGroupWithChildren {
 	children: Expense[];
 }
 
-// ExpenseCategory is fetched from the backend API
-// See /api/expenses/categories endpoint
-export type ExpenseCategory = string;
+// The six expense categories used throughout the app.
+export type ExpenseCategory =
+	| 'fuel'
+	| 'maintenance'
+	| 'financial'
+	| 'regulatory'
+	| 'enhancement'
+	| 'misc';
 
 export interface ExpenseCategoryInfo {
 	value: string;
@@ -142,6 +148,14 @@ export interface ExpenseCategoryInfo {
 export type VolumeUnit = 'gallons_us' | 'gallons_uk' | 'liters';
 export type ChargeUnit = 'kwh';
 export type DistanceUnit = 'miles' | 'kilometers';
+
+export interface UnitPreferences {
+	distanceUnit: DistanceUnit;
+	volumeUnit: VolumeUnit;
+	chargeUnit: ChargeUnit;
+}
+
+export type UnitsMetadata = UnitPreferences;
 
 export interface Expense {
 	id: string;
@@ -405,9 +419,7 @@ export interface AppState {
 export interface UserSettings {
 	id: string;
 	userId: string;
-	distanceUnit: DistanceUnit;
-	volumeUnit: VolumeUnit;
-	chargeUnit: ChargeUnit;
+	unitPreferences: UnitPreferences;
 	currencyUnit: string;
 	autoBackupEnabled: boolean;
 	backupFrequency: 'daily' | 'weekly' | 'monthly';
@@ -426,9 +438,7 @@ export interface UserSettings {
 }
 
 export interface SettingsFormData {
-	distanceUnit: DistanceUnit;
-	volumeUnit: VolumeUnit;
-	chargeUnit: ChargeUnit;
+	unitPreferences: UnitPreferences;
 	currencyUnit: string;
 	autoBackupEnabled: boolean;
 	backupFrequency: 'daily' | 'weekly' | 'monthly';
@@ -539,8 +549,9 @@ export interface FuelEfficiencyPoint {
 export interface QuickStatsResponse {
 	vehicleCount: number;
 	ytdSpending: number;
-	avgMpg: number | null;
+	avgEfficiency: number | null;
 	fleetHealthScore: number;
+	units: UnitsMetadata;
 }
 
 export interface FuelStatsResponse {
@@ -550,16 +561,16 @@ export interface FuelStatsResponse {
 		currentMonth: number;
 		previousMonth: number;
 	};
-	gallons: {
+	volume: {
 		currentYear: number;
 		previousYear: number;
 		currentMonth: number;
 		previousMonth: number;
 	};
 	fuelConsumption: {
-		avgMpg: number | null;
-		bestMpg: number | null;
-		worstMpg: number | null;
+		avgEfficiency: number | null;
+		bestEfficiency: number | null;
+		worstEfficiency: number | null;
 	};
 	fillupDetails: {
 		avgVolume: number | null;
@@ -568,17 +579,17 @@ export interface FuelStatsResponse {
 	};
 	averageCost: {
 		perFillup: number | null;
-		bestCostPerMile: number | null;
-		worstCostPerMile: number | null;
+		bestCostPerDistance: number | null;
+		worstCostPerDistance: number | null;
 		avgCostPerDay: number | null;
 	};
 	distance: {
-		totalMiles: number;
+		totalDistance: number;
 		avgPerDay: number | null;
 		avgPerMonth: number | null;
 	};
-	monthlyConsumption: Array<{ month: string; mpg: number; gallons: number }>;
-	gasPriceHistory: Array<{ date: string; fuelType: string; pricePerGallon: number }>;
+	monthlyConsumption: Array<{ month: string; efficiency: number; volume: number }>;
+	gasPriceHistory: Array<{ date: string; fuelType: string; pricePerVolume: number }>;
 	fillupCostByVehicle: Array<{
 		month: string;
 		vehicleId: string;
@@ -591,12 +602,13 @@ export interface FuelStatsResponse {
 		vehicleName: string;
 		mileage: number;
 	}>;
-	costPerMile: Array<{
+	costPerDistance: Array<{
 		month: string;
 		vehicleId: string;
 		vehicleName: string;
-		costPerMile: number;
+		costPerDistance: number;
 	}>;
+	units?: UnitsMetadata;
 }
 
 export interface FuelAdvancedResponse {
@@ -609,7 +621,7 @@ export interface FuelAdvancedResponse {
 	}>;
 	seasonalEfficiency: Array<{
 		season: string;
-		avgMpg: number;
+		avgEfficiency: number;
 		fillupCount: number;
 	}>;
 	vehicleRadar: Array<{
@@ -625,7 +637,7 @@ export interface FuelAdvancedResponse {
 		day: string;
 		fillupCount: number;
 		avgCost: number;
-		avgGallons: number;
+		avgVolume: number;
 	}>;
 	monthlyCostHeatmap: Array<{
 		month: string;
@@ -659,12 +671,13 @@ export interface CrossVehicleResponse {
 		vehicleId: string;
 		vehicleName: string;
 		totalCost: number;
-		costPerMile: number | null;
+		costPerDistance: number | null;
 	}>;
 	fuelEfficiencyComparison: Array<{
 		month: string;
-		vehicles: Array<{ vehicleId: string; vehicleName: string; mpg: number }>;
+		vehicles: Array<{ vehicleId: string; vehicleName: string; efficiency: number }>;
 	}>;
+	units?: UnitsMetadata;
 }
 
 export interface FinancingResponse {
@@ -741,8 +754,8 @@ export interface VehicleTCOResponse {
 	otherCosts: number;
 	totalCost: number;
 	ownershipMonths: number;
-	totalMiles: number;
-	costPerMile: number | null;
+	totalDistance: number;
+	costPerDistance: number | null;
 	costPerMonth: number;
 	monthlyTrend: Array<{
 		month: string;
@@ -755,7 +768,7 @@ export interface VehicleTCOResponse {
 
 export interface VehicleExpensesResponse {
 	maintenanceCosts: Array<{ month: string; cost: number }>;
-	fuelEfficiencyAndCost: Array<{ month: string; mpg: number | null; cost: number }>;
+	fuelEfficiencyAndCost: Array<{ month: string; efficiency: number | null; cost: number }>;
 	expenseBreakdown: Array<{ category: string; amount: number }>;
 }
 
@@ -767,7 +780,7 @@ export interface YearEndResponse {
 		amount: number;
 		percentage: number;
 	}>;
-	mpgTrend: Array<{ month: string; mpg: number }>;
+	efficiencyTrend: Array<{ month: string; efficiency: number }>;
 	biggestExpense: {
 		description: string;
 		amount: number;
@@ -778,7 +791,8 @@ export interface YearEndResponse {
 		percentageChange: number;
 	} | null;
 	vehicleCount: number;
-	totalMiles: number;
-	avgMpg: number | null;
-	costPerMile: number | null;
+	totalDistance: number;
+	avgEfficiency: number | null;
+	costPerDistance: number | null;
+	units?: UnitsMetadata;
 }

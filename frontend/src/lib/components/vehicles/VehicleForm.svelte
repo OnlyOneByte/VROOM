@@ -1,13 +1,26 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { appStore } from '$lib/stores/app.svelte';
-	import { ArrowLeft, Car, Trash2, X, Check, LoaderCircle, Fuel, Zap } from 'lucide-svelte';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import {
+		ArrowLeft,
+		Car,
+		Trash2,
+		X,
+		Check,
+		LoaderCircle,
+		Fuel,
+		Zap,
+		ChevronsUpDown,
+		Ruler
+	} from 'lucide-svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
 	import { Switch } from '$lib/components/ui/switch';
 	import * as Select from '$lib/components/ui/select';
+	import * as Collapsible from '$lib/components/ui/collapsible';
 	import { FormFieldError } from '$lib/components/ui/form-field';
 	import {
 		Card,
@@ -28,13 +41,18 @@
 	} from '$lib/components/ui/alert-dialog';
 	import FinancingFormSection from './FinancingFormSection.svelte';
 	import { vehicleApi } from '$lib/services/vehicle-api';
+	import { getLongFormLabel } from '$lib/utils/units';
 	import type {
 		Vehicle,
+		VehicleFinancing,
 		VehicleType,
 		VehicleFormData,
 		FinancingPaymentConfig,
 		VehicleFormErrors,
-		FinancingFormErrors
+		FinancingFormErrors,
+		DistanceUnit,
+		VolumeUnit,
+		ChargeUnit
 	} from '$lib/types.js';
 
 	interface Props {
@@ -56,6 +74,16 @@
 	// Energy tracking flags
 	let trackFuel = $state(true);
 	let trackCharging = $state(false);
+
+	// Unit preferences — default from global settings on create, vehicle values on edit
+	let unitPrefsOpen = $state(false);
+	let distanceUnit = $state<DistanceUnit>(settingsStore.unitPreferences.distanceUnit);
+	let volumeUnit = $state<VolumeUnit>(settingsStore.unitPreferences.volumeUnit);
+	let chargeUnit = $state<ChargeUnit>(settingsStore.unitPreferences.chargeUnit);
+
+	let distanceLabel = $derived(getLongFormLabel(distanceUnit));
+	let volumeLabel = $derived(getLongFormLabel(volumeUnit));
+	let chargeLabel = $derived(getLongFormLabel(chargeUnit));
 
 	// Form data
 	let vehicleForm = $state<VehicleFormData>({
@@ -170,6 +198,13 @@
 		// Set tracking flags from vehicle data
 		trackFuel = vehicle.trackFuel;
 		trackCharging = vehicle.trackCharging;
+
+		// Set unit preferences from vehicle data (edit mode)
+		if (vehicle.unitPreferences) {
+			distanceUnit = vehicle.unitPreferences.distanceUnit;
+			volumeUnit = vehicle.unitPreferences.volumeUnit;
+			chargeUnit = vehicle.unitPreferences.chargeUnit;
+		}
 
 		if (vehicle.financing?.isActive) {
 			// Set ownership type based on financing type
@@ -367,6 +402,11 @@
 				vehicleType: vehicleForm.vehicleType,
 				trackFuel,
 				trackCharging,
+				unitPreferences: {
+					distanceUnit,
+					volumeUnit,
+					chargeUnit
+				},
 				licensePlate: vehicleForm.licensePlate || undefined,
 				nickname: vehicleForm.nickname || undefined,
 				vin: vehicleForm.vin ? vehicleForm.vin.toUpperCase() : undefined,
@@ -386,7 +426,9 @@
 
 			// Handle financing data separately if provided
 			if (ownershipType !== 'own' && financingForm.provider.trim() && financingForm.startDate) {
-				const financingData: Record<string, unknown> = {
+				const financingData: Partial<
+					Omit<VehicleFinancing, 'id' | 'vehicleId' | 'createdAt' | 'updatedAt'>
+				> = {
 					financingType: financingForm.financingType,
 					provider: financingForm.provider,
 					originalAmount: Number(financingForm.originalAmount),
@@ -399,19 +441,19 @@
 
 				// Add APR for loans
 				if (financingForm.financingType === 'loan') {
-					financingData['apr'] = Number(financingForm.apr);
+					financingData.apr = Number(financingForm.apr);
 				}
 
 				// Add lease-specific fields
 				if (financingForm.financingType === 'lease') {
 					if (financingForm.residualValue !== undefined) {
-						financingData['residualValue'] = Number(financingForm.residualValue);
+						financingData.residualValue = Number(financingForm.residualValue);
 					}
 					if (financingForm.mileageLimit !== undefined) {
-						financingData['mileageLimit'] = Number(financingForm.mileageLimit);
+						financingData.mileageLimit = Number(financingForm.mileageLimit);
 					}
 					if (financingForm.excessMileageFee !== undefined) {
-						financingData['excessMileageFee'] = Number(financingForm.excessMileageFee);
+						financingData.excessMileageFee = Number(financingForm.excessMileageFee);
 					}
 				}
 
@@ -714,6 +756,96 @@
 						</div>
 					</div>
 				</CardContent>
+			</Card>
+
+			<!-- Unit Preferences -->
+			<Card>
+				<Collapsible.Root bind:open={unitPrefsOpen}>
+					<CardHeader>
+						<div class="flex items-center justify-between">
+							<div class="flex items-center gap-2">
+								<Ruler class="h-5 w-5 text-primary" />
+								<div>
+									<CardTitle>Unit Preferences</CardTitle>
+									<CardDescription>
+										Distance, volume, and charge units for this vehicle
+									</CardDescription>
+								</div>
+							</div>
+							<Collapsible.Trigger
+								class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted hover:text-muted-foreground h-9 w-9"
+							>
+								<ChevronsUpDown class="h-4 w-4" />
+								<span class="sr-only">Toggle unit preferences</span>
+							</Collapsible.Trigger>
+						</div>
+						{#if !unitPrefsOpen}
+							<p class="text-sm text-muted-foreground">
+								{distanceLabel} · {volumeLabel} · {chargeLabel}
+							</p>
+						{/if}
+					</CardHeader>
+					<Collapsible.Content>
+						<CardContent class="space-y-6">
+							<div class="space-y-2">
+								<Label for="distanceUnit">Distance Unit</Label>
+								<Select.Root
+									type="single"
+									value={distanceUnit}
+									onValueChange={v => {
+										if (v) distanceUnit = v as DistanceUnit;
+									}}
+								>
+									<Select.Trigger id="distanceUnit" class="w-full">
+										{distanceLabel}
+									</Select.Trigger>
+									<Select.Content>
+										<Select.Item value="miles" label="Miles">Miles</Select.Item>
+										<Select.Item value="kilometers" label="Kilometers">Kilometers</Select.Item>
+									</Select.Content>
+								</Select.Root>
+							</div>
+
+							<div class="space-y-2">
+								<Label for="volumeUnit">Fuel Volume Unit</Label>
+								<Select.Root
+									type="single"
+									value={volumeUnit}
+									onValueChange={v => {
+										if (v) volumeUnit = v as VolumeUnit;
+									}}
+								>
+									<Select.Trigger id="volumeUnit" class="w-full">
+										{volumeLabel}
+									</Select.Trigger>
+									<Select.Content>
+										<Select.Item value="gallons_us" label="Gallons (US)">Gallons (US)</Select.Item>
+										<Select.Item value="gallons_uk" label="Gallons (UK)">Gallons (UK)</Select.Item>
+										<Select.Item value="liters" label="Liters">Liters</Select.Item>
+									</Select.Content>
+								</Select.Root>
+							</div>
+
+							<div class="space-y-2">
+								<Label for="chargeUnit">Electric Charge Unit</Label>
+								<Select.Root
+									type="single"
+									value={chargeUnit}
+									onValueChange={v => {
+										if (v) chargeUnit = v as ChargeUnit;
+									}}
+								>
+									<Select.Trigger id="chargeUnit" class="w-full">
+										{chargeLabel}
+									</Select.Trigger>
+									<Select.Content>
+										<Select.Item value="kwh" label="kWh">kWh</Select.Item>
+									</Select.Content>
+								</Select.Root>
+							</div>
+						</CardContent>
+					</Collapsible.Content>
+				</Collapsible.Root>
 			</Card>
 
 			<!-- Financing Information -->

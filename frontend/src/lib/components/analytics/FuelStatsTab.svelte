@@ -16,6 +16,14 @@
 	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
 	import type { FuelStatsResponse, FuelAdvancedResponse } from '$lib/types';
 	import { formatCurrency } from '$lib/utils/formatters';
+	import {
+		getDistanceUnitLabel,
+		getVolumeUnitLabel,
+		getFuelEfficiencyLabel,
+		getCostPerDistanceLabel,
+		getLongFormLabel
+	} from '$lib/utils/units';
+	import { settingsStore } from '$lib/stores/settings.svelte';
 	import FuelCharts from './FuelCharts.svelte';
 	import AdvancedCharts from './AdvancedCharts.svelte';
 
@@ -35,6 +43,14 @@
 	let fuelStats = $derived(fuelStatsProp ?? localFuelStats);
 	let fuelAdvanced = $derived(fuelAdvancedProp ?? localFuelAdvanced);
 	let isLoading = $derived((!fuelStats || !fuelAdvanced) && internalLoading);
+
+	// Unit labels derived from response units metadata, falling back to global settings
+	let units = $derived(fuelStats?.units ?? settingsStore.unitPreferences);
+	let distLabelShort = $derived(getDistanceUnitLabel(units.distanceUnit, true));
+	let volLabelShort = $derived(getVolumeUnitLabel(units.volumeUnit, true));
+	let volLabelLong = $derived(getLongFormLabel(units.volumeUnit));
+	let effLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
+	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
 
 	function pctChange(current: number, previous: number): number | null {
 		if (previous === 0) return null;
@@ -142,26 +158,26 @@
 				</Card.Content>
 			</Card.Root>
 
-			<!-- Card 2: Gallons (ComparisonCard) -->
+			<!-- Card 2: Volume (ComparisonCard) -->
 			<Card.Root>
 				<Card.Content class="p-6">
 					<div class="mb-4 flex items-center gap-2">
 						<Droplet class="h-5 w-5 text-muted-foreground" />
-						<h3 class="font-semibold text-foreground">Gallons</h3>
+						<h3 class="font-semibold text-foreground">{volLabelLong}</h3>
 					</div>
 
 					<div class="space-y-3 border-b pb-3">
 						<div class="flex items-baseline justify-between">
 							<span class="text-xs uppercase tracking-wide text-muted-foreground">This Year</span>
-							<span class="text-2xl font-bold">{fuelStats.gallons.currentYear.toFixed(1)}</span>
+							<span class="text-2xl font-bold">{fuelStats.volume.currentYear.toFixed(1)}</span>
 						</div>
 						<div class="flex items-center justify-between">
 							<span class="text-xs text-muted-foreground">Last Year</span>
 							<div class="flex items-center gap-2">
 								<span class="text-sm text-muted-foreground"
-									>{fuelStats.gallons.previousYear.toFixed(1)}</span
+									>{fuelStats.volume.previousYear.toFixed(1)}</span
 								>
-								{@render changeBadge(fuelStats.gallons.currentYear, fuelStats.gallons.previousYear)}
+								{@render changeBadge(fuelStats.volume.currentYear, fuelStats.volume.previousYear)}
 							</div>
 						</div>
 					</div>
@@ -169,18 +185,15 @@
 					<div class="space-y-3 pt-3">
 						<div class="flex items-baseline justify-between">
 							<span class="text-xs uppercase tracking-wide text-muted-foreground">This Month</span>
-							<span class="text-2xl font-bold">{fuelStats.gallons.currentMonth.toFixed(1)}</span>
+							<span class="text-2xl font-bold">{fuelStats.volume.currentMonth.toFixed(1)}</span>
 						</div>
 						<div class="flex items-center justify-between">
 							<span class="text-xs text-muted-foreground">Last Month</span>
 							<div class="flex items-center gap-2">
 								<span class="text-sm text-muted-foreground"
-									>{fuelStats.gallons.previousMonth.toFixed(1)}</span
+									>{fuelStats.volume.previousMonth.toFixed(1)}</span
 								>
-								{@render changeBadge(
-									fuelStats.gallons.currentMonth,
-									fuelStats.gallons.previousMonth
-								)}
+								{@render changeBadge(fuelStats.volume.currentMonth, fuelStats.volume.previousMonth)}
 							</div>
 						</div>
 					</div>
@@ -196,28 +209,34 @@
 					</div>
 
 					<div class="border-b pb-3 text-center">
-						<span class="text-xs uppercase tracking-wide text-muted-foreground">Average MPG</span>
+						<span class="text-xs uppercase tracking-wide text-muted-foreground"
+							>Average {effLabel}</span
+						>
 						<p class="text-3xl font-bold">
-							{fuelStats.fuelConsumption.avgMpg != null
-								? fuelStats.fuelConsumption.avgMpg.toFixed(1)
+							{fuelStats.fuelConsumption.avgEfficiency != null
+								? fuelStats.fuelConsumption.avgEfficiency.toFixed(1)
 								: 'N/A'}
 						</p>
 					</div>
 
 					<div class="grid grid-cols-2 gap-4 pt-3">
 						<div class="text-center">
-							<span class="text-xs uppercase tracking-wide text-muted-foreground">Best MPG</span>
+							<span class="text-xs uppercase tracking-wide text-muted-foreground"
+								>Best {effLabel}</span
+							>
 							<p class="text-xl font-bold text-chart-2">
-								{fuelStats.fuelConsumption.bestMpg != null
-									? fuelStats.fuelConsumption.bestMpg.toFixed(1)
+								{fuelStats.fuelConsumption.bestEfficiency != null
+									? fuelStats.fuelConsumption.bestEfficiency.toFixed(1)
 									: 'N/A'}
 							</p>
 						</div>
 						<div class="text-center">
-							<span class="text-xs uppercase tracking-wide text-muted-foreground">Worst MPG</span>
+							<span class="text-xs uppercase tracking-wide text-muted-foreground"
+								>Worst {effLabel}</span
+							>
 							<p class="text-xl font-bold text-destructive">
-								{fuelStats.fuelConsumption.worstMpg != null
-									? fuelStats.fuelConsumption.worstMpg.toFixed(1)
+								{fuelStats.fuelConsumption.worstEfficiency != null
+									? fuelStats.fuelConsumption.worstEfficiency.toFixed(1)
 									: 'N/A'}
 							</p>
 						</div>
@@ -242,7 +261,7 @@
 						>
 						<p class="text-3xl font-bold">
 							{fuelStats.fillupDetails.avgVolume != null
-								? fuelStats.fillupDetails.avgVolume.toFixed(1) + ' gal'
+								? fuelStats.fillupDetails.avgVolume.toFixed(1) + ' ' + volLabelShort
 								: 'N/A'}
 						</p>
 					</div>
@@ -252,7 +271,7 @@
 							<span class="text-muted-foreground">Min Fill-up</span>
 							<span class="font-semibold">
 								{fuelStats.fillupDetails.minVolume != null
-									? fuelStats.fillupDetails.minVolume.toFixed(1) + ' gal'
+									? fuelStats.fillupDetails.minVolume.toFixed(1) + ' ' + volLabelShort
 									: 'N/A'}
 							</span>
 						</div>
@@ -260,7 +279,7 @@
 							<span class="text-muted-foreground">Max Fill-up</span>
 							<span class="font-semibold">
 								{fuelStats.fillupDetails.maxVolume != null
-									? fuelStats.fillupDetails.maxVolume.toFixed(1) + ' gal'
+									? fuelStats.fillupDetails.maxVolume.toFixed(1) + ' ' + volLabelShort
 									: 'N/A'}
 							</span>
 						</div>
@@ -287,18 +306,18 @@
 
 					<div class="space-y-2 pt-3">
 						<div class="flex items-center justify-between text-sm">
-							<span class="text-muted-foreground">Best Cost/Mile</span>
+							<span class="text-muted-foreground">Best {costPerDistLabel}</span>
 							<span class="font-semibold">
-								{fuelStats.averageCost.bestCostPerMile != null
-									? formatCurrency(fuelStats.averageCost.bestCostPerMile)
+								{fuelStats.averageCost.bestCostPerDistance != null
+									? formatCurrency(fuelStats.averageCost.bestCostPerDistance)
 									: 'N/A'}
 							</span>
 						</div>
 						<div class="flex items-center justify-between text-sm">
-							<span class="text-muted-foreground">Worst Cost/Mile</span>
+							<span class="text-muted-foreground">Worst {costPerDistLabel}</span>
 							<span class="font-semibold">
-								{fuelStats.averageCost.worstCostPerMile != null
-									? formatCurrency(fuelStats.averageCost.worstCostPerMile)
+								{fuelStats.averageCost.worstCostPerDistance != null
+									? formatCurrency(fuelStats.averageCost.worstCostPerDistance)
 									: 'N/A'}
 							</span>
 						</div>
@@ -326,7 +345,8 @@
 						<span class="text-xs uppercase tracking-wide text-muted-foreground">Total Distance</span
 						>
 						<p class="text-3xl font-bold">
-							{fuelStats.distance.totalMiles.toLocaleString()} mi
+							{fuelStats.distance.totalDistance.toLocaleString()}
+							{distLabelShort}
 						</p>
 					</div>
 
@@ -335,7 +355,7 @@
 							<span class="text-muted-foreground">Avg/Day</span>
 							<span class="font-semibold">
 								{fuelStats.distance.avgPerDay != null
-									? fuelStats.distance.avgPerDay.toFixed(1) + ' mi'
+									? fuelStats.distance.avgPerDay.toFixed(1) + ' ' + distLabelShort
 									: 'N/A'}
 							</span>
 						</div>
@@ -343,7 +363,7 @@
 							<span class="text-muted-foreground">Avg/Month</span>
 							<span class="font-semibold">
 								{fuelStats.distance.avgPerMonth != null
-									? fuelStats.distance.avgPerMonth.toFixed(0) + ' mi'
+									? fuelStats.distance.avgPerMonth.toFixed(0) + ' ' + distLabelShort
 									: 'N/A'}
 							</span>
 						</div>

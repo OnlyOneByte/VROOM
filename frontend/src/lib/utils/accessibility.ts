@@ -1,4 +1,5 @@
 // Focus management utilities
+import { browser } from '$app/environment';
 export function trapFocus(element: HTMLElement): () => void {
 	const focusableElements = element.querySelectorAll(
 		'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -38,6 +39,7 @@ export function announceToScreenReader(
 	message: string,
 	priority: 'polite' | 'assertive' = 'polite'
 ): void {
+	if (!browser) return;
 	const announcement = document.createElement('div');
 	announcement.setAttribute('aria-live', priority);
 	announcement.setAttribute('aria-atomic', 'true');
@@ -144,16 +146,19 @@ export function meetsWCAGContrast(
 
 // Reduced motion detection
 export function prefersReducedMotion(): boolean {
+	if (typeof window === 'undefined') return false;
 	return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 // High contrast detection
 export function prefersHighContrast(): boolean {
+	if (typeof window === 'undefined') return false;
 	return window.matchMedia('(prefers-contrast: high)').matches;
 }
 
 // Focus visible utilities
 export function addFocusVisiblePolyfill(): void {
+	if (!browser) return;
 	let hadKeyboardEvent = true;
 
 	const inputTypesAllowlist = {

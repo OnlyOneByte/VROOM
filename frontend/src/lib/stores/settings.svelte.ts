@@ -1,5 +1,12 @@
-import type { UserSettings } from '../types/index.js';
+import { browser } from '$app/environment';
+import type { UnitPreferences, UserSettings } from '../types/index.js';
 import { settingsApi } from '$lib/services/settings-api';
+
+const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
+	distanceUnit: 'miles',
+	volumeUnit: 'gallons_us',
+	chargeUnit: 'kwh'
+};
 
 function handleError(error: unknown): string {
 	return error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -13,6 +20,9 @@ function createSettingsStore() {
 	return {
 		get settings() {
 			return settings;
+		},
+		get unitPreferences() {
+			return settings?.unitPreferences ?? DEFAULT_UNIT_PREFERENCES;
 		},
 		get isLoading() {
 			return isLoading;
@@ -63,6 +73,7 @@ function createSettingsStore() {
 		},
 
 		async downloadBackup() {
+			if (!browser) return;
 			try {
 				const response = await settingsApi.downloadBackup();
 				if (!response.ok) throw new Error('Failed to download backup');
@@ -127,6 +138,7 @@ function createSettingsStore() {
 		},
 
 		async downloadBackupFromDrive(fileId: string) {
+			if (!browser) return;
 			try {
 				const response = await settingsApi.downloadBackupFromDrive(fileId);
 				if (!response.ok) throw new Error('Failed to download backup from Drive');

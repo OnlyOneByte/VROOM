@@ -7,14 +7,32 @@ import { vehicles as vehiclesTable } from '../../db/schema';
 import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import type { ApiResponse } from '../../types';
+import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../types';
 import { commonSchemas } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
+import { settingsRepository } from '../settings/repository';
 import { photoRoutes } from './photo-routes';
 import { vehicleRepository } from './repository';
 
 const routes = new Hono();
+
+// Zod schema for unitPreferences enum validation
+const unitPreferencesSchema = z.object({
+  distanceUnit: z.enum(DistanceUnit, {
+    message: "Invalid distanceUnit: must be 'miles' or 'kilometers'",
+  }),
+  volumeUnit: z.enum(VolumeUnit, {
+    message: "Invalid volumeUnit: must be 'gallons_us', 'gallons_uk', or 'liters'",
+  }),
+  chargeUnit: z.enum(ChargeUnit, {
+    message: "Invalid chargeUnit: must be 'kwh'",
+  }),
+});
+
+// Partial version for update (each field optional)
+const partialUnitPreferencesSchema = unitPreferencesSchema.partial();
 
 // Validation schemas derived from db schema
 const baseVehicleSchema = createInsertSchema(vehiclesTable, {
@@ -60,14 +78,30 @@ const baseVehicleSchema = createInsertSchema(vehiclesTable, {
 });
 
 // Omit auto-generated fields for create/update
-const createVehicleSchema = baseVehicleSchema.omit({
-  id: true,
-  userId: true,
-  createdAt: true,
-  updatedAt: true,
-});
+const createVehicleSchema = baseVehicleSchema
+  .omit({
+    id: true,
+    userId: true,
+    createdAt: true,
+    updatedAt: true,
+    unitPreferences: true,
+  })
+  .extend({
+    unitPreferences: unitPreferencesSchema.optional(),
+  });
 
-const updateVehicleSchema = createVehicleSchema.partial();
+const updateVehicleSchema = baseVehicleSchema
+  .omit({
+    id: true,
+    userId: true,
+    createdAt: true,
+    updatedAt: true,
+    unitPreferences: true,
+  })
+  .extend({
+    unitPreferences: partialUnitPreferencesSchema.optional(),
+  })
+  .partial();
 
 // Apply authentication and change tracking to all routes
 routes.use('*', requireAuth);
@@ -104,8 +138,16 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
     }
   }
 
+  // Default unitPreferences from user's settings if not provided
+  let { unitPreferences } = vehicleData;
+  if (!unitPreferences) {
+    const userSettings = await settingsRepository.getOrCreate(user.id);
+    unitPreferences = userSettings.unitPreferences;
+  }
+
   const createdVehicle = await vehicleRepository.create({
     ...vehicleData,
+    unitPreferences,
     userId: user.id,
   });
 
@@ -161,7 +203,16 @@ routes.put(
       }
     }
 
-    const updatedVehicle = await vehicleRepository.update(id, updateData);
+    // Merge partial unitPreferences with existing values
+    const { unitPreferences: partialUnitPrefs, ...restUpdateData } = updateData;
+    const mergedUnitPreferences: UnitPreferences | undefined = partialUnitPrefs
+      ? { ...existingVehicle.unitPreferences, ...partialUnitPrefs }
+      : undefined;
+
+    const updatedVehicle = await vehicleRepository.update(id, {
+      ...restUpdateData,
+      ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
+    });
 
     return c.json({
       success: true,

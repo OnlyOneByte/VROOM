@@ -33,10 +33,9 @@
 		vehicleStatsData &&
 			(vehicleStatsData.fuelExpenseCount > 0 || vehicleStatsData.chargeExpenseCount > 0)
 	);
-	let settings = $derived(settingsStore.settings);
-	let distanceUnit = $derived(settings?.distanceUnit || 'miles');
-	let volumeUnit = $derived(settings?.volumeUnit || 'gallons_us');
-	let chargeUnit = $derived(settings?.chargeUnit || 'kwh');
+	let distanceUnit = $derived(settingsStore.unitPreferences.distanceUnit);
+	let volumeUnit = $derived(settingsStore.unitPreferences.volumeUnit);
+	let chargeUnit = $derived(settingsStore.unitPreferences.chargeUnit);
 	let isKilometers = $derived(distanceUnit === 'kilometers');
 
 	let statItems = $derived.by(() => {

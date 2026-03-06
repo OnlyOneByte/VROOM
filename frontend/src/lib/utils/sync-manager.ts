@@ -13,8 +13,10 @@ import {
 	type SyncConfig
 } from './sync-state.svelte';
 import { loadOfflineExpenses, saveOfflineExpenses, type OfflineExpense } from './offline-storage';
+import type { ExpenseCategory } from '$lib/types';
 import { toBackendExpense } from '$lib/services/api-transformer';
 import { apiClient } from '$lib/services/api-client';
+import { browser } from '$app/environment';
 
 // Re-export types and state for consumers
 export type { SyncConflict, SyncConfig };
@@ -207,7 +209,7 @@ class SyncManager {
 			const backendExpense = toBackendExpense({
 				vehicleId: expense.vehicleId,
 				tags: expense.tags,
-				category: expense.category,
+				category: expense.category as ExpenseCategory,
 				amount: expense.amount,
 				date: expense.date,
 				mileage: expense.mileage,
@@ -286,7 +288,7 @@ class SyncManager {
 					const backendExpense = toBackendExpense({
 						vehicleId: conflict.localExpense.vehicleId,
 						tags: conflict.localExpense.tags,
-						category: conflict.localExpense.category,
+						category: conflict.localExpense.category as ExpenseCategory,
 						amount: conflict.localExpense.amount,
 						date: conflict.localExpense.date,
 						mileage: conflict.localExpense.mileage,
@@ -333,7 +335,7 @@ class SyncManager {
 
 		fetchLastSyncTime();
 
-		if (typeof window !== 'undefined') {
+		if (browser) {
 			window.addEventListener('online', () => {
 				if (!this.syncInProgress) {
 					fetchLastSyncTime();

@@ -535,6 +535,7 @@
 							<FuelEfficiencyTrendChart
 								data={fuelEfficiencyData}
 								fuelType={vehicle.vehicleType || 'gas'}
+								unitPreferences={vehicle.unitPreferences}
 								isLoading={false}
 							/>
 						{/if}
@@ -592,7 +593,7 @@
 
 			<!-- Odometer Tab -->
 			<TabsContent value="odometer" class="space-y-6">
-				<OdometerTab {vehicleId} />
+				<OdometerTab {vehicleId} unitPreferences={vehicle?.unitPreferences} />
 			</TabsContent>
 
 			<!-- Finance Tab -->
@@ -626,6 +627,7 @@
 									(vehicleStatsData?.currentMileage ?? vehicle.initialMileage ?? 0) -
 										(vehicle.initialMileage ?? 0)
 								)}
+								unitPreferences={vehicle.unitPreferences}
 							/>
 						{/if}
 					{:else}
@@ -645,6 +647,7 @@
 							financing={vehicle.financing}
 							currentMileage={vehicleStatsData?.currentMileage ?? vehicle.initialMileage ?? null}
 							initialMileage={vehicle.initialMileage ?? null}
+							unitPreferences={vehicle.unitPreferences}
 						/>
 					{/if}
 

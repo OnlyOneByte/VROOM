@@ -25,6 +25,8 @@
 	import type { CrossVehicleResponse, FinancingResponse, InsuranceResponse } from '$lib/types';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import { formatCurrencyAxis, parseMonthToDate } from '$lib/utils/chart-formatters';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { getFuelEfficiencyLabel, getDistanceUnitLabel } from '$lib/utils/units';
 
 	let crossVehicle = $state<CrossVehicleResponse | null>(null);
 	let financing = $state<FinancingResponse | null>(null);
@@ -38,6 +40,11 @@
 	// Uses synchronous MutationObserver + offsetParent check instead of async IO.
 	let costBarGate = createVisibilityWatch();
 	let typeDistGate = createVisibilityWatch();
+
+	// Dynamic unit labels — cross-vehicle view uses global unit preferences
+	let units = $derived(crossVehicle?.units ?? settingsStore.unitPreferences);
+	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
+	let distShortLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
 	async function loadData() {
 		try {
@@ -100,7 +107,7 @@
 				date: parseMonthToDate(d.month)
 			};
 			for (const v of d.vehicles) {
-				row[v.vehicleName] = v.mpg;
+				row[v.vehicleName] = v.efficiency;
 			}
 			return row;
 		});
@@ -324,8 +331,8 @@
 								<div class="flex items-center justify-between text-sm">
 									<span>{vehicle.vehicleName}</span>
 									<span class="font-semibold">
-										{vehicle.costPerMile != null
-											? `${formatCurrency(vehicle.costPerMile)}/mi`
+										{vehicle.costPerDistance != null
+											? `${formatCurrency(vehicle.costPerDistance)}/${distShortLabel}`
 											: 'N/A'}
 									</span>
 								</div>
@@ -340,13 +347,13 @@
 		{#if fuelEffData.length > 0}
 			<AppLineChart
 				title="Fuel Efficiency Comparison"
-				description="MPG trends across all vehicles"
+				description="{efficiencyLabel} trends across all vehicles"
 				data={fuelEffData}
 				x="date"
 				y={fuelEffVehicleNames}
 				series={fuelEffSeries}
 				config={fuelEffConfig}
-				yAxisFormat={v => `${v.toFixed(0)} MPG`}
+				yAxisFormat={v => `${v.toFixed(0)} ${efficiencyLabel}`}
 			/>
 		{/if}
 

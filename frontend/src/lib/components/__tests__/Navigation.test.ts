@@ -17,6 +17,11 @@ vi.mock('$app/stores', () => {
 	};
 });
 
+// Mock $app/state
+vi.mock('$app/state', () => ({
+	page: { url: { pathname: '/dashboard' } }
+}));
+
 // Mock SyncStatusIndicator component
 vi.mock('../SyncStatusIndicator.svelte', () => ({
 	default: class MockSyncStatusIndicator {
@@ -138,7 +143,7 @@ describe('Navigation Component Logic', () => {
 		// Test responsive class logic
 		const getResponsiveClasses = (isMobile: boolean) => {
 			return {
-				mobileHeader: isMobile ? 'lg:hidden fixed top-0' : 'lg:hidden fixed top-0',
+				mobileHeader: 'lg:hidden fixed top-0',
 				desktopSidebar: 'hidden lg:fixed lg:inset-y-0',
 				mobileMenu: isMobile ? 'translate-x-0' : '-translate-x-full'
 			};

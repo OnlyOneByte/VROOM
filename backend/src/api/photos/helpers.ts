@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '../../db/connection';
-import { expenseGroups, expenses } from '../../db/schema';
+import { expenseGroups, expenses, odometerEntries } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { insurancePolicyRepository } from '../insurance/repository';
 import type { GoogleDriveService } from '../sync/google-drive';
@@ -70,6 +70,17 @@ export async function validateEntityOwnership(
       await validateExpenseGroupOwnership(entityId, userId);
       break;
     }
+    case 'odometer_entry': {
+      const db = getDb();
+      const rows = await db
+        .select({ userId: odometerEntries.userId })
+        .from(odometerEntries)
+        .where(eq(odometerEntries.id, entityId))
+        .limit(1);
+      const entry = rows[0];
+      if (!entry || entry.userId !== userId) throw new NotFoundError('Odometer entry');
+      break;
+    }
     default:
       throw new ValidationError(`Unknown entity type: ${entityType}`);
   }
@@ -129,6 +140,19 @@ export async function resolveEntityDriveFolder(
       }
 
       const newFolder = await driveService.createFolder(expenseFolderName, mainFolderId);
+      return newFolder.id;
+    }
+    case 'odometer_entry': {
+      const folderStructure = await driveService.createVroomFolderStructure(folderName);
+      const mainFolderId = folderStructure.mainFolder.id;
+
+      const odometerFolderName = 'OdometerPhotos';
+      const existingFolder = await driveService.findFolder(odometerFolderName, mainFolderId);
+      if (existingFolder) {
+        return existingFolder.id;
+      }
+
+      const newFolder = await driveService.createFolder(odometerFolderName, mainFolderId);
       return newFolder.id;
     }
     default:

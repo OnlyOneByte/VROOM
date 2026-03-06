@@ -49,6 +49,10 @@
 	<CardHeader>
 		<CardTitle>Unit Preferences</CardTitle>
 		<CardDescription>Choose your preferred units for measurements</CardDescription>
+		<p class="text-sm text-muted-foreground mt-1">
+			These units are used as defaults when adding new vehicles and determine the display units for
+			cross-vehicle analytics.
+		</p>
 	</CardHeader>
 	<CardContent class="space-y-6">
 		<div class="space-y-2">
