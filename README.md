@@ -1,5 +1,6 @@
 # VROOM Car Tracker
 
+[![CI/CD](https://github.com/OnlyOneByte/VROOM/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/OnlyOneByte/VROOM/actions/workflows/ci-cd.yml)
 ![Frontend Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OnlyOneByte/VROOM/coverage-badges/frontend-coverage.json)
 ![Backend Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OnlyOneByte/VROOM/coverage-badges/backend-coverage.json)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20VROOM-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/onemorebyte)
@@ -8,12 +9,25 @@ VROOM (Vehicle Record & Organization Of Maintenance) — a modern, self-hostable
 
 > ⚠️ **This project is under rapid development.** Features, APIs, and database schemas may change between releases. Back up your data regularly via Google Drive sync. If you're self-hosting, pin to a specific image tag rather than `latest` for stability.
 
+> 🤖 **AI-native development.** Much of the code in this project is written with AI assistance. All architecture decisions, feature direction, and code review are done by a human developer. AI accelerates the implementation; a person steers the ship.
+
 ## Why VROOM?
 
 - **Open Source** — fork, customize, and host it yourself with full control over your data
 - **Open Format** — data stored in standard CSV format via Google Drive backup, zero lock-in
 - **Google Drive Integration** — your data syncs directly to your Google Drive
 - **Privacy First** — no third-party data storage; everything lives on your server and your Drive
+
+## Features
+
+- 📱 Mobile-first PWA with offline support
+- 🚗 Multi-vehicle tracking (gas, electric, hybrid)
+- 📊 Interactive analytics and cost visualization
+- ⛽ Fuel efficiency tracking
+- 💰 Financing and insurance management
+- 🔐 Google OAuth authentication
+- 💾 Google Drive backup + Google Sheets sync
+- 🐳 Docker-ready self-hosting
 
 ## Screenshots
 
@@ -115,17 +129,6 @@ vroom/
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
 
 These docs are also compatible with [GitHub Wiki](https://docs.github.com/en/communities/documenting-your-project-with-wikis) — see `docs/Home.md` and `docs/_Sidebar.md`.
-
-## Features
-
-- 📱 Mobile-first PWA with offline support
-- 🚗 Multi-vehicle tracking (gas, electric, hybrid)
-- 📊 Interactive analytics and cost visualization
-- ⛽ Fuel efficiency tracking
-- 💰 Financing and insurance management
-- 🔐 Google OAuth authentication
-- 💾 Google Drive backup + Google Sheets sync
-- � Docker-ready self-hosting
 
 ## Contributing
 

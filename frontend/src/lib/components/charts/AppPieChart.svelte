@@ -69,13 +69,7 @@
 							padAngle={0.02}
 							cornerRadius={4}
 							props={{
-								pie: {
-									motion: {
-										type: 'tween',
-										duration: 800,
-										easing: (t: number) => 1 - Math.pow(1 - t, 3)
-									}
-								}
+								pie: {}
 							}}
 						>
 							{#snippet tooltip()}
