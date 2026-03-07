@@ -3,7 +3,7 @@
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Badge } from '$lib/components/ui/badge';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import { Receipt, TrendingDown, DollarSign } from 'lucide-svelte';
+	import { Receipt, TrendingDown, DollarSign } from '@lucide/svelte';
 	import type { DerivedPaymentEntry, VehicleFinancing } from '$lib/types';
 
 	interface Props {

@@ -32,6 +32,8 @@
     "validate": "bun run type-check && bun run check && bun test && bun run build"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1003.0",
+    "@aws-sdk/s3-request-presigner": "^3.1003.0",
     "@hono/node-server": "^1.19.11",
     "@hono/zod-validator": "^0.7.6",
     "@lucia-auth/adapter-drizzle": "^1.1.0",

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Star, Trash2, Upload, ImagePlus } from 'lucide-svelte';
+	import { Star, Trash2, Upload, ImagePlus, LoaderCircle } from '@lucide/svelte';
 	import * as Carousel from '$lib/components/ui/carousel';
 	import type { CarouselAPI } from '$lib/components/ui/carousel/context';
 	import { Button } from '$lib/components/ui/button';
@@ -12,13 +12,23 @@
 		vehicleId: string;
 		photos: Photo[];
 		onUpload: () => void;
-		onDelete: (_photoId: string) => void;
+		onDelete: (_photoId: string) => void | Promise<void>;
 		onSetCover: (_photoId: string) => void;
 	}
 
 	let { vehicleId, photos, onUpload, onDelete, onSetCover }: Props = $props();
 
 	let hasPhotos = $derived(photos.length > 0);
+	let deletingPhotoId = $state<string | null>(null);
+
+	async function handleDelete(photoId: string) {
+		deletingPhotoId = photoId;
+		try {
+			await onDelete(photoId);
+		} finally {
+			deletingPhotoId = null;
+		}
+	}
 	let carouselApi = $state<CarouselAPI | undefined>(undefined);
 	let currentIndex = $derived(carouselApi?.selectedScrollSnap() ?? 0);
 
@@ -64,7 +74,7 @@
 								{/if}
 
 								<div
-									class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100"
+									class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 lg:opacity-0 transition-opacity lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
 								>
 									{#if !photo.isCover}
 										<Button
@@ -81,9 +91,14 @@
 										variant="destructive"
 										size="sm"
 										class="h-7 text-xs"
-										onclick={() => onDelete(photo.id)}
+										disabled={deletingPhotoId === photo.id}
+										onclick={() => handleDelete(photo.id)}
 									>
-										<Trash2 class="h-3 w-3" />
+										{#if deletingPhotoId === photo.id}
+											<LoaderCircle class="h-3 w-3 animate-spin" />
+										{:else}
+											<Trash2 class="h-3 w-3" />
+										{/if}
 									</Button>
 								</div>
 							</div>

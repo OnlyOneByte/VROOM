@@ -10,6 +10,7 @@ import {
   insurancePolicies,
   insurancePolicyVehicles,
   odometerEntries,
+  photoRefs,
   photos,
   vehicleFinancing,
   vehicles,
@@ -105,6 +106,12 @@ export const CONFIG = {
   },
   logging: { level: env.LOG_LEVEL },
   pagination: { defaultPageSize: 20, maxPageSize: 100, minPageSize: 1 },
+  syncWorker: {
+    enabled: env.NODE_ENV !== 'test',
+    pollIntervalMs: 30_000,
+    batchSize: 10,
+    maxRetries: 3,
+  },
   rateLimit: {
     cleanupInterval: 60_000,
     global: { windowMs: 15 * 60 * 1000, limit: 1000, message: 'Too many requests' },
@@ -175,6 +182,7 @@ export const TABLE_SCHEMA_MAP: Record<string, SQLiteTableWithColumns<any>> = {
   expenseGroups: expenseGroups,
   photos: photos,
   odometer: odometerEntries,
+  photoRefs: photoRefs,
 };
 
 export const TABLE_FILENAME_MAP: Record<string, string> = {
@@ -186,6 +194,7 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   expenseGroups: 'expense_groups.csv',
   photos: 'photos.csv',
   odometer: 'odometer_entries.csv',
+  photoRefs: 'photo_refs.csv',
 };
 
 export function getBackupTableKeys(): string[] {
@@ -198,6 +207,7 @@ const OPTIONAL_BACKUP_FILES = new Set([
   'expense_groups.csv',
   'photos.csv',
   'odometer_entries.csv',
+  'photo_refs.csv',
 ]);
 
 export function getRequiredBackupFiles(): string[] {
@@ -208,6 +218,8 @@ export function getRequiredBackupFiles(): string[] {
 }
 
 export const validateProductionConfig = () => {
+  const encryptionKey = process.env.PROVIDER_ENCRYPTION_KEY;
+
   if (CONFIG.env === 'production') {
     const requiredFields = [
       { field: 'GOOGLE_CLIENT_ID', value: CONFIG.auth.googleClientId },
@@ -216,6 +228,11 @@ export const validateProductionConfig = () => {
     ];
 
     const missing = requiredFields.filter(({ value }) => !value);
+
+    if (!encryptionKey) {
+      missing.push({ field: 'PROVIDER_ENCRYPTION_KEY', value: undefined });
+    }
+
     if (missing.length > 0) {
       console.error('❌ Missing required production configuration:');
       for (const { field } of missing) {
@@ -223,6 +240,16 @@ export const validateProductionConfig = () => {
       }
       process.exit(1);
     }
+
+    // Validate encryption key format (must be 64-char hex = 32 bytes)
+    if (encryptionKey && !/^[0-9a-fA-F]{64}$/.test(encryptionKey)) {
+      console.error('❌ PROVIDER_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)');
+      process.exit(1);
+    }
+  } else if (!encryptionKey) {
+    console.warn(
+      '⚠️  PROVIDER_ENCRYPTION_KEY is not set. Provider encryption will fail until configured.'
+    );
   }
 };
 

@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { appStore } from '$lib/stores/app.svelte';
-	import { ArrowLeft, Shield, Trash2, X, Check, LoaderCircle } from 'lucide-svelte';
+	import { routes } from '$lib/routes';
+	import { gotoDynamic } from '$lib/utils/navigation';
+	import { ArrowLeft, Shield, Trash2, X, Check, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -32,6 +35,7 @@
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import type { InsurancePolicy, Vehicle, PolicyDetails, FinanceDetails } from '$lib/types';
+	import FormLayout from '$lib/components/common/form-layout.svelte';
 
 	interface Props {
 		policyId?: string;
@@ -95,7 +99,7 @@
 		} catch (err) {
 			if (import.meta.env.DEV) console.error('Failed to load data:', err);
 			appStore.showError('Failed to load data');
-			goto(returnTo);
+			gotoDynamic(returnTo);
 		} finally {
 			isLoading = false;
 		}
@@ -111,7 +115,7 @@
 		} catch (err) {
 			if (import.meta.env.DEV) console.error('Failed to load policy:', err);
 			appStore.showError('Failed to load policy');
-			goto(returnTo);
+			gotoDynamic(returnTo);
 		}
 	}
 
@@ -167,7 +171,7 @@
 					isActive
 				});
 				appStore.showSuccess('Policy updated successfully');
-				goto(returnTo);
+				gotoDynamic(returnTo);
 			} else {
 				const policyDetails: PolicyDetails = {};
 				if (policyNumber.trim()) policyDetails.policyNumber = policyNumber.trim();
@@ -201,7 +205,7 @@
 					isActive
 				});
 				appStore.showSuccess('Policy created successfully');
-				goto('/insurance');
+				goto(resolve(routes.insurance));
 			}
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Unknown error';
@@ -221,7 +225,7 @@
 		try {
 			await insuranceApi.deletePolicy(policy.id);
 			appStore.showSuccess('Policy deleted successfully');
-			goto('/insurance');
+			goto(resolve(routes.insurance));
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to delete policy';
 			appStore.showError(message);
@@ -232,10 +236,11 @@
 	}
 
 	function handleBack() {
-		goto(returnTo);
+		gotoDynamic(returnTo);
 	}
 </script>
 
+<FormLayout>
 {#if isLoading}
 	<div class="flex items-center justify-center py-12">
 		<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
@@ -585,3 +590,4 @@
 		</AlertDialogContent>
 	</AlertDialog>
 {/if}
+</FormLayout>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Select from '$lib/components/ui/select';
-	import { LoaderCircle } from 'lucide-svelte';
+	import { LoaderCircle } from '@lucide/svelte';
 	import { PERIOD_OPTIONS, isValidPeriod, type TimePeriod } from '$lib/constants/time-periods';
 
 	interface Props {
@@ -33,7 +33,7 @@
 			</span>
 		</Select.Trigger>
 		<Select.Content>
-			{#each PERIOD_OPTIONS as option}
+			{#each PERIOD_OPTIONS as option (option.value)}
 				<Select.Item value={option.value} label={option.label}>
 					{option.label}
 				</Select.Item>

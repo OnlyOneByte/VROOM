@@ -2,10 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { authStore } from '../../stores/auth.svelte';
 import type { User } from '../../types/index.js';
 import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
 
 // Mock $app/navigation
 vi.mock('$app/navigation', () => ({
 	goto: vi.fn()
+}));
+
+// Mock $app/paths
+vi.mock('$app/paths', () => ({
+	resolve: (path: string) => path
 }));
 
 // Mock user data
@@ -68,7 +74,7 @@ describe('ProtectedRoute Logic', () => {
 
 		// Simulate the redirect logic
 		if (shouldRedirect) {
-			goto('/auth');
+			goto(resolve('/auth'));
 		}
 
 		expect(goto).toHaveBeenCalledWith('/auth');

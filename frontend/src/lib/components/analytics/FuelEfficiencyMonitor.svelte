@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Fuel } from 'lucide-svelte';
+	import { Fuel } from '@lucide/svelte';
 	import {
 		Empty,
 		EmptyDescription,

@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import { LoaderCircle, Check, X } from 'lucide-svelte';
+	import { routes } from '$lib/routes';
+	import { LoaderCircle, Check, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 
 	let status = $state('processing');
@@ -43,7 +45,7 @@
 			if (authState.isAuthenticated) {
 				status = 'success';
 				setTimeout(() => {
-					goto('/dashboard');
+					goto(resolve(routes.dashboard));
 				}, 1000);
 			} else if (status === 'processing') {
 				status = 'error';
@@ -53,7 +55,7 @@
 	});
 
 	function retryAuth() {
-		goto('/auth');
+		goto(resolve(routes.auth));
 	}
 </script>
 

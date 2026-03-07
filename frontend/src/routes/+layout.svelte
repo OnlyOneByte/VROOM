@@ -17,7 +17,7 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 
-	import { LoaderCircle } from 'lucide-svelte';
+	import { LoaderCircle } from '@lucide/svelte';
 
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { themeStore } from '$lib/stores/theme.svelte';
@@ -37,7 +37,9 @@
 		}
 	}
 
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- intentionally non-reactive tracking Set, not used in $state or $derived
 	const shownNotifications = new Set<string>();
+
 	let previousNotificationIds = new Set<string>();
 
 	let webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
@@ -48,9 +50,8 @@
 		offlineExpenseQueue.current = loadOfflineExpenses();
 
 		if (pwaInfo) {
-			const pwaRegister: typeof import('virtual:pwa-register') = await import(
-				'virtual:pwa-register'
-			);
+			const pwaRegister: typeof import('virtual:pwa-register') =
+				await import('virtual:pwa-register');
 			pwaRegister.registerSW({
 				immediate: true,
 				onRegistered(r: ServiceWorkerRegistration | undefined) {

@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { initializePWA, promptInstall, pwaInstallState, getPlatformInfo } from '$lib/utils/pwa';
-	import { Download, CircleCheck, Share, Smartphone, Monitor, Plus } from 'lucide-svelte';
-	import { LoaderCircle } from 'lucide-svelte';
+	import { Download, CircleCheck, Share, Smartphone, Monitor, Plus, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import {
 		Card,

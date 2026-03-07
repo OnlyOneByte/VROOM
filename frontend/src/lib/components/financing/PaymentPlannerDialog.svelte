@@ -22,7 +22,7 @@
 		ArrowDown,
 		Save,
 		LoaderCircle
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	interface Props {
 		financing: VehicleFinancing;

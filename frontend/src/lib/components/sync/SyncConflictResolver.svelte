@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { syncConflicts, syncManager, type SyncConflict } from '$lib/utils/sync-manager';
-	import { TriangleAlert, Check, X, Merge, LoaderCircle } from 'lucide-svelte';
+	import { TriangleAlert, Check, X, Merge, LoaderCircle } from '@lucide/svelte';
 	import {
 		Dialog,
 		DialogContent,

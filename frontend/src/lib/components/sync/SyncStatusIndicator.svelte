@@ -11,7 +11,7 @@
 		syncConflicts,
 		fetchLastSyncTime
 	} from '$lib/utils/sync-manager';
-	import { Wifi, WifiOff, RefreshCw, CircleAlert, Clock } from 'lucide-svelte';
+	import { Wifi, WifiOff, RefreshCw, CircleAlert, Clock } from '@lucide/svelte';
 	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';

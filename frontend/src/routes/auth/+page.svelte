@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { authStore } from '$lib/stores/auth.svelte';
+	import { routes } from '$lib/routes';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import { LoaderCircle, ArrowLeft } from 'lucide-svelte';
+	import { LoaderCircle, ArrowLeft } from '@lucide/svelte';
 
 	let isLoading = $state(false);
 
@@ -12,7 +14,7 @@
 	// Redirect if already authenticated
 	$effect(() => {
 		if (!authState.isLoading && authState.isAuthenticated) {
-			goto('/dashboard');
+			goto(resolve(routes.dashboard));
 		}
 	});
 
@@ -32,7 +34,12 @@
 >
 	<div class="w-full max-w-md space-y-6">
 		<!-- Back to home -->
-		<Button variant="ghost" size="sm" class="text-muted-foreground" onclick={() => goto('/')}>
+		<Button
+			variant="ghost"
+			size="sm"
+			class="text-muted-foreground"
+			onclick={() => goto(resolve(routes.home))}
+		>
 			<ArrowLeft class="mr-1 h-4 w-4" />
 			Back to home
 		</Button>

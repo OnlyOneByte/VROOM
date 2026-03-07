@@ -11,6 +11,8 @@ import { routes as financingRoutes } from './api/financing/routes';
 import { routes as insuranceRoutes } from './api/insurance/routes';
 import { routes as odometerRoutes } from './api/odometer/routes';
 import { routes as photoRoutes } from './api/photos/routes';
+import { routes as providerRoutes } from './api/providers/routes';
+import { startSyncWorker, stopSyncWorker } from './api/providers/sync-worker';
 import { routes as settingsRoutes } from './api/settings/routes';
 import { routes as syncRoutes } from './api/sync/routes';
 import { routes as vehicleRoutes } from './api/vehicles/routes';
@@ -143,6 +145,7 @@ app.route('/api/v1/expenses', expenseRoutes);
 app.route('/api/v1/insurance', insuranceRoutes);
 app.route('/api/v1/odometer', odometerRoutes);
 app.route('/api/v1/photos', photoRoutes);
+app.route('/api/v1/providers', providerRoutes);
 app.route('/api/v1/settings', settingsRoutes);
 app.route('/api/v1/sync', syncRoutes);
 app.route('/api/v1/analytics', analyticsRoutes);
@@ -263,9 +266,15 @@ const checkpointInterval = setInterval(
 // Force checkpoint on startup to ensure any previous data is persisted
 forceCheckpointWAL();
 
+// Start background sync worker (polls pending photo_refs for multi-provider fan-out)
+startSyncWorker();
+
 // Graceful shutdown handler
 const shutdown = (signal: string) => {
   logger.shutdown(`Received ${signal}, shutting down gracefully...`);
+
+  // Stop sync worker
+  stopSyncWorker();
 
   // Clear checkpoint interval
   clearInterval(checkpointInterval);

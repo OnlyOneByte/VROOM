@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { routes, paramRoutes } from '$lib/routes';
 	import { onMount } from 'svelte';
-	import { Shield, Plus, CircleAlert } from 'lucide-svelte';
+	import { Shield, Plus, CircleAlert } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
 	import PageHeader from '$lib/components/common/page-header.svelte';
@@ -68,11 +70,11 @@
 	}
 
 	function handleAddPolicy() {
-		goto('/insurance/new');
+		goto(resolve(routes.insuranceNew));
 	}
 
 	function handleEditPolicy(policy: InsurancePolicy) {
-		goto(`/insurance/${policy.id}/edit`);
+		goto(resolve(paramRoutes.insurancePolicyEdit, { id: policy.id }));
 	}
 </script>
 

@@ -1,5 +1,7 @@
 import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
 import type { HandleClientError, HandleFetch } from '@sveltejs/kit';
+import { routes } from '$lib/routes';
 
 let isRedirecting = false;
 
@@ -26,7 +28,7 @@ export const handleFetch: HandleFetch = async ({ request, fetch }) => {
 		});
 
 		// Redirect to auth page
-		goto('/auth');
+		goto(resolve(routes.auth));
 
 		// Reset flag after delay
 		setTimeout(() => {

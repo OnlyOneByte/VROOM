@@ -23,6 +23,7 @@ import {
   insurancePolicies,
   insurancePolicyVehicles,
   odometerEntries,
+  photoRefs,
   photos,
   vehicleFinancing,
   vehicles,
@@ -173,6 +174,16 @@ export class BackupService {
       odometerEntryIds,
     });
 
+    // Query photo_refs for all user photos (batched to stay under SQLite variable limit)
+    const photoIds = userPhotos.map((p) => p.id);
+    const userPhotoRefs: (typeof photoRefs.$inferSelect)[] = [];
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < photoIds.length; i += BATCH_SIZE) {
+      const batch = photoIds.slice(i, i + BATCH_SIZE);
+      const rows = await db.select().from(photoRefs).where(inArray(photoRefs.photoId, batch));
+      userPhotoRefs.push(...rows);
+    }
+
     return {
       metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId },
       vehicles: userVehicles,
@@ -183,6 +194,7 @@ export class BackupService {
       expenseGroups: userExpenseGroups,
       odometer: userOdometer,
       photos: userPhotos,
+      photoRefs: userPhotoRefs,
     };
   }
 
@@ -370,6 +382,7 @@ export class BackupService {
     const expenseGroupIds = new Set((backup.expenseGroups ?? []).map((g) => String(g.id)));
     const expenseIds = new Set(backup.expenses.map((e) => String(e.id)));
     const odometerIds = new Set((backup.odometer ?? []).map((o) => String(o.id)));
+    const photoIds = new Set((backup.photos ?? []).map((p) => String(p.id)));
 
     return [
       ...this.validateExpenseRefs(backup.expenses, vehicleIds, expenseGroupIds),
@@ -384,6 +397,7 @@ export class BackupService {
         expenseGroupIds,
         odometerIds,
       }),
+      ...this.validatePhotoRefEntries(backup.photoRefs ?? [], photoIds),
     ];
   }
 
@@ -486,6 +500,21 @@ export class BackupService {
       } else if (!idSet.has(entityId)) {
         errors.push(`Photo ${photo.id} references non-existent ${entityType} ${entityId}`);
       }
+    }
+    return errors;
+  }
+
+  private validatePhotoRefEntries(
+    photoRefList: Record<string, unknown>[],
+    photoIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const ref of photoRefList) {
+      if (!photoIds.has(String(ref.photoId))) {
+        errors.push(`PhotoRef ${ref.id} references non-existent photo ${ref.photoId}`);
+      }
+      // Note: providerId validation is skipped here because user_providers
+      // are not included in the backup data (they contain encrypted credentials)
     }
     return errors;
   }

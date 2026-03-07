@@ -1,5 +1,7 @@
 import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
 import { authStore } from '$lib/stores/auth.svelte';
+import { routes } from '$lib/routes';
 
 // Protected routes that require authentication
 export const protectedRoutes = ['/dashboard', '/vehicles', '/expenses', '/analytics', '/settings'];
@@ -24,19 +26,19 @@ export function handleRouteProtection(
 
 	// Handle root path — only redirect authenticated users to dashboard
 	if (pathname === '/' && isAuthenticated) {
-		goto('/dashboard');
+		goto(resolve(routes.dashboard));
 		return;
 	}
 
 	// Handle protected routes
 	if (isProtectedRoute(pathname) && !isAuthenticated) {
-		goto('/auth');
+		goto(resolve(routes.auth));
 		return;
 	}
 
 	// Handle public routes
 	if (isPublicRoute(pathname) && isAuthenticated) {
-		goto('/dashboard');
+		goto(resolve(routes.dashboard));
 	}
 }
 
@@ -44,21 +46,21 @@ export function requireAuth(): Promise<boolean> {
 	// With runes store, check state directly
 	if (!authStore.isLoading) {
 		if (!authStore.isAuthenticated) {
-			goto('/auth');
+			goto(resolve(routes.auth));
 			return Promise.resolve(false);
 		}
 		return Promise.resolve(true);
 	}
 
 	// If still loading, poll until resolved
-	return new Promise(resolve => {
+	return new Promise(resolve_ => {
 		const check = () => {
 			if (!authStore.isLoading) {
 				if (!authStore.isAuthenticated) {
-					goto('/auth');
-					resolve(false);
+					goto(resolve(routes.auth));
+					resolve_(false);
 				} else {
-					resolve(true);
+					resolve_(true);
 				}
 			} else {
 				setTimeout(check, 50);

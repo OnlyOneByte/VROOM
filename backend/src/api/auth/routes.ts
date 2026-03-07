@@ -42,14 +42,12 @@ const cleanupExpiredStates = () => {
 routes.get('/login/google', async (c) => {
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
-  const url = await google.createAuthorizationURL(state, codeVerifier, {
-    scopes: [
-      'openid',
-      'profile',
-      'email',
-      'https://www.googleapis.com/auth/drive.file', // Access only files created by this app
-    ],
-  });
+  const url = await google.createAuthorizationURL(state, codeVerifier, [
+    'openid',
+    'profile',
+    'email',
+    'https://www.googleapis.com/auth/drive.file', // Access only files created by this app
+  ]);
 
   // Add access_type=offline to get refresh token
   url.searchParams.set('access_type', 'offline');
@@ -91,7 +89,7 @@ routes.get('/callback/google', async (c) => {
   // Get user info from Google
   const googleUserResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
     headers: {
-      Authorization: `Bearer ${tokens.accessToken}`,
+      Authorization: `Bearer ${tokens.accessToken()}`,
     },
   });
 
@@ -128,16 +126,16 @@ routes.get('/callback/google', async (c) => {
       displayName: googleUser.name,
       provider: 'google',
       providerId: googleUser.sub,
-      googleRefreshToken: tokens.refreshToken || null,
+      googleRefreshToken: tokens.hasRefreshToken() ? tokens.refreshToken() : null,
     });
   } else {
     // Update existing user with fresh refresh token if available
     userId = existingUser[0].id;
-    if (tokens.refreshToken) {
+    if (tokens.hasRefreshToken()) {
       await db
         .update(users)
         .set({
-          googleRefreshToken: tokens.refreshToken,
+          googleRefreshToken: tokens.refreshToken(),
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId));
@@ -263,14 +261,12 @@ routes.get('/reauth/google', async (c) => {
   // Generate new OAuth state and code verifier
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
-  const url = await google.createAuthorizationURL(state, codeVerifier, {
-    scopes: [
-      'openid',
-      'profile',
-      'email',
-      'https://www.googleapis.com/auth/drive', // For Google Drive integration (full access needed to create folders)
-    ],
-  });
+  const url = await google.createAuthorizationURL(state, codeVerifier, [
+    'openid',
+    'profile',
+    'email',
+    'https://www.googleapis.com/auth/drive', // For Google Drive integration (full access needed to create folders)
+  ]);
 
   // Add prompt=consent to force re-consent and get new refresh token
   url.searchParams.set('prompt', 'consent');

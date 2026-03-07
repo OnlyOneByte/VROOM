@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
+	import { paramRoutes } from '$lib/routes';
 	import {
 		Plus,
 		LoaderCircle,
@@ -9,7 +11,7 @@
 		ChevronRight,
 		Pencil,
 		Trash2
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import type { ChartConfig } from '$lib/components/ui/chart';
@@ -172,7 +174,7 @@
 			mileage.
 		{/snippet}
 		{#snippet action()}
-			<Button href="/vehicles/{vehicleId}/odometer/new">
+			<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
 				<Plus class="h-4 w-4 mr-2" />
 				Add Reading
 			</Button>
@@ -182,7 +184,7 @@
 	<div class="space-y-6">
 		<!-- Add Reading Button -->
 		<div class="flex justify-end">
-			<Button href="/vehicles/{vehicleId}/odometer/new">
+			<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
 				<Plus class="h-4 w-4 mr-2" />
 				Add Reading
 			</Button>
@@ -263,7 +265,7 @@
 
 									{#if entry.linkedEntityType === 'expense' && entry.linkedEntityId}
 										<a
-											href="/expenses/{entry.linkedEntityId}"
+											href={resolve(paramRoutes.expense, { id: entry.linkedEntityId })}
 											class="mt-1 inline-flex items-center gap-1 text-sm text-primary hover:underline"
 										>
 											<LinkIcon class="h-3 w-3" />
@@ -281,7 +283,10 @@
 										size="icon"
 										class="h-8 w-8"
 										title="Edit reading"
-										href="/vehicles/{vehicleId}/odometer/{entry.id}/edit?returnTo=/vehicles/{vehicleId}"
+										href={resolve(paramRoutes.vehicleOdometerEntryEdit, {
+											id: vehicleId,
+											entryId: entry.id
+										}) + `?returnTo=/vehicles/${vehicleId}`}
 									>
 										<Pencil class="h-3.5 w-3.5" />
 									</Button>

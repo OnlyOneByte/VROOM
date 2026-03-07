@@ -10,7 +10,8 @@
 		ListFilter,
 		ChevronLeft,
 		ChevronRight
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { expenseApi } from '$lib/services/expense-api';
 	import type { Expense, Vehicle, ExpenseCategory } from '$lib/types';
@@ -169,6 +170,7 @@
 
 	// Group expenses: children with same expenseGroupId become collapsible groups
 	let tableRows = $derived.by((): DisplayRow[] => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
 		const grouped = new Map<string, Expense[]>();
 		const standalone: Expense[] = [];
 
@@ -197,6 +199,7 @@
 			const first = children[0];
 			if (!first) continue;
 			const totalAmount = Math.round(children.reduce((sum, c) => sum + c.amount, 0) * 100) / 100;
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Set used within $derived computation, not mutated reactively
 			const vehicleNameSet = new Set<string>();
 			for (const child of children) {
 				const v = vehicles.find(vh => vh.id === child.vehicleId);
@@ -227,7 +230,7 @@
 	});
 
 	// Expand state for groups
-	let expandedGroups = $state(new Set<string>());
+	let expandedGroups = new SvelteSet<string>();
 
 	// Mobile: selected row for showing actions
 	let selectedRowId = $state<string | null>(null);
@@ -237,13 +240,11 @@
 	}
 
 	function toggleGroup(groupId: string) {
-		const next = new Set(expandedGroups);
-		if (next.has(groupId)) {
-			next.delete(groupId);
+		if (expandedGroups.has(groupId)) {
+			expandedGroups.delete(groupId);
 		} else {
-			next.add(groupId);
+			expandedGroups.add(groupId);
 		}
-		expandedGroups = next;
 	}
 
 	function handleSort(newSortBy: typeof sortBy) {

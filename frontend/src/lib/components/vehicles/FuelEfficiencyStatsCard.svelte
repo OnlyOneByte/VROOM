@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Gauge, Plus } from 'lucide-svelte';
+	import { Gauge, Plus } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { StatCardGrid } from '$lib/components/charts';
 	import EmptyState from '$lib/components/common/empty-state.svelte';

@@ -4,8 +4,6 @@ import { AppError, NotFoundError } from '../../errors';
 import { requireAuth } from '../../middleware';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas } from '../../utils/validation';
-import { settingsRepository } from '../settings/repository';
-import { resolveVroomFolderName } from '../sync/folder-name';
 import {
   deletePhotoForEntity,
   getPhotoThumbnailForEntity,
@@ -47,9 +45,7 @@ routes.post('/:entityType/:entityId', async (c) => {
     throw new AppError('No photo file provided', 400);
   }
 
-  const settings = await settingsRepository.getOrCreate(user.id);
-  const folderName = resolveVroomFolderName(settings.googleDriveCustomFolderName, user.displayName);
-  const photo = await uploadPhotoForEntity(entityType, entityId, user.id, folderName, file);
+  const photo = await uploadPhotoForEntity(entityType, entityId, user.id, file);
   return c.json({ success: true, data: photo }, 201);
 });
 

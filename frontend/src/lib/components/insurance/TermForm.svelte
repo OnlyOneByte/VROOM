@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LoaderCircle, Save } from 'lucide-svelte';
+	import { LoaderCircle, Save } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';

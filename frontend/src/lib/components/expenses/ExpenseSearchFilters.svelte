@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Search, X, Car, Tag } from 'lucide-svelte';
+	import { Search, X, Car, Tag } from '@lucide/svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
@@ -207,7 +207,7 @@
 					class="border rounded-lg p-2 min-h-[42px] bg-background border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background"
 				>
 					<div class="flex flex-wrap gap-1.5 items-center">
-						{#each selectedTags as tag}
+						{#each selectedTags as tag (tag)}
 							<Badge variant="secondary" class="gap-1 pr-1">
 								{tag}
 								<button
@@ -242,7 +242,7 @@
 					<div
 						class="absolute z-50 left-0 right-0 mt-1 border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto"
 					>
-						{#each tagSuggestions.slice(0, 8) as suggestion}
+						{#each tagSuggestions.slice(0, 8) as suggestion (suggestion)}
 							<button
 								type="button"
 								onclick={() => addTag(suggestion)}

@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { ArrowLeft, Fuel } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
+	import { ArrowLeft, Fuel } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 </script>
@@ -12,7 +14,7 @@
 <div class="space-y-6">
 	<div class="flex items-center space-x-4">
 		<a
-			href="/analytics"
+			href={resolve(routes.analytics)}
 			class="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
 		>
 			<ArrowLeft class="h-5 w-5 mr-1" />
@@ -37,7 +39,7 @@
 			vehicle's detail page in the meantime.
 		{/snippet}
 		{#snippet action()}
-			<Button href="/dashboard">Back to Dashboard</Button>
+			<Button href={resolve(routes.dashboard)}>Back to Dashboard</Button>
 		{/snippet}
 	</EmptyState>
 </div>

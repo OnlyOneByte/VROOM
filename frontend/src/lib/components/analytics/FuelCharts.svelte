@@ -51,6 +51,7 @@
 	let gasPriceFuelTypes = $derived([...new Set(fuelStats.gasPriceHistory.map(d => d.fuelType))]);
 
 	let gasPriceData = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
 		const byDate = new Map<string, Record<string, number | string | Date>>();
 		for (const item of fuelStats.gasPriceHistory) {
 			if (!byDate.has(item.date))
@@ -79,6 +80,7 @@
 	]);
 
 	let fillupCostData = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
 		const byMonth = new Map<string, Record<string, number | string | Date>>();
 		for (const item of fuelStats.fillupCostByVehicle) {
 			if (!byMonth.has(item.month))
@@ -107,6 +109,7 @@
 	]);
 
 	let odometerData = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
 		const byMonth = new Map<string, Record<string, number | string | Date>>();
 		for (const item of fuelStats.odometerProgression) {
 			if (!byMonth.has(item.month))
@@ -133,6 +136,7 @@
 	let cpmVehicleNames = $derived([...new Set(fuelStats.costPerDistance.map(d => d.vehicleName))]);
 
 	let costPerMileData = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
 		const byMonth = new Map<string, Record<string, number | string | Date>>();
 		for (const item of fuelStats.costPerDistance) {
 			if (!byMonth.has(item.month))

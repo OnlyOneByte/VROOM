@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Car, DollarSign, TrendingUp, CreditCard } from 'lucide-svelte';
+	import { Car, DollarSign, TrendingUp, CreditCard } from '@lucide/svelte';
 	import { StatCardGrid } from '$lib/components/charts';
 	import { formatCurrency } from '$lib/utils/formatters';
 

@@ -50,7 +50,7 @@
 			: 'border-input'}"
 	>
 		<div class="flex flex-wrap gap-2 items-center">
-			{#each tags as tag}
+			{#each tags as tag (tag)}
 				<span
 					class="inline-flex items-center gap-1 px-2 py-1 bg-secondary text-secondary-foreground rounded-full text-sm"
 				>
@@ -87,7 +87,7 @@
 
 	{#if showSuggestions && filteredSuggestions.length > 0}
 		<div class="border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto">
-			{#each filteredSuggestions.slice(0, 8) as suggestion}
+			{#each filteredSuggestions.slice(0, 8) as suggestion (suggestion)}
 				<button
 					type="button"
 					onclick={() => addTag(suggestion)}

@@ -1,4 +1,4 @@
-import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert, Clock } from 'lucide-svelte';
+import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert, Clock } from '@lucide/svelte';
 
 type LucideIcon = typeof Wifi;
 

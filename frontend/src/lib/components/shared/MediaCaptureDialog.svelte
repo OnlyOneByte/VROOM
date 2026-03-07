@@ -9,7 +9,7 @@
 		Camera,
 		SwitchCamera,
 		Circle
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';

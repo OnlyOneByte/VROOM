@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Pencil, Trash2, RefreshCw } from 'lucide-svelte';
+	import { Pencil, Trash2, RefreshCw } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';

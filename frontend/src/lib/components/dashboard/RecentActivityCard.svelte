@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Clock, ArrowRight } from 'lucide-svelte';
+	import { Clock, ArrowRight } from '@lucide/svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
@@ -50,7 +50,7 @@
 	<Card.Content>
 		{#if isLoading}
 			<div class="space-y-3">
-				{#each Array(5) as _}
+				{#each Array(5) as _, i (i)}
 					<Skeleton class="h-16 w-full" />
 				{/each}
 			</div>

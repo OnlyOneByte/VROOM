@@ -1,15 +1,16 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { gotoDynamic } from '$lib/utils/navigation';
 	import { onMount } from 'svelte';
 	import { z } from 'zod';
-	import { ArrowLeft, LoaderCircle, Trash2, TriangleAlert } from 'lucide-svelte';
+	import { ArrowLeft, LoaderCircle, Trash2, TriangleAlert } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { odometerApi } from '$lib/services/odometer-api';
+	import FormLayout from '$lib/components/common/form-layout.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -120,7 +121,7 @@
 				recordedAt: new Date(date).toISOString(),
 				note: note || undefined
 			});
-			await goto(returnTo);
+			await gotoDynamic(returnTo);
 		} catch (e) {
 			submitError = e instanceof Error ? e.message : 'Failed to update odometer reading';
 		} finally {
@@ -134,7 +135,7 @@
 		try {
 			await odometerApi.delete(entryId);
 			deleteDialogOpen = false;
-			await goto(returnTo);
+			await gotoDynamic(returnTo);
 		} catch (e) {
 			deleteError = e instanceof Error ? e.message : 'Failed to delete reading';
 		} finally {
@@ -148,10 +149,10 @@
 	<meta name="description" content="Edit an odometer reading" />
 </svelte:head>
 
-<div class="mx-auto max-w-2xl px-4 py-6">
+<FormLayout>
 	<!-- Header -->
 	<div class="mb-6 flex items-center gap-3">
-		<Button variant="ghost" size="icon" onclick={() => goto(returnTo)}>
+		<Button variant="ghost" size="icon" onclick={() => gotoDynamic(returnTo)}>
 			<ArrowLeft class="h-5 w-5" />
 		</Button>
 		<h1 class="text-2xl font-bold text-foreground">Edit Odometer Reading</h1>
@@ -247,7 +248,12 @@
 					<span class="hidden sm:inline">Delete</span>
 				</Button>
 				<div class="flex flex-1 gap-3">
-					<Button type="button" variant="outline" onclick={() => goto(returnTo)} class="flex-1">
+					<Button
+						type="button"
+						variant="outline"
+						onclick={() => gotoDynamic(returnTo)}
+						class="flex-1"
+					>
 						Cancel
 					</Button>
 					<Button type="submit" disabled={isSubmitting} class="flex-1">
@@ -260,7 +266,7 @@
 			</div>
 		</form>
 	{/if}
-</div>
+</FormLayout>
 
 <!-- Delete Confirmation Dialog -->
 <Dialog.Root bind:open={deleteDialogOpen}>

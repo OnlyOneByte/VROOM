@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Upload, Trash2, FileText, Download, LoaderCircle, ImagePlus } from 'lucide-svelte';
+	import { Upload, Trash2, FileText, Download, LoaderCircle, ImagePlus } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import MediaCaptureDialog from '$lib/components/shared/MediaCaptureDialog.svelte';
 	import { insuranceApi } from '$lib/services/insurance-api';
@@ -94,17 +94,17 @@
 							<p class="w-full truncate text-center text-xs text-muted-foreground">
 								{doc.fileName}
 							</p>
-							{#if doc.webViewLink}
-								<a
-									href={doc.webViewLink}
-									target="_blank"
-									rel="noopener noreferrer"
-									class="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-								>
-									<Download class="h-3 w-3" />
-									Download
-								</a>
-							{/if}
+							<!-- eslint-disable svelte/no-navigation-without-resolve -- API endpoint URL, not an app route -->
+							<a
+								href={insuranceApi.getDocumentThumbnailUrl(policyId, doc.id)}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+							>
+								<Download class="h-3 w-3" />
+								Download
+							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						</div>
 					{/if}
 					<div

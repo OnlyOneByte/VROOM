@@ -497,3 +497,21 @@ export function derivePaymentEntries(
 		};
 	});
 }
+
+/**
+ * Calculate a payoff date by adding N months to a start date.
+ * Used by the vehicle form's amortization preview.
+ */
+export function calculatePayoffDateFromStart(
+	startDateStr: string | undefined,
+	numPayments: number
+): Date {
+	const start = startDateStr ? new Date(startDateStr) : new Date();
+	const targetMonth = start.getMonth() + numPayments;
+	const payoff = new Date(start.getFullYear(), targetMonth, start.getDate());
+	// If the day overflowed (e.g. Jan 31 + 1 month → Mar 3), clamp to last day of target month
+	if (payoff.getDate() !== start.getDate()) {
+		payoff.setDate(0); // Sets to last day of previous month (i.e. the intended target month)
+	}
+	return payoff;
+}

@@ -3,7 +3,7 @@
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Label } from '$lib/components/ui/label';
 	import * as Dialog from '$lib/components/ui/dialog';
-	import { LoaderCircle, RefreshCw } from 'lucide-svelte';
+	import { LoaderCircle, RefreshCw } from '@lucide/svelte';
 
 	interface Props {
 		open: boolean;

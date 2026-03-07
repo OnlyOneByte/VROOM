@@ -99,6 +99,53 @@ export default [
 		}
 	},
 	{
+		// Svelte module files (.svelte.ts) use runes syntax that the standard TS parser can't handle
+		files: ['**/*.svelte.ts'],
+		languageOptions: {
+			parser: tsParser,
+			parserOptions: {
+				ecmaVersion: 2020,
+				sourceType: 'module'
+			},
+			globals: {
+				...globals.browser,
+				...globals.es2020,
+				$state: 'readonly',
+				$derived: 'readonly',
+				$effect: 'readonly',
+				$props: 'readonly',
+				$bindable: 'readonly',
+				$inspect: 'readonly'
+			}
+		},
+		plugins: {
+			'@typescript-eslint': ts
+		},
+		rules: {
+			'@typescript-eslint/no-unused-vars': [
+				'error',
+				{
+					argsIgnorePattern: '^_',
+					varsIgnorePattern: '^_'
+				}
+			],
+			'no-unused-vars': 'off',
+			'no-undef': 'off' // Runes are global
+		}
+	},
+	{
+		// Upstream-managed shadcn-svelte components — disable Svelte-specific lint rules
+		// but keep TypeScript checks active
+		files: ['src/lib/components/ui/**/*.svelte'],
+		rules: {
+			'svelte/require-each-key': 'off',
+			'svelte/no-at-html-tags': 'off',
+			'svelte/valid-compile': 'off',
+			'svelte/no-navigation-without-resolve': 'off',
+			'no-useless-assignment': 'off'
+		}
+	},
+	{
 		files: ['**/*.test.{js,ts}', '**/__tests__/**/*.{js,ts}'],
 		languageOptions: {
 			globals: {

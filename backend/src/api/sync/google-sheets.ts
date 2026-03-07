@@ -12,6 +12,7 @@ import {
   insurancePolicies,
   insurancePolicyVehicles,
   odometerEntries,
+  photoRefs,
   photos,
   users,
   vehicleFinancing,
@@ -108,6 +109,7 @@ export class GoogleSheetsService {
           { properties: { title: 'Vehicle Financing' } },
           { properties: { title: 'Odometer' } },
           { properties: { title: 'Photos' } },
+          { properties: { title: 'Photo Refs' } },
         ],
       },
     });
@@ -150,6 +152,7 @@ export class GoogleSheetsService {
       'Vehicle Financing',
       'Odometer',
       'Photos',
+      'Photo Refs',
     ];
     const info = await this.getSpreadsheetInfo(spreadsheetId);
     const existingTitles = new Set(info.sheets.map((s) => s.title));
@@ -237,6 +240,16 @@ export class GoogleSheetsService {
       odometerEntryIds,
     });
 
+    // Query photo_refs for all user photos (batched to stay under SQLite variable limit)
+    const photoIds = userPhotos.map((p) => p.id);
+    const userPhotoRefs: (typeof photoRefs.$inferSelect)[] = [];
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < photoIds.length; i += BATCH_SIZE) {
+      const batch = photoIds.slice(i, i + BATCH_SIZE);
+      const rows = await db.select().from(photoRefs).where(inArray(photoRefs.photoId, batch));
+      userPhotoRefs.push(...rows);
+    }
+
     await Promise.all([
       this.updateSheet(spreadsheetId, 'Vehicles', userVehicles, this.getVehicleHeaders()),
       this.updateSheet(
@@ -270,6 +283,7 @@ export class GoogleSheetsService {
         this.getFinancingHeaders()
       ),
       this.updateSheet(spreadsheetId, 'Photos', userPhotos, this.getPhotoHeaders()),
+      this.updateSheet(spreadsheetId, 'Photo Refs', userPhotoRefs, this.getPhotoRefHeaders()),
       this.updateSheet(
         spreadsheetId,
         'Odometer',
@@ -401,13 +415,26 @@ export class GoogleSheetsService {
       'id',
       'entityType',
       'entityId',
-      'driveFileId',
       'fileName',
       'mimeType',
       'fileSize',
-      'webViewLink',
       'isCover',
       'sortOrder',
+      'createdAt',
+    ];
+  }
+
+  private getPhotoRefHeaders() {
+    return [
+      'id',
+      'photoId',
+      'providerId',
+      'storageRef',
+      'externalUrl',
+      'status',
+      'errorMessage',
+      'retryCount',
+      'syncedAt',
       'createdAt',
     ];
   }
@@ -495,6 +522,7 @@ export class GoogleSheetsService {
     expenseGroups: Record<string, unknown>[];
     photos: Record<string, unknown>[];
     odometer: Record<string, unknown>[];
+    photoRefs: Record<string, unknown>[];
   }> {
     const [
       vehiclesData,
@@ -505,6 +533,7 @@ export class GoogleSheetsService {
       expenseGroupsData,
       photosData,
       odometerData,
+      photoRefsData,
     ] = await Promise.all([
       this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
       this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
@@ -514,6 +543,7 @@ export class GoogleSheetsService {
       this.readSheetData(spreadsheetId, 'Expense Groups!A:Z'),
       this.readSheetData(spreadsheetId, 'Photos!A:Z').catch(() => []),
       this.readSheetData(spreadsheetId, 'Odometer!A:Z').catch(() => []),
+      this.readSheetData(spreadsheetId, 'Photo Refs!A:Z').catch(() => []),
     ]);
 
     const vehicles = this.parseSheetData(vehiclesData);
@@ -524,6 +554,7 @@ export class GoogleSheetsService {
     const expenseGroups = this.parseSheetData(expenseGroupsData);
     const photos = this.parseSheetData(photosData);
     const odometer = this.parseSheetData(odometerData);
+    const photoRefs = this.parseSheetData(photoRefsData);
 
     const userId = vehicles.length > 0 ? (vehicles[0].userId as string) : '';
 
@@ -537,6 +568,7 @@ export class GoogleSheetsService {
       expenseGroups,
       photos,
       odometer,
+      photoRefs,
     };
   }
 

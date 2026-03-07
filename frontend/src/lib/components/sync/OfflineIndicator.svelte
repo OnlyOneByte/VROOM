@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onlineStatus, syncState, offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { syncOfflineExpenses } from '$lib/utils/offline-storage';
-	import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert } from 'lucide-svelte';
+	import { Wifi, WifiOff, RefreshCw, CircleCheck, CircleAlert } from '@lucide/svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 
