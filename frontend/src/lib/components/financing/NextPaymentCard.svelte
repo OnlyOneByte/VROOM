@@ -3,7 +3,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Progress } from '$lib/components/ui/progress';
-	import { Calendar, CreditCard, ArrowRightLeft } from 'lucide-svelte';
+	import { Calendar, CreditCard, ArrowRightLeft } from '@lucide/svelte';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import {
 		calculateNextPaymentDate,

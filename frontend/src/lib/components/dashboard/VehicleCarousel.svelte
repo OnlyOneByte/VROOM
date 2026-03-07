@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { Car, Calendar, TrendingUp, DollarSign, Image as ImageIcon } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
+	import { routes, paramRoutes } from '$lib/routes';
+	import { gotoWithQuery } from '$lib/utils/navigation';
+	import { Car, Calendar, TrendingUp, DollarSign, Image as ImageIcon } from '@lucide/svelte';
 	import * as Card from '$lib/components/ui/card';
 	import * as Carousel from '$lib/components/ui/carousel';
 	import { Button } from '$lib/components/ui/button';
@@ -28,7 +31,7 @@
 	let { vehicles, isLoading = false }: Props = $props();
 
 	function handleVehicleClick(vehicleId: string) {
-		goto(`/vehicles/${vehicleId}`);
+		goto(resolve(paramRoutes.vehicle, { id: vehicleId }));
 	}
 </script>
 
@@ -145,7 +148,10 @@
 											class="w-full mt-3"
 											onclick={e => {
 												e.stopPropagation();
-												goto(`/expenses/new?vehicleId=${vehicle.id}&returnTo=/dashboard`);
+												gotoWithQuery(resolve(routes.expenseNew), {
+													vehicleId: vehicle.id,
+													returnTo: routes.dashboard
+												});
 											}}
 										>
 											Add Expense
@@ -179,7 +185,7 @@
 					Add your first vehicle to start tracking
 				{/snippet}
 				{#snippet action()}
-					<Button href="/vehicles/new">Add Vehicle</Button>
+					<Button href={resolve(routes.vehicleNew)}>Add Vehicle</Button>
 				{/snippet}
 			</EmptyState>
 		{/if}

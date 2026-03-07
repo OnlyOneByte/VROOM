@@ -83,6 +83,10 @@ export async function runMigrations() {
     logger.info('Running database migrations...');
     migrate(db, { migrationsFolder: './drizzle' });
     logger.info('Database migrations completed successfully');
+
+    // Run data migration (idempotent — creates providers and backfills photo_refs)
+    const { runDataMigration } = await import('./data-migration');
+    await runDataMigration(sqlite);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const cause = error instanceof Error && 'cause' in error ? error.cause : undefined;

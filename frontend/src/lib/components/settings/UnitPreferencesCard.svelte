@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Globe, Fuel, DollarSign } from 'lucide-svelte';
+	import { Globe, Fuel, DollarSign } from '@lucide/svelte';
 	import { Label } from '$lib/components/ui/label';
 	import * as Select from '$lib/components/ui/select';
 	import {

@@ -12,7 +12,9 @@ import {
   insurancePolicies,
   insurancePolicyVehicles,
   odometerEntries,
+  photoRefs,
   photos,
+  userProviders,
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
@@ -42,6 +44,7 @@ export interface ImportSummary {
   expenseGroups: number;
   odometer: number;
   photos: number;
+  photoRefs: number;
 }
 
 export interface RestoreResponse {
@@ -86,6 +89,7 @@ class RestoreService {
       expenseGroups: parsedBackup.expenseGroups?.length ?? 0,
       odometer: parsedBackup.odometer?.length ?? 0,
       photos: parsedBackup.photos?.length ?? 0,
+      photoRefs: parsedBackup.photoRefs?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -155,6 +159,7 @@ class RestoreService {
       expenseGroups: sheetData.expenseGroups?.length ?? 0,
       odometer: sheetData.odometer?.length ?? 0,
       photos: sheetData.photos?.length ?? 0,
+      photoRefs: sheetData.photoRefs?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -242,6 +247,7 @@ class RestoreService {
       { data: data.financing, table: vehicleFinancing, name: 'vehicle_financing' },
       { data: data.insurance, table: insurancePolicies, name: 'insurance_policies' },
       { data: data.photos ?? [], table: photos, name: 'photos' },
+      { data: data.photoRefs ?? [], table: photoRefs, name: 'photo_refs' },
     ];
 
     for (const { data: items, table, name } of tables) {
@@ -386,6 +392,23 @@ class RestoreService {
     // Insert photos AFTER all entity tables so entityId references are valid
     if (data.photos?.length > 0) {
       await tx.insert(photos).values(data.photos as (typeof photos.$inferInsert)[]);
+    }
+    // Insert photo_refs AFTER photos (photo_id FK references photos)
+    // Filter out refs whose providerId doesn't exist in user_providers —
+    // providers contain encrypted credentials and are NOT included in backups,
+    // so restored refs may reference providers that don't exist on this instance.
+    if (data.photoRefs?.length > 0) {
+      const refRows = data.photoRefs as (typeof photoRefs.$inferInsert)[];
+      const providerIds = [...new Set(refRows.map((r) => r.providerId))];
+      const existingProviders = await tx
+        .select({ id: userProviders.id })
+        .from(userProviders)
+        .where(inArray(userProviders.id, providerIds));
+      const existingProviderIds = new Set(existingProviders.map((p) => p.id));
+      const validRefs = refRows.filter((r) => existingProviderIds.has(r.providerId));
+      if (validRefs.length > 0) {
+        await tx.insert(photoRefs).values(validRefs);
+      }
     }
   }
 

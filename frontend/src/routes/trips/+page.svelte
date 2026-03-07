@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { MapPin } from 'lucide-svelte';
+	import { MapPin } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 </script>

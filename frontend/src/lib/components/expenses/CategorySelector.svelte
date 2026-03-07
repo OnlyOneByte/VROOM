@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Fuel, Wrench, CreditCard, FileText, Sparkles, Coffee } from 'lucide-svelte';
+	import { Fuel, Wrench, CreditCard, FileText, Sparkles, Coffee } from '@lucide/svelte';
 	import { Label } from '$lib/components/ui/label';
 	import { FormFieldError } from '$lib/components/ui/form-field';
 

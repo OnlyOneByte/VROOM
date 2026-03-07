@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import { LogOut, Settings } from 'lucide-svelte';
+	import { routes } from '$lib/routes';
+	import { LogOut, Settings } from '@lucide/svelte';
 	import { Avatar, AvatarFallback, AvatarImage } from '$lib/components/ui/avatar';
 	import {
 		DropdownMenu,
@@ -86,7 +88,7 @@
 			<DropdownMenuSeparator />
 		{/if}
 
-		<a href="/settings">
+		<a href={resolve(routes.settings)}>
 			<DropdownMenuItem>
 				<Settings class="mr-3 h-4 w-4" />
 				Settings

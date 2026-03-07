@@ -13,7 +13,7 @@
 		ChevronDown,
 		Receipt,
 		Tag
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { removeOfflineExpense } from '$lib/utils/offline-storage';
 	import { settingsStore } from '$lib/stores/settings.svelte';

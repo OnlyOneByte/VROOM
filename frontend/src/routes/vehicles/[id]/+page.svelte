@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
 	import { onMount, type Component } from 'svelte';
-	import { Plus, FileText, CreditCard, CircleAlert } from 'lucide-svelte';
+	import { Plus, FileText, CreditCard, CircleAlert } from '@lucide/svelte';
 	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
@@ -60,7 +62,7 @@
 		ExpenseSummary,
 		FuelEfficiencyPoint,
 		ExpenseCategory
-	} from '$lib/types.js';
+	} from '$lib/types';
 	import type { PageData } from './$types';
 
 	// Props from page load
@@ -276,7 +278,7 @@
 			vehicle = await vehicleApi.getVehicle(vehicleId);
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load vehicle');
-			goto('/dashboard');
+			goto(resolve(routes.dashboard));
 		}
 	}
 
@@ -465,17 +467,17 @@
 
 			<!-- Overview Tab -->
 			<TabsContent value="overview" class="space-y-6">
-				<!-- Vehicle Information Card -->
-				<VehicleInfoCard {vehicle} />
-
-				<!-- Photo Carousel -->
-				<VehiclePhotoCarousel
-					{vehicleId}
-					photos={vehiclePhotos}
-					onUpload={() => (showUploadDialog = true)}
-					onDelete={handleDeletePhoto}
-					onSetCover={handleSetCover}
-				/>
+				<!-- Vehicle Info + Photos: side-by-side on desktop, stacked on mobile -->
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+					<VehicleInfoCard {vehicle} />
+					<VehiclePhotoCarousel
+						{vehicleId}
+						photos={vehiclePhotos}
+						onUpload={() => (showUploadDialog = true)}
+						onDelete={handleDeletePhoto}
+						onSetCover={handleSetCover}
+					/>
+				</div>
 
 				<!-- Insurance Summary (lazy-loaded) -->
 				{#if InsuranceTab}
@@ -760,7 +762,9 @@
 			{VEHICLE_MESSAGES.VEHICLE_NOT_FOUND_DESC}
 		{/snippet}
 		{#snippet action()}
-			<Button onclick={() => goto('/dashboard')}>{VEHICLE_MESSAGES.BACK_TO_DASHBOARD}</Button>
+			<Button onclick={() => goto(resolve(routes.dashboard))}
+				>{VEHICLE_MESSAGES.BACK_TO_DASHBOARD}</Button
+			>
 		{/snippet}
 	</EmptyState>
 {/if}

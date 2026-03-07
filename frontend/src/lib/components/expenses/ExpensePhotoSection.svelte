@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Upload, Trash2, ImagePlus, LoaderCircle } from 'lucide-svelte';
+	import { Upload, Trash2, ImagePlus, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import MediaCaptureDialog from '$lib/components/shared/MediaCaptureDialog.svelte';
 	import { expenseApi } from '$lib/services/expense-api';

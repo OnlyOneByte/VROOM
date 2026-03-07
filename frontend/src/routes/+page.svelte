@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { authStore } from '$lib/stores/auth.svelte';
+	import { routes } from '$lib/routes';
 	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import {
@@ -13,7 +15,7 @@
 		FileSpreadsheet,
 		Lock,
 		Smartphone
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	const authState = authStore;
 	let visible = $state(false);
@@ -25,7 +27,7 @@
 	// Redirect authenticated users straight to dashboard
 	$effect(() => {
 		if (!authState.isLoading && authState.isAuthenticated) {
-			goto('/dashboard');
+			goto(resolve(routes.dashboard));
 		}
 	});
 </script>
@@ -55,7 +57,7 @@
 					</div>
 					<span class="text-xl font-bold text-foreground">VROOM</span>
 				</div>
-				<Button variant="outline" onclick={() => goto('/auth')}>
+				<Button variant="outline" onclick={() => goto(resolve(routes.auth))}>
 					Sign In
 					<ChevronRight class="ml-1 h-4 w-4" />
 				</Button>
@@ -86,7 +88,11 @@
 					</p>
 
 					<div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-						<Button size="lg" class="h-12 px-8 text-base" onclick={() => goto('/auth')}>
+						<Button
+							size="lg"
+							class="h-12 px-8 text-base"
+							onclick={() => goto(resolve(routes.auth))}
+						>
 							Get Started
 							<ChevronRight class="ml-1 h-5 w-5" />
 						</Button>
@@ -206,7 +212,7 @@
 			<p class="text-lg text-muted-foreground">
 				Sign in with Google to get started. No account creation needed, no credit card required.
 			</p>
-			<Button size="lg" class="h-12 px-8 text-base" onclick={() => goto('/auth')}>
+			<Button size="lg" class="h-12 px-8 text-base" onclick={() => goto(resolve(routes.auth))}>
 				Get Started — It's Free
 				<ChevronRight class="ml-1 h-5 w-5" />
 			</Button>
@@ -222,9 +228,10 @@
 					<span>VROOM — Vehicle Record & Organization Of Maintenance</span>
 				</div>
 				<div class="flex items-center gap-4 text-sm text-muted-foreground">
-					<a href="/privacypolicy" class="hover:text-foreground transition-colors">Privacy Policy</a
+					<a href={resolve(routes.privacyPolicy)} class="hover:text-foreground transition-colors"
+						>Privacy Policy</a
 					>
-					<a href="/termsofservice" class="hover:text-foreground transition-colors"
+					<a href={resolve(routes.termsOfService)} class="hover:text-foreground transition-colors"
 						>Terms of Service</a
 					>
 					<span>Open source. Self-hostable. Yours.</span>

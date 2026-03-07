@@ -1,9 +1,11 @@
-import type { Photo } from '../../db/schema';
-import { AppError, NotFoundError } from '../../errors';
+import type { Photo, PhotoRef } from '../../db/schema';
+import { AppError, NotFoundError, ValidationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import type { PaginatedResult } from '../../utils/pagination';
-import { getDriveServiceForUser } from '../sync/google-drive';
-import { resolveEntityDriveFolder, validateEntityOwnership } from './helpers';
+import { storageProviderRegistry } from '../providers/registry';
+import { ENTITY_TO_CATEGORY } from '../providers/storage-provider';
+import { validateEntityOwnership } from './helpers';
+import { photoRefRepository } from './photo-ref-repository';
 import { photoRepository } from './photo-repository';
 
 /** Accepted MIME types for photo/document uploads */
@@ -14,14 +16,13 @@ export const MAX_FILE_SIZE = 10_485_760;
 
 /**
  * Upload a photo for an entity. Validates ownership, file type/size,
- * uploads to Google Drive, creates a DB record, and auto-sets cover
- * if this is the first photo for the entity.
+ * uploads to the user's default storage provider, creates a DB record
+ * and photo_ref, and auto-sets cover if this is the first photo.
  */
 export async function uploadPhotoForEntity(
   entityType: string,
   entityId: string,
   userId: string,
-  folderName: string,
   file: File
 ): Promise<Photo> {
   await validateEntityOwnership(entityType, entityId, userId);
@@ -33,24 +34,59 @@ export async function uploadPhotoForEntity(
     throw new AppError('Photo must be under 10MB', 413);
   }
 
-  const driveService = await getDriveServiceForUser(userId);
-  const folderId = await resolveEntityDriveFolder(driveService, entityType, entityId, folderName);
+  const category = ENTITY_TO_CATEGORY[entityType];
+  if (!category) {
+    throw new AppError(`No photo category mapping for entity type: ${entityType}`, 400);
+  }
+
+  const { provider, providerId, folderPath } = await storageProviderRegistry.getDefaultProvider(
+    userId,
+    category
+  );
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const driveFile = await driveService.uploadFile(file.name, buffer, file.type, folderId);
+  const storageRef = await provider.upload({
+    fileName: file.name,
+    buffer,
+    mimeType: file.type,
+    entityType,
+    entityId,
+    pathHint: folderPath,
+  });
 
+  // Insert logical photo record (metadata only — no provider fields)
   const photo = await photoRepository.create({
     entityType,
     entityId,
-    driveFileId: driveFile.id,
     fileName: file.name,
     mimeType: file.type,
     fileSize: file.size,
-    webViewLink: driveFile.webViewLink,
     isCover: false,
     sortOrder: 0,
   });
 
+  // Insert photo_ref for the default provider (active immediately)
+  await photoRefRepository.create({
+    photoId: photo.id,
+    providerId,
+    storageRef: storageRef.externalId,
+    externalUrl: storageRef.externalUrl ?? null,
+    status: 'active',
+    syncedAt: new Date(),
+  });
+
+  // Create pending refs for backup providers (sync worker picks these up)
+  const backups = await storageProviderRegistry.getBackupProviders(userId, category);
+  for (const backup of backups) {
+    await photoRefRepository.create({
+      photoId: photo.id,
+      providerId: backup.providerId,
+      storageRef: '',
+      status: 'pending',
+    });
+  }
+
+  // Auto-set cover if this is the first photo for the entity
   const existingPhotos = await photoRepository.findByEntity(entityType, entityId);
   if (existingPhotos.length === 1) {
     return await photoRepository.setCoverPhoto(entityType, entityId, photo.id);
@@ -78,7 +114,8 @@ export async function listPhotosForEntity(
 }
 
 /**
- * Download a photo from Google Drive and return the raw buffer + MIME type.
+ * Download a photo via the provider abstraction and return the raw buffer + MIME type.
+ * Uses a fallback chain: try the user's default provider first, then any active ref.
  */
 export async function getPhotoThumbnailForEntity(
   entityType: string,
@@ -93,8 +130,42 @@ export async function getPhotoThumbnailForEntity(
     throw new NotFoundError('Photo');
   }
 
-  const driveService = await getDriveServiceForUser(userId);
-  const buffer = await driveService.downloadFile(photo.driveFileId);
+  const category = ENTITY_TO_CATEGORY[entityType];
+
+  // Try the default provider first, fall back to any active ref
+  let ref = null;
+  if (category) {
+    try {
+      const { providerId: defaultProviderId } = await storageProviderRegistry.getDefaultProvider(
+        userId,
+        category
+      );
+      ref = await photoRefRepository.findActiveByPhotoAndProvider(photoId, defaultProviderId);
+    } catch (error) {
+      // Only swallow "no provider configured" errors — rethrow unexpected failures
+      if (!(error instanceof ValidationError) && !(error instanceof NotFoundError)) {
+        throw error;
+      }
+    }
+  }
+
+  if (!ref) {
+    ref = await photoRefRepository.findActiveByPhoto(photoId);
+  }
+
+  if (!ref) {
+    throw new AppError(
+      'Photo exists but no storage provider is configured to serve it. Please configure a storage provider in Settings.',
+      422
+    );
+  }
+
+  const provider = await storageProviderRegistry.getProvider(ref.providerId, userId);
+  const buffer = await provider.download({
+    providerType: provider.type,
+    externalId: ref.storageRef,
+  });
+
   return { buffer, mimeType: photo.mimeType };
 }
 
@@ -118,8 +189,8 @@ export async function setCoverPhotoForEntity(
 }
 
 /**
- * Delete a single photo: remove from Drive (best-effort), delete DB record,
- * and promote the next cover if the deleted photo was the cover.
+ * Delete a single photo: remove from all providers (best-effort), delete photo_refs,
+ * delete DB record, and promote the next cover if the deleted photo was the cover.
  */
 export async function deletePhotoForEntity(
   entityType: string,
@@ -136,17 +207,28 @@ export async function deletePhotoForEntity(
 
   const wasCover = photo.isCover;
 
-  try {
-    const driveService = await getDriveServiceForUser(userId);
-    await driveService.deleteFile(photo.driveFileId);
-  } catch (error) {
-    logger.warn('Failed to delete photo from Google Drive', {
-      photoId,
-      driveFileId: photo.driveFileId,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  // Find all refs and attempt provider-side deletes (best-effort)
+  const refs = await photoRefRepository.findAllByPhoto(photoId);
+  for (const ref of refs) {
+    if (ref.status !== 'active') continue;
+    try {
+      const provider = await storageProviderRegistry.getProvider(ref.providerId, userId);
+      await provider.delete({
+        providerType: provider.type,
+        externalId: ref.storageRef,
+      });
+    } catch (error) {
+      logger.warn('Failed to delete photo from storage provider', {
+        photoId,
+        providerId: ref.providerId,
+        storageRef: ref.storageRef,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
+  // Delete all photo_refs, then the photo record
+  await photoRefRepository.deleteByPhoto(photoId);
   await photoRepository.delete(photoId);
 
   if (wasCover) {
@@ -158,29 +240,64 @@ export async function deletePhotoForEntity(
 }
 
 /**
- * Delete all photos for an entity (cascade). Removes Drive files best-effort,
- * then deletes all DB records in one shot.
+ * Best-effort delete files from providers for a set of photo refs, grouped by provider.
+ */
+async function deleteRefsFromProviders(
+  refsByProvider: Map<string, PhotoRef[]>,
+  userId: string
+): Promise<void> {
+  for (const [providerId, refs] of refsByProvider) {
+    try {
+      const provider = await storageProviderRegistry.getProvider(providerId, userId);
+      for (const ref of refs) {
+        try {
+          await provider.delete({ providerType: provider.type, externalId: ref.storageRef });
+        } catch (error) {
+          logger.warn('Failed to delete photo from provider during cascade', {
+            photoId: ref.photoId,
+            providerId: ref.providerId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to get provider for cascade delete', {
+        providerId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
+/**
+ * Delete all photos for an entity (cascade). Validates ownership, removes
+ * provider files best-effort, then deletes all photo_refs and photo DB records.
  */
 export async function deleteAllPhotosForEntity(
   entityType: string,
   entityId: string,
   userId: string
 ): Promise<void> {
-  const photos = await photoRepository.findByEntity(entityType, entityId);
-  if (photos.length === 0) return;
+  await validateEntityOwnership(entityType, entityId, userId);
 
-  const driveService = await getDriveServiceForUser(userId);
+  const entityPhotos = await photoRepository.findByEntity(entityType, entityId);
+  if (entityPhotos.length === 0) return;
 
-  for (const photo of photos) {
-    try {
-      await driveService.deleteFile(photo.driveFileId);
-    } catch (error) {
-      logger.warn('Failed to delete photo from Drive during cascade', {
-        photoId: photo.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+  const photoIds = entityPhotos.map((p) => p.id);
+  const allRefs = await photoRefRepository.findAllByPhotos(photoIds);
+
+  // Group active refs by provider to reuse provider instances
+  const refsByProvider = new Map<string, PhotoRef[]>();
+  for (const ref of allRefs) {
+    if (ref.status !== 'active') continue;
+    const existing = refsByProvider.get(ref.providerId) ?? [];
+    existing.push(ref);
+    refsByProvider.set(ref.providerId, existing);
   }
 
+  await deleteRefsFromProviders(refsByProvider, userId);
+
+  // Batch delete all refs, then all photo records
+  await photoRefRepository.deleteByPhotos(photoIds);
   await photoRepository.deleteByEntity(entityType, entityId);
 }

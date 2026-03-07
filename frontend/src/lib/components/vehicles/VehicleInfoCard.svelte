@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { Car, Settings } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
+	import { paramRoutes } from '$lib/routes';
+	import { Car, Settings } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { settingsStore } from '$lib/stores/settings.svelte';
@@ -24,7 +26,7 @@
 			<Button
 				variant="outline"
 				size="icon"
-				href="/vehicles/{vehicle.id}/edit"
+				href={resolve(paramRoutes.vehicleEdit, { id: vehicle.id })}
 				aria-label="Edit vehicle"
 			>
 				<Settings class="h-5 w-5" />

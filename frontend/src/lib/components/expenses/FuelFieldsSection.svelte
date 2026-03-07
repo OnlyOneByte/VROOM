@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Fuel, Gauge, Zap } from 'lucide-svelte';
+	import { Fuel, Gauge, Zap } from '@lucide/svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
 	import * as Select from '$lib/components/ui/select';
@@ -189,7 +189,7 @@
 					{/if}
 				</Select.Trigger>
 				<Select.Content>
-					{#each FUEL_TYPE_OPTIONS as option}
+					{#each FUEL_TYPE_OPTIONS as option (option.value)}
 						<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
 					{/each}
 				</Select.Content>
@@ -257,7 +257,7 @@
 					{/if}
 				</Select.Trigger>
 				<Select.Content>
-					{#each CHARGING_TYPE_OPTIONS as option}
+					{#each CHARGING_TYPE_OPTIONS as option (option.value)}
 						<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
 					{/each}
 				</Select.Content>

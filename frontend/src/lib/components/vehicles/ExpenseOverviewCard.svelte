@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { DollarSign, Clock, TrendingUp } from 'lucide-svelte';
+	import { DollarSign, Clock, TrendingUp } from '@lucide/svelte';
 	import { StatCardGrid } from '$lib/components/charts';
 	import { formatCurrency } from '$lib/utils/formatters';
 

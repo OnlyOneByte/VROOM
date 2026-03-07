@@ -28,6 +28,7 @@
 	},
 	"devDependencies": {
 		"@axe-core/playwright": "^4.11.1",
+		"@eslint/js": "^10.0.1",
 		"@internationalized/date": "^3.12.0",
 		"@lucide/svelte": "^0.577.0",
 		"@playwright/test": "^1.58.2",
@@ -78,7 +79,6 @@
 		"@tailwindcss/forms": "^0.5.11",
 		"@tailwindcss/postcss": "^4.2.1",
 		"d3": "^7.9.0",
-		"lucide-svelte": "^0.577.0",
 		"recharts": "^3.3.0",
 		"superforms": "^0.0.1",
 		"sveltekit-superforms": "^2.30.0",

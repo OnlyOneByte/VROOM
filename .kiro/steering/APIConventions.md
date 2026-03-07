@@ -108,7 +108,27 @@ export const entityRepository = new EntityRepository(getDb());
 ### Middleware
 - `requireAuth` — validates session, sets `c.get('user')`. Apply to all protected routes.
 - `changeTracker` — records data changes for sync. Apply to routes that modify data.
-- Rate limiters are configured in `CONFIG.rateLimit` and applied per-domain in `index.ts`.
+- Rate limiters are configured in `CONFIG.rateLimit` and applied per-domain in `index.ts`. If you add a rate limit config entry, you must also apply it — unused config is a bug.
+
+### Ownership & Authorization
+- Every mutation (POST/PUT/DELETE) must verify the resource belongs to the authenticated user before proceeding. Don't rely on downstream services to enforce this — validate at the route level.
+- When removing ownership checks (e.g., refactoring a service function), ensure the caller still validates ownership. Document the contract if ownership is the caller's responsibility.
+- Functions that accept `userId` must actually use it for scoping. Prefixing with `_` to silence lint warnings while removing the check is a security regression.
+
+### Raw SQL & Data Migrations
+- When building raw SQL `IN (...)` clauses with dynamic arrays, batch in chunks of ~500 to stay under SQLite's `SQLITE_MAX_VARIABLE_NUMBER` limit (default 999). Unbounded arrays will crash for users with large datasets.
+- Data migrations that run after Drizzle schema migrations must be idempotent — safe to run multiple times without duplicating data.
+
+### Entity Type Mappings
+- When mapping entity types to categories or behaviors, cover ALL entity types the system supports. Check the existing entity types in `photos.entityType`: `vehicle`, `expense`, `expense_group`, `insurance_policy`, `odometer_entry`. Missing mappings cause runtime errors for valid operations.
+
+### Imports & Module Initialization
+- Keep all `import` statements at the top of the file. Don't place imports mid-file after runtime code — they're hoisted by the runtime anyway, and mid-file placement is misleading.
+- Singleton instances that call `getDb()` at module scope work in this project but create tight coupling to initialization order. Be aware of this when adding new singletons.
+
+### Performance
+- Avoid N+1 query patterns in cascade operations (e.g., deleting all photos for an entity). When iterating over a list and querying per item, consider batch queries with `inArray()` instead.
+- Provider credential decryption and instantiation is expensive. Don't create new provider instances per-request in hot paths if the same provider is used repeatedly.
 
 ### Cross-Domain Side Effects
 - When a mutation in one domain affects another (e.g., expense creation adjusting financing balance), use a hooks file (`hooks.ts`)

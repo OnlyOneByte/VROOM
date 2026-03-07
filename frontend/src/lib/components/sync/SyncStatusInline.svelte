@@ -11,7 +11,7 @@
 		syncConflicts,
 		fetchLastSyncTime
 	} from '$lib/utils/sync-manager';
-	import { RefreshCw, CircleAlert, Clock, Wifi, WifiOff } from 'lucide-svelte';
+	import { RefreshCw, CircleAlert, Clock, Wifi, WifiOff } from '@lucide/svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { formatCompactRelativeTime } from '$lib/utils/formatters';

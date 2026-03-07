@@ -8,7 +8,7 @@
 		DollarSign,
 		Activity,
 		TrendingUp
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
 	import { StatCardGrid } from '$lib/components/charts';

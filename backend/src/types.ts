@@ -9,13 +9,17 @@ export type {
   NewExpense,
   NewExpenseGroup,
   NewInsurancePolicy,
+  NewPhotoRef,
   NewSession,
   NewUser,
+  NewUserProvider,
   NewUserSettings,
   NewVehicle,
   NewVehicleFinancing,
+  PhotoRef,
   Session,
   User,
+  UserProvider,
   UserSettings,
   Vehicle,
   VehicleFinancing,
@@ -117,6 +121,34 @@ export function parseUnitPreferences(value: unknown): UnitPreferences | null {
   };
 }
 
+// Photo provider storage types
+
+export type PhotoCategory =
+  | 'vehicle_photos'
+  | 'expense_receipts'
+  | 'insurance_docs'
+  | 'odometer_readings';
+
+export interface CategorySetting {
+  enabled: boolean;
+  folderPath: string;
+}
+
+export interface StorageConfig {
+  defaults: Record<PhotoCategory, string | null>;
+  providerCategories: Record<string, Record<PhotoCategory, CategorySetting>>;
+}
+
+export const DEFAULT_STORAGE_CONFIG: StorageConfig = {
+  defaults: {
+    vehicle_photos: null,
+    expense_receipts: null,
+    insurance_docs: null,
+    odometer_readings: null,
+  },
+  providerCategories: {},
+};
+
 export interface ApiError {
   code: string;
   message: string;
@@ -147,6 +179,7 @@ export interface BackupData {
   expenseGroups: import('./db/schema').ExpenseGroup[];
   photos: import('./db/schema').Photo[];
   odometer: import('./db/schema').OdometerEntry[];
+  photoRefs: import('./db/schema').PhotoRef[];
 }
 
 export interface ParsedBackupData {
@@ -159,4 +192,5 @@ export interface ParsedBackupData {
   expenseGroups: Record<string, unknown>[];
   photos: Record<string, unknown>[];
   odometer: Record<string, unknown>[];
+  photoRefs: Record<string, unknown>[];
 }

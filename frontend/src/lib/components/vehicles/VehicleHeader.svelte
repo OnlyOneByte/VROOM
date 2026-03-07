@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { ArrowLeft, Car } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
+	import { ArrowLeft, Car } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import type { Vehicle } from '$lib/types';
 
@@ -17,7 +19,7 @@
 	<Button
 		variant="outline"
 		size="icon"
-		onclick={() => goto('/dashboard')}
+		onclick={() => goto(resolve(routes.dashboard))}
 		aria-label="Back to dashboard"
 	>
 		<ArrowLeft class="h-4 w-4" />

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { DollarSign, Calculator } from 'lucide-svelte';
+	import { DollarSign, Calculator } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
@@ -180,7 +180,7 @@
 								{financingForm.termMonths} months ({Math.floor(financingForm.termMonths / 12)} years)
 							</Select.Trigger>
 							<Select.Content>
-								{#each [24, 36, 48, 60, 72, 84] as months}
+								{#each [24, 36, 48, 60, 72, 84] as months (months)}
 									<Select.Item value={String(months)} label="{months} months ({months / 12} years)">
 										{months} months ({months / 12} years)
 									</Select.Item>
@@ -217,7 +217,7 @@
 								{financingForm.dayOfMonth}
 							</Select.Trigger>
 							<Select.Content>
-								{#each Array(28) as _, i}
+								{#each Array(28) as _, i (i)}
 									<Select.Item value={String(i + 1)} label={String(i + 1)}>{i + 1}</Select.Item>
 								{/each}
 							</Select.Content>

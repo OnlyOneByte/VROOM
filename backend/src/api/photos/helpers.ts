@@ -3,7 +3,6 @@ import { getDb } from '../../db/connection';
 import { expenseGroups, expenses, odometerEntries } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { insurancePolicyRepository } from '../insurance/repository';
-import type { GoogleDriveService } from '../sync/google-drive';
 import { vehicleRepository } from '../vehicles/repository';
 
 async function validateExpenseOwnership(entityId: string, userId: string): Promise<void> {
@@ -80,80 +79,6 @@ export async function validateEntityOwnership(
       const entry = rows[0];
       if (!entry || entry.userId !== userId) throw new NotFoundError('Odometer entry');
       break;
-    }
-    default:
-      throw new ValidationError(`Unknown entity type: ${entityType}`);
-  }
-}
-
-/**
- * Resolves (find-or-create) the Google Drive folder for a given entity.
- * For vehicles, creates a subfolder named "{year} {make} {model}" under the
- * "Vehicle Photos" folder in the VROOM folder structure.
- * Returns the Drive folder ID.
- */
-export async function resolveEntityDriveFolder(
-  driveService: GoogleDriveService,
-  entityType: string,
-  entityId: string,
-  folderName: string
-): Promise<string> {
-  switch (entityType) {
-    case 'vehicle': {
-      const vehicle = await vehicleRepository.findById(entityId);
-      if (!vehicle) throw new NotFoundError('Vehicle');
-
-      const folderStructure = await driveService.createVroomFolderStructure(folderName);
-      const photosFolderId = folderStructure.subFolders.photos.id;
-
-      const vehicleFolderName = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
-      const existingFolder = await driveService.findFolder(vehicleFolderName, photosFolderId);
-      if (existingFolder) {
-        return existingFolder.id;
-      }
-
-      const newFolder = await driveService.createFolder(vehicleFolderName, photosFolderId);
-      return newFolder.id;
-    }
-    case 'insurance_policy': {
-      const folderStructure = await driveService.createVroomFolderStructure(folderName);
-      const mainFolderId = folderStructure.mainFolder.id;
-
-      const insuranceFolderName = 'Insurance Documents';
-      const existingFolder = await driveService.findFolder(insuranceFolderName, mainFolderId);
-      if (existingFolder) {
-        return existingFolder.id;
-      }
-
-      const newFolder = await driveService.createFolder(insuranceFolderName, mainFolderId);
-      return newFolder.id;
-    }
-    case 'expense':
-    case 'expense_group': {
-      const folderStructure = await driveService.createVroomFolderStructure(folderName);
-      const mainFolderId = folderStructure.mainFolder.id;
-
-      const expenseFolderName = 'ExpensePhotos';
-      const existingFolder = await driveService.findFolder(expenseFolderName, mainFolderId);
-      if (existingFolder) {
-        return existingFolder.id;
-      }
-
-      const newFolder = await driveService.createFolder(expenseFolderName, mainFolderId);
-      return newFolder.id;
-    }
-    case 'odometer_entry': {
-      const folderStructure = await driveService.createVroomFolderStructure(folderName);
-      const mainFolderId = folderStructure.mainFolder.id;
-
-      const odometerFolderName = 'OdometerPhotos';
-      const existingFolder = await driveService.findFolder(odometerFolderName, mainFolderId);
-      if (existingFolder) {
-        return existingFolder.id;
-      }
-
-      const newFolder = await driveService.createFolder(odometerFolderName, mainFolderId);
-      return newFolder.id;
     }
     default:
       throw new ValidationError(`Unknown entity type: ${entityType}`);

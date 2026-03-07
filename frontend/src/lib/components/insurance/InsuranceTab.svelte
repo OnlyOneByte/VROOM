@@ -1,7 +1,9 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { Shield, Plus, LoaderCircle, CircleAlert } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
+	import { routes, paramRoutes } from '$lib/routes';
+	import { gotoWithQuery } from '$lib/utils/navigation';
+	import { Shield, Plus, LoaderCircle, CircleAlert } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import PolicyList from './PolicyList.svelte';
@@ -38,11 +40,16 @@
 	}
 
 	function handleAddPolicy() {
-		goto(`/insurance/new?vehicleId=${vehicleId}&returnTo=/vehicles/${vehicleId}`);
+		gotoWithQuery(resolve(routes.insuranceNew), {
+			vehicleId,
+			returnTo: `/vehicles/${vehicleId}`
+		});
 	}
 
 	function handleEditPolicy(policy: InsurancePolicy) {
-		goto(`/insurance/${policy.id}/edit?returnTo=/vehicles/${vehicleId}`);
+		gotoWithQuery(resolve(paramRoutes.insurancePolicyEdit, { id: policy.id }), {
+			returnTo: `/vehicles/${vehicleId}`
+		});
 	}
 </script>
 

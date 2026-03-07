@@ -22,7 +22,7 @@
 		Trash2,
 		UserPlus,
 		Clock
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import {
 		Card,
@@ -40,9 +40,11 @@
 	import BackupSyncCard from '$lib/components/settings/BackupSyncCard.svelte';
 	import BackupNowDialog from '$lib/components/settings/BackupNowDialog.svelte';
 	import RestoreDialog from '$lib/components/settings/RestoreDialog.svelte';
+	import PhotoStorageSettings from '$lib/components/settings/PhotoStorageSettings.svelte';
 	import { fetchLastSyncTime } from '$lib/utils/sync-manager';
 	import { settingsApi } from '$lib/services/settings-api';
 	import { isVroomError } from '$lib/utils/error-handling';
+	import FormLayout from '$lib/components/common/form-layout.svelte';
 
 	// Sub-view state
 	let activeView = $state<'settings' | 'profile'>('settings');
@@ -459,11 +461,10 @@
 	}
 </script>
 
-<div class="max-w-4xl mx-auto">
-	{#snippet profileContent()}
-		<div class="space-y-6">
-			<!-- Identity -->
-			<Card>
+{#snippet profileContent()}
+	<div class="space-y-6">
+		<!-- Identity -->
+		<Card>
 				<CardHeader>
 					<div class="flex items-center justify-between">
 						<div class="flex items-center gap-2">
@@ -710,9 +711,10 @@
 					</div>
 				</CardContent>
 			</Card>
-		</div>
-	{/snippet}
+	</div>
+{/snippet}
 
+<FormLayout>
 	{#if activeView === 'profile'}
 		<!-- Profile sub-view -->
 		<div class="mb-6">
@@ -772,6 +774,8 @@
 				<UnitPreferencesCard bind:distanceUnit bind:volumeUnit bind:chargeUnit bind:currencyUnit />
 
 				<PWAInstallCard />
+
+				<PhotoStorageSettings />
 
 				<BackupSyncCard
 					{settings}
@@ -853,4 +857,4 @@
 		onPreview={handleSheetsRestorePreview}
 		onRestore={handleSheetsRestoreExecute}
 	/>
-</div>
+</FormLayout>

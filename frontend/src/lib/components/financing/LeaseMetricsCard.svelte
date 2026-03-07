@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Progress } from '$lib/components/ui/progress';
-	import { Gauge } from 'lucide-svelte';
+	import { Gauge } from '@lucide/svelte';
 	import { calculateLeaseMetrics } from '$lib/utils/financing-calculations';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { settingsStore } from '$lib/stores/settings.svelte';

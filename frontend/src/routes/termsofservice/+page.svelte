@@ -1,3 +1,8 @@
+<script lang="ts">
+	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
+</script>
+
 <svelte:head>
 	<title>Terms of Service — VROOM</title>
 	<meta
@@ -9,7 +14,7 @@
 <div class="min-h-screen bg-background">
 	<div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16">
 		<a
-			href="/"
+			href={resolve(routes.home)}
 			class="inline-flex items-center gap-2 text-sm text-muted-foreground mb-8 hover:text-foreground transition-colors"
 		>
 			<span>←</span> Back to home

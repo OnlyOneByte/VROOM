@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { Car, Calendar } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
+	import { routes, paramRoutes } from '$lib/routes';
+	import { gotoWithQuery } from '$lib/utils/navigation';
+	import { Car, Calendar } from '@lucide/svelte';
 	import * as Card from '$lib/components/ui/card';
 	import * as Table from '$lib/components/ui/table';
 	import { Button } from '$lib/components/ui/button';
@@ -27,7 +30,7 @@
 	let { vehicles, isLoading = false }: Props = $props();
 
 	function handleRowClick(vehicleId: string) {
-		goto(`/vehicles/${vehicleId}`);
+		goto(resolve(paramRoutes.vehicle, { id: vehicleId }));
 	}
 </script>
 
@@ -46,7 +49,7 @@
 	<Card.Content>
 		{#if isLoading}
 			<div class="space-y-3">
-				{#each Array(3) as _}
+				{#each Array(3) as _, i (i)}
 					<Skeleton class="h-16 w-full" />
 				{/each}
 			</div>
@@ -106,7 +109,10 @@
 										size="sm"
 										onclick={e => {
 											e.stopPropagation();
-											goto(`/expenses/new?vehicleId=${vehicle.id}&returnTo=/dashboard`);
+											gotoWithQuery(resolve(routes.expenseNew), {
+												vehicleId: vehicle.id,
+												returnTo: routes.dashboard
+											});
 										}}
 									>
 										Add Expense
@@ -129,7 +135,7 @@
 					Add your first vehicle to start tracking
 				{/snippet}
 				{#snippet action()}
-					<Button href="/vehicles/new">Add Vehicle</Button>
+					<Button href={resolve(routes.vehicleNew)}>Add Vehicle</Button>
 				{/snippet}
 			</EmptyState>
 		{/if}

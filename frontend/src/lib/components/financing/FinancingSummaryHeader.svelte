@@ -2,7 +2,7 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { StatCardGrid } from '$lib/components/charts';
-	import { DollarSign, TrendingUp, Wallet, Target } from 'lucide-svelte';
+	import { DollarSign, TrendingUp, Wallet, Target } from '@lucide/svelte';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import type { VehicleFinancing } from '$lib/types';
 

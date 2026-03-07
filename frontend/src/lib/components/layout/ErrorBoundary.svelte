@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { TriangleAlert, RefreshCw } from 'lucide-svelte';
+	import { TriangleAlert, RefreshCw } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
 
 	interface Props {
 		/** Error object if an error occurred */
@@ -27,7 +29,7 @@
 	}
 
 	function handleGoToDashboard() {
-		goto('/dashboard');
+		goto(resolve(routes.dashboard));
 	}
 </script>
 

@@ -1,6 +1,8 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
+	import { gotoDynamic, gotoWithQuery } from '$lib/utils/navigation';
 	import { onlineStatus } from '$lib/stores/offline.svelte';
 	import { addOfflineExpense } from '$lib/utils/offline-storage';
 	import { requestBackgroundSync } from '$lib/utils/pwa';
@@ -18,7 +20,7 @@
 		LoaderCircle,
 		GitBranch,
 		Shield
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
@@ -44,8 +46,9 @@
 		Vehicle,
 		Expense,
 		SplitConfig
-	} from '$lib/types.js';
+	} from '$lib/types';
 	import { isElectricFuelType, getDistanceUnitLabel } from '$lib/utils/units';
+	import FormLayout from '$lib/components/common/form-layout.svelte';
 
 	interface Props {
 		expenseId?: string;
@@ -192,7 +195,7 @@
 			const expense = await expenseApi.getExpense(expenseId!);
 			if (!expense) {
 				appStore.addNotification({ type: 'error', message: 'Expense not found' });
-				goto(returnTo);
+				gotoDynamic(returnTo);
 				return;
 			}
 
@@ -246,7 +249,7 @@
 						type: 'error',
 						message: 'Failed to load split expense group'
 					});
-					goto(returnTo);
+					gotoDynamic(returnTo);
 					return;
 				}
 				isLoading = false;
@@ -269,7 +272,7 @@
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading expense:', error);
 			appStore.addNotification({ type: 'error', message: 'Error loading expense' });
-			goto(returnTo);
+			gotoDynamic(returnTo);
 		} finally {
 			isLoading = false;
 		}
@@ -477,7 +480,7 @@
 					type: 'success',
 					message: 'Split expense updated successfully'
 				});
-				goto(returnTo);
+				gotoDynamic(returnTo);
 			} else if (isEditMode) {
 				// Update existing expense using API service
 				await expenseApi.updateExpense(expenseId!, expenseData);
@@ -486,7 +489,7 @@
 					type: 'success',
 					message: 'Expense updated successfully'
 				});
-				goto(returnTo);
+				gotoDynamic(returnTo);
 			} else if (isSplit && selectedVehicleIds.length >= 2) {
 				// Create split expense group
 				const splitConfig = buildSplitConfig();
@@ -505,7 +508,7 @@
 					type: 'success',
 					message: 'Split expense created successfully'
 				});
-				goto(returnTo);
+				gotoDynamic(returnTo);
 			} else {
 				// Create new expense
 				if (onlineStatus.current) {
@@ -517,7 +520,7 @@
 						type: 'success',
 						message: 'Expense added successfully'
 					});
-					goto(returnTo);
+					gotoDynamic(returnTo);
 				} else {
 					// Save offline
 					addOfflineExpense({
@@ -539,7 +542,7 @@
 						message: 'Expense saved offline. Will sync when online.'
 					});
 
-					goto(returnTo);
+					gotoDynamic(returnTo);
 				}
 			}
 		} catch (error) {
@@ -578,7 +581,7 @@
 					message: 'Saved offline due to connection issue. Will sync when online.'
 				});
 
-				goto(returnTo);
+				gotoDynamic(returnTo);
 			} else {
 				appStore.addNotification({
 					type: 'error',
@@ -611,7 +614,7 @@
 				type: 'success',
 				message: 'Expense deleted successfully'
 			});
-			goto(returnTo);
+			gotoDynamic(returnTo);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to delete expense:', error);
 			appStore.addNotification({
@@ -625,7 +628,7 @@
 	}
 
 	function handleBack() {
-		goto(returnTo);
+		gotoDynamic(returnTo);
 	}
 
 	async function uploadPendingPhotos(
@@ -719,15 +722,16 @@
 	}
 </script>
 
+<FormLayout>
 {#if isLoading}
 	<div class="flex items-center justify-center py-12">
 		<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
 	</div>
 {:else if isInsuranceManaged}
-	<div class="max-w-2xl mx-auto space-y-6">
+	<div class="space-y-6">
 		<!-- Header -->
 		<div class="flex items-center gap-4">
-			<button onclick={() => goto(returnTo)} class="p-2 hover:bg-muted rounded-lg">
+			<button onclick={() => gotoDynamic(returnTo)} class="p-2 hover:bg-muted rounded-lg">
 				<ArrowLeft class="h-5 w-5" />
 			</button>
 			<div>
@@ -751,10 +755,10 @@
 						size="sm"
 						class="mt-3"
 						onclick={() => {
-							const params = new URLSearchParams();
-							if (insurancePolicyId) params.set('policy', insurancePolicyId);
-							if (insuranceTermId) params.set('editTerm', insuranceTermId);
-							goto(`/insurance?${params.toString()}`);
+							const queryObj: Record<string, string> = {};
+							if (insurancePolicyId) queryObj['policy'] = insurancePolicyId;
+							if (insuranceTermId) queryObj['editTerm'] = insuranceTermId;
+							gotoWithQuery(resolve(routes.insurance), queryObj);
 						}}
 					>
 						<Shield class="mr-2 h-4 w-4" />
@@ -813,7 +817,7 @@
 
 		<!-- Back button -->
 		<div class="flex justify-center gap-3">
-			<Button variant="outline" onclick={() => goto(returnTo)}>
+			<Button variant="outline" onclick={() => gotoDynamic(returnTo)}>
 				<ArrowLeft class="mr-2 h-4 w-4" />
 				Back to Expenses
 			</Button>
@@ -828,10 +832,10 @@
 		</div>
 	</div>
 {:else}
-	<div class="max-w-2xl mx-auto space-y-6 pb-32 sm:pb-24">
+	<div class="space-y-6 pb-32 sm:pb-24">
 		<!-- Header -->
 		<div class="flex items-center gap-4">
-			<button onclick={() => goto(returnTo)} class="p-2 hover:bg-muted rounded-lg">
+			<button onclick={() => gotoDynamic(returnTo)} class="p-2 hover:bg-muted rounded-lg">
 				<ArrowLeft class="h-5 w-5" />
 			</button>
 
@@ -1240,3 +1244,4 @@
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
+</FormLayout>

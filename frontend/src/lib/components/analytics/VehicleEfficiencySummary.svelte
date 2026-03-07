@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Car } from 'lucide-svelte';
+	import { Car } from '@lucide/svelte';
 	import {
 		Empty,
 		EmptyDescription,

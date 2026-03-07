@@ -49,18 +49,18 @@
 - [x] Google Cloud Console created
 - [x] Analytics page lazy load 
 - [x] Unified pagination params for APIs 
-- [ ] Abstract out photo provider, allow users to choose backend
+- [x] Abstract out photo provider, allow users to choose backend
   - [ ] notify users that they must set up images for image storage in settings
-  - [ ] Contain provider specific settings within each one.
-    - [ ] Set specific backup folders for each type of photo.
-    - [ ] Be able to backup certain photos to certain
-    - [ ] Google Drive
-- [ ] Abstract out OAuth Login (Login provider)
+  - [x] Contain provider specific settings within each one.
+    - [x] Set specific backup folders for each type of photo.
+    - [x] Be able to backup certain photos to certain
+    - [x] Google Drive
 - [ ] Abstract out backup storage provider.
+- [ ] Abstract out OAuth Login (Login provider)
     - [ ] Backup to more than one google account
 - [ ] Abstract out SQLite backend entirely. Bring your own SQL 
 - [ ] Build out profile page
-- [ ] Let users know on settings page that auto-backups do not include image
+- [ ] Let users know on settings page that auto-backups do not include images
 - [x] Global units from selections in profile (ensure its used app wide)
   - [x] Per car units (?)
 - [ ] Admin/Management page.
@@ -125,8 +125,9 @@
 - [x] Expense API pagination (expense page slow with lots of expenses)
 - [ ] Import from other car cost trackers via CSV — Fuelly, Fuelio, Drivvo, Simply Auto, Road Trip, Spritmonitor, aCar, Car Expenses
 - [ ] Sync status time doesn't refresh in menu after enabling backup until page reload
-- [ ] Photos management for cars (set cover, delete)
+- [x] Photos management for cars (set cover, delete)
 - [ ] Fix camera flip bug
+- [x] Clean up routes and routing params
 
 ## Long Term Considerations
 - [ ] Receipt / invoice photo-based auto-fill (OCR → expense fields)
@@ -138,3 +139,4 @@
 ### Scaling concerns
 - [ ] Redis for rate-limiting / idempotency in multi-instance deployments
 - [ ] Abstract out to other backend storage (postgresql, nosql?)
+- [ ] Singleton repositories capture `getDb()` at module scope — tight coupling to initialization order. Consider lazy initialization or dependency injection if adding more singletons.

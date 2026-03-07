@@ -2,9 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { authStore } from '../../stores/auth.svelte';
 import type { User } from '../../types/index.js';
 import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
 
 vi.mock('$app/navigation', () => ({
 	goto: vi.fn()
+}));
+
+vi.mock('$app/paths', () => ({
+	resolve: (path: string) => path
 }));
 
 const mockFetch = vi.fn();
@@ -116,7 +121,7 @@ describe('Authentication Flow Integration', () => {
 			authStore.clearUser();
 			// Direct property access
 			if (!authStore.isAuthenticated && !authStore.isLoading) {
-				goto('/auth');
+				goto(resolve('/auth'));
 			}
 			expect(goto).toHaveBeenCalledWith('/auth');
 		});

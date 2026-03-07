@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { authStore } from '$lib/stores/auth.svelte';
+	import { routes } from '$lib/routes';
 	import {
 		House,
 		Receipt,
@@ -10,7 +12,7 @@
 		Menu,
 		LogOut,
 		MapPin
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
 	import { syncState, onlineStatus, offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { syncConflicts } from '$lib/utils/sync-manager';
@@ -32,18 +34,18 @@
 	let currentPath = $derived(page.url.pathname);
 
 	const navigation = [
-		{ name: 'Dashboard', href: '/dashboard', icon: House },
-		{ name: 'Expenses', href: '/expenses', icon: Receipt },
-		{ name: 'Insurance', href: '/insurance', icon: Shield },
-		{ name: 'Analytics', href: '/analytics', icon: ChartColumn },
-		{ name: 'Trips', href: '/trips', icon: MapPin }
-	];
+		{ name: 'Dashboard', href: routes.dashboard, icon: House },
+		{ name: 'Expenses', href: routes.expenses, icon: Receipt },
+		{ name: 'Insurance', href: routes.insurance, icon: Shield },
+		{ name: 'Analytics', href: routes.analytics, icon: ChartColumn },
+		{ name: 'Trips', href: routes.trips, icon: MapPin }
+	] as const;
 
-	const userNavigation = [{ name: 'Settings', href: '/settings', icon: Settings }];
+	const userNavigation = [{ name: 'Settings', href: routes.settings, icon: Settings }] as const;
 
 	function isActive(href: string): boolean {
-		if (href === '/dashboard') {
-			return currentPath === '/' || currentPath === '/dashboard';
+		if (href === routes.dashboard) {
+			return currentPath === '/' || currentPath === routes.dashboard;
 		}
 		return currentPath.startsWith(href);
 	}
@@ -127,7 +129,7 @@
 							{#each navigation as item (item.href)}
 								{@const IconComponent = item.icon}
 								<a
-									href={item.href}
+									href={resolve(item.href)}
 									class={cn(
 										'group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200',
 										isActive(item.href)
@@ -154,7 +156,7 @@
 							{#each userNavigation as item (item.href)}
 								{@const IconComponent = item.icon}
 								<a
-									href={item.href}
+									href={resolve(item.href)}
 									class={cn(
 										'group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200',
 										isActive(item.href)
@@ -229,7 +231,7 @@
 			{#each navigation as item (item.href)}
 				{@const IconComponent = item.icon}
 				<a
-					href={item.href}
+					href={resolve(item.href)}
 					class={cn(
 						'group flex items-center px-3 py-2 text-sm font-medium rounded-md',
 						'transition-colors duration-200',
@@ -262,7 +264,7 @@
 				{#each userNavigation as item (item.href)}
 					{@const IconComponent = item.icon}
 					<a
-						href={item.href}
+						href={resolve(item.href)}
 						class={cn(
 							'group flex items-center px-3 py-2 text-sm font-medium rounded-md',
 							'transition-colors duration-200',

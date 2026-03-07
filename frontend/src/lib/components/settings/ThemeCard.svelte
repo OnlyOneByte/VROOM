@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Sun, Moon, Monitor } from 'lucide-svelte';
+	import { Sun, Moon, Monitor } from '@lucide/svelte';
 	import { Label } from '$lib/components/ui/label';
 	import {
 		Card,

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import { LoaderCircle } from 'lucide-svelte';
+	import { routes } from '$lib/routes';
+	import { LoaderCircle } from '@lucide/svelte';
 
 	let { children } = $props();
 
@@ -9,7 +11,7 @@
 
 	$effect(() => {
 		if (!authState.isLoading && !authState.isAuthenticated) {
-			goto('/auth');
+			goto(resolve(routes.auth));
 		}
 	});
 </script>

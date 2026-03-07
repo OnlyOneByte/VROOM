@@ -10,8 +10,6 @@ import {
   setCoverPhotoForEntity,
   uploadPhotoForEntity,
 } from '../photos/photo-service';
-import { settingsRepository } from '../settings/repository';
-import { resolveVroomFolderName } from '../sync/folder-name';
 
 /**
  * Vehicle photo routes — thin Hono sub-router.
@@ -33,9 +31,7 @@ photoRoutes.post('/', async (c) => {
     throw new AppError('No photo file provided', 400);
   }
 
-  const settings = await settingsRepository.getOrCreate(user.id);
-  const folderName = resolveVroomFolderName(settings.googleDriveCustomFolderName, user.displayName);
-  const photo = await uploadPhotoForEntity('vehicle', vehicleId, user.id, folderName, file);
+  const photo = await uploadPhotoForEntity('vehicle', vehicleId, user.id, file);
   return c.json({ success: true, data: photo }, 201);
 });
 

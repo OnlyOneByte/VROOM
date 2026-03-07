@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { GitBranch } from 'lucide-svelte';
+	import { GitBranch } from '@lucide/svelte';
 </script>
 
 <span

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { TrendingUp, ChartPie } from 'lucide-svelte';
+	import { TrendingUp, ChartPie } from '@lucide/svelte';
 	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
 	import PageHeader from '$lib/components/common/page-header.svelte';
 	import DashboardStatsCards from '$lib/components/dashboard/DashboardStatsCards.svelte';
@@ -124,7 +124,9 @@
 				expenseApi.getVehicleStats()
 			]);
 
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map created and consumed within async function, not reactive state
 			const photosMap = new Map<string, Photo[]>();
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map created and consumed within async function, not reactive state
 			const statsMap = new Map<
 				string,
 				{ totalAmount: number; recentAmount: number; lastActivity: Date | null }

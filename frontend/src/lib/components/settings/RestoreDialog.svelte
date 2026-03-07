@@ -5,7 +5,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as RadioGroup from '$lib/components/ui/radio-group';
 	import * as Select from '$lib/components/ui/select';
-	import { LoaderCircle, ChevronDown } from 'lucide-svelte';
+	import { LoaderCircle, ChevronDown } from '@lucide/svelte';
 	import {
 		Collapsible,
 		CollapsibleContent,

@@ -14,7 +14,7 @@
 		Trash2,
 		UserPlus,
 		Clock
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import {
 		Card,
 		CardContent,
@@ -25,6 +25,7 @@
 	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Separator } from '$lib/components/ui/separator';
+	import FormLayout from '$lib/components/common/form-layout.svelte';
 
 	let user = $derived(authStore.user);
 
@@ -52,7 +53,8 @@
 	<meta name="description" content="Manage your profile and account" />
 </svelte:head>
 
-<div class="max-w-4xl mx-auto space-y-6">
+<FormLayout>
+<div class="space-y-6">
 	<div>
 		<h1 class="text-2xl font-bold tracking-tight">Profile</h1>
 		<p class="text-muted-foreground">Manage your account and personal preferences</p>
@@ -307,3 +309,4 @@
 		</CardContent>
 	</Card>
 </div>
+</FormLayout>

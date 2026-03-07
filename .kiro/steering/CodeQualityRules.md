@@ -330,7 +330,34 @@ let showFuelFields = $derived(formData.category === 'fuel');
 if (ctx.category === 'fuel') { ... }
 ```
 
-## 23. Don't Use `$effect` for Async Data Loading on Reactive State
+## 23. Never Globally Disable ESLint Rules
+
+When lint rules fail on specific files, fix the code or add scoped inline exceptions — don't disable the rule globally in `eslint.config.js`. Rules like `svelte/require-each-key`, `svelte/prefer-svelte-reactivity`, and `no-useless-assignment` catch real bugs.
+
+```javascript
+// ❌ WRONG — found in eslint.config.js (global override block)
+{
+  rules: {
+    'svelte/require-each-key': 'off',
+    'svelte/prefer-svelte-reactivity': 'off',
+    'no-useless-assignment': 'off'
+  }
+}
+
+// ✅ CORRECT — fix the code, or scope the exception to the specific file
+// In the specific .svelte file:
+<!-- eslint-disable svelte/require-each-key -->
+
+// Or in eslint.config.js, scoped to a specific file:
+{
+  files: ['**/SomeSpecificFile.svelte'],
+  rules: {
+    'svelte/require-each-key': 'off'
+  }
+}
+```
+
+## 24. Don't Use `$effect` for Async Data Loading on Reactive State
 
 `$effect` that watches reactive state and fires async functions (API calls) will re-fire on every change, including initial mount — causing duplicate requests when `onMount` already loads the same data.
 

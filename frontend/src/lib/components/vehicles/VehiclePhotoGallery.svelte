@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Upload, Star, Trash2, ImagePlus } from 'lucide-svelte';
+	import { Upload, Star, Trash2, ImagePlus } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import EmptyState from '$lib/components/common/empty-state.svelte';

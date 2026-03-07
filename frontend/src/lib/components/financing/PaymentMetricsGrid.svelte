@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { StatCardGrid } from '$lib/components/charts';
-	import { Banknote, Calendar, TrendingUp, Hash, DollarSign, TriangleAlert } from 'lucide-svelte';
+	import { Banknote, Calendar, TrendingUp, Hash, DollarSign, TriangleAlert } from '@lucide/svelte';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { settingsStore } from '$lib/stores/settings.svelte';
-	import type { VehicleFinancing, UnitPreferences } from '$lib/types.js';
+	import type { VehicleFinancing, UnitPreferences } from '$lib/types';
 	import type { AmortizationEntry } from '$lib/utils/financing-calculations';
 
 	interface Props {

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { X, Upload, ImagePlus } from 'lucide-svelte';
+	import { X, Upload, ImagePlus } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import MediaCaptureDialog from '$lib/components/shared/MediaCaptureDialog.svelte';
 

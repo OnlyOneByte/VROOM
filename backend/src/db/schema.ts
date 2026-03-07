@@ -1,8 +1,16 @@
 import { createId } from '@paralleldrive/cuid2';
 import { relations } from 'drizzle-orm';
-import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { UnitPreferences } from '../types';
-import { DEFAULT_UNIT_PREFERENCES } from '../types';
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
+import type { StorageConfig, UnitPreferences } from '../types';
+import { DEFAULT_STORAGE_CONFIG, DEFAULT_UNIT_PREFERENCES } from '../types';
 
 // User table
 export const users = sqliteTable('users', {
@@ -209,6 +217,31 @@ export const expenses = sqliteTable(
   })
 );
 
+// User Providers table (domain-agnostic provider connections)
+export const userProviders = sqliteTable(
+  'user_providers',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    domain: text('domain').notNull(),
+    providerType: text('provider_type').notNull(),
+    displayName: text('display_name').notNull(),
+    credentials: text('credentials').notNull(),
+    config: text('config', { mode: 'json' }),
+    status: text('status').notNull().default('active'),
+    lastSyncAt: integer('last_sync_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    userDomainIdx: index('up_user_domain_idx').on(table.userId, table.domain),
+  })
+);
+
 // User Settings table
 export const userSettings = sqliteTable('user_settings', {
   id: text('id')
@@ -236,6 +269,10 @@ export const userSettings = sqliteTable('user_settings', {
     .notNull()
     .default(10), // Number of backups to keep in Google Drive
   googleDriveCustomFolderName: text('google_drive_custom_folder_name'),
+  // Photo storage provider preferences
+  storageConfig: text('storage_config', { mode: 'json' })
+    .$type<StorageConfig>()
+    .default(DEFAULT_STORAGE_CONFIG),
   // Sync preferences (for Google Sheets mirroring)
   googleSheetsSyncEnabled: integer('google_sheets_sync_enabled', { mode: 'boolean' })
     .notNull()
@@ -302,6 +339,9 @@ export type NewExpense = typeof expenses.$inferInsert;
 export type UserSettings = typeof userSettings.$inferSelect;
 export type NewUserSettings = typeof userSettings.$inferInsert;
 
+export type UserProvider = typeof userProviders.$inferSelect;
+export type NewUserProvider = typeof userProviders.$inferInsert;
+
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
 
@@ -347,11 +387,9 @@ export const photos = sqliteTable(
       .$defaultFn(() => createId()),
     entityType: text('entity_type').notNull(),
     entityId: text('entity_id').notNull(),
-    driveFileId: text('drive_file_id').notNull(),
     fileName: text('file_name').notNull(),
     mimeType: text('mime_type').notNull(),
     fileSize: integer('file_size').notNull(),
-    webViewLink: text('web_view_link'),
     isCover: integer('is_cover', { mode: 'boolean' }).notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -361,8 +399,41 @@ export const photos = sqliteTable(
   })
 );
 
+// Photo Refs table (where each photo physically lives per provider)
+export const photoRefs = sqliteTable(
+  'photo_refs',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    photoId: text('photo_id')
+      .notNull()
+      .references(() => photos.id, { onDelete: 'cascade' }),
+    providerId: text('provider_id')
+      .notNull()
+      .references(() => userProviders.id, { onDelete: 'cascade' }),
+    storageRef: text('storage_ref').notNull(),
+    externalUrl: text('external_url'),
+    status: text('status', { enum: ['pending', 'active', 'failed'] })
+      .notNull()
+      .default('pending'),
+    errorMessage: text('error_message'),
+    retryCount: integer('retry_count').notNull().default(0),
+    syncedAt: integer('synced_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    photoProviderIdx: uniqueIndex('pr_photo_provider_idx').on(table.photoId, table.providerId),
+    pendingIdx: index('pr_pending_idx').on(table.status),
+  })
+);
+
 export type Photo = typeof photos.$inferSelect;
 export type NewPhoto = typeof photos.$inferInsert;
+
+export type PhotoRef = typeof photoRefs.$inferSelect;
+export type NewPhotoRef = typeof photoRefs.$inferInsert;
+
 export type PhotoEntityType =
   | 'vehicle'
   | 'expense'

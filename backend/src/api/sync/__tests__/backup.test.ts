@@ -26,6 +26,15 @@ import { backupService, coerceRow } from '../backup';
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Default string values by SQLite column type (mimics CSV output). */
+const COLUMN_TYPE_DEFAULTS: Record<string, string> = {
+  SQLiteBoolean: 'false',
+  SQLiteTimestamp: '2025-01-15T00:00:00.000Z',
+  SQLiteInteger: '100',
+  SQLiteReal: '50.00',
+  SQLiteTextJson: '[]',
+};
+
 /** Build a minimal valid CSV-like row (all string values) for a given table. */
 function buildMinimalStringRow(
   table: Parameters<typeof getTableColumns>[0],
@@ -39,15 +48,13 @@ function buildMinimalStringRow(
     const c = col as any;
     if (overrides[name] !== undefined) {
       row[name] = overrides[name];
-      continue;
+    } else if (COLUMN_TYPE_DEFAULTS[c.columnType]) {
+      row[name] = COLUMN_TYPE_DEFAULTS[c.columnType];
+    } else if (c.enumValues && c.enumValues.length > 0) {
+      row[name] = c.enumValues[0];
+    } else {
+      row[name] = `test-${name}`;
     }
-    // Provide sensible string defaults that mimic CSV output
-    if (c.columnType === 'SQLiteBoolean') row[name] = 'false';
-    else if (c.columnType === 'SQLiteTimestamp') row[name] = '2025-01-15T00:00:00.000Z';
-    else if (c.columnType === 'SQLiteInteger') row[name] = '100';
-    else if (c.columnType === 'SQLiteReal') row[name] = '50.00';
-    else if (c.columnType === 'SQLiteTextJson') row[name] = '[]';
-    else row[name] = `test-${name}`;
   }
   return row;
 }
@@ -307,6 +314,7 @@ describe('validateBackupData: acceptance', () => {
       expenseGroups: [],
       photos: [],
       odometer: [],
+      photoRefs: [],
     };
     // Fix vehicleId reference
     (backup.expenses[0] as Record<string, unknown>).vehicleId = backup.vehicles[0].id;
@@ -336,6 +344,7 @@ describe('validateBackupData: acceptance', () => {
       expenseGroups: [],
       photos: [photo],
       odometer: [],
+      photoRefs: [],
     };
 
     const result = backupService.validateBackupData(backup);
@@ -360,6 +369,7 @@ describe('validateBackupData: referential integrity', () => {
       expenseGroups: [],
       photos: [],
       odometer: [],
+      photoRefs: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -378,6 +388,7 @@ describe('validateBackupData: referential integrity', () => {
       expenseGroups: [],
       photos: [],
       odometer: [],
+      photoRefs: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -396,6 +407,7 @@ describe('validateBackupData: referential integrity', () => {
       expenseGroups: [],
       photos: [],
       odometer: [],
+      photoRefs: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -417,6 +429,7 @@ describe('validateBackupData: referential integrity', () => {
       expenseGroups: [],
       photos: [photo],
       odometer: [],
+      photoRefs: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -438,10 +451,68 @@ describe('validateBackupData: referential integrity', () => {
       expenseGroups: [],
       photos: [photo],
       odometer: [],
+      photoRefs: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('unknown entity type'))).toBe(true);
+  });
+
+  test('rejects photoRef referencing non-existent photo', () => {
+    const v = coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles);
+    const backup: ParsedBackupData = {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      vehicles: [v],
+      expenses: [],
+      financing: [],
+      insurance: [],
+      insurancePolicyVehicles: [],
+      expenseGroups: [],
+      photos: [],
+      odometer: [],
+      photoRefs: [
+        {
+          id: 'ref-1',
+          photoId: 'nonexistent-photo',
+          providerId: 'p1',
+          storageRef: 'abc',
+          status: 'active',
+        },
+      ],
+    };
+    const result = backupService.validateBackupData(backup);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e: string) => e.includes('non-existent photo'))).toBe(true);
+  });
+
+  test('accepts valid photoRef referencing existing photo', () => {
+    const v = coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles);
+    const photo = coerceRow(
+      buildMinimalStringRow(photos, { entityType: 'vehicle', entityId: v.id as string }),
+      photos
+    );
+    const backup: ParsedBackupData = {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      vehicles: [v],
+      expenses: [],
+      financing: [],
+      insurance: [],
+      insurancePolicyVehicles: [],
+      expenseGroups: [],
+      photos: [photo],
+      odometer: [],
+      photoRefs: [
+        {
+          id: 'ref-1',
+          photoId: photo.id as string,
+          providerId: 'p1',
+          storageRef: 'drive-abc',
+          status: 'active',
+        },
+      ],
+    };
+    const result = backupService.validateBackupData(backup);
+    expect(result.valid).toBe(true);
   });
 
   test('odometer entry referencing non-existent vehicle fails', () => {
@@ -459,6 +530,7 @@ describe('validateBackupData: referential integrity', () => {
       expenseGroups: [],
       photos: [],
       odometer: [entry],
+      photoRefs: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
@@ -607,6 +679,7 @@ describe('Property 9: Backup round-trip for tracking flags', () => {
           expenseGroups: [],
           photos: [],
           odometer: [],
+          photoRefs: [],
         };
 
         const result = backupService.validateBackupData(backup);
@@ -718,6 +791,7 @@ describe('coerceRow: unitPreferences JSON column on vehicles', () => {
       expenseGroups: [],
       photos: [],
       odometer: [],
+      photoRefs: [],
     };
 
     const result = backupService.validateBackupData(backup);

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { routes, paramRoutes } from '$lib/routes';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import {
@@ -13,7 +15,7 @@
 		Zap,
 		ChevronsUpDown,
 		Ruler
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
@@ -53,7 +55,9 @@
 		DistanceUnit,
 		VolumeUnit,
 		ChargeUnit
-	} from '$lib/types.js';
+	} from '$lib/types';
+	import { calculatePayoffDateFromStart } from '$lib/utils/financing-calculations';
+	import FormLayout from '$lib/components/common/form-layout.svelte';
 
 	interface Props {
 		vehicleId?: string;
@@ -170,7 +174,7 @@
 				type: 'error',
 				message: 'Error loading vehicle'
 			});
-			goto('/dashboard');
+			goto(resolve(routes.dashboard));
 		} finally {
 			isLoading = false;
 		}
@@ -324,9 +328,7 @@
 		const totalPayments = monthlyPayment * numPayments;
 		const totalInterest = totalPayments - principal;
 
-		const startDate = new Date(financingForm.startDate || new Date());
-		const payoffDate = new Date(startDate);
-		payoffDate.setMonth(payoffDate.getMonth() + numPayments);
+		const payoffDate = calculatePayoffDateFromStart(financingForm.startDate, numPayments);
 
 		amortizationPreview = {
 			monthlyPayment: Math.round(monthlyPayment * 100) / 100,
@@ -478,14 +480,14 @@
 				});
 				// Invalidate all data to force reload on the vehicle detail page
 				await invalidateAll();
-				goto(`/vehicles/${vehicleId}`);
+				goto(resolve(paramRoutes.vehicle, { id: vehicleId! }));
 			} else {
 				appStore.addVehicle(savedVehicle);
 				appStore.addNotification({
 					type: 'success',
 					message: 'Vehicle added successfully!'
 				});
-				goto('/dashboard');
+				goto(resolve(routes.dashboard));
 			}
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error submitting vehicle:', error);
@@ -513,7 +515,7 @@
 				type: 'success',
 				message: 'Vehicle deleted successfully'
 			});
-			goto('/dashboard');
+			goto(resolve(routes.dashboard));
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Failed to delete vehicle';
 			appStore.addNotification({
@@ -528,13 +530,14 @@
 
 	function handleBack() {
 		if (isEditMode) {
-			goto(`/vehicles/${vehicleId}`);
+			goto(resolve(paramRoutes.vehicle, { id: vehicleId! }));
 		} else {
-			goto('/dashboard');
+			goto(resolve(routes.dashboard));
 		}
 	}
 </script>
 
+<FormLayout>
 {#if isLoading}
 	<div class="flex items-center justify-center py-12">
 		<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
@@ -961,3 +964,4 @@
 		</AlertDialogContent>
 	</AlertDialog>
 {/if}
+</FormLayout>

@@ -1,5 +1,5 @@
 import type { ExpenseCategory } from '$lib/types';
-import { Fuel, Wrench, CreditCard, DollarSign } from 'lucide-svelte';
+import { Fuel, Wrench, CreditCard, DollarSign } from '@lucide/svelte';
 
 type LucideIcon = typeof Fuel;
 

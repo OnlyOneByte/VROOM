@@ -27,6 +27,11 @@ export interface DriveFile {
   modifiedTime?: string;
 }
 
+/** Escape single quotes for Drive API query strings */
+function escapeDriveQuery(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 export class GoogleDriveService {
   private oauth2Client: OAuth2Client;
   private drive: drive_v3.Drive;
@@ -98,9 +103,10 @@ export class GoogleDriveService {
   }
 
   async findFolder(name: string, parentId?: string): Promise<DriveFolder | null> {
+    const escapedName = escapeDriveQuery(name);
     const query = parentId
-      ? `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
-      : `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      ? `name='${escapedName}' and '${escapeDriveQuery(parentId)}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+      : `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
     const response = await this.drive.files.list({
       q: query,
