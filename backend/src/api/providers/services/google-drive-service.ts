@@ -47,58 +47,6 @@ export class GoogleDriveService {
     this.drive = google.drive({ version: 'v3', auth: this.oauth2Client });
   }
 
-  async createVroomFolderStructure(folderName: string): Promise<{
-    mainFolder: DriveFolder;
-    subFolders: {
-      receipts: DriveFolder;
-      maintenance: DriveFolder;
-      photos: DriveFolder;
-      backups: DriveFolder;
-    };
-  }> {
-    const existingFolder = await this.findFolder(folderName);
-    if (existingFolder) {
-      const subFolders = await this.getOrCreateSubFolders(existingFolder.id);
-      return { mainFolder: existingFolder, subFolders };
-    }
-
-    const mainFolder = await this.createFolder(folderName);
-    const subFolders = await this.getOrCreateSubFolders(mainFolder.id);
-    return { mainFolder, subFolders };
-  }
-
-  private async getOrCreateSubFolders(parentId: string): Promise<{
-    receipts: DriveFolder;
-    maintenance: DriveFolder;
-    photos: DriveFolder;
-    backups: DriveFolder;
-  }> {
-    const response = await this.drive.files.list({
-      q: `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: 'files(id, name, parents, webViewLink)',
-    });
-
-    const folders = response.data.files || [];
-    const findOrCreate = async (name: string) => {
-      const found = folders.find((f) => f.name === name);
-      return found
-        ? ({
-            id: found.id || '',
-            name: found.name || '',
-            parents: found.parents,
-            webViewLink: found.webViewLink,
-          } as DriveFolder)
-        : await this.createFolder(name, parentId);
-    };
-
-    return {
-      receipts: await findOrCreate('Receipts'),
-      maintenance: await findOrCreate('Maintenance Records'),
-      photos: await findOrCreate('Vehicle'),
-      backups: await findOrCreate('Backups'),
-    };
-  }
-
   async findFolder(name: string, parentId?: string): Promise<DriveFolder | null> {
     const escapedName = escapeDriveQuery(name);
     const query = parentId
@@ -143,37 +91,6 @@ export class GoogleDriveService {
     }
 
     return response.data as DriveFolder;
-  }
-
-  async createReceiptDateFolders(
-    receiptsFolderId: string,
-    year: number,
-    month: number
-  ): Promise<DriveFolder> {
-    const yearFolder =
-      (await this.findFolder(year.toString(), receiptsFolderId)) ||
-      (await this.createFolder(year.toString(), receiptsFolderId));
-
-    const monthNames = [
-      '01-January',
-      '02-February',
-      '03-March',
-      '04-April',
-      '05-May',
-      '06-June',
-      '07-July',
-      '08-August',
-      '09-September',
-      '10-October',
-      '11-November',
-      '12-December',
-    ];
-    const monthName = monthNames[month - 1];
-
-    return (
-      (await this.findFolder(monthName, yearFolder.id)) ||
-      (await this.createFolder(monthName, yearFolder.id))
-    );
   }
 
   async listFilesInFolder(folderId: string): Promise<DriveFile[]> {

@@ -74,7 +74,7 @@ function createContext(overrides: Partial<BackupStrategyContext> = {}): BackupSt
     providerId: 'prov-1',
     providerRow: {
       id: 'prov-1',
-      config: { photoRootPath: 'VROOM' },
+      config: { providerRootPath: 'VROOM' },
     } as BackupStrategyContext['providerRow'],
     decryptedCredentials: { refreshToken: 'test-refresh-token' },
     providerConfig: {

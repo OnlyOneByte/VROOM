@@ -224,7 +224,7 @@ export class StorageProviderRegistry {
   }
 
   /**
-   * Resolve the full folder path: provider.config.photoRootPath + category folderPath.
+   * Resolve the full folder path: providerRootPath + photoRootPath + category folderPath.
    */
   private resolveFolderPath(
     providerRow: UserProvider,
@@ -233,13 +233,14 @@ export class StorageProviderRegistry {
     category: PhotoCategory
   ): string {
     const config = providerRow.config as Record<string, unknown> | null;
-    const rootPath = (config?.photoRootPath as string) ?? '';
+    const providerRootPath = (config?.providerRootPath as string) ?? '';
+    const photoRootPath = (config?.photoRootPath as string) ?? '';
 
     const categorySettings = storageConfig.providerCategories[providerId];
     const categorySetting = categorySettings?.[category];
     const folderPath = categorySetting?.folderPath ?? '';
 
-    return joinStoragePath(rootPath, folderPath);
+    return joinStoragePath(providerRootPath, photoRootPath, folderPath);
   }
 }
 
