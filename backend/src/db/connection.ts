@@ -36,6 +36,13 @@ sqlite.run(`PRAGMA wal_autocheckpoint = ${CONFIG.database.walCheckpointPages}`);
 // Create Drizzle instance
 export const db = drizzle(sqlite, { schema });
 
+/**
+ * Database type alias — abstracts the dialect-specific Drizzle instance.
+ * Repositories and services should use this instead of importing BunSQLiteDatabase directly.
+ * When adding PostgreSQL support, this becomes a union: BunSQLiteDatabase | NodePgDatabase.
+ */
+export type AppDatabase = typeof db;
+
 // ============================================================================
 // TEST DATABASE SUPPORT
 // ============================================================================

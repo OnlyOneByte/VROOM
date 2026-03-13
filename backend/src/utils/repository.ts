@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
+import type { Column, Table } from 'drizzle-orm';
+import type { AppDatabase } from '../db/connection';
 import { NotFoundError } from '../errors';
 
 /**
@@ -24,7 +24,7 @@ import { NotFoundError } from '../errors';
  * Usage:
  * ```typescript
  * export class UserRepository extends BaseRepository<User, NewUser> {
- *   constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
+ *   constructor(db: AppDatabase) {
  *     super(db, users);
  *   }
  *
@@ -38,8 +38,8 @@ import { NotFoundError } from '../errors';
  */
 export abstract class BaseRepository<T, TNew extends Record<string, unknown>> {
   constructor(
-    protected db: BunSQLiteDatabase<Record<string, unknown>>,
-    protected table: SQLiteTable & { id: SQLiteColumn }
+    protected db: AppDatabase,
+    protected table: Table & { id: Column }
   ) {}
 
   async findById(id: string): Promise<T | null> {

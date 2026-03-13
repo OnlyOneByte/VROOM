@@ -1,5 +1,5 @@
 import { and, asc, eq, sql } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { AppDatabase } from '../../db/connection';
 import { getDb, transaction } from '../../db/connection';
 import { type NewPhoto, type Photo, photos } from '../../db/schema';
 import { NotFoundError } from '../../errors';
@@ -11,7 +11,7 @@ import type { PaginatedResult } from '../../utils/pagination';
  * Does NOT extend BaseRepository since the base class doesn't support entity-scoped queries.
  */
 export class PhotoRepository {
-  constructor(private db: BunSQLiteDatabase<Record<string, unknown>>) {}
+  constructor(private db: AppDatabase) {}
 
   async findByEntity(entityType: string, entityId: string): Promise<Photo[]> {
     return this.db

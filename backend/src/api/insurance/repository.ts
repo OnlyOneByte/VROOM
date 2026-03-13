@@ -1,6 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, InsurancePolicy, PolicyTerm } from '../../db/schema';
 import { expenses, insurancePolicies, insurancePolicyVehicles, vehicles } from '../../db/schema';
@@ -130,9 +130,9 @@ function getLatestTermVehicleIds(terms: PolicyTerm[], termCoverage: TermCoverage
 // ============================================================================
 
 export class InsurancePolicyRepository {
-  private db: BunSQLiteDatabase<Record<string, unknown>>;
+  private db: AppDatabase;
 
-  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
+  constructor(db: AppDatabase) {
     this.db = db;
   }
 
@@ -224,7 +224,7 @@ export class InsurancePolicyRepository {
    * Get distinct vehicleIds for a policy from the junction table.
    */
   private async getVehicleIdsForPolicy(
-    db: BunSQLiteDatabase<Record<string, unknown>> | DrizzleTransaction,
+    db: AppDatabase | DrizzleTransaction,
     policyId: string
   ): Promise<string[]> {
     const rows = await db
@@ -246,7 +246,7 @@ export class InsurancePolicyRepository {
    * Validate that all vehicleIds belong to the given userId.
    */
   private async validateVehicleOwnership(
-    db: BunSQLiteDatabase<Record<string, unknown>> | DrizzleTransaction,
+    db: AppDatabase | DrizzleTransaction,
     vehicleIds: string[],
     userId: string
   ): Promise<void> {
@@ -267,7 +267,7 @@ export class InsurancePolicyRepository {
    * Get term vehicle coverage rows from the junction table.
    */
   private async getTermVehicleCoverage(
-    db: BunSQLiteDatabase<Record<string, unknown>> | DrizzleTransaction,
+    db: AppDatabase | DrizzleTransaction,
     policyId: string
   ): Promise<TermCoverageRow[]> {
     const rows = await db
