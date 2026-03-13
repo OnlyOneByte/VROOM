@@ -21,8 +21,6 @@ export async function seedDatabase() {
       .values({
         email: 'demo@example.com',
         displayName: 'Demo User',
-        provider: 'google',
-        providerId: 'demo-provider-id',
       })
       .returning();
 

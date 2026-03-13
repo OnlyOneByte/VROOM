@@ -121,28 +121,25 @@ routes.get('/callback/google', async (c) => {
   // Get database instance
   const db = getDb();
 
-  // Check if user exists by providerId (handles both old and new user records)
+  // Check if user exists by email
   const existingUser = await db
     .select()
     .from(users)
-    .where(eq(users.providerId, googleUser.sub))
+    .where(eq(users.email, googleUser.email))
     .limit(1);
 
   let userId: string;
 
   if (existingUser.length === 0) {
-    // Create new user - use providerId as the userId for consistency
-    // This ensures the same OAuth account always gets the same userId
+    // Create new user
     userId = `google_${googleUser.sub}`;
     await db.insert(users).values({
       id: userId,
       email: googleUser.email,
       displayName: googleUser.name,
-      provider: 'google',
-      providerId: googleUser.sub,
     });
   } else {
-    // Existing user — no refresh token to update since login flow no longer requests offline access
+    // Existing user
     userId = existingUser[0].id;
   }
 
@@ -187,7 +184,6 @@ routes.get('/me', async (c) => {
         id: user.id,
         email: user.email,
         displayName: user.displayName,
-        provider: user.provider,
       },
       session: {
         id: session.id,
@@ -239,7 +235,6 @@ routes.post('/refresh', async (c) => {
         id: result.user.id,
         email: result.user.email,
         displayName: result.user.displayName,
-        provider: result.user.provider,
       },
       session: {
         id: result.session.id,

@@ -32,7 +32,7 @@ describe('Property 2: Upsert idempotency', () => {
 
     // Seed user and vehicle for FK constraints
     db.run(
-      "INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('u1', 'test@example.com', 'Test User', 'google', 'g1')"
+      "INSERT INTO users (id, email, display_name) VALUES ('u1', 'test@example.com', 'Test User')"
     );
     db.run(
       "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022)"
@@ -119,7 +119,7 @@ describe('Property 3: Link field consistency invariant', () => {
     applyMigrationsUpTo(db, migrations, migrations.length - 1);
 
     db.run(
-      "INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('u1', 'test@example.com', 'Test User', 'google', 'g1')"
+      "INSERT INTO users (id, email, display_name) VALUES ('u1', 'test@example.com', 'Test User')"
     );
     db.run(
       "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022)"

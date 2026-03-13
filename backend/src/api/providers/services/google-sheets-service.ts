@@ -48,19 +48,20 @@ export class GoogleSheetsService {
 
   async createOrUpdateVroomSpreadsheet(
     userId: string,
-    folderName: string
+    folderPath: string,
+    displayName: string
   ): Promise<SpreadsheetInfo> {
-    const folderStructure = await this.driveService.createVroomFolderStructure(folderName);
-    const existingSpreadsheet = await this.findVroomSpreadsheet(
-      folderStructure.mainFolder.id,
-      folderName
-    );
+    // Walk the folder path segments (e.g. "VROOM/Backups") to find-or-create each folder
+    const targetFolderId = await this.resolveOrCreateFolderPath(folderPath);
+
+    const spreadsheetName = `VROOM Data - ${displayName}`;
+    const existingSpreadsheet = await this.findVroomSpreadsheet(targetFolderId, displayName);
 
     let spreadsheetId: string;
     if (existingSpreadsheet) {
       spreadsheetId = existingSpreadsheet.id;
     } else {
-      const spreadsheet = await this.createSpreadsheet(`VROOM Data - ${folderName}`);
+      const spreadsheet = await this.createSpreadsheet(spreadsheetName);
       if (!spreadsheet.spreadsheetId) {
         throw new SyncError(
           SyncErrorCode.NETWORK_ERROR,
@@ -72,13 +73,41 @@ export class GoogleSheetsService {
       const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
       await drive.files.update({
         fileId: spreadsheetId,
-        addParents: folderStructure.mainFolder.id,
+        addParents: targetFolderId,
         removeParents: 'root',
       });
     }
 
     await this.updateSpreadsheetWithUserData(spreadsheetId, userId);
     return this.getSpreadsheetInfo(spreadsheetId);
+  }
+
+  /**
+   * Walk a slash-separated folder path (e.g. "VROOM/Backups"), finding or creating
+   * each segment in the Drive hierarchy. Returns the leaf folder's ID.
+   */
+  private async resolveOrCreateFolderPath(folderPath: string): Promise<string> {
+    const segments = folderPath
+      .split('/')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (segments.length === 0) {
+      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Backup folder path cannot be empty');
+    }
+
+    let parentId = '';
+    for (const segment of segments) {
+      const existing = await this.driveService.findFolder(segment, parentId || undefined);
+      if (existing) {
+        parentId = existing.id;
+      } else {
+        const created = await this.driveService.createFolder(segment, parentId || undefined);
+        parentId = created.id;
+      }
+    }
+
+    return parentId;
   }
 
   private async findVroomSpreadsheet(

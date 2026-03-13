@@ -34,7 +34,7 @@ const VEHICLE_IDS = ['v-1', 'v-2', 'v-3', 'v-4', 'v-5'];
 
 function seedTestData(): void {
   sqliteDb.run(
-    `INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('${USER_ID}', 'user1@test.com', 'User One', 'google', 'gid-1')`
+    `INSERT INTO users (id, email, display_name) VALUES ('${USER_ID}', 'user1@test.com', 'User One')`
   );
   for (const vid of VEHICLE_IDS) {
     sqliteDb.run(

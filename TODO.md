@@ -51,7 +51,6 @@
 - [x] Analytics page lazy load 
 - [x] Unified pagination params for APIs 
 - [x] Abstract out photo provider, allow users to choose backend
-  - [ ] notify users that they must set up images for image storage in settings
   - [x] Contain provider specific settings within each one.
     - [x] Set specific backup folders for each type of photo.
     - [x] Be able to backup certain photos to certain
@@ -69,6 +68,7 @@
   - [ ] Overall dashboard (number of expenses, users, cars)
   - [ ] Management - delete/remove/block user.
 - [ ] Guided setup tour (setup storage/etc)
+  - [ ] notify users that they must set up images for image storage in settings
 - [ ] Unit test coverage on backend
 - [ ] Unit test coverage on frontend
 - [ ] E2E Playwright tests
@@ -130,6 +130,9 @@
 - [x] Photos management for cars (set cover, delete)
 - [ ] Fix camera flip bug
 - [x] Clean up routes and routing params
+- [X] Fix issue where google sheets is creating a vroom/backup folder
+  - [X] Creating Vroom/Backup with backups, maintanence records, receipts, vehicles folders. SHould not need these.
+  - Photos going to root and not respecting provider root
 
 ## Long Term Considerations
 - [ ] Receipt / invoice photo-based auto-fill (OCR → expense fields)

@@ -6,8 +6,6 @@ export const mockUser = {
 	id: 'test-user-id',
 	email: 'test@example.com',
 	displayName: 'Test User',
-	provider: 'google' as const,
-	providerId: 'google-test-id',
 	createdAt: new Date().toISOString(),
 	updatedAt: new Date().toISOString()
 };
