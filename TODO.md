@@ -16,13 +16,10 @@
 - [x] Standardize Monthly Trend Chart formatting
 
 
-### Reminders, Recurring, and Templates
-- [ ] Quick-add widget: streamlined "just filled up" flow (gallons, price, mileage — three taps)
-- [ ] Pre-built templates for common maintenance schedules by vehicle type (put under profile for management)
+### Reminders & Scheduled/Recurring 
 - [ ] Maintenance schedule engine: define service intervals by mileage and/or time (oil change, tire rotation, brake inspection, etc.)
 - [ ] Reminders when a service is due based on current mileage + last service date
 - [ ] Define recurring expenses (insurance premiums, loan payments, parking passes) with frequency
-- [ ] Auto-create expense records each period based on templates
 - [ ] Dashboard indicator for upcoming recurring expenses
 
 ### Sharing & Multi-Household
@@ -58,8 +55,8 @@
     - [x] Backup to more than one google account
 - [x] Abstract out backup storage provider.
 - [x] Decouple login auth from provider auth 
-- [ ] Abstract out OAuth Login (Login provider)
-- [ ] Abstract out SQLite backend entirely. Bring your own SQL 
+- [x] Abstract out OAuth Login (Login provider)
+- [ ] Auth rate limiter: use Bun's `server.requestIP()` for real client IP; only trust `X-Forwarded-For` when `TRUSTED_PROXY_IPS` env is set
 - [ ] Build out profile page
 - [ ] Let users know on settings page that auto-backups do not include images
 - [x] Global units from selections in profile (ensure its used app wide)
@@ -72,6 +69,10 @@
 - [ ] Unit test coverage on backend
 - [ ] Unit test coverage on frontend
 - [ ] E2E Playwright tests
+
+
+### Importing from other sources.
+- [ ] Import from other car cost trackers via CSV — Fuelly, Fuelio, Drivvo, Simply Auto, Road Trip, Spritmonitor, aCar, Car Expenses
 
 ### UI Polish
 - [ ] Assets required
@@ -125,20 +126,25 @@
 - [x] Photos not showing in prod env (CORS?)
 - [x] Photos API pagination
 - [x] Expense API pagination (expense page slow with lots of expenses)
-- [ ] Import from other car cost trackers via CSV — Fuelly, Fuelio, Drivvo, Simply Auto, Road Trip, Spritmonitor, aCar, Car Expenses
 - [ ] Sync status time doesn't refresh in menu after enabling backup until page reload
 - [x] Photos management for cars (set cover, delete)
-- [ ] Fix camera flip bug
+- [x] Fix camera flip bug
 - [x] Clean up routes and routing params
 - [X] Fix issue where google sheets is creating a vroom/backup folder
   - [X] Creating Vroom/Backup with backups, maintanence records, receipts, vehicles folders. SHould not need these.
   - Photos going to root and not respecting provider root
+- [ ] Backend model revamp to be more performant
+- [ ] Backup versioning
 
 ## Long Term Considerations
 - [ ] Receipt / invoice photo-based auto-fill (OCR → expense fields)
 - [ ] Anonymous cost benchmarks: opt-in aggregated data to show how your costs compare to similar vehicles
 - [ ] Shareable year-end summary (exportable image or link)
   - This is a big one, proably gonna spend a full day on just this.
+- [ ] Abstract out SQLite backend entirely. Bring your own SQL 
+- [ ] Quick-add widget: streamlined "just filled up" flow (gallons, price, mileage — three taps)
+- [ ] Pre-built templates for common maintenance schedules by vehicle type (put under profile for management)
+- [ ] Reminders with push notification support
 
 
 ### Scaling concerns

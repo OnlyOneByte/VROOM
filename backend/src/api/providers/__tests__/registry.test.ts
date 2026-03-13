@@ -36,6 +36,7 @@ const baseProvider: UserProvider = {
   userId: 'user-1',
   domain: 'storage',
   providerType: 'google-drive',
+  providerAccountId: null,
   displayName: 'My Google Drive',
   credentials: 'encrypted:{"refreshToken":"tok-123"}',
   config: { photoRootPath: 'VROOM/Photos' },

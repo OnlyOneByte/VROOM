@@ -114,6 +114,7 @@ CREATE TABLE `user_providers` (
 	`user_id` text NOT NULL,
 	`domain` text NOT NULL,
 	`provider_type` text NOT NULL,
+	`provider_account_id` text,
 	`display_name` text NOT NULL,
 	`credentials` text NOT NULL,
 	`config` text,
@@ -203,3 +204,5 @@ CREATE TABLE `vehicles` (
 );
 --> statement-breakpoint
 CREATE INDEX `vehicles_user_id_idx` ON `vehicles` (`user_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS `up_auth_identity_idx` ON `user_providers`(`provider_type`, `provider_account_id`) WHERE `domain` = 'auth';

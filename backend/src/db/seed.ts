@@ -5,6 +5,7 @@ import {
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
+  userProviders,
   users,
   vehicleFinancing,
   vehicles,
@@ -25,6 +26,18 @@ export async function seedDatabase() {
       .returning();
 
     logger.info('Created sample user', { userId: sampleUser.id });
+
+    // Create auth-domain provider row for demo user
+    await db.insert(userProviders).values({
+      userId: sampleUser.id,
+      domain: 'auth',
+      providerType: 'google',
+      providerAccountId: 'demo-google-sub',
+      displayName: sampleUser.displayName,
+      credentials: '',
+      config: { email: sampleUser.email },
+      status: 'active',
+    });
 
     // Create sample vehicles
     const [vehicle1] = await db

@@ -141,4 +141,51 @@ describe('Migration 0000: Consolidated Schema', () => {
       );
     }).toThrow();
   });
+
+  test('user_providers has provider_account_id column', () => {
+    applyMigration(db, migrations[0]);
+    const cols = getColumnNames(db, 'user_providers');
+    expect(cols).toContain('provider_account_id');
+  });
+
+  test('up_auth_identity_idx partial unique index exists on user_providers', () => {
+    applyMigration(db, migrations[0]);
+    const indexes = getIndexNames(db, 'user_providers');
+    expect(indexes).toContain('up_auth_identity_idx');
+  });
+
+  test('up_auth_identity_idx enforces uniqueness for auth rows', () => {
+    applyMigration(db, migrations[0]);
+
+    db.run("INSERT INTO users (id, email, display_name) VALUES ('u1', 'a@test.com', 'User A')");
+    db.run("INSERT INTO users (id, email, display_name) VALUES ('u2', 'b@test.com', 'User B')");
+
+    // First auth row succeeds
+    db.run(
+      "INSERT INTO user_providers (id, user_id, domain, provider_type, provider_account_id, display_name, credentials, status) VALUES ('p1', 'u1', 'auth', 'google', 'goog-123', 'User A', '', 'active')"
+    );
+
+    // Second auth row with same providerType+providerAccountId should fail
+    expect(() => {
+      db.run(
+        "INSERT INTO user_providers (id, user_id, domain, provider_type, provider_account_id, display_name, credentials, status) VALUES ('p2', 'u2', 'auth', 'google', 'goog-123', 'User B', '', 'active')"
+      );
+    }).toThrow(/UNIQUE constraint failed/);
+  });
+
+  test('storage rows with NULL providerAccountId do not conflict', () => {
+    applyMigration(db, migrations[0]);
+
+    db.run("INSERT INTO users (id, email, display_name) VALUES ('u1', 'a@test.com', 'User A')");
+
+    // Two storage rows with NULL providerAccountId should both succeed
+    db.run(
+      "INSERT INTO user_providers (id, user_id, domain, provider_type, provider_account_id, display_name, credentials, status) VALUES ('s1', 'u1', 'storage', 'google-drive', NULL, 'Drive 1', 'enc1', 'active')"
+    );
+    db.run(
+      "INSERT INTO user_providers (id, user_id, domain, provider_type, provider_account_id, display_name, credentials, status) VALUES ('s2', 'u1', 'storage', 'google-drive', NULL, 'Drive 2', 'enc2', 'active')"
+    );
+
+    expect(countRows(db, 'user_providers')).toBe(2);
+  });
 });

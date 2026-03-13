@@ -159,10 +159,15 @@ describe('Auth Store', () => {
 		});
 	});
 
-	describe('loginWithGoogle', () => {
-		it('redirects to Google OAuth endpoint', () => {
-			authStore.loginWithGoogle();
+	describe('loginWith', () => {
+		it('redirects to provider OAuth endpoint', () => {
+			authStore.loginWith('google');
 			expect(mockLocation.href).toBe('/api/v1/auth/login/google');
+		});
+
+		it('redirects to GitHub OAuth endpoint', () => {
+			authStore.loginWith('github');
+			expect(mockLocation.href).toBe('/api/v1/auth/login/github');
 		});
 	});
 

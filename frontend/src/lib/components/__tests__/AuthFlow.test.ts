@@ -60,7 +60,7 @@ describe('Authentication Flow Integration', () => {
 
 	describe('Login Flow Logic', () => {
 		it('handles Google OAuth initiation', () => {
-			authStore.loginWithGoogle();
+			authStore.loginWith('google');
 			expect(mockLocation.href).toBe('/api/v1/auth/login/google');
 		});
 

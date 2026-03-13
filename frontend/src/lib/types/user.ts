@@ -19,3 +19,12 @@ export interface AuthState {
 	error: string | null;
 	token: string | null;
 }
+
+export interface LinkedAuthProvider {
+	id: string;
+	providerType: string;
+	displayName: string;
+	email: string;
+	avatarUrl?: string;
+	createdAt: string;
+}

@@ -235,6 +235,7 @@ export const userProviders = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     domain: text('domain').notNull(),
     providerType: text('provider_type').notNull(),
+    providerAccountId: text('provider_account_id'),
     displayName: text('display_name').notNull(),
     credentials: text('credentials').notNull(),
     config: text('config', { mode: 'json' }),

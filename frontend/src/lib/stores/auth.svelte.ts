@@ -70,9 +70,9 @@ function createAuthStore() {
 			}
 		},
 
-		loginWithGoogle() {
+		loginWith(providerId: string) {
 			if (browser) {
-				window.location.href = `${getApiBaseUrl()}/api/v1/auth/login/google`;
+				window.location.href = `${getApiBaseUrl()}/api/v1/auth/login/${providerId}`;
 			}
 		},
 
