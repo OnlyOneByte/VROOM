@@ -32,8 +32,8 @@
     "validate": "bun run type-check && bun run check && bun test && bun run build"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1003.0",
-    "@aws-sdk/s3-request-presigner": "^3.1003.0",
+    "@aws-sdk/client-s3": "^3.1008.0",
+    "@aws-sdk/s3-request-presigner": "^3.1008.0",
     "@hono/node-server": "^1.19.11",
     "@hono/zod-validator": "^0.7.6",
     "@lucia-auth/adapter-drizzle": "^1.1.0",
@@ -46,7 +46,7 @@
     "drizzle-orm": "^0.45.1",
     "drizzle-zod": "^0.8.3",
     "googleapis": "^171.4.0",
-    "hono": "^4.12.5",
+    "hono": "^4.12.7",
     "lucia": "^3.2.2",
     "oslo": "^1.2.1",
     "zod": "^4.3.6"
@@ -60,7 +60,7 @@
     "@types/adm-zip": "^0.5.7",
     "bun-types": "^1.3.10",
     "drizzle-kit": "^0.31.9",
-    "fast-check": "^4.5.3",
+    "fast-check": "^4.6.0",
     "typescript": "^5.9.3",
     "yaml": "^2.8.2"
   }
