@@ -59,8 +59,3 @@ export const EXPENSE_MESSAGES = {
 	NO_EXPENSES_DESC: 'Start tracking your vehicle expenses to see insights and analytics.',
 	ADD_FUEL_DESC: 'Add fuel expenses with mileage to see detailed fuel statistics'
 } as const;
-
-export const MAINTENANCE_MESSAGES = {
-	COMING_SOON: 'Maintenance reminders coming soon',
-	COMING_SOON_DESC: 'Set up reminders for oil changes, tire rotations, and more'
-} as const;

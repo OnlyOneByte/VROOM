@@ -108,12 +108,3 @@ export interface UserSettings {
 	createdAt: string;
 	updatedAt: string;
 }
-
-export interface SettingsFormData {
-	unitPreferences: UnitPreferences;
-	currencyUnit: string;
-	autoBackupEnabled: boolean;
-	backupFrequency: 'daily' | 'weekly' | 'monthly';
-	syncOnInactivity?: boolean;
-	syncInactivityMinutes?: number;
-}

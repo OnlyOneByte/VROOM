@@ -1,12 +1,5 @@
 import type { Vehicle } from './vehicle.js';
 
-export interface ApiResponse<T = unknown> {
-	success: boolean;
-	data?: T;
-	error?: string;
-	message?: string;
-}
-
 export interface Notification {
 	id: string;
 	type: 'success' | 'error' | 'warning' | 'info';
@@ -23,16 +16,14 @@ export interface AppState {
 	isMobileMenuOpen: boolean;
 }
 
-export interface PaginationMeta {
-	totalCount: number;
-	limit: number;
-	offset: number;
-	hasMore: boolean;
-}
-
 export interface PaginatedResponse<T> {
 	data: T[];
-	pagination: PaginationMeta;
+	pagination: {
+		totalCount: number;
+		limit: number;
+		offset: number;
+		hasMore: boolean;
+	};
 }
 
 export interface Photo {
@@ -45,16 +36,6 @@ export interface Photo {
 	isCover: boolean;
 	sortOrder: number;
 	createdAt: string;
-}
-
-export interface PhotoRef {
-	id: string;
-	photoId: string;
-	providerId: string;
-	storageRef: string;
-	externalUrl?: string;
-	status: 'active' | 'pending' | 'failed';
-	syncedAt?: string;
 }
 
 export interface UserProviderInfo {

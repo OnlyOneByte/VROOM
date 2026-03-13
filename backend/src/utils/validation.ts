@@ -8,60 +8,6 @@
 import { z } from 'zod';
 
 /**
- * Reusable validator functions for common patterns
- */
-export const validators = {
-  /**
-   * Required string with max length
-   */
-  requiredString: (name: string, maxLength: number) =>
-    z
-      .string()
-      .min(1, `${name} is required`)
-      .max(maxLength, `${name} must be ${maxLength} characters or less`),
-
-  /**
-   * Optional string with max length
-   */
-  optionalString: (maxLength: number) => z.string().max(maxLength).optional(),
-
-  /**
-   * Positive number (greater than 0)
-   */
-  positiveNumber: z.number().positive('Must be greater than 0'),
-
-  /**
-   * Non-negative integer (0 or greater)
-   */
-  nonNegativeInt: z.number().int().min(0, 'Must be 0 or greater'),
-
-  /**
-   * Positive integer (greater than 0)
-   */
-  positiveInt: z.number().int().positive('Must be a positive integer'),
-
-  /**
-   * Date string that coerces to Date
-   */
-  dateString: z.coerce.date(),
-
-  /**
-   * Optional URL
-   */
-  optionalUrl: z.string().url({ message: 'Invalid URL format' }).optional(),
-
-  /**
-   * Email address
-   */
-  email: z.string().email({ message: 'Invalid email address' }),
-
-  /**
-   * Percentage (0-100)
-   */
-  percentage: z.number().min(0, 'Must be at least 0').max(100, 'Must be at most 100'),
-};
-
-/**
  * Common validation schemas
  */
 export const commonSchemas = {

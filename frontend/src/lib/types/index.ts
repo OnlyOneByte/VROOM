@@ -14,4 +14,4 @@ export * from './analytics.js';
 export * from './common.js';
 
 // Backend API types — canonical definitions live in $lib/services/api-transformer.ts
-export type { BackendExpenseRequest, BackendExpenseResponse } from '../services/api-transformer.js';
+export type { BackendExpenseResponse } from '../services/api-transformer.js';

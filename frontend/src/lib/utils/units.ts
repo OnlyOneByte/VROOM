@@ -2,7 +2,7 @@
  * Unit display utilities for frontend
  */
 
-import type { DistanceUnit, VolumeUnit, ChargeUnit, VehicleType } from '$lib/types';
+import type { DistanceUnit, VolumeUnit, ChargeUnit } from '$lib/types';
 
 /**
  * Electric fuel types — duplicated from backend/src/db/types.ts since frontend
@@ -79,18 +79,6 @@ export function getElectricEfficiencyLabel(
 	const distLabel = getDistanceUnitLabel(distanceUnit, true);
 	const chargeLabel = getChargeUnitLabel(chargeUnit, true);
 	return `${distLabel}/${chargeLabel}`;
-}
-
-/**
- * Get vehicle type display label
- */
-export function getVehicleTypeLabel(vehicleType: VehicleType): string {
-	const labels: Record<VehicleType, string> = {
-		gas: 'Gas',
-		electric: 'Electric',
-		hybrid: 'Hybrid'
-	};
-	return labels[vehicleType];
 }
 
 /**

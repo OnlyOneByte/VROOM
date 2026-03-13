@@ -47,14 +47,7 @@ export type AppDatabase = typeof db;
 // TEST DATABASE SUPPORT
 // ============================================================================
 
-let testDb: typeof db | null = null;
-
-/**
- * Set test database instance (for testing only)
- */
-export function setTestDb(database: typeof db | null): void {
-  testDb = database;
-}
+const testDb: typeof db | null = null;
 
 /**
  * Get the active database instance (test or production)
@@ -152,16 +145,3 @@ export function forceCheckpointWAL(): void {
     logger.error('Forced WAL checkpoint failed', { error });
   }
 }
-
-// Graceful shutdown
-export function closeDatabaseConnection() {
-  try {
-    sqlite.close();
-    logger.info('Database connection closed');
-  } catch (error) {
-    logger.error('Error closing database connection', { error });
-  }
-}
-
-// Export the sqlite instance for direct access if needed
-export { sqlite };

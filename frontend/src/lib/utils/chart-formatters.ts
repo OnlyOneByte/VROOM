@@ -12,21 +12,6 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
 	maximumFractionDigits: 0
 });
 
-/** Format a date as "Jan 2025" */
-export function formatMonthYear(date: Date): string {
-	return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-}
-
-/** Format a date as 3-letter month abbreviation (e.g. "Jan", "Feb", "Mar") */
-export function formatMonthShort(date: Date): string {
-	return date.toLocaleDateString('en-US', { month: 'short' });
-}
-
-/** Format a date as "Jan 15" */
-export function formatMonthDay(date: Date): string {
-	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 /** Format a number as compact currency for Y-axis labels (e.g. "$1,200") */
 export function formatCurrencyAxis(value: number): string {
 	return currencyFormatter.format(value);
@@ -65,9 +50,6 @@ export function getXTickCount(dataLength: number, maxTicks = 6): number {
 /** Standard chart padding used across all chart types. */
 export const CHART_PADDING = { top: 4, left: 48, bottom: 20, right: 4 } as const;
 
-/** Wider left padding for charts with long y-axis labels (e.g. odometer "35,000"). */
-export const CHART_PADDING_WIDE = { top: 4, left: 56, bottom: 20, right: 4 } as const;
-
 /** Smooth curve for line/area charts — gives a natural, curvy appearance. */
 export const SMOOTH_CURVE = curveMonotoneX;
 
@@ -75,7 +57,7 @@ export const SMOOTH_CURVE = curveMonotoneX;
  * Format a Date value as 3-letter month for x-axis ticks.
  * Handles unknown input from layerchart axis callbacks.
  */
-export function formatMonthTick(value: unknown): string {
+function formatMonthTick(value: unknown): string {
 	if (!(value instanceof Date) || isNaN(value.getTime())) return '';
 	return value.toLocaleDateString('en-US', { month: 'short' });
 }

@@ -157,24 +157,3 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 
 	return frontendExpense;
 }
-
-/**
- * Transform array of backend expenses to frontend format
- */
-export function fromBackendExpenses(backendExpenses: BackendExpenseResponse[]): Expense[] {
-	return backendExpenses.map(expense => fromBackendExpense(expense));
-}
-
-/**
- * Check if an expense object uses backend field names
- */
-export function hasBackendFieldNames(expense: Record<string, unknown>): boolean {
-	return 'expenseAmount' in expense || 'fuelAmount' in expense;
-}
-
-/**
- * Check if an expense object uses frontend field names
- */
-export function hasFrontendFieldNames(expense: Record<string, unknown>): boolean {
-	return 'amount' in expense || 'volume' in expense || 'charge' in expense;
-}

@@ -254,23 +254,3 @@ export async function seedDatabase() {
     throw error;
   }
 }
-
-// Function to clear all data (useful for testing)
-export async function clearDatabase() {
-  try {
-    logger.info('Clearing database...');
-
-    // Delete in reverse order of dependencies
-    await db.delete(expenses);
-    await db.delete(insurancePolicyVehicles);
-    await db.delete(insurancePolicies);
-    await db.delete(vehicleFinancing);
-    await db.delete(vehicles);
-    await db.delete(users);
-
-    logger.info('Database cleared successfully');
-  } catch (error) {
-    logger.error('Error clearing database', { error });
-    throw error;
-  }
-}

@@ -46,16 +46,3 @@ export const syncState = {
 		_syncStatus = value;
 	}
 };
-
-// --- Derived connection status ---
-export const connectionStatus = {
-	get online() {
-		return _isOnline;
-	},
-	get syncing() {
-		return _syncStatus === 'syncing';
-	},
-	get hasOfflineData() {
-		return false;
-	}
-};

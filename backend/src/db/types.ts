@@ -35,28 +35,18 @@ export const EXPENSE_CATEGORY_DESCRIPTIONS: Record<ExpenseCategory, string> = {
 
 export type PaymentFrequency = 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 
-export type SharePermission = 'view' | 'edit';
-
-export type ShareStatus = 'pending' | 'accepted' | 'declined';
-
 // Generic type guard generator for string union types
 function createEnumGuard<T extends string>(validValues: readonly T[]) {
   return (value: string): value is T => validValues.includes(value as T);
 }
 
 // Validation functions - generated using createEnumGuard
-export const isValidExpenseCategory = createEnumGuard(EXPENSE_CATEGORIES);
-
 export const isValidPaymentFrequency = createEnumGuard([
   'monthly',
   'bi-weekly',
   'weekly',
   'custom',
 ] as const);
-
-export const isValidSharePermission = createEnumGuard(['view', 'edit'] as const);
-
-export const isValidShareStatus = createEnumGuard(['pending', 'accepted', 'declined'] as const);
 
 // Electric fuel types — single source of truth for determining charging vs fuel expenses
 export const ELECTRIC_FUEL_TYPES = [

@@ -1,21 +1,8 @@
 import { CONFIG } from '../config';
 
-export interface PaginationMeta {
-  totalCount: number;
-  limit: number;
-  offset: number;
-  hasMore: boolean;
-}
-
 export interface PaginatedResult<T> {
   data: T[];
   totalCount: number;
-}
-
-export interface PaginatedApiResponse<T> {
-  success: true;
-  data: T[];
-  pagination: PaginationMeta;
 }
 
 /**
@@ -32,6 +19,17 @@ export function clampPagination(pagination?: { limit?: number; offset?: number }
   const limit = Math.min(Math.max(pagination?.limit ?? defaultPageSize, minPageSize), maxPageSize);
   const offset = Math.max(pagination?.offset ?? 0, 0);
   return { limit, offset };
+}
+
+interface PaginatedApiResponse<T> {
+  success: true;
+  data: T[];
+  pagination: {
+    totalCount: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
 }
 
 /**

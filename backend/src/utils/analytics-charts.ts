@@ -5,13 +5,13 @@ import { isElectricFuelType } from '../db/types';
 // ---------------------------------------------------------------------------
 
 /** Efficiency filter constants — must match frontend expense-helpers.ts */
-export const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
-export const MIN_VALID_MPG = 5;
-export const MAX_VALID_MPG = 100;
-export const MIN_VALID_MI_KWH = 1;
-export const MAX_VALID_MI_KWH = 10;
+const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
+const MIN_VALID_MPG = 5;
+const MAX_VALID_MPG = 100;
+const MIN_VALID_MI_KWH = 1;
+const MAX_VALID_MI_KWH = 10;
 
-export const DAY_NAMES = [
+const DAY_NAMES = [
   'Sunday',
   'Monday',
   'Tuesday',
@@ -21,7 +21,7 @@ export const DAY_NAMES = [
   'Saturday',
 ] as const;
 
-export const SEASON_MAP: Record<number, string> = {
+const SEASON_MAP: Record<number, string> = {
   0: 'Winter',
   1: 'Winter',
   2: 'Spring',
@@ -36,7 +36,7 @@ export const SEASON_MAP: Record<number, string> = {
   11: 'Winter',
 };
 
-export const VALID_CATEGORIES = [
+const VALID_CATEGORIES = [
   'fuel',
   'maintenance',
   'financial',
@@ -84,7 +84,7 @@ export interface GeneralExpenseRow {
   fuelAmount: number | null;
 }
 
-export interface VehicleMetrics {
+interface VehicleMetrics {
   fuelEfficiency: number;
   maintenanceCost: number;
   maintenanceCount: number;
@@ -97,7 +97,7 @@ export interface VehicleMetrics {
 // ---------------------------------------------------------------------------
 
 /** Check if an efficiency value is within realistic bounds for the fuel type. */
-export function isRealisticEfficiency(efficiency: number, electric: boolean): boolean {
+function isRealisticEfficiency(efficiency: number, electric: boolean): boolean {
   if (electric) {
     return efficiency >= MIN_VALID_MI_KWH && efficiency <= MAX_VALID_MI_KWH;
   }
@@ -133,7 +133,7 @@ export function toMonthKey(d: Date): string {
 }
 
 /** Normalize a date field that may be a Date or timestamp (Unix seconds). */
-export function normalizeDate(d: Date | number | null): Date | null {
+function normalizeDate(d: Date | number | null): Date | null {
   if (d == null) return null;
   if (d instanceof Date) return d;
   if (typeof d === 'number') {
@@ -368,14 +368,14 @@ export function buildCostPerDistanceChart(
 }
 
 /** Assign maintenance timeline status based on days remaining. */
-export function assignTimelineStatus(daysRemaining: number): 'good' | 'warning' | 'overdue' {
+function assignTimelineStatus(daysRemaining: number): 'good' | 'warning' | 'overdue' {
   if (daysRemaining < 0) return 'overdue';
   if (daysRemaining < 30) return 'warning';
   return 'good';
 }
 
 /** Estimate the average interval in days between sorted service dates. */
-export function estimateServiceInterval(sorted: GeneralExpenseRow[]): number {
+function estimateServiceInterval(sorted: GeneralExpenseRow[]): number {
   if (sorted.length < 2) return 180;
   const intervals: number[] = [];
   for (let i = 0; i < sorted.length - 1; i++) {
@@ -390,7 +390,7 @@ export function estimateServiceInterval(sorted: GeneralExpenseRow[]): number {
 }
 
 /** Build a single maintenance timeline entry from a service group. */
-export function buildTimelineEntry(
+function buildTimelineEntry(
   service: string,
   rows: GeneralExpenseRow[],
   now: Date
@@ -460,7 +460,7 @@ export function buildMaintenanceTimeline(
 }
 
 /** Add efficiency data from consecutive fuel pairs to season data map. */
-export function addSeasonalEfficiencyData(
+function addSeasonalEfficiencyData(
   fuelRows: FuelExpenseRow[],
   seasonData: Map<string, { effSum: number; effCount: number; fillupCount: number }>
 ): void {
@@ -510,7 +510,7 @@ export function buildSeasonalEfficiency(
 }
 
 /** Normalize a score to 0-100 range. */
-export function normalizeScore(value: number, min: number, max: number, invert: boolean): number {
+function normalizeScore(value: number, min: number, max: number, invert: boolean): number {
   if (max === min) return 50;
   const ratio = (value - min) / (max - min);
   const score = invert ? 1 - ratio : ratio;
@@ -518,7 +518,7 @@ export function normalizeScore(value: number, min: number, max: number, invert: 
 }
 
 /** Accumulate expense-based metrics per vehicle. */
-export function accumulateExpenseMetrics(
+function accumulateExpenseMetrics(
   allExpenses: GeneralExpenseRow[],
   metrics: Map<string, VehicleMetrics>
 ): void {
@@ -537,7 +537,7 @@ export function accumulateExpenseMetrics(
 }
 
 /** Compute average fuel efficiency per vehicle from consecutive fuel pairs. */
-export function computePerVehicleFuelEfficiency(
+function computePerVehicleFuelEfficiency(
   fuelRows: FuelExpenseRow[],
   metrics: Map<string, VehicleMetrics>
 ): void {
@@ -869,7 +869,7 @@ export function buildVehicleMaintenanceCosts(
 }
 
 /** Accumulate fuel data for a single row into the month map. */
-export function accumulateFuelRow(
+function accumulateFuelRow(
   monthData: Map<
     string,
     { totalCost: number; totalGallons: number; totalMiles: number; count: number }
@@ -1025,36 +1025,6 @@ export function buildFuelEfficiencyComparison(
         vehicleName: vehicleNameMap.get(vId) ?? 'Unknown',
         efficiency: data.count > 0 ? data.sum / data.count : 0,
       })),
-    }));
-}
-
-/** Build monthly efficiency trend from fuel expense rows (max 12 entries). */
-export function buildEfficiencyTrend(
-  fuelRows: FuelExpenseRow[]
-): Array<{ month: string; efficiency: number }> {
-  const monthMap = new Map<string, { effSum: number; effCount: number }>();
-
-  for (const vehicleRows of groupByVehicle(fuelRows).values()) {
-    for (let i = 1; i < vehicleRows.length; i++) {
-      const current = vehicleRows[i];
-      const previous = vehicleRows[i - 1];
-      if (!current || !previous) continue;
-      const point = computeEfficiencyPoint(current, previous);
-      if (!point) continue;
-      const month = toMonthKey(new Date(point.date));
-      const entry = monthMap.get(month) ?? { effSum: 0, effCount: 0 };
-      entry.effSum += point.efficiency;
-      entry.effCount++;
-      monthMap.set(month, entry);
-    }
-  }
-
-  return Array.from(monthMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(0, 12)
-    .map(([month, data]) => ({
-      month,
-      efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
     }));
 }
 

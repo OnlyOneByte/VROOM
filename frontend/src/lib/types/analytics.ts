@@ -1,32 +1,5 @@
 import type { UnitsMetadata } from './settings.js';
 
-export interface FuelEfficiencyData {
-	averageMPG: number;
-	trend: Array<{
-		period: string;
-		mpg: number;
-		gallons: number;
-		cost: number;
-	}>;
-	totalGallons: number;
-	totalCost: number;
-	efficiency: 'excellent' | 'good' | 'average' | 'poor';
-}
-
-export interface ExpenseAnalytics {
-	totalExpenses: number;
-	monthlyAverage: number;
-	categoryBreakdown: Array<{
-		category: string;
-		amount: number;
-		percentage: number;
-	}>;
-	trends: Array<{
-		period: string;
-		amount: number;
-	}>;
-}
-
 export interface FuelEfficiencyPoint {
 	date: string;
 	efficiency: number;
