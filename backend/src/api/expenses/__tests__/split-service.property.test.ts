@@ -228,9 +228,10 @@ import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach } from 'bun:test';
 import { createId } from '@paralleldrive/cuid2';
 import { eq } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import type { AppDatabase } from '../../../db/connection';
+import * as schema from '../../../db/schema';
 import { expenses } from '../../../db/schema';
 
 // ---------------------------------------------------------------------------
@@ -238,7 +239,7 @@ import { expenses } from '../../../db/schema';
 // ---------------------------------------------------------------------------
 
 let sqliteDb: Database;
-let db: BunSQLiteDatabase<Record<string, unknown>>;
+let db: AppDatabase;
 
 const USER_ID = 'test-user-1';
 const VEHICLE_IDS = ['v-1', 'v-2', 'v-3', 'v-4', 'v-5'];
@@ -261,7 +262,7 @@ beforeEach(() => {
   for (const m of migrations) {
     applyMigration(sqliteDb, m);
   }
-  db = drizzle(sqliteDb);
+  db = drizzle(sqliteDb, { schema });
   seedDbTestData();
 });
 

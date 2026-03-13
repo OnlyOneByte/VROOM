@@ -6,10 +6,11 @@
  */
 
 import { Database } from 'bun:sqlite';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import type { AppDatabase } from '../../../db/connection';
+import * as schema from '../../../db/schema';
 
 // ---------------------------------------------------------------------------
 // Types for generated test data
@@ -138,7 +139,7 @@ export function expenseListArb(
 
 export interface TestDb {
   sqlite: Database;
-  drizzle: BunSQLiteDatabase<Record<string, unknown>>;
+  drizzle: AppDatabase;
 }
 
 /** Create an in-memory SQLite DB with the full schema applied. */
@@ -147,7 +148,7 @@ export function createTestDb(): TestDb {
   const sqlite = new Database(':memory:');
   sqlite.run('PRAGMA foreign_keys = ON');
   applyMigrationsUpTo(sqlite, migrations, migrations.length - 1);
-  return { sqlite, drizzle: drizzle(sqlite) };
+  return { sqlite, drizzle: drizzle(sqlite, { schema }) };
 }
 
 /** Insert a test user into the DB. */

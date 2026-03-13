@@ -10,11 +10,12 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { and, eq, isNotNull } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import type { AppDatabase } from '../../../db/connection';
 import type { PolicyTerm } from '../../../db/schema';
+import * as schema from '../../../db/schema';
 import { expenses, insurancePolicyVehicles, vehicles } from '../../../db/schema';
 import type { CreatePolicyData, TermVehicleCoverage } from '../repository';
 import { InsurancePolicyRepository } from '../repository';
@@ -30,7 +31,7 @@ import {
 // ---------------------------------------------------------------------------
 
 let sqliteDb: Database;
-let db: BunSQLiteDatabase<Record<string, unknown>>;
+let db: AppDatabase;
 let repo: InsurancePolicyRepository;
 
 const USER_ID = 'test-user-1';
@@ -64,7 +65,7 @@ beforeEach(() => {
   for (const m of migrations) {
     applyMigration(sqliteDb, m);
   }
-  db = drizzle(sqliteDb);
+  db = drizzle(sqliteDb, { schema });
   repo = new InsurancePolicyRepository(db);
   seedTestData();
 });
