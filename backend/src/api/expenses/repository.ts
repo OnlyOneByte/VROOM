@@ -1,11 +1,11 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
-import type { AppDatabase } from '../../db/connection';
 import { CONFIG } from '../../config';
+import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
-import { extractMonth, formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, odometerEntries, photos, vehicles } from '../../db/schema';
+import { extractMonth, formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import type { PaginatedResult } from '../../utils/pagination';
@@ -252,8 +252,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
       const result = await this.db
         .select({
-          month:
-            extractMonth(expenses.date).as('month'),
+          month: extractMonth(expenses.date).as('month'),
           total: sql<number>`sum(${expenses.expenseAmount})`.as('total'),
         })
         .from(expenses)
@@ -409,9 +408,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         // Monthly trend
         this.db
           .select({
-            period: formatYearMonth(expenses.date).as(
-              'period'
-            ),
+            period: formatYearMonth(expenses.date).as('period'),
             amount: sql<number>`SUM(${expenses.expenseAmount})`,
             count: sql<number>`count(*)`,
           })

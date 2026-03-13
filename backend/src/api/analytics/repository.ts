@@ -611,11 +611,7 @@ export class AnalyticsRepository {
       .select({ total: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)` })
       .from(expenses)
       .where(
-        and(
-          eq(expenses.userId, userId),
-          gte(expenses.date, yearStart),
-          lt(expenses.date, yearEnd)
-        )
+        and(eq(expenses.userId, userId), gte(expenses.date, yearStart), lt(expenses.date, yearEnd))
       );
     return result[0]?.total ?? 0;
   }

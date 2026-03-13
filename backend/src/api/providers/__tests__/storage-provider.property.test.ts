@@ -8,7 +8,7 @@
 
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import fc from 'fast-check';
-import { coalesceGoogleDriveFile } from '../domains/storage/google-drive-provider';
+import { coalesceGoogleDriveFile } from '../domains/storage/drive-file-utils';
 import type { DriveFile } from '../services/google-drive-service';
 
 // ---------------------------------------------------------------------------

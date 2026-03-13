@@ -1,5 +1,5 @@
-import { eq } from 'drizzle-orm';
 import type { Column, Table } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { AppDatabase } from '../db/connection';
 import { NotFoundError } from '../errors';
 
