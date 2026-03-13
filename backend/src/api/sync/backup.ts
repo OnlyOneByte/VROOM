@@ -60,11 +60,7 @@ for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
  * so the backup pipeline works regardless of the underlying database.
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Column type coercion requires checking multiple column types
-export function coerceRow(
-  row: Record<string, unknown>,
-  // biome-ignore lint/suspicious/noExplicitAny: Generic table type from Drizzle
-  table: Table
-): Record<string, unknown> {
+export function coerceRow(row: Record<string, unknown>, table: Table): Record<string, unknown> {
   const columns = getTableColumns(table);
   const coerced: Record<string, unknown> = { ...row };
 
@@ -497,11 +493,7 @@ export class BackupService {
       quote: '"',
     }) as Record<string, string>[];
   }
-  private coerceCSVRow(
-    row: Record<string, unknown>,
-    // biome-ignore lint/suspicious/noExplicitAny: Generic table type from Drizzle
-    table: Table
-  ): Record<string, unknown> {
+  private coerceCSVRow(row: Record<string, unknown>, table: Table): Record<string, unknown> {
     return coerceRow(row, table);
   }
 

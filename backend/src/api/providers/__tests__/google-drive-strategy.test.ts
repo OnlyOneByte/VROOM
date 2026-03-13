@@ -55,7 +55,7 @@ mock.module('../../../utils/logger', () => ({
 // Import the real backup module — don't mock it, since other test files depend
 // on its real exports (coerceRow, validateBackupData, etc.).
 // Instead, spy on the singleton's methods directly.
-import { backupService, resolveBackupFolderPath } from '../../sync/backup';
+import { backupService } from '../../sync/backup';
 
 // Import after mocks are set up
 const { GoogleDriveStrategy } = await import('../backup-strategies/google-drive-strategy');

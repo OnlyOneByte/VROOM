@@ -12,10 +12,11 @@ import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createId } from '@paralleldrive/cuid2';
 import { eq } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import type { AppDatabase } from '../../../db/connection';
+import * as schema from '../../../db/schema';
 import { expenses, photos } from '../../../db/schema';
 import { ExpenseRepository } from '../repository';
 import type { SplitConfig } from '../validation';
@@ -25,7 +26,7 @@ import type { SplitConfig } from '../validation';
 // ---------------------------------------------------------------------------
 
 let sqliteDb: Database;
-let db: BunSQLiteDatabase<Record<string, unknown>>;
+let db: AppDatabase;
 let repo: ExpenseRepository;
 
 const USER_ID = 'test-user-1';
@@ -49,7 +50,7 @@ beforeEach(() => {
   for (const m of migrations) {
     applyMigration(sqliteDb, m);
   }
-  db = drizzle(sqliteDb);
+  db = drizzle(sqliteDb, { schema });
   repo = new ExpenseRepository(db);
   seedTestData();
 });
@@ -150,7 +151,7 @@ const categoryArb = fc.constantFrom(
 // Helper: insert photos attached to expense IDs
 // ---------------------------------------------------------------------------
 async function insertPhotos(
-  drizzleDb: BunSQLiteDatabase<Record<string, unknown>>,
+  drizzleDb: AppDatabase,
   expenseIds: string[],
   count: number
 ): Promise<string[]> {

@@ -6,7 +6,6 @@
  */
 
 import { logger } from '../../../../utils/logger';
-import type { DriveFile } from '../../services/google-drive-service';
 import { GoogleDriveService } from '../../services/google-drive-service';
 import { coalesceGoogleDriveFile } from './drive-file-utils';
 import type {

@@ -11,16 +11,17 @@
 
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import type { AppDatabase } from '../../../db/connection';
 import type { NewOdometerEntry } from '../../../db/schema';
+import * as schema from '../../../db/schema';
 import { OdometerRepository } from '../repository';
 
 describe('Property 2: Upsert idempotency', () => {
   let db: Database;
-  let drizzleDb: BunSQLiteDatabase<Record<string, unknown>>;
+  let drizzleDb: AppDatabase;
   let repo: OdometerRepository;
   const migrations = loadMigrations();
 
@@ -37,7 +38,7 @@ describe('Property 2: Upsert idempotency', () => {
       "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022)"
     );
 
-    drizzleDb = drizzle(db);
+    drizzleDb = drizzle(db, { schema });
     repo = new OdometerRepository(drizzleDb);
   });
 
@@ -108,7 +109,7 @@ describe('Property 2: Upsert idempotency', () => {
  */
 describe('Property 3: Link field consistency invariant', () => {
   let db: Database;
-  let drizzleDb: BunSQLiteDatabase<Record<string, unknown>>;
+  let drizzleDb: AppDatabase;
   let repo: OdometerRepository;
   const migrations = loadMigrations();
 
@@ -124,7 +125,7 @@ describe('Property 3: Link field consistency invariant', () => {
       "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022)"
     );
 
-    drizzleDb = drizzle(db);
+    drizzleDb = drizzle(db, { schema });
     repo = new OdometerRepository(drizzleDb);
   });
 

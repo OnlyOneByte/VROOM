@@ -173,7 +173,6 @@ export const CONFIG = {
 
 export type RestoreMode = (typeof CONFIG.backup.supportedModes)[number];
 
-// biome-ignore lint/suspicious/noExplicitAny: Generic table type
 export const TABLE_SCHEMA_MAP: Record<string, Table> = {
   vehicles,
   expenses,
