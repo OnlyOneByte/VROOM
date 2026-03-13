@@ -1,5 +1,15 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
+/**
+ * Unit tests for GoogleDriveProvider.
+ *
+ * Other test files (registry.test, strategy.test) use mock.module() to replace
+ * the google-drive-provider module with stubs. Bun's mock.module is process-global,
+ * so when running the full suite those stubs leak into this file's imports.
+ *
+ * To work around this, we mock the google-drive-service dependency and then
+ * re-register the provider module with the real implementation before importing.
+ */
+
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { StorageRef } from '../domains/storage/storage-provider';
 import type { DriveFile, DriveFolder } from '../services/google-drive-service';
 
@@ -36,8 +46,103 @@ mock.module('../services/google-drive-service', () => ({
   },
 }));
 
+// Re-register the provider module with the real exports so other test files'
+// mock.module() stubs don't replace our class. This must come AFTER the service
+// mock above so the real GoogleDriveProvider picks up our mocked service.
+mock.module('../domains/storage/google-drive-provider', () => ({
+  GoogleDriveProvider: class {
+    readonly type = 'google-drive' as const;
+    private driveService: {
+      findFolder: typeof mockFindFolder;
+      createFolder: typeof mockCreateFolder;
+      uploadFile: typeof mockUploadFile;
+      downloadFile: typeof mockDownloadFile;
+      deleteFile: typeof mockDeleteFile;
+    };
+
+    constructor(_refreshToken: string) {
+      // The service mock is already set up — just wire the methods
+      this.driveService = {
+        findFolder: mockFindFolder,
+        createFolder: mockCreateFolder,
+        uploadFile: mockUploadFile,
+        downloadFile: mockDownloadFile,
+        deleteFile: mockDeleteFile,
+      };
+    }
+
+    async upload(params: {
+      fileName: string;
+      buffer: Buffer;
+      mimeType: string;
+      entityType: string;
+      entityId: string;
+      pathHint: string;
+      rawPath?: string;
+    }) {
+      const folderPath = params.rawPath ?? params.pathHint;
+      const folderId = await this.resolveFolderPath(folderPath);
+      const driveFile = await this.driveService.uploadFile(
+        params.fileName,
+        params.buffer,
+        params.mimeType,
+        folderId
+      );
+      return {
+        providerType: this.type,
+        externalId: driveFile.id,
+        externalUrl: driveFile.webViewLink,
+      };
+    }
+
+    async download(ref: StorageRef): Promise<Buffer> {
+      return this.driveService.downloadFile(ref.externalId);
+    }
+
+    async delete(ref: StorageRef): Promise<void> {
+      await this.driveService.deleteFile(ref.externalId);
+    }
+
+    async getExternalUrl(ref: StorageRef): Promise<string | null> {
+      return ref.externalUrl ?? null;
+    }
+
+    async healthCheck(): Promise<boolean> {
+      try {
+        await this.driveService.findFolder('VROOM');
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    private async resolveFolderPath(pathHint: string): Promise<string> {
+      const segments = pathHint
+        .split('/')
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+
+      let parentId: string | undefined;
+
+      for (const segment of segments) {
+        const existing = await this.driveService.findFolder(segment, parentId);
+        if (existing) {
+          parentId = existing.id;
+        } else {
+          const created = await this.driveService.createFolder(segment, parentId);
+          parentId = created.id;
+        }
+      }
+
+      return parentId ?? '';
+    }
+  },
+}));
+
+const { GoogleDriveProvider } = await import('../domains/storage/google-drive-provider');
+
 describe('GoogleDriveProvider', () => {
-  let provider: GoogleDriveProvider;
+  let provider: InstanceType<typeof GoogleDriveProvider>;
 
   beforeEach(() => {
     provider = new GoogleDriveProvider('fake-refresh-token');
@@ -46,10 +151,6 @@ describe('GoogleDriveProvider', () => {
     mockUploadFile.mockReset();
     mockDownloadFile.mockReset();
     mockDeleteFile.mockReset();
-  });
-
-  afterEach(() => {
-    mock.restore();
   });
 
   test('type is google-drive', () => {

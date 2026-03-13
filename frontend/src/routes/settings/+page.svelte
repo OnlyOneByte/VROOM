@@ -43,12 +43,8 @@
 	import { fetchLastSyncTime } from '$lib/utils/sync-manager';
 	import { providerApi } from '$lib/services/provider-api';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
-	import type {
-		BackupConfig,
-		BackupOrchestratorResult,
-		RestoreResult,
-		UserProviderInfo
-	} from '$lib/types';
+	import { toast } from 'svelte-sonner';
+	import type { BackupConfig, RestoreResult, UserProviderInfo } from '$lib/types';
 
 	let activeView = $state<'settings' | 'profile'>('settings');
 	let user = $derived(authStore.user);
@@ -77,7 +73,6 @@
 
 	let isSaving = $state(false);
 	let isBackingUp = $state(false);
-	let isSyncing = $state(false);
 
 	// Unit preferences
 	let distanceUnit = $state<'miles' | 'kilometers'>('miles');
@@ -114,7 +109,6 @@
 	// Dialog state
 	let showBackupDialog = $state(false);
 	let showRestoreDialog = $state(false);
-	let syncResults = $state<BackupOrchestratorResult | null>(null);
 
 	let isInitialized = $state(false);
 
@@ -178,40 +172,43 @@
 	}
 
 	function handleBackupNowClick() {
-		syncResults = null;
 		showBackupDialog = true;
 	}
 
 	async function handleBackupExecute() {
-		isSyncing = true;
-		syncResults = null;
+		showBackupDialog = false;
+		const toastId = toast.loading('Backup in progress...');
+
 		try {
 			const result = await settingsStore.executeSync(['backup'], true);
 			const data = result?.data;
-			if (data) {
-				syncResults = data;
 
-				// Handle 409 backup-in-progress
+			if (data) {
 				if (data.status === 'in_progress') {
-					appStore.showError('A backup is already in progress');
+					toast.error('A backup is already in progress', { id: toastId });
 					return;
 				}
 
 				if (data.skipped) {
+					toast.info('No changes since last backup — skipped', { id: toastId });
 					return;
 				}
 
 				const successCount = Object.values(data.results).filter(r => r.success).length;
 				const failCount = Object.values(data.results).filter(r => !r.success).length;
 
-				if (successCount > 0) {
-					appStore.showSuccess(
-						`Backed up to ${successCount} provider${successCount > 1 ? 's' : ''}`
+				if (failCount > 0) {
+					toast.error(`${failCount} provider${failCount > 1 ? 's' : ''} failed`, {
+						id: toastId
+					});
+				} else if (successCount > 0) {
+					toast.success(
+						`Backed up to ${successCount} provider${successCount > 1 ? 's' : ''}`,
+						{ id: toastId }
 					);
 				}
-				if (failCount > 0) {
-					appStore.showError(`${failCount} provider${failCount > 1 ? 's' : ''} failed`);
-				}
+			} else {
+				toast.success('Backup complete', { id: toastId });
 			}
 
 			await fetchLastSyncTime();
@@ -220,12 +217,10 @@
 		} catch (error) {
 			const msg = error instanceof Error ? error.message : 'Failed to execute backup';
 			if (msg.includes('BACKUP_IN_PROGRESS') || msg.includes('backup is already in progress')) {
-				appStore.showError('A backup is already in progress. Please try again later.');
+				toast.error('A backup is already in progress. Please try again later.', { id: toastId });
 			} else {
-				appStore.showError(msg);
+				toast.error(msg, { id: toastId });
 			}
-		} finally {
-			isSyncing = false;
 		}
 	}
 
@@ -542,9 +537,7 @@
 
 	<BackupNowDialog
 		bind:open={showBackupDialog}
-		{isSyncing}
 		{backupProvidersEnabled}
-		{syncResults}
 		onSync={handleBackupExecute}
 	/>
 

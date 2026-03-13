@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, test } from 'bun:test';
+import { describe, expect, mock, test } from 'bun:test';
 import type { UserProvider } from '../../../db/schema';
 import type { StorageConfig } from '../../../types';
 import { StorageProviderRegistry } from '../domains/storage/registry';
@@ -19,6 +19,14 @@ mock.module('../domains/storage/google-drive-provider', () => ({
     getExternalUrl = mock(() => Promise.resolve(null));
     healthCheck = mock(() => Promise.resolve(true));
   },
+  // Preserve exports that other test files import from this module
+  coalesceGoogleDriveFile: (f: Record<string, unknown>) => ({
+    key: f.id,
+    name: f.name,
+    size: Number(f.size) || 0,
+    createdTime: f.createdTime ?? f.modifiedTime ?? new Date(0).toISOString(),
+    lastModified: f.modifiedTime ?? f.createdTime ?? new Date(0).toISOString(),
+  }),
 }));
 
 // --- Test fixtures ---
@@ -86,10 +94,6 @@ function createMockDb(resultQueue: unknown[][]) {
 }
 
 describe('StorageProviderRegistry', () => {
-  afterEach(() => {
-    mock.restore();
-  });
-
   describe('getDefaultProvider', () => {
     test('returns correct provider with resolved folder path', async () => {
       // Call 1: loadStorageConfig → settings row

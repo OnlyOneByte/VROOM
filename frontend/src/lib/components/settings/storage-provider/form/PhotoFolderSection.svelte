@@ -32,12 +32,12 @@
 	let rootPrefix = $derived(providerRootPath ? `${providerRootPath.replace(/\/+$/, '')}/` : '');
 
 	// eslint-disable-next-line svelte/prefer-writable-derived -- rootPath is locally editable, reset on provider change
-	let rootPath = $state((provider.config?.['photoRootPath'] as string) ?? 'Photos');
+	let photoRootPath = $state('Photos');
 	let advancedOpen = $state(false);
 
-	// Reset rootPath when provider changes
+	// Set/reset rootPath when provider changes
 	$effect(() => {
-		rootPath = (provider.config?.['photoRootPath'] as string) ?? 'Photos';
+		photoRootPath = (provider.config?.['photoRootPath'] as string) ?? 'Photos';
 	});
 
 	let saveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -45,16 +45,16 @@
 	function handleRootPathBlur() {
 		if (provider.id === 'new') return;
 		const originalPath = (provider.config?.['photoRootPath'] as string) ?? 'Photos';
-		if (rootPath === originalPath) return;
+		if (photoRootPath === originalPath) return;
 
 		if (saveTimeout) clearTimeout(saveTimeout);
 		saveTimeout = setTimeout(async () => {
 			try {
 				await providerApi.updateProvider(provider.id, {
-					config: { ...provider.config, photoRootPath: rootPath }
+					config: { ...provider.config, photoRootPath: photoRootPath }
 				});
 			} catch {
-				rootPath = originalPath;
+				photoRootPath = originalPath;
 			}
 		}, 300);
 	}
@@ -109,9 +109,9 @@
 			{/if}
 			<input
 				id="root-path"
-				value={rootPath}
+				value={photoRootPath}
 				oninput={e => {
-					rootPath = e.currentTarget.value;
+					photoRootPath = e.currentTarget.value;
 				}}
 				onblur={handleRootPathBlur}
 				placeholder="Photos"
@@ -169,7 +169,7 @@
 						>
 							{#if rootPrefix}
 								<span class="pl-2 text-muted-foreground select-none shrink-0 text-xs"
-									>{rootPrefix}{rootPath}/</span
+									>{rootPrefix}{photoRootPath}/</span
 								>
 							{/if}
 							<input
