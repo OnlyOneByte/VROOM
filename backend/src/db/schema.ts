@@ -418,10 +418,3 @@ export type NewPhoto = typeof photos.$inferInsert;
 
 export type PhotoRef = typeof photoRefs.$inferSelect;
 export type NewPhotoRef = typeof photoRefs.$inferInsert;
-
-export type PhotoEntityType =
-  | 'vehicle'
-  | 'expense'
-  | 'trip'
-  | 'insurance_policy'
-  | 'odometer_entry';

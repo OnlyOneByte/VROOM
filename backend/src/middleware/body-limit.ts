@@ -7,7 +7,7 @@
 import type { Context, Next } from 'hono';
 import { createErrorResponse } from '../errors';
 
-export interface BodyLimitConfig {
+interface BodyLimitConfig {
   maxSize: number;
   message?: string;
 }

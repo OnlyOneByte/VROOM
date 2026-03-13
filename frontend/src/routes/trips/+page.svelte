@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
 	import { MapPin } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
@@ -27,7 +29,7 @@
 			analyze driving patterns across your vehicles.
 		{/snippet}
 		{#snippet action()}
-			<Button href="/dashboard">Back to Dashboard</Button>
+			<Button href={resolve(routes.dashboard)}>Back to Dashboard</Button>
 		{/snippet}
 	</EmptyState>
 </div>

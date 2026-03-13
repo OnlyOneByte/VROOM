@@ -60,6 +60,3 @@ export function formatCompactRelativeTime(date: Date | null): string {
 	if (hours < 24) return `${hours}h ago`;
 	return `${days}d ago`;
 }
-
-// Re-export debounce from canonical location
-export { debounce } from './memoize';

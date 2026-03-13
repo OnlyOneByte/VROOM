@@ -16,12 +16,12 @@ import { ApiError } from '$lib/utils/error-handling';
 import { apiClient } from './api-client';
 
 /** Parameters accepted by the fuel efficiency endpoint. */
-export interface FuelEfficiencyParams {
+interface FuelEfficiencyParams {
 	vehicleId?: string;
 }
 
 /** Response shape returned by the fuel efficiency endpoint. */
-export interface FuelEfficiencyResponse {
+interface FuelEfficiencyResponse {
 	fuelEfficiencyTrend: FuelEfficiencyPoint[];
 }
 

@@ -1,11 +1,11 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
 import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, odometerEntries, photos, vehicles } from '../../db/schema';
-import { extractMonth, formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
+import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import type { PaginatedResult } from '../../utils/pagination';
@@ -187,108 +187,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         error: error instanceof Error ? error.message : String(error),
       });
       throw new DatabaseError('Failed to find expenses', error);
-    }
-  }
-
-  async batchCreate(expenseList: NewExpense[]): Promise<Expense[]> {
-    try {
-      const result = await this.db.insert(expenses).values(expenseList).returning();
-      logger.info('Batch created expenses', { count: result.length });
-      return result;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Failed to batch create expenses', {
-        count: expenseList.length,
-        error: errorMessage,
-      });
-
-      if (errorMessage.includes('FOREIGN KEY constraint')) {
-        throw new DatabaseError('Invalid vehicle reference in batch expense creation', error);
-      }
-
-      throw new DatabaseError('Failed to batch create expenses', error);
-    }
-  }
-
-  async getTotalByCategory(
-    vehicleId: string,
-    startDate?: Date,
-    endDate?: Date
-  ): Promise<{ category: string; total: number }[]> {
-    try {
-      const whereConditions = [eq(expenses.vehicleId, vehicleId)];
-
-      if (startDate && endDate) {
-        whereConditions.push(gte(expenses.date, startDate));
-        whereConditions.push(lte(expenses.date, endDate));
-      }
-
-      const result = await this.db
-        .select({
-          category: expenses.category,
-          total: sql<number>`sum(${expenses.expenseAmount})`.as('total'),
-        })
-        .from(expenses)
-        .where(and(...whereConditions))
-        .groupBy(expenses.category);
-
-      return result.map((row) => ({
-        category: row.category,
-        total: Number(row.total) || 0,
-      }));
-    } catch (error) {
-      logger.error('Error getting total by category for vehicle', { vehicleId, error });
-      throw new DatabaseError('Failed to get total by category', error);
-    }
-  }
-
-  async getMonthlyTotals(
-    vehicleId: string,
-    year: number
-  ): Promise<{ month: number; total: number }[]> {
-    try {
-      const startDate = new Date(year, 0, 1);
-      const endDate = new Date(year, 11, 31, 23, 59, 59);
-
-      const result = await this.db
-        .select({
-          month: extractMonth(expenses.date).as('month'),
-          total: sql<number>`sum(${expenses.expenseAmount})`.as('total'),
-        })
-        .from(expenses)
-        .where(
-          and(
-            eq(expenses.vehicleId, vehicleId),
-            gte(expenses.date, startDate),
-            lte(expenses.date, endDate)
-          )
-        )
-        .groupBy(extractMonth(expenses.date))
-        .orderBy(sql`month`);
-
-      return result.map((row) => ({
-        month: row.month,
-        total: Number(row.total) || 0,
-      }));
-    } catch (error) {
-      logger.error('Error getting monthly totals for vehicle', { vehicleId, year, error });
-      throw new DatabaseError('Failed to get monthly totals', error);
-    }
-  }
-
-  async findFinancingByVehicleId(vehicleId: string): Promise<Expense[]> {
-    try {
-      return await this.db
-        .select()
-        .from(expenses)
-        .where(and(eq(expenses.vehicleId, vehicleId), eq(expenses.isFinancingPayment, true)))
-        .orderBy(asc(expenses.date));
-    } catch (error) {
-      logger.error('Failed to find financing expenses for vehicle', {
-        vehicleId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new DatabaseError('Failed to find financing expenses', error);
     }
   }
 

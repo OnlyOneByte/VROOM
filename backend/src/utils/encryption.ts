@@ -8,7 +8,7 @@ const KEY_LENGTH = 32; // 256 bits
 /** Cached encryption key — parsed once, reused for all encrypt/decrypt calls. */
 let _cachedKey: Buffer | null = null;
 
-export function getEncryptionKey(): Buffer {
+function getEncryptionKey(): Buffer {
   if (_cachedKey) return _cachedKey;
 
   const hex = process.env.PROVIDER_ENCRYPTION_KEY;

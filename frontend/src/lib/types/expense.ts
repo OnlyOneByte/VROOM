@@ -7,12 +7,6 @@ export type ExpenseCategory =
 	| 'enhancement'
 	| 'misc';
 
-export interface ExpenseCategoryInfo {
-	value: string;
-	label: string;
-	description: string;
-}
-
 // Common tag suggestions (not enforced)
 export const COMMON_EXPENSE_TAGS = [
 	'fuel',

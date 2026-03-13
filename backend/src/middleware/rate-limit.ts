@@ -11,7 +11,7 @@ import type { Context, Next } from 'hono';
 import { CONFIG } from '../config';
 import { createErrorResponse } from '../errors';
 
-export interface RateLimitConfig {
+interface RateLimitConfig {
   windowMs: number;
   limit: number;
   keyGenerator: (c: Context) => string;

@@ -4,34 +4,6 @@
  */
 
 /**
- * Memoize a function with a single argument
- * @param fn - Function to memoize
- * @returns Memoized function
- */
-export function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
-	const cache = new Map<string, R>();
-	const MAX_CACHE_SIZE = 100;
-
-	return (arg: T): R => {
-		const key = JSON.stringify(arg);
-
-		if (cache.has(key)) {
-			return cache.get(key)!;
-		}
-
-		const result = fn(arg);
-
-		if (cache.size >= MAX_CACHE_SIZE) {
-			const firstKey = cache.keys().next().value;
-			if (firstKey !== undefined) cache.delete(firstKey);
-		}
-
-		cache.set(key, result);
-		return result;
-	};
-}
-
-/**
  * Memoize a function with multiple arguments
  * @param fn - Function to memoize
  * @returns Memoized function

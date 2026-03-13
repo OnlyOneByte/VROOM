@@ -46,15 +46,6 @@ export interface VehicleFinancing {
 	updatedAt: string;
 }
 
-export interface FuelEfficiency {
-	vehicleId: string;
-	date: string;
-	mpg: number;
-	milesPerMonth: number;
-	costPerMile: number;
-	totalGallons: number;
-}
-
 export interface VehicleStats {
 	period: '7d' | '30d' | '90d' | '1y' | 'all';
 	totalMileage: number;

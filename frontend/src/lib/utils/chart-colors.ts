@@ -6,9 +6,6 @@
 
 import type { ExpenseCategory } from '$lib/types';
 
-// Re-export for convenience so existing consumers don't break.
-export type { ExpenseCategory };
-
 /** Semantic chart color CSS custom properties (var(--chart-1) through var(--chart-5)). */
 export const CHART_COLORS = [
 	'var(--chart-1)',

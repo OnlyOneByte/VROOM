@@ -1,13 +1,13 @@
 import type { OdometerEntry, PaginatedResponse, Photo } from '$lib/types';
 import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 
-export interface CreateOdometerRequest {
+interface CreateOdometerRequest {
 	odometer: number;
 	recordedAt: string;
 	note?: string;
 }
 
-export interface UpdateOdometerRequest {
+interface UpdateOdometerRequest {
 	odometer?: number;
 	recordedAt?: string;
 	note?: string;

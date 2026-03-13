@@ -15,10 +15,10 @@ import {
 import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 
 /** Convenience alias for a paginated response of transformed frontend Expenses. */
-export type PaginatedExpenseResponse = PaginatedResponse<Expense>;
+type PaginatedExpenseResponse = PaginatedResponse<Expense>;
 
 /** Parameters accepted by paginated expense list methods. */
-export interface ExpenseListParams {
+interface ExpenseListParams {
 	limit?: number;
 	offset?: number;
 	category?: string;
@@ -29,7 +29,7 @@ export interface ExpenseListParams {
 }
 
 /** Parameters accepted by the expense summary endpoint. */
-export interface ExpenseSummaryParams {
+interface ExpenseSummaryParams {
 	vehicleId?: string;
 	period?: string;
 }

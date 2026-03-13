@@ -2,12 +2,6 @@
  * Time period constants for date calculations
  */
 
-// Days in recent expense period (for "Last 30 Days" stat)
-export const DAYS_IN_RECENT_PERIOD = 30;
-
-// Months for calculating average expenses
-export const MONTHS_IN_AVERAGE_PERIOD = 12;
-
 // Period type definition
 export type TimePeriod = '7d' | '30d' | '90d' | '1y' | 'all';
 

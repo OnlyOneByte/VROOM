@@ -11,7 +11,7 @@ import type { Expense } from '../db/schema';
  * Minimal shape required by efficiency calculations.
  * Both Expense (full DB row) and FuelExpense (lightweight stats type) satisfy this.
  */
-export interface EfficiencyExpense {
+interface EfficiencyExpense {
   mileage: number | null;
   fuelAmount: number | null;
   missedFillup: boolean;
@@ -128,100 +128,4 @@ export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[])
 
   const sum = milesPerKwhValues.reduce((acc, val) => acc + val, 0);
   return sum / milesPerKwhValues.length;
-}
-
-// ============================================================================
-// COST CALCULATIONS
-// ============================================================================
-
-/**
- * Calculate cost per mile
- */
-export function calculateCostPerMile(cost: number, miles: number): number {
-  return miles > 0 ? cost / miles : 0;
-}
-
-/**
- * Round currency values to 2 decimal places
- */
-export function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-// ============================================================================
-// DATE GROUPING
-// ============================================================================
-
-/**
- * Group a date by the specified period
- * Returns a string key that can be used for grouping
- */
-export function groupByPeriod(date: Date, period: 'day' | 'week' | 'month' | 'year'): string {
-  const d = new Date(date);
-
-  switch (period) {
-    case 'day':
-      return d.toISOString().substring(0, 10); // YYYY-MM-DD
-    case 'week': {
-      // Get the start of the week (Sunday)
-      const weekStart = new Date(d);
-      weekStart.setDate(d.getDate() - d.getDay());
-      return weekStart.toISOString().substring(0, 10);
-    }
-    case 'month':
-      return d.toISOString().substring(0, 7); // YYYY-MM
-    case 'year':
-      return d.getFullYear().toString();
-    default:
-      return d.toISOString().substring(0, 7); // Default to month
-  }
-}
-
-/**
- * Calculate monthly breakdown for insurance policy
- */
-export function calculateMonthlyBreakdown(policy: {
-  startDate: Date;
-  endDate: Date;
-  monthlyCost: number;
-  termLengthMonths: number;
-}) {
-  const startDate = new Date(policy.startDate);
-  const endDate = new Date(policy.endDate);
-  const breakdown: {
-    month: number;
-    cost: number;
-    monthName: string;
-    startDate?: string;
-    endDate?: string;
-    isPaid?: boolean;
-    daysInMonth?: number;
-  }[] = [];
-  const currentDate = new Date(startDate);
-  let monthNumber = 1;
-
-  while (currentDate < endDate && monthNumber <= policy.termLengthMonths) {
-    const monthStart = new Date(currentDate);
-    const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-
-    if (monthEnd > endDate) {
-      monthEnd.setTime(endDate.getTime());
-    }
-
-    breakdown.push({
-      month: monthNumber,
-      monthName: monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-      startDate: monthStart.toISOString().split('T')[0],
-      endDate: monthEnd.toISOString().split('T')[0],
-      cost: Math.round(policy.monthlyCost * 100) / 100,
-      isPaid: monthEnd < new Date(),
-      daysInMonth:
-        Math.ceil((monthEnd.getTime() - monthStart.getTime()) / (24 * 60 * 60 * 1000)) + 1,
-    });
-
-    currentDate.setMonth(currentDate.getMonth() + 1);
-    monthNumber++;
-  }
-
-  return breakdown;
 }

@@ -3,7 +3,7 @@ import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewVehicle, Vehicle, VehicleWithFinancing } from '../../db/schema';
 import { vehicleFinancing, vehicles } from '../../db/schema';
-import { DatabaseError, NotFoundError } from '../../errors';
+import { DatabaseError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
@@ -53,38 +53,6 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
       .where(eq(vehicles.licensePlate, licensePlate))
       .limit(1);
     return result[0] || null;
-  }
-
-  async updateMileage(id: string, mileage: number): Promise<Vehicle> {
-    try {
-      const result = await this.db
-        .update(vehicles)
-        .set({
-          initialMileage: mileage,
-          updatedAt: new Date(),
-        })
-        .where(eq(vehicles.id, id))
-        .returning();
-
-      if (result.length === 0) {
-        logger.warn('Vehicle not found for mileage update', { id, mileage });
-        throw new NotFoundError('Vehicle');
-      }
-
-      logger.info('Updated vehicle mileage', { id, mileage });
-      return result[0];
-    } catch (error) {
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-
-      logger.error('Failed to update vehicle mileage', {
-        id,
-        mileage,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new DatabaseError(`Failed to update mileage for vehicle ${id}`, error);
-    }
   }
 
   async findByIdWithAccess(
