@@ -163,10 +163,10 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
    * **Validates: Requirements 3.1**
    *
    * Observation: /callback/google with a new Google account creates a user
-   * record with the correct fields (id, email, displayName, provider, providerId).
+   * record with the correct fields (id, email, displayName).
    *
    * Property: For all new user login flows, the callback inserts a user record
-   * with id = `google_${sub}`, the Google email, display name, and provider info.
+   * with id = `google_${sub}`, the Google email, and display name.
    */
   test('callback/google creates new user with correct id format and fields', () => {
     fc.assert(
@@ -175,9 +175,9 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
 
         // Insert a new user as the callback would
         sqliteDb.run(
-          `INSERT INTO users (id, email, display_name, provider, provider_id)
-             VALUES (?, ?, ?, 'google', ?)`,
-          [userId, email, displayName, googleSub]
+          `INSERT INTO users (id, email, display_name)
+             VALUES (?, ?, ?)`,
+          [userId, email, displayName]
         );
 
         // Verify the user was created correctly
@@ -190,8 +190,6 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
         expect(user?.id).toBe(userId);
         expect(user?.email).toBe(email);
         expect(user?.display_name).toBe(displayName);
-        expect(user?.provider).toBe('google');
-        expect(user?.provider_id).toBe(googleSub);
 
         // Clean up for next iteration
         sqliteDb.run('DELETE FROM users WHERE id = ?', [userId]);
@@ -204,11 +202,11 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
    * **Validates: Requirements 3.1, 3.2**
    *
    * Observation: /callback/google with an existing user finds the user by
-   * providerId, optionally updates the refresh token, creates a session,
+   * email, optionally updates the refresh token, creates a session,
    * and redirects.
    *
    * Property: For all existing user login flows, the callback finds the user
-   * by providerId, creates a session record in the sessions table, and the
+   * by email, creates a session record in the sessions table, and the
    * session references the correct userId.
    */
   test('callback/google with existing user creates session referencing correct userId', () => {
@@ -218,15 +216,15 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
 
         // Seed an existing user (as if they logged in before)
         sqliteDb.run(
-          `INSERT INTO users (id, email, display_name, provider, provider_id)
-             VALUES (?, ?, ?, 'google', ?)`,
-          [userId, email, displayName, googleSub]
+          `INSERT INTO users (id, email, display_name)
+             VALUES (?, ?, ?)`,
+          [userId, email, displayName]
         );
 
-        // Simulate what the callback does: look up user by providerId
+        // Simulate what the callback does: look up user by email
         const existingUser = sqliteDb
-          .query('SELECT * FROM users WHERE provider_id = ? LIMIT 1')
-          .get(googleSub) as Record<string, unknown> | null;
+          .query('SELECT * FROM users WHERE email = ? LIMIT 1')
+          .get(email) as Record<string, unknown> | null;
 
         expect(existingUser).not.toBeNull();
         expect(existingUser?.id).toBe(userId);
@@ -273,9 +271,9 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
 
         // Seed user
         sqliteDb.run(
-          `INSERT INTO users (id, email, display_name, provider, provider_id)
-             VALUES (?, ?, ?, 'google', ?)`,
-          [userId, email, displayName, googleSub]
+          `INSERT INTO users (id, email, display_name)
+             VALUES (?, ?, ?)`,
+          [userId, email, displayName]
         );
 
         // Seed session
@@ -290,7 +288,7 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
         // Simulate what /auth/me does: validate session → get user
         const result = sqliteDb
           .query(
-            `SELECT u.id, u.email, u.display_name, u.provider
+            `SELECT u.id, u.email, u.display_name
                FROM sessions s
                JOIN users u ON s.user_id = u.id
                WHERE s.id = ? AND s.expires_at > ?`
@@ -301,7 +299,6 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
         expect(result?.id).toBe(userId);
         expect(result?.email).toBe(email);
         expect(result?.display_name).toBe(displayName);
-        expect(result?.provider).toBe('google');
 
         // Clean up
         sqliteDb.run('DELETE FROM sessions WHERE id = ?', [sessionId]);
@@ -354,9 +351,9 @@ describe('Property 4: Preservation — Google Sheets sync uses provider credenti
 
           // Seed user
           sqliteDb.run(
-            `INSERT INTO users (id, email, display_name, provider, provider_id)
-             VALUES (?, ?, ?, 'google', ?)`,
-            [userId, email, displayName, googleSub]
+            `INSERT INTO users (id, email, display_name)
+             VALUES (?, ?, ?)`,
+            [userId, email, displayName]
           );
 
           // Seed a Google Drive provider with encrypted credentials containing refreshToken
@@ -401,9 +398,9 @@ describe('Property 4: Preservation — Google Sheets sync uses provider credenti
 
         // Seed user WITHOUT a Google Drive provider
         sqliteDb.run(
-          `INSERT INTO users (id, email, display_name, provider, provider_id)
-             VALUES (?, ?, ?, 'google', ?)`,
-          [userId, email, displayName, googleSub]
+          `INSERT INTO users (id, email, display_name)
+             VALUES (?, ?, ?)`,
+          [userId, email, displayName]
         );
 
         // getUserToken() checks for active Google Drive provider → throws AUTH_INVALID if none
@@ -443,9 +440,9 @@ describe('Property 4: Preservation — Google Sheets sync uses provider credenti
 
           // Seed user
           sqliteDb.run(
-            `INSERT INTO users (id, email, display_name, provider, provider_id)
-             VALUES (?, ?, ?, 'google', ?)`,
-            [userId, email, displayName, googleSub]
+            `INSERT INTO users (id, email, display_name)
+             VALUES (?, ?, ?)`,
+            [userId, email, displayName]
           );
 
           // Seed a Google Drive provider with proper credentials
@@ -496,9 +493,9 @@ describe('Property 4: Preservation — Google Sheets sync uses provider credenti
 
           // Seed user
           sqliteDb.run(
-            `INSERT INTO users (id, email, display_name, provider, provider_id)
-             VALUES (?, ?, ?, 'google', ?)`,
-            [userId, email, displayName, googleSub]
+            `INSERT INTO users (id, email, display_name)
+             VALUES (?, ?, ?)`,
+            [userId, email, displayName]
           );
 
           // Seed a Google Drive provider with credentials

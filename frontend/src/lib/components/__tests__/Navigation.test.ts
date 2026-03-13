@@ -34,8 +34,6 @@ const mockUser: User = {
 	id: '1',
 	email: 'test@example.com',
 	displayName: 'Test User',
-	provider: 'google',
-	providerId: 'google-123',
 	createdAt: '2024-01-01T00:00:00Z',
 	updatedAt: '2024-01-01T00:00:00Z'
 };

@@ -9,11 +9,7 @@
 		onSync: () => void;
 	}
 
-	let {
-		open = $bindable(),
-		backupProvidersEnabled,
-		onSync
-	}: Props = $props();
+	let { open = $bindable(), backupProvidersEnabled, onSync }: Props = $props();
 </script>
 
 <Dialog.Root bind:open>

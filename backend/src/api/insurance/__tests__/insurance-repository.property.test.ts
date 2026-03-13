@@ -41,10 +41,10 @@ const OTHER_VEHICLE_IDS = ['v-other-1', 'v-other-2'];
 
 function seedTestData(): void {
   sqliteDb.run(
-    `INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('${USER_ID}', 'user1@test.com', 'User One', 'google', 'gid-1')`
+    `INSERT INTO users (id, email, display_name) VALUES ('${USER_ID}', 'user1@test.com', 'User One')`
   );
   sqliteDb.run(
-    `INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('${OTHER_USER_ID}', 'user2@test.com', 'User Two', 'google', 'gid-2')`
+    `INSERT INTO users (id, email, display_name) VALUES ('${OTHER_USER_ID}', 'user2@test.com', 'User Two')`
   );
   for (const vid of VEHICLE_IDS) {
     sqliteDb.run(

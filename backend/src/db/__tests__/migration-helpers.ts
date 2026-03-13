@@ -98,7 +98,7 @@ export function countRows(db: Database, table: string): number {
 /** Seed a minimal user + vehicle + expense for data survival tests. */
 export function seedCoreData(db: Database): void {
   db.run(
-    "INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('u1', 'test@example.com', 'Test User', 'google', 'gid-123')"
+    "INSERT INTO users (id, email, display_name) VALUES ('u1', 'test@example.com', 'Test User')"
   );
   db.run(
     "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022)"
