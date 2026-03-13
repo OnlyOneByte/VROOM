@@ -92,7 +92,8 @@ export class GoogleDriveStrategy implements BackupStrategy {
       const backupFolderPath = resolveBackupFolderPath(context.providerRow, context.providerConfig);
       const spreadsheetInfo = await sheetsService.createOrUpdateVroomSpreadsheet(
         context.userId,
-        backupFolderPath
+        backupFolderPath,
+        context.displayName
       );
 
       return {
