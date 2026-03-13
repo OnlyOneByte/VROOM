@@ -34,7 +34,6 @@ export class SettingsRepository {
       currencyUnit: 'USD',
       autoBackupEnabled: false,
       backupFrequency: 'weekly',
-      googleDriveBackupEnabled: false,
     };
 
     const result = await this.db.insert(userSettings).values(newSettings).returning();
@@ -54,72 +53,24 @@ export class SettingsRepository {
     return result[0];
   }
 
-  async updateBackupDate(userId: string, backupFolderId?: string): Promise<void> {
-    const updateData: {
-      lastBackupDate: Date;
-      googleDriveBackupFolderId?: string;
-      updatedAt: Date;
-    } = {
-      lastBackupDate: new Date(),
-      updatedAt: new Date(),
-    };
-
-    if (backupFolderId) {
-      updateData.googleDriveBackupFolderId = backupFolderId;
-    }
-
-    await this.db.update(userSettings).set(updateData).where(eq(userSettings.userId, userId));
-  }
-
-  async updateBackupDateWithTime(userId: string, backupDate: Date): Promise<void> {
+  async updateSyncDate(userId: string): Promise<void> {
     await this.db
       .update(userSettings)
       .set({
-        lastBackupDate: backupDate,
+        lastSyncDate: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(userSettings.userId, userId));
   }
 
-  async updateSyncDate(userId: string, spreadsheetId?: string): Promise<void> {
-    const updateData: {
-      lastSyncDate: Date;
-      googleSheetsSpreadsheetId?: string;
-      updatedAt: Date;
-    } = {
-      lastSyncDate: new Date(),
-      updatedAt: new Date(),
-    };
-
-    if (spreadsheetId) {
-      updateData.googleSheetsSpreadsheetId = spreadsheetId;
-    }
-
-    await this.db.update(userSettings).set(updateData).where(eq(userSettings.userId, userId));
-  }
-
-  async updateSyncConfig(
+  async updateBackupConfig(
     userId: string,
-    config: {
-      googleSheetsSyncEnabled?: boolean;
-      googleDriveBackupEnabled?: boolean;
-      syncInactivityMinutes?: number;
-    }
+    config: import('../../types').BackupConfig
   ): Promise<void> {
     await this.db
       .update(userSettings)
       .set({
-        ...config,
-        updatedAt: new Date(),
-      })
-      .where(eq(userSettings.userId, userId));
-  }
-
-  async updateBackupFolderId(userId: string, folderId: string): Promise<void> {
-    await this.db
-      .update(userSettings)
-      .set({
-        googleDriveBackupFolderId: folderId,
+        backupConfig: config,
         updatedAt: new Date(),
       })
       .where(eq(userSettings.userId, userId));

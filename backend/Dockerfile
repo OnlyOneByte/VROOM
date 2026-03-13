@@ -13,9 +13,6 @@ RUN bun install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Generate Drizzle types
-RUN bun run db:generate
-
 # Build the application
 RUN bun build src/index.ts --outdir ./dist --target bun
 

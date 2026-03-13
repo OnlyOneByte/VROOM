@@ -28,6 +28,7 @@ function makeExpense(amount: number, dateIndex: number): Expense {
 	return {
 		id: `exp-${expenseCounter}`,
 		vehicleId: 'vehicle-1',
+		userId: 'user-1',
 		tags: [],
 		category: 'financial',
 		amount,

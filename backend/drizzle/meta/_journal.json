@@ -5,57 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1772408521243,
-      "tag": "0000_jittery_adam_warlock",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1772415177496,
-      "tag": "0001_cold_grandmaster",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1772429897391,
-      "tag": "0002_pretty_wallop",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1772480554062,
-      "tag": "0003_huge_spitfire",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1772584105165,
-      "tag": "0004_consolidated",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1772647678490,
-      "tag": "0005_pretty_chat",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1772779695830,
-      "tag": "0006_flaky_randall_flagg",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1772822609131,
-      "tag": "0007_previous_chameleon",
+      "when": 1773371773353,
+      "tag": "0000_regular_shiver_man",
       "breakpoints": true
     }
   ]

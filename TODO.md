@@ -46,6 +46,7 @@
 
 ### Productionalization must haves
 - [x] (Performance) Expenses table add keys
+- [x] Unify expenses tables
 - [x] Google Cloud Console created
 - [x] Analytics page lazy load 
 - [x] Unified pagination params for APIs 
@@ -55,7 +56,8 @@
     - [x] Set specific backup folders for each type of photo.
     - [x] Be able to backup certain photos to certain
     - [x] Google Drive
-- [ ] Abstract out backup storage provider.
+- [x] Abstract out backup storage provider.
+- [x] Decouple login auth from provider auth 
 - [ ] Abstract out OAuth Login (Login provider)
     - [ ] Backup to more than one google account
 - [ ] Abstract out SQLite backend entirely. Bring your own SQL 

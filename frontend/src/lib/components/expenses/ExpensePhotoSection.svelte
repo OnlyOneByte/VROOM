@@ -2,13 +2,13 @@
 	import { onMount } from 'svelte';
 	import { Upload, Trash2, ImagePlus, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
-	import MediaCaptureDialog from '$lib/components/shared/MediaCaptureDialog.svelte';
+	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
 	import { expenseApi } from '$lib/services/expense-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import type { Photo } from '$lib/types';
 
 	interface Props {
-		entityType: 'expense' | 'expense_group';
+		entityType: 'expense';
 		entityId: string;
 	}
 

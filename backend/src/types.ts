@@ -4,10 +4,8 @@
 
 export type {
   Expense,
-  ExpenseGroup,
   InsurancePolicy,
   NewExpense,
-  NewExpenseGroup,
   NewInsurancePolicy,
   NewPhotoRef,
   NewSession,
@@ -149,20 +147,6 @@ export const DEFAULT_STORAGE_CONFIG: StorageConfig = {
   providerCategories: {},
 };
 
-export interface ApiError {
-  code: string;
-  message: string;
-  details?: unknown;
-}
-
-export interface ApiResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  error?: string | ApiError;
-  count?: number;
-}
-
 export interface BackupMetadata {
   version: string;
   timestamp: string;
@@ -176,7 +160,6 @@ export interface BackupData {
   financing: import('./db/schema').VehicleFinancing[];
   insurance: import('./db/schema').InsurancePolicy[];
   insurancePolicyVehicles: import('./db/schema').InsurancePolicyVehicle[];
-  expenseGroups: import('./db/schema').ExpenseGroup[];
   photos: import('./db/schema').Photo[];
   odometer: import('./db/schema').OdometerEntry[];
   photoRefs: import('./db/schema').PhotoRef[];
@@ -189,8 +172,45 @@ export interface ParsedBackupData {
   financing: Record<string, unknown>[];
   insurance: Record<string, unknown>[];
   insurancePolicyVehicles: Record<string, unknown>[];
-  expenseGroups: Record<string, unknown>[];
   photos: Record<string, unknown>[];
   odometer: Record<string, unknown>[];
   photoRefs: Record<string, unknown>[];
+}
+
+// Backup provider types
+
+export interface ProviderBackupSettings {
+  enabled: boolean;
+  folderPath: string; // e.g., "/Backups" — appended to provider's rootPath
+  retentionCount: number; // Max backups to keep (default 10)
+  lastBackupAt?: string; // ISO 8601 — updated per-provider on successful backup
+  sheetsSyncEnabled?: boolean; // Google Sheets sync toggle (only for google-drive providers)
+  sheetsSpreadsheetId?: string; // The synced spreadsheet ID (only for google-drive providers)
+}
+
+export interface BackupConfig {
+  providers: Record<string, ProviderBackupSettings>; // keyed by providerId
+}
+
+export const DEFAULT_BACKUP_CONFIG: BackupConfig = {
+  providers: {},
+};
+
+export interface BackupFileInfo {
+  providerId: string;
+  providerName: string;
+  providerType: string;
+  fileRef: string; // Provider-specific reference (Drive fileId or S3 key)
+  fileName: string;
+  size: number;
+  createdTime: string;
+  isLatest: boolean;
+}
+
+export interface ProviderBackupList {
+  providerId: string;
+  providerName: string;
+  providerType: string;
+  backups: BackupFileInfo[];
+  error?: string; // If listing failed for this provider
 }

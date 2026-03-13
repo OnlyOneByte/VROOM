@@ -15,8 +15,6 @@ import {
   VolumeUnit,
 } from '../../types';
 import { logger } from '../../utils/logger';
-import { resolveVroomFolderName } from '../sync/folder-name';
-import { getDriveServiceForUser } from '../sync/google-drive';
 import { settingsRepository } from './repository';
 
 /**
@@ -74,6 +72,33 @@ async function validateStorageConfig(
 }
 
 /**
+ * Validate backupConfig provider references.
+ * All provider IDs in backupConfig.providers must exist in user_providers and belong to the user.
+ */
+async function validateBackupConfig(
+  backupConfig: z.infer<typeof backupConfigSchema>,
+  userId: string
+): Promise<void> {
+  const providerIds = Object.keys(backupConfig.providers);
+  if (providerIds.length === 0) return;
+
+  const db = getDb();
+  const ownedProviders = await db
+    .select({ id: userProviders.id })
+    .from(userProviders)
+    .where(and(inArray(userProviders.id, providerIds), eq(userProviders.userId, userId)));
+
+  const ownedIds = new Set(ownedProviders.map((p) => p.id));
+  for (const providerId of providerIds) {
+    if (!ownedIds.has(providerId)) {
+      throw new ValidationError(
+        `Provider '${providerId}' not found or does not belong to this user`
+      );
+    }
+  }
+}
+
+/**
  * Merge incoming storageConfig with existing, producing a full StorageConfig.
  */
 function mergeStorageConfig(
@@ -97,31 +122,6 @@ function mergeStorageConfig(
       ...incoming.providerCategories,
     },
   };
-}
-
-/**
- * Best-effort rename of existing Drive folder when custom name changes.
- */
-async function tryRenameDriveFolder(
-  userId: string,
-  displayName: string,
-  customFolderName: string | null,
-  backupFolderId: string
-): Promise<void> {
-  try {
-    const newFolderName = resolveVroomFolderName(customFolderName, displayName);
-    const driveService = await getDriveServiceForUser(userId);
-    const backupMeta = await driveService.getFileMetadata(backupFolderId);
-    const parentId = backupMeta.parents?.[0];
-    if (parentId) {
-      await driveService.renameFolder(parentId, newFolderName);
-    }
-  } catch (renameError) {
-    logger.warn('Best-effort Drive folder rename failed', {
-      userId,
-      error: renameError instanceof Error ? renameError.message : String(renameError),
-    });
-  }
 }
 
 const routes = new Hono();
@@ -168,29 +168,35 @@ const storageConfigSchema = z.object({
     }),
 });
 
+// Zod schema for per-provider backup settings
+const providerBackupSettingsSchema = z.object({
+  enabled: z.boolean(),
+  folderPath: z
+    .string()
+    .min(1)
+    .max(255)
+    .refine((s) => !s.includes('..'), { message: 'Path traversal not allowed' }),
+  retentionCount: z.number().int().min(1).max(100),
+  lastBackupAt: z.string().datetime().optional(),
+  sheetsSyncEnabled: z.boolean().optional(),
+  sheetsSpreadsheetId: z.string().optional(),
+});
+
+// Zod schema for backup config validation
+const backupConfigSchema = z.object({
+  providers: z
+    .record(z.string().max(64), providerBackupSettingsSchema)
+    .refine((obj) => Object.keys(obj).length <= 20, {
+      message: 'Too many provider entries (max 20)',
+    }),
+});
+
 // Validation schemas derived from db schema
 const baseSettingsSchema = createInsertSchema(userSettings, {
-  googleDriveBackupRetentionCount: z
-    .number()
-    .min(1)
-    .max(CONFIG.validation.settings.maxBackupRetention)
-    .optional(),
   syncInactivityMinutes: z
     .number()
     .min(1)
     .max(CONFIG.validation.settings.maxSyncInactivityMinutes)
-    .optional(),
-  googleDriveCustomFolderName: z
-    .string()
-    .max(255, 'Folder name must be 255 characters or fewer')
-    .refine((s) => !s.includes('/') && !s.includes('\\'), {
-      message: 'Folder name must not contain / or \\',
-    })
-    .transform((s) => {
-      const trimmed = s.trim();
-      return trimmed.length === 0 ? null : trimmed;
-    })
-    .nullable()
     .optional(),
 });
 
@@ -205,10 +211,12 @@ const updateSettingsSchema = baseSettingsSchema
     updatedAt: true,
     unitPreferences: true,
     storageConfig: true,
+    backupConfig: true,
   })
   .extend({
     unitPreferences: partialUnitPreferencesSchema.optional(),
     storageConfig: storageConfigSchema.optional(),
+    backupConfig: backupConfigSchema.optional(),
   })
   .partial();
 
@@ -246,7 +254,12 @@ routes.put('/', async (c) => {
     const existingSettings = await settingsRepository.getOrCreate(user.id);
 
     // Merge partial unitPreferences with existing values
-    const { unitPreferences: partialUnitPrefs, storageConfig, ...restUpdates } = updates;
+    const {
+      unitPreferences: partialUnitPrefs,
+      storageConfig,
+      backupConfig,
+      ...restUpdates
+    } = updates;
     const mergedUnitPreferences: UnitPreferences | undefined = partialUnitPrefs
       ? { ...existingSettings.unitPreferences, ...partialUnitPrefs }
       : undefined;
@@ -260,22 +273,18 @@ routes.put('/', async (c) => {
       await validateStorageConfig(mergedStorageConfig, user.id);
     }
 
+    // Validate backupConfig ownership if provided
+    if (backupConfig) {
+      await validateBackupConfig(backupConfig, user.id);
+    }
+
     // Update settings
     const updatedSettings = await settingsRepository.update(user.id, {
       ...restUpdates,
       ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
       ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
+      ...(backupConfig && { backupConfig }),
     });
-
-    // Best-effort rename of existing Drive folder when custom name changes
-    if ('googleDriveCustomFolderName' in updates && updatedSettings.googleDriveBackupFolderId) {
-      await tryRenameDriveFolder(
-        user.id,
-        user.displayName,
-        updatedSettings.googleDriveCustomFolderName,
-        updatedSettings.googleDriveBackupFolderId
-      );
-    }
 
     return c.json({
       success: true,
@@ -301,7 +310,9 @@ routes.put('/', async (c) => {
 routes.post('/backup', async (c) => {
   try {
     const user = c.get('user');
-    await settingsRepository.updateBackupDate(user.id);
+    await settingsRepository.update(user.id, {
+      lastBackupDate: new Date(),
+    });
 
     return c.json({
       success: true,

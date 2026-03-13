@@ -7,7 +7,6 @@ import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { TABLE_SCHEMA_MAP } from '../../config';
 import { getDb } from '../../db/connection';
 import {
-  expenseGroups,
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
@@ -19,10 +18,9 @@ import {
   vehicles,
 } from '../../db/schema';
 import { SyncError, SyncErrorCode } from '../../errors';
-import type { ParsedBackupData } from '../../types';
+import type { BackupConfig, ParsedBackupData } from '../../types';
 import { settingsRepository } from '../settings/repository';
 import { backupService, coerceRow } from './backup';
-import { GoogleSheetsService } from './google-sheets';
 
 type DrizzleTransaction = Parameters<
   Parameters<BunSQLiteDatabase<Record<string, unknown>>['transaction']>[0]
@@ -41,7 +39,6 @@ export interface ImportSummary {
   financing: number;
   insurance: number;
   insurancePolicyVehicles: number;
-  expenseGroups: number;
   odometer: number;
   photos: number;
   photoRefs: number;
@@ -53,6 +50,7 @@ export interface RestoreResponse {
   imported?: ImportSummary;
   conflicts?: Conflict[];
 }
+
 class RestoreService {
   private db = getDb();
 
@@ -86,7 +84,6 @@ class RestoreService {
       financing: parsedBackup.financing.length,
       insurance: parsedBackup.insurance.length,
       insurancePolicyVehicles: parsedBackup.insurancePolicyVehicles?.length ?? 0,
-      expenseGroups: parsedBackup.expenseGroups?.length ?? 0,
       odometer: parsedBackup.odometer?.length ?? 0,
       photos: parsedBackup.photos?.length ?? 0,
       photoRefs: parsedBackup.photoRefs?.length ?? 0,
@@ -115,16 +112,27 @@ class RestoreService {
 
   async restoreFromSheets(
     userId: string,
+    providerId: string,
     mode: 'replace' | 'merge' | 'preview'
   ): Promise<RestoreResponse> {
+    // Load backupConfig and read sheetsSpreadsheetId for this provider
     const settings = await settingsRepository.getUserSettings(userId);
-    if (!settings?.googleSheetsSpreadsheetId) {
-      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'No Google Sheets spreadsheet found');
+    const backupConfig = settings?.backupConfig as BackupConfig | null;
+    const providerConfig = backupConfig?.providers?.[providerId];
+    const sheetsSpreadsheetId = providerConfig?.sheetsSpreadsheetId;
+
+    if (!sheetsSpreadsheetId) {
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        'No Google Sheets spreadsheet found for this provider'
+      );
     }
 
-    const user = await this.getUserWithToken(userId);
-    const sheetsService = new GoogleSheetsService(user.googleRefreshToken);
-    const sheetData = await sheetsService.readSpreadsheetData(settings.googleSheetsSpreadsheetId);
+    const { createSheetsServiceForProvider } = await import(
+      '../providers/services/google-sheets-service'
+    );
+    const sheetsService = await createSheetsServiceForProvider(providerId, userId);
+    const sheetData = await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
 
     // Coerce Sheets data using schema-aware column types
     for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
@@ -156,7 +164,6 @@ class RestoreService {
       financing: sheetData.financing.length,
       insurance: sheetData.insurance.length,
       insurancePolicyVehicles: sheetData.insurancePolicyVehicles?.length ?? 0,
-      expenseGroups: sheetData.expenseGroups?.length ?? 0,
       odometer: sheetData.odometer?.length ?? 0,
       photos: sheetData.photos?.length ?? 0,
       photoRefs: sheetData.photoRefs?.length ?? 0,
@@ -181,62 +188,6 @@ class RestoreService {
     });
 
     return { success: true, imported: summary };
-  }
-
-  async autoRestoreFromLatestBackup(userId: string): Promise<{
-    restored: boolean;
-    backupInfo?: { fileId: string; fileName: string; createdTime?: string };
-    summary?: ImportSummary;
-    error?: string;
-  }> {
-    try {
-      const existingVehicles = await this.db
-        .select()
-        .from(vehicles)
-        .where(eq(vehicles.userId, userId))
-        .limit(1);
-      if (existingVehicles.length > 0) {
-        return { restored: false, error: 'User already has local data' };
-      }
-
-      const settings = await settingsRepository.getUserSettings(userId);
-      if (!settings?.googleDriveBackupFolderId) {
-        return { restored: false, error: 'No backup folder configured' };
-      }
-
-      const user = await this.getUserWithToken(userId);
-      const { GoogleDriveService } = await import('./google-drive');
-      const driveService = new GoogleDriveService(user.googleRefreshToken);
-
-      const backups = await driveService.listFilesInFolder(settings.googleDriveBackupFolderId);
-      const backupFiles = backups
-        .filter((file) => file.name.startsWith('vroom-backup-') && file.name.endsWith('.zip'))
-        .sort((a, b) => (b.modifiedTime || '').localeCompare(a.modifiedTime || ''));
-
-      if (backupFiles.length === 0) {
-        return { restored: false, error: 'No backups found' };
-      }
-
-      const latestBackup = backupFiles[0];
-      const fileBuffer = await driveService.downloadFile(latestBackup.id);
-      const result = await this.restoreFromBackup(userId, fileBuffer, 'replace');
-
-      if (result.success && result.imported) {
-        return {
-          restored: true,
-          backupInfo: {
-            fileId: latestBackup.id,
-            fileName: latestBackup.name,
-            createdTime: latestBackup.createdTime,
-          },
-          summary: result.imported,
-        };
-      }
-
-      return { restored: false, error: 'Restore operation failed' };
-    } catch (error) {
-      return { restored: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
   }
 
   private async detectConflicts(data: ParsedBackupData): Promise<Conflict[]> {
@@ -268,51 +219,36 @@ class RestoreService {
   }
 
   private async deleteUserData(tx: DrizzleTransaction, userId: string): Promise<void> {
-    const userVehicles = await tx.select().from(vehicles).where(eq(vehicles.userId, userId));
-    if (userVehicles.length === 0) {
-      // Still delete expense groups even if no vehicles (groups are user-level)
-      const userGroups = await tx
-        .select()
-        .from(expenseGroups)
-        .where(eq(expenseGroups.userId, userId));
-      // Delete photos for expense groups before deleting the groups
-      for (const group of userGroups) {
-        await tx
-          .delete(photos)
-          .where(and(eq(photos.entityType, 'expense_group'), eq(photos.entityId, group.id)));
-      }
-      await tx.delete(expenseGroups).where(eq(expenseGroups.userId, userId));
-      return;
-    }
-
-    const vehicleIds = userVehicles.map((v: { id: string }) => v.id);
-
-    // Collect expense IDs and expense group IDs for photo deletion
+    // Collect expense IDs for photo cleanup — delete directly by userId
     const userExpenses = await tx
       .select({ id: expenses.id })
       .from(expenses)
-      .where(inArray(expenses.vehicleId, vehicleIds));
+      .where(eq(expenses.userId, userId));
     const expenseIds = userExpenses.map((e) => e.id);
 
-    const userGroups = await tx
-      .select({ id: expenseGroups.id })
-      .from(expenseGroups)
-      .where(eq(expenseGroups.userId, userId));
-    const groupIds = userGroups.map((g) => g.id);
+    // Collect vehicle IDs for related entity cleanup
+    const userVehicles = await tx
+      .select({ id: vehicles.id })
+      .from(vehicles)
+      .where(eq(vehicles.userId, userId));
+    const vehicleIds = userVehicles.map((v) => v.id);
 
     // Collect insurance policy IDs for photo deletion
-    const userPolicyVehicles = await tx
-      .select({ policyId: insurancePolicyVehicles.policyId })
-      .from(insurancePolicyVehicles)
-      .where(inArray(insurancePolicyVehicles.vehicleId, vehicleIds));
-    const policyIds = [...new Set(userPolicyVehicles.map((pv) => pv.policyId))];
+    const userPolicies = await tx
+      .select({ id: insurancePolicies.id })
+      .from(insurancePolicies)
+      .where(eq(insurancePolicies.userId, userId));
+    const policyIds = userPolicies.map((p) => p.id);
 
     // Collect odometer entry IDs for photo deletion
-    const userOdometerEntries = await tx
-      .select({ id: odometerEntries.id })
-      .from(odometerEntries)
-      .where(inArray(odometerEntries.vehicleId, vehicleIds));
-    const odometerEntryIds = userOdometerEntries.map((o) => o.id);
+    const odometerIds: string[] = [];
+    if (vehicleIds.length > 0) {
+      const userOdometerEntries = await tx
+        .select({ id: odometerEntries.id })
+        .from(odometerEntries)
+        .where(inArray(odometerEntries.vehicleId, vehicleIds));
+      odometerIds.push(...userOdometerEntries.map((o) => o.id));
+    }
 
     // Delete photos for all entity types
     if (vehicleIds.length > 0) {
@@ -330,27 +266,23 @@ class RestoreService {
         .delete(photos)
         .where(and(eq(photos.entityType, 'insurance_policy'), inArray(photos.entityId, policyIds)));
     }
-    if (groupIds.length > 0) {
+    if (odometerIds.length > 0) {
       await tx
         .delete(photos)
-        .where(and(eq(photos.entityType, 'expense_group'), inArray(photos.entityId, groupIds)));
-    }
-    if (odometerEntryIds.length > 0) {
-      await tx
-        .delete(photos)
-        .where(
-          and(eq(photos.entityType, 'odometer_entry'), inArray(photos.entityId, odometerEntryIds))
-        );
+        .where(and(eq(photos.entityType, 'odometer_entry'), inArray(photos.entityId, odometerIds)));
     }
 
-    await tx.delete(expenses).where(inArray(expenses.vehicleId, vehicleIds));
+    // Delete expenses directly by userId (no vehicle ID lookups needed)
+    await tx.delete(expenses).where(eq(expenses.userId, userId));
+
     // Delete odometer entries before vehicles (FK constraint)
-    await tx.delete(odometerEntries).where(inArray(odometerEntries.vehicleId, vehicleIds));
-    await tx
-      .delete(insurancePolicyVehicles)
-      .where(inArray(insurancePolicyVehicles.vehicleId, vehicleIds));
-    await tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, vehicleIds));
-    await tx.delete(expenseGroups).where(eq(expenseGroups.userId, userId));
+    if (vehicleIds.length > 0) {
+      await tx.delete(odometerEntries).where(inArray(odometerEntries.vehicleId, vehicleIds));
+      await tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, vehicleIds));
+    }
+
+    // Delete insurance policies directly by userId (junction rows cascade via FK)
+    await tx.delete(insurancePolicies).where(eq(insurancePolicies.userId, userId));
     await tx.delete(vehicles).where(eq(vehicles.userId, userId));
   }
 
@@ -358,12 +290,6 @@ class RestoreService {
     // Data is already coerced by coerceRow (ZIP path via parseZipBackup, Sheets path via restoreFromSheets)
     if (data.vehicles.length > 0) {
       await tx.insert(vehicles).values(data.vehicles as (typeof vehicles.$inferInsert)[]);
-    }
-    // Insert expense groups BEFORE expenses (expenses.expenseGroupId FK references expense_groups)
-    if (data.expenseGroups?.length > 0) {
-      await tx
-        .insert(expenseGroups)
-        .values(data.expenseGroups as (typeof expenseGroups.$inferInsert)[]);
     }
     if (data.expenses.length > 0) {
       await tx.insert(expenses).values(data.expenses as (typeof expenses.$inferInsert)[]);
@@ -410,28 +336,6 @@ class RestoreService {
         await tx.insert(photoRefs).values(validRefs);
       }
     }
-  }
-
-  private async getUserWithToken(userId: string): Promise<{
-    id: string;
-    displayName: string;
-    googleRefreshToken: string;
-  }> {
-    const { users } = await import('../../db/schema');
-    const userResults = await this.db.select().from(users).where(eq(users.id, userId)).limit(1);
-
-    if (!userResults.length || !userResults[0].googleRefreshToken) {
-      throw new SyncError(
-        SyncErrorCode.AUTH_INVALID,
-        'Google Drive access not available. Please re-authenticate.'
-      );
-    }
-
-    return {
-      id: userResults[0].id,
-      displayName: userResults[0].displayName,
-      googleRefreshToken: userResults[0].googleRefreshToken,
-    };
   }
 }
 

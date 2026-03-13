@@ -1,0 +1,168 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** — Provider OAuth callback replaces auth session
+  - **CRITICAL**: This test MUST FAIL on unfixed code — failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior — it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the session-replacement bug
+  - **Scoped PBT Approach**: Scope the property to the concrete failing case — a provider OAuth callback request processed by the shared `/callback/google` handler
+  - Bug Condition from design: `isBugCondition(request)` where `state.flowType IS UNDEFINED AND state.returnTo IS NOT NULL AND callbackEndpoint = '/callback/google'`
+  - Test that initiating `/reauth/google` as an authenticated user and completing the OAuth callback with a different Google account's tokens causes the session cookie to change (demonstrates the bug)
+  - Test that the callback creates a new Lucia session instead of storing provider credentials (demonstrates the bug)
+  - Test that `user_providers.credentials` contains encrypted `{}` after the flow (demonstrates credential storage bug)
+  - Test that the OAuth state stored by `/reauth/google` has no `flowType` field (confirms root cause — no flow distinction)
+  - Run test on UNFIXED code — expect FAILURE (this confirms the bug exists)
+  - **EXPECTED OUTCOME**: Test FAILS — the callback replaces the session and stores credentials on the wrong entity
+  - Document counterexamples found to understand root cause
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 1.1, 1.2, 1.3, 1.4_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** — Login OAuth flow and session management unchanged
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe: `/login/google` generates OAuth URL and redirects to Google on unfixed code
+  - Observe: `/callback/google` with a valid login flow creates a user record, creates a Lucia session, sets the session cookie, and redirects to dashboard on unfixed code
+  - Observe: `/callback/google` with an existing user finds the user, creates a session, and redirects on unfixed code
+  - Observe: Session validation via `/auth/me` returns the correct user on unfixed code
+  - Write property-based test: for all login OAuth callback requests (where `flowType` is absent and `returnTo` is absent or points to dashboard), the handler creates or finds a user, calls `lucia.createSession()`, sets the session cookie, and redirects — matching pre-fix behavior
+  - Write property-based test: for all Google Sheets sync operations, `getUserToken()` returns a valid refresh token (currently from `users.googleRefreshToken`, will change to `user_providers.credentials` — behavior must be equivalent)
+  - Verify tests pass on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS — confirms baseline login and sync behavior to preserve
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.4_
+
+- [x] 3. Schema changes — drop `users.googleRefreshToken` and update types
+  - [x] 3.1 Remove `googleRefreshToken` column from `backend/src/db/schema.ts` users table
+    - Remove `googleRefreshToken: text('google_refresh_token')` from the users table definition
+    - _Requirements: 2.7, 4.2_
+  - [x] 3.2 Edit `backend/drizzle/0000_groovy_bishop.sql` to remove `google_refresh_token` column from `CREATE TABLE users`
+    - Edit the initial migration directly — no new migration file
+    - _Requirements: 4.2_
+  - [x] 3.3 Edit `backend/drizzle/meta/0000_snapshot.json` to remove `google_refresh_token` from the snapshot
+    - _Requirements: 4.2_
+  - [x] 3.4 Update `backend/src/api/auth/lucia.ts` — remove `googleRefreshToken` from `getUserAttributes()`, `DatabaseUserAttributes`, and Lucia `User` interface
+    - _Requirements: 2.7, 4.2_
+  - [x] 3.5 Update `frontend/src/lib/types/user.ts` — remove `googleRefreshToken` from the `User` interface
+    - _Requirements: 2.7_
+  - [x] 3.6 Grep and fix all test mocks referencing `googleRefreshToken` — remove the field from mock user objects
+    - _Requirements: 4.2_
+  - [x] 3.7 Update migration tests in `backend/src/db/__tests__/migration-0000.test.ts` — remove `google_refresh_token` from expected column lists for the `users` table
+    - _Requirements: 4.2_
+
+- [x] 4. Create pending credentials store
+  - [x] 4.1 Create `backend/src/utils/pending-credentials.ts` with `pendingProviderCredentials` Map and helpers (`storePending`, `getPendingEmail`, `consumePending`, `cleanupExpired`)
+    - Key format: `userId:nonce`
+    - TTL: 10 minutes
+    - Max size: 1000 entries with oldest-eviction
+    - Store shape: `{ refreshToken: string, email: string, createdAt: number }`
+    - _Requirements: 2.5_
+
+- [x] 5. Implement provider OAuth endpoints in backend
+  - [x] 5.1 Add `GET /providers/connect/google` endpoint in `backend/src/api/auth/routes.ts`
+    - First, update the `oauthStateStore` Map type to add optional fields: `userId?: string`, `flowType?: 'provider'`, `providerId?: string`, `nonce?: string`
+    - Require authentication (session cookie)
+    - Accept `returnTo` (required), `nonce` (required), `providerId` (optional), `email` (optional for `login_hint`)
+    - Store state with `{ codeVerifier, createdAt, returnTo, nonce, userId, flowType: 'provider', providerId }` in `oauthStateStore`
+    - Call `cleanupExpiredStates()` before redirecting
+    - Build OAuth URL with scopes: `openid`, `profile`, `email`, `https://www.googleapis.com/auth/drive.file`; `access_type=offline`, `prompt=consent`; optional `login_hint`
+    - Redirect to Google
+    - _Bug_Condition: This endpoint replaces `/reauth/google` with proper flow isolation_
+    - _Requirements: 2.1, 5.1, 7.1, 8.1_
+  - [x] 5.2 Add `GET /callback/provider/google` endpoint in `backend/src/api/auth/routes.ts`
+    - Validate state from `oauthStateStore`, verify `flowType === 'provider'`
+    - Validate session userId matches state userId (CSRF protection)
+    - Exchange code for tokens via `google.validateAuthorizationCode()`
+    - Fetch Google user info (email)
+    - If `state.providerId` exists: update existing provider's `credentials` with `{ refreshToken }` (encrypt via `encrypt()` before writing) and set `config.accountEmail` to the Google account's email
+    - If no `providerId`: store in `pendingProviderCredentials[userId:nonce]` via `storePending()`
+    - Redirect to `returnTo` + `?provider_connected=true&nonce=<nonce>` — no PII in URLs
+    - Handle errors: missing code → `?provider_error=cancelled`, token exchange failure → `?provider_error=exchange_failed`, missing refresh token → `?provider_error=no_refresh_token`, expired/missing session → redirect to login
+    - **SHALL NOT** call `lucia.createSession()` or set session cookie
+    - _Bug_Condition: isBugCondition(request) where shared callback creates session — this new endpoint avoids that entirely_
+    - _Expected_Behavior: Store credentials on provider record, redirect without session modification_
+    - _Preservation: Login callback `/callback/google` is untouched_
+    - _Requirements: 2.2, 2.3, 2.4, 2.5, 5.1, 5.2, 6.1, 6.2, 6.3_
+  - [x] 5.3 Add `GET /providers/pending/:nonce` endpoint in `backend/src/api/providers/routes.ts`
+    - Require authentication
+    - Look up `pendingProviderCredentials[userId:nonce]` via `getPendingEmail()`
+    - Return `{ success: true, data: { email } }` — does NOT return refresh token, does NOT consume entry
+    - 404 if not found or expired
+    - _Requirements: 2.5, 2.6_
+  - [x] 5.4 Remove `GET /reauth/google` endpoint from `backend/src/api/auth/routes.ts`
+    - This endpoint is replaced by `/providers/connect/google`
+    - _Requirements: 2.1_
+  - [x] 5.5 Update `GET /login/google` — reduce scopes to `openid`, `profile`, `email` only; use `prompt=select_account`; remove `access_type=offline`
+    - **Depends on**: 3.1 (schema drop) and 5.6 (stop writing googleRefreshToken) — without `access_type=offline`, Google won't return a refresh token, so the callback must not try to write one
+    - _Requirements: 7.2_
+  - [x] 5.6 Update `GET /callback/google` — stop writing `googleRefreshToken` in INSERT/UPDATE statements
+    - No other changes — session creation, user lookup/creation, redirect logic remain identical
+    - _Preservation: Login flow behavior unchanged_
+    - _Requirements: 3.1_
+
+- [x] 6. Update provider creation to consume pending credentials
+  - [x] 6.1 Update `POST /api/v1/providers` in `backend/src/api/providers/routes.ts` for `google-drive` type
+    - Update `createProviderSchema` to include `nonce: z.string().uuid().optional()`
+    - For `google-drive` type only (don't affect S3 or other providers):
+      - If `nonce` provided: look up `pendingProviderCredentials[userId:nonce]` via `consumePending()`
+      - Use stored `refreshToken` as credentials (encrypted via `encrypt()`), set `config.accountEmail` to stored email
+      - If nonce not found/expired: return 400 "Please connect your Google account first"
+      - If no nonce for google-drive type: return 400 "Missing nonce — please connect your Google account"
+    - _Requirements: 2.7_
+
+- [x] 7. Update Google Sheets sync and restore to read from provider credentials
+  - [x] 7.1 Update `getUserToken()` in `backend/src/api/providers/google-sheets-service.ts`
+    - Read refresh token from `user_providers.credentials` (where `domain='storage'`, `providerType='google-drive'`, `status='active'`) instead of `users.googleRefreshToken`
+    - Decrypt credentials and return `refreshToken`
+    - If no active Google Drive provider found: throw `SyncError` with `AUTH_INVALID` code
+    - _Preservation: Sync behavior equivalent — only the credential source changes_
+    - _Requirements: 3.4_
+  - [x] 7.2 Update `getUserWithToken()` in `backend/src/api/sync/restore.ts`
+    - Same change — read from `user_providers.credentials` instead of `users.googleRefreshToken`
+    - Update the return type: replace `{ id, displayName, googleRefreshToken }` with `{ id, displayName, refreshToken }` (from provider credentials)
+    - Update the caller (`restoreFromSheets`) to use the new return shape: `new GoogleSheetsService(user.refreshToken)` instead of `new GoogleSheetsService(user.googleRefreshToken)`
+    - _Preservation: Restore behavior equivalent — only the credential source changes_
+    - _Requirements: 3.4_
+
+- [x] 8. Update frontend provider form for nonce-based OAuth flow
+  - [x] 8.1 Update `ProviderForm.svelte` — generate nonce, navigate to `/api/v1/providers/connect/google`
+    - Generate `crypto.randomUUID()` nonce before OAuth redirect, save to `sessionStorage`
+    - Pass `nonce`, `returnTo`, and optionally `providerId` (edit mode) and `email` hint (re-auth) as query params
+    - `returnTo` should be `/settings/providers/new` for create mode, `/settings/providers/${providerId}/edit` for edit mode
+    - Replace `/api/v1/auth/reauth/google` navigation with `/api/v1/providers/connect/google`
+    - _Requirements: 2.1, 8.1_
+  - [x] 8.2 Update `ProviderForm.svelte` — handle OAuth return via query params
+    - On mount: check for `provider_connected=true` and `nonce` in URL query params
+    - If present: call `GET /api/v1/providers/pending/:nonce` to retrieve connected email
+    - Store email in component state as `pendingEmail`
+    - Clean URL with `goto(currentPath, { replaceState: true })`
+    - Handle `provider_error` query param — show appropriate toast message
+    - Remove `restoredFromOAuth` logic, replace with nonce-based detection
+    - _Requirements: 2.5, 2.6, 6.1, 6.2_
+  - [x] 8.3 Update `ProviderForm.svelte` — update email display and save logic
+    - In edit mode: read email from `existingProvider.config.accountEmail`
+    - In create mode after OAuth: read from `pendingEmail` (from pending credentials API)
+    - Update `canSave` logic: for Google Drive, use `isEditMode || !!pendingEmail` instead of `isEditMode || !!authStore.user?.email`
+    - Pass `nonce` in `POST /api/v1/providers` request body for Google Drive providers
+    - _Requirements: 2.6, 8.2, 8.3_
+
+- [x] 9. Verify fix — re-run exploration and preservation tests
+  - [x] 9.1 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** — Provider OAuth callback never modifies the session
+    - **IMPORTANT**: Re-run the SAME test from task 1 — do NOT write a new test
+    - **NOTE**: The test from task 1 targets `/reauth/google` which is removed in task 5.4. The test should be updated to target the new `/providers/connect/google` + `/callback/provider/google` endpoints while asserting the same properties (session unchanged, credentials stored on provider)
+    - When this test passes, it confirms the expected behavior is satisfied
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed)
+    - _Requirements: 2.2, 2.3, 2.4, 2.5_
+  - [x] 9.2 Verify preservation tests still pass
+    - **Property 2: Preservation** — Login OAuth flow and session management unchanged
+    - **IMPORTANT**: Re-run the SAME tests from task 2 — do NOT write new tests
+    - Run preservation property tests from step 2
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Confirm all tests still pass after fix (no regressions)
+    - _Requirements: 3.1, 3.2, 3.4_
+
+- [x] 10. Checkpoint — Ensure all tests pass
+  - Run `bun run all:fix && bun run validate` in `backend/` to verify linting, formatting, type checking, and all tests pass
+  - Run `npm run all:fix && npm run validate` in `frontend/` to verify linting, formatting, type checking, and all tests pass
+  - Ensure all tests pass, ask the user if questions arise

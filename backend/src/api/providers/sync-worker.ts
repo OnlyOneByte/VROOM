@@ -16,9 +16,9 @@ import type { PhotoRef } from '../../db/schema';
 import { logger } from '../../utils/logger';
 import { photoRefRepository } from '../photos/photo-ref-repository';
 import { photoRepository } from '../photos/photo-repository';
-import { storageProviderRegistry } from './registry';
-import type { PhotoCategory, StorageProvider } from './storage-provider';
-import { ENTITY_TO_CATEGORY } from './storage-provider';
+import { storageProviderRegistry } from './domains/storage/registry';
+import type { PhotoCategory, StorageProvider } from './domains/storage/storage-provider';
+import { ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let isProcessing = false;

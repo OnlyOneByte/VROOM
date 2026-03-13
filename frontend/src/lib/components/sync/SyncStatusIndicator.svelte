@@ -6,8 +6,8 @@
 		lastBackupTime,
 		lastSheetsSync,
 		lastDataChangeTime,
-		googleDriveBackupEnabled,
-		googleSheetsSyncEnabled,
+		backupEnabled,
+		sheetsSyncEnabled,
 		syncConflicts,
 		fetchLastSyncTime
 	} from '$lib/utils/sync-manager';
@@ -116,7 +116,7 @@
 			{/if}
 
 			<!-- Last backup -->
-			{#if googleDriveBackupEnabled.current || googleSheetsSyncEnabled.current}
+			{#if backupEnabled.current || sheetsSyncEnabled.current}
 				<div class="flex items-center justify-between">
 					<span class="text-sm text-muted-foreground">Last backup</span>
 					<span class="text-sm font-medium">

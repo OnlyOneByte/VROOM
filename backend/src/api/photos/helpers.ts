@@ -1,33 +1,19 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '../../db/connection';
-import { expenseGroups, expenses, odometerEntries } from '../../db/schema';
+import { expenses, odometerEntries } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { insurancePolicyRepository } from '../insurance/repository';
 import { vehicleRepository } from '../vehicles/repository';
 
 async function validateExpenseOwnership(entityId: string, userId: string): Promise<void> {
   const db = getDb();
-  const expenseRows = await db
-    .select({ vehicleId: expenses.vehicleId })
+  const rows = await db
+    .select({ userId: expenses.userId })
     .from(expenses)
     .where(eq(expenses.id, entityId))
     .limit(1);
-  const expense = expenseRows[0];
-  if (!expense) throw new NotFoundError('Expense');
-  const vehicle = await vehicleRepository.findByUserIdAndId(userId, expense.vehicleId);
-  if (!vehicle) throw new NotFoundError('Expense');
-}
-
-async function validateExpenseGroupOwnership(entityId: string, userId: string): Promise<void> {
-  const db = getDb();
-  const groupRows = await db
-    .select({ userId: expenseGroups.userId })
-    .from(expenseGroups)
-    .where(eq(expenseGroups.id, entityId))
-    .limit(1);
-  const group = groupRows[0];
-  if (!group) throw new NotFoundError('Expense group');
-  if (group.userId !== userId) throw new NotFoundError('Expense group');
+  const expense = rows[0];
+  if (!expense || expense.userId !== userId) throw new NotFoundError('Expense');
 }
 
 /**
@@ -48,25 +34,11 @@ export async function validateEntityOwnership(
     }
     case 'insurance_policy': {
       const policy = await insurancePolicyRepository.findById(entityId);
-      if (!policy) throw new NotFoundError('Insurance policy');
-
-      let ownsLinkedVehicle = false;
-      for (const vid of policy.vehicleIds) {
-        const vehicle = await vehicleRepository.findByUserIdAndId(userId, vid);
-        if (vehicle) {
-          ownsLinkedVehicle = true;
-          break;
-        }
-      }
-      if (!ownsLinkedVehicle) throw new NotFoundError('Insurance policy');
+      if (!policy || policy.userId !== userId) throw new NotFoundError('Insurance policy');
       break;
     }
     case 'expense': {
       await validateExpenseOwnership(entityId, userId);
-      break;
-    }
-    case 'expense_group': {
-      await validateExpenseGroupOwnership(entityId, userId);
       break;
     }
     case 'odometer_entry': {

@@ -1,8 +1,8 @@
 import { createId } from '@paralleldrive/cuid2';
-import { eq } from 'drizzle-orm';
-import type { Expense, ExpenseGroup, NewExpense, SplitConfig } from '../../db/schema';
-import { expenseGroups, expenses } from '../../db/schema';
+import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
+import { expenses } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
+import type { SplitConfig } from './validation';
 
 export class ExpenseSplitService {
   /**
@@ -68,69 +68,51 @@ export class ExpenseSplitService {
   }
 
   /**
-   * Delete existing children and create new ones from split config.
+   * Insert sibling expense rows sharing the same groupId.
    * Runs inside the caller's transaction.
    */
-  async materializeChildren(tx: DrizzleTransaction, group: ExpenseGroup): Promise<Expense[]> {
-    // 1. Delete existing children for this group
-    await tx.delete(expenses).where(eq(expenses.expenseGroupId, group.id));
+  async createSiblings(
+    tx: DrizzleTransaction,
+    params: {
+      groupId: string;
+      userId: string;
+      splitMethod: SplitMethod;
+      groupTotal: number;
+      allocations: Array<{ vehicleId: string; amount: number }>;
+      category: string;
+      date: Date;
+      tags?: string[];
+      description?: string;
+      insurancePolicyId?: string;
+      insuranceTermId?: string;
+    }
+  ): Promise<Expense[]> {
+    const siblings: Expense[] = [];
 
-    // 2. Compute per-vehicle allocations
-    const allocations = this.computeAllocations(group.splitConfig, group.totalAmount);
-
-    // 3. Insert a child expense per allocation
-    const childExpenses: Expense[] = [];
-    for (const allocation of allocations) {
+    for (const allocation of params.allocations) {
       const newExpense: NewExpense = {
         id: createId(),
         vehicleId: allocation.vehicleId,
         expenseAmount: allocation.amount,
-        expenseGroupId: group.id,
-        category: group.category,
-        date: group.date,
-        tags: group.tags,
-        description: group.description,
-        insurancePolicyId: group.insurancePolicyId,
-        insuranceTermId: group.insuranceTermId,
+        userId: params.userId,
+        groupId: params.groupId,
+        groupTotal: params.groupTotal,
+        splitMethod: params.splitMethod,
+        category: params.category,
+        date: params.date,
+        tags: params.tags ?? null,
+        description: params.description ?? null,
+        insurancePolicyId: params.insurancePolicyId ?? null,
+        insuranceTermId: params.insuranceTermId ?? null,
         isFinancingPayment: false,
         missedFillup: false,
       };
 
       const [inserted] = await tx.insert(expenses).values(newExpense).returning();
-      childExpenses.push(inserted);
+      siblings.push(inserted);
     }
 
-    return childExpenses;
-  }
-  /**
-   * Update an expense group's split config and regenerate children.
-   */
-  async updateSplit(
-    tx: DrizzleTransaction,
-    groupId: string,
-    newConfig: SplitConfig,
-    newTotalAmount?: number
-  ): Promise<{ group: ExpenseGroup; children: Expense[] }> {
-    // 1. Build the update payload
-    const updateData: Partial<ExpenseGroup> = {
-      splitConfig: newConfig,
-      updatedAt: new Date(),
-    };
-    if (newTotalAmount !== undefined) {
-      updateData.totalAmount = newTotalAmount;
-    }
-
-    // 2. Update the expense group row
-    const [updatedGroup] = await tx
-      .update(expenseGroups)
-      .set(updateData)
-      .where(eq(expenseGroups.id, groupId))
-      .returning();
-
-    // 3. Regenerate children (deletes old + inserts new)
-    const children = await this.materializeChildren(tx, updatedGroup);
-
-    return { group: updatedGroup, children };
+    return siblings;
   }
 }
 

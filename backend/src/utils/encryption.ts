@@ -5,7 +5,12 @@ const IV_LENGTH = 12; // 96 bits — recommended for GCM
 const AUTH_TAG_LENGTH = 16; // 128 bits
 const KEY_LENGTH = 32; // 256 bits
 
+/** Cached encryption key — parsed once, reused for all encrypt/decrypt calls. */
+let _cachedKey: Buffer | null = null;
+
 export function getEncryptionKey(): Buffer {
+  if (_cachedKey) return _cachedKey;
+
   const hex = process.env.PROVIDER_ENCRYPTION_KEY;
   if (!hex) {
     throw new Error('PROVIDER_ENCRYPTION_KEY environment variable is not set');
@@ -16,7 +21,13 @@ export function getEncryptionKey(): Buffer {
       `PROVIDER_ENCRYPTION_KEY must be a ${KEY_LENGTH}-byte hex string (${KEY_LENGTH * 2} hex chars)`
     );
   }
+  _cachedKey = key;
   return key;
+}
+
+/** Clear the cached key. Only for tests that swap PROVIDER_ENCRYPTION_KEY between cases. */
+export function _clearKeyCache(): void {
+  _cachedKey = null;
 }
 
 /**

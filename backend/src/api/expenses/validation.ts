@@ -35,6 +35,9 @@ export const splitConfigSchema = z.discriminatedUnion('method', [
   percentageSplitSchema,
 ]);
 
+/** Inferred SplitConfig type — the API-layer discriminated union. */
+export type SplitConfig = z.infer<typeof splitConfigSchema>;
+
 // ---------------------------------------------------------------------------
 // Create / Update Split Expense Schemas
 // ---------------------------------------------------------------------------

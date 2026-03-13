@@ -18,7 +18,7 @@
 	import { AppPieChart } from '$lib/components/charts';
 	import VehicleHeader from '$lib/components/vehicles/VehicleHeader.svelte';
 	import VehiclePhotoCarousel from '$lib/components/vehicles/VehiclePhotoCarousel.svelte';
-	import MediaCaptureDialog from '$lib/components/shared/MediaCaptureDialog.svelte';
+	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
 	import VehicleInfoCard from '$lib/components/vehicles/VehicleInfoCard.svelte';
 	import ExpenseOverviewCard from '$lib/components/vehicles/ExpenseOverviewCard.svelte';
 	import FuelEfficiencyStatsCard from '$lib/components/vehicles/FuelEfficiencyStatsCard.svelte';

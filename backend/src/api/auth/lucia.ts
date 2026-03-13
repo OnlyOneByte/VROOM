@@ -26,16 +26,22 @@ export const lucia = new Lucia(adapter, {
       displayName: attributes.displayName,
       provider: attributes.provider,
       providerId: attributes.providerId,
-      googleRefreshToken: attributes.googleRefreshToken,
     };
   },
 });
 
-// Initialize Google OAuth
+// Initialize Google OAuth — login flow
 export const google = new Google(
   CONFIG.auth.googleClientId || '',
   CONFIG.auth.googleClientSecret || '',
   CONFIG.auth.googleRedirectUri
+);
+
+// Initialize Google OAuth — provider flow (separate redirect URI)
+export const googleProvider = new Google(
+  CONFIG.auth.googleClientId || '',
+  CONFIG.auth.googleClientSecret || '',
+  CONFIG.auth.googleProviderRedirectUri
 );
 
 // Type declarations for Lucia
@@ -51,7 +57,6 @@ declare module 'lucia' {
     displayName: string;
     provider: string;
     providerId: string;
-    googleRefreshToken: string | null;
     createdAt: Date | null;
     updatedAt: Date | null;
   }
@@ -63,7 +68,6 @@ interface DatabaseUserAttributes {
   displayName: string;
   provider: string;
   providerId: string;
-  googleRefreshToken: string | null;
 }
 
 export type AuthUser = User;

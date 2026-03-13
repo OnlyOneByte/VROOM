@@ -555,7 +555,7 @@ export class AnalyticsRepository {
     range?: DateRange,
     vehicleId?: string
   ): Promise<FuelExpenseRow[]> {
-    const conditions = [eq(vehicles.userId, userId), eq(expenses.category, 'fuel')];
+    const conditions = [eq(expenses.userId, userId), eq(expenses.category, 'fuel')];
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
     if (range) {
       conditions.push(sql`${expenses.date} >= ${range.start}`);
@@ -572,7 +572,6 @@ export class AnalyticsRepository {
         vehicleId: expenses.vehicleId,
       })
       .from(expenses)
-      .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
       .where(and(...conditions))
       .orderBy(asc(expenses.date));
   }
@@ -583,7 +582,7 @@ export class AnalyticsRepository {
     range?: DateRange,
     vehicleId?: string
   ): Promise<GeneralExpenseRow[]> {
-    const conditions = [eq(vehicles.userId, userId)];
+    const conditions = [eq(expenses.userId, userId)];
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
     if (range) {
       conditions.push(sql`${expenses.date} >= ${range.start}`);
@@ -601,7 +600,6 @@ export class AnalyticsRepository {
         fuelAmount: expenses.fuelAmount,
       })
       .from(expenses)
-      .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
       .where(and(...conditions))
       .orderBy(asc(expenses.date));
   }
@@ -612,10 +610,9 @@ export class AnalyticsRepository {
     const result = await this.db
       .select({ total: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)` })
       .from(expenses)
-      .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
       .where(
         and(
-          eq(vehicles.userId, userId),
+          eq(expenses.userId, userId),
           sql`${expenses.date} >= ${Math.floor(yearStart.getTime() / 1000)}`,
           sql`${expenses.date} < ${Math.floor(yearEnd.getTime() / 1000)}`
         )
@@ -628,7 +625,7 @@ export class AnalyticsRepository {
     vehicleId?: string
   ): Promise<{ count: number; totalGallons: number }> {
     const conditions = [
-      eq(vehicles.userId, userId),
+      eq(expenses.userId, userId),
       eq(expenses.category, 'fuel'),
       sql`${expenses.date} >= ${range.start}`,
       sql`${expenses.date} < ${range.end}`,
@@ -640,7 +637,6 @@ export class AnalyticsRepository {
         totalGallons: sql<number>`COALESCE(SUM(${expenses.fuelAmount}), 0)`,
       })
       .from(expenses)
-      .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
       .where(and(...conditions));
     return {
       count: result[0]?.count ?? 0,
@@ -1561,15 +1557,21 @@ export class AnalyticsRepository {
   async getInsurance(userId: string): Promise<InsuranceData> {
     try {
       const vehicleNameMap = await this.queryVehicleNameMap(userId);
-      const userVehicleIds = [...vehicleNameMap.keys()];
       const emptyResult: InsuranceData = {
         summary: { totalMonthlyPremiums: 0, totalAnnualPremiums: 0, activePoliciesCount: 0 },
         vehicleDetails: [],
         monthlyPremiumTrend: [],
         costByCarrier: [],
       };
-      if (userVehicleIds.length === 0) return emptyResult;
 
+      // Query policies directly by userId
+      const policyRows = await this.db
+        .select()
+        .from(insurancePolicies)
+        .where(eq(insurancePolicies.userId, userId));
+      if (policyRows.length === 0) return emptyResult;
+
+      const policyIds = policyRows.map((p) => p.id);
       const junctionRows = await this.db
         .select({
           policyId: insurancePolicyVehicles.policyId,
@@ -1577,14 +1579,8 @@ export class AnalyticsRepository {
           vehicleId: insurancePolicyVehicles.vehicleId,
         })
         .from(insurancePolicyVehicles)
-        .where(inArray(insurancePolicyVehicles.vehicleId, userVehicleIds));
-      const policyIds = [...new Set(junctionRows.map((r) => r.policyId))];
-      if (policyIds.length === 0) return emptyResult;
+        .where(inArray(insurancePolicyVehicles.policyId, policyIds));
 
-      const policyRows = await this.db
-        .select()
-        .from(insurancePolicies)
-        .where(inArray(insurancePolicies.id, policyIds));
       const activePolicies = policyRows.filter((p) => p.isActive);
 
       const { vehicleDetails, totalMonthlyPremiums, totalAnnualPremiums, carrierMap, monthlyMap } =

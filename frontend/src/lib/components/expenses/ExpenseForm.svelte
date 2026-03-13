@@ -202,46 +202,58 @@
 			originalExpense = expense;
 
 			// Switch to group edit mode if this is a child of a split group
-			if (expense.expenseGroupId) {
-				groupId = expense.expenseGroupId;
+			if (expense.groupId) {
+				groupId = expense.groupId;
 				try {
-					const groupData = await expenseApi.getSplitExpense(expense.expenseGroupId);
-					const group = groupData.group;
+					const splitGroup = await expenseApi.getSplitExpense(expense.groupId);
+					const first = splitGroup.siblings[0];
+					if (!first) throw new Error('Empty split group');
 
-					// Check if this is insurance-managed
-					if (group.insurancePolicyId) {
+					// Check if this is insurance-managed (siblings have description with insurance prefix)
+					// Insurance-created expenses have tags including 'insurance'
+					const isInsurance = first.tags?.includes('insurance') ?? false;
+					if (isInsurance) {
 						isInsuranceManaged = true;
-						insurancePolicyId = group.insurancePolicyId;
-						insuranceTermId = group.insuranceTermId ?? null;
 						// Still populate form data for read-only display
-						formData.category = group.category;
-						formData.amount = group.totalAmount.toString();
-						formData.tags = group.tags || [];
-						const groupDate = new Date(group.date);
+						formData.category = first.category;
+						formData.amount = splitGroup.groupTotal.toString();
+						formData.tags = first.tags || [];
+						const groupDate = new Date(first.date);
 						formData.date = `${groupDate.getFullYear()}-${String(groupDate.getMonth() + 1).padStart(2, '0')}-${String(groupDate.getDate()).padStart(2, '0')}`;
-						formData.description = group.description || '';
+						formData.description = first.description || '';
 						isLoading = false;
 						return;
 					}
 
 					// User-created split — enter group edit mode
 					isGroupEditMode = true;
-					formData.category = group.category;
-					formData.amount = group.totalAmount.toString();
-					formData.tags = group.tags || [];
-					const groupDate = new Date(group.date);
+					formData.category = first.category;
+					formData.amount = splitGroup.groupTotal.toString();
+					formData.tags = first.tags || [];
+					const groupDate = new Date(first.date);
 					formData.date = `${groupDate.getFullYear()}-${String(groupDate.getMonth() + 1).padStart(2, '0')}-${String(groupDate.getDate()).padStart(2, '0')}`;
-					formData.description = group.description || '';
+					formData.description = first.description || '';
 
-					// Set up split state from group config
+					// Set up split state from siblings
 					isSplit = true;
-					splitMethod = group.splitConfig.method;
-					if (group.splitConfig.method === 'even') {
-						selectedVehicleIds = group.splitConfig.vehicleIds;
-						splitAllocations = group.splitConfig.vehicleIds.map(id => ({ vehicleId: id }));
+					const method = (splitGroup.splitMethod as 'even' | 'absolute' | 'percentage') || 'even';
+					splitMethod = method;
+					selectedVehicleIds = splitGroup.siblings.map(s => s.vehicleId);
+					if (method === 'even') {
+						splitAllocations = splitGroup.siblings.map(s => ({ vehicleId: s.vehicleId }));
+					} else if (method === 'absolute') {
+						splitAllocations = splitGroup.siblings.map(s => ({
+							vehicleId: s.vehicleId,
+							amount: s.amount
+						}));
 					} else {
-						selectedVehicleIds = group.splitConfig.allocations.map(a => a.vehicleId);
-						splitAllocations = group.splitConfig.allocations;
+						splitAllocations = splitGroup.siblings.map(s => ({
+							vehicleId: s.vehicleId,
+							percentage:
+								splitGroup.groupTotal > 0
+									? Math.round((s.amount / splitGroup.groupTotal) * 1000) / 10
+									: 0
+						}));
 					}
 				} catch (err) {
 					if (import.meta.env.DEV) console.error('Failed to load split group:', err);
@@ -502,7 +514,11 @@
 					totalAmount: parseFloat(formData.amount)
 				});
 
-				await uploadPendingPhotos('expense_group', result.group.id);
+				// Upload photos to the first sibling expense
+				const firstSibling = result.siblings[0];
+				if (firstSibling) {
+					await uploadPendingPhotos(firstSibling.id);
+				}
 
 				appStore.addNotification({
 					type: 'success',
@@ -514,7 +530,7 @@
 				if (onlineStatus.current) {
 					const created = await expenseApi.createExpense(expenseData);
 
-					await uploadPendingPhotos('expense', created.id);
+					await uploadPendingPhotos(created.id);
 
 					appStore.addNotification({
 						type: 'success',
@@ -631,15 +647,12 @@
 		gotoDynamic(returnTo);
 	}
 
-	async function uploadPendingPhotos(
-		entityType: 'expense' | 'expense_group',
-		entityId: string
-	): Promise<void> {
+	async function uploadPendingPhotos(entityId: string): Promise<void> {
 		if (pendingFiles.length === 0) return;
 		let failCount = 0;
 		for (const file of pendingFiles) {
 			try {
-				await expenseApi.uploadPhoto(entityType, entityId, file);
+				await expenseApi.uploadPhoto('expense', entityId, file);
 			} catch {
 				failCount++;
 			}
@@ -723,525 +736,528 @@
 </script>
 
 <FormLayout>
-{#if isLoading}
-	<div class="flex items-center justify-center py-12">
-		<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
-	</div>
-{:else if isInsuranceManaged}
-	<div class="space-y-6">
-		<!-- Header -->
-		<div class="flex items-center gap-4">
-			<button onclick={() => gotoDynamic(returnTo)} class="p-2 hover:bg-muted rounded-lg">
-				<ArrowLeft class="h-5 w-5" />
-			</button>
-			<div>
-				<h1 class="text-2xl font-bold text-foreground">Insurance Expense</h1>
-				<p class="text-muted-foreground">This expense is managed by an insurance policy</p>
-			</div>
+	{#if isLoading}
+		<div class="flex items-center justify-center py-12">
+			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
 		</div>
-
-		<!-- Insurance managed banner -->
-		<div class="flex items-start gap-3 rounded-lg border border-border bg-muted/50 p-4">
-			<Shield class="mt-0.5 h-5 w-5 shrink-0 text-chart-3" />
-			<div class="min-w-0 flex-1">
-				<p class="text-sm font-medium text-foreground">Managed by insurance policy</p>
-				<p class="mt-1 text-xs text-muted-foreground">
-					This expense was automatically created from an insurance term. To change the amount or
-					split, edit the insurance policy term.
-				</p>
-				{#if insurancePolicyId}
-					<Button
-						variant="outline"
-						size="sm"
-						class="mt-3"
-						onclick={() => {
-							const queryObj: Record<string, string> = {};
-							if (insurancePolicyId) queryObj['policy'] = insurancePolicyId;
-							if (insuranceTermId) queryObj['editTerm'] = insuranceTermId;
-							gotoWithQuery(resolve(routes.insurance), queryObj);
-						}}
-					>
-						<Shield class="mr-2 h-4 w-4" />
-						Edit Insurance Term
-					</Button>
-				{/if}
-			</div>
-		</div>
-
-		<!-- Read-only expense details -->
-		<div class="rounded-lg border bg-card p-6 space-y-4">
-			<div class="grid grid-cols-2 gap-4 text-sm">
+	{:else if isInsuranceManaged}
+		<div class="space-y-6">
+			<!-- Header -->
+			<div class="flex items-center gap-4">
+				<button onclick={() => gotoDynamic(returnTo)} class="p-2 hover:bg-muted rounded-lg">
+					<ArrowLeft class="h-5 w-5" />
+				</button>
 				<div>
-					<p class="text-muted-foreground">Category</p>
-					<p class="font-medium text-foreground">
-						{categoryLabels[formData.category as keyof typeof categoryLabels] ?? formData.category}
+					<h1 class="text-2xl font-bold text-foreground">Insurance Expense</h1>
+					<p class="text-muted-foreground">This expense is managed by an insurance policy</p>
+				</div>
+			</div>
+
+			<!-- Insurance managed banner -->
+			<div class="flex items-start gap-3 rounded-lg border border-border bg-muted/50 p-4">
+				<Shield class="mt-0.5 h-5 w-5 shrink-0 text-chart-3" />
+				<div class="min-w-0 flex-1">
+					<p class="text-sm font-medium text-foreground">Managed by insurance policy</p>
+					<p class="mt-1 text-xs text-muted-foreground">
+						This expense was automatically created from an insurance term. To change the amount or
+						split, edit the insurance policy term.
 					</p>
-				</div>
-				<div>
-					<p class="text-muted-foreground">Total Amount</p>
-					<p class="font-medium text-foreground">
-						{formatCurrency(parseFloat(formData.amount) || 0)}
-					</p>
-				</div>
-				<div>
-					<p class="text-muted-foreground">Date</p>
-					<p class="font-medium text-foreground">
-						{new Date(formData.date || '').toLocaleDateString()}
-					</p>
-				</div>
-				{#if formData.description}
-					<div>
-						<p class="text-muted-foreground">Description</p>
-						<p class="font-medium text-foreground">{formData.description}</p>
-					</div>
-				{/if}
-			</div>
-			{#if formData.tags.length > 0}
-				<div>
-					<p class="text-sm text-muted-foreground">Tags</p>
-					<div class="mt-1 flex flex-wrap gap-1">
-						{#each formData.tags as tag (tag)}
-							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground">{tag}</span>
-						{/each}
-					</div>
-				</div>
-			{/if}
-		</div>
-
-		<!-- Photos (read-only but can still view) -->
-		{#if groupId}
-			<div class="rounded-lg border bg-card p-6">
-				<ExpensePhotoSection entityType="expense_group" entityId={groupId} />
-			</div>
-		{/if}
-
-		<!-- Back button -->
-		<div class="flex justify-center gap-3">
-			<Button variant="outline" onclick={() => gotoDynamic(returnTo)}>
-				<ArrowLeft class="mr-2 h-4 w-4" />
-				Back to Expenses
-			</Button>
-			<Button
-				variant="destructive"
-				onclick={() => (showDeleteConfirm = true)}
-				disabled={isDeleting}
-			>
-				<Trash2 class="mr-2 h-4 w-4" />
-				Force Delete
-			</Button>
-		</div>
-	</div>
-{:else}
-	<div class="space-y-6 pb-32 sm:pb-24">
-		<!-- Header -->
-		<div class="flex items-center gap-4">
-			<button onclick={() => gotoDynamic(returnTo)} class="p-2 hover:bg-muted rounded-lg">
-				<ArrowLeft class="h-5 w-5" />
-			</button>
-
-			<div>
-				<h1 class="text-2xl font-bold text-foreground">
-					{isGroupEditMode ? 'Edit Split Expense' : isEditMode ? 'Edit Expense' : 'Add Expense'}
-				</h1>
-				<p class="text-muted-foreground">
-					{#if isGroupEditMode && selectedVehicleIds.length > 0}
-						{selectedVehicleIds
-							.map(id => {
-								const v = vehicles.find(veh => veh.id === id);
-								return v ? getVehicleDisplayName(v) : '';
-							})
-							.filter(Boolean)
-							.join(', ')}
-					{:else if isEditMode}
-						{getVehicleDisplayName(vehicle)}
-					{:else if !onlineStatus.current}
-						<span class="text-chart-5">Offline mode - will sync when online</span>
-					{:else}
-						Track a new vehicle expense
-					{/if}
-				</p>
-			</div>
-		</div>
-
-		<!-- Form -->
-		<form
-			onsubmit={e => {
-				e.preventDefault();
-				handleSubmit();
-			}}
-			class="rounded-lg border bg-card p-6 space-y-6"
-		>
-			<!-- Vehicle Selection / Split Summary -->
-			{#if isSplit && selectedVehicleIds.length >= 2}
-				<!-- Split configured: show tappable summary instead of vehicle dropdown -->
-				<div class="space-y-2">
-					<Label>Vehicle *</Label>
-					<button
-						type="button"
-						onclick={() => (showSplitSheet = true)}
-						class="flex w-full items-center justify-between rounded-lg border border-border bg-muted/50 px-4 py-3 text-left transition-colors hover:bg-muted"
-					>
-						<div class="flex items-center gap-2 min-w-0">
-							<GitBranch class="h-4 w-4 shrink-0 text-muted-foreground" />
-							<div class="min-w-0">
-								<p class="text-sm font-medium text-foreground">{splitSummaryText}</p>
-								<p class="truncate text-xs text-muted-foreground">
-									{selectedVehicleIds
-										.map(id => {
-											const v = vehicles.find(veh => veh.id === id);
-											return v ? getVehicleDisplayName(v) : id;
-										})
-										.join(', ')}
-								</p>
-							</div>
-						</div>
-						<span class="shrink-0 text-xs text-muted-foreground">Edit</span>
-					</button>
-					{#if !isEditMode}
-						<button
-							type="button"
-							onclick={() => handleSplitToggle(false)}
-							class="text-xs text-muted-foreground underline hover:text-foreground"
-						>
-							Remove split
-						</button>
-					{/if}
-				</div>
-			{:else}
-				<!-- Normal single vehicle selector + split button inline -->
-				<div class="space-y-2">
-					<Label for="vehicle">Vehicle *</Label>
-					<div class="flex gap-2">
-						<Select.Root
-							type="single"
-							value={formData.vehicleId}
-							onValueChange={v => {
-								if (v) {
-									formData.vehicleId = v;
-									touched['vehicleId'] = true;
-									handleBlur('vehicleId');
-								}
+					{#if insurancePolicyId}
+						<Button
+							variant="outline"
+							size="sm"
+							class="mt-3"
+							onclick={() => {
+								const queryObj: Record<string, string> = {};
+								if (insurancePolicyId) queryObj['policy'] = insurancePolicyId;
+								if (insuranceTermId) queryObj['editTerm'] = insuranceTermId;
+								gotoWithQuery(resolve(routes.insurance), queryObj);
 							}}
 						>
-							<Select.Trigger
-								id="vehicle"
-								class="w-full {touched['vehicleId'] && errors['vehicleId']
-									? 'border-destructive'
-									: ''}"
-								aria-invalid={!!(touched['vehicleId'] && errors['vehicleId'])}
-								aria-describedby={touched['vehicleId'] && errors['vehicleId']
-									? 'vehicleId-error'
-									: undefined}
+							<Shield class="mr-2 h-4 w-4" />
+							Edit Insurance Term
+						</Button>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Read-only expense details -->
+			<div class="rounded-lg border bg-card p-6 space-y-4">
+				<div class="grid grid-cols-2 gap-4 text-sm">
+					<div>
+						<p class="text-muted-foreground">Category</p>
+						<p class="font-medium text-foreground">
+							{categoryLabels[formData.category as keyof typeof categoryLabels] ??
+								formData.category}
+						</p>
+					</div>
+					<div>
+						<p class="text-muted-foreground">Total Amount</p>
+						<p class="font-medium text-foreground">
+							{formatCurrency(parseFloat(formData.amount) || 0)}
+						</p>
+					</div>
+					<div>
+						<p class="text-muted-foreground">Date</p>
+						<p class="font-medium text-foreground">
+							{new Date(formData.date || '').toLocaleDateString()}
+						</p>
+					</div>
+					{#if formData.description}
+						<div>
+							<p class="text-muted-foreground">Description</p>
+							<p class="font-medium text-foreground">{formData.description}</p>
+						</div>
+					{/if}
+				</div>
+				{#if formData.tags.length > 0}
+					<div>
+						<p class="text-sm text-muted-foreground">Tags</p>
+						<div class="mt-1 flex flex-wrap gap-1">
+							{#each formData.tags as tag (tag)}
+								<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground">{tag}</span>
+							{/each}
+						</div>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Photos (read-only but can still view) -->
+			{#if groupId && originalExpense}
+				<div class="rounded-lg border bg-card p-6">
+					<ExpensePhotoSection entityType="expense" entityId={originalExpense.id} />
+				</div>
+			{/if}
+
+			<!-- Back button -->
+			<div class="flex justify-center gap-3">
+				<Button variant="outline" onclick={() => gotoDynamic(returnTo)}>
+					<ArrowLeft class="mr-2 h-4 w-4" />
+					Back to Expenses
+				</Button>
+				<Button
+					variant="destructive"
+					onclick={() => (showDeleteConfirm = true)}
+					disabled={isDeleting}
+				>
+					<Trash2 class="mr-2 h-4 w-4" />
+					Force Delete
+				</Button>
+			</div>
+		</div>
+	{:else}
+		<div class="space-y-6 pb-32 sm:pb-24">
+			<!-- Header -->
+			<div class="flex items-center gap-4">
+				<button onclick={() => gotoDynamic(returnTo)} class="p-2 hover:bg-muted rounded-lg">
+					<ArrowLeft class="h-5 w-5" />
+				</button>
+
+				<div>
+					<h1 class="text-2xl font-bold text-foreground">
+						{isGroupEditMode ? 'Edit Split Expense' : isEditMode ? 'Edit Expense' : 'Add Expense'}
+					</h1>
+					<p class="text-muted-foreground">
+						{#if isGroupEditMode && selectedVehicleIds.length > 0}
+							{selectedVehicleIds
+								.map(id => {
+									const v = vehicles.find(veh => veh.id === id);
+									return v ? getVehicleDisplayName(v) : '';
+								})
+								.filter(Boolean)
+								.join(', ')}
+						{:else if isEditMode}
+							{getVehicleDisplayName(vehicle)}
+						{:else if !onlineStatus.current}
+							<span class="text-chart-5">Offline mode - will sync when online</span>
+						{:else}
+							Track a new vehicle expense
+						{/if}
+					</p>
+				</div>
+			</div>
+
+			<!-- Form -->
+			<form
+				onsubmit={e => {
+					e.preventDefault();
+					handleSubmit();
+				}}
+				class="rounded-lg border bg-card p-6 space-y-6"
+			>
+				<!-- Vehicle Selection / Split Summary -->
+				{#if isSplit && selectedVehicleIds.length >= 2}
+					<!-- Split configured: show tappable summary instead of vehicle dropdown -->
+					<div class="space-y-2">
+						<Label>Vehicle *</Label>
+						<button
+							type="button"
+							onclick={() => (showSplitSheet = true)}
+							class="flex w-full items-center justify-between rounded-lg border border-border bg-muted/50 px-4 py-3 text-left transition-colors hover:bg-muted"
+						>
+							<div class="flex items-center gap-2 min-w-0">
+								<GitBranch class="h-4 w-4 shrink-0 text-muted-foreground" />
+								<div class="min-w-0">
+									<p class="text-sm font-medium text-foreground">{splitSummaryText}</p>
+									<p class="truncate text-xs text-muted-foreground">
+										{selectedVehicleIds
+											.map(id => {
+												const v = vehicles.find(veh => veh.id === id);
+												return v ? getVehicleDisplayName(v) : id;
+											})
+											.join(', ')}
+									</p>
+								</div>
+							</div>
+							<span class="shrink-0 text-xs text-muted-foreground">Edit</span>
+						</button>
+						{#if !isEditMode}
+							<button
+								type="button"
+								onclick={() => handleSplitToggle(false)}
+								class="text-xs text-muted-foreground underline hover:text-foreground"
 							>
-								{#if formData.vehicleId}
-									{@const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId)}
-									{#if selectedVehicle}
-										{selectedVehicle.year}
-										{selectedVehicle.make}
-										{selectedVehicle.model}
-										{#if selectedVehicle.nickname}({selectedVehicle.nickname}){/if}
+								Remove split
+							</button>
+						{/if}
+					</div>
+				{:else}
+					<!-- Normal single vehicle selector + split button inline -->
+					<div class="space-y-2">
+						<Label for="vehicle">Vehicle *</Label>
+						<div class="flex gap-2">
+							<Select.Root
+								type="single"
+								value={formData.vehicleId}
+								onValueChange={v => {
+									if (v) {
+										formData.vehicleId = v;
+										touched['vehicleId'] = true;
+										handleBlur('vehicleId');
+									}
+								}}
+							>
+								<Select.Trigger
+									id="vehicle"
+									class="w-full {touched['vehicleId'] && errors['vehicleId']
+										? 'border-destructive'
+										: ''}"
+									aria-invalid={!!(touched['vehicleId'] && errors['vehicleId'])}
+									aria-describedby={touched['vehicleId'] && errors['vehicleId']
+										? 'vehicleId-error'
+										: undefined}
+								>
+									{#if formData.vehicleId}
+										{@const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId)}
+										{#if selectedVehicle}
+											{selectedVehicle.year}
+											{selectedVehicle.make}
+											{selectedVehicle.model}
+											{#if selectedVehicle.nickname}({selectedVehicle.nickname}){/if}
+										{:else}
+											Select a vehicle
+										{/if}
 									{:else}
 										Select a vehicle
 									{/if}
-								{:else}
-									Select a vehicle
-								{/if}
-							</Select.Trigger>
-							<Select.Content>
-								{#each vehicles as v (v.id)}
-									<Select.Item value={v.id} label="{v.year} {v.make} {v.model}">
-										{v.year}
-										{v.make}
-										{v.model}
-										{#if v.nickname}({v.nickname}){/if}
-									</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
-						{#if (!isEditMode || isGroupEditMode) && vehicles.length >= 2}
-							<Button
-								type="button"
-								variant="outline"
-								size="icon"
-								class="shrink-0"
-								onclick={() => {
-									if (!isSplit) {
-										handleSplitToggle(true);
-									}
-									showSplitSheet = true;
-								}}
-								aria-label="Split cost across vehicles"
-							>
-								<GitBranch class="h-4 w-4" />
-							</Button>
+								</Select.Trigger>
+								<Select.Content>
+									{#each vehicles as v (v.id)}
+										<Select.Item value={v.id} label="{v.year} {v.make} {v.model}">
+											{v.year}
+											{v.make}
+											{v.model}
+											{#if v.nickname}({v.nickname}){/if}
+										</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+							{#if (!isEditMode || isGroupEditMode) && vehicles.length >= 2}
+								<Button
+									type="button"
+									variant="outline"
+									size="icon"
+									class="shrink-0"
+									onclick={() => {
+										if (!isSplit) {
+											handleSplitToggle(true);
+										}
+										showSplitSheet = true;
+									}}
+									aria-label="Split cost across vehicles"
+								>
+									<GitBranch class="h-4 w-4" />
+								</Button>
+							{/if}
+						</div>
+						{#if touched['vehicleId'] && errors['vehicleId']}
+							<FormFieldError id="vehicleId-error">{errors['vehicleId']}</FormFieldError>
 						{/if}
 					</div>
-					{#if touched['vehicleId'] && errors['vehicleId']}
-						<FormFieldError id="vehicleId-error">{errors['vehicleId']}</FormFieldError>
+				{/if}
+
+				<!-- Category Selection (Required) -->
+				<CategorySelector
+					value={formData.category}
+					error={errors['category']}
+					touched={touched['category']}
+					onSelect={selectCategory}
+				/>
+
+				<!-- Financing Payment Checkbox -->
+				{#if showFinancingCheckbox}
+					<div class="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
+						<Checkbox id="isFinancingPayment" bind:checked={formData.isFinancingPayment} />
+						<Label for="isFinancingPayment" class="cursor-pointer text-sm font-medium leading-none">
+							Apply as payment towards financing
+						</Label>
+					</div>
+				{/if}
+
+				<!-- Date -->
+				<div class="space-y-2">
+					<Label for="date">Date *</Label>
+					<DatePicker
+						id="date"
+						bind:value={formData.date}
+						placeholder="Select date"
+						aria-invalid={!!(touched['date'] && errors['date'])}
+						aria-describedby={touched['date'] && errors['date'] ? 'date-error' : undefined}
+					/>
+					{#if touched['date'] && errors['date']}
+						<FormFieldError id="date-error">{errors['date']}</FormFieldError>
 					{/if}
 				</div>
-			{/if}
 
-			<!-- Category Selection (Required) -->
-			<CategorySelector
-				value={formData.category}
-				error={errors['category']}
-				touched={touched['category']}
-				onSelect={selectCategory}
-			/>
+				<!-- Amount -->
+				<div class="space-y-2">
+					<Label for="amount">Amount *</Label>
+					<div class="relative">
+						<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+							<span class="text-muted-foreground">$</span>
+						</div>
+						<Input
+							id="amount"
+							type="number"
+							step="0.01"
+							min="0"
+							bind:value={formData.amount}
+							placeholder="0.00"
+							class="pl-8"
+							onblur={() => handleBlur('amount')}
+							aria-invalid={!!(touched['amount'] && errors['amount'])}
+							aria-describedby={touched['amount'] && errors['amount'] ? 'amount-error' : undefined}
+						/>
+					</div>
+					{#if touched['amount'] && errors['amount']}
+						<FormFieldError id="amount-error">{errors['amount']}</FormFieldError>
+					{/if}
+				</div>
 
-			<!-- Financing Payment Checkbox -->
-			{#if showFinancingCheckbox}
-				<div class="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
-					<Checkbox id="isFinancingPayment" bind:checked={formData.isFinancingPayment} />
-					<Label for="isFinancingPayment" class="cursor-pointer text-sm font-medium leading-none">
-						Apply as payment towards financing
+				<!-- Mileage (always visible, required for fuel) -->
+				<div class="space-y-2">
+					<Label for="mileage">
+						Current Mileage {showFuelFields ? '*' : '(Optional)'}
 					</Label>
-				</div>
-			{/if}
-
-			<!-- Date -->
-			<div class="space-y-2">
-				<Label for="date">Date *</Label>
-				<DatePicker
-					id="date"
-					bind:value={formData.date}
-					placeholder="Select date"
-					aria-invalid={!!(touched['date'] && errors['date'])}
-					aria-describedby={touched['date'] && errors['date'] ? 'date-error' : undefined}
-				/>
-				{#if touched['date'] && errors['date']}
-					<FormFieldError id="date-error">{errors['date']}</FormFieldError>
-				{/if}
-			</div>
-
-			<!-- Amount -->
-			<div class="space-y-2">
-				<Label for="amount">Amount *</Label>
-				<div class="relative">
-					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-						<span class="text-muted-foreground">$</span>
+					<div class="relative">
+						<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+							<Gauge class="h-5 w-5 text-muted-foreground" />
+						</div>
+						<Input
+							id="mileage"
+							type="number"
+							min="0"
+							bind:value={formData.mileage}
+							placeholder="123456"
+							class="pl-10"
+							oninput={handleMileageChange}
+							onblur={() => handleBlur('mileage')}
+							aria-invalid={!!(touched['mileage'] && errors['mileage'])}
+							aria-describedby={touched['mileage'] && errors['mileage']
+								? 'mileage-error'
+								: undefined}
+						/>
 					</div>
-					<Input
-						id="amount"
-						type="number"
-						step="0.01"
-						min="0"
-						bind:value={formData.amount}
-						placeholder="0.00"
-						class="pl-8"
-						onblur={() => handleBlur('amount')}
-						aria-invalid={!!(touched['amount'] && errors['amount'])}
-						aria-describedby={touched['amount'] && errors['amount'] ? 'amount-error' : undefined}
+					{#if lastFuelExpense?.mileage && formData.tags.includes('fuel')}
+						<p class="text-xs text-muted-foreground">
+							Previous fuel entry: {lastFuelExpense.mileage.toLocaleString()}
+							{distLabel.toLowerCase()}
+						</p>
+					{/if}
+					{#if touched['mileage'] && errors['mileage']}
+						<FormFieldError id="mileage-error">{errors['mileage']}</FormFieldError>
+					{/if}
+				</div>
+
+				<!-- Fuel-specific fields -->
+				{#if showFuelFields && vehicle}
+					<FuelFieldsSection
+						trackFuel={vehicle.trackFuel}
+						trackCharging={vehicle.trackCharging}
+						bind:volume={formData.volume}
+						bind:charge={formData.charge}
+						bind:fuelType={formData.fuelType}
+						bind:missedFillup={formData.missedFillup}
+						amount={formData.amount}
+						{volumeUnit}
+						{chargeUnit}
+						{distanceUnit}
+						{calculatedMpg}
+						{calculatedEfficiency}
+						showMpgCalculation={showMpgCalculation && !formData.missedFillup}
+						{errors}
+						{touched}
+						onBlur={handleBlur}
+						onMileageChange={handleMileageChange}
+					/>
+				{/if}
+
+				<!-- Description -->
+				<div class="space-y-2">
+					<Label for="description">Description (Optional)</Label>
+					<Textarea
+						id="description"
+						bind:value={formData.description}
+						rows={3}
+						placeholder="Add any additional notes..."
+						class="bg-background"
 					/>
 				</div>
-				{#if touched['amount'] && errors['amount']}
-					<FormFieldError id="amount-error">{errors['amount']}</FormFieldError>
-				{/if}
-			</div>
 
-			<!-- Mileage (always visible, required for fuel) -->
-			<div class="space-y-2">
-				<Label for="mileage">
-					Current Mileage {showFuelFields ? '*' : '(Optional)'}
-				</Label>
-				<div class="relative">
-					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-						<Gauge class="h-5 w-5 text-muted-foreground" />
-					</div>
-					<Input
-						id="mileage"
-						type="number"
-						min="0"
-						bind:value={formData.mileage}
-						placeholder="123456"
-						class="pl-10"
-						oninput={handleMileageChange}
-						onblur={() => handleBlur('mileage')}
-						aria-invalid={!!(touched['mileage'] && errors['mileage'])}
-						aria-describedby={touched['mileage'] && errors['mileage'] ? 'mileage-error' : undefined}
+				<!-- Tags -->
+				<TagInput bind:tags={formData.tags} error={errors['tags']} touched={touched['tags']} />
+
+				<!-- Photos & Receipts -->
+				{#if isGroupEditMode && groupId && originalExpense}
+					<ExpensePhotoSection entityType="expense" entityId={originalExpense.id} />
+				{:else if isEditMode && expenseId}
+					<ExpensePhotoSection entityType="expense" entityId={expenseId} />
+				{:else}
+					<PendingPhotoPreview
+						files={pendingFiles}
+						onAdd={file => (pendingFiles = [...pendingFiles, file])}
+						onRemove={i => (pendingFiles = pendingFiles.filter((_, idx) => idx !== i))}
 					/>
-				</div>
-				{#if lastFuelExpense?.mileage && formData.tags.includes('fuel')}
-					<p class="text-xs text-muted-foreground">
-						Previous fuel entry: {lastFuelExpense.mileage.toLocaleString()}
-						{distLabel.toLowerCase()}
-					</p>
 				{/if}
-				{#if touched['mileage'] && errors['mileage']}
-					<FormFieldError id="mileage-error">{errors['mileage']}</FormFieldError>
-				{/if}
-			</div>
+			</form>
 
-			<!-- Fuel-specific fields -->
-			{#if showFuelFields && vehicle}
-				<FuelFieldsSection
-					trackFuel={vehicle.trackFuel}
-					trackCharging={vehicle.trackCharging}
-					bind:volume={formData.volume}
-					bind:charge={formData.charge}
-					bind:fuelType={formData.fuelType}
-					bind:missedFillup={formData.missedFillup}
-					amount={formData.amount}
-					{volumeUnit}
-					{chargeUnit}
-					{distanceUnit}
-					{calculatedMpg}
-					{calculatedEfficiency}
-					showMpgCalculation={showMpgCalculation && !formData.missedFillup}
-					{errors}
-					{touched}
-					onBlur={handleBlur}
-					onMileageChange={handleMileageChange}
-				/>
-			{/if}
-
-			<!-- Description -->
-			<div class="space-y-2">
-				<Label for="description">Description (Optional)</Label>
-				<Textarea
-					id="description"
-					bind:value={formData.description}
-					rows={3}
-					placeholder="Add any additional notes..."
-					class="bg-background"
-				/>
-			</div>
-
-			<!-- Tags -->
-			<TagInput bind:tags={formData.tags} error={errors['tags']} touched={touched['tags']} />
-
-			<!-- Photos & Receipts -->
-			{#if isGroupEditMode && groupId}
-				<ExpensePhotoSection entityType="expense_group" entityId={groupId} />
-			{:else if isEditMode && expenseId}
-				<ExpensePhotoSection entityType="expense" entityId={expenseId} />
-			{:else}
-				<PendingPhotoPreview
-					files={pendingFiles}
-					onAdd={file => (pendingFiles = [...pendingFiles, file])}
-					onRemove={i => (pendingFiles = pendingFiles.filter((_, idx) => idx !== i))}
-				/>
-			{/if}
-		</form>
-
-		<!-- Floating Action Bar -->
-		<div
-			class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto z-50"
-		>
+			<!-- Floating Action Bar -->
 			<div
-				class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none"
+				class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto z-50"
 			>
-				{#if isEditMode}
+				<div
+					class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none"
+				>
+					{#if isEditMode}
+						<Button
+							type="button"
+							variant="destructive"
+							onclick={confirmDelete}
+							disabled={isDeleting || isSubmitting}
+							class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
+						>
+							<Trash2 class="h-5 w-5 sm:mr-2" />
+							<span class="hidden sm:inline font-semibold">Delete</span>
+						</Button>
+					{/if}
+
 					<Button
 						type="button"
-						variant="destructive"
-						onclick={confirmDelete}
-						disabled={isDeleting || isSubmitting}
-						class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
+						variant="outline"
+						onclick={handleBack}
+						disabled={isSubmitting || isDeleting}
+						class="sm:rounded-full rounded-full bg-muted-foreground hover:bg-muted-foreground/80 text-background shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
 					>
-						<Trash2 class="h-5 w-5 sm:mr-2" />
-						<span class="hidden sm:inline font-semibold">Delete</span>
+						<X class="h-5 w-5 sm:mr-2" />
+						<span class="hidden sm:inline font-semibold">Cancel</span>
 					</Button>
-				{/if}
 
-				<Button
-					type="button"
-					variant="outline"
-					onclick={handleBack}
-					disabled={isSubmitting || isDeleting}
-					class="sm:rounded-full rounded-full bg-muted-foreground hover:bg-muted-foreground/80 text-background shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
-				>
-					<X class="h-5 w-5 sm:mr-2" />
-					<span class="hidden sm:inline font-semibold">Cancel</span>
-				</Button>
-
-				<Button
-					type="button"
-					onclick={handleSubmit}
-					disabled={isSubmitting || isDeleting}
-					class="sm:rounded-full rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 sm:h-14 px-6 border-0 flex-1 sm:flex-initial"
-				>
-					{#if isSubmitting}
-						<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
-						<span class="font-bold">{isEditMode ? 'Updating' : 'Saving'}...</span>
-					{:else}
-						<Check class="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" />
-						<span class="font-bold">{isEditMode ? 'Update' : 'Save'} Expense</span>
-					{/if}
-				</Button>
-			</div>
-		</div>
-	</div>
-
-	<!-- Split Cost Sheet -->
-	<SplitCostSheet
-		bind:open={showSplitSheet}
-		{vehicles}
-		{selectedVehicleIds}
-		{splitMethod}
-		allocations={splitAllocations}
-		totalAmount={parsedTotalAmount}
-		onVehicleIdsChange={ids => {
-			selectedVehicleIds = ids;
-			resetAllocationsForMethod(splitMethod);
-		}}
-		onMethodChange={handleMethodChange}
-		onAllocationsChange={handleAllocationsChange}
-		onClose={() => (showSplitSheet = false)}
-	/>
-{/if}
-
-<!-- Delete Confirmation AlertDialog (outside if/else so it works in all modes) -->
-<AlertDialog.Root bind:open={showDeleteConfirm}>
-	<AlertDialog.Content>
-		<AlertDialog.Header>
-			<AlertDialog.Title>Delete Expense</AlertDialog.Title>
-			<AlertDialog.Description>
-				{#if isInsuranceManaged && groupId}
-					This will delete the insurance expense group and all its child expenses. This action
-					cannot be undone.
-				{:else}
-					Are you sure you want to delete this expense? This action cannot be undone.
-				{/if}
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-
-		{#if originalExpense}
-			<div class="bg-muted rounded-lg p-3">
-				<div class="flex items-center gap-3">
-					<div class="p-2 rounded-lg bg-destructive/10 text-destructive">
-						<Save class="h-4 w-4" />
-					</div>
-					<div>
-						<p class="font-medium text-foreground">
-							{originalExpense.description || originalExpense.tags?.join(', ') || 'Expense'}
-						</p>
-						<p class="text-sm text-muted-foreground">
-							${originalExpense.amount.toFixed(2)} on {new Date(
-								originalExpense.date
-							).toLocaleDateString()}
-						</p>
-					</div>
+					<Button
+						type="button"
+						onclick={handleSubmit}
+						disabled={isSubmitting || isDeleting}
+						class="sm:rounded-full rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 sm:h-14 px-6 border-0 flex-1 sm:flex-initial"
+					>
+						{#if isSubmitting}
+							<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
+							<span class="font-bold">{isEditMode ? 'Updating' : 'Saving'}...</span>
+						{:else}
+							<Check class="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" />
+							<span class="font-bold">{isEditMode ? 'Update' : 'Save'} Expense</span>
+						{/if}
+					</Button>
 				</div>
 			</div>
-		{/if}
+		</div>
 
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel disabled={isDeleting}>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action
-				onclick={handleDelete}
-				disabled={isDeleting}
-				class="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-			>
-				{#if isDeleting}
-					<LoaderCircle class="h-4 w-4 animate-spin mr-2" />
-					Deleting...
-				{:else}
-					Delete Expense
-				{/if}
-			</AlertDialog.Action>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+		<!-- Split Cost Sheet -->
+		<SplitCostSheet
+			bind:open={showSplitSheet}
+			{vehicles}
+			{selectedVehicleIds}
+			{splitMethod}
+			allocations={splitAllocations}
+			totalAmount={parsedTotalAmount}
+			onVehicleIdsChange={ids => {
+				selectedVehicleIds = ids;
+				resetAllocationsForMethod(splitMethod);
+			}}
+			onMethodChange={handleMethodChange}
+			onAllocationsChange={handleAllocationsChange}
+			onClose={() => (showSplitSheet = false)}
+		/>
+	{/if}
+
+	<!-- Delete Confirmation AlertDialog (outside if/else so it works in all modes) -->
+	<AlertDialog.Root bind:open={showDeleteConfirm}>
+		<AlertDialog.Content>
+			<AlertDialog.Header>
+				<AlertDialog.Title>Delete Expense</AlertDialog.Title>
+				<AlertDialog.Description>
+					{#if isInsuranceManaged && groupId}
+						This will delete the insurance expense group and all its child expenses. This action
+						cannot be undone.
+					{:else}
+						Are you sure you want to delete this expense? This action cannot be undone.
+					{/if}
+				</AlertDialog.Description>
+			</AlertDialog.Header>
+
+			{#if originalExpense}
+				<div class="bg-muted rounded-lg p-3">
+					<div class="flex items-center gap-3">
+						<div class="p-2 rounded-lg bg-destructive/10 text-destructive">
+							<Save class="h-4 w-4" />
+						</div>
+						<div>
+							<p class="font-medium text-foreground">
+								{originalExpense.description || originalExpense.tags?.join(', ') || 'Expense'}
+							</p>
+							<p class="text-sm text-muted-foreground">
+								${originalExpense.amount.toFixed(2)} on {new Date(
+									originalExpense.date
+								).toLocaleDateString()}
+							</p>
+						</div>
+					</div>
+				</div>
+			{/if}
+
+			<AlertDialog.Footer>
+				<AlertDialog.Cancel disabled={isDeleting}>Cancel</AlertDialog.Cancel>
+				<AlertDialog.Action
+					onclick={handleDelete}
+					disabled={isDeleting}
+					class="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+				>
+					{#if isDeleting}
+						<LoaderCircle class="h-4 w-4 animate-spin mr-2" />
+						Deleting...
+					{:else}
+						Delete Expense
+					{/if}
+				</AlertDialog.Action>
+			</AlertDialog.Footer>
+		</AlertDialog.Content>
+	</AlertDialog.Root>
 </FormLayout>

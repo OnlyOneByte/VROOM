@@ -2,8 +2,12 @@
  * User Activity Tracker - Activity and change tracking for auto-sync
  */
 
+import { eq } from 'drizzle-orm';
+import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
+import { userSettings, users as usersTable } from '../../db/schema';
 import { logger } from '../../utils/logger';
+import { backupOrchestrator } from './backup-orchestrator';
 
 export interface UserActivity {
   userId: string;
@@ -83,75 +87,25 @@ export class UserActivityTracker {
     const hasChanges = await this.hasChangesSinceLastSync(userId);
     if (!hasChanges) return;
 
-    const db = getDb();
-    const { eq } = await import('drizzle-orm');
-    const { userSettings } = await import('../../db/schema');
+    logger.info('Auto-sync triggered', { userId });
+    await this.performAutoBackup(userId);
+  }
 
-    const settings = await db
-      .select()
-      .from(userSettings)
-      .where(eq(userSettings.userId, userId))
-      .limit(1);
-    if (!settings.length) return;
+  private async performAutoBackup(userId: string): Promise<void> {
+    try {
+      const db = getDb();
 
-    const syncTypes: string[] = [];
-    if (settings[0].googleSheetsSyncEnabled) syncTypes.push('sheets');
-    if (settings[0].googleDriveBackupEnabled) syncTypes.push('backup');
-
-    if (syncTypes.length === 0) return;
-
-    logger.info('Auto-sync triggered', { userId, syncTypes });
-
-    // Perform backup sync
-    if (syncTypes.includes('backup') && settings[0].googleDriveBackupFolderId) {
-      try {
-        const { backupService } = await import('./backup');
-        const { getDriveServiceForUser } = await import('./google-drive');
-        const { settingsRepository } = await import('../settings/repository');
-
-        const zipBuffer = await backupService.exportAsZip(userId);
-        const driveService = await getDriveServiceForUser(userId);
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const fileName = `vroom-backup-${timestamp}.zip`;
-
-        await driveService.uploadFile(
-          fileName,
-          zipBuffer,
-          'application/zip',
-          settings[0].googleDriveBackupFolderId
-        );
-
-        await settingsRepository.updateBackupDate(userId);
+      const userResult = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .limit(1);
+      if (userResult.length > 0) {
+        await backupOrchestrator.execute(userId, userResult[0].displayName, false);
         logger.info('Auto-sync backup completed', { userId });
-      } catch (error) {
-        logger.error('Auto-sync backup failed', { userId, error });
       }
-    }
-
-    // Perform sheets sync
-    if (syncTypes.includes('sheets')) {
-      try {
-        const { createSheetsServiceForUser } = await import('./google-sheets');
-        const { settingsRepository } = await import('../settings/repository');
-        const { users: usersTable } = await import('../../db/schema');
-
-        const userResult = await db
-          .select()
-          .from(usersTable)
-          .where(eq(usersTable.id, userId))
-          .limit(1);
-        if (userResult.length > 0) {
-          const sheetsService = await createSheetsServiceForUser(userId);
-          const spreadsheetInfo = await sheetsService.createOrUpdateVroomSpreadsheet(
-            userId,
-            userResult[0].displayName
-          );
-          await settingsRepository.updateSyncDate(userId, spreadsheetInfo.id);
-          logger.info('Auto-sync sheets completed', { userId });
-        }
-      } catch (error) {
-        logger.error('Auto-sync sheets failed', { userId, error });
-      }
+    } catch (error) {
+      logger.error('Auto-sync backup failed', { userId, error });
     }
   }
 
@@ -182,8 +136,6 @@ export class UserActivityTracker {
   async markDataChanged(userId: string): Promise<void> {
     try {
       const db = getDb();
-      const { eq } = await import('drizzle-orm');
-      const { userSettings } = await import('../../db/schema');
       await db
         .update(userSettings)
         .set({ lastDataChangeDate: new Date(), updatedAt: new Date() })
@@ -196,8 +148,6 @@ export class UserActivityTracker {
   async hasChangesSinceLastSync(userId: string): Promise<boolean> {
     try {
       const db = getDb();
-      const { eq } = await import('drizzle-orm');
-      const { userSettings } = await import('../../db/schema');
       const settings = await db
         .select()
         .from(userSettings)
@@ -218,4 +168,7 @@ export class UserActivityTracker {
 
 export const activityTracker = UserActivityTracker.getInstance();
 
-setInterval(() => activityTracker.cleanupInactiveUsers(), 60 * 60 * 1000);
+// Periodic cleanup of stale activity entries — disabled in test to avoid dangling timers
+if (CONFIG.env !== 'test') {
+  setInterval(() => activityTracker.cleanupInactiveUsers(), 60 * 60 * 1000);
+}

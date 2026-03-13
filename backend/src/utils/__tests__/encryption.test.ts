@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { randomBytes } from 'node:crypto';
-import { decrypt, encrypt } from '../encryption';
+import { _clearKeyCache, decrypt, encrypt } from '../encryption';
 
 // Valid 32-byte hex key for tests
 const TEST_KEY = 'a'.repeat(64);
@@ -11,6 +11,7 @@ let originalKey: string | undefined;
 beforeEach(() => {
   originalKey = process.env.PROVIDER_ENCRYPTION_KEY;
   process.env.PROVIDER_ENCRYPTION_KEY = TEST_KEY;
+  _clearKeyCache();
 });
 
 afterEach(() => {
@@ -19,6 +20,7 @@ afterEach(() => {
   } else {
     delete process.env.PROVIDER_ENCRYPTION_KEY;
   }
+  _clearKeyCache();
 });
 
 // ---------------------------------------------------------------------------
@@ -63,6 +65,7 @@ describe('wrong key throws', () => {
   test('decrypt with different key throws', () => {
     const ciphertext = encrypt('secret data');
     process.env.PROVIDER_ENCRYPTION_KEY = ALT_KEY;
+    _clearKeyCache();
     expect(() => decrypt(ciphertext)).toThrow();
   });
 });
@@ -99,6 +102,7 @@ describe('tampered ciphertext throws', () => {
 describe('missing or invalid encryption key', () => {
   test('throws when PROVIDER_ENCRYPTION_KEY is not set', () => {
     delete process.env.PROVIDER_ENCRYPTION_KEY;
+    _clearKeyCache();
     expect(() => encrypt('test')).toThrow(
       'PROVIDER_ENCRYPTION_KEY environment variable is not set'
     );
@@ -106,6 +110,7 @@ describe('missing or invalid encryption key', () => {
 
   test('throws when key is wrong length', () => {
     process.env.PROVIDER_ENCRYPTION_KEY = 'abcd'; // too short
+    _clearKeyCache();
     expect(() => encrypt('test')).toThrow('must be a 32-byte hex string');
   });
 });

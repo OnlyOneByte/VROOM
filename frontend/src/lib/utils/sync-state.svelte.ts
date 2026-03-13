@@ -110,23 +110,23 @@ export const lastDataChangeTime = {
 };
 
 // --- Feature flags ---
-let _googleDriveBackupEnabled = $state(false);
-let _googleSheetsSyncEnabled = $state(false);
+let _backupEnabled = $state(false);
+let _sheetsSyncEnabled = $state(false);
 
-export const googleDriveBackupEnabled = {
+export const backupEnabled = {
 	get current() {
-		return _googleDriveBackupEnabled;
+		return _backupEnabled;
 	},
 	set current(value: boolean) {
-		_googleDriveBackupEnabled = value;
+		_backupEnabled = value;
 	}
 };
 
-export const googleSheetsSyncEnabled = {
+export const sheetsSyncEnabled = {
 	get current() {
-		return _googleSheetsSyncEnabled;
+		return _sheetsSyncEnabled;
 	},
 	set current(value: boolean) {
-		_googleSheetsSyncEnabled = value;
+		_sheetsSyncEnabled = value;
 	}
 };

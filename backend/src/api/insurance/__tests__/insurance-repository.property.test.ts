@@ -9,13 +9,13 @@
 
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import type { PolicyTerm } from '../../../db/schema';
-import { expenseGroups, expenses, insurancePolicyVehicles, vehicles } from '../../../db/schema';
+import { expenses, insurancePolicyVehicles, vehicles } from '../../../db/schema';
 import type { CreatePolicyData, TermVehicleCoverage } from '../repository';
 import { InsurancePolicyRepository } from '../repository';
 import {
@@ -568,12 +568,12 @@ describe('Property 17: No expense for terms without totalCost', () => {
 });
 
 // ===========================================================================
-// Property 10: Term with totalCost creates expense group and children
+// Property 10: Term with totalCost creates sibling expenses with shared groupId
 // Feature: insurance-term-vehicle-coverage, Property 10
 // **Validates: Requirements 7.3, 8.1**
 // ===========================================================================
-describe('Property 10: Term with totalCost creates expense group and children', () => {
-  test('creating/adding a term with totalCost results in an expense group with matching totalAmount and children summing to totalCost', async () => {
+describe('Property 10: Term with totalCost creates sibling expenses with shared groupId', () => {
+  test('creating/adding a term with totalCost results in sibling expenses sharing a groupId with amounts summing to totalCost', async () => {
     await fc.assert(
       fc.asyncProperty(
         companyNameArb,
@@ -582,7 +582,6 @@ describe('Property 10: Term with totalCost creates expense group and children', 
         fc.boolean(),
         async (company, vehicleIds, term, useAddTerm) => {
           if (useAddTerm) {
-            // Test via addTerm: create policy with a no-cost base term, then add the costed term
             const baseTerm = { ...term, id: `base-${term.id}`, financeDetails: {} };
             const created = await repo.create(
               {
@@ -598,30 +597,31 @@ describe('Property 10: Term with totalCost creates expense group and children', 
               USER_ID
             );
 
-            // Verify expense group exists for this term
-            const groups = await db
-              .select()
-              .from(expenseGroups)
-              .where(
-                and(
-                  eq(expenseGroups.insurancePolicyId, created.id),
-                  eq(expenseGroups.insuranceTermId, term.id)
-                )
-              );
-            expect(groups.length).toBe(1);
-            expect(groups[0].totalAmount).toBe(term.financeDetails.totalCost);
-
-            // Verify children sum to totalCost
-            const children = await db
+            // Verify sibling expenses exist for this term with a shared groupId
+            const siblings = await db
               .select()
               .from(expenses)
-              .where(eq(expenses.expenseGroupId, groups[0].id));
-            expect(children.length).toBe(vehicleIds.length);
-            const childSum =
-              Math.round(children.reduce((s, e) => s + e.expenseAmount, 0) * 100) / 100;
-            expect(childSum).toBe(term.financeDetails.totalCost);
+              .where(
+                and(
+                  eq(expenses.insurancePolicyId, created.id),
+                  eq(expenses.insuranceTermId, term.id),
+                  isNotNull(expenses.groupId)
+                )
+              );
+            expect(siblings.length).toBe(vehicleIds.length);
+
+            // All siblings share the same groupId and groupTotal
+            const groupIds = new Set(siblings.map((s) => s.groupId));
+            expect(groupIds.size).toBe(1);
+            for (const s of siblings) {
+              expect(s.groupTotal).toBe(term.financeDetails.totalCost);
+            }
+
+            // Sum of sibling amounts equals totalCost
+            const siblingSum =
+              Math.round(siblings.reduce((s, e) => s + e.expenseAmount, 0) * 100) / 100;
+            expect(siblingSum).toBe(term.financeDetails.totalCost);
           } else {
-            // Test via create: policy with the costed term directly
             const created = await repo.create(
               {
                 company,
@@ -631,26 +631,27 @@ describe('Property 10: Term with totalCost creates expense group and children', 
               USER_ID
             );
 
-            const groups = await db
-              .select()
-              .from(expenseGroups)
-              .where(
-                and(
-                  eq(expenseGroups.insurancePolicyId, created.id),
-                  eq(expenseGroups.insuranceTermId, term.id)
-                )
-              );
-            expect(groups.length).toBe(1);
-            expect(groups[0].totalAmount).toBe(term.financeDetails.totalCost);
-
-            const children = await db
+            const siblings = await db
               .select()
               .from(expenses)
-              .where(eq(expenses.expenseGroupId, groups[0].id));
-            expect(children.length).toBe(vehicleIds.length);
-            const childSum =
-              Math.round(children.reduce((s, e) => s + e.expenseAmount, 0) * 100) / 100;
-            expect(childSum).toBe(term.financeDetails.totalCost);
+              .where(
+                and(
+                  eq(expenses.insurancePolicyId, created.id),
+                  eq(expenses.insuranceTermId, term.id),
+                  isNotNull(expenses.groupId)
+                )
+              );
+            expect(siblings.length).toBe(vehicleIds.length);
+
+            const groupIds = new Set(siblings.map((s) => s.groupId));
+            expect(groupIds.size).toBe(1);
+            for (const s of siblings) {
+              expect(s.groupTotal).toBe(term.financeDetails.totalCost);
+            }
+
+            const siblingSum =
+              Math.round(siblings.reduce((s, e) => s + e.expenseAmount, 0) * 100) / 100;
+            expect(siblingSum).toBe(term.financeDetails.totalCost);
           }
         }
       ),
@@ -719,7 +720,7 @@ describe('Property 11: Junction row correctness on policy create', () => {
 // **Validates: Requirements 8.3, 6.2**
 // ===========================================================================
 describe('Property 12: Coverage update regenerates children', () => {
-  test('updating vehicleCoverage results in junction rows matching new vehicles and children regenerated with sum equaling totalAmount', async () => {
+  test('updating vehicleCoverage results in junction rows matching new vehicles and sibling expenses regenerated with sum equaling groupTotal', async () => {
     await fc.assert(
       fc.asyncProperty(
         companyNameArb,
@@ -757,28 +758,27 @@ describe('Property 12: Coverage update regenerates children', () => {
             );
           expect(new Set(junctionRows.map((r) => r.vehicleId))).toEqual(new Set(updatedVehicleIds));
 
-          // Verify expense group still exists and children are regenerated
-          const groups = await db
-            .select()
-            .from(expenseGroups)
-            .where(
-              and(
-                eq(expenseGroups.insurancePolicyId, created.id),
-                eq(expenseGroups.insuranceTermId, term.id)
-              )
-            );
-          expect(groups.length).toBe(1);
-
-          const children = await db
+          // Verify sibling expenses exist with a shared groupId
+          const siblings = await db
             .select()
             .from(expenses)
-            .where(eq(expenses.expenseGroupId, groups[0].id));
-          expect(children.length).toBe(updatedVehicleIds.length);
-          expect(new Set(children.map((c) => c.vehicleId))).toEqual(new Set(updatedVehicleIds));
+            .where(
+              and(
+                eq(expenses.insurancePolicyId, created.id),
+                eq(expenses.insuranceTermId, term.id),
+                isNotNull(expenses.groupId)
+              )
+            );
+          expect(siblings.length).toBe(updatedVehicleIds.length);
+          expect(new Set(siblings.map((c) => c.vehicleId))).toEqual(new Set(updatedVehicleIds));
 
-          const childSum =
-            Math.round(children.reduce((s, e) => s + e.expenseAmount, 0) * 100) / 100;
-          expect(childSum).toBe(groups[0].totalAmount);
+          // All siblings share the same groupId
+          const groupIds = new Set(siblings.map((s) => s.groupId));
+          expect(groupIds.size).toBe(1);
+
+          const siblingSum =
+            Math.round(siblings.reduce((s, e) => s + e.expenseAmount, 0) * 100) / 100;
+          expect(siblingSum).toBe(term.financeDetails.totalCost);
         }
       ),
       { numRuns: 50 }

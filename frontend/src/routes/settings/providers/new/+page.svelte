@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ProviderForm from '$lib/components/settings/ProviderForm.svelte';
+	import ProviderForm from '$lib/components/settings/storage-provider/form/ProviderForm.svelte';
 </script>
 
 <svelte:head>

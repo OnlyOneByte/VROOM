@@ -36,7 +36,8 @@
         "performance_stop_trace",
         "performance_analyze_insight",
         "performance_analyze_insight",
-        "performance_analyze_insight"
+        "performance_analyze_insight",
+        "close_page"
       ]
     },
     "svelte": {

@@ -33,6 +33,7 @@ export interface BackendExpenseRequest {
 export interface BackendExpenseResponse {
 	id: string;
 	vehicleId: string;
+	userId: string;
 	tags: string[];
 	category: string;
 	expenseAmount: number; // Backend field name
@@ -44,7 +45,9 @@ export interface BackendExpenseResponse {
 	receiptUrl?: string;
 	isFinancingPayment?: boolean;
 	missedFillup?: boolean;
-	expenseGroupId?: string; // Non-null means this is a split child expense
+	groupId?: string; // Non-null means this is a split child expense
+	groupTotal?: number;
+	splitMethod?: string;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -112,6 +115,7 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 	const frontendExpense: Expense = {
 		id: backendExpense.id,
 		vehicleId: backendExpense.vehicleId,
+		userId: backendExpense.userId,
 		tags: backendExpense.tags || [],
 		category: backendExpense.category as ExpenseCategory,
 		amount: backendExpense.expenseAmount, // expenseAmount → amount
@@ -141,8 +145,14 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 	if (backendExpense.description) {
 		frontendExpense.description = backendExpense.description;
 	}
-	if (backendExpense.expenseGroupId) {
-		frontendExpense.expenseGroupId = backendExpense.expenseGroupId;
+	if (backendExpense.groupId) {
+		frontendExpense.groupId = backendExpense.groupId;
+	}
+	if (backendExpense.groupTotal !== undefined) {
+		frontendExpense.groupTotal = backendExpense.groupTotal;
+	}
+	if (backendExpense.splitMethod) {
+		frontendExpense.splitMethod = backendExpense.splitMethod;
 	}
 
 	return frontendExpense;

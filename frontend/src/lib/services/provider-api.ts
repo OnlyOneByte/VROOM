@@ -12,6 +12,7 @@ interface CreateProviderData {
 	displayName: string;
 	credentials: Record<string, unknown>;
 	config?: Record<string, unknown>;
+	nonce?: string;
 }
 
 interface UpdateProviderData {

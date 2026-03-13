@@ -45,29 +45,10 @@ export type SplitConfig =
 	| { method: 'absolute'; allocations: Array<{ vehicleId: string; amount: number }> }
 	| { method: 'percentage'; allocations: Array<{ vehicleId: string; percentage: number }> };
 
-export interface ExpenseGroup {
-	id: string;
-	userId: string;
-	splitConfig: SplitConfig;
-	category: string;
-	tags?: string[];
-	date: string;
-	description?: string;
-	totalAmount: number;
-	insurancePolicyId?: string;
-	insuranceTermId?: string;
-	createdAt: string;
-	updatedAt: string;
-}
-
-export interface ExpenseGroupWithChildren {
-	group: ExpenseGroup;
-	children: Expense[];
-}
-
 export interface Expense {
 	id: string;
 	vehicleId: string;
+	userId: string;
 	tags: string[];
 	category: ExpenseCategory;
 	amount: number;
@@ -81,9 +62,18 @@ export interface Expense {
 	receiptUrl?: string;
 	isFinancingPayment: boolean;
 	missedFillup?: boolean;
-	expenseGroupId?: string;
+	groupId?: string;
+	groupTotal?: number;
+	splitMethod?: string;
 	createdAt: string;
 	updatedAt: string;
+}
+
+export interface SplitExpenseGroup {
+	siblings: Expense[];
+	groupId: string;
+	groupTotal: number;
+	splitMethod: string;
 }
 
 export interface ExpenseSummary {

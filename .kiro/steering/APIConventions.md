@@ -120,7 +120,7 @@ export const entityRepository = new EntityRepository(getDb());
 - Data migrations that run after Drizzle schema migrations must be idempotent — safe to run multiple times without duplicating data.
 
 ### Entity Type Mappings
-- When mapping entity types to categories or behaviors, cover ALL entity types the system supports. Check the existing entity types in `photos.entityType`: `vehicle`, `expense`, `expense_group`, `insurance_policy`, `odometer_entry`. Missing mappings cause runtime errors for valid operations.
+- When mapping entity types to categories or behaviors, cover ALL entity types the system supports. Check the existing entity types in `photos.entityType`: `vehicle`, `expense`, `insurance_policy`, `odometer_entry`. Missing mappings cause runtime errors for valid operations.
 
 ### Imports & Module Initialization
 - Keep all `import` statements at the top of the file. Don't place imports mid-file after runtime code — they're hoisted by the runtime anyway, and mid-file placement is misleading.

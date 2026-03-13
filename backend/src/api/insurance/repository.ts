@@ -1,25 +1,14 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { getDb } from '../../db/connection';
-import type {
-  ExpenseGroup,
-  InsurancePolicy,
-  NewExpenseGroup,
-  PolicyTerm,
-  SplitConfig,
-} from '../../db/schema';
-import {
-  expenseGroups,
-  expenses,
-  insurancePolicies,
-  insurancePolicyVehicles,
-  vehicles,
-} from '../../db/schema';
+import type { Expense, InsurancePolicy, PolicyTerm } from '../../db/schema';
+import { expenses, insurancePolicies, insurancePolicyVehicles, vehicles } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
 import { ConflictError, DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { expenseSplitService } from '../expenses/split-service';
+import type { SplitConfig } from '../expenses/validation';
 
 // ============================================================================
 // Types
@@ -192,16 +181,16 @@ export class InsurancePolicyRepository {
   }
 
   /**
-   * Create an expense group and materialize children for a term with totalCost.
+   * Create sibling expense rows for a term with totalCost via the split service.
    */
-  private async createExpenseGroupForTerm(
+  private async createExpensesForTerm(
     tx: DrizzleTransaction,
     policyId: string,
     company: string,
     term: PolicyTerm,
     coverage: TermVehicleCoverage,
     userId: string
-  ): Promise<ExpenseGroup | null> {
+  ): Promise<Expense[] | null> {
     if (term.financeDetails?.totalCost == null || term.financeDetails.totalCost <= 0) {
       return null;
     }
@@ -211,23 +200,24 @@ export class InsurancePolicyRepository {
     }
 
     const splitConfig = buildSplitConfig(coverage);
-
-    const groupData: NewExpenseGroup = {
-      id: createId(),
-      userId,
+    const allocations = expenseSplitService.computeAllocations(
       splitConfig,
+      term.financeDetails.totalCost
+    );
+
+    return expenseSplitService.createSiblings(tx, {
+      groupId: createId(),
+      userId,
+      splitMethod: splitConfig.method,
+      groupTotal: term.financeDetails.totalCost,
+      allocations,
       category: 'financial',
-      tags: ['insurance'],
       date: new Date(term.startDate),
+      tags: ['insurance'],
       description: `Insurance: ${company} (${term.startDate} to ${term.endDate})`,
-      totalAmount: term.financeDetails.totalCost,
       insurancePolicyId: policyId,
       insuranceTermId: term.id,
-    };
-
-    const [group] = await tx.insert(expenseGroups).values(groupData).returning();
-    await expenseSplitService.materializeChildren(tx, group);
-    return group;
+    });
   }
 
   /**
@@ -327,6 +317,7 @@ export class InsurancePolicyRepository {
           .insert(insurancePolicies)
           .values({
             id: policyId,
+            userId,
             company: data.company,
             isActive,
             currentTermStart,
@@ -350,16 +341,9 @@ export class InsurancePolicyRepository {
             termCoverage.push({ termId: term.id, vehicleId: vid });
           }
 
-          // Create expense group if term has totalCost
+          // Create expenses if term has totalCost
           const cleanTerm = stripVehicleCoverage(term);
-          await this.createExpenseGroupForTerm(
-            tx,
-            policyId,
-            data.company,
-            cleanTerm,
-            coverage,
-            userId
-          );
+          await this.createExpensesForTerm(tx, policyId, data.company, cleanTerm, coverage, userId);
         }
 
         // 5. Sync vehicle references if active
@@ -424,18 +408,11 @@ export class InsurancePolicyRepository {
    */
   async findByUserId(userId: string): Promise<InsurancePolicyWithVehicles[]> {
     try {
-      const result = await this.db
-        .select({ policy: insurancePolicies })
+      const policies = await this.db
+        .select()
         .from(insurancePolicies)
-        .innerJoin(
-          insurancePolicyVehicles,
-          eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
-        )
-        .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId))
-        .groupBy(insurancePolicies.id);
+        .where(eq(insurancePolicies.userId, userId));
 
-      const policies = result.map((r) => r.policy);
       return Promise.all(policies.map((p) => this.attachVehicleIds(p)));
     } catch (error) {
       logger.error('Error finding insurance policies for user', { error });
@@ -562,8 +539,8 @@ export class InsurancePolicyRepository {
         // 6. Insert junction rows for the new term
         await this.insertJunctionRows(tx, policyId, term.id, term.vehicleCoverage.vehicleIds);
 
-        // 7. Create expense group if totalCost is defined
-        await this.createExpenseGroupForTerm(
+        // 7. Create expenses if totalCost is defined
+        await this.createExpensesForTerm(
           tx,
           policyId,
           policy.company,
@@ -629,8 +606,8 @@ export class InsurancePolicyRepository {
       );
     await this.insertJunctionRows(tx, policyId, termId, vehicleCoverage.vehicleIds);
 
-    // Update or create expense group
-    await this.syncExpenseGroupForTerm(
+    // Update or create expenses
+    await this.syncExpensesForTerm(
       tx,
       policyId,
       termId,
@@ -655,9 +632,10 @@ export class InsurancePolicyRepository {
   }
 
   /**
-   * Update or create an expense group for a term based on coverage changes.
+   * Update or create expenses for a term based on coverage changes.
+   * Queries the expenses table directly by insurancePolicyId + insuranceTermId + groupId IS NOT NULL.
    */
-  private async syncExpenseGroupForTerm(
+  private async syncExpensesForTerm(
     tx: DrizzleTransaction,
     policyId: string,
     termId: string,
@@ -666,23 +644,26 @@ export class InsurancePolicyRepository {
     company: string,
     userId: string
   ): Promise<void> {
-    const existingGroups = await tx
-      .select()
-      .from(expenseGroups)
+    const existing = await tx
+      .select({ groupId: expenses.groupId })
+      .from(expenses)
       .where(
         and(
-          eq(expenseGroups.insurancePolicyId, policyId),
-          eq(expenseGroups.insuranceTermId, termId)
+          eq(expenses.insurancePolicyId, policyId),
+          eq(expenses.insuranceTermId, termId),
+          isNotNull(expenses.groupId)
         )
-      );
+      )
+      .limit(1);
 
-    if (existingGroups.length > 0) {
-      const group = existingGroups[0];
-      const newSplitConfig = buildSplitConfig(coverage);
-      const newTotalAmount = term.financeDetails?.totalCost ?? undefined;
-      await expenseSplitService.updateSplit(tx, group.id, newSplitConfig, newTotalAmount);
+    if (existing.length > 0) {
+      // Delete old siblings and create new ones
+      await tx
+        .delete(expenses)
+        .where(and(eq(expenses.insurancePolicyId, policyId), eq(expenses.insuranceTermId, termId)));
+      await this.createExpensesForTerm(tx, policyId, company, term, coverage, userId);
     } else if (term.financeDetails?.totalCost != null) {
-      await this.createExpenseGroupForTerm(tx, policyId, company, term, coverage, userId);
+      await this.createExpensesForTerm(tx, policyId, company, term, coverage, userId);
     }
   }
 
@@ -809,7 +790,7 @@ export class InsurancePolicyRepository {
 
   /**
    * Delete a specific term from a policy's terms JSON array.
-   * Removes junction rows, nullifies expense FKs, and clears vehicle references for the term.
+   * Removes junction rows, deletes associated expenses, and clears vehicle references for the term.
    */
   async deleteTerm(
     policyId: string,
@@ -873,26 +854,11 @@ export class InsurancePolicyRepository {
             )
           );
 
-        // Nullify expense FK references for this term
+        // Delete expenses for this term directly
         await tx
-          .update(expenses)
-          .set({
-            insurancePolicyId: null,
-            insuranceTermId: null,
-            updatedAt: new Date(),
-          })
+          .delete(expenses)
           .where(
             and(eq(expenses.insurancePolicyId, policyId), eq(expenses.insuranceTermId, termId))
-          );
-
-        // Delete expense groups for this term
-        await tx
-          .delete(expenseGroups)
-          .where(
-            and(
-              eq(expenseGroups.insurancePolicyId, policyId),
-              eq(expenseGroups.insuranceTermId, termId)
-            )
           );
 
         // Clear vehicle references if no longer covered by other terms
@@ -978,26 +944,19 @@ export class InsurancePolicyRepository {
       const expirationDate = new Date();
       expirationDate.setDate(expirationDate.getDate() + daysFromNow);
 
-      const result = await this.db
-        .select({ policy: insurancePolicies })
+      const policies = await this.db
+        .select()
         .from(insurancePolicies)
-        .innerJoin(
-          insurancePolicyVehicles,
-          eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
-        )
-        .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
         .where(
           and(
-            eq(vehicles.userId, userId),
+            eq(insurancePolicies.userId, userId),
             eq(insurancePolicies.isActive, true),
             gte(insurancePolicies.currentTermEnd, now),
             lte(insurancePolicies.currentTermEnd, expirationDate)
           )
         )
-        .groupBy(insurancePolicies.id)
         .orderBy(insurancePolicies.currentTermEnd);
 
-      const policies = result.map((r) => r.policy);
       return Promise.all(policies.map((p) => this.attachVehicleIds(p)));
     } catch (error) {
       logger.error('Error finding expiring insurance policies', { error });

@@ -29,7 +29,7 @@ describe('Migrations: General', () => {
   });
 
   test('all migration files are loadable and non-empty', () => {
-    expect(migrations.length).toBeGreaterThanOrEqual(2);
+    expect(migrations.length).toBeGreaterThanOrEqual(1);
     for (const m of migrations) {
       expect(m.sql.length).toBeGreaterThan(0);
     }
@@ -42,7 +42,6 @@ describe('Migrations: General', () => {
 
     const tables = getTables(db);
     const expectedTables = [
-      'expense_groups',
       'expenses',
       'insurance_policies',
       'insurance_policy_vehicles',

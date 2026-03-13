@@ -1,5 +1,12 @@
 import { browser } from '$app/environment';
-import type { UnitPreferences, UserSettings } from '../types/index.js';
+import type {
+	UnitPreferences,
+	UserSettings,
+	BackupFileInfo,
+	ProviderBackupList,
+	RestoreProviderInfo,
+	RestoreResult
+} from '../types/index.js';
 import { settingsApi } from '$lib/services/settings-api';
 
 const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
@@ -16,6 +23,7 @@ function createSettingsStore() {
 	let settings = $state<UserSettings | null>(null);
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
+	let restoreProviders = $state<RestoreProviderInfo[]>([]);
 
 	return {
 		get settings() {
@@ -57,21 +65,6 @@ function createSettingsStore() {
 			}
 		},
 
-		async configureSyncSettings(config: {
-			googleSheetsSyncEnabled?: boolean;
-			googleDriveBackupEnabled?: boolean;
-			syncInactivityMinutes?: number;
-		}) {
-			try {
-				const result = await settingsApi.configureSyncSettings(config);
-				await this.load();
-				return result;
-			} catch (err) {
-				error = handleError(err);
-				throw err;
-			}
-		},
-
 		async downloadBackup() {
 			if (!browser) return;
 			try {
@@ -108,7 +101,7 @@ function createSettingsStore() {
 			}
 		},
 
-		async executeSync(syncTypes: ('sheets' | 'backup')[], force = false) {
+		async executeSync(syncTypes: 'backup'[], force = false) {
 			try {
 				return await settingsApi.executeSync(syncTypes, force);
 			} catch (err) {
@@ -117,97 +110,51 @@ function createSettingsStore() {
 			}
 		},
 
-		async initializeDrive() {
+		async listBackupsFromProvider(providerId: string): Promise<BackupFileInfo[]> {
 			try {
-				const result = await settingsApi.initializeDrive();
-				await this.load();
-				return result;
+				return await settingsApi.listBackupsFromProvider(providerId);
 			} catch (err) {
 				error = handleError(err);
 				throw err;
 			}
 		},
 
-		async listBackups() {
+		async listAllBackups(): Promise<ProviderBackupList[]> {
 			try {
-				return await settingsApi.listBackups();
+				return await settingsApi.listAllBackups();
 			} catch (err) {
 				error = handleError(err);
 				throw err;
 			}
 		},
 
-		async downloadBackupFromDrive(fileId: string) {
-			if (!browser) return;
+		async restoreFromProvider(opts: {
+			providerId: string;
+			sourceType: 'zip' | 'sheets';
+			mode: 'preview' | 'replace' | 'merge';
+			fileRef?: string;
+			idempotencyKey: string;
+		}): Promise<RestoreResult> {
 			try {
-				const response = await settingsApi.downloadBackupFromDrive(fileId);
-				if (!response.ok) throw new Error('Failed to download backup from Drive');
-
-				const blob = await response.blob();
-				const url = window.URL.createObjectURL(blob);
-				const a = document.createElement('a');
-				a.href = url;
-
-				const contentDisposition = response.headers.get('Content-Disposition');
-				let fileName = 'backup.zip';
-				if (contentDisposition) {
-					const matches = /filename="([^"]+)"/.exec(contentDisposition);
-					if (matches?.[1]) fileName = matches[1];
-				}
-
-				a.download = fileName;
-				document.body.appendChild(a);
-				a.click();
-				window.URL.revokeObjectURL(url);
-				document.body.removeChild(a);
-			} catch (err) {
-				error = handleError(err);
-				throw err;
-			}
-		},
-
-		async restoreFromDriveBackup(
-			fileId: string,
-			mode: 'preview' | 'replace' | 'merge' = 'preview'
-		) {
-			try {
-				const response = await settingsApi.downloadBackupFromDrive(fileId);
-				if (!response.ok) throw new Error('Failed to download backup from Drive');
-
-				const blob = await response.blob();
-				const contentDisposition = response.headers.get('Content-Disposition');
-				let fileName = 'backup.zip';
-				if (contentDisposition) {
-					const matches = /filename="([^"]+)"/.exec(contentDisposition);
-					if (matches?.[1]) fileName = matches[1];
-				}
-
-				const file = new File([blob], fileName, { type: 'application/zip' });
-				return await this.uploadBackup(file, mode);
-			} catch (err) {
-				error = handleError(err);
-				throw err;
-			}
-		},
-
-		async deleteBackup(fileId: string) {
-			try {
-				return await settingsApi.deleteBackup(fileId);
-			} catch (err) {
-				error = handleError(err);
-				throw err;
-			}
-		},
-
-		async restoreFromSheets(mode: 'preview' | 'replace' | 'merge' = 'preview') {
-			try {
-				const idempotencyKey = `restore-sheets-${mode}-${Date.now()}`;
-				const result = await settingsApi.restoreFromSheets(mode, idempotencyKey);
-
-				if (mode !== 'preview') {
+				const result = await settingsApi.restoreFromProvider(opts);
+				if (opts.mode !== 'preview') {
 					await this.load();
 				}
 				return result;
+			} catch (err) {
+				error = handleError(err);
+				throw err;
+			}
+		},
+
+		get restoreProviders() {
+			return restoreProviders;
+		},
+
+		async loadRestoreProviders(): Promise<RestoreProviderInfo[]> {
+			try {
+				restoreProviders = await settingsApi.getRestoreProviders();
+				return restoreProviders;
 			} catch (err) {
 				error = handleError(err);
 				throw err;
@@ -218,6 +165,7 @@ function createSettingsStore() {
 			settings = null;
 			isLoading = false;
 			error = null;
+			restoreProviders = [];
 		}
 	};
 }

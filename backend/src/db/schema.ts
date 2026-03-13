@@ -9,8 +9,8 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
-import type { StorageConfig, UnitPreferences } from '../types';
-import { DEFAULT_STORAGE_CONFIG, DEFAULT_UNIT_PREFERENCES } from '../types';
+import type { BackupConfig, StorageConfig, UnitPreferences } from '../types';
+import { DEFAULT_BACKUP_CONFIG, DEFAULT_STORAGE_CONFIG, DEFAULT_UNIT_PREFERENCES } from '../types';
 
 // User table
 export const users = sqliteTable('users', {
@@ -21,7 +21,6 @@ export const users = sqliteTable('users', {
   displayName: text('display_name').notNull(),
   provider: text('provider').notNull().default('google'),
   providerId: text('provider_id').notNull(),
-  googleRefreshToken: text('google_refresh_token'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
@@ -48,7 +47,10 @@ export const vehicles = sqliteTable(
     initialMileage: integer('initial_mileage'),
     purchasePrice: real('purchase_price'),
     purchaseDate: integer('purchase_date', { mode: 'timestamp' }),
-    currentInsurancePolicyId: text('current_insurance_policy_id'),
+    currentInsurancePolicyId: text('current_insurance_policy_id').references(
+      () => insurancePolicies.id,
+      { onDelete: 'set null' }
+    ),
     unitPreferences: text('unit_preferences', { mode: 'json' })
       .$type<UnitPreferences>()
       .notNull()
@@ -62,35 +64,41 @@ export const vehicles = sqliteTable(
 );
 
 // Vehicle Financing table (loans, leases, or owned vehicles)
-export const vehicleFinancing = sqliteTable('vehicle_financing', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  vehicleId: text('vehicle_id')
-    .notNull()
-    .references(() => vehicles.id, { onDelete: 'cascade' }),
-  financingType: text('financing_type').notNull().default('loan'), // 'loan' | 'lease' | 'own'
-  provider: text('provider').notNull(), // Lender name, leasing company, or dealer
-  originalAmount: real('original_amount').notNull(),
-  currentBalance: real('current_balance').notNull(),
-  apr: real('apr'), // For loans, null for leases/own
-  termMonths: integer('term_months').notNull(),
-  startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
-  // Payment Configuration
-  paymentAmount: real('payment_amount').notNull(),
-  paymentFrequency: text('payment_frequency').notNull().default('monthly'), // 'monthly' | 'bi-weekly' | 'weekly' | 'custom'
-  paymentDayOfMonth: integer('payment_day_of_month'), // For monthly (1-31)
-  paymentDayOfWeek: integer('payment_day_of_week'), // For weekly (0-6, Sunday=0)
-  // Lease-specific fields
-  residualValue: real('residual_value'), // End-of-lease buyout price
-  mileageLimit: integer('mileage_limit'), // Annual mileage limit for leases
-  excessMileageFee: real('excess_mileage_fee'), // Per-mile fee over limit
-  // Status
-  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-  endDate: integer('end_date', { mode: 'timestamp' }), // Payoff date or lease end date
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-});
+export const vehicleFinancing = sqliteTable(
+  'vehicle_financing',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    vehicleId: text('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id, { onDelete: 'cascade' }),
+    financingType: text('financing_type').notNull().default('loan'), // 'loan' | 'lease' | 'own'
+    provider: text('provider').notNull(), // Lender name, leasing company, or dealer
+    originalAmount: real('original_amount').notNull(),
+    currentBalance: real('current_balance').notNull(),
+    apr: real('apr'), // For loans, null for leases/own
+    termMonths: integer('term_months').notNull(),
+    startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
+    // Payment Configuration
+    paymentAmount: real('payment_amount').notNull(),
+    paymentFrequency: text('payment_frequency').notNull().default('monthly'), // 'monthly' | 'bi-weekly' | 'weekly' | 'custom'
+    paymentDayOfMonth: integer('payment_day_of_month'), // For monthly (1-31)
+    paymentDayOfWeek: integer('payment_day_of_week'), // For weekly (0-6, Sunday=0)
+    // Lease-specific fields
+    residualValue: real('residual_value'), // End-of-lease buyout price
+    mileageLimit: integer('mileage_limit'), // Annual mileage limit for leases
+    excessMileageFee: real('excess_mileage_fee'), // Per-mile fee over limit
+    // Status
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    endDate: integer('end_date', { mode: 'timestamp' }), // Payoff date or lease end date
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    vehicleIdIdx: index('vf_vehicle_id_idx').on(table.vehicleId),
+  })
+);
 
 // PolicyTerm type for the terms JSON column
 export interface PolicyTerm {
@@ -115,19 +123,28 @@ export interface PolicyTerm {
 }
 
 // Insurance Policy table
-export const insurancePolicies = sqliteTable('insurance_policies', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  company: text('company').notNull(),
-  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-  currentTermStart: integer('current_term_start', { mode: 'timestamp' }),
-  currentTermEnd: integer('current_term_end', { mode: 'timestamp' }),
-  terms: text('terms', { mode: 'json' }).$type<PolicyTerm[]>().notNull().default([]),
-  notes: text('notes'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-});
+export const insurancePolicies = sqliteTable(
+  'insurance_policies',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    company: text('company').notNull(),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    currentTermStart: integer('current_term_start', { mode: 'timestamp' }),
+    currentTermEnd: integer('current_term_end', { mode: 'timestamp' }),
+    terms: text('terms', { mode: 'json' }).$type<PolicyTerm[]>().notNull().default([]),
+    notes: text('notes'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    userIdIdx: index('insurance_policies_user_id_idx').on(table.userId),
+  })
+);
 
 // Insurance Policy ↔ Vehicles junction table (per-term coverage)
 export const insurancePolicyVehicles = sqliteTable(
@@ -143,36 +160,12 @@ export const insurancePolicyVehicles = sqliteTable(
   },
   (table) => ({
     pk: primaryKey({ columns: [table.policyId, table.termId, table.vehicleId] }),
+    vehiclePolicyIdx: index('ipv_vehicle_policy_idx').on(table.vehicleId, table.policyId),
   })
 );
 
-// Split config type for expense groups
-export type SplitConfig =
-  | { method: 'even'; vehicleIds: string[] }
-  | { method: 'absolute'; allocations: Array<{ vehicleId: string; amount: number }> }
-  | { method: 'percentage'; allocations: Array<{ vehicleId: string; percentage: number }> };
-
-// Expense Groups table (cross-vehicle cost allocation containers)
-export const expenseGroups = sqliteTable('expense_groups', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => createId()),
-  userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  splitConfig: text('split_config', { mode: 'json' }).$type<SplitConfig>().notNull(),
-  category: text('category').notNull(),
-  tags: text('tags', { mode: 'json' }).$type<string[]>(),
-  date: integer('date', { mode: 'timestamp' }).notNull(),
-  description: text('description'),
-  totalAmount: real('total_amount').notNull(),
-  // No FK constraint — insurance delete handler nullifies these via application logic
-  // to preserve expense groups as historical records
-  insurancePolicyId: text('insurance_policy_id'),
-  insuranceTermId: text('insurance_term_id'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-});
+// Split method type for split expenses
+export type SplitMethod = 'even' | 'absolute' | 'percentage';
 
 // Expense table
 export const expenses = sqliteTable(
@@ -201,9 +194,16 @@ export const expenses = sqliteTable(
     insurancePolicyId: text('insurance_policy_id'),
     insuranceTermId: text('insurance_term_id'),
     missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
-    expenseGroupId: text('expense_group_id').references(() => expenseGroups.id, {
-      onDelete: 'cascade',
-    }),
+    // Direct user ownership — eliminates vehicles JOIN for user-scoped queries
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    // NULL for standalone expenses, shared UUID for split siblings
+    groupId: text('group_id'),
+    // Pre-split total amount, same on all siblings in a group
+    groupTotal: real('group_total'),
+    // Split method: 'even' | 'absolute' | 'percentage'
+    splitMethod: text('split_method'),
   },
   (table) => ({
     vehicleDateIdx: index('expenses_vehicle_date_idx').on(table.vehicleId, table.date),
@@ -212,8 +212,16 @@ export const expenses = sqliteTable(
       table.category,
       table.date
     ),
-    expenseGroupIdx: index('expenses_group_idx').on(table.expenseGroupId),
     categoryDateIdx: index('expenses_category_date_idx').on(table.category, table.date),
+    // userId-based indexes for analytics hot paths
+    userDateIdx: index('expenses_user_date_idx').on(table.userId, table.date),
+    userCategoryDateIdx: index('expenses_user_category_date_idx').on(
+      table.userId,
+      table.category,
+      table.date
+    ),
+    // Group lookup for split operations
+    groupIdx: index('expenses_group_idx').on(table.groupId),
   })
 );
 
@@ -261,23 +269,14 @@ export const userSettings = sqliteTable('user_settings', {
   autoBackupEnabled: integer('auto_backup_enabled', { mode: 'boolean' }).notNull().default(false),
   backupFrequency: text('backup_frequency').notNull().default('weekly'), // 'daily' | 'weekly' | 'monthly'
   lastBackupDate: integer('last_backup_date', { mode: 'timestamp' }),
-  googleDriveBackupEnabled: integer('google_drive_backup_enabled', { mode: 'boolean' })
-    .notNull()
-    .default(false),
-  googleDriveBackupFolderId: text('google_drive_backup_folder_id'), // Folder for backups
-  googleDriveBackupRetentionCount: integer('google_drive_backup_retention_count')
-    .notNull()
-    .default(10), // Number of backups to keep in Google Drive
-  googleDriveCustomFolderName: text('google_drive_custom_folder_name'),
   // Photo storage provider preferences
   storageConfig: text('storage_config', { mode: 'json' })
     .$type<StorageConfig>()
     .default(DEFAULT_STORAGE_CONFIG),
-  // Sync preferences (for Google Sheets mirroring)
-  googleSheetsSyncEnabled: integer('google_sheets_sync_enabled', { mode: 'boolean' })
-    .notNull()
-    .default(false),
-  googleSheetsSpreadsheetId: text('google_sheets_spreadsheet_id'), // The synced spreadsheet
+  // Backup provider preferences (per-provider backup settings)
+  backupConfig: text('backup_config', { mode: 'json' })
+    .$type<BackupConfig>()
+    .default(DEFAULT_BACKUP_CONFIG),
   syncOnInactivity: integer('sync_on_inactivity', { mode: 'boolean' }).notNull().default(true),
   syncInactivityMinutes: integer('sync_inactivity_minutes').notNull().default(5), // Minutes of inactivity before sync
   lastSyncDate: integer('last_sync_date', { mode: 'timestamp' }),
@@ -295,18 +294,8 @@ export const sessions = sqliteTable('sessions', {
   expiresAt: integer('expires_at').notNull(),
 });
 
-// Drizzle relations for expense groups
-export const expenseGroupsRelations = relations(expenseGroups, ({ one, many }) => ({
-  user: one(users, { fields: [expenseGroups.userId], references: [users.id] }),
-  children: many(expenses),
-}));
-
 export const expensesRelations = relations(expenses, ({ one }) => ({
   vehicle: one(vehicles, { fields: [expenses.vehicleId], references: [vehicles.id] }),
-  expenseGroup: one(expenseGroups, {
-    fields: [expenses.expenseGroupId],
-    references: [expenseGroups.id],
-  }),
 }));
 
 // Export types for use in application
@@ -329,9 +318,6 @@ export type NewInsurancePolicy = typeof insurancePolicies.$inferInsert;
 
 export type InsurancePolicyVehicle = typeof insurancePolicyVehicles.$inferSelect;
 export type NewInsurancePolicyVehicle = typeof insurancePolicyVehicles.$inferInsert;
-
-export type ExpenseGroup = typeof expenseGroups.$inferSelect;
-export type NewExpenseGroup = typeof expenseGroups.$inferInsert;
 
 export type Expense = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;
@@ -439,5 +425,4 @@ export type PhotoEntityType =
   | 'expense'
   | 'trip'
   | 'insurance_policy'
-  | 'expense_group'
   | 'odometer_entry';

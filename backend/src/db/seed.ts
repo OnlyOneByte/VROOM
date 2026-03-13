@@ -1,3 +1,4 @@
+import { createId } from '@paralleldrive/cuid2';
 import { logger } from '../utils/logger';
 import { db } from './connection.js';
 import {
@@ -79,6 +80,7 @@ export async function seedDatabase() {
     const [policy1] = await db
       .insert(insurancePolicies)
       .values({
+        userId: sampleUser.id,
         company: 'State Farm',
         isActive: true,
         currentTermStart: new Date('2024-01-01'),
@@ -98,6 +100,7 @@ export async function seedDatabase() {
     const [policy2] = await db
       .insert(insurancePolicies)
       .values({
+        userId: sampleUser.id,
         company: 'Geico',
         isActive: true,
         currentTermStart: new Date('2024-01-01'),
@@ -120,11 +123,12 @@ export async function seedDatabase() {
       { policyId: policy2.id, termId: 'term-ge-1', vehicleId: vehicle2.id },
     ]);
 
-    // Create sample expenses
+    // Create sample standalone expenses (all include userId)
     const sampleExpenses = [
       // Fuel expenses for vehicle1
       {
         vehicleId: vehicle1.id,
+        userId: sampleUser.id,
         tags: ['fuel', 'gas'],
         category: 'fuel',
         expenseAmount: 45.5,
@@ -135,6 +139,7 @@ export async function seedDatabase() {
       },
       {
         vehicleId: vehicle1.id,
+        userId: sampleUser.id,
         tags: ['fuel', 'gas'],
         category: 'fuel',
         expenseAmount: 52.3,
@@ -146,6 +151,7 @@ export async function seedDatabase() {
       // Maintenance expenses
       {
         vehicleId: vehicle1.id,
+        userId: sampleUser.id,
         tags: ['oil-change', 'maintenance'],
         category: 'maintenance',
         expenseAmount: 75.0,
@@ -155,6 +161,7 @@ export async function seedDatabase() {
       },
       {
         vehicleId: vehicle2.id,
+        userId: sampleUser.id,
         tags: ['brakes', 'maintenance'],
         category: 'maintenance',
         expenseAmount: 150.0,
@@ -165,6 +172,7 @@ export async function seedDatabase() {
       // Insurance payments
       {
         vehicleId: vehicle1.id,
+        userId: sampleUser.id,
         tags: ['insurance', 'monthly'],
         category: 'financial',
         expenseAmount: 200.0,
@@ -174,6 +182,7 @@ export async function seedDatabase() {
       // Parking and tolls
       {
         vehicleId: vehicle1.id,
+        userId: sampleUser.id,
         tags: ['parking'],
         category: 'misc',
         expenseAmount: 15.0,
@@ -182,6 +191,7 @@ export async function seedDatabase() {
       },
       {
         vehicleId: vehicle1.id,
+        userId: sampleUser.id,
         tags: ['tolls'],
         category: 'misc',
         expenseAmount: 8.5,
@@ -192,7 +202,42 @@ export async function seedDatabase() {
 
     await db.insert(expenses).values(sampleExpenses);
 
-    logger.info('Database seeding completed successfully', { expenseCount: sampleExpenses.length });
+    // Create sample split expense (car wash shared evenly across both vehicles)
+    const splitGroupId = createId();
+    const splitGroupTotal = 60.0;
+    const splitDate = new Date('2024-02-01');
+
+    await db.insert(expenses).values([
+      {
+        vehicleId: vehicle1.id,
+        userId: sampleUser.id,
+        tags: ['car-wash'],
+        category: 'maintenance',
+        expenseAmount: 30.0,
+        date: splitDate,
+        description: 'Deluxe car wash - split',
+        groupId: splitGroupId,
+        groupTotal: splitGroupTotal,
+        splitMethod: 'even',
+      },
+      {
+        vehicleId: vehicle2.id,
+        userId: sampleUser.id,
+        tags: ['car-wash'],
+        category: 'maintenance',
+        expenseAmount: 30.0,
+        date: splitDate,
+        description: 'Deluxe car wash - split',
+        groupId: splitGroupId,
+        groupTotal: splitGroupTotal,
+        splitMethod: 'even',
+      },
+    ]);
+
+    logger.info('Database seeding completed successfully', {
+      standaloneExpenses: sampleExpenses.length,
+      splitExpenses: 2,
+    });
   } catch (error) {
     logger.error('Error seeding database', { error });
     throw error;

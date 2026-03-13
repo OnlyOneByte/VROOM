@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { S3CompatProvider } from '../s3-compat-provider';
-import type { StorageRef } from '../storage-provider';
+import { S3CompatProvider } from '../domains/storage/s3-compat-provider';
+import type { StorageRef } from '../domains/storage/storage-provider';
 
 // --- Mock AWS SDK ---
 
@@ -65,19 +65,19 @@ describe('S3CompatProvider', () => {
         mimeType: 'image/jpeg',
         entityType: 'vehicle',
         entityId: 'v-123',
-        pathHint: '/vroom/Vehicle Photos',
+        pathHint: '/vroom/Vehicle',
       });
 
       expect(result).toEqual({
         providerType: 's3',
-        externalId: 'vroom/Vehicle Photos/vehicle/v-123/photo.jpg',
+        externalId: 'vroom/Vehicle/vehicle/v-123/photo.jpg',
       });
 
       expect(mockSend).toHaveBeenCalledTimes(1);
       const command = mockSend.mock.calls[0]?.[0] as { input: Record<string, unknown> };
       expect(command.input).toEqual({
         Bucket: 'test-bucket',
-        Key: 'vroom/Vehicle Photos/vehicle/v-123/photo.jpg',
+        Key: 'vroom/Vehicle/vehicle/v-123/photo.jpg',
         Body: Buffer.from('image-data'),
         ContentType: 'image/jpeg',
       });
