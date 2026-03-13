@@ -196,11 +196,15 @@
 	}
 
 	// --- Camera ---
+	let cameraStartId = 0; // Guard against stale/duplicate startCamera calls
+
 	async function startCamera() {
 		if (!hasCameraSupport) {
 			cameraError = 'Camera is not supported in this browser.';
 			return;
 		}
+
+		const thisStartId = ++cameraStartId;
 		cameraError = null;
 		cameraReady = false;
 		capturedPreview = null;
@@ -211,19 +215,62 @@
 				video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
 				audio: false
 			});
+
+			// If another startCamera call happened while we were awaiting, discard this stream
+			if (thisStartId !== cameraStartId) {
+				for (const track of stream.getTracks()) track.stop();
+				return;
+			}
+
 			mediaStream = stream;
 			// Wait a tick for the video element to be in the DOM
 			await new Promise(r => setTimeout(r, 50));
+			if (thisStartId !== cameraStartId) {
+				for (const track of stream.getTracks()) track.stop();
+				return;
+			}
 			if (videoEl) {
 				videoEl.srcObject = stream;
 				await videoEl.play();
 				cameraReady = true;
 			}
 		} catch (err: unknown) {
+			// If superseded by a newer call, don't show an error
+			if (thisStartId !== cameraStartId) return;
+
 			if (err instanceof DOMException && err.name === 'NotAllowedError') {
 				cameraError = 'Camera access was denied. Please allow camera permissions and try again.';
 			} else if (err instanceof DOMException && err.name === 'NotFoundError') {
 				cameraError = 'No camera found on this device.';
+			} else if (
+				err instanceof DOMException &&
+				(err.name === 'OverconstrainedError' || err.name === 'NotReadableError')
+			) {
+				// Hardware busy or requested facingMode unavailable — retry with fallback
+				try {
+					const fallbackStream = await navigator.mediaDevices.getUserMedia({
+						video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
+						audio: false
+					});
+					if (thisStartId !== cameraStartId) {
+						for (const track of fallbackStream.getTracks()) track.stop();
+						return;
+					}
+					mediaStream = fallbackStream;
+					await new Promise(r => setTimeout(r, 50));
+					if (thisStartId !== cameraStartId) {
+						for (const track of fallbackStream.getTracks()) track.stop();
+						return;
+					}
+					if (videoEl) {
+						videoEl.srcObject = fallbackStream;
+						await videoEl.play();
+						cameraReady = true;
+					}
+				} catch {
+					if (thisStartId !== cameraStartId) return;
+					cameraError = 'Could not access camera. Please try again.';
+				}
 			} else {
 				cameraError = 'Could not access camera. Please try again.';
 			}
@@ -243,7 +290,29 @@
 	async function toggleFacingMode() {
 		facingMode = facingMode === 'environment' ? 'user' : 'environment';
 		stopCamera();
-		await startCamera();
+
+		// Retry getUserMedia with backoff — the OS may not have released the
+		// camera hardware yet. Retrying on the actual call is more reliable
+		// than a fixed delay since release time varies by device/browser.
+		const maxRetries = 3;
+		for (let attempt = 0; attempt < maxRetries; attempt++) {
+			try {
+				await startCamera();
+				if (!cameraError) return; // Success — done
+			} catch {
+				// startCamera handles its own errors, but guard just in case
+			}
+			// Only wait + retry if we got a hardware-related error
+			if (
+				cameraError === 'Could not access camera. Please try again.' &&
+				attempt < maxRetries - 1
+			) {
+				cameraError = null;
+				await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
+			} else {
+				return; // Permission denied, not found, or succeeded — don't retry
+			}
+		}
 	}
 
 	function capturePhoto() {
