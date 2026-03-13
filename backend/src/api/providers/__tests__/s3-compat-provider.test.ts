@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { S3CompatProvider } from '../domains/storage/s3-compat-provider';
 import type { StorageRef } from '../domains/storage/storage-provider';
 
@@ -45,10 +45,6 @@ describe('S3CompatProvider', () => {
     provider = new S3CompatProvider(credentials, config);
     mockSend.mockReset();
     mockGetSignedUrl.mockReset();
-  });
-
-  afterEach(() => {
-    mock.restore();
   });
 
   test('type is s3', () => {

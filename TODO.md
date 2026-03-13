@@ -56,10 +56,10 @@
     - [x] Set specific backup folders for each type of photo.
     - [x] Be able to backup certain photos to certain
     - [x] Google Drive
+    - [ ] Backup to more than one google account
 - [x] Abstract out backup storage provider.
 - [x] Decouple login auth from provider auth 
 - [ ] Abstract out OAuth Login (Login provider)
-    - [ ] Backup to more than one google account
 - [ ] Abstract out SQLite backend entirely. Bring your own SQL 
 - [ ] Build out profile page
 - [ ] Let users know on settings page that auto-backups do not include images

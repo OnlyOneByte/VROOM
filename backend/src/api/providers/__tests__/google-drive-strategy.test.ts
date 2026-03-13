@@ -4,7 +4,7 @@
  * null zipBuffer, retention enforcement, direct provider instantiation.
  */
 
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { BackupStrategyContext } from '../../sync/backup-strategy';
 
 // --- Mocks ---
@@ -12,7 +12,6 @@ import type { BackupStrategyContext } from '../../sync/backup-strategy';
 
 let mockUpload: ReturnType<typeof mock>;
 let mockCreateOrUpdate: ReturnType<typeof mock>;
-let mockEnforceRetention: ReturnType<typeof mock>;
 
 mock.module('../domains/storage/google-drive-provider', () => {
   mockUpload = mock(() => Promise.resolve({ externalId: 'file-ref-123' }));
@@ -21,6 +20,14 @@ mock.module('../domains/storage/google-drive-provider', () => {
       constructor(public refreshToken: string) {}
       upload = mockUpload;
     },
+    // Preserve exports that other test files import from this module
+    coalesceGoogleDriveFile: (f: Record<string, unknown>) => ({
+      key: f.id,
+      name: f.name,
+      size: Number(f.size) || 0,
+      createdTime: f.createdTime ?? f.modifiedTime ?? new Date(0).toISOString(),
+      lastModified: f.modifiedTime ?? f.createdTime ?? new Date(0).toISOString(),
+    }),
   };
 });
 
@@ -40,28 +47,35 @@ mock.module('../services/google-sheets-service', () => {
   };
 });
 
-mock.module('../../sync/backup', () => {
-  mockEnforceRetention = mock(() => Promise.resolve(2));
-  return {
-    backupService: { enforceRetention: mockEnforceRetention },
-    resolveBackupFolderPath: () => 'VROOM/Backups',
-  };
-});
-
 // Stub logger to avoid real logging
 mock.module('../../../utils/logger', () => ({
   logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
 
+// Import the real backup module — don't mock it, since other test files depend
+// on its real exports (coerceRow, validateBackupData, etc.).
+// Instead, spy on the singleton's methods directly.
+import { backupService, resolveBackupFolderPath } from '../../sync/backup';
+
 // Import after mocks are set up
 const { GoogleDriveStrategy } = await import('../backup-strategies/google-drive-strategy');
+
+// Spy on resolveBackupFolderPath by mocking it at the module level won't work,
+// so we override it on the strategy's usage path. The strategy imports it statically,
+// but since we can't partially mock, we'll mock the entire module but preserve exports.
+// Actually — the strategy uses resolveBackupFolderPath directly. Since we can't
+// partially mock, we'll just verify the behavior with the real function and
+// provide the right providerRow/config to produce a known path.
 
 function createContext(overrides: Partial<BackupStrategyContext> = {}): BackupStrategyContext {
   return {
     userId: 'user-1',
     displayName: 'Test User',
     providerId: 'prov-1',
-    providerRow: { id: 'prov-1', config: {} } as BackupStrategyContext['providerRow'],
+    providerRow: {
+      id: 'prov-1',
+      config: { photoRootPath: 'VROOM' },
+    } as BackupStrategyContext['providerRow'],
     decryptedCredentials: { refreshToken: 'test-refresh-token' },
     providerConfig: {
       enabled: true,
@@ -76,12 +90,12 @@ function createContext(overrides: Partial<BackupStrategyContext> = {}): BackupSt
 
 describe('GoogleDriveStrategy', () => {
   let strategy: InstanceType<typeof GoogleDriveStrategy>;
+  let mockEnforceRetention: ReturnType<typeof mock>;
 
   beforeEach(() => {
     strategy = new GoogleDriveStrategy();
     mockUpload.mockClear();
     mockCreateOrUpdate.mockClear();
-    mockEnforceRetention.mockClear();
 
     // Reset to default implementations
     mockUpload.mockImplementation(() => Promise.resolve({ externalId: 'file-ref-123' }));
@@ -91,11 +105,10 @@ describe('GoogleDriveStrategy', () => {
         webViewLink: 'https://docs.google.com/spreadsheets/d/sheet-id-456',
       })
     );
-    mockEnforceRetention.mockImplementation(() => Promise.resolve(2));
-  });
 
-  afterEach(() => {
-    mock.restore();
+    // Spy on the real backupService singleton's enforceRetention method
+    mockEnforceRetention = mock(() => Promise.resolve(2));
+    backupService.enforceRetention = mockEnforceRetention as typeof backupService.enforceRetention;
   });
 
   test('ZIP only — uploads ZIP and enforces retention when only enabled=true', async () => {
