@@ -1,9 +1,7 @@
 import type { AppDatabase } from './connection';
 
 // Drizzle transaction type — shared across repositories and services
-export type DrizzleTransaction = Parameters<
-  Parameters<AppDatabase['transaction']>[0]
->[0];
+export type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
 // Expense Categories - Single source of truth
 export const EXPENSE_CATEGORIES = [

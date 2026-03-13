@@ -137,6 +137,14 @@ mock.module('../domains/storage/google-drive-provider', () => ({
       return parentId ?? '';
     }
   },
+  // Preserve re-exported utility so mock doesn't break other test files
+  coalesceGoogleDriveFile: (f: Record<string, unknown>) => ({
+    key: f.id,
+    name: f.name,
+    size: Number(f.size) || 0,
+    createdTime: f.createdTime ?? f.modifiedTime ?? new Date(0).toISOString(),
+    lastModified: f.modifiedTime ?? f.createdTime ?? new Date(0).toISOString(),
+  }),
 }));
 
 const { GoogleDriveProvider } = await import('../domains/storage/google-drive-provider');

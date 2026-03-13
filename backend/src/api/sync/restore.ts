@@ -22,9 +22,7 @@ import type { BackupConfig, ParsedBackupData } from '../../types';
 import { settingsRepository } from '../settings/repository';
 import { backupService, coerceRow } from './backup';
 
-type DrizzleTransaction = Parameters<
-  Parameters<AppDatabase['transaction']>[0]
->[0];
+type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
 export interface Conflict {
   table: string;
