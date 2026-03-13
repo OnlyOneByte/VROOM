@@ -25,8 +25,6 @@ const TEST_USER = {
   id: 'user-123',
   email: 'test@example.com',
   displayName: 'Test User',
-  provider: 'google',
-  providerId: 'google-123',
   createdAt: new Date(),
   updatedAt: new Date(),
 };

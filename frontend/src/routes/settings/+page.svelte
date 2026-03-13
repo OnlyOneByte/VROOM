@@ -202,10 +202,9 @@
 						id: toastId
 					});
 				} else if (successCount > 0) {
-					toast.success(
-						`Backed up to ${successCount} provider${successCount > 1 ? 's' : ''}`,
-						{ id: toastId }
-					);
+					toast.success(`Backed up to ${successCount} provider${successCount > 1 ? 's' : ''}`, {
+						id: toastId
+					});
 				}
 			} else {
 				toast.success('Backup complete', { id: toastId });

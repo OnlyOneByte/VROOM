@@ -46,8 +46,8 @@ beforeEach(() => {
 
   // Seed User A (the logged-in user)
   sqliteDb.run(
-    `INSERT INTO users (id, email, display_name, provider, provider_id)
-     VALUES ('${USER_A_ID}', '${USER_A_EMAIL}', 'Alice', 'google', '${USER_A_SUB}')`
+    `INSERT INTO users (id, email, display_name)
+     VALUES ('${USER_A_ID}', '${USER_A_EMAIL}', 'Alice')`
   );
 
   // Seed a session for User A

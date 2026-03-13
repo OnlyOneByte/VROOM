@@ -24,8 +24,6 @@ export const lucia = new Lucia(adapter, {
       id: attributes.id,
       email: attributes.email,
       displayName: attributes.displayName,
-      provider: attributes.provider,
-      providerId: attributes.providerId,
     };
   },
 });
@@ -55,8 +53,6 @@ declare module 'lucia' {
     id: string;
     email: string;
     displayName: string;
-    provider: string;
-    providerId: string;
     createdAt: Date | null;
     updatedAt: Date | null;
   }
@@ -66,8 +62,6 @@ interface DatabaseUserAttributes {
   id: string;
   email: string;
   displayName: string;
-  provider: string;
-  providerId: string;
 }
 
 export type AuthUser = User;

@@ -35,8 +35,6 @@ export const EXPENSE_CATEGORY_DESCRIPTIONS: Record<ExpenseCategory, string> = {
 
 export type PaymentFrequency = 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 
-export type AuthProvider = 'google';
-
 export type SharePermission = 'view' | 'edit';
 
 export type ShareStatus = 'pending' | 'accepted' | 'declined';

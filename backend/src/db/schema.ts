@@ -19,8 +19,6 @@ export const users = sqliteTable('users', {
     .$defaultFn(() => createId()),
   email: text('email').notNull().unique(),
   displayName: text('display_name').notNull(),
-  provider: text('provider').notNull().default('google'),
-  providerId: text('provider_id').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });

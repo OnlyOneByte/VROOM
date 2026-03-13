@@ -149,8 +149,6 @@ CREATE TABLE `users` (
 	`id` text PRIMARY KEY NOT NULL,
 	`email` text NOT NULL,
 	`display_name` text NOT NULL,
-	`provider` text DEFAULT 'google' NOT NULL,
-	`provider_id` text NOT NULL,
 	`created_at` integer,
 	`updated_at` integer
 );

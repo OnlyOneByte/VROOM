@@ -24,7 +24,7 @@ export type {
   VehicleWithFinancing,
 } from './db/schema';
 
-export type { AuthProvider, ExpenseCategory, PaymentFrequency } from './db/types';
+export type { ExpenseCategory, PaymentFrequency } from './db/types';
 export {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_DESCRIPTIONS,

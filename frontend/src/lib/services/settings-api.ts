@@ -50,7 +50,12 @@ export const settingsApi = {
 	}): Promise<RestoreResult> {
 		const body: Record<string, string> =
 			opts.sourceType === 'zip'
-				? { providerId: opts.providerId, sourceType: 'zip', fileRef: opts.fileRef!, mode: opts.mode }
+				? {
+						providerId: opts.providerId,
+						sourceType: 'zip',
+						fileRef: opts.fileRef!,
+						mode: opts.mode
+					}
 				: { providerId: opts.providerId, sourceType: 'sheets', mode: opts.mode };
 
 		return apiClient.post<RestoreResult>('/api/v1/sync/restore/from-provider', body, {

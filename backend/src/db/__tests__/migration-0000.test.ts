@@ -105,7 +105,7 @@ describe('Migration 0000: Consolidated Schema', () => {
     applyMigration(db, migrations[0]);
 
     db.run(
-      "INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('u1', 'test@example.com', 'Test User', 'google', 'gid-123')"
+      "INSERT INTO users (id, email, display_name) VALUES ('u1', 'test@example.com', 'Test User')"
     );
     db.run(
       "INSERT INTO insurance_policies (id, user_id, company, terms) VALUES ('ip1', 'u1', 'Geico', '[]')"
@@ -132,7 +132,7 @@ describe('Migration 0000: Consolidated Schema', () => {
     applyMigration(db, migrations[0]);
 
     db.run(
-      "INSERT INTO users (id, email, display_name, provider, provider_id) VALUES ('u1', 'test@example.com', 'Test User', 'google', 'gid-123')"
+      "INSERT INTO users (id, email, display_name) VALUES ('u1', 'test@example.com', 'Test User')"
     );
 
     expect(() => {

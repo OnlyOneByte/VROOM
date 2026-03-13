@@ -77,10 +77,11 @@ function setupUserAndVehicle(opts?: {
 }): { userId: string; vehicle: TestVehicle } {
   const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
   // Use INSERT OR IGNORE so this is safe to call even if user was pre-seeded (e.g., for insurance FK)
-  testDb.sqlite.run(
-    "INSERT OR IGNORE INTO users (id, email, display_name, provider, provider_id) VALUES (?, ?, ?, 'google', ?)",
-    [user.id, user.email, user.displayName, `provider-${user.id}`]
-  );
+  testDb.sqlite.run('INSERT OR IGNORE INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+    user.id,
+    user.email,
+    user.displayName,
+  ]);
 
   const v: TestVehicle = {
     id: 'vehicle-user-1-0',

@@ -153,10 +153,11 @@ export function createTestDb(): TestDb {
 
 /** Insert a test user into the DB. */
 export function seedUser(db: Database, user: TestUser): void {
-  db.run(
-    "INSERT INTO users (id, email, display_name, provider, provider_id) VALUES (?, ?, ?, 'google', ?)",
-    [user.id, user.email, user.displayName, `provider-${user.id}`]
-  );
+  db.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+    user.id,
+    user.email,
+    user.displayName,
+  ]);
 }
 
 /** Insert a test vehicle into the DB. */
