@@ -1,17 +1,20 @@
 /**
- * Property-Based Tests for ExpenseSplitService.computeAllocations()
+ * Property-Based Tests for ExpenseSplitService
  *
- * Tests Properties 1–4 from the design document:
+ * Pure computation tests (computeAllocations):
  * - Property 1: Allocation sum invariant
  * - Property 2: Even split fairness
  * - Property 3: Allocation count matches vehicle count
  * - Property 4: Absolute split passthrough
+ *
+ * DB-backed tests (createSiblings):
+ * - Property 2 (Design): Split sibling consistency — all siblings share groupTotal, splitMethod, userId, category, date
  */
 
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import type { SplitConfig } from '../../../db/schema';
 import { ExpenseSplitService } from '../split-service';
+import type { SplitConfig } from '../validation';
 
 const service = new ExpenseSplitService();
 
@@ -218,7 +221,7 @@ describe('Property 4: Absolute split passthrough', () => {
 });
 
 // ===========================================================================
-// DB-backed property tests for materializeChildren (Properties 5–7)
+// DB-backed property tests for createSiblings
 // ===========================================================================
 
 import { Database } from 'bun:sqlite';
@@ -228,8 +231,7 @@ import { eq } from 'drizzle-orm';
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
-import type { ExpenseGroup, NewExpenseGroup } from '../../../db/schema';
-import { expenseGroups, expenses } from '../../../db/schema';
+import { expenses } from '../../../db/schema';
 
 // ---------------------------------------------------------------------------
 // Test infrastructure for DB-backed tests
@@ -271,10 +273,20 @@ afterEach(() => {
 // DB-scoped generators
 // ---------------------------------------------------------------------------
 
-/** Pick 1–5 unique vehicle IDs from the seeded set. */
+/** Pick 2–5 unique vehicle IDs from the seeded set (min 2 for valid split). */
 const dbVehicleIdsArb = fc
-  .subarray(VEHICLE_IDS, { minLength: 1, maxLength: VEHICLE_IDS.length })
-  .filter((arr) => arr.length >= 1);
+  .subarray(VEHICLE_IDS, { minLength: 2, maxLength: VEHICLE_IDS.length })
+  .filter((arr) => arr.length >= 2);
+
+/** Category arbitrary. */
+const categoryArb = fc.constantFrom(
+  'fuel',
+  'maintenance',
+  'financial',
+  'regulatory',
+  'enhancement',
+  'misc'
+);
 
 /** Even split config using seeded vehicle IDs. */
 const dbEvenConfigArb: fc.Arbitrary<SplitConfig> = dbVehicleIdsArb.map((vehicleIds) => ({
@@ -336,188 +348,136 @@ const dbConfigAndTotalArb: fc.Arbitrary<{ config: SplitConfig; totalAmount: numb
     )
   );
 
-/** Helper: insert an expense group row and return the full row. */
-async function insertExpenseGroup(
-  drizzleDb: BunSQLiteDatabase<Record<string, unknown>>,
-  config: SplitConfig,
-  totalAmount: number,
-  overrides?: Partial<NewExpenseGroup>
-): Promise<ExpenseGroup> {
-  const id = createId();
-  const now = new Date();
-  const [group] = await drizzleDb
-    .insert(expenseGroups)
-    .values({
-      id,
-      userId: USER_ID,
-      splitConfig: config,
-      category: 'financial',
-      tags: ['insurance'],
-      date: now,
-      description: 'Test expense group',
-      totalAmount,
-      ...overrides,
-    })
-    .returning();
-  return group;
+// ---------------------------------------------------------------------------
+// Helpers for sibling consistency verification
+// ---------------------------------------------------------------------------
+
+interface ExpenseRow {
+  groupTotal: number | null;
+  splitMethod: string | null;
+  userId: string;
+  category: string;
+  date: Date | null;
+  groupId: string | null;
+  [key: string]: unknown;
+}
+
+function verifySiblingConsistency(
+  siblings: ExpenseRow[],
+  expected: {
+    groupTotal: number;
+    splitMethod: string;
+    userId: string;
+    category: string;
+    dateTime: number;
+    groupId: string;
+  }
+): void {
+  for (const sibling of siblings) {
+    expect(sibling.groupTotal).toBe(expected.groupTotal);
+    expect(sibling.splitMethod).toBe(expected.splitMethod);
+    expect(sibling.userId).toBe(expected.userId);
+    expect(sibling.category).toBe(expected.category);
+    expect(sibling.date?.getTime()).toBe(expected.dateTime);
+    expect(sibling.groupId).toBe(expected.groupId);
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Property 5: Materialized children sum equals group total
-// **Validates: Requirements 5.4, 4.4**
+// Property 2 (Design): Split sibling consistency
+// All siblings share groupTotal, splitMethod, userId, category, and date.
+// **Validates: Requirements 5.2, 14.2**
 // ---------------------------------------------------------------------------
-describe('Property 5: Materialized children sum equals group total', () => {
-  test('sum of child expenseAmount values equals group totalAmount', async () => {
+describe('Property 2 (Design): Split sibling consistency', () => {
+  test('all siblings created by createSiblings share identical groupTotal, splitMethod, userId, category, and date', async () => {
     await fc.assert(
-      fc.asyncProperty(dbConfigAndTotalArb, async ({ config, totalAmount }) => {
-        const group = await insertExpenseGroup(db, config, totalAmount);
+      fc.asyncProperty(
+        dbConfigAndTotalArb,
+        categoryArb,
+        async ({ config, totalAmount }, category) => {
+          const allocations = service.computeAllocations(config, totalAmount);
+          const groupId = createId();
+          const splitMethod = config.method;
+          const date = new Date(2024, 5, 15);
 
-        const children = await db.transaction(async (tx) => {
-          return service.materializeChildren(tx, group);
-        });
+          const siblings = await db.transaction(async (tx) => {
+            return service.createSiblings(tx, {
+              groupId,
+              userId: USER_ID,
+              splitMethod,
+              groupTotal: totalAmount,
+              allocations,
+              category,
+              date,
+            });
+          });
 
-        const sum = children.reduce((s, c) => s + c.expenseAmount, 0);
-        expect(Math.round(sum * 100) / 100).toBe(totalAmount);
-      }),
-      { numRuns: 50 }
+          const expected = {
+            groupTotal: totalAmount,
+            splitMethod,
+            userId: USER_ID,
+            category,
+            dateTime: date.getTime(),
+            groupId,
+          };
+
+          // Verify returned siblings
+          verifySiblingConsistency(siblings as ExpenseRow[], expected);
+
+          // Verify the same consistency holds when reading back from DB
+          const dbSiblings = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
+
+          expect(dbSiblings.length).toBe(siblings.length);
+          verifySiblingConsistency(dbSiblings as ExpenseRow[], expected);
+        }
+      ),
+      { numRuns: 200 }
     );
   });
 });
 
 // ---------------------------------------------------------------------------
-// Property 6: Idempotent regeneration
-// **Validates: Requirement 5.5**
+// Property 3 (Design): Split amounts sum to groupTotal
+// The absolute difference between the sum of all sibling expenseAmount values
+// and the groupTotal must be less than 0.02.
+// **Validates: Requirements 5.3, 14.3**
 // ---------------------------------------------------------------------------
-describe('Property 6: Idempotent regeneration', () => {
-  test('calling materializeChildren twice produces identical vehicleId and expenseAmount', async () => {
+describe('Property 3 (Design): Split amounts sum to groupTotal', () => {
+  test('sum of sibling expenseAmount values equals groupTotal within ±0.01', async () => {
     await fc.assert(
-      fc.asyncProperty(dbConfigAndTotalArb, async ({ config, totalAmount }) => {
-        const group = await insertExpenseGroup(db, config, totalAmount);
+      fc.asyncProperty(
+        dbConfigAndTotalArb,
+        categoryArb,
+        async ({ config, totalAmount }, category) => {
+          const allocations = service.computeAllocations(config, totalAmount);
+          const groupId = createId();
+          const splitMethod = config.method;
+          const date = new Date(2024, 5, 15);
 
-        // First materialization
-        const first = await db.transaction(async (tx) => {
-          return service.materializeChildren(tx, group);
-        });
+          const siblings = await db.transaction(async (tx) => {
+            return service.createSiblings(tx, {
+              groupId,
+              userId: USER_ID,
+              splitMethod,
+              groupTotal: totalAmount,
+              allocations,
+              category,
+              date,
+            });
+          });
 
-        // Second materialization (same group, no config changes)
-        const second = await db.transaction(async (tx) => {
-          return service.materializeChildren(tx, group);
-        });
+          // Verify from returned objects
+          const returnedSum = siblings.reduce((s, sib) => s + (sib.expenseAmount ?? 0), 0);
+          expect(Math.abs(returnedSum - totalAmount)).toBeLessThan(0.02);
 
-        // Same count
-        expect(second.length).toBe(first.length);
+          // Verify from DB read
+          const dbSiblings = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
 
-        // Same vehicleId + expenseAmount pairs in order
-        for (let i = 0; i < first.length; i++) {
-          expect(second[i].vehicleId).toBe(first[i].vehicleId);
-          expect(second[i].expenseAmount).toBe(first[i].expenseAmount);
+          const dbSum = dbSiblings.reduce((s, row) => s + (row.expenseAmount ?? 0), 0);
+          expect(Math.abs(dbSum - totalAmount)).toBeLessThan(0.02);
         }
-
-        // IDs should differ (old children deleted, new ones created)
-        for (let i = 0; i < first.length; i++) {
-          expect(second[i].id).not.toBe(first[i].id);
-        }
-
-        // Only second batch should exist in DB
-        const dbChildren = await db
-          .select()
-          .from(expenses)
-          .where(eq(expenses.expenseGroupId, group.id));
-        expect(dbChildren.length).toBe(second.length);
-      }),
-      { numRuns: 50 }
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Property 7: Child expenses inherit group properties
-// **Validates: Requirements 5.2, 5.3**
-// ---------------------------------------------------------------------------
-describe('Property 7: Child expenses inherit group properties', () => {
-  test('every child has correct expenseGroupId, vehicleId, category, date, tags, description', async () => {
-    await fc.assert(
-      fc.asyncProperty(dbConfigAndTotalArb, async ({ config, totalAmount }) => {
-        const group = await insertExpenseGroup(db, config, totalAmount);
-
-        const children = await db.transaction(async (tx) => {
-          return service.materializeChildren(tx, group);
-        });
-
-        // Collect expected vehicle IDs from the config
-        const expectedVehicleIds =
-          config.method === 'even' ? config.vehicleIds : config.allocations.map((a) => a.vehicleId);
-
-        expect(children.length).toBe(expectedVehicleIds.length);
-
-        for (let i = 0; i < children.length; i++) {
-          const child = children[i];
-
-          // expenseGroupId set to group's ID
-          expect(child.expenseGroupId).toBe(group.id);
-
-          // vehicleId from split config
-          expect(child.vehicleId).toBe(expectedVehicleIds[i]);
-
-          // Inherited fields match group
-          expect(child.category).toBe(group.category);
-          expect(child.date?.getTime()).toBe(group.date.getTime());
-          expect(child.description).toBe(group.description);
-
-          // Tags comparison (JSON arrays)
-          expect(child.tags).toEqual(group.tags);
-        }
-      }),
-      { numRuns: 50 }
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Property 8: Cascade delete integrity
-// **Validates: Requirements 1.4, 2.3, 2.4**
-// ---------------------------------------------------------------------------
-describe('Property 8: Cascade delete integrity', () => {
-  test('deleting an expense group results in zero child expenses with that expenseGroupId', async () => {
-    await fc.assert(
-      fc.asyncProperty(dbConfigAndTotalArb, async ({ config, totalAmount }) => {
-        const group = await insertExpenseGroup(db, config, totalAmount);
-
-        // Materialize children
-        const children = await db.transaction(async (tx) => {
-          return service.materializeChildren(tx, group);
-        });
-
-        // Verify children exist
-        expect(children.length).toBeGreaterThan(0);
-
-        const childrenBefore = await db
-          .select()
-          .from(expenses)
-          .where(eq(expenses.expenseGroupId, group.id));
-        expect(childrenBefore.length).toBe(children.length);
-
-        // Delete children first (application-level cascade), then the group
-        await db.transaction(async (tx) => {
-          await tx.delete(expenses).where(eq(expenses.expenseGroupId, group.id));
-          await tx.delete(expenseGroups).where(eq(expenseGroups.id, group.id));
-        });
-
-        // Verify zero children remain with that expenseGroupId
-        const childrenAfter = await db
-          .select()
-          .from(expenses)
-          .where(eq(expenses.expenseGroupId, group.id));
-        expect(childrenAfter.length).toBe(0);
-
-        // Verify the group itself is gone
-        const groupAfter = await db
-          .select()
-          .from(expenseGroups)
-          .where(eq(expenseGroups.id, group.id));
-        expect(groupAfter.length).toBe(0);
-      }),
-      { numRuns: 50 }
+      ),
+      { numRuns: 200 }
     );
   });
 });

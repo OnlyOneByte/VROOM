@@ -14,17 +14,11 @@ import { routes as photoRoutes } from './api/photos/routes';
 import { routes as providerRoutes } from './api/providers/routes';
 import { startSyncWorker, stopSyncWorker } from './api/providers/sync-worker';
 import { routes as settingsRoutes } from './api/settings/routes';
+import './api/sync/init';
 import { routes as syncRoutes } from './api/sync/routes';
 import { routes as vehicleRoutes } from './api/vehicles/routes';
 import { CONFIG } from './config';
-import {
-  activityTracker,
-  bodyLimit,
-  errorHandler,
-  optionalAuth,
-  rateLimiter,
-  requireAuth,
-} from './middleware';
+import { activityTracker, bodyLimit, errorHandler, optionalAuth, rateLimiter } from './middleware';
 import { logger } from './utils/logger';
 
 const app = new Hono();
@@ -87,7 +81,8 @@ const globalRateLimiter = rateLimiter({
 });
 
 // Optional auth - sets user context if session cookie present (before rate limiter so it can key by user)
-app.use('*', optionalAuth);
+// Scoped to /api/* to avoid unnecessary DB lookups on health checks and static paths
+app.use('/api/*', optionalAuth);
 
 app.use('*', globalRateLimiter);
 
@@ -122,18 +117,12 @@ if (CONFIG.env === 'development') {
 // Activity tracking middleware (after auth middleware)
 app.use('*', activityTracker);
 
-// Health check endpoint with detailed status
+// Health check endpoint — minimal response, no internal details
 app.get('/health', (c) => {
   return c.json({
     status: 'ok',
-    message: 'VROOM Backend API is running',
     timestamp: new Date().toISOString(),
-    environment: CONFIG.env,
     version: '1.0.0',
-    database: {
-      status: 'connected',
-      path: CONFIG.database.url,
-    },
   });
 });
 
@@ -165,56 +154,15 @@ app.use('/api/*', async (c, next) => {
   return c.redirect(newPath, 308);
 });
 
-// API info endpoint
-app.get('/api', optionalAuth, (c) => {
-  const user = c.get('user');
-
+// API info endpoint — no PII, no route enumeration
+app.get('/api', (c) => {
   return c.json({
     message: 'VROOM Car Tracker API',
     version: '1.0.0',
     apiVersion: 'v1',
-    environment: CONFIG.env,
-    authenticated: !!user,
-    user: user
-      ? {
-          id: user.id,
-          email: user.email,
-          displayName: user.displayName,
-        }
-      : null,
-    endpoints: {
-      health: '/health',
-      auth: {
-        login: '/api/v1/auth/login/google',
-        callback: '/api/v1/auth/callback/google',
-        logout: '/api/v1/auth/logout',
-        me: '/api/v1/auth/me',
-        refresh: '/api/v1/auth/refresh',
-      },
-      vehicles: '/api/v1/vehicles',
-      financing: '/api/v1/financing',
-      expenses: '/api/v1/expenses',
-      insurance: '/api/v1/insurance',
-      settings: '/api/v1/settings',
-      sync: '/api/v1/sync',
-    },
     deprecation: {
       message: 'Unversioned endpoints (/api/*) are deprecated and will redirect to /api/v1/*',
       recommendation: 'Please update your client to use versioned endpoints (/api/v1/*)',
-    },
-  });
-});
-
-// Protected API example
-app.get('/api/protected', requireAuth, (c) => {
-  const user = c.get('user');
-
-  return c.json({
-    message: 'This is a protected endpoint',
-    user: {
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
     },
   });
 });
@@ -231,12 +179,11 @@ app.notFound((c) => {
   );
 });
 
-logger.startup(`VROOM Backend starting on port ${CONFIG.server.port}`);
-logger.startup(`Environment: ${CONFIG.env}`);
-logger.startup(`Database: ${CONFIG.database.url}`);
-
 // Run migrations on startup (idempotent — only applies new migrations)
 import { checkpointWAL, forceCheckpointWAL, runMigrations } from './db/connection';
+
+logger.startup(`VROOM Backend starting on port ${CONFIG.server.port}`);
+logger.startup(`Environment: ${CONFIG.env}`);
 
 try {
   await runMigrations();

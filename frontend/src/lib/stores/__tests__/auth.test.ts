@@ -125,7 +125,12 @@ describe('Auth Store', () => {
 
 	describe('initialize', () => {
 		it('successfully initializes with valid session', async () => {
-			mockFetch.mockResolvedValueOnce(mockApiResponse(mockUser));
+			mockFetch.mockResolvedValueOnce(
+				mockApiResponse({
+					user: mockUser,
+					session: { id: 'sess-1', expiresAt: '2026-04-07T00:00:00Z' }
+				})
+			);
 
 			await authStore.initialize();
 

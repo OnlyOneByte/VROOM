@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { Photo, PhotoRef } from '../../../db/schema';
-import type { StorageRef } from '../storage-provider';
+import type { StorageRef } from '../domains/storage/storage-provider';
 
 // --- Mocks must be set up before importing the module under test ---
 
@@ -46,7 +46,7 @@ function makeMockProvider(type = 'google-drive') {
 
 const mockGetProvider = mock(() => Promise.resolve(makeMockProvider()));
 
-mock.module('../registry', () => ({
+mock.module('../domains/storage/registry', () => ({
   storageProviderRegistry: {
     getProviderInternal: mockGetProvider,
     resolveProviderFolderPath: mock(() => Promise.resolve('')),
@@ -75,7 +75,6 @@ mock.module('../../../config', () => ({
       },
       pollIntervalMs: 30_000,
       batchSize: 10,
-      maxRetries: 3,
     },
   },
   TABLE_SCHEMA_MAP,

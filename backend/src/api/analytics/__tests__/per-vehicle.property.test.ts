@@ -76,7 +76,11 @@ function setupUserAndVehicle(opts?: {
   purchaseDate?: Date | null;
 }): { userId: string; vehicle: TestVehicle } {
   const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-  seedUser(testDb.sqlite, user);
+  // Use INSERT OR IGNORE so this is safe to call even if user was pre-seeded (e.g., for insurance FK)
+  testDb.sqlite.run(
+    "INSERT OR IGNORE INTO users (id, email, display_name, provider, provider_id) VALUES (?, ?, ?, 'google', ?)",
+    [user.id, user.email, user.displayName, `provider-${user.id}`]
+  );
 
   const v: TestVehicle = {
     id: 'vehicle-user-1-0',
@@ -167,8 +171,11 @@ describe('Property 10: Health score formula', () => {
           let policyId: string | null = null;
           if (hasInsurance) {
             policyId = 'policy-1';
+            // Seed user first so the FK on insurance_policies.user_id is satisfied
+            seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
             const policy: TestInsurancePolicy = {
               id: policyId,
+              userId: 'user-1',
               company: 'Test Insurance',
               isActive: true,
             };
@@ -218,8 +225,11 @@ describe('Property 11: Insurance coverage is binary', () => {
         let policyId: string | null = null;
         if (hasPolicy) {
           policyId = 'policy-1';
+          // Seed user first so the FK on insurance_policies.user_id is satisfied
+          seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
           seedInsurancePolicy(testDb.sqlite, {
             id: policyId,
+            userId: 'user-1',
             company: 'Test Co',
             isActive,
           });

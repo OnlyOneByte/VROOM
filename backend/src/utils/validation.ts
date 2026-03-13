@@ -123,16 +123,16 @@ export const commonSchemas = {
  * They throw HTTPException if the resource is not found or doesn't belong to the user.
  */
 
-import { HTTPException } from 'hono/http-exception';
 import { expenseRepository } from '../api/expenses/repository';
 import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
 import { vehicleRepository } from '../api/vehicles/repository';
 import type { Expense, InsurancePolicy, Vehicle, VehicleFinancing } from '../db/schema';
+import { NotFoundError } from '../errors';
 
 /**
  * Validate that a vehicle belongs to the user
- * @throws HTTPException(404) if vehicle not found or doesn't belong to user
+ * @throws NotFoundError if vehicle not found or doesn't belong to user
  */
 export async function validateVehicleOwnership(
   vehicleId: string,
@@ -140,36 +140,29 @@ export async function validateVehicleOwnership(
 ): Promise<Vehicle> {
   const vehicle = await vehicleRepository.findByUserIdAndId(userId, vehicleId);
   if (!vehicle) {
-    throw new HTTPException(404, { message: 'Vehicle not found' });
+    throw new NotFoundError('Vehicle');
   }
   return vehicle;
 }
 
 /**
- * Validate that an expense belongs to the user (via vehicle ownership)
- * @throws HTTPException(404) if expense not found or doesn't belong to user
+ * Validate that an expense belongs to the user (via direct userId column)
+ * @throws NotFoundError if expense not found or doesn't belong to user
  */
 export async function validateExpenseOwnership(
   expenseId: string,
   userId: string
 ): Promise<Expense> {
-  const expense = await expenseRepository.findById(expenseId);
+  const expense = await expenseRepository.findByIdAndUserId(expenseId, userId);
   if (!expense) {
-    throw new HTTPException(404, { message: 'Expense not found' });
+    throw new NotFoundError('Expense');
   }
-
-  // Verify the expense's vehicle belongs to the user
-  const vehicle = await vehicleRepository.findByUserIdAndId(userId, expense.vehicleId);
-  if (!vehicle) {
-    throw new HTTPException(404, { message: 'Expense not found' });
-  }
-
   return expense;
 }
 
 /**
  * Validate that financing belongs to the user (via vehicle ownership)
- * @throws HTTPException(404) if financing not found or doesn't belong to user
+ * @throws NotFoundError if financing not found or doesn't belong to user
  */
 export async function validateFinancingOwnership(
   financingId: string,
@@ -177,21 +170,21 @@ export async function validateFinancingOwnership(
 ): Promise<VehicleFinancing> {
   const financing = await financingRepository.findById(financingId);
   if (!financing) {
-    throw new HTTPException(404, { message: 'Financing not found' });
+    throw new NotFoundError('Financing');
   }
 
   // Verify the financing's vehicle belongs to the user
   const vehicle = await vehicleRepository.findByUserIdAndId(userId, financing.vehicleId);
   if (!vehicle) {
-    throw new HTTPException(404, { message: 'Financing not found' });
+    throw new NotFoundError('Financing');
   }
 
   return financing;
 }
 
 /**
- * Validate that insurance policy belongs to the user (via junction table → vehicle ownership)
- * @throws HTTPException(404) if insurance not found or doesn't belong to user
+ * Validate that insurance policy belongs to the user (via userId column)
+ * @throws NotFoundError if insurance not found or doesn't belong to user
  */
 export async function validateInsuranceOwnership(
   insuranceId: string,
@@ -199,22 +192,11 @@ export async function validateInsuranceOwnership(
 ): Promise<InsurancePolicy> {
   const insurance = await insurancePolicyRepository.findById(insuranceId);
   if (!insurance) {
-    throw new HTTPException(404, { message: 'Insurance policy not found' });
+    throw new NotFoundError('Insurance policy');
   }
 
-  // Verify the user owns at least one vehicle linked to this policy via junction table
-  const vehicleIds = await insurancePolicyRepository.getVehicleIds(insuranceId);
-  let ownsLinkedVehicle = false;
-  for (const vid of vehicleIds) {
-    const vehicle = await vehicleRepository.findByUserIdAndId(userId, vid);
-    if (vehicle) {
-      ownsLinkedVehicle = true;
-      break;
-    }
-  }
-
-  if (!ownsLinkedVehicle) {
-    throw new HTTPException(404, { message: 'Insurance policy not found' });
+  if (insurance.userId !== userId) {
+    throw new NotFoundError('Insurance policy');
   }
 
   return insurance;

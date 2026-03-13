@@ -90,7 +90,9 @@ describe('Authentication Flow Integration', () => {
 
 	describe('Authentication State Management', () => {
 		it('initializes authentication state on app load', async () => {
-			mockFetch.mockResolvedValueOnce(apiOk(mockUser));
+			mockFetch.mockResolvedValueOnce(
+				apiOk({ user: mockUser, session: { id: 'sess-1', expiresAt: '2026-04-07T00:00:00Z' } })
+			);
 			await authStore.initialize();
 			// Direct property access
 			expect(authStore.user).toEqual(mockUser);
@@ -189,7 +191,9 @@ describe('Authentication Flow Integration', () => {
 
 	describe('Session Persistence', () => {
 		it('maintains session across page reloads', async () => {
-			mockFetch.mockResolvedValueOnce(apiOk(mockUser));
+			mockFetch.mockResolvedValueOnce(
+				apiOk({ user: mockUser, session: { id: 'sess-1', expiresAt: '2026-04-07T00:00:00Z' } })
+			);
 			await authStore.initialize();
 			// Direct property access
 			expect(authStore.user).toEqual(mockUser);

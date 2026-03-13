@@ -32,6 +32,7 @@ export interface TestVehicle {
 export interface TestExpense {
   id: string;
   vehicleId: string;
+  userId?: string;
   category: string;
   expenseAmount: number;
   date: Date;
@@ -43,6 +44,7 @@ export interface TestExpense {
 
 export interface TestInsurancePolicy {
   id: string;
+  userId: string;
   company: string;
   isActive: boolean;
 }
@@ -177,11 +179,20 @@ export function seedExpense(db: Database, expense: TestExpense): void {
   if (Number.isNaN(dateUnix)) {
     throw new Error(`Invalid date for expense ${expense.id}: ${expense.date}`);
   }
+  // Resolve userId: use explicit value, or look up from vehicle
+  let userId = expense.userId;
+  if (!userId) {
+    const row = db.query('SELECT user_id FROM vehicles WHERE id = ?').get(expense.vehicleId) as {
+      user_id: string;
+    } | null;
+    userId = row?.user_id ?? 'unknown';
+  }
   db.run(
-    'INSERT INTO expenses (id, vehicle_id, category, expense_amount, date, mileage, fuel_amount, fuel_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, mileage, fuel_amount, fuel_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       expense.id,
       expense.vehicleId,
+      userId,
       expense.category,
       expense.expenseAmount,
       dateUnix,
@@ -195,8 +206,9 @@ export function seedExpense(db: Database, expense: TestExpense): void {
 
 /** Insert a test insurance policy into the DB. */
 export function seedInsurancePolicy(db: Database, policy: TestInsurancePolicy): void {
-  db.run('INSERT INTO insurance_policies (id, company, is_active) VALUES (?, ?, ?)', [
+  db.run('INSERT INTO insurance_policies (id, user_id, company, is_active) VALUES (?, ?, ?, ?)', [
     policy.id,
+    policy.userId,
     policy.company,
     policy.isActive ? 1 : 0,
   ]);

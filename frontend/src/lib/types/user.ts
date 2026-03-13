@@ -4,7 +4,6 @@ export interface User {
 	displayName: string;
 	provider: 'google';
 	providerId: string;
-	googleRefreshToken?: string;
 	createdAt: string;
 	updatedAt: string;
 }

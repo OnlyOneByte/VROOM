@@ -110,7 +110,10 @@ function makeExpense(id: string, vehicleId: string, mileage: number | null): Exp
     insurancePolicyId: null,
     insuranceTermId: null,
     missedFillup: false,
-    expenseGroupId: null,
+    userId: 'u1',
+    groupId: null,
+    groupTotal: null,
+    splitMethod: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

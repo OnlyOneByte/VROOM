@@ -6,8 +6,8 @@ import {
 	lastBackupTime,
 	lastSheetsSync,
 	lastDataChangeTime,
-	googleDriveBackupEnabled,
-	googleSheetsSyncEnabled,
+	backupEnabled,
+	sheetsSyncEnabled,
 	syncQueue,
 	type SyncConflict,
 	type SyncConfig
@@ -28,8 +28,8 @@ export {
 	lastBackupTime,
 	lastSheetsSync,
 	lastDataChangeTime,
-	googleDriveBackupEnabled,
-	googleSheetsSyncEnabled
+	backupEnabled,
+	sheetsSyncEnabled
 };
 
 export interface SyncResult {
@@ -47,8 +47,8 @@ export async function fetchLastSyncTime(): Promise<void> {
 			lastSyncDate?: string;
 			lastBackupDate?: string;
 			lastDataChangeDate?: string;
-			googleSheetsSyncEnabled?: boolean;
-			googleDriveBackupEnabled?: boolean;
+			sheetsSyncEnabled?: boolean;
+			backupEnabled?: boolean;
 		}>('/api/v1/sync/status');
 
 		if (result) {
@@ -59,8 +59,8 @@ export async function fetchLastSyncTime(): Promise<void> {
 			lastSheetsSync.current = syncDate;
 			lastBackupTime.current = backupDate;
 			lastDataChangeTime.current = changeDate;
-			googleSheetsSyncEnabled.current = result.googleSheetsSyncEnabled || false;
-			googleDriveBackupEnabled.current = result.googleDriveBackupEnabled || false;
+			sheetsSyncEnabled.current = result.sheetsSyncEnabled || false;
+			backupEnabled.current = result.backupEnabled || false;
 
 			let mostRecentSync: Date | null = null;
 			if (syncDate && backupDate) {

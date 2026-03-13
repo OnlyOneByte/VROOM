@@ -20,13 +20,6 @@
       "bun-types"
     ],
     "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/types/*": ["./src/types/*"],
-      "@/lib/*": ["./src/lib/*"],
-      "@/db/*": ["./src/db/*"],
-      "@/routes/*": ["./src/routes/*"]
-    },
     "resolveJsonModule": true,
     "esModuleInterop": true
   },

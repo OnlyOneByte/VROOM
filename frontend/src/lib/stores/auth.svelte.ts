@@ -54,8 +54,11 @@ function createAuthStore() {
 		async initialize() {
 			isLoading = true;
 			try {
-				const result = await apiClient.get<User>('/api/v1/auth/me');
-				user = result;
+				const result = await apiClient.get<{
+					user: User;
+					session: { id: string; expiresAt: string };
+				}>('/api/v1/auth/me');
+				user = result.user;
 				isAuthenticated = true;
 				isLoading = false;
 				error = null;

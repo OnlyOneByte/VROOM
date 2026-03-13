@@ -39,7 +39,10 @@ function makeExpense(overrides: {
     insurancePolicyId: null,
     insuranceTermId: null,
     missedFillup: overrides.missedFillup,
-    expenseGroupId: null,
+    userId: 'test-user',
+    groupId: null,
+    groupTotal: null,
+    splitMethod: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

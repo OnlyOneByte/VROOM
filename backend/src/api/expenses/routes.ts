@@ -68,6 +68,7 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
     .optional(),
   receiptUrl: z
     .string()
+    .max(2048, 'Receipt URL is too long')
     .refine((val) => {
       try {
         new URL(val);
@@ -84,6 +85,10 @@ const createExpenseSchema = baseExpenseSchema.omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  userId: true,
+  groupId: true,
+  groupTotal: true,
+  splitMethod: true,
 });
 
 const updateExpenseSchema = createExpenseSchema.partial();
@@ -117,24 +122,33 @@ routes.use('*', changeTracker);
 // Split expense routes (must be before /:id to avoid path conflicts)
 // ===========================================================================
 
-// POST /api/expenses/split — Create expense group + materialized children
+// POST /api/expenses/split — Create split expense as sibling rows
 routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) => {
   const user = c.get('user');
   const data = c.req.valid('json');
 
-  const result = await expenseRepository.createExpenseGroup(data, user.id);
+  const siblings = await expenseRepository.createSplitExpense(data, user.id);
+  const first = siblings[0];
+  if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
+    throw new ValidationError('Split expense creation returned invalid data');
+  }
 
   return c.json(
     {
       success: true,
-      data: result,
+      data: {
+        siblings,
+        groupId: first.groupId,
+        groupTotal: first.groupTotal,
+        splitMethod: first.splitMethod,
+      },
       message: 'Split expense created successfully',
     },
     201
   );
 });
 
-// PUT /api/expenses/split/:id — Update split config, regenerate children
+// PUT /api/expenses/split/:id — Update split config, regenerate siblings
 routes.put(
   '/split/:id',
   zValidator('param', commonSchemas.idParam),
@@ -144,32 +158,53 @@ routes.put(
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
 
-    const result = await expenseRepository.updateExpenseGroup(id, data, user.id);
+    const siblings = await expenseRepository.updateSplitExpense(id, data, user.id);
+    const first = siblings[0];
+    if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
+      throw new ValidationError('Split expense update returned invalid data');
+    }
 
     return c.json({
       success: true,
-      data: result,
+      data: {
+        siblings,
+        groupId: first.groupId,
+        groupTotal: first.groupTotal,
+        splitMethod: first.splitMethod,
+      },
       message: 'Split expense updated successfully',
     });
   }
 );
 
-// GET /api/expenses/split/:id — Get group with children
+// GET /api/expenses/split/:id — Get split expense siblings
 routes.get('/split/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const result = await expenseRepository.getExpenseGroup(id, user.id);
+  const siblings = await expenseRepository.getSplitExpense(id, user.id);
+  const first = siblings[0];
+  if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
+    throw new ValidationError('Split expense data is invalid');
+  }
 
-  return c.json({ success: true, data: result });
+  return c.json({
+    success: true,
+    data: {
+      siblings,
+      groupId: first.groupId,
+      groupTotal: first.groupTotal,
+      splitMethod: first.splitMethod,
+    },
+  });
 });
 
-// DELETE /api/expenses/split/:id — Delete group (cascade children)
+// DELETE /api/expenses/split/:id — Delete split expense group
 routes.delete('/split/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  await expenseRepository.deleteExpenseGroup(id, user.id);
+  await expenseRepository.deleteSplitExpense(id, user.id);
 
   return c.json({ success: true, message: 'Split expense deleted successfully' });
 });
@@ -265,7 +300,7 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     expenseData.fuelType
   );
 
-  const createdExpense = await expenseRepository.create(expenseData);
+  const createdExpense = await expenseRepository.create({ ...expenseData, userId: user.id });
 
   // Adjust financing balance if this is a financing payment
   const updatedFinancing = await handleFinancingOnCreate(createdExpense);

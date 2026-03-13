@@ -48,6 +48,7 @@ describe('Property 1: Transformer round-trip preservation', () => {
 					const backendResponse = {
 						...backend,
 						id: 'test-id',
+						userId: 'user-1',
 						createdAt: new Date().toISOString(),
 						updatedAt: new Date().toISOString()
 					};
@@ -77,6 +78,7 @@ describe('Property 1: Transformer round-trip preservation', () => {
 					const backendResponse = {
 						...backend,
 						id: 'test-id',
+						userId: 'user-1',
 						createdAt: new Date().toISOString(),
 						updatedAt: new Date().toISOString()
 					};
@@ -105,6 +107,7 @@ describe('Property 2: fuelType-based mutual exclusivity', () => {
 		fc.record({
 			id: fc.uuid(),
 			vehicleId: fc.uuid(),
+			userId: fc.uuid(),
 			category: fc.constantFrom(...CATEGORIES),
 			tags: fc.constant([] as string[]),
 			expenseAmount: fc.double({ min: 0.01, max: 100000, noNaN: true, noDefaultInfinity: true }),

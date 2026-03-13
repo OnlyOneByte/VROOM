@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import type { UserProvider } from '../../../db/schema';
 import type { StorageConfig } from '../../../types';
-import { StorageProviderRegistry } from '../registry';
+import { StorageProviderRegistry } from '../domains/storage/registry';
 
 // --- Mock encryption ---
 mock.module('../../../utils/encryption', () => ({
@@ -10,7 +10,7 @@ mock.module('../../../utils/encryption', () => ({
 }));
 
 // --- Mock GoogleDriveProvider ---
-mock.module('../google-drive-provider', () => ({
+mock.module('../domains/storage/google-drive-provider', () => ({
   GoogleDriveProvider: class {
     readonly type = 'google-drive';
     upload = mock(() => Promise.resolve({ providerType: 'google-drive', externalId: 'file-1' }));
@@ -30,7 +30,7 @@ const baseProvider: UserProvider = {
   providerType: 'google-drive',
   displayName: 'My Google Drive',
   credentials: 'encrypted:{"refreshToken":"tok-123"}',
-  config: { rootPath: '/VROOM' },
+  config: { photoRootPath: 'VROOM/Photos' },
   status: 'active',
   lastSyncAt: null,
   createdAt: new Date(),
@@ -46,10 +46,10 @@ const baseStorageConfig: StorageConfig = {
   },
   providerCategories: {
     'provider-1': {
-      vehicle_photos: { enabled: true, folderPath: '/Vehicle Photos' },
-      expense_receipts: { enabled: true, folderPath: '/Receipts' },
-      insurance_docs: { enabled: true, folderPath: '/Insurance' },
-      odometer_readings: { enabled: true, folderPath: '/Odometer' },
+      vehicle_photos: { enabled: true, folderPath: 'Vehicle' },
+      expense_receipts: { enabled: true, folderPath: 'Receipts' },
+      insurance_docs: { enabled: true, folderPath: 'Insurance' },
+      odometer_readings: { enabled: true, folderPath: 'Odometer' },
     },
   },
 };
@@ -100,7 +100,7 @@ describe('StorageProviderRegistry', () => {
       const result = await registry.getDefaultProvider('user-1', 'vehicle_photos');
 
       expect(result.providerId).toBe('provider-1');
-      expect(result.folderPath).toBe('/VROOM/Vehicle Photos');
+      expect(result.folderPath).toBe('VROOM/Photos/Vehicle');
       expect(result.provider.type).toBe('google-drive');
     });
 
@@ -158,7 +158,7 @@ describe('StorageProviderRegistry', () => {
         ...baseProvider,
         id: 'provider-2',
         displayName: 'Backup Drive',
-        config: { rootPath: '/VROOM' },
+        config: { photoRootPath: 'VROOM/Photos' },
       };
 
       const configWithBackup: StorageConfig = {
@@ -170,16 +170,16 @@ describe('StorageProviderRegistry', () => {
         },
         providerCategories: {
           'provider-1': {
-            vehicle_photos: { enabled: true, folderPath: '/Vehicle Photos' },
-            expense_receipts: { enabled: true, folderPath: '/Receipts' },
-            insurance_docs: { enabled: true, folderPath: '/Insurance' },
-            odometer_readings: { enabled: true, folderPath: '/Odometer' },
+            vehicle_photos: { enabled: true, folderPath: 'Vehicle' },
+            expense_receipts: { enabled: true, folderPath: 'Receipts' },
+            insurance_docs: { enabled: true, folderPath: 'Insurance' },
+            odometer_readings: { enabled: true, folderPath: 'Odometer' },
           },
           'provider-2': {
-            vehicle_photos: { enabled: true, folderPath: '/Backup/Photos' },
-            expense_receipts: { enabled: false, folderPath: '/Backup/Receipts' },
-            insurance_docs: { enabled: true, folderPath: '/Backup/Insurance' },
-            odometer_readings: { enabled: true, folderPath: '/Backup/Odometer' },
+            vehicle_photos: { enabled: true, folderPath: 'Backup/Photos' },
+            expense_receipts: { enabled: false, folderPath: 'Backup/Receipts' },
+            insurance_docs: { enabled: true, folderPath: 'Backup/Insurance' },
+            odometer_readings: { enabled: true, folderPath: 'Backup/Odometer' },
           },
         },
       };
@@ -193,7 +193,7 @@ describe('StorageProviderRegistry', () => {
 
       expect(results).toHaveLength(1);
       expect(results[0].providerId).toBe('provider-2');
-      expect(results[0].folderPath).toBe('/VROOM/Backup/Photos');
+      expect(results[0].folderPath).toBe('VROOM/Photos/Backup/Photos');
     });
 
     test('returns empty array when no backup providers have category enabled', async () => {
@@ -218,10 +218,10 @@ describe('StorageProviderRegistry', () => {
         providerCategories: {
           ...baseStorageConfig.providerCategories,
           'provider-2': {
-            vehicle_photos: { enabled: true, folderPath: '/Backup' },
-            expense_receipts: { enabled: true, folderPath: '/Backup' },
-            insurance_docs: { enabled: true, folderPath: '/Backup' },
-            odometer_readings: { enabled: true, folderPath: '/Backup' },
+            vehicle_photos: { enabled: true, folderPath: 'Backup' },
+            expense_receipts: { enabled: true, folderPath: 'Backup' },
+            insurance_docs: { enabled: true, folderPath: 'Backup' },
+            odometer_readings: { enabled: true, folderPath: 'Backup' },
           },
         },
       };

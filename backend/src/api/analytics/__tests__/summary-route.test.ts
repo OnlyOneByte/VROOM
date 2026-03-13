@@ -27,7 +27,6 @@ const TEST_USER = {
   displayName: 'Test User',
   provider: 'google',
   providerId: 'google-123',
-  googleRefreshToken: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

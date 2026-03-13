@@ -104,6 +104,6 @@ export function seedCoreData(db: Database): void {
     "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v1', 'u1', 'Toyota', 'Camry', 2022)"
   );
   db.run(
-    "INSERT INTO expenses (id, vehicle_id, category, date, expense_amount) VALUES ('e1', 'v1', 'fuel', 1700000000, 45.50)"
+    "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES ('e1', 'v1', 'u1', 'fuel', 1700000000, 45.50)"
   );
 }

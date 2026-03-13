@@ -3,18 +3,14 @@ import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-or
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
-import type {
-  Expense,
-  ExpenseGroup,
-  NewExpense,
-  NewExpenseGroup,
-  SplitConfig,
-} from '../../db/schema';
-import { expenseGroups, expenses, vehicles } from '../../db/schema';
+import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
+import { expenses, odometerEntries, photos, vehicles } from '../../db/schema';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
+import type { PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { expenseSplitService } from './split-service';
+import type { SplitConfig } from './validation';
 
 export interface ExpenseFilters {
   vehicleId?: string;
@@ -30,10 +26,8 @@ export interface PaginatedExpenseFilters extends ExpenseFilters {
   tags?: string[];
 }
 
-export interface PaginatedResult<T> {
-  data: T[];
-  totalCount: number;
-}
+// Re-export from shared pagination module for backward compat
+export type { PaginatedResult } from '../../utils/pagination';
 
 export interface ExpenseSummaryFilters {
   userId: string;
@@ -74,8 +68,20 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   /**
+   * Find an expense by ID scoped to a user. Returns null if not found or not owned.
+   */
+  async findByIdAndUserId(id: string, userId: string): Promise<Expense | null> {
+    const result = await this.db
+      .select()
+      .from(expenses)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .limit(1);
+    return result[0] ?? null;
+  }
+
+  /**
    * Paginated find with SQL-level filtering, LIMIT/OFFSET, and totalCount.
-   * Always joins with vehicles for userId ownership.
+   * Filters by expenses.userId directly.
    */
   async findPaginated(filters: PaginatedExpenseFilters): Promise<PaginatedResult<Expense>> {
     try {
@@ -112,28 +118,26 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         }
       }
 
-      // Always join with vehicles for userId ownership
-      const baseWhere = and(eq(vehicles.userId, filters.userId ?? ''), ...conditions);
+      // Filter by expenses.userId directly — no vehicles JOIN needed
+      const baseWhere = and(eq(expenses.userId, filters.userId ?? ''), ...conditions);
 
       const [countResult] = await this.db
         .select({ count: sql<number>`count(*)` })
         .from(expenses)
-        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
         .where(baseWhere);
 
       const totalCount = countResult?.count ?? 0;
 
       const data = await this.db
-        .select({ expenses })
+        .select()
         .from(expenses)
-        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
         .where(baseWhere)
         .orderBy(desc(expenses.date))
         .limit(limit)
         .offset(offset);
 
       return {
-        data: data.map((r) => r.expenses),
+        data,
         totalCount,
       };
     } catch (error) {
@@ -147,7 +151,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
   /**
    * Unpaginated find for internal callers that need all matching expenses.
-   * Always joins with vehicles for userId ownership.
+   * Filters by expenses.userId directly.
    */
   async findAll(filters: ExpenseFilters): Promise<Expense[]> {
     try {
@@ -170,13 +174,12 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       }
 
       const result = await this.db
-        .select({ expenses })
+        .select()
         .from(expenses)
-        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-        .where(and(eq(vehicles.userId, filters.userId ?? ''), ...conditions))
+        .where(and(eq(expenses.userId, filters.userId ?? ''), ...conditions))
         .orderBy(desc(expenses.date));
 
-      return result.map((row) => row.expenses);
+      return result;
     } catch (error) {
       logger.error('Failed to find expenses', {
         filters,
@@ -316,8 +319,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           lastExpenseDate: sql<string>`MAX(datetime(${expenses.date}, 'unixepoch'))`,
         })
         .from(expenses)
-        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId))
+        .where(eq(expenses.userId, userId))
         .groupBy(expenses.vehicleId);
 
       return rows.map((r) => ({
@@ -337,11 +339,11 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
   /**
    * Returns aggregated expense summary: totals, category breakdown, monthly trend, and recent spend.
-   * All queries join with vehicles for userId ownership.
+   * Filters by expenses.userId directly.
    */
   async getSummary(filters: ExpenseSummaryFilters): Promise<ExpenseSummary> {
     try {
-      const periodConditions: SQL[] = [eq(vehicles.userId, filters.userId)];
+      const periodConditions: SQL[] = [eq(expenses.userId, filters.userId)];
 
       if (filters.vehicleId) {
         periodConditions.push(eq(expenses.vehicleId, filters.vehicleId));
@@ -376,7 +378,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       // Recent amount conditions: always last 30 days, ignoring period filter
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const recentConditions: SQL[] = [
-        eq(vehicles.userId, filters.userId),
+        eq(expenses.userId, filters.userId),
         gte(expenses.date, thirtyDaysAgo),
       ];
       if (filters.vehicleId) {
@@ -392,7 +394,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             expenseCount: sql<number>`count(*)`,
           })
           .from(expenses)
-          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
           .where(periodWhere),
 
         // Category breakdown
@@ -403,7 +404,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             count: sql<number>`count(*)`,
           })
           .from(expenses)
-          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
           .where(periodWhere)
           .groupBy(expenses.category),
 
@@ -417,7 +417,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             count: sql<number>`count(*)`,
           })
           .from(expenses)
-          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
           .where(periodWhere)
           .groupBy(sql`strftime('%Y-%m', datetime(${expenses.date}, 'unixepoch'))`)
           .orderBy(sql`strftime('%Y-%m', datetime(${expenses.date}, 'unixepoch'))`),
@@ -428,7 +427,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             amount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
           })
           .from(expenses)
-          .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
           .where(recentWhere),
       ]);
 
@@ -462,7 +460,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   // ===========================================================================
-  // Expense Group Methods
+  // Split Expense Methods
   // ===========================================================================
 
   /**
@@ -489,10 +487,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   /**
-   * Create an expense group and materialize child expenses.
-   * Validates vehicle ownership, inserts group, calls materializeChildren.
+   * Create a split expense as sibling rows sharing a groupId.
+   * Validates vehicle ownership, then calls expenseSplitService.createSiblings().
    */
-  async createExpenseGroup(
+  async createSplitExpense(
     data: {
       splitConfig: SplitConfig;
       category: string;
@@ -504,133 +502,178 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       insuranceTermId?: string;
     },
     userId: string
-  ): Promise<{ group: ExpenseGroup; children: Expense[] }> {
+  ): Promise<Expense[]> {
     try {
       await this.validateVehicleOwnership(data.splitConfig, userId);
+
+      const allocations = expenseSplitService.computeAllocations(
+        data.splitConfig,
+        data.totalAmount
+      );
+      const splitMethod: SplitMethod = data.splitConfig.method;
 
       return await this.db.transaction(async (tx) => {
         const groupId = createId();
-        const now = new Date();
 
-        const newGroup: NewExpenseGroup = {
-          id: groupId,
+        return expenseSplitService.createSiblings(tx, {
+          groupId,
           userId,
-          splitConfig: data.splitConfig,
+          splitMethod,
+          groupTotal: data.totalAmount,
+          allocations,
           category: data.category,
-          tags: data.tags ?? null,
           date: data.date,
-          description: data.description ?? null,
-          totalAmount: data.totalAmount,
-          insurancePolicyId: data.insurancePolicyId ?? null,
-          insuranceTermId: data.insuranceTermId ?? null,
-          createdAt: now,
-          updatedAt: now,
-        };
-
-        const [group] = await tx.insert(expenseGroups).values(newGroup).returning();
-        const children = await expenseSplitService.materializeChildren(tx, group);
-
-        return { group, children };
+          tags: data.tags,
+          description: data.description,
+          insurancePolicyId: data.insurancePolicyId,
+          insuranceTermId: data.insuranceTermId,
+        });
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
-      logger.error('Failed to create expense group', {
+      logger.error('Failed to create split expense', {
         userId,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new DatabaseError('Failed to create expense group', error);
+      throw new DatabaseError('Failed to create split expense', error);
     }
   }
 
   /**
-   * Get an expense group with its children. Validates user ownership.
+   * Get a split expense group by groupId. Validates user ownership.
    */
-  async getExpenseGroup(
-    groupId: string,
-    userId: string
-  ): Promise<{ group: ExpenseGroup; children: Expense[] }> {
-    const groupRows = await this.db
-      .select()
-      .from(expenseGroups)
-      .where(and(eq(expenseGroups.id, groupId), eq(expenseGroups.userId, userId)))
-      .limit(1);
-
-    const group = groupRows[0];
-    if (!group) {
-      throw new NotFoundError('Expense group');
-    }
-
-    const children = await this.db
+  async getSplitExpense(groupId: string, userId: string): Promise<Expense[]> {
+    const siblings = await this.db
       .select()
       .from(expenses)
-      .where(eq(expenses.expenseGroupId, groupId));
+      .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
 
-    return { group, children };
+    if (siblings.length === 0) {
+      throw new NotFoundError('Split expense');
+    }
+
+    return siblings;
   }
 
   /**
-   * Delete an expense group and its children.
-   * Children are deleted first (application-level cascade), then the group.
+   * Delete a split expense group and all associated photos and odometer entries.
+   * Uses batch deletes with inArray() to avoid N+1 queries.
    */
-  async deleteExpenseGroup(groupId: string, userId: string): Promise<void> {
-    const groupRows = await this.db
-      .select()
-      .from(expenseGroups)
-      .where(and(eq(expenseGroups.id, groupId), eq(expenseGroups.userId, userId)))
-      .limit(1);
+  async deleteSplitExpense(groupId: string, userId: string): Promise<void> {
+    const siblings = await this.db
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
 
-    if (!groupRows[0]) {
-      throw new NotFoundError('Expense group');
+    if (siblings.length === 0) {
+      throw new NotFoundError('Split expense');
     }
+
+    const siblingIds = siblings.map((s) => s.id);
 
     try {
       await this.db.transaction(async (tx) => {
-        // Delete children first (application-level cascade)
-        await tx.delete(expenses).where(eq(expenses.expenseGroupId, groupId));
-        // Then delete the group
-        await tx.delete(expenseGroups).where(eq(expenseGroups.id, groupId));
+        // Delete photos attached to sibling expenses
+        await tx
+          .delete(photos)
+          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, siblingIds)));
+
+        // Delete odometer entries linked to sibling expenses
+        await tx
+          .delete(odometerEntries)
+          .where(
+            and(
+              eq(odometerEntries.linkedEntityType, 'expense'),
+              inArray(odometerEntries.linkedEntityId, siblingIds)
+            )
+          );
+
+        // Delete all sibling expense rows
+        await tx.delete(expenses).where(eq(expenses.groupId, groupId));
       });
     } catch (error) {
-      logger.error('Failed to delete expense group', {
+      logger.error('Failed to delete split expense', {
         groupId,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new DatabaseError('Failed to delete expense group', error);
+      throw new DatabaseError('Failed to delete split expense', error);
     }
   }
 
   /**
-   * Update an expense group's split config and regenerate children.
-   * Validates ownership and optionally vehicle ownership for new config.
+   * Update a split expense: delete old siblings, insert new ones with same groupId,
+   * and migrate photos from old siblings to the first new sibling.
    */
-  async updateExpenseGroup(
+  async updateSplitExpense(
     groupId: string,
     data: { splitConfig: SplitConfig; totalAmount?: number },
     userId: string
-  ): Promise<{ group: ExpenseGroup; children: Expense[] }> {
-    const groupRows = await this.db
+  ): Promise<Expense[]> {
+    const oldSiblings = await this.db
       .select()
-      .from(expenseGroups)
-      .where(and(eq(expenseGroups.id, groupId), eq(expenseGroups.userId, userId)))
-      .limit(1);
+      .from(expenses)
+      .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
 
-    if (!groupRows[0]) {
-      throw new NotFoundError('Expense group');
+    if (oldSiblings.length === 0) {
+      throw new NotFoundError('Split expense');
     }
 
     try {
       await this.validateVehicleOwnership(data.splitConfig, userId);
 
+      const firstOld = oldSiblings[0];
+      if (!firstOld) {
+        throw new NotFoundError('Split expense');
+      }
+      const totalAmount = data.totalAmount ?? firstOld.groupTotal ?? firstOld.expenseAmount;
+      const allocations = expenseSplitService.computeAllocations(data.splitConfig, totalAmount);
+      const splitMethod: SplitMethod = data.splitConfig.method;
+      const oldSiblingIds = oldSiblings.map((s) => s.id);
+
       return await this.db.transaction(async (tx) => {
-        return expenseSplitService.updateSplit(tx, groupId, data.splitConfig, data.totalAmount);
+        // 1. Collect photo IDs from old siblings
+        const oldPhotos = await tx
+          .select({ id: photos.id })
+          .from(photos)
+          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, oldSiblingIds)));
+
+        const photoIds = oldPhotos.map((p) => p.id);
+
+        // 2. Delete old siblings
+        await tx.delete(expenses).where(eq(expenses.groupId, groupId));
+
+        // 3. Insert new siblings with same groupId
+        const newSiblings = await expenseSplitService.createSiblings(tx, {
+          groupId,
+          userId,
+          splitMethod,
+          groupTotal: totalAmount,
+          allocations,
+          category: firstOld.category,
+          date: firstOld.date,
+          tags: firstOld.tags ?? undefined,
+          description: firstOld.description ?? undefined,
+          insurancePolicyId: firstOld.insurancePolicyId ?? undefined,
+          insuranceTermId: firstOld.insuranceTermId ?? undefined,
+        });
+
+        // 4. Migrate photos to first new sibling
+        if (photoIds.length > 0 && newSiblings[0]) {
+          await tx
+            .update(photos)
+            .set({ entityId: newSiblings[0].id })
+            .where(inArray(photos.id, photoIds));
+        }
+
+        return newSiblings;
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
-      logger.error('Failed to update expense group', {
+      logger.error('Failed to update split expense', {
         groupId,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new DatabaseError('Failed to update expense group', error);
+      throw new DatabaseError('Failed to update split expense', error);
     }
   }
 }

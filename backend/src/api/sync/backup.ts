@@ -17,8 +17,8 @@ import {
   TABLE_SCHEMA_MAP,
 } from '../../config';
 import { getDb } from '../../db/connection';
+import type { UserProvider } from '../../db/schema';
 import {
-  expenseGroups,
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
@@ -29,7 +29,17 @@ import {
   vehicles,
 } from '../../db/schema';
 import { ValidationError } from '../../errors';
-import type { BackupData, BackupMetadata, ParsedBackupData } from '../../types';
+import type {
+  BackupConfig,
+  BackupData,
+  BackupFileInfo,
+  BackupMetadata,
+  ParsedBackupData,
+  ProviderBackupList,
+  ProviderBackupSettings,
+} from '../../types';
+import { logger } from '../../utils/logger';
+import { joinStoragePath } from '../../utils/paths';
 
 export interface ValidationResult {
   valid: boolean;
@@ -101,76 +111,232 @@ export function coerceRow(
   return coerced;
 }
 
+/**
+ * Combines a provider's rootPath with the backup folder path from settings.
+ */
+export function resolveBackupFolderPath(
+  providerRow: UserProvider,
+  settings: ProviderBackupSettings
+): string {
+  const providerRootPath =
+    ((providerRow.config as Record<string, unknown> | null)?.providerRootPath as string) ?? '';
+  return joinStoragePath(providerRootPath, settings.folderPath);
+}
+
+/**
+ * Derives the most recent backup date across all providers in a BackupConfig.
+ * Returns null if no provider has a lastBackupAt value.
+ */
+export function deriveLastBackupDate(backupConfig: BackupConfig | null): string | null {
+  if (!backupConfig?.providers) return null;
+  let latest: string | null = null;
+  for (const settings of Object.values(backupConfig.providers)) {
+    if (settings.lastBackupAt && (!latest || settings.lastBackupAt > latest)) {
+      latest = settings.lastBackupAt;
+    }
+  }
+  return latest;
+}
+
 export class BackupService {
+  /**
+   * Load BackupConfig from user settings and filter to enabled providers.
+   */
+  async loadBackupConfig(
+    userId: string
+  ): Promise<{ config: BackupConfig; enabledProviders: [string, ProviderBackupSettings][] }> {
+    const { settingsRepository } = await import('../settings/repository');
+    const settings = await settingsRepository.getOrCreate(userId);
+    const config: BackupConfig = settings.backupConfig ?? { providers: {} };
+    const enabledProviders = Object.entries(config.providers).filter(([_, s]) => s.enabled);
+    return { config, enabledProviders };
+  }
+
+  /**
+   * Enforce retention policy for a specific provider.
+   * Lists backup files, sorts newest-first, deletes files beyond retentionCount.
+   * Returns the count of actually deleted files (not attempted).
+   */
+  async enforceRetention(userId: string, providerId: string): Promise<number> {
+    const { config } = await this.loadBackupConfig(userId);
+    const settings = config.providers[providerId];
+    if (!settings) return 0;
+
+    const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
+    const provider = await storageProviderRegistry.getProvider(providerId, userId);
+
+    const db = getDb();
+    const { userProviders } = await import('../../db/schema');
+    const providerRow = await db
+      .select()
+      .from(userProviders)
+      .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
+      .get();
+
+    if (!providerRow) return 0;
+
+    const folderPath = resolveBackupFolderPath(providerRow, settings);
+    const files = await provider.list(folderPath);
+
+    const backupFiles = files
+      .filter((f) => f.name.startsWith('vroom-backup-') && f.name.endsWith('.zip'))
+      .sort((a, b) => b.lastModified.localeCompare(a.lastModified));
+
+    if (backupFiles.length <= settings.retentionCount) return 0;
+
+    const toDelete = backupFiles.slice(settings.retentionCount);
+    let deletedCount = 0;
+
+    for (const file of toDelete) {
+      try {
+        await provider.delete({
+          providerType: provider.type,
+          externalId: file.key,
+        });
+        deletedCount++;
+      } catch (error) {
+        logger.warn('Failed to delete old backup', { key: file.key, error });
+      }
+    }
+
+    return deletedCount;
+  }
+
+  /**
+   * List backup files from a specific provider.
+   * Filters to vroom-backup-*.zip, sorts newest-first, marks isLatest.
+   */
+  async listBackups(userId: string, providerId: string): Promise<BackupFileInfo[]> {
+    const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
+    const provider = await storageProviderRegistry.getProvider(providerId, userId);
+
+    const db = getDb();
+    const { userProviders } = await import('../../db/schema');
+    const providerRow = await db
+      .select()
+      .from(userProviders)
+      .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
+      .get();
+    if (!providerRow) return [];
+
+    const { config } = await this.loadBackupConfig(userId);
+    const settings = config.providers[providerId];
+    if (!settings) return [];
+
+    const folderPath = resolveBackupFolderPath(providerRow, settings);
+    const files = await provider.list(folderPath);
+
+    const backups = files
+      .filter((f) => f.name.startsWith('vroom-backup-') && f.name.endsWith('.zip'))
+      .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
+      .map((f, i) => ({
+        providerId,
+        providerName: providerRow.displayName,
+        providerType: providerRow.providerType,
+        fileRef: f.key,
+        fileName: f.name,
+        size: f.size,
+        createdTime: f.createdTime,
+        isLatest: i === 0,
+      }));
+
+    return backups;
+  }
+
+  /**
+   * List backup files from ALL backup-enabled providers.
+   * Returns one ProviderBackupList per enabled provider with per-provider error handling.
+   */
+  async listAllBackups(userId: string): Promise<ProviderBackupList[]> {
+    const { enabledProviders } = await this.loadBackupConfig(userId);
+    const results: ProviderBackupList[] = [];
+
+    for (const [providerId] of enabledProviders) {
+      try {
+        const backups = await this.listBackups(userId, providerId);
+
+        const db = getDb();
+        const { userProviders } = await import('../../db/schema');
+        const providerRow = await db
+          .select()
+          .from(userProviders)
+          .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
+          .get();
+
+        results.push({
+          providerId,
+          providerName: providerRow?.displayName ?? 'Unknown',
+          providerType: providerRow?.providerType ?? 'unknown',
+          backups,
+        });
+      } catch (error) {
+        results.push({
+          providerId,
+          providerName: 'Unknown',
+          providerType: 'unknown',
+          backups: [],
+          error: error instanceof Error ? error.message : 'Failed to list backups',
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Download a backup file from a specific provider.
+   * Verifies ownership via storageProviderRegistry.getProvider().
+   */
+  async downloadBackup(userId: string, providerId: string, fileRef: string): Promise<Buffer> {
+    const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
+    const provider = await storageProviderRegistry.getProvider(providerId, userId);
+    return provider.download({ providerType: provider.type, externalId: fileRef });
+  }
+
   private getColumnNames(table: Parameters<typeof getTableColumns>[0]): string[] {
     return Object.keys(getTableColumns(table));
   }
 
   async createBackup(userId: string): Promise<BackupData> {
     const db = getDb();
-    const [
-      userVehicles,
-      userExpenses,
-      userFinancing,
-      userInsuranceJoined,
-      userExpenseGroups,
-      userOdometer,
-    ] = await Promise.all([
-      db.select().from(vehicles).where(eq(vehicles.userId, userId)),
-      db
-        .select()
-        .from(expenses)
-        .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId))
-        .then((r) => r.map((x) => x.expenses)),
-      db
-        .select()
-        .from(vehicleFinancing)
-        .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId))
-        .then((r) => r.map((x) => x.vehicle_financing)),
-      db
-        .select()
-        .from(insurancePolicies)
-        .innerJoin(
-          insurancePolicyVehicles,
-          eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
-        )
-        .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId)),
-      db.select().from(expenseGroups).where(eq(expenseGroups.userId, userId)),
-      db
-        .select()
-        .from(odometerEntries)
-        .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
-        .where(eq(vehicles.userId, userId))
-        .then((r) => r.map((x) => x.odometer_entries)),
-    ]);
+    const [userVehicles, userExpenses, userFinancing, userInsurance, userOdometer] =
+      await Promise.all([
+        db.select().from(vehicles).where(eq(vehicles.userId, userId)),
+        db.select().from(expenses).where(eq(expenses.userId, userId)),
+        db
+          .select()
+          .from(vehicleFinancing)
+          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId))
+          .then((r) => r.map((x) => x.vehicle_financing)),
+        db.select().from(insurancePolicies).where(eq(insurancePolicies.userId, userId)),
+        db
+          .select()
+          .from(odometerEntries)
+          .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
+          .where(eq(vehicles.userId, userId))
+          .then((r) => r.map((x) => x.odometer_entries)),
+      ]);
 
-    // Deduplicate insurance policies (join produces one row per vehicle)
-    const seenPolicyIds = new Set<string>();
-    const userInsurance = [];
-    const userInsurancePolicyVehicles = [];
-    for (const row of userInsuranceJoined) {
-      if (!seenPolicyIds.has(row.insurance_policies.id)) {
-        seenPolicyIds.add(row.insurance_policies.id);
-        userInsurance.push(row.insurance_policies);
-      }
-      userInsurancePolicyVehicles.push(row.insurance_policy_vehicles);
-    }
+    // Query junction rows for user's insurance policies
+    const policyIds = userInsurance.map((p) => p.id);
+    const userInsurancePolicyVehicles =
+      policyIds.length > 0
+        ? await db
+            .select()
+            .from(insurancePolicyVehicles)
+            .where(inArray(insurancePolicyVehicles.policyId, policyIds))
+        : [];
 
     // Collect all entity IDs to query photos for all user-owned entities
     const vehicleIds = userVehicles.map((v) => v.id);
     const expenseIds = userExpenses.map((e) => e.id);
-    const policyIds = [...seenPolicyIds];
-    const expenseGroupIds = userExpenseGroups.map((g) => g.id);
     const odometerEntryIds = userOdometer.map((o) => o.id);
 
     const userPhotos = await this.queryUserPhotos(db, {
       vehicleIds,
       expenseIds,
       policyIds,
-      expenseGroupIds,
       odometerEntryIds,
     });
 
@@ -191,7 +357,6 @@ export class BackupService {
       financing: userFinancing,
       insurance: userInsurance,
       insurancePolicyVehicles: userInsurancePolicyVehicles,
-      expenseGroups: userExpenseGroups,
       odometer: userOdometer,
       photos: userPhotos,
       photoRefs: userPhotoRefs,
@@ -209,7 +374,6 @@ export class BackupService {
       vehicleIds: string[];
       expenseIds: string[];
       policyIds: string[];
-      expenseGroupIds: string[];
       odometerEntryIds: string[];
     }
   ) {
@@ -219,7 +383,6 @@ export class BackupService {
       { type: 'vehicle', ids: entityIds.vehicleIds },
       { type: 'expense', ids: entityIds.expenseIds },
       { type: 'insurance_policy', ids: entityIds.policyIds },
-      { type: 'expense_group', ids: entityIds.expenseGroupIds },
       { type: 'odometer_entry', ids: entityIds.odometerEntryIds },
     ];
 
@@ -377,15 +540,15 @@ export class BackupService {
   }
 
   private validateReferentialIntegrity(backup: ParsedBackupData): string[] {
+    const userIds = new Set([backup.metadata.userId]);
     const vehicleIds = new Set(backup.vehicles.map((v) => String(v.id)));
     const policyIds = new Set(backup.insurance.map((i) => String(i.id)));
-    const expenseGroupIds = new Set((backup.expenseGroups ?? []).map((g) => String(g.id)));
     const expenseIds = new Set(backup.expenses.map((e) => String(e.id)));
     const odometerIds = new Set((backup.odometer ?? []).map((o) => String(o.id)));
     const photoIds = new Set((backup.photos ?? []).map((p) => String(p.id)));
 
     return [
-      ...this.validateExpenseRefs(backup.expenses, vehicleIds, expenseGroupIds),
+      ...this.validateExpenseRefs(backup.expenses, vehicleIds, userIds),
       ...this.validateFinancingRefs(backup.financing, vehicleIds),
       ...this.validateInsuranceRefs(backup.insurance),
       ...this.validateJunctionRefs(backup.insurancePolicyVehicles ?? [], policyIds, vehicleIds),
@@ -394,7 +557,6 @@ export class BackupService {
         vehicleIds,
         expenseIds,
         policyIds,
-        expenseGroupIds,
         odometerIds,
       }),
       ...this.validatePhotoRefEntries(backup.photoRefs ?? [], photoIds),
@@ -404,15 +566,15 @@ export class BackupService {
   private validateExpenseRefs(
     expenseList: Record<string, unknown>[],
     vehicleIds: Set<string>,
-    expenseGroupIds: Set<string>
+    userIds: Set<string>
   ): string[] {
     const errors: string[] = [];
     for (const expense of expenseList) {
       if (!vehicleIds.has(String(expense.vehicleId))) {
         errors.push(`Expense ${expense.id} references non-existent vehicle`);
       }
-      if (expense.expenseGroupId && !expenseGroupIds.has(String(expense.expenseGroupId))) {
-        errors.push(`Expense ${expense.id} references non-existent expense group`);
+      if (expense.userId && !userIds.has(String(expense.userId))) {
+        errors.push(`Expense ${expense.id} references non-existent user`);
       }
     }
     return errors;
@@ -477,7 +639,6 @@ export class BackupService {
       vehicleIds: Set<string>;
       expenseIds: Set<string>;
       policyIds: Set<string>;
-      expenseGroupIds: Set<string>;
       odometerIds: Set<string>;
     }
   ): string[] {
@@ -486,7 +647,6 @@ export class BackupService {
       vehicle: entityIds.vehicleIds,
       expense: entityIds.expenseIds,
       insurance_policy: entityIds.policyIds,
-      expense_group: entityIds.expenseGroupIds,
       odometer_entry: entityIds.odometerIds,
     };
 

@@ -5,17 +5,17 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { LoaderCircle } from '@lucide/svelte';
-	import ProviderForm from '$lib/components/settings/ProviderForm.svelte';
+	import ProviderForm from '$lib/components/settings/storage-provider/form/ProviderForm.svelte';
 	import { providerApi } from '$lib/services/provider-api';
 	import { settingsApi } from '$lib/services/settings-api';
 	import { routes } from '$lib/routes';
 	import type { PhotoCategory, CategorySetting, StorageConfig, UserProviderInfo } from '$lib/types';
 
 	const DEFAULT_CATEGORY_SETTINGS: Record<PhotoCategory, CategorySetting> = {
-		vehicle_photos: { enabled: false, folderPath: '/Vehicle Photos' },
-		expense_receipts: { enabled: false, folderPath: '/Receipts' },
-		insurance_docs: { enabled: false, folderPath: '/Insurance' },
-		odometer_readings: { enabled: false, folderPath: '/Odometer' }
+		vehicle_photos: { enabled: false, folderPath: 'Vehicle' },
+		expense_receipts: { enabled: false, folderPath: 'Receipts' },
+		insurance_docs: { enabled: false, folderPath: 'Insurance' },
+		odometer_readings: { enabled: false, folderPath: 'Odometer' }
 	};
 
 	let providerId = $derived(page.params.id);
@@ -44,11 +44,18 @@
 			}
 			provider = found;
 			const storageConfig: StorageConfig = settings.storageConfig ?? {
-				defaults: { vehicle_photos: null, expense_receipts: null, insurance_docs: null, odometer_readings: null },
+				defaults: {
+					vehicle_photos: null,
+					expense_receipts: null,
+					insurance_docs: null,
+					odometer_readings: null
+				},
 				providerCategories: {}
 			};
 			const stored = storageConfig.providerCategories[id];
-			folderSettings = stored ? { ...DEFAULT_CATEGORY_SETTINGS, ...stored } : DEFAULT_CATEGORY_SETTINGS;
+			folderSettings = stored
+				? { ...DEFAULT_CATEGORY_SETTINGS, ...stored }
+				: DEFAULT_CATEGORY_SETTINGS;
 			// Compute which categories have this provider as the default
 			defaultCategories.clear();
 			for (const [cat, pid] of Object.entries(storageConfig.defaults)) {

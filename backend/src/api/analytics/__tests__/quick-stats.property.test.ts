@@ -172,7 +172,12 @@ function seedVehiclesWithExpenses(db: TestDb, vehicleCount: number, withInsuranc
   let policyId: string | null = null;
   if (withInsurance) {
     policyId = 'policy-1';
-    seedInsurancePolicy(db.sqlite, { id: policyId, company: 'Test Insurance', isActive: true });
+    seedInsurancePolicy(db.sqlite, {
+      id: policyId,
+      userId: 'user-1',
+      company: 'Test Insurance',
+      isActive: true,
+    });
   }
 
   for (let i = 0; i < vehicleCount; i++) {

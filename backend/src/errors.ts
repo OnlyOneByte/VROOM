@@ -133,9 +133,11 @@ export function formatErrorResponse(error: unknown, includeStack: boolean = fals
   }
 
   if (error instanceof Error) {
+    // In production, don't expose raw error messages — they may contain internal details
+    const message = includeStack ? error.message : 'An internal error occurred';
     return createErrorResponse(
       'InternalServerError',
-      error.message,
+      message,
       includeStack ? { stack: error.stack } : undefined
     );
   }
@@ -178,9 +180,10 @@ export const handleDatabaseError = (error: unknown): AppError => {
       return new ValidationError('Invalid reference to related resource');
     if (error.message.includes('NOT NULL constraint failed'))
       return new ValidationError('Required field is missing');
-    return new DatabaseError(error.message);
+    // Don't leak raw SQLite error messages to clients
+    return new DatabaseError('A database error occurred');
   }
-  return new DatabaseError('Unknown database error');
+  return new DatabaseError('A database error occurred');
 };
 
 export function handleSyncError(

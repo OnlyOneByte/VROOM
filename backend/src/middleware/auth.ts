@@ -6,11 +6,11 @@
 
 import type { MiddlewareHandler } from 'hono';
 import { deleteCookie, getCookie } from 'hono/cookie';
-import { HTTPException } from 'hono/http-exception';
 import type { AuthUser } from '../api/auth/lucia';
 import { getLucia } from '../api/auth/lucia';
 import { validateAndRefreshSession } from '../api/auth/utils';
 import { CONFIG } from '../config';
+import { AuthenticationError } from '../errors';
 import { logger } from '../utils/logger';
 
 declare module 'hono' {
@@ -29,7 +29,7 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
   const sessionId = getCookie(c, lucia.sessionCookieName);
 
   if (!sessionId) {
-    throw new HTTPException(401, { message: 'Authentication required' });
+    throw new AuthenticationError('Authentication required');
   }
 
   const result = await validateAndRefreshSession(sessionId, lucia, c);
@@ -41,7 +41,7 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
       maxAge: 60 * 60 * 24 * 30,
       sameSite: 'Lax',
     });
-    throw new HTTPException(401, { message: 'Invalid or expired session' });
+    throw new AuthenticationError('Invalid or expired session');
   }
 
   c.set('session', { id: result.session.id, expiresAt: result.session.expiresAt });

@@ -4,7 +4,6 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { getDb } from '../../db/connection';
 import {
-  expenseGroups,
   expenses,
   insurancePolicyVehicles,
   odometerEntries,
@@ -14,20 +13,22 @@ import {
   userSettings,
   vehicles,
 } from '../../db/schema';
-import { ConflictError, NotFoundError } from '../../errors';
+import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import type { PhotoCategory, StorageConfig } from '../../types';
 import { DEFAULT_STORAGE_CONFIG } from '../../types';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
+import { consumePending, getPendingEmail } from '../../utils/pending-credentials';
 import { commonSchemas } from '../../utils/validation';
 import { photoRefRepository } from '../photos/photo-ref-repository';
-import { storageProviderRegistry } from './registry';
+import { settingsRepository } from '../settings/repository';
+import { storageProviderRegistry } from './domains/storage/registry';
 
 /** Maps photo categories to their corresponding entity types for photo queries. */
 const CATEGORY_TO_ENTITY_TYPES: Record<string, string[]> = {
   vehicle_photos: ['vehicle'],
-  expense_receipts: ['expense', 'expense_group'],
+  expense_receipts: ['expense'],
   insurance_docs: ['insurance_policy'],
   odometer_readings: ['odometer_entry'],
 };
@@ -67,8 +68,13 @@ async function countUserPhotos(
       .select({ count: sql<number>`count(*)` })
       .from(photos)
       .innerJoin(expenses, eq(photos.entityId, expenses.id))
-      .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-      .where(where);
+      .where(
+        and(
+          eq(photos.entityType, entityType),
+          eq(expenses.userId, userId),
+          ...(extraConditions ? [extraConditions] : [])
+        )
+      );
   } else if (entityType === 'insurance_policy') {
     result = await db
       .select({ count: sql<number>`count(DISTINCT ${photos.id})` })
@@ -76,20 +82,6 @@ async function countUserPhotos(
       .innerJoin(insurancePolicyVehicles, eq(photos.entityId, insurancePolicyVehicles.policyId))
       .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
       .where(where);
-  } else if (entityType === 'expense_group') {
-    // expense_groups have a direct userId column (not via vehicles), so we
-    // build a separate WHERE clause instead of reusing the vehicles-based `where`.
-    result = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(photos)
-      .innerJoin(expenseGroups, eq(photos.entityId, expenseGroups.id))
-      .where(
-        and(
-          eq(photos.entityType, entityType),
-          eq(expenseGroups.userId, userId),
-          ...(extraConditions ? [extraConditions] : [])
-        )
-      );
   } else if (entityType === 'odometer_entry') {
     result = await db
       .select({ count: sql<number>`count(*)` })
@@ -130,8 +122,13 @@ async function findUserPhotoIds(
       .select({ id: photos.id })
       .from(photos)
       .innerJoin(expenses, eq(photos.entityId, expenses.id))
-      .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
-      .where(where);
+      .where(
+        and(
+          eq(photos.entityType, entityType),
+          eq(expenses.userId, userId),
+          ...(extraConditions ? [extraConditions] : [])
+        )
+      );
   }
   if (entityType === 'insurance_policy') {
     return db
@@ -140,17 +137,6 @@ async function findUserPhotoIds(
       .innerJoin(insurancePolicyVehicles, eq(photos.entityId, insurancePolicyVehicles.policyId))
       .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
       .where(where);
-  }
-  if (entityType === 'expense_group') {
-    // expense_groups have a direct userId column (not via vehicles), so we
-    // build a separate WHERE clause instead of reusing the vehicles-based `where`.
-    const egConditions = [eq(photos.entityType, entityType), eq(expenseGroups.userId, userId)];
-    if (extraConditions) egConditions.push(extraConditions);
-    return db
-      .select({ id: photos.id })
-      .from(photos)
-      .innerJoin(expenseGroups, eq(photos.entityId, expenseGroups.id))
-      .where(and(...egConditions));
   }
   if (entityType === 'odometer_entry') {
     return db
@@ -166,6 +152,19 @@ async function findUserPhotoIds(
 // Apply middleware to all routes
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
+
+// GET /api/v1/providers/pending/:nonce — retrieve pending provider email after OAuth
+routes.get('/pending/:nonce', async (c) => {
+  const user = c.get('user');
+  const nonce = c.req.param('nonce');
+
+  const email = getPendingEmail(user.id, nonce);
+  if (!email) {
+    throw new NotFoundError('Pending provider credentials');
+  }
+
+  return c.json({ success: true, data: { email } });
+});
 
 // --- Zod schemas ---
 
@@ -183,6 +182,7 @@ const createProviderSchema = z.object({
     .max(100, 'Display name must be 100 characters or less'),
   credentials: z.record(z.string(), z.unknown()),
   config: z.record(z.string(), z.unknown()).optional(),
+  nonce: z.string().uuid().optional(),
 });
 
 const updateProviderSchema = z.object({
@@ -197,16 +197,16 @@ const DEFAULT_FOLDER_PATHS: Record<
   Record<PhotoCategory, { enabled: boolean; folderPath: string }>
 > = {
   'google-drive': {
-    vehicle_photos: { enabled: true, folderPath: '/Vehicle Photos' },
-    expense_receipts: { enabled: true, folderPath: '/Receipts' },
-    insurance_docs: { enabled: true, folderPath: '/Insurance' },
-    odometer_readings: { enabled: true, folderPath: '/Odometer' },
+    vehicle_photos: { enabled: true, folderPath: 'Vehicle' },
+    expense_receipts: { enabled: true, folderPath: 'Receipts' },
+    insurance_docs: { enabled: true, folderPath: 'Insurance' },
+    odometer_readings: { enabled: true, folderPath: 'Odometer' },
   },
   s3: {
-    vehicle_photos: { enabled: true, folderPath: '/vehicles' },
-    expense_receipts: { enabled: true, folderPath: '/receipts' },
-    insurance_docs: { enabled: true, folderPath: '/insurance' },
-    odometer_readings: { enabled: true, folderPath: '/odometer' },
+    vehicle_photos: { enabled: true, folderPath: 'vehicles' },
+    expense_receipts: { enabled: true, folderPath: 'receipts' },
+    insurance_docs: { enabled: true, folderPath: 'insurance' },
+    odometer_readings: { enabled: true, folderPath: 'odometer' },
   },
 };
 
@@ -238,6 +238,37 @@ routes.get('/', async (c) => {
   return c.json({ success: true, data });
 });
 
+/**
+ * Resolve credentials and config for a new provider.
+ * For google-drive: consumes pending OAuth credentials via nonce.
+ * For other types: encrypts the provided credentials directly.
+ */
+function resolveProviderCredentials(
+  userId: string,
+  providerType: string,
+  credentials: Record<string, unknown>,
+  config: Record<string, unknown> | null,
+  nonce?: string
+): { encryptedCredentials: string; resolvedConfig: Record<string, unknown> | null } {
+  if (providerType === 'google-drive') {
+    if (!nonce) {
+      throw new ValidationError('Missing nonce — please connect your Google account');
+    }
+    const pending = consumePending(userId, nonce);
+    if (!pending) {
+      throw new ValidationError('Please connect your Google account first');
+    }
+    return {
+      encryptedCredentials: encrypt(JSON.stringify({ refreshToken: pending.refreshToken })),
+      resolvedConfig: { ...(config ?? {}), accountEmail: pending.email },
+    };
+  }
+  return {
+    encryptedCredentials: encrypt(JSON.stringify(credentials)),
+    resolvedConfig: config,
+  };
+}
+
 // POST /api/v1/providers — create a new provider
 routes.post('/', zValidator('json', createProviderSchema), async (c) => {
   const user = c.get('user');
@@ -245,42 +276,59 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
 
   const db = getDb();
 
-  // Check for duplicate: same user + domain + providerType
-  const existing = await db
-    .select({ id: userProviders.id })
-    .from(userProviders)
-    .where(
-      and(
-        eq(userProviders.userId, user.id),
-        eq(userProviders.domain, body.domain),
-        eq(userProviders.providerType, body.providerType)
-      )
-    )
-    .limit(1);
+  const { encryptedCredentials, resolvedConfig } = resolveProviderCredentials(
+    user.id,
+    body.providerType,
+    body.credentials,
+    body.config ?? null,
+    body.nonce
+  );
 
-  if (existing[0]) {
-    throw new ConflictError(
-      `A ${body.providerType} provider already exists for this domain. Update the existing provider instead.`
-    );
-  }
+  // Use transaction to narrow TOCTOU window for duplicate check + insert
+  const created = await db.transaction(async (tx) => {
+    // Check for duplicate: same user + domain + providerType + accountEmail
+    const existingProviders = await tx
+      .select({ id: userProviders.id, config: userProviders.config })
+      .from(userProviders)
+      .where(
+        and(
+          eq(userProviders.userId, user.id),
+          eq(userProviders.domain, body.domain),
+          eq(userProviders.providerType, body.providerType)
+        )
+      );
 
-  // Encrypt credentials before storing
-  const encryptedCredentials = encrypt(JSON.stringify(body.credentials));
+    const newAccountEmail = (resolvedConfig as Record<string, unknown> | null)?.accountEmail as
+      | string
+      | undefined;
 
-  const result = await db
-    .insert(userProviders)
-    .values({
-      userId: user.id,
-      domain: body.domain,
-      providerType: body.providerType,
-      displayName: body.displayName,
-      credentials: encryptedCredentials,
-      config: body.config ?? null,
-      status: 'active',
-    })
-    .returning();
+    if (newAccountEmail) {
+      const duplicate = existingProviders.find((p) => {
+        const cfg = p.config as Record<string, unknown> | null;
+        return cfg?.accountEmail === newAccountEmail;
+      });
+      if (duplicate) {
+        throw new ConflictError(
+          `A ${body.providerType} provider with this account (${newAccountEmail}) already exists.`
+        );
+      }
+    }
 
-  const created = result[0];
+    const result = await tx
+      .insert(userProviders)
+      .values({
+        userId: user.id,
+        domain: body.domain,
+        providerType: body.providerType,
+        displayName: body.displayName,
+        credentials: encryptedCredentials,
+        config: resolvedConfig,
+        status: 'active',
+      })
+      .returning();
+
+    return result[0];
+  });
 
   // If domain is 'storage', auto-populate storage_config.providerCategories
   if (body.domain === 'storage') {
@@ -304,10 +352,10 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     } else {
       // Fallback: enable all categories with generic paths
       storageConfig.providerCategories[created.id] = {
-        vehicle_photos: { enabled: true, folderPath: '/vehicle-photos' },
-        expense_receipts: { enabled: true, folderPath: '/receipts' },
-        insurance_docs: { enabled: true, folderPath: '/insurance' },
-        odometer_readings: { enabled: true, folderPath: '/odometer' },
+        vehicle_photos: { enabled: true, folderPath: 'vehicle-photos' },
+        expense_receipts: { enabled: true, folderPath: 'receipts' },
+        insurance_docs: { enabled: true, folderPath: 'insurance' },
+        odometer_readings: { enabled: true, folderPath: 'odometer' },
       };
     }
 
@@ -432,6 +480,16 @@ async function cleanupStorageConfig(userId: string, providerId: string): Promise
     .where(eq(userSettings.userId, userId));
 }
 
+// Helper: clean up backup_config when a storage provider is deleted
+async function cleanupBackupConfig(userId: string, providerId: string): Promise<void> {
+  const settings = await settingsRepository.getOrCreate(userId);
+  if (!settings.backupConfig?.providers?.[providerId]) return;
+  const updated = { ...settings.backupConfig };
+  updated.providers = { ...updated.providers };
+  delete updated.providers[providerId];
+  await settingsRepository.updateBackupConfig(userId, updated);
+}
+
 // DELETE /api/v1/providers/:id — delete provider with cleanup
 routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
@@ -453,6 +511,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   // If domain is 'storage', clean up storage_config references and photo_refs
   if (existing[0].domain === 'storage') {
     await cleanupStorageConfig(user.id, id);
+    await cleanupBackupConfig(user.id, id);
 
     // Best-effort delete photo_refs for this provider
     try {

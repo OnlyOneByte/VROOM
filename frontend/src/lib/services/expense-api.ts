@@ -1,11 +1,11 @@
 import type {
 	Expense,
 	ExpenseCategory,
-	ExpenseGroupWithChildren,
 	ExpenseSummary,
 	PaginatedResponse,
 	Photo,
-	SplitConfig
+	SplitConfig,
+	SplitExpenseGroup
 } from '$lib/types';
 import {
 	fromBackendExpense,
@@ -141,7 +141,7 @@ export const expenseApi = {
 	// --- Photo methods (delegate to generic photo endpoints) ---
 
 	async getPhotos(
-		entityType: 'expense' | 'expense_group',
+		entityType: 'expense',
 		entityId: string,
 		params?: { limit?: number; offset?: number }
 	): Promise<PaginatedResponse<Photo>> {
@@ -150,29 +150,17 @@ export const expenseApi = {
 		);
 	},
 
-	async uploadPhoto(
-		entityType: 'expense' | 'expense_group',
-		entityId: string,
-		file: File
-	): Promise<Photo> {
+	async uploadPhoto(entityType: 'expense', entityId: string, file: File): Promise<Photo> {
 		const formData = new FormData();
 		formData.append('photo', file);
 		return apiClient.post<Photo>(`/api/v1/photos/${entityType}/${entityId}`, formData);
 	},
 
-	async deletePhoto(
-		entityType: 'expense' | 'expense_group',
-		entityId: string,
-		photoId: string
-	): Promise<void> {
+	async deletePhoto(entityType: 'expense', entityId: string, photoId: string): Promise<void> {
 		await apiClient.delete(`/api/v1/photos/${entityType}/${entityId}/${photoId}`);
 	},
 
-	getPhotoThumbnailUrl(
-		entityType: 'expense' | 'expense_group',
-		entityId: string,
-		photoId: string
-	): string {
+	getPhotoThumbnailUrl(entityType: 'expense', entityId: string, photoId: string): string {
 		return `${getApiBaseUrl()}/api/v1/photos/${entityType}/${entityId}/${photoId}/thumbnail`;
 	},
 
@@ -187,19 +175,19 @@ export const expenseApi = {
 		totalAmount: number;
 		insurancePolicyId?: string;
 		insuranceTermId?: string;
-	}): Promise<ExpenseGroupWithChildren> {
-		return apiClient.post<ExpenseGroupWithChildren>('/api/v1/expenses/split', data);
+	}): Promise<SplitExpenseGroup> {
+		return apiClient.post<SplitExpenseGroup>('/api/v1/expenses/split', data);
 	},
 
 	async updateSplitExpense(
 		groupId: string,
 		data: { splitConfig: SplitConfig; totalAmount?: number }
-	): Promise<ExpenseGroupWithChildren> {
-		return apiClient.put<ExpenseGroupWithChildren>(`/api/v1/expenses/split/${groupId}`, data);
+	): Promise<SplitExpenseGroup> {
+		return apiClient.put<SplitExpenseGroup>(`/api/v1/expenses/split/${groupId}`, data);
 	},
 
-	async getSplitExpense(groupId: string): Promise<ExpenseGroupWithChildren> {
-		return apiClient.get<ExpenseGroupWithChildren>(`/api/v1/expenses/split/${groupId}`);
+	async getSplitExpense(groupId: string): Promise<SplitExpenseGroup> {
+		return apiClient.get<SplitExpenseGroup>(`/api/v1/expenses/split/${groupId}`);
 	},
 
 	async deleteSplitExpense(groupId: string): Promise<void> {

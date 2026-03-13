@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import type { DriveFile, DriveFolder } from '../../sync/google-drive';
-import { GoogleDriveProvider } from '../google-drive-provider';
-import type { StorageRef } from '../storage-provider';
+import { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
+import type { StorageRef } from '../domains/storage/storage-provider';
+import type { DriveFile, DriveFolder } from '../services/google-drive-service';
 
 // --- Mock GoogleDriveService ---
 
@@ -26,7 +26,7 @@ const mockDownloadFile = mock<(fileId: string) => Promise<Buffer>>(() =>
 );
 const mockDeleteFile = mock<(fileId: string) => Promise<void>>(() => Promise.resolve());
 
-mock.module('../../sync/google-drive', () => ({
+mock.module('../services/google-drive-service', () => ({
   GoogleDriveService: class {
     findFolder = mockFindFolder;
     createFolder = mockCreateFolder;
@@ -63,7 +63,7 @@ describe('GoogleDriveProvider', () => {
         .mockResolvedValueOnce(null);
       mockCreateFolder.mockResolvedValueOnce({
         id: 'photos-folder-id',
-        name: 'Vehicle Photos',
+        name: 'Vehicle',
       });
       mockUploadFile.mockResolvedValueOnce({
         id: 'uploaded-id',
@@ -78,7 +78,7 @@ describe('GoogleDriveProvider', () => {
         mimeType: 'image/jpeg',
         entityType: 'vehicle',
         entityId: 'v-1',
-        pathHint: '/VROOM/Vehicle Photos',
+        pathHint: '/VROOM/Vehicle',
       });
 
       expect(result).toEqual({
@@ -89,10 +89,10 @@ describe('GoogleDriveProvider', () => {
 
       expect(mockFindFolder).toHaveBeenCalledTimes(2);
       expect(mockFindFolder).toHaveBeenNthCalledWith(1, 'VROOM', undefined);
-      expect(mockFindFolder).toHaveBeenNthCalledWith(2, 'Vehicle Photos', 'vroom-id');
+      expect(mockFindFolder).toHaveBeenNthCalledWith(2, 'Vehicle', 'vroom-id');
 
       expect(mockCreateFolder).toHaveBeenCalledTimes(1);
-      expect(mockCreateFolder).toHaveBeenCalledWith('Vehicle Photos', 'vroom-id');
+      expect(mockCreateFolder).toHaveBeenCalledWith('Vehicle', 'vroom-id');
 
       expect(mockUploadFile).toHaveBeenCalledWith(
         'car.jpg',

@@ -5,7 +5,6 @@
 import type { SQLiteTableWithColumns } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import {
-  expenseGroups,
   expenses,
   insurancePolicies,
   insurancePolicyVehicles,
@@ -33,6 +32,7 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/auth/callback/google'),
+  GOOGLE_PROVIDER_REDIRECT_URI: z.string().optional(),
   SESSION_SECRET: z.string().min(32, 'Session secret must be at least 32 characters').optional(),
   FRONTEND_URL: z.string().optional(),
   CORS_ORIGINS: z
@@ -91,6 +91,9 @@ export const CONFIG = {
     googleClientId: env.GOOGLE_CLIENT_ID,
     googleClientSecret: env.GOOGLE_CLIENT_SECRET,
     googleRedirectUri: env.GOOGLE_REDIRECT_URI,
+    googleProviderRedirectUri:
+      env.GOOGLE_PROVIDER_REDIRECT_URI ||
+      env.GOOGLE_REDIRECT_URI.replace('/callback/google', '/callback/provider/google'),
     sessionSecret: env.SESSION_SECRET,
     cookieMaxAge: 30 * 24 * 60 * 60,
     sessionDuration: 30 * 24 * 60 * 60 * 1000,
@@ -110,7 +113,6 @@ export const CONFIG = {
     enabled: env.NODE_ENV !== 'test',
     pollIntervalMs: 30_000,
     batchSize: 10,
-    maxRetries: 3,
   },
   rateLimit: {
     cleanupInterval: 60_000,
@@ -118,7 +120,6 @@ export const CONFIG = {
     sync: { windowMs: 15 * 60 * 1000, limit: 50, message: 'Too many sync requests' },
     backup: { windowMs: 5 * 60 * 1000, limit: 20, message: 'Too many backup requests' },
     restore: { windowMs: 10 * 60 * 1000, limit: 10, message: 'Too many restore requests' },
-    driveInit: { windowMs: 10 * 60 * 1000, limit: 3, message: 'Too many Drive init requests' },
   },
   backup: {
     maxFileSize: 50 * 1024 * 1024,
@@ -179,7 +180,6 @@ export const TABLE_SCHEMA_MAP: Record<string, SQLiteTableWithColumns<any>> = {
   financing: vehicleFinancing,
   insurance: insurancePolicies,
   insurancePolicyVehicles: insurancePolicyVehicles,
-  expenseGroups: expenseGroups,
   photos: photos,
   odometer: odometerEntries,
   photoRefs: photoRefs,
@@ -191,7 +191,6 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   financing: 'vehicle_financing.csv',
   insurance: 'insurance_policies.csv',
   insurancePolicyVehicles: 'insurance_policy_vehicles.csv',
-  expenseGroups: 'expense_groups.csv',
   photos: 'photos.csv',
   odometer: 'odometer_entries.csv',
   photoRefs: 'photo_refs.csv',
@@ -204,7 +203,6 @@ export function getBackupTableKeys(): string[] {
 // Files that may be absent in older backups (pre-migration)
 const OPTIONAL_BACKUP_FILES = new Set([
   'insurance_policy_vehicles.csv',
-  'expense_groups.csv',
   'photos.csv',
   'odometer_entries.csv',
   'photo_refs.csv',

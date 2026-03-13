@@ -168,19 +168,19 @@
 		return filtered;
 	});
 
-	// Group expenses: children with same expenseGroupId become collapsible groups
+	// Group expenses: children with same groupId become collapsible groups
 	let tableRows = $derived.by((): DisplayRow[] => {
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Map used within $derived computation, not mutated reactively
 		const grouped = new Map<string, Expense[]>();
 		const standalone: Expense[] = [];
 
 		for (const expense of sortedExpenses) {
-			if (expense.expenseGroupId) {
-				const existing = grouped.get(expense.expenseGroupId);
+			if (expense.groupId) {
+				const existing = grouped.get(expense.groupId);
 				if (existing) {
 					existing.push(expense);
 				} else {
-					grouped.set(expense.expenseGroupId, [expense]);
+					grouped.set(expense.groupId, [expense]);
 				}
 			} else {
 				standalone.push(expense);

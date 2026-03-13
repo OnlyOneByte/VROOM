@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { Upload, Trash2, FileText, Download, LoaderCircle, ImagePlus } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
-	import MediaCaptureDialog from '$lib/components/shared/MediaCaptureDialog.svelte';
+	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import type { Photo } from '$lib/types';

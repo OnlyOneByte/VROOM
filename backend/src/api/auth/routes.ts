@@ -1,12 +1,16 @@
 import { generateCodeVerifier, generateState } from 'arctic';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
-import { users } from '../../db/schema';
-import { getLucia, google } from './lucia';
+import { userProviders, users } from '../../db/schema';
+import { requireAuth } from '../../middleware';
+import { encrypt } from '../../utils/encryption';
+import { logger } from '../../utils/logger';
+import { storePending } from '../../utils/pending-credentials';
+import { getLucia, google, googleProvider } from './lucia';
 import { validateAndRefreshSession } from './utils';
 
 const routes = new Hono();
@@ -26,7 +30,19 @@ const routes = new Hono();
  * - Single-instance deployments with infrequent restarts
  * - Low-traffic applications where occasional OAuth retry is acceptable
  */
-const oauthStateStore = new Map<string, { codeVerifier: string; createdAt: number }>();
+const oauthStateStore = new Map<
+  string,
+  {
+    codeVerifier: string;
+    createdAt: number;
+    returnTo?: string;
+    // Provider flow fields (absent for login flow)
+    userId?: string;
+    flowType?: 'provider';
+    providerId?: string;
+    nonce?: string;
+  }
+>();
 
 // Clean up expired states (older than 10 minutes)
 const cleanupExpiredStates = () => {
@@ -46,12 +62,10 @@ routes.get('/login/google', async (c) => {
     'openid',
     'profile',
     'email',
-    'https://www.googleapis.com/auth/drive.file', // Access only files created by this app
   ]);
 
-  // Add access_type=offline to get refresh token
-  url.searchParams.set('access_type', 'offline');
-  url.searchParams.set('prompt', 'consent');
+  // Account picker for returning users — no offline access needed for login
+  url.searchParams.set('prompt', 'select_account');
 
   // Store state and code verifier in memory (for development)
   // In production, use Redis or a database with TTL
@@ -80,7 +94,7 @@ routes.get('/callback/google', async (c) => {
     });
   }
 
-  const { codeVerifier } = storedData;
+  const { codeVerifier, returnTo } = storedData;
   oauthStateStore.delete(state);
 
   // Exchange code for tokens
@@ -126,20 +140,10 @@ routes.get('/callback/google', async (c) => {
       displayName: googleUser.name,
       provider: 'google',
       providerId: googleUser.sub,
-      googleRefreshToken: tokens.hasRefreshToken() ? tokens.refreshToken() : null,
     });
   } else {
-    // Update existing user with fresh refresh token if available
+    // Existing user — no refresh token to update since login flow no longer requests offline access
     userId = existingUser[0].id;
-    if (tokens.hasRefreshToken()) {
-      await db
-        .update(users)
-        .set({
-          googleRefreshToken: tokens.refreshToken(),
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, userId));
-    }
   }
 
   // Create session
@@ -155,8 +159,10 @@ routes.get('/callback/google', async (c) => {
     sameSite: 'Lax',
   });
 
-  // Redirect to frontend
-  return c.redirect(`${CONFIG.frontend.url}/dashboard`);
+  // Redirect to frontend — use returnTo if provided (e.g., reauth from provider form),
+  // otherwise default to dashboard
+  const redirectPath = returnTo?.startsWith('/') ? returnTo : '/dashboard';
+  return c.redirect(`${CONFIG.frontend.url}${redirectPath}`);
 });
 
 // Get current user
@@ -243,45 +249,217 @@ routes.post('/refresh', async (c) => {
   });
 });
 
-// Re-authenticate with Google (force new OAuth flow to get fresh tokens)
-routes.get('/reauth/google', async (c) => {
-  const lucia = getLucia();
-  const sessionId = getCookie(c, lucia.sessionCookieName);
+// Provider OAuth initiation — isolated from login flow (Task 5.1)
+routes.get('/providers/connect/google', requireAuth, async (c) => {
+  const user = c.get('user');
+  const returnTo = c.req.query('returnTo');
+  const nonce = c.req.query('nonce');
 
-  if (!sessionId) {
-    throw new HTTPException(401, { message: 'No session found' });
+  if (!returnTo || !nonce) {
+    throw new HTTPException(400, { message: 'Missing required parameters: returnTo, nonce' });
   }
 
-  const { session } = await lucia.validateSession(sessionId);
+  const providerId = c.req.query('providerId') ?? undefined;
+  const email = c.req.query('email') ?? undefined;
 
-  if (!session) {
-    throw new HTTPException(401, { message: 'Invalid session' });
-  }
-
-  // Generate new OAuth state and code verifier
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
-  const url = await google.createAuthorizationURL(state, codeVerifier, [
+  const url = await googleProvider.createAuthorizationURL(state, codeVerifier, [
     'openid',
     'profile',
     'email',
-    'https://www.googleapis.com/auth/drive', // For Google Drive integration (full access needed to create folders)
+    'https://www.googleapis.com/auth/drive.file',
   ]);
 
-  // Add prompt=consent to force re-consent and get new refresh token
-  url.searchParams.set('prompt', 'consent');
   url.searchParams.set('access_type', 'offline');
+  url.searchParams.set('prompt', 'consent');
+  if (email) {
+    url.searchParams.set('login_hint', email);
+  }
 
-  // Store state and code verifier
   oauthStateStore.set(state, {
     codeVerifier,
     createdAt: Date.now(),
+    returnTo,
+    nonce,
+    userId: user.id,
+    flowType: 'provider',
+    providerId,
   });
 
-  // Clean up old states
   cleanupExpiredStates();
-
   return c.redirect(url.toString());
+});
+
+// --- Provider OAuth callback helpers ---
+
+async function validateProviderSession(
+  sessionId: string | undefined
+): Promise<{ user: { id: string }; session: { id: string } } | null> {
+  if (!sessionId) return null;
+  const lucia = getLucia();
+  const { session, user } = await lucia.validateSession(sessionId);
+  if (!session || !user) return null;
+  return { user, session };
+}
+
+async function exchangeProviderTokens(code: string, codeVerifier: string) {
+  const tokens = await googleProvider.validateAuthorizationCode(code, codeVerifier);
+  if (!tokens.hasRefreshToken()) return { tokens, refreshToken: null, email: null };
+
+  const email = await fetchGoogleEmail(tokens.accessToken());
+  return { tokens, refreshToken: tokens.refreshToken(), email };
+}
+
+async function fetchGoogleEmail(accessToken: string): Promise<string | null> {
+  const resp = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!resp.ok) return null;
+  const data = (await resp.json()) as { email: string };
+  return data.email;
+}
+
+async function updateExistingProvider(
+  providerId: string,
+  userId: string,
+  refreshToken: string,
+  email: string
+): Promise<void> {
+  const db = getDb();
+  const existing = await db
+    .select()
+    .from(userProviders)
+    .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
+    .limit(1);
+
+  if (!existing[0]) return;
+
+  const encryptedCredentials = encrypt(JSON.stringify({ refreshToken }));
+  const existingConfig = (existing[0].config as Record<string, unknown>) ?? {};
+  await db
+    .update(userProviders)
+    .set({
+      credentials: encryptedCredentials,
+      config: { ...existingConfig, accountEmail: email },
+      updatedAt: new Date(),
+    })
+    .where(eq(userProviders.id, providerId));
+}
+
+interface ProviderCallbackState {
+  codeVerifier: string;
+  returnTo: string;
+  userId: string;
+  nonce: string;
+  providerId?: string;
+}
+
+function resolveProviderState(
+  stateParam: string | null,
+  code: string | null
+): { state: ProviderCallbackState; returnTo: string } | { error: string; returnTo: string } {
+  const storedData = stateParam ? oauthStateStore.get(stateParam) : undefined;
+  const returnTo = storedData?.returnTo ?? '/settings/providers';
+
+  // Handle OAuth cancellation (user denied consent)
+  if (!code) {
+    if (stateParam) oauthStateStore.delete(stateParam);
+    return { error: 'cancelled', returnTo };
+  }
+
+  if (!stateParam || !storedData || storedData.flowType !== 'provider') {
+    if (stateParam) oauthStateStore.delete(stateParam);
+    return { error: 'invalid_state', returnTo };
+  }
+
+  oauthStateStore.delete(stateParam);
+  return {
+    state: {
+      codeVerifier: storedData.codeVerifier,
+      returnTo,
+      userId: storedData.userId ?? '',
+      nonce: storedData.nonce ?? '',
+      providerId: storedData.providerId,
+    },
+    returnTo,
+  };
+}
+
+async function validateProviderCsrf(
+  sessionId: string | undefined,
+  expectedUserId: string
+): Promise<{ userId: string } | null> {
+  const authResult = await validateProviderSession(sessionId);
+  if (!authResult) return null;
+  if (authResult.user.id !== expectedUserId) return null;
+  return { userId: authResult.user.id };
+}
+
+// Provider OAuth callback — never touches the session (Task 5.2)
+routes.get('/callback/provider/google', async (c) => {
+  const url = new URL(c.req.url);
+  const code = url.searchParams.get('code');
+  const stateParam = url.searchParams.get('state');
+  const frontendRedirect = (path: string) => `${CONFIG.frontend.url}${path}`;
+
+  const resolved = resolveProviderState(stateParam, code);
+  if ('error' in resolved) {
+    return c.redirect(frontendRedirect(`${resolved.returnTo}?provider_error=${resolved.error}`));
+  }
+
+  const { state } = resolved;
+  // code is guaranteed non-null here — resolveProviderState returns error if !code
+  const authCode = code as string;
+
+  // Validate session + CSRF: user must be authenticated and match state userId
+  const lucia = getLucia();
+  const sessionId = getCookie(c, lucia.sessionCookieName);
+  const validated = await validateProviderCsrf(sessionId, state.userId);
+  if (!validated) {
+    const authResult = await validateProviderSession(sessionId);
+    if (!authResult) {
+      return c.redirect(`${CONFIG.frontend.url}/auth/login`);
+    }
+    logger.warn('Provider OAuth CSRF mismatch', {
+      sessionUserId: authResult.user.id,
+      stateUserId: state.userId,
+    });
+    return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=session_mismatch`));
+  }
+
+  // Exchange code for tokens and fetch email
+  let result: Awaited<ReturnType<typeof exchangeProviderTokens>>;
+  try {
+    result = await exchangeProviderTokens(authCode, state.codeVerifier);
+  } catch (err) {
+    logger.error('Provider OAuth token exchange failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=exchange_failed`));
+  }
+
+  if (!result.refreshToken || !result.email) {
+    const errorType = !result.refreshToken ? 'no_refresh_token' : 'exchange_failed';
+    return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=${errorType}`));
+  }
+
+  if (state.providerId) {
+    await updateExistingProvider(
+      state.providerId,
+      validated.userId,
+      result.refreshToken,
+      result.email
+    );
+  } else {
+    storePending(validated.userId, state.nonce, result.refreshToken, result.email);
+  }
+
+  return c.redirect(
+    frontendRedirect(
+      `${state.returnTo}?provider_connected=true&nonce=${encodeURIComponent(state.nonce)}`
+    )
+  );
 });
 
 export { routes };

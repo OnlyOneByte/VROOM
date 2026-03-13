@@ -538,430 +538,435 @@
 </script>
 
 <FormLayout>
-{#if isLoading}
-	<div class="flex items-center justify-center py-12">
-		<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
-	</div>
-{:else}
-	<div class="space-y-6">
-		<!-- Header -->
-		<div class="flex items-center gap-4">
-			<Button variant="outline" size="icon" onclick={handleBack}>
-				<ArrowLeft class="h-4 w-4" />
-			</Button>
-			<div>
-				<h1 class="text-3xl font-bold tracking-tight">
-					{isEditMode ? 'Edit Vehicle' : 'Add New Vehicle'}
-				</h1>
-				{#if isEditMode && vehicleForm.make && vehicleForm.model}
-					<p class="text-muted-foreground mt-1">
-						{vehicleForm.nickname || `${vehicleForm.year} ${vehicleForm.make} ${vehicleForm.model}`}
-					</p>
-				{:else if !isEditMode}
-					<p class="text-muted-foreground mt-1">
-						Enter your vehicle information and optional financing details
-					</p>
-				{/if}
-			</div>
+	{#if isLoading}
+		<div class="flex items-center justify-center py-12">
+			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
 		</div>
-
-		<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
-			<!-- Vehicle Information -->
-			<Card>
-				<CardHeader>
-					<div class="flex items-center gap-2">
-						<Car class="h-5 w-5 text-primary" />
-						<CardTitle>Vehicle Information</CardTitle>
-					</div>
-					<CardDescription>Basic details about your vehicle</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-						<div class="space-y-2">
-							<Label for="make">Make *</Label>
-							<Input
-								id="make"
-								type="text"
-								placeholder="e.g., Toyota, Honda, Ford"
-								bind:value={vehicleForm.make}
-								aria-invalid={!!errors['make']}
-								aria-describedby={errors['make'] ? 'make-error' : undefined}
-								required
-							/>
-							{#if errors['make']}
-								<FormFieldError id="make-error">{errors['make']}</FormFieldError>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							<Label for="model">Model *</Label>
-							<Input
-								id="model"
-								type="text"
-								placeholder="e.g., Camry, Civic, F-150"
-								bind:value={vehicleForm.model}
-								aria-invalid={!!errors['model']}
-								aria-describedby={errors['model'] ? 'model-error' : undefined}
-								required
-							/>
-							{#if errors['model']}
-								<FormFieldError id="model-error">{errors['model']}</FormFieldError>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							<Label for="year">Year *</Label>
-							<Input
-								id="year"
-								type="number"
-								min="1900"
-								max={new Date().getFullYear() + 2}
-								bind:value={vehicleForm.year}
-								aria-invalid={!!errors['year']}
-								aria-describedby={errors['year'] ? 'year-error' : undefined}
-								required
-							/>
-							{#if errors['year']}
-								<FormFieldError id="year-error">{errors['year']}</FormFieldError>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							<Label for="licensePlate">License Plate</Label>
-							<Input
-								id="licensePlate"
-								type="text"
-								placeholder="e.g., ABC-1234"
-								bind:value={vehicleForm.licensePlate}
-								aria-invalid={!!errors['licensePlate']}
-								aria-describedby={errors['licensePlate'] ? 'licensePlate-error' : undefined}
-							/>
-							{#if errors['licensePlate']}
-								<FormFieldError id="licensePlate-error">{errors['licensePlate']}</FormFieldError>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							<Label for="vin">VIN (Vehicle Identification Number)</Label>
-							<Input
-								id="vin"
-								type="text"
-								placeholder="e.g., 1HGBH41JXMN109186"
-								bind:value={vehicleForm.vin}
-								aria-invalid={!!errors['vin']}
-								aria-describedby={errors['vin'] ? 'vin-error' : undefined}
-							/>
-							{#if errors['vin']}
-								<FormFieldError id="vin-error">{errors['vin']}</FormFieldError>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							<Label for="nickname">Nickname</Label>
-							<Input
-								id="nickname"
-								type="text"
-								placeholder="e.g., Daily Driver, Weekend Car"
-								bind:value={vehicleForm.nickname}
-								aria-invalid={!!errors['nickname']}
-								aria-describedby={errors['nickname'] ? 'nickname-error' : undefined}
-							/>
-							{#if errors['nickname']}
-								<FormFieldError id="nickname-error">{errors['nickname']}</FormFieldError>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							<Label for="initialMileage">Initial Mileage</Label>
-							<Input
-								id="initialMileage"
-								type="number"
-								min="0"
-								placeholder="Current odometer reading"
-								bind:value={vehicleForm.initialMileage}
-								aria-invalid={!!errors['initialMileage']}
-								aria-describedby={errors['initialMileage'] ? 'initialMileage-error' : undefined}
-							/>
-							{#if errors['initialMileage']}
-								<FormFieldError id="initialMileage-error">{errors['initialMileage']}</FormFieldError
-								>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							<Label for="purchasePrice">Purchase Price</Label>
-							<Input
-								id="purchasePrice"
-								type="number"
-								min="0"
-								step="0.01"
-								placeholder="0.00"
-								bind:value={vehicleForm.purchasePrice}
-								aria-invalid={!!errors['purchasePrice']}
-								aria-describedby={errors['purchasePrice'] ? 'purchasePrice-error' : undefined}
-							/>
-							{#if errors['purchasePrice']}
-								<FormFieldError id="purchasePrice-error">{errors['purchasePrice']}</FormFieldError>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							<Label for="purchaseDate">Purchase Date</Label>
-							<DatePicker
-								id="purchaseDate"
-								bind:value={vehicleForm.purchaseDate}
-								placeholder="Select purchase date"
-								aria-invalid={!!errors['purchaseDate']}
-								aria-describedby={errors['purchaseDate'] ? 'purchaseDate-error' : undefined}
-							/>
-							{#if errors['purchaseDate']}
-								<FormFieldError id="purchaseDate-error">{errors['purchaseDate']}</FormFieldError>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							<Label for="vehicleType">Vehicle Type</Label>
-							<Select.Root
-								type="single"
-								value={vehicleForm.vehicleType}
-								onValueChange={handleVehicleTypeChange}
-							>
-								<Select.Trigger id="vehicleType" class="w-full">
-									{vehicleForm.vehicleType === 'gas'
-										? 'Gas'
-										: vehicleForm.vehicleType === 'electric'
-											? 'Electric'
-											: 'Hybrid'}
-								</Select.Trigger>
-								<Select.Content>
-									<Select.Item value="gas" label="Gas">Gas</Select.Item>
-									<Select.Item value="electric" label="Electric">Electric</Select.Item>
-									<Select.Item value="hybrid" label="Hybrid">Hybrid</Select.Item>
-								</Select.Content>
-							</Select.Root>
-						</div>
-					</div>
-
-					<!-- Energy Tracking Preferences -->
-					<div class="mt-6 space-y-2">
-						<Label class="text-sm font-medium text-foreground">Energy Tracking</Label>
-						<div class="flex items-center gap-4">
-							<label for="trackFuel" class="flex items-center gap-1.5 cursor-pointer">
-								<Switch id="trackFuel" bind:checked={trackFuel} />
-								<Fuel class="h-3.5 w-3.5 text-muted-foreground" />
-								<span class="text-sm">Fuel</span>
-							</label>
-							<label for="trackCharging" class="flex items-center gap-1.5 cursor-pointer">
-								<Switch id="trackCharging" bind:checked={trackCharging} />
-								<Zap class="h-3.5 w-3.5 text-muted-foreground" />
-								<span class="text-sm">Charging</span>
-							</label>
-						</div>
-					</div>
-				</CardContent>
-			</Card>
-
-			<!-- Unit Preferences -->
-			<Card>
-				<Collapsible.Root bind:open={unitPrefsOpen}>
-					<CardHeader>
-						<div class="flex items-center justify-between">
-							<div class="flex items-center gap-2">
-								<Ruler class="h-5 w-5 text-primary" />
-								<div>
-									<CardTitle>Unit Preferences</CardTitle>
-									<CardDescription>
-										Distance, volume, and charge units for this vehicle
-									</CardDescription>
-								</div>
-							</div>
-							<Collapsible.Trigger
-								class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted hover:text-muted-foreground h-9 w-9"
-							>
-								<ChevronsUpDown class="h-4 w-4" />
-								<span class="sr-only">Toggle unit preferences</span>
-							</Collapsible.Trigger>
-						</div>
-						{#if !unitPrefsOpen}
-							<p class="text-sm text-muted-foreground">
-								{distanceLabel} · {volumeLabel} · {chargeLabel}
-							</p>
-						{/if}
-					</CardHeader>
-					<Collapsible.Content>
-						<CardContent class="space-y-6">
-							<div class="space-y-2">
-								<Label for="distanceUnit">Distance Unit</Label>
-								<Select.Root
-									type="single"
-									value={distanceUnit}
-									onValueChange={v => {
-										if (v) distanceUnit = v as DistanceUnit;
-									}}
-								>
-									<Select.Trigger id="distanceUnit" class="w-full">
-										{distanceLabel}
-									</Select.Trigger>
-									<Select.Content>
-										<Select.Item value="miles" label="Miles">Miles</Select.Item>
-										<Select.Item value="kilometers" label="Kilometers">Kilometers</Select.Item>
-									</Select.Content>
-								</Select.Root>
-							</div>
-
-							<div class="space-y-2">
-								<Label for="volumeUnit">Fuel Volume Unit</Label>
-								<Select.Root
-									type="single"
-									value={volumeUnit}
-									onValueChange={v => {
-										if (v) volumeUnit = v as VolumeUnit;
-									}}
-								>
-									<Select.Trigger id="volumeUnit" class="w-full">
-										{volumeLabel}
-									</Select.Trigger>
-									<Select.Content>
-										<Select.Item value="gallons_us" label="Gallons (US)">Gallons (US)</Select.Item>
-										<Select.Item value="gallons_uk" label="Gallons (UK)">Gallons (UK)</Select.Item>
-										<Select.Item value="liters" label="Liters">Liters</Select.Item>
-									</Select.Content>
-								</Select.Root>
-							</div>
-
-							<div class="space-y-2">
-								<Label for="chargeUnit">Electric Charge Unit</Label>
-								<Select.Root
-									type="single"
-									value={chargeUnit}
-									onValueChange={v => {
-										if (v) chargeUnit = v as ChargeUnit;
-									}}
-								>
-									<Select.Trigger id="chargeUnit" class="w-full">
-										{chargeLabel}
-									</Select.Trigger>
-									<Select.Content>
-										<Select.Item value="kwh" label="kWh">kWh</Select.Item>
-									</Select.Content>
-								</Select.Root>
-							</div>
-						</CardContent>
-					</Collapsible.Content>
-				</Collapsible.Root>
-			</Card>
-
-			<!-- Financing Information -->
-			<FinancingFormSection
-				bind:ownershipType
-				bind:financingForm
-				{errors}
-				{isEditMode}
-				{vehicle}
-				{amortizationPreview}
-			/>
-		</form>
-
-		<!-- Floating Action Bar -->
-		<div class="fixed bottom-4 left-4 right-4 z-50 sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto">
-			<div
-				class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none border sm:border-0"
-			>
-				{#if isEditMode}
-					<Button
-						type="button"
-						variant="destructive"
-						size="lg"
-						onclick={confirmDelete}
-						disabled={isDeleting || isSubmitting}
-						class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
-					>
-						<Trash2 class="h-5 w-5 sm:mr-2" />
-						<span class="hidden sm:inline font-semibold">Delete</span>
-					</Button>
-				{/if}
-
-				<Button
-					type="button"
-					variant="outline"
-					size="lg"
-					onclick={handleBack}
-					disabled={isSubmitting || isDeleting}
-					class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
-				>
-					<X class="h-5 w-5 sm:mr-2" />
-					<span class="hidden sm:inline font-semibold">Cancel</span>
+	{:else}
+		<div class="space-y-6">
+			<!-- Header -->
+			<div class="flex items-center gap-4">
+				<Button variant="outline" size="icon" onclick={handleBack}>
+					<ArrowLeft class="h-4 w-4" />
 				</Button>
-
-				<Button
-					type="button"
-					size="lg"
-					onclick={handleSubmit}
-					disabled={isSubmitting || isDeleting}
-					class="rounded-full group shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 px-6 flex-1 sm:flex-initial"
-				>
-					{#if isSubmitting}
-						<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
-						<span class="font-bold">{isEditMode ? 'Updating' : 'Adding'}...</span>
-					{:else}
-						<Check class="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" />
-						<span class="font-bold">{isEditMode ? 'Update' : 'Add'} Vehicle</span>
+				<div>
+					<h1 class="text-3xl font-bold tracking-tight">
+						{isEditMode ? 'Edit Vehicle' : 'Add New Vehicle'}
+					</h1>
+					{#if isEditMode && vehicleForm.make && vehicleForm.model}
+						<p class="text-muted-foreground mt-1">
+							{vehicleForm.nickname ||
+								`${vehicleForm.year} ${vehicleForm.make} ${vehicleForm.model}`}
+						</p>
+					{:else if !isEditMode}
+						<p class="text-muted-foreground mt-1">
+							Enter your vehicle information and optional financing details
+						</p>
 					{/if}
-				</Button>
+				</div>
 			</div>
-		</div>
-	</div>
 
-	<!-- Delete Confirmation AlertDialog -->
-	<AlertDialog bind:open={showDeleteConfirm}>
-		<AlertDialogContent>
-			<AlertDialogHeader>
-				<AlertDialogTitle>Delete Vehicle</AlertDialogTitle>
-				<AlertDialogDescription>
-					Are you sure you want to delete this vehicle? This will permanently delete the vehicle and
-					all associated expenses. This action cannot be undone.
-				</AlertDialogDescription>
-			</AlertDialogHeader>
-
-			{#if vehicle}
-				<Card class="bg-muted/50">
-					<CardContent class="p-4">
-						<div class="flex items-center gap-3">
-							<div class="p-2 rounded-lg bg-destructive/10 text-destructive">
-								<Car class="h-4 w-4" />
+			<form onsubmit={handleSubmit} class="space-y-6 pb-32 sm:pb-24">
+				<!-- Vehicle Information -->
+				<Card>
+					<CardHeader>
+						<div class="flex items-center gap-2">
+							<Car class="h-5 w-5 text-primary" />
+							<CardTitle>Vehicle Information</CardTitle>
+						</div>
+						<CardDescription>Basic details about your vehicle</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+							<div class="space-y-2">
+								<Label for="make">Make *</Label>
+								<Input
+									id="make"
+									type="text"
+									placeholder="e.g., Toyota, Honda, Ford"
+									bind:value={vehicleForm.make}
+									aria-invalid={!!errors['make']}
+									aria-describedby={errors['make'] ? 'make-error' : undefined}
+									required
+								/>
+								{#if errors['make']}
+									<FormFieldError id="make-error">{errors['make']}</FormFieldError>
+								{/if}
 							</div>
-							<div>
-								<p class="font-medium">
-									{vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-								</p>
-								<p class="text-sm text-muted-foreground">
-									{vehicle.year}
-									{vehicle.make}
-									{vehicle.model}
-								</p>
+
+							<div class="space-y-2">
+								<Label for="model">Model *</Label>
+								<Input
+									id="model"
+									type="text"
+									placeholder="e.g., Camry, Civic, F-150"
+									bind:value={vehicleForm.model}
+									aria-invalid={!!errors['model']}
+									aria-describedby={errors['model'] ? 'model-error' : undefined}
+									required
+								/>
+								{#if errors['model']}
+									<FormFieldError id="model-error">{errors['model']}</FormFieldError>
+								{/if}
+							</div>
+
+							<div class="space-y-2">
+								<Label for="year">Year *</Label>
+								<Input
+									id="year"
+									type="number"
+									min="1900"
+									max={new Date().getFullYear() + 2}
+									bind:value={vehicleForm.year}
+									aria-invalid={!!errors['year']}
+									aria-describedby={errors['year'] ? 'year-error' : undefined}
+									required
+								/>
+								{#if errors['year']}
+									<FormFieldError id="year-error">{errors['year']}</FormFieldError>
+								{/if}
+							</div>
+
+							<div class="space-y-2">
+								<Label for="licensePlate">License Plate</Label>
+								<Input
+									id="licensePlate"
+									type="text"
+									placeholder="e.g., ABC-1234"
+									bind:value={vehicleForm.licensePlate}
+									aria-invalid={!!errors['licensePlate']}
+									aria-describedby={errors['licensePlate'] ? 'licensePlate-error' : undefined}
+								/>
+								{#if errors['licensePlate']}
+									<FormFieldError id="licensePlate-error">{errors['licensePlate']}</FormFieldError>
+								{/if}
+							</div>
+
+							<div class="space-y-2">
+								<Label for="vin">VIN (Vehicle Identification Number)</Label>
+								<Input
+									id="vin"
+									type="text"
+									placeholder="e.g., 1HGBH41JXMN109186"
+									bind:value={vehicleForm.vin}
+									aria-invalid={!!errors['vin']}
+									aria-describedby={errors['vin'] ? 'vin-error' : undefined}
+								/>
+								{#if errors['vin']}
+									<FormFieldError id="vin-error">{errors['vin']}</FormFieldError>
+								{/if}
+							</div>
+
+							<div class="space-y-2">
+								<Label for="nickname">Nickname</Label>
+								<Input
+									id="nickname"
+									type="text"
+									placeholder="e.g., Daily Driver, Weekend Car"
+									bind:value={vehicleForm.nickname}
+									aria-invalid={!!errors['nickname']}
+									aria-describedby={errors['nickname'] ? 'nickname-error' : undefined}
+								/>
+								{#if errors['nickname']}
+									<FormFieldError id="nickname-error">{errors['nickname']}</FormFieldError>
+								{/if}
+							</div>
+
+							<div class="space-y-2">
+								<Label for="initialMileage">Initial Mileage</Label>
+								<Input
+									id="initialMileage"
+									type="number"
+									min="0"
+									placeholder="Current odometer reading"
+									bind:value={vehicleForm.initialMileage}
+									aria-invalid={!!errors['initialMileage']}
+									aria-describedby={errors['initialMileage'] ? 'initialMileage-error' : undefined}
+								/>
+								{#if errors['initialMileage']}
+									<FormFieldError id="initialMileage-error"
+										>{errors['initialMileage']}</FormFieldError
+									>
+								{/if}
+							</div>
+
+							<div class="space-y-2">
+								<Label for="purchasePrice">Purchase Price</Label>
+								<Input
+									id="purchasePrice"
+									type="number"
+									min="0"
+									step="0.01"
+									placeholder="0.00"
+									bind:value={vehicleForm.purchasePrice}
+									aria-invalid={!!errors['purchasePrice']}
+									aria-describedby={errors['purchasePrice'] ? 'purchasePrice-error' : undefined}
+								/>
+								{#if errors['purchasePrice']}
+									<FormFieldError id="purchasePrice-error">{errors['purchasePrice']}</FormFieldError
+									>
+								{/if}
+							</div>
+
+							<div class="space-y-2">
+								<Label for="purchaseDate">Purchase Date</Label>
+								<DatePicker
+									id="purchaseDate"
+									bind:value={vehicleForm.purchaseDate}
+									placeholder="Select purchase date"
+									aria-invalid={!!errors['purchaseDate']}
+									aria-describedby={errors['purchaseDate'] ? 'purchaseDate-error' : undefined}
+								/>
+								{#if errors['purchaseDate']}
+									<FormFieldError id="purchaseDate-error">{errors['purchaseDate']}</FormFieldError>
+								{/if}
+							</div>
+
+							<div class="space-y-2">
+								<Label for="vehicleType">Vehicle Type</Label>
+								<Select.Root
+									type="single"
+									value={vehicleForm.vehicleType}
+									onValueChange={handleVehicleTypeChange}
+								>
+									<Select.Trigger id="vehicleType" class="w-full">
+										{vehicleForm.vehicleType === 'gas'
+											? 'Gas'
+											: vehicleForm.vehicleType === 'electric'
+												? 'Electric'
+												: 'Hybrid'}
+									</Select.Trigger>
+									<Select.Content>
+										<Select.Item value="gas" label="Gas">Gas</Select.Item>
+										<Select.Item value="electric" label="Electric">Electric</Select.Item>
+										<Select.Item value="hybrid" label="Hybrid">Hybrid</Select.Item>
+									</Select.Content>
+								</Select.Root>
+							</div>
+						</div>
+
+						<!-- Energy Tracking Preferences -->
+						<div class="mt-6 space-y-2">
+							<Label class="text-sm font-medium text-foreground">Energy Tracking</Label>
+							<div class="flex items-center gap-4">
+								<label for="trackFuel" class="flex items-center gap-1.5 cursor-pointer">
+									<Switch id="trackFuel" bind:checked={trackFuel} />
+									<Fuel class="h-3.5 w-3.5 text-muted-foreground" />
+									<span class="text-sm">Fuel</span>
+								</label>
+								<label for="trackCharging" class="flex items-center gap-1.5 cursor-pointer">
+									<Switch id="trackCharging" bind:checked={trackCharging} />
+									<Zap class="h-3.5 w-3.5 text-muted-foreground" />
+									<span class="text-sm">Charging</span>
+								</label>
 							</div>
 						</div>
 					</CardContent>
 				</Card>
-			{/if}
 
-			<AlertDialogFooter>
-				<AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-				<AlertDialogAction
-					onclick={handleDelete}
-					disabled={isDeleting}
-					class="bg-destructive hover:bg-destructive/90"
+				<!-- Unit Preferences -->
+				<Card>
+					<Collapsible.Root bind:open={unitPrefsOpen}>
+						<CardHeader>
+							<div class="flex items-center justify-between">
+								<div class="flex items-center gap-2">
+									<Ruler class="h-5 w-5 text-primary" />
+									<div>
+										<CardTitle>Unit Preferences</CardTitle>
+										<CardDescription>
+											Distance, volume, and charge units for this vehicle
+										</CardDescription>
+									</div>
+								</div>
+								<Collapsible.Trigger
+									class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted hover:text-muted-foreground h-9 w-9"
+								>
+									<ChevronsUpDown class="h-4 w-4" />
+									<span class="sr-only">Toggle unit preferences</span>
+								</Collapsible.Trigger>
+							</div>
+							{#if !unitPrefsOpen}
+								<p class="text-sm text-muted-foreground">
+									{distanceLabel} · {volumeLabel} · {chargeLabel}
+								</p>
+							{/if}
+						</CardHeader>
+						<Collapsible.Content>
+							<CardContent class="space-y-6">
+								<div class="space-y-2">
+									<Label for="distanceUnit">Distance Unit</Label>
+									<Select.Root
+										type="single"
+										value={distanceUnit}
+										onValueChange={v => {
+											if (v) distanceUnit = v as DistanceUnit;
+										}}
+									>
+										<Select.Trigger id="distanceUnit" class="w-full">
+											{distanceLabel}
+										</Select.Trigger>
+										<Select.Content>
+											<Select.Item value="miles" label="Miles">Miles</Select.Item>
+											<Select.Item value="kilometers" label="Kilometers">Kilometers</Select.Item>
+										</Select.Content>
+									</Select.Root>
+								</div>
+
+								<div class="space-y-2">
+									<Label for="volumeUnit">Fuel Volume Unit</Label>
+									<Select.Root
+										type="single"
+										value={volumeUnit}
+										onValueChange={v => {
+											if (v) volumeUnit = v as VolumeUnit;
+										}}
+									>
+										<Select.Trigger id="volumeUnit" class="w-full">
+											{volumeLabel}
+										</Select.Trigger>
+										<Select.Content>
+											<Select.Item value="gallons_us" label="Gallons (US)">Gallons (US)</Select.Item
+											>
+											<Select.Item value="gallons_uk" label="Gallons (UK)">Gallons (UK)</Select.Item
+											>
+											<Select.Item value="liters" label="Liters">Liters</Select.Item>
+										</Select.Content>
+									</Select.Root>
+								</div>
+
+								<div class="space-y-2">
+									<Label for="chargeUnit">Electric Charge Unit</Label>
+									<Select.Root
+										type="single"
+										value={chargeUnit}
+										onValueChange={v => {
+											if (v) chargeUnit = v as ChargeUnit;
+										}}
+									>
+										<Select.Trigger id="chargeUnit" class="w-full">
+											{chargeLabel}
+										</Select.Trigger>
+										<Select.Content>
+											<Select.Item value="kwh" label="kWh">kWh</Select.Item>
+										</Select.Content>
+									</Select.Root>
+								</div>
+							</CardContent>
+						</Collapsible.Content>
+					</Collapsible.Root>
+				</Card>
+
+				<!-- Financing Information -->
+				<FinancingFormSection
+					bind:ownershipType
+					bind:financingForm
+					{errors}
+					{isEditMode}
+					{vehicle}
+					{amortizationPreview}
+				/>
+			</form>
+
+			<!-- Floating Action Bar -->
+			<div class="fixed bottom-4 left-4 right-4 z-50 sm:bottom-8 sm:right-8 sm:left-auto sm:w-auto">
+				<div
+					class="flex flex-row gap-3 sm:gap-4 justify-center sm:justify-end items-center bg-background sm:bg-transparent p-3 sm:p-0 rounded-full sm:rounded-none shadow-2xl sm:shadow-none border sm:border-0"
 				>
-					{#if isDeleting}
-						<LoaderCircle class="h-4 w-4 animate-spin mr-2" />
-						Deleting...
-					{:else}
-						<Trash2 class="h-4 w-4 mr-2" />
-						Delete Vehicle
+					{#if isEditMode}
+						<Button
+							type="button"
+							variant="destructive"
+							size="lg"
+							onclick={confirmDelete}
+							disabled={isDeleting || isSubmitting}
+							class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
+						>
+							<Trash2 class="h-5 w-5 sm:mr-2" />
+							<span class="hidden sm:inline font-semibold">Delete</span>
+						</Button>
 					{/if}
-				</AlertDialogAction>
-			</AlertDialogFooter>
-		</AlertDialogContent>
-	</AlertDialog>
-{/if}
+
+					<Button
+						type="button"
+						variant="outline"
+						size="lg"
+						onclick={handleBack}
+						disabled={isSubmitting || isDeleting}
+						class="rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 px-5 flex-shrink-0"
+					>
+						<X class="h-5 w-5 sm:mr-2" />
+						<span class="hidden sm:inline font-semibold">Cancel</span>
+					</Button>
+
+					<Button
+						type="button"
+						size="lg"
+						onclick={handleSubmit}
+						disabled={isSubmitting || isDeleting}
+						class="rounded-full group shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 px-6 flex-1 sm:flex-initial"
+					>
+						{#if isSubmitting}
+							<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
+							<span class="font-bold">{isEditMode ? 'Updating' : 'Adding'}...</span>
+						{:else}
+							<Check class="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" />
+							<span class="font-bold">{isEditMode ? 'Update' : 'Add'} Vehicle</span>
+						{/if}
+					</Button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Delete Confirmation AlertDialog -->
+		<AlertDialog bind:open={showDeleteConfirm}>
+			<AlertDialogContent>
+				<AlertDialogHeader>
+					<AlertDialogTitle>Delete Vehicle</AlertDialogTitle>
+					<AlertDialogDescription>
+						Are you sure you want to delete this vehicle? This will permanently delete the vehicle
+						and all associated expenses. This action cannot be undone.
+					</AlertDialogDescription>
+				</AlertDialogHeader>
+
+				{#if vehicle}
+					<Card class="bg-muted/50">
+						<CardContent class="p-4">
+							<div class="flex items-center gap-3">
+								<div class="p-2 rounded-lg bg-destructive/10 text-destructive">
+									<Car class="h-4 w-4" />
+								</div>
+								<div>
+									<p class="font-medium">
+										{vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+									</p>
+									<p class="text-sm text-muted-foreground">
+										{vehicle.year}
+										{vehicle.make}
+										{vehicle.model}
+									</p>
+								</div>
+							</div>
+						</CardContent>
+					</Card>
+				{/if}
+
+				<AlertDialogFooter>
+					<AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+					<AlertDialogAction
+						onclick={handleDelete}
+						disabled={isDeleting}
+						class="bg-destructive hover:bg-destructive/90"
+					>
+						{#if isDeleting}
+							<LoaderCircle class="h-4 w-4 animate-spin mr-2" />
+							Deleting...
+						{:else}
+							<Trash2 class="h-4 w-4 mr-2" />
+							Delete Vehicle
+						{/if}
+					</AlertDialogAction>
+				</AlertDialogFooter>
+			</AlertDialogContent>
+		</AlertDialog>
+	{/if}
 </FormLayout>

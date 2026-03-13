@@ -3,48 +3,19 @@
  * Centralized API calls for settings and sync operations using apiClient
  */
 
-import type { UserSettings } from '$lib/types';
+import type {
+	BackupFileInfo,
+	BackupOrchestratorResult,
+	ProviderBackupList,
+	RestoreProviderInfo,
+	RestoreResult,
+	UserSettings
+} from '$lib/types/settings';
 import { apiClient } from './api-client';
 
-/** Generic API response envelope */
-interface ApiEnvelope<T = unknown> {
+interface SyncResponse {
 	success: boolean;
-	data?: T;
-	message?: string;
-}
-
-interface RestorePreview {
-	vehicles?: number;
-	expenses?: number;
-	settings?: number;
-	financing?: number;
-	[key: string]: number | undefined;
-}
-
-interface RestoreResult {
-	success: boolean;
-	preview?: RestorePreview;
-	imported?: Record<string, number>;
-	conflicts?: Array<{ field: string; local: unknown; remote: unknown }>;
-	data?: RestoreResult;
-}
-
-interface BackupItem {
-	fileId: string;
-	fileName: string;
-	createdTime: string;
-	modifiedTime: string;
-	size: string;
-}
-
-// apiClient unwraps the { success, data } envelope, so we get the array directly
-type BackupListResult = BackupItem[];
-
-interface SyncResult {
-	success: boolean;
-	data?: {
-		results: Record<string, { success: boolean; message?: string; skipped?: boolean }>;
-	};
+	data?: BackupOrchestratorResult;
 }
 
 export const settingsApi = {
@@ -56,36 +27,43 @@ export const settingsApi = {
 		return apiClient.put<UserSettings>('/api/v1/settings', updates);
 	},
 
-	async configureSyncSettings(config: {
-		googleSheetsSyncEnabled?: boolean;
-		googleDriveBackupEnabled?: boolean;
-		syncInactivityMinutes?: number;
-	}): Promise<ApiEnvelope> {
-		return apiClient.post<ApiEnvelope>('/api/v1/sync/configure', config);
+	async executeSync(syncTypes: 'backup'[], force = false): Promise<SyncResponse> {
+		return apiClient.post<SyncResponse>('/api/v1/sync', { syncTypes, force });
 	},
 
-	async executeSync(syncTypes: ('sheets' | 'backup')[], force = false): Promise<SyncResult> {
-		return apiClient.post<SyncResult>('/api/v1/sync', { syncTypes, force });
+	async listBackupsFromProvider(providerId: string): Promise<BackupFileInfo[]> {
+		return apiClient.get<BackupFileInfo[]>(
+			`/api/v1/sync/backups/providers?providerId=${encodeURIComponent(providerId)}`
+		);
 	},
 
-	async initializeDrive(): Promise<ApiEnvelope> {
-		return apiClient.post<ApiEnvelope>('/api/v1/sync/backups/initialize-drive');
+	async listAllBackups(): Promise<ProviderBackupList[]> {
+		return apiClient.get<ProviderBackupList[]>('/api/v1/sync/backups/providers');
 	},
 
-	async listBackups(): Promise<BackupListResult> {
-		return apiClient.get<BackupListResult>('/api/v1/sync/backups');
+	async restoreFromProvider(opts: {
+		providerId: string;
+		sourceType: 'zip' | 'sheets';
+		mode: 'preview' | 'replace' | 'merge';
+		fileRef?: string;
+		idempotencyKey: string;
+	}): Promise<RestoreResult> {
+		const body: Record<string, string> =
+			opts.sourceType === 'zip'
+				? { providerId: opts.providerId, sourceType: 'zip', fileRef: opts.fileRef!, mode: opts.mode }
+				: { providerId: opts.providerId, sourceType: 'sheets', mode: opts.mode };
+
+		return apiClient.post<RestoreResult>('/api/v1/sync/restore/from-provider', body, {
+			headers: { 'Idempotency-Key': opts.idempotencyKey }
+		});
 	},
 
-	async deleteBackup(fileId: string): Promise<ApiEnvelope> {
-		return apiClient.delete<ApiEnvelope>(`/api/v1/sync/backups/${fileId}`);
+	async getRestoreProviders(): Promise<RestoreProviderInfo[]> {
+		return apiClient.get<RestoreProviderInfo[]>('/api/v1/sync/restore/providers');
 	},
 
 	async downloadBackup(): Promise<Response> {
 		return apiClient.raw('/api/v1/sync/backups/download');
-	},
-
-	async downloadBackupFromDrive(fileId: string): Promise<Response> {
-		return apiClient.raw(`/api/v1/sync/backups/${fileId}/download`);
 	},
 
 	async uploadBackup(
@@ -100,16 +78,5 @@ export const settingsApi = {
 		return apiClient.post<RestoreResult>('/api/v1/sync/restore/from-backup', formData, {
 			headers: { 'Idempotency-Key': idempotencyKey }
 		});
-	},
-
-	async restoreFromSheets(
-		mode: 'preview' | 'replace' | 'merge',
-		idempotencyKey: string
-	): Promise<RestoreResult> {
-		return apiClient.post<RestoreResult>(
-			'/api/v1/sync/restore/from-sheets',
-			{ mode },
-			{ headers: { 'Idempotency-Key': idempotencyKey } }
-		);
 	}
 };
