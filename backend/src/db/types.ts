@@ -1,8 +1,8 @@
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { AppDatabase } from './connection';
 
 // Drizzle transaction type — shared across repositories and services
 export type DrizzleTransaction = Parameters<
-  Parameters<BunSQLiteDatabase<Record<string, unknown>>['transaction']>[0]
+  Parameters<AppDatabase['transaction']>[0]
 >[0];
 
 // Expense Categories - Single source of truth

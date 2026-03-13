@@ -2,7 +2,7 @@
  * Configuration Module - Environment variables, validation, and constants
  */
 
-import type { SQLiteTableWithColumns } from 'drizzle-orm/sqlite-core';
+import type { Table } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   expenses,
@@ -174,7 +174,7 @@ export const CONFIG = {
 export type RestoreMode = (typeof CONFIG.backup.supportedModes)[number];
 
 // biome-ignore lint/suspicious/noExplicitAny: Generic table type
-export const TABLE_SCHEMA_MAP: Record<string, SQLiteTableWithColumns<any>> = {
+export const TABLE_SCHEMA_MAP: Record<string, Table> = {
   vehicles,
   expenses,
   financing: vehicleFinancing,

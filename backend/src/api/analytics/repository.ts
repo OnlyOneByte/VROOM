@@ -1,5 +1,5 @@
-import { and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import { and, asc, eq, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm';
+import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {
   expenses,
@@ -290,7 +290,7 @@ export class AnalyticsRepository {
   private static readonly VEHICLE_NAME_CACHE_TTL = 5_000; // 5 seconds
   private static readonly VEHICLE_NAME_CACHE_MAX_SIZE = 100;
 
-  constructor(private db: BunSQLiteDatabase<Record<string, unknown>>) {}
+  constructor(private db: AppDatabase) {}
 
   // ---- Private helpers ----------------------------------------------------
 
@@ -558,8 +558,8 @@ export class AnalyticsRepository {
     const conditions = [eq(expenses.userId, userId), eq(expenses.category, 'fuel')];
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
     if (range) {
-      conditions.push(sql`${expenses.date} >= ${range.start}`);
-      conditions.push(sql`${expenses.date} < ${range.end}`);
+      conditions.push(gte(expenses.date, new Date(range.start * 1000)));
+      conditions.push(lt(expenses.date, new Date(range.end * 1000)));
     }
     return this.db
       .select({
@@ -585,8 +585,8 @@ export class AnalyticsRepository {
     const conditions = [eq(expenses.userId, userId)];
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
     if (range) {
-      conditions.push(sql`${expenses.date} >= ${range.start}`);
-      conditions.push(sql`${expenses.date} < ${range.end}`);
+      conditions.push(gte(expenses.date, new Date(range.start * 1000)));
+      conditions.push(lt(expenses.date, new Date(range.end * 1000)));
     }
     return this.db
       .select({
@@ -613,8 +613,8 @@ export class AnalyticsRepository {
       .where(
         and(
           eq(expenses.userId, userId),
-          sql`${expenses.date} >= ${Math.floor(yearStart.getTime() / 1000)}`,
-          sql`${expenses.date} < ${Math.floor(yearEnd.getTime() / 1000)}`
+          gte(expenses.date, yearStart),
+          lt(expenses.date, yearEnd)
         )
       );
     return result[0]?.total ?? 0;
@@ -627,8 +627,8 @@ export class AnalyticsRepository {
     const conditions = [
       eq(expenses.userId, userId),
       eq(expenses.category, 'fuel'),
-      sql`${expenses.date} >= ${range.start}`,
-      sql`${expenses.date} < ${range.end}`,
+      gte(expenses.date, new Date(range.start * 1000)),
+      lt(expenses.date, new Date(range.end * 1000)),
     ];
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
     const result = await this.db
@@ -1679,8 +1679,8 @@ export class AnalyticsRepository {
       if (year) {
         const yearStart = new Date(year, 0, 1);
         const yearEnd = new Date(year + 1, 0, 1);
-        conditions.push(sql`${expenses.date} >= ${Math.floor(yearStart.getTime() / 1000)}`);
-        conditions.push(sql`${expenses.date} < ${Math.floor(yearEnd.getTime() / 1000)}`);
+        conditions.push(gte(expenses.date, yearStart));
+        conditions.push(lt(expenses.date, yearEnd));
       }
       const detailedExpenses = await this.db
         .select({

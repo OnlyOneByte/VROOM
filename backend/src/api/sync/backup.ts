@@ -6,7 +6,7 @@ import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
 import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
-import type { SQLiteTableWithColumns } from 'drizzle-orm/sqlite-core';
+import type { Table } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import type { z } from 'zod';
 import {
@@ -55,15 +55,26 @@ for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
 /**
  * Schema-aware row coercion using Drizzle column metadata.
  * Converts string values from CSV/Sheets into proper JS types (Date, boolean, number, JSON).
+ *
+ * Column type sets are dialect-agnostic — supports both SQLite and PostgreSQL column types
+ * so the backup pipeline works regardless of the underlying database.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Column type coercion requires checking multiple SQLite column types
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Column type coercion requires checking multiple column types
 export function coerceRow(
   row: Record<string, unknown>,
   // biome-ignore lint/suspicious/noExplicitAny: Generic table type from Drizzle
-  table: SQLiteTableWithColumns<any>
+  table: Table
 ): Record<string, unknown> {
   const columns = getTableColumns(table);
   const coerced: Record<string, unknown> = { ...row };
+
+  // Dialect-agnostic column type sets — add PG types here when adding PostgreSQL support
+  const BOOLEAN_TYPES = new Set(['SQLiteBoolean', 'PgBoolean']);
+  const TIMESTAMP_TYPES = new Set(['SQLiteTimestamp', 'PgTimestamp', 'PgTimestampString']);
+  const JSON_TYPES = new Set(['SQLiteTextJson', 'PgJsonb', 'PgJson']);
+  const INTEGER_TYPES = new Set(['SQLiteInteger', 'PgInteger', 'PgSerial', 'PgBigInt53']);
+  const REAL_TYPES = new Set(['SQLiteReal', 'PgDoublePrecision', 'PgNumeric', 'PgReal']);
+  const TEXT_TYPES = new Set(['SQLiteText', 'PgText', 'PgVarchar']);
 
   for (const [columnName, column] of Object.entries(columns)) {
     // biome-ignore lint/suspicious/noExplicitAny: Drizzle column type is not fully exposed
@@ -71,38 +82,35 @@ export function coerceRow(
     const val = coerced[columnName];
 
     if (val === undefined || val === null) {
-      // Missing column (undefined) on NOT NULL boolean: use schema default (e.g., trackFuel defaults to true)
-      // Explicit null: also use schema default for NOT NULL booleans
-      if (col.columnType === 'SQLiteBoolean') {
+      if (BOOLEAN_TYPES.has(col.columnType)) {
         coerced[columnName] = val === undefined ? (col.default ?? false) : false;
       }
       continue;
     }
     const strVal = String(val);
     if (strVal === '' || strVal === 'null' || strVal === 'NULL' || strVal === 'undefined') {
-      // Empty/null-like string values: boolean defaults to false (value was present but empty)
-      coerced[columnName] = col.columnType === 'SQLiteBoolean' ? false : null;
+      coerced[columnName] = BOOLEAN_TYPES.has(col.columnType) ? false : null;
       continue;
     }
 
-    if (col.columnType === 'SQLiteTimestamp') {
+    if (TIMESTAMP_TYPES.has(col.columnType)) {
       const date = new Date(strVal);
       coerced[columnName] = Number.isNaN(date.getTime()) ? null : date;
-    } else if (col.columnType === 'SQLiteBoolean') {
+    } else if (BOOLEAN_TYPES.has(col.columnType)) {
       coerced[columnName] = strVal === 'true' || strVal === '1' || strVal === 'TRUE';
-    } else if (col.columnType === 'SQLiteTextJson') {
+    } else if (JSON_TYPES.has(col.columnType)) {
       try {
         coerced[columnName] = JSON.parse(strVal);
       } catch {
         coerced[columnName] = null;
       }
-    } else if (col.columnType === 'SQLiteInteger') {
+    } else if (INTEGER_TYPES.has(col.columnType)) {
       const num = Number.parseInt(strVal, 10);
       coerced[columnName] = Number.isNaN(num) ? null : num;
-    } else if (col.columnType === 'SQLiteReal') {
+    } else if (REAL_TYPES.has(col.columnType)) {
       const num = Number.parseFloat(strVal);
       coerced[columnName] = Number.isNaN(num) ? null : num;
-    } else if (col.columnType === 'SQLiteText') {
+    } else if (TEXT_TYPES.has(col.columnType)) {
       // Google Sheets may return numeric-looking text values (e.g., license plates) as numbers
       coerced[columnName] = strVal;
     }
@@ -492,7 +500,7 @@ export class BackupService {
   private coerceCSVRow(
     row: Record<string, unknown>,
     // biome-ignore lint/suspicious/noExplicitAny: Generic table type from Drizzle
-    table: SQLiteTableWithColumns<any>
+    table: Table
   ): Record<string, unknown> {
     return coerceRow(row, table);
   }

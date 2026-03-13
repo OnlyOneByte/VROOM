@@ -6,7 +6,7 @@
  */
 
 import { asc, eq } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewVehicleFinancing, VehicleFinancing } from '../../db/schema';
 import { vehicleFinancing } from '../../db/schema';
@@ -15,7 +15,7 @@ import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
 export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVehicleFinancing> {
-  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
+  constructor(db: AppDatabase) {
     super(db, vehicleFinancing);
   }
 

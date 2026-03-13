@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import { type NewPhotoRef, type PhotoRef, photoRefs, photos } from '../../db/schema';
 
@@ -18,7 +18,7 @@ export interface UpdateStatusOptions {
  * across providers.
  */
 export class PhotoRefRepository {
-  constructor(private db: BunSQLiteDatabase<Record<string, unknown>>) {}
+  constructor(private db: AppDatabase) {}
 
   /** Find an active ref for a specific photo on a specific provider. */
   async findActiveByPhotoAndProvider(

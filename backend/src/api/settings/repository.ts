@@ -1,12 +1,12 @@
 import { eq } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewUserSettings, UserSettings } from '../../db/schema';
 import { userSettings } from '../../db/schema';
 import { DEFAULT_UNIT_PREFERENCES } from '../../types';
 
 export class SettingsRepository {
-  constructor(private db: BunSQLiteDatabase<Record<string, unknown>>) {}
+  constructor(private db: AppDatabase) {}
 
   async getByUserId(userId: string): Promise<UserSettings | null> {
     const result = await this.db

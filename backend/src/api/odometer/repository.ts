@@ -1,13 +1,13 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, count, desc, eq } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
 import { odometerEntries } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
 
 export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdometerEntry> {
-  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
+  constructor(db: AppDatabase) {
     super(db, odometerEntries);
   }
 

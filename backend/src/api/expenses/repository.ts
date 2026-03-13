@@ -1,8 +1,9 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { AppDatabase } from '../../db/connection';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
+import { extractMonth, formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, odometerEntries, photos, vehicles } from '../../db/schema';
 import { DatabaseError, NotFoundError } from '../../errors';
@@ -63,7 +64,7 @@ function computeMonthlyAverage(
 }
 
 export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
-  constructor(db: BunSQLiteDatabase<Record<string, unknown>>) {
+  constructor(db: AppDatabase) {
     super(db, expenses);
   }
 
@@ -252,9 +253,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const result = await this.db
         .select({
           month:
-            sql<number>`cast(strftime('%m', datetime(${expenses.date} / 1000, 'unixepoch')) as integer)`.as(
-              'month'
-            ),
+            extractMonth(expenses.date).as('month'),
           total: sql<number>`sum(${expenses.expenseAmount})`.as('total'),
         })
         .from(expenses)
@@ -265,7 +264,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             lte(expenses.date, endDate)
           )
         )
-        .groupBy(sql`strftime('%m', datetime(${expenses.date} / 1000, 'unixepoch'))`)
+        .groupBy(extractMonth(expenses.date))
         .orderBy(sql`month`);
 
       return result.map((row) => ({
@@ -316,7 +315,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           vehicleId: expenses.vehicleId,
           totalAmount: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
           recentAmount: sql<number>`COALESCE(SUM(CASE WHEN ${expenses.date} >= ${recentCutoffSec} THEN ${expenses.expenseAmount} ELSE 0 END), 0)`,
-          lastExpenseDate: sql<string>`MAX(datetime(${expenses.date}, 'unixepoch'))`,
+          lastExpenseDate: sql<string>`MAX(${toDateTimeString(expenses.date)})`,
         })
         .from(expenses)
         .where(eq(expenses.userId, userId))
@@ -410,7 +409,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         // Monthly trend
         this.db
           .select({
-            period: sql<string>`strftime('%Y-%m', datetime(${expenses.date}, 'unixepoch'))`.as(
+            period: formatYearMonth(expenses.date).as(
               'period'
             ),
             amount: sql<number>`SUM(${expenses.expenseAmount})`,
@@ -418,8 +417,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           })
           .from(expenses)
           .where(periodWhere)
-          .groupBy(sql`strftime('%Y-%m', datetime(${expenses.date}, 'unixepoch'))`)
-          .orderBy(sql`strftime('%Y-%m', datetime(${expenses.date}, 'unixepoch'))`),
+          .groupBy(formatYearMonth(expenses.date))
+          .orderBy(formatYearMonth(expenses.date)),
 
         // Recent amount (last 30 days, always computed regardless of period)
         this.db

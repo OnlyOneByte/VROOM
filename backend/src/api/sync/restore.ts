@@ -3,8 +3,8 @@
  */
 
 import { and, eq, inArray } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { TABLE_SCHEMA_MAP } from '../../config';
+import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {
   expenses,
@@ -23,7 +23,7 @@ import { settingsRepository } from '../settings/repository';
 import { backupService, coerceRow } from './backup';
 
 type DrizzleTransaction = Parameters<
-  Parameters<BunSQLiteDatabase<Record<string, unknown>>['transaction']>[0]
+  Parameters<AppDatabase['transaction']>[0]
 >[0];
 
 export interface Conflict {
