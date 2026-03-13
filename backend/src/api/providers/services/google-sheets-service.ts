@@ -48,13 +48,14 @@ export class GoogleSheetsService {
 
   async createOrUpdateVroomSpreadsheet(
     userId: string,
-    folderPath: string
+    folderPath: string,
+    displayName: string
   ): Promise<SpreadsheetInfo> {
     // Walk the folder path segments (e.g. "VROOM/Backups") to find-or-create each folder
     const targetFolderId = await this.resolveOrCreateFolderPath(folderPath);
 
-    const spreadsheetName = `VROOM Data - ${folderPath}`;
-    const existingSpreadsheet = await this.findVroomSpreadsheet(targetFolderId, folderPath);
+    const spreadsheetName = `VROOM Data - ${displayName}`;
+    const existingSpreadsheet = await this.findVroomSpreadsheet(targetFolderId, displayName);
 
     let spreadsheetId: string;
     if (existingSpreadsheet) {
