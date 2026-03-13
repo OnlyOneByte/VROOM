@@ -82,21 +82,19 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
    * generates a valid Google OAuth authorization URL and stores state in the
    * oauthStateStore with { codeVerifier, createdAt } (no flowType, no userId).
    */
-  test('login/google generates OAuth URL with correct structure and state shape', async () => {
+  test('login/:authProvider generates OAuth URL with correct structure and state shape', async () => {
     // Read the source to verify the login endpoint's behavior structurally
     const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
 
     fc.assert(
       fc.property(fc.constant(null), () => {
         // Extract the login handler section
-        const loginStart = routesSource.indexOf("routes.get('/login/google'");
-        const loginEnd = routesSource.indexOf("routes.get('/callback/google'");
+        const loginStart = routesSource.indexOf("routes.get('/login/:authProvider'");
+        const loginEnd = routesSource.indexOf("routes.get('/link/:authProvider'");
         const loginSection = routesSource.slice(loginStart, loginEnd);
 
-        // Login endpoint creates OAuth URL with required scopes
-        expect(loginSection).toContain('openid');
-        expect(loginSection).toContain('profile');
-        expect(loginSection).toContain('email');
+        // Login endpoint looks up provider from registry
+        expect(loginSection).toContain('getEnabledProvider');
 
         // Login endpoint stores state with codeVerifier and createdAt
         expect(loginSection).toContain('codeVerifier');
@@ -124,34 +122,29 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
    * 5. Sets the session cookie via setCookie()
    * 6. Redirects to the dashboard (or returnTo)
    */
-  test('callback/google always creates session and sets cookie for login flow', async () => {
+  test('callback/:authProvider always creates session and sets cookie for login flow', async () => {
     const routesSource = await Bun.file(`${import.meta.dir}/../routes.ts`).text();
 
     fc.assert(
       fc.property(loginReturnToArb, (_returnTo) => {
-        // Extract the callback handler
-        const callbackStart = routesSource.indexOf("routes.get('/callback/google'");
-        const callbackEnd = routesSource.indexOf("routes.get('/me'");
+        // Extract the generic callback handler (between callback/:authProvider and session routes)
+        const callbackStart = routesSource.indexOf("routes.get('/callback/:authProvider'");
+        const callbackEnd =
+          routesSource.indexOf('// ====\n// SESSION ROUTES') !== -1
+            ? routesSource.indexOf('// ====\n// SESSION ROUTES')
+            : routesSource.indexOf("routes.get('/me'");
         const callbackSection = routesSource.slice(callbackStart, callbackEnd);
 
-        // Callback exchanges code for tokens
-        expect(callbackSection).toContain('validateAuthorizationCode');
+        // Callback uses exchangeAuthTokens helper for token exchange
+        expect(callbackSection).toContain('exchangeAuthTokens');
 
-        // Callback fetches Google user info
-        expect(callbackSection).toContain('openidconnect.googleapis.com/v1/userinfo');
-
-        // Callback looks up or creates user
-        expect(callbackSection).toContain('existingUser');
-        expect(callbackSection).toContain('db.insert(users)');
+        // Callback resolves user via 3-way resolution
+        expect(callbackSection).toContain('findByProviderIdentity');
 
         // Callback ALWAYS creates a Lucia session (this is the login behavior to preserve)
-        expect(callbackSection).toContain('lucia.createSession');
+        expect(callbackSection).toContain('createAuthSession');
 
-        // Callback ALWAYS sets the session cookie
-        expect(callbackSection).toContain('setCookie');
-        expect(callbackSection).toContain('lucia.sessionCookieName');
-
-        // Callback redirects (to dashboard by default)
+        // Callback redirects to dashboard
         expect(callbackSection).toContain('c.redirect');
         expect(callbackSection).toContain('/dashboard');
       }),

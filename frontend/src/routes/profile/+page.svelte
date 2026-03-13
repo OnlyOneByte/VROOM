@@ -1,5 +1,12 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { page } from '$app/state';
+	import { browser } from '$app/environment';
 	import { authStore } from '$lib/stores/auth.svelte';
+	import { authApi } from '$lib/services/auth-api';
+	import { getApiBaseUrl } from '$lib/services/api-client';
+	import type { LinkedAuthProvider } from '$lib/types';
+	import type { Component } from 'svelte';
 	import {
 		CircleUser,
 		Link2,
@@ -13,7 +20,12 @@
 		Download,
 		Trash2,
 		UserPlus,
-		Clock
+		Clock,
+		LoaderCircle,
+		Unlink,
+		CircleAlert,
+		CircleCheck,
+		LogIn
 	} from '@lucide/svelte';
 	import {
 		Card,
@@ -24,10 +36,43 @@
 	} from '$lib/components/ui/card';
 	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
+	import GoogleLogo from '$lib/components/icons/GoogleLogo.svelte';
+	import GitHubLogo from '$lib/components/icons/GitHubLogo.svelte';
+
+	const iconMap: Record<string, Component<{ class?: string }>> = {
+		google: GoogleLogo,
+		github: GitHubLogo
+	};
+
+	const linkErrorMessages: Record<string, string> = {
+		account_conflict: 'This account is already linked to a different user.',
+		already_linked: 'This account is already linked to your profile.',
+		cancelled: 'Linking was cancelled.'
+	};
+
+	const successMessages: Record<string, string> = {
+		linked: 'Account linked successfully.'
+	};
 
 	let user = $derived(authStore.user);
+
+	let accounts = $state<LinkedAuthProvider[]>([]);
+	let providers = $state<{ id: string; displayName: string }[]>([]);
+	let isLoadingAccounts = $state(true);
+	let unlinkingId = $state<string | null>(null);
+	let unlinkError = $state<string | null>(null);
+	let linkingProvider = $state<string | null>(null);
+
+	const linkError = $derived(page.url.searchParams.get('link_error'));
+	const linkErrorMessage = $derived(linkError ? (linkErrorMessages[linkError] ?? null) : null);
+	const successParam = $derived(page.url.searchParams.get('success'));
+	const successMessage = $derived(successParam ? (successMessages[successParam] ?? null) : null);
+
+	const linkedProviderTypes = $derived(new Set(accounts.map(a => a.providerType)));
+	const unlinkableProviders = $derived(providers.filter(p => !linkedProviderTypes.has(p.id)));
 
 	let initials = $derived.by(() => {
 		if (!user?.displayName) return '?';
@@ -46,6 +91,46 @@
 			year: 'numeric'
 		});
 	});
+
+	onMount(async () => {
+		try {
+			const [fetchedAccounts, fetchedProviders] = await Promise.all([
+				authApi.getLinkedAccounts(),
+				authApi.getProviders()
+			]);
+			accounts = fetchedAccounts;
+			providers = fetchedProviders;
+		} catch {
+			// Silently handle — accounts will show empty
+		} finally {
+			isLoadingAccounts = false;
+		}
+	});
+
+	async function handleUnlink(id: string) {
+		unlinkingId = id;
+		unlinkError = null;
+		try {
+			await authApi.unlinkAccount(id);
+			accounts = accounts.filter(a => a.id !== id);
+		} catch (err) {
+			const code = err instanceof Error && 'code' in err ? (err as { code: string }).code : '';
+			if (code === 'LAST_ACCOUNT') {
+				unlinkError = 'Cannot unlink your last sign-in method.';
+			} else {
+				unlinkError = 'Failed to unlink account. Please try again.';
+			}
+		} finally {
+			unlinkingId = null;
+		}
+	}
+
+	function handleLink(providerId: string) {
+		if (browser) {
+			linkingProvider = providerId;
+			window.location.href = `${getApiBaseUrl()}/api/v1/auth/link/${providerId}`;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -109,54 +194,107 @@
 			</CardContent>
 		</Card>
 
+		<!-- Link Error / Success Messages -->
+		{#if linkErrorMessage}
+			<div
+				class="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4"
+			>
+				<CircleAlert class="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+				<p class="text-sm text-destructive">{linkErrorMessage}</p>
+			</div>
+		{/if}
+		{#if successMessage}
+			<div class="flex items-start gap-3 rounded-lg border border-chart-2/50 bg-chart-2/10 p-4">
+				<CircleCheck class="h-5 w-5 text-chart-2 shrink-0 mt-0.5" />
+				<p class="text-sm text-chart-2">{successMessage}</p>
+			</div>
+		{/if}
+
 		<!-- Connected Accounts -->
 		<Card>
 			<CardHeader>
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<Link2 class="h-5 w-5 text-muted-foreground" />
-						<CardTitle>Connected Accounts</CardTitle>
-					</div>
-					<Badge variant="secondary">Coming Soon</Badge>
+				<div class="flex items-center gap-2">
+					<Link2 class="h-5 w-5 text-muted-foreground" />
+					<CardTitle>Connected Accounts</CardTitle>
 				</div>
-				<CardDescription>Manage linked services and OAuth providers</CardDescription>
+				<CardDescription>Manage your linked sign-in methods</CardDescription>
 			</CardHeader>
 			<CardContent>
-				<div class="space-y-3 opacity-50">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-3">
-							<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-								<svg class="h-5 w-5" viewBox="0 0 24 24">
-									<path
-										d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-										fill="#4285F4"
-									/>
-									<path
-										d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-										fill="#34A853"
-									/>
-									<path
-										d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-										fill="#FBBC05"
-									/>
-									<path
-										d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-										fill="#EA4335"
-									/>
-								</svg>
-							</div>
-							<div>
-								<p class="text-sm font-medium">Google</p>
-								<p class="text-xs text-muted-foreground">Sign-in & Drive access</p>
-							</div>
-						</div>
-						<Badge variant="outline">Connected</Badge>
+				{#if unlinkError}
+					<div
+						class="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-3 mb-3"
+					>
+						<CircleAlert class="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+						<p class="text-sm text-destructive">{unlinkError}</p>
 					</div>
-					<Separator />
-					<p class="text-sm text-muted-foreground">
-						Manage OAuth scopes, re-authenticate, and link additional providers.
-					</p>
-				</div>
+				{/if}
+				{#if isLoadingAccounts}
+					<div class="flex items-center justify-center py-6">
+						<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
+					</div>
+				{:else}
+					<div class="space-y-3">
+						{#each accounts as account (account.id)}
+							{@const IconComponent = iconMap[account.providerType]}
+							<div class="flex items-center justify-between">
+								<div class="flex items-center gap-3">
+									<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+										{#if IconComponent}
+											<IconComponent class="h-5 w-5" />
+										{:else}
+											<LogIn class="h-5 w-5 text-muted-foreground" />
+										{/if}
+									</div>
+									<div>
+										<p class="text-sm font-medium">{account.displayName}</p>
+										<p class="text-xs text-muted-foreground">{account.email}</p>
+									</div>
+								</div>
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={accounts.length <= 1 || unlinkingId !== null}
+									onclick={() => handleUnlink(account.id)}
+								>
+									{#if unlinkingId === account.id}
+										<LoaderCircle class="h-4 w-4 animate-spin" />
+									{:else}
+										<Unlink class="h-4 w-4" />
+									{/if}
+								</Button>
+							</div>
+						{/each}
+
+						{#if unlinkableProviders.length > 0}
+							<Separator />
+							<div class="space-y-2">
+								<p class="text-sm text-muted-foreground">Link another account</p>
+								{#each unlinkableProviders as provider (provider.id)}
+									{@const ProviderIcon = iconMap[provider.id]}
+									<Button
+										variant="outline"
+										size="sm"
+										class="w-full justify-start"
+										disabled={linkingProvider !== null}
+										onclick={() => handleLink(provider.id)}
+									>
+										{#if linkingProvider === provider.id}
+											<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+											Linking...
+										{:else}
+											{#if ProviderIcon}
+												<ProviderIcon class="mr-2 h-4 w-4" />
+											{:else}
+												<LogIn class="mr-2 h-4 w-4" />
+											{/if}
+											Link {provider.displayName}
+										{/if}
+									</Button>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/if}
 			</CardContent>
 		</Card>
 

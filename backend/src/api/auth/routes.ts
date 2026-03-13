@@ -1,16 +1,19 @@
 import { generateCodeVerifier, generateState } from 'arctic';
 import { and, eq } from 'drizzle-orm';
+import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { userProviders, users } from '../../db/schema';
-import { requireAuth } from '../../middleware';
+import { rateLimiter, requireAuth } from '../../middleware';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { storePending } from '../../utils/pending-credentials';
-import { getLucia, google, googleProvider } from './lucia';
+import { authProviderRepository } from './auth-provider-repository';
+import { getLucia, googleProvider } from './lucia';
+import { getEnabledProvider, getEnabledProviders, getProvider } from './providers/registry';
 import { validateAndRefreshSession } from './utils';
 
 const routes = new Hono();
@@ -33,18 +36,19 @@ const routes = new Hono();
 const oauthStateStore = new Map<
   string,
   {
-    codeVerifier: string;
+    codeVerifier?: string;
     createdAt: number;
     returnTo?: string;
     // Provider flow fields (absent for login flow)
     userId?: string;
-    flowType?: 'provider';
+    flowType?: 'provider' | 'auth-link';
     providerId?: string;
     nonce?: string;
   }
 >();
 
 // Clean up expired states (older than 10 minutes)
+const MAX_STATE_STORE_SIZE = 1000;
 const cleanupExpiredStates = () => {
   const now = Date.now();
   for (const [state, data] of oauthStateStore.entries()) {
@@ -52,101 +56,293 @@ const cleanupExpiredStates = () => {
       oauthStateStore.delete(state);
     }
   }
+  // Hard cap: if still over limit after expiry cleanup, evict oldest entries
+  if (oauthStateStore.size > MAX_STATE_STORE_SIZE) {
+    const entries = [...oauthStateStore.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt);
+    const toRemove = entries.slice(0, oauthStateStore.size - MAX_STATE_STORE_SIZE);
+    for (const [key] of toRemove) {
+      oauthStateStore.delete(key);
+    }
+  }
 };
 
-// Google OAuth login initiation
-routes.get('/login/google', async (c) => {
+// --- Auth rate limiter (IP-based, for unauthenticated login/callback/link routes) ---
+const authRateLimiter = rateLimiter({
+  ...CONFIG.rateLimit.auth,
+  keyGenerator: (c) => {
+    return `auth:${c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'anonymous'}`;
+  },
+});
+
+// ============================================================================
+// PUBLIC AUTH ROUTES (no requireAuth)
+// ============================================================================
+
+// List enabled auth providers (public)
+routes.get('/providers', async (c) => {
+  const providers = getEnabledProviders();
+  return c.json({
+    success: true,
+    data: providers.map((p) => ({ id: p.id, displayName: p.displayName })),
+  });
+});
+
+// Auth login initiation — provider-agnostic
+routes.get('/login/:authProvider', authRateLimiter, async (c) => {
+  const authProviderId = c.req.param('authProvider') ?? '';
+  const providerConfig = getEnabledProvider(authProviderId);
+
+  if (!providerConfig) {
+    return c.redirect(`${CONFIG.frontend.url}/auth?auth_error=unknown_provider`);
+  }
+
   const state = generateState();
-  const codeVerifier = generateCodeVerifier();
-  const url = await google.createAuthorizationURL(state, codeVerifier, [
-    'openid',
-    'profile',
-    'email',
-  ]);
+  const codeVerifier = providerConfig.supportsPKCE ? generateCodeVerifier() : undefined;
 
-  // Account picker for returning users — no offline access needed for login
-  url.searchParams.set('prompt', 'select_account');
-
-  // Store state and code verifier in memory (for development)
-  // In production, use Redis or a database with TTL
   oauthStateStore.set(state, {
     codeVerifier,
     createdAt: Date.now(),
   });
 
+  const url = providerConfig.createAuthorizationURL(state, codeVerifier);
   cleanupExpiredStates();
   return c.redirect(url.toString());
 });
 
-routes.get('/callback/google', async (c) => {
-  const url = new URL(c.req.url);
-  const code = url.searchParams.get('code');
-  const state = url.searchParams.get('state');
+// Auth link initiation — requires authentication
+routes.get('/link/:authProvider', authRateLimiter, requireAuth, async (c) => {
+  const user = c.get('user');
+  const authProviderId = c.req.param('authProvider') ?? '';
+  const providerConfig = getEnabledProvider(authProviderId);
 
-  if (!code || !state) {
-    throw new HTTPException(400, { message: 'Missing code or state parameter' });
+  if (!providerConfig) {
+    return c.redirect(`${CONFIG.frontend.url}/profile?link_error=unknown_provider`);
   }
 
-  const storedData = oauthStateStore.get(state);
-  if (!storedData) {
-    throw new HTTPException(400, {
-      message: 'Invalid or expired state. Please try logging in again.',
-    });
-  }
+  const state = generateState();
+  const codeVerifier = providerConfig.supportsPKCE ? generateCodeVerifier() : undefined;
 
-  const { codeVerifier, returnTo } = storedData;
-  oauthStateStore.delete(state);
-
-  // Exchange code for tokens
-  const tokens = await google.validateAuthorizationCode(code, codeVerifier);
-
-  // Get user info from Google
-  const googleUserResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-    headers: {
-      Authorization: `Bearer ${tokens.accessToken()}`,
-    },
+  oauthStateStore.set(state, {
+    codeVerifier,
+    createdAt: Date.now(),
+    userId: user.id,
+    flowType: 'auth-link',
   });
 
-  if (!googleUserResponse.ok) {
-    throw new HTTPException(500, { message: 'Failed to fetch user info from Google' });
-  }
+  const url = providerConfig.createAuthorizationURL(state, codeVerifier);
+  cleanupExpiredStates();
+  return c.redirect(url.toString());
+});
 
-  const googleUser = (await googleUserResponse.json()) as {
-    sub: string;
-    email: string;
-    name: string;
-    picture?: string;
-  };
+// --- Auth callback helper: exchange tokens and fetch user info ---
+async function exchangeAuthTokens(
+  providerConfig: ReturnType<typeof getProvider> & object,
+  code: string,
+  codeVerifier: string | undefined
+) {
+  const cv = providerConfig.supportsPKCE ? codeVerifier : undefined;
+  const tokens = await providerConfig.validateAuthorizationCode(code, cv);
+  const userInfo = await providerConfig.fetchUserInfo(tokens.accessToken);
+  return userInfo;
+}
 
-  // Get database instance
+// --- Auth callback helper: update existing user's profile ---
+async function updateExistingUserProfile(
+  userId: string,
+  authRowId: string,
+  userInfo: { email: string; displayName: string; avatarUrl?: string }
+) {
   const db = getDb();
+  await authProviderRepository.updateProfile(authRowId, userId, {
+    email: userInfo.email,
+    displayName: userInfo.displayName,
+    avatarUrl: userInfo.avatarUrl,
+  });
+  // Update users table — wrap email update in try/catch for UNIQUE constraint
+  try {
+    await db
+      .update(users)
+      .set({ email: userInfo.email, displayName: userInfo.displayName, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  } catch (emailErr) {
+    if (emailErr instanceof Error && emailErr.message.includes('UNIQUE constraint failed')) {
+      logger.warn(
+        'Skipped email update due to UNIQUE conflict — another user already has this email',
+        {
+          userId,
+          attemptedEmail: userInfo.email,
+        }
+      );
+      await db
+        .update(users)
+        .set({ displayName: userInfo.displayName, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+    } else {
+      throw emailErr;
+    }
+  }
+}
 
-  // Check if user exists by email
-  const existingUser = await db
+// --- Auth callback helper: resolve new user (no existing auth row) ---
+async function resolveNewUser(
+  authProviderId: string,
+  userInfo: { providerAccountId: string; email: string; displayName: string; avatarUrl?: string }
+): Promise<{ userId: string } | { redirect: string }> {
+  const db = getDb();
+  const existingByEmail = await db
     .select()
     .from(users)
-    .where(eq(users.email, googleUser.email))
+    .where(eq(users.email, userInfo.email))
     .limit(1);
 
-  let userId: string;
-
-  if (existingUser.length === 0) {
-    // Create new user
-    userId = `google_${googleUser.sub}`;
-    await db.insert(users).values({
-      id: userId,
-      email: googleUser.email,
-      displayName: googleUser.name,
-    });
-  } else {
-    // Existing user
-    userId = existingUser[0].id;
+  if (existingByEmail.length > 0) {
+    // Email already taken — no implicit account merging
+    return { redirect: `${CONFIG.frontend.url}/auth?auth_error=email_exists` };
   }
 
-  // Create session
+  // New user transaction with race condition catch
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [newUser] = await tx
+        .insert(users)
+        .values({
+          email: userInfo.email,
+          displayName: userInfo.displayName,
+        })
+        .returning();
+      await tx.insert(userProviders).values({
+        userId: newUser.id,
+        domain: 'auth',
+        providerType: authProviderId,
+        providerAccountId: userInfo.providerAccountId,
+        displayName: userInfo.displayName,
+        credentials: '',
+        config: { email: userInfo.email, avatarUrl: userInfo.avatarUrl },
+        status: 'active',
+      });
+      return { userId: newUser.id };
+    });
+    return result;
+  } catch (txErr) {
+    if (txErr instanceof Error && txErr.message.includes('UNIQUE constraint failed')) {
+      const retryRow = await authProviderRepository.findByProviderIdentity(
+        authProviderId,
+        userInfo.providerAccountId
+      );
+      if (retryRow) return { userId: retryRow.userId };
+      return { redirect: `${CONFIG.frontend.url}/auth?auth_error=email_exists` };
+    }
+    throw txErr;
+  }
+}
+
+// --- Auth callback helper: validate OAuth state for link flow ---
+function validateLinkState(stateParam: string | null) {
+  const storedData = stateParam ? oauthStateStore.get(stateParam) : undefined;
+  if (!stateParam || !storedData || storedData.flowType !== 'auth-link') {
+    if (stateParam) oauthStateStore.delete(stateParam);
+    return { error: 'invalid_state' as const };
+  }
+  oauthStateStore.delete(stateParam);
+  return { data: storedData };
+}
+
+// --- Auth callback helper: validate OAuth state for login flow ---
+function validateLoginState(stateParam: string | null) {
+  const storedData = stateParam ? oauthStateStore.get(stateParam) : undefined;
+  if (!stateParam || !storedData || storedData.flowType) {
+    if (stateParam) oauthStateStore.delete(stateParam);
+    return { error: 'invalid_state' as const };
+  }
+  oauthStateStore.delete(stateParam);
+  return { data: storedData };
+}
+
+// --- Auth callback helper: handle link conflict check ---
+async function checkLinkConflicts(
+  authProviderId: string,
+  providerAccountId: string,
+  currentUserId: string
+): Promise<string | null> {
+  const existingRow = await authProviderRepository.findByProviderIdentity(
+    authProviderId,
+    providerAccountId
+  );
+  if (!existingRow) return null;
+  if (existingRow.userId === currentUserId) return 'already_linked';
+  return 'account_conflict';
+}
+
+// Link callback — MUST be registered BEFORE the generic callback to avoid route collision
+routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
+  const authProviderId = c.req.param('authProvider') ?? '';
+  const url = new URL(c.req.url);
+  const code = url.searchParams.get('code');
+  const stateParam = url.searchParams.get('state');
+  const profileRedirect = (params: string) => `${CONFIG.frontend.url}/profile?${params}`;
+
+  // Handle cancellation
+  if (!code) {
+    if (stateParam) oauthStateStore.delete(stateParam);
+    return c.redirect(profileRedirect('link_error=cancelled'));
+  }
+
+  const stateResult = validateLinkState(stateParam);
+  if ('error' in stateResult) return c.redirect(profileRedirect('link_error=invalid_state'));
+  const storedData = stateResult.data;
+
+  // Validate session manually
+  const lucia = getLucia();
+  const sessionId = getCookie(c, lucia.sessionCookieName);
+  const authResult = await validateProviderSession(sessionId);
+  if (!authResult) return c.redirect(`${CONFIG.frontend.url}/auth?auth_error=invalid_state`);
+
+  // CSRF check
+  if (storedData.userId !== authResult.user.id) {
+    logger.warn('Auth link CSRF mismatch', {
+      sessionUserId: authResult.user.id,
+      stateUserId: storedData.userId,
+    });
+    return c.redirect(profileRedirect('link_error=session_mismatch'));
+  }
+
+  const providerConfig = getProvider(authProviderId);
+  if (!providerConfig) return c.redirect(profileRedirect('link_error=unknown_provider'));
+
+  const tokenResult = await exchangeAuthTokensOrRedirect(
+    providerConfig,
+    code,
+    storedData.codeVerifier,
+    authProviderId,
+    'Auth link'
+  );
+  if ('redirect' in tokenResult)
+    return c.redirect(profileRedirect(`link_error=${tokenResult.redirect}`));
+  const { userInfo } = tokenResult;
+
+  const conflict = await checkLinkConflicts(
+    authProviderId,
+    userInfo.providerAccountId,
+    authResult.user.id
+  );
+  if (conflict) return c.redirect(profileRedirect(`link_error=${conflict}`));
+
+  await authProviderRepository.create({
+    userId: authResult.user.id,
+    authProvider: authProviderId,
+    providerAccountId: userInfo.providerAccountId,
+    email: userInfo.email,
+    displayName: userInfo.displayName,
+    avatarUrl: userInfo.avatarUrl,
+  });
+
+  return c.redirect(profileRedirect('success=linked'));
+});
+
+// --- Auth callback helper: create Lucia session and set cookie ---
+async function createAuthSession(c: Context, userId: string) {
   const lucia = getLucia();
   const session = await lucia.createSession(userId, {});
-
   setCookie(c, lucia.sessionCookieName, session.id, {
     path: '/',
     secure: CONFIG.env === 'production',
@@ -155,12 +351,83 @@ routes.get('/callback/google', async (c) => {
     expires: session.expiresAt,
     sameSite: 'Lax',
   });
+}
 
-  // Redirect to frontend — use returnTo if provided (e.g., reauth from provider form),
-  // otherwise default to dashboard
-  const redirectPath = returnTo?.startsWith('/') ? returnTo : '/dashboard';
-  return c.redirect(`${CONFIG.frontend.url}${redirectPath}`);
+// --- Auth callback helper: exchange tokens with error redirect ---
+async function exchangeAuthTokensOrRedirect(
+  providerConfig: ReturnType<typeof getProvider> & object,
+  code: string,
+  codeVerifier: string | undefined,
+  authProviderId: string,
+  errorPrefix: string
+): Promise<
+  { userInfo: Awaited<ReturnType<typeof providerConfig.fetchUserInfo>> } | { redirect: string }
+> {
+  try {
+    const userInfo = await exchangeAuthTokens(providerConfig, code, codeVerifier);
+    return { userInfo };
+  } catch (err) {
+    logger.error(`${errorPrefix} token exchange or user info fetch failed`, {
+      error: err instanceof Error ? err.message : String(err),
+      provider: authProviderId,
+    });
+    const isNoEmail = err instanceof Error && err.message.includes('No verified email');
+    return { redirect: isNoEmail ? 'no_email' : 'provider_unavailable' };
+  }
+}
+
+// Generic auth callback — REGISTERED AFTER link callback
+routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
+  const authProviderId = c.req.param('authProvider') ?? '';
+  const url = new URL(c.req.url);
+  const code = url.searchParams.get('code');
+  const stateParam = url.searchParams.get('state');
+  const authRedirect = (params: string) => `${CONFIG.frontend.url}/auth?${params}`;
+
+  if (!code) {
+    if (stateParam) oauthStateStore.delete(stateParam);
+    return c.redirect(authRedirect('auth_error=cancelled'));
+  }
+
+  const stateResult = validateLoginState(stateParam);
+  if ('error' in stateResult) return c.redirect(authRedirect('auth_error=invalid_state'));
+
+  const providerConfig = getProvider(authProviderId);
+  if (!providerConfig) return c.redirect(authRedirect('auth_error=unknown_provider'));
+
+  const tokenResult = await exchangeAuthTokensOrRedirect(
+    providerConfig,
+    code,
+    stateResult.data.codeVerifier,
+    authProviderId,
+    'Auth callback'
+  );
+  if ('redirect' in tokenResult)
+    return c.redirect(authRedirect(`auth_error=${tokenResult.redirect}`));
+  const { userInfo } = tokenResult;
+
+  const existingAuthRow = await authProviderRepository.findByProviderIdentity(
+    authProviderId,
+    userInfo.providerAccountId
+  );
+
+  let userId: string;
+  if (existingAuthRow) {
+    userId = existingAuthRow.userId;
+    await updateExistingUserProfile(userId, existingAuthRow.id, userInfo);
+  } else {
+    const resolution = await resolveNewUser(authProviderId, userInfo);
+    if ('redirect' in resolution) return c.redirect(resolution.redirect);
+    userId = resolution.userId;
+  }
+
+  await createAuthSession(c, userId);
+  return c.redirect(`${CONFIG.frontend.url}/dashboard`);
 });
+
+// ============================================================================
+// SESSION ROUTES (no rate limiter — these are not auth initiation)
+// ============================================================================
 
 // Get current user
 routes.get('/me', async (c) => {
@@ -244,7 +511,99 @@ routes.post('/refresh', async (c) => {
   });
 });
 
-// Provider OAuth initiation — isolated from login flow (Task 5.1)
+// ============================================================================
+// LINKED ACCOUNTS ROUTES (requireAuth, no rate limiter)
+// ============================================================================
+
+// List linked auth accounts
+routes.get('/accounts', requireAuth, async (c) => {
+  const user = c.get('user');
+  const rows = await authProviderRepository.findByUserId(user.id);
+
+  const data = rows.map((row) => {
+    const config = (row.config as Record<string, unknown>) ?? {};
+    return {
+      id: row.id,
+      providerType: row.providerType,
+      displayName: row.displayName,
+      email: (config.email as string) ?? '',
+      avatarUrl: (config.avatarUrl as string) ?? undefined,
+      createdAt: row.createdAt ? row.createdAt.toISOString() : new Date().toISOString(),
+    };
+  });
+
+  return c.json({ success: true, data });
+});
+
+// Unlink auth account — transaction-safe
+routes.delete('/accounts/:id', requireAuth, async (c) => {
+  const user = c.get('user');
+  const accountId = c.req.param('id');
+  const db = getDb();
+
+  const result = await db.transaction(async (tx) => {
+    // Verify row exists, belongs to user, and is auth domain
+    const row = await tx
+      .select()
+      .from(userProviders)
+      .where(
+        and(
+          eq(userProviders.id, accountId),
+          eq(userProviders.userId, user.id),
+          eq(userProviders.domain, 'auth')
+        )
+      )
+      .limit(1);
+
+    if (!row[0]) {
+      return { error: 'not_found' as const };
+    }
+
+    // Count auth rows within the transaction
+    const countResult = await tx
+      .select({ value: userProviders.id })
+      .from(userProviders)
+      .where(and(eq(userProviders.userId, user.id), eq(userProviders.domain, 'auth')));
+
+    if (countResult.length <= 1) {
+      return { error: 'last_account' as const };
+    }
+
+    await tx.delete(userProviders).where(eq(userProviders.id, accountId));
+
+    return { success: true as const };
+  });
+
+  if ('error' in result) {
+    if (result.error === 'not_found') {
+      return c.json(
+        {
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Auth account not found' },
+        },
+        404
+      );
+    }
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: 'LAST_ACCOUNT',
+          message: 'Cannot unlink your last sign-in method',
+        },
+      },
+      400
+    );
+  }
+
+  return c.body(null, 204);
+});
+
+// ============================================================================
+// STORAGE PROVIDER OAUTH ROUTES (existing — kept below auth routes)
+// ============================================================================
+
+// Provider OAuth initiation — isolated from login flow
 routes.get('/providers/connect/google', requireAuth, async (c) => {
   const user = c.get('user');
   const returnTo = c.req.query('returnTo');
@@ -259,7 +618,7 @@ routes.get('/providers/connect/google', requireAuth, async (c) => {
 
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
-  const url = await googleProvider.createAuthorizationURL(state, codeVerifier, [
+  const url = googleProvider.createAuthorizationURL(state, codeVerifier, [
     'openid',
     'profile',
     'email',
@@ -368,6 +727,12 @@ function resolveProviderState(
     return { error: 'invalid_state', returnTo };
   }
 
+  // Runtime assertion: provider flow always requires codeVerifier (Google supports PKCE)
+  if (!storedData.codeVerifier) {
+    oauthStateStore.delete(stateParam);
+    return { error: 'invalid_state', returnTo };
+  }
+
   oauthStateStore.delete(stateParam);
   return {
     state: {
@@ -391,7 +756,7 @@ async function validateProviderCsrf(
   return { userId: authResult.user.id };
 }
 
-// Provider OAuth callback — never touches the session (Task 5.2)
+// Provider OAuth callback — never touches the session
 routes.get('/callback/provider/google', async (c) => {
   const url = new URL(c.req.url);
   const code = url.searchParams.get('code');

@@ -28,14 +28,7 @@ export const lucia = new Lucia(adapter, {
   },
 });
 
-// Initialize Google OAuth — login flow
-export const google = new Google(
-  CONFIG.auth.googleClientId || '',
-  CONFIG.auth.googleClientSecret || '',
-  CONFIG.auth.googleRedirectUri
-);
-
-// Initialize Google OAuth — provider flow (separate redirect URI)
+// Initialize Google OAuth — provider flow (separate redirect URI, offline access for storage)
 export const googleProvider = new Google(
   CONFIG.auth.googleClientId || '',
   CONFIG.auth.googleClientSecret || '',

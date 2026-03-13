@@ -33,6 +33,9 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().default('http://localhost:3001/auth/callback/google'),
   GOOGLE_PROVIDER_REDIRECT_URI: z.string().optional(),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  GITHUB_REDIRECT_URI: z.string().default('http://localhost:3001/api/v1/auth/callback/github'),
   SESSION_SECRET: z.string().min(32, 'Session secret must be at least 32 characters').optional(),
   FRONTEND_URL: z.string().optional(),
   CORS_ORIGINS: z
@@ -94,6 +97,9 @@ export const CONFIG = {
     googleProviderRedirectUri:
       env.GOOGLE_PROVIDER_REDIRECT_URI ||
       env.GOOGLE_REDIRECT_URI.replace('/callback/google', '/callback/provider/google'),
+    githubClientId: env.GITHUB_CLIENT_ID,
+    githubClientSecret: env.GITHUB_CLIENT_SECRET,
+    githubRedirectUri: env.GITHUB_REDIRECT_URI,
     sessionSecret: env.SESSION_SECRET,
     cookieMaxAge: 30 * 24 * 60 * 60,
     sessionDuration: 30 * 24 * 60 * 60 * 1000,
@@ -117,6 +123,7 @@ export const CONFIG = {
   rateLimit: {
     cleanupInterval: 60_000,
     global: { windowMs: 15 * 60 * 1000, limit: 1000, message: 'Too many requests' },
+    auth: { windowMs: 15 * 60 * 1000, limit: 30 },
     sync: { windowMs: 15 * 60 * 1000, limit: 50, message: 'Too many sync requests' },
     backup: { windowMs: 5 * 60 * 1000, limit: 20, message: 'Too many backup requests' },
     restore: { windowMs: 10 * 60 * 1000, limit: 10, message: 'Too many restore requests' },

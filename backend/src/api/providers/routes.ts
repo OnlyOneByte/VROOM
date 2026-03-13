@@ -276,6 +276,11 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
 
   const db = getDb();
 
+  // Domain guard: auth providers are managed through /auth routes only
+  if (body.domain === 'auth') {
+    throw new ValidationError('Auth providers cannot be created through this endpoint');
+  }
+
   const { encryptedCredentials, resolvedConfig } = resolveProviderCredentials(
     user.id,
     body.providerType,
@@ -406,6 +411,11 @@ routes.put(
       throw new NotFoundError('Provider');
     }
 
+    // Domain guard: auth providers are managed through /auth routes only
+    if (existing[0].domain === 'auth') {
+      throw new ValidationError('Auth providers cannot be modified through this endpoint');
+    }
+
     const updates: Record<string, unknown> = { updatedAt: new Date() };
 
     if (body.displayName !== undefined) {
@@ -506,6 +516,11 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
 
   if (!existing[0]) {
     throw new NotFoundError('Provider');
+  }
+
+  // Domain guard: auth providers are managed through /auth routes only
+  if (existing[0].domain === 'auth') {
+    throw new ValidationError('Auth providers cannot be modified through this endpoint');
   }
 
   // If domain is 'storage', clean up storage_config references and photo_refs

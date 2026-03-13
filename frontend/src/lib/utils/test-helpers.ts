@@ -52,7 +52,7 @@ export function createMockAuthStore() {
 		setLoading: vi.fn(),
 		setError: vi.fn(),
 		initialize: vi.fn(),
-		loginWithGoogle: vi.fn(),
+		loginWith: vi.fn(),
 		refreshToken: vi.fn(),
 		logout: vi.fn()
 	};
