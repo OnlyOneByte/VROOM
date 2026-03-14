@@ -28,6 +28,10 @@
 - [ ] Shared expense log: expenses entered by any authorized user appear on the vehicle's timeline
 - [ ] Permission levels: view-only vs. edit access per shared vehicle
 
+### Location
+- [ ] Store location with expenses
+- [ ] Road trip! Trips tracking
+
 ### Insurance Tracking
 - [x] Core insurance policy information
 - [x] Document storage: upload & retrieve proof-of-insurance cards and policy PDFs per policy (integrate with existing photo/file infrastructure)
