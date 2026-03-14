@@ -15,7 +15,6 @@
 	import { loadOfflineExpenses } from '$lib/utils/offline-storage';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import '../app.css';
-	import favicon from '$lib/assets/favicon.svg';
 
 	import { LoaderCircle } from '@lucide/svelte';
 
@@ -120,7 +119,6 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<meta name="theme-color" content="#2563eb" />
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -- PWA manifest link from @vite-pwa/sveltekit -->

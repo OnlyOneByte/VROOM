@@ -97,7 +97,7 @@ describe('Property 1: Transformer round-trip preservation', () => {
  * Property 2: fuelType-based mutual exclusivity
  * Validates: Requirements 2.5, 2.6
  *
- * For any backend expense with a non-null fuelAmount,
+ * For any backend expense with a non-null volume,
  * fromBackendExpense maps it to exactly one of volume or charge,
  * determined solely by isElectricFuelType(fuelType).
  * The two fields are never both defined on the same expense.
@@ -112,32 +112,32 @@ describe('Property 2: fuelType-based mutual exclusivity', () => {
 			tags: fc.constant([] as string[]),
 			expenseAmount: fc.double({ min: 0.01, max: 100000, noNaN: true, noDefaultInfinity: true }),
 			date: fc.constant('2024-06-15T12:00:00.000Z'),
-			fuelAmount: fc.double({ min: 0.01, max: 10000, noNaN: true, noDefaultInfinity: true }),
+			volume: fc.double({ min: 0.01, max: 10000, noNaN: true, noDefaultInfinity: true }),
 			fuelType,
 			createdAt: fc.constant(new Date().toISOString()),
 			updatedAt: fc.constant(new Date().toISOString())
 		});
 
-	test('electric fuelType maps fuelAmount to charge, volume is undefined', () => {
+	test('electric fuelType maps volume to charge, volume is undefined on result', () => {
 		fc.assert(
 			fc.property(backendExpenseArb(fc.constantFrom(...ELECTRIC_FUEL_TYPES)), backendExpense => {
 				const result = fromBackendExpense(backendExpense);
 
-				expect(result.charge).toBe(backendExpense.fuelAmount);
+				expect(result.charge).toBe(backendExpense.volume);
 				expect(result.volume).toBeUndefined();
 			}),
 			{ numRuns: 100 }
 		);
 	});
 
-	test('non-electric fuelType maps fuelAmount to volume, charge is undefined', () => {
+	test('non-electric fuelType maps volume to volume, charge is undefined', () => {
 		fc.assert(
 			fc.property(
 				backendExpenseArb(fc.constantFrom(...NON_ELECTRIC_FUEL_TYPES)),
 				backendExpense => {
 					const result = fromBackendExpense(backendExpense);
 
-					expect(result.volume).toBe(backendExpense.fuelAmount);
+					expect(result.volume).toBe(backendExpense.volume);
 					expect(result.charge).toBeUndefined();
 				}
 			),
@@ -153,7 +153,7 @@ describe('Property 2: fuelType-based mutual exclusivity', () => {
 				const hasVolume = result.volume !== undefined;
 				const hasCharge = result.charge !== undefined;
 
-				// Exactly one must be defined (since fuelAmount is non-null)
+				// Exactly one must be defined (since volume is non-null)
 				expect(hasVolume !== hasCharge).toBe(true);
 
 				// The choice must match isElectricFuelType
