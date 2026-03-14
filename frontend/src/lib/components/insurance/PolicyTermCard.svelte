@@ -3,14 +3,14 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import type { PolicyTerm } from '$lib/types';
+	import type { InsuranceTerm } from '$lib/types';
 
 	interface Props {
-		term: PolicyTerm;
+		term: InsuranceTerm;
 		isCurrent?: boolean;
 		vehicleNames?: string[];
-		onEdit?: (_term: PolicyTerm) => void;
-		onDelete?: (_term: PolicyTerm) => void;
+		onEdit?: (_term: InsuranceTerm) => void;
+		onDelete?: (_term: InsuranceTerm) => void;
 		onRenew?: () => void;
 	}
 
@@ -70,16 +70,16 @@
 			<div class="text-muted-foreground">End</div>
 			<div class="font-medium text-foreground">{formatDate(term.endDate)}</div>
 		{/if}
-		{#if term.financeDetails.totalCost !== undefined}
+		{#if term.totalCost !== undefined}
 			<div class="text-muted-foreground">Total Cost</div>
 			<div class="font-semibold text-foreground">
-				{formatCurrency(term.financeDetails.totalCost)}
+				{formatCurrency(term.totalCost)}
 			</div>
 		{/if}
-		{#if term.financeDetails.monthlyCost !== undefined}
+		{#if term.monthlyCost !== undefined}
 			<div class="text-muted-foreground">Monthly</div>
 			<div class="font-medium text-foreground">
-				{formatCurrency(term.financeDetails.monthlyCost)}/mo
+				{formatCurrency(term.monthlyCost)}/mo
 			</div>
 		{/if}
 		{#if vehicleNames.length > 0}
@@ -88,9 +88,9 @@
 		{/if}
 	</div>
 
-	{#if term.policyDetails.coverageDescription}
+	{#if term.coverageDescription}
 		<p class="text-xs text-muted-foreground line-clamp-2">
-			{term.policyDetails.coverageDescription}
+			{term.coverageDescription}
 		</p>
 	{/if}
 </div>

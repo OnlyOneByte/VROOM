@@ -19,31 +19,23 @@
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { ALLOWED_MIME_TYPES } from '../../photos/photo-service';
-import { policyTermSchema } from '../validation';
-import {
-  termWithNegativeCoverageLimitArb,
-  termWithNegativeDeductibleArb,
-  termWithNegativeMonthlyCostArb,
-  termWithNegativeTotalCostArb,
-  termWithReversedDatesArb,
-  termWithSameDatesArb,
-  termWithZeroCoverageLimitArb,
-  termWithZeroDeductibleArb,
-  termWithZeroMonthlyCostArb,
-  termWithZeroTotalCostArb,
-  validTermArb,
-} from './insurance-test-generators';
+import { createTermSchema } from '../validation';
+import { validTermInputArb } from './insurance-test-generators';
 
-// Feature: insurance-management, Property 4: Term field validation
+// Feature: insurance-management, Property 19: Insurance validation accepts flat term fields
 
-describe('Property 4: Term field validation', () => {
+describe('Property 19: Insurance validation accepts flat term fields', () => {
   // -----------------------------------------------------------------------
-  // 1. Valid terms should parse successfully
+  // 1. Valid flat terms should parse successfully
   // -----------------------------------------------------------------------
-  test('valid terms with all constraints satisfied should parse successfully', () => {
+  test('valid flat terms with vehicleCoverage should parse successfully', () => {
     fc.assert(
-      fc.property(validTermArb, (term) => {
-        const result = policyTermSchema.safeParse(term);
+      fc.property(validTermInputArb, (term) => {
+        const input = {
+          ...term,
+          vehicleCoverage: { vehicleIds: ['v-1'] },
+        };
+        const result = createTermSchema.safeParse(input);
         expect(result.success).toBe(true);
       }),
       { numRuns: 100 }
@@ -51,12 +43,17 @@ describe('Property 4: Term field validation', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 2. Terms with startDate >= endDate (same date) should be rejected
+  // 2. Terms with startDate >= endDate should be rejected
   // -----------------------------------------------------------------------
   test('terms with startDate equal to endDate should be rejected', () => {
     fc.assert(
-      fc.property(termWithSameDatesArb, (term) => {
-        const result = policyTermSchema.safeParse(term);
+      fc.property(validTermInputArb, (term) => {
+        const input = {
+          ...term,
+          endDate: term.startDate, // same date
+          vehicleCoverage: { vehicleIds: ['v-1'] },
+        };
+        const result = createTermSchema.safeParse(input);
         expect(result.success).toBe(false);
       }),
       { numRuns: 100 }
@@ -64,27 +61,17 @@ describe('Property 4: Term field validation', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 3. Terms with startDate > endDate (reversed) should be rejected
-  // -----------------------------------------------------------------------
-  test('terms with startDate after endDate should be rejected', () => {
-    fc.assert(
-      fc.property(termWithReversedDatesArb, (term) => {
-        // Only test when dates are actually different after reversal
-        if (term.startDate === term.endDate) return;
-        const result = policyTermSchema.safeParse(term);
-        expect(result.success).toBe(false);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  // -----------------------------------------------------------------------
-  // 4. Terms with negative deductibleAmount should be rejected
+  // 3. Terms with negative deductibleAmount should be rejected
   // -----------------------------------------------------------------------
   test('terms with negative deductibleAmount should be rejected', () => {
     fc.assert(
-      fc.property(termWithNegativeDeductibleArb, (term) => {
-        const result = policyTermSchema.safeParse(term);
+      fc.property(validTermInputArb, (term) => {
+        const input = {
+          ...term,
+          deductibleAmount: -(Math.random() * 1000 + 0.01),
+          vehicleCoverage: { vehicleIds: ['v-1'] },
+        };
+        const result = createTermSchema.safeParse(input);
         expect(result.success).toBe(false);
       }),
       { numRuns: 100 }
@@ -92,51 +79,17 @@ describe('Property 4: Term field validation', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 5. Terms with zero deductibleAmount should be rejected (must be positive)
-  // -----------------------------------------------------------------------
-  test('terms with zero deductibleAmount should be rejected', () => {
-    fc.assert(
-      fc.property(termWithZeroDeductibleArb, (term) => {
-        const result = policyTermSchema.safeParse(term);
-        expect(result.success).toBe(false);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  // -----------------------------------------------------------------------
-  // 6. Terms with negative coverageLimit should be rejected
-  // -----------------------------------------------------------------------
-  test('terms with negative coverageLimit should be rejected', () => {
-    fc.assert(
-      fc.property(termWithNegativeCoverageLimitArb, (term) => {
-        const result = policyTermSchema.safeParse(term);
-        expect(result.success).toBe(false);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  // -----------------------------------------------------------------------
-  // 7. Terms with zero coverageLimit should be rejected (must be positive)
-  // -----------------------------------------------------------------------
-  test('terms with zero coverageLimit should be rejected', () => {
-    fc.assert(
-      fc.property(termWithZeroCoverageLimitArb, (term) => {
-        const result = policyTermSchema.safeParse(term);
-        expect(result.success).toBe(false);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  // -----------------------------------------------------------------------
-  // 8. Terms with negative totalCost should be rejected
+  // 4. Terms with negative totalCost should be rejected
   // -----------------------------------------------------------------------
   test('terms with negative totalCost should be rejected', () => {
     fc.assert(
-      fc.property(termWithNegativeTotalCostArb, (term) => {
-        const result = policyTermSchema.safeParse(term);
+      fc.property(validTermInputArb, (term) => {
+        const input = {
+          ...term,
+          totalCost: -(Math.random() * 1000 + 0.01),
+          vehicleCoverage: { vehicleIds: ['v-1'] },
+        };
+        const result = createTermSchema.safeParse(input);
         expect(result.success).toBe(false);
       }),
       { numRuns: 100 }
@@ -144,25 +97,17 @@ describe('Property 4: Term field validation', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 9. Terms with negative monthlyCost should be rejected
-  // -----------------------------------------------------------------------
-  test('terms with negative monthlyCost should be rejected', () => {
-    fc.assert(
-      fc.property(termWithNegativeMonthlyCostArb, (term) => {
-        const result = policyTermSchema.safeParse(term);
-        expect(result.success).toBe(false);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  // -----------------------------------------------------------------------
-  // 10. Terms with zero totalCost should be accepted (non-negative)
+  // 5. Terms with zero totalCost should be accepted (non-negative)
   // -----------------------------------------------------------------------
   test('terms with zero totalCost should be accepted', () => {
     fc.assert(
-      fc.property(termWithZeroTotalCostArb, (term) => {
-        const result = policyTermSchema.safeParse(term);
+      fc.property(validTermInputArb, (term) => {
+        const input = {
+          ...term,
+          totalCost: 0,
+          vehicleCoverage: { vehicleIds: ['v-1'] },
+        };
+        const result = createTermSchema.safeParse(input);
         expect(result.success).toBe(true);
       }),
       { numRuns: 100 }
@@ -170,13 +115,13 @@ describe('Property 4: Term field validation', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 11. Terms with zero monthlyCost should be accepted (non-negative)
+  // 6. Terms missing vehicleCoverage should be rejected
   // -----------------------------------------------------------------------
-  test('terms with zero monthlyCost should be accepted', () => {
+  test('terms without vehicleCoverage should be rejected', () => {
     fc.assert(
-      fc.property(termWithZeroMonthlyCostArb, (term) => {
-        const result = policyTermSchema.safeParse(term);
-        expect(result.success).toBe(true);
+      fc.property(validTermInputArb, (term) => {
+        const result = createTermSchema.safeParse(term);
+        expect(result.success).toBe(false);
       }),
       { numRuns: 100 }
     );

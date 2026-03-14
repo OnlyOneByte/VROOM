@@ -133,6 +133,7 @@ function makeActiveRef(overrides: Partial<PhotoRef> = {}): PhotoRef {
 function makePhoto(overrides: Partial<Photo> = {}): Photo {
   return {
     id: 'photo-1',
+    userId: 'user-1',
     entityType: 'vehicle',
     entityId: 'vehicle-1',
     fileName: 'car.jpg',

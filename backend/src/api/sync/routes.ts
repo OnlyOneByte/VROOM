@@ -18,7 +18,7 @@ import {
 import { bodyLimit, idempotency, rateLimiter, requireAuth } from '../../middleware';
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
-import { settingsRepository } from '../settings/repository';
+import { preferencesRepository, syncStateRepository } from '../settings/repository';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
 import { backupOrchestrator } from './backup-orchestrator';
@@ -108,8 +108,9 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
 routes.get('/status', async (c) => {
   const user = c.get('user');
   try {
-    const settings = await settingsRepository.getOrCreate(user.id);
+    const settings = await preferencesRepository.getOrCreate(user.id);
     const syncStatus = activityTracker.getSyncStatus(user.id);
+    const syncStateData = await syncStateRepository.getOrCreate(user.id);
 
     // Derive backup/sheets status from backupConfig
     const config = settings.backupConfig as BackupConfig | null;
@@ -125,9 +126,9 @@ routes.get('/status', async (c) => {
         sheetsSyncEnabled,
         syncOnInactivity: settings.syncOnInactivity,
         syncInactivityMinutes: settings.syncInactivityMinutes,
-        lastSyncDate: settings.lastSyncDate,
-        lastBackupDate: settings.lastBackupDate,
-        lastDataChangeDate: settings.lastDataChangeDate,
+        lastSyncDate: syncStateData.lastSyncDate,
+        lastBackupDate: syncStateData.lastBackupDate,
+        lastDataChangeDate: syncStateData.lastDataChangeDate,
         ...syncStatus,
       })
     );
@@ -296,7 +297,7 @@ routes.get('/restore/providers', syncRateLimiter, async (c) => {
         )
       );
 
-    const settings = await settingsRepository.getOrCreate(user.id);
+    const settings = await preferencesRepository.getOrCreate(user.id);
     const config: BackupConfig = (settings.backupConfig as BackupConfig | null) ?? {
       providers: {},
     };

@@ -27,7 +27,6 @@ export interface TestVehicle {
   make: string;
   model: string;
   year: number;
-  currentInsurancePolicyId: string | null;
 }
 
 export interface TestExpense {
@@ -38,7 +37,7 @@ export interface TestExpense {
   expenseAmount: number;
   date: Date;
   mileage: number | null;
-  fuelAmount: number | null;
+  volume: number | null;
   fuelType: string | null;
   missedFillup: boolean;
 }
@@ -83,7 +82,6 @@ export function vehicleArb(userId: string, vehicleIndex: number): fc.Arbitrary<T
     make: fc.constantFrom('Toyota', 'Honda', 'Ford', 'BMW', 'Tesla'),
     model: fc.constantFrom('Camry', 'Civic', 'F-150', 'X3', 'Model 3'),
     year: fc.integer({ min: 2000, max: 2025 }),
-    currentInsurancePolicyId: fc.constant(null),
   });
 }
 
@@ -108,7 +106,7 @@ export function expenseArb(
     expenseAmount: fc.double({ min: 0.01, max: 10000, noNaN: true, noDefaultInfinity: true }),
     date: fc.integer({ min: minTs, max: maxTs }).map((ts) => new Date(ts)),
     mileage: fc.option(fc.integer({ min: 1000, max: 300000 }), { nil: null }),
-    fuelAmount: fc.option(fc.double({ min: 0.1, max: 30, noNaN: true, noDefaultInfinity: true }), {
+    volume: fc.option(fc.double({ min: 0.1, max: 30, noNaN: true, noDefaultInfinity: true }), {
       nil: null,
     }),
     fuelType: fc.option(fc.constantFrom('Regular', 'Premium', 'Diesel'), { nil: null }),
@@ -162,17 +160,13 @@ export function seedUser(db: Database, user: TestUser): void {
 
 /** Insert a test vehicle into the DB. */
 export function seedVehicle(db: Database, vehicle: TestVehicle): void {
-  db.run(
-    'INSERT INTO vehicles (id, user_id, make, model, year, current_insurance_policy_id) VALUES (?, ?, ?, ?, ?, ?)',
-    [
-      vehicle.id,
-      vehicle.userId,
-      vehicle.make,
-      vehicle.model,
-      vehicle.year,
-      vehicle.currentInsurancePolicyId,
-    ]
-  );
+  db.run('INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)', [
+    vehicle.id,
+    vehicle.userId,
+    vehicle.make,
+    vehicle.model,
+    vehicle.year,
+  ]);
 }
 
 /** Insert a test expense into the DB. */
@@ -190,7 +184,7 @@ export function seedExpense(db: Database, expense: TestExpense): void {
     userId = row?.user_id ?? 'unknown';
   }
   db.run(
-    'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, mileage, fuel_amount, fuel_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, mileage, volume, fuel_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       expense.id,
       expense.vehicleId,
@@ -199,7 +193,7 @@ export function seedExpense(db: Database, expense: TestExpense): void {
       expense.expenseAmount,
       dateUnix,
       expense.mileage,
-      expense.fuelAmount,
+      expense.volume,
       expense.fuelType,
       expense.missedFillup ? 1 : 0,
     ]
@@ -225,7 +219,6 @@ export interface TestVehicleFinancing {
   financingType: 'loan' | 'lease' | 'own';
   provider: string;
   originalAmount: number;
-  currentBalance: number;
   apr: number | null;
   termMonths: number;
   startDate: Date;
@@ -237,14 +230,13 @@ export interface TestVehicleFinancing {
 export function seedVehicleFinancing(db: Database, fin: TestVehicleFinancing): void {
   const startDateUnix = Math.floor(fin.startDate.getTime() / 1000);
   db.run(
-    'INSERT INTO vehicle_financing (id, vehicle_id, financing_type, provider, original_amount, current_balance, apr, term_months, start_date, payment_amount, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO vehicle_financing (id, vehicle_id, financing_type, provider, original_amount, apr, term_months, start_date, payment_amount, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       fin.id,
       fin.vehicleId,
       fin.financingType,
       fin.provider,
       fin.originalAmount,
-      fin.currentBalance,
       fin.apr,
       fin.termMonths,
       startDateUnix,
@@ -255,20 +247,19 @@ export function seedVehicleFinancing(db: Database, fin: TestVehicleFinancing): v
 }
 
 // ---------------------------------------------------------------------------
-// Insurance Policy Vehicle helpers
+// Insurance Term Vehicle helpers
 // ---------------------------------------------------------------------------
-export interface TestInsurancePolicyVehicle {
-  policyId: string;
+export interface TestInsuranceTermVehicle {
   termId: string;
   vehicleId: string;
 }
 
-/** Insert a test insurance policy vehicle junction record into the DB. */
-export function seedInsurancePolicyVehicle(db: Database, row: TestInsurancePolicyVehicle): void {
-  db.run(
-    'INSERT INTO insurance_policy_vehicles (policy_id, term_id, vehicle_id) VALUES (?, ?, ?)',
-    [row.policyId, row.termId, row.vehicleId]
-  );
+/** Insert a test insurance term vehicle junction record into the DB. */
+export function seedInsuranceTermVehicle(db: Database, row: TestInsuranceTermVehicle): void {
+  db.run('INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)', [
+    row.termId,
+    row.vehicleId,
+  ]);
 }
 
 // ---------------------------------------------------------------------------

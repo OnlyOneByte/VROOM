@@ -46,7 +46,7 @@ function makeFinancing(overrides: Partial<VehicleFinancing> = {}): VehicleFinanc
 		financingType: 'loan',
 		provider: 'Test Bank',
 		originalAmount: 20000,
-		currentBalance: 20000,
+		computedBalance: 20000,
 		apr: 5.0,
 		termMonths: 60,
 		startDate: '2024-01-01',

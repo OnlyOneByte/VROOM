@@ -6,7 +6,7 @@
  *
  * Property 17: MPG computation from consecutive expenses
  * For any pair of consecutive fuel expenses with valid mileage readings,
- * MPG should equal (currentMileage - previousMileage) / fuelAmount.
+ * MPG should equal (currentMileage - previousMileage) / volume.
  *
  * Property 8: Monthly arrays bounded to 12 entries
  * For any analytics response containing monthly data arrays, the array should contain at most 12 entries.
@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Generator: fuel expenses with guaranteed positive fuelAmount
+// Generator: fuel expenses with guaranteed positive volume
 // ---------------------------------------------------------------------------
 function fuelExpenseArb(vehicleId: string, index: number, year: number): fc.Arbitrary<TestExpense> {
   const minTs = new Date(year, 0, 2).getTime();
@@ -60,7 +60,7 @@ function fuelExpenseArb(vehicleId: string, index: number, year: number): fc.Arbi
     expenseAmount: fc.double({ min: 5, max: 200, noNaN: true, noDefaultInfinity: true }),
     date: fc.integer({ min: minTs, max: maxTs }).map((ts) => new Date(ts)),
     mileage: fc.constant(null as number | null),
-    fuelAmount: fc.double({ min: 1, max: 30, noNaN: true, noDefaultInfinity: true }),
+    volume: fc.double({ min: 1, max: 30, noNaN: true, noDefaultInfinity: true }),
     fuelType: fc.constantFrom('Regular', 'Premium', 'Diesel'),
     missedFillup: fc.constant(false),
   });
@@ -87,11 +87,10 @@ describe('Property 16: Fuel volume ordering invariant', () => {
           make: 'Toyota',
           model: 'Camry',
           year: 2022,
-          currentInsurancePolicyId: null,
         };
         seedVehicle(testDb.sqlite, vehicle);
 
-        // Generate fuel expenses with positive fuelAmount
+        // Generate fuel expenses with positive volume
         const expensesArr =
           fc.sample(
             fc.array(fuelExpenseArb(vehicle.id, 0, 2024), {
@@ -136,14 +135,14 @@ describe('Property 16: Fuel volume ordering invariant', () => {
 // **Validates: Requirement 4.5**
 // ---------------------------------------------------------------------------
 describe('Property 17: MPG computation from consecutive expenses', () => {
-  test('MPG equals (currentMileage - previousMileage) / fuelAmount for consecutive fuel expenses', async () => {
+  test('MPG equals (currentMileage - previousMileage) / volume for consecutive fuel expenses', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 10000, max: 50000 }),
         fc.integer({ min: 100, max: 500 }),
         fc.double({ min: 5, max: 25, noNaN: true, noDefaultInfinity: true }),
         fc.double({ min: 10, max: 100, noNaN: true, noDefaultInfinity: true }),
-        async (startMileage, milesDriven, fuelAmount, expenseAmount) => {
+        async (startMileage, milesDriven, volume, expenseAmount) => {
           testDb.sqlite.close();
           testDb = createTestDb();
           repo = new AnalyticsRepository(testDb.drizzle);
@@ -157,12 +156,11 @@ describe('Property 17: MPG computation from consecutive expenses', () => {
             make: 'Toyota',
             model: 'Camry',
             year: 2022,
-            currentInsurancePolicyId: null,
           };
           seedVehicle(testDb.sqlite, vehicle);
 
           const endMileage = startMileage + milesDriven;
-          const expectedMpg = milesDriven / fuelAmount;
+          const expectedMpg = milesDriven / volume;
 
           // Skip unrealistic MPG values that the filter would reject
           if (expectedMpg < 5 || expectedMpg > 100) return;
@@ -176,7 +174,7 @@ describe('Property 17: MPG computation from consecutive expenses', () => {
             expenseAmount: 40,
             date: new Date(2024, 3, 1),
             mileage: startMileage,
-            fuelAmount: 10,
+            volume: 10,
             fuelType: 'Regular',
             missedFillup: false,
           };
@@ -188,7 +186,7 @@ describe('Property 17: MPG computation from consecutive expenses', () => {
             expenseAmount,
             date: new Date(2024, 3, 15),
             mileage: endMileage,
-            fuelAmount,
+            volume,
             fuelType: 'Regular',
             missedFillup: false,
           };
@@ -230,7 +228,6 @@ describe('Property 8: Monthly arrays bounded to 12 entries', () => {
           make: 'Toyota',
           model: 'Camry',
           year: 2022,
-          currentInsurancePolicyId: null,
         };
         seedVehicle(testDb.sqlite, vehicle);
 
@@ -244,7 +241,7 @@ describe('Property 8: Monthly arrays bounded to 12 entries', () => {
             expenseAmount: 40 + i,
             date: new Date(2024, month, 10 + (i % 15)),
             mileage: 10000 + i * 300,
-            fuelAmount: 8 + (i % 10),
+            volume: 8 + (i % 10),
             fuelType: 'Regular',
             missedFillup: false,
           };
@@ -281,11 +278,10 @@ describe('Property 18: Gas price always positive', () => {
           make: 'Toyota',
           model: 'Camry',
           year: 2022,
-          currentInsurancePolicyId: null,
         };
         seedVehicle(testDb.sqlite, vehicle);
 
-        // Generate fuel expenses with positive amounts and fuelAmount
+        // Generate fuel expenses with positive amounts and volume
         const expensesArr =
           fc.sample(
             fc.array(fuelExpenseArb(vehicle.id, 0, 2024), {

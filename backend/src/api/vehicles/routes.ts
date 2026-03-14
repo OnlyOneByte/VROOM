@@ -12,7 +12,7 @@ import { commonSchemas } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
-import { settingsRepository } from '../settings/repository';
+import { preferencesRepository } from '../settings/repository';
 import { photoRoutes } from './photo-routes';
 import { vehicleRepository } from './repository';
 
@@ -141,7 +141,7 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
   // Default unitPreferences from user's settings if not provided
   let { unitPreferences } = vehicleData;
   if (!unitPreferences) {
-    const userSettings = await settingsRepository.getOrCreate(user.id);
+    const userSettings = await preferencesRepository.getOrCreate(user.id);
     unitPreferences = userSettings.unitPreferences;
   }
 

@@ -64,7 +64,6 @@ function setupUserAndVehicle(): { userId: string; vehicle: TestVehicle } {
     make: 'Toyota',
     model: 'Camry',
     year: 2022,
-    currentInsurancePolicyId: null,
   };
   seedVehicle(testDb.sqlite, v);
 

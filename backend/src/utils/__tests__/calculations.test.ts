@@ -14,7 +14,7 @@ import { calculateAverageMilesPerKwh, calculateMilesPerKwh } from '../calculatio
 
 function makeChargeExpense(overrides: {
   mileage: number | null;
-  fuelAmount: number | null;
+  volume: number | null;
   missedFillup?: boolean;
   index: number;
 }): Expense {
@@ -26,12 +26,11 @@ function makeChargeExpense(overrides: {
     date: new Date(2024, 0, 1 + overrides.index),
     expenseAmount: 15,
     mileage: overrides.mileage,
-    fuelAmount: overrides.fuelAmount,
+    volume: overrides.volume,
     fuelType: 'Level 2 (AC)',
     description: null,
     receiptUrl: null,
     isFinancingPayment: false,
-    insurancePolicyId: null,
     insuranceTermId: null,
     missedFillup: overrides.missedFillup ?? false,
     userId: 'test-user',
@@ -75,15 +74,15 @@ describe('calculateMilesPerKwh', () => {
 // ---------------------------------------------------------------------------
 describe('calculateAverageMilesPerKwh', () => {
   test('returns null for fewer than 2 expenses', () => {
-    const single = [makeChargeExpense({ mileage: 1000, fuelAmount: 30, index: 0 })];
+    const single = [makeChargeExpense({ mileage: 1000, volume: 30, index: 0 })];
     expect(calculateAverageMilesPerKwh(single)).toBeNull();
     expect(calculateAverageMilesPerKwh([])).toBeNull();
   });
 
   test('returns null when fewer than 2 expenses have mileage', () => {
     const expenses = [
-      makeChargeExpense({ mileage: 1000, fuelAmount: 30, index: 0 }),
-      makeChargeExpense({ mileage: null, fuelAmount: 25, index: 1 }),
+      makeChargeExpense({ mileage: 1000, volume: 30, index: 0 }),
+      makeChargeExpense({ mileage: null, volume: 25, index: 1 }),
     ];
     expect(calculateAverageMilesPerKwh(expenses)).toBeNull();
   });
@@ -91,8 +90,8 @@ describe('calculateAverageMilesPerKwh', () => {
   test('calculates correct average for valid pair', () => {
     // 100 miles / 30 kWh = 3.333 mi/kWh
     const expenses = [
-      makeChargeExpense({ mileage: 1000, fuelAmount: 30, index: 0 }),
-      makeChargeExpense({ mileage: 1100, fuelAmount: 30, index: 1 }),
+      makeChargeExpense({ mileage: 1000, volume: 30, index: 0 }),
+      makeChargeExpense({ mileage: 1100, volume: 30, index: 1 }),
     ];
     const result = calculateAverageMilesPerKwh(expenses);
     expect(result).not.toBeNull();
@@ -101,9 +100,9 @@ describe('calculateAverageMilesPerKwh', () => {
 
   test('excludes pairs with missedFillup', () => {
     const expenses = [
-      makeChargeExpense({ mileage: 1000, fuelAmount: 30, index: 0 }),
-      makeChargeExpense({ mileage: 1100, fuelAmount: 30, missedFillup: true, index: 1 }),
-      makeChargeExpense({ mileage: 1200, fuelAmount: 25, index: 2 }),
+      makeChargeExpense({ mileage: 1000, volume: 30, index: 0 }),
+      makeChargeExpense({ mileage: 1100, volume: 30, missedFillup: true, index: 1 }),
+      makeChargeExpense({ mileage: 1200, volume: 25, index: 2 }),
     ];
     // Pair (0,1) skipped because 1 is missedFillup
     // Pair (1,2) skipped because 1 is missedFillup
@@ -114,17 +113,17 @@ describe('calculateAverageMilesPerKwh', () => {
   test('filters out unrealistic values > 10 mi/kWh', () => {
     // 500 miles / 10 kWh = 50 mi/kWh → filtered out
     const expenses = [
-      makeChargeExpense({ mileage: 1000, fuelAmount: 10, index: 0 }),
-      makeChargeExpense({ mileage: 1500, fuelAmount: 10, index: 1 }),
+      makeChargeExpense({ mileage: 1000, volume: 10, index: 0 }),
+      makeChargeExpense({ mileage: 1500, volume: 10, index: 1 }),
     ];
     expect(calculateAverageMilesPerKwh(expenses)).toBeNull();
   });
 
   test('returns null when all pairs produce unrealistic values', () => {
     const expenses = [
-      makeChargeExpense({ mileage: 1000, fuelAmount: 5, index: 0 }),
-      makeChargeExpense({ mileage: 2000, fuelAmount: 5, index: 1 }),
-      makeChargeExpense({ mileage: 3000, fuelAmount: 5, index: 2 }),
+      makeChargeExpense({ mileage: 1000, volume: 5, index: 0 }),
+      makeChargeExpense({ mileage: 2000, volume: 5, index: 1 }),
+      makeChargeExpense({ mileage: 3000, volume: 5, index: 2 }),
     ];
     // 1000/5 = 200, 1000/5 = 200 → both > 10 → null
     expect(calculateAverageMilesPerKwh(expenses)).toBeNull();
@@ -132,9 +131,9 @@ describe('calculateAverageMilesPerKwh', () => {
 
   test('averages multiple valid pairs', () => {
     const expenses = [
-      makeChargeExpense({ mileage: 1000, fuelAmount: 30, index: 0 }),
-      makeChargeExpense({ mileage: 1120, fuelAmount: 40, index: 1 }), // 120/40 = 3.0
-      makeChargeExpense({ mileage: 1240, fuelAmount: 30, index: 2 }), // 120/30 = 4.0
+      makeChargeExpense({ mileage: 1000, volume: 30, index: 0 }),
+      makeChargeExpense({ mileage: 1120, volume: 40, index: 1 }), // 120/40 = 3.0
+      makeChargeExpense({ mileage: 1240, volume: 30, index: 2 }), // 120/30 = 4.0
     ];
     const result = calculateAverageMilesPerKwh(expenses);
     expect(result).not.toBeNull();
@@ -144,8 +143,8 @@ describe('calculateAverageMilesPerKwh', () => {
   test('sorts expenses by date before calculating', () => {
     // Provide out-of-order expenses
     const expenses = [
-      makeChargeExpense({ mileage: 1100, fuelAmount: 30, index: 2 }),
-      makeChargeExpense({ mileage: 1000, fuelAmount: 30, index: 0 }),
+      makeChargeExpense({ mileage: 1100, volume: 30, index: 2 }),
+      makeChargeExpense({ mileage: 1000, volume: 30, index: 0 }),
     ];
     const result = calculateAverageMilesPerKwh(expenses);
     expect(result).not.toBeNull();

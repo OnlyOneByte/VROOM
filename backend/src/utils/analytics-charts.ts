@@ -58,7 +58,7 @@ export interface FuelEfficiencyPoint {
 export interface FuelRow {
   date: Date | number | null;
   mileage: number | null;
-  fuelAmount: number | null;
+  volume: number | null;
   fuelType: string | null;
   missedFillup: boolean;
 }
@@ -66,7 +66,7 @@ export interface FuelRow {
 export interface FuelExpenseRow {
   date: Date | number | null;
   mileage: number | null;
-  fuelAmount: number | null;
+  volume: number | null;
   fuelType: string | null;
   missedFillup: boolean;
   expenseAmount: number;
@@ -81,7 +81,7 @@ export interface GeneralExpenseRow {
   expenseAmount: number;
   date: Date | number | null;
   mileage: number | null;
-  fuelAmount: number | null;
+  volume: number | null;
 }
 
 interface VehicleMetrics {
@@ -114,9 +114,9 @@ export function computeEfficiencyPoint(
 
   const milesDriven = current.mileage - previous.mileage;
   if (milesDriven <= 0 || milesDriven > MAX_REASONABLE_MILES_BETWEEN_FILLUPS) return null;
-  if (!current.fuelAmount || current.fuelAmount <= 0) return null;
+  if (!current.volume || current.volume <= 0) return null;
 
-  const efficiency = milesDriven / current.fuelAmount;
+  const efficiency = milesDriven / current.volume;
   if (!isRealisticEfficiency(efficiency, isElectricFuelType(current.fuelType))) return null;
 
   const normalized = normalizeDate(current.date);
@@ -202,7 +202,7 @@ export function buildMonthlyConsumption(
     if (!d) continue;
     const key = toMonthKey(d);
     const entry = map.get(key) ?? { effSum: 0, effCount: 0, volume: 0 };
-    entry.volume += row.fuelAmount ?? 0;
+    entry.volume += row.volume ?? 0;
     map.set(key, entry);
   }
 
@@ -233,13 +233,11 @@ export function buildGasPriceHistory(
   rows: FuelExpenseRow[]
 ): Array<{ date: string; fuelType: string; pricePerVolume: number }> {
   return rows
-    .filter(
-      (r) => r.fuelAmount != null && r.fuelAmount > 0 && r.expenseAmount > 0 && r.date != null
-    )
+    .filter((r) => r.volume != null && r.volume > 0 && r.expenseAmount > 0 && r.date != null)
     .map((r) => ({
       date: r.date instanceof Date ? r.date.toISOString() : String(r.date),
       fuelType: r.fuelType ?? 'Regular',
-      pricePerVolume: r.expenseAmount / (r.fuelAmount as number),
+      pricePerVolume: r.expenseAmount / (r.volume as number),
     }))
     .slice(-100); // Cap to last 100 entries
 }
@@ -661,7 +659,7 @@ export function buildDayOfWeekPatterns(
     const entry = dayData.get(dayName) ?? { count: 0, totalCost: 0, totalGallons: 0 };
     entry.count++;
     entry.totalCost += row.expenseAmount;
-    entry.totalGallons += row.fuelAmount ?? 0;
+    entry.totalGallons += row.volume ?? 0;
     dayData.set(dayName, entry);
   }
 
@@ -817,7 +815,7 @@ export function buildTCOMonthlyTrend(
     expenseAmount: number;
     date: Date | number | null;
     isFinancingPayment: boolean;
-    insurancePolicyId: string | null;
+    insuranceTermId: string | null;
   }>
 ): Array<{
   month: string;
@@ -837,7 +835,7 @@ export function buildTCOMonthlyTrend(
     const entry = map.get(key) ?? { financing: 0, insurance: 0, fuel: 0, maintenance: 0 };
     if (row.category === 'financial' && row.isFinancingPayment) {
       entry.financing += row.expenseAmount;
-    } else if (row.category === 'financial' && row.insurancePolicyId) {
+    } else if (row.category === 'financial' && row.insuranceTermId) {
       entry.insurance += row.expenseAmount;
     } else if (row.category === 'fuel') {
       entry.fuel += row.expenseAmount;
@@ -887,13 +885,13 @@ function accumulateFuelRow(
     prevRow &&
     row.mileage != null &&
     prevRow.mileage != null &&
-    row.fuelAmount != null &&
-    row.fuelAmount > 0
+    row.volume != null &&
+    row.volume > 0
   ) {
     const miles = row.mileage - prevRow.mileage;
     if (miles > 0) {
       entry.totalMiles += miles;
-      entry.totalGallons += row.fuelAmount;
+      entry.totalGallons += row.volume;
     }
   }
   entry.count++;

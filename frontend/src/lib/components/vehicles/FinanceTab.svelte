@@ -44,9 +44,8 @@
 			if (!vehicle?.financing?.isActive) return 0;
 			const financing = vehicle.financing;
 			if (!financing.originalAmount || financing.originalAmount <= 0) return 0;
-			return (
-				((financing.originalAmount - financing.currentBalance) / financing.originalAmount) * 100
-			);
+			const balance = financing.computedBalance ?? financing.originalAmount;
+			return ((financing.originalAmount - balance) / financing.originalAmount) * 100;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error calculating progress percentage:', error);
 			return 0;

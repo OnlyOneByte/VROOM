@@ -200,7 +200,7 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 			return new Date();
 		}
 
-		if (financing.currentBalance <= 0) {
+		if ((financing.computedBalance ?? 0) <= 0) {
 			return new Date();
 		}
 
@@ -221,12 +221,14 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 		}
 
 		if (!financing.apr || financing.apr <= 0) {
-			const paymentsRemaining = Math.ceil(financing.currentBalance / financing.paymentAmount);
+			const paymentsRemaining = Math.ceil(
+				(financing.computedBalance ?? 0) / financing.paymentAmount
+			);
 			return calculatePaymentDate(new Date(), paymentsRemaining, financing.paymentFrequency);
 		}
 
 		const monthlyRate = financing.apr / 100 / 12;
-		let balance = financing.currentBalance;
+		let balance = financing.computedBalance ?? 0;
 		let paymentsRemaining = 0;
 
 		while (balance > 0 && paymentsRemaining < financing.termMonths * 2) {
@@ -280,7 +282,7 @@ function calculateExtraPaymentImpactImpl(
 		const monthlyRate = financing.apr / 100 / 12;
 		const newPaymentAmount = financing.paymentAmount + extraPaymentAmount;
 
-		let originalBalance = financing.currentBalance;
+		let originalBalance = financing.computedBalance ?? 0;
 		let originalMonths = 0;
 		let originalTotalInterest = 0;
 
@@ -298,7 +300,7 @@ function calculateExtraPaymentImpactImpl(
 			originalMonths++;
 		}
 
-		let newBalance = financing.currentBalance;
+		let newBalance = financing.computedBalance ?? 0;
 		let newMonths = 0;
 		let newTotalInterest = 0;
 

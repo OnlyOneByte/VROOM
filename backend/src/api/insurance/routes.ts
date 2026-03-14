@@ -1,10 +1,8 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import type { PolicyTerm } from '../../db/schema';
 import { changeTracker, requireAuth } from '../../middleware';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
-import type { TermVehicleCoverage } from './repository';
 import { insurancePolicyRepository } from './repository';
 import {
   addTermSchema,
@@ -28,26 +26,6 @@ const vehiclePoliciesParamSchema = z.object({
   vehicleId: z.string().min(1, 'Vehicle ID is required'),
 });
 
-/**
- * Convert Zod-coerced Date objects in a term back to ISO strings
- * so they match the PolicyTerm interface expected by the repository.
- * Preserves vehicleCoverage for per-term vehicle assignment.
- */
-function toStorableTerm(term: {
-  id: string;
-  startDate: Date;
-  endDate: Date;
-  policyDetails?: Record<string, unknown>;
-  financeDetails?: Record<string, unknown>;
-  vehicleCoverage: TermVehicleCoverage;
-}): PolicyTerm & { vehicleCoverage: TermVehicleCoverage } {
-  return {
-    ...term,
-    startDate: term.startDate.toISOString(),
-    endDate: term.endDate.toISOString(),
-  } as PolicyTerm & { vehicleCoverage: TermVehicleCoverage };
-}
-
 // Apply authentication and change tracking to all routes
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
@@ -61,10 +39,12 @@ routes.get('/', async (c) => {
 
 // GET /api/v1/insurance/expiring-soon — expiring policies
 routes.get('/expiring-soon', async (c) => {
-  const user = c.get('user');
+  const _user = c.get('user');
   const daysAhead = Number.parseInt(c.req.query('days') || '30', 10);
-  const policies = await insurancePolicyRepository.findExpiringPolicies(user.id, daysAhead);
-  return c.json({ success: true, data: policies, count: policies.length, daysAhead });
+  const now = new Date();
+  const endDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+  const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate);
+  return c.json({ success: true, data: terms, count: terms.length, daysAhead });
 });
 
 // GET /api/v1/insurance/vehicles/:vehicleId/policies — policies for a vehicle
@@ -84,10 +64,7 @@ routes.get(
 routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   const user = c.get('user');
   const data = c.req.valid('json');
-  const policy = await insurancePolicyRepository.create(
-    { ...data, terms: data.terms.map(toStorableTerm) },
-    user.id
-  );
+  const policy = await insurancePolicyRepository.create(data, user.id);
   return c.json(
     { success: true, data: policy, message: 'Insurance policy created successfully' },
     201
@@ -130,7 +107,7 @@ routes.delete('/:id', zValidator('param', idParamSchema), async (c) => {
   return c.json({ success: true, message: 'Insurance policy deleted successfully' });
 });
 
-// POST /api/v1/insurance/:id/terms — add term
+// POST /api/v1/insurance/:id/terms — add term (flat fields)
 routes.post(
   '/:id/terms',
   zValidator('param', idParamSchema),
@@ -140,12 +117,12 @@ routes.post(
     const { id } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const termData = c.req.valid('json');
-    const policy = await insurancePolicyRepository.addTerm(id, toStorableTerm(termData), user.id);
+    const policy = await insurancePolicyRepository.addTerm(id, termData, user.id);
     return c.json({ success: true, data: policy, message: 'Term added successfully' }, 201);
   }
 );
 
-// PUT /api/v1/insurance/:id/terms/:termId — update term
+// PUT /api/v1/insurance/:id/terms/:termId — update term (flat fields)
 routes.put(
   '/:id/terms/:termId',
   zValidator('param', termParamsSchema),
@@ -154,14 +131,8 @@ routes.put(
     const user = c.get('user');
     const { id, termId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
-    const { startDate, endDate, vehicleCoverage, ...rest } = c.req.valid('json');
-    const converted: Partial<PolicyTerm> & { vehicleCoverage?: TermVehicleCoverage } = {
-      ...rest,
-      ...(startDate && { startDate: startDate.toISOString() }),
-      ...(endDate && { endDate: endDate.toISOString() }),
-      ...(vehicleCoverage && { vehicleCoverage }),
-    };
-    const policy = await insurancePolicyRepository.updateTerm(id, termId, converted, user.id);
+    const updates = c.req.valid('json');
+    const policy = await insurancePolicyRepository.updateTerm(id, termId, updates, user.id);
     return c.json({ success: true, data: policy, message: 'Term updated successfully' });
   }
 );

@@ -145,7 +145,7 @@
 - [ ] Quick-add widget: streamlined "just filled up" flow (gallons, price, mileage — three taps)
 - [ ] Pre-built templates for common maintenance schedules by vehicle type (put under profile for management)
 - [ ] Reminders with push notification support
-
+- [ ] i18n internationalization
 
 ### Scaling concerns
 - [ ] Redis for rate-limiting / idempotency in multi-instance deployments

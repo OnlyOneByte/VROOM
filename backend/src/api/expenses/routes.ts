@@ -17,17 +17,7 @@ import {
   validateExpenseOwnership,
   validateFuelExpenseData,
 } from '../../utils/validation';
-import {
-  handleFinancingOnCreate,
-  handleFinancingOnDelete,
-  handleFinancingOnUpdate,
-} from '../financing/hooks';
 import { financingRepository } from '../financing/repository';
-import {
-  handleOdometerOnExpenseCreate,
-  handleOdometerOnExpenseDelete,
-  handleOdometerOnExpenseUpdate,
-} from '../odometer/hooks';
 import { vehicleRepository } from '../vehicles/repository';
 import { expenseRepository } from './repository';
 import { createSplitExpenseSchema, updateSplitSchema } from './validation';
@@ -56,7 +46,7 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
     .default([]),
   category: expenseCategorySchema,
   expenseAmount: z.number().positive('Expense amount must be positive'),
-  fuelAmount: z.number().positive('Fuel amount must be positive').nullable().optional(),
+  volume: z.number().positive('Volume must be positive').nullable().optional(),
   date: z.coerce.date(),
   mileage: z.number().int().min(0, 'Mileage cannot be negative').nullable().optional(),
   description: z
@@ -296,34 +286,21 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   validateFuelExpenseData(
     expenseData.category,
     expenseData.mileage,
-    expenseData.fuelAmount,
+    expenseData.volume,
     expenseData.fuelType
   );
 
   const createdExpense = await expenseRepository.create({ ...expenseData, userId: user.id });
 
-  // Adjust financing balance if this is a financing payment
-  const updatedFinancing = await handleFinancingOnCreate(createdExpense);
-
-  // Auto-create linked odometer entry if expense has mileage
-  await handleOdometerOnExpenseCreate(createdExpense, user.id);
-
   return c.json(
     {
       success: true,
-      data: updatedFinancing
-        ? { expense: createdExpense, financing: updatedFinancing }
-        : createdExpense,
+      data: createdExpense,
       message: 'Expense created successfully',
     },
     201
   );
 });
-
-// Note: With Drizzle JSON mode, tags are automatically parsed/stringified
-// No need for manual JSON.parse/stringify helper functions
-
-// validateFuelExpenseData moved to utils/validation.ts
 
 // GET /api/expenses - Get all expenses for the user (with optional vehicle filter)
 routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
@@ -381,25 +358,17 @@ routes.put(
       updateData.category !== undefined ? updateData.category : existingExpense.category;
     const finalMileage =
       updateData.mileage !== undefined ? updateData.mileage : existingExpense.mileage;
-    const finalFuelAmount =
-      updateData.fuelAmount !== undefined ? updateData.fuelAmount : existingExpense.fuelAmount;
+    const finalVolume =
+      updateData.volume !== undefined ? updateData.volume : existingExpense.volume;
     const finalFuelType =
       updateData.fuelType !== undefined ? updateData.fuelType : existingExpense.fuelType;
 
-    validateFuelExpenseData(finalCategory, finalMileage, finalFuelAmount, finalFuelType);
-
-    // Adjust financing balance if financing involvement changed
-    const updatedFinancing = await handleFinancingOnUpdate(existingExpense, updateData);
-
-    // Auto-manage linked odometer entry based on mileage changes
-    await handleOdometerOnExpenseUpdate(existingExpense, updateData, user.id);
+    validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
     const updatedExpense = await expenseRepository.update(id, updateData);
     return c.json({
       success: true,
-      data: updatedFinancing
-        ? { expense: updatedExpense, financing: updatedFinancing }
-        : updatedExpense,
+      data: updatedExpense,
       message: 'Expense updated successfully',
     });
   }
@@ -409,13 +378,7 @@ routes.put(
 routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
-  const expense = await validateExpenseOwnership(id, user.id);
-
-  // Reverse financing balance adjustment before deleting
-  await handleFinancingOnDelete(expense);
-
-  // Delete linked odometer entry if expense has mileage
-  await handleOdometerOnExpenseDelete(expense);
+  await validateExpenseOwnership(id, user.id);
 
   await expenseRepository.delete(id);
   return c.json({ success: true, message: 'Expense deleted successfully' });

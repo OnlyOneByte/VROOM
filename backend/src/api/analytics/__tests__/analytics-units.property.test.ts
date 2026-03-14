@@ -57,8 +57,7 @@ const mixedUnitPairArb: fc.Arbitrary<[UnitPreferences, UnitPreferences]> = fc
 // ---------------------------------------------------------------------------
 
 function seedUserSettings(db: Database, userId: string, units: UnitPreferences): void {
-  db.run('INSERT INTO user_settings (id, user_id, unit_preferences) VALUES (?, ?, ?)', [
-    `settings-${userId}`,
+  db.run('INSERT INTO user_preferences (user_id, unit_preferences) VALUES (?, ?)', [
     userId,
     JSON.stringify(units),
   ]);
@@ -66,16 +65,8 @@ function seedUserSettings(db: Database, userId: string, units: UnitPreferences):
 
 function seedVehicleWithUnits(db: Database, vehicle: TestVehicle, units: UnitPreferences): void {
   db.run(
-    'INSERT INTO vehicles (id, user_id, make, model, year, current_insurance_policy_id, unit_preferences) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [
-      vehicle.id,
-      vehicle.userId,
-      vehicle.make,
-      vehicle.model,
-      vehicle.year,
-      vehicle.currentInsurancePolicyId,
-      JSON.stringify(units),
-    ]
+    'INSERT INTO vehicles (id, user_id, make, model, year, unit_preferences) VALUES (?, ?, ?, ?, ?, ?)',
+    [vehicle.id, vehicle.userId, vehicle.make, vehicle.model, vehicle.year, JSON.stringify(units)]
   );
 }
 
@@ -83,24 +74,24 @@ function makeFuelExpense(
   vehicleId: string,
   index: number,
   mileage: number,
-  fuelAmount: number,
+  volume: number,
   date: Date
 ): TestExpense {
   return {
     id: `expense-${vehicleId}-${index}`,
     vehicleId,
     category: 'fuel',
-    expenseAmount: fuelAmount * 3.5,
+    expenseAmount: volume * 3.5,
     date,
     mileage,
-    fuelAmount,
+    volume,
     fuelType: 'Regular',
     missedFillup: false,
   };
 }
 
 function makeTestVehicle(id: string, userId: string, make: string, model: string): TestVehicle {
-  return { id, userId, make, model, year: 2022, currentInsurancePolicyId: null };
+  return { id, userId, make, model, year: 2022 };
 }
 
 /** Seed 3 fuel expenses with increasing mileage for a vehicle. */
@@ -108,7 +99,7 @@ function seedFuelExpensesForVehicle(
   db: Database,
   vehicleId: string,
   mileageIncrement: number,
-  fuelAmount: number,
+  volume: number,
   baseMileage: number,
   dateOffsetMs: number
 ): void {
@@ -117,7 +108,7 @@ function seedFuelExpensesForVehicle(
     const date = new Date(baseDate.getTime() + i * 30 * 86400000 + dateOffsetMs);
     seedExpense(
       db,
-      makeFuelExpense(vehicleId, i, baseMileage + i * mileageIncrement * 100, fuelAmount, date)
+      makeFuelExpense(vehicleId, i, baseMileage + i * mileageIncrement * 100, volume, date)
     );
   }
 }
@@ -177,7 +168,7 @@ function assertEfficiencyConverted(
   fuelEfficiencyComparison: CrossVehicleData['fuelEfficiencyComparison'],
   vehicleId: string,
   mileageIncrement: number,
-  fuelAmount: number,
+  volume: number,
   vehicleUnits: UnitPreferences,
   userUnits: UnitPreferences
 ): void {
@@ -185,7 +176,7 @@ function assertEfficiencyConverted(
     const vEntry = monthEntry.vehicles.find((v) => v.vehicleId === vehicleId);
     if (!vEntry) continue;
     expect(vEntry.efficiency).toBeGreaterThan(0);
-    const rawEff = (mileageIncrement * 100) / fuelAmount;
+    const rawEff = (mileageIncrement * 100) / volume;
     const expectedEff = convertEfficiency(
       rawEff,
       vehicleUnits.distanceUnit,

@@ -2,24 +2,27 @@
  * Restore Service - Handles data restoration from backups and Google Sheets
  */
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { TABLE_SCHEMA_MAP } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {
   expenses,
   insurancePolicies,
-  insurancePolicyVehicles,
+  insuranceTerms,
+  insuranceTermVehicles,
   odometerEntries,
   photoRefs,
   photos,
+  syncState,
+  userPreferences,
   userProviders,
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
 import { SyncError, SyncErrorCode } from '../../errors';
 import type { BackupConfig, ParsedBackupData } from '../../types';
-import { settingsRepository } from '../settings/repository';
+import { preferencesRepository } from '../settings/repository';
 import { backupService, coerceRow } from './backup';
 
 type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
@@ -36,10 +39,13 @@ export interface ImportSummary {
   expenses: number;
   financing: number;
   insurance: number;
-  insurancePolicyVehicles: number;
+  insuranceTerms: number;
+  insuranceTermVehicles: number;
   odometer: number;
   photos: number;
   photoRefs: number;
+  userPreferences: number;
+  syncState: number;
 }
 
 export interface RestoreResponse {
@@ -81,10 +87,13 @@ class RestoreService {
       expenses: parsedBackup.expenses.length,
       financing: parsedBackup.financing.length,
       insurance: parsedBackup.insurance.length,
-      insurancePolicyVehicles: parsedBackup.insurancePolicyVehicles?.length ?? 0,
+      insuranceTerms: parsedBackup.insuranceTerms?.length ?? 0,
+      insuranceTermVehicles: parsedBackup.insuranceTermVehicles?.length ?? 0,
       odometer: parsedBackup.odometer?.length ?? 0,
       photos: parsedBackup.photos?.length ?? 0,
       photoRefs: parsedBackup.photoRefs?.length ?? 0,
+      userPreferences: parsedBackup.userPreferences?.length ?? 0,
+      syncState: parsedBackup.syncState?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -108,14 +117,15 @@ class RestoreService {
     return { success: true, imported: summary };
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Restore orchestration requires sequential validation and data insertion steps
   async restoreFromSheets(
     userId: string,
     providerId: string,
     mode: 'replace' | 'merge' | 'preview'
   ): Promise<RestoreResponse> {
     // Load backupConfig and read sheetsSpreadsheetId for this provider
-    const settings = await settingsRepository.getUserSettings(userId);
-    const backupConfig = settings?.backupConfig as BackupConfig | null;
+    const prefs = await preferencesRepository.getOrCreate(userId);
+    const backupConfig = prefs?.backupConfig as BackupConfig | null;
     const providerConfig = backupConfig?.providers?.[providerId];
     const sheetsSpreadsheetId = providerConfig?.sheetsSpreadsheetId;
 
@@ -161,10 +171,13 @@ class RestoreService {
       expenses: sheetData.expenses.length,
       financing: sheetData.financing.length,
       insurance: sheetData.insurance.length,
-      insurancePolicyVehicles: sheetData.insurancePolicyVehicles?.length ?? 0,
+      insuranceTerms: sheetData.insuranceTerms?.length ?? 0,
+      insuranceTermVehicles: sheetData.insuranceTermVehicles?.length ?? 0,
       odometer: sheetData.odometer?.length ?? 0,
       photos: sheetData.photos?.length ?? 0,
       photoRefs: sheetData.photoRefs?.length ?? 0,
+      userPreferences: sheetData.userPreferences?.length ?? 0,
+      syncState: sheetData.syncState?.length ?? 0,
     };
 
     if (mode === 'preview') {
@@ -217,13 +230,6 @@ class RestoreService {
   }
 
   private async deleteUserData(tx: DrizzleTransaction, userId: string): Promise<void> {
-    // Collect expense IDs for photo cleanup — delete directly by userId
-    const userExpenses = await tx
-      .select({ id: expenses.id })
-      .from(expenses)
-      .where(eq(expenses.userId, userId));
-    const expenseIds = userExpenses.map((e) => e.id);
-
     // Collect vehicle IDs for related entity cleanup
     const userVehicles = await tx
       .select({ id: vehicles.id })
@@ -231,46 +237,10 @@ class RestoreService {
       .where(eq(vehicles.userId, userId));
     const vehicleIds = userVehicles.map((v) => v.id);
 
-    // Collect insurance policy IDs for photo deletion
-    const userPolicies = await tx
-      .select({ id: insurancePolicies.id })
-      .from(insurancePolicies)
-      .where(eq(insurancePolicies.userId, userId));
-    const policyIds = userPolicies.map((p) => p.id);
+    // Delete photos directly by userId (photos now have user_id column)
+    await tx.delete(photos).where(eq(photos.userId, userId));
 
-    // Collect odometer entry IDs for photo deletion
-    const odometerIds: string[] = [];
-    if (vehicleIds.length > 0) {
-      const userOdometerEntries = await tx
-        .select({ id: odometerEntries.id })
-        .from(odometerEntries)
-        .where(inArray(odometerEntries.vehicleId, vehicleIds));
-      odometerIds.push(...userOdometerEntries.map((o) => o.id));
-    }
-
-    // Delete photos for all entity types
-    if (vehicleIds.length > 0) {
-      await tx
-        .delete(photos)
-        .where(and(eq(photos.entityType, 'vehicle'), inArray(photos.entityId, vehicleIds)));
-    }
-    if (expenseIds.length > 0) {
-      await tx
-        .delete(photos)
-        .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, expenseIds)));
-    }
-    if (policyIds.length > 0) {
-      await tx
-        .delete(photos)
-        .where(and(eq(photos.entityType, 'insurance_policy'), inArray(photos.entityId, policyIds)));
-    }
-    if (odometerIds.length > 0) {
-      await tx
-        .delete(photos)
-        .where(and(eq(photos.entityType, 'odometer_entry'), inArray(photos.entityId, odometerIds)));
-    }
-
-    // Delete expenses directly by userId (no vehicle ID lookups needed)
+    // Delete expenses directly by userId
     await tx.delete(expenses).where(eq(expenses.userId, userId));
 
     // Delete odometer entries before vehicles (FK constraint)
@@ -279,8 +249,13 @@ class RestoreService {
       await tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, vehicleIds));
     }
 
-    // Delete insurance policies directly by userId (junction rows cascade via FK)
+    // Delete insurance policies directly by userId (terms and junction rows cascade via FK)
     await tx.delete(insurancePolicies).where(eq(insurancePolicies.userId, userId));
+
+    // Delete user preferences and sync state
+    await tx.delete(userPreferences).where(eq(userPreferences.userId, userId));
+    await tx.delete(syncState).where(eq(syncState.userId, userId));
+
     await tx.delete(vehicles).where(eq(vehicles.userId, userId));
   }
 
@@ -288,15 +263,6 @@ class RestoreService {
     // Data is already coerced by coerceRow (ZIP path via parseZipBackup, Sheets path via restoreFromSheets)
     if (data.vehicles.length > 0) {
       await tx.insert(vehicles).values(data.vehicles as (typeof vehicles.$inferInsert)[]);
-    }
-    if (data.expenses.length > 0) {
-      await tx.insert(expenses).values(data.expenses as (typeof expenses.$inferInsert)[]);
-    }
-    // Insert odometer entries AFTER expenses (linked_entity_id may reference expense IDs)
-    if (data.odometer?.length > 0) {
-      await tx
-        .insert(odometerEntries)
-        .values(data.odometer as (typeof odometerEntries.$inferInsert)[]);
     }
     if (data.financing.length > 0) {
       await tx
@@ -308,10 +274,34 @@ class RestoreService {
         .insert(insurancePolicies)
         .values(data.insurance as (typeof insurancePolicies.$inferInsert)[]);
     }
-    if (data.insurancePolicyVehicles?.length > 0) {
+    // Insert insurance terms after policies (FK constraint)
+    if (data.insuranceTerms?.length > 0) {
       await tx
-        .insert(insurancePolicyVehicles)
-        .values(data.insurancePolicyVehicles as (typeof insurancePolicyVehicles.$inferInsert)[]);
+        .insert(insuranceTerms)
+        .values(data.insuranceTerms as (typeof insuranceTerms.$inferInsert)[]);
+    }
+    // Insert insurance term vehicles after terms (FK constraint)
+    if (data.insuranceTermVehicles?.length > 0) {
+      await tx
+        .insert(insuranceTermVehicles)
+        .values(data.insuranceTermVehicles as (typeof insuranceTermVehicles.$inferInsert)[]);
+    }
+    if (data.expenses.length > 0) {
+      await tx.insert(expenses).values(data.expenses as (typeof expenses.$inferInsert)[]);
+    }
+    if (data.odometer?.length > 0) {
+      await tx
+        .insert(odometerEntries)
+        .values(data.odometer as (typeof odometerEntries.$inferInsert)[]);
+    }
+    // Insert user preferences and sync state
+    if (data.userPreferences?.length > 0) {
+      await tx
+        .insert(userPreferences)
+        .values(data.userPreferences as (typeof userPreferences.$inferInsert)[]);
+    }
+    if (data.syncState?.length > 0) {
+      await tx.insert(syncState).values(data.syncState as (typeof syncState.$inferInsert)[]);
     }
     // Insert photos AFTER all entity tables so entityId references are valid
     if (data.photos?.length > 0) {

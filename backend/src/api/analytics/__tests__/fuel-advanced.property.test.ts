@@ -75,7 +75,6 @@ function seedDefaultUserAndVehicle(): TestVehicle {
     make: 'Toyota',
     model: 'Camry',
     year: 2022,
-    currentInsurancePolicyId: null,
   };
   seedVehicle(testDb.sqlite, vehicle);
   return vehicle;
@@ -92,7 +91,6 @@ function seedMultipleVehicles(count: number): TestVehicle[] {
       make: 'Toyota',
       model: `Model${v}`,
       year: 2022,
-      currentInsurancePolicyId: null,
     };
     seedVehicle(testDb.sqlite, vehicle);
     result.push(vehicle);
@@ -112,7 +110,7 @@ function seedMixedExpenses(vehicleList: TestVehicle[], perVehicle: number): void
         expenseAmount: 20 + i * 15,
         date: new Date(2024, i % 12, 10 + (i % 15)),
         mileage: cat === 'fuel' ? 10000 + i * 300 : null,
-        fuelAmount: cat === 'fuel' ? 8 + (i % 10) : null,
+        volume: cat === 'fuel' ? 8 + (i % 10) : null,
         fuelType: cat === 'fuel' ? 'Regular' : null,
         missedFillup: false,
       };
@@ -152,7 +150,7 @@ describe('Property 20: Maintenance timeline status assignment', () => {
               expenseAmount: 100,
               date: expenseDate,
               mileage: 10000 + i * 5000,
-              fuelAmount: null,
+              volume: null,
               fuelType: null,
               missedFillup: false,
             };
@@ -227,7 +225,7 @@ describe('Property 21: Fillup interval bucketing completeness', () => {
             expenseAmount: 40 + i,
             date: new Date(2024, 0, 2 + i * 3),
             mileage: 10000 + i * 300,
-            fuelAmount: 10,
+            volume: 10,
             fuelType: 'Regular',
             missedFillup: false,
           };
@@ -261,7 +259,7 @@ function seedCategorizedExpenses(vehicleId: string, count: number): void {
       expenseAmount: 50 + i * 10,
       date: new Date(2024, i % 12, 10),
       mileage: cat === 'fuel' ? 10000 + i * 300 : null,
-      fuelAmount: cat === 'fuel' ? 10 : null,
+      volume: cat === 'fuel' ? 10 : null,
       fuelType: cat === 'fuel' ? 'Regular' : null,
       missedFillup: false,
     };

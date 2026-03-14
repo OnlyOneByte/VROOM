@@ -4,7 +4,7 @@ import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
-import { expenses, odometerEntries, photos, vehicles } from '../../db/schema';
+import { expenses, photos, vehicles } from '../../db/schema';
 import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -392,7 +392,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       date: Date;
       description?: string;
       totalAmount: number;
-      insurancePolicyId?: string;
       insuranceTermId?: string;
     },
     userId: string
@@ -419,7 +418,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           date: data.date,
           tags: data.tags,
           description: data.description,
-          insurancePolicyId: data.insurancePolicyId,
           insuranceTermId: data.insuranceTermId,
         });
       });
@@ -450,7 +448,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   /**
-   * Delete a split expense group and all associated photos and odometer entries.
+   * Delete a split expense group and all associated photos.
    * Uses batch deletes with inArray() to avoid N+1 queries.
    */
   async deleteSplitExpense(groupId: string, userId: string): Promise<void> {
@@ -471,16 +469,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         await tx
           .delete(photos)
           .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, siblingIds)));
-
-        // Delete odometer entries linked to sibling expenses
-        await tx
-          .delete(odometerEntries)
-          .where(
-            and(
-              eq(odometerEntries.linkedEntityType, 'expense'),
-              inArray(odometerEntries.linkedEntityId, siblingIds)
-            )
-          );
 
         // Delete all sibling expense rows
         await tx.delete(expenses).where(eq(expenses.groupId, groupId));
@@ -547,7 +535,6 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           date: firstOld.date,
           tags: firstOld.tags ?? undefined,
           description: firstOld.description ?? undefined,
-          insurancePolicyId: firstOld.insurancePolicyId ?? undefined,
           insuranceTermId: firstOld.insuranceTermId ?? undefined,
         });
 

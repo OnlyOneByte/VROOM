@@ -79,7 +79,6 @@ function seedUserAndVehicle(userId: string, email: string, name: string): TestVe
     make: 'Toyota',
     model: 'Camry',
     year: 2022,
-    currentInsurancePolicyId: null,
   };
   seedVehicle(testDb.sqlite, v);
   return v;
@@ -139,7 +138,7 @@ function seedVehiclesWithDistinctiveExpenses(userId: string, vehicleCount: numbe
       expenseAmount: 99999,
       date: new Date(2024, 5, 15),
       mileage: null,
-      fuelAmount: null,
+      volume: null,
       fuelType: null,
       missedFillup: false,
     });
@@ -171,7 +170,6 @@ describe('Property 6: Vehicle ownership validation', () => {
           make: 'Toyota',
           model: 'Camry',
           year: 2022,
-          currentInsurancePolicyId: null,
         };
         const vehicle2: TestVehicle = {
           id: 'vehicle-user-2-0',
@@ -179,7 +177,6 @@ describe('Property 6: Vehicle ownership validation', () => {
           make: 'Honda',
           model: 'Civic',
           year: 2023,
-          currentInsurancePolicyId: null,
         };
         seedVehicle(testDb.sqlite, vehicle1);
         seedVehicle(testDb.sqlite, vehicle2);
@@ -417,7 +414,6 @@ describe("Property 19: Vehicle ID filtering returns only that vehicle's data", (
             make: 'Toyota',
             model: 'Camry',
             year: 2022,
-            currentInsurancePolicyId: null,
           };
           const vehicle2: TestVehicle = {
             id: 'vehicle-user-1-1',
@@ -425,7 +421,6 @@ describe("Property 19: Vehicle ID filtering returns only that vehicle's data", (
             make: 'Honda',
             model: 'Civic',
             year: 2023,
-            currentInsurancePolicyId: null,
           };
           seedVehicle(testDb.sqlite, vehicle1);
           seedVehicle(testDb.sqlite, vehicle2);
@@ -439,7 +434,7 @@ describe("Property 19: Vehicle ID filtering returns only that vehicle's data", (
               expenseAmount: 50 + i,
               date: new Date(2024, i % 12, 15),
               mileage: 10000 + i * 1000,
-              fuelAmount: 10 + i,
+              volume: 10 + i,
               fuelType: 'Regular',
               missedFillup: false,
             });
@@ -454,7 +449,7 @@ describe("Property 19: Vehicle ID filtering returns only that vehicle's data", (
               expenseAmount: 200 + i,
               date: new Date(2024, i % 12, 20),
               mileage: 20000 + i * 1000,
-              fuelAmount: 15 + i,
+              volume: 15 + i,
               fuelType: 'Premium',
               missedFillup: false,
             });

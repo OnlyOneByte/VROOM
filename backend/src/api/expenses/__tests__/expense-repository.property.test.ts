@@ -162,6 +162,7 @@ async function insertPhotos(
     const photoId = createId();
     await drizzleDb.insert(photos).values({
       id: photoId,
+      userId: USER_ID,
       entityType: 'expense',
       entityId: targetExpenseId,
       fileName: `photo-${i}.jpg`,

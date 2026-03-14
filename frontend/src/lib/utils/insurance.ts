@@ -1,4 +1,4 @@
-import type { FinanceDetails, InsurancePolicy, PolicyDetails, PolicyTerm } from '$lib/types';
+import type { InsurancePolicy, InsuranceTerm } from '$lib/types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -23,7 +23,7 @@ export function isExpiringSoon(currentTermEnd: string | Date, thresholdDays = 30
 /**
  * Returns a new array of terms sorted by endDate descending (most recent first).
  */
-export function sortTermsByEndDateDesc(terms: PolicyTerm[]): PolicyTerm[] {
+export function sortTermsByEndDateDesc(terms: InsuranceTerm[]): InsuranceTerm[] {
 	return [...terms].sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
 }
 
@@ -49,11 +49,11 @@ export function groupPoliciesByActive(policies: InsurancePolicy[]): {
 /**
  * Returns the term with the latest endDate, or undefined if the array is empty.
  */
-export function getLatestTerm(terms: PolicyTerm[]): PolicyTerm | undefined {
+export function getLatestTerm(terms: InsuranceTerm[]): InsuranceTerm | undefined {
 	if (terms.length === 0) return undefined;
-	let latest = terms[0] as PolicyTerm;
+	let latest = terms[0] as InsuranceTerm;
 	for (let i = 1; i < terms.length; i++) {
-		const term = terms[i] as PolicyTerm;
+		const term = terms[i] as InsuranceTerm;
 		if (new Date(term.endDate).getTime() > new Date(latest.endDate).getTime()) {
 			latest = term;
 		}
@@ -62,14 +62,23 @@ export function getLatestTerm(terms: PolicyTerm[]): PolicyTerm | undefined {
 }
 
 /**
- * Deep-copies policyDetails and financeDetails from a term for renewal pre-fill.
+ * Deep-copies flat term fields from a previous term for renewal pre-fill.
+ * v2: Terms use flat fields, no nested policyDetails/financeDetails.
  */
-export function prefillFromPreviousTerm(term: PolicyTerm): {
-	policyDetails: PolicyDetails;
-	financeDetails: FinanceDetails;
-} {
+export function prefillFromPreviousTerm(
+	term: InsuranceTerm
+): Omit<InsuranceTerm, 'id' | 'policyId' | 'startDate' | 'endDate' | 'createdAt' | 'updatedAt'> {
 	return {
-		policyDetails: structuredClone(term.policyDetails),
-		financeDetails: structuredClone(term.financeDetails)
+		policyNumber: term.policyNumber,
+		coverageDescription: term.coverageDescription,
+		deductibleAmount: term.deductibleAmount,
+		coverageLimit: term.coverageLimit,
+		agentName: term.agentName,
+		agentPhone: term.agentPhone,
+		agentEmail: term.agentEmail,
+		totalCost: term.totalCost,
+		monthlyCost: term.monthlyCost,
+		premiumFrequency: term.premiumFrequency,
+		paymentAmount: term.paymentAmount
 	};
 }

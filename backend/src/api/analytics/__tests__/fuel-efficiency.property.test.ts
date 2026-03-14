@@ -34,7 +34,7 @@ const MAX_VALID_MI_KWH = 10;
 interface FuelRow {
   date: Date;
   mileage: number | null;
-  fuelAmount: number | null;
+  volume: number | null;
   fuelType: string | null;
   missedFillup: boolean;
 }
@@ -61,9 +61,9 @@ function computeEfficiencyPoint(current: FuelRow, previous: FuelRow): FuelEffici
 
   const milesDriven = current.mileage - previous.mileage;
   if (milesDriven <= 0 || milesDriven > MAX_REASONABLE_MILES_BETWEEN_FILLUPS) return null;
-  if (!current.fuelAmount || current.fuelAmount <= 0) return null;
+  if (!current.volume || current.volume <= 0) return null;
 
-  const efficiency = milesDriven / current.fuelAmount;
+  const efficiency = milesDriven / current.volume;
   if (!isRealisticEfficiency(efficiency, isElectricFuelType(current.fuelType))) return null;
 
   return {
@@ -94,7 +94,7 @@ function referenceFuelEfficiencyTrend(rows: FuelRow[]): FuelEfficiencyPoint[] {
 
 // ---------------------------------------------------------------------------
 // Frontend reference — replicates prepareFuelEfficiencyData logic
-// Uses volume/charge instead of fuelAmount, validates per fuel type
+// Uses volume/charge instead of volume, validates per fuel type
 // ---------------------------------------------------------------------------
 interface FrontendExpense {
   category: string;
@@ -178,7 +178,7 @@ const gasFuelRowArb = (baseMileage: number) =>
     mileage: fc
       .integer({ min: baseMileage, max: baseMileage + 1200 })
       .map((m) => m as number | null),
-    fuelAmount: fc
+    volume: fc
       .double({ min: 0.1, max: 30, noNaN: true, noDefaultInfinity: true })
       .map((v) => v as number | null),
     fuelType: fc.constantFrom(...GAS_FUEL_TYPES),
@@ -192,7 +192,7 @@ const electricFuelRowArb = (baseMileage: number) =>
     mileage: fc
       .integer({ min: baseMileage, max: baseMileage + 1200 })
       .map((m) => m as number | null),
-    fuelAmount: fc
+    volume: fc
       .double({ min: 0.5, max: 200, noNaN: true, noDefaultInfinity: true })
       .map((v) => v as number | null),
     fuelType: fc.constantFrom(...ELECTRIC_FUEL_TYPES),
@@ -219,12 +219,12 @@ const fuelRowListArb = fc
   .map((rows) => [...rows].sort((a, b) => a.date.getTime() - b.date.getTime()));
 
 /**
- * Generate rows that include edge cases: null mileage, null fuelAmount, zero fuelAmount.
+ * Generate rows that include edge cases: null mileage, null volume, zero volume.
  */
 const edgeCaseFuelRowArb = fc.record({
   date: fuelDateArb,
   mileage: fc.option(fc.integer({ min: 1000, max: 200000 }), { nil: null }),
-  fuelAmount: fc.option(fc.double({ min: -5, max: 50, noNaN: true, noDefaultInfinity: true }), {
+  volume: fc.option(fc.double({ min: -5, max: 50, noNaN: true, noDefaultInfinity: true }), {
     nil: null,
   }),
   fuelType: fc.constantFrom(...GAS_FUEL_TYPES, ...ELECTRIC_FUEL_TYPES),
@@ -334,12 +334,12 @@ describe('Property 7: Fuel Efficiency — Backend matches frontend for same inpu
         // Backend computation
         const backendPoints = referenceFuelEfficiencyTrend(gasRows);
 
-        // Convert to frontend format: fuelAmount → volume
+        // Convert to frontend format: volume → volume
         const frontendExpenses: FrontendExpense[] = gasRows.map((r) => ({
           category: 'fuel',
           date: r.date.toISOString(),
           mileage: r.mileage ?? undefined,
-          volume: r.fuelAmount ?? undefined,
+          volume: r.volume ?? undefined,
           charge: undefined,
           fuelType: r.fuelType ?? undefined,
           missedFillup: r.missedFillup,
@@ -376,13 +376,13 @@ describe('Property 7: Fuel Efficiency — Backend matches frontend for same inpu
         // Backend computation
         const backendPoints = referenceFuelEfficiencyTrend(electricRows);
 
-        // Convert to frontend format: fuelAmount → charge
+        // Convert to frontend format: volume → charge
         const frontendExpenses: FrontendExpense[] = electricRows.map((r) => ({
           category: 'fuel',
           date: r.date.toISOString(),
           mileage: r.mileage ?? undefined,
           volume: undefined,
-          charge: r.fuelAmount ?? undefined,
+          charge: r.volume ?? undefined,
           fuelType: r.fuelType ?? undefined,
           missedFillup: r.missedFillup,
         }));

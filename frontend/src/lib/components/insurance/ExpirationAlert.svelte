@@ -3,13 +3,13 @@
 	import { getDaysRemaining, isExpiringSoon } from '$lib/utils/insurance';
 
 	interface Props {
-		currentTermEnd: string;
+		latestTermEnd: string;
 	}
 
-	let { currentTermEnd }: Props = $props();
+	let { latestTermEnd }: Props = $props();
 
-	let daysRemaining = $derived(getDaysRemaining(currentTermEnd));
-	let expiring = $derived(isExpiringSoon(currentTermEnd));
+	let daysRemaining = $derived(getDaysRemaining(latestTermEnd));
+	let expiring = $derived(isExpiringSoon(latestTermEnd));
 	let isUrgent = $derived(daysRemaining <= 7);
 </script>
 

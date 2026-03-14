@@ -56,6 +56,7 @@ export async function uploadPhotoForEntity(
 
   // Insert logical photo record (metadata only — no provider fields)
   const photo = await photoRepository.create({
+    userId,
     entityType,
     entityId,
     fileName: file.name,

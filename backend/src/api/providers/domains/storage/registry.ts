@@ -9,7 +9,7 @@
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '../../../../db/connection';
 import type { UserProvider } from '../../../../db/schema';
-import { userProviders, userSettings } from '../../../../db/schema';
+import { userPreferences, userProviders } from '../../../../db/schema';
 import { NotFoundError, ValidationError } from '../../../../errors';
 import type { PhotoCategory, StorageConfig } from '../../../../types';
 import { DEFAULT_STORAGE_CONFIG } from '../../../../types';
@@ -207,9 +207,9 @@ export class StorageProviderRegistry {
    */
   private async loadStorageConfig(userId: string): Promise<StorageConfig> {
     const row = await this.db
-      .select({ storageConfig: userSettings.storageConfig })
-      .from(userSettings)
-      .where(eq(userSettings.userId, userId))
+      .select({ storageConfig: userPreferences.storageConfig })
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId))
       .limit(1);
 
     const settings = row[0];

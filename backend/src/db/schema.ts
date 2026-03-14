@@ -23,7 +23,7 @@ export const users = sqliteTable('users', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
-// Vehicle table
+// Vehicle table (v2: removed currentInsurancePolicyId)
 export const vehicles = sqliteTable(
   'vehicles',
   {
@@ -45,10 +45,6 @@ export const vehicles = sqliteTable(
     initialMileage: integer('initial_mileage'),
     purchasePrice: real('purchase_price'),
     purchaseDate: integer('purchase_date', { mode: 'timestamp' }),
-    currentInsurancePolicyId: text('current_insurance_policy_id').references(
-      () => insurancePolicies.id,
-      { onDelete: 'set null' }
-    ),
     unitPreferences: text('unit_preferences', { mode: 'json' })
       .$type<UnitPreferences>()
       .notNull()
@@ -61,7 +57,7 @@ export const vehicles = sqliteTable(
   })
 );
 
-// Vehicle Financing table (loans, leases, or owned vehicles)
+// Vehicle Financing table (v2: removed currentBalance — computed on read)
 export const vehicleFinancing = sqliteTable(
   'vehicle_financing',
   {
@@ -74,7 +70,6 @@ export const vehicleFinancing = sqliteTable(
     financingType: text('financing_type').notNull().default('loan'), // 'loan' | 'lease' | 'own'
     provider: text('provider').notNull(), // Lender name, leasing company, or dealer
     originalAmount: real('original_amount').notNull(),
-    currentBalance: real('current_balance').notNull(),
     apr: real('apr'), // For loans, null for leases/own
     termMonths: integer('term_months').notNull(),
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
@@ -98,29 +93,7 @@ export const vehicleFinancing = sqliteTable(
   })
 );
 
-// PolicyTerm type for the terms JSON column
-export interface PolicyTerm {
-  id: string;
-  startDate: string;
-  endDate: string;
-  policyDetails: {
-    policyNumber?: string;
-    coverageDescription?: string;
-    deductibleAmount?: number;
-    coverageLimit?: number;
-    agentName?: string;
-    agentPhone?: string;
-    agentEmail?: string;
-  };
-  financeDetails: {
-    totalCost?: number;
-    monthlyCost?: number;
-    premiumFrequency?: string;
-    paymentAmount?: number;
-  };
-}
-
-// Insurance Policy table
+// Insurance Policy table (v2: removed terms JSON, currentTermStart, currentTermEnd)
 export const insurancePolicies = sqliteTable(
   'insurance_policies',
   {
@@ -132,9 +105,6 @@ export const insurancePolicies = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     company: text('company').notNull(),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-    currentTermStart: integer('current_term_start', { mode: 'timestamp' }),
-    currentTermEnd: integer('current_term_end', { mode: 'timestamp' }),
-    terms: text('terms', { mode: 'json' }).$type<PolicyTerm[]>().notNull().default([]),
     notes: text('notes'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -144,28 +114,59 @@ export const insurancePolicies = sqliteTable(
   })
 );
 
-// Insurance Policy ↔ Vehicles junction table (per-term coverage)
-export const insurancePolicyVehicles = sqliteTable(
-  'insurance_policy_vehicles',
+// Insurance Terms table (v2: extracted from JSON column on insurance_policies)
+export const insuranceTerms = sqliteTable(
+  'insurance_terms',
   {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
     policyId: text('policy_id')
       .notNull()
       .references(() => insurancePolicies.id, { onDelete: 'cascade' }),
-    termId: text('term_id').notNull(),
+    startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
+    endDate: integer('end_date', { mode: 'timestamp' }).notNull(),
+    policyNumber: text('policy_number'),
+    coverageDescription: text('coverage_description'),
+    deductibleAmount: real('deductible_amount'),
+    coverageLimit: real('coverage_limit'),
+    agentName: text('agent_name'),
+    agentPhone: text('agent_phone'),
+    agentEmail: text('agent_email'),
+    totalCost: real('total_cost'),
+    monthlyCost: real('monthly_cost'),
+    premiumFrequency: text('premium_frequency'),
+    paymentAmount: real('payment_amount'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    policyIdIdx: index('it_policy_id_idx').on(table.policyId),
+    policyEndDateIdx: index('it_policy_end_date_idx').on(table.policyId, table.endDate),
+  })
+);
+
+// Insurance Term ↔ Vehicles junction table (v2: replaces insurancePolicyVehicles)
+export const insuranceTermVehicles = sqliteTable(
+  'insurance_term_vehicles',
+  {
+    termId: text('term_id')
+      .notNull()
+      .references(() => insuranceTerms.id, { onDelete: 'cascade' }),
     vehicleId: text('vehicle_id')
       .notNull()
       .references(() => vehicles.id, { onDelete: 'cascade' }),
   },
   (table) => ({
-    pk: primaryKey({ columns: [table.policyId, table.termId, table.vehicleId] }),
-    vehiclePolicyIdx: index('ipv_vehicle_policy_idx').on(table.vehicleId, table.policyId),
+    pk: primaryKey({ columns: [table.termId, table.vehicleId] }),
+    vehicleIdx: index('itv_vehicle_idx').on(table.vehicleId),
   })
 );
 
 // Split method type for split expenses
 export type SplitMethod = 'even' | 'absolute' | 'percentage';
 
-// Expense table
+// Expense table (v2: fuelAmount → volume, removed insurancePolicyId, added insuranceTermId FK)
 export const expenses = sqliteTable(
   'expenses',
   {
@@ -184,13 +185,14 @@ export const expenses = sqliteTable(
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     expenseAmount: real('expense_amount').notNull(),
-    fuelAmount: real('fuel_amount'),
+    volume: real('volume'),
     fuelType: text('fuel_type'),
     isFinancingPayment: integer('is_financing_payment', { mode: 'boolean' })
       .notNull()
       .default(false),
-    insurancePolicyId: text('insurance_policy_id'),
-    insuranceTermId: text('insurance_term_id'),
+    insuranceTermId: text('insurance_term_id').references(() => insuranceTerms.id, {
+      onDelete: 'set null',
+    }),
     missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
     // Direct user ownership — eliminates vehicles JOIN for user-scoped queries
     userId: text('user_id')
@@ -220,10 +222,12 @@ export const expenses = sqliteTable(
     ),
     // Group lookup for split operations
     groupIdx: index('expenses_group_idx').on(table.groupId),
+    // Insurance term lookup
+    insuranceTermIdx: index('expenses_insurance_term_idx').on(table.insuranceTermId),
   })
 );
 
-// User Providers table (domain-agnostic provider connections)
+// User Providers table (domain-agnostic provider connections) — UNCHANGED in v2
 export const userProviders = sqliteTable(
   'user_providers',
   {
@@ -249,39 +253,39 @@ export const userProviders = sqliteTable(
   })
 );
 
-// User Settings table
-export const userSettings = sqliteTable('user_settings', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => createId()),
+// User Preferences table (v2: split from userSettings — write-rare, user-facing settings)
+export const userPreferences = sqliteTable('user_preferences', {
   userId: text('user_id')
-    .notNull()
-    .unique()
+    .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
-  // Unit preferences (consolidated JSON column)
   unitPreferences: text('unit_preferences', { mode: 'json' })
     .$type<UnitPreferences>()
     .notNull()
     .default(DEFAULT_UNIT_PREFERENCES),
   currencyUnit: text('currency_unit').notNull().default('USD'),
-  // Backup preferences (for data dumps)
   autoBackupEnabled: integer('auto_backup_enabled', { mode: 'boolean' }).notNull().default(false),
   backupFrequency: text('backup_frequency').notNull().default('weekly'), // 'daily' | 'weekly' | 'monthly'
-  lastBackupDate: integer('last_backup_date', { mode: 'timestamp' }),
-  // Photo storage provider preferences
+  syncOnInactivity: integer('sync_on_inactivity', { mode: 'boolean' }).notNull().default(true),
+  syncInactivityMinutes: integer('sync_inactivity_minutes').notNull().default(5),
   storageConfig: text('storage_config', { mode: 'json' })
     .$type<StorageConfig>()
     .default(DEFAULT_STORAGE_CONFIG),
-  // Backup provider preferences (per-provider backup settings)
   backupConfig: text('backup_config', { mode: 'json' })
     .$type<BackupConfig>()
     .default(DEFAULT_BACKUP_CONFIG),
-  syncOnInactivity: integer('sync_on_inactivity', { mode: 'boolean' }).notNull().default(true),
-  syncInactivityMinutes: integer('sync_inactivity_minutes').notNull().default(5), // Minutes of inactivity before sync
-  lastSyncDate: integer('last_sync_date', { mode: 'timestamp' }),
-  lastDataChangeDate: integer('last_data_change_date', { mode: 'timestamp' }), // Track when data was last modified
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// Sync State table (v2: split from userSettings — write-heavy, system timestamps only)
+// NOTE: No createdAt/updatedAt columns by design
+export const syncState = sqliteTable('sync_state', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  lastSyncDate: integer('last_sync_date', { mode: 'timestamp' }),
+  lastDataChangeDate: integer('last_data_change_date', { mode: 'timestamp' }),
+  lastBackupDate: integer('last_backup_date', { mode: 'timestamp' }),
 });
 
 // Lucia Auth session table
@@ -293,47 +297,16 @@ export const sessions = sqliteTable('sessions', {
   expiresAt: integer('expires_at').notNull(),
 });
 
+// Relations (v2: added insuranceTermId → insuranceTerms)
 export const expensesRelations = relations(expenses, ({ one }) => ({
   vehicle: one(vehicles, { fields: [expenses.vehicleId], references: [vehicles.id] }),
+  insuranceTerm: one(insuranceTerms, {
+    fields: [expenses.insuranceTermId],
+    references: [insuranceTerms.id],
+  }),
 }));
 
-// Export types for use in application
-export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
-
-export type Vehicle = typeof vehicles.$inferSelect;
-export type NewVehicle = typeof vehicles.$inferInsert;
-
-// Extended Vehicle type with optional financing relationship
-export type VehicleWithFinancing = Vehicle & {
-  financing?: VehicleFinancing;
-};
-
-export type VehicleFinancing = typeof vehicleFinancing.$inferSelect;
-export type NewVehicleFinancing = typeof vehicleFinancing.$inferInsert;
-
-export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
-export type NewInsurancePolicy = typeof insurancePolicies.$inferInsert;
-
-export type InsurancePolicyVehicle = typeof insurancePolicyVehicles.$inferSelect;
-export type NewInsurancePolicyVehicle = typeof insurancePolicyVehicles.$inferInsert;
-
-export type Expense = typeof expenses.$inferSelect;
-export type NewExpense = typeof expenses.$inferInsert;
-
-export type UserSettings = typeof userSettings.$inferSelect;
-export type NewUserSettings = typeof userSettings.$inferInsert;
-
-export type UserProvider = typeof userProviders.$inferSelect;
-export type NewUserProvider = typeof userProviders.$inferInsert;
-
-export type Session = typeof sessions.$inferSelect;
-export type NewSession = typeof sessions.$inferInsert;
-
-export type OdometerEntry = typeof odometerEntries.$inferSelect;
-export type NewOdometerEntry = typeof odometerEntries.$inferInsert;
-
-// Odometer Entries table (manual readings + expense-linked auto-entries)
+// Odometer Entries table (v2: removed linkedEntityType, linkedEntityId, odometer_linked_entity_idx)
 export const odometerEntries = sqliteTable(
   'odometer_entries',
   {
@@ -349,27 +322,24 @@ export const odometerEntries = sqliteTable(
     odometer: integer('odometer').notNull(),
     recordedAt: integer('recorded_at', { mode: 'timestamp' }).notNull(),
     note: text('note'),
-    linkedEntityType: text('linked_entity_type'),
-    linkedEntityId: text('linked_entity_id'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
   (table) => ({
     vehicleDateIdx: index('odometer_vehicle_date_idx').on(table.vehicleId, table.recordedAt),
-    linkedEntityIdx: index('odometer_linked_entity_idx').on(
-      table.linkedEntityType,
-      table.linkedEntityId
-    ),
   })
 );
 
-// Photos table (polymorphic: entityType + entityId)
+// Photos table (v2: added userId FK, added photos_user_entity_type_idx)
 export const photos = sqliteTable(
   'photos',
   {
     id: text('id')
       .primaryKey()
       .$defaultFn(() => createId()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     entityType: text('entity_type').notNull(),
     entityId: text('entity_id').notNull(),
     fileName: text('file_name').notNull(),
@@ -381,10 +351,11 @@ export const photos = sqliteTable(
   },
   (table) => ({
     entityIdx: index('photos_entity_idx').on(table.entityType, table.entityId),
+    userEntityTypeIdx: index('photos_user_entity_type_idx').on(table.userId, table.entityType),
   })
 );
 
-// Photo Refs table (where each photo physically lives per provider)
+// Photo Refs table (v2: removed pendingIdx — will be manually appended as partial index)
 export const photoRefs = sqliteTable(
   'photo_refs',
   {
@@ -409,9 +380,50 @@ export const photoRefs = sqliteTable(
   },
   (table) => ({
     photoProviderIdx: uniqueIndex('pr_photo_provider_idx').on(table.photoId, table.providerId),
-    pendingIdx: index('pr_pending_idx').on(table.status),
   })
 );
+
+// Export types for use in application
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+
+export type Vehicle = typeof vehicles.$inferSelect;
+export type NewVehicle = typeof vehicles.$inferInsert;
+
+// Extended Vehicle type with optional financing relationship
+export type VehicleWithFinancing = Vehicle & {
+  financing?: VehicleFinancing;
+};
+
+export type VehicleFinancing = typeof vehicleFinancing.$inferSelect;
+export type NewVehicleFinancing = typeof vehicleFinancing.$inferInsert;
+
+export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
+export type NewInsurancePolicy = typeof insurancePolicies.$inferInsert;
+
+export type InsuranceTerm = typeof insuranceTerms.$inferSelect;
+export type NewInsuranceTerm = typeof insuranceTerms.$inferInsert;
+
+export type InsuranceTermVehicle = typeof insuranceTermVehicles.$inferSelect;
+export type NewInsuranceTermVehicle = typeof insuranceTermVehicles.$inferInsert;
+
+export type Expense = typeof expenses.$inferSelect;
+export type NewExpense = typeof expenses.$inferInsert;
+
+export type UserPreferences = typeof userPreferences.$inferSelect;
+export type NewUserPreferences = typeof userPreferences.$inferInsert;
+
+export type SyncState = typeof syncState.$inferSelect;
+export type NewSyncState = typeof syncState.$inferInsert;
+
+export type UserProvider = typeof userProviders.$inferSelect;
+export type NewUserProvider = typeof userProviders.$inferInsert;
+
+export type Session = typeof sessions.$inferSelect;
+export type NewSession = typeof sessions.$inferInsert;
+
+export type OdometerEntry = typeof odometerEntries.$inferSelect;
+export type NewOdometerEntry = typeof odometerEntries.$inferInsert;
 
 export type Photo = typeof photos.$inferSelect;
 export type NewPhoto = typeof photos.$inferInsert;

@@ -1,17 +1,11 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import {
-		LoaderCircle,
-		Upload,
-		X,
-		CircleAlert,
-		SwitchCamera,
-		Circle
-	} from '@lucide/svelte';
+	import { LoaderCircle, Upload, X, CircleAlert, SwitchCamera, Circle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		uploadErrors: string[];
+		// eslint-disable-next-line no-unused-vars
 		onUploadCapture: (file: File) => Promise<void>;
 		onClose: () => void;
 	}
@@ -67,7 +61,7 @@
 			}
 
 			mediaStream = stream;
-			await new Promise((r) => setTimeout(r, 50));
+			await new Promise(r => setTimeout(r, 50));
 			if (thisStartId !== cameraStartId) {
 				for (const track of stream.getTracks()) track.stop();
 				return;
@@ -98,7 +92,7 @@
 						return;
 					}
 					mediaStream = fallbackStream;
-					await new Promise((r) => setTimeout(r, 50));
+					await new Promise(r => setTimeout(r, 50));
 					if (thisStartId !== cameraStartId) {
 						for (const track of fallbackStream.getTracks()) track.stop();
 						return;
@@ -145,7 +139,7 @@
 				attempt < maxRetries - 1
 			) {
 				cameraError = null;
-				await new Promise((r) => setTimeout(r, 100 * (attempt + 1)));
+				await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
 			} else {
 				return;
 			}
@@ -162,7 +156,7 @@
 		ctx.drawImage(videoEl, 0, 0);
 
 		canvasEl.toBlob(
-			(blob) => {
+			blob => {
 				if (!blob) return;
 				const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 				const file = new File([blob], `capture-${timestamp}.jpg`, { type: 'image/jpeg' });
@@ -223,16 +217,10 @@
 {:else if capturedPreview}
 	<!-- Preview captured photo -->
 	<div class="relative overflow-hidden rounded-lg border border-border">
-		<img
-			src={capturedPreview}
-			alt="Captured preview"
-			class="aspect-video w-full object-cover"
-		/>
+		<img src={capturedPreview} alt="Captured preview" class="aspect-video w-full object-cover" />
 	</div>
 	<div class="flex justify-end gap-2">
-		<Button variant="outline" onclick={retakePhoto} disabled={uploadingCapture}>
-			Retake
-		</Button>
+		<Button variant="outline" onclick={retakePhoto} disabled={uploadingCapture}>Retake</Button>
 		<Button onclick={uploadCapture} disabled={uploadingCapture}>
 			{#if uploadingCapture}
 				<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />

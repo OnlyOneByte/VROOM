@@ -58,7 +58,6 @@ const nonBackupFileArb: fc.Arbitrary<StorageFileInfo> = fc.record({
   lastModified: isoTimestampArb,
 });
 
-
 // ---------------------------------------------------------------------------
 // Property 4: Backup listing filter, sort, and badge
 // Validates: Requirements 4.1, 4.2

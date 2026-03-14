@@ -19,7 +19,7 @@ import { calculateAverageMPG } from '../calculations';
 /** Build a synthetic Expense for testing calculateAverageMPG. */
 function makeExpense(overrides: {
   mileage: number;
-  fuelAmount: number;
+  volume: number;
   missedFillup: boolean;
   index: number;
 }): Expense {
@@ -29,14 +29,13 @@ function makeExpense(overrides: {
     category: 'fuel',
     tags: [],
     date: new Date(2024, 0, 1 + overrides.index),
-    expenseAmount: overrides.fuelAmount * 3.5,
+    expenseAmount: overrides.volume * 3.5,
     mileage: overrides.mileage,
-    fuelAmount: overrides.fuelAmount,
+    volume: overrides.volume,
     fuelType: '87 (Regular)',
     description: null,
     receiptUrl: null,
     isFinancingPayment: false,
-    insurancePolicyId: null,
     insuranceTermId: null,
     missedFillup: overrides.missedFillup,
     userId: 'test-user',
@@ -60,9 +59,9 @@ function countFilteredPairs(expenses: Expense[]): number {
     const current = sorted[i];
     const previous = sorted[i - 1];
     if (current.missedFillup || previous.missedFillup) continue;
-    if (current.mileage && previous.mileage && current.fuelAmount) {
+    if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
-      const mpg = miles / current.fuelAmount;
+      const mpg = miles / current.volume;
       if (mpg > 0 && mpg < 150) count++;
     }
   }
@@ -80,9 +79,9 @@ function countUnfilteredPairs(expenses: Expense[]): number {
   for (let i = 1; i < sorted.length; i++) {
     const current = sorted[i];
     const previous = sorted[i - 1];
-    if (current.mileage && previous.mileage && current.fuelAmount) {
+    if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
-      const mpg = miles / current.fuelAmount;
+      const mpg = miles / current.volume;
       if (mpg > 0 && mpg < 150) count++;
     }
   }
@@ -98,7 +97,7 @@ const expenseListArb = fc.integer({ min: 2, max: 20 }).chain((len) =>
     ...Array.from({ length: len }, (_, i) =>
       fc.record({
         mileage: fc.integer({ min: 10000 + i * 200, max: 10000 + i * 200 + 199 }),
-        fuelAmount: fc.double({ min: 5, max: 25, noNaN: true }),
+        volume: fc.double({ min: 5, max: 25, noNaN: true }),
         missedFillup: fc.boolean(),
         index: fc.constant(i),
       })
@@ -111,7 +110,7 @@ const allUnflaggedListArb = fc.integer({ min: 2, max: 20 }).chain((len) =>
     ...Array.from({ length: len }, (_, i) =>
       fc.record({
         mileage: fc.integer({ min: 10000 + i * 200, max: 10000 + i * 200 + 199 }),
-        fuelAmount: fc.double({ min: 5, max: 25, noNaN: true }),
+        volume: fc.double({ min: 5, max: 25, noNaN: true }),
         missedFillup: fc.constant(false),
         index: fc.constant(i),
       })
@@ -126,9 +125,9 @@ describe('Property 1: Missed fill-up pairs are excluded from calculateAverageMPG
   test('result is null when all pairs are skipped due to missed fill-ups', () => {
     // All expenses flagged as missed → no valid pairs → null
     const expenses = [
-      makeExpense({ mileage: 10000, fuelAmount: 10, missedFillup: true, index: 0 }),
-      makeExpense({ mileage: 10300, fuelAmount: 12, missedFillup: true, index: 1 }),
-      makeExpense({ mileage: 10600, fuelAmount: 11, missedFillup: true, index: 2 }),
+      makeExpense({ mileage: 10000, volume: 10, missedFillup: true, index: 0 }),
+      makeExpense({ mileage: 10300, volume: 12, missedFillup: true, index: 1 }),
+      makeExpense({ mileage: 10600, volume: 11, missedFillup: true, index: 2 }),
     ];
     expect(calculateAverageMPG(expenses)).toBeNull();
   });
@@ -175,8 +174,8 @@ describe('Property 2: Backward compatibility for calculateAverageMPG', () => {
 
   test('result is non-null when valid unflagged pairs exist', () => {
     const expenses = [
-      makeExpense({ mileage: 10000, fuelAmount: 10, missedFillup: false, index: 0 }),
-      makeExpense({ mileage: 10300, fuelAmount: 12, missedFillup: false, index: 1 }),
+      makeExpense({ mileage: 10000, volume: 10, missedFillup: false, index: 0 }),
+      makeExpense({ mileage: 10300, volume: 12, missedFillup: false, index: 1 }),
     ];
     const result = calculateAverageMPG(expenses);
     expect(result).not.toBeNull();

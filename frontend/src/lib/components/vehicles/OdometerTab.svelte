@@ -6,7 +6,6 @@
 		Plus,
 		LoaderCircle,
 		Gauge,
-		Link as LinkIcon,
 		ChevronLeft,
 		ChevronRight,
 		Pencil,
@@ -219,20 +218,11 @@
 					{#each entries as entry (entry.id)}
 						<div class="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
 							<div class="flex items-start gap-3">
-								<!-- Icon: distinguish manual vs linked -->
-								{#if entry.linkedEntityType}
-									<div
-										class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-chart-1/10"
-									>
-										<LinkIcon class="h-4 w-4 text-chart-1" />
-									</div>
-								{:else}
-									<div
-										class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10"
-									>
-										<Gauge class="h-4 w-4 text-primary" />
-									</div>
-								{/if}
+								<div
+									class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10"
+								>
+									<Gauge class="h-4 w-4 text-primary" />
+								</div>
 
 								<div class="min-w-0">
 									<div class="flex items-center gap-2">
@@ -240,19 +230,11 @@
 											{formatOdometer(entry.odometer)}
 											{distLabel}
 										</span>
-										{#if entry.linkedEntityType}
-											<span
-												class="inline-flex items-center rounded-full bg-chart-1/10 px-2 py-0.5 text-xs font-medium text-chart-1"
-											>
-												{entry.linkedEntityType}
-											</span>
-										{:else}
-											<span
-												class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
-											>
-												manual
-											</span>
-										{/if}
+										<span
+											class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+										>
+											manual
+										</span>
 									</div>
 
 									<p class="text-sm text-muted-foreground">
@@ -262,45 +244,33 @@
 									{#if entry.note}
 										<p class="mt-1 text-sm text-muted-foreground">{entry.note}</p>
 									{/if}
-
-									{#if entry.linkedEntityType === 'expense' && entry.linkedEntityId}
-										<a
-											href={resolve(paramRoutes.expense, { id: entry.linkedEntityId })}
-											class="mt-1 inline-flex items-center gap-1 text-sm text-primary hover:underline"
-										>
-											<LinkIcon class="h-3 w-3" />
-											View expense
-										</a>
-									{/if}
 								</div>
 							</div>
 
-							<!-- Edit/Delete buttons (manual entries only) -->
-							{#if !entry.linkedEntityType}
-								<div class="flex shrink-0 gap-1">
-									<Button
-										variant="ghost"
-										size="icon"
-										class="h-8 w-8"
-										title="Edit reading"
-										href={resolve(paramRoutes.vehicleOdometerEntryEdit, {
-											id: vehicleId,
-											entryId: entry.id
-										}) + `?returnTo=/vehicles/${vehicleId}`}
-									>
-										<Pencil class="h-3.5 w-3.5" />
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="h-8 w-8 text-destructive hover:text-destructive"
-										title="Delete reading"
-										onclick={() => openDeleteDialog(entry)}
-									>
-										<Trash2 class="h-3.5 w-3.5" />
-									</Button>
-								</div>
-							{/if}
+							<!-- Edit/Delete buttons -->
+							<div class="flex shrink-0 gap-1">
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-8 w-8"
+									title="Edit reading"
+									href={resolve(paramRoutes.vehicleOdometerEntryEdit, {
+										id: vehicleId,
+										entryId: entry.id
+									}) + `?returnTo=/vehicles/${vehicleId}`}
+								>
+									<Pencil class="h-3.5 w-3.5" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-8 w-8 text-destructive hover:text-destructive"
+									title="Delete reading"
+									onclick={() => openDeleteDialog(entry)}
+								>
+									<Trash2 class="h-3.5 w-3.5" />
+								</Button>
+							</div>
 						</div>
 					{/each}
 				{/if}

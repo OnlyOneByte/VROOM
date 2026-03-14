@@ -71,7 +71,7 @@ function resetDb(): void {
 
 /** Create user and a single vehicle, returning IDs. */
 function setupUserAndVehicle(opts?: {
-  insurancePolicyId?: string | null;
+  insuranceTermId?: string | null;
   purchasePrice?: number | null;
   purchaseDate?: Date | null;
 }): { userId: string; vehicle: TestVehicle } {
@@ -89,7 +89,6 @@ function setupUserAndVehicle(opts?: {
     make: 'Toyota',
     model: 'Camry',
     year: 2022,
-    currentInsurancePolicyId: opts?.insurancePolicyId ?? null,
   };
   seedVehicle(testDb.sqlite, v);
 
@@ -119,7 +118,7 @@ function seedMaintenanceWithDates(vehicleId: string, dates: Date[]): void {
       expenseAmount: 100,
       date: d,
       mileage: null,
-      fuelAmount: null,
+      volume: null,
       fuelType: null,
       missedFillup: false,
     });
@@ -139,7 +138,7 @@ function seedMaintenanceWithMileages(vehicleId: string, mileages: number[]): voi
       expenseAmount: 100,
       date: new Date(baseDate.getTime() + i * 30 * 24 * 60 * 60 * 1000),
       mileage: m,
-      fuelAmount: null,
+      volume: null,
       fuelType: null,
       missedFillup: false,
     });
@@ -184,7 +183,7 @@ describe('Property 10: Health score formula', () => {
           }
 
           const { userId, vehicle } = setupUserAndVehicle({
-            insurancePolicyId: policyId,
+            insuranceTermId: policyId,
           });
           seedRandomExpenses(vehicle.id, expenseCount);
 
@@ -223,22 +222,33 @@ describe('Property 11: Insurance coverage is binary', () => {
       fc.asyncProperty(fc.boolean(), fc.boolean(), async (hasPolicy, isActive) => {
         resetDb();
 
-        let policyId: string | null = null;
+        const { userId, vehicle } = setupUserAndVehicle({});
+
         if (hasPolicy) {
-          policyId = 'policy-1';
-          // Seed user first so the FK on insurance_policies.user_id is satisfied
-          seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
+          const policyId = 'policy-1';
+          const termId = 'term-1';
           seedInsurancePolicy(testDb.sqlite, {
             id: policyId,
-            userId: 'user-1',
+            userId,
             company: 'Test Co',
             isActive,
           });
+          // Create insurance term for the policy
+          testDb.sqlite.run(
+            'INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES (?, ?, ?, ?)',
+            [
+              termId,
+              policyId,
+              Math.floor(Date.now() / 1000) - 86400,
+              Math.floor(Date.now() / 1000) + 86400 * 365,
+            ]
+          );
+          // Create junction row linking term to vehicle
+          testDb.sqlite.run(
+            'INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)',
+            [termId, vehicle.id]
+          );
         }
-
-        const { userId, vehicle } = setupUserAndVehicle({
-          insurancePolicyId: policyId,
-        });
 
         const result = await repo.getVehicleHealth(userId, vehicle.id);
 

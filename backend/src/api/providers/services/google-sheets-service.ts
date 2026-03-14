@@ -9,10 +9,13 @@ import { getDb } from '../../../db/connection';
 import {
   expenses,
   insurancePolicies,
-  insurancePolicyVehicles,
+  insuranceTerms,
+  insuranceTermVehicles,
   odometerEntries,
   photoRefs,
   photos,
+  syncState,
+  userPreferences,
   vehicleFinancing,
   vehicles,
 } from '../../../db/schema';
@@ -131,11 +134,14 @@ export class GoogleSheetsService {
           { properties: { title: 'Vehicles' } },
           { properties: { title: 'Expenses' } },
           { properties: { title: 'Insurance Policies' } },
-          { properties: { title: 'Insurance Policy Vehicles' } },
+          { properties: { title: 'Insurance Terms' } },
+          { properties: { title: 'Insurance Term Vehicles' } },
           { properties: { title: 'Vehicle Financing' } },
           { properties: { title: 'Odometer' } },
           { properties: { title: 'Photos' } },
           { properties: { title: 'Photo Refs' } },
+          { properties: { title: 'User Preferences' } },
+          { properties: { title: 'Sync State' } },
         ],
       },
     });
@@ -173,11 +179,14 @@ export class GoogleSheetsService {
       'Vehicles',
       'Expenses',
       'Insurance Policies',
-      'Insurance Policy Vehicles',
+      'Insurance Terms',
+      'Insurance Term Vehicles',
       'Vehicle Financing',
       'Odometer',
       'Photos',
       'Photo Refs',
+      'User Preferences',
+      'Sync State',
     ];
     const info = await this.getSpreadsheetInfo(spreadsheetId);
     const existingTitles = new Set(info.sheets.map((s) => s.title));
@@ -219,27 +228,25 @@ export class GoogleSheetsService {
           .where(eq(vehicles.userId, userId)),
       ]);
 
-    // Query junction rows for user's insurance policies
+    // Query insurance terms for user's policies
     const policyIds = userInsurance.map((p) => p.id);
-    const userInsurancePolicyVehicles =
+    const userInsuranceTerms =
       policyIds.length > 0
-        ? await db
-            .select()
-            .from(insurancePolicyVehicles)
-            .where(inArray(insurancePolicyVehicles.policyId, policyIds))
+        ? await db.select().from(insuranceTerms).where(inArray(insuranceTerms.policyId, policyIds))
         : [];
 
-    // Query photos for all user-owned entities
-    const vehicleIds = userVehicles.map((v) => v.id);
-    const expenseIds = userExpenses.map((e) => e.id);
-    const odometerEntryIds = userOdometer.map((o) => o.odometer_entries.id);
+    // Query junction rows for user's insurance terms
+    const termIds = userInsuranceTerms.map((t) => t.id);
+    const userInsuranceTermVehicles =
+      termIds.length > 0
+        ? await db
+            .select()
+            .from(insuranceTermVehicles)
+            .where(inArray(insuranceTermVehicles.termId, termIds))
+        : [];
 
-    const userPhotos = await this.queryUserPhotos(db, {
-      vehicleIds,
-      expenseIds,
-      policyIds,
-      odometerEntryIds,
-    });
+    // Query photos directly by userId
+    const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
 
     // Query photo_refs for all user photos (batched to stay under SQLite variable limit)
     const photoIds = userPhotos.map((p) => p.id);
@@ -250,6 +257,13 @@ export class GoogleSheetsService {
       const rows = await db.select().from(photoRefs).where(inArray(photoRefs.photoId, batch));
       userPhotoRefs.push(...rows);
     }
+
+    // Query user preferences and sync state
+    const userPreferencesRows = await db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId));
+    const syncStateRows = await db.select().from(syncState).where(eq(syncState.userId, userId));
 
     await Promise.all([
       this.updateSheet(spreadsheetId, 'Vehicles', userVehicles, this.getVehicleHeaders()),
@@ -262,9 +276,15 @@ export class GoogleSheetsService {
       ),
       this.updateSheet(
         spreadsheetId,
-        'Insurance Policy Vehicles',
-        userInsurancePolicyVehicles,
-        this.getInsurancePolicyVehiclesHeaders()
+        'Insurance Terms',
+        userInsuranceTerms,
+        this.getInsuranceTermHeaders()
+      ),
+      this.updateSheet(
+        spreadsheetId,
+        'Insurance Term Vehicles',
+        userInsuranceTermVehicles,
+        this.getInsuranceTermVehiclesHeaders()
       ),
       this.updateSheet(
         spreadsheetId,
@@ -280,6 +300,13 @@ export class GoogleSheetsService {
         userOdometer.map((o) => o.odometer_entries),
         this.getOdometerHeaders()
       ),
+      this.updateSheet(
+        spreadsheetId,
+        'User Preferences',
+        userPreferencesRows,
+        this.getUserPreferencesHeaders()
+      ),
+      this.updateSheet(spreadsheetId, 'Sync State', syncStateRows, this.getSyncStateHeaders()),
     ]);
   }
 
@@ -295,6 +322,7 @@ export class GoogleSheetsService {
       'trackCharging',
       'licensePlate',
       'nickname',
+      'vin',
       'initialMileage',
       'purchasePrice',
       'purchaseDate',
@@ -312,7 +340,7 @@ export class GoogleSheetsService {
       'tags',
       'category',
       'expenseAmount',
-      'fuelAmount',
+      'volume',
       'fuelType',
       'isFinancingPayment',
       'missedFillup',
@@ -323,7 +351,6 @@ export class GoogleSheetsService {
       'groupId',
       'groupTotal',
       'splitMethod',
-      'insurancePolicyId',
       'insuranceTermId',
       'createdAt',
       'updatedAt',
@@ -331,22 +358,33 @@ export class GoogleSheetsService {
   }
 
   private getInsuranceHeaders() {
+    return ['id', 'userId', 'company', 'isActive', 'notes', 'createdAt', 'updatedAt'];
+  }
+
+  private getInsuranceTermHeaders() {
     return [
       'id',
-      'userId',
-      'company',
-      'isActive',
-      'currentTermStart',
-      'currentTermEnd',
-      'terms',
-      'notes',
+      'policyId',
+      'startDate',
+      'endDate',
+      'policyNumber',
+      'coverageDescription',
+      'deductibleAmount',
+      'coverageLimit',
+      'agentName',
+      'agentPhone',
+      'agentEmail',
+      'totalCost',
+      'monthlyCost',
+      'premiumFrequency',
+      'paymentAmount',
       'createdAt',
       'updatedAt',
     ];
   }
 
-  private getInsurancePolicyVehiclesHeaders() {
-    return ['policyId', 'termId', 'vehicleId'];
+  private getInsuranceTermVehiclesHeaders() {
+    return ['termId', 'vehicleId'];
   }
 
   private getFinancingHeaders() {
@@ -356,7 +394,6 @@ export class GoogleSheetsService {
       'financingType',
       'provider',
       'originalAmount',
-      'currentBalance',
       'apr',
       'termMonths',
       'startDate',
@@ -382,8 +419,6 @@ export class GoogleSheetsService {
       'odometer',
       'recordedAt',
       'note',
-      'linkedEntityType',
-      'linkedEntityId',
       'createdAt',
       'updatedAt',
     ];
@@ -392,6 +427,7 @@ export class GoogleSheetsService {
   private getPhotoHeaders() {
     return [
       'id',
+      'userId',
       'entityType',
       'entityId',
       'fileName',
@@ -418,34 +454,24 @@ export class GoogleSheetsService {
     ];
   }
 
-  private async queryUserPhotos(
-    db: ReturnType<typeof getDb>,
-    entityIds: {
-      vehicleIds: string[];
-      expenseIds: string[];
-      policyIds: string[];
-      odometerEntryIds: string[];
-    }
-  ) {
-    const allPhotos = [];
-
-    const entityQueries: { type: string; ids: string[] }[] = [
-      { type: 'vehicle', ids: entityIds.vehicleIds },
-      { type: 'expense', ids: entityIds.expenseIds },
-      { type: 'insurance_policy', ids: entityIds.policyIds },
-      { type: 'odometer_entry', ids: entityIds.odometerEntryIds },
+  private getUserPreferencesHeaders() {
+    return [
+      'userId',
+      'unitPreferences',
+      'currencyUnit',
+      'autoBackupEnabled',
+      'backupFrequency',
+      'syncOnInactivity',
+      'syncInactivityMinutes',
+      'storageConfig',
+      'backupConfig',
+      'createdAt',
+      'updatedAt',
     ];
+  }
 
-    for (const { type, ids } of entityQueries) {
-      if (ids.length === 0) continue;
-      const rows = await db
-        .select()
-        .from(photos)
-        .where(and(eq(photos.entityType, type), inArray(photos.entityId, ids)));
-      allPhotos.push(...rows);
-    }
-
-    return allPhotos;
+  private getSyncStateHeaders() {
+    return ['userId', 'lastSyncDate', 'lastDataChangeDate', 'lastBackupDate'];
   }
 
   private async updateSheet<T extends Record<string, unknown>>(
@@ -495,39 +521,51 @@ export class GoogleSheetsService {
     expenses: Record<string, unknown>[];
     financing: Record<string, unknown>[];
     insurance: Record<string, unknown>[];
-    insurancePolicyVehicles: Record<string, unknown>[];
+    insuranceTerms: Record<string, unknown>[];
+    insuranceTermVehicles: Record<string, unknown>[];
     photos: Record<string, unknown>[];
     odometer: Record<string, unknown>[];
     photoRefs: Record<string, unknown>[];
+    userPreferences: Record<string, unknown>[];
+    syncState: Record<string, unknown>[];
   }> {
     const [
       vehiclesData,
       expensesData,
       insuranceData,
-      insurancePolicyVehiclesData,
+      insuranceTermsData,
+      insuranceTermVehiclesData,
       financingData,
       photosData,
       odometerData,
       photoRefsData,
+      userPreferencesData,
+      syncStateData,
     ] = await Promise.all([
       this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
       this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
       this.readSheetData(spreadsheetId, 'Insurance Policies!A:Z'),
-      this.readSheetData(spreadsheetId, 'Insurance Policy Vehicles!A:Z'),
+      this.readSheetData(spreadsheetId, 'Insurance Terms!A:Z').catch(() => []),
+      this.readSheetData(spreadsheetId, 'Insurance Term Vehicles!A:Z').catch(() => []),
       this.readSheetData(spreadsheetId, 'Vehicle Financing!A:Z'),
       this.readSheetData(spreadsheetId, 'Photos!A:Z').catch(() => []),
       this.readSheetData(spreadsheetId, 'Odometer!A:Z').catch(() => []),
       this.readSheetData(spreadsheetId, 'Photo Refs!A:Z').catch(() => []),
+      this.readSheetData(spreadsheetId, 'User Preferences!A:Z').catch(() => []),
+      this.readSheetData(spreadsheetId, 'Sync State!A:Z').catch(() => []),
     ]);
 
     const vehicleRecords = this.parseSheetData(vehiclesData);
     const expenseRecords = this.parseSheetData(expensesData);
     const insurance = this.parseSheetData(insuranceData);
-    const insurancePolicyVehicles = this.parseSheetData(insurancePolicyVehiclesData);
+    const insuranceTermsRecords = this.parseSheetData(insuranceTermsData);
+    const insuranceTermVehiclesRecords = this.parseSheetData(insuranceTermVehiclesData);
     const financing = this.parseSheetData(financingData);
     const photoRecords = this.parseSheetData(photosData);
     const odometer = this.parseSheetData(odometerData);
     const photoRefs = this.parseSheetData(photoRefsData);
+    const userPreferencesRecords = this.parseSheetData(userPreferencesData);
+    const syncStateRecords = this.parseSheetData(syncStateData);
 
     const userId = vehicleRecords.length > 0 ? (vehicleRecords[0].userId as string) : '';
 
@@ -537,10 +575,13 @@ export class GoogleSheetsService {
       expenses: expenseRecords,
       financing,
       insurance,
-      insurancePolicyVehicles,
+      insuranceTerms: insuranceTermsRecords,
+      insuranceTermVehicles: insuranceTermVehiclesRecords,
       photos: photoRecords,
       odometer,
       photoRefs,
+      userPreferences: userPreferencesRecords,
+      syncState: syncStateRecords,
     };
   }
 

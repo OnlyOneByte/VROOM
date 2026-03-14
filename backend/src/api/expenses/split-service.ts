@@ -83,7 +83,6 @@ export class ExpenseSplitService {
       date: Date;
       tags?: string[];
       description?: string;
-      insurancePolicyId?: string;
       insuranceTermId?: string;
     }
   ): Promise<Expense[]> {
@@ -102,7 +101,6 @@ export class ExpenseSplitService {
         date: params.date,
         tags: params.tags ?? null,
         description: params.description ?? null,
-        insurancePolicyId: params.insurancePolicyId ?? null,
         insuranceTermId: params.insuranceTermId ?? null,
         isFinancingPayment: false,
         missedFillup: false,

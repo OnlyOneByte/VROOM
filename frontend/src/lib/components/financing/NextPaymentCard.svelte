@@ -115,7 +115,9 @@
 		minimumPayment !== null && financing.paymentAmount > minimumPayment + 0.01
 	);
 
-	let amountPaid = $derived(Math.max(0, financing.originalAmount - financing.currentBalance));
+	let amountPaid = $derived(
+		Math.max(0, financing.originalAmount - (financing.computedBalance ?? 0))
+	);
 </script>
 
 <Card class="border-2 {cardBorderClass}" role="region" aria-labelledby="next-payment-heading">
@@ -223,7 +225,7 @@
 					<div>
 						<p class="text-xs text-muted-foreground">Remaining</p>
 						<p class="text-sm sm:text-base font-semibold">
-							{formatCurrency(financing.currentBalance)}
+							{formatCurrency(financing.computedBalance ?? 0)}
 						</p>
 					</div>
 				</div>

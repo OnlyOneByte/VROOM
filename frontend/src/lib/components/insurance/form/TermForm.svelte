@@ -14,19 +14,13 @@
 	import { prefillFromPreviousTerm } from '$lib/utils/insurance';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import SplitConfigEditor from '$lib/components/expenses/split/SplitConfigEditor.svelte';
-	import type {
-		PolicyTerm,
-		PolicyDetails,
-		FinanceDetails,
-		Vehicle,
-		TermCoverageRow
-	} from '$lib/types';
+	import type { InsuranceTerm, Vehicle, TermCoverageRow } from '$lib/types';
 
 	interface Props {
 		open: boolean;
 		policyId: string;
-		term?: PolicyTerm | null;
-		previousTerm?: PolicyTerm | null;
+		term?: InsuranceTerm | null;
+		previousTerm?: InsuranceTerm | null;
 		vehicles?: Vehicle[];
 		termVehicleCoverage?: TermCoverageRow[];
 		onSuccess: () => void;
@@ -116,19 +110,19 @@
 		splitAllocations = allocs;
 	}
 
-	// Populate form fields from a term source
-	function populateFromTerm(source: PolicyTerm) {
-		policyNumber = source.policyDetails.policyNumber ?? '';
-		coverageDescription = source.policyDetails.coverageDescription ?? '';
-		deductibleAmount = source.policyDetails.deductibleAmount?.toString() ?? '';
-		coverageLimit = source.policyDetails.coverageLimit?.toString() ?? '';
-		agentName = source.policyDetails.agentName ?? '';
-		agentPhone = source.policyDetails.agentPhone ?? '';
-		agentEmail = source.policyDetails.agentEmail ?? '';
-		totalCost = source.financeDetails.totalCost?.toString() ?? '';
-		monthlyCost = source.financeDetails.monthlyCost?.toString() ?? '';
-		premiumFrequency = source.financeDetails.premiumFrequency ?? '';
-		paymentAmount = source.financeDetails.paymentAmount?.toString() ?? '';
+	// Populate form fields from a term source (v2: flat fields)
+	function populateFromTerm(source: InsuranceTerm | Partial<InsuranceTerm>) {
+		policyNumber = source.policyNumber ?? '';
+		coverageDescription = source.coverageDescription ?? '';
+		deductibleAmount = source.deductibleAmount?.toString() ?? '';
+		coverageLimit = source.coverageLimit?.toString() ?? '';
+		agentName = source.agentName ?? '';
+		agentPhone = source.agentPhone ?? '';
+		agentEmail = source.agentEmail ?? '';
+		totalCost = source.totalCost?.toString() ?? '';
+		monthlyCost = source.monthlyCost?.toString() ?? '';
+		premiumFrequency = source.premiumFrequency ?? '';
+		paymentAmount = source.paymentAmount?.toString() ?? '';
 	}
 
 	function resetFormFields() {
@@ -168,11 +162,7 @@
 		} else if (previousTerm) {
 			resetFormFields();
 			const prefill = prefillFromPreviousTerm(previousTerm);
-			populateFromTerm({
-				...previousTerm,
-				policyDetails: prefill.policyDetails,
-				financeDetails: prefill.financeDetails
-			});
+			populateFromTerm(prefill);
 			// Dates should be blank for renewal — user enters new dates
 			startDate = '';
 			endDate = '';
@@ -213,23 +203,20 @@
 		return Object.keys(newErrors).length === 0;
 	}
 
-	function buildPolicyDetails(): PolicyDetails {
-		const details: PolicyDetails = {};
-		if (policyNumber.trim()) details.policyNumber = policyNumber.trim();
-		if (coverageDescription.trim()) details.coverageDescription = coverageDescription.trim();
-		if (deductibleAmount) details.deductibleAmount = Number(deductibleAmount);
-		if (coverageLimit) details.coverageLimit = Number(coverageLimit);
-		if (agentName.trim()) details.agentName = agentName.trim();
-		if (agentPhone.trim()) details.agentPhone = agentPhone.trim();
-		if (agentEmail.trim()) details.agentEmail = agentEmail.trim();
-		return details;
-	}
-
-	function buildFinanceDetails(): FinanceDetails {
-		const details: FinanceDetails = {};
-		if (totalCost) details.totalCost = Number(totalCost);
-		if (premiumFrequency) details.premiumFrequency = premiumFrequency;
-		return details;
+	function buildTermData(): Record<string, unknown> {
+		const data: Record<string, unknown> = {};
+		if (policyNumber.trim()) data['policyNumber'] = policyNumber.trim();
+		if (coverageDescription.trim()) data['coverageDescription'] = coverageDescription.trim();
+		if (deductibleAmount) data['deductibleAmount'] = Number(deductibleAmount);
+		if (coverageLimit) data['coverageLimit'] = Number(coverageLimit);
+		if (agentName.trim()) data['agentName'] = agentName.trim();
+		if (agentPhone.trim()) data['agentPhone'] = agentPhone.trim();
+		if (agentEmail.trim()) data['agentEmail'] = agentEmail.trim();
+		if (totalCost) data['totalCost'] = Number(totalCost);
+		if (monthlyCost) data['monthlyCost'] = Number(monthlyCost);
+		if (premiumFrequency) data['premiumFrequency'] = premiumFrequency;
+		if (paymentAmount) data['paymentAmount'] = Number(paymentAmount);
+		return data;
 	}
 
 	async function handleSubmit() {
@@ -243,21 +230,20 @@
 				allocations: splitMethod !== 'even' ? splitAllocations : undefined
 			};
 
+			const termData = buildTermData();
+
 			if (isEdit && term) {
 				await insuranceApi.updateTerm(policyId, term.id, {
 					startDate,
 					endDate,
-					policyDetails: buildPolicyDetails(),
-					financeDetails: buildFinanceDetails(),
+					...termData,
 					vehicleCoverage
 				});
 			} else {
 				await insuranceApi.addTerm(policyId, {
-					id: crypto.randomUUID(),
 					startDate,
 					endDate,
-					policyDetails: buildPolicyDetails(),
-					financeDetails: buildFinanceDetails(),
+					...termData,
 					vehicleCoverage
 				});
 			}

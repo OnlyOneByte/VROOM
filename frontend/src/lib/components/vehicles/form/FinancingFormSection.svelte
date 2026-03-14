@@ -282,7 +282,7 @@
 				</div>
 
 				<!-- Current Balance (Edit Mode) -->
-				{#if isEditMode && vehicle?.financing?.currentBalance !== undefined}
+				{#if isEditMode && vehicle?.financing?.computedBalance !== undefined}
 					<Card class="bg-muted/50">
 						<CardHeader>
 							<CardTitle class="text-base">Current Status</CardTitle>
@@ -292,7 +292,7 @@
 								<div>
 									<p class="text-muted-foreground">Current Balance</p>
 									<p class="font-semibold text-lg">
-										{formatCurrency(vehicle.financing.currentBalance)}
+										{formatCurrency(vehicle.financing.computedBalance ?? 0)}
 									</p>
 								</div>
 								<div>
@@ -305,7 +305,7 @@
 									<p class="text-muted-foreground">Amount Paid</p>
 									<p class="font-semibold text-lg">
 										{formatCurrency(
-											vehicle.financing.originalAmount - vehicle.financing.currentBalance
+											vehicle.financing.originalAmount - (vehicle.financing.computedBalance ?? 0)
 										)}
 									</p>
 								</div>
