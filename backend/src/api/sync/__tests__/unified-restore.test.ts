@@ -100,10 +100,13 @@ describe('Unified restore', () => {
         expenses: 10,
         financing: 0,
         insurance: 0,
-        insurancePolicyVehicles: 0,
+        insuranceTerms: 0,
+        insuranceTermVehicles: 0,
         odometer: 0,
         photos: 0,
         photoRefs: 0,
+        userPreferences: 0,
+        syncState: 0,
       },
     });
 

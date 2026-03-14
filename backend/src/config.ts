@@ -7,10 +7,13 @@ import { z } from 'zod';
 import {
   expenses,
   insurancePolicies,
-  insurancePolicyVehicles,
+  insuranceTerms,
+  insuranceTermVehicles,
   odometerEntries,
   photoRefs,
   photos,
+  syncState,
+  userPreferences,
   vehicleFinancing,
   vehicles,
 } from './db/schema';
@@ -185,10 +188,13 @@ export const TABLE_SCHEMA_MAP: Record<string, Table> = {
   expenses,
   financing: vehicleFinancing,
   insurance: insurancePolicies,
-  insurancePolicyVehicles: insurancePolicyVehicles,
+  insuranceTerms: insuranceTerms,
+  insuranceTermVehicles: insuranceTermVehicles,
   photos: photos,
   odometer: odometerEntries,
   photoRefs: photoRefs,
+  userPreferences: userPreferences,
+  syncState: syncState,
 };
 
 export const TABLE_FILENAME_MAP: Record<string, string> = {
@@ -196,10 +202,13 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   expenses: 'expenses.csv',
   financing: 'vehicle_financing.csv',
   insurance: 'insurance_policies.csv',
-  insurancePolicyVehicles: 'insurance_policy_vehicles.csv',
+  insuranceTerms: 'insurance_terms.csv',
+  insuranceTermVehicles: 'insurance_term_vehicles.csv',
   photos: 'photos.csv',
   odometer: 'odometer_entries.csv',
   photoRefs: 'photo_refs.csv',
+  userPreferences: 'user_preferences.csv',
+  syncState: 'sync_state.csv',
 };
 
 export function getBackupTableKeys(): string[] {
@@ -208,10 +217,13 @@ export function getBackupTableKeys(): string[] {
 
 // Files that may be absent in older backups (pre-migration)
 const OPTIONAL_BACKUP_FILES = new Set([
-  'insurance_policy_vehicles.csv',
+  'insurance_terms.csv',
+  'insurance_term_vehicles.csv',
   'photos.csv',
   'odometer_entries.csv',
   'photo_refs.csv',
+  'user_preferences.csv',
+  'sync_state.csv',
 ]);
 
 export function getRequiredBackupFiles(): string[] {

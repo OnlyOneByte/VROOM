@@ -64,12 +64,6 @@
 				return;
 			}
 
-			if (entry.linkedEntityType) {
-				loadError =
-					'Linked odometer entries are managed automatically. Edit the source record instead.';
-				return;
-			}
-
 			odometer = String(entry.odometer);
 			date = new Date(entry.recordedAt).toISOString().split('T')[0] ?? '';
 			note = entry.note ?? '';

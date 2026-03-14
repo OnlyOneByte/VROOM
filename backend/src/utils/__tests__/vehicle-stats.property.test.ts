@@ -20,7 +20,7 @@ import { calculateVehicleStats, type FuelExpense } from '../vehicle-stats';
 /** Build a synthetic FuelExpense for testing. */
 function makeFuelExpense(overrides: {
   mileage: number;
-  fuelAmount: number;
+  volume: number;
   missedFillup: boolean;
   index: number;
   fuelType?: string;
@@ -28,10 +28,10 @@ function makeFuelExpense(overrides: {
   return {
     id: `exp-${overrides.index}`,
     mileage: overrides.mileage,
-    fuelAmount: overrides.fuelAmount,
+    volume: overrides.volume,
     fuelType: overrides.fuelType ?? '87 (Regular)',
     date: new Date(2024, 0, 1 + overrides.index),
-    expenseAmount: overrides.fuelAmount * 3.5,
+    expenseAmount: overrides.volume * 3.5,
     missedFillup: overrides.missedFillup,
   };
 }
@@ -46,9 +46,9 @@ function referenceMpg(expenses: FuelExpense[]): { mpgValues: number[]; avg: numb
     const current = expenses[i];
     const previous = expenses[i - 1];
     if (current.missedFillup || previous.missedFillup) continue;
-    if (current.mileage && previous.mileage && current.fuelAmount) {
+    if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
-      const mpg = miles / current.fuelAmount;
+      const mpg = miles / current.volume;
       if (mpg > 0 && mpg < 150) {
         mpgValues.push(mpg);
       }
@@ -66,9 +66,9 @@ function countUnfilteredPairs(expenses: FuelExpense[]): number {
   for (let i = 1; i < expenses.length; i++) {
     const current = expenses[i];
     const previous = expenses[i - 1];
-    if (current.mileage && previous.mileage && current.fuelAmount) {
+    if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
-      const mpg = miles / current.fuelAmount;
+      const mpg = miles / current.volume;
       if (mpg > 0 && mpg < 150) count++;
     }
   }
@@ -84,7 +84,7 @@ const fuelExpenseListArb = fc.integer({ min: 2, max: 20 }).chain((len) =>
     ...Array.from({ length: len }, (_, i) =>
       fc.record({
         mileage: fc.integer({ min: 10000 + i * 200, max: 10000 + i * 200 + 199 }),
-        fuelAmount: fc.double({ min: 5, max: 25, noNaN: true }),
+        volume: fc.double({ min: 5, max: 25, noNaN: true }),
         missedFillup: fc.boolean(),
         index: fc.constant(i),
       })
@@ -97,7 +97,7 @@ const allUnflaggedListArb = fc.integer({ min: 2, max: 20 }).chain((len) =>
     ...Array.from({ length: len }, (_, i) =>
       fc.record({
         mileage: fc.integer({ min: 10000 + i * 200, max: 10000 + i * 200 + 199 }),
-        fuelAmount: fc.double({ min: 5, max: 25, noNaN: true }),
+        volume: fc.double({ min: 5, max: 25, noNaN: true }),
         missedFillup: fc.constant(false),
         index: fc.constant(i),
       })
@@ -114,9 +114,9 @@ function verifyMpgValuesMatchReference(expenses: FuelExpense[], mpgValues: numbe
     const current = expenses[i];
     const previous = expenses[i - 1];
     if (current.missedFillup || previous.missedFillup) continue;
-    if (current.mileage && previous.mileage && current.fuelAmount) {
+    if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
-      const mpg = miles / current.fuelAmount;
+      const mpg = miles / current.volume;
       if (mpg > 0 && mpg < 150) {
         expect(mpgValues[validIdx]).toBeCloseTo(mpg, 5);
         validIdx++;
@@ -207,7 +207,7 @@ const NON_ELECTRIC_FUEL_TYPES = [
 const mixedFuelExpenseArb = (index: number) =>
   fc
     .record({
-      fuelAmount: fc.double({ min: 0.1, max: 500, noNaN: true }),
+      volume: fc.double({ min: 0.1, max: 500, noNaN: true }),
       fuelType: fc.oneof(
         fc.constantFrom(...ELECTRIC_FUEL_TYPES),
         fc.constantFrom(...NON_ELECTRIC_FUEL_TYPES)
@@ -220,7 +220,7 @@ const mixedFuelExpenseArb = (index: number) =>
       (r): FuelExpense => ({
         id: `exp-${index}`,
         mileage: r.mileage,
-        fuelAmount: r.fuelAmount,
+        volume: r.volume,
         fuelType: r.fuelType,
         date: new Date(2024, 0, 1 + index),
         expenseAmount: r.expenseAmount,
@@ -246,11 +246,11 @@ function referenceTotals(expenses: FuelExpense[]): { fuel: number; charge: numbe
   let fuel = 0;
   let charge = 0;
   for (const e of expenses) {
-    if (e.fuelAmount) {
+    if (e.volume) {
       if (isElectricFuelType(e.fuelType)) {
-        charge += e.fuelAmount;
+        charge += e.volume;
       } else {
-        fuel += e.fuelAmount;
+        fuel += e.volume;
       }
     }
   }
@@ -269,12 +269,12 @@ function toExpenseList(expenses: FuelExpense[] | FuelExpense): FuelExpense[] {
  * **Validates: Requirements 4.1, 4.6, 4.7**
  *
  * For any list of fuel-category expenses:
- * - totalFuelConsumed equals the sum of fuelAmount for non-electric fuelType expenses
- * - totalChargeConsumed equals the sum of fuelAmount for electric fuelType expenses
- * - totalFuelConsumed + totalChargeConsumed equals the sum of ALL fuelAmount values
+ * - totalFuelConsumed equals the sum of volume for non-electric fuelType expenses
+ * - totalChargeConsumed equals the sum of volume for electric fuelType expenses
+ * - totalFuelConsumed + totalChargeConsumed equals the sum of ALL volume values
  */
 describe('Property 4: Stats totals partition by fuelType', () => {
-  test('totalFuelConsumed + totalChargeConsumed equals sum of all fuelAmount values', () => {
+  test('totalFuelConsumed + totalChargeConsumed equals sum of all volume values', () => {
     fc.assert(
       fc.property(mixedExpenseListArb, (expenses) => {
         const expenseList = toExpenseList(expenses);

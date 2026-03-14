@@ -319,10 +319,9 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
     testDb.sqlite.close();
   });
 
-  /** Seed user_settings with specific unit preferences. */
-  function seedUserSettings(db: Database, userId: string, units: UnitPreferences): void {
-    db.run('INSERT INTO user_settings (id, user_id, unit_preferences) VALUES (?, ?, ?)', [
-      `settings-${userId}`,
+  /** Seed user_preferences with specific unit preferences. */
+  function seedUserPreferences(db: Database, userId: string, units: UnitPreferences): void {
+    db.run('INSERT INTO user_preferences (user_id, unit_preferences) VALUES (?, ?)', [
       userId,
       JSON.stringify(units),
     ]);
@@ -350,7 +349,7 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
     return JSON.parse(row.unit_preferences) as UnitPreferences;
   }
 
-  test('updating user_settings unit_preferences does not change existing vehicles', () => {
+  test('updating user_preferences unit_preferences does not change existing vehicles', () => {
     fc.assert(
       fc.property(
         validUnitPreferencesArb,
@@ -367,7 +366,7 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
             email: 'prop17@test.com',
             displayName: 'Prop17 User',
           });
-          seedUserSettings(testDb.sqlite, userId, initialUnits);
+          seedUserPreferences(testDb.sqlite, userId, initialUnits);
 
           // Create vehicles that inherit the initial unit preferences
           const vehicleIds: string[] = [];
@@ -387,14 +386,14 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
           }
 
           // Update the user's global unit preferences
-          testDb.sqlite.run('UPDATE user_settings SET unit_preferences = ? WHERE user_id = ?', [
+          testDb.sqlite.run('UPDATE user_preferences SET unit_preferences = ? WHERE user_id = ?', [
             JSON.stringify(updatedUnits),
             userId,
           ]);
 
           // Verify the settings actually changed
           const settingsRow = testDb.sqlite
-            .query('SELECT unit_preferences FROM user_settings WHERE user_id = ?')
+            .query('SELECT unit_preferences FROM user_preferences WHERE user_id = ?')
             .get(userId) as { unit_preferences: string } | null;
           expect(settingsRow).not.toBeNull();
           const newSettings = JSON.parse(settingsRow?.unit_preferences ?? '{}') as UnitPreferences;

@@ -187,7 +187,6 @@ function seedVehiclesWithExpenses(db: TestDb, vehicleCount: number, withInsuranc
       make: 'Toyota',
       model: 'Camry',
       year: 2022,
-      currentInsurancePolicyId: i === 0 && withInsurance ? policyId : null,
     };
     seedVehicle(db.sqlite, v);
 

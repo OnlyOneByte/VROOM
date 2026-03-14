@@ -3,10 +3,11 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
-import { userSettings, users as usersTable } from '../../db/schema';
+import { users as usersTable } from '../../db/schema';
 import { logger } from '../../utils/logger';
+import { syncStateRepository } from '../settings/repository';
+
 import { backupOrchestrator } from './backup-orchestrator';
 
 export interface UserActivity {
@@ -29,9 +30,7 @@ export interface UserActivity {
  * Current implementation is suitable for:
  * - Development environments
  * - Single-instance deployments
- * - Applications where activity tracking reset on restart is acceptable
- *
- * Note: lastDataChangeDate is persisted to database via userSettings table
+ * Note: lastDataChangeDate is persisted to database via sync_state table
  */
 export class UserActivityTracker {
   private static instance: UserActivityTracker;
@@ -135,11 +134,7 @@ export class UserActivityTracker {
 
   async markDataChanged(userId: string): Promise<void> {
     try {
-      const db = getDb();
-      await db
-        .update(userSettings)
-        .set({ lastDataChangeDate: new Date(), updatedAt: new Date() })
-        .where(eq(userSettings.userId, userId));
+      await syncStateRepository.markDataChanged(userId);
     } catch (error) {
       logger.error('Failed to mark data change', { userId, error });
     }
@@ -147,18 +142,7 @@ export class UserActivityTracker {
 
   async hasChangesSinceLastSync(userId: string): Promise<boolean> {
     try {
-      const db = getDb();
-      const settings = await db
-        .select()
-        .from(userSettings)
-        .where(eq(userSettings.userId, userId))
-        .limit(1);
-
-      if (!settings.length) return true;
-
-      const { lastDataChangeDate, lastSyncDate } = settings[0];
-      if (!lastSyncDate || !lastDataChangeDate) return true;
-      return lastDataChangeDate > lastSyncDate;
+      return await syncStateRepository.hasChangesSinceLastSync(userId);
     } catch (error) {
       logger.error('Failed to check changes', { userId, error });
       return true;
@@ -167,8 +151,3 @@ export class UserActivityTracker {
 }
 
 export const activityTracker = UserActivityTracker.getInstance();
-
-// Periodic cleanup of stale activity entries — disabled in test to avoid dangling timers
-if (CONFIG.env !== 'test') {
-  setInterval(() => activityTracker.cleanupInactiveUsers(), 60 * 60 * 1000);
-}

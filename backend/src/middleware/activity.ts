@@ -5,7 +5,7 @@
  */
 
 import type { Context, MiddlewareHandler, Next } from 'hono';
-import { settingsRepository } from '../api/settings/repository';
+import { preferencesRepository } from '../api/settings/repository';
 import { activityTracker as userActivityTracker } from '../api/sync/activity-tracker';
 import type { BackupConfig } from '../types';
 import { logger } from '../utils/logger';
@@ -29,7 +29,7 @@ export const activityTracker: MiddlewareHandler = async (c, next) => {
 
     if (!shouldTrack) return;
 
-    const settings = await settingsRepository.getOrCreate(user.id);
+    const settings = await preferencesRepository.getOrCreate(user.id);
     const backupConfig = settings.backupConfig as BackupConfig | null;
     const hasSyncEnabled = backupConfig?.providers
       ? Object.values(backupConfig.providers).some((p) => p.enabled)

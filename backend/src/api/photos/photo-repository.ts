@@ -7,11 +7,67 @@ import type { PaginatedResult } from '../../utils/pagination';
 
 /**
  * Generic PhotoRepository — entity-agnostic data access for the photos table.
- * All queries are scoped by both entityType and entityId (polymorphic pattern).
- * Does NOT extend BaseRepository since the base class doesn't support entity-scoped queries.
+ *
+ * v2: photos carry a direct user_id FK. User-scoped queries use WHERE user_id = ?
+ * directly instead of multi-branch entity JOINs.
  */
 export class PhotoRepository {
   constructor(private db: AppDatabase) {}
+
+  /**
+   * Find all photos belonging to a user, optionally filtered by entity type.
+   * Uses the direct user_id column instead of JOINing through entity tables.
+   */
+  async findByUser(userId: string, entityType?: string): Promise<Photo[]> {
+    const conditions = [eq(photos.userId, userId)];
+    if (entityType) {
+      conditions.push(eq(photos.entityType, entityType));
+    }
+    return this.db
+      .select()
+      .from(photos)
+      .where(and(...conditions))
+      .orderBy(asc(photos.createdAt));
+  }
+
+  /**
+   * Count photos belonging to a user, optionally filtered by entity type.
+   * Uses the direct user_id column instead of JOINing through entity tables.
+   */
+  async countByUser(userId: string, entityType?: string): Promise<number> {
+    const conditions = [eq(photos.userId, userId)];
+    if (entityType) {
+      conditions.push(eq(photos.entityType, entityType));
+    }
+    const [result] = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(photos)
+      .where(and(...conditions));
+    return result?.count ?? 0;
+  }
+
+  /**
+   * Find photo IDs belonging to a user, optionally filtered by entity type.
+   * Uses the direct user_id column instead of JOINing through entity tables.
+   */
+  async findIdsByUser(
+    userId: string,
+    entityType?: string,
+    extraConditions?: ReturnType<typeof and>
+  ): Promise<string[]> {
+    const conditions = [eq(photos.userId, userId)];
+    if (entityType) {
+      conditions.push(eq(photos.entityType, entityType));
+    }
+    if (extraConditions) {
+      conditions.push(extraConditions);
+    }
+    const rows = await this.db
+      .select({ id: photos.id })
+      .from(photos)
+      .where(and(...conditions));
+    return rows.map((r) => r.id);
+  }
 
   async findByEntity(entityType: string, entityId: string): Promise<Photo[]> {
     return this.db

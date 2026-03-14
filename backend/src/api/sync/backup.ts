@@ -21,10 +21,13 @@ import type { UserProvider } from '../../db/schema';
 import {
   expenses,
   insurancePolicies,
-  insurancePolicyVehicles,
+  insuranceTerms,
+  insuranceTermVehicles,
   odometerEntries,
   photoRefs,
   photos,
+  syncState,
+  userPreferences,
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
@@ -149,9 +152,9 @@ export class BackupService {
   async loadBackupConfig(
     userId: string
   ): Promise<{ config: BackupConfig; enabledProviders: [string, ProviderBackupSettings][] }> {
-    const { settingsRepository } = await import('../settings/repository');
-    const settings = await settingsRepository.getOrCreate(userId);
-    const config: BackupConfig = settings.backupConfig ?? { providers: {} };
+    const { preferencesRepository } = await import('../settings/repository');
+    const prefs = await preferencesRepository.getOrCreate(userId);
+    const config: BackupConfig = prefs.backupConfig ?? { providers: {} };
     const enabledProviders = Object.entries(config.providers).filter(([_, s]) => s.enabled);
     return { config, enabledProviders };
   }
@@ -322,27 +325,25 @@ export class BackupService {
           .then((r) => r.map((x) => x.odometer_entries)),
       ]);
 
-    // Query junction rows for user's insurance policies
+    // Query insurance terms for user's policies
     const policyIds = userInsurance.map((p) => p.id);
-    const userInsurancePolicyVehicles =
+    const userInsuranceTerms =
       policyIds.length > 0
-        ? await db
-            .select()
-            .from(insurancePolicyVehicles)
-            .where(inArray(insurancePolicyVehicles.policyId, policyIds))
+        ? await db.select().from(insuranceTerms).where(inArray(insuranceTerms.policyId, policyIds))
         : [];
 
-    // Collect all entity IDs to query photos for all user-owned entities
-    const vehicleIds = userVehicles.map((v) => v.id);
-    const expenseIds = userExpenses.map((e) => e.id);
-    const odometerEntryIds = userOdometer.map((o) => o.id);
+    // Query junction rows for user's insurance terms
+    const termIds = userInsuranceTerms.map((t) => t.id);
+    const userInsuranceTermVehicles =
+      termIds.length > 0
+        ? await db
+            .select()
+            .from(insuranceTermVehicles)
+            .where(inArray(insuranceTermVehicles.termId, termIds))
+        : [];
 
-    const userPhotos = await this.queryUserPhotos(db, {
-      vehicleIds,
-      expenseIds,
-      policyIds,
-      odometerEntryIds,
-    });
+    // Query photos directly by userId
+    const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
 
     // Query photo_refs for all user photos (batched to stay under SQLite variable limit)
     const photoIds = userPhotos.map((p) => p.id);
@@ -354,52 +355,27 @@ export class BackupService {
       userPhotoRefs.push(...rows);
     }
 
+    // Query user preferences and sync state
+    const userPreferencesRows = await db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId));
+    const syncStateRows = await db.select().from(syncState).where(eq(syncState.userId, userId));
+
     return {
       metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId },
       vehicles: userVehicles,
       expenses: userExpenses,
       financing: userFinancing,
       insurance: userInsurance,
-      insurancePolicyVehicles: userInsurancePolicyVehicles,
+      insuranceTerms: userInsuranceTerms,
+      insuranceTermVehicles: userInsuranceTermVehicles,
       odometer: userOdometer,
       photos: userPhotos,
       photoRefs: userPhotoRefs,
+      userPreferences: userPreferencesRows,
+      syncState: syncStateRows,
     };
-  }
-
-  /**
-   * Query all photos belonging to a user's entities.
-   * Photos use a polymorphic entityType/entityId pattern with no userId column,
-   * so we query by each entity type's IDs separately.
-   */
-  private async queryUserPhotos(
-    db: ReturnType<typeof getDb>,
-    entityIds: {
-      vehicleIds: string[];
-      expenseIds: string[];
-      policyIds: string[];
-      odometerEntryIds: string[];
-    }
-  ) {
-    const allPhotos = [];
-
-    const entityQueries: { type: string; ids: string[] }[] = [
-      { type: 'vehicle', ids: entityIds.vehicleIds },
-      { type: 'expense', ids: entityIds.expenseIds },
-      { type: 'insurance_policy', ids: entityIds.policyIds },
-      { type: 'odometer_entry', ids: entityIds.odometerEntryIds },
-    ];
-
-    for (const { type, ids } of entityQueries) {
-      if (ids.length === 0) continue;
-      const rows = await db
-        .select()
-        .from(photos)
-        .where(and(eq(photos.entityType, type), inArray(photos.entityId, ids)));
-      allPhotos.push(...rows);
-    }
-
-    return allPhotos;
   }
 
   async exportAsZip(userId: string): Promise<Buffer> {
@@ -543,6 +519,7 @@ export class BackupService {
     const userIds = new Set([backup.metadata.userId]);
     const vehicleIds = new Set(backup.vehicles.map((v) => String(v.id)));
     const policyIds = new Set(backup.insurance.map((i) => String(i.id)));
+    const termIds = new Set((backup.insuranceTerms ?? []).map((t) => String(t.id)));
     const expenseIds = new Set(backup.expenses.map((e) => String(e.id)));
     const odometerIds = new Set((backup.odometer ?? []).map((o) => String(o.id)));
     const photoIds = new Set((backup.photos ?? []).map((p) => String(p.id)));
@@ -551,7 +528,12 @@ export class BackupService {
       ...this.validateExpenseRefs(backup.expenses, vehicleIds, userIds),
       ...this.validateFinancingRefs(backup.financing, vehicleIds),
       ...this.validateInsuranceRefs(backup.insurance),
-      ...this.validateJunctionRefs(backup.insurancePolicyVehicles ?? [], policyIds, vehicleIds),
+      ...this.validateInsuranceTermRefs(backup.insuranceTerms ?? [], policyIds),
+      ...this.validateTermVehicleJunctionRefs(
+        backup.insuranceTermVehicles ?? [],
+        termIds,
+        vehicleIds
+      ),
       ...this.validateOdometerRefs(backup.odometer ?? [], vehicleIds),
       ...this.validatePhotoRefs(backup.photos ?? [], {
         vehicleIds,
@@ -603,15 +585,28 @@ export class BackupService {
     return errors;
   }
 
-  private validateJunctionRefs(
+  private validateInsuranceTermRefs(
+    termList: Record<string, unknown>[],
+    policyIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const term of termList) {
+      if (!policyIds.has(String(term.policyId))) {
+        errors.push(`Insurance term ${term.id} references non-existent policy ${term.policyId}`);
+      }
+    }
+    return errors;
+  }
+
+  private validateTermVehicleJunctionRefs(
     junctionList: Record<string, unknown>[],
-    policyIds: Set<string>,
+    termIds: Set<string>,
     vehicleIds: Set<string>
   ): string[] {
     const errors: string[] = [];
     for (const junction of junctionList) {
-      if (!policyIds.has(String(junction.policyId))) {
-        errors.push(`Insurance junction references non-existent policy ${junction.policyId}`);
+      if (!termIds.has(String(junction.termId))) {
+        errors.push(`Insurance junction references non-existent term ${junction.termId}`);
       }
       if (!vehicleIds.has(String(junction.vehicleId))) {
         errors.push(`Insurance junction references non-existent vehicle ${junction.vehicleId}`);

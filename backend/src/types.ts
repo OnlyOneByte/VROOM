@@ -5,20 +5,26 @@
 export type {
   Expense,
   InsurancePolicy,
+  InsuranceTerm,
+  InsuranceTermVehicle,
   NewExpense,
   NewInsurancePolicy,
+  NewInsuranceTerm,
+  NewInsuranceTermVehicle,
   NewPhotoRef,
   NewSession,
+  NewSyncState,
   NewUser,
+  NewUserPreferences,
   NewUserProvider,
-  NewUserSettings,
   NewVehicle,
   NewVehicleFinancing,
   PhotoRef,
   Session,
+  SyncState,
   User,
+  UserPreferences,
   UserProvider,
-  UserSettings,
   Vehicle,
   VehicleFinancing,
   VehicleWithFinancing,
@@ -159,10 +165,13 @@ export interface BackupData {
   expenses: import('./db/schema').Expense[];
   financing: import('./db/schema').VehicleFinancing[];
   insurance: import('./db/schema').InsurancePolicy[];
-  insurancePolicyVehicles: import('./db/schema').InsurancePolicyVehicle[];
+  insuranceTerms: import('./db/schema').InsuranceTerm[];
+  insuranceTermVehicles: import('./db/schema').InsuranceTermVehicle[];
   photos: import('./db/schema').Photo[];
   odometer: import('./db/schema').OdometerEntry[];
   photoRefs: import('./db/schema').PhotoRef[];
+  userPreferences: import('./db/schema').UserPreferences[];
+  syncState: import('./db/schema').SyncState[];
 }
 
 export interface ParsedBackupData {
@@ -171,10 +180,13 @@ export interface ParsedBackupData {
   expenses: Record<string, unknown>[];
   financing: Record<string, unknown>[];
   insurance: Record<string, unknown>[];
-  insurancePolicyVehicles: Record<string, unknown>[];
+  insuranceTerms: Record<string, unknown>[];
+  insuranceTermVehicles: Record<string, unknown>[];
   photos: Record<string, unknown>[];
   odometer: Record<string, unknown>[];
   photoRefs: Record<string, unknown>[];
+  userPreferences: Record<string, unknown>[];
+  syncState: Record<string, unknown>[];
 }
 
 // Backup provider types

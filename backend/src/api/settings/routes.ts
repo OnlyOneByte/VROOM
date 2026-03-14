@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
-import { userProviders, userSettings } from '../../db/schema';
+import { userPreferences, userProviders } from '../../db/schema';
 import { AppError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import {
@@ -15,7 +15,7 @@ import {
   VolumeUnit,
 } from '../../types';
 import { logger } from '../../utils/logger';
-import { settingsRepository } from './repository';
+import { preferencesRepository, syncStateRepository } from './repository';
 
 /**
  * Validate storageConfig provider references and consistency.
@@ -191,8 +191,8 @@ const backupConfigSchema = z.object({
     }),
 });
 
-// Validation schemas derived from db schema
-const baseSettingsSchema = createInsertSchema(userSettings, {
+// Validation schema derived from userPreferences Drizzle table
+const baseSettingsSchema = createInsertSchema(userPreferences, {
   syncInactivityMinutes: z
     .number()
     .min(1)
@@ -202,11 +202,7 @@ const baseSettingsSchema = createInsertSchema(userSettings, {
 
 const updateSettingsSchema = baseSettingsSchema
   .omit({
-    id: true,
     userId: true,
-    lastBackupDate: true,
-    lastSyncDate: true,
-    lastDataChangeDate: true,
     createdAt: true,
     updatedAt: true,
     unitPreferences: true,
@@ -228,11 +224,11 @@ routes.get('/', async (c) => {
   try {
     const user = c.get('user');
 
-    const userSettings = await settingsRepository.getOrCreate(user.id);
+    const prefs = await preferencesRepository.getOrCreate(user.id);
 
     return c.json({
       success: true,
-      data: userSettings,
+      data: prefs,
     });
   } catch (error) {
     logger.error('Error fetching settings', { error });
@@ -251,7 +247,7 @@ routes.put('/', async (c) => {
     const updates = updateSettingsSchema.parse(body);
 
     // Ensure settings exist first
-    const existingSettings = await settingsRepository.getOrCreate(user.id);
+    const existingSettings = await preferencesRepository.getOrCreate(user.id);
 
     // Merge partial unitPreferences with existing values
     const {
@@ -279,7 +275,7 @@ routes.put('/', async (c) => {
     }
 
     // Update settings
-    const updatedSettings = await settingsRepository.update(user.id, {
+    const updatedSettings = await preferencesRepository.update(user.id, {
       ...restUpdates,
       ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
       ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
@@ -305,14 +301,12 @@ routes.put('/', async (c) => {
 
 /**
  * POST /api/settings/backup
- * Trigger manual backup
+ * Trigger manual backup — updates lastBackupDate in sync_state
  */
 routes.post('/backup', async (c) => {
   try {
     const user = c.get('user');
-    await settingsRepository.update(user.id, {
-      lastBackupDate: new Date(),
-    });
+    await syncStateRepository.updateBackupDate(user.id);
 
     return c.json({
       success: true,

@@ -1,9 +1,24 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '../../db/connection';
-import { expenses, odometerEntries } from '../../db/schema';
+import { expenses, odometerEntries, photos } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { insurancePolicyRepository } from '../insurance/repository';
 import { vehicleRepository } from '../vehicles/repository';
+
+/**
+ * Check photo ownership directly via photos.user_id.
+ * Used for operations on existing photos (delete, set cover).
+ */
+export async function validatePhotoOwnership(photoId: string, userId: string): Promise<void> {
+  const db = getDb();
+  const rows = await db
+    .select({ userId: photos.userId })
+    .from(photos)
+    .where(eq(photos.id, photoId))
+    .limit(1);
+  const photo = rows[0];
+  if (!photo || photo.userId !== userId) throw new NotFoundError('Photo');
+}
 
 async function validateExpenseOwnership(entityId: string, userId: string): Promise<void> {
   const db = getDb();
@@ -18,6 +33,13 @@ async function validateExpenseOwnership(entityId: string, userId: string): Promi
 
 /**
  * Validates that the authenticated user owns the entity referenced by entityType + entityId.
+ *
+ * v2 dual behavior:
+ * - For operations on **existing photos** (delete, set cover): use validatePhotoOwnership()
+ *   which checks photos.user_id directly.
+ * - For **new photo uploads** (no photo row exists yet): this function validates entity
+ *   ownership through the entity tables (vehicle, expense, insurance_policy, odometer_entry).
+ *
  * Throws NotFoundError if the entity doesn't exist or doesn't belong to the user.
  * Throws ValidationError for unknown entity types.
  */

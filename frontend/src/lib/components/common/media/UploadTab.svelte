@@ -10,6 +10,7 @@
 		uploadIndex: number;
 		uploadTotal: number;
 		uploadErrors: string[];
+		// eslint-disable-next-line no-unused-vars
 		onFilesReady: (files: File[]) => void;
 		onClose: () => void;
 	}
@@ -37,7 +38,7 @@
 	let maxSizeMB = $derived(Math.round(maxFileSize / (1024 * 1024)));
 	let acceptedLabels = $derived(
 		acceptedTypes
-			.map((t) => {
+			.map(t => {
 				if (t === 'image/jpeg') return 'JPEG';
 				if (t === 'image/png') return 'PNG';
 				if (t === 'image/webp') return 'WebP';
@@ -131,7 +132,7 @@
 		ondragleave={handleDragLeave}
 		ondrop={handleDrop}
 		onclick={() => fileInputEl?.click()}
-		onkeydown={(e) => {
+		onkeydown={e => {
 			if (e.key === 'Enter' || e.key === ' ') {
 				e.preventDefault();
 				fileInputEl?.click();

@@ -12,7 +12,7 @@ import { calculateAverageMilesPerKwh } from './calculations';
 export interface FuelExpense {
   id: string;
   mileage: number | null;
-  fuelAmount: number | null;
+  volume: number | null;
   fuelType: string | null;
   date: Date;
   expenseAmount: number;
@@ -76,8 +76,8 @@ export function calculateVehicleStats(
   }
 
   // Calculate totals split by group
-  stats.totalFuelConsumed = sumFuelAmount(fuelGroup);
-  stats.totalChargeConsumed = sumFuelAmount(chargeGroup);
+  stats.totalFuelConsumed = sumVolume(fuelGroup);
+  stats.totalChargeConsumed = sumVolume(chargeGroup);
   stats.totalFuelCost = fuelGroup.reduce((sum, e) => sum + e.expenseAmount, 0);
   stats.totalChargeCost = chargeGroup.reduce((sum, e) => sum + e.expenseAmount, 0);
   stats.fuelExpenseCount = fuelGroup.length;
@@ -111,13 +111,13 @@ export function calculateVehicleStats(
 }
 
 /**
- * Sum fuelAmount values for a group of expenses
+ * Sum volume values for a group of expenses
  */
-function sumFuelAmount(expenses: FuelExpense[]): number {
+function sumVolume(expenses: FuelExpense[]): number {
   let total = 0;
   for (const expense of expenses) {
-    if (expense.fuelAmount) {
-      total += expense.fuelAmount;
+    if (expense.volume) {
+      total += expense.volume;
     }
   }
   return total;
@@ -157,9 +157,9 @@ function calculateAverageMpg(expensesWithMileage: FuelExpense[]): number | null 
       continue;
     }
 
-    if (current.mileage && previous.mileage && current.fuelAmount) {
+    if (current.mileage && previous.mileage && current.volume) {
       const milesDriven = current.mileage - previous.mileage;
-      const mpg = milesDriven / current.fuelAmount;
+      const mpg = milesDriven / current.volume;
 
       // Filter out unrealistic values (likely data errors)
       if (mpg > 0 && mpg < 150) {

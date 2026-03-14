@@ -34,7 +34,7 @@
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import type { InsurancePolicy, Vehicle, PolicyDetails, FinanceDetails } from '$lib/types';
+	import type { InsurancePolicy, Vehicle, CreateTermRequest } from '$lib/types';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 
 	interface Props {
@@ -173,33 +173,29 @@
 				appStore.showSuccess('Policy updated successfully');
 				gotoDynamic(returnTo);
 			} else {
-				const policyDetails: PolicyDetails = {};
-				if (policyNumber.trim()) policyDetails.policyNumber = policyNumber.trim();
+				const termData: Record<string, unknown> = {};
+				if (policyNumber.trim()) termData['policyNumber'] = policyNumber.trim();
 				if (coverageDescription.trim())
-					policyDetails.coverageDescription = coverageDescription.trim();
-				if (deductibleAmount) policyDetails.deductibleAmount = Number(deductibleAmount);
-				if (coverageLimit) policyDetails.coverageLimit = Number(coverageLimit);
-				if (agentName.trim()) policyDetails.agentName = agentName.trim();
-				if (agentPhone.trim()) policyDetails.agentPhone = agentPhone.trim();
-				if (agentEmail.trim()) policyDetails.agentEmail = agentEmail.trim();
-
-				const financeDetails: FinanceDetails = {};
-				if (totalCost) financeDetails.totalCost = Number(totalCost);
-				if (premiumFrequency) financeDetails.premiumFrequency = premiumFrequency;
+					termData['coverageDescription'] = coverageDescription.trim();
+				if (deductibleAmount) termData['deductibleAmount'] = Number(deductibleAmount);
+				if (coverageLimit) termData['coverageLimit'] = Number(coverageLimit);
+				if (agentName.trim()) termData['agentName'] = agentName.trim();
+				if (agentPhone.trim()) termData['agentPhone'] = agentPhone.trim();
+				if (agentEmail.trim()) termData['agentEmail'] = agentEmail.trim();
+				if (totalCost) termData['totalCost'] = Number(totalCost);
+				if (premiumFrequency) termData['premiumFrequency'] = premiumFrequency;
 
 				await insuranceApi.createPolicy({
 					company: company.trim(),
 					terms: [
 						{
-							id: crypto.randomUUID(),
 							startDate,
 							endDate,
-							policyDetails,
-							financeDetails,
+							...termData,
 							vehicleCoverage: {
 								vehicleIds: selectedVehicleIds
 							}
-						}
+						} as CreateTermRequest
 					],
 					notes: notes.trim() || undefined,
 					isActive

@@ -4,9 +4,9 @@ import { getDb } from '../../db/connection';
 import {
   expenses,
   insurancePolicies,
-  insurancePolicyVehicles,
-  type PolicyTerm,
-  userSettings,
+  insuranceTerms,
+  insuranceTermVehicles,
+  userPreferences,
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
@@ -309,13 +309,13 @@ export class AnalyticsRepository {
     this.vehicleNameCache.set(cacheKey, { data, timestamp: now });
   }
 
-  /** Read the user's global unit preferences from user_settings. */
+  /** Read the user's global unit preferences from user_preferences. */
   async getUserUnits(userId: string): Promise<UnitPreferences> {
     try {
       const rows = await this.db
-        .select({ unitPreferences: userSettings.unitPreferences })
-        .from(userSettings)
-        .where(eq(userSettings.userId, userId))
+        .select({ unitPreferences: userPreferences.unitPreferences })
+        .from(userPreferences)
+        .where(eq(userPreferences.userId, userId))
         .limit(1);
 
       const row = rows[0];
@@ -565,7 +565,7 @@ export class AnalyticsRepository {
       .select({
         date: expenses.date,
         mileage: expenses.mileage,
-        fuelAmount: expenses.fuelAmount,
+        volume: expenses.volume,
         fuelType: expenses.fuelType,
         missedFillup: expenses.missedFillup,
         expenseAmount: expenses.expenseAmount,
@@ -597,7 +597,7 @@ export class AnalyticsRepository {
         expenseAmount: expenses.expenseAmount,
         date: expenses.date,
         mileage: expenses.mileage,
-        fuelAmount: expenses.fuelAmount,
+        volume: expenses.volume,
       })
       .from(expenses)
       .where(and(...conditions))
@@ -630,7 +630,7 @@ export class AnalyticsRepository {
     const result = await this.db
       .select({
         count: sql<number>`COUNT(*)`,
-        totalGallons: sql<number>`COALESCE(SUM(${expenses.fuelAmount}), 0)`,
+        totalGallons: sql<number>`COALESCE(SUM(${expenses.volume}), 0)`,
       })
       .from(expenses)
       .where(and(...conditions));
@@ -672,27 +672,28 @@ export class AnalyticsRepository {
   // ---- Financing helpers --------------------------------------------------
 
   /** Build vehicle financing details from active financing rows. */
-  private buildFinancingVehicleDetails(
+  private async buildFinancingVehicleDetails(
     financingRows: Array<{
       id: string;
       vehicleId: string;
       isActive: boolean;
       financingType: string;
       paymentAmount: number;
-      currentBalance: number;
+      originalAmount: number;
       apr: number | null;
       termMonths: number;
       startDate: Date | null;
     }>,
     vehicleNameMap: Map<string, string>
-  ): {
+  ): Promise<{
     vehicleDetails: FinancingData['vehicleDetails'];
     totalMonthlyPayments: number;
     remainingBalance: number;
     loanCount: number;
     leaseCount: number;
     activeIds: Set<string>;
-  } {
+  }> {
+    const { financingRepository } = await import('../financing/repository');
     const vehicleDetails: FinancingData['vehicleDetails'] = [];
     let totalMonthlyPayments = 0;
     let remainingBalance = 0;
@@ -704,10 +705,11 @@ export class AnalyticsRepository {
       if (!fin.isActive) continue;
       activeIds.add(fin.id);
       totalMonthlyPayments += fin.paymentAmount;
-      remainingBalance += fin.currentBalance;
+      const computedBalance = await financingRepository.computeBalance(fin.id);
+      remainingBalance += computedBalance;
       if (fin.financingType === 'loan') loanCount++;
       if (fin.financingType === 'lease') leaseCount++;
-      vehicleDetails.push(this.buildSingleFinancingDetail(fin, vehicleNameMap));
+      vehicleDetails.push(this.buildSingleFinancingDetail(fin, vehicleNameMap, computedBalance));
     }
 
     // Add unfinanced vehicles as 'own'
@@ -742,15 +744,16 @@ export class AnalyticsRepository {
       vehicleId: string;
       financingType: string;
       paymentAmount: number;
-      currentBalance: number;
+      originalAmount: number;
       apr: number | null;
       termMonths: number;
       startDate: Date | null;
     },
-    vehicleNameMap: Map<string, string>
+    vehicleNameMap: Map<string, string>,
+    computedBalance: number
   ): FinancingData['vehicleDetails'][number] {
     const interestPaid =
-      fin.financingType === 'loan' && fin.apr ? (fin.currentBalance * (fin.apr / 100)) / 12 : 0;
+      fin.financingType === 'loan' && fin.apr ? (computedBalance * (fin.apr / 100)) / 12 : 0;
     const startDate =
       fin.startDate instanceof Date ? fin.startDate : new Date(fin.startDate as unknown as number);
     const now = new Date();
@@ -763,7 +766,7 @@ export class AnalyticsRepository {
       vehicleName: vehicleNameMap.get(fin.vehicleId) ?? 'Unknown',
       financingType: fin.financingType as 'loan' | 'lease' | 'own',
       monthlyPayment: fin.paymentAmount,
-      remainingBalance: fin.currentBalance,
+      remainingBalance: computedBalance,
       apr: fin.apr,
       interestPaid,
       monthsRemaining: Math.max(0, fin.termMonths - monthsElapsed),
@@ -795,27 +798,39 @@ export class AnalyticsRepository {
   }
 
   /** Build loan interest/principal breakdown for the next 12 months. */
-  private buildLoanBreakdown(
+  private async buildLoanBreakdown(
     financingRows: Array<{
+      id: string;
       isActive: boolean;
       financingType: string;
       apr: number | null;
-      currentBalance: number;
+      originalAmount: number;
       paymentAmount: number;
     }>
-  ): FinancingData['loanBreakdown'] {
+  ): Promise<FinancingData['loanBreakdown']> {
     const activeLoans = financingRows.filter(
       (f) => f.isActive && f.financingType === 'loan' && f.apr
     );
     if (activeLoans.length === 0) return [];
+
+    const { financingRepository } = await import('../financing/repository');
     const now = new Date();
     const breakdown: FinancingData['loanBreakdown'] = [];
+
+    // Compute balances for all active loans
+    const loanBalances = new Map<string, number>();
+    for (const loan of activeLoans) {
+      const balance = await financingRepository.computeBalance(loan.id);
+      loanBalances.set(loan.id, balance);
+    }
+
     for (let m = 0; m < 12; m++) {
       const monthDate = new Date(now.getFullYear(), now.getMonth() + m, 1);
       let totalInterest = 0;
       let totalPrincipal = 0;
       for (const loan of activeLoans) {
-        const interest = loan.currentBalance * ((loan.apr ?? 0) / 100 / 12);
+        const balance = loanBalances.get(loan.id) ?? 0;
+        const interest = balance * ((loan.apr ?? 0) / 100 / 12);
         totalInterest += Math.max(0, interest);
         totalPrincipal += Math.max(0, loan.paymentAmount - interest);
       }
@@ -830,11 +845,20 @@ export class AnalyticsRepository {
 
   // ---- Insurance helpers --------------------------------------------------
 
-  /** Process active policies into vehicle details and aggregation maps. */
-  /** Process active policies into vehicle details and aggregation maps. */
+  /** Process active policies into vehicle details and aggregation maps using insurance_terms table. */
   private buildInsuranceDetails(
-    activePolicies: Array<{ id: string; company: string; terms: PolicyTerm[] | null }>,
-    junctionRows: Array<{ policyId: string; vehicleId: string }>,
+    activePolicies: Array<{ id: string; company: string }>,
+    termRows: Array<{
+      id: string;
+      policyId: string;
+      startDate: Date | null;
+      endDate: Date | null;
+      monthlyCost: number | null;
+      totalCost: number | null;
+      deductibleAmount: number | null;
+      coverageDescription: string | null;
+    }>,
+    junctionRows: Array<{ termId: string; vehicleId: string }>,
     vehicleNameMap: Map<string, string>
   ): {
     vehicleDetails: InsuranceData['vehicleDetails'];
@@ -850,14 +874,23 @@ export class AnalyticsRepository {
     const monthlyMap = new Map<string, number>();
 
     for (const policy of activePolicies) {
-      const terms = (policy.terms ?? []) as PolicyTerm[];
-      const latestTerm = terms[terms.length - 1];
+      // Get the latest term for this policy
+      const policyTerms = termRows.filter((t) => t.policyId === policy.id);
+      const latestTerm = policyTerms.sort((a, b) => {
+        const aEnd = a.endDate instanceof Date ? a.endDate.getTime() : 0;
+        const bEnd = b.endDate instanceof Date ? b.endDate.getTime() : 0;
+        return bEnd - aEnd;
+      })[0];
       if (!latestTerm) continue;
 
-      const monthlyPremium = latestTerm.financeDetails?.monthlyCost ?? 0;
+      const monthlyPremium = latestTerm.monthlyCost ?? 0;
       const annualPremium = monthlyPremium * 12;
       const coveredVehicleIds = [
-        ...new Set(junctionRows.filter((j) => j.policyId === policy.id).map((j) => j.vehicleId)),
+        ...new Set(
+          junctionRows
+            .filter((j) => policyTerms.some((t) => t.id === j.termId))
+            .map((j) => j.vehicleId)
+        ),
       ];
 
       totalMonthlyPremiums += monthlyPremium;
@@ -900,7 +933,7 @@ export class AnalyticsRepository {
     carrier: string,
     monthlyPremium: number,
     annualPremium: number,
-    term: PolicyTerm
+    term: { deductibleAmount: number | null; coverageDescription: string | null }
   ): void {
     const perVehicleMonthly =
       coveredVehicleIds.length > 0 ? monthlyPremium / coveredVehicleIds.length : 0;
@@ -913,21 +946,25 @@ export class AnalyticsRepository {
         carrier,
         monthlyPremium: perVehicleMonthly,
         annualPremium: perVehicleAnnual,
-        deductible: term.policyDetails?.deductibleAmount ?? null,
-        coverageType: term.policyDetails?.coverageDescription ?? null,
+        deductible: term.deductibleAmount ?? null,
+        coverageType: term.coverageDescription ?? null,
       });
     }
   }
 
-  /** Accumulate monthly premium data from a policy term's date range. */
+  /** Accumulate monthly premium data from a term's date range. */
   private accumulateMonthlyPremiums(
     monthlyMap: Map<string, number>,
-    term: PolicyTerm,
+    term: { startDate: Date | null; endDate: Date | null },
     monthlyPremium: number
   ): void {
     if (!term.startDate || !term.endDate) return;
-    const start = new Date(term.startDate);
-    const end = new Date(term.endDate);
+    const start =
+      term.startDate instanceof Date
+        ? term.startDate
+        : new Date(term.startDate as unknown as number);
+    const end =
+      term.endDate instanceof Date ? term.endDate : new Date(term.endDate as unknown as number);
     const current = new Date(start);
     while (current <= end) {
       const key = toMonthKey(current);
@@ -944,7 +981,7 @@ export class AnalyticsRepository {
       category: string;
       expenseAmount: number;
       isFinancingPayment: boolean;
-      insurancePolicyId: string | null;
+      insuranceTermId: string | null;
     }>
   ): {
     financingInterest: number;
@@ -961,7 +998,7 @@ export class AnalyticsRepository {
     for (const row of rows) {
       if (row.category === 'financial' && row.isFinancingPayment)
         financingInterest += row.expenseAmount;
-      else if (row.category === 'financial' && row.insurancePolicyId)
+      else if (row.category === 'financial' && row.insuranceTermId)
         insuranceCost += row.expenseAmount;
       else if (row.category === 'fuel') fuelCost += row.expenseAmount;
       else if (row.category === 'maintenance') maintenanceCost += row.expenseAmount;
@@ -979,14 +1016,14 @@ export class AnalyticsRepository {
         eq(vehicles.userId, userId),
         eq(expenses.category, 'fuel'),
         isNotNull(expenses.mileage),
-        isNotNull(expenses.fuelAmount),
+        isNotNull(expenses.volume),
       ];
       if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
       const rows = await this.db
         .select({
           date: expenses.date,
           mileage: expenses.mileage,
-          fuelAmount: expenses.fuelAmount,
+          volume: expenses.volume,
           fuelType: expenses.fuelType,
           missedFillup: expenses.missedFillup,
         })
@@ -1020,7 +1057,6 @@ export class AnalyticsRepository {
       const vehicleRows = await this.db
         .select({
           id: vehicles.id,
-          currentInsurancePolicyId: vehicles.currentInsurancePolicyId,
         })
         .from(vehicles)
         .where(eq(vehicles.userId, userId));
@@ -1048,7 +1084,7 @@ export class AnalyticsRepository {
           : null;
 
       const fleetHealthScore =
-        vehicleCount > 0 ? await this.computeFleetHealthScore(vehicleRows) : 0;
+        vehicleCount > 0 ? await this.computeFleetHealthScore(vehicleRows, userId) : 0;
 
       return {
         vehicleCount,
@@ -1074,7 +1110,8 @@ export class AnalyticsRepository {
 
   /** Batch-compute fleet health score across all vehicles without N+1 queries. */
   private async computeFleetHealthScore(
-    vehicleRows: Array<{ id: string; currentInsurancePolicyId: string | null }>
+    vehicleRows: Array<{ id: string }>,
+    userId: string
   ): Promise<number> {
     const vehicleIds = vehicleRows.map((v) => v.id);
 
@@ -1103,8 +1140,8 @@ export class AnalyticsRepository {
       arr.push({ date: row.date, mileage: row.mileage });
     }
 
-    // Batch-query all active insurance policies
-    const activePolicyIds = await this.queryActivePolicyIds(vehicleRows);
+    // Batch-query vehicles with active insurance coverage via insurance_terms JOIN
+    const coveredVehicleIds = await this.queryCoveredVehicleIds(vehicleIds, userId);
 
     // Compute per-vehicle scores without individual DB calls
     let totalScore = 0;
@@ -1112,8 +1149,7 @@ export class AnalyticsRepository {
       const maint = maintenanceByVehicle.get(v.id) ?? [];
       const maintenanceRegularity = computeRegularityScore(maint);
       const mileageAdherence = computeMileageScore(maint);
-      const insuranceCoverage =
-        v.currentInsurancePolicyId && activePolicyIds.has(v.currentInsurancePolicyId) ? 100 : 0;
+      const insuranceCoverage = coveredVehicleIds.has(v.id) ? 100 : 0;
       totalScore += Math.round(
         maintenanceRegularity * 0.4 + mileageAdherence * 0.35 + insuranceCoverage * 0.25
       );
@@ -1121,22 +1157,25 @@ export class AnalyticsRepository {
     return Math.round(totalScore / vehicleRows.length);
   }
 
-  /** Query active insurance policy IDs for a set of vehicles in one batch. */
-  private async queryActivePolicyIds(
-    vehicleRows: Array<{ currentInsurancePolicyId: string | null }>
-  ): Promise<Set<string>> {
-    const policyIds = vehicleRows
-      .map((v) => v.currentInsurancePolicyId)
-      .filter((id): id is string => id != null);
+  /** Query vehicle IDs that have active insurance coverage via insurance_terms + insurance_term_vehicles JOIN. */
+  private async queryCoveredVehicleIds(vehicleIds: string[], userId: string): Promise<Set<string>> {
+    if (vehicleIds.length === 0) return new Set();
 
-    if (policyIds.length === 0) return new Set();
+    // Find vehicles covered by active policies via JOIN through insurance_terms + insurance_term_vehicles
+    const rows = await this.db
+      .select({ vehicleId: insuranceTermVehicles.vehicleId })
+      .from(insuranceTermVehicles)
+      .innerJoin(insuranceTerms, eq(insuranceTermVehicles.termId, insuranceTerms.id))
+      .innerJoin(insurancePolicies, eq(insuranceTerms.policyId, insurancePolicies.id))
+      .where(
+        and(
+          inArray(insuranceTermVehicles.vehicleId, vehicleIds),
+          eq(insurancePolicies.isActive, true),
+          eq(insurancePolicies.userId, userId)
+        )
+      );
 
-    const policyRows = await this.db
-      .select({ id: insurancePolicies.id })
-      .from(insurancePolicies)
-      .where(and(inArray(insurancePolicies.id, policyIds), eq(insurancePolicies.isActive, true)));
-
-    return new Set(policyRows.map((p) => p.id));
+    return new Set(rows.map((r) => r.vehicleId));
   }
 
   /** Compute fuel stats: fillup counts, consumption metrics, charts. */
@@ -1201,8 +1240,7 @@ export class AnalyticsRepository {
     const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
     const prevMonthFillups = fuelRows.filter((r) => toDate(r).getMonth() === prevMonth).length;
 
-    const sumGallons = (rows: FuelExpenseRow[]) =>
-      rows.reduce((s, r) => s + (r.fuelAmount ?? 0), 0);
+    const sumGallons = (rows: FuelExpenseRow[]) => rows.reduce((s, r) => s + (r.volume ?? 0), 0);
     const currentYearGallons = sumGallons(fuelRows);
     const previousYearGallons = prevYearAgg.totalGallons;
     const currentMonthGallons = sumGallons(
@@ -1214,8 +1252,8 @@ export class AnalyticsRepository {
     const fuelConsumption = computeFuelConsumptionMetrics(mpgValues);
 
     const volumes = fuelRows
-      .filter((r) => r.fuelAmount != null && r.fuelAmount > 0)
-      .map((r) => r.fuelAmount as number);
+      .filter((r) => r.volume != null && r.volume > 0)
+      .map((r) => r.volume as number);
     const fillupDetails = {
       avgVolume: volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : null,
       minVolume: volumes.length > 0 ? Math.min(...volumes) : null,
@@ -1508,7 +1546,7 @@ export class AnalyticsRepository {
         loanCount,
         leaseCount,
         activeIds,
-      } = this.buildFinancingVehicleDetails(financingRows, vehicleNameMap);
+      } = await this.buildFinancingVehicleDetails(financingRows, vehicleNameMap);
 
       const monthlyTimeline = this.buildFinancingTimeline(vehicleDetails);
 
@@ -1538,7 +1576,7 @@ export class AnalyticsRepository {
         vehicleDetails,
         monthlyTimeline,
         typeDistribution,
-        loanBreakdown: this.buildLoanBreakdown(financingRows),
+        loanBreakdown: await this.buildLoanBreakdown(financingRows),
       };
     } catch (error) {
       logger.error('Failed to compute financing analytics', {
@@ -1568,19 +1606,41 @@ export class AnalyticsRepository {
       if (policyRows.length === 0) return emptyResult;
 
       const policyIds = policyRows.map((p) => p.id);
-      const junctionRows = await this.db
-        .select({
-          policyId: insurancePolicyVehicles.policyId,
-          termId: insurancePolicyVehicles.termId,
-          vehicleId: insurancePolicyVehicles.vehicleId,
-        })
-        .from(insurancePolicyVehicles)
-        .where(inArray(insurancePolicyVehicles.policyId, policyIds));
+
+      // Query terms for all policies
+      const termRows =
+        policyIds.length > 0
+          ? await this.db
+              .select({
+                id: insuranceTerms.id,
+                policyId: insuranceTerms.policyId,
+                startDate: insuranceTerms.startDate,
+                endDate: insuranceTerms.endDate,
+                monthlyCost: insuranceTerms.monthlyCost,
+                totalCost: insuranceTerms.totalCost,
+                deductibleAmount: insuranceTerms.deductibleAmount,
+                coverageDescription: insuranceTerms.coverageDescription,
+              })
+              .from(insuranceTerms)
+              .where(inArray(insuranceTerms.policyId, policyIds))
+          : [];
+
+      const termIds = termRows.map((t) => t.id);
+      const junctionRows =
+        termIds.length > 0
+          ? await this.db
+              .select({
+                termId: insuranceTermVehicles.termId,
+                vehicleId: insuranceTermVehicles.vehicleId,
+              })
+              .from(insuranceTermVehicles)
+              .where(inArray(insuranceTermVehicles.termId, termIds))
+          : [];
 
       const activePolicies = policyRows.filter((p) => p.isActive);
 
       const { vehicleDetails, totalMonthlyPremiums, totalAnnualPremiums, carrierMap, monthlyMap } =
-        this.buildInsuranceDetails(activePolicies, junctionRows, vehicleNameMap);
+        this.buildInsuranceDetails(activePolicies, termRows, junctionRows, vehicleNameMap);
 
       return {
         summary: {
@@ -1610,13 +1670,8 @@ export class AnalyticsRepository {
   /** Compute vehicle health score from maintenance regularity, mileage, and insurance. */
   async getVehicleHealth(userId: string, vehicleId: string): Promise<VehicleHealthData> {
     try {
-      const [vehicleNameMap, vehicleRows, maintenanceRows] = await Promise.all([
+      const [vehicleNameMap, maintenanceRows] = await Promise.all([
         this.queryVehicleNameMap(userId, vehicleId),
-        this.db
-          .select({ currentInsurancePolicyId: vehicles.currentInsurancePolicyId })
-          .from(vehicles)
-          .where(and(eq(vehicles.id, vehicleId), eq(vehicles.userId, userId)))
-          .limit(1),
         this.db
           .select({ date: expenses.date, mileage: expenses.mileage })
           .from(expenses)
@@ -1625,14 +1680,13 @@ export class AnalyticsRepository {
       ]);
 
       const vehicleName = vehicleNameMap.get(vehicleId) ?? 'Unknown';
-      const policyId = vehicleRows[0]?.currentInsurancePolicyId ?? null;
-      const activePolicyIds = policyId
-        ? await this.queryActivePolicyIds([{ currentInsurancePolicyId: policyId }])
-        : new Set<string>();
+
+      // Derive active insurance coverage via JOIN through insurance_terms + insurance_term_vehicles
+      const coveredVehicleIds = await this.queryCoveredVehicleIds([vehicleId], userId);
+      const insuranceCoverage = coveredVehicleIds.has(vehicleId) ? 100 : 0;
 
       const maintenanceRegularity = computeRegularityScore(maintenanceRows);
       const mileageIntervalAdherence = computeMileageScore(maintenanceRows);
-      const insuranceCoverage = policyId && activePolicyIds.has(policyId) ? 100 : 0;
       const overallScore = Math.round(
         maintenanceRegularity * 0.4 + mileageIntervalAdherence * 0.35 + insuranceCoverage * 0.25
       );
@@ -1684,7 +1738,7 @@ export class AnalyticsRepository {
           expenseAmount: expenses.expenseAmount,
           date: expenses.date,
           isFinancingPayment: expenses.isFinancingPayment,
-          insurancePolicyId: expenses.insurancePolicyId,
+          insuranceTermId: expenses.insuranceTermId,
           mileage: expenses.mileage,
         })
         .from(expenses)
@@ -1862,7 +1916,6 @@ export class AnalyticsRepository {
         this.db
           .select({
             id: vehicles.id,
-            currentInsurancePolicyId: vehicles.currentInsurancePolicyId,
           })
           .from(vehicles)
           .where(eq(vehicles.userId, userId)),
@@ -1894,7 +1947,7 @@ export class AnalyticsRepository {
           : null;
       const ytdSpending = allExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
       const fleetHealthScore =
-        vehicleRows.length > 0 ? await this.computeFleetHealthScore(vehicleRows) : 0;
+        vehicleRows.length > 0 ? await this.computeFleetHealthScore(vehicleRows, userId) : 0;
 
       const quickStats: QuickStatsData = {
         vehicleCount: vehicleRows.length,

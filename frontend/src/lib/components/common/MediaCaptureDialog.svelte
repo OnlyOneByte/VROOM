@@ -115,7 +115,7 @@
 	}
 </script>
 
-<Dialog.Root bind:open onOpenChange={(isOpen) => !isOpen && handleClose()}>
+<Dialog.Root bind:open onOpenChange={isOpen => !isOpen && handleClose()}>
 	<Dialog.Content class="sm:max-w-lg">
 		<Dialog.Header>
 			<Dialog.Title>{title}</Dialog.Title>
@@ -167,7 +167,7 @@
 						{multiple}
 						{uploading}
 						{uploadIndex}
-						uploadTotal={uploadTotal}
+						{uploadTotal}
 						{uploadErrors}
 						onFilesReady={handleFilesReady}
 						onClose={handleClose}

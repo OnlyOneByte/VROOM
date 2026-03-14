@@ -55,8 +55,6 @@ export interface OdometerEntry {
 	odometer: number;
 	recordedAt: string;
 	note?: string;
-	linkedEntityType?: string;
-	linkedEntityId?: string;
 	createdAt: string;
 	updatedAt: string;
 }

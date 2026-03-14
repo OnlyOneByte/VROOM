@@ -1,16 +1,16 @@
 <script lang="ts">
-	import PolicyTermCard from './PolicyTermCard.svelte';
+	import InsuranceTermCard from './PolicyTermCard.svelte';
 	import TermForm from './form/TermForm.svelte';
 	import { sortTermsByEndDateDesc } from '$lib/utils/insurance';
-	import type { PolicyTerm, Vehicle, TermCoverageRow } from '$lib/types';
+	import type { InsuranceTerm, Vehicle, TermCoverageRow } from '$lib/types';
 
 	interface Props {
-		terms: PolicyTerm[];
+		terms: InsuranceTerm[];
 		policyId: string;
 		vehicles?: Vehicle[];
 		termVehicleCoverage?: TermCoverageRow[];
 		onRefresh: () => Promise<void>;
-		onDeleteTerm?: (_term: PolicyTerm) => void;
+		onDeleteTerm?: (_term: InsuranceTerm) => void;
 	}
 
 	let {
@@ -25,9 +25,9 @@
 	let sortedTerms = $derived(sortTermsByEndDateDesc(terms));
 
 	let showTermForm = $state(false);
-	let editingTerm = $state<PolicyTerm | null>(null);
+	let editingTerm = $state<InsuranceTerm | null>(null);
 
-	function handleEdit(term: PolicyTerm) {
+	function handleEdit(term: InsuranceTerm) {
 		editingTerm = term;
 		showTermForm = true;
 	}
@@ -57,7 +57,7 @@
 	{:else}
 		<div class="space-y-2">
 			{#each sortedTerms as t (t.id)}
-				<PolicyTermCard
+				<InsuranceTermCard
 					term={t}
 					isCurrent={false}
 					vehicleNames={getTermVehicleNames(t.id)}

@@ -1,18 +1,9 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, eq, inArray, notExists, sql } from 'drizzle-orm';
+import { and, eq, notExists, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { getDb } from '../../db/connection';
-import {
-  expenses,
-  insurancePolicyVehicles,
-  odometerEntries,
-  photoRefs,
-  photos,
-  userProviders,
-  userSettings,
-  vehicles,
-} from '../../db/schema';
+import { photoRefs, photos, userProviders } from '../../db/schema';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import type { PhotoCategory, StorageConfig } from '../../types';
@@ -22,7 +13,7 @@ import { logger } from '../../utils/logger';
 import { consumePending, getPendingEmail } from '../../utils/pending-credentials';
 import { commonSchemas } from '../../utils/validation';
 import { photoRefRepository } from '../photos/photo-ref-repository';
-import { settingsRepository } from '../settings/repository';
+import { preferencesRepository } from '../settings/repository';
 import { storageProviderRegistry } from './domains/storage/registry';
 
 /** Maps photo categories to their corresponding entity types for photo queries. */
@@ -43,7 +34,7 @@ type DbInstance =
 
 /**
  * Count photos of a given entity type owned by a specific user.
- * Joins through the ownership chain based on entity type.
+ * v2: uses direct photos.user_id instead of multi-branch entity JOINs.
  */
 async function countUserPhotos(
   db: DbInstance,
@@ -51,47 +42,13 @@ async function countUserPhotos(
   userId: string,
   extraConditions?: ReturnType<typeof and>
 ): Promise<number> {
-  let result: { count: number }[];
+  const conditions = [eq(photos.entityType, entityType), eq(photos.userId, userId)];
+  if (extraConditions) conditions.push(extraConditions);
 
-  const baseConditions = [eq(photos.entityType, entityType), eq(vehicles.userId, userId)];
-  if (extraConditions) baseConditions.push(extraConditions);
-  const where = and(...baseConditions);
-
-  if (entityType === 'vehicle') {
-    result = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(photos)
-      .innerJoin(vehicles, eq(photos.entityId, vehicles.id))
-      .where(where);
-  } else if (entityType === 'expense') {
-    result = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(photos)
-      .innerJoin(expenses, eq(photos.entityId, expenses.id))
-      .where(
-        and(
-          eq(photos.entityType, entityType),
-          eq(expenses.userId, userId),
-          ...(extraConditions ? [extraConditions] : [])
-        )
-      );
-  } else if (entityType === 'insurance_policy') {
-    result = await db
-      .select({ count: sql<number>`count(DISTINCT ${photos.id})` })
-      .from(photos)
-      .innerJoin(insurancePolicyVehicles, eq(photos.entityId, insurancePolicyVehicles.policyId))
-      .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
-      .where(where);
-  } else if (entityType === 'odometer_entry') {
-    result = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(photos)
-      .innerJoin(odometerEntries, eq(photos.entityId, odometerEntries.id))
-      .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
-      .where(where);
-  } else {
-    return 0;
-  }
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(photos)
+    .where(and(...conditions));
 
   return result[0]?.count ?? 0;
 }
@@ -99,6 +56,7 @@ async function countUserPhotos(
 /**
  * Find photo IDs of a given entity type owned by a specific user,
  * optionally filtered by additional conditions (e.g. missing refs).
+ * v2: uses direct photos.user_id instead of multi-branch entity JOINs.
  */
 async function findUserPhotoIds(
   db: DbInstance,
@@ -106,47 +64,13 @@ async function findUserPhotoIds(
   userId: string,
   extraConditions?: ReturnType<typeof and>
 ): Promise<{ id: string }[]> {
-  const baseConditions = [eq(photos.entityType, entityType), eq(vehicles.userId, userId)];
-  if (extraConditions) baseConditions.push(extraConditions);
-  const where = and(...baseConditions);
+  const conditions = [eq(photos.entityType, entityType), eq(photos.userId, userId)];
+  if (extraConditions) conditions.push(extraConditions);
 
-  if (entityType === 'vehicle') {
-    return db
-      .select({ id: photos.id })
-      .from(photos)
-      .innerJoin(vehicles, eq(photos.entityId, vehicles.id))
-      .where(where);
-  }
-  if (entityType === 'expense') {
-    return db
-      .select({ id: photos.id })
-      .from(photos)
-      .innerJoin(expenses, eq(photos.entityId, expenses.id))
-      .where(
-        and(
-          eq(photos.entityType, entityType),
-          eq(expenses.userId, userId),
-          ...(extraConditions ? [extraConditions] : [])
-        )
-      );
-  }
-  if (entityType === 'insurance_policy') {
-    return db
-      .selectDistinct({ id: photos.id })
-      .from(photos)
-      .innerJoin(insurancePolicyVehicles, eq(photos.entityId, insurancePolicyVehicles.policyId))
-      .innerJoin(vehicles, eq(insurancePolicyVehicles.vehicleId, vehicles.id))
-      .where(where);
-  }
-  if (entityType === 'odometer_entry') {
-    return db
-      .select({ id: photos.id })
-      .from(photos)
-      .innerJoin(odometerEntries, eq(photos.entityId, odometerEntries.id))
-      .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
-      .where(where);
-  }
-  return [];
+  return db
+    .select({ id: photos.id })
+    .from(photos)
+    .where(and(...conditions));
 }
 
 // Apply middleware to all routes
@@ -337,14 +261,10 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
 
   // If domain is 'storage', auto-populate storage_config.providerCategories
   if (body.domain === 'storage') {
-    const settingsRow = await db
-      .select({ storageConfig: userSettings.storageConfig })
-      .from(userSettings)
-      .where(eq(userSettings.userId, user.id))
-      .limit(1);
+    const prefs = await preferencesRepository.getOrCreate(user.id);
 
-    const storageConfig: StorageConfig = settingsRow[0]?.storageConfig
-      ? { ...settingsRow[0].storageConfig }
+    const storageConfig: StorageConfig = prefs.storageConfig
+      ? { ...prefs.storageConfig }
       : { ...DEFAULT_STORAGE_CONFIG };
 
     // Deep-clone providerCategories to avoid mutation
@@ -364,10 +284,7 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
       };
     }
 
-    await db
-      .update(userSettings)
-      .set({ storageConfig, updatedAt: new Date() })
-      .where(eq(userSettings.userId, user.id));
+    await preferencesRepository.update(user.id, { storageConfig });
   }
 
   return c.json(
@@ -454,17 +371,11 @@ routes.put(
 
 // Helper: clean up storage_config when a storage provider is deleted
 async function cleanupStorageConfig(userId: string, providerId: string): Promise<void> {
-  const db = getDb();
+  const prefs = await preferencesRepository.getOrCreate(userId);
 
-  const settingsRow = await db
-    .select({ storageConfig: userSettings.storageConfig })
-    .from(userSettings)
-    .where(eq(userSettings.userId, userId))
-    .limit(1);
+  if (!prefs.storageConfig) return;
 
-  if (!settingsRow[0]?.storageConfig) return;
-
-  const storageConfig: StorageConfig = { ...settingsRow[0].storageConfig };
+  const storageConfig: StorageConfig = { ...prefs.storageConfig };
 
   // Remove from providerCategories
   storageConfig.providerCategories = { ...storageConfig.providerCategories };
@@ -484,20 +395,17 @@ async function cleanupStorageConfig(userId: string, providerId: string): Promise
     }
   }
 
-  await db
-    .update(userSettings)
-    .set({ storageConfig, updatedAt: new Date() })
-    .where(eq(userSettings.userId, userId));
+  await preferencesRepository.update(userId, { storageConfig });
 }
 
 // Helper: clean up backup_config when a storage provider is deleted
 async function cleanupBackupConfig(userId: string, providerId: string): Promise<void> {
-  const settings = await settingsRepository.getOrCreate(userId);
-  if (!settings.backupConfig?.providers?.[providerId]) return;
-  const updated = { ...settings.backupConfig };
+  const prefs = await preferencesRepository.getOrCreate(userId);
+  if (!prefs.backupConfig?.providers?.[providerId]) return;
+  const updated = { ...prefs.backupConfig };
   updated.providers = { ...updated.providers };
   delete updated.providers[providerId];
-  await settingsRepository.updateBackupConfig(userId, updated);
+  await preferencesRepository.update(userId, { backupConfig: updated });
 }
 
 // DELETE /api/v1/providers/:id — delete provider with cleanup
@@ -588,13 +496,8 @@ routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (
   }
 
   // Load storage config to find enabled categories for this provider
-  const settingsRow = await db
-    .select({ storageConfig: userSettings.storageConfig })
-    .from(userSettings)
-    .where(eq(userSettings.userId, user.id))
-    .limit(1);
-
-  const storageConfig = settingsRow[0]?.storageConfig as StorageConfig | null;
+  const prefs = await preferencesRepository.getOrCreate(user.id);
+  const storageConfig = prefs.storageConfig as StorageConfig | null;
   const providerCategories = storageConfig?.providerCategories?.[id];
   if (!providerCategories) {
     return c.json({ success: true, data: { created: 0 } });
@@ -670,7 +573,10 @@ routes.get('/:id/sync-status', zValidator('param', commonSchemas.idParam), async
         and(
           eq(photoRefs.providerId, id),
           eq(photoRefs.status, 'active'),
-          inArray(photos.entityType, entityTypes)
+          sql`${photos.entityType} IN (${sql.join(
+            entityTypes.map((t) => sql`${t}`),
+            sql`, `
+          )})`
         )
       );
 
@@ -683,7 +589,10 @@ routes.get('/:id/sync-status', zValidator('param', commonSchemas.idParam), async
         and(
           eq(photoRefs.providerId, id),
           eq(photoRefs.status, 'failed'),
-          inArray(photos.entityType, entityTypes)
+          sql`${photos.entityType} IN (${sql.join(
+            entityTypes.map((t) => sql`${t}`),
+            sql`, `
+          )})`
         )
       );
 

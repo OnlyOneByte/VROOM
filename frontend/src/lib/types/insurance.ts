@@ -1,4 +1,9 @@
-export interface PolicyDetails {
+// v2: Flat insurance term type matching insurance_terms table columns
+export interface InsuranceTerm {
+	id: string;
+	policyId: string;
+	startDate: string;
+	endDate: string;
 	policyNumber?: string;
 	coverageDescription?: string;
 	deductibleAmount?: number;
@@ -6,21 +11,12 @@ export interface PolicyDetails {
 	agentName?: string;
 	agentPhone?: string;
 	agentEmail?: string;
-}
-
-export interface FinanceDetails {
 	totalCost?: number;
 	monthlyCost?: number;
 	premiumFrequency?: string;
 	paymentAmount?: number;
-}
-
-export interface PolicyTerm {
-	id: string;
-	startDate: string;
-	endDate: string;
-	policyDetails: PolicyDetails;
-	financeDetails: FinanceDetails;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface TermVehicleCoverage {
@@ -38,11 +34,9 @@ export interface InsurancePolicy {
 	id: string;
 	company: string;
 	isActive: boolean;
-	currentTermStart?: string;
-	currentTermEnd?: string;
-	terms: PolicyTerm[];
 	notes?: string;
 	vehicleIds: string[];
+	terms: InsuranceTerm[];
 	termVehicleCoverage: TermCoverageRow[];
 	createdAt: string;
 	updatedAt: string;
@@ -50,14 +44,7 @@ export interface InsurancePolicy {
 
 export interface CreatePolicyRequest {
 	company: string;
-	terms: {
-		id: string;
-		startDate: string;
-		endDate: string;
-		policyDetails?: PolicyDetails;
-		financeDetails?: FinanceDetails;
-		vehicleCoverage: TermVehicleCoverage;
-	}[];
+	terms: CreateTermRequest[];
 	notes?: string;
 	isActive?: boolean;
 }
@@ -69,18 +56,35 @@ export interface UpdatePolicyRequest {
 }
 
 export interface CreateTermRequest {
-	id: string;
 	startDate: string;
 	endDate: string;
-	policyDetails?: PolicyDetails;
-	financeDetails?: FinanceDetails;
+	policyNumber?: string;
+	coverageDescription?: string;
+	deductibleAmount?: number;
+	coverageLimit?: number;
+	agentName?: string;
+	agentPhone?: string;
+	agentEmail?: string;
+	totalCost?: number;
+	monthlyCost?: number;
+	premiumFrequency?: string;
+	paymentAmount?: number;
 	vehicleCoverage: TermVehicleCoverage;
 }
 
 export interface UpdateTermRequest {
 	startDate?: string;
 	endDate?: string;
-	policyDetails?: PolicyDetails;
-	financeDetails?: FinanceDetails;
+	policyNumber?: string;
+	coverageDescription?: string;
+	deductibleAmount?: number;
+	coverageLimit?: number;
+	agentName?: string;
+	agentPhone?: string;
+	agentEmail?: string;
+	totalCost?: number;
+	monthlyCost?: number;
+	premiumFrequency?: string;
+	paymentAmount?: number;
 	vehicleCoverage?: TermVehicleCoverage;
 }

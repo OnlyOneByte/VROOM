@@ -13,7 +13,7 @@ import type { Expense } from '../db/schema';
  */
 interface EfficiencyExpense {
   mileage: number | null;
-  fuelAmount: number | null;
+  volume: number | null;
   missedFillup: boolean;
   date: Date | string;
 }
@@ -54,9 +54,9 @@ export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
       continue;
     }
 
-    if (current.mileage && previous.mileage && current.fuelAmount) {
+    if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
-      const mpg = calculateMPG(miles, current.fuelAmount);
+      const mpg = calculateMPG(miles, current.volume);
 
       // Filter out unrealistic values (negative miles or extremely high/low MPG)
       if (mpg > 0 && mpg < 150) {
@@ -111,9 +111,9 @@ export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[])
       continue;
     }
 
-    if (current.mileage && previous.mileage && current.fuelAmount) {
+    if (current.mileage && previous.mileage && current.volume) {
       const miles = current.mileage - previous.mileage;
-      const milesPerKwh = calculateMilesPerKwh(miles, current.fuelAmount);
+      const milesPerKwh = calculateMilesPerKwh(miles, current.volume);
 
       // Filter out unrealistic values (negative miles or > 10 mi/kWh)
       if (milesPerKwh > 0 && milesPerKwh < 10) {

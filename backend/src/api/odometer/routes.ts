@@ -2,7 +2,7 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { NotFoundError, ValidationError } from '../../errors';
+import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
@@ -63,6 +63,33 @@ routes.get(
   }
 );
 
+// GET /:vehicleId/history — unified odometer history (UNION of expenses + manual entries)
+routes.get(
+  '/:vehicleId/history',
+  zValidator('param', commonSchemas.vehicleIdParam),
+  zValidator('query', listQuerySchema),
+  async (c) => {
+    const user = c.get('user');
+    const { vehicleId } = c.req.valid('param');
+    const query = c.req.valid('query');
+
+    await validateVehicleOwnership(vehicleId, user.id);
+
+    const limit = Math.min(
+      query.limit ?? CONFIG.pagination.defaultPageSize,
+      CONFIG.pagination.maxPageSize
+    );
+    const offset = query.offset ?? 0;
+
+    const { data, totalCount } = await odometerRepository.getHistory(vehicleId, {
+      limit,
+      offset,
+    });
+
+    return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
+  }
+);
+
 // GET /entry/:id — get a single entry by ID
 routes.get('/entry/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
@@ -94,15 +121,13 @@ routes.post(
       odometer: data.odometer,
       recordedAt: data.recordedAt,
       note: data.note ?? null,
-      linkedEntityType: null,
-      linkedEntityId: null,
     });
 
     return c.json({ success: true, data: entry, message: 'Odometer reading created' }, 201);
   }
 );
 
-// PUT /:id — update a manual entry (reject if linked)
+// PUT /:id — update a manual entry
 routes.put(
   '/:id',
   zValidator('param', commonSchemas.idParam),
@@ -117,12 +142,6 @@ routes.put(
       throw new NotFoundError('Odometer entry');
     }
 
-    if (entry.linkedEntityType) {
-      throw new ValidationError(
-        'Linked odometer entries are managed automatically. Edit the source record instead.'
-      );
-    }
-
     const updated = await odometerRepository.update(id, {
       ...data,
       updatedAt: new Date(),
@@ -132,7 +151,7 @@ routes.put(
   }
 );
 
-// DELETE /:id — delete a manual entry (reject if linked)
+// DELETE /:id — delete a manual entry
 routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
@@ -140,12 +159,6 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const entry = await odometerRepository.findById(id);
   if (!entry || entry.userId !== user.id) {
     throw new NotFoundError('Odometer entry');
-  }
-
-  if (entry.linkedEntityType) {
-    throw new ValidationError(
-      'Linked odometer entries are managed automatically. Edit the source record instead.'
-    );
   }
 
   await deleteAllPhotosForEntity('odometer_entry', id, user.id);

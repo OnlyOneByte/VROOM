@@ -81,7 +81,6 @@ export const createSplitExpenseSchema = z
     date: z.coerce.date(),
     description: z.string().optional(),
     totalAmount: z.number().positive('Amount must be positive'),
-    insurancePolicyId: z.string().optional(),
     insuranceTermId: z.string().optional(),
   })
   .superRefine(refineSplitConfig);

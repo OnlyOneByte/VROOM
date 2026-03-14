@@ -1,8 +1,8 @@
 /**
- * Shared fast-check generators for insurance property tests.
+ * Shared fast-check generators for insurance property tests (v2 schema).
  *
- * Exports reusable arbitraries for policy details, finance details,
- * policy terms (valid and invalid), and full policy inputs.
+ * Exports reusable arbitraries for flat term inputs, policy inputs,
+ * and date generators matching the insurance_terms table structure.
  */
 
 import fc from 'fast-check';
@@ -14,10 +14,10 @@ const ins = CONFIG.validation.insurance;
 // Primitive generators
 // ---------------------------------------------------------------------------
 
-/** A date in the 2020–2030 range as an ISO date string. */
+/** A date in the 2020–2030 range as a Date object. */
 export const dateArb = fc
   .integer({ min: 1577836800000, max: 1893456000000 }) // 2020-01-01 to 2030-01-01 in ms
-  .map((ms) => new Date(ms).toISOString().split('T')[0]);
+  .map((ms) => new Date(ms));
 
 /** A positive number suitable for deductibleAmount or coverageLimit. */
 export const positiveAmountArb = fc.double({
@@ -35,14 +35,110 @@ export const nonNegativeAmountArb = fc.double({
   noDefaultInfinity: true,
 });
 
+// ---------------------------------------------------------------------------
+// Company name generator
+// ---------------------------------------------------------------------------
+
+export const companyNameArb = fc
+  .stringMatching(/^[A-Za-z][A-Za-z0-9 ]{0,49}$/)
+  .filter((s) => s.trim().length > 0)
+  .map((s) => s.trim());
+
+// ---------------------------------------------------------------------------
+// Valid flat term input generator (v2 — matches CreateTermInput)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a valid CreateTermInput with startDate < endDate and
+ * optional flat fields for policy/finance details.
+ */
+export const validTermInputArb = fc
+  .record({
+    startMs: fc.integer({ min: 1577836800000, max: 1861920000000 }), // 2020 to ~2029
+    gapMs: fc.integer({ min: 86_400_000, max: 365 * 86_400_000 }), // 1 day to 1 year gap
+    policyNumber: fc.option(fc.string({ maxLength: ins.policyNumberMaxLength }), {
+      nil: undefined,
+    }),
+    coverageDescription: fc.option(fc.string({ maxLength: ins.coverageDescriptionMaxLength }), {
+      nil: undefined,
+    }),
+    deductibleAmount: fc.option(positiveAmountArb, { nil: undefined }),
+    coverageLimit: fc.option(positiveAmountArb, { nil: undefined }),
+    agentName: fc.option(fc.string({ maxLength: ins.agentNameMaxLength }), { nil: undefined }),
+    agentPhone: fc.option(fc.string({ maxLength: ins.agentPhoneMaxLength }), { nil: undefined }),
+    agentEmail: fc.option(
+      fc
+        .tuple(
+          fc.stringMatching(/^[a-z][a-z0-9]{0,9}$/),
+          fc.stringMatching(/^[a-z][a-z0-9]{0,9}$/),
+          fc.constantFrom('com', 'org', 'net', 'io')
+        )
+        .map(([local, domain, tld]) => `${local}@${domain}.${tld}`)
+        .filter((e) => e.length <= ins.agentEmailMaxLength),
+      { nil: undefined }
+    ),
+    totalCost: fc.option(nonNegativeAmountArb, { nil: undefined }),
+    monthlyCost: fc.option(nonNegativeAmountArb, { nil: undefined }),
+    premiumFrequency: fc.option(fc.string({ maxLength: ins.premiumFrequencyMaxLength }), {
+      nil: undefined,
+    }),
+    paymentAmount: fc.option(nonNegativeAmountArb, { nil: undefined }),
+  })
+  .map(({ startMs, gapMs, ...rest }) => ({
+    startDate: new Date(startMs),
+    endDate: new Date(startMs + gapMs),
+    ...rest,
+  }));
+
+/**
+ * Valid term input that always has a totalCost defined.
+ */
+export const validTermInputWithTotalCostArb = validTermInputArb.map((term) => ({
+  ...term,
+  totalCost: Math.round((Math.random() * 5000 + 100) * 100) / 100,
+}));
+
+/**
+ * Valid term input that never has a totalCost.
+ */
+export const validTermInputWithoutTotalCostArb = validTermInputArb.map((term) => {
+  const { totalCost: _, ...rest } = term;
+  return rest;
+});
+
+// ---------------------------------------------------------------------------
+// Valid policy input generator (for repository tests)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a valid CreatePolicyData-shaped object.
+ * vehicleIds must be supplied externally (they depend on seeded DB state).
+ */
+export const validPolicyInputArb = (vehicleIds: string[]) =>
+  fc
+    .record({
+      company: companyNameArb,
+      terms: fc.array(validTermInputArb, { minLength: 1, maxLength: 5 }),
+      notes: fc.option(fc.string({ maxLength: 200 }), { nil: undefined }),
+      isActive: fc.boolean(),
+    })
+    .map((input) => ({
+      ...input,
+      terms: input.terms.map((t) => ({
+        ...t,
+        vehicleCoverage: { vehicleIds },
+      })),
+    }));
+
+// ---------------------------------------------------------------------------
+// Legacy v1 generators (used by insurance-validation.property.test.ts)
+// These will be removed when validation is rewritten for v2 flat term schema.
+// ---------------------------------------------------------------------------
+
 /** A simple non-empty string ID. */
 export const termIdArb = fc
   .string({ minLength: 1, maxLength: 25 })
   .filter((s) => s.trim().length > 0);
-
-// ---------------------------------------------------------------------------
-// Valid nested detail generators
-// ---------------------------------------------------------------------------
 
 /** Valid policyDetails — all fields optional, numeric fields positive when present. */
 export const validPolicyDetailsArb = fc.record(
@@ -76,19 +172,12 @@ export const validFinanceDetailsArb = fc.record(
   { requiredKeys: [] }
 );
 
-// ---------------------------------------------------------------------------
-// Valid term generator
-// ---------------------------------------------------------------------------
-
-/**
- * Generates a valid PolicyTerm input where startDate < endDate and all
- * numeric fields satisfy their constraints.
- */
+/** Legacy valid term (v1 shape with nested policyDetails/financeDetails). */
 export const validTermArb = fc
   .record({
     id: termIdArb,
-    startMs: fc.integer({ min: 1577836800000, max: 1861920000000 }), // 2020 to ~2029
-    gapMs: fc.integer({ min: 86_400_000, max: 365 * 86_400_000 }), // 1 day to 1 year gap
+    startMs: fc.integer({ min: 1577836800000, max: 1861920000000 }),
+    gapMs: fc.integer({ min: 86_400_000, max: 365 * 86_400_000 }),
     policyDetails: validPolicyDetailsArb,
     financeDetails: validFinanceDetailsArb,
   })
@@ -99,10 +188,6 @@ export const validTermArb = fc
     policyDetails,
     financeDetails,
   }));
-
-// ---------------------------------------------------------------------------
-// Invalid term generators (one constraint violated at a time)
-// ---------------------------------------------------------------------------
 
 /** Term where startDate >= endDate (same date). */
 export const termWithSameDatesArb = validTermArb.map((term) => ({
@@ -189,10 +274,6 @@ export const termWithZeroMonthlyCostArb = validTermArb.map((term) => ({
   },
 }));
 
-// ---------------------------------------------------------------------------
-// Valid term with guaranteed totalCost (for expense tests)
-// ---------------------------------------------------------------------------
-
 /** Valid term that always has financeDetails.totalCost defined. */
 export const validTermWithTotalCostArb = validTermArb.map((term) => ({
   ...term,
@@ -207,36 +288,3 @@ export const validTermWithoutTotalCostArb = validTermArb.map((term) => {
   const { totalCost: _, ...rest } = term.financeDetails;
   return { ...term, financeDetails: rest };
 });
-
-// ---------------------------------------------------------------------------
-// Company name generator
-// ---------------------------------------------------------------------------
-
-export const companyNameArb = fc
-  .stringMatching(/^[A-Za-z][A-Za-z0-9 ]{0,49}$/)
-  .filter((s) => s.trim().length > 0)
-  .map((s) => s.trim());
-
-// ---------------------------------------------------------------------------
-// Valid policy input generator (for repository tests)
-// ---------------------------------------------------------------------------
-
-/**
- * Generates a valid CreatePolicyData-shaped object.
- * vehicleIds must be supplied externally (they depend on seeded DB state).
- */
-export const validPolicyInputArb = (vehicleIds: string[]) =>
-  fc
-    .record({
-      company: companyNameArb,
-      terms: fc.array(validTermArb, { minLength: 1, maxLength: 5 }),
-      notes: fc.option(fc.string({ maxLength: 200 }), { nil: undefined }),
-      isActive: fc.boolean(),
-    })
-    .map((input) => ({
-      ...input,
-      terms: input.terms.map((t) => ({
-        ...t,
-        vehicleCoverage: { vehicleIds },
-      })),
-    }));

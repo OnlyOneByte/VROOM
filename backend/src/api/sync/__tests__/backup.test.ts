@@ -181,30 +181,22 @@ describe('coerceRow: Timestamp columns', () => {
 // ---------------------------------------------------------------------------
 
 describe('coerceRow: JSON columns', () => {
-  test('valid JSON string is parsed', () => {
-    const terms = JSON.stringify([{ id: 't1', startDate: '2025-01-01', endDate: '2025-12-31' }]);
-    const row = buildMinimalStringRow(insurancePolicies, { terms });
-    const result = coerceRow(row, insurancePolicies);
-    expect(Array.isArray(result.terms)).toBe(true);
-    expect((result.terms as unknown[])[0]).toHaveProperty('id', 't1');
-  });
-
-  test('empty JSON column coerces to null', () => {
-    const row = buildMinimalStringRow(insurancePolicies, { terms: '' });
-    const result = coerceRow(row, insurancePolicies);
-    expect(result.terms).toBeNull();
-  });
-
-  test('invalid JSON coerces to null', () => {
-    const row = buildMinimalStringRow(insurancePolicies, { terms: '{broken' });
-    const result = coerceRow(row, insurancePolicies);
-    expect(result.terms).toBeNull();
-  });
-
   test('tags JSON array on expenses is parsed', () => {
     const row = buildMinimalStringRow(expenses, { tags: '["oil-change","filter"]' });
     const result = coerceRow(row, expenses);
     expect(result.tags).toEqual(['oil-change', 'filter']);
+  });
+
+  test('empty JSON column coerces to null', () => {
+    const row = buildMinimalStringRow(expenses, { tags: '' });
+    const result = coerceRow(row, expenses);
+    expect(result.tags).toBeNull();
+  });
+
+  test('invalid JSON coerces to null', () => {
+    const row = buildMinimalStringRow(expenses, { tags: '{broken' });
+    const result = coerceRow(row, expenses);
+    expect(result.tags).toBeNull();
   });
 });
 
@@ -310,7 +302,10 @@ describe('validateBackupData: acceptance', () => {
       ],
       financing: [],
       insurance: [],
-      insurancePolicyVehicles: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      userPreferences: [],
+      syncState: [],
       photos: [],
       odometer: [],
       photoRefs: [],
@@ -339,7 +334,10 @@ describe('validateBackupData: acceptance', () => {
       expenses: [],
       financing: [],
       insurance: [],
-      insurancePolicyVehicles: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      userPreferences: [],
+      syncState: [],
       photos: [photo],
       odometer: [],
       photoRefs: [],
@@ -363,7 +361,10 @@ describe('validateBackupData: referential integrity', () => {
       expenses: [coerceRow(buildMinimalStringRow(expenses, { vehicleId: 'ghost' }), expenses)],
       financing: [],
       insurance: [],
-      insurancePolicyVehicles: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      userPreferences: [],
+      syncState: [],
       photos: [],
       odometer: [],
       photoRefs: [],
@@ -373,7 +374,7 @@ describe('validateBackupData: referential integrity', () => {
     expect(result.errors.some((e) => e.includes('non-existent vehicle'))).toBe(true);
   });
 
-  test('junction row referencing non-existent policy fails', () => {
+  test('term-vehicle junction row referencing non-existent term fails', () => {
     const v = coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles);
     const backup: ParsedBackupData = {
       metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
@@ -381,17 +382,20 @@ describe('validateBackupData: referential integrity', () => {
       expenses: [],
       financing: [],
       insurance: [],
-      insurancePolicyVehicles: [{ policyId: 'ghost', vehicleId: v.id as string }],
+      insuranceTerms: [],
+      insuranceTermVehicles: [{ termId: 'ghost', vehicleId: v.id as string }],
+      userPreferences: [],
+      syncState: [],
       photos: [],
       odometer: [],
       photoRefs: [],
     };
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes('non-existent policy'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('non-existent term'))).toBe(true);
   });
 
-  test('junction row referencing non-existent vehicle fails', () => {
+  test('term-vehicle junction row referencing non-existent vehicle fails', () => {
     const ins = coerceRow(buildMinimalStringRow(insurancePolicies), insurancePolicies);
     const backup: ParsedBackupData = {
       metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
@@ -399,7 +403,12 @@ describe('validateBackupData: referential integrity', () => {
       expenses: [],
       financing: [],
       insurance: [ins],
-      insurancePolicyVehicles: [{ policyId: ins.id as string, vehicleId: 'ghost' }],
+      insuranceTerms: [
+        { id: 'it1', policyId: ins.id as string, startDate: '2025-01-01', endDate: '2025-12-31' },
+      ],
+      insuranceTermVehicles: [{ termId: 'it1', vehicleId: 'ghost' }],
+      userPreferences: [],
+      syncState: [],
       photos: [],
       odometer: [],
       photoRefs: [],
@@ -420,7 +429,10 @@ describe('validateBackupData: referential integrity', () => {
       expenses: [],
       financing: [],
       insurance: [],
-      insurancePolicyVehicles: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      userPreferences: [],
+      syncState: [],
       photos: [photo],
       odometer: [],
       photoRefs: [],
@@ -441,7 +453,10 @@ describe('validateBackupData: referential integrity', () => {
       expenses: [],
       financing: [],
       insurance: [],
-      insurancePolicyVehicles: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      userPreferences: [],
+      syncState: [],
       photos: [photo],
       odometer: [],
       photoRefs: [],
@@ -459,7 +474,10 @@ describe('validateBackupData: referential integrity', () => {
       expenses: [],
       financing: [],
       insurance: [],
-      insurancePolicyVehicles: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      userPreferences: [],
+      syncState: [],
       photos: [],
       odometer: [],
       photoRefs: [
@@ -489,7 +507,10 @@ describe('validateBackupData: referential integrity', () => {
       expenses: [],
       financing: [],
       insurance: [],
-      insurancePolicyVehicles: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      userPreferences: [],
+      syncState: [],
       photos: [photo],
       odometer: [],
       photoRefs: [
@@ -517,7 +538,10 @@ describe('validateBackupData: referential integrity', () => {
       expenses: [],
       financing: [],
       insurance: [],
-      insurancePolicyVehicles: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      userPreferences: [],
+      syncState: [],
       photos: [],
       odometer: [entry],
       photoRefs: [],
@@ -550,30 +574,6 @@ describe('coerceRow: Odometer entry columns', () => {
     const result = coerceRow(row, odometerEntries);
     expect(result.note).toBeNull();
   });
-
-  test('nullable linkedEntityType coerces correctly when present', () => {
-    const row = buildMinimalStringRow(odometerEntries, { linkedEntityType: 'expense' });
-    const result = coerceRow(row, odometerEntries);
-    expect(result.linkedEntityType).toBe('expense');
-  });
-
-  test('empty linkedEntityType coerces to null', () => {
-    const row = buildMinimalStringRow(odometerEntries, { linkedEntityType: '' });
-    const result = coerceRow(row, odometerEntries);
-    expect(result.linkedEntityType).toBeNull();
-  });
-
-  test('nullable linkedEntityId coerces correctly when present', () => {
-    const row = buildMinimalStringRow(odometerEntries, { linkedEntityId: 'exp-123' });
-    const result = coerceRow(row, odometerEntries);
-    expect(result.linkedEntityId).toBe('exp-123');
-  });
-
-  test('empty linkedEntityId coerces to null', () => {
-    const row = buildMinimalStringRow(odometerEntries, { linkedEntityId: '' });
-    const result = coerceRow(row, odometerEntries);
-    expect(result.linkedEntityId).toBeNull();
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -587,9 +587,13 @@ describe('TABLE_SCHEMA_MAP coverage', () => {
       'expenses',
       'financing',
       'insurance',
-      'insurancePolicyVehicles',
+      'insuranceTerms',
+      'insuranceTermVehicles',
       'photos',
       'odometer',
+      'photoRefs',
+      'userPreferences',
+      'syncState',
     ];
     for (const key of expected) {
       expect(TABLE_SCHEMA_MAP[key]).toBeDefined();
@@ -665,7 +669,10 @@ describe('Property 9: Backup round-trip for tracking flags', () => {
           expenses: [],
           financing: [],
           insurance: [],
-          insurancePolicyVehicles: [],
+          insuranceTerms: [],
+          insuranceTermVehicles: [],
+          userPreferences: [],
+          syncState: [],
           photos: [],
           odometer: [],
           photoRefs: [],
@@ -776,7 +783,10 @@ describe('coerceRow: unitPreferences JSON column on vehicles', () => {
       expenses: [],
       financing: [],
       insurance: [],
-      insurancePolicyVehicles: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      userPreferences: [],
+      syncState: [],
       photos: [],
       odometer: [],
       photoRefs: [],

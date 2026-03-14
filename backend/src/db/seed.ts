@@ -4,7 +4,10 @@ import { db } from './connection.js';
 import {
   expenses,
   insurancePolicies,
-  insurancePolicyVehicles,
+  insuranceTerms,
+  insuranceTermVehicles,
+  syncState,
+  userPreferences,
   userProviders,
   users,
   vehicleFinancing,
@@ -37,6 +40,14 @@ export async function seedDatabase() {
       credentials: '',
       config: { email: sampleUser.email },
       status: 'active',
+    });
+
+    // Create user preferences and sync state
+    await db.insert(userPreferences).values({
+      userId: sampleUser.id,
+    });
+    await db.insert(syncState).values({
+      userId: sampleUser.id,
     });
 
     // Create sample vehicles
@@ -72,13 +83,12 @@ export async function seedDatabase() {
 
     logger.info('Created sample vehicles', { vehicle1Id: vehicle1.id, vehicle2Id: vehicle2.id });
 
-    // Create sample financing for vehicle1
+    // Create sample financing for vehicle1 (no currentBalance — computed on read)
     await db.insert(vehicleFinancing).values({
       vehicleId: vehicle1.id,
       financingType: 'loan',
       provider: 'Bank of America',
       originalAmount: 20000,
-      currentBalance: 15000,
       apr: 4.5,
       termMonths: 60,
       startDate: new Date('2020-03-15'),
@@ -87,24 +97,13 @@ export async function seedDatabase() {
       paymentDayOfMonth: 15,
     });
 
-    // Create sample insurance policies with new multi-term schema
+    // Create sample insurance policies (v2: no terms JSON, no currentTermStart/End)
     const [policy1] = await db
       .insert(insurancePolicies)
       .values({
         userId: sampleUser.id,
         company: 'State Farm',
         isActive: true,
-        currentTermStart: new Date('2024-01-01'),
-        currentTermEnd: new Date('2024-06-30'),
-        terms: [
-          {
-            id: 'term-sf-1',
-            startDate: '2024-01-01',
-            endDate: '2024-06-30',
-            policyDetails: { policyNumber: 'SF123456789' },
-            financeDetails: { totalCost: 1200, monthlyCost: 200 },
-          },
-        ],
       })
       .returning();
 
@@ -114,27 +113,41 @@ export async function seedDatabase() {
         userId: sampleUser.id,
         company: 'Geico',
         isActive: true,
-        currentTermStart: new Date('2024-01-01'),
-        currentTermEnd: new Date('2024-06-30'),
-        terms: [
-          {
-            id: 'term-ge-1',
-            startDate: '2024-01-01',
-            endDate: '2024-06-30',
-            policyDetails: { policyNumber: 'GE987654321' },
-            financeDetails: { totalCost: 900, monthlyCost: 150 },
-          },
-        ],
       })
       .returning();
 
-    // Link policies to vehicles via junction table
-    await db.insert(insurancePolicyVehicles).values([
-      { policyId: policy1.id, termId: 'term-sf-1', vehicleId: vehicle1.id },
-      { policyId: policy2.id, termId: 'term-ge-1', vehicleId: vehicle2.id },
+    // Create insurance terms with flat columns
+    const termSf1Id = createId();
+    const termGe1Id = createId();
+
+    await db.insert(insuranceTerms).values([
+      {
+        id: termSf1Id,
+        policyId: policy1.id,
+        startDate: new Date('2024-01-01'),
+        endDate: new Date('2024-06-30'),
+        policyNumber: 'SF123456789',
+        totalCost: 1200,
+        monthlyCost: 200,
+      },
+      {
+        id: termGe1Id,
+        policyId: policy2.id,
+        startDate: new Date('2024-01-01'),
+        endDate: new Date('2024-06-30'),
+        policyNumber: 'GE987654321',
+        totalCost: 900,
+        monthlyCost: 150,
+      },
     ]);
 
-    // Create sample standalone expenses (all include userId)
+    // Link terms to vehicles via junction table
+    await db.insert(insuranceTermVehicles).values([
+      { termId: termSf1Id, vehicleId: vehicle1.id },
+      { termId: termGe1Id, vehicleId: vehicle2.id },
+    ]);
+
+    // Create sample standalone expenses (v2: volume instead of fuelAmount)
     const sampleExpenses = [
       // Fuel expenses for vehicle1
       {
@@ -145,7 +158,7 @@ export async function seedDatabase() {
         expenseAmount: 45.5,
         date: new Date('2024-01-15'),
         mileage: 25500,
-        fuelAmount: 12.5,
+        volume: 12.5,
         description: 'Shell Gas Station',
       },
       {
@@ -156,7 +169,7 @@ export async function seedDatabase() {
         expenseAmount: 52.3,
         date: new Date('2024-01-28'),
         mileage: 25850,
-        fuelAmount: 14.2,
+        volume: 14.2,
         description: 'Chevron Gas Station',
       },
       // Maintenance expenses

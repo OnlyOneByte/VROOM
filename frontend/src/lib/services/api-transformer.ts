@@ -2,8 +2,8 @@
  * API Transformation Layer
  *
  * Transforms frontend data models to backend API contracts and vice versa.
- * Handles field name mappings between frontend (amount, volume, charge) and
- * backend (expenseAmount, fuelAmount).
+ * v2: Backend uses `volume` directly — no fuelAmount bridging needed.
+ * Maps: frontend amount ↔ backend expenseAmount, frontend volume/charge ↔ backend volume.
  */
 
 import type { Expense, ExpenseCategory } from '$lib/types';
@@ -16,10 +16,10 @@ export interface BackendExpenseRequest {
 	vehicleId: string;
 	tags: string[];
 	category: string;
-	expenseAmount: number; // Backend field name
+	expenseAmount: number;
 	date: string;
 	mileage?: number;
-	fuelAmount?: number; // Backend field name (unified for volume/charge)
+	volume?: number;
 	fuelType?: string;
 	description?: string;
 	receiptUrl?: string;
@@ -36,16 +36,16 @@ export interface BackendExpenseResponse {
 	userId: string;
 	tags: string[];
 	category: string;
-	expenseAmount: number; // Backend field name
+	expenseAmount: number;
 	date: string;
 	mileage?: number;
-	fuelAmount?: number; // Backend field name (unified for volume/charge)
+	volume?: number;
 	fuelType?: string;
 	description?: string;
 	receiptUrl?: string;
 	isFinancingPayment?: boolean;
 	missedFillup?: boolean;
-	groupId?: string; // Non-null means this is a split child expense
+	groupId?: string;
 	groupTotal?: number;
 	splitMethod?: string;
 	createdAt: string;
@@ -54,7 +54,7 @@ export interface BackendExpenseResponse {
 
 /**
  * Transform frontend expense to backend request format
- * Maps: amount → expenseAmount, volume → fuelAmount, charge → fuelAmount
+ * Maps: amount → expenseAmount, volume/charge → volume
  */
 export function toBackendExpense(
 	frontendExpense: Partial<Expense> & {
@@ -67,18 +67,18 @@ export function toBackendExpense(
 		vehicleId: frontendExpense.vehicleId,
 		tags: frontendExpense.tags || [],
 		category: frontendExpense.category,
-		expenseAmount: frontendExpense.amount, // amount → expenseAmount
+		expenseAmount: frontendExpense.amount,
 		date: frontendExpense.date || new Date().toISOString()
 	};
 
-	// Map volume or charge to fuelAmount based on fuelType
+	// Map volume or charge to backend volume field
 	if (isElectricFuelType(frontendExpense.fuelType)) {
 		if (frontendExpense.charge !== undefined && frontendExpense.charge !== null) {
-			backendExpense.fuelAmount = frontendExpense.charge;
+			backendExpense.volume = frontendExpense.charge;
 		}
 	} else {
 		if (frontendExpense.volume !== undefined && frontendExpense.volume !== null) {
-			backendExpense.fuelAmount = frontendExpense.volume;
+			backendExpense.volume = frontendExpense.volume;
 		}
 	}
 
@@ -107,9 +107,7 @@ export function toBackendExpense(
 
 /**
  * Transform backend expense response to frontend format
- * Maps: expenseAmount → amount, fuelAmount → volume or charge (based on fuelType)
- *
- * Uses isElectricFuelType(fuelType) as the sole discriminator — no vehicleType needed.
+ * Maps: expenseAmount → amount, volume → volume or charge (based on fuelType)
  */
 export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expense {
 	const frontendExpense: Expense = {
@@ -118,7 +116,7 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 		userId: backendExpense.userId,
 		tags: backendExpense.tags || [],
 		category: backendExpense.category as ExpenseCategory,
-		amount: backendExpense.expenseAmount, // expenseAmount → amount
+		amount: backendExpense.expenseAmount,
 		date: backendExpense.date,
 		isFinancingPayment: backendExpense.isFinancingPayment ?? false,
 		missedFillup: backendExpense.missedFillup ?? false,
@@ -126,12 +124,12 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 		updatedAt: backendExpense.updatedAt
 	};
 
-	// Map fuelAmount to volume or charge based on fuelType
-	if (backendExpense.fuelAmount !== undefined && backendExpense.fuelAmount !== null) {
+	// Map backend volume to frontend volume or charge based on fuelType
+	if (backendExpense.volume !== undefined && backendExpense.volume !== null) {
 		if (isElectricFuelType(backendExpense.fuelType)) {
-			frontendExpense.charge = backendExpense.fuelAmount;
+			frontendExpense.charge = backendExpense.volume;
 		} else {
-			frontendExpense.volume = backendExpense.fuelAmount;
+			frontendExpense.volume = backendExpense.volume;
 		}
 	}
 

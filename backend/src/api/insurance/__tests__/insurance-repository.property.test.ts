@@ -1,30 +1,23 @@
 /**
- * Property-Based Tests for Insurance Repository
+ * Property-Based Tests for Insurance Repository (v2 schema)
  *
- * Tests Properties 1, 2, 3, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17 against a real in-memory
+ * Tests Properties 1, 2, 11, 12, 13 against a real in-memory
  * SQLite database with all migrations applied.
  *
- * **Validates: Requirements 1.1, 1.2, 1.3, 1.6, 1.12, 1.13, 1.15, 5.1–5.6, 6.2, 7.2, 7.3, 8.1, 8.3, 8.4, 9.2**
+ * **Validates: Requirements 1.6, 3.2, 16.1, 16.3, 16.4, 32.1, 36.1**
  */
 
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import type { AppDatabase } from '../../../db/connection';
-import type { PolicyTerm } from '../../../db/schema';
 import * as schema from '../../../db/schema';
-import { expenses, insurancePolicyVehicles, vehicles } from '../../../db/schema';
-import type { CreatePolicyData, TermVehicleCoverage } from '../repository';
+import { insuranceTerms, insuranceTermVehicles } from '../../../db/schema';
 import { InsurancePolicyRepository } from '../repository';
-import {
-  companyNameArb,
-  validTermArb,
-  validTermWithoutTotalCostArb,
-  validTermWithTotalCostArb,
-} from './insurance-test-generators';
+import { companyNameArb, validTermInputArb } from './insurance-test-generators';
 
 // ---------------------------------------------------------------------------
 // Test infrastructure
@@ -83,607 +76,22 @@ const userVehicleIdsArb = fc
   .subarray(VEHICLE_IDS, { minLength: 1, maxLength: VEHICLE_IDS.length })
   .filter((arr) => arr.length > 0);
 
-/** Build a TermVehicleCoverage from vehicle IDs (even split). */
-function coverageFor(vehicleIds: string[]): TermVehicleCoverage {
-  return { vehicleIds };
-}
-
-/** Generate a valid CreatePolicyData using seeded vehicle IDs. */
-const validCreatePolicyArb = fc
-  .record({
-    company: companyNameArb,
-    vehicleIds: userVehicleIdsArb,
-    terms: fc.array(validTermArb, { minLength: 1, maxLength: 3 }),
-    notes: fc.option(fc.string({ minLength: 1, maxLength: 100 }), { nil: undefined }),
-    isActive: fc.boolean(),
-  })
-  .map(({ vehicleIds, terms, ...rest }) => ({
-    ...rest,
-    terms: terms.map((t, i) => ({
-      ...t,
-      id: `${t.id}-${i}`,
-      vehicleCoverage: coverageFor(vehicleIds),
-    })),
-    _vehicleIds: vehicleIds, // keep for assertions
-  }));
-
 // ===========================================================================
-// Property 1: Policy creation round-trip
-// Feature: insurance-management, Property 1: Policy creation round-trip
+// Property 1: Current term derivation returns latest term
+// **Validates: Requirements 1.6**
 // ===========================================================================
-describe('Property 1: Policy creation round-trip', () => {
-  test('creating and retrieving a policy returns matching fields and deserialized terms', async () => {
-    await fc.assert(
-      fc.asyncProperty(validCreatePolicyArb, async (input) => {
-        const created = await repo.create(input, USER_ID);
-        const retrieved = await repo.findById(created.id);
-
-        expect(retrieved).not.toBeNull();
-        expect(retrieved?.company).toBe(input.company);
-        expect(retrieved?.isActive).toBe(input.isActive !== false);
-        expect(retrieved?.notes).toBe(input.notes ?? null);
-
-        // Terms round-trip: same length and matching IDs
-        const retrievedTerms = retrieved?.terms as PolicyTerm[];
-        expect(retrievedTerms.length).toBe(input.terms.length);
-        for (let i = 0; i < input.terms.length; i++) {
-          expect(retrievedTerms[i].id).toBe(input.terms[i].id);
-          expect(retrievedTerms[i].startDate).toBe(input.terms[i].startDate);
-          expect(retrievedTerms[i].endDate).toBe(input.terms[i].endDate);
-        }
-
-        // vehicleIds match
-        expect(new Set(retrieved?.vehicleIds)).toEqual(new Set(input._vehicleIds));
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
-
-// ===========================================================================
-// Property 2: Junction table integrity
-// Feature: insurance-management, Property 2: Junction table integrity
-// ===========================================================================
-describe('Property 2: Junction table integrity', () => {
-  test('junction table has exactly N rows matching the input vehicle IDs', async () => {
-    await fc.assert(
-      fc.asyncProperty(validCreatePolicyArb, async (input) => {
-        const created = await repo.create(input, USER_ID);
-
-        const junctionRows = await db
-          .select()
-          .from(insurancePolicyVehicles)
-          .where(eq(insurancePolicyVehicles.policyId, created.id));
-
-        // Each term has the same vehicleIds, so total rows = terms * vehicleIds
-        const expectedRows = input.terms.length * input._vehicleIds.length;
-        expect(junctionRows.length).toBe(expectedRows);
-        const junctionVehicleIds = new Set(junctionRows.map((r) => r.vehicleId));
-        expect(junctionVehicleIds).toEqual(new Set(input._vehicleIds));
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
-
-// ===========================================================================
-// Property 3: Vehicle ownership validation
-// Feature: insurance-management, Property 3: Vehicle ownership validation
-// ===========================================================================
-describe('Property 3: Vehicle ownership validation', () => {
-  test('rejects policy creation with vehicles not owned by the user', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        companyNameArb,
-        fc.subarray(OTHER_VEHICLE_IDS, { minLength: 1, maxLength: OTHER_VEHICLE_IDS.length }),
-        fc.array(validTermArb, { minLength: 1, maxLength: 2 }),
-        async (company, otherVehicleIds, terms) => {
-          if (otherVehicleIds.length === 0) return;
-
-          const input: CreatePolicyData = {
-            company,
-            terms: terms.map((t) => ({ ...t, vehicleCoverage: coverageFor(otherVehicleIds) })),
-            isActive: true,
-          };
-
-          // Count policies before
-          const beforeRows = sqliteDb
-            .query('SELECT COUNT(*) as count FROM insurance_policies')
-            .get() as { count: number };
-
-          let threw = false;
-          try {
-            await repo.create(input, USER_ID);
-          } catch {
-            threw = true;
-          }
-
-          expect(threw).toBe(true);
-
-          // DB unchanged
-          const afterRows = sqliteDb
-            .query('SELECT COUNT(*) as count FROM insurance_policies')
-            .get() as { count: number };
-          expect(afterRows.count).toBe(beforeRows.count);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
-
-// ===========================================================================
-// Property 5: Denormalized field sync invariant
-// Feature: insurance-management, Property 5: Denormalized field sync invariant
-// ===========================================================================
-describe('Property 5: Denormalized field sync invariant', () => {
-  test('after term additions, currentTermEnd equals max endDate and currentTermStart equals that terms startDate', async () => {
+describe('Property 1: Current term derivation returns latest term', () => {
+  test('getCurrentTermDates returns the term with the latest end_date', async () => {
     await fc.assert(
       fc.asyncProperty(
         companyNameArb,
         userVehicleIdsArb,
-        fc.array(validTermArb, { minLength: 1, maxLength: 5 }),
+        fc.array(validTermInputArb, { minLength: 1, maxLength: 5 }),
         async (company, vehicleIds, terms) => {
-          // Ensure unique term IDs
-          const uniqueTerms = terms.map((t, i) => ({ ...t, id: `${t.id}-${i}` }));
-
-          // Create with first term
-          const input: CreatePolicyData = {
-            company,
-            terms: [{ ...uniqueTerms[0], vehicleCoverage: coverageFor(vehicleIds) }],
-            isActive: true,
-          };
-          const created = await repo.create(input, USER_ID);
-
-          // Add remaining terms one by one
-          const policyId = created.id;
-          for (let i = 1; i < uniqueTerms.length; i++) {
-            await repo.addTerm(
-              policyId,
-              { ...uniqueTerms[i], vehicleCoverage: coverageFor(vehicleIds) },
-              USER_ID
-            );
-          }
-
-          // Retrieve and verify
-          const policy = await repo.findById(policyId);
-          expect(policy).not.toBeNull();
-
-          const allTerms = policy?.terms as PolicyTerm[];
-          expect(allTerms.length).toBe(uniqueTerms.length);
-
-          // Find the term with the max endDate
-          let latestTerm = allTerms[0];
-          for (const t of allTerms) {
-            if (new Date(t.endDate).getTime() > new Date(latestTerm.endDate).getTime()) {
-              latestTerm = t;
-            }
-          }
-
-          // currentTermEnd should match the max endDate
-          const currentTermEnd = policy?.currentTermEnd;
-          expect(currentTermEnd).not.toBeNull();
-          expect(new Date(String(currentTermEnd)).toISOString().split('T')[0]).toBe(
-            latestTerm.endDate
-          );
-
-          // currentTermStart should match that term's startDate
-          const currentTermStart = policy?.currentTermStart;
-          expect(currentTermStart).not.toBeNull();
-          expect(new Date(String(currentTermStart)).toISOString().split('T')[0]).toBe(
-            latestTerm.startDate
-          );
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
-
-// ===========================================================================
-// Property 6: Active policy sets vehicle reference
-// Feature: insurance-management, Property 6: Active policy sets vehicle reference
-// ===========================================================================
-describe('Property 6: Active policy sets vehicle reference', () => {
-  test('after creating an active policy, each vehicle has currentInsurancePolicyId set', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        companyNameArb,
-        userVehicleIdsArb,
-        fc.array(validTermArb, { minLength: 1, maxLength: 2 }),
-        async (company, vehicleIds, terms) => {
-          const input: CreatePolicyData = {
-            company,
-            terms: terms.map((t, i) => ({
-              ...t,
-              id: `${t.id}-${i}`,
-              vehicleCoverage: coverageFor(vehicleIds),
-            })),
-            isActive: true,
-          };
-          const created = await repo.create(input, USER_ID);
-
-          // Check each vehicle
-          for (const vid of vehicleIds) {
-            const vehicleRows = await db
-              .select({ currentInsurancePolicyId: vehicles.currentInsurancePolicyId })
-              .from(vehicles)
-              .where(eq(vehicles.id, vid));
-            expect(vehicleRows[0].currentInsurancePolicyId).toBe(created.id);
-          }
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
-
-// ===========================================================================
-// Property 7: Deactivation clears vehicle reference
-// Feature: insurance-management, Property 7: Deactivation clears vehicle reference
-// ===========================================================================
-describe('Property 7: Deactivation clears vehicle reference', () => {
-  test('after deleting a policy, vehicles that referenced it have currentInsurancePolicyId null', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        companyNameArb,
-        userVehicleIdsArb,
-        fc.array(validTermArb, { minLength: 1, maxLength: 2 }),
-        async (company, vehicleIds, terms) => {
-          // Create active policy so vehicles get the reference
-          const input: CreatePolicyData = {
-            company,
-            terms: terms.map((t, i) => ({
-              ...t,
-              id: `${t.id}-${i}`,
-              vehicleCoverage: coverageFor(vehicleIds),
-            })),
-            isActive: true,
-          };
-          const created = await repo.create(input, USER_ID);
-
-          // Verify references are set
-          for (const vid of vehicleIds) {
-            const rows = await db
-              .select({ ref: vehicles.currentInsurancePolicyId })
-              .from(vehicles)
-              .where(eq(vehicles.id, vid));
-            expect(rows[0].ref).toBe(created.id);
-          }
-
-          // Delete the policy
-          await repo.delete(created.id, USER_ID);
-
-          // Verify references are cleared
-          for (const vid of vehicleIds) {
-            const rows = await db
-              .select({ ref: vehicles.currentInsurancePolicyId })
-              .from(vehicles)
-              .where(eq(vehicles.id, vid));
-            expect(rows[0].ref).toBeNull();
-          }
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-
-  test('after deactivating a policy via update, vehicles have currentInsurancePolicyId null', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        companyNameArb,
-        userVehicleIdsArb,
-        fc.array(validTermArb, { minLength: 1, maxLength: 2 }),
-        async (company, vehicleIds, terms) => {
-          // Create active policy
-          const created = await repo.create(
-            {
-              company,
-              terms: terms.map((t, i) => ({
-                ...t,
-                id: `${t.id}-${i}`,
-                vehicleCoverage: coverageFor(vehicleIds),
-              })),
-              isActive: true,
-            },
-            USER_ID
-          );
-
-          // Deactivate via update
-          await repo.update(created.id, { isActive: false }, USER_ID);
-
-          // Verify references are cleared
-          for (const vid of vehicleIds) {
-            const rows = await db
-              .select({ ref: vehicles.currentInsurancePolicyId })
-              .from(vehicles)
-              .where(eq(vehicles.id, vid));
-            expect(rows[0].ref).toBeNull();
-          }
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
-
-// ===========================================================================
-// Property 15: Expense auto-generation on term addition
-// Feature: insurance-management, Property 15: Expense auto-generation on term addition
-// ===========================================================================
-describe('Property 15: Expense auto-generation on term addition', () => {
-  test('term with totalCost creates child expenses via expense group with correct fields', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        companyNameArb,
-        userVehicleIdsArb,
-        validTermWithTotalCostArb,
-        async (company, vehicleIds, term) => {
-          // Create policy with a term that has no totalCost first
-          const baseTerm = { ...term, id: `base-${term.id}`, financeDetails: {} };
-          const created = await repo.create(
-            {
-              company,
-              terms: [{ ...baseTerm, vehicleCoverage: coverageFor(vehicleIds) }],
-              isActive: true,
-            },
-            USER_ID
-          );
-
-          // Add term with totalCost
-          await repo.addTerm(
-            created.id,
-            { ...term, vehicleCoverage: coverageFor(vehicleIds) },
-            USER_ID
-          );
-
-          // Query expenses linked to this policy and term
-          const expenseRows = await db
-            .select()
-            .from(expenses)
-            .where(eq(expenses.insurancePolicyId, created.id));
-
-          // Should have one child expense per vehicle for this term
-          const newExpenses = expenseRows.filter((e) => e.insuranceTermId === term.id);
-          expect(newExpenses.length).toBe(vehicleIds.length);
-
-          // Each child should have correct fields
-          for (const expense of newExpenses) {
-            expect(expense.category).toBe('financial');
-            expect(expense.tags).toContain('insurance');
-            expect(expense.insurancePolicyId).toBe(created.id);
-            expect(expense.insuranceTermId).toBe(term.id);
-            expect(expense.description).toContain(term.startDate);
-            expect(expense.description).toContain(term.endDate);
-            expect(vehicleIds).toContain(expense.vehicleId);
-          }
-
-          // Sum of child amounts should equal totalCost
-          const totalChildAmount = newExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
-          expect(Math.round(totalChildAmount * 100) / 100).toBe(term.financeDetails.totalCost);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
-
-// ===========================================================================
-// Property 16: Expense preservation on policy deletion
-// Feature: insurance-management, Property 16: Expense preservation on policy deletion
-// ===========================================================================
-describe('Property 16: Expense preservation on policy deletion', () => {
-  test('deleting a policy preserves expenses but nullifies FK references', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        companyNameArb,
-        userVehicleIdsArb,
-        validTermWithTotalCostArb,
-        async (company, vehicleIds, term) => {
-          // Create policy with a term that generates an expense
-          const created = await repo.create(
-            {
-              company,
-              terms: [{ ...term, vehicleCoverage: coverageFor(vehicleIds) }],
-              isActive: true,
-            },
-            USER_ID
-          );
-
-          // Verify expense exists
-          const beforeExpenses = await db
-            .select()
-            .from(expenses)
-            .where(eq(expenses.insurancePolicyId, created.id));
-          expect(beforeExpenses.length).toBeGreaterThanOrEqual(1);
-
-          const expenseIds = beforeExpenses.map((e) => e.id);
-
-          // Delete the policy
-          await repo.delete(created.id, USER_ID);
-
-          // Verify expenses still exist but FKs are nullified
-          for (const expId of expenseIds) {
-            const rows = await db.select().from(expenses).where(eq(expenses.id, expId));
-            expect(rows.length).toBe(1);
-            expect(rows[0].insurancePolicyId).toBeNull();
-            expect(rows[0].insuranceTermId).toBeNull();
-            // Amount should be preserved
-            expect(rows[0].expenseAmount).toBe(
-              beforeExpenses.find((e) => e.id === expId)?.expenseAmount ?? 0
-            );
-          }
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
-
-// ===========================================================================
-// Property 17: No expense for terms without totalCost
-// Feature: insurance-management, Property 17: No expense for terms without totalCost
-// ===========================================================================
-describe('Property 17: No expense for terms without totalCost', () => {
-  test('term without totalCost does not create any expense', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        companyNameArb,
-        userVehicleIdsArb,
-        validTermWithoutTotalCostArb,
-        async (company, vehicleIds, term) => {
-          // Create policy with a no-cost base term
-          const baseTerm = { ...term, id: `base-${term.id}`, financeDetails: {} };
-          const created = await repo.create(
-            {
-              company,
-              terms: [{ ...baseTerm, vehicleCoverage: coverageFor(vehicleIds) }],
-              isActive: true,
-            },
-            USER_ID
-          );
-
-          // Count expenses before
-          const beforeCount = (
-            sqliteDb.query('SELECT COUNT(*) as count FROM expenses').get() as { count: number }
-          ).count;
-
-          // Add term without totalCost
-          await repo.addTerm(
-            created.id,
-            { ...term, vehicleCoverage: coverageFor(vehicleIds) },
-            USER_ID
-          );
-
-          // Count expenses after — should be unchanged
-          const afterCount = (
-            sqliteDb.query('SELECT COUNT(*) as count FROM expenses').get() as { count: number }
-          ).count;
-
-          expect(afterCount).toBe(beforeCount);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
-
-// ===========================================================================
-// Property 10: Term with totalCost creates sibling expenses with shared groupId
-// Feature: insurance-term-vehicle-coverage, Property 10
-// **Validates: Requirements 7.3, 8.1**
-// ===========================================================================
-describe('Property 10: Term with totalCost creates sibling expenses with shared groupId', () => {
-  test('creating/adding a term with totalCost results in sibling expenses sharing a groupId with amounts summing to totalCost', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        companyNameArb,
-        userVehicleIdsArb,
-        validTermWithTotalCostArb,
-        fc.boolean(),
-        async (company, vehicleIds, term, useAddTerm) => {
-          if (useAddTerm) {
-            const baseTerm = { ...term, id: `base-${term.id}`, financeDetails: {} };
-            const created = await repo.create(
-              {
-                company,
-                terms: [{ ...baseTerm, vehicleCoverage: coverageFor(vehicleIds) }],
-                isActive: true,
-              },
-              USER_ID
-            );
-            await repo.addTerm(
-              created.id,
-              { ...term, vehicleCoverage: coverageFor(vehicleIds) },
-              USER_ID
-            );
-
-            // Verify sibling expenses exist for this term with a shared groupId
-            const siblings = await db
-              .select()
-              .from(expenses)
-              .where(
-                and(
-                  eq(expenses.insurancePolicyId, created.id),
-                  eq(expenses.insuranceTermId, term.id),
-                  isNotNull(expenses.groupId)
-                )
-              );
-            expect(siblings.length).toBe(vehicleIds.length);
-
-            // All siblings share the same groupId and groupTotal
-            const groupIds = new Set(siblings.map((s) => s.groupId));
-            expect(groupIds.size).toBe(1);
-            for (const s of siblings) {
-              expect(s.groupTotal).toBe(term.financeDetails.totalCost);
-            }
-
-            // Sum of sibling amounts equals totalCost
-            const siblingSum =
-              Math.round(siblings.reduce((s, e) => s + e.expenseAmount, 0) * 100) / 100;
-            expect(siblingSum).toBe(term.financeDetails.totalCost);
-          } else {
-            const created = await repo.create(
-              {
-                company,
-                terms: [{ ...term, vehicleCoverage: coverageFor(vehicleIds) }],
-                isActive: true,
-              },
-              USER_ID
-            );
-
-            const siblings = await db
-              .select()
-              .from(expenses)
-              .where(
-                and(
-                  eq(expenses.insurancePolicyId, created.id),
-                  eq(expenses.insuranceTermId, term.id),
-                  isNotNull(expenses.groupId)
-                )
-              );
-            expect(siblings.length).toBe(vehicleIds.length);
-
-            const groupIds = new Set(siblings.map((s) => s.groupId));
-            expect(groupIds.size).toBe(1);
-            for (const s of siblings) {
-              expect(s.groupTotal).toBe(term.financeDetails.totalCost);
-            }
-
-            const siblingSum =
-              Math.round(siblings.reduce((s, e) => s + e.expenseAmount, 0) * 100) / 100;
-            expect(siblingSum).toBe(term.financeDetails.totalCost);
-          }
-        }
-      ),
-      { numRuns: 50 }
-    );
-  });
-});
-
-// ===========================================================================
-// Property 11: Junction row correctness on policy create
-// Feature: insurance-term-vehicle-coverage, Property 11
-// **Validates: Requirement 7.2**
-// ===========================================================================
-describe('Property 11: Junction row correctness on policy create', () => {
-  test('junction table has exactly sum(V_i) rows with correct (policyId, termId, vehicleId) triples', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        companyNameArb,
-        fc.array(
-          fc.record({
-            term: validTermArb,
-            vehicleIds: userVehicleIdsArb,
-          }),
-          { minLength: 1, maxLength: 3 }
-        ),
-        async (company, termSpecs) => {
-          // Ensure unique term IDs
-          const termsWithCoverage = termSpecs.map((spec, i) => ({
-            ...spec.term,
-            id: `${spec.term.id}-${i}`,
-            vehicleCoverage: coverageFor(spec.vehicleIds),
+          // Create policy with multiple terms
+          const termsWithCoverage = terms.map((t) => ({
+            ...t,
+            vehicleCoverage: { vehicleIds },
           }));
 
           const created = await repo.create(
@@ -691,227 +99,450 @@ describe('Property 11: Junction row correctness on policy create', () => {
             USER_ID
           );
 
-          const junctionRows = await db
-            .select()
-            .from(insurancePolicyVehicles)
-            .where(eq(insurancePolicyVehicles.policyId, created.id));
+          // Get current term dates
+          const currentDates = await repo.getCurrentTermDates(created.id);
+          expect(currentDates).not.toBeNull();
 
-          // Expected total rows = sum of vehicle counts per term
-          const expectedTotal = termSpecs.reduce((sum, spec) => sum + spec.vehicleIds.length, 0);
-          expect(junctionRows.length).toBe(expectedTotal);
+          // Find the term with the latest endDate from the created terms
+          const allTerms = created.terms;
+          let latestTerm = allTerms[0];
+          for (const t of allTerms) {
+            if (t.endDate.getTime() > latestTerm.endDate.getTime()) {
+              latestTerm = t;
+            }
+          }
 
-          // Verify each (termId, vehicleId) triple is correct
-          for (let i = 0; i < termsWithCoverage.length; i++) {
-            const termId = termsWithCoverage[i].id;
-            const expectedVehicles = termSpecs[i].vehicleIds;
-            const termRows = junctionRows.filter((r) => r.termId === termId);
-            expect(termRows.length).toBe(expectedVehicles.length);
-            expect(new Set(termRows.map((r) => r.vehicleId))).toEqual(new Set(expectedVehicles));
+          // getCurrentTermDates should match the latest term
+          expect(currentDates?.startDate.getTime()).toBe(latestTerm.startDate.getTime());
+          expect(currentDates?.endDate.getTime()).toBe(latestTerm.endDate.getTime());
+        }
+      ),
+      { numRuns: 50 }
+    );
+  });
+
+  test('getCurrentTermDates returns null for policy with no terms', async () => {
+    const created = await repo.create({ company: 'TestCo', terms: [], isActive: true }, USER_ID);
+    const result = await repo.getCurrentTermDates(created.id);
+    expect(result).toBeNull();
+  });
+});
+
+// ===========================================================================
+// Property 2: Active policy derivation for vehicle
+// **Validates: Requirements 3.2, 32.1**
+// ===========================================================================
+describe('Property 2: Active policy derivation for vehicle', () => {
+  test('getActiveInsurancePolicyId returns a non-null active policy for a covered vehicle', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        companyNameArb,
+        userVehicleIdsArb,
+        validTermInputArb,
+        async (company, vehicleIds, term) => {
+          await repo.create(
+            {
+              company,
+              terms: [{ ...term, vehicleCoverage: { vehicleIds } }],
+              isActive: true,
+            },
+            USER_ID
+          );
+
+          // Each covered vehicle should have some active policy
+          for (const vid of vehicleIds) {
+            const activePolicyId = await repo.getActiveInsurancePolicyId(vid);
+            expect(activePolicyId).not.toBeNull();
           }
         }
       ),
       { numRuns: 50 }
     );
   });
+
+  test('getActiveInsurancePolicyId returns null when only inactive policies exist', async () => {
+    // Use a dedicated vehicle to avoid interference from other iterations
+    const testVid = 'v-inactive-test';
+    sqliteDb.run(
+      `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('${testVid}', '${USER_ID}', 'Nissan', 'Leaf', 2023)`
+    );
+
+    const term = fc.sample(validTermInputArb, 1)[0];
+    await repo.create(
+      {
+        company: 'InactiveCo',
+        terms: [{ ...term, vehicleCoverage: { vehicleIds: [testVid] } }],
+        isActive: false,
+      },
+      USER_ID
+    );
+
+    const activePolicyId = await repo.getActiveInsurancePolicyId(testVid);
+    expect(activePolicyId).toBeNull();
+  });
+
+  test('getActiveInsurancePolicyId returns null for uncovered vehicle', async () => {
+    const result = await repo.getActiveInsurancePolicyId('v-nonexistent');
+    expect(result).toBeNull();
+  });
+
+  test('getActiveInsurancePolicyId returns policy with latest term end_date when multiple active policies exist', async () => {
+    const vid = VEHICLE_IDS[0];
+    const earlyTerm = {
+      ...fc.sample(validTermInputArb, 1)[0],
+      startDate: new Date('2020-01-01'),
+      endDate: new Date('2020-12-31'),
+      vehicleCoverage: { vehicleIds: [vid] },
+    };
+    const lateTerm = {
+      ...fc.sample(validTermInputArb, 1)[0],
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-12-31'),
+      vehicleCoverage: { vehicleIds: [vid] },
+    };
+
+    await repo.create({ company: 'EarlyCo', terms: [earlyTerm], isActive: true }, USER_ID);
+    const laterPolicy = await repo.create(
+      { company: 'LateCo', terms: [lateTerm], isActive: true },
+      USER_ID
+    );
+
+    const activePolicyId = await repo.getActiveInsurancePolicyId(vid);
+    expect(activePolicyId).toBe(laterPolicy.id);
+  });
 });
 
 // ===========================================================================
-// Property 12: Coverage update regenerates children
-// Feature: insurance-term-vehicle-coverage, Property 12
-// **Validates: Requirements 8.3, 6.2**
+// Property 11: Insurance term CRUD round-trip
+// **Validates: Requirements 16.1, 36.1**
 // ===========================================================================
-describe('Property 12: Coverage update regenerates children', () => {
-  test('updating vehicleCoverage results in junction rows matching new vehicles and sibling expenses regenerated with sum equaling groupTotal', async () => {
+describe('Property 11: Insurance term CRUD round-trip', () => {
+  test('addTerm inserts a term row and junction rows retrievable via findById', async () => {
     await fc.assert(
       fc.asyncProperty(
         companyNameArb,
-        validTermWithTotalCostArb,
         userVehicleIdsArb,
-        userVehicleIdsArb,
-        async (company, term, initialVehicleIds, updatedVehicleIds) => {
-          // Create policy with initial coverage
+        validTermInputArb,
+        validTermInputArb,
+        async (company, vehicleIds, baseTerm, newTerm) => {
+          // Create policy with one term
           const created = await repo.create(
             {
               company,
-              terms: [{ ...term, vehicleCoverage: coverageFor(initialVehicleIds) }],
+              terms: [{ ...baseTerm, vehicleCoverage: { vehicleIds } }],
+              isActive: true,
+            },
+            USER_ID
+          );
+          expect(created.terms.length).toBe(1);
+
+          // Add a second term
+          const updated = await repo.addTerm(
+            created.id,
+            { ...newTerm, vehicleCoverage: { vehicleIds } },
+            USER_ID
+          );
+          expect(updated.terms.length).toBe(2);
+
+          // Verify via findById
+          const retrieved = await repo.findById(created.id);
+          expect(retrieved).not.toBeNull();
+          expect(retrieved?.terms.length).toBe(2);
+
+          // Junction rows should exist for both terms
+          expect(retrieved?.termVehicleCoverage.length).toBe(vehicleIds.length * 2);
+        }
+      ),
+      { numRuns: 30 }
+    );
+  });
+
+  test('updateTerm modifies term fields and persists changes', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        companyNameArb,
+        userVehicleIdsArb,
+        validTermInputArb,
+        async (company, vehicleIds, term) => {
+          const created = await repo.create(
+            {
+              company,
+              terms: [{ ...term, vehicleCoverage: { vehicleIds } }],
               isActive: true,
             },
             USER_ID
           );
 
-          // Update the term with different vehicle coverage
+          const termId = created.terms[0].id;
+          const newDescription = 'Updated coverage description';
+
           await repo.updateTerm(
             created.id,
-            term.id,
-            { vehicleCoverage: coverageFor(updatedVehicleIds) },
+            termId,
+            { coverageDescription: newDescription },
             USER_ID
           );
 
-          // Verify junction rows match the new vehicle set
-          const junctionRows = await db
-            .select()
-            .from(insurancePolicyVehicles)
-            .where(
-              and(
-                eq(insurancePolicyVehicles.policyId, created.id),
-                eq(insurancePolicyVehicles.termId, term.id)
-              )
-            );
-          expect(new Set(junctionRows.map((r) => r.vehicleId))).toEqual(new Set(updatedVehicleIds));
-
-          // Verify sibling expenses exist with a shared groupId
-          const siblings = await db
-            .select()
-            .from(expenses)
-            .where(
-              and(
-                eq(expenses.insurancePolicyId, created.id),
-                eq(expenses.insuranceTermId, term.id),
-                isNotNull(expenses.groupId)
-              )
-            );
-          expect(siblings.length).toBe(updatedVehicleIds.length);
-          expect(new Set(siblings.map((c) => c.vehicleId))).toEqual(new Set(updatedVehicleIds));
-
-          // All siblings share the same groupId
-          const groupIds = new Set(siblings.map((s) => s.groupId));
-          expect(groupIds.size).toBe(1);
-
-          const siblingSum =
-            Math.round(siblings.reduce((s, e) => s + e.expenseAmount, 0) * 100) / 100;
-          expect(siblingSum).toBe(term.financeDetails.totalCost);
+          const retrieved = await repo.findById(created.id);
+          const updatedTerm = retrieved?.terms.find((t) => t.id === termId);
+          expect(updatedTerm).not.toBeUndefined();
+          expect(updatedTerm?.coverageDescription).toBe(newDescription);
         }
       ),
-      { numRuns: 50 }
+      { numRuns: 30 }
     );
   });
-});
 
-// ===========================================================================
-// Property 13: Vehicle removal clears policy reference
-// Feature: insurance-term-vehicle-coverage, Property 13
-// **Validates: Requirement 8.4**
-// ===========================================================================
-describe('Property 13: Vehicle removal clears policy reference', () => {
-  test('a vehicle removed from coverage (not covered by other terms) has currentInsurancePolicyId set to null', async () => {
-    await fc.assert(
-      fc.asyncProperty(companyNameArb, validTermWithTotalCostArb, async (company, term) => {
-        // Use all 3 vehicles initially, then remove one
-        const allVehicles = [...VEHICLE_IDS];
-        const removedVehicle = allVehicles[allVehicles.length - 1];
-        const remainingVehicles = allVehicles.slice(0, -1);
-
-        // Create active policy covering all vehicles in a single term
-        const created = await repo.create(
-          {
-            company,
-            terms: [{ ...term, vehicleCoverage: coverageFor(allVehicles) }],
-            isActive: true,
-          },
-          USER_ID
-        );
-
-        // Verify all vehicles have the policy reference
-        for (const vid of allVehicles) {
-          const rows = await db
-            .select({ ref: vehicles.currentInsurancePolicyId })
-            .from(vehicles)
-            .where(eq(vehicles.id, vid));
-          expect(rows[0].ref).toBe(created.id);
-        }
-
-        // Update term to remove the last vehicle
-        await repo.updateTerm(
-          created.id,
-          term.id,
-          { vehicleCoverage: coverageFor(remainingVehicles) },
-          USER_ID
-        );
-
-        // Removed vehicle should have null reference
-        const removedRows = await db
-          .select({ ref: vehicles.currentInsurancePolicyId })
-          .from(vehicles)
-          .where(eq(vehicles.id, removedVehicle));
-        expect(removedRows[0].ref).toBeNull();
-
-        // Remaining vehicles should still have the policy reference
-        for (const vid of remainingVehicles) {
-          const rows = await db
-            .select({ ref: vehicles.currentInsurancePolicyId })
-            .from(vehicles)
-            .where(eq(vehicles.id, vid));
-          expect(rows[0].ref).toBe(created.id);
-        }
-      }),
-      { numRuns: 50 }
-    );
-  });
-});
-
-// ===========================================================================
-// Property 14: vehicleIds reflects the latest term's vehicles
-// Feature: insurance-term-vehicle-coverage, Property 14
-// **Validates: Requirement 9.2**
-// ===========================================================================
-describe('Property 14: vehicleIds reflects the latest term vehicles', () => {
-  test('vehicleIds in API response equals the vehicle IDs of the latest term only', async () => {
+  test('deleteTerm removes the term and its junction rows', async () => {
     await fc.assert(
       fc.asyncProperty(
         companyNameArb,
-        fc.array(
-          fc.record({
-            term: validTermArb,
-            vehicleIds: userVehicleIdsArb,
-          }),
-          { minLength: 1, maxLength: 3 }
-        ),
-        async (company, termSpecs) => {
-          // Create policy with multiple terms, each potentially covering different vehicles
-          const termsWithCoverage = termSpecs.map((spec, i) => ({
-            ...spec.term,
-            id: `${spec.term.id}-${i}`,
-            vehicleCoverage: coverageFor(spec.vehicleIds),
-          }));
-
+        userVehicleIdsArb,
+        validTermInputArb,
+        validTermInputArb,
+        async (company, vehicleIds, term1, term2) => {
+          // Create policy with two terms
           const created = await repo.create(
-            { company, terms: termsWithCoverage, isActive: true },
+            {
+              company,
+              terms: [
+                { ...term1, vehicleCoverage: { vehicleIds } },
+                { ...term2, vehicleCoverage: { vehicleIds } },
+              ],
+              isActive: true,
+            },
+            USER_ID
+          );
+          expect(created.terms.length).toBe(2);
+
+          const termToDelete = created.terms[0].id;
+
+          // Delete one term
+          const updated = await repo.deleteTerm(created.id, termToDelete, USER_ID);
+          expect(updated.terms.length).toBe(1);
+          expect(updated.terms[0].id).not.toBe(termToDelete);
+
+          // Junction rows for deleted term should be gone
+          const junctionRows = await db
+            .select()
+            .from(insuranceTermVehicles)
+            .where(eq(insuranceTermVehicles.termId, termToDelete));
+          expect(junctionRows.length).toBe(0);
+        }
+      ),
+      { numRuns: 30 }
+    );
+  });
+});
+
+// ===========================================================================
+// Property 12: Expiring terms date range query
+// **Validates: Requirements 16.3**
+// ===========================================================================
+describe('Property 12: Expiring terms date range query', () => {
+  test('findExpiringTerms returns terms with end_date within the range', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        companyNameArb,
+        userVehicleIdsArb,
+        fc.array(validTermInputArb, { minLength: 1, maxLength: 5 }),
+        async (company, vehicleIds, terms) => {
+          // Create policy with multiple terms
+          const created = await repo.create(
+            {
+              company,
+              terms: terms.map((t) => ({ ...t, vehicleCoverage: { vehicleIds } })),
+              isActive: true,
+            },
             USER_ID
           );
 
-          // Retrieve the policy via findById (which calls attachVehicleIds)
-          const policy = await repo.findById(created.id);
-          expect(policy).not.toBeNull();
+          // Pick a date range that covers some terms
+          const allEndDates = created.terms.map((t) => t.endDate.getTime());
+          const minEnd = Math.min(...allEndDates);
+          const maxEnd = Math.max(...allEndDates);
 
-          // Find the latest term (max endDate)
-          const allTerms = policy?.terms ?? [];
-          let latestTerm = allTerms[0];
-          for (const t of allTerms) {
-            if (new Date(t.endDate).getTime() > new Date(latestTerm?.endDate).getTime()) {
-              latestTerm = t;
+          // Use the full range to ensure all terms are found
+          const rangeStart = new Date(minEnd);
+          const rangeEnd = new Date(maxEnd);
+
+          const expiring = await repo.findExpiringTerms(rangeStart, rangeEnd);
+
+          // All created terms should be in the result (their end_dates are within range)
+          const expiringIds = new Set(expiring.map((t) => t.id));
+          for (const term of created.terms) {
+            const endTime = term.endDate.getTime();
+            if (endTime >= rangeStart.getTime() && endTime <= rangeEnd.getTime()) {
+              expect(expiringIds.has(term.id)).toBe(true);
             }
           }
 
-          // vehicleIds should match only the latest term's junction rows
-          const junctionRows = await db
-            .select()
-            .from(insurancePolicyVehicles)
-            .where(eq(insurancePolicyVehicles.policyId, created.id));
-          const latestTermVehicles = new Set(
-            junctionRows.filter((r) => r.termId === latestTerm?.id).map((r) => r.vehicleId)
-          );
-
-          expect(new Set(policy?.vehicleIds)).toEqual(latestTermVehicles);
-
-          // termVehicleCoverage should still contain ALL terms' coverage
-          const allCoverageVehicleIds = new Set(junctionRows.map((r) => r.vehicleId));
-          const responseCoverageVehicleIds = new Set(
-            policy?.termVehicleCoverage.map((r) => r.vehicleId)
-          );
-          expect(responseCoverageVehicleIds).toEqual(allCoverageVehicleIds);
+          // No term outside the range should be returned
+          for (const t of expiring) {
+            const endTime = t.endDate.getTime();
+            expect(endTime).toBeGreaterThanOrEqual(rangeStart.getTime());
+            expect(endTime).toBeLessThanOrEqual(rangeEnd.getTime());
+          }
         }
       ),
-      { numRuns: 50 }
+      { numRuns: 30 }
+    );
+  });
+
+  test('findExpiringTerms returns empty for range with no matching terms', async () => {
+    // Create a term in 2025
+    await repo.create(
+      {
+        company: 'TestCo',
+        terms: [
+          {
+            startDate: new Date('2025-01-01'),
+            endDate: new Date('2025-06-30'),
+            vehicleCoverage: { vehicleIds: [VEHICLE_IDS[0]] },
+          },
+        ],
+        isActive: true,
+      },
+      USER_ID
+    );
+
+    // Query for 2030 range — should find nothing
+    const expiring = await repo.findExpiringTerms(new Date('2030-01-01'), new Date('2030-12-31'));
+    expect(expiring.length).toBe(0);
+  });
+});
+
+// ===========================================================================
+// Property 13: Insurance term-vehicle junction FK cascade
+// **Validates: Requirements 16.4**
+// ===========================================================================
+describe('Property 13: Insurance term-vehicle junction FK cascade', () => {
+  test('deleting a term cascades to junction rows', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        companyNameArb,
+        userVehicleIdsArb,
+        validTermInputArb,
+        async (company, vehicleIds, term) => {
+          const created = await repo.create(
+            {
+              company,
+              terms: [{ ...term, vehicleCoverage: { vehicleIds } }],
+              isActive: true,
+            },
+            USER_ID
+          );
+
+          const termId = created.terms[0].id;
+
+          // Verify junction rows exist
+          const beforeJunction = await db
+            .select()
+            .from(insuranceTermVehicles)
+            .where(eq(insuranceTermVehicles.termId, termId));
+          expect(beforeJunction.length).toBe(vehicleIds.length);
+
+          // Delete the term directly via SQL to test FK cascade
+          sqliteDb.run(`DELETE FROM insurance_terms WHERE id = '${termId}'`);
+
+          // Junction rows should be cascade-deleted
+          const afterJunction = await db
+            .select()
+            .from(insuranceTermVehicles)
+            .where(eq(insuranceTermVehicles.termId, termId));
+          expect(afterJunction.length).toBe(0);
+        }
+      ),
+      { numRuns: 30 }
+    );
+  });
+
+  test('deleting a vehicle cascades to junction rows', async () => {
+    // Use a dedicated vehicle for this test to avoid affecting other tests
+    const testVehicleId = 'v-cascade-test';
+    sqliteDb.run(
+      `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('${testVehicleId}', '${USER_ID}', 'Ford', 'Focus', 2021)`
+    );
+
+    const term = fc.sample(validTermInputArb, 1)[0];
+    const created = await repo.create(
+      {
+        company: 'CascadeCo',
+        terms: [{ ...term, vehicleCoverage: { vehicleIds: [testVehicleId] } }],
+        isActive: true,
+      },
+      USER_ID
+    );
+
+    const termId = created.terms[0].id;
+
+    // Verify junction row exists
+    const beforeJunction = await db
+      .select()
+      .from(insuranceTermVehicles)
+      .where(eq(insuranceTermVehicles.termId, termId));
+    expect(beforeJunction.length).toBe(1);
+    expect(beforeJunction[0].vehicleId).toBe(testVehicleId);
+
+    // Delete the vehicle
+    sqliteDb.run(`DELETE FROM vehicles WHERE id = '${testVehicleId}'`);
+
+    // Junction row should be cascade-deleted
+    const afterJunction = await db
+      .select()
+      .from(insuranceTermVehicles)
+      .where(eq(insuranceTermVehicles.termId, termId));
+    expect(afterJunction.length).toBe(0);
+  });
+
+  test('deleting a policy cascades to terms and junction rows', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        companyNameArb,
+        userVehicleIdsArb,
+        fc.array(validTermInputArb, { minLength: 1, maxLength: 3 }),
+        async (company, vehicleIds, terms) => {
+          const created = await repo.create(
+            {
+              company,
+              terms: terms.map((t) => ({ ...t, vehicleCoverage: { vehicleIds } })),
+              isActive: true,
+            },
+            USER_ID
+          );
+
+          const termIds = created.terms.map((t) => t.id);
+
+          // Verify terms and junction rows exist
+          for (const tid of termIds) {
+            const termRows = await db
+              .select()
+              .from(insuranceTerms)
+              .where(eq(insuranceTerms.id, tid));
+            expect(termRows.length).toBe(1);
+          }
+
+          // Delete the policy
+          await repo.delete(created.id, USER_ID);
+
+          // All terms should be cascade-deleted
+          for (const tid of termIds) {
+            const termRows = await db
+              .select()
+              .from(insuranceTerms)
+              .where(eq(insuranceTerms.id, tid));
+            expect(termRows.length).toBe(0);
+
+            // Junction rows should also be gone
+            const junctionRows = await db
+              .select()
+              .from(insuranceTermVehicles)
+              .where(eq(insuranceTermVehicles.termId, tid));
+            expect(junctionRows.length).toBe(0);
+          }
+        }
+      ),
+      { numRuns: 30 }
     );
   });
 });

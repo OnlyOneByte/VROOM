@@ -163,11 +163,11 @@ import { ValidationError } from '../errors';
 export function validateFuelExpenseData(
   category: string,
   mileage: number | null | undefined,
-  fuelAmount: number | null | undefined,
+  volume: number | null | undefined,
   fuelType: string | null | undefined
 ): void {
   if (category === 'fuel') {
-    if (!fuelAmount || !mileage) {
+    if (!volume || !mileage) {
       if (isElectricFuelType(fuelType ?? null)) {
         throw new ValidationError('Charging expenses require charge amount (kWh) and mileage data');
       }

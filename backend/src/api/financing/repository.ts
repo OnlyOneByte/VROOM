@@ -1,16 +1,17 @@
 /**
  * Financing Repository
  *
- * Vehicle financing operations (loan/lease configuration and balance tracking).
- * Payment tracking is now handled through the expenses table with isFinancingPayment flag.
+ * Vehicle financing operations (loan/lease configuration and computed balance).
+ * Payment tracking is handled through the expenses table with isFinancingPayment flag.
+ * Balance is computed on read: originalAmount - SUM(financing payment expenses).
  */
 
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewVehicleFinancing, VehicleFinancing } from '../../db/schema';
-import { vehicleFinancing } from '../../db/schema';
-import { DatabaseError, NotFoundError } from '../../errors';
+import { expenses, vehicleFinancing } from '../../db/schema';
+import { DatabaseError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
@@ -40,51 +41,36 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
       .orderBy(asc(vehicleFinancing.startDate));
   }
 
-  async updateBalance(id: string, newBalance: number): Promise<VehicleFinancing> {
+  /**
+   * Compute the current balance for a financing record.
+   *
+   * Looks up the financing record's originalAmount and vehicleId, then computes:
+   *   originalAmount - COALESCE(SUM(expenses.expenseAmount), 0)
+   * WHERE is_financing_payment = 1 for that vehicle, clamped to min 0.
+   *
+   * Returns 0 if the financing record does not exist.
+   */
+  async computeBalance(financingId: string): Promise<number> {
     try {
-      const result = await this.db
-        .update(vehicleFinancing)
-        .set({
-          currentBalance: newBalance,
-          updatedAt: new Date(),
-        })
-        .where(eq(vehicleFinancing.id, id))
-        .returning();
-
-      if (result.length === 0) {
-        throw new NotFoundError('Vehicle financing');
+      const financing = await this.findById(financingId);
+      if (!financing) {
+        return 0;
       }
 
-      return result[0];
-    } catch (error) {
-      if (error instanceof NotFoundError) throw error;
-      logger.error('Error updating balance for financing', { id, error });
-      throw new DatabaseError('Failed to update financing balance', error);
-    }
-  }
-
-  async markAsCompleted(id: string, endDate: Date): Promise<VehicleFinancing> {
-    try {
-      const result = await this.db
-        .update(vehicleFinancing)
-        .set({
-          isActive: false,
-          currentBalance: 0,
-          endDate: endDate,
-          updatedAt: new Date(),
+      const [result] = await this.db
+        .select({
+          totalPayments: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
         })
-        .where(eq(vehicleFinancing.id, id))
-        .returning();
+        .from(expenses)
+        .where(
+          sql`${expenses.vehicleId} = ${financing.vehicleId} AND ${expenses.isFinancingPayment} = 1`
+        );
 
-      if (result.length === 0) {
-        throw new NotFoundError('Vehicle financing');
-      }
-
-      return result[0];
+      const totalPayments = Number(result?.totalPayments) || 0;
+      return Math.max(0, financing.originalAmount - totalPayments);
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
-      logger.error('Error marking financing as completed', { id, error });
-      throw new DatabaseError('Failed to mark financing as completed', error);
+      logger.error('Error computing balance for financing', { financingId, error });
+      throw new DatabaseError('Failed to compute financing balance', error);
     }
   }
 }

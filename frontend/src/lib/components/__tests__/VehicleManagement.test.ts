@@ -58,7 +58,7 @@ const mockVehicles: Vehicle[] = [
 			financingType: 'loan' as const,
 			provider: 'Chase Bank',
 			originalAmount: 20000,
-			currentBalance: 15000,
+			computedBalance: 15000,
 			apr: 4.5,
 			termMonths: 60,
 			paymentAmount: 350,

@@ -1,28 +1,42 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm';
+import { and, between, desc, eq, inArray } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
-import type { Expense, InsurancePolicy, PolicyTerm } from '../../db/schema';
-import { expenses, insurancePolicies, insurancePolicyVehicles, vehicles } from '../../db/schema';
+import type { InsurancePolicy, InsuranceTerm } from '../../db/schema';
+import {
+  insurancePolicies,
+  insuranceTerms,
+  insuranceTermVehicles,
+  vehicles,
+} from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
-import { ConflictError, DatabaseError, NotFoundError } from '../../errors';
+import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { expenseSplitService } from '../expenses/split-service';
-import type { SplitConfig } from '../expenses/validation';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface TermVehicleCoverage {
-  vehicleIds: string[];
-  splitMethod?: 'even' | 'absolute' | 'percentage';
-  allocations?: Array<{ vehicleId: string; amount?: number; percentage?: number }>;
+export interface CreateTermInput {
+  startDate: Date;
+  endDate: Date;
+  policyNumber?: string;
+  coverageDescription?: string;
+  deductibleAmount?: number;
+  coverageLimit?: number;
+  agentName?: string;
+  agentPhone?: string;
+  agentEmail?: string;
+  totalCost?: number;
+  monthlyCost?: number;
+  premiumFrequency?: string;
+  paymentAmount?: number;
+  vehicleCoverage: { vehicleIds: string[] };
 }
 
 export interface CreatePolicyData {
   company: string;
-  terms: Array<PolicyTerm & { vehicleCoverage: TermVehicleCoverage }>;
+  terms: CreateTermInput[];
   notes?: string;
   isActive?: boolean;
 }
@@ -38,92 +52,11 @@ export interface TermCoverageRow {
   vehicleId: string;
 }
 
-// Policy with vehicleIds and per-term coverage attached (returned from queries)
+/** Policy with terms from insurance_terms table and junction coverage. */
 export type InsurancePolicyWithVehicles = InsurancePolicy & {
-  vehicleIds: string[];
+  terms: InsuranceTerm[];
   termVehicleCoverage: TermCoverageRow[];
 };
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/**
- * Find the latest term by endDate and sync currentTermStart/currentTermEnd.
- */
-function syncDenormalizedFields(terms: PolicyTerm[]): {
-  currentTermStart: Date | null;
-  currentTermEnd: Date | null;
-} {
-  if (terms.length === 0) {
-    return { currentTermStart: null, currentTermEnd: null };
-  }
-
-  let latestTerm = terms[0];
-  for (const term of terms) {
-    if (new Date(term.endDate).getTime() > new Date(latestTerm.endDate).getTime()) {
-      latestTerm = term;
-    }
-  }
-
-  return {
-    currentTermStart: new Date(latestTerm.startDate),
-    currentTermEnd: new Date(latestTerm.endDate),
-  };
-}
-
-/**
- * Build a SplitConfig from TermVehicleCoverage input.
- */
-function buildSplitConfig(coverage: TermVehicleCoverage): SplitConfig {
-  const method = coverage.splitMethod ?? 'even';
-  if (method === 'even') {
-    return { method: 'even', vehicleIds: coverage.vehicleIds };
-  }
-  if (method === 'absolute') {
-    return {
-      method: 'absolute',
-      allocations:
-        coverage.allocations?.map((a) => ({
-          vehicleId: a.vehicleId,
-          amount: a.amount ?? 0,
-        })) ?? coverage.vehicleIds.map((id) => ({ vehicleId: id, amount: 0 })),
-    };
-  }
-  // percentage
-  return {
-    method: 'percentage',
-    allocations:
-      coverage.allocations?.map((a) => ({
-        vehicleId: a.vehicleId,
-        percentage: a.percentage ?? 0,
-      })) ?? coverage.vehicleIds.map((id) => ({ vehicleId: id, percentage: 0 })),
-  };
-}
-
-/**
- * Strip vehicleCoverage from a term, returning a clean PolicyTerm for JSON storage.
- */
-function stripVehicleCoverage(
-  term: PolicyTerm & { vehicleCoverage?: TermVehicleCoverage }
-): PolicyTerm {
-  const { vehicleCoverage: _, ...cleanTerm } = term;
-  return cleanTerm;
-}
-
-/**
- * Get vehicleIds for the latest (current) term from coverage rows.
- */
-function getLatestTermVehicleIds(terms: PolicyTerm[], termCoverage: TermCoverageRow[]): string[] {
-  if (terms.length === 0) return [];
-  let latest = terms[0];
-  for (const t of terms) {
-    if (new Date(t.endDate).getTime() > new Date(latest.endDate).getTime()) {
-      latest = t;
-    }
-  }
-  return [...new Set(termCoverage.filter((r) => r.termId === latest.id).map((r) => r.vehicleId))];
-}
 
 // ============================================================================
 // Repository
@@ -141,119 +74,17 @@ export class InsurancePolicyRepository {
   // --------------------------------------------------------------------------
 
   /**
-   * Update currentInsurancePolicyId on vehicles based on policy active state.
-   */
-  private async syncVehicleReferences(
-    tx: DrizzleTransaction,
-    policyId: string,
-    vehicleIds: string[],
-    isActive: boolean
-  ): Promise<void> {
-    if (vehicleIds.length === 0) return;
-
-    if (isActive) {
-      await tx
-        .update(vehicles)
-        .set({ currentInsurancePolicyId: policyId, updatedAt: new Date() })
-        .where(inArray(vehicles.id, vehicleIds));
-    } else {
-      await tx
-        .update(vehicles)
-        .set({ currentInsurancePolicyId: null, updatedAt: new Date() })
-        .where(
-          and(inArray(vehicles.id, vehicleIds), eq(vehicles.currentInsurancePolicyId, policyId))
-        );
-    }
-  }
-
-  /**
-   * Insert junction rows for a term's vehicle coverage.
-   */
-  private async insertJunctionRows(
-    tx: DrizzleTransaction,
-    policyId: string,
-    termId: string,
-    vehicleIds: string[]
-  ): Promise<void> {
-    for (const vehicleId of vehicleIds) {
-      await tx.insert(insurancePolicyVehicles).values({ policyId, termId, vehicleId });
-    }
-  }
-
-  /**
-   * Create sibling expense rows for a term with totalCost via the split service.
-   */
-  private async createExpensesForTerm(
-    tx: DrizzleTransaction,
-    policyId: string,
-    company: string,
-    term: PolicyTerm,
-    coverage: TermVehicleCoverage,
-    userId: string
-  ): Promise<Expense[] | null> {
-    if (term.financeDetails?.totalCost == null || term.financeDetails.totalCost <= 0) {
-      return null;
-    }
-
-    if (coverage.vehicleIds.length === 0) {
-      return null;
-    }
-
-    const splitConfig = buildSplitConfig(coverage);
-    const allocations = expenseSplitService.computeAllocations(
-      splitConfig,
-      term.financeDetails.totalCost
-    );
-
-    return expenseSplitService.createSiblings(tx, {
-      groupId: createId(),
-      userId,
-      splitMethod: splitConfig.method,
-      groupTotal: term.financeDetails.totalCost,
-      allocations,
-      category: 'financial',
-      date: new Date(term.startDate),
-      tags: ['insurance'],
-      description: `Insurance: ${company} (${term.startDate} to ${term.endDate})`,
-      insurancePolicyId: policyId,
-      insuranceTermId: term.id,
-    });
-  }
-
-  /**
-   * Get distinct vehicleIds for a policy from the junction table.
-   */
-  private async getVehicleIdsForPolicy(
-    db: AppDatabase | DrizzleTransaction,
-    policyId: string
-  ): Promise<string[]> {
-    const rows = await db
-      .select({ vehicleId: insurancePolicyVehicles.vehicleId })
-      .from(insurancePolicyVehicles)
-      .where(eq(insurancePolicyVehicles.policyId, policyId));
-    // Return distinct vehicle IDs
-    return [...new Set(rows.map((r) => r.vehicleId))];
-  }
-
-  /**
-   * Public accessor for vehicle IDs linked to a policy.
-   */
-  async getVehicleIds(policyId: string): Promise<string[]> {
-    return this.getVehicleIdsForPolicy(this.db, policyId);
-  }
-
-  /**
    * Validate that all vehicleIds belong to the given userId.
    */
   private async validateVehicleOwnership(
-    db: AppDatabase | DrizzleTransaction,
+    dbOrTx: AppDatabase | DrizzleTransaction,
     vehicleIds: string[],
     userId: string
   ): Promise<void> {
     if (vehicleIds.length === 0) return;
 
     const uniqueIds = [...new Set(vehicleIds)];
-    const ownedVehicles = await db
+    const ownedVehicles = await dbOrTx
       .select({ id: vehicles.id })
       .from(vehicles)
       .where(and(inArray(vehicles.id, uniqueIds), eq(vehicles.userId, userId)));
@@ -264,51 +95,59 @@ export class InsurancePolicyRepository {
   }
 
   /**
-   * Get term vehicle coverage rows from the junction table.
+   * Insert junction rows for a term's vehicle coverage.
    */
-  private async getTermVehicleCoverage(
-    db: AppDatabase | DrizzleTransaction,
-    policyId: string
-  ): Promise<TermCoverageRow[]> {
-    const rows = await db
-      .select({
-        termId: insurancePolicyVehicles.termId,
-        vehicleId: insurancePolicyVehicles.vehicleId,
-      })
-      .from(insurancePolicyVehicles)
-      .where(eq(insurancePolicyVehicles.policyId, policyId));
-    return rows;
+  private async insertJunctionRows(
+    tx: DrizzleTransaction,
+    termId: string,
+    vehicleIds: string[]
+  ): Promise<void> {
+    for (const vehicleId of vehicleIds) {
+      await tx.insert(insuranceTermVehicles).values({ termId, vehicleId });
+    }
   }
 
   /**
-   * Attach vehicleIds and termVehicleCoverage to a policy result.
+   * Attach terms and coverage to a policy, returning InsurancePolicyWithVehicles.
    */
-  private async attachVehicleIds(policy: InsurancePolicy): Promise<InsurancePolicyWithVehicles> {
-    const termCoverage = await this.getTermVehicleCoverage(this.db, policy.id);
-    const terms = (policy.terms ?? []) as PolicyTerm[];
-    const vehicleIds = getLatestTermVehicleIds(terms, termCoverage);
-    return { ...policy, vehicleIds, termVehicleCoverage: termCoverage };
+  private async attachTermsAndCoverage(
+    policy: InsurancePolicy
+  ): Promise<InsurancePolicyWithVehicles> {
+    const terms = await this.db
+      .select()
+      .from(insuranceTerms)
+      .where(eq(insuranceTerms.policyId, policy.id))
+      .orderBy(desc(insuranceTerms.endDate));
+
+    const termIds = terms.map((t) => t.id);
+    let termVehicleCoverage: TermCoverageRow[] = [];
+    if (termIds.length > 0) {
+      const rows = await this.db
+        .select({
+          termId: insuranceTermVehicles.termId,
+          vehicleId: insuranceTermVehicles.vehicleId,
+        })
+        .from(insuranceTermVehicles)
+        .where(inArray(insuranceTermVehicles.termId, termIds));
+      termVehicleCoverage = rows;
+    }
+
+    return { ...policy, terms, termVehicleCoverage };
   }
 
   // --------------------------------------------------------------------------
-  // CRUD Methods
+  // Policy CRUD
   // --------------------------------------------------------------------------
 
-  /**
-   * Create a policy with per-term vehicle coverage, junction rows, expense groups, and vehicle references.
-   */
   async create(data: CreatePolicyData, userId: string): Promise<InsurancePolicyWithVehicles> {
     try {
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Policy creation requires sequential steps within a transaction
       return await this.db.transaction(async (tx) => {
-        // 1. Collect all vehicle IDs across all terms and validate ownership
+        // Validate vehicle ownership across all terms
         const allVehicleIds = [...new Set(data.terms.flatMap((t) => t.vehicleCoverage.vehicleIds))];
         await this.validateVehicleOwnership(tx, allVehicleIds, userId);
 
-        // 2. Compute denormalized fields from terms
-        const strippedTerms = data.terms.map(stripVehicleCoverage);
-        const { currentTermStart, currentTermEnd } = syncDenormalizedFields(strippedTerms);
-
-        // 3. Insert policy row
+        // Insert policy row
         const policyId = createId();
         const now = new Date();
         const isActive = data.isActive !== false;
@@ -320,9 +159,6 @@ export class InsurancePolicyRepository {
             userId,
             company: data.company,
             isActive,
-            currentTermStart,
-            currentTermEnd,
-            terms: strippedTerms,
             notes: data.notes ?? null,
             createdAt: now,
             updatedAt: now,
@@ -331,28 +167,44 @@ export class InsurancePolicyRepository {
 
         const policy = policyResult[0];
 
-        // 4. Insert junction rows and create expense groups per term
+        // Insert terms and junction rows
+        const insertedTerms: InsuranceTerm[] = [];
         const termCoverage: TermCoverageRow[] = [];
+
         for (const term of data.terms) {
-          const coverage = term.vehicleCoverage;
-          // Insert junction rows for this term
-          await this.insertJunctionRows(tx, policyId, term.id, coverage.vehicleIds);
-          for (const vid of coverage.vehicleIds) {
-            termCoverage.push({ termId: term.id, vehicleId: vid });
+          const termId = createId();
+          const termResult = await tx
+            .insert(insuranceTerms)
+            .values({
+              id: termId,
+              policyId,
+              startDate: term.startDate,
+              endDate: term.endDate,
+              policyNumber: term.policyNumber ?? null,
+              coverageDescription: term.coverageDescription ?? null,
+              deductibleAmount: term.deductibleAmount ?? null,
+              coverageLimit: term.coverageLimit ?? null,
+              agentName: term.agentName ?? null,
+              agentPhone: term.agentPhone ?? null,
+              agentEmail: term.agentEmail ?? null,
+              totalCost: term.totalCost ?? null,
+              monthlyCost: term.monthlyCost ?? null,
+              premiumFrequency: term.premiumFrequency ?? null,
+              paymentAmount: term.paymentAmount ?? null,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .returning();
+
+          insertedTerms.push(termResult[0]);
+
+          await this.insertJunctionRows(tx, termId, term.vehicleCoverage.vehicleIds);
+          for (const vid of term.vehicleCoverage.vehicleIds) {
+            termCoverage.push({ termId, vehicleId: vid });
           }
-
-          // Create expenses if term has totalCost
-          const cleanTerm = stripVehicleCoverage(term);
-          await this.createExpensesForTerm(tx, policyId, data.company, cleanTerm, coverage, userId);
         }
 
-        // 5. Sync vehicle references if active
-        if (isActive) {
-          await this.syncVehicleReferences(tx, policyId, allVehicleIds, true);
-        }
-
-        const vehicleIds = getLatestTermVehicleIds(strippedTerms, termCoverage);
-        return { ...policy, vehicleIds, termVehicleCoverage: termCoverage };
+        return { ...policy, terms: insertedTerms, termVehicleCoverage: termCoverage };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -363,9 +215,6 @@ export class InsurancePolicyRepository {
     }
   }
 
-  /**
-   * Find a single policy by ID with parsed terms, vehicleIds, and termVehicleCoverage.
-   */
   async findById(id: string): Promise<InsurancePolicyWithVehicles | null> {
     const result = await this.db
       .select()
@@ -376,36 +225,9 @@ export class InsurancePolicyRepository {
     const policy = result[0];
     if (!policy) return null;
 
-    return this.attachVehicleIds(policy);
+    return this.attachTermsAndCoverage(policy);
   }
 
-  /**
-   * Find all policies for a vehicle via junction join.
-   */
-  async findByVehicleId(vehicleId: string): Promise<InsurancePolicyWithVehicles[]> {
-    try {
-      const result = await this.db
-        .select({ policy: insurancePolicies })
-        .from(insurancePolicies)
-        .innerJoin(
-          insurancePolicyVehicles,
-          eq(insurancePolicies.id, insurancePolicyVehicles.policyId)
-        )
-        .where(eq(insurancePolicyVehicles.vehicleId, vehicleId))
-        .groupBy(insurancePolicies.id)
-        .orderBy(insurancePolicies.currentTermEnd);
-
-      const policies = result.map((r) => r.policy);
-      return Promise.all(policies.map((p) => this.attachVehicleIds(p)));
-    } catch (error) {
-      logger.error('Error finding insurance policies for vehicle', { vehicleId, error });
-      throw new DatabaseError('Failed to find insurance policies for vehicle', error);
-    }
-  }
-
-  /**
-   * Find all policies for a user via vehicle → junction join.
-   */
   async findByUserId(userId: string): Promise<InsurancePolicyWithVehicles[]> {
     try {
       const policies = await this.db
@@ -413,27 +235,31 @@ export class InsurancePolicyRepository {
         .from(insurancePolicies)
         .where(eq(insurancePolicies.userId, userId));
 
-      return Promise.all(policies.map((p) => this.attachVehicleIds(p)));
+      return Promise.all(policies.map((p) => this.attachTermsAndCoverage(p)));
     } catch (error) {
       logger.error('Error finding insurance policies for user', { error });
       throw new DatabaseError('Failed to find insurance policies for user', error);
     }
   }
 
-  /**
-   * Build the set of fields to update on the policy row.
-   */
-  private buildUpdateFields(data: UpdatePolicyData): Record<string, unknown> {
-    const fields: Record<string, unknown> = { updatedAt: new Date() };
-    if (data.company !== undefined) fields.company = data.company;
-    if (data.notes !== undefined) fields.notes = data.notes;
-    if (data.isActive !== undefined) fields.isActive = data.isActive;
-    return fields;
+  async findByVehicleId(vehicleId: string): Promise<InsurancePolicyWithVehicles[]> {
+    try {
+      const result = await this.db
+        .select({ policy: insurancePolicies })
+        .from(insurancePolicies)
+        .innerJoin(insuranceTerms, eq(insurancePolicies.id, insuranceTerms.policyId))
+        .innerJoin(insuranceTermVehicles, eq(insuranceTerms.id, insuranceTermVehicles.termId))
+        .where(eq(insuranceTermVehicles.vehicleId, vehicleId))
+        .groupBy(insurancePolicies.id);
+
+      const policies = result.map((r) => r.policy);
+      return Promise.all(policies.map((p) => this.attachTermsAndCoverage(p)));
+    } catch (error) {
+      logger.error('Error finding insurance policies for vehicle', { vehicleId, error });
+      throw new DatabaseError('Failed to find insurance policies for vehicle', error);
+    }
   }
 
-  /**
-   * Update a policy. Vehicle assignment is per-term only — no vehicleIds on UpdatePolicyData.
-   */
   async update(
     id: string,
     data: UpdatePolicyData,
@@ -451,31 +277,37 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Insurance policy');
         }
 
-        const policy = existing[0];
-        const currentVehicleIds = await this.getVehicleIdsForPolicy(tx, id);
+        const fields: Record<string, unknown> = { updatedAt: new Date() };
+        if (data.company !== undefined) fields.company = data.company;
+        if (data.notes !== undefined) fields.notes = data.notes;
+        if (data.isActive !== undefined) fields.isActive = data.isActive;
 
         const updatedResult = await tx
           .update(insurancePolicies)
-          .set(this.buildUpdateFields(data))
+          .set(fields)
           .where(eq(insurancePolicies.id, id))
           .returning();
 
-        // Sync vehicle references if isActive changed
-        const newIsActive = data.isActive ?? policy.isActive;
-        const wasActive = policy.isActive;
-        if (newIsActive && !wasActive) {
-          await this.syncVehicleReferences(tx, id, currentVehicleIds, true);
-        } else if (!newIsActive && wasActive) {
-          await this.syncVehicleReferences(tx, id, currentVehicleIds, false);
+        // Fetch terms and coverage for the response
+        const terms = await tx
+          .select()
+          .from(insuranceTerms)
+          .where(eq(insuranceTerms.policyId, id))
+          .orderBy(desc(insuranceTerms.endDate));
+
+        const termIds = terms.map((t) => t.id);
+        let termVehicleCoverage: TermCoverageRow[] = [];
+        if (termIds.length > 0) {
+          termVehicleCoverage = await tx
+            .select({
+              termId: insuranceTermVehicles.termId,
+              vehicleId: insuranceTermVehicles.vehicleId,
+            })
+            .from(insuranceTermVehicles)
+            .where(inArray(insuranceTermVehicles.termId, termIds));
         }
 
-        const termCoverage = await this.getTermVehicleCoverage(tx, id);
-        const terms = (updatedResult[0].terms ?? []) as PolicyTerm[];
-        return {
-          ...updatedResult[0],
-          vehicleIds: getLatestTermVehicleIds(terms, termCoverage),
-          termVehicleCoverage: termCoverage,
-        };
+        return { ...updatedResult[0], terms, termVehicleCoverage };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -487,17 +319,43 @@ export class InsurancePolicyRepository {
     }
   }
 
-  /**
-   * Append a term to the policy's terms JSON array with per-term vehicle coverage.
-   */
+  async delete(id: string, _userId: string): Promise<void> {
+    try {
+      await this.db.transaction(async (tx) => {
+        const existing = await tx
+          .select()
+          .from(insurancePolicies)
+          .where(eq(insurancePolicies.id, id))
+          .limit(1);
+
+        if (existing.length === 0) {
+          throw new NotFoundError('Insurance policy');
+        }
+
+        // Delete the policy — terms and junction rows cascade via FK ON DELETE CASCADE
+        await tx.delete(insurancePolicies).where(eq(insurancePolicies.id, id));
+      });
+    } catch (error) {
+      if (error instanceof NotFoundError) throw error;
+      logger.error('Failed to delete insurance policy', {
+        id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to delete insurance policy', error);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Term CRUD
+  // --------------------------------------------------------------------------
+
   async addTerm(
     policyId: string,
-    term: PolicyTerm & { vehicleCoverage: TermVehicleCoverage },
+    term: CreateTermInput,
     userId: string
   ): Promise<InsurancePolicyWithVehicles> {
     try {
       return await this.db.transaction(async (tx) => {
-        // 1. Fetch existing policy
         const existing = await tx
           .select()
           .from(insurancePolicies)
@@ -508,58 +366,70 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Insurance policy');
         }
 
-        const policy = existing[0];
-        const currentTerms = (policy.terms ?? []) as PolicyTerm[];
-
-        // 2. Check for duplicate term ID
-        if (currentTerms.some((t) => t.id === term.id)) {
-          throw new ConflictError('Term with this ID already exists');
-        }
-
-        // 3. Validate vehicle ownership
+        // Validate vehicle ownership
         await this.validateVehicleOwnership(tx, term.vehicleCoverage.vehicleIds, userId);
 
-        // 4. Strip vehicleCoverage and append term
-        const cleanTerm = stripVehicleCoverage(term);
-        const updatedTerms = [...currentTerms, cleanTerm];
-        const { currentTermStart, currentTermEnd } = syncDenormalizedFields(updatedTerms);
-
-        // 5. Update policy
-        const updatedResult = await tx
-          .update(insurancePolicies)
-          .set({
-            terms: updatedTerms,
-            currentTermStart,
-            currentTermEnd,
-            updatedAt: new Date(),
-          })
-          .where(eq(insurancePolicies.id, policyId))
-          .returning();
-
-        // 6. Insert junction rows for the new term
-        await this.insertJunctionRows(tx, policyId, term.id, term.vehicleCoverage.vehicleIds);
-
-        // 7. Create expenses if totalCost is defined
-        await this.createExpensesForTerm(
-          tx,
+        // Insert term row
+        const termId = createId();
+        const now = new Date();
+        await tx.insert(insuranceTerms).values({
+          id: termId,
           policyId,
-          policy.company,
-          cleanTerm,
-          term.vehicleCoverage,
-          userId
-        );
+          startDate: term.startDate,
+          endDate: term.endDate,
+          policyNumber: term.policyNumber ?? null,
+          coverageDescription: term.coverageDescription ?? null,
+          deductibleAmount: term.deductibleAmount ?? null,
+          coverageLimit: term.coverageLimit ?? null,
+          agentName: term.agentName ?? null,
+          agentPhone: term.agentPhone ?? null,
+          agentEmail: term.agentEmail ?? null,
+          totalCost: term.totalCost ?? null,
+          monthlyCost: term.monthlyCost ?? null,
+          premiumFrequency: term.premiumFrequency ?? null,
+          paymentAmount: term.paymentAmount ?? null,
+          createdAt: now,
+          updatedAt: now,
+        });
 
-        // 8. Sync vehicle references if policy is active
-        if (policy.isActive) {
-          await this.syncVehicleReferences(tx, policyId, term.vehicleCoverage.vehicleIds, true);
+        // Insert junction rows
+        await this.insertJunctionRows(tx, termId, term.vehicleCoverage.vehicleIds);
+
+        // Update policy updatedAt
+        await tx
+          .update(insurancePolicies)
+          .set({ updatedAt: now })
+          .where(eq(insurancePolicies.id, policyId));
+
+        // Fetch full policy with terms for response
+        const updatedPolicy = await tx
+          .select()
+          .from(insurancePolicies)
+          .where(eq(insurancePolicies.id, policyId))
+          .limit(1);
+
+        const terms = await tx
+          .select()
+          .from(insuranceTerms)
+          .where(eq(insuranceTerms.policyId, policyId))
+          .orderBy(desc(insuranceTerms.endDate));
+
+        const termIds = terms.map((t) => t.id);
+        let termVehicleCoverage: TermCoverageRow[] = [];
+        if (termIds.length > 0) {
+          termVehicleCoverage = await tx
+            .select({
+              termId: insuranceTermVehicles.termId,
+              vehicleId: insuranceTermVehicles.vehicleId,
+            })
+            .from(insuranceTermVehicles)
+            .where(inArray(insuranceTermVehicles.termId, termIds));
         }
 
-        const termCoverage = await this.getTermVehicleCoverage(tx, policyId);
-        const vehicleIds = getLatestTermVehicleIds(updatedTerms, termCoverage);
-        return { ...updatedResult[0], vehicleIds, termVehicleCoverage: termCoverage };
+        return { ...updatedPolicy[0], terms, termVehicleCoverage };
       });
     } catch (error) {
-      if (error instanceof NotFoundError || error instanceof ConflictError) throw error;
+      if (error instanceof NotFoundError) throw error;
       logger.error('Failed to add term to insurance policy', {
         policyId,
         error: error instanceof Error ? error.message : String(error),
@@ -568,156 +438,16 @@ export class InsurancePolicyRepository {
     }
   }
 
-  /**
-   * Handle vehicleCoverage changes for a term update: re-sync junction rows,
-   * update/create expense groups, and clear stale vehicle references.
-   */
-  private async handleCoverageUpdate(
-    tx: DrizzleTransaction,
-    policyId: string,
-    termId: string,
-    vehicleCoverage: TermVehicleCoverage,
-    updatedTerm: PolicyTerm,
-    policy: InsurancePolicy,
-    userId: string
-  ): Promise<void> {
-    await this.validateVehicleOwnership(tx, vehicleCoverage.vehicleIds, userId);
-
-    // Get old vehicle IDs for this term before deleting junction rows
-    const oldTermRows = await tx
-      .select({ vehicleId: insurancePolicyVehicles.vehicleId })
-      .from(insurancePolicyVehicles)
-      .where(
-        and(
-          eq(insurancePolicyVehicles.policyId, policyId),
-          eq(insurancePolicyVehicles.termId, termId)
-        )
-      );
-    const oldVehicleIds = oldTermRows.map((r) => r.vehicleId);
-
-    // Delete old junction rows for this term and insert new ones
-    await tx
-      .delete(insurancePolicyVehicles)
-      .where(
-        and(
-          eq(insurancePolicyVehicles.policyId, policyId),
-          eq(insurancePolicyVehicles.termId, termId)
-        )
-      );
-    await this.insertJunctionRows(tx, policyId, termId, vehicleCoverage.vehicleIds);
-
-    // Update or create expenses
-    await this.syncExpensesForTerm(
-      tx,
-      policyId,
-      termId,
-      vehicleCoverage,
-      updatedTerm,
-      policy.company,
-      userId
-    );
-
-    // Clear currentInsurancePolicyId for removed vehicles not covered by other terms
-    await this.clearRemovedVehicleRefs(tx, policyId, oldVehicleIds, vehicleCoverage.vehicleIds);
-
-    // Sync references for newly added vehicles if policy is active
-    if (policy.isActive) {
-      const newVehicleIds = vehicleCoverage.vehicleIds.filter(
-        (vid) => !oldVehicleIds.includes(vid)
-      );
-      if (newVehicleIds.length > 0) {
-        await this.syncVehicleReferences(tx, policyId, newVehicleIds, true);
-      }
-    }
-  }
-
-  /**
-   * Update or create expenses for a term based on coverage changes.
-   * Queries the expenses table directly by insurancePolicyId + insuranceTermId + groupId IS NOT NULL.
-   */
-  private async syncExpensesForTerm(
-    tx: DrizzleTransaction,
-    policyId: string,
-    termId: string,
-    coverage: TermVehicleCoverage,
-    term: PolicyTerm,
-    company: string,
-    userId: string
-  ): Promise<void> {
-    const existing = await tx
-      .select({ groupId: expenses.groupId })
-      .from(expenses)
-      .where(
-        and(
-          eq(expenses.insurancePolicyId, policyId),
-          eq(expenses.insuranceTermId, termId),
-          isNotNull(expenses.groupId)
-        )
-      )
-      .limit(1);
-
-    if (existing.length > 0) {
-      // Delete old siblings and create new ones
-      await tx
-        .delete(expenses)
-        .where(and(eq(expenses.insurancePolicyId, policyId), eq(expenses.insuranceTermId, termId)));
-      await this.createExpensesForTerm(tx, policyId, company, term, coverage, userId);
-    } else if (term.financeDetails?.totalCost != null) {
-      await this.createExpensesForTerm(tx, policyId, company, term, coverage, userId);
-    }
-  }
-
-  /**
-   * Clear currentInsurancePolicyId for vehicles removed from a term
-   * that aren't covered by other terms of the same policy.
-   */
-  private async clearRemovedVehicleRefs(
-    tx: DrizzleTransaction,
-    policyId: string,
-    oldVehicleIds: string[],
-    newVehicleIds: string[]
-  ): Promise<void> {
-    const removedVehicleIds = oldVehicleIds.filter((vid) => !newVehicleIds.includes(vid));
-    if (removedVehicleIds.length === 0) return;
-
-    const stillCoveredRows = await tx
-      .select({ vehicleId: insurancePolicyVehicles.vehicleId })
-      .from(insurancePolicyVehicles)
-      .where(
-        and(
-          eq(insurancePolicyVehicles.policyId, policyId),
-          inArray(insurancePolicyVehicles.vehicleId, removedVehicleIds)
-        )
-      );
-    const stillCoveredIds = new Set(stillCoveredRows.map((r) => r.vehicleId));
-    const trulyRemovedIds = removedVehicleIds.filter((vid) => !stillCoveredIds.has(vid));
-
-    if (trulyRemovedIds.length > 0) {
-      await tx
-        .update(vehicles)
-        .set({ currentInsurancePolicyId: null, updatedAt: new Date() })
-        .where(
-          and(
-            inArray(vehicles.id, trulyRemovedIds),
-            eq(vehicles.currentInsurancePolicyId, policyId)
-          )
-        );
-    }
-  }
-
-  /**
-   * Update a specific term in the policy's terms JSON array by termId.
-   * If vehicleCoverage is provided, re-sync junction rows and regenerate expense children.
-   */
   async updateTerm(
     policyId: string,
     termId: string,
-    termData: Partial<PolicyTerm> & { vehicleCoverage?: TermVehicleCoverage },
+    updates: Partial<CreateTermInput>,
     userId: string
   ): Promise<InsurancePolicyWithVehicles> {
     try {
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Term update requires field-by-field mapping and junction management
       return await this.db.transaction(async (tx) => {
-        // 1. Fetch existing policy
+        // Verify policy exists
         const existing = await tx
           .select()
           .from(insurancePolicies)
@@ -728,54 +458,82 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Insurance policy');
         }
 
-        const policy = existing[0];
-        const currentTerms = (policy.terms ?? []) as PolicyTerm[];
+        // Verify term exists and belongs to this policy
+        const termRows = await tx
+          .select()
+          .from(insuranceTerms)
+          .where(and(eq(insuranceTerms.id, termId), eq(insuranceTerms.policyId, policyId)))
+          .limit(1);
 
-        // 2. Find and update the specific term
-        const termIndex = currentTerms.findIndex((t) => t.id === termId);
-        if (termIndex === -1) {
+        if (termRows.length === 0) {
           throw new NotFoundError('Term');
         }
 
-        const { vehicleCoverage, ...termFields } = termData;
-        const updatedTerms = [...currentTerms];
-        updatedTerms[termIndex] = {
-          ...currentTerms[termIndex],
-          ...termFields,
-          id: termId,
-        };
+        // Build update fields
+        const { vehicleCoverage, ...termFields } = updates;
+        const setFields: Record<string, unknown> = { updatedAt: new Date() };
+        if (termFields.startDate !== undefined) setFields.startDate = termFields.startDate;
+        if (termFields.endDate !== undefined) setFields.endDate = termFields.endDate;
+        if (termFields.policyNumber !== undefined) setFields.policyNumber = termFields.policyNumber;
+        if (termFields.coverageDescription !== undefined)
+          setFields.coverageDescription = termFields.coverageDescription;
+        if (termFields.deductibleAmount !== undefined)
+          setFields.deductibleAmount = termFields.deductibleAmount;
+        if (termFields.coverageLimit !== undefined)
+          setFields.coverageLimit = termFields.coverageLimit;
+        if (termFields.agentName !== undefined) setFields.agentName = termFields.agentName;
+        if (termFields.agentPhone !== undefined) setFields.agentPhone = termFields.agentPhone;
+        if (termFields.agentEmail !== undefined) setFields.agentEmail = termFields.agentEmail;
+        if (termFields.totalCost !== undefined) setFields.totalCost = termFields.totalCost;
+        if (termFields.monthlyCost !== undefined) setFields.monthlyCost = termFields.monthlyCost;
+        if (termFields.premiumFrequency !== undefined)
+          setFields.premiumFrequency = termFields.premiumFrequency;
+        if (termFields.paymentAmount !== undefined)
+          setFields.paymentAmount = termFields.paymentAmount;
 
-        // 3. Sync denormalized fields
-        const { currentTermStart, currentTermEnd } = syncDenormalizedFields(updatedTerms);
+        await tx.update(insuranceTerms).set(setFields).where(eq(insuranceTerms.id, termId));
 
-        // 4. Update policy
-        const updatedResult = await tx
-          .update(insurancePolicies)
-          .set({
-            terms: updatedTerms,
-            currentTermStart,
-            currentTermEnd,
-            updatedAt: new Date(),
-          })
-          .where(eq(insurancePolicies.id, policyId))
-          .returning();
-
-        // 5. Handle vehicleCoverage changes
+        // Handle vehicle coverage changes
         if (vehicleCoverage) {
-          await this.handleCoverageUpdate(
-            tx,
-            policyId,
-            termId,
-            vehicleCoverage,
-            updatedTerms[termIndex],
-            policy,
-            userId
-          );
+          await this.validateVehicleOwnership(tx, vehicleCoverage.vehicleIds, userId);
+
+          // Delete old junction rows and insert new ones
+          await tx.delete(insuranceTermVehicles).where(eq(insuranceTermVehicles.termId, termId));
+          await this.insertJunctionRows(tx, termId, vehicleCoverage.vehicleIds);
         }
 
-        const termCoverage = await this.getTermVehicleCoverage(tx, policyId);
-        const vehicleIds = getLatestTermVehicleIds(updatedTerms, termCoverage);
-        return { ...updatedResult[0], vehicleIds, termVehicleCoverage: termCoverage };
+        // Update policy updatedAt
+        await tx
+          .update(insurancePolicies)
+          .set({ updatedAt: new Date() })
+          .where(eq(insurancePolicies.id, policyId));
+
+        // Fetch full policy with terms for response
+        const updatedPolicy = await tx
+          .select()
+          .from(insurancePolicies)
+          .where(eq(insurancePolicies.id, policyId))
+          .limit(1);
+
+        const terms = await tx
+          .select()
+          .from(insuranceTerms)
+          .where(eq(insuranceTerms.policyId, policyId))
+          .orderBy(desc(insuranceTerms.endDate));
+
+        const termIds = terms.map((t) => t.id);
+        let termVehicleCoverage: TermCoverageRow[] = [];
+        if (termIds.length > 0) {
+          termVehicleCoverage = await tx
+            .select({
+              termId: insuranceTermVehicles.termId,
+              vehicleId: insuranceTermVehicles.vehicleId,
+            })
+            .from(insuranceTermVehicles)
+            .where(inArray(insuranceTermVehicles.termId, termIds));
+        }
+
+        return { ...updatedPolicy[0], terms, termVehicleCoverage };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -788,10 +546,6 @@ export class InsurancePolicyRepository {
     }
   }
 
-  /**
-   * Delete a specific term from a policy's terms JSON array.
-   * Removes junction rows, deletes associated expenses, and clears vehicle references for the term.
-   */
   async deleteTerm(
     policyId: string,
     termId: string,
@@ -809,64 +563,52 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Insurance policy');
         }
 
-        const policy = existing[0];
-        const currentTerms = (policy.terms ?? []) as PolicyTerm[];
-        const termIndex = currentTerms.findIndex((t) => t.id === termId);
-        if (termIndex === -1) {
+        // Verify term exists
+        const termRows = await tx
+          .select()
+          .from(insuranceTerms)
+          .where(and(eq(insuranceTerms.id, termId), eq(insuranceTerms.policyId, policyId)))
+          .limit(1);
+
+        if (termRows.length === 0) {
           throw new NotFoundError('Term');
         }
 
-        // Get vehicle IDs for this term before removing junction rows
-        const termVehicleRows = await tx
-          .select({ vehicleId: insurancePolicyVehicles.vehicleId })
-          .from(insurancePolicyVehicles)
-          .where(
-            and(
-              eq(insurancePolicyVehicles.policyId, policyId),
-              eq(insurancePolicyVehicles.termId, termId)
-            )
-          );
-        const termVehicleIds = termVehicleRows.map((r) => r.vehicleId);
+        // Delete term — junction rows cascade, expenses get SET NULL via FK
+        await tx.delete(insuranceTerms).where(eq(insuranceTerms.id, termId));
 
-        // Remove the term from the array
-        const updatedTerms = currentTerms.filter((t) => t.id !== termId);
-        const { currentTermStart, currentTermEnd } = syncDenormalizedFields(updatedTerms);
-
-        // Update policy
-        const updatedResult = await tx
+        // Update policy updatedAt
+        await tx
           .update(insurancePolicies)
-          .set({
-            terms: updatedTerms,
-            currentTermStart,
-            currentTermEnd,
-            updatedAt: new Date(),
-          })
+          .set({ updatedAt: new Date() })
+          .where(eq(insurancePolicies.id, policyId));
+
+        // Fetch full policy with remaining terms
+        const updatedPolicy = await tx
+          .select()
+          .from(insurancePolicies)
           .where(eq(insurancePolicies.id, policyId))
-          .returning();
+          .limit(1);
 
-        // Delete junction rows for this term
-        await tx
-          .delete(insurancePolicyVehicles)
-          .where(
-            and(
-              eq(insurancePolicyVehicles.policyId, policyId),
-              eq(insurancePolicyVehicles.termId, termId)
-            )
-          );
+        const terms = await tx
+          .select()
+          .from(insuranceTerms)
+          .where(eq(insuranceTerms.policyId, policyId))
+          .orderBy(desc(insuranceTerms.endDate));
 
-        // Delete expenses for this term directly
-        await tx
-          .delete(expenses)
-          .where(
-            and(eq(expenses.insurancePolicyId, policyId), eq(expenses.insuranceTermId, termId))
-          );
+        const termIds = terms.map((t) => t.id);
+        let termVehicleCoverage: TermCoverageRow[] = [];
+        if (termIds.length > 0) {
+          termVehicleCoverage = await tx
+            .select({
+              termId: insuranceTermVehicles.termId,
+              vehicleId: insuranceTermVehicles.vehicleId,
+            })
+            .from(insuranceTermVehicles)
+            .where(inArray(insuranceTermVehicles.termId, termIds));
+        }
 
-        // Clear vehicle references if no longer covered by other terms
-        await this.clearRemovedVehicleRefs(tx, policyId, termVehicleIds, []);
-
-        const termCoverage = await this.getTermVehicleCoverage(tx, policyId);
-        const vehicleIds = getLatestTermVehicleIds(updatedTerms, termCoverage);
-        return { ...updatedResult[0], vehicleIds, termVehicleCoverage: termCoverage };
+        return { ...updatedPolicy[0], terms, termVehicleCoverage };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -879,88 +621,66 @@ export class InsurancePolicyRepository {
     }
   }
 
+  // --------------------------------------------------------------------------
+  // Derived queries
+  // --------------------------------------------------------------------------
+
   /**
-   * Delete a policy. Clears currentInsurancePolicyId on vehicles and nullifies expense FKs.
-   * Junction rows are cascade-deleted by the DB.
+   * Get the current (latest) term dates for a policy.
+   * Returns the term with the latest end_date.
    */
-  async delete(id: string, _userId: string): Promise<void> {
+  async getCurrentTermDates(policyId: string): Promise<{ startDate: Date; endDate: Date } | null> {
+    const result = await this.db
+      .select({
+        startDate: insuranceTerms.startDate,
+        endDate: insuranceTerms.endDate,
+      })
+      .from(insuranceTerms)
+      .where(eq(insuranceTerms.policyId, policyId))
+      .orderBy(desc(insuranceTerms.endDate))
+      .limit(1);
+
+    if (result.length === 0) return null;
+    return { startDate: result[0].startDate, endDate: result[0].endDate };
+  }
+
+  /**
+   * Find terms expiring within a date range.
+   */
+  async findExpiringTerms(startDate: Date, endDate: Date): Promise<InsuranceTerm[]> {
     try {
-      await this.db.transaction(async (tx) => {
-        const existing = await tx
-          .select()
-          .from(insurancePolicies)
-          .where(eq(insurancePolicies.id, id))
-          .limit(1);
-
-        if (existing.length === 0) {
-          throw new NotFoundError('Insurance policy');
-        }
-
-        // Get vehicle IDs before deletion (junction will be cascade-deleted)
-        const vehicleIds = await this.getVehicleIdsForPolicy(tx, id);
-
-        // Clear currentInsurancePolicyId on vehicles that reference this policy
-        if (vehicleIds.length > 0) {
-          await tx
-            .update(vehicles)
-            .set({ currentInsurancePolicyId: null, updatedAt: new Date() })
-            .where(
-              and(inArray(vehicles.id, vehicleIds), eq(vehicles.currentInsurancePolicyId, id))
-            );
-        }
-
-        // Nullify expense FK references (preserve expenses)
-        await tx
-          .update(expenses)
-          .set({
-            insurancePolicyId: null,
-            insuranceTermId: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(expenses.insurancePolicyId, id));
-
-        // Delete the policy (junction rows cascade)
-        await tx.delete(insurancePolicies).where(eq(insurancePolicies.id, id));
-      });
+      return await this.db
+        .select()
+        .from(insuranceTerms)
+        .where(between(insuranceTerms.endDate, startDate, endDate))
+        .orderBy(insuranceTerms.endDate);
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
-      logger.error('Failed to delete insurance policy', {
-        id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new DatabaseError('Failed to delete insurance policy', error);
+      logger.error('Error finding expiring insurance terms', { error });
+      throw new DatabaseError('Failed to find expiring insurance terms', error);
     }
   }
 
   /**
-   * Find active policies where currentTermEnd is within N days from now.
+   * Derive the active insurance policy ID for a vehicle via JOIN.
+   * Returns the policy with the latest term end_date where is_active = 1.
    */
-  async findExpiringPolicies(
-    userId: string,
-    daysFromNow: number
-  ): Promise<InsurancePolicyWithVehicles[]> {
+  async getActiveInsurancePolicyId(vehicleId: string): Promise<string | null> {
     try {
-      const now = new Date();
-      const expirationDate = new Date();
-      expirationDate.setDate(expirationDate.getDate() + daysFromNow);
-
-      const policies = await this.db
-        .select()
+      const result = await this.db
+        .select({ id: insurancePolicies.id })
         .from(insurancePolicies)
+        .innerJoin(insuranceTerms, eq(insuranceTerms.policyId, insurancePolicies.id))
+        .innerJoin(insuranceTermVehicles, eq(insuranceTermVehicles.termId, insuranceTerms.id))
         .where(
-          and(
-            eq(insurancePolicies.userId, userId),
-            eq(insurancePolicies.isActive, true),
-            gte(insurancePolicies.currentTermEnd, now),
-            lte(insurancePolicies.currentTermEnd, expirationDate)
-          )
+          and(eq(insuranceTermVehicles.vehicleId, vehicleId), eq(insurancePolicies.isActive, true))
         )
-        .orderBy(insurancePolicies.currentTermEnd);
+        .orderBy(desc(insuranceTerms.endDate))
+        .limit(1);
 
-      return Promise.all(policies.map((p) => this.attachVehicleIds(p)));
+      return result[0]?.id ?? null;
     } catch (error) {
-      logger.error('Error finding expiring insurance policies', { error });
-      throw new DatabaseError('Failed to find expiring insurance policies', error);
+      logger.error('Error deriving active insurance policy for vehicle', { vehicleId, error });
+      throw new DatabaseError('Failed to derive active insurance policy', error);
     }
   }
 }

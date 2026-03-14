@@ -60,8 +60,8 @@ export class BackupOrchestrator {
       }
 
       // Load backup config — own filter including sheetsSyncEnabled
-      const { settingsRepository } = await import('../settings/repository');
-      const settings = await settingsRepository.getOrCreate(userId);
+      const { preferencesRepository } = await import('../settings/repository');
+      const settings = await preferencesRepository.getOrCreate(userId);
       const config: BackupConfig = (settings.backupConfig as BackupConfig | null) ?? {
         providers: {},
       };
@@ -191,8 +191,10 @@ export class BackupOrchestrator {
 
       // Persist config updates
       if (anySuccess) {
-        await settingsRepository.updateBackupConfig(userId, updatedConfig);
-        await settingsRepository.updateSyncDate(userId);
+        await preferencesRepository.update(userId, { backupConfig: updatedConfig });
+        const { syncStateRepository } = await import('../settings/repository');
+        await syncStateRepository.updateSyncDate(userId);
+        await syncStateRepository.updateBackupDate(userId);
       }
 
       return { timestamp, results };

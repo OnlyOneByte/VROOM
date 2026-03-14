@@ -3,7 +3,7 @@
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import PolicyTermCard from './PolicyTermCard.svelte';
+	import InsuranceTermCard from './PolicyTermCard.svelte';
 	import ExpirationAlert from './ExpirationAlert.svelte';
 	import TermHistory from './TermHistory.svelte';
 	import TermForm from './form/TermForm.svelte';
@@ -37,8 +37,8 @@
 	let pastTerms = $derived(policy.terms.filter(t => t.id !== latestTerm?.id));
 
 	let showTermForm = $state(false);
-	let editingTerm = $state<import('$lib/types').PolicyTerm | null>(null);
-	let renewFromTerm = $state<import('$lib/types').PolicyTerm | null>(null);
+	let editingTerm = $state<import('$lib/types').InsuranceTerm | null>(null);
+	let renewFromTerm = $state<import('$lib/types').InsuranceTerm | null>(null);
 	let autoEditHandled = $state(false);
 
 	// Auto-open term edit when deep-linked from an expense
@@ -55,7 +55,7 @@
 		}
 	});
 
-	function handleEditTerm(term: import('$lib/types').PolicyTerm) {
+	function handleEditTerm(term: import('$lib/types').InsuranceTerm) {
 		editingTerm = term;
 		renewFromTerm = null;
 		showTermForm = true;
@@ -74,7 +74,7 @@
 		await onRefresh();
 	}
 
-	async function handleDeleteTerm(term: import('$lib/types').PolicyTerm) {
+	async function handleDeleteTerm(term: import('$lib/types').InsuranceTerm) {
 		try {
 			await insuranceApi.deleteTerm(policy.id, term.id);
 			await onRefresh();
@@ -94,9 +94,9 @@
 				</div>
 				<div class="min-w-0">
 					<h4 class="text-sm font-semibold text-foreground truncate">{policy.company}</h4>
-					{#if latestTerm?.policyDetails.policyNumber}
+					{#if latestTerm?.policyNumber}
 						<p class="text-xs text-muted-foreground">
-							Policy #{latestTerm.policyDetails.policyNumber}
+							Policy #{latestTerm.policyNumber}
 						</p>
 					{/if}
 				</div>
@@ -105,8 +105,8 @@
 				{#if !policy.isActive}
 					<Badge variant="secondary">Inactive</Badge>
 				{/if}
-				{#if policy.currentTermEnd}
-					<ExpirationAlert currentTermEnd={policy.currentTermEnd} />
+				{#if latestTerm?.endDate}
+					<ExpirationAlert latestTermEnd={latestTerm?.endDate} />
 				{/if}
 				<Button
 					variant="ghost"
@@ -123,7 +123,7 @@
 		<!-- Current term card -->
 		{#if latestTerm}
 			<div class="mt-3">
-				<PolicyTermCard
+				<InsuranceTermCard
 					term={latestTerm}
 					isCurrent={true}
 					{vehicleNames}

@@ -9,7 +9,7 @@ interface VehicleLike {
 	financing?: {
 		isActive: boolean;
 		originalAmount: number;
-		currentBalance: number;
+		computedBalance?: number;
 	};
 }
 
@@ -23,8 +23,8 @@ export function getVehicleDisplayName(vehicle: VehicleLike | null | undefined): 
 export function getFinancingProgress(vehicle: VehicleLike): number {
 	if (!vehicle?.financing?.isActive) return 0;
 
-	const { originalAmount, currentBalance } = vehicle.financing;
-	return ((originalAmount - currentBalance) / originalAmount) * 100;
+	const { originalAmount, computedBalance = 0 } = vehicle.financing;
+	return ((originalAmount - computedBalance) / originalAmount) * 100;
 }
 
 // Get financing type label

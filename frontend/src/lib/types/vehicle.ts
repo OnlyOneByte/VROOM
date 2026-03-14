@@ -29,7 +29,6 @@ export interface VehicleFinancing {
 	financingType: 'loan' | 'lease' | 'own';
 	provider: string;
 	originalAmount: number;
-	currentBalance: number;
 	apr?: number;
 	termMonths: number;
 	startDate: string;
@@ -42,6 +41,8 @@ export interface VehicleFinancing {
 	excessMileageFee?: number;
 	isActive: boolean;
 	endDate?: string;
+	computedBalance?: number;
+	eligibleForPayoff?: boolean;
 	createdAt: string;
 	updatedAt: string;
 }

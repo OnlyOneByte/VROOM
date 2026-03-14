@@ -63,7 +63,6 @@ const baseFinancingSchema = createInsertSchema(vehicleFinancing, {
 
 const createFinancingSchema = baseFinancingSchema.omit({
   id: true,
-  currentBalance: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -75,6 +74,20 @@ const financingParamsSchema = z.object({
 // Apply authentication and change tracking to all routes
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
+
+/**
+ * Helper: enrich a financing record with computed balance and payoff eligibility.
+ */
+async function enrichWithBalance(
+  financing: NonNullable<Awaited<ReturnType<typeof financingRepository.findByVehicleId>>>
+) {
+  const computedBalance = await financingRepository.computeBalance(financing.id);
+  return {
+    ...financing,
+    computedBalance,
+    eligibleForPayoff: computedBalance <= 0.01,
+  };
+}
 
 // GET /api/vehicles/:vehicleId/financing - Get financing details for a vehicle
 routes.get(
@@ -89,11 +102,16 @@ routes.get(
     }
 
     const financingData = await financingRepository.findByVehicleId(vehicleId);
-    return c.json({
-      success: true,
-      data: financingData || null,
-      message: financingData ? undefined : 'No financing found for this vehicle',
-    });
+    if (!financingData) {
+      return c.json({
+        success: true,
+        data: null,
+        message: 'No financing found for this vehicle',
+      });
+    }
+
+    const enriched = await enrichWithBalance(financingData);
+    return c.json({ success: true, data: enriched });
   }
 );
 
@@ -132,7 +150,6 @@ routes.post(
     if (existingFinancing) {
       const updatedFinancing = await financingRepository.update(existingFinancing.id, {
         ...financingData,
-        currentBalance: financingData.originalAmount,
       });
       return c.json({
         success: true,
@@ -144,7 +161,6 @@ routes.post(
     const createdFinancing = await financingRepository.create({
       ...financingData,
       vehicleId,
-      currentBalance: financingData.originalAmount,
     });
     return c.json(
       { success: true, data: createdFinancing, message: 'Financing created successfully' },
@@ -181,12 +197,33 @@ routes.patch(
   }
 );
 
-// DELETE /api/financing/:financingId - Delete financing (mark as completed)
+// PUT /api/financing/:financingId/payoff - Explicitly mark financing as paid off
+routes.put('/:financingId/payoff', zValidator('param', financingParamsSchema), async (c) => {
+  const user = c.get('user');
+  const { financingId } = c.req.valid('param');
+  await validateFinancingOwnership(financingId, user.id);
+
+  const updated = await financingRepository.update(financingId, {
+    isActive: false,
+    endDate: new Date(),
+  });
+  return c.json({
+    success: true,
+    data: updated,
+    message: 'Financing marked as paid off',
+  });
+});
+
+// DELETE /api/financing/:financingId - Deactivate financing
 routes.delete('/:financingId', zValidator('param', financingParamsSchema), async (c) => {
   const user = c.get('user');
   const { financingId } = c.req.valid('param');
   await validateFinancingOwnership(financingId, user.id);
-  await financingRepository.markAsCompleted(financingId, new Date());
+
+  await financingRepository.update(financingId, {
+    isActive: false,
+    endDate: new Date(),
+  });
   return c.json({ success: true, message: 'Financing marked as completed successfully' });
 });
 
