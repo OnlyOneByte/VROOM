@@ -8,7 +8,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import PendingPhotoPreview from '$lib/components/expenses/PendingPhotoPreview.svelte';
+	import PendingPhotoPreview from '$lib/components/expenses/form/PendingPhotoPreview.svelte';
 	import { odometerApi } from '$lib/services/odometer-api';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 	import type { PageData } from './$types';

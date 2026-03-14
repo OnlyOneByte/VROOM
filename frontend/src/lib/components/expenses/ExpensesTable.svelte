@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { paramRoutes } from '$lib/routes';
 	import {
 		Pencil,
 		Trash2,
@@ -8,7 +10,6 @@
 		Car,
 		LoaderCircle,
 		ListFilter,
-		ChevronLeft,
 		ChevronRight
 	} from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -48,7 +49,8 @@
 		EmptyTitle
 	} from '$lib/components/ui/empty';
 	import * as Select from '$lib/components/ui/select';
-	import SplitExpenseBadge from './SplitExpenseBadge.svelte';
+	import SplitExpenseBadge from './split/SplitExpenseBadge.svelte';
+	import PaginationControls from '$lib/components/common/pagination-controls.svelte';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte';
 
 	// Types for grouped display
@@ -113,12 +115,6 @@
 
 	// Pagination derived values
 	let showPagination = $derived(totalCount !== undefined && onPageChange !== undefined);
-	let currentPage = $derived(Math.floor(currentOffset / pageSize) + 1);
-	let totalPages = $derived(totalCount !== undefined ? Math.ceil(totalCount / pageSize) : 1);
-	let isPrevDisabled = $derived(currentOffset === 0);
-	let isNextDisabled = $derived(
-		totalCount !== undefined ? currentOffset + pageSize >= totalCount : true
-	);
 
 	const isMobile = new IsMobile();
 
@@ -438,7 +434,7 @@
 											variant="ghost"
 											size="sm"
 											class="h-7 px-2 text-xs"
-											href="/expenses/{expense.id}/edit?returnTo={returnTo}"
+											href={`${resolve(paramRoutes.expenseEdit, { id: expense.id })}?returnTo=${returnTo}`}
 											onclick={e => e.stopPropagation()}
 										>
 											<Pencil class="h-3.5 w-3.5 mr-1" />
@@ -517,7 +513,7 @@
 											variant="ghost"
 											size="sm"
 											class="h-7 px-2 text-xs"
-											href="/expenses/{row.children[0]?.id}/edit?returnTo={returnTo}"
+											href={`${resolve(paramRoutes.expenseEdit, { id: row.children[0]?.id ?? '' })}?returnTo=${returnTo}`}
 											onclick={e => e.stopPropagation()}
 										>
 											<Pencil class="h-3.5 w-3.5 mr-1" />
@@ -718,7 +714,7 @@
 												variant="ghost"
 												size="icon"
 												class="h-8 w-8"
-												href="/expenses/{expense.id}/edit?returnTo={returnTo}"
+												href={`${resolve(paramRoutes.expenseEdit, { id: expense.id })}?returnTo=${returnTo}`}
 												title="Edit expense"
 												onclick={e => e.stopPropagation()}
 											>
@@ -803,7 +799,7 @@
 												variant="ghost"
 												size="icon"
 												class="h-8 w-8"
-												href="/expenses/{row.children[0]?.id}/edit?returnTo={returnTo}"
+												href={`${resolve(paramRoutes.expenseEdit, { id: row.children[0]?.id ?? '' })}?returnTo=${returnTo}`}
 												title="Edit split expense"
 												onclick={e => e.stopPropagation()}
 											>
@@ -871,36 +867,14 @@
 	</div>
 {/if}
 
-<!-- Pagination Footer -->
-{#if showPagination}
-	<div class="flex items-center justify-between border-t px-4 py-3">
-		<p class="text-sm text-muted-foreground">
-			Page {currentPage} of {totalPages}
-		</p>
-		<div class="flex items-center gap-2">
-			{#if isLoadingPage}
-				<LoaderCircle class="h-4 w-4 animate-spin text-muted-foreground" />
-			{/if}
-			<Button
-				variant="outline"
-				size="sm"
-				disabled={isPrevDisabled || isLoadingPage}
-				onclick={() => onPageChange?.(currentOffset - pageSize)}
-			>
-				<ChevronLeft class="h-4 w-4" />
-				Previous
-			</Button>
-			<Button
-				variant="outline"
-				size="sm"
-				disabled={isNextDisabled || isLoadingPage}
-				onclick={() => onPageChange?.(currentOffset + pageSize)}
-			>
-				Next
-				<ChevronRight class="h-4 w-4" />
-			</Button>
-		</div>
-	</div>
+{#if showPagination && totalCount !== undefined && onPageChange !== undefined}
+	<PaginationControls
+		{currentOffset}
+		{pageSize}
+		{totalCount}
+		isLoading={isLoadingPage}
+		{onPageChange}
+	/>
 {/if}
 
 <!-- Delete Confirmation AlertDialog -->

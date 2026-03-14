@@ -12,7 +12,7 @@
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
 	import { StatCardGrid } from '$lib/components/charts';
-	import FuelStatsTab from '$lib/components/analytics/FuelStatsTab.svelte';
+	import FuelStatsTab from '$lib/components/analytics/fuel/FuelStatsTab.svelte';
 	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
 	import { formatCurrency } from '$lib/utils/formatters';
 	import { getFuelEfficiencyLabel } from '$lib/utils/units';

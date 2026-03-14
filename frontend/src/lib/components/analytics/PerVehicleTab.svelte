@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
 	import { LoaderCircle, CircleAlert } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
@@ -123,7 +125,7 @@
 {:else if vehicles.length === 0}
 	<div class="rounded-lg border bg-card p-6 text-center">
 		<p class="text-muted-foreground mb-4">No vehicles found. Add a vehicle to see analytics.</p>
-		<Button href="/vehicles/new">Add Vehicle</Button>
+		<Button href={resolve(routes.vehicleNew)}>Add Vehicle</Button>
 	</div>
 {:else}
 	<div class="space-y-6">

@@ -1,4 +1,4 @@
-import type { OfflineExpense } from './offline-storage';
+import type { OfflineExpense } from '../offline-storage';
 
 export interface SyncConflict {
 	id: string;

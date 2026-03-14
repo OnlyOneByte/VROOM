@@ -43,9 +43,7 @@ export const paramRoutes = {
 	insurancePolicyEdit: '/insurance/[id]/edit',
 	vehicle: '/vehicles/[id]',
 	vehicleEdit: '/vehicles/[id]/edit', // Route page exists — VehicleInfoCard links here
-	vehicleOdometer: '/vehicles/[id]/odometer',
 	vehicleOdometerNew: '/vehicles/[id]/odometer/new',
-	vehicleOdometerEntry: '/vehicles/[id]/odometer/[entryId]',
 	vehicleOdometerEntryEdit: '/vehicles/[id]/odometer/[entryId]/edit',
 	settingsProviderEdit: '/settings/providers/[id]/edit'
 } as const;

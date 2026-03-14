@@ -12,7 +12,7 @@ import {
 	type SyncConflict,
 	type SyncConfig
 } from './sync-state.svelte';
-import { loadOfflineExpenses, saveOfflineExpenses, type OfflineExpense } from './offline-storage';
+import { loadOfflineExpenses, saveOfflineExpenses, type OfflineExpense } from '../offline-storage';
 import type { ExpenseCategory } from '$lib/types';
 import { toBackendExpense } from '$lib/services/api-transformer';
 import { apiClient } from '$lib/services/api-client';

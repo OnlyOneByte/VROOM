@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PolicyTermCard from './PolicyTermCard.svelte';
-	import TermForm from './TermForm.svelte';
+	import TermForm from './form/TermForm.svelte';
 	import { sortTermsByEndDateDesc } from '$lib/utils/insurance';
 	import type { PolicyTerm, Vehicle, TermCoverageRow } from '$lib/types';
 

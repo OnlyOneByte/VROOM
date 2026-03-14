@@ -1,50 +1,32 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		Clock,
-		CircleCheck,
-		Calendar,
-		DollarSign,
-		Search,
-		FileText,
-		TrendingUp,
-		X,
-		Car,
-		ChevronDown,
-		Receipt,
-		Tag
-	} from '@lucide/svelte';
+	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
+	import { Calendar, DollarSign, Search, FileText, TrendingUp, X, Car } from '@lucide/svelte';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { removeOfflineExpense } from '$lib/utils/offline-storage';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { expenseApi } from '$lib/services/expense-api';
-	import type { Expense, Vehicle, ExpenseCategory, ExpenseSummary } from '$lib/types';
+	import type { Expense, Vehicle, ExpenseSummary } from '$lib/types';
 
 	// Extended Expense type with vehicle info
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
 	import { formatCurrency } from '$lib/utils/formatters';
-	import { categoryLabels, getCategoryIcon, getCategoryColor } from '$lib/utils/expense-helpers';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { extractUniqueTags } from '$lib/utils/expense-filters';
 	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '$lib/constants/messages';
-	import { DISPLAY_LIMITS } from '$lib/constants/limits';
 	import DateRangePicker from '$lib/components/common/date-range-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
 	import * as CardNs from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import ExpensesTable from '$lib/components/expenses/ExpensesTable.svelte';
-	import { StatCardGrid } from '$lib/components/charts';
 	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
 	import PageHeader from '$lib/components/common/page-header.svelte';
-
-	import {
-		Collapsible,
-		CollapsibleContent,
-		CollapsibleTrigger
-	} from '$lib/components/ui/collapsible';
+	import ExpenseTagFilter from '$lib/components/expenses/ExpenseTagFilter.svelte';
+	import OfflineExpenseCards from '$lib/components/expenses/OfflineExpenseCards.svelte';
+	import ExpenseOverviewSection from '$lib/components/expenses/ExpenseOverviewSection.svelte';
 	import * as Select from '$lib/components/ui/select';
 
 	// Component state
@@ -72,19 +54,6 @@
 	// Tag filter state
 	let selectedTags = $state<string[]>([]);
 	let tagMatchMode = $state<'any' | 'all'>('any');
-	let tagSearchTerm = $state('');
-	let tagSearchFocused = $state(false);
-	let tagInputEl = $state<HTMLInputElement | null>(null);
-
-	// Filtered tag suggestions based on search input
-	let tagSuggestions = $derived.by(() => {
-		if (!tagSearchTerm.trim()) return allTags.filter(t => !selectedTags.includes(t));
-		const term = tagSearchTerm.toLowerCase();
-		return allTags.filter(t => !selectedTags.includes(t) && t.toLowerCase().includes(term));
-	});
-
-	// Collapsible state
-	let overviewOpen = $state(false);
 
 	let pendingExpenses = $derived(offlineExpenseQueue.current.filter(expense => !expense.synced));
 	let syncedExpenses = $derived(offlineExpenseQueue.current.filter(expense => expense.synced));
@@ -216,7 +185,6 @@
 
 	function clearFilters() {
 		searchTerm = '';
-		tagSearchTerm = '';
 		tagMatchMode = 'any';
 		selectedVehicleId = undefined;
 		selectedTags = [];
@@ -226,40 +194,13 @@
 		fetchPageAndSummary(0);
 	}
 
-	function addTag(tag: string): void {
-		if (!selectedTags.includes(tag)) {
-			selectedTags = [...selectedTags, tag];
-			handleFilterChange();
-		}
-		tagSearchTerm = '';
-		tagSearchFocused = true;
-		tagInputEl?.focus();
-	}
-
-	function removeTag(tag: string): void {
-		selectedTags = selectedTags.filter(t => t !== tag);
+	function handleTagsChange(tags: string[]) {
+		selectedTags = tags;
 		handleFilterChange();
 	}
 
-	function handleTagKeydown(e: KeyboardEvent): void {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			const exactMatch = allTags.find(
-				t => !selectedTags.includes(t) && t.toLowerCase() === tagSearchTerm.trim().toLowerCase()
-			);
-			if (exactMatch) {
-				addTag(exactMatch);
-			} else if (tagSuggestions.length > 0) {
-				const firstSuggestion = tagSuggestions[0];
-				if (firstSuggestion) addTag(firstSuggestion);
-			}
-		} else if (e.key === 'Backspace' && !tagSearchTerm && selectedTags.length > 0) {
-			const lastTag = selectedTags[selectedTags.length - 1];
-			if (lastTag) removeTag(lastTag);
-		} else if (e.key === 'Escape') {
-			tagSearchFocused = false;
-			tagInputEl?.blur();
-		}
+	function handleMatchModeChange(mode: 'any' | 'all') {
+		tagMatchMode = mode;
 	}
 
 	async function handleDeleteExpense(_deletedExpense: ExpenseWithVehicle) {
@@ -373,96 +314,13 @@
 				</div>
 
 				<!-- Tag Search Input -->
-				<div class="space-y-2">
-					<div class="flex items-center justify-between">
-						<p class="text-sm font-medium text-muted-foreground">Tags</p>
-						{#if selectedTags.length > 1}
-							<div
-								class="flex items-center rounded-md border text-xs"
-								role="radiogroup"
-								aria-label="Tag match mode"
-							>
-								<button
-									role="radio"
-									aria-checked={tagMatchMode === 'any'}
-									class="px-2.5 py-1 rounded-l-md transition-colors {tagMatchMode === 'any'
-										? 'bg-primary text-primary-foreground'
-										: 'text-muted-foreground hover:bg-muted'}"
-									onclick={() => {
-										tagMatchMode = 'any';
-									}}
-								>
-									Any
-								</button>
-								<button
-									role="radio"
-									aria-checked={tagMatchMode === 'all'}
-									class="px-2.5 py-1 rounded-r-md transition-colors {tagMatchMode === 'all'
-										? 'bg-primary text-primary-foreground'
-										: 'text-muted-foreground hover:bg-muted'}"
-									onclick={() => {
-										tagMatchMode = 'all';
-									}}
-								>
-									All
-								</button>
-							</div>
-						{/if}
-					</div>
-					<div class="relative">
-						<div
-							class="border rounded-lg p-2 min-h-[42px] bg-background border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ring-offset-background"
-						>
-							<div class="flex flex-wrap gap-1.5 items-center">
-								{#each selectedTags as tag (tag)}
-									<Badge variant="secondary" class="gap-1 pr-1">
-										{tag}
-										<button
-											type="button"
-											onclick={() => removeTag(tag)}
-											class="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5"
-											aria-label="Remove tag {tag}"
-										>
-											<X class="h-3 w-3" />
-										</button>
-									</Badge>
-								{/each}
-								<div class="flex items-center gap-1.5 flex-1 min-w-[120px]">
-									<Tag class="h-4 w-4 text-muted-foreground flex-shrink-0" />
-									<input
-										bind:this={tagInputEl}
-										bind:value={tagSearchTerm}
-										onkeydown={handleTagKeydown}
-										onfocus={() => (tagSearchFocused = true)}
-										onblur={() => setTimeout(() => (tagSearchFocused = false), 200)}
-										placeholder={selectedTags.length > 0
-											? 'Add more tags...'
-											: 'Search and add tags...'}
-										class="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-										aria-label="Search tags"
-									/>
-								</div>
-							</div>
-						</div>
-
-						{#if tagSearchFocused && tagSuggestions.length > 0}
-							<div
-								class="absolute z-50 left-0 right-0 mt-1 border border-border rounded-lg shadow-lg bg-popover max-h-48 overflow-y-auto"
-							>
-								{#each tagSuggestions.slice(0, 8) as suggestion (suggestion)}
-									<button
-										type="button"
-										onclick={() => addTag(suggestion)}
-										class="flex w-full items-center gap-2 px-3 py-2 hover:bg-accent text-sm"
-									>
-										<Tag class="h-3.5 w-3.5 text-muted-foreground" />
-										{suggestion}
-									</button>
-								{/each}
-							</div>
-						{/if}
-					</div>
-				</div>
+				<ExpenseTagFilter
+					{allTags}
+					{selectedTags}
+					{tagMatchMode}
+					onTagsChange={handleTagsChange}
+					onMatchModeChange={handleMatchModeChange}
+				/>
 
 				<!-- Clear Filters -->
 				{#if searchTerm || selectedVehicleId || selectedTags.length > 0 || startDate || endDate}
@@ -477,180 +335,14 @@
 		</CardNs.Root>
 
 		<!-- Expense Overview (collapsible) -->
-		<CardNs.Root>
-			<Collapsible bind:open={overviewOpen}>
-				<CardNs.Header class="pb-0">
-					<CollapsibleTrigger class="flex items-center justify-between w-full">
-						<div class="flex items-center gap-3">
-							<div class="p-2 rounded-lg bg-chart-1/10">
-								<TrendingUp class="h-5 w-5 text-chart-1" />
-							</div>
-							<div class="text-left">
-								<CardNs.Title>Expense Overview</CardNs.Title>
-								<CardNs.Description>
-									{formatCurrency(summary?.totalAmount ?? 0)} across {summary?.expenseCount ?? 0}
-									expense{(summary?.expenseCount ?? 0) !== 1 ? 's' : ''}
-								</CardNs.Description>
-							</div>
-						</div>
-						<ChevronDown
-							class="h-5 w-5 text-muted-foreground transition-transform duration-200 {overviewOpen
-								? 'rotate-180'
-								: ''}"
-						/>
-					</CollapsibleTrigger>
-				</CardNs.Header>
-				<CollapsibleContent>
-					<CardNs.Content class="space-y-6">
-						<!-- Stats Grid -->
-						<StatCardGrid items={statCards} columns={4} />
-
-						<!-- Category Breakdown -->
-						{#if summary && summary.categoryBreakdown.length > 0}
-							<div class="space-y-3">
-								<div class="flex items-center gap-2">
-									<Receipt class="h-4 w-4 text-muted-foreground" />
-									<p class="text-sm font-medium">
-										{EXPENSE_MESSAGES.EXPENSES_BY_CATEGORY}
-									</p>
-								</div>
-								<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-									{#each summary.categoryBreakdown as item (item.category)}
-										{@const IconComponent = getCategoryIcon(item.category as ExpenseCategory)}
-										<div class="p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-											<div class="flex items-center gap-2">
-												<div
-													class="p-1.5 rounded-lg {getCategoryColor(
-														item.category as ExpenseCategory
-													)} shrink-0"
-												>
-													<IconComponent class="h-3.5 w-3.5" />
-												</div>
-												<span class="text-xs sm:text-sm font-medium">
-													{categoryLabels[item.category as ExpenseCategory]}
-												</span>
-											</div>
-											<p class="text-sm font-bold mt-1.5">
-												{formatCurrency(item.amount)}
-											</p>
-										</div>
-									{/each}
-								</div>
-							</div>
-						{/if}
-					</CardNs.Content>
-				</CollapsibleContent>
-			</Collapsible>
-		</CardNs.Root>
+		<ExpenseOverviewSection {summary} {statCards} />
 
 		<!-- Offline Expenses Section -->
-		{#if pendingExpenses.length > 0}
-			<CardNs.Root>
-				<CardNs.Header>
-					<div class="flex items-center justify-between">
-						<div>
-							<CardNs.Title>
-								{EXPENSE_MESSAGES.PENDING_SYNC} ({pendingExpenses.length})
-							</CardNs.Title>
-							<CardNs.Description>These expenses are waiting to be synced</CardNs.Description>
-						</div>
-						<div class="p-2 rounded-lg bg-chart-5/10">
-							<Clock class="h-5 w-5 text-chart-5" />
-						</div>
-					</div>
-				</CardNs.Header>
-				<CardNs.Content>
-					<div class="space-y-3">
-						{#each pendingExpenses as expense (expense.id)}
-							<div
-								class="flex items-center gap-3 p-3 bg-chart-5/10 border border-chart-5/20 rounded-lg"
-							>
-								<button
-									onclick={() => removeOfflineExpense(expense.id)}
-									class="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-									title="Delete pending expense"
-								>
-									<X class="h-4 w-4" />
-								</button>
-								<div class="flex-1">
-									<div class="flex items-center gap-2 mb-1">
-										<Badge variant="secondary" class="capitalize">
-											{expense.category}
-										</Badge>
-										{#if expense.tags && expense.tags.length > 0}
-											<span class="text-sm text-muted-foreground">
-												{expense.tags.join(', ')}
-											</span>
-										{/if}
-										<span class="text-sm text-muted-foreground">
-											{expense.date}
-										</span>
-									</div>
-									<div class="text-sm text-muted-foreground">
-										${expense.amount.toFixed(2)}
-										{#if expense.description}
-											• {expense.description}
-										{/if}
-									</div>
-								</div>
-								<Clock class="h-4 w-4 text-chart-5 flex-shrink-0" />
-							</div>
-						{/each}
-					</div>
-				</CardNs.Content>
-			</CardNs.Root>
-		{/if}
-
-		<!-- Synced Offline Expenses -->
-		{#if syncedExpenses.length > 0}
-			<CardNs.Root>
-				<CardNs.Header>
-					<div class="flex items-center justify-between">
-						<div>
-							<CardNs.Title>
-								{EXPENSE_MESSAGES.RECENTLY_SYNCED} ({syncedExpenses.length})
-							</CardNs.Title>
-							<CardNs.Description>Successfully synced to the server</CardNs.Description>
-						</div>
-						<div class="p-2 rounded-lg bg-chart-2/10">
-							<CircleCheck class="h-5 w-5 text-chart-2" />
-						</div>
-					</div>
-				</CardNs.Header>
-				<CardNs.Content>
-					<div class="space-y-3">
-						{#each syncedExpenses.slice(0, DISPLAY_LIMITS.RECENT_SYNCED_EXPENSES) as expense (expense.id)}
-							<div
-								class="flex items-center justify-between p-3 bg-chart-2/10 border border-chart-2/20 rounded-lg"
-							>
-								<div class="flex-1">
-									<div class="flex items-center gap-2 mb-1">
-										<Badge variant="secondary" class="capitalize">
-											{expense.category}
-										</Badge>
-										{#if expense.tags && expense.tags.length > 0}
-											<span class="text-sm text-muted-foreground">
-												{expense.tags.join(', ')}
-											</span>
-										{/if}
-										<span class="text-sm text-muted-foreground">
-											{expense.date}
-										</span>
-									</div>
-									<div class="text-sm text-muted-foreground">
-										${expense.amount.toFixed(2)}
-										{#if expense.description}
-											• {expense.description}
-										{/if}
-									</div>
-								</div>
-								<CircleCheck class="h-4 w-4 text-chart-2" />
-							</div>
-						{/each}
-					</div>
-				</CardNs.Content>
-			</CardNs.Root>
-		{/if}
+		<OfflineExpenseCards
+			{pendingExpenses}
+			{syncedExpenses}
+			onRemovePending={removeOfflineExpense}
+		/>
 
 		<!-- Expense List -->
 		<CardNs.Root>
@@ -670,12 +362,12 @@
 					expenses={displayExpenses}
 					{vehicles}
 					showVehicleColumn={true}
-					returnTo="/expenses"
+					returnTo={resolve(routes.expenses)}
 					onDelete={handleDeleteExpense}
 					emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
 					emptyDescription={EXPENSE_MESSAGES.NO_EXPENSES_DESC}
 					emptyActionLabel={COMMON_MESSAGES.ADD_FIRST_EXPENSE}
-					emptyActionHref="/expenses/new"
+					emptyActionHref={resolve(routes.expenseNew)}
 					scrollHeight="600px"
 					onClearFilters={clearFilters}
 					hasActiveFilters={!!(
@@ -697,7 +389,7 @@
 
 	<!-- Floating Action Button -->
 	<FloatingActionButton
-		href="/expenses/new"
+		href={resolve(routes.expenseNew)}
 		label={COMMON_MESSAGES.ADD_EXPENSE}
 		ariaLabel="Add expense"
 	/>

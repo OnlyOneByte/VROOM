@@ -15,8 +15,8 @@
 	} from '@lucide/svelte';
 	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
 	import { syncState, onlineStatus, offlineExpenseQueue } from '$lib/stores/offline.svelte';
-	import { syncConflicts } from '$lib/utils/sync-manager';
-	import { getSyncStatusInfo } from '$lib/utils/sync-status';
+	import { syncConflicts } from '$lib/utils/sync/sync-manager';
+	import { getSyncStatusInfo } from '$lib/utils/sync/sync-status';
 	import { Badge } from '$lib/components/ui/badge';
 	import {
 		Sheet,

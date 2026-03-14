@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import InsurancePolicyForm from '$lib/components/insurance/InsurancePolicyForm.svelte';
+	import InsurancePolicyForm from '$lib/components/insurance/form/InsurancePolicyForm.svelte';
 
 	let policyId = $derived(page.params.id);
 	let returnTo = $derived(page.url.searchParams.get('returnTo') || '/insurance');

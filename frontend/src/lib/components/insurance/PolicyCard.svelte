@@ -6,7 +6,7 @@
 	import PolicyTermCard from './PolicyTermCard.svelte';
 	import ExpirationAlert from './ExpirationAlert.svelte';
 	import TermHistory from './TermHistory.svelte';
-	import TermForm from './TermForm.svelte';
+	import TermForm from './form/TermForm.svelte';
 	import DocumentViewer from './DocumentViewer.svelte';
 	import { getLatestTerm } from '$lib/utils/insurance';
 	import { insuranceApi } from '$lib/services/insurance-api';

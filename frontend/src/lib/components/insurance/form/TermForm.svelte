@@ -13,7 +13,7 @@
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import { prefillFromPreviousTerm } from '$lib/utils/insurance';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import SplitConfigEditor from '$lib/components/expenses/SplitConfigEditor.svelte';
+	import SplitConfigEditor from '$lib/components/expenses/split/SplitConfigEditor.svelte';
 	import type {
 		PolicyTerm,
 		PolicyDetails,
