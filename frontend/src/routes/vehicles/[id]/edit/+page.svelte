@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import VehicleForm from '$lib/components/vehicles/VehicleForm.svelte';
+	import VehicleForm from '$lib/components/vehicles/form/VehicleForm.svelte';
 
 	let vehicleId = $derived(page.params.id);
 </script>

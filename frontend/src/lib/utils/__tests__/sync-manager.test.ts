@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { syncManager, syncConfig, type SyncConflict } from '../sync-manager';
+import { syncManager, syncConfig, type SyncConflict } from '../sync/sync-manager';
 import { onlineStatus, syncState } from '../../stores/offline.svelte';
 import type { OfflineExpense } from '../offline-storage';
 

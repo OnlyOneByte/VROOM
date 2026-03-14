@@ -39,6 +39,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
+	import ComingSoonCard from '$lib/components/common/coming-soon-card.svelte';
 	import GoogleLogo from '$lib/components/icons/GoogleLogo.svelte';
 	import GitHubLogo from '$lib/components/icons/GitHubLogo.svelte';
 
@@ -299,152 +300,50 @@
 		</Card>
 
 		<!-- Sessions -->
-		<Card>
-			<CardHeader>
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<Monitor class="h-5 w-5 text-muted-foreground" />
-						<CardTitle>Sessions</CardTitle>
-					</div>
-					<Badge variant="secondary">Coming Soon</Badge>
-				</div>
-				<CardDescription>View and manage your active sessions</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<div class="space-y-3 opacity-50">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<Monitor class="h-4 w-4" />
-							<span>Active sessions</span>
-						</div>
-						<span class="text-sm text-muted-foreground">—</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<Clock class="h-4 w-4" />
-							<span>Last login</span>
-						</div>
-						<span class="text-sm text-muted-foreground">—</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<LogOut class="h-4 w-4" />
-							<span>Sign out other devices</span>
-						</div>
-						<span class="text-sm text-muted-foreground">—</span>
-					</div>
-				</div>
-			</CardContent>
-		</Card>
+		<ComingSoonCard
+			icon={Monitor}
+			title="Sessions"
+			description="View and manage your active sessions"
+			items={[
+				{ icon: Monitor, label: 'Active sessions' },
+				{ icon: Clock, label: 'Last login' },
+				{ icon: LogOut, label: 'Sign out other devices' }
+			]}
+		/>
 
 		<!-- Data & Privacy -->
-		<Card>
-			<CardHeader>
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<Shield class="h-5 w-5 text-muted-foreground" />
-						<CardTitle>Data & Privacy</CardTitle>
-					</div>
-					<Badge variant="secondary">Coming Soon</Badge>
-				</div>
-				<CardDescription>Control your data and privacy preferences</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<div class="space-y-3 opacity-50">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<Download class="h-4 w-4" />
-							<span>Export all data</span>
-						</div>
-						<span class="text-sm text-muted-foreground">—</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<Trash2 class="h-4 w-4" />
-							<span>Delete account</span>
-						</div>
-						<span class="text-sm text-muted-foreground">—</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<Shield class="h-4 w-4" />
-							<span>Data retention preferences</span>
-						</div>
-						<span class="text-sm text-muted-foreground">—</span>
-					</div>
-				</div>
-			</CardContent>
-		</Card>
+		<ComingSoonCard
+			icon={Shield}
+			title="Data & Privacy"
+			description="Control your data and privacy preferences"
+			items={[
+				{ icon: Download, label: 'Export all data' },
+				{ icon: Trash2, label: 'Delete account' },
+				{ icon: Shield, label: 'Data retention preferences' }
+			]}
+		/>
 
 		<!-- Sharing -->
-		<Card>
-			<CardHeader>
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<Users class="h-5 w-5 text-muted-foreground" />
-						<CardTitle>Sharing</CardTitle>
-					</div>
-					<Badge variant="secondary">Coming Soon</Badge>
-				</div>
-				<CardDescription>Household access and shared vehicles</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<div class="space-y-3 opacity-50">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<UserPlus class="h-4 w-4" />
-							<span>Invite household member</span>
-						</div>
-						<span class="text-sm text-muted-foreground">—</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<Users class="h-4 w-4" />
-							<span>Manage shared access</span>
-						</div>
-						<span class="text-sm text-muted-foreground">—</span>
-					</div>
-				</div>
-			</CardContent>
-		</Card>
+		<ComingSoonCard
+			icon={Users}
+			title="Sharing"
+			description="Household access and shared vehicles"
+			items={[
+				{ icon: UserPlus, label: 'Invite household member' },
+				{ icon: Users, label: 'Manage shared access' }
+			]}
+		/>
 
 		<!-- Notifications -->
-		<Card>
-			<CardHeader>
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<Bell class="h-5 w-5 text-muted-foreground" />
-						<CardTitle>Notifications</CardTitle>
-					</div>
-					<Badge variant="secondary">Coming Soon</Badge>
-				</div>
-				<CardDescription>Reminders and alert preferences</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<div class="space-y-3 opacity-50">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<Bell class="h-4 w-4" />
-							<span>Payment reminders</span>
-						</div>
-						<span class="text-sm text-muted-foreground">—</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<Bell class="h-4 w-4" />
-							<span>Maintenance reminders</span>
-						</div>
-						<span class="text-sm text-muted-foreground">—</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
-							<Bell class="h-4 w-4" />
-							<span>Backup failure alerts</span>
-						</div>
-						<span class="text-sm text-muted-foreground">—</span>
-					</div>
-				</div>
-			</CardContent>
-		</Card>
+		<ComingSoonCard
+			icon={Bell}
+			title="Notifications"
+			description="Reminders and alert preferences"
+			items={[
+				{ icon: Bell, label: 'Payment reminders' },
+				{ icon: Bell, label: 'Maintenance reminders' },
+				{ icon: Bell, label: 'Backup failure alerts' }
+			]}
+		/>
 	</div>
 </FormLayout>

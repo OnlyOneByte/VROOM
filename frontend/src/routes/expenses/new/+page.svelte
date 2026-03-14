@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import ExpenseForm from '$lib/components/expenses/ExpenseForm.svelte';
+	import ExpenseForm from '$lib/components/expenses/form/ExpenseForm.svelte';
 
 	let returnTo = $derived(page.url.searchParams.get('returnTo') || '/expenses');
 	let preselectedVehicleId = $derived(page.url.searchParams.get('vehicleId'));

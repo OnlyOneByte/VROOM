@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
 	import { TrendingUp, ChartPie } from '@lucide/svelte';
 	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
 	import PageHeader from '$lib/components/common/page-header.svelte';
@@ -8,7 +10,7 @@
 	import { AppPieChart } from '$lib/components/charts';
 	import RecentActivityCard from '$lib/components/dashboard/RecentActivityCard.svelte';
 	import VehicleCarousel from '$lib/components/dashboard/VehicleCarousel.svelte';
-	import PeriodSelector from '$lib/components/vehicles/PeriodSelector.svelte';
+	import PeriodSelector from '$lib/components/common/period-selector.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
 	import { getCategoryColor as getCategoryChartColor } from '$lib/utils/chart-colors';
@@ -223,4 +225,4 @@
 	{/if}
 </div>
 
-<FloatingActionButton href="/vehicles/new" label="Add Vehicle" />
+<FloatingActionButton href={resolve(routes.vehicleNew)} label="Add Vehicle" />

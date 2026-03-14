@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { routes, paramRoutes } from '$lib/routes';
 	import { Gauge, Plus } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { StatCardGrid } from '$lib/components/charts';
@@ -140,7 +142,7 @@
 		{/snippet}
 		{#snippet action()}
 			<Button
-				href="/expenses/new?vehicleId={vehicleId}&returnTo=/vehicles/{vehicleId}&category=fuel"
+				href={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}&category=fuel`}
 			>
 				<Plus class="h-4 w-4 mr-2" />
 				{COMMON_MESSAGES.ADD_FUEL_EXPENSE}

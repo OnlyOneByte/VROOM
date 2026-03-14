@@ -34,7 +34,7 @@
 	import TagInput from './TagInput.svelte';
 	import ExpensePhotoSection from './ExpensePhotoSection.svelte';
 	import PendingPhotoPreview from './PendingPhotoPreview.svelte';
-	import SplitCostSheet from './SplitCostSheet.svelte';
+	import SplitCostSheet from '../split/SplitCostSheet.svelte';
 	import { validateExpenseField } from './expense-form-validation';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';

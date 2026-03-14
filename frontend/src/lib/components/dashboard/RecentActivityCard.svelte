@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
 	import { Clock, ArrowRight } from '@lucide/svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
@@ -81,7 +83,7 @@
 				{/each}
 			</div>
 			<div class="mt-4 pt-4 border-t">
-				<Button href="/expenses" variant="outline" class="w-full">
+				<Button href={resolve(routes.expenses)} variant="outline" class="w-full">
 					View All Expenses
 					<ArrowRight class="h-4 w-4 ml-2" />
 				</Button>

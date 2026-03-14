@@ -1,5 +1,5 @@
 <script lang="ts">
-	import VehicleForm from '$lib/components/vehicles/VehicleForm.svelte';
+	import VehicleForm from '$lib/components/vehicles/form/VehicleForm.svelte';
 </script>
 
 <svelte:head>
