@@ -1,15 +1,15 @@
-# VROOM Car Tracker
+# VROOM
 
 [![CI/CD](https://github.com/OnlyOneByte/VROOM/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/OnlyOneByte/VROOM/actions/workflows/ci-cd.yml)
 ![Frontend Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OnlyOneByte/VROOM/coverage-badges/frontend-coverage.json)
 ![Backend Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/OnlyOneByte/VROOM/coverage-badges/backend-coverage.json)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20VROOM-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/onemorebyte)
 
-VROOM (Vehicle Record & Organization Of Maintenance) — a modern, self-hostable car cost tracking and visualization web app with mobile-first design and comprehensive expense analytics.
+VROOM (Vehicle Record & Organization Of Maintenance) is a self-hostable car cost tracking app with mobile-first design, comprehensive expense analytics, and Google Drive backup.
 
-> ⚠️ **This project is under rapid development.** Features, APIs, and database schemas may change between releases. Back up your data regularly via Google Drive sync. If you're self-hosting, pin to a specific image tag rather than `latest` for stability.
+> ⚠️ **Under active development.** Features, APIs, and database schemas may change between releases. Back up your data regularly via Google Drive sync. Pin to a specific image tag rather than `latest` for stability.
 
-> 🤖 **AI-native development.** Much of the code in this project is written with AI assistance. All architecture decisions, feature direction, and code review are done by a human developer. AI accelerates the implementation; a person steers the ship.
+> 🤖 **AI-native development.** Much of the code is written with AI assistance. All architecture decisions, feature direction, and code review are done by a human developer.
 
 ## Why VROOM?
 
@@ -23,28 +23,19 @@ VROOM (Vehicle Record & Organization Of Maintenance) — a modern, self-hostable
 - 📱 Mobile-first PWA with offline support
 - 🚗 Multi-vehicle tracking (gas, electric, hybrid)
 - 📊 Interactive analytics and cost visualization
-- ⛽ Fuel efficiency tracking
+- ⛽ Fuel efficiency tracking with fill-up history
 - 💰 Financing and insurance management
-- 🔐 Google OAuth authentication
+- � Pohoto attachments for receipts and documents
+- 🔐 OAuth authentication (Google, GitHub)
 - 💾 Google Drive backup + Google Sheets sync
 - 🐳 Docker-ready self-hosting
-
-## Screenshots
-
-| Dashboard | Analytics |
-|---|---|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Analytics](docs/screenshots/analytics.png) |
-
-| Vehicle Detail | Insurance |
-|---|---|
-| ![Vehicle Detail](docs/screenshots/vehicle-detail.png) | ![Insurance](docs/screenshots/insurance.png) |
 
 ## Tech Stack
 
 | Layer | Technologies |
 |---|---|
-| Frontend | SvelteKit, Svelte 5 (runes), Tailwind CSS v4, shadcn-svelte (bits-ui), layerchart, Zod, Vitest + Playwright |
-| Backend | Hono on Bun, Drizzle ORM + SQLite, Lucia Auth (Google OAuth), Biome |
+| Frontend | SvelteKit, Svelte 5 (runes), Tailwind CSS v4, shadcn-svelte, layerchart, Zod, Vitest + Playwright |
+| Backend | Hono on Bun, Drizzle ORM + SQLite, Lucia Auth, Biome |
 | Infra | Docker, GitHub Actions CI/CD, GitHub Container Registry |
 
 ## Quick Start
@@ -58,14 +49,13 @@ VROOM (Vehicle Record & Organization Of Maintenance) — a modern, self-hostable
 ### Local Development
 
 ```bash
-# Use correct Node version
 nvm use
 
 # Backend
 cd backend
 bun install
-cp .env.example .env   # configure Google OAuth credentials
-bun run db:push         # apply migrations
+cp .env.example .env   # configure OAuth credentials
+bun run db:push
 bun run dev             # http://localhost:3001
 
 # Frontend (separate terminal)
@@ -78,9 +68,9 @@ npm run dev             # http://localhost:5173
 ### Docker (Production)
 
 ```bash
-cp docs/examples/.env.example .env    # configure all required env vars
+cp docs/examples/.env.example .env
 cp docs/examples/docker-compose.yml .
-docker-compose -f docker-compose.yml up -d
+docker-compose up -d
 # Frontend: http://localhost:3000
 # Backend:  http://localhost:3001
 ```
@@ -93,14 +83,10 @@ See the [Deployment Guide](docs/deployment.md) for full instructions.
 vroom/
 ├── backend/              # Bun + Hono API server
 │   ├── src/
-│   │   ├── api/          # Domain modules (auth, vehicles, expenses, financing, insurance, settings, sync)
+│   │   ├── api/          # Domain modules (auth, vehicles, expenses, financing, insurance, photos, analytics, sync)
 │   │   ├── db/           # Schema, connection, migrations, seeding
 │   │   ├── middleware/    # Auth, rate-limit, error-handler, idempotency, body-limit, activity
-│   │   ├── utils/        # Calculations, logger, validation, unit-conversions, vehicle-stats
-│   │   ├── config.ts     # Environment config with Zod validation
-│   │   ├── errors.ts     # Error classes and handlers
-│   │   ├── types.ts      # Shared TypeScript types
-│   │   └── index.ts      # App entry point
+│   │   └── utils/        # Calculations, logger, validation, unit-conversions
 │   └── drizzle/          # SQL migrations
 ├── frontend/             # SvelteKit PWA
 │   ├── src/
@@ -114,7 +100,7 @@ vroom/
 │   │   │   └── hooks/        # Svelte 5 reactive hooks
 │   │   └── routes/           # SvelteKit file-based routing
 │   └── e2e/                  # Playwright E2E tests
-├── docs/                 # Documentation (wiki-compatible)
+├── docs/                 # Documentation
 │   └── examples/         # Docker Compose, Portainer stack, .env template
 └── .github/workflows/    # CI/CD pipeline
 ```
@@ -123,12 +109,10 @@ vroom/
 
 | Document | Description |
 |---|---|
-| [Architecture](docs/architecture.md) | System design, data flow, patterns, and module responsibilities |
+| [Architecture](docs/architecture.md) | System design, data flow, and module responsibilities |
 | [Development Guide](docs/development.md) | Local setup, workflow, testing, and code style |
-| [Deployment Guide](docs/deployment.md) | Docker, self-hosting, reverse proxy, SSL, and maintenance |
+| [Deployment Guide](docs/deployment.md) | Docker, self-hosting, reverse proxy, and SSL |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
-
-These docs are also compatible with [GitHub Wiki](https://docs.github.com/en/communities/documenting-your-project-with-wikis) — see `docs/Home.md` and `docs/_Sidebar.md`.
 
 ## Contributing
 
@@ -148,4 +132,4 @@ If VROOM is useful to you, consider buying me a coffee:
 
 ## License
 
-AGPL-3.0 License — see [LICENSE](LICENSE) for details.
+AGPL-3.0 — see [LICENSE](LICENSE) for details.
