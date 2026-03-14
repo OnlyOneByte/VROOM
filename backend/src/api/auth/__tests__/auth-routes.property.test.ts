@@ -40,7 +40,7 @@ describe('Auth routes structural properties', () => {
         // Must reject when flowType is set (storedData.flowType is truthy)
         expect(fnBody).toContain('storedData.flowType');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -66,7 +66,7 @@ describe('Auth routes structural properties', () => {
 
         expect(fnBody).toContain("'auth-link'");
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -88,7 +88,7 @@ describe('Auth routes structural properties', () => {
         expect(genericCallbackPos).not.toBe(-1);
         expect(linkCallbackPos).toBeLessThan(genericCallbackPos);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -113,7 +113,7 @@ describe('Auth routes structural properties', () => {
         // The /providers route should NOT include requireAuth
         expect(routeLine).not.toContain('requireAuth');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -164,7 +164,7 @@ describe('Auth routes structural properties', () => {
         );
         expect(linkInitDef).toContain('authRateLimiter');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

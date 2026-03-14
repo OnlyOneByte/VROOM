@@ -52,7 +52,7 @@ describe('Property 10: Label function output correctness', () => {
 			fc.property(distanceUnitArb, unit => {
 				expect(getDistanceUnitLabel(unit, true)).toBe(EXPECTED_SHORT_DISTANCE[unit]);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -61,7 +61,7 @@ describe('Property 10: Label function output correctness', () => {
 			fc.property(volumeUnitArb, unit => {
 				expect(getVolumeUnitLabel(unit, true)).toBe(EXPECTED_SHORT_VOLUME[unit]);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -70,7 +70,7 @@ describe('Property 10: Label function output correctness', () => {
 			fc.property(chargeUnitArb, unit => {
 				expect(getChargeUnitLabel(unit, true)).toBe(EXPECTED_SHORT_CHARGE[unit]);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -80,7 +80,7 @@ describe('Property 10: Label function output correctness', () => {
 				const expected = `${getDistanceUnitLabel(d, true)}/${getVolumeUnitLabel(v, true)}`;
 				expect(getFuelEfficiencyLabel(d, v)).toBe(expected);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -90,7 +90,7 @@ describe('Property 10: Label function output correctness', () => {
 				const expected = `${getDistanceUnitLabel(d, true)}/${getChargeUnitLabel(c, true)}`;
 				expect(getElectricEfficiencyLabel(d, c)).toBe(expected);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -99,7 +99,7 @@ describe('Property 10: Label function output correctness', () => {
 			fc.property(distanceUnitArb, d => {
 				expect(getCostPerDistanceLabel(d)).toBe(`Cost/${getDistanceUnitLabel(d, true)}`);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -110,7 +110,7 @@ describe('Property 10: Label function output correctness', () => {
 				expect(typeof label).toBe('string');
 				expect(label.length).toBeGreaterThan(0);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });

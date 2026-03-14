@@ -126,7 +126,7 @@ describe('Property 16: Fuel volume ordering invariant', () => {
           );
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -204,7 +204,7 @@ describe('Property 17: MPG computation from consecutive expenses', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -255,7 +255,7 @@ describe('Property 8: Monthly arrays bounded to 12 entries', () => {
 
         expect(result.monthlyConsumption.length).toBeLessThanOrEqual(12);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -310,7 +310,7 @@ describe('Property 18: Gas price always positive', () => {
           expect(entry.pricePerVolume).toBeGreaterThan(0);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

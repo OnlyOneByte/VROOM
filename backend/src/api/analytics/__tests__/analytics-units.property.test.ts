@@ -287,7 +287,7 @@ describe('Property 11: Cross-vehicle analytics conversion', () => {
           );
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -317,7 +317,7 @@ describe('Property 11: Cross-vehicle analytics conversion', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

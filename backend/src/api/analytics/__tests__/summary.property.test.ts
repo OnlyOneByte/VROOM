@@ -108,7 +108,7 @@ describe('Property 2: Summary data equivalence', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

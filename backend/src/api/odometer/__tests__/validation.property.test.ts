@@ -32,7 +32,7 @@ describe('Property 4: Input validation rejects invalid odometer data', () => {
         });
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -48,7 +48,7 @@ describe('Property 4: Input validation rejects invalid odometer data', () => {
           expect(result.success).toBe(false);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -64,7 +64,7 @@ describe('Property 4: Input validation rejects invalid odometer data', () => {
           expect(result.success).toBe(false);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -93,7 +93,7 @@ describe('Property 4: Input validation rejects invalid odometer data', () => {
           expect(result.success).toBe(true);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });

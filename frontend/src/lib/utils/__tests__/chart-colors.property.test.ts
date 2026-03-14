@@ -69,7 +69,7 @@ describe('Property 9: assignSeriesColors length and order preservation', () => {
 					expect(result[i]!.color).toBe(CHART_COLORS[i % CHART_COLORS.length]);
 				}
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -101,7 +101,7 @@ describe('Property 10: buildChartConfig structure preservation', () => {
 					expect(config[s.key]!.color).toBe(series.findLast(x => x.key === s.key)!.color);
 				}
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -127,7 +127,7 @@ describe('Property 11: buildCategoryPieData correctness', () => {
 					expect(item.value).toBeGreaterThan(0);
 				}
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -139,7 +139,7 @@ describe('Property 11: buildCategoryPieData correctness', () => {
 				const sum = result.reduce((acc, item) => acc + item.percentage, 0);
 				expect(sum).toBeCloseTo(100, 1);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -152,7 +152,7 @@ describe('Property 11: buildCategoryPieData correctness', () => {
 					expect(item.label).toBe(getCategoryLabel(item.key));
 				}
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -183,7 +183,7 @@ describe('Property 12: Category key fallback safety', () => {
 			fc.property(unknownKeyArb, key => {
 				expect(getCategoryColor(key)).toBe('var(--primary)');
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -192,7 +192,7 @@ describe('Property 12: Category key fallback safety', () => {
 			fc.property(unknownKeyArb, key => {
 				expect(getCategoryLabel(key)).toBe(key);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });

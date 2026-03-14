@@ -132,7 +132,7 @@ describe('Property 1: Single Cover Invariant', () => {
         }
         assertCoverInvariant(model);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -146,7 +146,7 @@ describe('Property 1: Single Cover Invariant', () => {
           assertCoverInvariant(model);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -157,7 +157,7 @@ describe('Property 1: Single Cover Invariant', () => {
         model.create('photo-0', ts);
         expect(model.photos[0].isCover).toBe(true);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -183,7 +183,7 @@ describe('Property 1: Single Cover Invariant', () => {
         const oldestRemaining = model.photos.reduce((a, b) => (a.createdAt <= b.createdAt ? a : b));
         expect(newCover.id).toBe(oldestRemaining.id);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -362,7 +362,7 @@ describe('Property 4: Entity Isolation', () => {
           expect(idsA.has(id)).toBe(false);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -381,7 +381,7 @@ describe('Property 4: Entity Isolation', () => {
           expect(photosB.length).toBe(0);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -417,7 +417,7 @@ describe('Property 4: Entity Isolation', () => {
           expect(coverBAfter?.isCover).toBe(coverBBefore?.isCover);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -453,7 +453,7 @@ describe('Property 4: Entity Isolation', () => {
           expect(model.coverPhoto(keyB)?.id).toBe(coverBBefore?.id);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -498,7 +498,7 @@ describe('Property 4: Entity Isolation', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

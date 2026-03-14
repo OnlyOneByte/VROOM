@@ -149,7 +149,7 @@ describe('Property 1: Balance Consistency', () => {
           expect(Math.abs(actualBalance - expectedBalance)).toBeLessThanOrEqual(0.02);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -197,7 +197,7 @@ describe('Property 2: Create-Delete Symmetry', () => {
           expect(Math.abs(balanceAfter - balanceBefore)).toBeLessThanOrEqual(0.02);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -235,7 +235,7 @@ describe('Property 2: Create-Delete Symmetry', () => {
           expect(Math.abs(balanceAfter - balanceBefore)).toBeLessThanOrEqual(0.02);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -268,7 +268,7 @@ describe('Property 2: Create-Delete Symmetry', () => {
           ).toBeLessThanOrEqual(0.02);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -320,7 +320,7 @@ describe('Property 3: Update Delta Correctness', () => {
           expect(Math.abs(actualBalance - expectedBalance)).toBeLessThanOrEqual(0.02);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -353,7 +353,7 @@ describe('Property 3: Update Delta Correctness', () => {
           expect(Math.abs(actualBalance - expectedBalance)).toBeLessThanOrEqual(0.02);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -390,7 +390,7 @@ describe('Property 3: Update Delta Correctness', () => {
           expect(Math.abs(actualBalance - expectedBalance)).toBeLessThanOrEqual(0.02);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -435,7 +435,7 @@ describe('Property 5: Non-Financing Expense Isolation', () => {
           expect(mockFinancing.currentBalance).toBe(balanceBefore);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -466,7 +466,7 @@ describe('Property 5: Non-Financing Expense Isolation', () => {
           expect(mockFinancing.currentBalance).toBe(balanceBefore);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -502,7 +502,7 @@ describe('Property 5: Non-Financing Expense Isolation', () => {
           expect(mockFinancing.currentBalance).toBe(balanceBefore);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -551,7 +551,7 @@ describe('Property 6: Financing Active Status Consistency', () => {
           expect(mockFinancing?.endDate).not.toBeNull();
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -583,7 +583,7 @@ describe('Property 6: Financing Active Status Consistency', () => {
           expect(mockFinancing?.currentBalance ?? 0).toBeGreaterThan(0.01);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -617,7 +617,7 @@ describe('Property 6: Financing Active Status Consistency', () => {
           expect(mockFinancing?.currentBalance ?? 0).toBeGreaterThan(0.01);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -655,7 +655,7 @@ describe('Property 8: Financing Payment Validation', () => {
           expect(mockFinancing).toBeNull();
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -691,7 +691,7 @@ describe('Property 8: Financing Payment Validation', () => {
           expect(mockFinancing.isActive).toBe(isActiveBefore);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

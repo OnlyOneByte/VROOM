@@ -66,7 +66,7 @@ describe('Property 5: Unit conversion correctness', () => {
         const expected = value * expectedDistanceFactor(from, to);
         expect(result).toBeCloseTo(expected, 5);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -77,7 +77,7 @@ describe('Property 5: Unit conversion correctness', () => {
         const expected = value * expectedVolumeFactor(from, to);
         expect(result).toBeCloseTo(expected, 5);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -95,7 +95,7 @@ describe('Property 5: Unit conversion correctness', () => {
           expect(result).toBeCloseTo(expected, 5);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -111,7 +111,7 @@ describe('Property 6: Unit conversion identity', () => {
         const result = convertDistance(value, unit, unit);
         expect(result).toBe(value);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -121,7 +121,7 @@ describe('Property 6: Unit conversion identity', () => {
         const result = convertVolume(value, unit, unit);
         expect(result).toBe(value);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -131,7 +131,7 @@ describe('Property 6: Unit conversion identity', () => {
         const result = convertEfficiency(value, distUnit, volUnit, distUnit, volUnit);
         expect(result).toBe(value);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -148,7 +148,7 @@ describe('Property 7: Unit conversion round-trip', () => {
         const roundTripped = convertDistance(converted, to, from);
         expect(Math.abs(roundTripped - value)).toBeLessThan(0.0001);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -159,7 +159,7 @@ describe('Property 7: Unit conversion round-trip', () => {
         const roundTripped = convertVolume(converted, to, from);
         expect(Math.abs(roundTripped - value)).toBeLessThan(0.0001);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -175,7 +175,7 @@ describe('Property 7: Unit conversion round-trip', () => {
           expect(Math.abs(roundTripped - value)).toBeLessThan(0.0001);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

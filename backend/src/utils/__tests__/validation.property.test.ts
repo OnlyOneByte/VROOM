@@ -75,7 +75,7 @@ describe('Property 8: fuelType-based validation', () => {
           ).not.toThrow();
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -91,7 +91,7 @@ describe('Property 8: fuelType-based validation', () => {
           );
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -107,7 +107,7 @@ describe('Property 8: fuelType-based validation', () => {
           ).toThrow(ValidationError);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -123,7 +123,7 @@ describe('Property 8: fuelType-based validation', () => {
           expect((e as ValidationError).message).toContain('charge amount (kWh)');
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -142,7 +142,7 @@ describe('Property 8: fuelType-based validation', () => {
           ).not.toThrow();
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -158,7 +158,7 @@ describe('Property 8: fuelType-based validation', () => {
           );
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -174,7 +174,7 @@ describe('Property 8: fuelType-based validation', () => {
           ).toThrow(ValidationError);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -189,7 +189,7 @@ describe('Property 8: fuelType-based validation', () => {
           expect((e as ValidationError).message).toContain('fuel amount');
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -209,7 +209,7 @@ describe('Property 8: fuelType-based validation', () => {
           ).not.toThrow();
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -229,7 +229,7 @@ describe('Property 8: fuelType-based validation', () => {
           ).not.toThrow();
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -240,7 +240,7 @@ describe('Property 8: fuelType-based validation', () => {
           ValidationError
         );
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

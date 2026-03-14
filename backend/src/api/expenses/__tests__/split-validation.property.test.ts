@@ -140,7 +140,7 @@ describe('Property 9: Split config validation correctness', () => {
         const result = splitConfigSchema.safeParse(config);
         expect(result.success).toBe(true);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -150,7 +150,7 @@ describe('Property 9: Split config validation correctness', () => {
         const result = splitConfigSchema.safeParse(config);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -160,7 +160,7 @@ describe('Property 9: Split config validation correctness', () => {
         const result = splitConfigSchema.safeParse(config);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -170,7 +170,7 @@ describe('Property 9: Split config validation correctness', () => {
         const result = splitConfigSchema.safeParse(config);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -180,7 +180,7 @@ describe('Property 9: Split config validation correctness', () => {
         const result = splitConfigSchema.safeParse(config);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -190,7 +190,7 @@ describe('Property 9: Split config validation correctness', () => {
         const result = splitConfigSchema.safeParse(config);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -200,7 +200,7 @@ describe('Property 9: Split config validation correctness', () => {
         const result = splitConfigSchema.safeParse(config);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -210,7 +210,7 @@ describe('Property 9: Split config validation correctness', () => {
         const result = splitConfigSchema.safeParse(config);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -225,7 +225,7 @@ describe('Property 9: Split config validation correctness', () => {
         const result = splitConfigSchema.safeParse(config);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });

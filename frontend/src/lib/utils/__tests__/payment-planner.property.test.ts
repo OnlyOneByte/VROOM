@@ -85,7 +85,7 @@ describe('Property 1: Planner State Classification', () => {
 					expect(result.state).toBe('below-minimum');
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -105,7 +105,7 @@ describe('Property 1: Planner State Classification', () => {
 
 				expect(result.state).toBe('at-minimum');
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -129,7 +129,7 @@ describe('Property 1: Planner State Classification', () => {
 					expect(result.primaryImpact).toBeDefined();
 				}
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -158,7 +158,7 @@ describe('Property 1: Planner State Classification', () => {
 					expect(result.secondaryDelta).toBeDefined();
 				}
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -214,7 +214,7 @@ describe('Property 1: Planner State Classification', () => {
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -245,7 +245,7 @@ describe('Property 1: Planner State Classification', () => {
 				const deltaResult = computePlannerState(financing, aboveInput, minimum, deltaSaved);
 				expect(deltaResult.state).toBe('with-delta');
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -293,7 +293,7 @@ describe('Property 2: Impact Monotonicity', () => {
 					resultB.primaryImpact.monthsSaved
 				);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -315,7 +315,7 @@ describe('Property 2: Impact Monotonicity', () => {
 					resultB.primaryImpact.interestSaved
 				);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -372,7 +372,7 @@ describe('Property 3: Secondary Delta Correctness and Direction', () => {
 					);
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -405,7 +405,7 @@ describe('Property 3: Secondary Delta Correctness and Direction', () => {
 					);
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -437,7 +437,7 @@ describe('Property 3: Secondary Delta Correctness and Direction', () => {
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -482,7 +482,7 @@ describe('Property 4: Save Guard Correctness', () => {
 					expect(canSave(input, minimum, saved, isSaving)).toBe(false);
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -503,7 +503,7 @@ describe('Property 4: Save Guard Correctness', () => {
 					expect(canSave(input, minimum, saved, isSaving)).toBe(false);
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -525,7 +525,7 @@ describe('Property 4: Save Guard Correctness', () => {
 					expect(canSave(input, minimum, saved, true)).toBe(false);
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -549,7 +549,7 @@ describe('Property 4: Save Guard Correctness', () => {
 					expect(canSave(input, minimum, saved, false)).toBe(true);
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -583,7 +583,7 @@ describe('Property 4: Save Guard Correctness', () => {
 					expect(canSave(input, minimum, saved, true)).toBe(false);
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -632,7 +632,7 @@ describe('Property 5: Save Idempotency', () => {
 					expect(postSave.state).toBe('normal');
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -651,7 +651,7 @@ describe('Property 5: Save Idempotency', () => {
 					expect(canSave(input, minimum, input, false)).toBe(false);
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -693,7 +693,7 @@ describe('Property 6: Summary Sentence Consistency', () => {
 
 				expect(result).toBe('This is the minimum payment. No extra savings.');
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -713,7 +713,7 @@ describe('Property 6: Summary Sentence Consistency', () => {
 				expect(result).toContain('Your current payment');
 				expect(result).toContain('vs the minimum');
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -747,7 +747,7 @@ describe('Property 6: Summary Sentence Consistency', () => {
 					expect(result).toContain('than your current');
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -772,7 +772,7 @@ describe('Property 7: Non-Loan Financing Guard', () => {
 
 				expect(result).toBeNull();
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });

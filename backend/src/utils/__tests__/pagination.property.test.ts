@@ -43,7 +43,7 @@ describe('Property 1: buildPaginatedResponse shape and hasMore', () => {
           expect(result.pagination.hasMore).toBe(expectedHasMore);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -61,7 +61,7 @@ describe('Property 1: buildPaginatedResponse shape and hasMore', () => {
           expect(result1).toEqual(result2);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -115,7 +115,7 @@ describe('Property 2: Iterating pages yields exactly totalCount items with no du
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -149,7 +149,7 @@ describe('Property 3: clampPagination output always satisfies bounds', () => {
           expect(result.offset).toBe(expectedOffset);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 

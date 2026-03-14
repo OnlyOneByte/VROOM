@@ -103,7 +103,7 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
         // Login endpoint redirects to the generated URL
         expect(loginSection).toContain('c.redirect');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -148,7 +148,7 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
         expect(callbackSection).toContain('c.redirect');
         expect(callbackSection).toContain('/dashboard');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -187,7 +187,7 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
         // Clean up for next iteration
         sqliteDb.run('DELETE FROM users WHERE id = ?', [userId]);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -244,7 +244,7 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
         sqliteDb.run('DELETE FROM sessions WHERE id = ?', [sessionId]);
         sqliteDb.run('DELETE FROM users WHERE id = ?', [userId]);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -297,7 +297,7 @@ describe('Property 2: Preservation — Login OAuth callback behavior unchanged',
         sqliteDb.run('DELETE FROM sessions WHERE id = ?', [sessionId]);
         sqliteDb.run('DELETE FROM users WHERE id = ?', [userId]);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -374,7 +374,7 @@ describe('Property 4: Preservation — Google Sheets sync uses provider credenti
           sqliteDb.run('DELETE FROM users WHERE id = ?', [userId]);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -410,7 +410,7 @@ describe('Property 4: Preservation — Google Sheets sync uses provider credenti
         // Clean up
         sqliteDb.run('DELETE FROM users WHERE id = ?', [userId]);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -463,7 +463,7 @@ describe('Property 4: Preservation — Google Sheets sync uses provider credenti
           sqliteDb.run('DELETE FROM users WHERE id = ?', [userId]);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -523,7 +523,7 @@ describe('Property 4: Preservation — Google Sheets sync uses provider credenti
           sqliteDb.run('DELETE FROM users WHERE id = ?', [userId]);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

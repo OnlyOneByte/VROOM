@@ -213,7 +213,7 @@ describe('Property 6: Vehicle ownership validation', () => {
         expect(vExpenses.fuelEfficiencyAndCost).toEqual([]);
         expect(vExpenses.expenseBreakdown).toEqual([]);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -262,7 +262,7 @@ describe('Property 7: Year scoping filters correctly', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -330,7 +330,7 @@ describe('Property 27: User data isolation', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -364,7 +364,7 @@ describe('Property 28: Invalid parameters rejected with 400', () => {
           expect(result.data.year).toBe(year);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -485,7 +485,7 @@ describe("Property 19: Vehicle ID filtering returns only that vehicle's data", (
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

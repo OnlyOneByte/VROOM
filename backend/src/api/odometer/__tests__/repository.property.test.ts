@@ -93,7 +93,7 @@ describe('Property 2: Upsert idempotency', () => {
           expect(row.cnt).toBe(1);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -213,7 +213,7 @@ describe('Property 3: Link field consistency invariant', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

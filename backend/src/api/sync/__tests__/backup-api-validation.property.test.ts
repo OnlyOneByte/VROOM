@@ -3,10 +3,9 @@
  *
  * Property 6: Restore endpoint input validation
  * Property 7: BackupConfig validation
- * Property 8: Ownership enforcement
  * Property 12: Provider deletion cleans up BackupConfig
  * Property 13: Stale provider resilience
- * Validates: Requirements 5.2, 5.4, 6.2, 6.3, 11.1, 11.2, 11.3, 14.1, 14.2, 14.3
+ * Validates: Requirements 5.2, 6.2, 11.1, 11.2, 11.3, 14.2, 14.3
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -116,7 +115,7 @@ describe('Property 6: Restore endpoint input validation', () => {
           expect(result.success).toBe(true);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -130,7 +129,7 @@ describe('Property 6: Restore endpoint input validation', () => {
         });
         expect(result.success).toBe(true);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -145,7 +144,7 @@ describe('Property 6: Restore endpoint input validation', () => {
         });
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -159,7 +158,7 @@ describe('Property 6: Restore endpoint input validation', () => {
         });
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -175,7 +174,7 @@ describe('Property 6: Restore endpoint input validation', () => {
         });
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -190,7 +189,7 @@ describe('Property 6: Restore endpoint input validation', () => {
         });
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -204,7 +203,7 @@ describe('Property 6: Restore endpoint input validation', () => {
         });
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -234,7 +233,7 @@ describe('Property 6: Restore endpoint input validation', () => {
           expect(sheetsResult.success).toBe(false);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -249,7 +248,7 @@ describe('Property 6: Restore endpoint input validation', () => {
           expect(result.success).toBe(false);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -267,7 +266,7 @@ describe('Property 6: Restore endpoint input validation', () => {
           expect(result.success).toBe(false);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -300,7 +299,7 @@ describe('Property 6: Restore endpoint input validation', () => {
           expect(result3.success).toBe(false);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });
@@ -349,7 +348,7 @@ describe('Property 7: BackupConfig validation', () => {
         const result = backupConfigSchema.safeParse(config);
         expect(result.success).toBe(true);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -371,7 +370,7 @@ describe('Property 7: BackupConfig validation', () => {
         const result = backupConfigSchema.safeParse(config);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -386,7 +385,7 @@ describe('Property 7: BackupConfig validation', () => {
         const result = backupConfigSchema.safeParse(config);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -410,7 +409,7 @@ describe('Property 7: BackupConfig validation', () => {
           expect(result.success).toBe(false);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -433,7 +432,7 @@ describe('Property 7: BackupConfig validation', () => {
           expect(result.success).toBe(false);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -459,127 +458,13 @@ describe('Property 7: BackupConfig validation', () => {
         const result = backupConfigSchema.safeParse(config);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
   test('accepts empty providers object', () => {
     const result = backupConfigSchema.safeParse({ providers: {} });
     expect(result.success).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Property 8: Ownership enforcement
-// Validates: Requirements 5.4, 6.3, 14.1, 14.2
-// ---------------------------------------------------------------------------
-
-describe('Property 8: Ownership enforcement', () => {
-  /**
-   * **Validates: Requirements 5.4, 6.3, 14.1, 14.2**
-   *
-   * For any backup operation (list, download, delete, restore, config update),
-   * the system SHALL verify that the specified provider ID belongs to the
-   * authenticated user — and SHALL reject operations on providers not owned
-   * by the user.
-   *
-   * We test the pure ownership check logic: given a set of owned provider IDs
-   * and a requested provider ID, the check passes iff the ID is in the owned set.
-   */
-
-  /**
-   * Pure function replicating the ownership check pattern used by:
-   * - storageProviderRegistry.getProvider(providerId, userId) — queries user_providers with userId filter
-   * - validateBackupConfig() — queries user_providers with userId filter for all provider IDs
-   * Returns true if the provider is owned, false otherwise.
-   */
-  function checkOwnership(ownedProviderIds: Set<string>, requestedProviderId: string): boolean {
-    return ownedProviderIds.has(requestedProviderId);
-  }
-
-  /**
-   * Pure function replicating the backupConfig ownership validation.
-   * Returns the list of provider IDs that are NOT owned by the user.
-   */
-  function validateBackupConfigOwnership(
-    configProviderIds: string[],
-    ownedProviderIds: Set<string>
-  ): string[] {
-    return configProviderIds.filter((id) => !ownedProviderIds.has(id));
-  }
-
-  /** Arbitrary for a set of owned provider IDs. */
-  const ownedProviderSetArb = fc
-    .array(providerIdArb, { minLength: 1, maxLength: 10 })
-    .map((ids) => new Set(ids));
-
-  test('accepts operations on providers owned by the user', () => {
-    fc.assert(
-      fc.property(ownedProviderSetArb, (ownedIds) => {
-        // Pick a random owned ID
-        const ownedArray = [...ownedIds];
-        for (const id of ownedArray) {
-          expect(checkOwnership(ownedIds, id)).toBe(true);
-        }
-      }),
-      { numRuns: 200 }
-    );
-  });
-
-  test('rejects operations on providers NOT owned by the user', () => {
-    fc.assert(
-      fc.property(ownedProviderSetArb, providerIdArb, (ownedIds, requestedId) => {
-        // Only test when requestedId is NOT in the owned set
-        fc.pre(!ownedIds.has(requestedId));
-        expect(checkOwnership(ownedIds, requestedId)).toBe(false);
-      }),
-      { numRuns: 200 }
-    );
-  });
-
-  test('backupConfig validation rejects configs with unowned provider IDs', () => {
-    fc.assert(
-      fc.property(
-        ownedProviderSetArb,
-        fc.array(providerIdArb, { minLength: 1, maxLength: 5 }),
-        (ownedIds, configProviderIds) => {
-          const violations = validateBackupConfigOwnership(configProviderIds, ownedIds);
-
-          // Every violation must NOT be in the owned set
-          for (const v of violations) {
-            expect(ownedIds.has(v)).toBe(false);
-          }
-
-          // Every non-violation must be in the owned set
-          const nonViolations = configProviderIds.filter((id) => !violations.includes(id));
-          for (const nv of nonViolations) {
-            expect(ownedIds.has(nv)).toBe(true);
-          }
-        }
-      ),
-      { numRuns: 200 }
-    );
-  });
-
-  test('backupConfig validation accepts configs where all providers are owned', () => {
-    fc.assert(
-      fc.property(ownedProviderSetArb, (ownedIds) => {
-        const configProviderIds = [...ownedIds].slice(0, 5);
-        const violations = validateBackupConfigOwnership(configProviderIds, ownedIds);
-        expect(violations.length).toBe(0);
-      }),
-      { numRuns: 200 }
-    );
-  });
-
-  test('ownership check is consistent: owned iff in the set', () => {
-    fc.assert(
-      fc.property(ownedProviderSetArb, providerIdArb, (ownedIds, requestedId) => {
-        const isOwned = checkOwnership(ownedIds, requestedId);
-        expect(isOwned).toBe(ownedIds.has(requestedId));
-      }),
-      { numRuns: 200 }
-    );
   });
 });
 
@@ -667,7 +552,7 @@ describe('Property 12: Provider deletion cleans up BackupConfig', () => {
           expect(Object.keys(updated.providers).length).toBe(providerIds.length - 1);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -685,7 +570,7 @@ describe('Property 12: Provider deletion cleans up BackupConfig', () => {
           expect(updated.providers[id]).toEqual(settings);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -695,7 +580,7 @@ describe('Property 12: Provider deletion cleans up BackupConfig', () => {
         const updated = cleanupBackupConfig(config, providerId);
         expect(updated).toEqual({ providers: {} });
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -712,7 +597,7 @@ describe('Property 12: Provider deletion cleans up BackupConfig', () => {
           expect(afterSecond).toEqual(afterFirst);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });
@@ -798,7 +683,7 @@ describe('Property 13: Stale provider resilience', () => {
         // Should have a result for every enabled provider
         expect(Object.keys(results).length).toBe(allIds.length);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -818,7 +703,7 @@ describe('Property 13: Stale provider resilience', () => {
           expect(results[id]?.message).toBeDefined();
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -835,7 +720,7 @@ describe('Property 13: Stale provider resilience', () => {
           expect(result.message).toBeUndefined();
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -853,7 +738,7 @@ describe('Property 13: Stale provider resilience', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });

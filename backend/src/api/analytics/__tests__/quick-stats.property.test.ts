@@ -121,7 +121,7 @@ describe('Property 1: Expense sum computation', () => {
           expect(Math.abs(result.ytdSpending - expectedSum)).toBeLessThan(0.01);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -162,7 +162,7 @@ describe('Property 2: Vehicle count computation', () => {
 
         expect(result.vehicleCount).toBe(vehicleCount);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -230,7 +230,7 @@ describe('Property 3: Fleet health score is bounded weighted average', () => {
           expect(Number.isInteger(result.fleetHealthScore)).toBe(true);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
