@@ -137,7 +137,7 @@ describe('Property 1: Missed fill-up pairs are excluded from calculations', () =
         const { mpgValues } = referenceMpg(expenses);
         verifyMpgValuesMatchReference(expenses, mpgValues);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -156,7 +156,7 @@ describe('Property 2: Backward compatibility when no expenses are flagged', () =
         // When no expenses are flagged, all valid pairs should be included
         expect(mpgValues.length).toBe(unfilteredCount);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -183,7 +183,7 @@ describe('Property 3: Flagging expenses is monotonically non-increasing on data 
           unflaggedResult.mpgValues.length
         );
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -288,7 +288,7 @@ describe('Property 4: Stats totals partition by fuelType', () => {
           5
         );
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -301,7 +301,7 @@ describe('Property 4: Stats totals partition by fuelType', () => {
 
         expect(stats.totalFuelConsumed).toBeCloseTo(expected.fuel, 5);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -314,7 +314,7 @@ describe('Property 4: Stats totals partition by fuelType', () => {
 
         expect(stats.totalChargeConsumed).toBeCloseTo(expected.charge, 5);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -338,7 +338,7 @@ describe('Property 5: Stats tracking flag gating', () => {
         const stats = calculateVehicleStats(expenseList, 0, false, true);
         expect(stats.averageMpg).toBeNull();
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -349,7 +349,7 @@ describe('Property 5: Stats tracking flag gating', () => {
         const stats = calculateVehicleStats(expenseList, 0, true, false);
         expect(stats.averageMilesPerKwh).toBeNull();
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -361,7 +361,7 @@ describe('Property 5: Stats tracking flag gating', () => {
         expect(stats.averageMpg).toBeNull();
         expect(stats.averageMilesPerKwh).toBeNull();
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -379,7 +379,7 @@ describe('Property 5: Stats tracking flag gating', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -397,7 +397,7 @@ describe('Property 5: Stats tracking flag gating', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

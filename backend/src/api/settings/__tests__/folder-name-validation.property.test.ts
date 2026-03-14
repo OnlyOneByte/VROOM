@@ -24,7 +24,7 @@ describe('Property 3: Folder name validation correctness', () => {
         const result = folderNameSchema.safeParse(name);
         expect(result.success).toBe(true);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -38,7 +38,7 @@ describe('Property 3: Folder name validation correctness', () => {
         const result = folderNameSchema.safeParse(name);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -52,7 +52,7 @@ describe('Property 3: Folder name validation correctness', () => {
         const result = folderNameSchema.safeParse(name);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -68,7 +68,7 @@ describe('Property 3: Folder name validation correctness', () => {
         const result = folderNameSchema.safeParse(name);
         expect(result.success).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });

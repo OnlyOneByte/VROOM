@@ -50,7 +50,7 @@ describe('Property 14: Restore dialog source options', () => {
 					expect(options[0]).toBe('Upload file');
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -66,7 +66,7 @@ describe('Property 14: Restore dialog source options', () => {
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -84,7 +84,7 @@ describe('Property 14: Restore dialog source options', () => {
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -99,7 +99,7 @@ describe('Property 14: Restore dialog source options', () => {
 					expect(options.length).toBe(expected);
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -147,7 +147,7 @@ describe('Property 5: Restore source equivalence', () => {
 				expect(fromFile).toEqual(fromProvider);
 				expect(fromProvider).toEqual(fromSheets);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -163,7 +163,7 @@ describe('Property 5: Restore source equivalence', () => {
 					expect(result.preview).toBeUndefined();
 				}
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });

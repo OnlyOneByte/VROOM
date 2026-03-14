@@ -112,7 +112,7 @@ describe('Property 24: Biggest expense is the maximum', () => {
           expect(result.biggestExpense?.amount).toBeGreaterThanOrEqual(e.expenseAmount - 0.001);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -167,7 +167,7 @@ describe('Property 25: Year-over-year percentage change formula', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

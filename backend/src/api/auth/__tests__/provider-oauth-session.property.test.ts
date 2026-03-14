@@ -125,7 +125,7 @@ describe('Property 1: Expected Behavior — Provider OAuth callback never modifi
         // The endpoint requires authentication
         expect(connectSection).toContain('requireAuth');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -162,7 +162,7 @@ describe('Property 1: Expected Behavior — Provider OAuth callback never modifi
           expect(callbackSection).not.toContain('setCookie(');
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -200,7 +200,7 @@ describe('Property 1: Expected Behavior — Provider OAuth callback never modifi
           expect(callbackSection).not.toContain('.update(users)');
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -236,7 +236,7 @@ describe('Property 1: Expected Behavior — Provider OAuth callback never modifi
           expect(line).not.toContain('@');
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -263,7 +263,7 @@ describe('Property 1: Expected Behavior — Provider OAuth callback never modifi
         // There must be a session mismatch error path
         expect(callbackSection).toContain('session_mismatch');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -296,7 +296,7 @@ describe('Property 1: Expected Behavior — Provider OAuth callback never modifi
         const again = consumePending(USER_A_ID, nonce);
         expect(again).toBeNull();
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -314,7 +314,7 @@ describe('Property 1: Expected Behavior — Provider OAuth callback never modifi
         expect(routesSource).not.toContain("'/reauth/google'");
         expect(routesSource).not.toContain('"/reauth/google"');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

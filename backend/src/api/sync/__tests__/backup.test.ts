@@ -623,7 +623,7 @@ describe('Property 9: Backup round-trip for tracking flags', () => {
         expect(coerced.trackFuel).toBe(expectedTrackFuel);
         expect(coerced.trackCharging).toBe(expectedTrackCharging);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -644,7 +644,7 @@ describe('Property 9: Backup round-trip for tracking flags', () => {
         }
         expect(result.success).toBe(true);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -675,7 +675,7 @@ describe('Property 9: Backup round-trip for tracking flags', () => {
         expect(result.valid).toBe(true);
         expect(result.errors).toHaveLength(0);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 

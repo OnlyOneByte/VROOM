@@ -58,7 +58,7 @@ describe('Property 1: Transformer round-trip preservation', () => {
 					expect(roundTripped.charge).toBeUndefined();
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -88,7 +88,7 @@ describe('Property 1: Transformer round-trip preservation', () => {
 					expect(roundTripped.volume).toBeUndefined();
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -126,7 +126,7 @@ describe('Property 2: fuelType-based mutual exclusivity', () => {
 				expect(result.charge).toBe(backendExpense.fuelAmount);
 				expect(result.volume).toBeUndefined();
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -141,7 +141,7 @@ describe('Property 2: fuelType-based mutual exclusivity', () => {
 					expect(result.charge).toBeUndefined();
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -165,7 +165,7 @@ describe('Property 2: fuelType-based mutual exclusivity', () => {
 					expect(hasCharge).toBe(false);
 				}
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });

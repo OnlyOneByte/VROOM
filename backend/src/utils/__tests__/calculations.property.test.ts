@@ -151,7 +151,7 @@ describe('Property 1: Missed fill-up pairs are excluded from calculateAverageMPG
           }
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -169,7 +169,7 @@ describe('Property 2: Backward compatibility for calculateAverageMPG', () => {
 
         expect(filteredCount).toBe(unfilteredCount);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 

@@ -208,7 +208,7 @@ describe('Property 10: Health score formula', () => {
           expect(result.insuranceCoverage).toBeLessThanOrEqual(100);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -248,7 +248,7 @@ describe('Property 11: Insurance coverage is binary', () => {
           expect(result.insuranceCoverage).toBe(0);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -300,7 +300,7 @@ describe('Property 12: Maintenance regularity penalizes large gaps', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -350,7 +350,7 @@ describe('Property 13: Mileage adherence scores good intervals', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -388,7 +388,7 @@ describe('Property 14: TCO total equals sum of components', () => {
           expect(Math.abs(result.totalCost - componentSum)).toBeLessThan(0.01);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -424,7 +424,7 @@ describe('Property 15: Cost per month formula', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

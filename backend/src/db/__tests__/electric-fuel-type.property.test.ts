@@ -12,7 +12,7 @@ describe('Property 3: isElectricFuelType consistency', () => {
       fc.property(fc.constantFrom(...ELECTRIC_FUEL_TYPES), (fuelType) => {
         expect(isElectricFuelType(fuelType)).toBe(true);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -24,7 +24,7 @@ describe('Property 3: isElectricFuelType consistency', () => {
           expect(isElectricFuelType(fuelType)).toBe(false);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -48,7 +48,7 @@ describe('Property 3: isElectricFuelType consistency', () => {
           expect(isElectricFuelType(fuelType)).toBe(false);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });

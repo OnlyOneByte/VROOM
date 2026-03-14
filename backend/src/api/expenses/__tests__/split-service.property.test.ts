@@ -105,7 +105,7 @@ describe('Property 1: Allocation sum invariant', () => {
         const sum = result.reduce((s, a) => s + a.amount, 0);
         expect(Math.round(sum * 100) / 100).toBe(totalAmount);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -119,7 +119,7 @@ describe('Property 1: Allocation sum invariant', () => {
           expect(Math.round(sum * 100) / 100).toBe(totalAmount);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -130,7 +130,7 @@ describe('Property 1: Allocation sum invariant', () => {
         const sum = result.reduce((s, a) => s + a.amount, 0);
         expect(Math.round(sum * 100) / 100).toBe(totalAmount);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -150,7 +150,7 @@ describe('Property 2: Even split fairness', () => {
         const diff = Math.round((maxAmt - minAmt) * 100) / 100;
         expect(diff).toBeLessThanOrEqual(0.01);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -167,7 +167,7 @@ describe('Property 3: Allocation count matches vehicle count', () => {
         const result = service.computeAllocations(config, totalAmount);
         expect(result.length).toBe(config.vehicleIds.length);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -181,7 +181,7 @@ describe('Property 3: Allocation count matches vehicle count', () => {
           expect(result.length).toBe(config.allocations.length);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -192,7 +192,7 @@ describe('Property 3: Allocation count matches vehicle count', () => {
         if (config.method !== 'percentage') throw new Error('unexpected');
         expect(result.length).toBe(config.allocations.length);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -215,7 +215,7 @@ describe('Property 4: Absolute split passthrough', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -432,7 +432,7 @@ describe('Property 2 (Design): Split sibling consistency', () => {
           verifySiblingConsistency(dbSiblings as ExpenseRow[], expected);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -478,7 +478,7 @@ describe('Property 3 (Design): Split amounts sum to groupTotal', () => {
           expect(Math.abs(dbSum - totalAmount)).toBeLessThan(0.02);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

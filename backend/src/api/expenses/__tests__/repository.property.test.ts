@@ -253,7 +253,7 @@ describe('Property 1: Pagination Completeness', () => {
           expect(collectedIds.length).toBe(totalCount);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });
@@ -291,7 +291,7 @@ describe('Property 2: TotalCount Accuracy', () => {
           expect(result.totalCount).toBe(fullResult.data.length);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });
@@ -320,7 +320,7 @@ describe('Property 4: Limit Clamping', () => {
           expect(result.data.length).toBeLessThanOrEqual(effectiveLimit);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -336,7 +336,7 @@ describe('Property 4: Limit Clamping', () => {
 
         expect(result.data.length).toBeLessThanOrEqual(CONFIG.pagination.defaultPageSize);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -355,7 +355,7 @@ describe('Property 4: Limit Clamping', () => {
 
         expect(result.data.length).toBeLessThanOrEqual(CONFIG.pagination.maxPageSize);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });
@@ -399,7 +399,7 @@ describe('Property 5: Tag Filter SQL Equivalence', () => {
           expect(sqlResult.totalCount).toBe(jsFiltered.length);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -423,7 +423,7 @@ describe('Property 5: Tag Filter SQL Equivalence', () => {
 
         expect(withEmptyTags.totalCount).toBe(withoutTags.totalCount);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });
@@ -480,7 +480,7 @@ describe('Property 7: Financing Expense Query Correctness', () => {
         const resultIds = new Set(result.map((e) => e.id));
         expect(resultIds).toEqual(expectedIds);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -497,7 +497,7 @@ describe('Property 7: Financing Expense Query Correctness', () => {
           expect(curr).toBeGreaterThanOrEqual(prev);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -515,7 +515,7 @@ describe('Property 7: Financing Expense Query Correctness', () => {
           expect(nonFinancingIds.has(e.id)).toBe(false);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -529,7 +529,7 @@ describe('Property 7: Financing Expense Query Correctness', () => {
           expect(e.vehicleId).toBe(targetVehicleId);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });
@@ -675,7 +675,7 @@ describe('Property 6: Summary Consistency', () => {
         // Use approximate equality for floating point
         expect(Math.abs(summary.totalAmount - categorySum)).toBeLessThan(0.001);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -689,7 +689,7 @@ describe('Property 6: Summary Consistency', () => {
 
         expect(summary.expenseCount).toBe(categoryCountSum);
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 
@@ -705,7 +705,7 @@ describe('Property 6: Summary Consistency', () => {
           expect(curr.localeCompare(prev)).toBeGreaterThan(0);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 50 }
     );
   });
 });

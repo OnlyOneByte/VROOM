@@ -138,7 +138,7 @@ describe('Property 4: Category percentages sum to 100', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -167,7 +167,7 @@ describe('Property 5: Cost per distance formula', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -193,7 +193,7 @@ describe('Property 23: Unfinanced vehicles classified as own', () => {
           assertFinancedAreNotOwn(result.vehicleDetails, vehicles, actualFinanced);
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

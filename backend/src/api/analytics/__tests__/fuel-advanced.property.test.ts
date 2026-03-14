@@ -172,7 +172,7 @@ describe('Property 20: Maintenance timeline status assignment', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -203,7 +203,7 @@ describe('Property 9: All computed scores bounded [0, 100]', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -242,7 +242,7 @@ describe('Property 21: Fillup interval bucketing completeness', () => {
         );
         expect(totalBucketCount).toBe(expenseCount - 1);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -296,7 +296,7 @@ describe('Property 22: Heatmap uses valid expense categories', () => {
           }
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

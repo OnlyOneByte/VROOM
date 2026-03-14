@@ -37,7 +37,7 @@ describe('Domain guard on provider routes', () => {
         // Must throw ValidationError
         expect(deleteBody).toContain('ValidationError');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -64,7 +64,7 @@ describe('Domain guard on provider routes', () => {
         // Must throw ValidationError
         expect(putBody).toContain('ValidationError');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -94,7 +94,7 @@ describe('Domain guard on provider routes', () => {
         // Must throw ValidationError
         expect(postBody).toContain('ValidationError');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

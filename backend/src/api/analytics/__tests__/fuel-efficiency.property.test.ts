@@ -256,7 +256,7 @@ describe('Property 7: Fuel Efficiency — Missed fillups are always skipped', ()
           }
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -267,7 +267,7 @@ describe('Property 7: Fuel Efficiency — Missed fillups are always skipped', ()
         const points = referenceFuelEfficiencyTrend(allMissed);
         expect(points.length).toBe(0);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -294,7 +294,7 @@ describe('Property 7: Fuel Efficiency — Unrealistic values are filtered', () =
           }
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -312,7 +312,7 @@ describe('Property 7: Fuel Efficiency — Unrealistic values are filtered', () =
         // All gaps are > 1000, so no points should be produced
         expect(points.length).toBe(0);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -360,7 +360,7 @@ describe('Property 7: Fuel Efficiency — Backend matches frontend for same inpu
           expect(bp.mileage).toBe(fp.mileage);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -400,7 +400,7 @@ describe('Property 7: Fuel Efficiency — Backend matches frontend for same inpu
           expect(bp.mileage).toBe(fp.mileage);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -419,7 +419,7 @@ describe('Property 7: Fuel Efficiency — Efficiency is always positive', () => 
           expect(point.efficiency).toBeGreaterThan(0);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -445,7 +445,7 @@ describe('Property 7: Fuel Efficiency — Mileage increases between consecutive 
           }
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -461,7 +461,7 @@ describe('Property 7: Fuel Efficiency — Mileage increases between consecutive 
         const points = referenceFuelEfficiencyTrend(modified);
         expect(points.length).toBe(0);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

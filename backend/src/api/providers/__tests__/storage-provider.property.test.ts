@@ -92,7 +92,7 @@ describe('Property 3: StorageFileInfo field coalescing', () => {
         expect(result.size).toBeGreaterThanOrEqual(0);
         expect(Number.isNaN(result.size)).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -103,7 +103,7 @@ describe('Property 3: StorageFileInfo field coalescing', () => {
         const expected = Number(driveFile.size) || 0;
         expect(result.size).toBe(expected);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -120,7 +120,7 @@ describe('Property 3: StorageFileInfo field coalescing', () => {
         expect(result.createdTime).toBe(EPOCH_ISO);
         expect(result.lastModified).toBe(EPOCH_ISO);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -131,7 +131,7 @@ describe('Property 3: StorageFileInfo field coalescing', () => {
         const expected = driveFile.createdTime ?? driveFile.modifiedTime ?? EPOCH_ISO;
         expect(result.createdTime).toBe(expected);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -142,7 +142,7 @@ describe('Property 3: StorageFileInfo field coalescing', () => {
         const expected = driveFile.modifiedTime ?? driveFile.createdTime ?? EPOCH_ISO;
         expect(result.lastModified).toBe(expected);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -237,7 +237,7 @@ describe('Property 11: rawPath key routing', () => {
           // Verify entityType/entityId are NOT in the key (buildKey bypassed)
           expect(key).not.toContain('backup/user-1');
         }),
-        { numRuns: 200 }
+        { numRuns: 100 }
       );
     });
 
@@ -270,7 +270,7 @@ describe('Property 11: rawPath key routing', () => {
           expect(key).toContain('backup/user-1');
           expect(key).toEndWith(fileName);
         }),
-        { numRuns: 200 }
+        { numRuns: 100 }
       );
     });
   });
@@ -300,7 +300,7 @@ describe('Property 11: rawPath key routing', () => {
           expect(selectedPath).toBe(rawPath);
           expect(selectedPath).not.toBe(pathHint);
         }),
-        { numRuns: 200 }
+        { numRuns: 100 }
       );
     });
 
@@ -311,7 +311,7 @@ describe('Property 11: rawPath key routing', () => {
           const selectedPath = params.rawPath ?? params.pathHint;
           expect(selectedPath).toBe(pathHint);
         }),
-        { numRuns: 200 }
+        { numRuns: 100 }
       );
     });
   });

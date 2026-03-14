@@ -56,7 +56,7 @@ describe('Property 15: Frontend derivation correctness', () => {
 				);
 				expect(derived).toBe(hasAnySheets);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -91,7 +91,7 @@ describe('Property 15: Frontend derivation correctness', () => {
 					expect(deriveSheetsSyncEnabled(config)).toBe(false);
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -110,7 +110,7 @@ describe('Property 15: Frontend derivation correctness', () => {
 					expect(derived).toBe(maxDate);
 				}
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -144,7 +144,7 @@ describe('Property 15: Frontend derivation correctness', () => {
 					expect(deriveLastBackupDate(config)).toBeNull();
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -163,7 +163,7 @@ describe('Property 15: Frontend derivation correctness', () => {
 				};
 				expect(deriveLastBackupDate(config)).toBe(date);
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });

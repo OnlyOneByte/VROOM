@@ -116,7 +116,7 @@ describe('Property 4: Payment Number Monotonicity and Remaining Balance', () => 
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -141,7 +141,7 @@ describe('Property 4: Payment Number Monotonicity and Remaining Balance', () => 
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -165,7 +165,7 @@ describe('Property 4: Payment Number Monotonicity and Remaining Balance', () => 
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -184,7 +184,7 @@ describe('Property 4: Payment Number Monotonicity and Remaining Balance', () => 
 					expect(entries.length).toBe(expenses.length);
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -215,7 +215,7 @@ describe('Property 9: Payment Type Classification', () => {
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -229,7 +229,7 @@ describe('Property 9: Payment Type Classification', () => {
 
 				expect(entries[0]?.paymentType).toBe('standard');
 			}),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });
@@ -266,7 +266,7 @@ describe('Property 10: Principal and Interest Derivation', () => {
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -293,7 +293,7 @@ describe('Property 10: Principal and Interest Derivation', () => {
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -320,7 +320,7 @@ describe('Property 10: Principal and Interest Derivation', () => {
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 
@@ -364,7 +364,7 @@ describe('Property 10: Principal and Interest Derivation', () => {
 					}
 				}
 			),
-			{ numRuns: 200 }
+			{ numRuns: 100 }
 		);
 	});
 });

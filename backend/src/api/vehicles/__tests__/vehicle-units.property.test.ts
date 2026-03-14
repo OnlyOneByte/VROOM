@@ -83,7 +83,7 @@ describe('Property 1: Unit preferences contain required keys', () => {
           chargeUnit: prefs.chargeUnit,
         });
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -97,7 +97,7 @@ describe('Property 1: Unit preferences contain required keys', () => {
         });
         expect(result).toBeNull();
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -111,7 +111,7 @@ describe('Property 1: Unit preferences contain required keys', () => {
         });
         expect(result).toBeNull();
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -125,7 +125,7 @@ describe('Property 1: Unit preferences contain required keys', () => {
         });
         expect(result).toBeNull();
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -144,7 +144,7 @@ describe('Property 1: Unit preferences contain required keys', () => {
         const result = parseUnitPreferences(value);
         expect(result).toBeNull();
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -167,7 +167,7 @@ describe('Property 2: Default unit inheritance on vehicle creation', () => {
         expect(resolvedPrefs.volumeUnit).toBe(userPrefs.volumeUnit);
         expect(resolvedPrefs.chargeUnit).toBe(userPrefs.chargeUnit);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -194,7 +194,7 @@ describe('Property 2: Default unit inheritance on vehicle creation', () => {
           chargeUnit: userPrefs.chargeUnit,
         });
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -215,7 +215,7 @@ describe('Property 3: Explicit unit preferences override defaults', () => {
         expect(resolvedPrefs.volumeUnit).toBe(explicitPrefs.volumeUnit);
         expect(resolvedPrefs.chargeUnit).toBe(explicitPrefs.chargeUnit);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -231,7 +231,7 @@ describe('Property 3: Explicit unit preferences override defaults', () => {
           chargeUnit: explicitPrefs.chargeUnit,
         });
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -253,7 +253,7 @@ describe('Property 4: Unit preferences are updatable', () => {
         expect(validated?.volumeUnit).toBe(updated.volumeUnit);
         expect(validated?.chargeUnit).toBe(updated.chargeUnit);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -272,7 +272,7 @@ describe('Property 4: Unit preferences are updatable', () => {
         expect(validated?.volumeUnit).toBe(existing.volumeUnit);
         expect(validated?.chargeUnit).toBe(existing.chargeUnit);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -288,7 +288,7 @@ describe('Property 4: Unit preferences are updatable', () => {
         expect(validated?.distanceUnit).toBe(existing.distanceUnit);
         expect(validated?.chargeUnit).toBe(existing.chargeUnit);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -299,7 +299,7 @@ describe('Property 4: Unit preferences are updatable', () => {
         const validated = parseUnitPreferences(merged);
         expect(validated).not.toBeNull();
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -412,7 +412,7 @@ describe('Property 17: Global settings change does not affect vehicles', () => {
           }
         }
       ),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

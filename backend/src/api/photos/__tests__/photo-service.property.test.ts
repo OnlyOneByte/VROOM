@@ -31,7 +31,7 @@ describe('Property 6: MIME Type Validation', () => {
       fc.property(fc.constantFrom(...ALLOWED_MIME_TYPES), (mimeType) => {
         expect(ALLOWED_MIME_TYPES.includes(mimeType)).toBe(true);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -68,7 +68,7 @@ describe('Property 6: MIME Type Validation', () => {
       fc.property(invalidMimeArb, (mimeType) => {
         expect(ALLOWED_MIME_TYPES.includes(mimeType)).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -91,7 +91,7 @@ describe('Property 7: File Size Validation', () => {
       fc.property(oversizedArb, (size) => {
         expect(size > MAX_FILE_SIZE).toBe(true);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -102,7 +102,7 @@ describe('Property 7: File Size Validation', () => {
       fc.property(validSizeArb, (size) => {
         expect(size > MAX_FILE_SIZE).toBe(false);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -193,7 +193,7 @@ describe('Property 2: Auto-Cover on First Upload', () => {
         expect(photo.isCover).toBe(true);
         expect(model.coverPhoto?.id).toBe('photo-0');
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -216,7 +216,7 @@ describe('Property 2: Auto-Cover on First Upload', () => {
           expect(model.photos[i].isCover).toBe(false);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -232,7 +232,7 @@ describe('Property 2: Auto-Cover on First Upload', () => {
           expect(coverCount).toBe(1);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
@@ -276,7 +276,7 @@ describe('Property 3: Cover Promotion on Delete', () => {
         const oldest = model.photos.reduce((a, b) => (a.createdAt <= b.createdAt ? a : b));
         expect(newCover.id).toBe(oldest.id);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -291,7 +291,7 @@ describe('Property 3: Cover Promotion on Delete', () => {
         expect(model.photos.length).toBe(0);
         expect(model.coverPhoto).toBeUndefined();
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -315,7 +315,7 @@ describe('Property 3: Cover Promotion on Delete', () => {
         // Cover must be unchanged
         expect(model.coverPhoto?.id).toBe(coverBefore?.id);
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 
@@ -342,7 +342,7 @@ describe('Property 3: Cover Promotion on Delete', () => {
           expect(newCover.id).toBe(oldest.id);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });

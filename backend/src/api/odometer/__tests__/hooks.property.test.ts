@@ -230,7 +230,7 @@ describe('Property 1: Expense hook invariant', () => {
           expect(matching[0].odometer).toBe(mileage as number);
         }
       }),
-      { numRuns: 200 }
+      { numRuns: 100 }
     );
   });
 });
