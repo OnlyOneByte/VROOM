@@ -7,28 +7,19 @@
 		policies: InsurancePolicy[];
 		vehicleNameMap?: Map<string, string>;
 		vehicles?: Vehicle[];
-		editTermId?: string | null;
-		editPolicyId?: string | null;
 		onEdit: (_policy: InsurancePolicy) => void;
 		onRefresh: () => Promise<void>;
 	}
 
-	let {
-		policies,
-		vehicleNameMap = new Map(),
-		vehicles = [],
-		editTermId = null,
-		editPolicyId = null,
-		onEdit,
-		onRefresh
-	}: Props = $props();
+	let { policies, vehicleNameMap = new Map(), vehicles = [], onEdit, onRefresh }: Props = $props();
 
 	let grouped = $derived(groupPoliciesByActive(policies));
 
 	function getVehicleNames(policy: InsurancePolicy): string[] {
-		return policy.vehicleIds
-			.map(id => vehicleNameMap.get(id))
-			.filter((name): name is string => !!name);
+		const ids = policy.vehicleIds ?? [
+			...new Set(policy.termVehicleCoverage?.map(tc => tc.vehicleId) ?? [])
+		];
+		return ids.map(id => vehicleNameMap.get(id)).filter((name): name is string => !!name);
 	}
 </script>
 
@@ -41,7 +32,6 @@
 					{policy}
 					vehicleNames={getVehicleNames(policy)}
 					{vehicles}
-					autoEditTermId={editPolicyId === policy.id ? editTermId : null}
 					{onEdit}
 					{onRefresh}
 				/>
@@ -57,7 +47,6 @@
 					{policy}
 					vehicleNames={getVehicleNames(policy)}
 					{vehicles}
-					autoEditTermId={editPolicyId === policy.id ? editTermId : null}
 					{onEdit}
 					{onRefresh}
 				/>

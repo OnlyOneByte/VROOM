@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { paramRoutes } from '$lib/routes';
 	import InsuranceTermCard from './PolicyTermCard.svelte';
-	import TermForm from './form/TermForm.svelte';
 	import { sortTermsByEndDateDesc } from '$lib/utils/insurance';
 	import type { InsuranceTerm, Vehicle, TermCoverageRow } from '$lib/types';
 
@@ -9,7 +11,7 @@
 		policyId: string;
 		vehicles?: Vehicle[];
 		termVehicleCoverage?: TermCoverageRow[];
-		onRefresh: () => Promise<void>;
+		onRefresh?: () => Promise<void>;
 		onDeleteTerm?: (_term: InsuranceTerm) => void;
 	}
 
@@ -18,24 +20,14 @@
 		policyId,
 		vehicles = [],
 		termVehicleCoverage = [],
-		onRefresh,
+		onRefresh: _onRefresh,
 		onDeleteTerm
 	}: Props = $props();
 
 	let sortedTerms = $derived(sortTermsByEndDateDesc(terms));
 
-	let showTermForm = $state(false);
-	let editingTerm = $state<InsuranceTerm | null>(null);
-
 	function handleEdit(term: InsuranceTerm) {
-		editingTerm = term;
-		showTermForm = true;
-	}
-
-	async function handleTermSuccess() {
-		showTermForm = false;
-		editingTerm = null;
-		await onRefresh();
+		goto(resolve(paramRoutes.insuranceTermEdit, { id: policyId, termId: term.id }));
 	}
 
 	function getTermVehicleNames(termId: string): string[] {
@@ -68,13 +60,3 @@
 		</div>
 	{/if}
 </div>
-
-<TermForm
-	bind:open={showTermForm}
-	{policyId}
-	term={editingTerm}
-	previousTerm={null}
-	{vehicles}
-	{termVehicleCoverage}
-	onSuccess={handleTermSuccess}
-/>

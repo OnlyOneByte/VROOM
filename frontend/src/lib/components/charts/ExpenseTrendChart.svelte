@@ -6,7 +6,7 @@
 	import {
 		formatCurrencyAxis,
 		CHART_PADDING,
-		TREND_LINE_PROPS,
+		getTrendLineProps,
 		monthlyXAxisProps
 	} from '$lib/utils/chart-formatters';
 	import type { Snippet } from 'svelte';
@@ -64,7 +64,7 @@
 			{series}
 			padding={CHART_PADDING}
 			props={{
-				...TREND_LINE_PROPS,
+				...getTrendLineProps(data.length),
 				xAxis: monthlyXAxisProps(data.length),
 				yAxis: { format: formatCurrencyAxis }
 			}}

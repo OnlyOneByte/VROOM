@@ -11,6 +11,7 @@ import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../.
 import { commonSchemas } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
+import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
 import { preferencesRepository } from '../settings/repository';
 import { photoRoutes } from './photo-routes';
@@ -116,10 +117,28 @@ routes.get('/', async (c) => {
 
   const userVehicles = await vehicleRepository.findByUserId(user.id);
 
-  const response: ApiResponse<typeof userVehicles> = {
+  // Enrich financing with computed balance
+  const enrichedVehicles = await Promise.all(
+    userVehicles.map(async (v) => {
+      if (v.financing) {
+        const computedBalance = await financingRepository.computeBalance(v.financing.id);
+        return {
+          ...v,
+          financing: {
+            ...v.financing,
+            computedBalance,
+            eligibleForPayoff: computedBalance <= 0.01,
+          },
+        };
+      }
+      return v;
+    })
+  );
+
+  const response: ApiResponse<typeof enrichedVehicles> = {
     success: true,
-    data: userVehicles,
-    message: `Found ${userVehicles.length} vehicle${userVehicles.length !== 1 ? 's' : ''}`,
+    data: enrichedVehicles,
+    message: `Found ${enrichedVehicles.length} vehicle${enrichedVehicles.length !== 1 ? 's' : ''}`,
   };
 
   return c.json(response);
@@ -171,9 +190,28 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     throw new NotFoundError('Vehicle');
   }
 
-  const response: ApiResponse<typeof vehicle> = {
+  // Enrich financing with computed balance so the frontend can show progress
+  let responseData: typeof vehicle & {
+    financing?: (typeof vehicle)['financing'] & {
+      computedBalance?: number;
+      eligibleForPayoff?: boolean;
+    };
+  } = vehicle;
+  if (vehicle.financing) {
+    const computedBalance = await financingRepository.computeBalance(vehicle.financing.id);
+    responseData = {
+      ...vehicle,
+      financing: {
+        ...vehicle.financing,
+        computedBalance,
+        eligibleForPayoff: computedBalance <= 0.01,
+      },
+    };
+  }
+
+  const response: ApiResponse<typeof responseData> = {
     success: true,
-    data: vehicle,
+    data: responseData,
   };
 
   return c.json(response);

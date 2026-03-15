@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { browser } from '$app/environment';
 	import { CircleAlert, Upload, Camera } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -58,16 +59,21 @@
 	let cameraTabRef = $state<ReturnType<typeof CameraTab> | null>(null);
 
 	// --- Reset on open/close ---
+	let previousOpen = $state(false);
 	$effect(() => {
-		if (open) {
+		const isOpen = open;
+		if (isOpen && !previousOpen) {
 			activeTab = 'upload';
 			uploading = false;
 			uploadIndex = 0;
 			uploadTotal = 0;
 			uploadErrors = [];
-			uploadTabRef?.reset();
-			cameraTabRef?.reset();
+			untrack(() => {
+				uploadTabRef?.reset();
+				cameraTabRef?.reset();
+			});
 		}
+		previousOpen = isOpen;
 	});
 
 	// --- Upload loop (orchestrated by parent) ---

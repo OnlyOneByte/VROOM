@@ -96,6 +96,21 @@ export const TREND_LINE_PROPS = {
 	}
 } as const;
 
+/**
+ * Build line chart props that handle single-data-point visibility.
+ * When there's only one point, renders a larger filled dot so the value
+ * is visible without hovering. For 2+ points, uses standard trend props.
+ */
+export function getTrendLineProps(dataLength: number) {
+	if (dataLength <= 1) {
+		return {
+			spline: { curve: SMOOTH_CURVE },
+			points: { r: 6, class: 'fill-primary stroke-primary stroke-2' }
+		};
+	}
+	return TREND_LINE_PROPS;
+}
+
 /** Parse a "YYYY-MM" month string into a Date (1st of that month). */
 export function parseMonthToDate(month: string): Date {
 	const parts = month.split('-');

@@ -12,7 +12,6 @@ import type { PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { expenseSplitService } from './split-service';
 import type { SplitConfig } from './validation';
-
 export interface ExpenseFilters {
   vehicleId?: string;
   userId?: string;
@@ -350,6 +349,40 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         error: error instanceof Error ? error.message : String(error),
       });
       throw new DatabaseError('Failed to get expense summary', error);
+    }
+  }
+
+  /**
+   * Delete all expenses linked to an insurance term.
+   * Used when a term is updated to replace old auto-created expenses.
+   */
+  async deleteByInsuranceTermId(termId: string, userId: string): Promise<number> {
+    try {
+      const linked = await this.db
+        .select({ id: expenses.id })
+        .from(expenses)
+        .where(and(eq(expenses.insuranceTermId, termId), eq(expenses.userId, userId)));
+
+      if (linked.length === 0) return 0;
+
+      const linkedIds = linked.map((e) => e.id);
+
+      await this.db.transaction(async (tx) => {
+        await tx
+          .delete(photos)
+          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, linkedIds)));
+        await tx
+          .delete(expenses)
+          .where(and(eq(expenses.insuranceTermId, termId), eq(expenses.userId, userId)));
+      });
+
+      return linked.length;
+    } catch (error) {
+      logger.error('Failed to delete expenses by insurance term', {
+        termId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to delete expenses by insurance term', error);
     }
   }
 

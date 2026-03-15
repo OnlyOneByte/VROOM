@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import { routes, paramRoutes } from '$lib/routes';
 	import { onMount } from 'svelte';
 	import { Shield, Plus, CircleAlert } from '@lucide/svelte';
@@ -22,32 +21,11 @@
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
-	// Deep-link query params for auto-opening a term edit (captured once, cleared after use)
-	let editTermId = $state<string | null>(null);
-	let editPolicyId = $state<string | null>(null);
-
 	// Build a map of vehicleId → display name for showing on policy cards
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
 	onMount(async () => {
-		// Capture deep-link params before loading
-		editTermId = page.url.searchParams.get('editTerm');
-		editPolicyId = page.url.searchParams.get('policy');
-		// Clear URL params immediately using page.url (already available from $app/state)
-		if (editTermId || editPolicyId) {
-			const url = new URL(page.url);
-			url.searchParams.delete('editTerm');
-			url.searchParams.delete('policy');
-			history.replaceState(history.state, '', url.pathname);
-		}
 		await loadData();
-		// Clear deep-link params after a tick so PolicyCard has time to read them
-		if (editTermId || editPolicyId) {
-			setTimeout(() => {
-				editTermId = null;
-				editPolicyId = null;
-			}, 100);
-		}
 	});
 
 	async function loadData() {
@@ -142,8 +120,6 @@
 				{policies}
 				{vehicleNameMap}
 				{vehicles}
-				{editTermId}
-				{editPolicyId}
 				onEdit={handleEditPolicy}
 				onRefresh={loadData}
 			/>

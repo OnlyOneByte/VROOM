@@ -137,8 +137,11 @@
 - [X] Fix issue where google sheets is creating a vroom/backup folder
   - [X] Creating Vroom/Backup with backups, maintanence records, receipts, vehicles folders. SHould not need these.
   - Photos going to root and not respecting provider root
-- [ ] Backend model revamp to be more performant
+- [x] Backend model revamp to be more performant
 - [ ] Backup versioning
+- [ ] Expense splitting to move inline
+  - [ ] cost splitting to happen after cost is entered
+  - [ ] odometer entry hidden (or per vehicle)
 
 ## Long Term Considerations
 - [ ] Receipt / invoice photo-based auto-fill (OCR → expense fields)
