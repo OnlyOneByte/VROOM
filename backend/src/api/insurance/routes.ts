@@ -40,11 +40,11 @@ routes.get('/', async (c) => {
 
 // GET /api/v1/insurance/expiring-soon — expiring policies
 routes.get('/expiring-soon', async (c) => {
-  const _user = c.get('user');
+  const user = c.get('user');
   const daysAhead = Number.parseInt(c.req.query('days') || '30', 10);
   const now = new Date();
   const endDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
-  const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate);
+  const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate, user.id);
   return c.json({ success: true, data: terms, count: terms.length, daysAhead });
 });
 
@@ -140,26 +140,17 @@ routes.post(
 
     // Auto-create split expenses if the new term has a totalCost
     if (termData.totalCost && termData.totalCost > 0) {
-      // Find the newly added term (latest by createdAt)
-      const newTerm = policy.terms.find(
-        (t) =>
-          t.policyNumber === (termData.policyNumber ?? null) &&
-          t.totalCost === termData.totalCost &&
-          t.startDate.getTime() === termData.startDate.getTime()
-      );
-      if (newTerm) {
-        const termVehicleIds = policy.termVehicleCoverage
-          .filter((tc) => tc.termId === newTerm.id)
-          .map((tc) => tc.vehicleId);
-        await createTermExpenses({
-          termId: newTerm.id,
-          vehicleIds: termVehicleIds,
-          totalCost: termData.totalCost,
-          startDate: termData.startDate,
-          policyNumber: termData.policyNumber,
-          userId: user.id,
-        });
-      }
+      const termVehicleIds = policy.termVehicleCoverage
+        .filter((tc) => tc.termId === policy.newTermId)
+        .map((tc) => tc.vehicleId);
+      await createTermExpenses({
+        termId: policy.newTermId,
+        vehicleIds: termVehicleIds,
+        totalCost: termData.totalCost,
+        startDate: termData.startDate,
+        policyNumber: termData.policyNumber,
+        userId: user.id,
+      });
     }
 
     return c.json({ success: true, data: policy, message: 'Term added successfully' }, 201);

@@ -367,7 +367,7 @@ export class InsurancePolicyRepository {
     policyId: string,
     term: CreateTermInput,
     userId: string
-  ): Promise<InsurancePolicyWithVehicles> {
+  ): Promise<InsurancePolicyWithVehicles & { newTermId: string }> {
     try {
       return await this.db.transaction(async (tx) => {
         const existing = await tx
@@ -445,6 +445,7 @@ export class InsurancePolicyRepository {
           terms,
           termVehicleCoverage,
           vehicleIds: [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))],
+          newTermId: termId,
         };
       });
     } catch (error) {
@@ -676,13 +677,24 @@ export class InsurancePolicyRepository {
   /**
    * Find terms expiring within a date range.
    */
-  async findExpiringTerms(startDate: Date, endDate: Date): Promise<InsuranceTerm[]> {
+  async findExpiringTerms(
+    startDate: Date,
+    endDate: Date,
+    userId: string
+  ): Promise<InsuranceTerm[]> {
     try {
       return await this.db
-        .select()
+        .select({ term: insuranceTerms })
         .from(insuranceTerms)
-        .where(between(insuranceTerms.endDate, startDate, endDate))
-        .orderBy(insuranceTerms.endDate);
+        .innerJoin(insurancePolicies, eq(insuranceTerms.policyId, insurancePolicies.id))
+        .where(
+          and(
+            between(insuranceTerms.endDate, startDate, endDate),
+            eq(insurancePolicies.userId, userId)
+          )
+        )
+        .orderBy(insuranceTerms.endDate)
+        .then((rows) => rows.map((r) => r.term));
     } catch (error) {
       logger.error('Error finding expiring insurance terms', { error });
       throw new DatabaseError('Failed to find expiring insurance terms', error);

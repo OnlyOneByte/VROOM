@@ -34,7 +34,7 @@
 	import TagInput from './TagInput.svelte';
 	import ExpensePhotoSection from './ExpensePhotoSection.svelte';
 	import PendingPhotoPreview from './PendingPhotoPreview.svelte';
-	import SplitCostSheet from '../split/SplitCostSheet.svelte';
+	import SplitConfigEditor from '../split/SplitConfigEditor.svelte';
 	import { validateExpenseField } from './expense-form-validation';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
@@ -114,7 +114,10 @@
 	// Group edit mode — when editing a child expense, we load the parent group
 	let isGroupEditMode = $state(false);
 	let groupId = $state<string | null>(null);
-	let showSplitSheet = $state(false);
+
+	// Per-vehicle mileage for split mode
+	let showPerVehicleMileage = $state(false);
+	let splitMileages = $state<Record<string, string>>({});
 
 	// Insurance-managed mode — read-only, links to policy page
 	let isInsuranceManaged = $state(false);
@@ -125,14 +128,6 @@
 	let pendingFiles = $state<File[]>([]);
 
 	let parsedTotalAmount = $derived(parseFloat(formData.amount) || 0);
-
-	// Split summary for compact display
-	let splitSummaryText = $derived.by(() => {
-		if (!isSplit || selectedVehicleIds.length < 2) return '';
-		const methodLabel =
-			splitMethod === 'even' ? 'Even' : splitMethod === 'absolute' ? 'Fixed' : 'Percentage';
-		return `${methodLabel} split across ${selectedVehicleIds.length} vehicles`;
-	});
 
 	// Get user settings for units
 	let settings = $derived(settingsStore.settings);
@@ -888,32 +883,29 @@
 				}}
 				class="rounded-lg border bg-card p-6 space-y-6"
 			>
-				<!-- Vehicle Selection / Split Summary -->
-				{#if isSplit && selectedVehicleIds.length >= 2}
-					<!-- Split configured: show tappable summary instead of vehicle dropdown -->
+				<!-- Vehicle Selection -->
+				{#if isSplit}
+					<!-- Split mode: multi-select checkboxes -->
 					<div class="space-y-2">
-						<Label>Vehicle *</Label>
-						<button
-							type="button"
-							onclick={() => (showSplitSheet = true)}
-							class="flex w-full items-center justify-between rounded-lg border border-border bg-muted/50 px-4 py-3 text-left transition-colors hover:bg-muted"
-						>
-							<div class="flex items-center gap-2 min-w-0">
-								<GitBranch class="h-4 w-4 shrink-0 text-muted-foreground" />
-								<div class="min-w-0">
-									<p class="text-sm font-medium text-foreground">{splitSummaryText}</p>
-									<p class="truncate text-xs text-muted-foreground">
-										{selectedVehicleIds
-											.map(id => {
-												const v = vehicles.find(veh => veh.id === id);
-												return v ? getVehicleDisplayName(v) : id;
-											})
-											.join(', ')}
-									</p>
-								</div>
-							</div>
-							<span class="shrink-0 text-xs text-muted-foreground">Edit</span>
-						</button>
+						<Label>Vehicles *</Label>
+						<div class="rounded-md border border-input p-3 space-y-2">
+							{#each vehicles as v (v.id)}
+								<label class="flex items-center gap-2 cursor-pointer">
+									<Checkbox
+										checked={selectedVehicleIds.includes(v.id)}
+										onCheckedChange={() => {
+											if (selectedVehicleIds.includes(v.id)) {
+												selectedVehicleIds = selectedVehicleIds.filter(id => id !== v.id);
+											} else {
+												selectedVehicleIds = [...selectedVehicleIds, v.id];
+											}
+											resetAllocationsForMethod(splitMethod);
+										}}
+									/>
+									<span class="text-sm text-foreground">{getVehicleDisplayName(v)}</span>
+								</label>
+							{/each}
+						</div>
 						{#if !isEditMode}
 							<button
 								type="button"
@@ -981,12 +973,7 @@
 									variant="outline"
 									size="icon"
 									class="shrink-0"
-									onclick={() => {
-										if (!isSplit) {
-											handleSplitToggle(true);
-										}
-										showSplitSheet = true;
-									}}
+									onclick={() => handleSplitToggle(true)}
 									aria-label="Split cost across vehicles"
 								>
 									<GitBranch class="h-4 w-4" />
@@ -1057,40 +1044,106 @@
 					{/if}
 				</div>
 
-				<!-- Mileage (always visible, required for fuel) -->
-				<div class="space-y-2">
-					<Label for="mileage">
-						Current Mileage {showFuelFields ? '*' : '(Optional)'}
-					</Label>
-					<div class="relative">
-						<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-							<Gauge class="h-5 w-5 text-muted-foreground" />
+				<!-- Inline Split Breakdown (shown when split is active and amount > 0) -->
+				{#if isSplit && selectedVehicleIds.length >= 2 && parsedTotalAmount > 0}
+					<div class="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+						<div class="flex items-center gap-2">
+							<GitBranch class="h-4 w-4 text-muted-foreground" />
+							<span class="text-sm font-medium text-foreground">Split Breakdown</span>
 						</div>
-						<Input
-							id="mileage"
-							type="number"
-							min="0"
-							bind:value={formData.mileage}
-							placeholder="123456"
-							class="pl-10"
-							oninput={handleMileageChange}
-							onblur={() => handleBlur('mileage')}
-							aria-invalid={!!(touched['mileage'] && errors['mileage'])}
-							aria-describedby={touched['mileage'] && errors['mileage']
-								? 'mileage-error'
-								: undefined}
+						<SplitConfigEditor
+							vehicles={vehicles.filter(v => selectedVehicleIds.includes(v.id))}
+							totalAmount={parsedTotalAmount}
+							{splitMethod}
+							allocations={splitAllocations}
+							onMethodChange={handleMethodChange}
+							onAllocationsChange={handleAllocationsChange}
 						/>
 					</div>
-					{#if lastFuelExpense?.mileage && formData.tags.includes('fuel')}
-						<p class="text-xs text-muted-foreground">
-							Previous fuel entry: {lastFuelExpense.mileage.toLocaleString()}
-							{distLabel.toLowerCase()}
-						</p>
-					{/if}
-					{#if touched['mileage'] && errors['mileage']}
-						<FormFieldError id="mileage-error">{errors['mileage']}</FormFieldError>
-					{/if}
-				</div>
+				{/if}
+
+				<!-- Mileage: single field or per-vehicle collapsible -->
+				{#if isSplit && selectedVehicleIds.length >= 2}
+					<!-- Per-vehicle mileage (collapsible) -->
+					<div class="space-y-2">
+						<button
+							type="button"
+							onclick={() => (showPerVehicleMileage = !showPerVehicleMileage)}
+							class="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+						>
+							<span class="text-xs">{showPerVehicleMileage ? '▾' : '▸'}</span>
+							Add mileage readings (optional)
+						</button>
+						{#if showPerVehicleMileage}
+							<div class="rounded-md border border-input p-3 space-y-3">
+								{#each selectedVehicleIds as vid (vid)}
+									{@const v = vehicles.find(veh => veh.id === vid)}
+									{#if v}
+										<div class="space-y-1">
+											<Label for="mileage-{vid}" class="text-xs">{getVehicleDisplayName(v)}</Label>
+											<div class="relative">
+												<div
+													class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
+												>
+													<Gauge class="h-4 w-4 text-muted-foreground" />
+												</div>
+												<Input
+													id="mileage-{vid}"
+													type="number"
+													min="0"
+													value={splitMileages[vid] ?? ''}
+													oninput={e => {
+														const target = e.currentTarget;
+														if (target instanceof HTMLInputElement) {
+															splitMileages[vid] = target.value;
+														}
+													}}
+													placeholder="Current mileage"
+													class="pl-10 h-9 text-sm"
+												/>
+											</div>
+										</div>
+									{/if}
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{:else}
+					<!-- Single vehicle mileage -->
+					<div class="space-y-2">
+						<Label for="mileage">
+							Current Mileage {showFuelFields ? '*' : '(Optional)'}
+						</Label>
+						<div class="relative">
+							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+								<Gauge class="h-5 w-5 text-muted-foreground" />
+							</div>
+							<Input
+								id="mileage"
+								type="number"
+								min="0"
+								bind:value={formData.mileage}
+								placeholder="123456"
+								class="pl-10"
+								oninput={handleMileageChange}
+								onblur={() => handleBlur('mileage')}
+								aria-invalid={!!(touched['mileage'] && errors['mileage'])}
+								aria-describedby={touched['mileage'] && errors['mileage']
+									? 'mileage-error'
+									: undefined}
+							/>
+						</div>
+						{#if lastFuelExpense?.mileage && formData.tags.includes('fuel')}
+							<p class="text-xs text-muted-foreground">
+								Previous fuel entry: {lastFuelExpense.mileage.toLocaleString()}
+								{distLabel.toLowerCase()}
+							</p>
+						{/if}
+						{#if touched['mileage'] && errors['mileage']}
+							<FormFieldError id="mileage-error">{errors['mileage']}</FormFieldError>
+						{/if}
+					</div>
+				{/if}
 
 				<!-- Fuel-specific fields -->
 				{#if showFuelFields && vehicle}
@@ -1192,23 +1245,6 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- Split Cost Sheet -->
-		<SplitCostSheet
-			bind:open={showSplitSheet}
-			{vehicles}
-			{selectedVehicleIds}
-			{splitMethod}
-			allocations={splitAllocations}
-			totalAmount={parsedTotalAmount}
-			onVehicleIdsChange={ids => {
-				selectedVehicleIds = ids;
-				resetAllocationsForMethod(splitMethod);
-			}}
-			onMethodChange={handleMethodChange}
-			onAllocationsChange={handleAllocationsChange}
-			onClose={() => (showSplitSheet = false)}
-		/>
 	{/if}
 
 	<!-- Delete Confirmation AlertDialog (outside if/else so it works in all modes) -->

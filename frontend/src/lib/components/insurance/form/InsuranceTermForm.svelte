@@ -1,8 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { routes } from '$lib/routes';
 	import { gotoDynamic } from '$lib/utils/navigation';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { ArrowLeft, Check, LoaderCircle, X, FileText } from '@lucide/svelte';
@@ -246,7 +243,7 @@
 				});
 				appStore.showSuccess(renewFrom ? 'Term renewed successfully' : 'Term added successfully');
 			}
-			goto(resolve(routes.insurance));
+			gotoDynamic(returnTo);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Unknown error';
 			appStore.showError(`Failed to ${isEditMode ? 'update' : 'add'} term: ${message}`);
@@ -375,7 +372,7 @@
 								<Select.Root
 									type="single"
 									value={premiumFrequency}
-									onValueChange={(v) => {
+									onValueChange={v => {
 										premiumFrequency = v ?? '';
 									}}
 								>
@@ -534,7 +531,7 @@
 						size="lg"
 						onclick={handleSubmit}
 						disabled={isSubmitting}
-						class="rounded-full group shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 px-6 flex-1 sm:flex-initial"
+						class="rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 h-14 px-6 flex-1 sm:flex-initial"
 					>
 						{#if isSubmitting}
 							<LoaderCircle class="h-5 w-5 animate-spin mr-2" />
