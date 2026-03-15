@@ -340,7 +340,10 @@
 			// Skip if this is the initial load (onMount handles it)
 			if (vehicle !== null || !isLoading) {
 				// Reset financing flag when switching vehicles (new vehicle may not have financing)
-				formData.isFinancingPayment = false;
+				// But don't reset during edit mode initial load — loadExpense sets the correct value
+				if (!isEditMode || vehicle !== null) {
+					formData.isFinancingPayment = false;
+				}
 				loadVehicle();
 				loadLastFuelExpense();
 				loadAllVehicleExpenses();

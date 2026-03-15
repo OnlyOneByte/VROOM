@@ -14,6 +14,7 @@
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import * as Select from '$lib/components/ui/select';
 	import { FormFieldError } from '$lib/components/ui/form-field';
+	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import {
 		Card,
 		CardContent,
@@ -73,6 +74,8 @@
 	let agentEmail = $state('');
 	let totalCost = $state('');
 	let premiumFrequency = $state('');
+	let monthlyCost = $state('');
+	let paymentAmount = $state('');
 
 	// Validation
 	interface FormErrors {
@@ -183,7 +186,9 @@
 				if (agentPhone.trim()) termData['agentPhone'] = agentPhone.trim();
 				if (agentEmail.trim()) termData['agentEmail'] = agentEmail.trim();
 				if (totalCost) termData['totalCost'] = Number(totalCost);
+				if (monthlyCost) termData['monthlyCost'] = Number(monthlyCost);
 				if (premiumFrequency) termData['premiumFrequency'] = premiumFrequency;
+				if (paymentAmount) termData['paymentAmount'] = Number(paymentAmount);
 
 				await insuranceApi.createPolicy({
 					company: company.trim(),
@@ -325,13 +330,11 @@
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 								<div class="space-y-2">
 									<Label for="start-date">Start Date *</Label>
-									<Input
+									<DatePicker
 										id="start-date"
-										type="date"
 										bind:value={startDate}
-										aria-invalid={!!errors.startDate}
-										aria-describedby={errors.startDate ? 'start-date-error' : undefined}
-										required
+										class={errors.startDate ? 'border-destructive' : ''}
+										placeholder="Pick start date"
 									/>
 									{#if errors.startDate}
 										<FormFieldError id="start-date-error">{errors.startDate}</FormFieldError>
@@ -339,13 +342,11 @@
 								</div>
 								<div class="space-y-2">
 									<Label for="end-date">End Date *</Label>
-									<Input
+									<DatePicker
 										id="end-date"
-										type="date"
 										bind:value={endDate}
-										aria-invalid={!!errors.endDate}
-										aria-describedby={errors.endDate ? 'end-date-error' : undefined}
-										required
+										class={errors.endDate ? 'border-destructive' : ''}
+										placeholder="Pick end date"
 									/>
 									{#if errors.endDate}
 										<FormFieldError id="end-date-error">{errors.endDate}</FormFieldError>
@@ -472,6 +473,29 @@
 										{#if errors.totalCost}
 											<FormFieldError id="total-cost-error">{errors.totalCost}</FormFieldError>
 										{/if}
+									</div>
+									<div class="space-y-2">
+										<Label for="monthly-cost">Monthly Cost ($)</Label>
+										<Input
+											id="monthly-cost"
+											type="number"
+											step="0.01"
+											min="0"
+											bind:value={monthlyCost}
+										/>
+									</div>
+								</div>
+
+								<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+									<div class="space-y-2">
+										<Label for="payment-amount">Payment Amount ($)</Label>
+										<Input
+											id="payment-amount"
+											type="number"
+											step="0.01"
+											min="0"
+											bind:value={paymentAmount}
+										/>
 									</div>
 									<div class="space-y-2">
 										<Label for="premium-frequency">Premium Frequency</Label>

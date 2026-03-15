@@ -1,4 +1,8 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { paramRoutes } from '$lib/routes';
+	import { gotoDynamic } from '$lib/utils/navigation';
 	import { ChevronDown, ChevronUp, Building2, Settings } from '@lucide/svelte';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
@@ -6,7 +10,6 @@
 	import InsuranceTermCard from './PolicyTermCard.svelte';
 	import ExpirationAlert from './ExpirationAlert.svelte';
 	import TermHistory from './TermHistory.svelte';
-	import TermForm from './form/TermForm.svelte';
 	import DocumentViewer from './DocumentViewer.svelte';
 	import { getLatestTerm } from '$lib/utils/insurance';
 	import { insuranceApi } from '$lib/services/insurance-api';
@@ -17,61 +20,25 @@
 		policy: InsurancePolicy;
 		vehicleNames?: string[];
 		vehicles?: Vehicle[];
-		autoEditTermId?: string | null;
 		onEdit: (_policy: InsurancePolicy) => void;
 		onDelete?: (_policyId: string) => void;
 		onRefresh: () => Promise<void>;
 	}
 
-	let {
-		policy,
-		vehicleNames = [],
-		vehicles = [],
-		autoEditTermId = null,
-		onEdit,
-		onRefresh
-	}: Props = $props();
+	let { policy, vehicleNames = [], vehicles = [], onEdit, onRefresh }: Props = $props();
 
 	let expanded = $state(false);
 	let latestTerm = $derived(getLatestTerm(policy.terms));
 	let pastTerms = $derived(policy.terms.filter(t => t.id !== latestTerm?.id));
 
-	let showTermForm = $state(false);
-	let editingTerm = $state<import('$lib/types').InsuranceTerm | null>(null);
-	let renewFromTerm = $state<import('$lib/types').InsuranceTerm | null>(null);
-	let autoEditHandled = $state(false);
-
-	// Auto-open term edit when deep-linked from an expense
-	$effect(() => {
-		if (autoEditTermId && !autoEditHandled) {
-			autoEditHandled = true;
-			const term = policy.terms.find(t => t.id === autoEditTermId);
-			if (term) {
-				expanded = true;
-				editingTerm = term;
-				renewFromTerm = null;
-				showTermForm = true;
-			}
-		}
-	});
-
 	function handleEditTerm(term: import('$lib/types').InsuranceTerm) {
-		editingTerm = term;
-		renewFromTerm = null;
-		showTermForm = true;
+		goto(resolve(paramRoutes.insuranceTermEdit, { id: policy.id, termId: term.id }));
 	}
 
 	function handleRenew() {
-		editingTerm = null;
-		renewFromTerm = latestTerm ?? null;
-		showTermForm = true;
-	}
-
-	async function handleTermSuccess() {
-		showTermForm = false;
-		editingTerm = null;
-		renewFromTerm = null;
-		await onRefresh();
+		if (!latestTerm) return;
+		const base = resolve(paramRoutes.insuranceTermNew, { id: policy.id });
+		gotoDynamic(`${base}?renewFrom=${latestTerm.id}`);
 	}
 
 	async function handleDeleteTerm(term: import('$lib/types').InsuranceTerm) {
@@ -179,15 +146,5 @@
 		<div class="mt-3 border-t border-border pt-3">
 			<DocumentViewer policyId={policy.id} />
 		</div>
-
-		<TermForm
-			bind:open={showTermForm}
-			policyId={policy.id}
-			term={editingTerm}
-			previousTerm={renewFromTerm}
-			{vehicles}
-			termVehicleCoverage={policy.termVehicleCoverage}
-			onSuccess={handleTermSuccess}
-		/>
 	</CardContent>
 </Card>

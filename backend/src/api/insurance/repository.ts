@@ -56,6 +56,7 @@ export interface TermCoverageRow {
 export type InsurancePolicyWithVehicles = InsurancePolicy & {
   terms: InsuranceTerm[];
   termVehicleCoverage: TermCoverageRow[];
+  vehicleIds: string[];
 };
 
 // ============================================================================
@@ -132,7 +133,10 @@ export class InsurancePolicyRepository {
       termVehicleCoverage = rows;
     }
 
-    return { ...policy, terms, termVehicleCoverage };
+    // Derive unique vehicleIds from junction rows
+    const vehicleIds = [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))];
+
+    return { ...policy, terms, termVehicleCoverage, vehicleIds };
   }
 
   // --------------------------------------------------------------------------
@@ -204,7 +208,12 @@ export class InsurancePolicyRepository {
           }
         }
 
-        return { ...policy, terms: insertedTerms, termVehicleCoverage: termCoverage };
+        return {
+          ...policy,
+          terms: insertedTerms,
+          termVehicleCoverage: termCoverage,
+          vehicleIds: [...new Set(termCoverage.map((tc) => tc.vehicleId))],
+        };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -307,7 +316,12 @@ export class InsurancePolicyRepository {
             .where(inArray(insuranceTermVehicles.termId, termIds));
         }
 
-        return { ...updatedResult[0], terms, termVehicleCoverage };
+        return {
+          ...updatedResult[0],
+          terms,
+          termVehicleCoverage,
+          vehicleIds: [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))],
+        };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -426,7 +440,12 @@ export class InsurancePolicyRepository {
             .where(inArray(insuranceTermVehicles.termId, termIds));
         }
 
-        return { ...updatedPolicy[0], terms, termVehicleCoverage };
+        return {
+          ...updatedPolicy[0],
+          terms,
+          termVehicleCoverage,
+          vehicleIds: [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))],
+        };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -533,7 +552,12 @@ export class InsurancePolicyRepository {
             .where(inArray(insuranceTermVehicles.termId, termIds));
         }
 
-        return { ...updatedPolicy[0], terms, termVehicleCoverage };
+        return {
+          ...updatedPolicy[0],
+          terms,
+          termVehicleCoverage,
+          vehicleIds: [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))],
+        };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -608,7 +632,12 @@ export class InsurancePolicyRepository {
             .where(inArray(insuranceTermVehicles.termId, termIds));
         }
 
-        return { ...updatedPolicy[0], terms, termVehicleCoverage };
+        return {
+          ...updatedPolicy[0],
+          terms,
+          termVehicleCoverage,
+          vehicleIds: [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))],
+        };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;

@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { changeTracker, requireAuth } from '../../middleware';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
+import { createTermExpenses, updateTermExpenses } from './hooks';
 import { insurancePolicyRepository } from './repository';
 import {
   addTermSchema,
@@ -65,6 +66,24 @@ routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   const user = c.get('user');
   const data = c.req.valid('json');
   const policy = await insurancePolicyRepository.create(data, user.id);
+
+  // Auto-create split expenses for each term that has a totalCost
+  for (const term of policy.terms) {
+    if (term.totalCost && term.totalCost > 0) {
+      const termVehicleIds = policy.termVehicleCoverage
+        .filter((tc) => tc.termId === term.id)
+        .map((tc) => tc.vehicleId);
+      await createTermExpenses({
+        termId: term.id,
+        vehicleIds: termVehicleIds,
+        totalCost: term.totalCost,
+        startDate: term.startDate,
+        policyNumber: term.policyNumber ?? undefined,
+        userId: user.id,
+      });
+    }
+  }
+
   return c.json(
     { success: true, data: policy, message: 'Insurance policy created successfully' },
     201
@@ -118,6 +137,31 @@ routes.post(
     await validateInsuranceOwnership(id, user.id);
     const termData = c.req.valid('json');
     const policy = await insurancePolicyRepository.addTerm(id, termData, user.id);
+
+    // Auto-create split expenses if the new term has a totalCost
+    if (termData.totalCost && termData.totalCost > 0) {
+      // Find the newly added term (latest by createdAt)
+      const newTerm = policy.terms.find(
+        (t) =>
+          t.policyNumber === (termData.policyNumber ?? null) &&
+          t.totalCost === termData.totalCost &&
+          t.startDate.getTime() === termData.startDate.getTime()
+      );
+      if (newTerm) {
+        const termVehicleIds = policy.termVehicleCoverage
+          .filter((tc) => tc.termId === newTerm.id)
+          .map((tc) => tc.vehicleId);
+        await createTermExpenses({
+          termId: newTerm.id,
+          vehicleIds: termVehicleIds,
+          totalCost: termData.totalCost,
+          startDate: termData.startDate,
+          policyNumber: termData.policyNumber,
+          userId: user.id,
+        });
+      }
+    }
+
     return c.json({ success: true, data: policy, message: 'Term added successfully' }, 201);
   }
 );
@@ -133,6 +177,23 @@ routes.put(
     await validateInsuranceOwnership(id, user.id);
     const updates = c.req.valid('json');
     const policy = await insurancePolicyRepository.updateTerm(id, termId, updates, user.id);
+
+    // Sync auto-created expenses with updated term data
+    const updatedTerm = policy.terms.find((t) => t.id === termId);
+    if (updatedTerm) {
+      const termVehicleIds = policy.termVehicleCoverage
+        .filter((tc) => tc.termId === termId)
+        .map((tc) => tc.vehicleId);
+      await updateTermExpenses({
+        termId,
+        vehicleIds: termVehicleIds,
+        totalCost: updatedTerm.totalCost ?? 0,
+        startDate: updatedTerm.startDate,
+        policyNumber: updatedTerm.policyNumber ?? undefined,
+        userId: user.id,
+      });
+    }
+
     return c.json({ success: true, data: policy, message: 'Term updated successfully' });
   }
 );
