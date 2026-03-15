@@ -366,7 +366,7 @@ describe('Property 12: Expiring terms date range query', () => {
           const rangeStart = new Date(minEnd);
           const rangeEnd = new Date(maxEnd);
 
-          const expiring = await repo.findExpiringTerms(rangeStart, rangeEnd);
+          const expiring = await repo.findExpiringTerms(rangeStart, rangeEnd, USER_ID);
 
           // All created terms should be in the result (their end_dates are within range)
           const expiringIds = new Set(expiring.map((t) => t.id));
@@ -407,7 +407,11 @@ describe('Property 12: Expiring terms date range query', () => {
     );
 
     // Query for 2030 range — should find nothing
-    const expiring = await repo.findExpiringTerms(new Date('2030-01-01'), new Date('2030-12-31'));
+    const expiring = await repo.findExpiringTerms(
+      new Date('2030-01-01'),
+      new Date('2030-12-31'),
+      USER_ID
+    );
     expect(expiring.length).toBe(0);
   });
 });
