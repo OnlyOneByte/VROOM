@@ -39,10 +39,6 @@ export const providerApi = {
 		await apiClient.delete(`/api/v1/providers/${id}`);
 	},
 
-	async testProvider(id: string): Promise<{ healthy: boolean }> {
-		return apiClient.post<{ healthy: boolean }>(`/api/v1/providers/${id}/test`);
-	},
-
 	async backfillProvider(id: string): Promise<{ created: number }> {
 		return apiClient.post<{ created: number }>(`/api/v1/providers/${id}/backfill`);
 	},

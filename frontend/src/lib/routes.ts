@@ -24,7 +24,6 @@ export const routes = {
 	insurance: '/insurance',
 	insuranceNew: '/insurance/new',
 	analytics: '/analytics',
-	analyticsFuelEfficiency: '/analytics/fuel-efficiency',
 	settings: '/settings',
 	settingsProviderNew: '/settings/providers/new',
 	profile: '/profile',

@@ -43,18 +43,6 @@ export const syncConfig = {
 	}
 };
 
-// --- Sync queue ---
-let _syncQueue = $state<OfflineExpense[]>([]);
-
-export const syncQueue = {
-	get current() {
-		return _syncQueue;
-	},
-	set current(value: OfflineExpense[]) {
-		_syncQueue = value;
-	}
-};
-
 // --- Sync conflicts ---
 let _syncConflicts = $state<SyncConflict[]>([]);
 

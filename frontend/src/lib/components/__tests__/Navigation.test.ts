@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { authStore } from '../../stores/auth.svelte';
-import { appStore } from '../../stores/app.svelte';
 import type { User } from '../../types/index.js';
 
 // Mock $app/stores
@@ -43,7 +42,6 @@ describe('Navigation Component Logic', () => {
 		vi.clearAllMocks();
 		// Reset stores to initial state
 		authStore.clearUser();
-		appStore.closeMobileMenu();
 	});
 
 	afterEach(() => {
@@ -61,19 +59,6 @@ describe('Navigation Component Logic', () => {
 		expect(authStore.isAuthenticated).toBe(true);
 		expect(authStore.user?.displayName).toBe('Test User');
 		expect(authStore.user?.email).toBe('test@example.com');
-	});
-
-	it('manages mobile menu state correctly', () => {
-		// Initially closed
-		expect(appStore.isMobileMenuOpen).toBe(false);
-
-		// Toggle open
-		appStore.toggleMobileMenu();
-		expect(appStore.isMobileMenuOpen).toBe(true);
-
-		// Close
-		appStore.closeMobileMenu();
-		expect(appStore.isMobileMenuOpen).toBe(false);
 	});
 
 	it('determines active navigation correctly', () => {

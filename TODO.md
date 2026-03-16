@@ -139,9 +139,9 @@
   - Photos going to root and not respecting provider root
 - [x] Backend model revamp to be more performant
 - [ ] Backup versioning
-- [ ] Expense splitting to move inline
-  - [ ] cost splitting to happen after cost is entered
-  - [ ] odometer entry hidden (or per vehicle)
+- [x]xExpense splitting to move inline
+  - [x] cost splitting to happen after cost is entered
+  - [x] odometer entry hidden (or per vehicle)
 
 ## Long Term Considerations
 - [ ] Receipt / invoice photo-based auto-fill (OCR → expense fields)

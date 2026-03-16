@@ -54,11 +54,6 @@ export const insuranceApi = {
 		return apiClient.delete<InsurancePolicy>(`/api/v1/insurance/${policyId}/terms/${termId}`);
 	},
 
-	async getExpiringPolicies(days?: number): Promise<InsurancePolicy[]> {
-		const query = days !== undefined ? `?days=${days}` : '';
-		return apiClient.get<InsurancePolicy[]>(`/api/v1/insurance/expiring-soon${query}`);
-	},
-
 	// --- Document methods (delegate to photo endpoints) ---
 
 	async getDocuments(

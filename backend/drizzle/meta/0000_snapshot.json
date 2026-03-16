@@ -56,13 +56,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "receipt_url": {
-          "name": "receipt_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",

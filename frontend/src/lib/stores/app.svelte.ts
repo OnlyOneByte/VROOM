@@ -2,8 +2,6 @@ import type { Vehicle, AppState, Notification } from '../types/index.js';
 
 const initialState: AppState = {
 	vehicles: [],
-	selectedVehicle: null,
-	isMobileMenuOpen: false,
 	isLoading: false,
 	notifications: []
 };
@@ -14,12 +12,6 @@ function createAppStore() {
 	return {
 		get vehicles() {
 			return state.vehicles;
-		},
-		get selectedVehicle() {
-			return state.selectedVehicle;
-		},
-		get isMobileMenuOpen() {
-			return state.isMobileMenuOpen;
 		},
 		get isLoading() {
 			return state.isLoading;
@@ -39,42 +31,14 @@ function createAppStore() {
 
 		updateVehicle(vehicleId: string, updates: Partial<Vehicle>) {
 			state.vehicles = state.vehicles.map(v => (v.id === vehicleId ? { ...v, ...updates } : v));
-			if (state.selectedVehicle?.id === vehicleId) {
-				state.selectedVehicle = { ...state.selectedVehicle, ...updates };
-			}
 		},
 
 		removeVehicle(vehicleId: string) {
 			state.vehicles = state.vehicles.filter(v => v.id !== vehicleId);
-			if (state.selectedVehicle?.id === vehicleId) {
-				state.selectedVehicle = null;
-			}
-		},
-
-		selectVehicle(vehicleId: string) {
-			state.selectedVehicle = state.vehicles.find(v => v.id === vehicleId) || null;
-		},
-
-		clearSelectedVehicle() {
-			state.selectedVehicle = null;
 		},
 
 		clearVehicles() {
 			state.vehicles = [];
-			state.selectedVehicle = null;
-		},
-
-		// UI state management
-		toggleMobileMenu() {
-			state.isMobileMenuOpen = !state.isMobileMenuOpen;
-		},
-
-		openMobileMenu() {
-			state.isMobileMenuOpen = true;
-		},
-
-		closeMobileMenu() {
-			state.isMobileMenuOpen = false;
 		},
 
 		setLoading(isLoading: boolean) {

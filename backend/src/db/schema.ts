@@ -181,7 +181,6 @@ export const expenses = sqliteTable(
     date: integer('date', { mode: 'timestamp' }).notNull(),
     mileage: integer('mileage'),
     description: text('description'),
-    receiptUrl: text('receipt_url'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     expenseAmount: real('expense_amount').notNull(),

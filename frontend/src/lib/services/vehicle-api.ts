@@ -57,10 +57,6 @@ export const vehicleApi = {
 		});
 	},
 
-	async deleteFinancing(financingId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/financing/${financingId}`);
-	},
-
 	async getPhotos(
 		vehicleId: string,
 		params?: { limit?: number; offset?: number }

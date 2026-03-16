@@ -9,9 +9,7 @@ import type { PhotoCategory } from '$lib/types';
  * Scroll heights for different table/list views
  */
 export const SCROLL_HEIGHTS = {
-	TABLE_DEFAULT: '600px',
-	TABLE_COMPACT: '400px',
-	TABLE_LARGE: '800px'
+	TABLE_DEFAULT: '600px'
 } as const;
 
 /**

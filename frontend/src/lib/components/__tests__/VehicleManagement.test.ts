@@ -533,19 +533,6 @@ describe('Vehicle Management Components', () => {
 	});
 
 	describe('Responsive Behavior', () => {
-		it('handles mobile menu state correctly', () => {
-			// Test initial state
-			expect(appStore.isMobileMenuOpen).toBe(false);
-
-			// Test toggle
-			appStore.toggleMobileMenu();
-			expect(appStore.isMobileMenuOpen).toBe(true);
-
-			// Test close
-			appStore.closeMobileMenu();
-			expect(appStore.isMobileMenuOpen).toBe(false);
-		});
-
 		it('provides responsive CSS classes for different screen sizes', () => {
 			const getResponsiveClasses = (isMobile: boolean) => {
 				return {

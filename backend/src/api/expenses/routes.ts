@@ -56,18 +56,6 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
       `Description must be ${CONFIG.validation.expense.descriptionMaxLength} characters or less`
     )
     .optional(),
-  receiptUrl: z
-    .string()
-    .max(2048, 'Receipt URL is too long')
-    .refine((val) => {
-      try {
-        new URL(val);
-        return true;
-      } catch {
-        return false;
-      }
-    }, 'Receipt URL must be valid')
-    .optional(),
   isFinancingPayment: z.boolean().optional().default(false),
 });
 
