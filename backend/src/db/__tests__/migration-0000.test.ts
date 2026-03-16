@@ -48,6 +48,9 @@ describe('Migration 0000: Consolidated v2 Schema', () => {
       'odometer_entries',
       'photo_refs',
       'photos',
+      'reminder_notifications',
+      'reminder_vehicles',
+      'reminders',
       'sessions',
       'sync_state',
       'user_preferences',
@@ -145,6 +148,84 @@ describe('Migration 0000: Consolidated v2 Schema', () => {
     expect(cols).not.toContain('terms');
     expect(cols).not.toContain('current_term_start');
     expect(cols).not.toContain('current_term_end');
+  });
+
+  test('expenses table has source_type and source_id columns', () => {
+    applyMigration(db, migrations[0]);
+    const cols = getColumnNames(db, 'expenses');
+    expect(cols).toContain('source_type');
+    expect(cols).toContain('source_id');
+  });
+
+  test('expenses_source_idx index exists on expenses', () => {
+    applyMigration(db, migrations[0]);
+    const indexes = getIndexNames(db, 'expenses');
+    expect(indexes).toContain('expenses_source_idx');
+  });
+
+  test('reminders table has expected columns', () => {
+    applyMigration(db, migrations[0]);
+    const cols = getColumnNames(db, 'reminders');
+    expect(cols).toContain('id');
+    expect(cols).toContain('user_id');
+    expect(cols).toContain('name');
+    expect(cols).toContain('description');
+    expect(cols).toContain('type');
+    expect(cols).toContain('action_mode');
+    expect(cols).toContain('frequency');
+    expect(cols).toContain('interval_value');
+    expect(cols).toContain('interval_unit');
+    expect(cols).toContain('start_date');
+    expect(cols).toContain('end_date');
+    expect(cols).toContain('next_due_date');
+    expect(cols).toContain('expense_category');
+    expect(cols).toContain('expense_tags');
+    expect(cols).toContain('expense_amount');
+    expect(cols).toContain('expense_description');
+    expect(cols).toContain('expense_split_config');
+    expect(cols).toContain('is_active');
+    expect(cols).toContain('last_triggered_at');
+    expect(cols).toContain('created_at');
+    expect(cols).toContain('updated_at');
+  });
+
+  test('reminders_user_active_due_idx index exists on reminders', () => {
+    applyMigration(db, migrations[0]);
+    const indexes = getIndexNames(db, 'reminders');
+    expect(indexes).toContain('reminders_user_active_due_idx');
+  });
+
+  test('reminder_vehicles table has expected columns and rv_vehicle_idx index', () => {
+    applyMigration(db, migrations[0]);
+    const cols = getColumnNames(db, 'reminder_vehicles');
+    expect(cols).toContain('reminder_id');
+    expect(cols).toContain('vehicle_id');
+    const indexes = getIndexNames(db, 'reminder_vehicles');
+    expect(indexes).toContain('rv_vehicle_idx');
+  });
+
+  test('reminder_notifications table has expected columns', () => {
+    applyMigration(db, migrations[0]);
+    const cols = getColumnNames(db, 'reminder_notifications');
+    expect(cols).toContain('id');
+    expect(cols).toContain('reminder_id');
+    expect(cols).toContain('user_id');
+    expect(cols).toContain('due_date');
+    expect(cols).toContain('is_read');
+    expect(cols).toContain('created_at');
+    expect(cols).toContain('updated_at');
+  });
+
+  test('rn_user_unread_idx index exists on reminder_notifications', () => {
+    applyMigration(db, migrations[0]);
+    const indexes = getIndexNames(db, 'reminder_notifications');
+    expect(indexes).toContain('rn_user_unread_idx');
+  });
+
+  test('rn_reminder_due_idx unique index exists on reminder_notifications', () => {
+    applyMigration(db, migrations[0]);
+    const indexes = getIndexNames(db, 'reminder_notifications');
+    expect(indexes).toContain('rn_reminder_due_idx');
   });
 
   test('users.email has a unique index', () => {

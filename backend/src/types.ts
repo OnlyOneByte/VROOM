@@ -9,10 +9,16 @@ export type {
   InsuranceTermVehicle,
   NewExpense,
   NewPhotoRef,
+  NewReminder,
+  NewReminderNotification,
+  NewReminderVehicle,
   NewUserPreferences,
   NewVehicle,
   NewVehicleFinancing,
   PhotoRef,
+  Reminder,
+  ReminderNotification,
+  ReminderVehicle,
   Session,
   SyncState,
   User,
@@ -142,6 +148,9 @@ export interface BackupData {
   photoRefs: import('./db/schema').PhotoRef[];
   userPreferences: import('./db/schema').UserPreferences[];
   syncState: import('./db/schema').SyncState[];
+  reminders?: import('./db/schema').Reminder[];
+  reminderVehicles?: import('./db/schema').ReminderVehicle[];
+  reminderNotifications?: import('./db/schema').ReminderNotification[];
 }
 
 export interface ParsedBackupData {
@@ -157,6 +166,9 @@ export interface ParsedBackupData {
   photoRefs: Record<string, unknown>[];
   userPreferences: Record<string, unknown>[];
   syncState: Record<string, unknown>[];
+  reminders?: Record<string, unknown>[];
+  reminderVehicles?: Record<string, unknown>[];
+  reminderNotifications?: Record<string, unknown>[];
 }
 
 // Backup provider types

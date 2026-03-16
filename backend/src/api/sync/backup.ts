@@ -26,6 +26,9 @@ import {
   odometerEntries,
   photoRefs,
   photos,
+  reminderNotifications,
+  reminders,
+  reminderVehicles,
   syncState,
   userPreferences,
   vehicleFinancing,
@@ -362,6 +365,23 @@ export class BackupService {
       .where(eq(userPreferences.userId, userId));
     const syncStateRows = await db.select().from(syncState).where(eq(syncState.userId, userId));
 
+    // Query reminders, reminder_vehicles, and reminder_notifications
+    const userReminders = await db.select().from(reminders).where(eq(reminders.userId, userId));
+
+    const reminderIds = userReminders.map((r) => r.id);
+    const userReminderVehicles =
+      reminderIds.length > 0
+        ? await db
+            .select()
+            .from(reminderVehicles)
+            .where(inArray(reminderVehicles.reminderId, reminderIds))
+        : [];
+
+    const userReminderNotifications = await db
+      .select()
+      .from(reminderNotifications)
+      .where(eq(reminderNotifications.userId, userId));
+
     return {
       metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId },
       vehicles: userVehicles,
@@ -375,6 +395,9 @@ export class BackupService {
       photoRefs: userPhotoRefs,
       userPreferences: userPreferencesRows,
       syncState: syncStateRows,
+      reminders: userReminders,
+      reminderVehicles: userReminderVehicles,
+      reminderNotifications: userReminderNotifications,
     };
   }
 
@@ -488,8 +511,8 @@ export class BackupService {
 
     for (const key of getBackupTableKeys()) {
       const schema = TABLE_SCHEMAS[key];
-      const data = backup[key as keyof ParsedBackupData] as Record<string, unknown>[];
-      if (schema) {
+      const data = backup[key as keyof ParsedBackupData] as Record<string, unknown>[] | undefined;
+      if (schema && data) {
         errors.push(...this.validateArray(data, schema, key));
       }
     }
@@ -523,9 +546,11 @@ export class BackupService {
     const expenseIds = new Set(backup.expenses.map((e) => String(e.id)));
     const odometerIds = new Set((backup.odometer ?? []).map((o) => String(o.id)));
     const photoIds = new Set((backup.photos ?? []).map((p) => String(p.id)));
+    const reminderIds = new Set((backup.reminders ?? []).map((r) => String(r.id)));
 
     return [
       ...this.validateExpenseRefs(backup.expenses, vehicleIds, userIds),
+      ...this.validateExpenseSourceRefs(backup.expenses, reminderIds),
       ...this.validateFinancingRefs(backup.financing, vehicleIds),
       ...this.validateInsuranceRefs(backup.insurance),
       ...this.validateInsuranceTermRefs(backup.insuranceTerms ?? [], policyIds),
@@ -542,6 +567,17 @@ export class BackupService {
         odometerIds,
       }),
       ...this.validatePhotoRefEntries(backup.photoRefs ?? [], photoIds),
+      ...this.validateReminderRefs(backup.reminders ?? [], userIds),
+      ...this.validateReminderVehicleJunctionRefs(
+        backup.reminderVehicles ?? [],
+        reminderIds,
+        vehicleIds
+      ),
+      ...this.validateReminderNotificationRefs(
+        backup.reminderNotifications ?? [],
+        reminderIds,
+        userIds
+      ),
     ];
   }
 
@@ -670,6 +706,78 @@ export class BackupService {
       }
       // Note: providerId validation is skipped here because user_providers
       // are not included in the backup data (they contain encrypted credentials)
+    }
+    return errors;
+  }
+
+  private validateExpenseSourceRefs(
+    expenseList: Record<string, unknown>[],
+    reminderIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const expense of expenseList) {
+      if (expense.sourceType === 'reminder' && expense.sourceId) {
+        if (!reminderIds.has(String(expense.sourceId))) {
+          errors.push(
+            `Expense ${expense.id} references non-existent reminder source ${expense.sourceId}`
+          );
+        }
+      }
+    }
+    return errors;
+  }
+
+  private validateReminderRefs(
+    reminderList: Record<string, unknown>[],
+    userIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const reminder of reminderList) {
+      if (reminder.userId && !userIds.has(String(reminder.userId))) {
+        errors.push(`Reminder ${reminder.id} references non-existent user ${reminder.userId}`);
+      }
+    }
+    return errors;
+  }
+
+  private validateReminderVehicleJunctionRefs(
+    junctionList: Record<string, unknown>[],
+    reminderIds: Set<string>,
+    vehicleIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const junction of junctionList) {
+      if (!reminderIds.has(String(junction.reminderId))) {
+        errors.push(
+          `Reminder vehicle junction references non-existent reminder ${junction.reminderId}`
+        );
+      }
+      if (!vehicleIds.has(String(junction.vehicleId))) {
+        errors.push(
+          `Reminder vehicle junction references non-existent vehicle ${junction.vehicleId}`
+        );
+      }
+    }
+    return errors;
+  }
+
+  private validateReminderNotificationRefs(
+    notificationList: Record<string, unknown>[],
+    reminderIds: Set<string>,
+    userIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const notification of notificationList) {
+      if (!reminderIds.has(String(notification.reminderId))) {
+        errors.push(
+          `Reminder notification ${notification.id} references non-existent reminder ${notification.reminderId}`
+        );
+      }
+      if (notification.userId && !userIds.has(String(notification.userId))) {
+        errors.push(
+          `Reminder notification ${notification.id} references non-existent user ${notification.userId}`
+        );
+      }
     }
     return errors;
   }

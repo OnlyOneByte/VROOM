@@ -13,6 +13,7 @@ import { routes as odometerRoutes } from './api/odometer/routes';
 import { routes as photoRoutes } from './api/photos/routes';
 import { routes as providerRoutes } from './api/providers/routes';
 import { startSyncWorker, stopSyncWorker } from './api/providers/sync-worker';
+import { routes as reminderRoutes } from './api/reminders/routes';
 import { routes as settingsRoutes } from './api/settings/routes';
 import './api/sync/init';
 import { routes as syncRoutes } from './api/sync/routes';
@@ -138,6 +139,7 @@ app.route('/api/v1/providers', providerRoutes);
 app.route('/api/v1/settings', settingsRoutes);
 app.route('/api/v1/sync', syncRoutes);
 app.route('/api/v1/analytics', analyticsRoutes);
+app.route('/api/v1/reminders', reminderRoutes);
 
 // Backward compatibility: Redirect /api/* to /api/v1/* (except /api root)
 app.use('/api/*', async (c, next) => {

@@ -11,6 +11,7 @@ import {
 } from 'drizzle-orm/sqlite-core';
 import type { BackupConfig, StorageConfig, UnitPreferences } from '../types';
 import { DEFAULT_BACKUP_CONFIG, DEFAULT_STORAGE_CONFIG, DEFAULT_UNIT_PREFERENCES } from '../types';
+import type { ReminderSplitConfig } from './types';
 
 // User table
 export const users = sqliteTable('users', {
@@ -203,6 +204,9 @@ export const expenses = sqliteTable(
     groupTotal: real('group_total'),
     // Split method: 'even' | 'absolute' | 'percentage'
     splitMethod: text('split_method'),
+    // Source tracking — nullable, server-set only (e.g., 'reminder', 'import', 'api')
+    sourceType: text('source_type'),
+    sourceId: text('source_id'),
   },
   (table) => ({
     vehicleDateIdx: index('expenses_vehicle_date_idx').on(table.vehicleId, table.date),
@@ -223,6 +227,8 @@ export const expenses = sqliteTable(
     groupIdx: index('expenses_group_idx').on(table.groupId),
     // Insurance term lookup
     insuranceTermIdx: index('expenses_insurance_term_idx').on(table.insuranceTermId),
+    // Source tracking lookup (e.g., all expenses from a specific reminder)
+    sourceIdx: index('expenses_source_idx').on(table.sourceType, table.sourceId),
   })
 );
 
@@ -382,6 +388,88 @@ export const photoRefs = sqliteTable(
   })
 );
 
+// Reminders table
+export const reminders = sqliteTable(
+  'reminders',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    type: text('type').notNull(), // 'expense' | 'notification'
+    actionMode: text('action_mode').notNull().default('automatic'), // 'automatic' | 'requires_confirmation'
+    frequency: text('frequency').notNull(), // 'weekly' | 'monthly' | 'yearly' | 'custom'
+    intervalValue: integer('interval_value'), // for custom: e.g. 3
+    intervalUnit: text('interval_unit'), // 'day' | 'week' | 'month' | 'year'
+    startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
+    endDate: integer('end_date', { mode: 'timestamp' }), // null = runs forever
+    nextDueDate: integer('next_due_date', { mode: 'timestamp' }).notNull(),
+    expenseCategory: text('expense_category'),
+    expenseTags: text('expense_tags', { mode: 'json' }).$type<string[]>(),
+    expenseAmount: real('expense_amount'), // total amount, required when type='expense' + actionMode='automatic'
+    expenseDescription: text('expense_description'),
+    expenseSplitConfig: text('expense_split_config', { mode: 'json' }).$type<ReminderSplitConfig>(),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    lastTriggeredAt: integer('last_triggered_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    // Optimal for the overdue query: WHERE user_id = ? AND is_active = true AND next_due_date <= now
+    userActiveDueIdx: index('reminders_user_active_due_idx').on(
+      table.userId,
+      table.isActive,
+      table.nextDueDate
+    ),
+  })
+);
+
+// Reminder ↔ Vehicles junction table
+export const reminderVehicles = sqliteTable(
+  'reminder_vehicles',
+  {
+    reminderId: text('reminder_id')
+      .notNull()
+      .references(() => reminders.id, { onDelete: 'cascade' }),
+    vehicleId: text('vehicle_id')
+      .notNull()
+      .references(() => vehicles.id, { onDelete: 'cascade' }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.reminderId, table.vehicleId] }),
+    vehicleIdx: index('rv_vehicle_idx').on(table.vehicleId),
+  })
+);
+
+// Reminder Notifications table (persistent notification state)
+export const reminderNotifications = sqliteTable(
+  'reminder_notifications',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    reminderId: text('reminder_id')
+      .notNull()
+      .references(() => reminders.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    dueDate: integer('due_date', { mode: 'timestamp' }).notNull(), // the period this notification is for
+    isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    userUnreadIdx: index('rn_user_unread_idx').on(table.userId, table.isRead),
+    // Prevents duplicate notifications for the same reminder + period
+    reminderDueIdx: uniqueIndex('rn_reminder_due_idx').on(table.reminderId, table.dueDate),
+  })
+);
+
 // Export types for use in application
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -429,3 +517,12 @@ export type NewPhoto = typeof photos.$inferInsert;
 
 export type PhotoRef = typeof photoRefs.$inferSelect;
 export type NewPhotoRef = typeof photoRefs.$inferInsert;
+
+export type Reminder = typeof reminders.$inferSelect;
+export type NewReminder = typeof reminders.$inferInsert;
+
+export type ReminderVehicle = typeof reminderVehicles.$inferSelect;
+export type NewReminderVehicle = typeof reminderVehicles.$inferInsert;
+
+export type ReminderNotification = typeof reminderNotifications.$inferSelect;
+export type NewReminderNotification = typeof reminderNotifications.$inferInsert;

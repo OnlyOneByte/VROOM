@@ -14,6 +14,9 @@ import {
   odometerEntries,
   photoRefs,
   photos,
+  reminderNotifications,
+  reminders,
+  reminderVehicles,
   syncState,
   userPreferences,
   userProviders,
@@ -41,6 +44,9 @@ export interface ImportSummary {
   insurance: number;
   insuranceTerms: number;
   insuranceTermVehicles: number;
+  reminders: number;
+  reminderVehicles: number;
+  reminderNotifications: number;
   odometer: number;
   photos: number;
   photoRefs: number;
@@ -58,6 +64,7 @@ export interface RestoreResponse {
 class RestoreService {
   private db = getDb();
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Restore orchestration requires sequential validation and data insertion steps
   async restoreFromBackup(
     userId: string,
     file: Buffer,
@@ -89,6 +96,9 @@ class RestoreService {
       insurance: parsedBackup.insurance.length,
       insuranceTerms: parsedBackup.insuranceTerms?.length ?? 0,
       insuranceTermVehicles: parsedBackup.insuranceTermVehicles?.length ?? 0,
+      reminders: parsedBackup.reminders?.length ?? 0,
+      reminderVehicles: parsedBackup.reminderVehicles?.length ?? 0,
+      reminderNotifications: parsedBackup.reminderNotifications?.length ?? 0,
       odometer: parsedBackup.odometer?.length ?? 0,
       photos: parsedBackup.photos?.length ?? 0,
       photoRefs: parsedBackup.photoRefs?.length ?? 0,
@@ -173,6 +183,9 @@ class RestoreService {
       insurance: sheetData.insurance.length,
       insuranceTerms: sheetData.insuranceTerms?.length ?? 0,
       insuranceTermVehicles: sheetData.insuranceTermVehicles?.length ?? 0,
+      reminders: (sheetData as ParsedBackupData).reminders?.length ?? 0,
+      reminderVehicles: (sheetData as ParsedBackupData).reminderVehicles?.length ?? 0,
+      reminderNotifications: (sheetData as ParsedBackupData).reminderNotifications?.length ?? 0,
       odometer: sheetData.odometer?.length ?? 0,
       photos: sheetData.photos?.length ?? 0,
       photoRefs: sheetData.photoRefs?.length ?? 0,
@@ -252,6 +265,9 @@ class RestoreService {
     // Delete insurance policies directly by userId (terms and junction rows cascade via FK)
     await tx.delete(insurancePolicies).where(eq(insurancePolicies.userId, userId));
 
+    // Delete reminders before vehicles (CASCADE handles reminder_vehicles + reminder_notifications)
+    await tx.delete(reminders).where(eq(reminders.userId, userId));
+
     // Delete user preferences and sync state
     await tx.delete(userPreferences).where(eq(userPreferences.userId, userId));
     await tx.delete(syncState).where(eq(syncState.userId, userId));
@@ -259,6 +275,7 @@ class RestoreService {
     await tx.delete(vehicles).where(eq(vehicles.userId, userId));
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Sequential FK-ordered inserts for all backup tables
   private async insertBackupData(tx: DrizzleTransaction, data: ParsedBackupData): Promise<void> {
     // Data is already coerced by coerceRow (ZIP path via parseZipBackup, Sheets path via restoreFromSheets)
     if (data.vehicles.length > 0) {
@@ -285,6 +302,22 @@ class RestoreService {
       await tx
         .insert(insuranceTermVehicles)
         .values(data.insuranceTermVehicles as (typeof insuranceTermVehicles.$inferInsert)[]);
+    }
+    // Insert reminders after vehicles (userId + vehicleId FKs)
+    if ((data.reminders?.length ?? 0) > 0) {
+      await tx.insert(reminders).values(data.reminders as (typeof reminders.$inferInsert)[]);
+    }
+    // Insert reminder vehicles after reminders and vehicles (junction FK)
+    if ((data.reminderVehicles?.length ?? 0) > 0) {
+      await tx
+        .insert(reminderVehicles)
+        .values(data.reminderVehicles as (typeof reminderVehicles.$inferInsert)[]);
+    }
+    // Insert reminder notifications after reminders (reminderId FK)
+    if ((data.reminderNotifications?.length ?? 0) > 0) {
+      await tx
+        .insert(reminderNotifications)
+        .values(data.reminderNotifications as (typeof reminderNotifications.$inferInsert)[]);
     }
     if (data.expenses.length > 0) {
       await tx.insert(expenses).values(data.expenses as (typeof expenses.$inferInsert)[]);

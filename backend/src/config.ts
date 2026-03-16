@@ -12,6 +12,9 @@ import {
   odometerEntries,
   photoRefs,
   photos,
+  reminderNotifications,
+  reminders,
+  reminderVehicles,
   syncState,
   userPreferences,
   vehicleFinancing,
@@ -130,6 +133,7 @@ export const CONFIG = {
     sync: { windowMs: 15 * 60 * 1000, limit: 50, message: 'Too many sync requests' },
     backup: { windowMs: 5 * 60 * 1000, limit: 20, message: 'Too many backup requests' },
     restore: { windowMs: 10 * 60 * 1000, limit: 10, message: 'Too many restore requests' },
+    trigger: { windowMs: 15 * 60 * 1000, limit: 10, message: 'Too many trigger requests' },
   },
   backup: {
     maxFileSize: 50 * 1024 * 1024,
@@ -177,6 +181,14 @@ export const CONFIG = {
       minDayOfWeek: 0,
       maxDayOfWeek: 6,
     },
+    reminder: {
+      nameMaxLength: 100,
+      descriptionMaxLength: 500,
+      maxExpenseAmount: 1_000_000,
+      maxCatchUpOccurrences: 12,
+      maxTags: 10,
+      tagMaxLength: 50,
+    },
     settings: { maxBackupRetention: 100, maxSyncInactivityMinutes: 30 },
   },
 } as const;
@@ -193,6 +205,9 @@ export const TABLE_SCHEMA_MAP: Record<string, Table> = {
   photoRefs: photoRefs,
   userPreferences: userPreferences,
   syncState: syncState,
+  reminders: reminders,
+  reminderVehicles: reminderVehicles,
+  reminderNotifications: reminderNotifications,
 };
 
 export const TABLE_FILENAME_MAP: Record<string, string> = {
@@ -207,6 +222,9 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   photoRefs: 'photo_refs.csv',
   userPreferences: 'user_preferences.csv',
   syncState: 'sync_state.csv',
+  reminders: 'reminders.csv',
+  reminderVehicles: 'reminder_vehicles.csv',
+  reminderNotifications: 'reminder_notifications.csv',
 };
 
 export function getBackupTableKeys(): string[] {
@@ -222,6 +240,9 @@ const OPTIONAL_BACKUP_FILES = new Set([
   'photo_refs.csv',
   'user_preferences.csv',
   'sync_state.csv',
+  'reminders.csv',
+  'reminder_vehicles.csv',
+  'reminder_notifications.csv',
 ]);
 
 export function getRequiredBackupFiles(): string[] {
