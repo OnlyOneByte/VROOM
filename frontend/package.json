@@ -58,7 +58,7 @@
 		"fast-check": "^4.6.0",
 		"globals": "^17.4.0",
 		"happy-dom": "^20.8.4",
-		"jsdom": "^28.1.0",
+		"jsdom": "^29.0.0",
 		"layerchart": "^2.0.0-next.46",
 		"mode-watcher": "^1.1.0",
 		"postcss": "^8.5.8",
