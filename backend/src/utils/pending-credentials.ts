@@ -29,7 +29,7 @@ function isExpired(entry: PendingCredential): boolean {
 /**
  * Remove all entries older than TTL.
  */
-export function cleanupExpired(): void {
+function cleanupExpired(): void {
   for (const [key, entry] of pendingProviderCredentials.entries()) {
     if (isExpired(entry)) {
       pendingProviderCredentials.delete(key);

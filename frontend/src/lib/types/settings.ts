@@ -66,23 +66,21 @@ export interface RestoreProviderInfo {
 	sourceTypes: ('zip' | 'sheets')[];
 }
 
-export interface BackupCapabilityResult {
-	success: boolean;
-	message?: string;
-	metadata?: Record<string, unknown>;
-}
-
-export interface BackupStrategyResult {
-	success: boolean;
-	message?: string;
-	capabilities: Record<string, BackupCapabilityResult>;
-}
-
 export interface BackupOrchestratorResult {
 	timestamp: string;
 	status?: 'in_progress';
 	skipped?: boolean;
-	results: Record<string, BackupStrategyResult>;
+	results: Record<
+		string,
+		{
+			success: boolean;
+			message?: string;
+			capabilities: Record<
+				string,
+				{ success: boolean; message?: string; metadata?: Record<string, unknown> }
+			>;
+		}
+	>;
 }
 
 export interface RestoreResult {

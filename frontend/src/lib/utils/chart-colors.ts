@@ -56,14 +56,6 @@ export function getCategoryLabel(key: string): string {
 	return Object.hasOwn(CATEGORY_LABELS, key) ? (CATEGORY_LABELS[key] as string) : key;
 }
 
-/** Assign colors from CHART_COLORS to a dynamic list of series keys, cycling via modular indexing. */
-export function assignSeriesColors(keys: string[]): Array<{ key: string; color: string }> {
-	return keys.map((key, i) => ({
-		key,
-		color: CHART_COLORS[i % CHART_COLORS.length] as string
-	}));
-}
-
 /** Build a ChartConfig record from a series array (key → { label, color }). */
 export function buildChartConfig(
 	series: Array<{ key: string; label: string; color: string }>

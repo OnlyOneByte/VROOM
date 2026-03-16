@@ -2,7 +2,6 @@
  * Property-Based Tests for chart-colors utilities
  *
  * Property 8: Category maps completeness
- * Property 9: assignSeriesColors length and order preservation
  * Property 10: buildChartConfig structure preservation
  * Property 11: buildCategoryPieData correctness
  * Property 12: Category key fallback safety
@@ -14,7 +13,6 @@ import {
 	CATEGORY_COLORS,
 	CATEGORY_LABELS,
 	CHART_COLORS,
-	assignSeriesColors,
 	buildChartConfig,
 	buildCategoryPieData,
 	getCategoryColor,
@@ -50,27 +48,6 @@ describe('Property 8: Category maps completeness', () => {
 		for (const color of CHART_COLORS) {
 			expect(color).toMatch(/^var\(--chart-\d\)$/);
 		}
-	});
-});
-
-// ---------------------------------------------------------------------------
-// Property 9: assignSeriesColors length and order preservation
-// **Validates: Requirements 12.1, 12.3**
-// ---------------------------------------------------------------------------
-describe('Property 9: assignSeriesColors length and order preservation', () => {
-	test('∀ string array of length N, output has length N, preserves order, all colors from CHART_COLORS', () => {
-		fc.assert(
-			fc.property(fc.array(fc.string({ minLength: 1 }), { minLength: 0, maxLength: 20 }), keys => {
-				const result = assignSeriesColors(keys);
-				expect(result).toHaveLength(keys.length);
-				for (let i = 0; i < keys.length; i++) {
-					expect(result[i]!.key).toBe(keys[i]);
-					expect(CHART_COLORS).toContain(result[i]!.color);
-					expect(result[i]!.color).toBe(CHART_COLORS[i % CHART_COLORS.length]);
-				}
-			}),
-			{ numRuns: 100 }
-		);
 	});
 });
 

@@ -8,15 +8,8 @@ export type {
   InsuranceTerm,
   InsuranceTermVehicle,
   NewExpense,
-  NewInsurancePolicy,
-  NewInsuranceTerm,
-  NewInsuranceTermVehicle,
   NewPhotoRef,
-  NewSession,
-  NewSyncState,
-  NewUser,
   NewUserPreferences,
-  NewUserProvider,
   NewVehicle,
   NewVehicleFinancing,
   PhotoRef,
@@ -38,20 +31,7 @@ export {
   isValidPaymentFrequency as isPaymentFrequency,
 } from './db/types';
 
-export enum Currency {
-  USD = 'USD',
-  EUR = 'EUR',
-  GBP = 'GBP',
-  CAD = 'CAD',
-  AUD = 'AUD',
-  JPY = 'JPY',
-}
-
-export enum Environment {
-  DEVELOPMENT = 'development',
-  PRODUCTION = 'production',
-  TEST = 'test',
-}
+export type Environment = 'development' | 'production' | 'test';
 
 export enum DistanceUnit {
   MILES = 'miles',
@@ -68,22 +48,12 @@ export enum ChargeUnit {
   KWH = 'kwh',
 }
 
-export enum VehicleType {
-  GAS = 'gas',
-  ELECTRIC = 'electric',
-  HYBRID = 'hybrid',
-}
-
-export const isCurrency = (value: string): value is Currency =>
-  Object.values(Currency).includes(value as Currency);
 export const isDistanceUnit = (value: string): value is DistanceUnit =>
   Object.values(DistanceUnit).includes(value as DistanceUnit);
 export const isVolumeUnit = (value: string): value is VolumeUnit =>
   Object.values(VolumeUnit).includes(value as VolumeUnit);
 export const isChargeUnit = (value: string): value is ChargeUnit =>
   Object.values(ChargeUnit).includes(value as ChargeUnit);
-export const isVehicleType = (value: string): value is VehicleType =>
-  Object.values(VehicleType).includes(value as VehicleType);
 
 export interface UnitPreferences {
   distanceUnit: DistanceUnit;

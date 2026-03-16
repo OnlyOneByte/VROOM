@@ -11,7 +11,7 @@ export interface BeforeInstallPromptEvent extends Event {
 
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
 
-export type PwaPlatform = 'ios' | 'android' | 'desktop';
+type PwaPlatform = 'ios' | 'android' | 'desktop';
 
 export interface PlatformInfo {
 	platform: PwaPlatform;

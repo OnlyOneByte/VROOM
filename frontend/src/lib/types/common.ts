@@ -10,10 +10,8 @@ export interface Notification {
 
 export interface AppState {
 	vehicles: Vehicle[];
-	selectedVehicle: Vehicle | null;
 	notifications: Notification[];
 	isLoading: boolean;
-	isMobileMenuOpen: boolean;
 }
 
 export interface PaginatedResponse<T> {

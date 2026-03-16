@@ -10,9 +10,10 @@ import type { Expense, ExpenseCategory } from '$lib/types';
 import { isElectricFuelType } from '$lib/utils/units';
 
 /**
- * Backend expense request format (what we send to the API)
+ * Backend expense request format (what we send to the API).
+ * Internal to this module — not exported since no external consumer needs it.
  */
-export interface BackendExpenseRequest {
+interface BackendExpenseRequest {
 	vehicleId: string;
 	tags: string[];
 	category: string;
@@ -22,7 +23,6 @@ export interface BackendExpenseRequest {
 	volume?: number;
 	fuelType?: string;
 	description?: string;
-	receiptUrl?: string;
 	isFinancingPayment?: boolean;
 	missedFillup?: boolean;
 }
@@ -42,7 +42,6 @@ export interface BackendExpenseResponse {
 	volume?: number;
 	fuelType?: string;
 	description?: string;
-	receiptUrl?: string;
 	isFinancingPayment?: boolean;
 	missedFillup?: boolean;
 	groupId?: string;
@@ -91,9 +90,6 @@ export function toBackendExpense(
 	}
 	if (frontendExpense.description) {
 		backendExpense.description = frontendExpense.description;
-	}
-	if (frontendExpense.receiptUrl) {
-		backendExpense.receiptUrl = frontendExpense.receiptUrl;
 	}
 	if (frontendExpense.isFinancingPayment !== undefined) {
 		backendExpense.isFinancingPayment = frontendExpense.isFinancingPayment;

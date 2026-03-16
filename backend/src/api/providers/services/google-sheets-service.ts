@@ -347,7 +347,6 @@ export class GoogleSheetsService {
       'date',
       'mileage',
       'description',
-      'receiptUrl',
       'groupId',
       'groupTotal',
       'splitMethod',

@@ -82,11 +82,8 @@ export function monthlyXAxisProps(dataLength: number) {
 	};
 }
 
-/**
- * Shared spline (line) props for smooth trend lines with dots.
- * Apply via `props: { ...TREND_LINE_PROPS }` on LineChart components.
- */
-export const TREND_LINE_PROPS = {
+/** Shared spline (line) props for smooth trend lines with dots. */
+const TREND_LINE_PROPS = {
 	spline: {
 		curve: SMOOTH_CURVE
 	},

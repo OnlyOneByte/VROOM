@@ -181,8 +181,6 @@ export const CONFIG = {
   },
 } as const;
 
-export type RestoreMode = (typeof CONFIG.backup.supportedModes)[number];
-
 export const TABLE_SCHEMA_MAP: Record<string, Table> = {
   vehicles,
   expenses,

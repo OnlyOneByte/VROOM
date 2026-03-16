@@ -8,7 +8,6 @@ import {
 	lastDataChangeTime,
 	backupEnabled,
 	sheetsSyncEnabled,
-	syncQueue,
 	type SyncConflict,
 	type SyncConfig
 } from './sync-state.svelte';
@@ -23,7 +22,6 @@ export type { SyncConflict, SyncConfig };
 export {
 	syncConfig,
 	syncConflicts,
-	syncQueue,
 	lastSyncTime,
 	lastBackupTime,
 	lastSheetsSync,
@@ -32,7 +30,7 @@ export {
 	sheetsSyncEnabled
 };
 
-export interface SyncResult {
+interface SyncResult {
 	success: boolean;
 	synced: number;
 	failed: number;
