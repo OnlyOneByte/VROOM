@@ -84,6 +84,8 @@ export class ExpenseSplitService {
       tags?: string[];
       description?: string;
       insuranceTermId?: string;
+      sourceType?: string;
+      sourceId?: string;
     }
   ): Promise<Expense[]> {
     const siblings: Expense[] = [];
@@ -104,6 +106,8 @@ export class ExpenseSplitService {
         insuranceTermId: params.insuranceTermId ?? null,
         isFinancingPayment: false,
         missedFillup: false,
+        sourceType: params.sourceType ?? null,
+        sourceId: params.sourceId ?? null,
       };
 
       const [inserted] = await tx.insert(expenses).values(newExpense).returning();

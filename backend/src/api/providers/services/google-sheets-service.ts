@@ -14,6 +14,9 @@ import {
   odometerEntries,
   photoRefs,
   photos,
+  reminderNotifications,
+  reminders,
+  reminderVehicles,
   syncState,
   userPreferences,
   vehicleFinancing,
@@ -142,6 +145,9 @@ export class GoogleSheetsService {
           { properties: { title: 'Photo Refs' } },
           { properties: { title: 'User Preferences' } },
           { properties: { title: 'Sync State' } },
+          { properties: { title: 'Reminders' } },
+          { properties: { title: 'Reminder Vehicles' } },
+          { properties: { title: 'Reminder Notifications' } },
         ],
       },
     });
@@ -187,6 +193,9 @@ export class GoogleSheetsService {
       'Photo Refs',
       'User Preferences',
       'Sync State',
+      'Reminders',
+      'Reminder Vehicles',
+      'Reminder Notifications',
     ];
     const info = await this.getSpreadsheetInfo(spreadsheetId);
     const existingTitles = new Set(info.sheets.map((s) => s.title));
@@ -265,6 +274,22 @@ export class GoogleSheetsService {
       .where(eq(userPreferences.userId, userId));
     const syncStateRows = await db.select().from(syncState).where(eq(syncState.userId, userId));
 
+    // Query reminders, reminder_vehicles, and reminder_notifications
+    const userReminders = await db.select().from(reminders).where(eq(reminders.userId, userId));
+
+    const reminderIds = userReminders.map((r) => r.id);
+    const userReminderVehicles =
+      reminderIds.length > 0
+        ? await db
+            .select()
+            .from(reminderVehicles)
+            .where(inArray(reminderVehicles.reminderId, reminderIds))
+        : [];
+    const userReminderNotifications = await db
+      .select()
+      .from(reminderNotifications)
+      .where(eq(reminderNotifications.userId, userId));
+
     await Promise.all([
       this.updateSheet(spreadsheetId, 'Vehicles', userVehicles, this.getVehicleHeaders()),
       this.updateSheet(spreadsheetId, 'Expenses', userExpenses, this.getExpenseHeaders()),
@@ -307,6 +332,19 @@ export class GoogleSheetsService {
         this.getUserPreferencesHeaders()
       ),
       this.updateSheet(spreadsheetId, 'Sync State', syncStateRows, this.getSyncStateHeaders()),
+      this.updateSheet(spreadsheetId, 'Reminders', userReminders, this.getReminderHeaders()),
+      this.updateSheet(
+        spreadsheetId,
+        'Reminder Vehicles',
+        userReminderVehicles,
+        this.getReminderVehicleHeaders()
+      ),
+      this.updateSheet(
+        spreadsheetId,
+        'Reminder Notifications',
+        userReminderNotifications,
+        this.getReminderNotificationHeaders()
+      ),
     ]);
   }
 
@@ -350,6 +388,8 @@ export class GoogleSheetsService {
       'groupId',
       'groupTotal',
       'splitMethod',
+      'sourceType',
+      'sourceId',
       'insuranceTermId',
       'createdAt',
       'updatedAt',
@@ -473,6 +513,40 @@ export class GoogleSheetsService {
     return ['userId', 'lastSyncDate', 'lastDataChangeDate', 'lastBackupDate'];
   }
 
+  private getReminderHeaders() {
+    return [
+      'id',
+      'userId',
+      'name',
+      'description',
+      'type',
+      'actionMode',
+      'frequency',
+      'intervalValue',
+      'intervalUnit',
+      'startDate',
+      'endDate',
+      'nextDueDate',
+      'expenseCategory',
+      'expenseTags',
+      'expenseAmount',
+      'expenseDescription',
+      'expenseSplitConfig',
+      'isActive',
+      'lastTriggeredAt',
+      'createdAt',
+      'updatedAt',
+    ];
+  }
+
+  private getReminderVehicleHeaders() {
+    return ['reminderId', 'vehicleId'];
+  }
+
+  private getReminderNotificationHeaders() {
+    return ['id', 'reminderId', 'userId', 'dueDate', 'isRead', 'createdAt', 'updatedAt'];
+  }
+
   private async updateSheet<T extends Record<string, unknown>>(
     spreadsheetId: string,
     sheetName: string,
@@ -527,6 +601,9 @@ export class GoogleSheetsService {
     photoRefs: Record<string, unknown>[];
     userPreferences: Record<string, unknown>[];
     syncState: Record<string, unknown>[];
+    reminders: Record<string, unknown>[];
+    reminderVehicles: Record<string, unknown>[];
+    reminderNotifications: Record<string, unknown>[];
   }> {
     const [
       vehiclesData,
@@ -540,6 +617,9 @@ export class GoogleSheetsService {
       photoRefsData,
       userPreferencesData,
       syncStateData,
+      remindersData,
+      reminderVehiclesData,
+      reminderNotificationsData,
     ] = await Promise.all([
       this.readSheetData(spreadsheetId, 'Vehicles!A:Z'),
       this.readSheetData(spreadsheetId, 'Expenses!A:Z'),
@@ -552,6 +632,9 @@ export class GoogleSheetsService {
       this.readSheetData(spreadsheetId, 'Photo Refs!A:Z').catch(() => []),
       this.readSheetData(spreadsheetId, 'User Preferences!A:Z').catch(() => []),
       this.readSheetData(spreadsheetId, 'Sync State!A:Z').catch(() => []),
+      this.readSheetData(spreadsheetId, 'Reminders!A:Z').catch(() => []),
+      this.readSheetData(spreadsheetId, 'Reminder Vehicles!A:Z').catch(() => []),
+      this.readSheetData(spreadsheetId, 'Reminder Notifications!A:Z').catch(() => []),
     ]);
 
     const vehicleRecords = this.parseSheetData(vehiclesData);
@@ -565,6 +648,9 @@ export class GoogleSheetsService {
     const photoRefs = this.parseSheetData(photoRefsData);
     const userPreferencesRecords = this.parseSheetData(userPreferencesData);
     const syncStateRecords = this.parseSheetData(syncStateData);
+    const remindersRecords = this.parseSheetData(remindersData);
+    const reminderVehiclesRecords = this.parseSheetData(reminderVehiclesData);
+    const reminderNotificationsRecords = this.parseSheetData(reminderNotificationsData);
 
     const userId = vehicleRecords.length > 0 ? (vehicleRecords[0].userId as string) : '';
 
@@ -581,6 +667,9 @@ export class GoogleSheetsService {
       photoRefs,
       userPreferences: userPreferencesRecords,
       syncState: syncStateRecords,
+      reminders: remindersRecords,
+      reminderVehicles: reminderVehiclesRecords,
+      reminderNotifications: reminderNotificationsRecords,
     };
   }
 

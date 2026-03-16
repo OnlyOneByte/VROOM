@@ -67,6 +67,8 @@ const createExpenseSchema = baseExpenseSchema.omit({
   groupId: true,
   groupTotal: true,
   splitMethod: true,
+  sourceType: true,
+  sourceId: true,
 });
 
 const updateExpenseSchema = createExpenseSchema.partial();

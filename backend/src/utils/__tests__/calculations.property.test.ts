@@ -41,6 +41,8 @@ function makeExpense(overrides: {
     groupId: null,
     groupTotal: null,
     splitMethod: null,
+    sourceType: null,
+    sourceId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

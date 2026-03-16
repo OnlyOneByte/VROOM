@@ -35,6 +35,16 @@ export const EXPENSE_CATEGORY_DESCRIPTIONS: Record<ExpenseCategory, string> = {
 
 export type PaymentFrequency = 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
 
+// ---------------------------------------------------------------------------
+// Reminder Split Config — mirrors SplitConfig shape from api/expenses/validation.ts
+// Defined here to avoid reverse dependency (db → api).
+// ---------------------------------------------------------------------------
+
+export type ReminderSplitConfig =
+  | { method: 'even'; vehicleIds: string[] }
+  | { method: 'absolute'; allocations: { vehicleId: string; amount: number }[] }
+  | { method: 'percentage'; allocations: { vehicleId: string; percentage: number }[] };
+
 // Generic type guard generator for string union types
 function createEnumGuard<T extends string>(validValues: readonly T[]) {
   return (value: string): value is T => validValues.includes(value as T);

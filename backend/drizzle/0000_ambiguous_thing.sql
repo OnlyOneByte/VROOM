@@ -1,6 +1,5 @@
 CREATE TABLE `expenses` (
 	`id` text PRIMARY KEY NOT NULL,
-	`user_id` text NOT NULL,
 	`vehicle_id` text NOT NULL,
 	`category` text NOT NULL,
 	`tags` text,
@@ -15,9 +14,12 @@ CREATE TABLE `expenses` (
 	`is_financing_payment` integer DEFAULT false NOT NULL,
 	`insurance_term_id` text,
 	`missed_fillup` integer DEFAULT false NOT NULL,
+	`user_id` text NOT NULL,
 	`group_id` text,
 	`group_total` real,
 	`split_method` text,
+	`source_type` text,
+	`source_id` text,
 	FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`insurance_term_id`) REFERENCES `insurance_terms`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
@@ -30,6 +32,7 @@ CREATE INDEX `expenses_user_date_idx` ON `expenses` (`user_id`,`date`);--> state
 CREATE INDEX `expenses_user_category_date_idx` ON `expenses` (`user_id`,`category`,`date`);--> statement-breakpoint
 CREATE INDEX `expenses_group_idx` ON `expenses` (`group_id`);--> statement-breakpoint
 CREATE INDEX `expenses_insurance_term_idx` ON `expenses` (`insurance_term_id`);--> statement-breakpoint
+CREATE INDEX `expenses_source_idx` ON `expenses` (`source_type`,`source_id`);--> statement-breakpoint
 CREATE TABLE `insurance_policies` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
@@ -120,6 +123,55 @@ CREATE TABLE `photos` (
 --> statement-breakpoint
 CREATE INDEX `photos_entity_idx` ON `photos` (`entity_type`,`entity_id`);--> statement-breakpoint
 CREATE INDEX `photos_user_entity_type_idx` ON `photos` (`user_id`,`entity_type`);--> statement-breakpoint
+CREATE TABLE `reminder_notifications` (
+	`id` text PRIMARY KEY NOT NULL,
+	`reminder_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`due_date` integer NOT NULL,
+	`is_read` integer DEFAULT false NOT NULL,
+	`created_at` integer,
+	`updated_at` integer,
+	FOREIGN KEY (`reminder_id`) REFERENCES `reminders`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `rn_user_unread_idx` ON `reminder_notifications` (`user_id`,`is_read`);--> statement-breakpoint
+CREATE UNIQUE INDEX `rn_reminder_due_idx` ON `reminder_notifications` (`reminder_id`,`due_date`);--> statement-breakpoint
+CREATE TABLE `reminder_vehicles` (
+	`reminder_id` text NOT NULL,
+	`vehicle_id` text NOT NULL,
+	PRIMARY KEY(`reminder_id`, `vehicle_id`),
+	FOREIGN KEY (`reminder_id`) REFERENCES `reminders`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `rv_vehicle_idx` ON `reminder_vehicles` (`vehicle_id`);--> statement-breakpoint
+CREATE TABLE `reminders` (
+	`id` text PRIMARY KEY NOT NULL,
+	`user_id` text NOT NULL,
+	`name` text NOT NULL,
+	`description` text,
+	`type` text NOT NULL,
+	`action_mode` text DEFAULT 'automatic' NOT NULL,
+	`frequency` text NOT NULL,
+	`interval_value` integer,
+	`interval_unit` text,
+	`start_date` integer NOT NULL,
+	`end_date` integer,
+	`next_due_date` integer NOT NULL,
+	`expense_category` text,
+	`expense_tags` text,
+	`expense_amount` real,
+	`expense_description` text,
+	`expense_split_config` text,
+	`is_active` integer DEFAULT true NOT NULL,
+	`last_triggered_at` integer,
+	`created_at` integer,
+	`updated_at` integer,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `reminders_user_active_due_idx` ON `reminders` (`user_id`,`is_active`,`next_due_date`);--> statement-breakpoint
 CREATE TABLE `sessions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
