@@ -81,9 +81,20 @@ export const createSplitExpenseSchema = z
     date: z.coerce.date(),
     description: z.string().optional(),
     totalAmount: z.number().positive('Amount must be positive'),
-    insuranceTermId: z.string().optional(),
+    sourceType: z.string().optional(),
+    sourceId: z.string().optional(),
   })
-  .superRefine(refineSplitConfig);
+  .superRefine((data, ctx) => {
+    refineSplitConfig(data, ctx);
+    // Enforce both-or-neither for source fields
+    if ((data.sourceType && !data.sourceId) || (!data.sourceType && data.sourceId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'sourceType and sourceId must both be provided or both omitted',
+        path: ['sourceType'],
+      });
+    }
+  });
 
 export const updateSplitSchema = z
   .object({

@@ -980,8 +980,7 @@ export class AnalyticsRepository {
     rows: Array<{
       category: string;
       expenseAmount: number;
-      isFinancingPayment: boolean;
-      insuranceTermId: string | null;
+      sourceType: string | null;
     }>
   ): {
     financingInterest: number;
@@ -996,9 +995,9 @@ export class AnalyticsRepository {
     let maintenanceCost = 0;
     let otherCosts = 0;
     for (const row of rows) {
-      if (row.category === 'financial' && row.isFinancingPayment)
+      if (row.category === 'financial' && row.sourceType === 'financing')
         financingInterest += row.expenseAmount;
-      else if (row.category === 'financial' && row.insuranceTermId)
+      else if (row.category === 'financial' && row.sourceType === 'insurance_term')
         insuranceCost += row.expenseAmount;
       else if (row.category === 'fuel') fuelCost += row.expenseAmount;
       else if (row.category === 'maintenance') maintenanceCost += row.expenseAmount;
@@ -1737,8 +1736,7 @@ export class AnalyticsRepository {
           category: expenses.category,
           expenseAmount: expenses.expenseAmount,
           date: expenses.date,
-          isFinancingPayment: expenses.isFinancingPayment,
-          insuranceTermId: expenses.insuranceTermId,
+          sourceType: expenses.sourceType,
           mileage: expenses.mileage,
         })
         .from(expenses)

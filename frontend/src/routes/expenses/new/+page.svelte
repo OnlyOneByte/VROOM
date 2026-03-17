@@ -5,9 +5,7 @@
 	let returnTo = $derived(page.url.searchParams.get('returnTo') || '/expenses');
 	let preselectedVehicleId = $derived(page.url.searchParams.get('vehicleId'));
 	let preselectedCategory = $derived(page.url.searchParams.get('category'));
-	let preselectedIsFinancingPayment = $derived(
-		page.url.searchParams.get('isFinancingPayment') === 'true'
-	);
+	let preselectedFinancingId = $derived(page.url.searchParams.get('financingId'));
 	let preselectedAmount = $derived(page.url.searchParams.get('amount'));
 </script>
 
@@ -20,6 +18,6 @@
 	{returnTo}
 	{preselectedVehicleId}
 	{preselectedCategory}
-	{preselectedIsFinancingPayment}
+	{preselectedFinancingId}
 	{preselectedAmount}
 />

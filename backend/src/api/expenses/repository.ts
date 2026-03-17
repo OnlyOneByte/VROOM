@@ -353,15 +353,21 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   /**
-   * Delete all expenses linked to an insurance term.
-   * Used when a term is updated to replace old auto-created expenses.
+   * Delete all expenses linked to a source (e.g., insurance term, financing).
+   * Used when a source entity is deleted/updated to replace auto-created expenses.
    */
-  async deleteByInsuranceTermId(termId: string, userId: string): Promise<number> {
+  async deleteBySource(sourceType: string, sourceId: string, userId: string): Promise<number> {
     try {
       const linked = await this.db
         .select({ id: expenses.id })
         .from(expenses)
-        .where(and(eq(expenses.insuranceTermId, termId), eq(expenses.userId, userId)));
+        .where(
+          and(
+            eq(expenses.sourceType, sourceType),
+            eq(expenses.sourceId, sourceId),
+            eq(expenses.userId, userId)
+          )
+        );
 
       if (linked.length === 0) return 0;
 
@@ -373,16 +379,51 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, linkedIds)));
         await tx
           .delete(expenses)
-          .where(and(eq(expenses.insuranceTermId, termId), eq(expenses.userId, userId)));
+          .where(
+            and(
+              eq(expenses.sourceType, sourceType),
+              eq(expenses.sourceId, sourceId),
+              eq(expenses.userId, userId)
+            )
+          );
       });
 
       return linked.length;
     } catch (error) {
-      logger.error('Failed to delete expenses by insurance term', {
-        termId,
+      logger.error('Failed to delete expenses by source', {
+        sourceType,
+        sourceId,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new DatabaseError('Failed to delete expenses by insurance term', error);
+      throw new DatabaseError('Failed to delete expenses by source', error);
+    }
+  }
+
+  /**
+   * Null-out source fields on expenses linked to a source.
+   * Used when a source entity is deactivated but expenses should persist.
+   */
+  async clearSource(sourceType: string, sourceId: string, userId: string): Promise<number> {
+    try {
+      const result = await this.db
+        .update(expenses)
+        .set({ sourceType: null, sourceId: null })
+        .where(
+          and(
+            eq(expenses.sourceType, sourceType),
+            eq(expenses.sourceId, sourceId),
+            eq(expenses.userId, userId)
+          )
+        );
+
+      return result.changes;
+    } catch (error) {
+      logger.error('Failed to clear source on expenses', {
+        sourceType,
+        sourceId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to clear source on expenses', error);
     }
   }
 
@@ -425,7 +466,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       date: Date;
       description?: string;
       totalAmount: number;
-      insuranceTermId?: string;
+      sourceType?: string;
+      sourceId?: string;
     },
     userId: string
   ): Promise<Expense[]> {
@@ -451,7 +493,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           date: data.date,
           tags: data.tags,
           description: data.description,
-          insuranceTermId: data.insuranceTermId,
+          sourceType: data.sourceType,
+          sourceId: data.sourceId,
         });
       });
     } catch (error) {
@@ -568,7 +611,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           date: firstOld.date,
           tags: firstOld.tags ?? undefined,
           description: firstOld.description ?? undefined,
-          insuranceTermId: firstOld.insuranceTermId ?? undefined,
+          sourceType: firstOld.sourceType ?? undefined,
+          sourceId: firstOld.sourceId ?? undefined,
         });
 
         // 4. Migrate photos to first new sibling

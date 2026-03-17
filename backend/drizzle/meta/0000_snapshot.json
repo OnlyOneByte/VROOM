@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5e4ff091-9737-4ee3-aadf-48c0c2fa6095",
+  "id": "d79f6511-2e30-4450-a97e-eda54c4aa028",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "expenses": {
@@ -86,21 +86,6 @@
         },
         "fuel_type": {
           "name": "fuel_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "is_financing_payment": {
-          "name": "is_financing_payment",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "insurance_term_id": {
-          "name": "insurance_term_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -207,13 +192,6 @@
           ],
           "isUnique": false
         },
-        "expenses_insurance_term_idx": {
-          "name": "expenses_insurance_term_idx",
-          "columns": [
-            "insurance_term_id"
-          ],
-          "isUnique": false
-        },
         "expenses_source_idx": {
           "name": "expenses_source_idx",
           "columns": [
@@ -235,19 +213,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "expenses_insurance_term_id_insurance_terms_id_fk": {
-          "name": "expenses_insurance_term_id_insurance_terms_id_fk",
-          "tableFrom": "expenses",
-          "tableTo": "insurance_terms",
-          "columnsFrom": [
-            "insurance_term_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "expenses_user_id_users_id_fk": {

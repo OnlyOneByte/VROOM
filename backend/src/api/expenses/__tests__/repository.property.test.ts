@@ -19,7 +19,7 @@
  * Monthly trend periods are sorted chronologically.
  *
  * Property 7: Financing Expense Query Correctness
- * Query should return exactly those expenses where `isFinancingPayment === true`
+ * Query should return exactly those expenses where `sourceType === 'financing'`
  * and `vehicleId` matches, sorted by date ascending.
  *
  * **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 3.1, 3.2, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2**
@@ -62,12 +62,10 @@ function makePaginatedExpense(overrides: {
     tags: overrides.tags,
     date: overrides.date,
     expenseAmount: 100,
-    isFinancingPayment: false,
     mileage: null,
     description: null,
     volume: null,
     fuelType: null,
-    insuranceTermId: null,
     missedFillup: false,
     userId: 'test-user',
     groupId: null,
@@ -132,30 +130,29 @@ function referenceFindPaginated(
 /** Build a synthetic Expense for testing filtering/sorting logic. */
 function makeExpense(overrides: {
   vehicleId: string;
-  isFinancingPayment: boolean;
+  sourceType: string | null;
+  sourceId: string | null;
   date: Date;
   index: number;
 }): Expense {
   return {
     id: `exp-${overrides.index}`,
     vehicleId: overrides.vehicleId,
-    category: overrides.isFinancingPayment ? 'financial' : 'maintenance',
+    category: overrides.sourceType === 'financing' ? 'financial' : 'maintenance',
     tags: [],
     date: overrides.date,
     expenseAmount: 100,
-    isFinancingPayment: overrides.isFinancingPayment,
     mileage: null,
     description: null,
     volume: null,
     fuelType: null,
-    insuranceTermId: null,
     missedFillup: false,
     userId: 'test-user',
     groupId: null,
     groupTotal: null,
     splitMethod: null,
-    sourceType: null,
-    sourceId: null,
+    sourceType: overrides.sourceType,
+    sourceId: overrides.sourceId,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -164,13 +161,13 @@ function makeExpense(overrides: {
 /**
  * Reference implementation of the filtering/sorting contract that
  * `findFinancingByVehicleId` must satisfy:
- *   - Only expenses with `isFinancingPayment === true`
+ *   - Only expenses with `sourceType === 'financing'`
  *   - Only expenses matching the target `vehicleId`
  *   - Sorted by date ascending
  */
 function referenceQuery(allExpenses: Expense[], vehicleId: string): Expense[] {
   return allExpenses
-    .filter((e) => e.isFinancingPayment === true && e.vehicleId === vehicleId)
+    .filter((e) => e.sourceType === 'financing' && e.vehicleId === vehicleId)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
@@ -442,7 +439,8 @@ const expenseDateArb = fc
 const expenseArb = (index: number) =>
   fc.record({
     vehicleId: vehicleIdArb,
-    isFinancingPayment: fc.boolean(),
+    sourceType: fc.constantFrom('financing', null) as fc.Arbitrary<string | null>,
+    sourceId: fc.constant('fin-1') as fc.Arbitrary<string | null>,
     date: expenseDateArb,
     index: fc.constant(index),
   });
@@ -455,15 +453,15 @@ const expenseListArb = fc
 // Property 7: Financing Expense Query Correctness
 // ---------------------------------------------------------------------------
 describe('Property 7: Financing Expense Query Correctness', () => {
-  test('filtering returns exactly expenses with isFinancingPayment === true for the target vehicleId', () => {
+  test('filtering returns exactly expenses with sourceType === financing for the target vehicleId', () => {
     fc.assert(
       fc.property(expenseListArb, vehicleIdArb, (expenseInputs, targetVehicleId) => {
         const allExpenses = expenseInputs.map((input) => makeExpense(input));
         const result = referenceQuery(allExpenses, targetVehicleId);
 
-        // Every returned expense must have isFinancingPayment === true
+        // Every returned expense must have sourceType === 'financing'
         for (const e of result) {
-          expect(e.isFinancingPayment).toBe(true);
+          expect(e.sourceType).toBe('financing');
         }
 
         // Every returned expense must match the target vehicleId
@@ -474,7 +472,7 @@ describe('Property 7: Financing Expense Query Correctness', () => {
         // No matching expense should be missing from the result
         const expectedIds = new Set(
           allExpenses
-            .filter((e) => e.isFinancingPayment === true && e.vehicleId === targetVehicleId)
+            .filter((e) => e.sourceType === 'financing' && e.vehicleId === targetVehicleId)
             .map((e) => e.id)
         );
         const resultIds = new Set(result.map((e) => e.id));
@@ -501,14 +499,14 @@ describe('Property 7: Financing Expense Query Correctness', () => {
     );
   });
 
-  test('expenses with isFinancingPayment === false never appear in results', () => {
+  test('expenses with sourceType !== financing never appear in results', () => {
     fc.assert(
       fc.property(expenseListArb, vehicleIdArb, (expenseInputs, targetVehicleId) => {
         const allExpenses = expenseInputs.map((input) => makeExpense(input));
         const result = referenceQuery(allExpenses, targetVehicleId);
 
         const nonFinancingIds = new Set(
-          allExpenses.filter((e) => e.isFinancingPayment === false).map((e) => e.id)
+          allExpenses.filter((e) => e.sourceType !== 'financing').map((e) => e.id)
         );
 
         for (const e of result) {
@@ -555,12 +553,10 @@ function makeSummaryExpense(input: SummaryExpenseInput): Expense {
     tags: [],
     date: input.date,
     expenseAmount: input.expenseAmount,
-    isFinancingPayment: false,
     mileage: null,
     description: null,
     volume: null,
     fuelType: null,
-    insuranceTermId: null,
     missedFillup: false,
     userId: 'test-user',
     groupId: null,

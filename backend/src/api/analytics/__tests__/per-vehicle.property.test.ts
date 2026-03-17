@@ -71,7 +71,6 @@ function resetDb(): void {
 
 /** Create user and a single vehicle, returning IDs. */
 function setupUserAndVehicle(opts?: {
-  insuranceTermId?: string | null;
   purchasePrice?: number | null;
   purchaseDate?: Date | null;
 }): { userId: string; vehicle: TestVehicle } {
@@ -182,9 +181,7 @@ describe('Property 10: Health score formula', () => {
             seedInsurancePolicy(testDb.sqlite, policy);
           }
 
-          const { userId, vehicle } = setupUserAndVehicle({
-            insuranceTermId: policyId,
-          });
+          const { userId, vehicle } = setupUserAndVehicle({});
           seedRandomExpenses(vehicle.id, expenseCount);
 
           const result = await repo.getVehicleHealth(userId, vehicle.id);

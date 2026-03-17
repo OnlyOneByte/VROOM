@@ -2,7 +2,7 @@
  * Financing Repository
  *
  * Vehicle financing operations (loan/lease configuration and computed balance).
- * Payment tracking is handled through the expenses table with isFinancingPayment flag.
+ * Payment tracking is handled through the expenses table with source_type = 'financing'.
  * Balance is computed on read: originalAmount - SUM(financing payment expenses).
  */
 
@@ -44,9 +44,9 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
   /**
    * Compute the current balance for a financing record.
    *
-   * Looks up the financing record's originalAmount and vehicleId, then computes:
+   * Looks up the financing record's originalAmount, then computes:
    *   originalAmount - COALESCE(SUM(expenses.expenseAmount), 0)
-   * WHERE is_financing_payment = 1 for that vehicle, clamped to min 0.
+   * WHERE source_type = 'financing' AND source_id = financingId, clamped to min 0.
    *
    * Returns 0 if the financing record does not exist.
    */
@@ -63,7 +63,7 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
         })
         .from(expenses)
         .where(
-          sql`${expenses.vehicleId} = ${financing.vehicleId} AND ${expenses.isFinancingPayment} = 1`
+          sql`${expenses.sourceType} = 'financing' AND ${expenses.sourceId} = ${financingId}`
         );
 
       const totalPayments = Number(result?.totalPayments) || 0;

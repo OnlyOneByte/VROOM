@@ -38,7 +38,8 @@ export async function createTermExpenses(params: TermExpenseParams): Promise<voi
         date: startDate,
         description,
         totalAmount: totalCost,
-        insuranceTermId: termId,
+        sourceType: 'insurance_term',
+        sourceId: termId,
       },
       userId
     );
@@ -66,7 +67,7 @@ export async function updateTermExpenses(params: TermExpenseParams): Promise<voi
 
   try {
     // Delete old auto-created expenses for this term
-    const deleted = await expenseRepository.deleteByInsuranceTermId(termId, userId);
+    const deleted = await expenseRepository.deleteBySource('insurance_term', termId, userId);
     if (deleted > 0) {
       logger.info('Deleted old insurance expenses for term update', { termId, deleted });
     }

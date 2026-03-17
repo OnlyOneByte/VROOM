@@ -56,10 +56,11 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
       `Description must be ${CONFIG.validation.expense.descriptionMaxLength} characters or less`
     )
     .optional(),
-  isFinancingPayment: z.boolean().optional().default(false),
+  sourceType: z.enum(['financing', 'insurance_term', 'reminder']).optional(),
+  sourceId: z.string().min(1).optional(),
 });
 
-const createExpenseSchema = baseExpenseSchema.omit({
+const createExpenseSchemaBase = baseExpenseSchema.omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -67,11 +68,19 @@ const createExpenseSchema = baseExpenseSchema.omit({
   groupId: true,
   groupTotal: true,
   splitMethod: true,
-  sourceType: true,
-  sourceId: true,
 });
 
-const updateExpenseSchema = createExpenseSchema.partial();
+const createExpenseSchema = createExpenseSchemaBase.refine(
+  (data) => {
+    // Enforce both-or-neither for source fields
+    const hasType = !!data.sourceType;
+    const hasId = !!data.sourceId;
+    return hasType === hasId;
+  },
+  { message: 'sourceType and sourceId must both be provided or both omitted', path: ['sourceType'] }
+);
+
+const updateExpenseSchema = createExpenseSchemaBase.partial();
 
 const expenseQuerySchema = z.object({
   vehicleId: z.string().optional(),
@@ -264,11 +273,14 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     throw new NotFoundError('Vehicle');
   }
 
-  // Validate: reject financing payment if vehicle has no active financing
-  if (expenseData.isFinancingPayment) {
+  // Validate: if sourceType is provided, verify the referenced entity exists
+  if (expenseData.sourceType === 'financing') {
     const financing = await financingRepository.findByVehicleId(expenseData.vehicleId);
     if (!financing || !financing.isActive) {
       throw new ValidationError('Vehicle has no active financing');
+    }
+    if (expenseData.sourceId !== financing.id) {
+      throw new ValidationError('Source ID does not match the active financing record');
     }
   }
 

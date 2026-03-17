@@ -65,65 +65,53 @@ function buildMinimalStringRow(
 
 describe('coerceRow: Boolean columns', () => {
   test('empty string on NOT NULL boolean defaults to false', () => {
-    const row = buildMinimalStringRow(expenses, { missedFillup: '', isFinancingPayment: '' });
+    const row = buildMinimalStringRow(expenses, { missedFillup: '' });
     const result = coerceRow(row, expenses);
     expect(result.missedFillup).toBe(false);
-    expect(result.isFinancingPayment).toBe(false);
   });
 
   test('null on NOT NULL boolean defaults to false', () => {
     const row = buildMinimalStringRow(expenses, {});
     row.missedFillup = null as unknown as string;
-    row.isFinancingPayment = null as unknown as string;
     const result = coerceRow(row, expenses);
     expect(result.missedFillup).toBe(false);
-    expect(result.isFinancingPayment).toBe(false);
   });
 
   test('undefined on NOT NULL boolean defaults to false', () => {
     const row = buildMinimalStringRow(expenses, {});
     delete (row as Record<string, unknown>).missedFillup;
-    delete (row as Record<string, unknown>).isFinancingPayment;
     const result = coerceRow(row, expenses);
     expect(result.missedFillup).toBe(false);
-    expect(result.isFinancingPayment).toBe(false);
   });
 
   test('"null" string on NOT NULL boolean defaults to false', () => {
     const row = buildMinimalStringRow(expenses, {
       missedFillup: 'null',
-      isFinancingPayment: 'NULL',
     });
     const result = coerceRow(row, expenses);
     expect(result.missedFillup).toBe(false);
-    expect(result.isFinancingPayment).toBe(false);
   });
 
   test('"true" string coerces to true', () => {
     const row = buildMinimalStringRow(expenses, {
       missedFillup: 'true',
-      isFinancingPayment: 'TRUE',
     });
     const result = coerceRow(row, expenses);
     expect(result.missedFillup).toBe(true);
-    expect(result.isFinancingPayment).toBe(true);
   });
 
   test('"1" string coerces to true', () => {
-    const row = buildMinimalStringRow(expenses, { missedFillup: '1', isFinancingPayment: '1' });
+    const row = buildMinimalStringRow(expenses, { missedFillup: '1' });
     const result = coerceRow(row, expenses);
     expect(result.missedFillup).toBe(true);
-    expect(result.isFinancingPayment).toBe(true);
   });
 
   test('"false" string coerces to false', () => {
     const row = buildMinimalStringRow(expenses, {
       missedFillup: 'false',
-      isFinancingPayment: '0',
     });
     const result = coerceRow(row, expenses);
     expect(result.missedFillup).toBe(false);
-    expect(result.isFinancingPayment).toBe(false);
   });
 
   test('boolean handling works on vehicleFinancing.isActive', () => {
@@ -255,8 +243,8 @@ describe('Validation: coerced rows pass insert schemas', () => {
 // ---------------------------------------------------------------------------
 
 describe('Validation: empty NOT NULL booleans pass after coercion', () => {
-  test('expense with empty missedFillup and isFinancingPayment passes validation', () => {
-    const row = buildMinimalStringRow(expenses, { missedFillup: '', isFinancingPayment: '' });
+  test('expense with empty missedFillup passes validation', () => {
+    const row = buildMinimalStringRow(expenses, { missedFillup: '' });
     const coerced = coerceRow(row, expenses);
     const schema = createInsertSchema(expenses);
     const result = schema.safeParse(coerced);
@@ -295,7 +283,6 @@ describe('validateBackupData: acceptance', () => {
             vehicleId: 'test-id',
             userId: 'u1',
             missedFillup: '',
-            isFinancingPayment: '',
           }),
           expenses
         ),

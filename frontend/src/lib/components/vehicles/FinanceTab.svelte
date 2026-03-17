@@ -111,7 +111,7 @@
 				limit: 100,
 				category: 'financial'
 			});
-			const financingExpenses = result.data.filter(e => e.isFinancingPayment === true);
+			const financingExpenses = result.data.filter(e => e.sourceType === 'financing');
 			payments = derivePaymentEntries(financingExpenses, vehicle.financing);
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading payment history:', error);
@@ -134,7 +134,7 @@
 			<NextPaymentCard
 				financing={vehicle.financing}
 				lastPayment={payments.length > 0 ? payments[0] : undefined}
-				recordPaymentHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&category=financial&isFinancingPayment=true&amount=${vehicle.financing.paymentAmount}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
+				recordPaymentHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&category=financial&financingId=${vehicle.financing.id}&amount=${vehicle.financing.paymentAmount}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
 				{progressPercentage}
 				onChangePayment={() => (showPaymentPlanner = true)}
 			/>
