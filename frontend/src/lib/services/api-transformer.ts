@@ -23,8 +23,9 @@ interface BackendExpenseRequest {
 	volume?: number;
 	fuelType?: string;
 	description?: string;
-	isFinancingPayment?: boolean;
 	missedFillup?: boolean;
+	sourceType?: string;
+	sourceId?: string;
 }
 
 /**
@@ -42,8 +43,9 @@ export interface BackendExpenseResponse {
 	volume?: number;
 	fuelType?: string;
 	description?: string;
-	isFinancingPayment?: boolean;
 	missedFillup?: boolean;
+	sourceType?: string;
+	sourceId?: string;
 	groupId?: string;
 	groupTotal?: number;
 	splitMethod?: string;
@@ -91,8 +93,11 @@ export function toBackendExpense(
 	if (frontendExpense.description) {
 		backendExpense.description = frontendExpense.description;
 	}
-	if (frontendExpense.isFinancingPayment !== undefined) {
-		backendExpense.isFinancingPayment = frontendExpense.isFinancingPayment;
+	if (frontendExpense.sourceType) {
+		backendExpense.sourceType = frontendExpense.sourceType;
+	}
+	if (frontendExpense.sourceId) {
+		backendExpense.sourceId = frontendExpense.sourceId;
 	}
 	if (frontendExpense.missedFillup !== undefined) {
 		backendExpense.missedFillup = frontendExpense.missedFillup;
@@ -114,7 +119,6 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 		category: backendExpense.category as ExpenseCategory,
 		amount: backendExpense.expenseAmount,
 		date: backendExpense.date,
-		isFinancingPayment: backendExpense.isFinancingPayment ?? false,
 		missedFillup: backendExpense.missedFillup ?? false,
 		createdAt: backendExpense.createdAt,
 		updatedAt: backendExpense.updatedAt
@@ -147,6 +151,12 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 	}
 	if (backendExpense.splitMethod) {
 		frontendExpense.splitMethod = backendExpense.splitMethod;
+	}
+	if (backendExpense.sourceType) {
+		frontendExpense.sourceType = backendExpense.sourceType;
+	}
+	if (backendExpense.sourceId) {
+		frontendExpense.sourceId = backendExpense.sourceId;
 	}
 
 	return frontendExpense;

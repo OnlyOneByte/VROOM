@@ -19,7 +19,8 @@
 		Trash2,
 		LoaderCircle,
 		GitBranch,
-		Shield
+		Shield,
+		CreditCard
 	} from '@lucide/svelte';
 	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
@@ -55,7 +56,7 @@
 		returnTo?: string;
 		preselectedVehicleId?: string | null;
 		preselectedCategory?: string | null;
-		preselectedIsFinancingPayment?: boolean;
+		preselectedFinancingId?: string | null;
 		preselectedAmount?: string | null;
 	}
 
@@ -64,7 +65,7 @@
 		returnTo = '/expenses',
 		preselectedVehicleId = null,
 		preselectedCategory = null,
-		preselectedIsFinancingPayment = false,
+		preselectedFinancingId = null,
 		preselectedAmount = null
 	}: Props = $props();
 
@@ -83,7 +84,6 @@
 		charge: '',
 		fuelType: '',
 		description: '',
-		isFinancingPayment: false,
 		missedFillup: false
 	});
 
@@ -122,7 +122,10 @@
 	// Insurance-managed mode — read-only, links to policy page
 	let isInsuranceManaged = $state(false);
 	let insurancePolicyId = $state<string | null>(null);
-	let insuranceTermId = $state<string | null>(null);
+
+	// Source tracking for financing payments
+	let sourceType = $state<string | null>(null);
+	let sourceId = $state<string | null>(null);
 
 	// Pending photo files for create mode (uploaded after expense is saved)
 	let pendingFiles = $state<File[]>([]);
@@ -166,10 +169,11 @@
 			await loadAllVehicleExpenses();
 		}
 
-		// Set financing payment flag AFTER vehicle is loaded so the $effect
+		// Set financing source fields AFTER vehicle is loaded so the $effect
 		// for vehicle changes has already fired and won't reset it
-		if (!isEditMode && preselectedIsFinancingPayment) {
-			formData.isFinancingPayment = true;
+		if (!isEditMode && preselectedFinancingId) {
+			sourceType = 'financing';
+			sourceId = preselectedFinancingId;
 		}
 	});
 
@@ -274,7 +278,6 @@
 			formData.charge = expense.charge?.toString() ?? '';
 			formData.fuelType = expense.fuelType || '';
 			formData.description = expense.description || '';
-			formData.isFinancingPayment = expense.isFinancingPayment ?? false;
 			formData.missedFillup = expense.missedFillup ?? false;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Error loading expense:', error);
@@ -321,9 +324,10 @@
 		touched['category'] = true;
 		handleBlur('category');
 
-		// Reset financing payment flag when switching away from financial category
+		// Reset financing source when switching away from financial category
 		if (categoryValue !== 'financial') {
-			formData.isFinancingPayment = false;
+			sourceType = null;
+			sourceId = null;
 		}
 	}
 
@@ -337,7 +341,8 @@
 				// Reset financing flag when switching vehicles (new vehicle may not have financing)
 				// But don't reset during edit mode initial load — loadExpense sets the correct value
 				if (!isEditMode || vehicle !== null) {
-					formData.isFinancingPayment = false;
+					sourceType = null;
+					sourceId = null;
 				}
 				loadVehicle();
 				loadLastFuelExpense();
@@ -349,10 +354,8 @@
 	// Show fuel-specific fields when Fuel category is selected
 	let showFuelFields = $derived(formData.category === 'fuel');
 
-	// Show financing checkbox when category is 'financial' AND vehicle has active financing
-	let showFinancingCheckbox = $derived(
-		formData.category === 'financial' && vehicle?.financing?.isActive === true
-	);
+	// Whether the current expense is a financing payment
+	let isFinancingPayment = $derived(sourceType === 'financing' && !!sourceId);
 
 	// Determine which energy field to require based on the selected fuelType
 	let showVolumeField = $derived(showFuelFields && !isElectricFuelType(formData.fuelType));
@@ -474,7 +477,8 @@
 				fuelType: formData.fuelType || undefined,
 				description: formData.description || undefined,
 				currency: currencyUnit,
-				isFinancingPayment: formData.isFinancingPayment,
+				sourceType: sourceType ?? undefined,
+				sourceId: sourceId ?? undefined,
 				missedFillup: formData.missedFillup
 			};
 
@@ -768,7 +772,7 @@
 							onclick={() => {
 								const queryObj: Record<string, string> = {};
 								if (insurancePolicyId) queryObj['policy'] = insurancePolicyId;
-								if (insuranceTermId) queryObj['editTerm'] = insuranceTermId;
+								if (sourceType === 'insurance_term' && sourceId) queryObj['editTerm'] = sourceId;
 								gotoWithQuery(resolve(routes.insurance), queryObj);
 							}}
 						>
@@ -994,13 +998,13 @@
 					onSelect={selectCategory}
 				/>
 
-				<!-- Financing Payment Checkbox -->
-				{#if showFinancingCheckbox}
+				<!-- Financing Payment Indicator (read-only, set via URL param) -->
+				{#if isFinancingPayment}
 					<div class="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
-						<Checkbox id="isFinancingPayment" bind:checked={formData.isFinancingPayment} />
-						<Label for="isFinancingPayment" class="cursor-pointer text-sm font-medium leading-none">
-							Apply as payment towards financing
-						</Label>
+						<CreditCard class="h-4 w-4 text-chart-3" />
+						<span class="text-sm font-medium leading-none text-foreground">
+							Financing payment
+						</span>
 					</div>
 				{/if}
 

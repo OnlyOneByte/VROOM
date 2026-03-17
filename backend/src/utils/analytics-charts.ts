@@ -814,8 +814,7 @@ export function buildTCOMonthlyTrend(
     category: string;
     expenseAmount: number;
     date: Date | number | null;
-    isFinancingPayment: boolean;
-    insuranceTermId: string | null;
+    sourceType: string | null;
   }>
 ): Array<{
   month: string;
@@ -833,9 +832,9 @@ export function buildTCOMonthlyTrend(
     if (!d) continue;
     const key = toMonthKey(d);
     const entry = map.get(key) ?? { financing: 0, insurance: 0, fuel: 0, maintenance: 0 };
-    if (row.category === 'financial' && row.isFinancingPayment) {
+    if (row.category === 'financial' && row.sourceType === 'financing') {
       entry.financing += row.expenseAmount;
-    } else if (row.category === 'financial' && row.insuranceTermId) {
+    } else if (row.category === 'financial' && row.sourceType === 'insurance_term') {
       entry.insurance += row.expenseAmount;
     } else if (row.category === 'fuel') {
       entry.fuel += row.expenseAmount;

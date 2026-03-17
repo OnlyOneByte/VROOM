@@ -11,8 +11,6 @@ CREATE TABLE `expenses` (
 	`expense_amount` real NOT NULL,
 	`volume` real,
 	`fuel_type` text,
-	`is_financing_payment` integer DEFAULT false NOT NULL,
-	`insurance_term_id` text,
 	`missed_fillup` integer DEFAULT false NOT NULL,
 	`user_id` text NOT NULL,
 	`group_id` text,
@@ -21,7 +19,6 @@ CREATE TABLE `expenses` (
 	`source_type` text,
 	`source_id` text,
 	FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`insurance_term_id`) REFERENCES `insurance_terms`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
@@ -31,7 +28,6 @@ CREATE INDEX `expenses_category_date_idx` ON `expenses` (`category`,`date`);--> 
 CREATE INDEX `expenses_user_date_idx` ON `expenses` (`user_id`,`date`);--> statement-breakpoint
 CREATE INDEX `expenses_user_category_date_idx` ON `expenses` (`user_id`,`category`,`date`);--> statement-breakpoint
 CREATE INDEX `expenses_group_idx` ON `expenses` (`group_id`);--> statement-breakpoint
-CREATE INDEX `expenses_insurance_term_idx` ON `expenses` (`insurance_term_id`);--> statement-breakpoint
 CREATE INDEX `expenses_source_idx` ON `expenses` (`source_type`,`source_id`);--> statement-breakpoint
 CREATE TABLE `insurance_policies` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -274,8 +270,3 @@ CREATE TABLE `vehicles` (
 );
 --> statement-breakpoint
 CREATE INDEX `vehicles_user_id_idx` ON `vehicles` (`user_id`);
---> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS vf_active_vehicle_idx ON vehicle_financing (vehicle_id) WHERE is_active = 1;--> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS vehicles_license_plate_idx ON vehicles (license_plate) WHERE license_plate IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS up_auth_identity_idx ON user_providers (provider_type, provider_account_id) WHERE domain = 'auth' AND provider_account_id IS NOT NULL;--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS pr_pending_idx ON photo_refs (status, created_at) WHERE status IN ('pending', 'failed') AND retry_count < 3;

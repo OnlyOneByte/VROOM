@@ -33,7 +33,8 @@ function makeExpense(amount: number, dateIndex: number): Expense {
 		category: 'financial',
 		amount,
 		date: `${year}-${month}-${day}`,
-		isFinancingPayment: true,
+		sourceType: 'financing' as const,
+		sourceId: 'fin-test',
 		createdAt: '2024-01-01T00:00:00.000Z',
 		updatedAt: '2024-01-01T00:00:00.000Z'
 	};

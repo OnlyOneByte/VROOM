@@ -167,7 +167,7 @@ export const insuranceTermVehicles = sqliteTable(
 // Split method type for split expenses
 export type SplitMethod = 'even' | 'absolute' | 'percentage';
 
-// Expense table (v2: fuelAmount → volume, removed insurancePolicyId, added insuranceTermId FK)
+// Expense table (v2: fuelAmount → volume, removed insurancePolicyId; v3: removed isFinancingPayment + insuranceTermId, uses sourceType/sourceId)
 export const expenses = sqliteTable(
   'expenses',
   {
@@ -187,12 +187,6 @@ export const expenses = sqliteTable(
     expenseAmount: real('expense_amount').notNull(),
     volume: real('volume'),
     fuelType: text('fuel_type'),
-    isFinancingPayment: integer('is_financing_payment', { mode: 'boolean' })
-      .notNull()
-      .default(false),
-    insuranceTermId: text('insurance_term_id').references(() => insuranceTerms.id, {
-      onDelete: 'set null',
-    }),
     missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
     // Direct user ownership — eliminates vehicles JOIN for user-scoped queries
     userId: text('user_id')
@@ -225,9 +219,7 @@ export const expenses = sqliteTable(
     ),
     // Group lookup for split operations
     groupIdx: index('expenses_group_idx').on(table.groupId),
-    // Insurance term lookup
-    insuranceTermIdx: index('expenses_insurance_term_idx').on(table.insuranceTermId),
-    // Source tracking lookup (e.g., all expenses from a specific reminder)
+    // Source tracking lookup (e.g., all expenses from a specific reminder or financing)
     sourceIdx: index('expenses_source_idx').on(table.sourceType, table.sourceId),
   })
 );
@@ -302,13 +294,9 @@ export const sessions = sqliteTable('sessions', {
   expiresAt: integer('expires_at').notNull(),
 });
 
-// Relations (v2: added insuranceTermId → insuranceTerms)
+// Relations
 export const expensesRelations = relations(expenses, ({ one }) => ({
   vehicle: one(vehicles, { fields: [expenses.vehicleId], references: [vehicles.id] }),
-  insuranceTerm: one(insuranceTerms, {
-    fields: [expenses.insuranceTermId],
-    references: [insuranceTerms.id],
-  }),
 }));
 
 // Odometer Entries table (v2: removed linkedEntityType, linkedEntityId, odometer_linked_entity_idx)

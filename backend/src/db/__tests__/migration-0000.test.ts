@@ -78,13 +78,16 @@ describe('Migration 0000: Consolidated v2 Schema', () => {
     expect(cols).not.toContain('current_insurance_policy_id');
   });
 
-  test('expenses table has volume column (not fuel_amount) and insurance_term_id', () => {
+  test('expenses table has volume column (not fuel_amount) and source_type/source_id', () => {
     applyMigration(db, migrations[0]);
     const cols = getColumnNames(db, 'expenses');
     expect(cols).toContain('volume');
-    expect(cols).toContain('insurance_term_id');
+    expect(cols).toContain('source_type');
+    expect(cols).toContain('source_id');
     expect(cols).toContain('user_id');
     expect(cols).not.toContain('fuel_amount');
+    expect(cols).not.toContain('is_financing_payment');
+    expect(cols).not.toContain('insurance_term_id');
     expect(cols).not.toContain('insurance_policy_id');
   });
 
@@ -326,16 +329,19 @@ describe('Migration 0000: Consolidated v2 Schema', () => {
     );
     db.run("INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES ('it1', 'v1')");
     db.run(
-      "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, insurance_term_id) VALUES ('e1', 'v1', 'u1', 'regulatory', 1700000000, 100, 'it1')"
+      "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, source_type, source_id) VALUES ('e1', 'v1', 'u1', 'financial', 1700000000, 100, 'insurance_term', 'it1')"
     );
 
     db.run("DELETE FROM insurance_terms WHERE id = 'it1'");
 
     expect(countRows(db, 'insurance_term_vehicles')).toBe(0);
-    const expense = db.query("SELECT insurance_term_id FROM expenses WHERE id = 'e1'").get() as {
-      insurance_term_id: string | null;
+    // Source fields are NOT FK-cascaded — app-level cleanup handles this
+    const expense = db.query("SELECT source_type, source_id FROM expenses WHERE id = 'e1'").get() as {
+      source_type: string | null;
+      source_id: string | null;
     };
-    expect(expense.insurance_term_id).toBeNull();
+    expect(expense.source_type).toBe('insurance_term');
+    expect(expense.source_id).toBe('it1');
     expect(countRows(db, 'expenses')).toBe(1);
   });
 });

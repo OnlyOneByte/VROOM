@@ -13,6 +13,7 @@ import {
 } from '../../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
 import { financingRepository } from './repository';
+import { onFinancingDeactivated } from './hooks';
 
 const routes = new Hono();
 
@@ -207,6 +208,9 @@ routes.put('/:financingId/payoff', zValidator('param', financingParamsSchema), a
     isActive: false,
     endDate: new Date(),
   });
+
+  await onFinancingDeactivated(financingId, user.id);
+
   return c.json({
     success: true,
     data: updated,
@@ -224,6 +228,9 @@ routes.delete('/:financingId', zValidator('param', financingParamsSchema), async
     isActive: false,
     endDate: new Date(),
   });
+
+  await onFinancingDeactivated(financingId, user.id);
+
   return c.json({ success: true, message: 'Financing marked as completed successfully' });
 });
 

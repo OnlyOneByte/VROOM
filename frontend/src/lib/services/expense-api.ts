@@ -173,8 +173,8 @@ export const expenseApi = {
 		date: string;
 		description?: string;
 		totalAmount: number;
-		insurancePolicyId?: string;
-		insuranceTermId?: string;
+		sourceType?: string;
+		sourceId?: string;
 	}): Promise<SplitExpenseGroup> {
 		return apiClient.post<SplitExpenseGroup>('/api/v1/expenses/split', data);
 	},

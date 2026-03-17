@@ -117,7 +117,6 @@ async function createExpenseFromReminder(
         date: dueDate,
         description: reminder.expenseDescription ?? null,
         expenseAmount: amount,
-        isFinancingPayment: false,
         missedFillup: false,
         mileage: null,
         volume: null,

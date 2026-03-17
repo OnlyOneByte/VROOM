@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { changeTracker, requireAuth } from '../../middleware';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
+import { expenseRepository } from '../expenses/repository';
 import { createTermExpenses, updateTermExpenses } from './hooks';
 import { insurancePolicyRepository } from './repository';
 import {
@@ -194,6 +195,10 @@ routes.delete('/:id/terms/:termId', zValidator('param', termParamsSchema), async
   const user = c.get('user');
   const { id, termId } = c.req.valid('param');
   await validateInsuranceOwnership(id, user.id);
+
+  // Delete auto-created expenses before deleting the term (FK cascade is gone)
+  await expenseRepository.deleteBySource('insurance_term', termId, user.id);
+
   const policy = await insurancePolicyRepository.deleteTerm(id, termId, user.id);
   return c.json({ success: true, data: policy, message: 'Term deleted successfully' });
 });

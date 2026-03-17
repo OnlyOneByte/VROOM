@@ -380,7 +380,6 @@ export class GoogleSheetsService {
       'expenseAmount',
       'volume',
       'fuelType',
-      'isFinancingPayment',
       'missedFillup',
       'date',
       'mileage',
@@ -390,7 +389,6 @@ export class GoogleSheetsService {
       'splitMethod',
       'sourceType',
       'sourceId',
-      'insuranceTermId',
       'createdAt',
       'updatedAt',
     ];

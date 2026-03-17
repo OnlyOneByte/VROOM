@@ -83,7 +83,6 @@ export class ExpenseSplitService {
       date: Date;
       tags?: string[];
       description?: string;
-      insuranceTermId?: string;
       sourceType?: string;
       sourceId?: string;
     }
@@ -103,8 +102,6 @@ export class ExpenseSplitService {
         date: params.date,
         tags: params.tags ?? null,
         description: params.description ?? null,
-        insuranceTermId: params.insuranceTermId ?? null,
-        isFinancingPayment: false,
         missedFillup: false,
         sourceType: params.sourceType ?? null,
         sourceId: params.sourceId ?? null,

@@ -29,8 +29,6 @@ function makeChargeExpense(overrides: {
     volume: overrides.volume,
     fuelType: 'Level 2 (AC)',
     description: null,
-    isFinancingPayment: false,
-    insuranceTermId: null,
     missedFillup: overrides.missedFillup ?? false,
     userId: 'test-user',
     groupId: null,

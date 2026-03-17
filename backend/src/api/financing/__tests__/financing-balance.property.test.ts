@@ -76,19 +76,19 @@ function createFinancing(originalAmount: number): string {
   return id;
 }
 
-function createFinancingPayment(amount: number): void {
+function createFinancingPayment(amount: number, financingId: string): void {
   const id = `exp-fp-${++expenseCounter}`;
   sqliteDb.run(
-    `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, is_financing_payment)
-     VALUES ('${id}', '${VEHICLE_ID}', '${USER_ID}', 'financial', ${Math.floor(Date.now() / 1000)}, ${amount}, 1)`
+    `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, source_type, source_id)
+     VALUES ('${id}', '${VEHICLE_ID}', '${USER_ID}', 'financial', ${Math.floor(Date.now() / 1000)}, ${amount}, 'financing', '${financingId}')`
   );
 }
 
 function createNonFinancingExpense(amount: number): void {
   const id = `exp-nf-${++expenseCounter}`;
   sqliteDb.run(
-    `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, is_financing_payment)
-     VALUES ('${id}', '${VEHICLE_ID}', '${USER_ID}', 'fuel', ${Math.floor(Date.now() / 1000)}, ${amount}, 0)`
+    `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
+     VALUES ('${id}', '${VEHICLE_ID}', '${USER_ID}', 'fuel', ${Math.floor(Date.now() / 1000)}, ${amount})`
   );
 }
 
@@ -106,7 +106,7 @@ describe('Property 5: Financing balance computation', () => {
           const financingId = createFinancing(originalAmount);
 
           for (const payment of payments) {
-            createFinancingPayment(payment);
+            createFinancingPayment(payment, financingId);
           }
 
           const computedBalance = await repo.computeBalance(financingId);
@@ -134,7 +134,7 @@ describe('Property 5: Financing balance computation', () => {
         async (originalAmount, financingPayment, regularExpense) => {
           const financingId = createFinancing(originalAmount);
 
-          createFinancingPayment(financingPayment);
+          createFinancingPayment(financingPayment, financingId);
           createNonFinancingExpense(regularExpense);
 
           const computedBalance = await repo.computeBalance(financingId);
@@ -152,8 +152,8 @@ describe('Property 5: Financing balance computation', () => {
 
   test('balance is clamped to 0 when payments exceed original amount', async () => {
     const financingId = createFinancing(1000);
-    createFinancingPayment(600);
-    createFinancingPayment(600);
+    createFinancingPayment(600, financingId);
+    createFinancingPayment(600, financingId);
 
     const balance = await repo.computeBalance(financingId);
     expect(balance).toBe(0);
@@ -185,7 +185,7 @@ describe('Property 6: Financing payoff eligibility flag', () => {
           const financingId = createFinancing(originalAmount);
 
           for (const payment of payments) {
-            createFinancingPayment(payment);
+            createFinancingPayment(payment, financingId);
           }
 
           const computedBalance = await repo.computeBalance(financingId);
@@ -210,7 +210,7 @@ describe('Property 6: Financing payoff eligibility flag', () => {
 
   test('fully paid off financing is eligible for payoff', async () => {
     const financingId = createFinancing(1000);
-    createFinancingPayment(1000);
+    createFinancingPayment(1000, financingId);
 
     const balance = await repo.computeBalance(financingId);
     expect(balance).toBe(0);
@@ -219,7 +219,7 @@ describe('Property 6: Financing payoff eligibility flag', () => {
 
   test('financing with remaining balance is not eligible', async () => {
     const financingId = createFinancing(10000);
-    createFinancingPayment(100);
+    createFinancingPayment(100, financingId);
 
     const balance = await repo.computeBalance(financingId);
     expect(balance).toBeGreaterThan(0.01);
