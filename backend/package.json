@@ -32,21 +32,21 @@
     "validate": "bun run type-check && bun run check && bun test && bun run build"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1009.0",
-    "@aws-sdk/s3-request-presigner": "^3.1009.0",
+    "@aws-sdk/client-s3": "^3.1014.0",
+    "@aws-sdk/s3-request-presigner": "^3.1014.0",
     "@hono/node-server": "^1.19.11",
     "@hono/zod-validator": "^0.7.6",
     "@lucia-auth/adapter-drizzle": "^1.1.0",
     "@paralleldrive/cuid2": "^3.3.0",
     "adm-zip": "^0.5.16",
     "arctic": "^3.7.0",
-    "csv-parse": "^6.1.0",
-    "csv-stringify": "^6.6.0",
+    "csv-parse": "^6.2.1",
+    "csv-stringify": "^6.7.0",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
     "drizzle-zod": "^0.8.3",
     "googleapis": "^171.4.0",
-    "hono": "^4.12.8",
+    "hono": "^4.12.9",
     "lucia": "^3.2.2",
     "oslo": "^1.2.1",
     "zod": "^4.3.6"
@@ -56,12 +56,12 @@
     "jws": "^4.0.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.7",
-    "@types/adm-zip": "^0.5.7",
-    "bun-types": "^1.3.10",
-    "drizzle-kit": "^0.31.9",
+    "@biomejs/biome": "^2.4.8",
+    "@types/adm-zip": "^0.5.8",
+    "bun-types": "^1.3.11",
+    "drizzle-kit": "^0.31.10",
     "fast-check": "^4.6.0",
     "typescript": "^5.9.3",
-    "yaml": "^2.8.2"
+    "yaml": "^2.8.3"
   }
 }
