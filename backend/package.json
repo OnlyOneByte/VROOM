@@ -32,8 +32,8 @@
     "validate": "bun run type-check && bun run check && bun test && bun run build"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1032.0",
-    "@aws-sdk/s3-request-presigner": "^3.1032.0",
+    "@aws-sdk/client-s3": "^3.1037.0",
+    "@aws-sdk/s3-request-presigner": "^3.1037.0",
     "@hono/node-server": "^1.19.14",
     "@hono/zod-validator": "^0.7.6",
     "@lucia-auth/adapter-drizzle": "^1.1.0",
@@ -46,7 +46,7 @@
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
     "googleapis": "^171.4.0",
-    "hono": "^4.12.14",
+    "hono": "^4.12.15",
     "lucia": "^3.2.2",
     "oslo": "^1.2.1",
     "zod": "^4.3.6"
@@ -56,7 +56,7 @@
     "jws": "^4.0.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.12",
+    "@biomejs/biome": "^2.4.13",
     "@types/adm-zip": "^0.5.8",
     "bun-types": "^1.3.13",
     "drizzle-kit": "^0.31.10",
