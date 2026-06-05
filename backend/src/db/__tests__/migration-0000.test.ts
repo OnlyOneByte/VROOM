@@ -336,7 +336,9 @@ describe('Migration 0000: Consolidated v2 Schema', () => {
 
     expect(countRows(db, 'insurance_term_vehicles')).toBe(0);
     // Source fields are NOT FK-cascaded — app-level cleanup handles this
-    const expense = db.query("SELECT source_type, source_id FROM expenses WHERE id = 'e1'").get() as {
+    const expense = db
+      .query("SELECT source_type, source_id FROM expenses WHERE id = 'e1'")
+      .get() as {
       source_type: string | null;
       source_id: string | null;
     };

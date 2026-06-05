@@ -84,7 +84,7 @@ export class StorageProviderRegistry {
         .limit(1);
 
       const providerRow = row[0];
-      if (!providerRow || providerRow.status !== 'active') continue;
+      if (providerRow?.status !== 'active') continue;
 
       const provider = this.createProviderInstance(providerRow);
       const folderPath = this.resolveFolderPath(providerRow, storageConfig, providerId, category);
