@@ -276,7 +276,7 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   // Validate: if sourceType is provided, verify the referenced entity exists
   if (expenseData.sourceType === 'financing') {
     const financing = await financingRepository.findByVehicleId(expenseData.vehicleId);
-    if (!financing || !financing.isActive) {
+    if (!financing?.isActive) {
       throw new ValidationError('Vehicle has no active financing');
     }
     if (expenseData.sourceId !== financing.id) {

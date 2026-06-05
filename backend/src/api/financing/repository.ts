@@ -62,9 +62,7 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
           totalPayments: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
         })
         .from(expenses)
-        .where(
-          sql`${expenses.sourceType} = 'financing' AND ${expenses.sourceId} = ${financingId}`
-        );
+        .where(sql`${expenses.sourceType} = 'financing' AND ${expenses.sourceId} = ${financingId}`);
 
       const totalPayments = Number(result?.totalPayments) || 0;
       return Math.max(0, financing.originalAmount - totalPayments);
