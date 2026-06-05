@@ -12,8 +12,8 @@ import {
   validateLoanTerms,
 } from '../../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
-import { financingRepository } from './repository';
 import { onFinancingDeactivated } from './hooks';
+import { financingRepository } from './repository';
 
 const routes = new Hono();
 
