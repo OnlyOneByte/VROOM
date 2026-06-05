@@ -30,8 +30,11 @@ const reminderBaseSchema = z.object({
 });
 
 type ReminderInput = z.infer<typeof reminderBaseSchema>;
+// Refinements run against both the full create schema and the partial update
+// schema, so accept a partial shape — each helper guards on the fields it needs.
+type ReminderRefineInput = Partial<ReminderInput>;
 
-function refineCustomFrequency(data: ReminderInput, ctx: z.RefinementCtx) {
+function refineCustomFrequency(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   if (data.frequency !== 'custom') return;
   if (!data.intervalValue) {
     ctx.addIssue({
@@ -49,7 +52,7 @@ function refineCustomFrequency(data: ReminderInput, ctx: z.RefinementCtx) {
   }
 }
 
-function refineExpenseType(data: ReminderInput, ctx: z.RefinementCtx) {
+function refineExpenseType(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   if (data.type !== 'expense') return;
   if (!data.expenseCategory) {
     ctx.addIssue({
@@ -67,7 +70,7 @@ function refineExpenseType(data: ReminderInput, ctx: z.RefinementCtx) {
   }
 }
 
-function refineDateRange(data: ReminderInput, ctx: z.RefinementCtx) {
+function refineDateRange(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   if (data.endDate && data.startDate && data.endDate <= data.startDate) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -77,7 +80,7 @@ function refineDateRange(data: ReminderInput, ctx: z.RefinementCtx) {
   }
 }
 
-function refineSplitConfig(data: ReminderInput, ctx: z.RefinementCtx) {
+function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   if (!data.expenseSplitConfig) return;
 
   const splitVehicleIds =
@@ -127,4 +130,13 @@ export const createReminderSchema = reminderBaseSchema.superRefine((data, ctx) =
   refineSplitConfig(data, ctx);
 });
 
-export const updateReminderSchema = createReminderSchema.partial();
+// Note: `.partial()` cannot be called on a schema that already has refinements
+// (Zod v4 throws). Partial-ize the base object first, then re-apply the same
+// cross-field refinements. The refine helpers guard on each field, so missing
+// (undefined) fields in a partial update are handled correctly.
+export const updateReminderSchema = reminderBaseSchema.partial().superRefine((data, ctx) => {
+  refineCustomFrequency(data, ctx);
+  refineExpenseType(data, ctx);
+  refineDateRange(data, ctx);
+  refineSplitConfig(data, ctx);
+});
