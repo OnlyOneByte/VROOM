@@ -269,4 +269,13 @@ CREATE TABLE `vehicles` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `vehicles_user_id_idx` ON `vehicles` (`user_id`);
+CREATE INDEX `vehicles_user_id_idx` ON `vehicles` (`user_id`);--> statement-breakpoint
+-- Partial unique/filtered indexes (manually appended — Drizzle cannot express WHERE clauses on indexes)
+-- One active financing per vehicle
+CREATE UNIQUE INDEX `vf_active_vehicle_idx` ON `vehicle_financing` (`vehicle_id`) WHERE `is_active` = 1;--> statement-breakpoint
+-- Unique license plates (non-null only)
+CREATE UNIQUE INDEX `vehicles_license_plate_idx` ON `vehicles` (`license_plate`) WHERE `license_plate` IS NOT NULL;--> statement-breakpoint
+-- Auth identity uniqueness (auth-domain rows only)
+CREATE UNIQUE INDEX `up_auth_identity_idx` ON `user_providers` (`provider_type`, `provider_account_id`) WHERE `domain` = 'auth';--> statement-breakpoint
+-- Sync worker poll optimization
+CREATE INDEX `pr_pending_idx` ON `photo_refs` (`status`, `created_at`) WHERE `status` IN ('pending', 'failed') AND `retry_count` < 3;
