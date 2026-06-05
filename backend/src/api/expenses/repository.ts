@@ -414,9 +414,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             eq(expenses.sourceId, sourceId),
             eq(expenses.userId, userId)
           )
-        );
+        )
+        .returning();
 
-      return result.changes;
+      return result.length;
     } catch (error) {
       logger.error('Failed to clear source on expenses', {
         sourceType,

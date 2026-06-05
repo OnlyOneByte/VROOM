@@ -8,7 +8,6 @@
     "noEmit": true,
     "composite": false,
     "strict": true,
-    "downlevelIteration": true,
     "skipLibCheck": true,
     "jsx": "preserve",
     "allowSyntheticDefaultImports": true,
@@ -19,7 +18,6 @@
     "types": [
       "bun-types"
     ],
-    "baseUrl": ".",
     "resolveJsonModule": true,
     "esModuleInterop": true
   },
