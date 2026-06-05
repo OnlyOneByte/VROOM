@@ -5,8 +5,7 @@
 	import { getChartContext, Tooltip as TooltipPrimitive } from "layerchart";
 	import type { Snippet } from "svelte";
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	function defaultFormatter(value: any, _payload: TooltipPayload[]) {
+	function defaultFormatter(value: unknown, _payload: TooltipPayload[]) {
 		return `${value}`;
 	}
 
@@ -32,8 +31,9 @@
 		labelKey?: string;
 		hideIndicator?: boolean;
 		labelClassName?: string;
-		labelFormatter?: // eslint-disable-next-line @typescript-eslint/no-explicit-any
-			((value: any, payload: TooltipPayload[]) => string | number | Snippet) | null;
+		labelFormatter?:
+			| ((_value: unknown, _payload: TooltipPayload[]) => string | number | Snippet)
+			| null;
 		formatter?: Snippet<
 			[
 				{
@@ -60,6 +60,7 @@
 		if (hideLabel || !visibleSeries?.length) return null;
 
 		const [item] = visibleSeries;
+		if (!item) return null;
 		const tooltipData = chartCtx.tooltip.data;
 
 		// Get the x-axis label value from the raw tooltip data (e.g. a Date or month string)
