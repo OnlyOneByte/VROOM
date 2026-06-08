@@ -14,9 +14,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 13 |
 | bug | 3 | 14 |
 | arch | 5 | 18 |
-| infra | 6 | 12 |
+| infra | 6 | 19 |
 
-Current cycle: **18**
+Current cycle: **19**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -308,3 +308,19 @@ Current cycle: **18**
   moved: maintenance T1/T2 shipped, arch category active, 18 cycles in) or a loop-tooling improvement.
   `guard` (cyc 13, starved-for 6 = budget, breaches at 19 too) is the close runner-up but infra is more
   starved. Take infra; if the infra need is trivial, also knock the starved guard next.
+- **C19 (infra)** — `infra` breached budget (cyc 12, starved-for 7 > 6) → forced pick; queue empty,
+  so took the standing infra need: fresh-clone orientation accuracy. CLAUDE.md's "Current state &
+  gaps" still listed both feature specs as merely "Approved & ready to build" — stale now that the
+  maintenance-schedule build is mid-flight (T1 additive-migration C15, T2 getCurrentOdometer C16
+  both shipped). A fresh agent would mis-orient on what's done vs pending. Rewrote that bullet to
+  split the two specs by real status: maintenance-schedule **mid-build** (T1+T2 done, T3 next =
+  trigger logic + the deferred nullable rebuild), import-trackers **approved, not started** (T1+).
+  Same fresh-clone-orientation class as C5/C12. Verified the new claims against
+  `maintenance-schedule/tasks.md` (T1 [x], T2 [~], T3 [ ]) and `import-trackers/tasks.md` (T0 [x],
+  T1 [ ]). Docs-only; no build (no code touched). CLAUDE.md correctly defers category/budget detail
+  to loop/BACKLOG.md (the live snapshot) — nothing stale there.
+  Next cycle (20): `guard` breaches budget (cyc 13, starved-for 7 > 6) → MUST pick `guard`. Queue is
+  empty → populate from a real bug class. Strong candidate: a source-scan guard for the C18 dedup —
+  fail if `photos/helpers.ts` reintroduces a private/inlined ownership check instead of the shared
+  validators (locks in the single-source-of-truth). Or pin another recurring class. `deep-review`
+  (cyc 14, starved-for 6 > 5) also breaches — runner-up if guard is satisfied cheaply.
