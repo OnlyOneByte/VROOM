@@ -306,7 +306,22 @@ class ReminderTriggerService {
    */
   async recheckMileageReminders(userId: string, vehicleId: string): Promise<TriggerResult> {
     const result: TriggerResult = { createdExpenses: [], notifications: [], skipped: [] };
-    const mileageReminders = await reminderRepository.findMileageTracking(userId);
+    // The candidate query is also best-effort: it throws DatabaseError on failure, and this runs
+    // AFTER the odometer/expense write has already persisted — so a query hiccup must NOT propagate
+    // and 500 the (successful) write. Swallow it into a skip and return what we have. (C42 review:
+    // the per-reminder try/catch below didn't cover this fetch, so the "never throws" contract was a
+    // lie when the DB hiccuped between the write and the recheck.)
+    let mileageReminders: ReminderWithVehicles[];
+    try {
+      mileageReminders = await reminderRepository.findMileageTracking(userId);
+    } catch (error) {
+      result.skipped.push({
+        reminderId: 'all',
+        reason: 'recheck_query_failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return result;
+    }
     for (const { reminder, vehicleIds } of mileageReminders) {
       if (!vehicleIds.includes(vehicleId)) continue;
       try {

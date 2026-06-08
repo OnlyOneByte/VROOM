@@ -10,13 +10,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 39 |
-| deep-review | 5 | 35 |
+| deep-review | 5 | 42 |
 | guard | 6 | 41 |
 | bug | 3 | 38 |
 | arch | 5 | 36 |
 | infra | 6 | 40 |
 
-Current cycle: **41**
+Current cycle: **42**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -846,3 +846,26 @@ Current cycle: **41**
   → it wins. Eyes-on/HTTP review of a shipped surface — the live mileage API + the C39 frontend
   null-date handling are the freshest unreviewed; fan out per rule 7, verify findings vs source. T7
   (ReminderForm mileage branch) resumes after. #9/#11 bugs queued; #14 awaits Angelo.
+- **C42 (deep-review — mark-serviced/recheck backend + C39 frontend null-handling; fixed 1 real bug)**
+  — `deep-review` forced (cyc 35, starved-for 7 > 5). Fanned out 2 Explore agents, VERIFIED every
+  finding vs source (C21/C28/C35 lesson). RESULTS:
+  • Agent A (C39 frontend null-date handling): CLEAN — every nextDueDate/dueDate/dueOdometer/mileage
+    read site is guarded (page null-checks, dashboard type-narrowing predicate, DueRemindersCard gets
+    pre-filtered non-null props, ReminderForm null-coalesces expenseTags). 0 remaining. Good.
+  • Agent B (mark-serviced C32 + recheck C37): 1 REAL bug + 3 filed. FIXED THIS CYCLE (own-code bug,
+    small + the comment was actively false): recheckMileageReminders' `findMileageTracking` fetch was
+    OUTSIDE the per-reminder try/catch — it throws DatabaseError, and recheck runs AFTER the
+    odometer/expense write persists, so a DB hiccup would propagate + 500 a SUCCESSFUL write, breaking
+    the "never throws" contract the call sites rely on (they don't wrap it). Wrapped the fetch →
+    swallows to a skip + returns. Pinned by `recheck-query-failure.test.ts` (spyOn mockRejectedValue →
+    resolves with reason 'recheck_query_failed', doesn't throw). The other 3 verified findings filed,
+    NOT auto-fixed (judgment, not bugs): (1) markServiced is ownership-scoped, NOT value-CAS'd — the
+    C32 "optimistic-locked" comment OVERCLAIMS, but two concurrent user mark-serviced calls compute
+    the same result from the same row (no corruption), so it's a doc-accuracy fix; (2) mark-serviced
+    advances nextDueDate ONE period even from an overdue date (could "bounce" through the past) —
+    matches the trigger's own model + assumes a trigger ran first; a semantics decision; (3)
+    recheck-on-write is CREATE-only (not expense/odometer UPDATE) — a documented scope choice (D5 says
+    "create"). Verified: validate:local EXIT 0 (tsc 0 · musl-biome clean · 958 pass/0 fail, +1 · build).
+  Next cycle (43): nothing over budget (arch cyc 36 starved-for 7 > 5 at cyc 43 — arch breaches) →
+  `arch` wins → arch #1 part 2c (drop the `auth`/`settings` try/catch, characterize-then-drop per the
+  C30/C36 pattern). T7 (ReminderForm) is the next feature pick after. Filed bugs below; #14 Angelo.

@@ -156,6 +156,28 @@ positives, debunked in LEDGER C21; these two are the real ones)*
     renew". Surfaced C28; needs a product decision (filter to `endDate >= now`, or keep + document)
     before fixing. No test covers buildInsuranceDetails at all — a characterization test should precede
     any change. (correctness?, med — needs decision)
+
+*(surfaced + VERIFIED by the C42 mark-serviced/recheck audit — 1 fixed in-cycle, these 3 filed)*
+15. **`markServiced` comment overclaims "optimistic-locked"** — `repository.ts` markServiced is
+    ownership-scoped (`where id + userId`), NOT value-CAS'd like advanceNextDueDate
+    (`where nextDueDate = expected`). Two concurrent user mark-serviced calls both succeed; they
+    compute the SAME result from the same row so there's no corruption — but the C32 comment +
+    design.md claim "optimistic-locked transaction" is false. Either add a CAS guard on the pre-call
+    nextDueDate/nextDueOdometer, or (lighter) correct the comment to "ownership-scoped". (doc-accuracy
+    / low — no data risk; pick one)
+16. **mark-serviced advances nextDueDate one period even from an overdue date** — `routes.ts:100`
+    computeNextDueDate from the CURRENT (possibly past) nextDueDate advances by ONE period, so marking
+    an overdue reminder serviced without first running /trigger can leave it still in the past
+    ("bounces" through past periods, re-firing). Matches the trigger's one-period model + assumes a
+    trigger ran first. SEMANTICS CALL: catch-up to >= now, or assert/leave-as-is. (needs decision)
+17. **recheck-on-write is CREATE-only** — recheckMileageReminders is wired into expense/odometer
+    CREATE, not their UPDATE (PUT). Editing a reading upward across a milestone won't fire until the
+    next /trigger. Matches D5's "after a create" wording — a documented scope choice. Expand to UPDATE
+    routes only if the product wants edit-triggered rechecks. (by-design gap)
+- ~~**recheckMileageReminders could 500 a successful write (C42)**~~ — *DONE C42 (found by the audit):
+  the findMileageTracking fetch was outside the per-reminder try/catch + throws DatabaseError; recheck
+  runs after the write persists, so a DB hiccup propagated + 500'd the (successful) write, breaking the
+  "never throws" contract. Wrapped the fetch → swallows to a skip. Pinned by recheck-query-failure.test.ts.*
 - ~~**Expense update wipes tags (`.default([])` survives `.partial()`)**~~ — *DONE C34 (found by the
   guard, failing-first): `updateExpenseSchema`'s base `tags: .optional().default([])` injected `[]` on
   any edit omitting tags → silent data loss. Fixed by re-declaring `tags` as plain `.optional()` (no
