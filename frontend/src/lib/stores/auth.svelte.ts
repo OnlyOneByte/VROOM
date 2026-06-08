@@ -70,6 +70,15 @@ function createAuthStore() {
 			}
 		},
 
+		async updateDisplayName(displayName: string) {
+			const { authApi } = await import('$lib/services/auth-api');
+			const result = await authApi.updateProfile({ displayName });
+			if (user) {
+				user = { ...user, displayName: result.user.displayName };
+			}
+			return result.user;
+		},
+
 		loginWith(providerId: string) {
 			if (browser) {
 				window.location.href = `${getApiBaseUrl()}/api/v1/auth/login/${providerId}`;

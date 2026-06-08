@@ -7,6 +7,9 @@
 	let preselectedCategory = $derived(page.url.searchParams.get('category'));
 	let preselectedFinancingId = $derived(page.url.searchParams.get('financingId'));
 	let preselectedAmount = $derived(page.url.searchParams.get('amount'));
+	let preselectedDescription = $derived(page.url.searchParams.get('description'));
+	// Tags arrive as a comma-separated list (from "Duplicate expense").
+	let preselectedTags = $derived(page.url.searchParams.get('tags'));
 </script>
 
 <svelte:head>
@@ -20,4 +23,6 @@
 	{preselectedCategory}
 	{preselectedFinancingId}
 	{preselectedAmount}
+	{preselectedDescription}
+	{preselectedTags}
 />

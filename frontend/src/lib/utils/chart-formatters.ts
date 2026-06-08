@@ -4,29 +4,19 @@
  */
 
 import { curveMonotoneX } from 'd3-shape';
+import { formatCurrency } from './formatters';
 
-const currencyFormatter = new Intl.NumberFormat('en-US', {
-	style: 'currency',
-	currency: 'USD',
-	minimumFractionDigits: 0,
-	maximumFractionDigits: 0
-});
-
-/** Format a number as compact currency for Y-axis labels (e.g. "$1,200") */
+/** Format a number as compact currency for Y-axis labels (e.g. "$1,200").
+ *  Delegates to formatCurrency so the symbol follows the user's currencyUnit
+ *  (€/£/…), not a hardcoded $. */
 export function formatCurrencyAxis(value: number): string {
-	return currencyFormatter.format(value);
+	return formatCurrency(value, undefined, 0);
 }
 
-const centsCurrencyFormatter = new Intl.NumberFormat('en-US', {
-	style: 'currency',
-	currency: 'USD',
-	minimumFractionDigits: 2,
-	maximumFractionDigits: 2
-});
-
-/** Format small currency values (e.g. cost per mile: $0.05) with 2 decimal places */
+/** Format small currency values (e.g. cost per mile: $0.05) with 2 decimal
+ *  places — also currency-aware via formatCurrency. */
 export function formatCentsAxis(value: number): string {
-	return centsCurrencyFormatter.format(value);
+	return formatCurrency(value, undefined, 2);
 }
 
 /** Format a number with fixed decimal places for Y-axis labels */

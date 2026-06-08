@@ -105,21 +105,37 @@ describe('Navigation Component Logic', () => {
 		expect(authStore.user).toBe(null);
 	});
 
-	it('provides correct navigation items', () => {
+	it('documents the current navigation items', () => {
+		// NOTE: this mirrors the `navigation` + `userNavigation` arrays defined inside
+		// Navigation.svelte (they're local consts, not exported, so they can't be
+		// imported directly). It's a documentation/regression fixture, not proof the
+		// component renders them — keep it in sync if the nav changes. (Corrected
+		// cycle 155: the old fixture still listed a "Vehicles" item the live nav
+		// dropped and omitted Insurance/Reminders/Trips — a stale self-assert.)
 		const navigation = [
 			{ name: 'Dashboard', href: '/dashboard' },
-			{ name: 'Vehicles', href: '/vehicles' },
 			{ name: 'Expenses', href: '/expenses' },
+			{ name: 'Insurance', href: '/insurance' },
 			{ name: 'Analytics', href: '/analytics' },
-			{ name: 'Settings', href: '/settings' }
+			{ name: 'Reminders', href: '/reminders' },
+			{ name: 'Trips', href: '/trips' }
 		];
+		const userNavigation = [{ name: 'Settings', href: '/settings' }];
 
-		expect(navigation).toHaveLength(5);
-		expect(navigation.find(item => item.name === 'Dashboard')).toBeDefined();
-		expect(navigation.find(item => item.name === 'Vehicles')).toBeDefined();
-		expect(navigation.find(item => item.name === 'Expenses')).toBeDefined();
-		expect(navigation.find(item => item.name === 'Analytics')).toBeDefined();
-		expect(navigation.find(item => item.name === 'Settings')).toBeDefined();
+		expect(navigation).toHaveLength(6);
+		// Every nav href must point at a real declared route (no dead links).
+		const declared = new Set([
+			'/dashboard',
+			'/expenses',
+			'/insurance',
+			'/analytics',
+			'/reminders',
+			'/trips',
+			'/settings'
+		]);
+		for (const item of [...navigation, ...userNavigation]) {
+			expect(declared.has(item.href), `${item.name} -> ${item.href}`).toBe(true);
+		}
 	});
 
 	it('handles responsive breakpoints', () => {

@@ -216,7 +216,9 @@ class SyncManager {
 				description: expense.description
 			});
 
-			await apiClient.post('/api/v1/expenses', backendExpense);
+			// Send the idempotency key so a retried POST returns the original row
+			// instead of creating a duplicate.
+			await apiClient.post('/api/v1/expenses', { ...backendExpense, clientId: expense.clientId });
 			return { success: true };
 		} catch (error) {
 			return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -297,6 +299,7 @@ class SyncManager {
 					try {
 						await apiClient.post('/api/v1/expenses', {
 							...backendExpense,
+							clientId: conflict.localExpense.clientId,
 							forceOverwrite: true
 						});
 						this.markExpenseAsSynced(conflict.localExpense.id);

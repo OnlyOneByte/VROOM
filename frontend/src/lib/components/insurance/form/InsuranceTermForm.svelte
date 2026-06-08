@@ -24,6 +24,7 @@
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { prefillFromPreviousTerm } from '$lib/utils/insurance';
+	import { getCurrencySymbol } from '$lib/utils/formatters';
 	import type { InsurancePolicy, InsuranceTerm, Vehicle } from '$lib/types';
 
 	interface Props {
@@ -34,6 +35,10 @@
 	}
 
 	let { policyId, termId, renewFrom, returnTo = '/insurance' }: Props = $props();
+
+	// Money-field labels follow the user's currency symbol, not a hardcoded "$"
+	// (EUR/GBP users would otherwise see the wrong unit). Same class as cycles 74/75.
+	const currencySymbol = $derived(getCurrencySymbol());
 
 	const isEditMode = !!termId;
 
@@ -197,19 +202,37 @@
 		return Object.keys(newErrors).length === 0;
 	}
 
-	function buildTermData(): Record<string, unknown> {
+	/**
+	 * Build the optional term fields for the request.
+	 * - forEdit=false (add/renew): omit empty fields — there's no value to clear.
+	 * - forEdit=true  (edit): send `null` for an emptied field so the backend
+	 *   CLEARS the column. Omitting it (undefined) would be dropped by
+	 *   JSON.stringify and the repo would keep the old value — silent data loss.
+	 */
+	function buildTermData(forEdit = false): Record<string, unknown> {
 		const data: Record<string, unknown> = {};
-		if (policyNumber.trim()) data['policyNumber'] = policyNumber.trim();
-		if (coverageDescription.trim()) data['coverageDescription'] = coverageDescription.trim();
-		if (deductibleAmount) data['deductibleAmount'] = Number(deductibleAmount);
-		if (coverageLimit) data['coverageLimit'] = Number(coverageLimit);
-		if (agentName.trim()) data['agentName'] = agentName.trim();
-		if (agentPhone.trim()) data['agentPhone'] = agentPhone.trim();
-		if (agentEmail.trim()) data['agentEmail'] = agentEmail.trim();
-		if (totalCost) data['totalCost'] = Number(totalCost);
-		if (monthlyCost) data['monthlyCost'] = Number(monthlyCost);
+		const str = (key: string, raw: string) => {
+			const v = raw.trim();
+			if (v) data[key] = v;
+			else if (forEdit) data[key] = null;
+		};
+		const num = (key: string, raw: string) => {
+			if (raw) data[key] = Number(raw);
+			else if (forEdit) data[key] = null;
+		};
+		str('policyNumber', policyNumber);
+		str('coverageDescription', coverageDescription);
+		num('deductibleAmount', deductibleAmount);
+		num('coverageLimit', coverageLimit);
+		str('agentName', agentName);
+		str('agentPhone', agentPhone);
+		str('agentEmail', agentEmail);
+		num('totalCost', totalCost);
+		num('monthlyCost', monthlyCost);
+		// premiumFrequency is a select string, not a free-text field.
 		if (premiumFrequency) data['premiumFrequency'] = premiumFrequency;
-		if (paymentAmount) data['paymentAmount'] = Number(paymentAmount);
+		else if (forEdit) data['premiumFrequency'] = null;
+		num('paymentAmount', paymentAmount);
 		return data;
 	}
 
@@ -224,13 +247,13 @@
 				splitMethod: splitMethod !== 'even' ? splitMethod : undefined,
 				allocations: splitMethod !== 'even' ? splitAllocations : undefined
 			};
-			const termData = buildTermData();
 
 			if (isEditMode && termId) {
+				// forEdit=true → emptied optionals are sent as null to clear them.
 				await insuranceApi.updateTerm(policyId, termId, {
 					startDate,
 					endDate,
-					...termData,
+					...buildTermData(true),
 					vehicleCoverage
 				});
 				appStore.showSuccess('Term updated successfully');
@@ -238,7 +261,7 @@
 				await insuranceApi.addTerm(policyId, {
 					startDate,
 					endDate,
-					...termData,
+					...buildTermData(),
 					vehicleCoverage
 				});
 				appStore.showSuccess(renewFrom ? 'Term renewed successfully' : 'Term added successfully');
@@ -266,7 +289,7 @@
 		<div class="space-y-6">
 			<!-- Header -->
 			<div class="flex items-center gap-4">
-				<Button variant="outline" size="icon" onclick={handleBack}>
+				<Button variant="outline" size="icon" aria-label="Go back" onclick={handleBack}>
 					<ArrowLeft class="h-4 w-4" />
 				</Button>
 				<div>
@@ -323,7 +346,7 @@
 					<CardContent>
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div class="space-y-2">
-								<Label for="total-cost">Total Cost ($)</Label>
+								<Label for="total-cost">Total Cost ({currencySymbol})</Label>
 								<Input
 									id="total-cost"
 									type="number"
@@ -337,7 +360,7 @@
 								{/if}
 							</div>
 							<div class="space-y-2">
-								<Label for="monthly-cost">Monthly Cost ($)</Label>
+								<Label for="monthly-cost">Monthly Cost ({currencySymbol})</Label>
 								<Input
 									id="monthly-cost"
 									type="number"
@@ -354,7 +377,7 @@
 
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
 							<div class="space-y-2">
-								<Label for="payment-amount">Payment Amount ($)</Label>
+								<Label for="payment-amount">Payment Amount ({currencySymbol})</Label>
 								<Input
 									id="payment-amount"
 									type="number"
@@ -449,7 +472,7 @@
 								<Input id="policy-number" placeholder="e.g. SF-12345" bind:value={policyNumber} />
 							</div>
 							<div class="space-y-2">
-								<Label for="deductible">Deductible ($)</Label>
+								<Label for="deductible">Deductible ({currencySymbol})</Label>
 								<Input
 									id="deductible"
 									type="number"
@@ -476,7 +499,7 @@
 
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div class="space-y-2">
-								<Label for="coverage-limit">Coverage Limit ($)</Label>
+								<Label for="coverage-limit">Coverage Limit ({currencySymbol})</Label>
 								<Input
 									id="coverage-limit"
 									type="number"

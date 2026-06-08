@@ -1,4 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
+import { stringify } from 'csv-stringify/sync';
 import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -11,6 +12,7 @@ import {
 } from '../../db/types';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { neutralizeCsvRow } from '../../utils/csv-safety';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import {
   commonSchemas,
@@ -18,7 +20,15 @@ import {
   validateFuelExpenseData,
 } from '../../utils/validation';
 import { financingRepository } from '../financing/repository';
+import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
+import { preferencesRepository } from '../settings/repository';
 import { vehicleRepository } from '../vehicles/repository';
+import {
+  buildImportPlan,
+  CsvImportError,
+  importCsvSchema,
+  summarizeImportPlan,
+} from './import-csv';
 import { expenseRepository } from './repository';
 import { createSplitExpenseSchema, updateSplitSchema } from './validation';
 
@@ -55,9 +65,15 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
       CONFIG.validation.expense.descriptionMaxLength,
       `Description must be ${CONFIG.validation.expense.descriptionMaxLength} characters or less`
     )
-    .optional(),
+    // .nullish() (not .optional()) so an edit can send description:null to CLEAR
+    // it — the clear-optional-field class (cycles 82-85). BaseRepository.update
+    // writes null through to the column; undefined is still dropped (create omits it).
+    .nullish(),
   sourceType: z.enum(['financing', 'insurance_term', 'reminder']).optional(),
   sourceId: z.string().min(1).optional(),
+  // Offline idempotency key — client-generated UUID. Optional; present only for
+  // expenses created via the offline outbox.
+  clientId: z.string().min(1).max(64).optional(),
 });
 
 const createExpenseSchemaBase = baseExpenseSchema.omit({
@@ -80,9 +96,12 @@ const createExpenseSchema = createExpenseSchemaBase.refine(
   { message: 'sourceType and sourceId must both be provided or both omitted', path: ['sourceType'] }
 );
 
-const updateExpenseSchema = createExpenseSchemaBase.partial();
+// clientId is a create-only idempotency key; it must not be mutable via update.
+const updateExpenseSchema = createExpenseSchemaBase.omit({ clientId: true }).partial();
 
-const expenseQuerySchema = z.object({
+// Exported so the query-contract (search/limit/tags coercion) can be unit-tested
+// at the route boundary without standing up a server.
+export const expenseQuerySchema = z.object({
   vehicleId: z.string().optional(),
   tags: z
     .string()
@@ -91,6 +110,7 @@ const expenseQuerySchema = z.object({
   category: expenseCategorySchema.optional(),
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
+  search: z.string().trim().min(1).max(100).optional(),
   limit: z
     .string()
     .transform((val) => parseInt(val, 10))
@@ -101,6 +121,10 @@ const expenseQuerySchema = z.object({
     .transform((val) => parseInt(val, 10))
     .pipe(z.number().int().min(0))
     .optional(),
+  // Sort is an enum allowlist (not a free column name) so it can never inject;
+  // both default server-side (date desc) when omitted, preserving prior behavior.
+  sortBy: z.enum(['date', 'amount', 'category']).optional(),
+  sortDir: z.enum(['asc', 'desc']).optional(),
 });
 
 // Apply authentication and change tracking to all routes
@@ -193,6 +217,13 @@ routes.delete('/split/:id', zValidator('param', commonSchemas.idParam), async (c
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
+  // Clean each sibling expense's photos (provider files + refs + rows) BEFORE the
+  // group delete. deleteSplitExpense already removes the photo DB rows in its
+  // transaction, but NOT the external storage files or photo_refs — so without
+  // this those would leak. Cleaning here makes the repo's row-delete a no-op.
+  const siblingIds = await expenseRepository.findIdsByGroupId(id, user.id);
+  await deletePhotosForEntities('expense', siblingIds, user.id);
+
   await expenseRepository.deleteSplitExpense(id, user.id);
 
   return c.json({ success: true, message: 'Split expense deleted successfully' });
@@ -262,6 +293,158 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
   return c.json({ success: true, data: summary });
 });
 
+// GET /api/expenses/export - Download all matching expenses as CSV.
+// Uses the UNPAGINATED findAll (so it never silently truncates the way a
+// big-limit list call would, since the list route clamps to maxPageSize) and
+// honours the core filters findAll supports (vehicle / category / date range).
+const exportQuerySchema = z.object({
+  vehicleId: z.string().optional(),
+  category: expenseCategorySchema.optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  // search + tags so the export matches the filtered table exactly (same coercion as
+  // the list query: comma-joined tags → array, trimmed non-empty search).
+  search: z.string().trim().min(1).max(100).optional(),
+  tags: z
+    .string()
+    .optional()
+    .transform((val) => (val ? val.split(',').map((t) => t.trim()) : undefined)),
+});
+
+// Stable, import-friendly column order. Raw values (ISO dates, unformatted
+// numbers) for portability; a human Vehicle name column for readability.
+const EXPORT_COLUMNS = [
+  'date',
+  'vehicle',
+  'category',
+  'amount',
+  'currency',
+  'mileage',
+  'volume',
+  'fuelType',
+  'description',
+  'tags',
+  'missedFillup',
+  'createdAt',
+] as const;
+
+routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
+  const user = c.get('user');
+  const { vehicleId, category, startDate, endDate, search, tags } = c.req.valid('query');
+
+  if (vehicleId) {
+    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
+    if (!vehicle) {
+      throw new NotFoundError('Vehicle');
+    }
+  }
+
+  const [rows, vehicles, prefs] = await Promise.all([
+    expenseRepository.findAll({
+      userId: user.id,
+      vehicleId,
+      category,
+      startDate,
+      endDate,
+      search,
+      tags,
+    }),
+    vehicleRepository.findByUserId(user.id),
+    // Read-only: an export must not create a preferences row as a side effect.
+    preferencesRepository.getByUserId(user.id),
+  ]);
+
+  // The user's real currency — NOT a hardcoded 'USD'. A EUR/GBP user's export
+  // must label amounts in their own currency (the cycle 74–75 hardcoded-USD class).
+  const currency = prefs?.currencyUnit || 'USD';
+
+  const vehicleName = new Map(
+    vehicles.map((v) => [v.id, v.nickname || `${v.year} ${v.make} ${v.model}`])
+  );
+
+  // neutralizeCsvRow guards every string cell against spreadsheet formula
+  // injection (CWE-1236) — user free-text like `description` / `tags` / a vehicle
+  // `nickname` could otherwise start with `=`/`+`/`-`/`@` and be evaluated when
+  // the export is opened in Excel/Sheets. Numbers (amount) pass through untouched.
+  // This export is one-way (nothing re-parses it), so prefixing is safe here.
+  const records = rows.map((e) =>
+    neutralizeCsvRow({
+      date: e.date instanceof Date ? e.date.toISOString() : e.date,
+      vehicle: vehicleName.get(e.vehicleId) ?? 'Unknown Vehicle',
+      category: e.category,
+      amount: e.expenseAmount,
+      currency,
+      mileage: e.mileage ?? '',
+      volume: e.volume ?? '',
+      fuelType: e.fuelType ?? '',
+      description: e.description ?? '',
+      tags: Array.isArray(e.tags) ? e.tags.join('; ') : '',
+      missedFillup: e.missedFillup ? 'true' : 'false',
+      createdAt: e.createdAt instanceof Date ? e.createdAt.toISOString() : (e.createdAt ?? ''),
+    })
+  );
+
+  const csv = stringify(records, {
+    header: true,
+    columns: EXPORT_COLUMNS as unknown as string[],
+    quoted: true,
+    quoted_empty: false,
+  });
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  c.header('Content-Type', 'text/csv; charset=utf-8');
+  c.header('Content-Disposition', `attachment; filename="vroom-expenses-${stamp}.csv"`);
+  return c.body(csv);
+});
+
+// POST /api/expenses/import - Import expenses from a "VROOM CSV" (the round-trip
+// target of /export). The request carries the CSV TEXT (not a multipart upload) so
+// it rides the same JSON auth/validation path as everything else. Every row is
+// validated and its vehicle resolved to one the USER OWNS by name — never a
+// file-provided id (cross-tenant-write class, cycle 145). dryRun:true validates +
+// reports only (the UI previews, then commits); dryRun:false inserts the ready rows.
+routes.post('/import', zValidator('json', importCsvSchema), async (c) => {
+  const user = c.get('user');
+  const { csv, dryRun } = c.req.valid('json');
+
+  const vehicles = await vehicleRepository.findByUserId(user.id);
+  if (vehicles.length === 0) {
+    throw new ValidationError('Add a vehicle before importing expenses');
+  }
+
+  let plan: ReturnType<typeof buildImportPlan>;
+  try {
+    plan = buildImportPlan(csv, vehicles);
+  } catch (err) {
+    // File-level problems (unparseable / empty / too many rows) → 400, not 500.
+    if (err instanceof CsvImportError) throw new ValidationError(err.message);
+    throw err;
+  }
+
+  // Preview: report the full per-row plan without writing anything.
+  if (dryRun) {
+    return c.json({
+      success: true,
+      data: { dryRun: true, imported: 0, ...summarizeImportPlan(plan) },
+    });
+  }
+
+  // Commit: insert only the rows that validated. Rows that errored are reported
+  // back untouched so the user can fix and re-import just those.
+  let imported = 0;
+  for (const row of plan.rows) {
+    if (row.status === 'ready' && row.expense) {
+      await expenseRepository.create({ ...row.expense, userId: user.id });
+      imported += 1;
+    }
+  }
+
+  return c.json({
+    success: true,
+    data: { dryRun: false, imported, ...summarizeImportPlan(plan) },
+  });
+});
+
 // POST /api/expenses - Create a new expense
 routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const user = c.get('user');
@@ -292,7 +475,12 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     expenseData.fuelType
   );
 
-  const createdExpense = await expenseRepository.create({ ...expenseData, userId: user.id });
+  // Idempotent create: a retried offline POST with the same clientId returns the
+  // original row instead of duplicating it. Plain create when clientId is absent.
+  const createdExpense = await expenseRepository.createIdempotent({
+    ...expenseData,
+    userId: user.id,
+  });
 
   return c.json(
     {
@@ -324,6 +512,9 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
     startDate: query.startDate,
     endDate: query.endDate,
     tags: query.tags,
+    search: query.search,
+    sortBy: query.sortBy,
+    sortDir: query.sortDir,
     limit: query.limit,
     offset: query.offset,
   });
@@ -381,6 +572,10 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
   await validateExpenseOwnership(id, user.id);
+
+  // Clean the expense's receipt photos (provider files + DB) before deleting the
+  // row — the photos table has no FK, so they'd otherwise orphan.
+  await deleteAllPhotosForEntity('expense', id, user.id);
 
   await expenseRepository.delete(id);
   return c.json({ success: true, message: 'Expense deleted successfully' });

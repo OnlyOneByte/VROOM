@@ -36,6 +36,7 @@ function makeChargeExpense(overrides: {
     splitMethod: null,
     sourceType: null,
     sourceId: null,
+    clientId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

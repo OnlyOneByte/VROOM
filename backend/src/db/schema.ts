@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
   index,
   integer,
@@ -164,6 +164,37 @@ export const insuranceTermVehicles = sqliteTable(
   })
 );
 
+// Insurance Claims table — a claim filed against a policy (optionally a specific
+// term and vehicle). claimType / status / faultDesignation are free-text columns
+// whose allowed values are enforced by the zod validation layer, mirroring how
+// insurance_terms.premiumFrequency is handled (text column + app-level enum).
+export const insuranceClaims = sqliteTable(
+  'insurance_claims',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    policyId: text('policy_id')
+      .notNull()
+      .references(() => insurancePolicies.id, { onDelete: 'cascade' }),
+    termId: text('term_id').references(() => insuranceTerms.id, { onDelete: 'set null' }),
+    vehicleId: text('vehicle_id').references(() => vehicles.id, { onDelete: 'set null' }),
+    claimDate: integer('claim_date', { mode: 'timestamp' }).notNull(),
+    claimType: text('claim_type').notNull(), // collision | theft | weather | vandalism | other
+    description: text('description'),
+    status: text('status').notNull().default('filed'), // filed | in_progress | settled | denied
+    payoutAmount: real('payout_amount'),
+    faultDesignation: text('fault_designation'), // at_fault | not_at_fault | shared | null
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    policyIdIdx: index('ic_policy_id_idx').on(table.policyId),
+    policyStatusIdx: index('ic_policy_status_idx').on(table.policyId, table.status),
+    vehicleIdx: index('ic_vehicle_idx').on(table.vehicleId),
+  })
+);
+
 // Split method type for split expenses
 export type SplitMethod = 'even' | 'absolute' | 'percentage';
 
@@ -201,6 +232,10 @@ export const expenses = sqliteTable(
     // Source tracking — nullable, server-set only (e.g., 'reminder', 'import', 'api')
     sourceType: text('source_type'),
     sourceId: text('source_id'),
+    // Offline idempotency key — client-generated UUID for expenses created via the
+    // offline outbox. NULL for server- or legacy-created rows. Scoped unique per user
+    // so a retried offline POST returns the original row instead of duplicating it.
+    clientId: text('client_id'),
   },
   (table) => ({
     vehicleDateIdx: index('expenses_vehicle_date_idx').on(table.vehicleId, table.date),
@@ -221,6 +256,12 @@ export const expenses = sqliteTable(
     groupIdx: index('expenses_group_idx').on(table.groupId),
     // Source tracking lookup (e.g., all expenses from a specific reminder or financing)
     sourceIdx: index('expenses_source_idx').on(table.sourceType, table.sourceId),
+    // Offline idempotency: partial unique index so a retried create with the same
+    // client_id returns the original row. Partial (WHERE client_id IS NOT NULL) so
+    // the many NULL rows from server/legacy creates are unaffected.
+    userClientIdx: uniqueIndex('expenses_user_client_idx')
+      .on(table.userId, table.clientId)
+      .where(sql`${table.clientId} IS NOT NULL`),
   })
 );
 
@@ -481,6 +522,9 @@ export type NewInsuranceTerm = typeof insuranceTerms.$inferInsert;
 
 export type InsuranceTermVehicle = typeof insuranceTermVehicles.$inferSelect;
 export type NewInsuranceTermVehicle = typeof insuranceTermVehicles.$inferInsert;
+
+export type InsuranceClaim = typeof insuranceClaims.$inferSelect;
+export type NewInsuranceClaim = typeof insuranceClaims.$inferInsert;
 
 export type Expense = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;

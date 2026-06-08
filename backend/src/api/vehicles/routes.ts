@@ -12,7 +12,8 @@ import { commonSchemas } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
 import { financingRepository } from '../financing/repository';
-import { deleteAllPhotosForEntity } from '../photos/photo-service';
+import { odometerRepository } from '../odometer/repository';
+import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { preferencesRepository } from '../settings/repository';
 import { photoRoutes } from './photo-routes';
 import { vehicleRepository } from './repository';
@@ -101,6 +102,18 @@ const updateVehicleSchema = baseVehicleSchema
   })
   .extend({
     unitPreferences: partialUnitPreferencesSchema.optional(),
+    // On UPDATE, the nullable optional columns are nullish so an emptied field
+    // can be CLEARED with an explicit null (the form sends null on edit). The
+    // base schema overrides these as .optional() (rejects null); re-declare them
+    // here. Drizzle's .set() passes null through and drops undefined, so null
+    // clears and omitting leaves unchanged. (vin keeps drizzle-zod's nullable
+    // default, but is re-declared here for consistency.)
+    licensePlate: baseVehicleSchema.shape.licensePlate.nullish(),
+    nickname: baseVehicleSchema.shape.nickname.nullish(),
+    vin: baseVehicleSchema.shape.vin.nullish(),
+    initialMileage: baseVehicleSchema.shape.initialMileage.nullish(),
+    purchasePrice: baseVehicleSchema.shape.purchasePrice.nullish(),
+    purchaseDate: baseVehicleSchema.shape.purchaseDate.nullish(),
   })
   .partial();
 
@@ -117,23 +130,27 @@ routes.get('/', async (c) => {
 
   const userVehicles = await vehicleRepository.findByUserId(user.id);
 
-  // Enrich financing with computed balance
-  const enrichedVehicles = await Promise.all(
-    userVehicles.map(async (v) => {
-      if (v.financing) {
-        const computedBalance = await financingRepository.computeBalance(v.financing.id);
-        return {
-          ...v,
-          financing: {
-            ...v.financing,
-            computedBalance,
-            eligibleForPayoff: computedBalance <= 0.01,
-          },
-        };
-      }
-      return v;
-    })
-  );
+  // Enrich financing with computed balance. Batch all balances in two queries
+  // (computeBalances) instead of an N+1 over each financed vehicle.
+  const financingIds = userVehicles
+    .map((v) => v.financing?.id)
+    .filter((id): id is string => id !== undefined);
+  const balances = await financingRepository.computeBalances(financingIds);
+
+  const enrichedVehicles = userVehicles.map((v) => {
+    if (v.financing) {
+      const computedBalance = balances.get(v.financing.id) ?? 0;
+      return {
+        ...v,
+        financing: {
+          ...v.financing,
+          computedBalance,
+          eligibleForPayoff: computedBalance <= 0.01,
+        },
+      };
+    }
+    return v;
+  });
 
   const response: ApiResponse<typeof enrichedVehicles> = {
     success: true,
@@ -271,8 +288,19 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     throw new NotFoundError('Vehicle');
   }
 
-  // Cascade delete all photos (Drive + DB) before removing the vehicle
+  // Cascade delete all photos (provider files + DB) BEFORE removing the vehicle.
+  // The photos table links to entities by (entity_type, entity_id) strings with
+  // NO foreign key, so the DB FK-cascade that removes the vehicle's expenses and
+  // odometer entries would otherwise orphan their photo rows AND leak the
+  // external storage files. Clean the vehicle's own photos plus every dependent
+  // entity's photos here, while those entities still exist to be enumerated.
+  const [expenseIds, odometerIds] = await Promise.all([
+    expenseRepository.findIdsByVehicleId(id),
+    odometerRepository.findIdsByVehicleId(id),
+  ]);
   await deleteAllPhotosForEntity('vehicle', id, user.id);
+  await deletePhotosForEntities('expense', expenseIds, user.id);
+  await deletePhotosForEntities('odometer_entry', odometerIds, user.id);
 
   await vehicleRepository.delete(id);
 

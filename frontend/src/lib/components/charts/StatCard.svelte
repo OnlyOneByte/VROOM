@@ -68,7 +68,11 @@
 				<div class="flex-1 space-y-1 min-w-0">
 					<span class="text-sm font-medium text-muted-foreground">{label}</span>
 					<div class="flex items-baseline gap-1 flex-wrap">
-						<span class="text-2xl font-bold">{value}</span>
+						<!-- min-w-0 + break-words so a long value (e.g. a big currency figure)
+						     can't set a min-content width wider than this min-w-0 column and
+						     push the card past its grid track (the dual layout sits two of
+						     these + a divider inside a 2-col mobile grid). -->
+						<span class="text-2xl font-bold min-w-0 break-words">{value}</span>
 						{#if unit}
 							<span class="text-xs text-muted-foreground">{unit}</span>
 						{/if}
@@ -78,7 +82,7 @@
 				<div class="flex-1 space-y-1 min-w-0">
 					<span class="text-sm font-medium text-muted-foreground">{secondaryLabel}</span>
 					<div class="flex items-baseline gap-1 flex-wrap">
-						<span class="text-2xl font-bold">{secondaryValue}</span>
+						<span class="text-2xl font-bold min-w-0 break-words">{secondaryValue}</span>
 						{#if secondaryUnit}
 							<span class="text-xs text-muted-foreground">{secondaryUnit}</span>
 						{/if}

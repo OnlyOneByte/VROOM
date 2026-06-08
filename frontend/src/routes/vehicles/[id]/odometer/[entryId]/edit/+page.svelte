@@ -10,6 +10,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { odometerApi } from '$lib/services/odometer-api';
+	import { dateOnlyToISO } from '$lib/utils/formatters';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 	import type { PageData } from './$types';
 
@@ -112,7 +113,7 @@
 		try {
 			await odometerApi.update(entryId, {
 				odometer: Number(odometer),
-				recordedAt: new Date(date).toISOString(),
+				recordedAt: dateOnlyToISO(date),
 				note: note || undefined
 			});
 			await gotoDynamic(returnTo);

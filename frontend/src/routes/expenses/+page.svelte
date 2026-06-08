@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { routes } from '$lib/routes';
-	import { Calendar, DollarSign, Search, FileText, TrendingUp, X, Car } from '@lucide/svelte';
+	import { Calendar, DollarSign, Search, FileText, TrendingUp, X, Car, CircleAlert, Download, Upload } from '@lucide/svelte';
 	import { offlineExpenseQueue } from '$lib/stores/offline.svelte';
 	import { removeOfflineExpense } from '$lib/utils/offline-storage';
 	import { settingsStore } from '$lib/stores/settings.svelte';
@@ -13,6 +13,7 @@
 	// Extended Expense type with vehicle info
 	type ExpenseWithVehicle = Expense & { vehicle?: Vehicle };
 	import { formatCurrency } from '$lib/utils/formatters';
+	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { extractUniqueTags } from '$lib/utils/expense-filters';
 	import { COMMON_MESSAGES, EXPENSE_MESSAGES } from '$lib/constants/messages';
@@ -27,10 +28,12 @@
 	import ExpenseTagFilter from '$lib/components/expenses/ExpenseTagFilter.svelte';
 	import OfflineExpenseCards from '$lib/components/expenses/OfflineExpenseCards.svelte';
 	import ExpenseOverviewSection from '$lib/components/expenses/ExpenseOverviewSection.svelte';
+	import ImportExpensesDialog from '$lib/components/expenses/ImportExpensesDialog.svelte';
 	import * as Select from '$lib/components/ui/select';
 
 	// Component state
 	let isLoading = $state(true);
+	let loadError = $state<string | null>(null);
 	let expenses = $state<ExpenseWithVehicle[]>([]);
 	let vehicles = $state<Vehicle[]>([]);
 	let summary = $state<ExpenseSummary | null>(null);
@@ -54,6 +57,14 @@
 	// Tag filter state
 	let selectedTags = $state<string[]>([]);
 	let tagMatchMode = $state<'any' | 'all'>('any');
+
+	// Server-side sort state (default date desc — matches prior behavior).
+	let sortBy = $state<'date' | 'amount'>('date');
+	let sortDir = $state<'asc' | 'desc'>('desc');
+
+	// Server-side category filter ('' = all). Owned here so it spans ALL pages, not
+	// just the current 20-row slice (the table's local filter only narrowed the page).
+	let categoryFilter = $state<string>('');
 
 	let pendingExpenses = $derived(offlineExpenseQueue.current.filter(expense => !expense.synced));
 	let syncedExpenses = $derived(offlineExpenseQueue.current.filter(expense => expense.synced));
@@ -100,13 +111,48 @@
 		}
 	});
 
-	onMount(async () => {
-		await settingsStore.load();
-		const loadedVehicles = await vehicleApi.getVehicles();
-		vehicles = loadedVehicles;
-		await fetchPageAndSummary();
-		isLoading = false;
+	// Server-side search: debounce searchTerm changes and re-fetch page 0 so
+	// matches on OTHER pages are found (client-side filtering only saw the
+	// current 20-row page, which silently hid valid results).
+	let searchDebounce: ReturnType<typeof setTimeout> | undefined;
+	// Plain (non-reactive) guard: writing it must NOT re-trigger this effect,
+	// otherwise the cleanup below would cancel the just-armed timer on the
+	// self-triggered re-run and the search would never fire.
+	let prevSearchTerm = '';
+	$effect(() => {
+		const term = searchTerm;
+		if (isLoading) return; // skip during initial mount
+		if (term === prevSearchTerm) return;
+		prevSearchTerm = term;
+		clearTimeout(searchDebounce);
+		searchDebounce = setTimeout(() => handleFilterChange(), 300);
+		// Cancel a pending debounce on the next searchTerm change or on unmount,
+		// so we don't fire a fetch / setState after teardown.
+		return () => clearTimeout(searchDebounce);
 	});
+
+	onMount(loadInitial);
+
+	/**
+	 * Initial page load. Previously these awaits were unguarded, so a failure in
+	 * settings/vehicles/expenses left `isLoading` stuck `true` forever (permanent
+	 * skeleton). Now a failure surfaces a persistent error + Retry, matching the
+	 * insurance/dashboard/analytics routes.
+	 */
+	async function loadInitial() {
+		isLoading = true;
+		loadError = null;
+		try {
+			await settingsStore.load();
+			vehicles = await vehicleApi.getVehicles();
+			await fetchPageAndSummary();
+		} catch (error) {
+			loadError = error instanceof Error ? error.message : 'Failed to load expenses';
+			handleErrorWithNotification(error, 'Failed to load expenses');
+		} finally {
+			isLoading = false;
+		}
+	}
 
 	/** Build the params object for the current filter state. */
 	function buildListParams(offset: number) {
@@ -116,7 +162,11 @@
 			...(selectedVehicleId && { vehicleId: selectedVehicleId }),
 			...(startDate && { startDate }),
 			...(endDate && { endDate }),
-			...(selectedTags.length > 0 && { tags: selectedTags })
+			...(selectedTags.length > 0 && { tags: selectedTags }),
+			...(searchTerm.trim() && { search: searchTerm.trim() }),
+			...(categoryFilter && { category: categoryFilter }),
+			sortBy,
+			sortDir
 		};
 	}
 
@@ -144,7 +194,11 @@
 			currentOffset = offset;
 			summary = summaryResult;
 		} catch (error) {
-			if (import.meta.env.DEV) console.error('Failed to load expenses:', error);
+			// Re-throw during the initial load so loadInitial() can show the full-page
+			// error+retry; for later filter/delete refreshes show a toast (the page is
+			// already rendered, so a non-destructive notification is the right scope).
+			if (isLoading) throw error;
+			handleErrorWithNotification(error, 'Failed to load expenses');
 		} finally {
 			isLoadingPage = false;
 		}
@@ -183,6 +237,25 @@
 		fetchPage(offset);
 	}
 
+	/** Sort changed in the table — re-fetch from page 0 so the sort spans ALL pages. */
+	function handleSortChange(by: 'date' | 'amount', dir: 'asc' | 'desc') {
+		sortBy = by;
+		sortDir = dir;
+		currentOffset = 0;
+		fetchPage(0);
+	}
+
+	/** Category changed in the table — re-fetch from page 0 so it filters ALL pages. */
+	function handleCategoryChange(category: string) {
+		categoryFilter = category;
+		currentOffset = 0;
+		// Re-fetch the page only (not the summary). The Expense Overview card is the
+		// all-category total, scoped by vehicle only — same as search/date/tags, which
+		// also don't rescope it. Keeping that consistent avoids changing the card's
+		// meaning when a category is picked.
+		fetchPage(0);
+	}
+
 	function clearFilters() {
 		searchTerm = '';
 		tagMatchMode = 'any';
@@ -190,6 +263,37 @@
 		selectedTags = [];
 		startDate = undefined;
 		endDate = undefined;
+		categoryFilter = '';
+		currentOffset = 0;
+		fetchPageAndSummary(0);
+	}
+
+	let isExporting = $state(false);
+	async function handleExportCsv() {
+		isExporting = true;
+		try {
+			// Export mirrors EVERY active list filter (vehicle, category, date range,
+			// search, tags) so the CSV is exactly what the user is viewing — not a
+			// broader set. (Previously it omitted category/search/tags.)
+			await expenseApi.downloadExpensesCsv({
+				vehicleId: selectedVehicleId,
+				category: categoryFilter || undefined,
+				startDate,
+				endDate,
+				search: searchTerm.trim() || undefined,
+				tags: selectedTags.length > 0 ? selectedTags : undefined
+			});
+		} catch (err) {
+			handleErrorWithNotification(err, 'Failed to export expenses');
+		} finally {
+			isExporting = false;
+		}
+	}
+
+	// CSV import (dialog previews then commits). On success, reload from page 0 so
+	// the freshly-imported rows are visible and counts/summary refresh.
+	let importOpen = $state(false);
+	function handleImported() {
 		currentOffset = 0;
 		fetchPageAndSummary(0);
 	}
@@ -208,20 +312,10 @@
 		await fetchPageAndSummary(currentOffset);
 	}
 
-	// Client-side search filter (applied on top of server-paginated data)
-	let displayExpenses = $derived.by(() => {
-		if (!searchTerm.trim()) return expenses;
-		const term = searchTerm.toLowerCase();
-		return expenses.filter(
-			expense =>
-				expense.description?.toLowerCase().includes(term) ||
-				expense.category.toLowerCase().includes(term) ||
-				expense.amount.toString().includes(term) ||
-				expense.vehicle?.make?.toLowerCase().includes(term) ||
-				expense.vehicle?.model?.toLowerCase().includes(term) ||
-				expense.vehicle?.nickname?.toLowerCase().includes(term)
-		);
-	});
+	// Search is now applied server-side (description + category) across ALL pages,
+	// so the rows we receive are already filtered — no client-side narrowing needed.
+	// (The previous client-only filter silently missed matches on other pages.)
+	let displayExpenses = $derived(expenses);
 </script>
 
 <svelte:head>
@@ -238,13 +332,45 @@
 		<Skeleton class="h-40 w-full" />
 		<Skeleton class="h-64 w-full" />
 	</div>
+{:else if loadError}
+	<!-- Error state: a failed initial load must surface a retry, not hang on the
+	     skeleton forever (the previous unguarded onMount) nor render an empty list. -->
+	<div class="space-y-6">
+		<PageHeader
+			title="All Expenses"
+			description="Track and categorize expenses across all vehicles"
+		/>
+		<div class="rounded-lg border bg-card p-6">
+			<div class="mb-4 flex items-center gap-3 text-destructive">
+				<CircleAlert class="h-5 w-5" />
+				<p class="font-medium">Failed to load expenses</p>
+			</div>
+			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
+			<Button onclick={loadInitial}>Retry</Button>
+		</div>
+	</div>
 {:else}
 	<div class="space-y-6 pb-24">
 		<!-- Header -->
 		<PageHeader
 			title="All Expenses"
 			description="Track and categorize expenses across all vehicles"
-		/>
+		>
+			{#snippet actions()}
+				<!-- Import is always available — a user with no expenses yet is exactly who
+				     wants to import. Export only makes sense once there's something to export. -->
+				<Button variant="outline" onclick={() => (importOpen = true)}>
+					<Upload class="mr-2 h-4 w-4" />
+					Import CSV
+				</Button>
+				{#if totalCount > 0}
+					<Button variant="outline" onclick={handleExportCsv} disabled={isExporting}>
+						<Download class="mr-2 h-4 w-4" />
+						{isExporting ? 'Exporting…' : 'Export CSV'}
+					</Button>
+				{/if}
+			{/snippet}
+		</PageHeader>
 
 		<!-- Search, Vehicle & Filters -->
 		<CardNs.Root>
@@ -322,8 +448,10 @@
 					onMatchModeChange={handleMatchModeChange}
 				/>
 
-				<!-- Clear Filters -->
-				{#if searchTerm || selectedVehicleId || selectedTags.length > 0 || startDate || endDate}
+				<!-- Clear Filters. Mirror the SAME predicate as `hasActiveFilters` passed to
+				     the table (and `clearFilters`, which resets categoryFilter): a category-only
+				     filter is still an active filter, so the Clear affordance must appear for it. -->
+				{#if searchTerm || selectedVehicleId || selectedTags.length > 0 || startDate || endDate || categoryFilter}
 					<div class="flex justify-end pt-2">
 						<Button variant="outline" size="sm" onclick={clearFilters}>
 							<X class="h-4 w-4 mr-2" />
@@ -375,13 +503,19 @@
 						selectedVehicleId ||
 						selectedTags.length > 0 ||
 						startDate ||
-						endDate
+						endDate ||
+						categoryFilter
 					)}
 					{totalCount}
 					{currentOffset}
 					{pageSize}
 					{isLoadingPage}
 					onPageChange={handlePageChange}
+					activeSortBy={sortBy}
+					activeSortDir={sortDir}
+					onSortChange={handleSortChange}
+					activeCategory={categoryFilter}
+					onCategoryChange={handleCategoryChange}
 				/>
 			</CardNs.Content>
 		</CardNs.Root>
@@ -393,4 +527,7 @@
 		label={COMMON_MESSAGES.ADD_EXPENSE}
 		ariaLabel="Add expense"
 	/>
+
+	<!-- CSV import dialog (previews via dryRun, then commits) -->
+	<ImportExpensesDialog bind:open={importOpen} onImported={handleImported} />
 {/if}

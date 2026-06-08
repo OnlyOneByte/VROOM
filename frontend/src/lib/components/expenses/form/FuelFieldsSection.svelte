@@ -13,6 +13,7 @@
 		getFuelEfficiencyLabel,
 		getElectricEfficiencyLabel
 	} from '$lib/utils/units';
+	import { formatCurrency } from '$lib/utils/formatters';
 	import type { VolumeUnit, ChargeUnit, DistanceUnit } from '$lib/types';
 
 	interface Props {
@@ -157,9 +158,8 @@
 
 		{#if volume && amount}
 			<div class="text-sm text-muted-foreground">
-				<strong>Price per {getVolumeUnitLabel(volumeUnit, true)}:</strong> ${(
-					parseFloat(amount) / parseFloat(volume)
-				).toFixed(3)}
+				<strong>Price per {getVolumeUnitLabel(volumeUnit, true)}:</strong>
+				{formatCurrency(parseFloat(amount) / parseFloat(volume), undefined, 3)}
 			</div>
 		{/if}
 
@@ -233,9 +233,8 @@
 
 		{#if charge && amount}
 			<div class="text-sm text-muted-foreground">
-				<strong>Price per {getChargeUnitLabel(chargeUnit, true)}:</strong> ${(
-					parseFloat(amount) / parseFloat(charge)
-				).toFixed(3)}
+				<strong>Price per {getChargeUnitLabel(chargeUnit, true)}:</strong>
+				{formatCurrency(parseFloat(amount) / parseFloat(charge), undefined, 3)}
 			</div>
 		{/if}
 
@@ -268,35 +267,38 @@
 	<!-- Efficiency display -->
 	{#if showMpgCalculation}
 		{#if calculatedMpg && energyMode === 'fuel'}
+			<!-- Color stays on the icon (graphical, exempt); the TEXT is text-foreground.
+			     chart-2/chart-5 small text on this bg-chart-2/10 tint fails WCAG AA
+			     (~3.1:1); the ✅/⚠️ glyph carries the good/poor signal. (cycle 188/196 class) -->
 			<div class="bg-chart-2/10 border border-chart-2/20 rounded-lg p-3">
-				<div class="flex items-center gap-2 text-chart-2">
-					<Gauge class="h-4 w-4" />
+				<div class="flex items-center gap-2 text-foreground">
+					<Gauge class="h-4 w-4 text-chart-2" />
 					<span class="text-sm font-medium">
 						Calculated: {calculatedMpg}
 						{getFuelEfficiencyLabel(distanceUnit, volumeUnit)}
 					</span>
 				</div>
 				{#if calculatedMpg < 15}
-					<p class="text-xs text-chart-5 mt-1">
+					<p class="text-xs text-foreground mt-1">
 						⚠️ Low fuel efficiency - consider maintenance check
 					</p>
 				{:else if calculatedMpg > 50}
-					<p class="text-xs text-chart-2 mt-1">✅ Excellent fuel efficiency!</p>
+					<p class="text-xs text-foreground mt-1">✅ Excellent fuel efficiency!</p>
 				{/if}
 			</div>
 		{:else if calculatedEfficiency && energyMode === 'charging'}
 			<div class="bg-chart-2/10 border border-chart-2/20 rounded-lg p-3">
-				<div class="flex items-center gap-2 text-chart-2">
-					<Zap class="h-4 w-4" />
+				<div class="flex items-center gap-2 text-foreground">
+					<Zap class="h-4 w-4 text-chart-2" />
 					<span class="text-sm font-medium">
 						Calculated: {calculatedEfficiency}
 						{getElectricEfficiencyLabel(distanceUnit, chargeUnit)}
 					</span>
 				</div>
 				{#if calculatedEfficiency < 2}
-					<p class="text-xs text-chart-5 mt-1">⚠️ Low efficiency - check driving conditions</p>
+					<p class="text-xs text-foreground mt-1">⚠️ Low efficiency - check driving conditions</p>
 				{:else if calculatedEfficiency > 4}
-					<p class="text-xs text-chart-2 mt-1">✅ Excellent efficiency!</p>
+					<p class="text-xs text-foreground mt-1">✅ Excellent efficiency!</p>
 				{/if}
 			</div>
 		{/if}

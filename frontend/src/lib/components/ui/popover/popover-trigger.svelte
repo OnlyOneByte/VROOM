@@ -11,9 +11,12 @@
 </script>
 
 {#if child}
-	<PopoverPrimitive.Trigger {...restProps}>
-		{@render child({ props: restProps })}
-	</PopoverPrimitive.Trigger>
+	<!-- Forward the `child` snippet to the PRIMITIVE's own `child` prop so bits-ui
+	     renders ONLY the delegated element (merging its trigger behavior via `props`)
+	     instead of wrapping it in its own <button>. Rendering child *inside*
+	     <Trigger> emits a button-in-button (nested-interactive) whose outer button
+	     has no accessible name (button-name) — a real a11y bug the date pickers hit. -->
+	<PopoverPrimitive.Trigger {...restProps} {child} />
 {:else}
 	<PopoverPrimitive.Trigger {...restProps}>
 		{@render children?.()}

@@ -208,11 +208,13 @@
 
 	<!-- Global default provider -->
 	<div class="space-y-2">
-		<div class="flex items-center justify-between gap-4">
-			<p class="text-xs text-muted-foreground">Select a provider to serve all photo types from.</p>
+		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+			<p class="text-xs text-muted-foreground min-w-0">
+				Select a provider to serve all photo types from.
+			</p>
 			<div class="flex items-center gap-2">
 				{#if checkingCategory && !advancedOpen}
-					<LoaderCircle class="h-4 w-4 animate-spin text-muted-foreground" />
+					<LoaderCircle class="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
 				{/if}
 				<Select.Root
 					type="single"
@@ -221,7 +223,7 @@
 						if (val !== 'mixed') handleGlobalChange(val);
 					}}
 				>
-					<Select.Trigger class="w-[220px]">
+					<Select.Trigger class="w-full sm:w-[220px]">
 						{#if hasPerCategoryOverrides}
 							<span class="text-muted-foreground">Mixed</span>
 						{:else if uniformDefault}
@@ -274,21 +276,21 @@
 					{@const enabledProviders = getEnabledProviders(category)}
 					{@const currentDefault = storageConfig.defaults[category]}
 					{@const Icon = meta.icon}
-					<div class="flex items-center justify-between gap-4">
+					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
 						<div class="flex items-center gap-2 min-w-0">
 							<Icon class="h-4 w-4 text-muted-foreground shrink-0" />
-							<span class="text-sm">{meta.label}</span>
+							<span class="text-sm truncate">{meta.label}</span>
 						</div>
 						<div class="flex items-center gap-2">
 							{#if checkingCategory === category}
-								<LoaderCircle class="h-4 w-4 animate-spin text-muted-foreground" />
+								<LoaderCircle class="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
 							{/if}
 							<Select.Root
 								type="single"
 								value={currentDefault ?? 'none'}
 								onValueChange={val => handleCategoryChange(category, val)}
 							>
-								<Select.Trigger class="w-[200px]">
+								<Select.Trigger class="w-full sm:w-[200px]">
 									{#if currentDefault}
 										{@const provider = providers.find(p => p.id === currentDefault)}
 										<span class="truncate">

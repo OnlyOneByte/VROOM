@@ -108,6 +108,11 @@
 					{:else}
 						{@render children()}
 					{/if}
+				{:else}
+					<!-- Visibility-gated (below the fold / inactive tab): show a Skeleton,
+					     never a blank box, so the card always reads as "loading" until the
+					     chart mounts on scroll-in. (UIQuality Four-States: no empty white box.) -->
+					<Skeleton class="w-full" style="height: {placeholderHeight}px" />
 				{/if}
 			</div>
 		{/if}

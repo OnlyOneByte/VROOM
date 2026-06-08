@@ -88,16 +88,21 @@
 	let distLongLabel = $derived(getDistanceUnitLabel(units.distanceUnit));
 
 	// --- Health Score ---
-	function getScoreColor(score: number): string {
-		if (score >= 70) return 'text-chart-2';
-		if (score >= 40) return 'text-chart-5';
-		return 'text-destructive';
-	}
-
+	// The score TEXT is intentionally NOT tinted with the tier color: chart-5 amber
+	// (#fe9a00) on its own bg-chart-5/10 tint is only 1.97:1 — illegible, failing WCAG
+	// AA even at the large-text 3:1 bar (cycle 189). The tier is instead conveyed by the
+	// tint-colored ring (graphical) PLUS an explicit text label below, so it's legible
+	// AND not signalled by color alone.
 	function getScoreBgColor(score: number): string {
 		if (score >= 70) return 'bg-chart-2/10';
 		if (score >= 40) return 'bg-chart-5/10';
 		return 'bg-destructive/10';
+	}
+
+	function getScoreLabel(score: number): string {
+		if (score >= 70) return 'Good';
+		if (score >= 40) return 'Fair';
+		return 'Needs attention';
 	}
 
 	// --- TCO Summary Stat Cards ---
@@ -190,13 +195,13 @@
 									health.overallScore
 								)}"
 							>
-								<span class="text-3xl font-bold {getScoreColor(health.overallScore)}">
+								<span class="text-3xl font-bold text-foreground">
 									{health.overallScore}
 								</span>
 							</div>
 							<div>
 								<p class="text-sm text-muted-foreground">Overall Score</p>
-								<p class="text-lg font-medium">out of 100</p>
+								<p class="text-lg font-medium">{getScoreLabel(health.overallScore)} · out of 100</p>
 							</div>
 						</div>
 

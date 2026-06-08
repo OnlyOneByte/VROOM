@@ -1,9 +1,12 @@
 import type {
+	CreateClaimRequest,
 	CreatePolicyRequest,
 	CreateTermRequest,
+	InsuranceClaim,
 	InsurancePolicy,
 	PaginatedResponse,
 	Photo,
+	UpdateClaimRequest,
 	UpdatePolicyRequest,
 	UpdateTermRequest
 } from '$lib/types';
@@ -54,31 +57,53 @@ export const insuranceApi = {
 		return apiClient.delete<InsurancePolicy>(`/api/v1/insurance/${policyId}/terms/${termId}`);
 	},
 
-	// --- Document methods (delegate to photo endpoints) ---
+	// --- Document methods (delegate to the entityType-generic photo endpoints) ---
+	// entityType is 'insurance_policy' or 'insurance_claim'; both route to the
+	// insurance_docs storage category on the backend.
 
-	async getDocuments(
-		policyId: string,
+	async getEntityDocuments(
+		entityType: string,
+		entityId: string,
 		params?: { limit?: number; offset?: number }
 	): Promise<PaginatedResponse<Photo>> {
 		return apiClient.getPaginated<Photo>(
-			withPagination(`/api/v1/photos/insurance_policy/${policyId}`, params)
+			withPagination(`/api/v1/photos/${entityType}/${entityId}`, params)
 		);
 	},
 
-	async uploadDocument(policyId: string, file: File, termId?: string): Promise<Photo> {
+	async uploadEntityDocument(entityType: string, entityId: string, file: File): Promise<Photo> {
 		const formData = new FormData();
 		formData.append('photo', file);
-		if (termId) {
-			formData.append('termId', termId);
-		}
-		return apiClient.post<Photo>(`/api/v1/photos/insurance_policy/${policyId}`, formData);
+		return apiClient.post<Photo>(`/api/v1/photos/${entityType}/${entityId}`, formData);
 	},
 
-	async deleteDocument(policyId: string, photoId: string): Promise<void> {
-		await apiClient.delete(`/api/v1/photos/insurance_policy/${policyId}/${photoId}`);
+	async deleteEntityDocument(entityType: string, entityId: string, photoId: string): Promise<void> {
+		await apiClient.delete(`/api/v1/photos/${entityType}/${entityId}/${photoId}`);
 	},
 
-	getDocumentThumbnailUrl(policyId: string, photoId: string): string {
-		return `${getApiBaseUrl()}/api/v1/photos/insurance_policy/${policyId}/${photoId}/thumbnail`;
+	getEntityDocumentThumbnailUrl(entityType: string, entityId: string, photoId: string): string {
+		return `${getApiBaseUrl()}/api/v1/photos/${entityType}/${entityId}/${photoId}/thumbnail`;
+	},
+
+	// --- Claims methods ---
+
+	async getClaims(policyId: string): Promise<InsuranceClaim[]> {
+		return apiClient.get<InsuranceClaim[]>(`/api/v1/insurance/${policyId}/claims`);
+	},
+
+	async createClaim(policyId: string, data: CreateClaimRequest): Promise<InsuranceClaim> {
+		return apiClient.post<InsuranceClaim>(`/api/v1/insurance/${policyId}/claims`, data);
+	},
+
+	async updateClaim(
+		policyId: string,
+		claimId: string,
+		data: UpdateClaimRequest
+	): Promise<InsuranceClaim> {
+		return apiClient.put<InsuranceClaim>(`/api/v1/insurance/${policyId}/claims/${claimId}`, data);
+	},
+
+	async deleteClaim(policyId: string, claimId: string): Promise<void> {
+		await apiClient.delete(`/api/v1/insurance/${policyId}/claims/${claimId}`);
 	}
 };

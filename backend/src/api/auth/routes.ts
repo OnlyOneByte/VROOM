@@ -8,6 +8,7 @@ import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { userProviders, users } from '../../db/schema';
 import { rateLimiter, requireAuth } from '../../middleware';
+import { getClientIp } from '../../utils/client-ip';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { storePending } from '../../utils/pending-credentials';
@@ -69,9 +70,10 @@ const cleanupExpiredStates = () => {
 // --- Auth rate limiter (IP-based, for unauthenticated login/callback/link routes) ---
 const authRateLimiter = rateLimiter({
   ...CONFIG.rateLimit.auth,
-  keyGenerator: (c) => {
-    return `auth:${c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'anonymous'}`;
-  },
+  // Key on the trusted client IP (real socket IP, or X-Forwarded-For only behind a
+  // configured trusted proxy) — NOT the raw spoofable header, which would let an
+  // attacker get a fresh bucket per request and bypass the brute-force limit.
+  keyGenerator: (c) => `auth:${getClientIp(c)}`,
 });
 
 // ============================================================================
@@ -451,12 +453,52 @@ routes.get('/me', async (c) => {
         id: user.id,
         email: user.email,
         displayName: user.displayName,
+        createdAt: user.createdAt?.toISOString() ?? null,
+        updatedAt: user.updatedAt?.toISOString() ?? null,
       },
       session: {
         id: session.id,
         expiresAt: session.expiresAt,
       },
     },
+  });
+});
+
+// Update current user's profile (display name).
+routes.patch('/me', requireAuth, async (c) => {
+  const user = c.get('user');
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: 'Invalid JSON body' });
+  }
+
+  const displayNameRaw = (body as { displayName?: unknown })?.displayName;
+  if (typeof displayNameRaw !== 'string') {
+    throw new HTTPException(400, { message: 'displayName is required' });
+  }
+  const displayName = displayNameRaw.trim();
+  if (displayName.length < 1 || displayName.length > 100) {
+    throw new HTTPException(400, {
+      message: 'displayName must be between 1 and 100 characters',
+    });
+  }
+
+  const db = getDb();
+  const [updated] = await db
+    .update(users)
+    .set({ displayName, updatedAt: new Date() })
+    .where(eq(users.id, user.id))
+    .returning();
+
+  return c.json({
+    success: true,
+    data: {
+      user: { id: updated.id, email: updated.email, displayName: updated.displayName },
+    },
+    message: 'Profile updated successfully',
   });
 });
 
@@ -502,6 +544,8 @@ routes.post('/refresh', async (c) => {
         id: result.user.id,
         email: result.user.email,
         displayName: result.user.displayName,
+        createdAt: result.user.createdAt?.toISOString() ?? null,
+        updatedAt: result.user.updatedAt?.toISOString() ?? null,
       },
       session: {
         id: result.session.id,

@@ -1,16 +1,5 @@
 <script lang="ts">
-	import '$lib/components/charts/line-chart-animations.css';
 	import '$lib/components/charts/bar-chart-animations.css';
-	import { animateOnView } from '$lib/utils/animate-on-view';
-	import { createVisibilityWatch } from '$lib/utils/visibility-watch.svelte';
-
-	import { LineChart } from 'layerchart';
-
-	import { curveLinearClosed } from 'd3-shape';
-
-	import { scaleBand } from 'd3-scale';
-	import * as Card from '$lib/components/ui/card';
-	import * as Chart from '$lib/components/ui/chart';
 	import { formatDecimalAxis, parseMonthToDate } from '$lib/utils/chart-formatters';
 	import { AppBarChart } from '$lib/components/charts';
 	import {
@@ -37,6 +26,16 @@
 		{ key: 'avgEfficiency', label: `Avg ${efficiencyLabel}`, color: CHART_COLORS[0] as string }
 	]);
 	let seasonalConfig = $derived(buildChartConfig(seasonalSeries));
+
+	// buildSeasonalEfficiency always returns all 4 seasons (avgEfficiency 0 when there's
+	// no fuel data), so a length check is always true and the chart would render a bare
+	// empty axis. Gate on REAL data; when there's none, pass [] so AppBarChart shows its
+	// kit empty-state, matching the sibling charts (same fix as the day-of-week chart).
+	let seasonalData = $derived(
+		fuelAdvanced.seasonalEfficiency.some(d => d.fillupCount > 0)
+			? fuelAdvanced.seasonalEfficiency
+			: []
+	);
 
 	// --- 3. Vehicle Performance Comparison (Radar) ---
 	const radarMetrics = [
@@ -96,10 +95,6 @@
 		return value.toLocaleDateString('en-US', { month: 'short' });
 	}
 
-	// Visibility gate for the radar chart (bypasses ChartCard, uses LayerChart directly)
-	// Uses synchronous MutationObserver + offsetParent check instead of async IO.
-	let radarGate = createVisibilityWatch();
-
 	let heatmapData = $derived(
 		fuelAdvanced.monthlyCostHeatmap.map(d => ({ ...d, date: parseMonthToDate(d.month) }))
 	);
@@ -123,96 +118,36 @@
 		<AppBarChart
 			title="Seasonal Efficiency"
 			description="Average {efficiencyLabel} by season"
-			data={fuelAdvanced.seasonalEfficiency}
+			data={seasonalData}
 			x="season"
 			y="avgEfficiency"
 			series={seasonalSeries}
 			config={seasonalConfig}
 			yAxisFormat={formatDecimalAxis}
 			xAxisProps={{
-				ticks: fuelAdvanced.seasonalEfficiency.map(d => d.season),
+				ticks: seasonalData.map(d => d.season),
 				format: (v: string) => (typeof v === 'string' ? v : String(v))
 			}}
 		/>
 
-		<!-- Vehicle Performance Comparison (Radar) — kept manual -->
-		<Card.Root>
-			<Card.Header>
-				<Card.Title>Vehicle Performance Comparison</Card.Title>
-				<Card.Description>Multi-metric analysis</Card.Description>
-			</Card.Header>
-			<Card.Content>
-				{#if fuelAdvanced.vehicleRadar.length > 0}
-					<div bind:this={radarGate.el} style="min-height: 300px">
-						{#if radarGate.visible}
-							<div class="chart-line-animate-ready" use:animateOnView={'chart-line-animated'}>
-								<Chart.Container
-									config={radarConfig}
-									class="mx-auto aspect-square max-h-[300px] w-full"
-								>
-									<LineChart
-										data={radarData}
-										series={radarVehicleSeries}
-										radial
-										x="metric"
-										xScale={scaleBand()}
-										padding={{ top: 16, right: 16, bottom: 16, left: 16 }}
-										props={{
-											spline: {
-												curve: curveLinearClosed,
-												fillOpacity: 0.2,
-												motion: 'tween'
-											},
-											xAxis: {
-												tickLength: 0
-											},
-											yAxis: {
-												format: () => ''
-											},
-											grid: {
-												radialY: 'linear'
-											},
-											tooltip: {
-												context: {
-													mode: 'voronoi'
-												}
-											},
-											highlight: {
-												lines: false
-											}
-										}}
-									>
-										{#snippet tooltip()}
-											<Chart.Tooltip />
-										{/snippet}
-									</LineChart>
-								</Chart.Container>
-							</div>
-							<div
-								class="mt-3 flex flex-wrap items-center justify-center gap-4 text-sm"
-								role="list"
-								aria-label="Vehicle legend"
-							>
-								{#each radarVehicleSeries as s (s.key)}
-									<div class="flex items-center gap-2" role="listitem">
-										<div
-											class="h-3 w-3 rounded-sm"
-											style="background-color: {s.color}"
-											aria-hidden="true"
-										></div>
-										<span class="text-muted-foreground">{s.label}</span>
-									</div>
-								{/each}
-							</div>
-						{/if}
-					</div>
-				{:else}
-					<p class="text-sm text-muted-foreground text-center py-8">
-						No vehicle comparison data available
-					</p>
-				{/if}
-			</Card.Content>
-		</Card.Root>
+		<!-- Vehicle Performance Comparison — grouped bar (was a radial LineChart, but
+		     layerchart@2.0.0-next.65's radial geometry produced infinite-radius paths
+		     `M-Infinity,… aInfinity,Infinity`; see TODO.md. A grouped bar conveys the
+		     same per-vehicle, per-metric comparison and renders cleanly via the kit.
+		     Scores are normalized 0–100 server-side, so yDomain is fixed. -->
+		<AppBarChart
+			title="Vehicle Performance Comparison"
+			description="Normalized 0–100 scores by metric (higher is better)"
+			data={radarData}
+			x="metric"
+			y={radarVehicleSeries.map((s) => s.key)}
+			series={radarVehicleSeries}
+			config={radarConfig}
+			seriesLayout="group"
+			yDomain={[0, 100]}
+			yAxisFormat={(v: number) => String(v)}
+			xAxisProps={{ ticks: radarMetrics.map((m) => m.label) }}
+		/>
 	</div>
 
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">

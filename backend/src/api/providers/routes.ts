@@ -2,6 +2,7 @@ import { zValidator } from '@hono/zod-validator';
 import { and, eq, notExists, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { photoRefs, photos, userProviders } from '../../db/schema';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
@@ -20,7 +21,7 @@ import { storageProviderRegistry } from './domains/storage/registry';
 const CATEGORY_TO_ENTITY_TYPES: Record<string, string[]> = {
   vehicle_photos: ['vehicle'],
   expense_receipts: ['expense'],
-  insurance_docs: ['insurance_policy'],
+  insurance_docs: ['insurance_policy', 'insurance_claim'],
   odometer_readings: ['odometer_entry'],
 };
 
@@ -92,8 +93,15 @@ routes.get('/pending/:nonce', async (c) => {
 
 // --- Zod schemas ---
 
-/** Supported provider types — validated at creation time to fail fast. */
-const SUPPORTED_PROVIDER_TYPES = ['google-drive', 's3'] as const;
+/**
+ * Supported provider types — validated at creation time to fail fast.
+ * `fake` is accepted by the schema but additionally runtime-gated on
+ * `CONFIG.allowFakeStorageProvider` in the POST handler, so it can only ever be
+ * created in non-production with `ALLOW_FAKE_STORAGE=1` (the same double-gate the
+ * registry uses to instantiate it). This is the seam that lets headless E2E seed
+ * a storage provider — and exercise the backup/photo paths — without real OAuth.
+ */
+const SUPPORTED_PROVIDER_TYPES = ['google-drive', 's3', 'fake'] as const;
 
 const createProviderSchema = z.object({
   domain: z.string().min(1, 'Domain is required'),
@@ -203,6 +211,13 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
   // Domain guard: auth providers are managed through /auth routes only
   if (body.domain === 'auth') {
     throw new ValidationError('Auth providers cannot be created through this endpoint');
+  }
+
+  // Fake provider is a test-only seam — refuse it unless explicitly opted in
+  // (ALLOW_FAKE_STORAGE=1 AND non-production). Same gate the registry uses to
+  // instantiate it, enforced here so prod can never persist a fake row.
+  if (body.providerType === 'fake' && !CONFIG.allowFakeStorageProvider) {
+    throw new ValidationError('Fake storage provider is not enabled in this environment');
   }
 
   const { encryptedCredentials, resolvedConfig } = resolveProviderCredentials(

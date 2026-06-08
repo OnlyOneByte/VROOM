@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { browser } from '$app/environment';
-	import { CircleAlert, Upload, Camera } from '@lucide/svelte';
+	import { resolve } from '$app/paths';
+	import { CircleAlert, Upload, Camera, HardDrive } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
+	import { routes } from '$lib/routes';
+	import { providerApi } from '$lib/services/provider-api';
 	import UploadTab from './media/UploadTab.svelte';
 	import CameraTab from './media/CameraTab.svelte';
 
@@ -54,6 +57,23 @@
 
 	let hasCameraSupport = $derived(browser && !!navigator.mediaDevices?.getUserMedia);
 
+	// Storage-provider gate: uploads fail server-side if the user has no storage
+	// provider configured (getDefaultProvider throws). Surface that up-front with
+	// guidance instead of a generic post-attempt error. null = not yet checked.
+	let hasStorageProvider = $state<boolean | null>(null);
+
+	async function checkStorageProvider() {
+		hasStorageProvider = null;
+		try {
+			const providers = await providerApi.getProviders('storage');
+			hasStorageProvider = providers.length > 0;
+		} catch {
+			// Don't block uploads on a failed check — assume configured and let the
+			// upload surface any real error.
+			hasStorageProvider = true;
+		}
+	}
+
 	// Child component refs
 	let uploadTabRef = $state<ReturnType<typeof UploadTab> | null>(null);
 	let cameraTabRef = $state<ReturnType<typeof CameraTab> | null>(null);
@@ -71,6 +91,7 @@
 			untrack(() => {
 				uploadTabRef?.reset();
 				cameraTabRef?.reset();
+				void checkStorageProvider();
 			});
 		}
 		previousOpen = isOpen;
@@ -152,6 +173,25 @@
 			<Dialog.Footer>
 				<Button variant="outline" onclick={handleClose}>Close</Button>
 			</Dialog.Footer>
+		{:else if hasStorageProvider === false}
+			<!-- No storage provider configured → uploads would fail server-side.
+			     Guide the user to Settings instead of letting them try and fail. -->
+			<div class="space-y-4 py-2">
+				<div class="flex items-start gap-3 rounded-lg border border-border bg-muted/50 p-4">
+					<HardDrive class="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+					<div class="min-w-0">
+						<p class="text-sm font-medium text-foreground">No photo storage set up yet</p>
+						<p class="mt-1 text-xs text-muted-foreground">
+							Connect a storage provider (Google Drive, S3, …) in Settings before uploading
+							photos or documents.
+						</p>
+					</div>
+				</div>
+				<Dialog.Footer>
+					<Button variant="outline" onclick={handleClose}>Cancel</Button>
+					<Button href={resolve(routes.settings)} onclick={handleClose}>Go to Settings</Button>
+				</Dialog.Footer>
+			</div>
 		{:else}
 			<Tabs.Root bind:value={activeTab}>
 				<Tabs.List class="grid w-full grid-cols-2">

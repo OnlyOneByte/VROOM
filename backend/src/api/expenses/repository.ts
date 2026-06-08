@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
 import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
@@ -18,12 +18,78 @@ export interface ExpenseFilters {
   category?: string;
   startDate?: Date;
   endDate?: Date;
+  /** Tags — a row must carry EVERY listed tag (AND semantics). */
+  tags?: string[];
+  /** Free-text search over description + category (case-insensitive substring). */
+  search?: string;
 }
+
+/** Columns a caller may sort the expense list by. */
+export type ExpenseSortBy = 'date' | 'amount' | 'category';
+export type SortDirection = 'asc' | 'desc';
 
 export interface PaginatedExpenseFilters extends ExpenseFilters {
   limit?: number;
   offset?: number;
-  tags?: string[];
+  /** Sort column (default 'date'). Allowlisted — never an arbitrary string. */
+  sortBy?: ExpenseSortBy;
+  /** Sort direction (default 'desc'). */
+  sortDir?: SortDirection;
+}
+
+// Map the allowlisted sort key to its real column. Keeping this as a lookup (not
+// string interpolation into SQL) means an unexpected value can only fall back to
+// the default, never inject. `id` is appended as a stable tiebreaker so equal
+// amounts/categories have a deterministic order across pages (pagination would
+// otherwise drop/duplicate rows on ties).
+const EXPENSE_SORT_COLUMNS = {
+  date: expenses.date,
+  amount: expenses.expenseAmount,
+  category: expenses.category,
+} as const;
+
+/**
+ * Build the shared WHERE conditions for an expense query (everything EXCEPT the
+ * userId scope, which the caller ANDs in). Used by BOTH findPaginated and findAll so
+ * the list table and the CSV export filter identically — a divergence here is exactly
+ * how "export shows more rows than the filtered table" bugs creep in. Tags use AND
+ * semantics (a row must carry every listed tag); search is a case-insensitive LIKE
+ * over description + category.
+ */
+function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
+  const conditions: SQL[] = [];
+
+  if (filters.vehicleId) {
+    conditions.push(eq(expenses.vehicleId, filters.vehicleId));
+  }
+  if (filters.category) {
+    conditions.push(eq(expenses.category, filters.category));
+  }
+  if (filters.startDate) {
+    conditions.push(gte(expenses.date, filters.startDate));
+  }
+  if (filters.endDate) {
+    conditions.push(lte(expenses.date, filters.endDate));
+  }
+  // SQL-level tag filtering via json_each (a row must carry EVERY listed tag).
+  if (filters.tags?.length) {
+    for (const tag of filters.tags) {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM json_each(${expenses.tags}) WHERE json_each.value = ${tag})`
+      );
+    }
+  }
+  // Free-text search over description + category (case-insensitive). LIKE is
+  // case-insensitive for ASCII in SQLite by default; lower() handles mixed case too.
+  const search = filters.search?.trim();
+  if (search) {
+    const pattern = `%${search.toLowerCase()}%`;
+    conditions.push(
+      sql`(lower(${expenses.description}) LIKE ${pattern} OR lower(${expenses.category}) LIKE ${pattern})`
+    );
+  }
+
+  return conditions;
 }
 
 // Re-export from shared pagination module for backward compat
@@ -79,6 +145,62 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return result[0] ?? null;
   }
 
+  /** IDs of all expenses for a vehicle (for photo cascade cleanup on delete). */
+  async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(eq(expenses.vehicleId, vehicleId));
+    return rows.map((r) => r.id);
+  }
+
+  /** IDs of all sibling expenses in a split group, scoped to a user. */
+  async findIdsByGroupId(groupId: string, userId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
+    return rows.map((r) => r.id);
+  }
+
+  /**
+   * Find an expense by its offline idempotency key, scoped to a user.
+   * Returns null if no row with that clientId exists for the user.
+   */
+  async findByClientId(clientId: string, userId: string): Promise<Expense | null> {
+    const result = await this.db
+      .select()
+      .from(expenses)
+      .where(and(eq(expenses.clientId, clientId), eq(expenses.userId, userId)))
+      .limit(1);
+    return result[0] ?? null;
+  }
+
+  /**
+   * Idempotent create for offline-outbox writes. If an expense with the same
+   * (userId, clientId) already exists, returns it instead of inserting a duplicate
+   * — so a retried offline POST is a no-op. When clientId is absent this is a plain
+   * create. The pre-check + unique index together close the retry race: a concurrent
+   * duplicate insert hits the unique constraint, which we recover by re-reading.
+   */
+  async createIdempotent(data: NewExpense): Promise<Expense> {
+    if (!data.clientId) {
+      return this.create(data);
+    }
+    const existing = await this.findByClientId(data.clientId, data.userId);
+    if (existing) return existing;
+
+    try {
+      return await this.create(data);
+    } catch (error) {
+      // Lost the race: another request inserted the same (userId, clientId).
+      // Re-read and return the winner rather than surfacing a constraint error.
+      const raced = await this.findByClientId(data.clientId, data.userId);
+      if (raced) return raced;
+      throw error;
+    }
+  }
+
   /**
    * Paginated find with SQL-level filtering, LIMIT/OFFSET, and totalCount.
    * Filters by expenses.userId directly.
@@ -91,32 +213,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       );
       const offset = filters.offset ?? 0;
 
-      const conditions: SQL[] = [];
-
-      if (filters.vehicleId) {
-        conditions.push(eq(expenses.vehicleId, filters.vehicleId));
-      }
-
-      if (filters.category) {
-        conditions.push(eq(expenses.category, filters.category));
-      }
-
-      if (filters.startDate) {
-        conditions.push(gte(expenses.date, filters.startDate));
-      }
-
-      if (filters.endDate) {
-        conditions.push(lte(expenses.date, filters.endDate));
-      }
-
-      // SQL-level tag filtering using json_each
-      if (filters.tags?.length) {
-        for (const tag of filters.tags) {
-          conditions.push(
-            sql`EXISTS (SELECT 1 FROM json_each(${expenses.tags}) WHERE json_each.value = ${tag})`
-          );
-        }
-      }
+      const conditions = buildExpenseConditions(filters);
 
       // Filter by expenses.userId directly — no vehicles JOIN needed
       const baseWhere = and(eq(expenses.userId, filters.userId ?? ''), ...conditions);
@@ -128,11 +225,16 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
       const totalCount = countResult?.count ?? 0;
 
+      // Sort by the allowlisted column (default date), with a stable id tiebreaker
+      // so ties don't reorder across pages. dir() applies the chosen direction to
+      // the primary column; the tiebreaker matches it so order is fully determined.
+      const sortColumn = EXPENSE_SORT_COLUMNS[filters.sortBy ?? 'date'];
+      const dir = filters.sortDir === 'asc' ? asc : desc;
       const data = await this.db
         .select()
         .from(expenses)
         .where(baseWhere)
-        .orderBy(desc(expenses.date))
+        .orderBy(dir(sortColumn), dir(expenses.id))
         .limit(limit)
         .offset(offset);
 
@@ -155,23 +257,9 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    */
   async findAll(filters: ExpenseFilters): Promise<Expense[]> {
     try {
-      const conditions: SQL[] = [];
-
-      if (filters.vehicleId) {
-        conditions.push(eq(expenses.vehicleId, filters.vehicleId));
-      }
-
-      if (filters.category) {
-        conditions.push(eq(expenses.category, filters.category));
-      }
-
-      if (filters.startDate) {
-        conditions.push(gte(expenses.date, filters.startDate));
-      }
-
-      if (filters.endDate) {
-        conditions.push(lte(expenses.date, filters.endDate));
-      }
+      // Same condition set as findPaginated (incl. tags + search) so the CSV export
+      // returns exactly the rows the filtered table shows — see buildExpenseConditions.
+      const conditions = buildExpenseConditions(filters);
 
       const result = await this.db
         .select()

@@ -7,6 +7,7 @@
 		Trash2,
 		Cloud,
 		Database,
+		Image,
 		RefreshCw,
 		LoaderCircle
 	} from '@lucide/svelte';
@@ -55,6 +56,8 @@
 		switch (providerType) {
 			case 'google-drive':
 				return Cloud;
+			case 'google-photos':
+				return Image;
 			case 's3':
 				return Database;
 			default:
@@ -66,6 +69,8 @@
 		switch (providerType) {
 			case 'google-drive':
 				return 'Google Drive';
+			case 'google-photos':
+				return 'Google Photos';
 			case 's3':
 				return 'S3 Compatible';
 			default:
@@ -146,19 +151,27 @@
 	});
 
 	let Icon = $derived(getProviderIcon(provider.providerType));
+
+	// Google Photos is a photo destination only — it can't store ZIP backups (the
+	// Library API is append-only/photos-only, no folder listing). Hide the ZIP toggle
+	// for it; Drive/S3 keep it. Mirrors the backend capability gate (D3b/D2a).
+	let supportsZipBackup = $derived(provider.providerType !== 'google-photos');
 </script>
 
 <Card>
 	<CardHeader class="pb-3">
-		<div class="flex items-center justify-between">
+		<!-- min-w-0: CardHeader is a CSS grid; a grid item defaults to min-width:auto,
+		     so a long provider name would expand the track past the viewport and
+		     overflow on mobile until the item is allowed to shrink. -->
+		<div class="flex items-center justify-between gap-2 min-w-0">
 			<div class="flex items-center gap-3 min-w-0">
 				<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
 					<Icon class="h-5 w-5 text-muted-foreground" />
 				</div>
 				<div class="min-w-0">
-					<div class="flex items-center gap-2">
-						<p class="text-sm font-semibold truncate">{provider.displayName}</p>
-						<Badge variant={getStatusVariant(provider.status)} class="text-xs">
+					<div class="flex items-center gap-2 min-w-0">
+						<p class="text-sm font-semibold truncate min-w-0">{provider.displayName}</p>
+						<Badge variant={getStatusVariant(provider.status)} class="text-xs shrink-0">
 							{getStatusLabel(provider.status)}
 						</Badge>
 					</div>
@@ -170,14 +183,33 @@
 					</p>
 				</div>
 			</div>
-			<div class="flex items-center gap-1">
-				<Button variant="ghost" size="icon" class="h-8 w-8" onclick={() => onEdit(provider)}>
+			<div class="flex items-center gap-1 shrink-0">
+				<Button
+					variant="ghost"
+					size="icon"
+					class="h-8 w-8"
+					aria-label="Edit {provider.displayName}"
+					onclick={() => onEdit(provider)}
+				>
 					<Pencil class="h-4 w-4" />
 				</Button>
-				<Button variant="ghost" size="icon" class="h-8 w-8" onclick={() => onDelete(provider)}>
+				<Button
+					variant="ghost"
+					size="icon"
+					class="h-8 w-8"
+					aria-label="Delete {provider.displayName}"
+					onclick={() => onDelete(provider)}
+				>
 					<Trash2 class="h-4 w-4 text-destructive" />
 				</Button>
-				<Button variant="ghost" size="icon" class="h-8 w-8" onclick={() => (expanded = !expanded)}>
+				<Button
+					variant="ghost"
+					size="icon"
+					class="h-8 w-8"
+					aria-label={expanded ? 'Collapse provider details' : 'Expand provider details'}
+					aria-expanded={expanded}
+					onclick={() => (expanded = !expanded)}
+				>
 					{#if expanded}
 						<ChevronUp class="h-4 w-4" />
 					{:else}
@@ -190,17 +222,29 @@
 
 	<CardContent class="pt-0">
 		<div class="space-y-3">
-			<div class="flex items-center justify-between">
-				<div class="space-y-0.5">
-					<Label for="backup-{provider.id}" class="text-sm">ZIP backup</Label>
-					<p class="text-xs text-muted-foreground">Store ZIP backups on this provider</p>
+			{#if supportsZipBackup}
+				<div class="flex items-center justify-between">
+					<div class="space-y-0.5">
+						<Label for="backup-{provider.id}" class="text-sm">ZIP backup</Label>
+						<p class="text-xs text-muted-foreground">Store ZIP backups on this provider</p>
+					</div>
+					<Switch
+						id="backup-{provider.id}"
+						checked={backupEnabled}
+						onCheckedChange={checked => onBackupToggle?.(provider.id, checked === true)}
+					/>
 				</div>
-				<Switch
-					id="backup-{provider.id}"
-					checked={backupEnabled}
-					onCheckedChange={checked => onBackupToggle?.(provider.id, checked === true)}
-				/>
-			</div>
+				{#if backupEnabled}
+					<p class="text-xs text-muted-foreground">
+						Backups include your data only — images and photos are not included.
+					</p>
+				{/if}
+			{:else}
+				<p class="text-xs text-muted-foreground">
+					Google Photos stores your photos only. Use a Google Drive or S3 provider for ZIP data
+					backups.
+				</p>
+			{/if}
 			{#if provider.providerType === 'google-drive'}
 				<div class="flex items-center justify-between">
 					<div class="space-y-0.5">

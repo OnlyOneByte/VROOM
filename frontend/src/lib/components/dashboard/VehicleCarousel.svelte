@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '$lib/routes';
 	import { gotoWithQuery } from '$lib/utils/navigation';
@@ -29,10 +28,6 @@
 	}
 
 	let { vehicles, isLoading = false }: Props = $props();
-
-	function handleVehicleClick(vehicleId: string) {
-		goto(resolve(paramRoutes.vehicle, { id: vehicleId }));
-	}
 </script>
 
 <Card.Root>
@@ -68,12 +63,12 @@
 							class="pl-2 md:pl-4 basis-[85%] sm:basis-[70%] md:basis-1/2 lg:basis-1/3"
 						>
 							<div class="p-1">
+								<!-- Card is NOT interactive itself (that would nest the Add-Expense
+								     button inside an interactive ancestor — an a11y violation). The
+								     vehicle-name link below is the navigation target; the card just
+								     provides the hover affordance. -->
 								<Card.Root
-									class="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
-									onclick={() => handleVehicleClick(vehicle.id)}
-									role="button"
-									tabindex={0}
-									onkeydown={e => e.key === 'Enter' && handleVehicleClick(vehicle.id)}
+									class="overflow-hidden hover:shadow-lg transition-shadow group"
 								>
 									<!-- Image area -->
 									<div
@@ -101,11 +96,20 @@
 										{/if}
 									</div>
 
-									<Card.Content class="p-4 flex flex-col h-[200px]">
-										<!-- Vehicle Name -->
+									<Card.Content class="relative p-4 flex flex-col h-[200px]">
+										<!-- Vehicle Name — the card's navigation target. The stretched-link
+										     pattern (`after:absolute after:inset-0`) makes the whole card
+										     clickable for mouse users while keeping a single real <a> for
+										     keyboard/AT. The Add-Expense button sits above it (z-10) so it
+										     stays independently clickable without nesting interactives. -->
 										<div class="mb-3">
 											<h3 class="font-semibold text-lg leading-tight">
-												{vehicle.nickname || vehicle.name}
+												<a
+													href={resolve(paramRoutes.vehicle, { id: vehicle.id })}
+													class="rounded-sm after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+												>
+													{vehicle.nickname || vehicle.name}
+												</a>
 											</h3>
 											{#if vehicle.nickname}
 												<p class="text-sm text-muted-foreground">{vehicle.name}</p>
@@ -141,13 +145,13 @@
 											</div>
 										</div>
 
-										<!-- Action Button -->
+										<!-- Action Button — relative z-10 keeps it above the stretched-link
+										     overlay so it's independently clickable. -->
 										<Button
 											variant="outline"
 											size="sm"
-											class="w-full mt-3"
-											onclick={e => {
-												e.stopPropagation();
+											class="relative z-10 w-full mt-3"
+											onclick={() => {
 												gotoWithQuery(resolve(routes.expenseNew), {
 													vehicleId: vehicle.id,
 													returnTo: routes.dashboard

@@ -438,13 +438,17 @@ describe('Property 2 (Design): Split sibling consistency', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Property 3 (Design): Split amounts sum to groupTotal
-// The absolute difference between the sum of all sibling expenseAmount values
-// and the groupTotal must be less than 0.02.
+// Property 3 (Design): Split amounts sum EXACTLY to groupTotal (to the cent)
+// computeAllocations is penny-exact by construction (Property 1 asserts the pure
+// sum === totalAmount), so the persisted siblings must re-sum to the SAME CENT too.
+// The original `< 0.02` tolerance was looser than that guarantee — it would let a
+// real ±0.01 drift (one sibling off by a penny) pass silently. Assert cent-equality
+// (round both to integer cents and compare) so a genuine penny-drift regression
+// fails. (cycle 198)
 // **Validates: Requirements 5.3, 14.3**
 // ---------------------------------------------------------------------------
 describe('Property 3 (Design): Split amounts sum to groupTotal', () => {
-  test('sum of sibling expenseAmount values equals groupTotal within ±0.01', async () => {
+  test('sum of sibling expenseAmount values equals groupTotal to the cent', async () => {
     await fc.assert(
       fc.asyncProperty(
         dbConfigAndTotalArb,
@@ -454,6 +458,7 @@ describe('Property 3 (Design): Split amounts sum to groupTotal', () => {
           const groupId = createId();
           const splitMethod = config.method;
           const date = new Date(2024, 5, 15);
+          const totalCents = Math.round(totalAmount * 100);
 
           const siblings = await db.transaction(async (tx) => {
             return service.createSiblings(tx, {
@@ -467,15 +472,15 @@ describe('Property 3 (Design): Split amounts sum to groupTotal', () => {
             });
           });
 
-          // Verify from returned objects
+          // Verify from returned objects — exact to the cent.
           const returnedSum = siblings.reduce((s, sib) => s + (sib.expenseAmount ?? 0), 0);
-          expect(Math.abs(returnedSum - totalAmount)).toBeLessThan(0.02);
+          expect(Math.round(returnedSum * 100)).toBe(totalCents);
 
-          // Verify from DB read
+          // Verify from DB read — the float round-trip must still re-sum to the cent.
           const dbSiblings = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
 
           const dbSum = dbSiblings.reduce((s, row) => s + (row.expenseAmount ?? 0), 0);
-          expect(Math.abs(dbSum - totalAmount)).toBeLessThan(0.02);
+          expect(Math.round(dbSum * 100)).toBe(totalCents);
         }
       ),
       { numRuns: 100 }

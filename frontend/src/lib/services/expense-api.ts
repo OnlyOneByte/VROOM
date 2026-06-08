@@ -17,7 +17,29 @@ import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 /** Convenience alias for a paginated response of transformed frontend Expenses. */
 type PaginatedExpenseResponse = PaginatedResponse<Expense>;
 
+/** One row's outcome from a CSV import (mirrors the backend summarizeImportPlan). */
+export interface ExpenseImportRow {
+	row: number;
+	status: 'ready' | 'error';
+	message?: string;
+	raw?: { vehicle: string; category: string; amount: string; date: string };
+}
+
+/** Result of POST /expenses/import (preview when dryRun, else the commit summary). */
+export interface ExpenseImportResult {
+	dryRun: boolean;
+	imported: number;
+	readyCount: number;
+	errorCount: number;
+	totalRows: number;
+	rows: ExpenseImportRow[];
+}
+
 /** Parameters accepted by paginated expense list methods. */
+/** Columns the expense list can be sorted by (must match the backend allowlist). */
+export type ExpenseSortBy = 'date' | 'amount' | 'category';
+export type ExpenseSortDir = 'asc' | 'desc';
+
 interface ExpenseListParams {
 	limit?: number;
 	offset?: number;
@@ -26,6 +48,9 @@ interface ExpenseListParams {
 	endDate?: string;
 	tags?: string[];
 	period?: string;
+	search?: string;
+	sortBy?: ExpenseSortBy;
+	sortDir?: ExpenseSortDir;
 }
 
 /** Parameters accepted by the expense summary endpoint. */
@@ -36,8 +61,10 @@ interface ExpenseSummaryParams {
 
 /**
  * Build a URLSearchParams from expense list params + optional vehicleId.
+ * Exported for unit testing (the expense list/search/pagination correctness
+ * depends on this building the query string exactly right).
  */
-function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string): string {
+export function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string): string {
 	const query = new URLSearchParams();
 	if (vehicleId) query.set('vehicleId', vehicleId);
 	if (params?.limit) query.set('limit', String(params.limit));
@@ -46,6 +73,11 @@ function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string): stri
 	if (params?.startDate) query.set('startDate', params.startDate);
 	if (params?.endDate) query.set('endDate', params.endDate);
 	if (params?.period) query.set('period', params.period);
+	if (params?.search?.trim()) query.set('search', params.search.trim());
+	// Only emit sort params when set to a non-default — keeps URLs/queries identical
+	// to before for the default (date desc) path, so nothing else changes behavior.
+	if (params?.sortBy) query.set('sortBy', params.sortBy);
+	if (params?.sortDir) query.set('sortDir', params.sortDir);
 	if (params?.tags?.length) {
 		for (const tag of params.tags) {
 			query.append('tags', tag);
@@ -92,6 +124,54 @@ export const expenseApi = {
 		return fetchPaginatedExpenses(`/api/v1/expenses${qs ? `?${qs}` : ''}`);
 	},
 
+	/**
+	 * Download all matching expenses as a CSV file (server-generated). Honours the
+	 * SAME filters as the list table — vehicle / category / date-range / free-text
+	 * search / tags — so the export matches exactly what the user is viewing.
+	 * Triggers a browser download.
+	 */
+	async downloadExpensesCsv(params?: {
+		vehicleId?: string;
+		category?: string;
+		startDate?: string;
+		endDate?: string;
+		search?: string;
+		tags?: string[];
+	}): Promise<void> {
+		const query = new URLSearchParams();
+		if (params?.vehicleId) query.set('vehicleId', params.vehicleId);
+		if (params?.category) query.set('category', params.category);
+		if (params?.startDate) query.set('startDate', params.startDate);
+		if (params?.endDate) query.set('endDate', params.endDate);
+		if (params?.search?.trim()) query.set('search', params.search.trim());
+		// tags as a comma-joined param (the export schema splits on comma).
+		if (params?.tags?.length) query.set('tags', params.tags.join(','));
+		const qs = query.toString();
+
+		const res = await apiClient.raw(`/api/v1/expenses/export${qs ? `?${qs}` : ''}`);
+		if (!res.ok) throw new Error(`Export failed with status ${res.status}`);
+
+		const blob = await res.blob();
+		const url = window.URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `vroom-expenses-${new Date().toISOString().slice(0, 10)}.csv`;
+		document.body.appendChild(a);
+		a.click();
+		window.URL.revokeObjectURL(url);
+		document.body.removeChild(a);
+	},
+
+	/**
+	 * Import expenses from a "VROOM CSV" (the round-trip target of the export). Sends
+	 * the CSV TEXT; the server validates every row and resolves each vehicle by NAME
+	 * within the user's own fleet. With `dryRun: true` the server validates + reports
+	 * only (preview) and writes nothing; `dryRun: false` commits the valid rows.
+	 */
+	async importExpensesCsv(csv: string, dryRun = false): Promise<ExpenseImportResult> {
+		return apiClient.post<ExpenseImportResult>('/api/v1/expenses/import', { csv, dryRun });
+	},
+
 	async getExpenseSummary(params?: ExpenseSummaryParams): Promise<ExpenseSummary> {
 		const query = new URLSearchParams();
 		if (params?.vehicleId) query.set('vehicleId', params.vehicleId);
@@ -126,7 +206,10 @@ export const expenseApi = {
 		expenseId: string,
 		expense: Partial<Expense> & { vehicleId: string; category: ExpenseCategory; amount: number }
 	): Promise<Expense> {
-		const backendExpense = toBackendExpense(expense);
+		// isEdit: an emptied description is sent as null so the user can CLEAR it
+		// (the clear-optional-field class). Create + offline/sync paths don't pass
+		// this, so their payloads are unchanged.
+		const backendExpense = toBackendExpense(expense, { isEdit: true });
 		const data = await apiClient.put<BackendExpenseResponse>(
 			`/api/v1/expenses/${expenseId}`,
 			backendExpense

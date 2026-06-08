@@ -11,8 +11,12 @@
 		TrendingUp,
 		TrendingDown
 	} from '@lucide/svelte';
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
+	import EmptyState from '$lib/components/common/empty-state.svelte';
+	import { routes } from '$lib/routes';
+	import { gotoWithQuery } from '$lib/utils/navigation';
 	import { analyticsApi, getDefaultDateRange } from '$lib/services/analytics-api';
 	import type { FuelStatsResponse, FuelAdvancedResponse } from '$lib/types';
 	import { formatCurrency } from '$lib/utils/formatters';
@@ -52,6 +56,22 @@
 	let effLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
 
+	// Whether there's ANY fuel data to show. When false, the whole tab is ~10
+	// identical "No data available" cards (6 zero/N-A stat cards + the chart
+	// cards), so we render a single empty state instead. Conservative on purpose:
+	// any fill-up in the year buckets OR any recorded distance shows the full grid,
+	// so we never hide real data.
+	let hasFuelData = $derived(
+		!!fuelStats &&
+			(fuelStats.fillups.currentYear > 0 ||
+				fuelStats.fillups.previousYear > 0 ||
+				fuelStats.distance.totalDistance > 0)
+	);
+
+	function logFillup() {
+		gotoWithQuery(resolve(routes.expenseNew), { category: 'fuel', returnTo: routes.analytics });
+	}
+
 	function pctChange(current: number, previous: number): number | null {
 		if (previous === 0) return null;
 		return Math.round(((current - previous) / previous) * 100);
@@ -85,15 +105,15 @@
 {#snippet changeBadge(current: number, previous: number)}
 	{@const change = pctChange(current, previous)}
 	{#if change != null}
-		<span
-			class="inline-flex items-center gap-1 text-xs font-medium {change >= 0
-				? 'text-chart-2'
-				: 'text-destructive'}"
-		>
+		<!-- Direction hue lives on the ICON (graphical, exempt); the % TEXT is
+		     text-foreground. chart-2 (#009689) on white is 3.66:1 at text-xs — below
+		     WCAG AA 4.5:1 (cycle 189). text-destructive is dark enough to pass, but
+		     keeping the text neutral in both branches is simpler and consistent. -->
+		<span class="inline-flex items-center gap-1 text-xs font-medium text-foreground">
 			{#if change >= 0}
-				<TrendingUp class="h-3 w-3" />
+				<TrendingUp class="h-3 w-3 text-chart-2" />
 			{:else}
-				<TrendingDown class="h-3 w-3" />
+				<TrendingDown class="h-3 w-3 text-destructive" />
 			{/if}
 			{change > 0 ? '+' : ''}{change}%
 		</span>
@@ -113,6 +133,26 @@
 		<p class="mb-4 text-sm text-muted-foreground">{error}</p>
 		<Button onclick={loadData}>Retry</Button>
 	</div>
+{:else if fuelStats && !hasFuelData}
+	<!-- No fuel data at all → one empty state instead of ~10 zero/N-A cards. -->
+	<EmptyState>
+		{#snippet icon()}
+			<div class="mb-4 rounded-full bg-muted p-4">
+				<Fuel class="h-8 w-8 text-muted-foreground" />
+			</div>
+		{/snippet}
+		{#snippet title()}No fuel data yet{/snippet}
+		{#snippet description()}
+			Log a fill-up to unlock fuel efficiency, cost, and consumption insights — your fill-up
+			stats and trend charts will appear here once you have data.
+		{/snippet}
+		{#snippet action()}
+			<Button onclick={logFillup}>
+				<Fuel class="mr-2 h-4 w-4" />
+				Log a Fill-up
+			</Button>
+		{/snippet}
+	</EmptyState>
 {:else if fuelStats}
 	<div class="space-y-6">
 		<!-- Row 1: Fill-ups, Gallons, Fuel Consumption -->

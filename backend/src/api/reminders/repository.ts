@@ -1,4 +1,5 @@
-import { and, eq, inArray, lte, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, lte, type SQL } from 'drizzle-orm';
+import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb, transaction } from '../../db/connection';
 import type { NewReminder, Reminder, ReminderNotification } from '../../db/schema';
@@ -350,7 +351,9 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       return await this.db
         .select()
         .from(reminderNotifications)
-        .where(and(...conditions));
+        .where(and(...conditions))
+        .orderBy(desc(reminderNotifications.dueDate))
+        .limit(CONFIG.validation.reminder.notificationsHistoryLimit);
     } catch (error) {
       logger.error('Failed to find notifications', {
         userId,

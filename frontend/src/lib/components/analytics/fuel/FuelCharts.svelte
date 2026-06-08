@@ -168,6 +168,14 @@
 		{ key: 'fillupCount', label: 'Fill-ups', color: CHART_COLORS[0] as string }
 	];
 
+	// The backend always returns all 7 days (fillupCount 0 when there's no fuel data),
+	// so a length check is always true and the chart would render a bare empty axis.
+	// Gate on REAL data; when there's none, pass [] so AppBarChart shows its kit
+	// empty-state ("No data available"), matching the sibling charts.
+	let dayPatternData = $derived(
+		(dayOfWeekPatterns ?? []).some(d => d.fillupCount > 0) ? (dayOfWeekPatterns ?? []) : []
+	);
+
 	function parseDateString(dateStr: string): Date {
 		return new Date(dateStr);
 	}
@@ -236,22 +244,20 @@
 			yAxisFormat={v => v.toLocaleString()}
 		/>
 
-		{#if dayOfWeekPatterns && dayOfWeekPatterns.length > 0}
-			<AppBarChart
-				title="Fill-up Patterns by Day of Week"
-				description="When you typically fill up"
-				data={dayOfWeekPatterns}
-				x="day"
-				y="fillupCount"
-				series={dayPatternSeries}
-				config={dayPatternConfig}
-				height={350}
-				yAxisFormat={v => String(Math.round(v))}
-				xAxisProps={{
-					ticks: dayOfWeekPatterns.map(d => d.day),
-					format: (v: string) => (typeof v === 'string' ? v.slice(0, 3) : String(v))
-				}}
-			/>
-		{/if}
+		<AppBarChart
+			title="Fill-up Patterns by Day of Week"
+			description="When you typically fill up"
+			data={dayPatternData}
+			x="day"
+			y="fillupCount"
+			series={dayPatternSeries}
+			config={dayPatternConfig}
+			height={350}
+			yAxisFormat={v => String(Math.round(v))}
+			xAxisProps={{
+				ticks: dayPatternData.map(d => d.day),
+				format: (v: string) => (typeof v === 'string' ? v.slice(0, 3) : String(v))
+			}}
+		/>
 	</div>
 </div>

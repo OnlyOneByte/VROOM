@@ -98,6 +98,9 @@
 					</Select.Content>
 				</Select.Root>
 				<p class="text-xs text-muted-foreground">Older backups are automatically deleted</p>
+				<p class="text-xs text-muted-foreground">
+					Note: backups include your data only — images and photos are not included.
+				</p>
 			</div>
 		{/if}
 	</div>

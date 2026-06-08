@@ -5,7 +5,13 @@
 	import { appStore } from '$lib/stores/app.svelte';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { routes } from '$lib/routes';
-	import { Settings as SettingsIcon, Save, LoaderCircle, ChevronRight } from '@lucide/svelte';
+	import {
+		Settings as SettingsIcon,
+		Save,
+		LoaderCircle,
+		ChevronRight,
+		CircleAlert
+	} from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
@@ -36,6 +42,12 @@
 	// Derive state from store
 	let settings = $derived(settingsStore.settings);
 	let isLoading = $derived(settingsStore.isLoading);
+	// Only a treat-as-fatal error is one that left us with NO settings to show.
+	// A failed *save* keeps `settings` populated, so the form stays up and just
+	// toasts — we must not blow that away. Showing the form seeded with hardcoded
+	// defaults on a failed initial load would let a Save silently overwrite the
+	// user's real preferences (miles/USD/etc.), so gate the form on having data.
+	let loadError = $derived(settingsStore.error && !settings ? settingsStore.error : null);
 
 	let isSaving = $state(false);
 	let isBackingUp = $state(false);
@@ -82,6 +94,11 @@
 		settingsStore.load();
 		loadProviders();
 	});
+
+	function retryLoad() {
+		settingsStore.load();
+		loadProviders();
+	}
 
 	async function loadProviders() {
 		try {
@@ -203,6 +220,11 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Settings - VROOM Car Tracker</title>
+	<meta name="description" content="Manage your preferences, units, and storage providers" />
+</svelte:head>
+
 <FormLayout>
 	<div class="mb-6">
 		<h1 class="text-3xl font-bold text-foreground flex items-center gap-3">
@@ -214,6 +236,15 @@
 	{#if isLoading}
 		<div class="flex items-center justify-center py-12">
 			<LoaderCircle class="h-8 w-8 animate-spin text-primary" />
+		</div>
+	{:else if loadError}
+		<div class="rounded-lg border bg-card p-6">
+			<div class="mb-4 flex items-center gap-3 text-destructive">
+				<CircleAlert class="h-5 w-5" />
+				<p class="font-medium">Failed to load settings</p>
+			</div>
+			<p class="mb-4 text-sm text-muted-foreground">{loadError}</p>
+			<Button onclick={retryLoad}>Retry</Button>
 		</div>
 	{:else}
 		<div class="space-y-6 pb-32 sm:pb-24">
@@ -251,19 +282,25 @@
 		</div>
 	{/if}
 
-	<Button
-		onclick={handleSave}
-		disabled={isSaving}
-		class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto sm:rounded-full rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 z-50 h-16 sm:h-16 pl-6 pr-10 border-0 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-	>
-		{#if isSaving}
-			<LoaderCircle class="h-6 w-6 animate-spin transition-transform duration-300" />
-			<span class="font-bold text-lg">Saving...</span>
-		{:else}
-			<Save class="h-6 w-6 transition-transform duration-300 group-hover:scale-110" />
-			<span class="font-bold text-lg">Save Settings</span>
-		{/if}
-	</Button>
+	<!-- Save is a fixed FAB rendered outside the load/error/form branches, so it
+	     must be gated too: on a failed load the form shows seeded defaults, and a
+	     Save here would overwrite the user's real (unfetched) preferences. Hide it
+	     until settings actually loaded. (isSaving still disables it during a save.) -->
+	{#if !isLoading && !loadError}
+		<Button
+			onclick={handleSave}
+			disabled={isSaving}
+			class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto sm:rounded-full rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 z-50 h-16 sm:h-16 pl-6 pr-10 border-0 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+		>
+			{#if isSaving}
+				<LoaderCircle class="h-6 w-6 animate-spin transition-transform duration-300" />
+				<span class="font-bold text-lg">Saving...</span>
+			{:else}
+				<Save class="h-6 w-6 transition-transform duration-300 group-hover:scale-110" />
+				<span class="font-bold text-lg">Save Settings</span>
+			{/if}
+		</Button>
+	{/if}
 
 	<BackupNowDialog
 		bind:open={showBackupDialog}

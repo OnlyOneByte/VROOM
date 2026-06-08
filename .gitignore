@@ -116,3 +116,8 @@ backend/COMPREHENSIVE_IMPROVEMENT_PLAN.md
 analyticsFigma/
 playwright-report/
 RankedTODO.md
+
+# MeshClaw agent working files (not part of the product)
+.meshclaw-autopilot/
+STATUS.md
+BRANCH_REVIEW.md

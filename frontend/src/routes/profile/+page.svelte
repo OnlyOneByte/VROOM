@@ -35,9 +35,12 @@
 		CardTitle
 	} from '$lib/components/ui/card';
 	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
-	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import Input from '$lib/components/ui/input/input.svelte';
 	import { Separator } from '$lib/components/ui/separator';
+	import { appStore } from '$lib/stores/app.svelte';
+	import { settingsStore } from '$lib/stores/settings.svelte';
+	import { Pencil, Check, X } from '@lucide/svelte';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 	import ComingSoonCard from '$lib/components/common/coming-soon-card.svelte';
 	import GoogleLogo from '$lib/components/icons/GoogleLogo.svelte';
@@ -66,6 +69,43 @@
 	let unlinkingId = $state<string | null>(null);
 	let unlinkError = $state<string | null>(null);
 	let linkingProvider = $state<string | null>(null);
+
+	// --- Display name editing ---
+	let isEditingName = $state(false);
+	let nameDraft = $state('');
+	let isSavingName = $state(false);
+
+	function startEditName() {
+		nameDraft = user?.displayName ?? '';
+		isEditingName = true;
+	}
+
+	function cancelEditName() {
+		isEditingName = false;
+	}
+
+	async function saveDisplayName() {
+		const trimmed = nameDraft.trim();
+		if (trimmed.length < 1 || trimmed.length > 100) {
+			appStore.showError('Display name must be between 1 and 100 characters');
+			return;
+		}
+		if (trimmed === user?.displayName) {
+			isEditingName = false;
+			return;
+		}
+		isSavingName = true;
+		try {
+			await authStore.updateDisplayName(trimmed);
+			appStore.showSuccess('Display name updated');
+			isEditingName = false;
+		} catch (err) {
+			if (import.meta.env.DEV) console.error('Failed to update display name:', err);
+			appStore.showError('Failed to update display name');
+		} finally {
+			isSavingName = false;
+		}
+	}
 
 	const linkError = $derived(page.url.searchParams.get('link_error'));
 	const linkErrorMessage = $derived(linkError ? (linkErrorMessages[linkError] ?? null) : null);
@@ -132,6 +172,22 @@
 			window.location.href = `${getApiBaseUrl()}/api/v1/auth/link/${providerId}`;
 		}
 	}
+
+	// --- Export all data ---
+	let isExporting = $state(false);
+
+	async function handleExportData() {
+		isExporting = true;
+		try {
+			await settingsStore.downloadBackup();
+			appStore.showSuccess('Data export downloaded');
+		} catch (err) {
+			if (import.meta.env.DEV) console.error('Failed to export data:', err);
+			appStore.showError('Failed to export data');
+		} finally {
+			isExporting = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -149,12 +205,9 @@
 		<!-- Identity -->
 		<Card>
 			<CardHeader>
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<CircleUser class="h-5 w-5 text-muted-foreground" />
-						<CardTitle>Identity</CardTitle>
-					</div>
-					<Badge variant="secondary">Coming Soon</Badge>
+				<div class="flex items-center gap-2">
+					<CircleUser class="h-5 w-5 text-muted-foreground" />
+					<CardTitle>Identity</CardTitle>
 				</div>
 				<CardDescription>Your account details and personal information</CardDescription>
 			</CardHeader>
@@ -169,20 +222,68 @@
 					</div>
 				</div>
 				<Separator class="mb-4" />
-				<div class="space-y-3 opacity-50">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2 text-sm text-muted-foreground">
+				<div class="space-y-3">
+					<div class="flex items-center justify-between gap-3">
+						<div class="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
 							<CircleUser class="h-4 w-4" />
 							<span>Display Name</span>
 						</div>
-						<span class="text-sm text-muted-foreground">Edit coming soon</span>
+						{#if isEditingName}
+							<div class="flex items-center gap-2 flex-1 justify-end">
+								<Input
+									bind:value={nameDraft}
+									maxlength={100}
+									class="h-8 max-w-[200px]"
+									disabled={isSavingName}
+									aria-label="Display name"
+									onkeydown={(e: KeyboardEvent) => {
+										if (e.key === 'Enter') saveDisplayName();
+										if (e.key === 'Escape') cancelEditName();
+									}}
+								/>
+								<Button
+									size="sm"
+									variant="ghost"
+									onclick={saveDisplayName}
+									disabled={isSavingName}
+									aria-label="Save display name"
+								>
+									{#if isSavingName}
+										<LoaderCircle class="h-4 w-4 animate-spin" />
+									{:else}
+										<Check class="h-4 w-4" />
+									{/if}
+								</Button>
+								<Button
+									size="sm"
+									variant="ghost"
+									onclick={cancelEditName}
+									disabled={isSavingName}
+									aria-label="Cancel editing"
+								>
+									<X class="h-4 w-4" />
+								</Button>
+							</div>
+						{:else}
+							<div class="flex items-center gap-2">
+								<span class="text-sm">{user?.displayName ?? '—'}</span>
+								<Button
+									size="sm"
+									variant="ghost"
+									onclick={startEditName}
+									aria-label="Edit display name"
+								>
+									<Pencil class="h-3.5 w-3.5" />
+								</Button>
+							</div>
+						{/if}
 					</div>
 					<div class="flex items-center justify-between">
 						<div class="flex items-center gap-2 text-sm text-muted-foreground">
 							<Mail class="h-4 w-4" />
 							<span>Email</span>
 						</div>
-						<span class="text-sm text-muted-foreground">Linked to OAuth</span>
+						<span class="text-sm">{user?.email ?? '—'}</span>
 					</div>
 					<div class="flex items-center justify-between">
 						<div class="flex items-center gap-2 text-sm text-muted-foreground">
@@ -205,9 +306,12 @@
 			</div>
 		{/if}
 		{#if successMessage}
+			<!-- Icon keeps the chart-2 "success" hue (graphical, exempt) + the tint bg;
+			     the TEXT is text-foreground because chart-2 on its own 10% tint is ~3.26:1,
+			     below WCAG AA 4.5:1 for this small text (cycle 187-189 class). -->
 			<div class="flex items-start gap-3 rounded-lg border border-chart-2/50 bg-chart-2/10 p-4">
 				<CircleCheck class="h-5 w-5 text-chart-2 shrink-0 mt-0.5" />
-				<p class="text-sm text-chart-2">{successMessage}</p>
+				<p class="text-sm text-foreground">{successMessage}</p>
 			</div>
 		{/if}
 
@@ -254,6 +358,7 @@
 								<Button
 									variant="ghost"
 									size="sm"
+									aria-label="Unlink {account.displayName}"
 									disabled={accounts.length <= 1 || unlinkingId !== null}
 									onclick={() => handleUnlink(account.id)}
 								>
@@ -312,16 +417,55 @@
 		/>
 
 		<!-- Data & Privacy -->
-		<ComingSoonCard
-			icon={Shield}
-			title="Data & Privacy"
-			description="Control your data and privacy preferences"
-			items={[
-				{ icon: Download, label: 'Export all data' },
-				{ icon: Trash2, label: 'Delete account' },
-				{ icon: Shield, label: 'Data retention preferences' }
-			]}
-		/>
+		<Card>
+			<CardHeader>
+				<div class="flex items-center gap-2">
+					<Shield class="h-5 w-5 text-muted-foreground" />
+					<CardTitle>Data & Privacy</CardTitle>
+				</div>
+				<CardDescription>Control your data and privacy preferences</CardDescription>
+			</CardHeader>
+			<CardContent class="space-y-4">
+				<!-- Export all data (live) -->
+				<div class="flex items-center justify-between gap-3">
+					<div class="flex items-center gap-2 text-sm">
+						<Download class="h-4 w-4 text-muted-foreground" />
+						<div>
+							<p>Export all data</p>
+							<p class="text-xs text-muted-foreground">
+								Download a ZIP of your data. Images and photos are not included.
+							</p>
+						</div>
+					</div>
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={handleExportData}
+						disabled={isExporting}
+					>
+						{#if isExporting}
+							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+							Exporting...
+						{:else}
+							<Download class="mr-2 h-4 w-4" />
+							Export
+						{/if}
+					</Button>
+				</div>
+				<Separator />
+				<!-- Delete account (not yet available — destructive, needs confirm flow).
+				     No opacity-50: dimming muted text drops it below WCAG AA contrast.
+				     Full-opacity muted-foreground (~5:1) reads as secondary while staying
+				     accessible; the "Coming soon" pill carries the disabled state. -->
+				<div class="flex items-center justify-between gap-3">
+					<div class="flex items-center gap-2 text-sm text-muted-foreground">
+						<Trash2 class="h-4 w-4" />
+						<span>Delete account</span>
+					</div>
+					<span class="text-xs text-muted-foreground">Coming soon</span>
+				</div>
+			</CardContent>
+		</Card>
 
 		<!-- Sharing -->
 		<ComingSoonCard

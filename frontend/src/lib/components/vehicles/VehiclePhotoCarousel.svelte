@@ -5,6 +5,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Card from '$lib/components/ui/card';
+	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import type { Photo } from '$lib/types';
 
@@ -21,7 +22,19 @@
 	let hasPhotos = $derived(photos.length > 0);
 	let deletingPhotoId = $state<string | null>(null);
 
-	async function handleDelete(photoId: string) {
+	// Styled confirm dialog (replaces native confirm()) — deletion is permanent
+	// (removes the file from storage too).
+	let confirmOpen = $state(false);
+	let pendingDeleteId = $state<string | null>(null);
+
+	function requestDelete(photoId: string) {
+		pendingDeleteId = photoId;
+		confirmOpen = true;
+	}
+
+	async function performDelete() {
+		if (!pendingDeleteId) return;
+		const photoId = pendingDeleteId;
 		deletingPhotoId = photoId;
 		try {
 			await onDelete(photoId);
@@ -92,7 +105,7 @@
 										size="sm"
 										class="h-7 text-xs"
 										disabled={deletingPhotoId === photo.id}
-										onclick={() => handleDelete(photo.id)}
+										onclick={() => requestDelete(photo.id)}
 									>
 										{#if deletingPhotoId === photo.id}
 											<LoaderCircle class="h-3 w-3 animate-spin" />
@@ -147,3 +160,10 @@
 		{/if}
 	</Card.Content>
 </Card.Root>
+
+<ConfirmDialog
+	bind:open={confirmOpen}
+	title="Delete photo?"
+	description="This permanently removes the photo from storage and cannot be undone."
+	onConfirm={performDelete}
+/>

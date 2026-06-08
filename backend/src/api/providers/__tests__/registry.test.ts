@@ -4,29 +4,14 @@ import type { StorageConfig } from '../../../types';
 import { StorageProviderRegistry } from '../domains/storage/registry';
 
 // --- Mock encryption ---
+// The only module-mock this file needs: the fixtures store credentials as
+// `encrypted:{...}` so decrypt() must strip that prefix. The GoogleDriveProvider
+// is NO LONGER mocked — createProviderInstance builds the REAL provider (its
+// OAuth2 client is lazy, no network at construction), and the tests only assert
+// provider.type, so the real class is exactly what we want to verify.
 mock.module('../../../utils/encryption', () => ({
   encrypt: (plaintext: string) => `encrypted:${plaintext}`,
   decrypt: (ciphertext: string) => ciphertext.replace('encrypted:', ''),
-}));
-
-// --- Mock GoogleDriveProvider ---
-mock.module('../domains/storage/google-drive-provider', () => ({
-  GoogleDriveProvider: class {
-    readonly type = 'google-drive';
-    upload = mock(() => Promise.resolve({ providerType: 'google-drive', externalId: 'file-1' }));
-    download = mock(() => Promise.resolve(Buffer.from('data')));
-    delete = mock(() => Promise.resolve());
-    getExternalUrl = mock(() => Promise.resolve(null));
-    healthCheck = mock(() => Promise.resolve(true));
-  },
-  // Preserve exports that other test files import from this module
-  coalesceGoogleDriveFile: (f: Record<string, unknown>) => ({
-    key: f.id,
-    name: f.name,
-    size: Number(f.size) || 0,
-    createdTime: f.createdTime ?? f.modifiedTime ?? new Date(0).toISOString(),
-    lastModified: f.modifiedTime ?? f.createdTime ?? new Date(0).toISOString(),
-  }),
 }));
 
 // --- Test fixtures ---

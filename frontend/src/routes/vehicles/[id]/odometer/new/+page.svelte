@@ -10,6 +10,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import PendingPhotoPreview from '$lib/components/expenses/form/PendingPhotoPreview.svelte';
 	import { odometerApi } from '$lib/services/odometer-api';
+	import { dateOnlyToISO } from '$lib/utils/formatters';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 	import type { PageData } from './$types';
 
@@ -91,7 +92,7 @@
 		try {
 			const entry = await odometerApi.create(vehicleId, {
 				odometer: Number(odometer),
-				recordedAt: new Date(date).toISOString(),
+				recordedAt: dateOnlyToISO(date),
 				note: note || undefined
 			});
 
