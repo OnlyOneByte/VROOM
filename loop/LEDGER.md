@@ -13,10 +13,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 35 |
 | guard | 6 | 34 |
 | bug | 3 | 34 |
-| arch | 5 | 30 |
+| arch | 5 | 36 |
 | infra | 6 | 33 |
 
-Current cycle: **35**
+Current cycle: **36**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -730,3 +730,24 @@ Current cycle: **35**
   Next cycle (36): `arch` is over budget (cyc 30, starved-for 6 > 5 at cyc 36) → it wins → the sync
   try/catch DROP (arch #1 part 2b), now safe behind the C30 characterization net. `feature` (cyc 32,
   starved-for 4 = budget) is next after. #14 still awaits the Angelo semantics decision.
+- **C36 (arch — #1 part 2b: drop the sync try/catch, converge on the central handler)** — `arch`
+  forced (cyc 30, starved-for 6 > 5). Executed the drop the C24→C30 sequence set up: removed the
+  hand-rolled `try/catch → handleSyncError` from all 7 `sync/routes.ts` handlers + the now-unused
+  handleSyncError import, so errors propagate to the central errorHandler (SyncError-aware since C24).
+  BEHAVIOR: SyncError paths byte-identical (C24-proven) → the C30 characterization assertions stayed
+  GREEN unchanged, proving no regression on the common case; non-SyncError paths IMPROVED as designed
+  (a ZodError/AppError thrown in a handler now returns its proper status — 400/401/etc — instead of
+  the old blanket 500 OPERATION_FAILED from handleSyncError's tail). This was an authorized, reviewed
+  behavior change (the arch-rule-2 exception flagged + net-built across C24/C30), not a silent one.
+  Updated `sync-route-errors.test.ts`: refreshed the header + divergence note to the post-drop
+  contract, and replaced the now-stale "part-2 WILL change this" analytic note with a LIVE assertion
+  (unauthenticated POST /sync → 401 AuthenticationError via the central handler — confirms it's the
+  single error path + an AppError keeps its statusCode, not flattened to 500). Verified via
+  `validate:local`: EXIT 0 (tsc 0 · musl-biome clean — auto-reflowed the de-indented handlers · 943
+  pass/0 fail · build bundled); the full 161-test sync suite green. `sync` is the first of the three
+  hand-rolled route files converged.
+  Next cycle (37): nothing over budget (feature cyc 32 starved-for 5 > 4 at cyc 37 — feature breaches)
+  → `feature` wins → maintenance-schedule T4 part 3 (recheck-on-write D5: fire a mileage reminder the
+  moment an odometer/mileaged-expense write crosses its milestone, idempotent via the existing dedup).
+  Arch #1 has 2 route files LEFT (auth: 7 try/catch, settings: 5) — each its own characterize-then-drop
+  pair when arch next fires (~cyc 41). #14 still awaits the Angelo semantics decision.

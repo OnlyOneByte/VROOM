@@ -1,19 +1,16 @@
 /**
- * Characterization tests for sync ROUTE error behavior through the REAL HTTP stack (arch #1 part 2
- * prerequisite, cycle 30).
+ * Characterization tests for sync ROUTE error behavior through the REAL HTTP stack (arch #1: net
+ * written C30, try/catch DROPPED C36).
  *
- * arch #1 wants to drop the hand-rolled try/catch → handleSyncError from sync/routes.ts and let the
- * central errorHandler (made SyncError-aware in C24) shape errors instead. C24 proved the two paths
- * are byte-identical for a SyncError. BUT for a NON-SyncError thrown inside a sync handler they
- * DIVERGE: handleSyncError's tail wraps any non-SyncError as 500 OPERATION_FAILED, while the central
- * errorHandler maps a ZodError → 400 ValidationError and an AppError by its statusCode. So a blind
- * try/catch drop is NOT behavior-preserving for those paths — it changes at least one status code.
+ * arch #1 dropped the hand-rolled try/catch → handleSyncError from sync/routes.ts (C36) so errors
+ * propagate to the central errorHandler (made SyncError-aware in C24). C24 proved the two paths are
+ * byte-identical for a SyncError — so the SyncError-path assertions below are UNCHANGED across the
+ * drop and prove it caused no regression on the common case. For a NON-SyncError thrown inside a sync
+ * handler the paths diverged (handleSyncError wrapped any non-SyncError as 500 OPERATION_FAILED; the
+ * central errorHandler maps a ZodError → 400 ValidationError + an AppError by its statusCode), so the
+ * drop deliberately IMPROVED those: bad input now returns its proper status instead of a blanket 500.
  *
- * The sync routes had NO real HTTP-stack error coverage (the existing "tests" are pure-logic
- * replicas). This file is the safety net the drop needs: it pins TODAY's observable status + body at
- * representative error sites, and explicitly marks which assertions the part-2 drop will change (so
- * that change is a deliberate, reviewed step, not a silent regression). Test-only, behavior-preserving.
- *
+ * This file was the net that made the drop provable; it now also documents the post-drop contract.
  * createTestApp() rewrites env then dynamic-imports DB-bound modules; keep imports to the harness +
  * bun:test.
  */
@@ -69,16 +66,20 @@ describe('sync route error behavior (characterization — pins today before the 
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  // ⚠️ DIVERGENCE NOTE (the reason part-2 is NOT a no-op drop) — documented analytically because the
-  // app.request harness always JSON-stringifies the body (so an in-handler ZodError can't be provoked
-  // through it without a header arg the harness lacks). The divergence, traced from source:
-  //   A non-SyncError thrown INSIDE a sync handler's try/catch (e.g. restoreFromProviderSchema.parse()
-  //   ZodError, or a repository AppError/DatabaseError) is wrapped by handleSyncError's tail (errors.ts
-  //   :197-198) as 500 OPERATION_FAILED. The central errorHandler instead maps a ZodError → 400
-  //   ValidationError and an AppError by its statusCode. So dropping the try/catch CHANGES the status
-  //   for those paths (500 → 400 for bad input). That's an improvement, but a behavior change: the
-  //   part-2 commit must update the SyncError-path assertions above AND add the now-reachable
-  //   400-ValidationError assertions in the same change. This file is the net that makes that visible.
+  // POST-DROP CONTRACT (C36): with the try/catch gone, a non-SyncError thrown inside a sync handler
+  // now reaches the central errorHandler, which maps it to its proper status instead of the old
+  // blanket 500 OPERATION_FAILED. Asserted live here: an unauthenticated request hits requireAuth
+  // (which throws AuthenticationError, an AppError, NOT a SyncError) → the central handler returns
+  // 401 AuthenticationError. Pre-drop, requireAuth ran before the route try/catch so this was already
+  // 401 — but it now confirms the central handler is the single error path for these routes, and that
+  // an AppError keeps its statusCode rather than being flattened to 500.
+  test('an unauthenticated sync request → 401 via the central handler (AppError keeps its status)', async () => {
+    const res = await ctx.anon('POST', '/api/v1/sync', { syncTypes: ['backup'] });
+    expect(res.status).toBe(401);
+    const body = (await json<ErrorBody>(res)) as ErrorBody;
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('AuthenticationError');
+  });
 
   test('GET /sync/health is unauthenticated-safe and returns healthy (no error path)', async () => {
     // A positive control so the suite also pins a non-error route shape next to the error ones.

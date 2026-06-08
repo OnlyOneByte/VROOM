@@ -219,12 +219,19 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
      behavior-preserving). The sync routes had ZERO real HTTP-stack error coverage. Committed
      `sync-route-errors.test.ts` (4 tests, real app.request) pinning today's status+body on the
      SyncError paths + documenting the 500→400 divergence analytically. Test-only.
-   - [ ] **part 2b — drop the try/catch (now provable).** Remove the hand-rolled try/catch from
-     `sync/routes.ts` (7 handlers); let SyncErrors + the others propagate to `errorHandler`. The
-     SyncError-path assertions in sync-route-errors.test.ts stay green; UPDATE the divergent
-     assertions to 400 ValidationError IN THE SAME COMMIT (deliberate, reviewed status change — it's an
-     improvement, but a change). Then repeat for `auth` (7) and `settings` (5) — one route file per
-     cycle, each with its own characterize-then-drop pair if it lacks error coverage. (consistency)
+   - [x] **part 2b (C36) — dropped the sync try/catch.** Removed try/catch → handleSyncError from all
+     7 `sync/routes.ts` handlers + the unused import; errors now propagate to the central errorHandler.
+     SyncError-path C30 assertions stayed green (no regression on the common case); non-SyncError paths
+     improved (proper status, not blanket 500) — authorized behavior change. sync-route-errors.test.ts
+     updated to the post-drop contract + a live 401-via-central-handler assertion. validate:local green
+     (943 pass), full 161-test sync suite green.
+   - [ ] **part 2c — repeat for `auth` (7 try/catch) + `settings` (5).** One route file per cycle. Each
+     LACKS real HTTP-stack error coverage, so do the C30/C36 pattern: characterize current behavior
+     first (a test through app.request pinning today's status+body), THEN drop the try/catch + update
+     the divergent assertions in the same commit. Check each route's throws: a handler that only ever
+     throws AppError subclasses (not SyncError) is already centrally-shaped, so its drop is a pure
+     no-op simplification; a SyncError/handleSyncError user gets the same 500→proper-status improvement
+     as sync. (consistency)
 2. **Extract the frontend page load-state pattern.** ~14 `+page.svelte` files repeat the same
    `isLoading` / `loadError` / `try → fetch → catch → toast + set error` triad (dashboard,
    expenses, reminders, insurance, analytics, vehicles/[id], settings, profile, …) — the exact
