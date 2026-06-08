@@ -63,6 +63,33 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
    Use inline `style="height: …"` like ChartCard. (low, overflow — verify in-browser first)
 4. **ExpensesTable combined-row re-sort lacks an id tiebreaker** — same-date/amount rows can
    reorder vs the server's id-tiebroken order. Cosmetic flicker. (low)
+
+*(surfaced by the C7 backend deep review — CSV import + analytics math; ranked by severity)*
+5. **CSV import has no idempotency** — `expenses/routes.ts:~437` uses `create()` (not
+   `createIdempotent`) and sets no `clientId`, so re-importing the same file silently DUPLICATES
+   every row. Restore path hardened this; import regressed it. Derive a deterministic per-row
+   clientId + route through createIdempotent. (data-safety, high)
+6. **CSV import commit is non-atomic** — bare per-row insert loop, no transaction; a DB error on
+   row N leaves 1..N-1 persisted with a lost count → fix-and-re-import double-writes. Wrap in
+   `db.transaction`. (data-safety, high)
+7. **CSV import: missed-fillup corrupts MPG/cost charts** — `analytics-charts.ts` accumulateFuelRow
+   (`~868`) + accumulateCostPerMile (`~320`) compute miles between fillups with NO missedFillup
+   guard / MAX-miles cap (unlike the canonical computeEfficiencyPoint), inflating that month's MPG
+   & cost on any missed fill-up. Skip when `row.missedFillup || prev.missedFillup`. (correctness, med)
+8. **`buildMonthlyConsumption` shows OLDEST 12 months** — `analytics-charts.ts:~221` `.slice(0,12)`
+   after ascending sort (every sibling uses `.slice(-N)`), so >12 months of data hides the recent
+   period. Use `.slice(-12)`. (correctness, med)
+9. **CSV import: no UTF-8 BOM strip** — `import-csv.ts:~245` `parse()` lacks `bom:true`; an
+   Excel/Sheets-edited export (BOM-prefixed) fails EVERY row with a misleading "Invalid date".
+   Add `bom: true`. (correctness, med — clean one-liner)
+10. **CSV import: date-only cells midnight-UTC** (`import-csv.ts:~120` `new Date(raw)`) + **currency
+    column silently ignored** on import — same class as C6; foreign/edited files commonly use
+    date-only and other currencies. (correctness, med)
+11. **Analytics month bucketing uses local-tz `getMonth()`** (`analytics-charts.ts toMonthKey:~131`
+    + heatmap/TCO/day-of-week/seasonal) — backend twin of the C6 class; benign if server runs UTC,
+    real on a negative-offset host. Verify deploy TZ first, then bucket on UTC. (correctness, low-med)
+- ~~**Analytics totalDistance pooled across vehicles**~~ — *DONE C7: buildFuelStatsFromData now sums
+  per-vehicle max-min; pinned by a two-vehicle regression test.*
 - ~~**Month-trend dates parsed midnight-UTC**~~ — *DONE C6: routed vehicle-detail + dashboard
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 

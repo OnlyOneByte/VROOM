@@ -10,12 +10,12 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 4 |
-| deep-review | 5 | 3 |
+| deep-review | 5 | 7 |
 | guard | 6 | 6 |
-| bug | 3 | 6 |
+| bug | 3 | 7 |
 | infra | 6 | 5 |
 
-Current cycle: **6**
+Current cycle: **7**
 
 ## Cycle log
 - **C1 (infra)** — Bootstrapped the `loop/` scaffold the loop format depends on:
@@ -103,3 +103,22 @@ Current cycle: **6**
   (vehicle Overview/ExpensesTable, or analytics route) or a backend correctness audit. The
   remaining UI-review bugs (load-masquerade error state, page-local vehicle-detail filter,
   interpolated h-[…]) are still queued.
+- **C7 (deep-review → bug + guard)** — Fanned out 2 Explore agents (CSV-import correctness +
+  analytics aggregation math). Both surfaced real bugs. Fixed the HIGHEST-severity one:
+  `buildFuelStatsFromData` (analytics/repository.ts) pooled odometer readings across ALL
+  vehicles into one max-min, so a multi-vehicle user saw a garbage `totalDistance` on the
+  dashboard summary (e.g. cars at 12k + 95k mi → ~83k "driven"). Wrong-but-plausible, on the
+  most-viewed surface. Fixed by grouping per vehicle and summing per-car ranges (mirrors the
+  existing computeConvertedTotalDistance). Pinned with a deterministic two-vehicle regression
+  test in fuel-stats.property.test.ts (1000+500 → 1500, not pooled 80500). Single-vehicle path
+  unchanged. Verified: 847 pass/0 fail (+1), tsc 0, Biome musl clean, build bundled.
+  The reviews surfaced more REAL bugs now queued (see BACKLOG bug list): CSV-import has no
+  idempotency (re-import duplicates rows), non-atomic partial commit, no BOM strip (Excel-edited
+  files fail wholesale), date-only midnight-UTC, currency column ignored; analytics has
+  missed-fillup MPG/cost-chart corruption, buildMonthlyConsumption slice(0,12) showing OLDEST
+  months, and local-tz month bucketing. Several are data-safety — strong candidates next cycles.
+  Next cycle (8): nothing over budget (deep-review & bug both fresh at 7, guard 6, infra 5,
+  feature 4 → feature starved-for 4 = AT budget, breaches at cycle 9). Prefer the highest-value
+  queued `bug` (CSV-import BOM strip is a clean low-risk one-liner; idempotency / missed-fillup
+  MPG are higher-severity data-safety) — or take `feature` before it breaches if maintenance
+  sign-off has landed.

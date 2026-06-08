@@ -1267,8 +1267,21 @@ export class AnalyticsRepository {
       now
     );
 
-    const mileages = fuelRows.filter((r) => r.mileage != null).map((r) => r.mileage as number);
-    const totalDistance = mileages.length >= 2 ? Math.max(...mileages) - Math.min(...mileages) : 0;
+    // Distance must be summed PER VEHICLE (max-min within each car), then totaled. Pooling
+    // every vehicle's odometer readings into one max-min gives garbage for a multi-vehicle
+    // user (e.g. a car at 12k mi and one at 95k mi would report ~83k). Mirrors the grouped
+    // computeConvertedTotalDistance; this summary path is single-unit so it doesn't convert.
+    const mileagesByVehicle = new Map<string, number[]>();
+    for (const r of fuelRows) {
+      if (r.mileage == null) continue;
+      const arr = mileagesByVehicle.get(r.vehicleId) ?? [];
+      arr.push(r.mileage);
+      mileagesByVehicle.set(r.vehicleId, arr);
+    }
+    let totalDistance = 0;
+    for (const mileages of mileagesByVehicle.values()) {
+      if (mileages.length >= 2) totalDistance += Math.max(...mileages) - Math.min(...mileages);
+    }
     const daysSoFar = Math.max(
       1,
       Math.ceil(
