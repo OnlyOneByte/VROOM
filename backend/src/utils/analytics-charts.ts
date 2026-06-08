@@ -220,14 +220,18 @@ export function buildMonthlyConsumption(
     }
   });
 
-  return Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(0, 12)
-    .map(([month, data]) => ({
-      month,
-      efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
-      volume: data.volume,
-    }));
+  return (
+    Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      // Keep the most RECENT 12 months (slice from the end of the ascending sort). slice(0, 12)
+      // would keep the OLDEST 12 and hide the current period once a user has >12 months of data.
+      .slice(-12)
+      .map(([month, data]) => ({
+        month,
+        efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
+        volume: data.volume,
+      }))
+  );
 }
 
 /** Build gas price history from fuel rows. */

@@ -12,10 +12,10 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 9 |
 | deep-review | 5 | 7 |
 | guard | 6 | 6 |
-| bug | 3 | 10 |
+| bug | 3 | 11 |
 | infra | 6 | 5 |
 
-Current cycle: **10**
+Current cycle: **11**
 
 ## Cycle log
 - **C1 (infra)** — Bootstrapped the `loop/` scaffold the loop format depends on:
@@ -167,3 +167,15 @@ Current cycle: **10**
   Next cycle (11): `guard` is most-starved (cyc 6, breaches at 12) → prefer a guard, or the next
   queued `bug` (slice(0,12) oldest-months — clean one-liner + test; or the BOM strip). Both
   feature builds remain sign-off-blocked (maintenance D1–D6, import-trackers D1–D5).
+- **C11 (bug + guard)** — Fixed buildMonthlyConsumption showing the OLDEST 12 months
+  (`.slice(0,12)` after an ascending sort → hides the current period once a user has >12 months
+  of fill-ups). Changed to `.slice(-12)` (most recent), matching every sibling monthly builder.
+  Also fixed the latent copy in repository.ts buildConvertedEfficiencyTrend (benign today —
+  year-end caps to ≤12 buckets — but same class). Pinned with 2 unit tests (14 months → latest
+  12, oldest dropped; ≤12 → all, ascending). Verified: 856 pass/0 fail (+2), tsc 0, Biome musl
+  clean, build bundled.
+  Next cycle (12): `guard` breaches budget (last cyc 6, starved-for 6 = budget) → MUST pick a
+  `guard`. The guard queue is empty, so populate it from a real bug class: candidates — a
+  committed source-scan that no analytics monthly builder uses `.slice(0, N)` (would have caught
+  C11), or extend `no-utc-month-parse` to the backend `toMonthKey`/import paths (bug #8 class).
+  Otherwise the remaining queued `bug`s (BOM strip, date-only/currency, tz bucketing) are fair game.

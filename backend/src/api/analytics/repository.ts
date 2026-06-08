@@ -496,13 +496,18 @@ export class AnalyticsRepository {
       }
     }
 
-    return Array.from(monthMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(0, 12)
-      .map(([month, data]) => ({
-        month,
-        efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
-      }));
+    return (
+      Array.from(monthMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        // Most RECENT 12 months (see buildMonthlyConsumption). Today this is only reached via
+        // getYearEnd (range capped to ≤12 buckets, so slice(0,12) was benign), but fixing the
+        // latent copy keeps the whole month-window convention consistent.
+        .slice(-12)
+        .map(([month, data]) => ({
+          month,
+          efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
+        }))
+    );
   }
 
   /** Build a map of vehicleId → display name for a user's vehicles. */
