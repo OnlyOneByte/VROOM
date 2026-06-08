@@ -10,13 +10,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 32 |
-| deep-review | 5 | 28 |
+| deep-review | 5 | 35 |
 | guard | 6 | 34 |
 | bug | 3 | 34 |
 | arch | 5 | 30 |
 | infra | 6 | 33 |
 
-Current cycle: **34**
+Current cycle: **35**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -701,3 +701,32 @@ Current cycle: **34**
   Next cycle (35): nothing over budget (arch starved-for 5 = budget at cyc 35; bug just fed). Highest-
   leverage = continue T4 part 3 (recheck-on-write D5), OR take the most-starved-at-budget arch (the
   sync try/catch DROP, now safe behind the C30 net). #14 still awaits Angelo.
+- **C35 (deep-review — audit the live mileage API + the .partial()/.default() class)** — BALANCE:
+  `deep-review` only over-budget category (cyc 28, starved-for 7 > 5) → forced. (My C34 note guessed
+  T4/arch; the table ruled — deep-review's 7 beat arch's at-budget 5.) Verification-only (no product
+  code; like C21/C28). Fanned out 2 Explore agents, VERIFIED every finding against source per the
+  C21/C28 lesson — which corrected one agent's reasoning. RESULTS:
+  • Agent A (mileage API C31/C32): CERTIFIED CLEAN on all 5 scrutinized areas. Spot-verified the
+    load-bearing one — a mileage reminder created with no odometer reading anchors at 0 → milestone =
+    interval, but `processMileageReminder` returns early on `currentOdometer === null`, so NO
+    false-immediate-fire (fires only once a real reading ≥ milestone appears). triggerMode switches
+    keep a consistent row (resolveMileageFields clears/sets per mode + flips nextDueDate); mark-serviced
+    axis guards correct; refineMileageTrigger enforces single-vehicle + intervalMileage on both create
+    AND the merged-revalidate update (no bypass); undefined triggerMode → startDate (not null). Good.
+  • Agent B (.partial()+.default() class): flagged reminders `actionMode` as a "REAL data-loss risk,
+    route-defended" — BOTH HALVES WRONG on verification (the C21 lesson in action). It is NOT
+    route-defended (the route writes {...reminderFields} from the parsed partialUpdate, which WOULD
+    carry an injected actionMode), but it's HARMLESS regardless: `actionMode: z.literal('automatic')`
+    has exactly ONE legal value, so injecting/writing 'automatic' clobbers nothing (the C34 class only
+    bites a USER-SETTABLE field). NO remaining real instances: expense tags fixed (C34); reminders
+    expenseTags is `.nullish()` (no default); vehicles/settings/odometer safe because drizzle-zod does
+    NOT extract DB column defaults into Zod + their routes merge explicitly. USEFUL STRUCTURAL FACT
+    (verified): createInsertSchema does NOT surface `.notNull().default(x)` DB columns as Zod
+    `.default()` — so DB defaults are not part of this class; only hand-written Zod `.default()` is.
+  Net: live mileage surface certified, class audit closed (0 new real bugs), 1 agent misread debunked.
+  The C34 class-level source-scan guard is still the right lock (now scoped: flag a hand-written Zod
+  `.default()` on a user-settable field in a `.partial()` update schema; literal-single-value defaults
+  like actionMode are exempt). No code touched; LEDGER/BACKLOG only.
+  Next cycle (36): `arch` is over budget (cyc 30, starved-for 6 > 5 at cyc 36) → it wins → the sync
+  try/catch DROP (arch #1 part 2b), now safe behind the C30 characterization net. `feature` (cyc 32,
+  starved-for 4 = budget) is next after. #14 still awaits the Angelo semantics decision.

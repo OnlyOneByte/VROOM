@@ -79,13 +79,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   data-loss bug; added the schema-vs-headers coverage guard. CSV path confirmed safe.*
 
 ### guard
-1. **Source-scan: no surviving `.default()` in a `.partial()` update schema.** The C31/C34 data-loss
-   class — a Zod `.default(x)` survives `.partial()`, so a `base.partial()` update schema injects `x`
-   on an omitted field and clobbers the stored value (C34: expense tags wiped on any edit). A
-   merge-surviving static scan that flags any update schema built via `.partial()` whose base carries a
-   `.default()` (not re-declared optional) would lock the whole class. Per-instance behavioral guards
-   exist for reminders (C31) + expense tags (C34); this is the class-level net. (med — prevents a
-   recurring silent data-loss class)
+1. **Source-scan: no surviving hand-written `.default()` on a user-settable field in a `.partial()`
+   update schema.** The C31/C34 data-loss class — a Zod `.default(x)` survives `.partial()`, so a
+   `base.partial()` update schema injects `x` on an omitted field and clobbers the stored value (C34:
+   expense tags wiped on any edit). SCOPED by the C35 audit: (a) only HAND-WRITTEN Zod `.default()`
+   counts — `createInsertSchema` does NOT surface `.notNull().default()` DB columns as Zod defaults
+   (verified), so DB defaults are out of scope; (b) a literal-single-value default like
+   `actionMode: z.literal('automatic').default('automatic')` is EXEMPT (injecting the only legal value
+   clobbers nothing). C35 confirmed NO remaining real instances beyond the fixed expense tags — so this
+   scan is a forward-looking merge-surviving net (catches the NEXT one), not a fix for an open bug.
+   Per-instance behavioral guards exist for reminders triggerMode (C31) + expense tags (C34).
+   (low-now / med-ongoing — prevents a recurring silent data-loss class)
 - ~~**maintenance-fields backup round-trip**~~ — *DONE C27: `maintenance-fields-roundtrip.test.ts`
   (3 tests, real exportAsZip → restoreFromBackup) locks the C22/C25 columns (triggerMode,
   intervalMileage, lastServiceOdometer, nextDueOdometer, dueOdometer) + the nullable dates surviving
