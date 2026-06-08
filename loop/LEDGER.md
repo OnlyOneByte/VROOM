@@ -12,10 +12,10 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 9 |
 | deep-review | 5 | 7 |
 | guard | 6 | 6 |
-| bug | 3 | 8 |
+| bug | 3 | 10 |
 | infra | 6 | 5 |
 
-Current cycle: **9**
+Current cycle: **10**
 
 ## Cycle log
 - **C1 (infra)** — Bootstrapped the `loop/` scaffold the loop format depends on:
@@ -152,3 +152,18 @@ Current cycle: **9**
   Next cycle (10): feature touched (9) → most-starved becomes `guard` (cyc 6, breaches at 12) then
   `deep-review` (cyc 7). Both build queues are sign-off-blocked; plenty of queued `bug`s (missed-
   fillup MPG, slice(0,12), BOM strip) and guard/review work remain. Prefer a queued bug or a guard.
+- **C10 (bug + guard)** — Fixed the missed-fill-up MPG/cost corruption (queued bug #5 from C7's
+  analytics review). Two month-aggregating builders had drifted from the canonical
+  computeEfficiencyPoint contract: `accumulateFuelRow` (monthly MPG) and `accumulateCostPerMile`
+  (cost/distance) folded a missed/partial fill-up pair into the month — counting one tank's volume
+  against two tanks' miles (inflated MPG) / spiking cost-per-distance — with no missedFillup skip
+  and no MAX-miles cap. Extracted a shared `validMilesBetween(current, prev)` helper (skips
+  missedFillup either-row + non-positive + over-cap gaps) and routed both through it; also keeps
+  cognitive-complexity under the Biome max. Needed `missedFillup` added to GeneralExpenseRow + the
+  queryAllExpenses select (column already exists, notNull default false). Pinned with 5 unit tests
+  on the exported builders (missed pair → null/excluded; over-cap → excluded; clean pair → sane).
+  Verified: 854 pass/0 fail (+5), tsc 0, Biome musl clean, build bundled. Valid-data paths
+  unchanged (full analytics property suite green).
+  Next cycle (11): `guard` is most-starved (cyc 6, breaches at 12) → prefer a guard, or the next
+  queued `bug` (slice(0,12) oldest-months — clean one-liner + test; or the BOM strip). Both
+  feature builds remain sign-off-blocked (maintenance D1–D6, import-trackers D1–D5).

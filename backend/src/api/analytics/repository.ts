@@ -598,6 +598,7 @@ export class AnalyticsRepository {
         date: expenses.date,
         mileage: expenses.mileage,
         volume: expenses.volume,
+        missedFillup: expenses.missedFillup,
       })
       .from(expenses)
       .where(and(...conditions))

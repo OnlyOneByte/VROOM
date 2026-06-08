@@ -66,22 +66,21 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
    reorder vs the server's id-tiebroken order. Cosmetic flicker. (low)
 
 *(surfaced by the C7 backend deep review — CSV import + analytics math; ranked by severity)*
-5. **CSV import: missed-fillup corrupts MPG/cost charts** — `analytics-charts.ts` accumulateFuelRow
-   (`~868`) + accumulateCostPerMile (`~320`) compute miles between fillups with NO missedFillup
-   guard / MAX-miles cap (unlike the canonical computeEfficiencyPoint), inflating that month's MPG
-   & cost on any missed fill-up. Skip when `row.missedFillup || prev.missedFillup`. (correctness, med)
-6. **`buildMonthlyConsumption` shows OLDEST 12 months** — `analytics-charts.ts:~221` `.slice(0,12)`
+5. **`buildMonthlyConsumption` shows OLDEST 12 months** — `analytics-charts.ts:~221` `.slice(0,12)`
    after ascending sort (every sibling uses `.slice(-N)`), so >12 months of data hides the recent
-   period. Use `.slice(-12)`. (correctness, med)
-7. **CSV import: no UTF-8 BOM strip** — `import-csv.ts:~245` `parse()` lacks `bom:true`; an
+   period. Use `.slice(-12)`. (correctness, med — clean one-liner + test)
+6. **CSV import: no UTF-8 BOM strip** — `import-csv.ts:~245` `parse()` lacks `bom:true`; an
    Excel/Sheets-edited export (BOM-prefixed) fails EVERY row with a misleading "Invalid date".
    Add `bom: true`. (correctness, med — clean one-liner)
-8. **CSV import: date-only cells midnight-UTC** (`import-csv.ts:~120` `new Date(raw)`) + **currency
+7. **CSV import: date-only cells midnight-UTC** (`import-csv.ts:~120` `new Date(raw)`) + **currency
    column silently ignored** on import — same class as C6; foreign/edited files commonly use
    date-only and other currencies. (correctness, med)
-9. **Analytics month bucketing uses local-tz `getMonth()`** (`analytics-charts.ts toMonthKey:~131`
+8. **Analytics month bucketing uses local-tz `getMonth()`** (`analytics-charts.ts toMonthKey:~131`
    + heatmap/TCO/day-of-week/seasonal) — backend twin of the C6 class; benign if server runs UTC,
    real on a negative-offset host. Verify deploy TZ first, then bucket on UTC. (correctness, low-med)
+- ~~**CSV import: missed-fillup corrupts MPG/cost charts**~~ — *DONE C10: shared validMilesBetween
+  guard (skip missedFillup either-row + over-cap gap) in accumulateFuelRow + accumulateCostPerMile;
+  pinned by 5 unit tests.*
 - ~~**CSV import: no idempotency + non-atomic commit**~~ — *DONE C8: deterministic per-row
   clientId + createIdempotent-style dedup, all inserts in one db.transaction (importExpenses);
   pinned by 2 HTTP tests (re-import no-op, identical-rows-both-import).*

@@ -82,6 +82,8 @@ export interface GeneralExpenseRow {
   date: Date | number | null;
   mileage: number | null;
   volume: number | null;
+  // Needed so the monthly MPG accumulator can skip multi-tank windows (matches FuelRow).
+  missedFillup: boolean;
 }
 
 interface VehicleMetrics {
@@ -317,6 +319,24 @@ export function computeAverageCosts(
   };
 }
 
+/**
+ * Miles driven between a consecutive fill-up pair, or null if the window isn't a valid
+ * distance measurement — mirroring computeEfficiencyPoint: a missed/partial fill-up (either
+ * row) spans multiple tanks, a non-positive delta is out-of-order/duplicate data, and an
+ * implausibly large gap (> cap) is bad data. Used so month aggregators can't fold a bogus
+ * window into MPG / cost-per-distance.
+ */
+function validMilesBetween(
+  current: { mileage: number | null; missedFillup: boolean },
+  previous: { mileage: number | null; missedFillup: boolean }
+): number | null {
+  if (current.missedFillup || previous.missedFillup) return null;
+  if (!current.mileage || !previous.mileage) return null;
+  const miles = current.mileage - previous.mileage;
+  if (miles <= 0 || miles > MAX_REASONABLE_MILES_BETWEEN_FILLUPS) return null;
+  return miles;
+}
+
 /** Accumulate cost-per-mile data from consecutive fuel expense pairs for a single vehicle. */
 function accumulateCostPerMile(
   vehicleRows: FuelExpenseRow[],
@@ -326,9 +346,8 @@ function accumulateCostPerMile(
     const current = vehicleRows[i];
     const previous = vehicleRows[i - 1];
     if (!current || !previous) continue;
-    if (!current.mileage || !previous.mileage) continue;
-    const miles = current.mileage - previous.mileage;
-    if (miles <= 0) continue;
+    const miles = validMilesBetween(current, previous);
+    if (miles === null) continue;
     const d = normalizeDate(current.date);
     if (!d) continue;
     const key = `${toMonthKey(d)}|${current.vehicleId}`;
@@ -880,18 +899,13 @@ function accumulateFuelRow(
   const entry = monthData.get(key) ?? { totalCost: 0, totalGallons: 0, totalMiles: 0, count: 0 };
   entry.totalCost += row.expenseAmount;
 
-  if (
-    prevRow &&
-    row.mileage != null &&
-    prevRow.mileage != null &&
-    row.volume != null &&
-    row.volume > 0
-  ) {
-    const miles = row.mileage - prevRow.mileage;
-    if (miles > 0) {
-      entry.totalMiles += miles;
-      entry.totalGallons += row.volume;
-    }
+  // Only fold a pair into the month's MPG when it's a valid distance window (skips missed
+  // fill-ups + over-cap gaps, mirroring computeEfficiencyPoint) AND this row has volume —
+  // else one tank's volume gets counted against two tanks' miles, inflating MPG.
+  const miles = prevRow ? validMilesBetween(row, prevRow) : null;
+  if (miles !== null && row.volume != null && row.volume > 0) {
+    entry.totalMiles += miles;
+    entry.totalGallons += row.volume;
   }
   entry.count++;
   monthData.set(key, entry);
