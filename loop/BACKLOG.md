@@ -262,6 +262,10 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 
 ### infra
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**Frontend `validate:local` (C40)**~~ — *DONE C40: added frontend `validate:local` =
+  type-check && build && test (the CLAUDE.md local VERIFY gate as one command, mirroring the C33
+  backend script). The existing `validate` is the CI-shaped lint gate; this is the local floor. CLAUDE.md
+  VERIFY step updated. Well-timed for the T7–T9 frontend arc.*
 - ~~**`validate:local` + `check:musl` scripts (C33)**~~ — *DONE C33: added package scripts wrapping the
   musl-biome workaround — `check:musl`/`check:musl:fix` (src/) + `validate:local` (type-check &&
   check:musl && test && build) = the documented 4-step local-green path as ONE command. Refreshed

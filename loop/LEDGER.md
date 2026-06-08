@@ -14,9 +14,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 34 |
 | bug | 3 | 38 |
 | arch | 5 | 36 |
-| infra | 6 | 33 |
+| infra | 6 | 40 |
 
-Current cycle: **39**
+Current cycle: **40**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -812,3 +812,17 @@ Current cycle: **39**
   hint + editable lastServiceOdometer, single-vehicle constraint when mileage. THIS is the visual
   cycle — compose from the kit, eyes-on screenshot required (ui-autoloop). T8 (page/card mileage due
   rendering + Mark serviced button) + T9 (e2e) follow. #9/#11 bugs queued; #14 awaits Angelo.
+- **C40 (infra — frontend `validate:local`)** — BALANCE OVERRIDE: `infra` breached (cyc 33,
+  starved-for 7 > 6), the only over-budget category (deep-review + guard sat exactly AT budget, not
+  over) → infra wins, T7 waits one cycle. Symmetry gap with the C33 backend work: the frontend had
+  `validate` (lint + format:check + type-check + test, the CI-shaped gate) but NO single command for
+  the CLAUDE.md local VERIFY gate (type-check + build), so every frontend cycle ran those by hand and
+  the build step was easy to skip. Added `validate:local` = type-check && build && test (fail-fast
+  order) mirroring the backend. Verified the test step green FIRST (345 pass) before wiring, then ran
+  the new command end-to-end: EXIT 0 (tsc 0 · build ✓ · 345 pass). Refreshed CLAUDE.md's VERIFY step
+  to point Frontend at `npm run validate:local`. Well-timed: the T7–T9 frontend arc is the next 3
+  feature cycles, each now a one-command gate. No product code; package.json + CLAUDE.md only.
+  Next cycle (41): nothing over budget (deep-review cyc 35 starved-for 6 > 5 at cyc 41 — deep-review
+  breaches) → `deep-review` wins, NOT the T7 feature. Likely target: an eyes-on/HTTP review of a
+  shipped surface (the live mileage API + the just-landed frontend null-date handling), or fan out per
+  rule 7. T7 (ReminderForm mileage branch) resumes once deep-review is fed. #9/#11 queued; #14 Angelo.

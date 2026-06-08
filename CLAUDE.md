@@ -24,7 +24,8 @@ this loop, then advance to the next item:
              (`validate:local` = tsc + musl-biome + `bun test` + build in one command — the
               local-green path on this host; plain `validate` uses the dead glibc biome, see Hard
               rules. CI still runs glibc biome and is the lint source of truth.)
-             Frontend: cd frontend && mise exec -- npm run type-check && npm run build
+             Frontend: cd frontend && mise exec -- npm run validate:local
+             (`validate:local` = type-check + build + vitest in one command)
              E2E:      .meshclaw-tools/regress.sh   (route-smoke + axe + mobile + screenshots)
              UI proof: node .meshclaw-tools/shot.mjs <route> [mobile|desktop] [out.png]
    UI WORK?  A passing build is a FLOOR, not "human-ready". For any UI feature:
