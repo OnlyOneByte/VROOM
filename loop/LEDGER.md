@@ -9,13 +9,13 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 4 |
+| feature | 4 | 9 |
 | deep-review | 5 | 7 |
 | guard | 6 | 6 |
 | bug | 3 | 8 |
 | infra | 6 | 5 |
 
-Current cycle: **8**
+Current cycle: **9**
 
 ## Cycle log
 - **C1 (infra)** — Bootstrapped the `loop/` scaffold the loop format depends on:
@@ -137,3 +137,18 @@ Current cycle: **8**
   maintenance build is blocked on D1–D6 sign-off; if unsigned, the eligible feature work is
   drafting the #2 "import from other trackers" spec (Fuelly/Fuelio mapping) or recurring-expenses
   — OR, if Angelo signed off, start maintenance T1. Check sign-off first; else draft + flag.
+- **C9 (feature → spec)** — `feature` was over budget (starved-for 5 > 4) → forced pick. Checked
+  remote: NO maintenance sign-off landed (no commits since C8), so that build stays blocked. Per
+  spec-first, drafted the #2 feature spec instead: `.kiro/specs/import-trackers/` (import from
+  Fuelly/Fuelio/Drivvo). Key design: it's a server-side header+value MAPPING pre-pass that emits a
+  VROOM-native-shape CSV, then reuses the UNCHANGED buildImportPlan → importExpenses — so it
+  inherits ALL the safety I just hardened (cycle-8 idempotency/atomicity, formula-neutralize,
+  cross-tenant vehicle resolution, caps, per-row errors) rather than re-implementing them. Route
+  extension is backward-compatible (native path unchanged when no `mapping` sent). 5 open decisions
+  (D1–D5: units, category vocab, date formats, no-vehicle-column, preset set) flagged; recommended
+  option each; tasks.md T0 blocks build. Verify (spec-only): D1–D5 consistent across all 3 files,
+  groundings (EXPORT_COLUMNS, parseRow, importExpenses, unit-conversions) verified against source.
+  Flagged Angelo (now TWO specs awaiting sign-off: maintenance D1–D6 + import-trackers D1–D5).
+  Next cycle (10): feature touched (9) → most-starved becomes `guard` (cyc 6, breaches at 12) then
+  `deep-review` (cyc 7). Both build queues are sign-off-blocked; plenty of queued `bug`s (missed-
+  fillup MPG, slice(0,12), BOM strip) and guard/review work remain. Prefer a queued bug or a guard.

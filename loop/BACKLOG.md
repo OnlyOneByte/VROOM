@@ -26,9 +26,10 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
    requirements+design+tasks). **BLOCKED on Angelo's D1–D6 sign-off** (flagged via send_message
    C4). Once ratified, build is backend-first per tasks.md T1–T9. *(highest user value; reuses the
    reminders + odometer engines; adds a mileage trigger axis + canonical current-odometer helper.)*
-2. **Import from other trackers** — CSV import from Fuelly/Fuelio/Drivvo/etc. (VROOM-native
-   CSV round-trip already ships; this is mapping foreign schemas). Needs per-source column
-   mapping design.
+2. **Import from other trackers** — spec DRAFTED C9 (`.kiro/specs/import-trackers/`). **BLOCKED on
+   Angelo's D1–D5 sign-off** (flagged C9). Design: a server-side mapping pre-pass → VROOM-native CSV
+   → the UNCHANGED hardened import pipeline (inherits cycle-8 idempotency/atomicity + formula/tenant
+   safety). Backward-compatible route extension. Build per tasks.md T1–T6 once ratified.
 3. **Recurring expenses** beyond reminders — first-class recurring (insurance premium, loan
    payment, parking pass) with frequency + dashboard surfacing.
 
