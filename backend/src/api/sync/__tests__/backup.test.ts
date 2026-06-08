@@ -13,6 +13,7 @@ import fc from 'fast-check';
 import { TABLE_SCHEMA_MAP } from '../../../config';
 import {
   expenses,
+  insuranceClaims,
   insurancePolicies,
   odometerEntries,
   photos,
@@ -403,6 +404,66 @@ describe('validateBackupData: referential integrity', () => {
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('non-existent vehicle'))).toBe(true);
+  });
+
+  test('insurance claim referencing a known policy passes (round-trips)', () => {
+    const ins = coerceRow(buildMinimalStringRow(insurancePolicies), insurancePolicies);
+    const backup: ParsedBackupData = {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      vehicles: [],
+      expenses: [],
+      financing: [],
+      insurance: [ins],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      insuranceClaims: [
+        coerceRow(
+          buildMinimalStringRow(insuranceClaims, {
+            policyId: ins.id as string,
+            claimType: 'collision',
+            status: 'filed',
+            // No optional links — buildMinimalStringRow would otherwise fill
+            // term_id/vehicle_id with dummy ids that fail the ref-check.
+            termId: '',
+            vehicleId: '',
+          }),
+          insuranceClaims
+        ),
+      ],
+      userPreferences: [],
+      syncState: [],
+      photos: [],
+      odometer: [],
+      photoRefs: [],
+    };
+    const result = backupService.validateBackupData(backup);
+    expect(result.valid, JSON.stringify(result.errors)).toBe(true);
+  });
+
+  test('insurance claim referencing a non-existent policy fails', () => {
+    const backup: ParsedBackupData = {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      vehicles: [],
+      expenses: [],
+      financing: [],
+      insurance: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      insuranceClaims: [
+        coerceRow(
+          buildMinimalStringRow(insuranceClaims, { policyId: 'ghost', claimType: 'theft' }),
+          insuranceClaims
+        ),
+      ],
+      userPreferences: [],
+      syncState: [],
+      photos: [],
+      odometer: [],
+      photoRefs: [],
+    };
+    const result = backupService.validateBackupData(backup);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('non-existent policy'))).toBe(true);
   });
 
   test('photo referencing non-existent vehicle fails', () => {

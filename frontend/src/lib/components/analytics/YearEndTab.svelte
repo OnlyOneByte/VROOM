@@ -226,8 +226,11 @@
 										+{yearEnd.previousYearComparison.percentageChange.toFixed(1)}%
 									</span>
 								{:else if yearEnd.previousYearComparison.percentageChange < 0}
+									<!-- Icon keeps the chart-2 "good / spending down" hue (graphical, exempt);
+									     the TEXT is text-foreground because chart-2 (#009689) on white is 3.66:1,
+									     below WCAG AA 4.5:1 for this 18px medium text (cycle 189 latent case). -->
 									<TrendingDown class="h-5 w-5 text-chart-2" />
-									<span class="text-lg font-medium text-chart-2">
+									<span class="text-lg font-medium text-foreground">
 										{yearEnd.previousYearComparison.percentageChange.toFixed(1)}%
 									</span>
 								{:else}

@@ -9,7 +9,25 @@ import type {
 import { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
 import { GoogleSheetsService } from '../services/google-sheets-service';
 
+/**
+ * Factories for the Drive provider + Sheets service this strategy uses. Injected
+ * in tests (via the constructor) to substitute fakes WITHOUT `mock.module` — whose
+ * process-global stubs leak across files. Production omits them and the real
+ * `new GoogleDriveProvider` / `new GoogleSheetsService` are built per refresh token.
+ */
+export interface GoogleDriveStrategyDeps {
+  createDriveProvider: (refreshToken: string) => GoogleDriveProvider;
+  createSheetsService: (refreshToken: string) => GoogleSheetsService;
+}
+
+const defaultDeps: GoogleDriveStrategyDeps = {
+  createDriveProvider: (refreshToken) => new GoogleDriveProvider(refreshToken),
+  createSheetsService: (refreshToken) => new GoogleSheetsService(refreshToken),
+};
+
 export class GoogleDriveStrategy implements BackupStrategy {
+  constructor(private readonly deps: GoogleDriveStrategyDeps = defaultDeps) {}
+
   async execute(context: BackupStrategyContext): Promise<BackupStrategyResult> {
     const { providerConfig, decryptedCredentials } = context;
     const refreshToken = decryptedCredentials.refreshToken as string;
@@ -42,7 +60,7 @@ export class GoogleDriveStrategy implements BackupStrategy {
         return { success: false, message: 'ZIP generation failed or skipped' };
       }
 
-      const provider = new GoogleDriveProvider(refreshToken);
+      const provider = this.deps.createDriveProvider(refreshToken);
       const folderPath = resolveBackupFolderPath(context.providerRow, context.providerConfig);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const fileName = `vroom-backup-${timestamp}.zip`;
@@ -88,7 +106,7 @@ export class GoogleDriveStrategy implements BackupStrategy {
     refreshToken: string
   ): Promise<BackupCapabilityResult> {
     try {
-      const sheetsService = new GoogleSheetsService(refreshToken);
+      const sheetsService = this.deps.createSheetsService(refreshToken);
       const backupFolderPath = resolveBackupFolderPath(context.providerRow, context.providerConfig);
       const spreadsheetInfo = await sheetsService.createOrUpdateVroomSpreadsheet(
         context.userId,

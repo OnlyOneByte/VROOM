@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '../../db/connection';
 import { expenses, odometerEntries, photos } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
+import { insuranceClaimRepository } from '../insurance/claims-repository';
 import { insurancePolicyRepository } from '../insurance/repository';
 import { vehicleRepository } from '../vehicles/repository';
 
@@ -57,6 +58,12 @@ export async function validateEntityOwnership(
     case 'insurance_policy': {
       const policy = await insurancePolicyRepository.findById(entityId);
       if (!policy || policy.userId !== userId) throw new NotFoundError('Insurance policy');
+      break;
+    }
+    case 'insurance_claim': {
+      // Claim ownership is transitive through its policy (claim → policy.userId).
+      const ownerId = await insuranceClaimRepository.findOwnerUserId(entityId);
+      if (ownerId !== userId) throw new NotFoundError('Insurance claim');
       break;
     }
     case 'expense': {

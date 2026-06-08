@@ -3,7 +3,11 @@ import { AppError, NotFoundError, ValidationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import type { PaginatedResult } from '../../utils/pagination';
 import { storageProviderRegistry } from '../providers/domains/storage/registry';
-import { ENTITY_TO_CATEGORY } from '../providers/domains/storage/storage-provider';
+import {
+  capabilitiesOf,
+  ENTITY_TO_CATEGORY,
+  isImageMimeType,
+} from '../providers/domains/storage/storage-provider';
 import { validateEntityOwnership } from './helpers';
 import { photoRefRepository } from './photo-ref-repository';
 import { photoRepository } from './photo-repository';
@@ -44,6 +48,16 @@ export async function uploadPhotoForEntity(
     category
   );
 
+  // Capability gate (D2a): a limited backend like Google Photos stores images only.
+  // If the DEFAULT provider can't store this file type, fail with a clear message
+  // rather than letting the provider throw a vendor-specific error mid-upload.
+  if (!capabilitiesOf(provider).arbitraryFiles && !isImageMimeType(file.type)) {
+    throw new AppError(
+      `${provider.type} stores images only — choose a Google Drive or S3 provider for PDF documents.`,
+      400
+    );
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer());
   const storageRef = await provider.upload({
     fileName: file.name,
@@ -76,9 +90,14 @@ export async function uploadPhotoForEntity(
     syncedAt: new Date(),
   });
 
-  // Create pending refs for backup providers (sync worker picks these up)
+  // Create pending refs for backup providers (sync worker picks these up).
+  // Skip providers that can't store this file type (D2a) — e.g. don't queue a PDF
+  // to back up into Google Photos; that ref would only ever fail in the worker.
   const backups = await storageProviderRegistry.getBackupProviders(userId, category);
   for (const backup of backups) {
+    if (!capabilitiesOf(backup.provider).arbitraryFiles && !isImageMimeType(file.type)) {
+      continue;
+    }
     await photoRefRepository.create({
       photoId: photo.id,
       providerId: backup.providerId,
@@ -112,6 +131,29 @@ export async function listPhotosForEntity(
     pagination.limit,
     pagination.offset
   );
+}
+
+/**
+ * Batch-list a user's photos of one entity type (e.g. all 'vehicle' photos),
+ * grouped by entityId. One user-scoped query — lets callers like the dashboard
+ * avoid an N+1 of per-entity list requests. Ownership is enforced by the
+ * userId filter on the photos table (photos.userId is the row owner).
+ */
+export async function listPhotosByEntityType(
+  entityType: string,
+  userId: string
+): Promise<Record<string, Photo[]>> {
+  const all = await photoRepository.findByUser(userId, entityType);
+  const grouped: Record<string, Photo[]> = {};
+  for (const photo of all) {
+    const bucket = grouped[photo.entityId];
+    if (bucket) {
+      bucket.push(photo);
+    } else {
+      grouped[photo.entityId] = [photo];
+    }
+  }
+  return grouped;
 }
 
 /**
@@ -301,4 +343,43 @@ export async function deleteAllPhotosForEntity(
   // Batch delete all refs, then all photo records
   await photoRefRepository.deleteByPhotos(photoIds);
   await photoRepository.deleteByEntity(entityType, entityId);
+}
+
+/**
+ * Delete all photos for MANY entities of one type — used during a parent cascade
+ * (e.g. deleting a vehicle must clean the photos of its expenses + odometer
+ * entries, which the DB FK-cascade removes but the photos table — linked only by
+ * (entity_type, entity_id) strings, no FK — would otherwise leave orphaned along
+ * with their external storage files).
+ *
+ * Unlike deleteAllPhotosForEntity, this does NOT re-validate per-entity ownership:
+ * the caller has already validated the parent (vehicle/policy) it owns, and these
+ * child entities are being deleted in the same operation. Best-effort on provider
+ * files; always clears refs + photo rows. No-op for an empty id list.
+ */
+export async function deletePhotosForEntities(
+  entityType: string,
+  entityIds: string[],
+  userId: string
+): Promise<void> {
+  if (entityIds.length === 0) return;
+
+  const entityPhotos = await photoRepository.findByEntities(entityType, entityIds);
+  if (entityPhotos.length === 0) return;
+
+  const photoIds = entityPhotos.map((p) => p.id);
+  const allRefs = await photoRefRepository.findAllByPhotos(photoIds);
+
+  const refsByProvider = new Map<string, PhotoRef[]>();
+  for (const ref of allRefs) {
+    if (ref.status !== 'active') continue;
+    const existing = refsByProvider.get(ref.providerId) ?? [];
+    existing.push(ref);
+    refsByProvider.set(ref.providerId, existing);
+  }
+
+  await deleteRefsFromProviders(refsByProvider, userId);
+
+  await photoRefRepository.deleteByPhotos(photoIds);
+  await photoRepository.deleteByEntities(entityType, entityIds);
 }

@@ -2,6 +2,7 @@
 	import { Pencil, Trash2, RefreshCw } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
+	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import type { InsuranceTerm } from '$lib/types';
 
@@ -16,11 +17,10 @@
 
 	let { term, isCurrent = false, vehicleNames = [], onEdit, onDelete, onRenew }: Props = $props();
 
-	function handleDelete() {
-		if (confirm('Delete this term? Associated expenses will be preserved but unlinked.')) {
-			onDelete?.(term);
-		}
-	}
+	// Styled confirm dialog (replaces native confirm()). The backend deletes the
+	// auto-created premium expenses for this term (deleteBySource('insurance_term')),
+	// so the confirmation says so.
+	let confirmOpen = $state(false);
 </script>
 
 <div class="rounded-lg border p-3 space-y-2 {isCurrent ? 'bg-muted/30' : 'bg-background'}">
@@ -45,7 +45,7 @@
 					variant="ghost"
 					size="icon"
 					class="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-					onclick={handleDelete}
+					onclick={() => (confirmOpen = true)}
 					title="Delete term"
 				>
 					<Trash2 class="h-3 w-3" />
@@ -94,3 +94,10 @@
 		</p>
 	{/if}
 </div>
+
+<ConfirmDialog
+	bind:open={confirmOpen}
+	title="Delete term?"
+	description="This term's auto-created premium expense(s) will also be permanently deleted. This cannot be undone."
+	onConfirm={() => onDelete?.(term)}
+/>

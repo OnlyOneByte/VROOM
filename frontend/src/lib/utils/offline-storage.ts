@@ -5,10 +5,19 @@ import { browser } from '$app/environment';
 import type { ExpenseCategory } from '$lib/types';
 
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
-const OFFLINE_STORAGE_VERSION = '2.0'; // Incremented for field name migration
+const OFFLINE_STORAGE_VERSION = '3.0'; // v3: added clientId idempotency key
 
 export interface OfflineExpense {
 	id: string;
+	/**
+	 * Stable idempotency key sent to the backend on create. A retried POST with the
+	 * same clientId returns the original server row instead of duplicating it, so
+	 * sync is safe to retry without the fragile fuzzy duplicate-detection fallback.
+	 * Optional only for legacy (pre-v3) persisted entries; `addOfflineExpense` always
+	 * sets it and `loadOfflineExpenses` backfills it on read, so live entries always
+	 * carry one before they are ever synced.
+	 */
+	clientId?: string;
 	vehicleId: string;
 	type?: string; // Deprecated, kept for backwards compatibility
 	tags: string[]; // New flexible tags
@@ -38,8 +47,12 @@ export function loadOfflineExpenses(): OfflineExpense[] {
 		// Migrate old format expenses to new format if needed
 		return expenses.map(expense => {
 			if (!expense.version || expense.version !== OFFLINE_STORAGE_VERSION) {
-				// Mark as migrated
-				return { ...expense, version: OFFLINE_STORAGE_VERSION };
+				// Backfill a clientId for pre-v3 entries so they sync idempotently.
+				return {
+					...expense,
+					clientId: expense.clientId ?? crypto.randomUUID(),
+					version: OFFLINE_STORAGE_VERSION
+				};
 			}
 			return expense;
 		});
@@ -63,11 +76,12 @@ export function saveOfflineExpenses(expenses: OfflineExpense[]): void {
 
 // Add expense to offline queue
 export function addOfflineExpense(
-	expense: Omit<OfflineExpense, 'id' | 'timestamp' | 'synced' | 'version'>
+	expense: Omit<OfflineExpense, 'id' | 'clientId' | 'timestamp' | 'synced' | 'version'>
 ): void {
 	const offlineExpense: OfflineExpense = {
 		...expense,
 		id: `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+		clientId: crypto.randomUUID(),
 		timestamp: Date.now(),
 		synced: false,
 		version: OFFLINE_STORAGE_VERSION
@@ -142,7 +156,8 @@ export async function syncOfflineExpenses(): Promise<void> {
 				description: expense.description
 			});
 
-			await apiClient.post('/api/v1/expenses', backendExpense);
+			// Send the idempotency key so a retried POST returns the original row.
+			await apiClient.post('/api/v1/expenses', { ...backendExpense, clientId: expense.clientId });
 			markExpenseAsSynced(expense.id);
 		}
 

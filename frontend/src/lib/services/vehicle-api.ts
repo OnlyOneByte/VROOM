@@ -1,4 +1,11 @@
-import type { PaginatedResponse, Photo, Vehicle, VehicleFinancing, VehicleStats } from '$lib/types';
+import type {
+	PaginatedResponse,
+	Photo,
+	UpdateVehicleRequest,
+	Vehicle,
+	VehicleFinancing,
+	VehicleStats
+} from '$lib/types';
 import type { TimePeriod } from '$lib/constants/time-periods';
 import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 
@@ -19,7 +26,7 @@ export const vehicleApi = {
 		return apiClient.post<Vehicle>('/api/v1/vehicles', data);
 	},
 
-	async updateVehicle(vehicleId: string, data: Partial<Vehicle>): Promise<Vehicle> {
+	async updateVehicle(vehicleId: string, data: UpdateVehicleRequest): Promise<Vehicle> {
 		return apiClient.put<Vehicle>(`/api/v1/vehicles/${vehicleId}`, data);
 	},
 
@@ -64,6 +71,14 @@ export const vehicleApi = {
 		return apiClient.getPaginated<Photo>(
 			withPagination(`/api/v1/vehicles/${vehicleId}/photos`, params)
 		);
+	},
+
+	/**
+	 * Batch-fetch all of the user's vehicle photos in a single request, keyed by
+	 * vehicleId. Avoids the dashboard N+1 of one getPhotos() call per vehicle.
+	 */
+	async getAllVehiclePhotos(): Promise<Record<string, Photo[]>> {
+		return apiClient.get<Record<string, Photo[]>>('/api/v1/photos?entityType=vehicle');
 	},
 
 	async uploadPhoto(vehicleId: string, file: File): Promise<Photo> {

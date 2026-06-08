@@ -169,3 +169,32 @@ describe('Property 2: fuelType-based mutual exclusivity', () => {
 		);
 	});
 });
+
+/**
+ * description clear-on-edit (the clear-optional-field class, cycles 82-85).
+ * On CREATE (default), an empty/absent description is OMITTED — preserving the
+ * historical payload that the offline outbox + sync paths also emit. On EDIT
+ * (isEdit: true), an emptied description is sent as explicit `null` so the user
+ * can actually clear a previously-saved description (backend schema is .nullish()
+ * and writes null through). A non-empty description serializes the same either way.
+ */
+describe('toBackendExpense description clear-on-edit', () => {
+	const base = { vehicleId: 'v1', category: 'misc' as const, amount: 10 };
+
+	test('create omits an empty/absent description (offline-safe, unchanged)', () => {
+		expect('description' in toBackendExpense({ ...base })).toBe(false);
+		expect('description' in toBackendExpense({ ...base, description: '' })).toBe(false);
+	});
+
+	test('edit sends null for an emptied description (so it clears)', () => {
+		expect(toBackendExpense({ ...base, description: '' }, { isEdit: true }).description).toBe(null);
+		expect(toBackendExpense({ ...base }, { isEdit: true }).description).toBe(null);
+	});
+
+	test('a non-empty description serializes identically on create and edit', () => {
+		expect(toBackendExpense({ ...base, description: 'oil change' }).description).toBe('oil change');
+		expect(
+			toBackendExpense({ ...base, description: 'oil change' }, { isEdit: true }).description
+		).toBe('oil change');
+	});
+});

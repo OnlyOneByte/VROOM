@@ -160,12 +160,10 @@
 								},
 								xAxis: {
 									ticks: Math.min(amortizationChartData.length, 8),
-									format: (v: number) => `#${v}`,
-									label: 'Payment Number'
+									format: (v: number) => `#${v}`
 								},
 								yAxis: {
-									format: formatCurrencyAxis,
-									label: 'Amount ($)'
+									format: formatCurrencyAxis
 								}
 							}}
 						>

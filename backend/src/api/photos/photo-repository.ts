@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb, transaction } from '../../db/connection';
 import { type NewPhoto, type Photo, photos } from '../../db/schema';
@@ -75,6 +75,25 @@ export class PhotoRepository {
       .from(photos)
       .where(and(eq(photos.entityType, entityType), eq(photos.entityId, entityId)))
       .orderBy(asc(photos.sortOrder), asc(photos.createdAt));
+  }
+
+  /**
+   * Find all photos for many entities of one type (e.g. every expense of a
+   * vehicle being deleted). Batches the IN clause to stay under SQLite's
+   * variable limit. Returns [] for an empty id list.
+   */
+  async findByEntities(entityType: string, entityIds: string[]): Promise<Photo[]> {
+    if (entityIds.length === 0) return [];
+    const out: Photo[] = [];
+    for (let i = 0; i < entityIds.length; i += 500) {
+      const batch = entityIds.slice(i, i + 500);
+      const rows = await this.db
+        .select()
+        .from(photos)
+        .where(and(eq(photos.entityType, entityType), inArray(photos.entityId, batch)));
+      out.push(...rows);
+    }
+    return out;
   }
 
   async findByEntityPaginated(
@@ -156,6 +175,17 @@ export class PhotoRepository {
     await this.db
       .delete(photos)
       .where(and(eq(photos.entityType, entityType), eq(photos.entityId, entityId)));
+  }
+
+  /** Delete all photo rows for many entities of one type. Batched for SQLite. */
+  async deleteByEntities(entityType: string, entityIds: string[]): Promise<void> {
+    if (entityIds.length === 0) return;
+    for (let i = 0; i < entityIds.length; i += 500) {
+      const batch = entityIds.slice(i, i + 500);
+      await this.db
+        .delete(photos)
+        .where(and(eq(photos.entityType, entityType), inArray(photos.entityId, batch)));
+    }
   }
 }
 

@@ -17,10 +17,22 @@
 	--secondary: oklch(0.967 0.001 286.375);
 	--secondary-foreground: oklch(0.21 0.006 285.885);
 	--muted: oklch(0.967 0.001 286.375);
-	--muted-foreground: oklch(0.552 0.016 285.938);
+	/* Darkened from 0.552 → 0.486 so muted text clears WCAG AA 4.5:1 on white/card
+	   backgrounds (axe color-contrast). 0.552 was ~4.0:1; 0.486 is ~5.0:1. */
+	--muted-foreground: oklch(0.486 0.016 285.938);
 	--accent: oklch(0.967 0.001 286.375);
 	--accent-foreground: oklch(0.21 0.006 285.885);
-	--destructive: oklch(0.577 0.245 27.325);
+	/* Darkened from 0.577 → 0.505 so `text-destructive` clears WCAG AA 4.5:1 on
+	   white/card (was ~3.9:1). Still clearly red; used as text in 76 sites
+	   (delete buttons, form errors, error icons). The gallery's a11y gate caught this. */
+	--destructive: oklch(0.505 0.22 27.325);
+	/* "Attention"/"due now" amber. Used as TEXT (text-warning) and a tint
+	   (bg-warning/10) for reminder due-state cues. Deliberately DARK (L=0.52) so it
+	   clears WCAG AA 4.5:1 on white/card — the light chart-4/5 ambers (L≈0.83/0.77)
+	   fail as text (cycle 189). This token was referenced by reminders + the dashboard
+	   DueRemindersCard but never defined, so text-warning/bg-warning were silent
+	   no-ops (cycle 194). */
+	--warning: oklch(0.52 0.12 75);
 	--border: oklch(0.92 0.004 286.32);
 	--input: oklch(0.92 0.004 286.32);
 	--ring: oklch(0.705 0.015 286.067);
@@ -55,6 +67,9 @@
 	--accent: oklch(0.274 0.006 286.033);
 	--accent-foreground: oklch(0.985 0 0);
 	--destructive: oklch(0.704 0.191 22.216);
+	/* Lighter amber on the dark surface (mirrors how --destructive lightens in dark
+	   mode) so text-warning/bg-warning stay legible against the near-black bg. */
+	--warning: oklch(0.8 0.13 80);
 	--border: oklch(1 0 0 / 10%);
 	--input: oklch(1 0 0 / 15%);
 	--ring: oklch(0.552 0.016 285.938);
@@ -93,6 +108,7 @@
 	--color-accent: var(--accent);
 	--color-accent-foreground: var(--accent-foreground);
 	--color-destructive: var(--destructive);
+	--color-warning: var(--warning);
 	--color-border: var(--border);
 	--color-input: var(--input);
 	--color-ring: var(--ring);

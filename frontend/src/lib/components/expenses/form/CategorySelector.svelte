@@ -40,7 +40,12 @@
 		},
 		{
 			value: 'misc',
-			label: 'Misc Operating Costs',
+			// Keep this label concise like its five siblings: it shares a 2-col mobile
+			// grid where a multi-word label ("Misc Operating Costs") wraps to a second
+			// line and floats the icon mid-card, breaking the row rhythm. "Misc" also
+			// matches the canonical categoryLabels used in tables/charts/dashboard; the
+			// description below carries the "operating costs" detail.
+			label: 'Misc',
 			description: 'Tolls, parking, etc.',
 			icon: Coffee
 		}

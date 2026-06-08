@@ -30,10 +30,22 @@ function escapeDriveQuery(value: string): string {
 }
 
 export class GoogleDriveService {
-  private oauth2Client: OAuth2Client;
+  private oauth2Client?: OAuth2Client;
   private drive: drive_v3.Drive;
 
-  constructor(refreshToken: string) {
+  /**
+   * @param refreshToken  Google OAuth refresh token (ignored when `driveClient` is injected).
+   * @param driveClient   Optional pre-built Drive client. Inject an in-memory fake in tests
+   *                       to exercise the real service logic (folder dedup, path walking,
+   *                       upload/list/delete) with ZERO network and no `mock.module` leakage.
+   *                       Production callers omit it and an OAuth2-authed client is built.
+   */
+  constructor(refreshToken: string, driveClient?: drive_v3.Drive) {
+    if (driveClient) {
+      this.drive = driveClient;
+      return;
+    }
+
     this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,

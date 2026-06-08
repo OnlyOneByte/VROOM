@@ -5,6 +5,7 @@
 	import type { OfflineExpense } from '$lib/utils/offline-storage';
 	import { DISPLAY_LIMITS } from '$lib/constants/limits';
 	import { EXPENSE_MESSAGES } from '$lib/constants/messages';
+	import { formatCurrency } from '$lib/utils/formatters';
 
 	interface Props {
 		pendingExpenses: OfflineExpense[];
@@ -58,7 +59,7 @@
 								</span>
 							</div>
 							<div class="text-sm text-muted-foreground">
-								${expense.amount.toFixed(2)}
+								{formatCurrency(expense.amount)}
 								{#if expense.description}
 									• {expense.description}
 								{/if}
@@ -108,7 +109,7 @@
 								</span>
 							</div>
 							<div class="text-sm text-muted-foreground">
-								${expense.amount.toFixed(2)}
+								{formatCurrency(expense.amount)}
 								{#if expense.description}
 									• {expense.description}
 								{/if}

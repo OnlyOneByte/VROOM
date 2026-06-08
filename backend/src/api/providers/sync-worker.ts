@@ -20,6 +20,33 @@ import { storageProviderRegistry } from './domains/storage/registry';
 import type { PhotoCategory, StorageProvider } from './domains/storage/storage-provider';
 import { ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
 
+/**
+ * Collaborators the sync worker reaches for. Injected in tests (via the optional
+ * `deps` arg on `processBatch`) so fakes are substituted WITHOUT `mock.module` —
+ * whose process-global stubs leak across files. The old test mock.module'd these
+ * three modules and never restored them (mock.restore() doesn't undo module
+ * mocks), so every later suite saw a stubbed `photoRepository` missing
+ * `findByUser` and real photos-route tests 500'd. Production omits the arg and
+ * the real module singletons are used. See .kiro/steering/TestingExternalAPIs.md.
+ */
+export interface SyncWorkerDeps {
+  photoRefRepository: Pick<
+    typeof photoRefRepository,
+    'findPendingOrFailed' | 'findActiveByPhoto' | 'updateStatus'
+  >;
+  photoRepository: Pick<typeof photoRepository, 'findById'>;
+  registry: Pick<
+    typeof storageProviderRegistry,
+    'getProviderInternal' | 'resolveProviderFolderPath'
+  >;
+}
+
+const defaultDeps: SyncWorkerDeps = {
+  photoRefRepository,
+  photoRepository,
+  registry: storageProviderRegistry,
+};
+
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let isProcessing = false;
 
@@ -94,12 +121,14 @@ function shouldProcessRef(ref: PhotoRef, now: Date): boolean {
  * Downloads from any active ref for the same photo, uploads to the target provider.
  * Caches provider instances within the batch to avoid repeated DB lookups + decryption.
  */
-export async function processBatch(): Promise<void> {
+export async function processBatch(deps: SyncWorkerDeps = defaultDeps): Promise<void> {
   if (isProcessing) return;
   isProcessing = true;
 
   try {
-    const pendingRefs = await photoRefRepository.findPendingOrFailed(CONFIG.syncWorker.batchSize);
+    const pendingRefs = await deps.photoRefRepository.findPendingOrFailed(
+      CONFIG.syncWorker.batchSize
+    );
     if (pendingRefs.length === 0) return;
 
     logger.debug(`Sync worker: processing ${pendingRefs.length} pending refs`);
@@ -114,7 +143,7 @@ export async function processBatch(): Promise<void> {
 
       inFlightRefs.set(ref.id, nowMs);
       try {
-        await processSingleRef(ref, providerCache);
+        await processSingleRef(ref, providerCache, deps);
       } catch (error) {
         logger.warn('Sync worker: failed to process ref', {
           refId: ref.id,
@@ -139,12 +168,13 @@ export async function processBatch(): Promise<void> {
  */
 async function getCachedProvider(
   providerId: string,
-  cache: Map<string, StorageProvider>
+  cache: Map<string, StorageProvider>,
+  registry: SyncWorkerDeps['registry']
 ): Promise<StorageProvider> {
   const cached = cache.get(providerId);
   if (cached) return cached;
 
-  const provider = await storageProviderRegistry.getProviderInternal(providerId);
+  const provider = await registry.getProviderInternal(providerId);
   cache.set(providerId, provider);
   return provider;
 }
@@ -155,10 +185,11 @@ async function getCachedProvider(
  */
 async function processSingleRef(
   ref: PhotoRef,
-  providerCache: Map<string, StorageProvider>
+  providerCache: Map<string, StorageProvider>,
+  deps: SyncWorkerDeps
 ): Promise<void> {
   // Find an active ref for the same photo to download from
-  const sourceRef = await photoRefRepository.findActiveByPhoto(ref.photoId);
+  const sourceRef = await deps.photoRefRepository.findActiveByPhoto(ref.photoId);
   if (!sourceRef) {
     logger.debug('Sync worker: no active source ref for photo, skipping', {
       refId: ref.id,
@@ -168,7 +199,7 @@ async function processSingleRef(
   }
 
   // Look up photo metadata for proper upload params
-  const photo = await photoRepository.findById(ref.photoId);
+  const photo = await deps.photoRepository.findById(ref.photoId);
   if (!photo) {
     logger.debug('Sync worker: photo record not found, skipping', {
       refId: ref.id,
@@ -179,7 +210,11 @@ async function processSingleRef(
 
   try {
     // Download from source provider
-    const sourceProvider = await getCachedProvider(sourceRef.providerId, providerCache);
+    const sourceProvider = await getCachedProvider(
+      sourceRef.providerId,
+      providerCache,
+      deps.registry
+    );
     const buffer = await sourceProvider.download({
       providerType: sourceProvider.type,
       externalId: sourceRef.storageRef,
@@ -191,17 +226,14 @@ async function processSingleRef(
 
     if (category) {
       try {
-        pathHint = await storageProviderRegistry.resolveProviderFolderPath(
-          ref.providerId,
-          category
-        );
+        pathHint = await deps.registry.resolveProviderFolderPath(ref.providerId, category);
       } catch {
         // If path resolution fails, continue with empty pathHint
       }
     }
 
     // Upload to target provider with proper metadata
-    const targetProvider = await getCachedProvider(ref.providerId, providerCache);
+    const targetProvider = await getCachedProvider(ref.providerId, providerCache, deps.registry);
     const uploadResult = await targetProvider.upload({
       fileName: photo.fileName,
       buffer,
@@ -212,7 +244,7 @@ async function processSingleRef(
     });
 
     // Update ref to active with the new storage ref and sync timestamp
-    await photoRefRepository.updateStatus(ref.id, {
+    await deps.photoRefRepository.updateStatus(ref.id, {
       status: 'active',
       storageRef: uploadResult.externalId,
       externalUrl: uploadResult.externalUrl,
@@ -228,7 +260,7 @@ async function processSingleRef(
     // On failure: increment retry_count, set errorMessage, update syncedAt for backoff tracking
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    await photoRefRepository.updateStatus(ref.id, {
+    await deps.photoRefRepository.updateStatus(ref.id, {
       status: 'failed',
       errorMessage,
       retryCount: ref.retryCount + 1,
