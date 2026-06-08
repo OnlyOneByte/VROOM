@@ -11,12 +11,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 25 |
 | deep-review | 5 | 21 |
-| guard | 6 | 20 |
+| guard | 6 | 27 |
 | bug | 3 | 23 |
 | arch | 5 | 24 |
 | infra | 6 | 26 |
 
-Current cycle: **26**
+Current cycle: **27**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -513,3 +513,25 @@ Current cycle: **26**
   at cyc 27) will ALSO be over budget next cycle — if both feature-continuation and guard contend,
   guard wins the balance rule; a merge-surviving guard candidate: a source-scan that the mileage
   trigger's no-auto-re-arm invariant (one notification per milestone) stays intact.
+- **C27 (guard — maintenance-fields backup round-trip lock)** — BALANCE OVERRIDE: three categories
+  were over budget at cyc 27 (deep-review 6>5, guard 7>6, bug 4>3); the rule picks the MOST starved
+  over-budget one → `guard` (starved-for 7). Exactly the heads-up C26 left. Guard queue was empty, so
+  picked the highest-leverage merge-surviving lock for the just-shipped C22/C25 work: a TRUE
+  backup→restore round-trip for the maintenance-schedule reminder fields (this is also T5's explicit
+  "Remaining" item — data-safety quality bar #1). RATIONALE: C22 added reminders.{triggerMode,
+  intervalMileage, lastServiceOdometer, nextDueOdometer} + reminderNotifications.dueOdometer and made
+  next_due_date/due_date nullable. The CSV backup is schema-derived so they SHOULD ride along — but
+  the `coerceRow` boundary (integer + nullable columns, and a NULL date that must NOT coerce to 0/"")
+  is exactly the C3 clientId silent-drop class, and nothing proved a mileage reminder survives
+  export→import. Committed `maintenance-fields-roundtrip.test.ts` (3 tests through the REAL exportAsZip
+  → restoreFromBackup stack, mileage reminders seeded via sqlite since T4 validation isn't wired):
+  (1) mileage-only reminder + mileage notification survive with all 4 mileage cols + NULL date/odo
+  intact; (2) a `both` reminder preserves both axes (real date AND mileage cols); (3) a plain time
+  reminder restores with mileage cols NULL (not coerced to 0) + its real date. The NULL-not-zero
+  assertions are the load-bearing ones — that's where coerce would silently mangle. Verified: tsc 0 ·
+  musl-biome clean · 921 pass/0 fail (+3, up from 918) · build bundled. No product code touched.
+  Next cycle (28): `deep-review` is now most-starved over budget (cyc 21, starved-for 7 > 5) → it wins
+  the balance rule, NOT feature. Take the top deep-review item (eyes-on vehicle Overview + ExpensesTable
+  populated states, mobile+desktop) or the analytics route sweep — fan out 2-3 Explore agents per
+  rule 7. `bug` (cyc 23, starved-for 5 > 3) is also over budget and would be next after deep-review.
+  T3 part 3/T4 (mark-serviced + validation) resumes once the starved review/bug categories are fed.

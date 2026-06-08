@@ -63,8 +63,11 @@
 - [~] **T5 (partial, cycle 15)** Added the 5 new columns to `SHEET_HEADERS` (reminders +
       reminderNotifications) the moment T1's migration landed, because the cycle-3
       sheets-header-coverage guard fails otherwise (R9). CSV path is schema-derived → auto-covered.
-      **Remaining:** a backup→restore round-trip test that asserts every maintenance field
-      survives both paths (do once T3/T4 can create a mileage reminder with non-null values).
+      **Remaining: DONE (C27)** — `maintenance-fields-roundtrip.test.ts` asserts every maintenance
+      field (triggerMode, intervalMileage, lastServiceOdometer, nextDueOdometer, dueOdometer + the
+      nullable dates) survives a real exportAsZip → restoreFromBackup, incl. the NULL-date-not-
+      coerced-to-0 cases. Seeds mileage reminders via sqlite (API creation lands in T4). Sheets-path
+      coverage is the SHEET_HEADERS guard (already updated in T5-partial).
 
 ## Phase 3 — frontend
 - [ ] **T6** Types + service client for the new fields + mark-serviced.

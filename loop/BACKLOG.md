@@ -80,6 +80,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 
 ### guard
 *(queue empty — re-populate as reviews surface new bug classes.)*
+- ~~**maintenance-fields backup round-trip**~~ — *DONE C27: `maintenance-fields-roundtrip.test.ts`
+  (3 tests, real exportAsZip → restoreFromBackup) locks the C22/C25 columns (triggerMode,
+  intervalMileage, lastServiceOdometer, nextDueOdometer, dueOdometer) + the nullable dates surviving
+  the round-trip — incl. the load-bearing NULL-date-not-coerced-to-0 cases (the C3 clientId class).
+  Also closes T5's "Remaining" round-trip item.*
 - ~~**ownership-dedup guard**~~ — *DONE C20: source-scan `ownership-uses-shared-validators.test.ts`
   locks in the C18 dedup — `photos/helpers.ts` must call the 3 shared validators, must NOT locally
   re-declare them, must NOT re-import vehicleRepository/insurancePolicyRepository (inlined-check
