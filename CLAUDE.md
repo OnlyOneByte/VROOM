@@ -105,7 +105,13 @@ Highlights:
   and pluggable storage providers (Drive/Sheets/Photos/S3) all ship.
 - Backup/restore round-trips every table on the CSV path (schema-derived + coverage guards)
   and the Google Sheets path (header set is pinned by `sheets-header-coverage.test.ts`).
+- Approved & ready to build (Angelo signed off; backend-first per each `tasks.md`):
+  `.kiro/specs/maintenance-schedule/` (mileage+time service-interval reminders) and
+  `.kiro/specs/import-trackers/` (Fuelly/Fuelio/Drivvo CSV via a mapping pre-pass over the
+  hardened import pipeline). Each is a multi-task build — one tasks.md task per loop cycle.
+- Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides (badges today:
+  frontend ~59%, backend ~74%) — fold into bug/guard/arch cycles, don't regress it.
 - Open gaps: full in-process backend HTTP harness needs a DB-injection refactor (the
   `const sqlite = new Database(...)` singleton binds at import); screenshot visual-diffing is
   capture-only (no baseline compare); storage-backup-toggle E2E needs an OAuth provider (not
-  headless-feasible). Drafted-but-unbuilt: `.kiro/specs/maintenance-schedule/` (awaiting sign-off).
+  headless-feasible).

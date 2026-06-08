@@ -171,6 +171,8 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 
 ### infra
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**CLAUDE.md post-sign-off refresh**~~ — *DONE C12: the stale "maintenance-schedule drafted/
+  awaiting sign-off" line → both specs APPROVED/BUILD GO + the standing 90% coverage goal.*
 - ~~**CLAUDE.md stale refs**~~ — *DONE C5: corrected Biome (musl works), branch convention
   (claude-loop-dev), STATUS.md→loop/ pointers, refreshed state/gaps. All claims verified.*
 - ~~**`loop/` scaffold + push.sh**~~ — *DONE cycle 1.*

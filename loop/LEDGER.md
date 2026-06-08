@@ -14,9 +14,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 6 |
 | bug | 3 | 11 |
 | arch | 5 | 11 |
-| infra | 6 | 5 |
+| infra | 6 | 12 |
 
-Current cycle: **11**
+Current cycle: **12**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -184,3 +184,17 @@ Current cycle: **11**
   committed source-scan that no analytics monthly builder uses `.slice(0, N)` (would have caught
   C11), or extend `no-utc-month-parse` to the backend `toMonthKey`/import paths (bug #8 class).
   Otherwise the remaining queued `bug`s (BOM strip, date-only/currency, tz bucketing) are fair game.
+- **C12 (infra)** — Balance forced it: `infra` was the only OVER-budget category (last cyc 5,
+  starved-for 7 > budget 6), so the rule required it over starting a feature build. (Between C11
+  and now: Angelo rebased the branch onto origin/main + signed off BOTH feature specs; I recorded
+  that out-of-band — lesson saved authorizing claude-loop-dev force-push, both specs flipped to
+  APPROVED/BUILD GO, 90% coverage goal added to TODO Misc, arch category added to the loop.)
+  This cycle's infra increment: reconciled the one now-stale CLAUDE.md line — "drafted-but-unbuilt
+  maintenance-schedule (awaiting sign-off)" → both specs APPROVED/ready-to-build + the standing 90%
+  coverage goal. Same fresh-clone-orientation class as C5. Docs-only; verified the claims match
+  reality (both requirements.md say APPROVED, coverage goal in TODO.md). No build.
+  Next cycle (13): nothing over budget (infra now 12). Most-starved: `deep-review` (cyc 7,
+  starved-for 6 > budget 5 → OVER next cycle) and `guard` (cyc 6, starved-for 7 > 6 → OVER).
+  Both breach at 13 → MUST pick the more-starved: `guard` (starved-for 7). Populate the guard
+  queue (e.g. the no-slice(0,N) source-scan) OR, since features are now BUILD GO and `feature`
+  is also climbing (starved-for 4 at cyc 13), weigh pulling maintenance T1. Guard is forced first.
