@@ -9,14 +9,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 45 |
+| feature | 4 | 46 |
 | deep-review | 5 | 42 |
 | guard | 6 | 41 |
 | bug | 3 | 44 |
 | arch | 5 | 43 |
 | infra | 6 | 40 |
 
-Current cycle: **45**
+Current cycle: **46**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -927,3 +927,21 @@ Current cycle: **45**
   leverage = continue the feature arc → **T8** (/reminders page + DueRemindersCard: OR-in mileage due,
   render the milestone + gap with unit label, wire the "Mark serviced" button to reminderApi.markServiced;
   four states + a11y) — also visual. Then T9 (e2e). bug #11 + arch settings-DROP/auth queued. #14/#16 Angelo.
+- **C46 (feature — maintenance-schedule T8: Mark-serviced button on /reminders)** — nothing over budget;
+  continued the feature arc. T8's display half (mileage milestone render + null-date guards on the
+  /reminders cards + notification dueOdometer render) already landed in C39 with the nullable-type
+  fixes; the dashboard DueRemindersCard is time-axis-only BY DESIGN (mileage due surfaces via
+  notifications, not the date-window widget) so it needs no change. So T8's remaining NEW piece = the
+  re-arm action: added `markServiced(item)` handler (per-reminder `servicingId` spinner, success toast
+  'reminder re-armed', reload) + `isMileageTracking()` helper, and a "Serviced" Button (Check icon /
+  RefreshCw spinner) on each ACTIVE mileage/both card, before Pause/Edit/Delete — wired to
+  reminderApi.markServiced (C39 client). Composed from the kit. Verified: frontend tsc 0 · build ·
+  345 tests · prettier clean. ⚠️ EYES-ON STILL PENDING (same Playwright sandbox-deny as C45) — extended
+  the untracked reminder-mileage e2e to assert the Serviced button shows + click re-arms + screenshot.
+  Both T7+T8 visuals will be confirmed in one pass when Angelo runs regress.sh / glances at /reminders
+  (flagged C45). T8 marked [~] until then.
+  Next cycle (47): `arch` is most-starved (cyc 43, starved-for 4 < 5 — not over yet; deep-review cyc 42
+  starved-for 5 = budget at cyc 47). Nothing strictly over budget at 47 → highest-leverage = T9 (the
+  maintenance-schedule e2e — promote the untracked reminder-mileage spec's coverage into the committed
+  suite shape, closing the feature) OR continue toward closing the UI. bug #11 + arch settings-DROP/auth
+  remain queued; #14/#16 await Angelo. Watch: deep-review + arch both breach ~cyc 47-48.

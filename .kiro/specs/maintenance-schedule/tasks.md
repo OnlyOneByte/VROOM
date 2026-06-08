@@ -106,8 +106,14 @@
       ⚠️ Eyes-on screenshot NOT captured (Playwright sandbox-denied in autonomous ctx) — untracked
       `reminder-mileage.meshclaw.e2e.ts` captures it on regress.sh; flagged to Angelo. Tick to [x] once
       eyes-on confirmed.
-- [ ] **T8** `/reminders` page + `DueRemindersCard`: OR-in mileage due, render reason + gap with
-      unit label, "Mark serviced" action. Four states + a11y.
+- [~] **T8 (C39 display + C46 action, eyes-on PENDING)** `/reminders` page: the milestone render +
+      null-date guards + notification dueOdometer display landed C39 (with the nullable-type fixes);
+      C46 added the "Serviced" re-arm Button (active mileage/both cards → reminderApi.markServiced,
+      per-reminder spinner, success toast) + isMileageTracking helper. DueRemindersCard left unchanged
+      — it's the TIME-axis due-soon widget by design (mileage due surfaces via notifications). tsc 0 ·
+      build · 345 tests · prettier. ⚠️ Eyes-on (incl. four-states/a11y of the mileage cards) PENDING —
+      same Playwright sandbox-deny; untracked reminder-mileage e2e asserts the Serviced button + screenshots.
+      Tick [x] once eyes-on confirmed.
 
 ## Phase 4 — verify
 - [ ] **T9** E2E (mi + km vehicle, mileage-due flip on odometer write, mark-serviced re-arm) +
