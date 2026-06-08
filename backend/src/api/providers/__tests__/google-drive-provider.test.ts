@@ -1,226 +1,63 @@
 /**
- * Unit tests for GoogleDriveProvider.
- *
- * Other test files (registry.test, strategy.test) use mock.module() to replace
- * the google-drive-provider module with stubs. Bun's mock.module is process-global,
- * so when running the full suite those stubs leak into this file's imports.
- *
- * To work around this, we mock the google-drive-service dependency and then
- * re-register the provider module with the real implementation before importing.
+ * GoogleDriveProvider tests — exercises the REAL provider against a REAL
+ * GoogleDriveService wired to an in-memory fake Drive client (injected via the
+ * constructor seam). No `mock.module` here: the old version stubbed the service
+ * AND re-registered a 100-line re-implementation of the provider, which (a) only
+ * tested the copy, and (b) leaked process-global stubs into sibling test files.
+ * Injection tests the actual shipping code and leaks nothing.
  */
 
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
+import {
+  FakeGoogleStore,
+  googleApiError,
+  idOf,
+  makeFakeDrive,
+} from '../../../test-helpers/fake-google-clients';
+import { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
 import type { StorageRef } from '../domains/storage/storage-provider';
-import type { DriveFile, DriveFolder } from '../services/google-drive-service';
+import { GoogleDriveService } from '../services/google-drive-service';
 
-// --- Mock GoogleDriveService ---
+let store: FakeGoogleStore;
+let provider: GoogleDriveProvider;
 
-const mockFindFolder = mock<(name: string, parentId?: string) => Promise<DriveFolder | null>>(() =>
-  Promise.resolve(null)
-);
-const mockCreateFolder = mock<(name: string, parentId?: string) => Promise<DriveFolder>>(() =>
-  Promise.resolve({ id: 'new-folder-id', name: 'folder' })
-);
-const mockUploadFile = mock<
-  (name: string, content: Buffer | string, mime: string, parentId?: string) => Promise<DriveFile>
->(() =>
-  Promise.resolve({
-    id: 'drive-file-123',
-    name: 'photo.jpg',
-    mimeType: 'image/jpeg',
-    webViewLink: 'https://drive.google.com/file/d/drive-file-123/view',
-  })
-);
-const mockDownloadFile = mock<(fileId: string) => Promise<Buffer>>(() =>
-  Promise.resolve(Buffer.from('file-content'))
-);
-const mockDeleteFile = mock<(fileId: string) => Promise<void>>(() => Promise.resolve());
-
-mock.module('../services/google-drive-service', () => ({
-  GoogleDriveService: class {
-    findFolder = mockFindFolder;
-    createFolder = mockCreateFolder;
-    uploadFile = mockUploadFile;
-    downloadFile = mockDownloadFile;
-    deleteFile = mockDeleteFile;
-  },
-}));
-
-// Re-register the provider module with the real exports so other test files'
-// mock.module() stubs don't replace our class. This must come AFTER the service
-// mock above so the real GoogleDriveProvider picks up our mocked service.
-mock.module('../domains/storage/google-drive-provider', () => ({
-  GoogleDriveProvider: class {
-    readonly type = 'google-drive' as const;
-    private driveService: {
-      findFolder: typeof mockFindFolder;
-      createFolder: typeof mockCreateFolder;
-      uploadFile: typeof mockUploadFile;
-      downloadFile: typeof mockDownloadFile;
-      deleteFile: typeof mockDeleteFile;
-    };
-
-    constructor(_refreshToken: string) {
-      // The service mock is already set up — just wire the methods
-      this.driveService = {
-        findFolder: mockFindFolder,
-        createFolder: mockCreateFolder,
-        uploadFile: mockUploadFile,
-        downloadFile: mockDownloadFile,
-        deleteFile: mockDeleteFile,
-      };
-    }
-
-    async upload(params: {
-      fileName: string;
-      buffer: Buffer;
-      mimeType: string;
-      entityType: string;
-      entityId: string;
-      pathHint: string;
-      rawPath?: string;
-    }) {
-      const folderPath = params.rawPath ?? params.pathHint;
-      const folderId = await this.resolveFolderPath(folderPath);
-      const driveFile = await this.driveService.uploadFile(
-        params.fileName,
-        params.buffer,
-        params.mimeType,
-        folderId
-      );
-      return {
-        providerType: this.type,
-        externalId: driveFile.id,
-        externalUrl: driveFile.webViewLink,
-      };
-    }
-
-    async download(ref: StorageRef): Promise<Buffer> {
-      return this.driveService.downloadFile(ref.externalId);
-    }
-
-    async delete(ref: StorageRef): Promise<void> {
-      await this.driveService.deleteFile(ref.externalId);
-    }
-
-    async getExternalUrl(ref: StorageRef): Promise<string | null> {
-      return ref.externalUrl ?? null;
-    }
-
-    async healthCheck(): Promise<boolean> {
-      try {
-        await this.driveService.findFolder('VROOM');
-        return true;
-      } catch {
-        return false;
-      }
-    }
-
-    private async resolveFolderPath(pathHint: string): Promise<string> {
-      const segments = pathHint
-        .split('/')
-        .map((s: string) => s.trim())
-        .filter(Boolean);
-
-      let parentId: string | undefined;
-
-      for (const segment of segments) {
-        const existing = await this.driveService.findFolder(segment, parentId);
-        if (existing) {
-          parentId = existing.id;
-        } else {
-          const created = await this.driveService.createFolder(segment, parentId);
-          parentId = created.id;
-        }
-      }
-
-      return parentId ?? '';
-    }
-  },
-  // Preserve re-exported utility so mock doesn't break other test files
-  coalesceGoogleDriveFile: (f: Record<string, unknown>) => ({
-    key: f.id,
-    name: f.name,
-    size: Number(f.size) || 0,
-    createdTime: f.createdTime ?? f.modifiedTime ?? new Date(0).toISOString(),
-    lastModified: f.modifiedTime ?? f.createdTime ?? new Date(0).toISOString(),
-  }),
-}));
-
-const { GoogleDriveProvider } = await import('../domains/storage/google-drive-provider');
+beforeEach(() => {
+  store = new FakeGoogleStore();
+  const driveService = new GoogleDriveService('fake-refresh-token', makeFakeDrive(store));
+  provider = new GoogleDriveProvider('fake-refresh-token', driveService);
+});
 
 describe('GoogleDriveProvider', () => {
-  let provider: InstanceType<typeof GoogleDriveProvider>;
-
-  beforeEach(() => {
-    provider = new GoogleDriveProvider('fake-refresh-token');
-    mockFindFolder.mockReset();
-    mockCreateFolder.mockReset();
-    mockUploadFile.mockReset();
-    mockDownloadFile.mockReset();
-    mockDeleteFile.mockReset();
-  });
-
   test('type is google-drive', () => {
     expect(provider.type).toBe('google-drive');
   });
 
   describe('upload', () => {
-    test('resolves folder path and uploads file', async () => {
-      mockFindFolder
-        .mockResolvedValueOnce({ id: 'vroom-id', name: 'VROOM' })
-        .mockResolvedValueOnce(null);
-      mockCreateFolder.mockResolvedValueOnce({
-        id: 'photos-folder-id',
-        name: 'Vehicle',
-      });
-      mockUploadFile.mockResolvedValueOnce({
-        id: 'uploaded-id',
-        name: 'car.jpg',
-        mimeType: 'image/jpeg',
-        webViewLink: 'https://drive.google.com/file/d/uploaded-id/view',
-      });
-
+    test('walks the path, creating missing folders, and uploads into the leaf', async () => {
       const result = await provider.upload({
         fileName: 'car.jpg',
         buffer: Buffer.from('image-data'),
         mimeType: 'image/jpeg',
         entityType: 'vehicle',
         entityId: 'v-1',
-        pathHint: '/VROOM/Vehicle',
+        pathHint: 'VROOM/Vehicle',
       });
 
-      expect(result).toEqual({
-        providerType: 'google-drive',
-        externalId: 'uploaded-id',
-        externalUrl: 'https://drive.google.com/file/d/uploaded-id/view',
-      });
+      expect(result.providerType).toBe('google-drive');
+      expect(result.externalId).toBeTruthy();
+      expect(result.externalUrl).toContain(result.externalId);
 
-      expect(mockFindFolder).toHaveBeenCalledTimes(2);
-      expect(mockFindFolder).toHaveBeenNthCalledWith(1, 'VROOM', undefined);
-      expect(mockFindFolder).toHaveBeenNthCalledWith(2, 'Vehicle', 'vroom-id');
-
-      expect(mockCreateFolder).toHaveBeenCalledTimes(1);
-      expect(mockCreateFolder).toHaveBeenCalledWith('Vehicle', 'vroom-id');
-
-      expect(mockUploadFile).toHaveBeenCalledWith(
-        'car.jpg',
-        Buffer.from('image-data'),
-        'image/jpeg',
-        'photos-folder-id'
-      );
+      // The file landed in the VROOM/Vehicle leaf with the right bytes.
+      const vroom = store.childrenOf('').find((f) => f.name === 'VROOM');
+      const vehicle = store.childrenOf(idOf(vroom)).find((f) => f.name === 'Vehicle');
+      const uploaded = store.files.get(result.externalId);
+      expect(uploaded?.parents).toEqual([idOf(vehicle)]);
+      expect(uploaded?.content.toString()).toBe('image-data');
     });
 
-    test('reuses existing folders when all segments exist', async () => {
-      mockFindFolder
-        .mockResolvedValueOnce({ id: 'vroom-id', name: 'VROOM' })
-        .mockResolvedValueOnce({ id: 'receipts-id', name: 'Receipts' });
-      mockUploadFile.mockResolvedValueOnce({
-        id: 'receipt-file-id',
-        name: 'receipt.pdf',
-        mimeType: 'application/pdf',
-        webViewLink: 'https://drive.google.com/file/d/receipt-file-id/view',
-      });
+    test('reuses existing folders when all path segments already exist', async () => {
+      const vroom = store.seedFolder('VROOM');
+      const receipts = store.seedFolder('Receipts', vroom);
 
       const result = await provider.upload({
         fileName: 'receipt.pdf',
@@ -228,20 +65,32 @@ describe('GoogleDriveProvider', () => {
         mimeType: 'application/pdf',
         entityType: 'expense',
         entityId: 'e-1',
-        pathHint: '/VROOM/Receipts',
+        pathHint: 'VROOM/Receipts',
       });
 
-      expect(result.externalId).toBe('receipt-file-id');
-      expect(mockCreateFolder).not.toHaveBeenCalled();
+      // No duplicate folders were created.
+      expect(store.childrenOf('').filter((f) => f.name === 'VROOM')).toHaveLength(1);
+      expect(store.childrenOf(vroom).filter((f) => f.name === 'Receipts')).toHaveLength(1);
+      expect(store.files.get(result.externalId)?.parents).toEqual([receipts]);
     });
 
-    test('handles empty pathHint by uploading to root', async () => {
-      mockUploadFile.mockResolvedValueOnce({
-        id: 'root-file-id',
-        name: 'file.jpg',
-        mimeType: 'image/jpeg',
+    test('rawPath takes precedence over pathHint', async () => {
+      const result = await provider.upload({
+        fileName: 'backup.zip',
+        buffer: Buffer.from('zip'),
+        mimeType: 'application/zip',
+        entityType: 'backup',
+        entityId: 'u-1',
+        pathHint: 'IGNORED',
+        rawPath: 'VROOM/Backups',
       });
+      const vroom = store.childrenOf('').find((f) => f.name === 'VROOM');
+      const backups = store.childrenOf(idOf(vroom)).find((f) => f.name === 'Backups');
+      expect(store.files.get(result.externalId)?.parents).toEqual([idOf(backups)]);
+      expect(store.childrenOf('').some((f) => f.name === 'IGNORED')).toBe(false);
+    });
 
+    test('empty pathHint uploads to root', async () => {
       const result = await provider.upload({
         fileName: 'file.jpg',
         buffer: Buffer.from('data'),
@@ -250,93 +99,79 @@ describe('GoogleDriveProvider', () => {
         entityId: 'v-1',
         pathHint: '',
       });
-
-      expect(result.externalId).toBe('root-file-id');
-      expect(result.externalUrl).toBeUndefined();
-      expect(mockFindFolder).not.toHaveBeenCalled();
-      expect(mockUploadFile).toHaveBeenCalledWith(
-        'file.jpg',
-        Buffer.from('data'),
-        'image/jpeg',
-        ''
-      );
+      expect(store.files.get(result.externalId)?.parents).toEqual([]);
     });
   });
 
   describe('download', () => {
-    test('downloads file by externalId', async () => {
-      const content = Buffer.from('downloaded-content');
-      mockDownloadFile.mockResolvedValueOnce(content);
-
-      const ref: StorageRef = {
-        providerType: 'google-drive',
-        externalId: 'file-abc',
-      };
-
-      const result = await provider.download(ref);
-      expect(result).toEqual(content);
-      expect(mockDownloadFile).toHaveBeenCalledWith('file-abc');
+    test('returns the uploaded bytes by externalId', async () => {
+      const up = await provider.upload({
+        fileName: 'blob.bin',
+        buffer: Buffer.from([9, 8, 7]),
+        mimeType: 'application/octet-stream',
+        entityType: 'vehicle',
+        entityId: 'v-1',
+        pathHint: '',
+      });
+      const ref: StorageRef = { providerType: 'google-drive', externalId: up.externalId };
+      expect((await provider.download(ref)).equals(Buffer.from([9, 8, 7]))).toBe(true);
     });
   });
 
   describe('delete', () => {
-    test('deletes file by externalId', async () => {
-      mockDeleteFile.mockResolvedValueOnce(undefined);
-
-      const ref: StorageRef = {
-        providerType: 'google-drive',
-        externalId: 'file-to-delete',
-      };
-
-      await provider.delete(ref);
-      expect(mockDeleteFile).toHaveBeenCalledWith('file-to-delete');
+    test('removes the file by externalId', async () => {
+      const up = await provider.upload({
+        fileName: 'temp.zip',
+        buffer: Buffer.from('x'),
+        mimeType: 'application/zip',
+        entityType: 'backup',
+        entityId: 'u-1',
+        pathHint: '',
+      });
+      await provider.delete({ providerType: 'google-drive', externalId: up.externalId });
+      expect(store.files.has(up.externalId)).toBe(false);
     });
   });
 
   describe('getExternalUrl', () => {
-    test('returns externalUrl when present', async () => {
-      const ref: StorageRef = {
-        providerType: 'google-drive',
-        externalId: 'file-1',
-        externalUrl: 'https://drive.google.com/file/d/file-1/view',
-      };
+    test('returns externalUrl when present, null when absent', async () => {
+      expect(
+        await provider.getExternalUrl({
+          providerType: 'google-drive',
+          externalId: 'f',
+          externalUrl: 'https://drive.google.com/file/d/f/view',
+        })
+      ).toBe('https://drive.google.com/file/d/f/view');
+      expect(
+        await provider.getExternalUrl({ providerType: 'google-drive', externalId: 'f' })
+      ).toBeNull();
+    });
+  });
 
-      const url = await provider.getExternalUrl(ref);
-      expect(url).toBe('https://drive.google.com/file/d/file-1/view');
+  describe('list', () => {
+    test('lists files in an existing folder path', async () => {
+      const vroom = store.seedFolder('VROOM');
+      const backups = store.seedFolder('Backups', vroom);
+      store.seedFile({ name: 'a.zip', mimeType: 'application/zip', parentId: backups });
+      store.seedFile({ name: 'b.zip', mimeType: 'application/zip', parentId: backups });
+
+      const files = await provider.list('VROOM/Backups');
+      expect(files.map((f) => f.name).sort()).toEqual(['a.zip', 'b.zip']);
     });
 
-    test('returns null when externalUrl is undefined', async () => {
-      const ref: StorageRef = {
-        providerType: 'google-drive',
-        externalId: 'file-2',
-      };
-
-      const url = await provider.getExternalUrl(ref);
-      expect(url).toBeNull();
+    test('returns [] when the folder path does not exist', async () => {
+      expect(await provider.list('VROOM/Nope')).toEqual([]);
     });
   });
 
   describe('healthCheck', () => {
-    test('returns true when Drive is accessible', async () => {
-      mockFindFolder.mockResolvedValueOnce({ id: 'vroom-id', name: 'VROOM' });
-
-      const result = await provider.healthCheck();
-      expect(result).toBe(true);
-      expect(mockFindFolder).toHaveBeenCalledWith('VROOM');
+    test('true when Drive is reachable (folder absent is still healthy)', async () => {
+      expect(await provider.healthCheck()).toBe(true);
     });
 
-    test('returns false when Drive call fails', async () => {
-      mockFindFolder.mockRejectedValueOnce(new Error('Network error'));
-
-      const result = await provider.healthCheck();
-      expect(result).toBe(false);
-    });
-
-    test('returns true even when VROOM folder does not exist', async () => {
-      mockFindFolder.mockResolvedValueOnce(null);
-
-      const result = await provider.healthCheck();
-      expect(result).toBe(true);
+    test('false when the Drive API errors', async () => {
+      store.injectFault('files.list', googleApiError(401, 'Invalid Credentials'));
+      expect(await provider.healthCheck()).toBe(false);
     });
   });
 });

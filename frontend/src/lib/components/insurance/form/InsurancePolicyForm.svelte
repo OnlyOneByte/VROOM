@@ -35,8 +35,13 @@
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import { getCurrencySymbol } from '$lib/utils/formatters';
 	import type { InsurancePolicy, Vehicle, CreateTermRequest } from '$lib/types';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
+
+	// Money-field labels show the user's currency symbol, not a hardcoded "$"
+	// (EUR/GBP users would otherwise see the wrong unit). Same class as cycles 74/75.
+	const currencySymbol = $derived(getCurrencySymbol());
 
 	interface Props {
 		policyId?: string;
@@ -170,7 +175,9 @@
 			if (isEditMode && policy) {
 				await insuranceApi.updatePolicy(policy.id, {
 					company: company.trim(),
-					notes: notes.trim() || undefined,
+					// null (not undefined) so an emptied notes field is actually cleared
+					// server-side — JSON drops undefined, leaving the old notes intact.
+					notes: notes.trim() || null,
 					isActive
 				});
 				appStore.showSuccess('Policy updated successfully');
@@ -250,7 +257,7 @@
 		<div class="space-y-6">
 			<!-- Header -->
 			<div class="flex items-center gap-4">
-				<Button variant="outline" size="icon" onclick={handleBack}>
+				<Button variant="outline" size="icon" aria-label="Go back" onclick={handleBack}>
 					<ArrowLeft class="h-4 w-4" />
 				</Button>
 				<div>
@@ -391,7 +398,7 @@
 										/>
 									</div>
 									<div class="space-y-2">
-										<Label for="deductible">Deductible ($)</Label>
+										<Label for="deductible">Deductible ({currencySymbol})</Label>
 										<Input
 											id="deductible"
 											type="number"
@@ -421,7 +428,7 @@
 
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
 									<div class="space-y-2">
-										<Label for="coverage-limit">Coverage Limit ($)</Label>
+										<Label for="coverage-limit">Coverage Limit ({currencySymbol})</Label>
 										<Input
 											id="coverage-limit"
 											type="number"
@@ -460,7 +467,7 @@
 								<h4 class="text-sm font-medium text-foreground mb-4">Finance Details</h4>
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 									<div class="space-y-2">
-										<Label for="total-cost">Total Cost ($)</Label>
+										<Label for="total-cost">Total Cost ({currencySymbol})</Label>
 										<Input
 											id="total-cost"
 											type="number"
@@ -475,7 +482,7 @@
 										{/if}
 									</div>
 									<div class="space-y-2">
-										<Label for="monthly-cost">Monthly Cost ($)</Label>
+										<Label for="monthly-cost">Monthly Cost ({currencySymbol})</Label>
 										<Input
 											id="monthly-cost"
 											type="number"
@@ -488,7 +495,7 @@
 
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
 									<div class="space-y-2">
-										<Label for="payment-amount">Payment Amount ($)</Label>
+										<Label for="payment-amount">Payment Amount ({currencySymbol})</Label>
 										<Input
 											id="payment-amount"
 											type="number"
@@ -583,8 +590,9 @@
 				<AlertDialogHeader>
 					<AlertDialogTitle>Delete Policy</AlertDialogTitle>
 					<AlertDialogDescription>
-						Are you sure you want to delete this insurance policy? This will permanently remove the
-						policy and all its terms. This action cannot be undone.
+						Are you sure you want to delete this insurance policy? This permanently removes the
+						policy and everything under it — all terms, filed claims, and uploaded documents. This
+						action cannot be undone.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 

@@ -33,8 +33,29 @@ export interface StorageFileInfo {
   lastModified: string; // ISO 8601
 }
 
+/**
+ * What a provider's backend can actually do. Most providers (Drive, S3) support
+ * full CRUD and omit this — `capabilitiesOf()` defaults them to FULL_CRUD. A
+ * limited backend like Google Photos (append-only, photos-only, no folders)
+ * declares reduced capabilities so callers branch BEFORE invoking an operation
+ * the API can't perform, instead of catching a thrown error after the fact.
+ */
+export interface StorageCapabilities {
+  /** Backend can remove a stored object (Google Photos cannot — library is append-only). */
+  delete: boolean;
+  /** Backend can enumerate a folder/album (Google Photos has no folder listing). */
+  list: boolean;
+  /** Backend can store non-image types like PDF (Google Photos is photos/videos only). */
+  arbitraryFiles: boolean;
+}
+
 export interface StorageProvider {
   readonly type: string;
+  /**
+   * Optional. When omitted the provider is assumed full-CRUD (see FULL_CRUD).
+   * Drive/S3/fake don't declare it; Google Photos does.
+   */
+  readonly capabilities?: StorageCapabilities;
 
   upload(params: UploadParams): Promise<StorageRef>;
   download(ref: StorageRef): Promise<Buffer>;
@@ -44,10 +65,24 @@ export interface StorageProvider {
   list(folderPath: string): Promise<StorageFileInfo[]>;
 }
 
+/** Default capabilities for a provider that doesn't declare any — full CRUD. */
+export const FULL_CRUD: StorageCapabilities = { delete: true, list: true, arbitraryFiles: true };
+
+/** Resolve a provider's capabilities, defaulting an undeclared provider to FULL_CRUD. */
+export function capabilitiesOf(provider: StorageProvider): StorageCapabilities {
+  return provider.capabilities ?? FULL_CRUD;
+}
+
+/** True for the image MIME types Google Photos (and similar) can store. */
+export function isImageMimeType(mimeType: string): boolean {
+  return mimeType.startsWith('image/');
+}
+
 /** Maps entity types to their photo category for provider routing. */
 export const ENTITY_TO_CATEGORY: Record<string, PhotoCategory> = {
   vehicle: 'vehicle_photos',
   expense: 'expense_receipts',
   insurance_policy: 'insurance_docs',
+  insurance_claim: 'insurance_docs',
   odometer_entry: 'odometer_readings',
 };

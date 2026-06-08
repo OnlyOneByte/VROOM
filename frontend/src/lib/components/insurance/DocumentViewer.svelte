@@ -3,6 +3,7 @@
 	import { Upload, Trash2, FileText, Download, LoaderCircle, ImagePlus } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
+	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import type { Photo } from '$lib/types';
@@ -11,10 +12,13 @@
 	const ALLOWED_TYPES = [...IMAGE_TYPES, 'application/pdf'];
 
 	interface Props {
-		policyId: string;
+		// The entity the documents hang off. Defaults to insurance_policy for
+		// back-compat; ClaimsSection passes 'insurance_claim'.
+		entityId: string;
+		entityType?: string;
 	}
 
-	let { policyId }: Props = $props();
+	let { entityId, entityType = 'insurance_policy' }: Props = $props();
 
 	let documents = $state<Photo[]>([]);
 	let isLoading = $state(true);
@@ -27,7 +31,7 @@
 	async function loadDocuments() {
 		isLoading = true;
 		try {
-			const docsResult = await insuranceApi.getDocuments(policyId);
+			const docsResult = await insuranceApi.getEntityDocuments(entityType, entityId);
 			documents = docsResult.data;
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to load documents');
@@ -44,12 +48,25 @@
 		documents = [...documents, result as Photo];
 	}
 
-	async function handleDelete(docId: string) {
+	// Styled confirm dialog (replaces native confirm()) — deletion is permanent
+	// (removes the file from storage too).
+	let confirmOpen = $state(false);
+	let pendingDeleteId = $state<string | null>(null);
+
+	function requestDelete(docId: string) {
+		pendingDeleteId = docId;
+		confirmOpen = true;
+	}
+
+	async function performDelete() {
+		if (!pendingDeleteId) return;
+		const docId = pendingDeleteId;
 		try {
-			await insuranceApi.deleteDocument(policyId, docId);
+			await insuranceApi.deleteEntityDocument(entityType, entityId, docId);
 			documents = documents.filter(d => d.id !== docId);
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to delete document');
+			throw err; // keep the dialog open on failure
 		}
 	}
 </script>
@@ -83,7 +100,7 @@
 				<div class="group relative overflow-hidden rounded-md border border-border bg-muted/50">
 					{#if isImage(doc.mimeType)}
 						<img
-							src={insuranceApi.getDocumentThumbnailUrl(policyId, doc.id)}
+							src={insuranceApi.getEntityDocumentThumbnailUrl(entityType, entityId, doc.id)}
 							alt={doc.fileName}
 							loading="lazy"
 							class="aspect-square w-full object-cover"
@@ -96,7 +113,7 @@
 							</p>
 							<!-- eslint-disable svelte/no-navigation-without-resolve -- API endpoint URL, not an app route -->
 							<a
-								href={insuranceApi.getDocumentThumbnailUrl(policyId, doc.id)}
+								href={insuranceApi.getEntityDocumentThumbnailUrl(entityType, entityId, doc.id)}
 								target="_blank"
 								rel="noopener noreferrer"
 								class="inline-flex items-center gap-1 text-xs text-primary hover:underline"
@@ -114,7 +131,7 @@
 							variant="destructive"
 							size="sm"
 							class="h-6 text-xs"
-							onclick={() => handleDelete(doc.id)}
+							onclick={() => requestDelete(doc.id)}
 						>
 							<Trash2 class="h-3 w-3" />
 						</Button>
@@ -130,7 +147,14 @@
 	title="Upload Documents"
 	description="Upload or capture insurance documents (JPEG, PNG, WebP, PDF up to 10MB)"
 	acceptedTypes={ALLOWED_TYPES}
-	onUpload={file => insuranceApi.uploadDocument(policyId, file)}
+	onUpload={file => insuranceApi.uploadEntityDocument(entityType, entityId, file)}
 	onUploadComplete={handleUploadComplete}
 	onClose={() => (showUploadDialog = false)}
+/>
+
+<ConfirmDialog
+	bind:open={confirmOpen}
+	title="Delete document?"
+	description="This permanently removes the document from storage and cannot be undone."
+	onConfirm={performDelete}
 />

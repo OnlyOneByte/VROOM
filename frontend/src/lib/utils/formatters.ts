@@ -1,15 +1,41 @@
 // Centralized formatting utilities
 import { settingsStore } from '$lib/stores/settings.svelte';
 
-// Currency formatting - uses user's currency setting from store
-export function formatCurrency(amount: number, currency?: string): string {
+// Currency formatting - uses user's currency setting from store.
+// `fractionDigits` overrides the default 2 decimals (e.g. fuel price-per-unit
+// is conventionally shown at 3 decimals like €3.499/L).
+export function formatCurrency(
+	amount: number,
+	currency?: string,
+	fractionDigits?: number
+): string {
 	// If currency not provided, get from settings store
 	const currencyToUse = currency || settingsStore.settings?.currencyUnit || 'USD';
 
 	return new Intl.NumberFormat('en-US', {
 		style: 'currency',
-		currency: currencyToUse
+		currency: currencyToUse,
+		...(fractionDigits != null && {
+			minimumFractionDigits: fractionDigits,
+			maximumFractionDigits: fractionDigits
+		})
 	}).format(amount);
+}
+
+/**
+ * The user's currency SYMBOL alone (e.g. "$", "€", "£") — for field labels and
+ * axis titles where we want the symbol, not a formatted amount. Resolves the
+ * unit from the settings store exactly like formatCurrency, then extracts the
+ * `currency` part via Intl so EUR/GBP users never see a hardcoded "$".
+ * Falls back to the raw code (e.g. "CHF") when there's no distinct symbol.
+ */
+export function getCurrencySymbol(currency?: string): string {
+	const currencyToUse = currency || settingsStore.settings?.currencyUnit || 'USD';
+	const parts = new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: currencyToUse
+	}).formatToParts(0);
+	return parts.find((p) => p.type === 'currency')?.value ?? currencyToUse;
 }
 
 // Number formatting
@@ -28,6 +54,23 @@ export function formatDate(date: string | Date): string {
 		month: 'short',
 		day: 'numeric'
 	}).format(d);
+}
+
+/**
+ * Convert a date-only string ("YYYY-MM-DD" from a date picker) to an ISO
+ * timestamp anchored at NOON LOCAL time.
+ *
+ * `new Date("2024-03-15").toISOString()` parses as midnight UTC, which renders
+ * as the PREVIOUS calendar day once formatDate() (local time) displays it for
+ * any negative-offset (Americas) user. Anchoring at noon local keeps the
+ * calendar date stable across every real timezone offset (±14h never crosses
+ * midnight from noon). Empty/invalid input falls back to now.
+ */
+export function dateOnlyToISO(dateOnly: string | undefined | null): string {
+	if (!dateOnly) return new Date().toISOString();
+	const [year, month, day] = dateOnly.split('-').map(Number);
+	if (!year || !month || !day) return new Date().toISOString();
+	return new Date(year, month - 1, day, 12, 0, 0).toISOString();
 }
 
 // Relative time formatting

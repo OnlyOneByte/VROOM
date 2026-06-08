@@ -143,6 +143,7 @@ export interface BackupData {
   insurance: import('./db/schema').InsurancePolicy[];
   insuranceTerms: import('./db/schema').InsuranceTerm[];
   insuranceTermVehicles: import('./db/schema').InsuranceTermVehicle[];
+  insuranceClaims?: import('./db/schema').InsuranceClaim[];
   photos: import('./db/schema').Photo[];
   odometer: import('./db/schema').OdometerEntry[];
   photoRefs: import('./db/schema').PhotoRef[];
@@ -161,6 +162,7 @@ export interface ParsedBackupData {
   insurance: Record<string, unknown>[];
   insuranceTerms: Record<string, unknown>[];
   insuranceTermVehicles: Record<string, unknown>[];
+  insuranceClaims?: Record<string, unknown>[];
   photos: Record<string, unknown>[];
   odometer: Record<string, unknown>[];
   photoRefs: Record<string, unknown>[];

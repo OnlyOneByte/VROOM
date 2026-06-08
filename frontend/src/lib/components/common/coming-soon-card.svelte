@@ -37,7 +37,14 @@
 		<CardDescription>{description}</CardDescription>
 	</CardHeader>
 	<CardContent>
-		<div class="space-y-3 opacity-50">
+		<!-- Decorative preview of a not-yet-built feature. The "Coming Soon" badge in
+		     the header is the real status; this list is non-interactive filler, so it's
+		     aria-hidden (screen readers announce title + badge + description, not
+		     features that don't work yet). NOTE: no opacity-50 — axe checks
+		     color-contrast on visually-rendered text even when aria-hidden, and dimming
+		     muted-foreground drops it below WCAG AA. Full-opacity muted-foreground
+		     (~5:1) already reads as clearly secondary. -->
+		<div class="space-y-3" aria-hidden="true">
 			{#each items as item (item.label)}
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-2 text-sm text-muted-foreground">

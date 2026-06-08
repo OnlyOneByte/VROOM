@@ -1,5 +1,6 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { AppError, NotFoundError } from '../../errors';
 import { requireAuth } from '../../middleware';
 import { buildPaginatedResponse } from '../../utils/pagination';
@@ -7,6 +8,7 @@ import { commonSchemas } from '../../utils/validation';
 import {
   deletePhotoForEntity,
   getPhotoThumbnailForEntity,
+  listPhotosByEntityType,
   listPhotosForEntity,
   uploadPhotoForEntity,
 } from './photo-service';
@@ -18,6 +20,20 @@ import {
 const routes = new Hono();
 
 routes.use('*', requireAuth);
+
+// GET /photos?entityType=vehicle — Batch-list the user's photos of one entity
+// type, grouped by entityId. Lets the dashboard fetch all vehicle photos in a
+// single request instead of one request per vehicle (N+1).
+routes.get(
+  '/',
+  zValidator('query', z.object({ entityType: z.string().min(1).max(64) })),
+  async (c) => {
+    const { entityType } = c.req.valid('query');
+    const user = c.get('user');
+    const grouped = await listPhotosByEntityType(entityType, user.id);
+    return c.json({ success: true, data: grouped });
+  }
+);
 
 // GET /photos/:entityType/:entityId — List photos for an entity
 routes.get('/:entityType/:entityId', zValidator('query', commonSchemas.pagination), async (c) => {

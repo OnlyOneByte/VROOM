@@ -49,6 +49,11 @@ function ensureCleanupTimer(): void {
 export function rateLimiter(config: RateLimitConfig) {
   ensureCleanupTimer();
   return async (c: Context, next: Next) => {
+    // Local E2E harness opt-out (double-gated: only outside production). The harness's
+    // own request volume otherwise exhausts the in-memory window and flakes specs with
+    // 429s. Never active in production — see CONFIG.disableRateLimit.
+    if (CONFIG.disableRateLimit) return next();
+
     const key = config.keyGenerator(c);
     const now = Date.now();
     const entry = rateLimitStore.get(key);

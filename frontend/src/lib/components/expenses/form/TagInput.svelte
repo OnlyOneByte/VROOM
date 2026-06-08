@@ -7,15 +7,27 @@
 		tags: string[];
 		error?: string;
 		touched?: boolean;
+		/**
+		 * The pool of suggested tags. Defaults to the static COMMON_EXPENSE_TAGS so
+		 * existing callers keep their behavior; callers can pass a wider list (e.g.
+		 * the common tags plus the user's previously-used tags) to surface history.
+		 * `readonly` so the `as const` COMMON_EXPENSE_TAGS tuple is assignable.
+		 */
+		suggestions?: readonly string[];
 	}
 
-	let { tags = $bindable(), error, touched = false }: Props = $props();
+	let {
+		tags = $bindable(),
+		error,
+		touched = false,
+		suggestions = COMMON_EXPENSE_TAGS
+	}: Props = $props();
 
 	let tagInput = $state('');
 	let showSuggestions = $state(false);
 
 	let filteredSuggestions = $derived(
-		COMMON_EXPENSE_TAGS.filter(
+		suggestions.filter(
 			tag => !tags.includes(tag) && tag.toLowerCase().includes(tagInput.toLowerCase())
 		)
 	);

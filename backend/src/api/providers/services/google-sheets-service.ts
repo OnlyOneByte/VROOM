@@ -4,10 +4,11 @@
 
 import { and, eq, inArray } from 'drizzle-orm';
 import type { OAuth2Client } from 'google-auth-library';
-import { google, type sheets_v4 } from 'googleapis';
+import { type drive_v3, google, type sheets_v4 } from 'googleapis';
 import { getDb } from '../../../db/connection';
 import {
   expenses,
+  insuranceClaims,
   insurancePolicies,
   insuranceTerms,
   insuranceTermVehicles,
@@ -32,12 +33,37 @@ export interface SpreadsheetInfo {
   sheets: { id: number; title: string }[];
 }
 
+/**
+ * Pre-built googleapis clients for {@link GoogleSheetsService}. Inject in-memory fakes in
+ * tests to drive the real service logic (folder path walk, sheet clear+write, read
+ * round-trip) with ZERO network. All three should share one backing store so folder
+ * creation, file moves, and listing stay coherent across the Sheets + Drive surfaces.
+ */
+export interface GoogleSheetsClients {
+  sheets: sheets_v4.Sheets;
+  drive: drive_v3.Drive;
+  driveService: GoogleDriveService;
+}
+
 export class GoogleSheetsService {
-  private oauth2Client: OAuth2Client;
+  private oauth2Client?: OAuth2Client;
   private sheets: sheets_v4.Sheets;
+  private drive: drive_v3.Drive;
   private driveService: GoogleDriveService;
 
-  constructor(refreshToken: string) {
+  /**
+   * @param refreshToken  Google OAuth refresh token (ignored when `clients` is injected).
+   * @param clients       Optional pre-built Sheets + Drive clients (see {@link GoogleSheetsClients}).
+   *                      Production callers omit it and OAuth2-authed clients are built.
+   */
+  constructor(refreshToken: string, clients?: GoogleSheetsClients) {
+    if (clients) {
+      this.sheets = clients.sheets;
+      this.drive = clients.drive;
+      this.driveService = clients.driveService;
+      return;
+    }
+
     this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
@@ -49,6 +75,7 @@ export class GoogleSheetsService {
     });
 
     this.sheets = google.sheets({ version: 'v4', auth: this.oauth2Client });
+    this.drive = google.drive({ version: 'v3', auth: this.oauth2Client });
     this.driveService = new GoogleDriveService(refreshToken);
   }
 
@@ -76,8 +103,7 @@ export class GoogleSheetsService {
       }
       spreadsheetId = spreadsheet.spreadsheetId;
 
-      const drive = google.drive({ version: 'v3', auth: this.oauth2Client });
-      await drive.files.update({
+      await this.drive.files.update({
         fileId: spreadsheetId,
         addParents: targetFolderId,
         removeParents: 'root',
@@ -139,6 +165,7 @@ export class GoogleSheetsService {
           { properties: { title: 'Insurance Policies' } },
           { properties: { title: 'Insurance Terms' } },
           { properties: { title: 'Insurance Term Vehicles' } },
+          { properties: { title: 'Insurance Claims' } },
           { properties: { title: 'Vehicle Financing' } },
           { properties: { title: 'Odometer' } },
           { properties: { title: 'Photos' } },
@@ -187,6 +214,7 @@ export class GoogleSheetsService {
       'Insurance Policies',
       'Insurance Terms',
       'Insurance Term Vehicles',
+      'Insurance Claims',
       'Vehicle Financing',
       'Odometer',
       'Photos',
@@ -254,6 +282,15 @@ export class GoogleSheetsService {
             .where(inArray(insuranceTermVehicles.termId, termIds))
         : [];
 
+    // Query insurance claims for user's policies
+    const userInsuranceClaims =
+      policyIds.length > 0
+        ? await db
+            .select()
+            .from(insuranceClaims)
+            .where(inArray(insuranceClaims.policyId, policyIds))
+        : [];
+
     // Query photos directly by userId
     const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
 
@@ -310,6 +347,12 @@ export class GoogleSheetsService {
         'Insurance Term Vehicles',
         userInsuranceTermVehicles,
         this.getInsuranceTermVehiclesHeaders()
+      ),
+      this.updateSheet(
+        spreadsheetId,
+        'Insurance Claims',
+        userInsuranceClaims,
+        this.getInsuranceClaimHeaders()
       ),
       this.updateSheet(
         spreadsheetId,
@@ -422,6 +465,23 @@ export class GoogleSheetsService {
 
   private getInsuranceTermVehiclesHeaders() {
     return ['termId', 'vehicleId'];
+  }
+
+  private getInsuranceClaimHeaders() {
+    return [
+      'id',
+      'policyId',
+      'termId',
+      'vehicleId',
+      'claimDate',
+      'claimType',
+      'description',
+      'status',
+      'payoutAmount',
+      'faultDesignation',
+      'createdAt',
+      'updatedAt',
+    ];
   }
 
   private getFinancingHeaders() {
@@ -594,6 +654,7 @@ export class GoogleSheetsService {
     insurance: Record<string, unknown>[];
     insuranceTerms: Record<string, unknown>[];
     insuranceTermVehicles: Record<string, unknown>[];
+    insuranceClaims: Record<string, unknown>[];
     photos: Record<string, unknown>[];
     odometer: Record<string, unknown>[];
     photoRefs: Record<string, unknown>[];
@@ -609,6 +670,7 @@ export class GoogleSheetsService {
       insuranceData,
       insuranceTermsData,
       insuranceTermVehiclesData,
+      insuranceClaimsData,
       financingData,
       photosData,
       odometerData,
@@ -624,6 +686,7 @@ export class GoogleSheetsService {
       this.readSheetData(spreadsheetId, 'Insurance Policies!A:Z'),
       this.readSheetData(spreadsheetId, 'Insurance Terms!A:Z').catch(() => []),
       this.readSheetData(spreadsheetId, 'Insurance Term Vehicles!A:Z').catch(() => []),
+      this.readSheetData(spreadsheetId, 'Insurance Claims!A:Z').catch(() => []),
       this.readSheetData(spreadsheetId, 'Vehicle Financing!A:Z'),
       this.readSheetData(spreadsheetId, 'Photos!A:Z').catch(() => []),
       this.readSheetData(spreadsheetId, 'Odometer!A:Z').catch(() => []),
@@ -640,6 +703,7 @@ export class GoogleSheetsService {
     const insurance = this.parseSheetData(insuranceData);
     const insuranceTermsRecords = this.parseSheetData(insuranceTermsData);
     const insuranceTermVehiclesRecords = this.parseSheetData(insuranceTermVehiclesData);
+    const insuranceClaimsRecords = this.parseSheetData(insuranceClaimsData);
     const financing = this.parseSheetData(financingData);
     const photoRecords = this.parseSheetData(photosData);
     const odometer = this.parseSheetData(odometerData);
@@ -660,6 +724,7 @@ export class GoogleSheetsService {
       insurance,
       insuranceTerms: insuranceTermsRecords,
       insuranceTermVehicles: insuranceTermVehiclesRecords,
+      insuranceClaims: insuranceClaimsRecords,
       photos: photoRecords,
       odometer,
       photoRefs,

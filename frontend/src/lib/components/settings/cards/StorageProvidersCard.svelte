@@ -18,6 +18,7 @@
 	import ProviderCard from '../storage-provider/ProviderInfoCard.svelte';
 	import { providerApi } from '$lib/services/provider-api';
 	import { settingsApi } from '$lib/services/settings-api';
+	import { fetchLastSyncTime } from '$lib/utils/sync/sync-manager';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { routes, paramRoutes } from '$lib/routes';
 	import type {
@@ -157,6 +158,9 @@
 		try {
 			await settingsApi.updateSettings({ backupConfig: updatedConfig });
 			backupConfig = updatedConfig;
+			// Refresh the sync-status store so the menu's backup state/time updates
+			// immediately instead of staying stale until the next poll or a reload.
+			await fetchLastSyncTime();
 			appStore.showSuccess(
 				enabled ? 'ZIP backup enabled for provider' : 'ZIP backup disabled for provider'
 			);
@@ -183,6 +187,8 @@
 		try {
 			await settingsApi.updateSettings({ backupConfig: updatedConfig });
 			backupConfig = updatedConfig;
+			// Refresh the sync-status store so the menu reflects the change immediately.
+			await fetchLastSyncTime();
 			appStore.showSuccess(
 				enabled ? 'Sheets sync enabled for provider' : 'Sheets sync disabled for provider'
 			);

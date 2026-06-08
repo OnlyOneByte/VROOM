@@ -43,8 +43,13 @@ describe('Offline Storage', () => {
 			localStorageMock.getItem.mockReturnValue(JSON.stringify(mockExpenses));
 
 			const expenses = loadOfflineExpenses();
-			// Expenses should have version field added during migration
-			expect(expenses).toEqual(mockExpenses.map(e => ({ ...e, version: '2.0' })));
+			// Expenses should have version bumped and a clientId backfilled on migration
+			expect(expenses).toHaveLength(1);
+			const migrated = expenses[0];
+			if (!migrated) throw new Error('expected one migrated expense');
+			expect(migrated).toMatchObject({ ...mockExpenses[0], version: '3.0' });
+			expect(typeof migrated.clientId).toBe('string');
+			expect((migrated.clientId ?? '').length).toBeGreaterThan(0);
 		});
 
 		it('should handle corrupted localStorage data gracefully', () => {
@@ -135,8 +140,11 @@ describe('Offline Storage', () => {
 
 			const savedData = JSON.parse(localStorageMock.setItem.mock.calls[0][1]);
 			expect(savedData).toHaveLength(2);
-			expect(savedData[0]).toEqual({ ...existingExpenses[0], version: '2.0' });
+			// Existing entry is migrated: version bumped + clientId backfilled.
+			expect(savedData[0]).toMatchObject({ ...existingExpenses[0], version: '3.0' });
+			expect(typeof savedData[0].clientId).toBe('string');
 			expect(savedData[1]).toMatchObject(newExpenseData);
+			expect(typeof savedData[1].clientId).toBe('string');
 		});
 	});
 

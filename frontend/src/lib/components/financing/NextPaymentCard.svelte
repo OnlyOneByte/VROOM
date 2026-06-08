@@ -95,14 +95,8 @@
 					: `Due in ${daysUntilPayment} days`
 	);
 
-	let progressColor = $derived(
-		progressPercentage > 75
-			? 'text-chart-2'
-			: progressPercentage >= 50
-				? 'text-chart-3'
-				: 'text-chart-1'
-	);
-
+	// (progressColor for the % text was removed: chart-1/chart-2 on white fail WCAG AA.
+	// The % now uses text-foreground; the colored bar below carries the progress signal.)
 	let progressIndicatorClass = $derived(
 		progressPercentage > 75
 			? '[&_[data-slot=progress-indicator]]:bg-chart-2'
@@ -194,7 +188,11 @@
 				<div class="space-y-2">
 					<div class="flex justify-between items-center">
 						<span class="text-sm font-medium text-muted-foreground">Payment Progress</span>
-						<span class="text-lg font-bold {progressColor}">
+						<!-- text-foreground, NOT the chart color: text-chart-1 (#f54900) on white is
+						     only 3.59:1 and chart-2 3.66:1 — both fail WCAG AA for this text. The
+						     colored Progress bar below carries the progress signal; the number just
+						     needs to be legible. (Same text-on-chart-color class as cycle 187/188.) -->
+						<span class="text-lg font-bold text-foreground">
 							{Math.round(progressPercentage)}%
 						</span>
 					</div>
@@ -218,7 +216,9 @@
 					</div>
 					<div>
 						<p class="text-xs text-muted-foreground">Paid</p>
-						<p class="text-sm sm:text-base font-semibold text-chart-2">
+						<!-- text-foreground, NOT text-chart-2: #009689 on white is 3.66:1 (fails WCAG
+						     AA). The "Paid" label above already identifies it; same class as cycle 187/188. -->
+						<p class="text-sm sm:text-base font-semibold text-foreground">
 							{formatCurrency(amountPaid)}
 						</p>
 					</div>

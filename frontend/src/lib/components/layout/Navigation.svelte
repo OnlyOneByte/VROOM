@@ -11,7 +11,8 @@
 		Settings,
 		Menu,
 		LogOut,
-		MapPin
+		MapPin,
+		Bell
 	} from '@lucide/svelte';
 	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
 	import { syncState, onlineStatus, offlineExpenseQueue } from '$lib/stores/offline.svelte';
@@ -38,6 +39,7 @@
 		{ name: 'Expenses', href: routes.expenses, icon: Receipt },
 		{ name: 'Insurance', href: routes.insurance, icon: Shield },
 		{ name: 'Analytics', href: routes.analytics, icon: ChartColumn },
+		{ name: 'Reminders', href: routes.reminders, icon: Bell },
 		{ name: 'Trips', href: routes.trips, icon: MapPin }
 	] as const;
 

@@ -22,10 +22,23 @@ interface BackendExpenseRequest {
 	mileage?: number;
 	volume?: number;
 	fuelType?: string;
-	description?: string;
+	// `null` on an edit means "clear the description" (the backend schema is
+	// .nullish() and writes null through); omitted/undefined leaves it unchanged.
+	description?: string | null;
 	missedFillup?: boolean;
 	sourceType?: string;
 	sourceId?: string;
+}
+
+/** Options controlling create-vs-edit serialization differences. */
+interface ToBackendOptions {
+	/**
+	 * When true (an EDIT), an empty/missing description is sent as explicit `null`
+	 * so the user can CLEAR it. When false (the default — create, and the offline
+	 * outbox + sync paths, which are create-only in v1), an empty description is
+	 * omitted, preserving the historical create payload byte-for-byte.
+	 */
+	isEdit?: boolean;
 }
 
 /**
@@ -42,7 +55,8 @@ export interface BackendExpenseResponse {
 	mileage?: number;
 	volume?: number;
 	fuelType?: string;
-	description?: string;
+	// Nullable column: a real response can carry null (a cleared description).
+	description?: string | null;
 	missedFillup?: boolean;
 	sourceType?: string;
 	sourceId?: string;
@@ -62,7 +76,8 @@ export function toBackendExpense(
 		vehicleId: string;
 		category: ExpenseCategory;
 		amount: number;
-	}
+	},
+	options: ToBackendOptions = {}
 ): BackendExpenseRequest {
 	const backendExpense: BackendExpenseRequest = {
 		vehicleId: frontendExpense.vehicleId,
@@ -92,6 +107,10 @@ export function toBackendExpense(
 	}
 	if (frontendExpense.description) {
 		backendExpense.description = frontendExpense.description;
+	} else if (options.isEdit) {
+		// Edit with an emptied description → send null to clear the stored value.
+		// (Create/offline/sync omit it, matching the historical payload.)
+		backendExpense.description = null;
 	}
 	if (frontendExpense.sourceType) {
 		backendExpense.sourceType = frontendExpense.sourceType;

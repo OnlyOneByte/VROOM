@@ -73,6 +73,7 @@ function makePaginatedExpense(overrides: {
     splitMethod: null,
     sourceType: null,
     sourceId: null,
+    clientId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -153,6 +154,7 @@ function makeExpense(overrides: {
     splitMethod: null,
     sourceType: overrides.sourceType,
     sourceId: overrides.sourceId,
+    clientId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -564,6 +566,7 @@ function makeSummaryExpense(input: SummaryExpenseInput): Expense {
     splitMethod: null,
     sourceType: null,
     sourceId: null,
+    clientId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
