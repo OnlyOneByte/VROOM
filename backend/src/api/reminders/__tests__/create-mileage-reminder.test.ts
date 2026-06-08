@@ -30,7 +30,11 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', { make: 'Honda', model: 'CR-V', year: 2021 });
+  const res = await ctx.authed('POST', '/api/v1/vehicles', {
+    make: 'Honda',
+    model: 'CR-V',
+    year: 2021,
+  });
   const body = await json<DataEnvelope<{ id: string }>>(res);
   expect(res.status, JSON.stringify(body)).toBeLessThan(300);
   return body.data.id;

@@ -14,9 +14,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 27 |
 | bug | 3 | 29 |
 | arch | 5 | 30 |
-| infra | 6 | 26 |
+| infra | 6 | 33 |
 
-Current cycle: **32**
+Current cycle: **33**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -658,3 +658,24 @@ Current cycle: **32**
   /trigger), idempotent via the existing dedup. Then T3-part-3 (vehicle-stats reconcile) + T5
   remaining + frontend T6–T9. NOTE: deep-review hits budget at cyc 33 — if it's picked, the live
   mileage create+trigger+re-arm surface is now worth an eyes-on/HTTP review. #14 still awaits Angelo.
+- **C33 (infra — `validate:local` + `check:musl` scripts; CLAUDE.md refresh)** — BALANCE: the C32
+  forecast said "nothing over budget," but `infra` had breached (last-touched 26, budget 6 →
+  starved-for 7 > 6) AND `bug` was over (4 > 3); infra is most-starved → it wins. (Recurring lesson:
+  I keep under-forecasting the slow-budget categories — compute ALL six from the table each cycle.)
+  Infra queue empty → scoped a real loop-tooling item: every cycle manually runs 4 commands because
+  `bun run validate`'s `check` step invokes the dead glibc biome (GLIBC_2.29). Added package scripts
+  `check:musl` / `check:musl:fix` (the working musl binary over src/) + `validate:local` = type-check
+  && check:musl && test && build — the documented 4-step workaround as ONE command. DISCOVERY (the
+  payoff): running check:musl over the WHOLE tree surfaced a formatter reflow in my own C31 file
+  (create-mileage-reminder.test.ts — a long object literal) that the per-file C31 biome check missed
+  but CI's glibc biome would flag — auto-fixed (one tracked file, purely mechanical line-wrap; the 10
+  pre-existing noNonNullAssertion WARNINGS in other test files are unsafe-fix + non-blocking, left
+  alone — no scope creep into unrelated committed files). Refreshed CLAUDE.md VERIFY step + the Biome
+  hard-rule to point at validate:local/check:musl and to note "run check:musl over the whole tree
+  before committing — a per-file check can miss a reflow CI flags." Verified: `bun run validate:local`
+  EXIT 0 end-to-end (tsc 0 · musl-biome clean · 940 pass/0 fail · build bundled) — the new command IS
+  the cycle's verification.
+  Next cycle (34): `bug` is now most-starved over budget (cyc 29, starved-for 5 > 3) → it wins.
+  Decided standalone bugs: #10 (buildLoanBreakdown flat balance — characterization test first, then
+  decrement) or #9 (interestPaidYtd rename) or #11 (mobile fuel-stat wrap — UI). #14 still needs the
+  Angelo semantics decision. T4 part 3 (recheck-on-write D5) resumes once bug is fed.

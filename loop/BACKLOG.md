@@ -242,6 +242,11 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 
 ### infra
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**`validate:local` + `check:musl` scripts (C33)**~~ — *DONE C33: added package scripts wrapping the
+  musl-biome workaround — `check:musl`/`check:musl:fix` (src/) + `validate:local` (type-check &&
+  check:musl && test && build) = the documented 4-step local-green path as ONE command. Refreshed
+  CLAUDE.md to point at them. Running check:musl tree-wide caught a formatter reflow a per-file check
+  missed.*
 - ~~**Orientation-doc refresh (C26)**~~ — *DONE C26: CLAUDE.md current-state was stale (said
   maintenance-schedule "T1+T2 shipped, next T3"; actually T1/T2/T3-part-1/T3-part-2 all shipped,
   engine dormant until T4) → rewrote + spelled out the T4 surface; softened the coverage badge to a

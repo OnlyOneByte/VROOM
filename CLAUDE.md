@@ -20,9 +20,10 @@ this loop, then advance to the next item:
              frontend (types → service → store/state → route/page → component). Match
              the patterns in the steering docs exactly — runes, $lib/routes resolve(),
              polymorphic source_id/source_type for expense-linked records.
-3. VERIFY    Backend:  cd backend  && mise exec -- bun run validate
-             (validate's `check` step uses the dead glibc biome here — see Hard rules;
-              run tsc + musl-biome + `bun test` + build directly for a true green locally)
+3. VERIFY    Backend:  cd backend  && mise exec -- bun run validate:local
+             (`validate:local` = tsc + musl-biome + `bun test` + build in one command — the
+              local-green path on this host; plain `validate` uses the dead glibc biome, see Hard
+              rules. CI still runs glibc biome and is the lint source of truth.)
              Frontend: cd frontend && mise exec -- npm run type-check && npm run build
              E2E:      .meshclaw-tools/regress.sh   (route-smoke + axe + mobile + screenshots)
              UI proof: node .meshclaw-tools/shot.mjs <route> [mobile|desktop] [out.png]
@@ -55,9 +56,13 @@ this loop, then advance to the next item:
 - **Biome on this aarch64 AL2 host: use the MUSL binary.** The default glibc CLI (what
   `bun run check` invokes) is dead here (`GLIBC_2.29 not found`), but the musl build runs
   fine: `backend/node_modules/@biomejs/cli-linux-arm64-musl/biome check --write <paths>`
-  auto-fixes format + organizeImports + safe lint. So `bun run validate` fails only at the
-  `check` step — run tsc, the musl biome, `bun test`, and `bun run build` directly to get a
-  full green. CI runs the glibc CLI and is the lint source of truth.
+  auto-fixes format + organizeImports + safe lint. The package scripts now wrap this:
+  **`bun run check:musl`** (+ `check:musl:fix`) runs the musl binary over `src/`, and
+  **`bun run validate:local`** = `type-check && check:musl && test && build` — the single
+  full-green command for this host (plain `bun run validate` fails at its glibc `check` step).
+  CI runs the glibc CLI and is the lint source of truth, so `check:musl` is the faithful
+  local mirror — run it over the WHOLE tree before committing (a per-file check can miss a
+  formatter reflow CI would flag).
 - NEVER `git push` to `main`, force-push shared branches, run destructive ops, or read
   credential files. The human approves every merge.
 
