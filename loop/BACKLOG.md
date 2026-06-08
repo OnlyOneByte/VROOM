@@ -53,10 +53,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 ### feature
 1. **Maintenance-schedule reminders** — spec APPROVED; BUILD IN PROGRESS per
    `.kiro/specs/maintenance-schedule/tasks.md`. **T1 DONE (C15):** additive migration
-   `0003_many_jean_grey.sql` (mileage columns on reminders + dueOdometer on notifications) +
-   SHEET_HEADERS (T5-partial). **NEXT = T2:** `getCurrentOdometer(vehicleId)` = MAX over
-   odometer_entries + expenses.mileage (D2) + reconcile vehicle-stats. Then T3 (incl. the deferred
-   nextDueDate/dueDate nullable rebuild) → T4 routes → T6–T9 frontend/e2e.
+   `0003_many_jean_grey.sql` (mileage columns + dueOdometer) + SHEET_HEADERS (T5-partial).
+   **T2 DONE (C16):** `getCurrentOdometer(vehicleId)` = MAX-by-value UNION over expenses.mileage +
+   odometer_entries (8 unit tests); vehicle-stats reconcile deferred to T3 (period-semantics call).
+   **NEXT = T3:** trigger-service whichever-comes-first due logic + the deferred nextDueDate/dueDate
+   nullable rebuild (table rebuild — verify child rows survive) + the vehicle-stats reconcile. Then
+   T4 routes → T6–T9 frontend/e2e.
 2. **Import from other trackers** — spec APPROVED (Angelo signed off D1–D5, cycle 12). **BUILD GO**,
    backend-first per `.kiro/specs/import-trackers/tasks.md` T1→T6. Server-side mapping pre-pass →
    VROOM-native CSV → the UNCHANGED hardened import pipeline (inherits cycle-8 idempotency/atomicity

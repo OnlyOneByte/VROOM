@@ -122,6 +122,39 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       throw new DatabaseError('Failed to get odometer history', error);
     }
   }
+
+  /**
+   * Current odometer reading for a vehicle = MAX across both sources
+   * (`expenses.mileage` + `odometer_entries.odometer`), by value — not by date.
+   *
+   * This is the canonical "current odometer" for the maintenance-schedule
+   * mileage trigger (design D2). It reconciles the fuel-only
+   * `vehicle-stats.currentMileage` (which ignores manual entries and non-fuel
+   * mileage) by considering every reading the vehicle has.
+   *
+   * Returns null when the vehicle has no readings on either source.
+   * Distance is stored as-entered in the vehicle's distanceUnit (convert-on-read).
+   */
+  async getCurrentOdometer(vehicleId: string): Promise<number | null> {
+    try {
+      const [row] = await this.db.all<{ current: number | null }>(sql`
+        SELECT MAX(odometer) AS current FROM (
+          SELECT mileage AS odometer FROM expenses
+            WHERE vehicle_id = ${vehicleId} AND mileage IS NOT NULL
+          UNION ALL
+          SELECT odometer FROM odometer_entries WHERE vehicle_id = ${vehicleId}
+        )
+      `);
+
+      return row?.current == null ? null : Number(row.current);
+    } catch (error) {
+      logger.error('Failed to get current odometer', {
+        vehicleId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to get current odometer', error);
+    }
+  }
 }
 
 export const odometerRepository = new OdometerRepository(getDb());

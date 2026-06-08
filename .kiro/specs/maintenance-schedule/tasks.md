@@ -17,13 +17,23 @@
       dedup index forces a SQLite table REBUILD that cascade-drops child notification rows; moved to
       T3 where the trigger logic actually needs a null date. Until then NOT NULL stays correct (no
       mileage-only reminder is created yet).
-- [ ] **T2** `odometerRepository.getCurrentOdometer(vehicleId)` = MAX over odometer_entries +
-      expenses.mileage (D2). Unit tests. Reconcile `vehicle-stats.currentMileage` to reuse it.
+- [~] **T2 (partial, cycle 16)** `OdometerRepository.getCurrentOdometer(vehicleId)` shipped =
+      `MAX(odometer)` across a UNION of `expenses.mileage` + `odometer_entries.odometer`, by value
+      (not by date), null when no reading, vehicle-scoped. Reuses the `getHistory` UNION shape.
+      Pinned by `get-current-odometer.test.ts` (8 cases: null-empty, single-source max, cross-source
+      max either way, NULL-mileage ignored, per-vehicle scoping, zero≠null). **DEFERRED to T3:** the
+      `vehicle-stats.currentMileage` reconcile — that field is computed inside a PERIOD-FILTERED,
+      fuel-only stats route, so swapping it to the all-sources/all-time MAX is a visible semantics
+      change (under a 7d filter "current mileage" would jump to the all-time odometer), not a
+      behavior-preserving reconcile. Do it in T3 alongside the mileage-due consumer, where the period
+      semantics can be decided deliberately.
 - [ ] **T3** `trigger-service`: whichever-comes-first due logic (time OR mileage); null-guard the
       time query; mileage dedup via `dueOdometer`. **First: the deferred migration** — relax
       `nextDueDate`/`dueDate` to nullable + widen the dedup index to (reminderId, dueDate,
       dueOdometer). Write it carefully (table rebuild; verify child rows survive — the
-      migration-0003 harness lesson). Unit tests for all due/not-due permutations.
+      migration-0003 harness lesson). Unit tests for all due/not-due permutations. **Also here:**
+      the deferred T2 reconcile — decide `vehicle-stats.currentMileage` period semantics and route it
+      (or a new all-time field) through `getCurrentOdometer`.
 - [ ] **T4** Routes + validation: extend create/update Zod refinements (D4 single-vehicle when
       mileage); `POST /:id/mark-serviced` re-arm (D3); `recheckMileageReminders` on odometer/
       mileaged-expense write (D5). HTTP tests.

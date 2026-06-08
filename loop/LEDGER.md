@@ -9,14 +9,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 15 |
+| feature | 4 | 16 |
 | deep-review | 5 | 14 |
 | guard | 6 | 13 |
 | bug | 3 | 14 |
 | arch | 5 | 11 |
 | infra | 6 | 12 |
 
-Current cycle: **15**
+Current cycle: **16**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -250,3 +250,21 @@ Current cycle: **15**
   5 = budget 5 → breaches at 17) and `deep-review`/`bug` (both starved-for 2). Prefer continuing the
   maintenance build (**T2**: getCurrentOdometer helper) since it's mid-feature and high-value, OR
   take an `arch` audit-fanout to seed that queue before it bites. Lean T2 (continue the feature).
+- **C16 (feature → maintenance T2)** — nothing over budget; continued the mid-feature, high-value
+  maintenance build (arch was AT budget, not over). Shipped `OdometerRepository.getCurrentOdometer`
+  (design D2) = `MAX(odometer)` across a UNION of `expenses.mileage` + `odometer_entries.odometer`,
+  BY VALUE not date, null when no reading, vehicle-scoped — reusing the existing `getHistory` UNION
+  shape. This is the canonical "current odometer" the T3 mileage trigger needs; it reconciles the
+  fuel-only `vehicle-stats.currentMileage` (which ignores manual entries + non-fuel mileage).
+  Pinned by `get-current-odometer.test.ts` (8 cases). **Key call: DEFERRED the
+  `vehicle-stats.currentMileage` reconcile to T3.** That field is computed inside a PERIOD-FILTERED,
+  fuel-only stats route — swapping it to the all-sources/all-time MAX is a VISIBLE semantics change
+  (under a 7d filter, "current mileage" would jump to the all-time odometer), not a
+  behavior-preserving reconcile. Better decided deliberately in T3 next to the mileage-due consumer
+  than smuggled into a helper-add cycle. Verified: tsc 0, Biome musl clean, 875 pass/0 fail (+8),
+  build bundled.
+  Next cycle (17): `arch` is now OVER budget (cyc 11, starved-for 6 > budget 5) → MUST pick `arch`.
+  Take BACKLOG arch #1 (dedup ownership-validation: route the photos entityType switch through the
+  shared validators in utils/validation.ts) — test-anchor the cross-tenant IDOR suite covers all
+  four entityTypes FIRST, then refactor. Obey the arch rules (one small behavior-preserving refactor,
+  green→green). Or run the rule-7 audit fan-out if arch #1 no longer grounds against source.
