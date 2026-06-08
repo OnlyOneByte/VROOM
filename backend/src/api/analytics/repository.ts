@@ -43,6 +43,7 @@ import {
   findBiggestExpense,
   type GeneralExpenseRow,
   groupByVehicle,
+  monthKeysInRange,
   toMonthKey,
 } from '../../utils/analytics-charts';
 import { logger } from '../../utils/logger';
@@ -971,11 +972,10 @@ export class AnalyticsRepository {
         : new Date(term.startDate as unknown as number);
     const end =
       term.endDate instanceof Date ? term.endDate : new Date(term.endDate as unknown as number);
-    const current = new Date(start);
-    while (current <= end) {
-      const key = toMonthKey(current);
+    // monthKeysInRange anchors to day-1 per month, so a term starting on day 29-31 no longer
+    // skips a short month (the setMonth-overshoot bug — cycle 14).
+    for (const key of monthKeysInRange(start, end)) {
       monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + monthlyPremium);
-      current.setMonth(current.getMonth() + 1);
     }
   }
 

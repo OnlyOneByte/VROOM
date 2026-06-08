@@ -10,13 +10,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 9 |
-| deep-review | 5 | 7 |
+| deep-review | 5 | 14 |
 | guard | 6 | 13 |
-| bug | 3 | 11 |
+| bug | 3 | 14 |
 | arch | 5 | 11 |
 | infra | 6 | 12 |
 
-Current cycle: **13**
+Current cycle: **14**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -210,3 +210,23 @@ Current cycle: **13**
   pick it. Take an eyes-on UI sweep (vehicle Overview/ExpensesTable still un-eyes-on'd) or a backend
   correctness audit (fan out per the arch rule-7 style). `feature` (starved-for 5) breaches right
   after — maintenance-schedule T1 (the DB migration) is next once deep-review clears.
+- **C14 (deep-review → bug)** — `deep-review` was most-starved over-budget (cyc 7, starved-for 7 >
+  budget 5). Fanned out 2 Explore agents: (a) financing/insurance analytics correctness; (b) eyes-on
+  vehicle Overview/ExpensesTable WITH real screenshots (cluster was up). The financing agent found a
+  HIGH bug — `accumulateMonthlyPremiums` stepped a raw term-start Date with setMonth(+1), so a term
+  starting day 29–31 OVERSHOOTS short months (Jan 31 → Mar 2/3) and SILENTLY SKIPS February's bucket
+  in the insurance monthlyPremiumTrend (the C6/C11 setMonth-rollover class, ~3/12 of start dates).
+  Fixed by extracting a pure `monthKeysInRange(start,end)` helper (day-1-anchored, rollover-safe) in
+  analytics-charts.ts and routing accumulateMonthlyPremiums through it. Pinned with 5 unit tests
+  (incl. Jan-31→Apr-30 keeps Feb; day-31 6-month term keeps all). Verified: tsc 0, Biome musl clean,
+  863 pass/0 fail (+5, full analytics suite green = behavior-preserving), build bundled.
+  The reviews surfaced more REAL findings now queued as `bug`s: financing — insurance shows $0 when
+  only totalCost (not monthlyCost) is set; interestPaidYtd is mislabeled (1-month estimate);
+  loan-breakdown holds balance flat (no amortization). UI eyes-on (CONFIRMED via screenshots) —
+  mobile fuel-stat numbers wrap mid-value ($97/.80) in the 3-col dual-metric StatCardGrid; the
+  ExpensesTable ScrollArea `h-[{scrollHeight}]` is a DEAD interpolated-Tailwind class (no CSS rule →
+  no 600px cap, latent unbounded-growth — confirms C3's interpolated-h-[] item as real).
+  Next cycle (15): `feature` is most-starved over-budget (cyc 9, starved-for 6 > budget 4) → MUST
+  pick it → maintenance-schedule **T1** (the additive DB migration), the first real build increment
+  of the signed-off feature. Follow tasks.md; DatabaseMigrations.md; db:init path (drizzle-kit push
+  fails under bun).

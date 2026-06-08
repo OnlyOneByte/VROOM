@@ -134,6 +134,26 @@ export function toMonthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/**
+ * Every YYYY-MM month key from `start`'s month through `end`'s month, inclusive.
+ *
+ * The cursor is anchored to day-1 of each month: stepping a raw day-29..31 date with
+ * setMonth overshoots short months (Jan 31 -> "Feb 31" rolls to Mar 2/3), silently SKIPPING
+ * February. Anchoring to day-1 is rollover-safe and matches what toMonthKey reads (year+month
+ * only). Returns [] if either bound is null or start is after end.
+ */
+export function monthKeysInRange(start: Date | null, end: Date | null): string[] {
+  if (!start || !end) return [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth(), 1);
+  const keys: string[] = [];
+  while (cursor <= last) {
+    keys.push(toMonthKey(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return keys;
+}
+
 /** Normalize a date field that may be a Date or timestamp (Unix seconds). */
 function normalizeDate(d: Date | number | null): Date | null {
   if (d == null) return null;

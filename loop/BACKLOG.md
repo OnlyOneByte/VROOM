@@ -95,10 +95,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    while header reads "All Expenses ({totalCount})" — matches on other pages invisible; the
    in-table category Select is uncontrolled here (no `onCategoryChange`). Wire server-side
    filtering (as `/expenses` does) or hide the controls when paginated. (medium)
-3. **Interpolated Tailwind `h-[{…}]` may no-op** — `ExpensesTable.svelte` ScrollArea
-   `class="h-[{scrollHeight}]"` + `ExpenseTrendChart.svelte` `h-[{CHART_HEIGHT}px]` aren't literal
-   class strings, so Tailwind v4 may not generate them (ScrollArea loses its 600px scroll cap).
-   Use inline `style="height: …"` like ChartCard. (low, overflow — verify in-browser first)
+3. **ExpensesTable ScrollArea `h-[{scrollHeight}]` is a DEAD class — CONFIRMED C14 via DOM probe**
+   (`h-[600px]` present but no CSS rule generated → height is content-driven, the 600px cap +
+   internal scroll NEVER engage; latent unbounded growth on a >~20-row vehicle). Fix: inline
+   `style="height: …"` like ChartCard. The same interpolated-`h-[CHART_HEIGHT]` in ExpenseTrendChart/
+   FuelEfficiencyTrendChart is harmless (ChartCard sets real height via style) but worth the sweep. (med, overflow)
 4. **ExpensesTable combined-row re-sort lacks an id tiebreaker** — same-date/amount rows can
    reorder vs the server's id-tiebroken order. Cosmetic flicker. (low)
 
@@ -112,6 +113,25 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 7. **Analytics month bucketing uses local-tz `getMonth()`** (`analytics-charts.ts toMonthKey:~131`
    + heatmap/TCO/day-of-week/seasonal) — backend twin of the C6 class; benign if server runs UTC,
    real on a negative-offset host. Verify deploy TZ first, then bucket on UTC. (correctness, low-med)
+
+*(surfaced by the C14 deep review — financing/insurance analytics + vehicle-detail eyes-on)*
+8. **Insurance shows $0 when only `totalCost` (not `monthlyCost`) is set** — `getInsurance`/
+   `buildInsuranceDetails` (`repository.ts:~892`) does `monthlyCost ?? 0`; `totalCost` is selected
+   (`:1638`) but never used. A "6-month premium = $1,200" term (totalCost set, monthlyCost null)
+   contributes $0 to every premium total/trend. Fall back to `totalCost / monthsInTerm`. (data, med-high)
+9. **`interestPaidYtd` is mislabeled** — `repository.ts:761` computes ONE month's interest on the
+   CURRENT balance, then sums it as `interestPaidYtd` (`:1589`). Neither YTD nor "paid". Rename to
+   `monthlyInterestEstimate` (smallest honest fix) or compute true YTD from payment history. (med)
+10. **`buildLoanBreakdown` holds balance flat across 12 months** — `repository.ts:~829` never
+    decrements the running balance, so every month is identical (interest doesn't decline, principal
+    doesn't rise) and loans that pay off mid-window are over-projected. Decrement balance each
+    iteration; stop at 0. (correctness, med)
+11. **Mobile fuel-stat numbers wrap mid-value** — CONFIRMED C14 via screenshot+DOM probe: in
+    `FuelEfficiencyStatsCard` the `StatCardGrid columns={3}` with dual-metric `text-2xl` StatCards =
+    4 large numbers across 393px → `$97.80`→"$97"/".80", `25,850`→"25,"/"850". Same dual-metric
+    cramping class as the cycle-169 fix. Drop to fewer columns on mobile or smaller value text. (overflow, med)
+- ~~**Insurance premium trend skips a month for day-29–31 term starts**~~ — *DONE C14: extracted
+  day-1-anchored `monthKeysInRange` helper, routed accumulateMonthlyPremiums through it; 5 unit tests.*
 - ~~**buildMonthlyConsumption shows OLDEST 12 months**~~ — *DONE C11: slice(0,12)→slice(-12) in
   buildMonthlyConsumption + the latent buildConvertedEfficiencyTrend copy; pinned by 2 unit tests.*
 - ~~**CSV import: missed-fillup corrupts MPG/cost charts**~~ — *DONE C10: shared validMilesBetween
