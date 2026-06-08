@@ -13,6 +13,7 @@ import {
 import { DatabaseError, ValidationError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import {
+  buildAmortizationSchedule,
   buildCostPerDistanceChart,
   buildDayOfWeekPatterns,
   buildExpenseByCategory,
@@ -37,12 +38,14 @@ import {
   computeMpgAndCostPerMile,
   computePreviousYearComparison,
   computeRegularityScore,
+  effectiveMonthlyPremium,
   type FuelEfficiencyPoint,
   type FuelExpenseRow,
   type FuelRow,
   findBiggestExpense,
   type GeneralExpenseRow,
   groupByVehicle,
+  monthKeysInRange,
   toMonthKey,
 } from '../../utils/analytics-charts';
 import { logger } from '../../utils/logger';
@@ -174,7 +177,10 @@ export interface FinancingData {
   summary: {
     totalMonthlyPayments: number;
     remainingBalance: number;
-    interestPaidYtd: number;
+    // One month's interest on each loan's CURRENT balance, summed across loans. Renamed from the
+    // misleading `interestPaidYtd` (bug #9): it is neither year-to-date nor actually paid — it's a
+    // forward estimate of this month's interest. True YTD-paid would need a payment-history sum.
+    monthlyInterestEstimate: number;
     activeCount: number;
     loanCount: number;
     leaseCount: number;
@@ -186,7 +192,8 @@ export interface FinancingData {
     monthlyPayment: number;
     remainingBalance: number;
     apr: number | null;
-    interestPaid: number;
+    // This month's interest on the current balance (see summary note) — renamed from `interestPaid`.
+    monthlyInterestEstimate: number;
     monthsRemaining: number;
   }>;
   monthlyTimeline: Array<{
@@ -496,13 +503,18 @@ export class AnalyticsRepository {
       }
     }
 
-    return Array.from(monthMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(0, 12)
-      .map(([month, data]) => ({
-        month,
-        efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
-      }));
+    return (
+      Array.from(monthMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        // Most RECENT 12 months (see buildMonthlyConsumption). Today this is only reached via
+        // getYearEnd (range capped to ≤12 buckets, so slice(0,12) was benign), but fixing the
+        // latent copy keeps the whole month-window convention consistent.
+        .slice(-12)
+        .map(([month, data]) => ({
+          month,
+          efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
+        }))
+    );
   }
 
   /** Build a map of vehicleId → display name for a user's vehicles. */
@@ -598,6 +610,7 @@ export class AnalyticsRepository {
         date: expenses.date,
         mileage: expenses.mileage,
         volume: expenses.volume,
+        missedFillup: expenses.missedFillup,
       })
       .from(expenses)
       .where(and(...conditions))
@@ -722,7 +735,7 @@ export class AnalyticsRepository {
           monthlyPayment: 0,
           remainingBalance: 0,
           apr: null,
-          interestPaid: 0,
+          monthlyInterestEstimate: 0,
           monthsRemaining: 0,
         });
       }
@@ -752,7 +765,7 @@ export class AnalyticsRepository {
     vehicleNameMap: Map<string, string>,
     computedBalance: number
   ): FinancingData['vehicleDetails'][number] {
-    const interestPaid =
+    const monthlyInterestEstimate =
       fin.financingType === 'loan' && fin.apr ? (computedBalance * (fin.apr / 100)) / 12 : 0;
     const startDate =
       fin.startDate instanceof Date ? fin.startDate : new Date(fin.startDate as unknown as number);
@@ -768,7 +781,7 @@ export class AnalyticsRepository {
       monthlyPayment: fin.paymentAmount,
       remainingBalance: computedBalance,
       apr: fin.apr,
-      interestPaid,
+      monthlyInterestEstimate,
       monthsRemaining: Math.max(0, fin.termMonths - monthsElapsed),
     };
   }
@@ -815,32 +828,22 @@ export class AnalyticsRepository {
 
     const { financingRepository } = await import('../financing/repository');
     const now = new Date();
-    const breakdown: FinancingData['loanBreakdown'] = [];
 
-    // Compute balances for all active loans
-    const loanBalances = new Map<string, number>();
-    for (const loan of activeLoans) {
-      const balance = await financingRepository.computeBalance(loan.id);
-      loanBalances.set(loan.id, balance);
-    }
+    // Resolve each loan's current balance, then hand the pure amortization helper the inputs +
+    // the 12 month-key labels. The helper walks each balance down by its principal each month
+    // (bug #10 — balances were previously read but never decremented, so all 12 months were equal).
+    const loans = await Promise.all(
+      activeLoans.map(async (loan) => ({
+        balance: await financingRepository.computeBalance(loan.id),
+        apr: loan.apr ?? 0,
+        paymentAmount: loan.paymentAmount,
+      }))
+    );
+    const monthKeys = Array.from({ length: 12 }, (_, m) =>
+      toMonthKey(new Date(now.getFullYear(), now.getMonth() + m, 1))
+    );
 
-    for (let m = 0; m < 12; m++) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() + m, 1);
-      let totalInterest = 0;
-      let totalPrincipal = 0;
-      for (const loan of activeLoans) {
-        const balance = loanBalances.get(loan.id) ?? 0;
-        const interest = balance * ((loan.apr ?? 0) / 100 / 12);
-        totalInterest += Math.max(0, interest);
-        totalPrincipal += Math.max(0, loan.paymentAmount - interest);
-      }
-      breakdown.push({
-        month: toMonthKey(monthDate),
-        interest: totalInterest,
-        principal: totalPrincipal,
-      });
-    }
-    return breakdown;
+    return buildAmortizationSchedule(loans, monthKeys);
   }
 
   // ---- Insurance helpers --------------------------------------------------
@@ -883,7 +886,9 @@ export class AnalyticsRepository {
       })[0];
       if (!latestTerm) continue;
 
-      const monthlyPremium = latestTerm.monthlyCost ?? 0;
+      // Honour both cost shapes: an explicit monthlyCost, or a lump-sum totalCost amortized
+      // across the term span (bug #8 — `monthlyCost ?? 0` zeroed every totalCost-only term).
+      const monthlyPremium = effectiveMonthlyPremium(latestTerm);
       const annualPremium = monthlyPremium * 12;
       const coveredVehicleIds = [
         ...new Set(
@@ -965,11 +970,10 @@ export class AnalyticsRepository {
         : new Date(term.startDate as unknown as number);
     const end =
       term.endDate instanceof Date ? term.endDate : new Date(term.endDate as unknown as number);
-    const current = new Date(start);
-    while (current <= end) {
-      const key = toMonthKey(current);
+    // monthKeysInRange anchors to day-1 per month, so a term starting on day 29-31 no longer
+    // skips a short month (the setMonth-overshoot bug — cycle 14).
+    for (const key of monthKeysInRange(start, end)) {
       monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + monthlyPremium);
-      current.setMonth(current.getMonth() + 1);
     }
   }
 
@@ -1267,8 +1271,21 @@ export class AnalyticsRepository {
       now
     );
 
-    const mileages = fuelRows.filter((r) => r.mileage != null).map((r) => r.mileage as number);
-    const totalDistance = mileages.length >= 2 ? Math.max(...mileages) - Math.min(...mileages) : 0;
+    // Distance must be summed PER VEHICLE (max-min within each car), then totaled. Pooling
+    // every vehicle's odometer readings into one max-min gives garbage for a multi-vehicle
+    // user (e.g. a car at 12k mi and one at 95k mi would report ~83k). Mirrors the grouped
+    // computeConvertedTotalDistance; this summary path is single-unit so it doesn't convert.
+    const mileagesByVehicle = new Map<string, number[]>();
+    for (const r of fuelRows) {
+      if (r.mileage == null) continue;
+      const arr = mileagesByVehicle.get(r.vehicleId) ?? [];
+      arr.push(r.mileage);
+      mileagesByVehicle.set(r.vehicleId, arr);
+    }
+    let totalDistance = 0;
+    for (const mileages of mileagesByVehicle.values()) {
+      if (mileages.length >= 2) totalDistance += Math.max(...mileages) - Math.min(...mileages);
+    }
     const daysSoFar = Math.max(
       1,
       Math.ceil(
@@ -1522,7 +1539,7 @@ export class AnalyticsRepository {
           summary: {
             totalMonthlyPayments: 0,
             remainingBalance: 0,
-            interestPaidYtd: 0,
+            monthlyInterestEstimate: 0,
             activeCount: 0,
             loanCount: 0,
             leaseCount: 0,
@@ -1567,7 +1584,10 @@ export class AnalyticsRepository {
         summary: {
           totalMonthlyPayments,
           remainingBalance,
-          interestPaidYtd: vehicleDetails.reduce((s, d) => s + d.interestPaid, 0),
+          monthlyInterestEstimate: vehicleDetails.reduce(
+            (s, d) => s + d.monthlyInterestEstimate,
+            0
+          ),
           activeCount: activeIds.size,
           loanCount,
           leaseCount,

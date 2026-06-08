@@ -6,6 +6,7 @@ import { expenses, reminderNotifications } from '../../db/schema';
 import type { DrizzleTransaction, ReminderSplitConfig } from '../../db/types';
 import { ValidationError } from '../../errors';
 import { expenseSplitService } from '../expenses/split-service';
+import { odometerRepository } from '../odometer/repository';
 import type { ReminderWithVehicles } from './repository';
 import { reminderRepository } from './repository';
 
@@ -53,6 +54,14 @@ function advanceCustom(
       next.setFullYear(next.getFullYear() + intervalValue);
       clampToAnchorDay(next, anchorDay);
       break;
+    default:
+      // An unknown intervalUnit must NOT silently no-op: leaving `next` unchanged makes the
+      // catch-up / fast-forward `while (nextDue <= now)` loops spin forever (bug #13). Zod's
+      // intervalUnitSchema blocks bad values on create + update, so this only fires on DB
+      // corruption or a validation bypass — fail fast so the caller records a per-reminder skip.
+      throw new ValidationError(
+        `Invalid reminder intervalUnit "${intervalUnit}" (expected day|week|month|year)`
+      );
   }
 }
 
@@ -217,13 +226,31 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
   const previousDue = currentDue;
   let nextDue = currentDue;
   while (nextDue <= now) {
-    nextDue = computeNextDueDate(
+    // Bug #12 (C21 audit): honor endDate here too. The main catch-up loop deactivates a bounded
+    // reminder once nextDue crosses endDate, but a reminder lapsed past maxCatchUp reaches this
+    // fast-forward instead — without this check it would advance past now and stay "active" but
+    // permanently dormant (never fires, never closes). Deactivate the moment we step past endDate.
+    if (reminder.endDate && nextDue > reminder.endDate) {
+      await reminderRepository.deactivate(reminder.id);
+      return;
+    }
+    const advanced = computeNextDueDate(
       nextDue,
       reminder.frequency,
       reminder.intervalValue,
       reminder.intervalUnit,
       getAnchorDay(reminder)
     );
+    // Non-progress backstop (bug #13): this loop is bounded only by the date advancing past `now`,
+    // so a frequency/intervalUnit that fails to move the date forward would spin forever. advanceCustom
+    // now throws on a bad unit, but guard the invariant directly — if the date didn't strictly
+    // advance, bail rather than hang the trigger endpoint.
+    if (advanced <= nextDue) {
+      throw new ValidationError(
+        `Reminder ${reminder.id} did not advance (frequency "${reminder.frequency}") — aborting fast-forward`
+      );
+    }
+    nextDue = advanced;
   }
   await reminderRepository.advanceNextDueDate(reminder.id, previousDue, nextDue);
 }
@@ -232,8 +259,10 @@ class ReminderTriggerService {
   async processOverdueReminders(userId: string): Promise<TriggerResult> {
     const now = new Date();
     const result: TriggerResult = { createdExpenses: [], notifications: [], skipped: [] };
-    const overdueReminders = await reminderRepository.findOverdue(userId, now);
 
+    // Time axis: reminders whose nextDueDate has elapsed (mileage-only reminders have a null date
+    // and are excluded by the SQL `<= now`).
+    const overdueReminders = await reminderRepository.findOverdue(userId, now);
     for (const { reminder, vehicleIds } of overdueReminders) {
       try {
         await this.processReminder(reminder, vehicleIds, now, result);
@@ -246,7 +275,103 @@ class ReminderTriggerService {
       }
     }
 
+    // Mileage axis (whichever-comes-first): mileage/both reminders are due when the vehicle's
+    // current odometer has reached the nextDueOdometer milestone. A `both` reminder can fire on
+    // BOTH axes — they are distinct events with distinct dedup keys, so this pass runs independently
+    // of the time pass above and over the full candidate set (not just the time-overdue ones).
+    const mileageReminders = await reminderRepository.findMileageTracking(userId);
+    for (const { reminder, vehicleIds } of mileageReminders) {
+      try {
+        await this.processMileageReminder(reminder, vehicleIds, result);
+      } catch (error) {
+        result.skipped.push({
+          reminderId: reminder.id,
+          reason: 'error',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
     return result;
+  }
+
+  /**
+   * Mileage re-check on write (D5): evaluate ONLY the given vehicle's mileage/both reminders right
+   * after a new odometer reading lands (a manual odometer entry or a mileaged expense), so a reminder
+   * fires the moment its milestone is crossed instead of waiting for the next /trigger or login pass.
+   * Reuses the same per-reminder mileage logic, so it's idempotent via the dedup key — the
+   * login-trigger path can't double-fire what this already wrote. Cheap + synchronous (no cron):
+   * filters the user's mileage-tracking reminders to those linked to this vehicle. Best-effort —
+   * skips are collected, never thrown, so a reminder hiccup can't fail the underlying write.
+   */
+  async recheckMileageReminders(userId: string, vehicleId: string): Promise<TriggerResult> {
+    const result: TriggerResult = { createdExpenses: [], notifications: [], skipped: [] };
+    // The candidate query is also best-effort: it throws DatabaseError on failure, and this runs
+    // AFTER the odometer/expense write has already persisted — so a query hiccup must NOT propagate
+    // and 500 the (successful) write. Swallow it into a skip and return what we have. (C42 review:
+    // the per-reminder try/catch below didn't cover this fetch, so the "never throws" contract was a
+    // lie when the DB hiccuped between the write and the recheck.)
+    let mileageReminders: ReminderWithVehicles[];
+    try {
+      mileageReminders = await reminderRepository.findMileageTracking(userId);
+    } catch (error) {
+      result.skipped.push({
+        reminderId: 'all',
+        reason: 'recheck_query_failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return result;
+    }
+    for (const { reminder, vehicleIds } of mileageReminders) {
+      if (!vehicleIds.includes(vehicleId)) continue;
+      try {
+        await this.processMileageReminder(reminder, vehicleIds, result);
+      } catch (error) {
+        result.skipped.push({
+          reminderId: reminder.id,
+          reason: 'error',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Mileage axis for one reminder: due when the linked vehicle's current odometer (max across
+   * expenses + odometer entries) has reached nextDueOdometer. Emits ONE notification per milestone
+   * (null dueDate, dueOdometer set), deduped so re-running the trigger is a no-op. There is NO
+   * auto-re-arm on this axis — a mileage reminder stays due until the user marks it serviced (D3/
+   * T4), so an overdue service keeps signalling rather than silently clearing. Mileage requires
+   * exactly one vehicle (D4); a misconfigured multi/zero-vehicle reminder is skipped, not errored.
+   */
+  private async processMileageReminder(
+    reminder: Reminder,
+    vehicleIds: string[],
+    result: TriggerResult
+  ): Promise<void> {
+    if (reminder.nextDueOdometer === null) return; // candidate query guarantees this, belt + braces
+    if (vehicleIds.length !== 1) {
+      result.skipped.push({ reminderId: reminder.id, reason: 'mileage_requires_single_vehicle' });
+      return;
+    }
+
+    const currentOdometer = await odometerRepository.getCurrentOdometer(vehicleIds[0]);
+    if (currentOdometer === null || currentOdometer < reminder.nextDueOdometer) {
+      return; // not yet due
+    }
+
+    // Idempotent: skip if this milestone already produced a notification.
+    if (await reminderRepository.mileageNotificationExists(reminder.id, reminder.nextDueOdometer)) {
+      return;
+    }
+
+    const created = await reminderRepository.createMileageNotification(
+      reminder.id,
+      reminder.userId,
+      reminder.nextDueOdometer
+    );
+    if (created) result.notifications.push(created);
   }
 
   private async processReminder(
@@ -260,8 +385,16 @@ class ReminderTriggerService {
       return;
     }
 
+    // Time axis: a mileage-only reminder has a null next_due_date (T3) — it has no time periods to
+    // process here. findOverdue's `next_due_date <= now` already excludes NULL rows via SQL
+    // three-valued logic, so this is also the type guard that narrows nextDue to Date below. The
+    // mileage axis is processed separately (C23); a null date here means "no time work to do".
+    if (reminder.nextDueDate === null) {
+      return;
+    }
+
     const maxCatchUp = CONFIG.validation.reminder.maxCatchUpOccurrences;
-    let nextDue = reminder.nextDueDate;
+    let nextDue: Date = reminder.nextDueDate;
     let catchUpCount = 0;
 
     while (nextDue <= now && catchUpCount < maxCatchUp) {

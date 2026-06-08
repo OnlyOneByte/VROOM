@@ -26,6 +26,202 @@ import {
 import { SyncError, SyncErrorCode } from '../../../errors';
 import { GoogleDriveService } from './google-drive-service';
 
+/**
+ * Per-table column order for every VROOM sheet, keyed by the SAME keys as
+ * `TABLE_SCHEMA_MAP` in config.ts. These arrays are the single source of truth for the
+ * Sheets backup/restore round-trip: the export writes row 0 = headers and each data row
+ * = `headers.map((h) => row[h])`, and the import re-keys each cell off the sheet's own
+ * header row. Because the order is hand-maintained (Sheets, unlike the CSV path, is not
+ * schema-derived), a schema column that isn't mirrored here is SILENTLY DROPPED on backup
+ * and restored as null — a data-loss bug. `sheets-header-coverage.test.ts` pins every
+ * array to its schema as a regression guard; keep these in sync with db/schema.ts.
+ */
+export const SHEET_HEADERS = {
+  vehicles: [
+    'id',
+    'userId',
+    'make',
+    'model',
+    'year',
+    'vehicleType',
+    'trackFuel',
+    'trackCharging',
+    'licensePlate',
+    'nickname',
+    'vin',
+    'initialMileage',
+    'purchasePrice',
+    'purchaseDate',
+    'unitPreferences',
+    'createdAt',
+    'updatedAt',
+  ],
+  expenses: [
+    'id',
+    'vehicleId',
+    'userId',
+    'clientId',
+    'tags',
+    'category',
+    'expenseAmount',
+    'volume',
+    'fuelType',
+    'missedFillup',
+    'date',
+    'mileage',
+    'description',
+    'groupId',
+    'groupTotal',
+    'splitMethod',
+    'sourceType',
+    'sourceId',
+    'createdAt',
+    'updatedAt',
+  ],
+  insurance: ['id', 'userId', 'company', 'isActive', 'notes', 'createdAt', 'updatedAt'],
+  insuranceTerms: [
+    'id',
+    'policyId',
+    'startDate',
+    'endDate',
+    'policyNumber',
+    'coverageDescription',
+    'deductibleAmount',
+    'coverageLimit',
+    'agentName',
+    'agentPhone',
+    'agentEmail',
+    'totalCost',
+    'monthlyCost',
+    'premiumFrequency',
+    'paymentAmount',
+    'createdAt',
+    'updatedAt',
+  ],
+  insuranceTermVehicles: ['termId', 'vehicleId'],
+  insuranceClaims: [
+    'id',
+    'policyId',
+    'termId',
+    'vehicleId',
+    'claimDate',
+    'claimType',
+    'description',
+    'status',
+    'payoutAmount',
+    'faultDesignation',
+    'createdAt',
+    'updatedAt',
+  ],
+  financing: [
+    'id',
+    'vehicleId',
+    'financingType',
+    'provider',
+    'originalAmount',
+    'apr',
+    'termMonths',
+    'startDate',
+    'paymentAmount',
+    'paymentFrequency',
+    'paymentDayOfMonth',
+    'paymentDayOfWeek',
+    'residualValue',
+    'mileageLimit',
+    'excessMileageFee',
+    'isActive',
+    'endDate',
+    'createdAt',
+    'updatedAt',
+  ],
+  odometer: [
+    'id',
+    'vehicleId',
+    'userId',
+    'odometer',
+    'recordedAt',
+    'note',
+    'createdAt',
+    'updatedAt',
+  ],
+  photos: [
+    'id',
+    'userId',
+    'entityType',
+    'entityId',
+    'fileName',
+    'mimeType',
+    'fileSize',
+    'isCover',
+    'sortOrder',
+    'createdAt',
+  ],
+  photoRefs: [
+    'id',
+    'photoId',
+    'providerId',
+    'storageRef',
+    'externalUrl',
+    'status',
+    'errorMessage',
+    'retryCount',
+    'syncedAt',
+    'createdAt',
+  ],
+  userPreferences: [
+    'userId',
+    'unitPreferences',
+    'currencyUnit',
+    'autoBackupEnabled',
+    'backupFrequency',
+    'syncOnInactivity',
+    'syncInactivityMinutes',
+    'storageConfig',
+    'backupConfig',
+    'createdAt',
+    'updatedAt',
+  ],
+  syncState: ['userId', 'lastSyncDate', 'lastDataChangeDate', 'lastBackupDate'],
+  reminders: [
+    'id',
+    'userId',
+    'name',
+    'description',
+    'type',
+    'actionMode',
+    'frequency',
+    'intervalValue',
+    'intervalUnit',
+    'triggerMode',
+    'intervalMileage',
+    'lastServiceOdometer',
+    'nextDueOdometer',
+    'startDate',
+    'endDate',
+    'nextDueDate',
+    'expenseCategory',
+    'expenseTags',
+    'expenseAmount',
+    'expenseDescription',
+    'expenseSplitConfig',
+    'isActive',
+    'lastTriggeredAt',
+    'createdAt',
+    'updatedAt',
+  ],
+  reminderVehicles: ['reminderId', 'vehicleId'],
+  reminderNotifications: [
+    'id',
+    'reminderId',
+    'userId',
+    'dueDate',
+    'dueOdometer',
+    'isRead',
+    'createdAt',
+    'updatedAt',
+  ],
+} as const satisfies Record<string, readonly string[]>;
+
 export interface SpreadsheetInfo {
   id: string;
   name: string;
@@ -328,288 +524,69 @@ export class GoogleSheetsService {
       .where(eq(reminderNotifications.userId, userId));
 
     await Promise.all([
-      this.updateSheet(spreadsheetId, 'Vehicles', userVehicles, this.getVehicleHeaders()),
-      this.updateSheet(spreadsheetId, 'Expenses', userExpenses, this.getExpenseHeaders()),
-      this.updateSheet(
-        spreadsheetId,
-        'Insurance Policies',
-        userInsurance,
-        this.getInsuranceHeaders()
-      ),
+      this.updateSheet(spreadsheetId, 'Vehicles', userVehicles, SHEET_HEADERS.vehicles),
+      this.updateSheet(spreadsheetId, 'Expenses', userExpenses, SHEET_HEADERS.expenses),
+      this.updateSheet(spreadsheetId, 'Insurance Policies', userInsurance, SHEET_HEADERS.insurance),
       this.updateSheet(
         spreadsheetId,
         'Insurance Terms',
         userInsuranceTerms,
-        this.getInsuranceTermHeaders()
+        SHEET_HEADERS.insuranceTerms
       ),
       this.updateSheet(
         spreadsheetId,
         'Insurance Term Vehicles',
         userInsuranceTermVehicles,
-        this.getInsuranceTermVehiclesHeaders()
+        SHEET_HEADERS.insuranceTermVehicles
       ),
       this.updateSheet(
         spreadsheetId,
         'Insurance Claims',
         userInsuranceClaims,
-        this.getInsuranceClaimHeaders()
+        SHEET_HEADERS.insuranceClaims
       ),
       this.updateSheet(
         spreadsheetId,
         'Vehicle Financing',
         userFinancing.map((f) => f.vehicle_financing),
-        this.getFinancingHeaders()
+        SHEET_HEADERS.financing
       ),
-      this.updateSheet(spreadsheetId, 'Photos', userPhotos, this.getPhotoHeaders()),
-      this.updateSheet(spreadsheetId, 'Photo Refs', userPhotoRefs, this.getPhotoRefHeaders()),
+      this.updateSheet(spreadsheetId, 'Photos', userPhotos, SHEET_HEADERS.photos),
+      this.updateSheet(spreadsheetId, 'Photo Refs', userPhotoRefs, SHEET_HEADERS.photoRefs),
       this.updateSheet(
         spreadsheetId,
         'Odometer',
         userOdometer.map((o) => o.odometer_entries),
-        this.getOdometerHeaders()
+        SHEET_HEADERS.odometer
       ),
       this.updateSheet(
         spreadsheetId,
         'User Preferences',
         userPreferencesRows,
-        this.getUserPreferencesHeaders()
+        SHEET_HEADERS.userPreferences
       ),
-      this.updateSheet(spreadsheetId, 'Sync State', syncStateRows, this.getSyncStateHeaders()),
-      this.updateSheet(spreadsheetId, 'Reminders', userReminders, this.getReminderHeaders()),
+      this.updateSheet(spreadsheetId, 'Sync State', syncStateRows, SHEET_HEADERS.syncState),
+      this.updateSheet(spreadsheetId, 'Reminders', userReminders, SHEET_HEADERS.reminders),
       this.updateSheet(
         spreadsheetId,
         'Reminder Vehicles',
         userReminderVehicles,
-        this.getReminderVehicleHeaders()
+        SHEET_HEADERS.reminderVehicles
       ),
       this.updateSheet(
         spreadsheetId,
         'Reminder Notifications',
         userReminderNotifications,
-        this.getReminderNotificationHeaders()
+        SHEET_HEADERS.reminderNotifications
       ),
     ]);
-  }
-
-  private getVehicleHeaders() {
-    return [
-      'id',
-      'userId',
-      'make',
-      'model',
-      'year',
-      'vehicleType',
-      'trackFuel',
-      'trackCharging',
-      'licensePlate',
-      'nickname',
-      'vin',
-      'initialMileage',
-      'purchasePrice',
-      'purchaseDate',
-      'unitPreferences',
-      'createdAt',
-      'updatedAt',
-    ];
-  }
-
-  private getExpenseHeaders() {
-    return [
-      'id',
-      'vehicleId',
-      'userId',
-      'tags',
-      'category',
-      'expenseAmount',
-      'volume',
-      'fuelType',
-      'missedFillup',
-      'date',
-      'mileage',
-      'description',
-      'groupId',
-      'groupTotal',
-      'splitMethod',
-      'sourceType',
-      'sourceId',
-      'createdAt',
-      'updatedAt',
-    ];
-  }
-
-  private getInsuranceHeaders() {
-    return ['id', 'userId', 'company', 'isActive', 'notes', 'createdAt', 'updatedAt'];
-  }
-
-  private getInsuranceTermHeaders() {
-    return [
-      'id',
-      'policyId',
-      'startDate',
-      'endDate',
-      'policyNumber',
-      'coverageDescription',
-      'deductibleAmount',
-      'coverageLimit',
-      'agentName',
-      'agentPhone',
-      'agentEmail',
-      'totalCost',
-      'monthlyCost',
-      'premiumFrequency',
-      'paymentAmount',
-      'createdAt',
-      'updatedAt',
-    ];
-  }
-
-  private getInsuranceTermVehiclesHeaders() {
-    return ['termId', 'vehicleId'];
-  }
-
-  private getInsuranceClaimHeaders() {
-    return [
-      'id',
-      'policyId',
-      'termId',
-      'vehicleId',
-      'claimDate',
-      'claimType',
-      'description',
-      'status',
-      'payoutAmount',
-      'faultDesignation',
-      'createdAt',
-      'updatedAt',
-    ];
-  }
-
-  private getFinancingHeaders() {
-    return [
-      'id',
-      'vehicleId',
-      'financingType',
-      'provider',
-      'originalAmount',
-      'apr',
-      'termMonths',
-      'startDate',
-      'paymentAmount',
-      'paymentFrequency',
-      'paymentDayOfMonth',
-      'paymentDayOfWeek',
-      'residualValue',
-      'mileageLimit',
-      'excessMileageFee',
-      'isActive',
-      'endDate',
-      'createdAt',
-      'updatedAt',
-    ];
-  }
-
-  private getOdometerHeaders() {
-    return [
-      'id',
-      'vehicleId',
-      'userId',
-      'odometer',
-      'recordedAt',
-      'note',
-      'createdAt',
-      'updatedAt',
-    ];
-  }
-
-  private getPhotoHeaders() {
-    return [
-      'id',
-      'userId',
-      'entityType',
-      'entityId',
-      'fileName',
-      'mimeType',
-      'fileSize',
-      'isCover',
-      'sortOrder',
-      'createdAt',
-    ];
-  }
-
-  private getPhotoRefHeaders() {
-    return [
-      'id',
-      'photoId',
-      'providerId',
-      'storageRef',
-      'externalUrl',
-      'status',
-      'errorMessage',
-      'retryCount',
-      'syncedAt',
-      'createdAt',
-    ];
-  }
-
-  private getUserPreferencesHeaders() {
-    return [
-      'userId',
-      'unitPreferences',
-      'currencyUnit',
-      'autoBackupEnabled',
-      'backupFrequency',
-      'syncOnInactivity',
-      'syncInactivityMinutes',
-      'storageConfig',
-      'backupConfig',
-      'createdAt',
-      'updatedAt',
-    ];
-  }
-
-  private getSyncStateHeaders() {
-    return ['userId', 'lastSyncDate', 'lastDataChangeDate', 'lastBackupDate'];
-  }
-
-  private getReminderHeaders() {
-    return [
-      'id',
-      'userId',
-      'name',
-      'description',
-      'type',
-      'actionMode',
-      'frequency',
-      'intervalValue',
-      'intervalUnit',
-      'startDate',
-      'endDate',
-      'nextDueDate',
-      'expenseCategory',
-      'expenseTags',
-      'expenseAmount',
-      'expenseDescription',
-      'expenseSplitConfig',
-      'isActive',
-      'lastTriggeredAt',
-      'createdAt',
-      'updatedAt',
-    ];
-  }
-
-  private getReminderVehicleHeaders() {
-    return ['reminderId', 'vehicleId'];
-  }
-
-  private getReminderNotificationHeaders() {
-    return ['id', 'reminderId', 'userId', 'dueDate', 'isRead', 'createdAt', 'updatedAt'];
   }
 
   private async updateSheet<T extends Record<string, unknown>>(
     spreadsheetId: string,
     sheetName: string,
     data: T[],
-    headers: string[]
+    headers: readonly string[]
   ): Promise<void> {
     // Clear existing data before writing to remove stale rows
     await this.sheets.spreadsheets.values.clear({
@@ -618,7 +595,7 @@ export class GoogleSheetsService {
     });
 
     const values = [
-      headers,
+      [...headers],
       ...data.map((row) => headers.map((header) => this.formatValue(row[header]))),
     ];
 

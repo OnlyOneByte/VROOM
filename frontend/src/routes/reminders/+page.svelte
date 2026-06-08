@@ -1,11 +1,27 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Bell, BellRing, Calendar, RefreshCw, Trash2, Car, CircleAlert, Plus, Pencil, Check, History } from '@lucide/svelte';
+	import {
+		Bell,
+		BellRing,
+		Calendar,
+		RefreshCw,
+		Trash2,
+		Car,
+		CircleAlert,
+		Plus,
+		Pencil,
+		Check,
+		History
+	} from '@lucide/svelte';
 	import { reminderApi } from '$lib/services/reminder-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import type { ReminderNotification, ReminderWithVehicles, Vehicle } from '$lib/types';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import {
+		isReminderTimeDue,
+		isMileageTracking as isMileageTrackingReminder
+	} from '$lib/utils/reminder-helpers';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
@@ -25,10 +41,8 @@
 
 	// reminderId -> name, so a notification (which carries only reminderId) can
 	// show which reminder fired. Falls back gracefully if the reminder was deleted.
-	let reminderNames = $derived(
-		new Map(reminders.map((r) => [r.reminder.id, r.reminder.name]))
-	);
-	let unreadNotifications = $derived(notifications.filter((n) => !n.isRead));
+	let reminderNames = $derived(new Map(reminders.map(r => [r.reminder.id, r.reminder.name])));
+	let unreadNotifications = $derived(notifications.filter(n => !n.isRead));
 
 	// Create/edit form (dialog) state.
 	let formOpen = $state(false);
@@ -45,20 +59,15 @@
 	}
 
 	// Map vehicleId -> display name for quick lookup.
-	let vehicleNames = $derived(
-		new Map(vehicles.map((v) => [v.id, getVehicleDisplayName(v)]))
-	);
+	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
-	// A reminder is "due" when its nextDueDate is today or in the past.
-	function isDue(r: ReminderWithVehicles): boolean {
-		return new Date(r.reminder.nextDueDate).getTime() <= Date.now();
-	}
+	// Time-due check + mileage-tracking detection live in reminder-helpers (null-safe, unit-tested):
+	// a pure-mileage reminder has a null nextDueDate and must never hit `new Date(...)` (= epoch).
+	const isDue = (r: ReminderWithVehicles) => isReminderTimeDue(r.reminder);
 
-	let dueReminders = $derived(reminders.filter((r) => r.reminder.isActive && isDue(r)));
-	let upcomingReminders = $derived(
-		reminders.filter((r) => r.reminder.isActive && !isDue(r))
-	);
-	let inactiveReminders = $derived(reminders.filter((r) => !r.reminder.isActive));
+	let dueReminders = $derived(reminders.filter(r => r.reminder.isActive && isDue(r)));
+	let upcomingReminders = $derived(reminders.filter(r => r.reminder.isActive && !isDue(r)));
+	let inactiveReminders = $derived(reminders.filter(r => !r.reminder.isActive));
 
 	async function load() {
 		isLoading = true;
@@ -105,7 +114,7 @@
 
 	async function markNotificationRead(id: string) {
 		// Optimistic: flip locally, then persist. On failure, reload to resync.
-		notifications = notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n));
+		notifications = notifications.map(n => (n.id === id ? { ...n, isRead: true } : n));
 		try {
 			await reminderApi.markNotificationRead(id);
 		} catch (error) {
@@ -116,11 +125,11 @@
 	}
 
 	async function markAllNotificationsRead() {
-		const unread = notifications.filter((n) => !n.isRead);
+		const unread = notifications.filter(n => !n.isRead);
 		if (unread.length === 0) return;
-		notifications = notifications.map((n) => ({ ...n, isRead: true }));
+		notifications = notifications.map(n => ({ ...n, isRead: true }));
 		try {
-			await Promise.all(unread.map((n) => reminderApi.markNotificationRead(n.id)));
+			await Promise.all(unread.map(n => reminderApi.markNotificationRead(n.id)));
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to mark all read:', error);
 			appStore.addNotification({ type: 'error', message: 'Failed to mark all as read' });
@@ -135,6 +144,24 @@
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to toggle reminder:', error);
 			appStore.addNotification({ type: 'error', message: 'Failed to update reminder' });
+		}
+	}
+
+	// "Mark serviced" re-arms a mileage reminder (D3): the backend re-anchors lastServiceOdometer to
+	// the vehicle's current odometer and recomputes the next milestone (and advances the time axis
+	// for a 'both' reminder). Tracked per-reminder so only the clicked button shows its spinner.
+	let servicingId = $state<string | null>(null);
+	async function markServiced(item: ReminderWithVehicles) {
+		servicingId = item.reminder.id;
+		try {
+			await reminderApi.markServiced(item.reminder.id);
+			appStore.addNotification({ type: 'success', message: 'Marked serviced — reminder re-armed' });
+			await load();
+		} catch (error) {
+			if (import.meta.env.DEV) console.error('Failed to mark serviced:', error);
+			appStore.addNotification({ type: 'error', message: 'Failed to mark serviced' });
+		} finally {
+			servicingId = null;
 		}
 	}
 
@@ -168,6 +195,9 @@
 		}
 		return frequency.charAt(0).toUpperCase() + frequency.slice(1);
 	}
+
+	// Delegates to the tested helper (kept as a local so the template reads `isMileageTracking(item)`).
+	const isMileageTracking = (r: ReminderWithVehicles) => isMileageTrackingReminder(r.reminder);
 
 	onMount(load);
 </script>
@@ -262,7 +292,11 @@
 							<div class="flex items-center gap-4 mt-2 text-sm text-muted-foreground flex-wrap">
 								<span class="inline-flex items-center gap-1">
 									<Calendar class="h-3.5 w-3.5" />
-									{due ? 'Due' : 'Next'}: {formatDate(item.reminder.nextDueDate)}
+									{#if item.reminder.nextDueDate !== null}
+										{due ? 'Due' : 'Next'}: {formatDate(item.reminder.nextDueDate)}
+									{:else if item.reminder.nextDueOdometer !== null}
+										Next: {item.reminder.nextDueOdometer.toLocaleString()} (odometer)
+									{/if}
 								</span>
 								{#if item.reminder.expenseAmount != null}
 									<span>{formatCurrency(item.reminder.expenseAmount)}</span>
@@ -270,15 +304,29 @@
 								{#if item.vehicleIds && item.vehicleIds.length > 0}
 									<span class="inline-flex items-center gap-1">
 										<Car class="h-3.5 w-3.5" />
-										{item.vehicleIds
-											.map((id) => vehicleNames.get(id) ?? 'Vehicle')
-											.join(', ')}
+										{item.vehicleIds.map(id => vehicleNames.get(id) ?? 'Vehicle').join(', ')}
 									</span>
 								{/if}
 							</div>
 						</div>
 					</div>
 					<div class="flex items-center gap-1 flex-shrink-0">
+						{#if item.reminder.isActive && isMileageTracking(item)}
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={() => markServiced(item)}
+								disabled={servicingId === item.reminder.id}
+								aria-label="Mark serviced"
+							>
+								{#if servicingId === item.reminder.id}
+									<RefreshCw class="mr-1.5 h-3.5 w-3.5 animate-spin" />
+								{:else}
+									<Check class="mr-1.5 h-3.5 w-3.5" />
+								{/if}
+								Serviced
+							</Button>
+						{/if}
 						<Button variant="ghost" size="sm" onclick={() => toggleActive(item)}>
 							{item.reminder.isActive ? 'Pause' : 'Resume'}
 						</Button>
@@ -379,7 +427,11 @@
 										{reminderNames.get(n.reminderId) ?? 'Reminder'}
 									</p>
 									<p class="text-xs text-muted-foreground">
-										Due {formatDate(n.dueDate)}
+										{#if n.dueDate !== null}
+											Due {formatDate(n.dueDate)}
+										{:else if n.dueOdometer !== null}
+											Due at {n.dueOdometer.toLocaleString()} (odometer)
+										{/if}
 									</p>
 								</div>
 							</div>

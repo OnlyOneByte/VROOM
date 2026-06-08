@@ -20,8 +20,12 @@ this loop, then advance to the next item:
              frontend (types → service → store/state → route/page → component). Match
              the patterns in the steering docs exactly — runes, $lib/routes resolve(),
              polymorphic source_id/source_type for expense-linked records.
-3. VERIFY    Backend:  cd backend  && mise exec -- bun run validate
-             Frontend: cd frontend && mise exec -- npm run type-check && npm run build
+3. VERIFY    Backend:  cd backend  && mise exec -- bun run validate:local
+             (`validate:local` = tsc + musl-biome + `bun test` + build in one command — the
+              local-green path on this host; plain `validate` uses the dead glibc biome, see Hard
+              rules. CI still runs glibc biome and is the lint source of truth.)
+             Frontend: cd frontend && mise exec -- npm run validate:local
+             (`validate:local` = type-check + build + vitest in one command)
              E2E:      .meshclaw-tools/regress.sh   (route-smoke + axe + mobile + screenshots)
              UI proof: node .meshclaw-tools/shot.mjs <route> [mobile|desktop] [out.png]
    UI WORK?  A passing build is a FLOOR, not "human-ready". For any UI feature:
@@ -40,16 +44,26 @@ this loop, then advance to the next item:
              for PR/merge. Then advance to the next ranked item.
 ```
 
-### Hard rules (inherited from .meshclaw-autopilot/LOOP.md)
+### Hard rules
 - Work ONLY in `/local/home/angryang/.meshclaw/workspace/VROOM`. Never commit to `main`;
-  branch as `autopilot/<task>` or `feat/<task>` off latest `origin/main`.
+  the autonomous loop works on the long-lived `claude-loop-dev` branch (cut off latest
+  `origin/main`); a human opens the PR and approves every merge. (One-off task branches may
+  still use `feat/<task>`.)
 - All node/bun commands run under `mise exec --` (node22+bun scoped via `mise.local.toml`;
   do not touch the global mise node18).
 - Git network ops need `env -u GIT_SSH_COMMAND` (sandbox injects a `-F /dev/null` that
   ignores `~/.ssh/config`). Commit identity: `OnlyOneByte` / the noreply email.
 - Stage ONE short path per `git add` (multi-path add trips the permission engine).
-- **Biome CLI can't run on this aarch64 AL2 host (GLIBC too old).** Apply Biome fixes by
-  hand from the rules in `CodeQualityRules.md`; CI is the lint source of truth.
+- **Biome on this aarch64 AL2 host: use the MUSL binary.** The default glibc CLI (what
+  `bun run check` invokes) is dead here (`GLIBC_2.29 not found`), but the musl build runs
+  fine: `backend/node_modules/@biomejs/cli-linux-arm64-musl/biome check --write <paths>`
+  auto-fixes format + organizeImports + safe lint. The package scripts now wrap this:
+  **`bun run check:musl`** (+ `check:musl:fix`) runs the musl binary over `src/`, and
+  **`bun run validate:local`** = `type-check && check:musl && test && build` — the single
+  full-green command for this host (plain `bun run validate` fails at its glibc `check` step).
+  CI runs the glibc CLI and is the lint source of truth, so `check:musl` is the faithful
+  local mirror — run it over the WHOLE tree before committing (a per-file check can miss a
+  formatter reflow CI would flag).
 - NEVER `git push` to `main`, force-push shared branches, run destructive ops, or read
   credential files. The human approves every merge.
 
@@ -85,12 +99,36 @@ this loop, then advance to the next item:
   (:5173, proxies `/api` → :3001).
 
 ## Current state & gaps
-For the live snapshot (branch, what's done, what's next, open gaps) read **`STATUS.md`**
-in the repo root — it's kept current each cycle and is the fastest way to orient.
-Highlights as of the offline-entries branch:
-- Reminders `/reminders` route is **built and wired** (the old "route missing" gap is closed).
-- Offline-entries foundation (client_id idempotency + migration 0001 + outbox sync) is committed.
-- Remaining gaps: full in-process backend HTTP test harness needs a DB-injection refactor
-  (the `const sqlite = new Database(...)` singleton binds at import); screenshot visual-diffing
-  is capture-only (no baseline comparison yet); storage-backup-toggle E2E needs an OAuth
-  provider (not headless-feasible).
+The autonomous loop steers from `loop/` (tracked): **`loop/NORTH_STAR.md`** (vision + quality
+bar), **`loop/BACKLOG.md`** (ranked queue by category), **`loop/LEDGER.md`** (per-cycle log +
+balance table). Read those three first to orient — they are the live snapshot.
+(Note: `STATUS.md`, `BRANCH_REVIEW.md`, and `.meshclaw-autopilot/` are gitignored agent working
+files, absent from a fresh clone — don't rely on them.)
+
+Highlights:
+- Reminders `/reminders` route is built and wired; offline-entries foundation (client_id
+  idempotency + outbox sync) is committed; insurance/claims, analytics, CSV import/export,
+  and pluggable storage providers (Drive/Sheets/Photos/S3) all ship.
+- Backup/restore round-trips every table on the CSV path (schema-derived + coverage guards)
+  and the Google Sheets path (header set is pinned by `sheets-header-coverage.test.ts`).
+- Two feature specs are signed off (backend-first, one `tasks.md` task per loop cycle):
+  - `.kiro/specs/maintenance-schedule/` (mileage+time service-interval reminders) — **backend COMPLETE,
+    frontend nearly done.** Backend (T1–T5): nullable-date rebuild migration 0004 + partial mileage
+    dedup index, `getCurrentOdometer`, whichever-comes-first trigger (fires on /trigger AND on
+    odometer/expense write via `recheckMileageReminders`), `POST /:id/mark-serviced` re-arm, D4 Zod
+    refinements (mileage reminders are API-creatable), backup round-trip guard. Frontend: T6 (types +
+    `markServiced` client), T7 (`ReminderForm` trigger-mode control + mileage branch), T8 (/reminders
+    milestone render + "Serviced" re-arm button) all shipped — **T7/T8 await an eyes-on screenshot**
+    (the Playwright harness is sandbox-denied in the autonomous loop; an untracked
+    `reminder-mileage.meshclaw.e2e.ts` captures it on regress.sh). **Remaining: T9** (commit the e2e)
+    + the deferred `vehicle-stats.currentMileage` reconcile (T3-part-3). Track in its `tasks.md`.
+  - `.kiro/specs/import-trackers/` (Fuelly/Fuelio/Drivvo CSV via a mapping pre-pass over the
+    hardened import pipeline) is **approved, not started** (T1+).
+- Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides (last-measured
+  baseline in TODO.md: frontend ~59%, backend ~74% — the backend suite has grown to ~962 tests
+  + frontend ~345 since, so treat these as a floor, not a current reading) — fold into
+  bug/guard/arch cycles, don't regress it.
+- Open gaps: full in-process backend HTTP harness needs a DB-injection refactor (the
+  `const sqlite = new Database(...)` singleton binds at import); screenshot visual-diffing is
+  capture-only (no baseline compare); storage-backup-toggle E2E needs an OAuth provider (not
+  headless-feasible).

@@ -4,7 +4,7 @@ import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { expenses as expensesTable } from '../../db/schema';
+import { expenses as expensesTable, type NewExpense } from '../../db/schema';
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_DESCRIPTIONS,
@@ -21,6 +21,7 @@ import {
 } from '../../utils/validation';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
+import { reminderTriggerService } from '../reminders/trigger-service';
 import { preferencesRepository } from '../settings/repository';
 import { vehicleRepository } from '../vehicles/repository';
 import {
@@ -97,7 +98,20 @@ const createExpenseSchema = createExpenseSchemaBase.refine(
 );
 
 // clientId is a create-only idempotency key; it must not be mutable via update.
-const updateExpenseSchema = createExpenseSchemaBase.omit({ clientId: true }).partial();
+// `tags` is overridden to drop the base `.default([])`: a Zod `.default()` SURVIVES `.partial()`, so
+// without this an update that OMITS tags would parse to `{ tags: [] }` and silently WIPE a tagged
+// expense's tags on any unrelated edit (e.g. changing just the amount). Re-declaring it as a plain
+// optional (no default) means an omitted `tags` stays undefined → dropped by the update, preserving
+// the stored value; an explicit array still replaces. (Data-loss class from C31; guarded cycle 34.)
+const updateExpenseSchema = createExpenseSchemaBase
+  .omit({ clientId: true })
+  .partial()
+  .extend({
+    tags: z
+      .array(z.string().min(1).max(CONFIG.validation.expense.tagMaxLength))
+      .max(CONFIG.validation.expense.maxTags)
+      .optional(),
+  });
 
 // Exported so the query-contract (search/limit/tags coercion) can be unit-tested
 // at the route boundary without standing up a server.
@@ -431,17 +445,18 @@ routes.post('/import', zValidator('json', importCsvSchema), async (c) => {
 
   // Commit: insert only the rows that validated. Rows that errored are reported
   // back untouched so the user can fix and re-import just those.
-  let imported = 0;
-  for (const row of plan.rows) {
-    if (row.status === 'ready' && row.expense) {
-      await expenseRepository.create({ ...row.expense, userId: user.id });
-      imported += 1;
-    }
-  }
+  //
+  // Insert ATOMICALLY (all-or-nothing transaction) and IDEMPOTENTLY: each ready row carries
+  // a deterministic clientId, so re-importing the same file is a no-op — already-present
+  // rows are skipped and counted as duplicates rather than duplicated.
+  const readyRows = plan.rows
+    .filter((row) => row.status === 'ready' && row.expense)
+    .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
+  const { imported, duplicates } = await expenseRepository.importExpenses(readyRows, user.id);
 
   return c.json({
     success: true,
-    data: { dryRun: false, imported, ...summarizeImportPlan(plan) },
+    data: { dryRun: false, imported, duplicates, ...summarizeImportPlan(plan) },
   });
 });
 
@@ -481,6 +496,13 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     ...expenseData,
     userId: user.id,
   });
+
+  // D5: a mileaged expense is also a new odometer reading — re-check this vehicle's mileage reminders
+  // so a crossed milestone fires immediately. Only when mileage is present (getCurrentOdometer reads
+  // expenses.mileage); idempotent via the dedup, best-effort (never throws).
+  if (createdExpense.mileage != null) {
+    await reminderTriggerService.recheckMileageReminders(user.id, createdExpense.vehicleId);
+  }
 
   return c.json(
     {

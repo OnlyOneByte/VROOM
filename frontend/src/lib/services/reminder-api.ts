@@ -55,6 +55,15 @@ export const reminderApi = {
 		return apiClient.post<TriggerResult>('/api/v1/reminders/trigger');
 	},
 
+	/**
+	 * Mark a maintenance reminder serviced — re-arms it (D3). The backend anchors the mileage axis
+	 * to the vehicle's current odometer (recomputing the next milestone) and/or advances the time
+	 * axis one period. Returns the updated reminder.
+	 */
+	async markServiced(id: string): Promise<Reminder> {
+		return apiClient.post<Reminder>(`/api/v1/reminders/${id}/mark-serviced`);
+	},
+
 	async getNotifications(unreadOnly?: boolean): Promise<ReminderNotification[]> {
 		const query = unreadOnly ? '?unreadOnly=true' : '';
 		return apiClient.get<ReminderNotification[]>(`/api/v1/reminders/notifications${query}`);

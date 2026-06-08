@@ -434,9 +434,22 @@ export const reminders = sqliteTable(
     frequency: text('frequency').notNull(), // 'weekly' | 'monthly' | 'yearly' | 'custom'
     intervalValue: integer('interval_value'), // for custom: e.g. 3
     intervalUnit: text('interval_unit'), // 'day' | 'week' | 'month' | 'year'
+    // Maintenance-schedule (cycle 15, spec .kiro/specs/maintenance-schedule): a reminder may be
+    // due by time, by mileage, or by whichever-comes-first. These are additive + nullable/
+    // defaulted so existing reminders behave identically (triggerMode defaults to 'time').
+    triggerMode: text('trigger_mode').notNull().default('time'), // 'time' | 'mileage' | 'both'
+    intervalMileage: integer('interval_mileage'), // distance interval, in the vehicle's distanceUnit
+    lastServiceOdometer: integer('last_service_odometer'), // anchor for the mileage axis
+    nextDueOdometer: integer('next_due_odometer'), // cache = lastServiceOdometer + intervalMileage
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     endDate: integer('end_date', { mode: 'timestamp' }), // null = runs forever
-    nextDueDate: integer('next_due_date', { mode: 'timestamp' }).notNull(),
+    // Nullable as of T3 (cycle 22): a mileage-ONLY reminder has no time axis, so it carries no
+    // next_due_date. The time-due query null-guards (`IS NOT NULL AND next_due_date <= now`) and
+    // the trigger loop skips a null date. Relaxing this from NOT NULL forced a SQLite table rebuild
+    // (migration 0004), hand-authored child-first so the reminder_vehicles / reminder_notifications
+    // ON DELETE CASCADE does not wipe child rows (the C15 lesson: PRAGMA foreign_keys=OFF is a
+    // no-op inside the migrator's transaction).
+    nextDueDate: integer('next_due_date', { mode: 'timestamp' }),
     expenseCategory: text('expense_category'),
     expenseTags: text('expense_tags', { mode: 'json' }).$type<string[]>(),
     expenseAmount: real('expense_amount'), // total amount, required when type='expense' + actionMode='automatic'
@@ -487,15 +500,28 @@ export const reminderNotifications = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    dueDate: integer('due_date', { mode: 'timestamp' }).notNull(), // the period this notification is for
+    // Nullable as of T3 (cycle 22): a mileage-fired notification has no time period, so it carries
+    // no due_date (its milestone lives in due_odometer instead). Exactly one of dueDate/dueOdometer
+    // is set per notification (time axis vs mileage axis).
+    dueDate: integer('due_date', { mode: 'timestamp' }), // the period this notification is for (time axis)
+    // Odometer milestone for a mileage-fired notification (cycle 15 column; activated T3, cycle 22).
+    dueOdometer: integer('due_odometer'),
     isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
   (table) => ({
     userUnreadIdx: index('rn_user_unread_idx').on(table.userId, table.isRead),
-    // Prevents duplicate notifications for the same reminder + period
+    // Time axis: dedups one notification per reminder + period. dueDate is now nullable; SQLite
+    // treats NULLs as distinct in a UNIQUE index, so mileage rows (null dueDate) are not
+    // constrained here — they get their own index below.
     reminderDueIdx: uniqueIndex('rn_reminder_due_idx').on(table.reminderId, table.dueDate),
+    // Mileage axis: dedups one notification per reminder + odometer milestone. PARTIAL index
+    // (WHERE due_odometer IS NOT NULL) so it only constrains mileage rows — folding dueOdometer
+    // into the time index instead would break time-axis dedup (its NULL dueOdometer is distinct).
+    reminderOdoIdx: uniqueIndex('rn_reminder_odo_idx')
+      .on(table.reminderId, table.dueOdometer)
+      .where(sql`${table.dueOdometer} IS NOT NULL`),
   })
 );
 

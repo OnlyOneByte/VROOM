@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lte, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, lte, ne, type SQL } from 'drizzle-orm';
 import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb, transaction } from '../../db/connection';
@@ -174,6 +174,82 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   /**
+   * Find active mileage-tracking reminders for a user — `triggerMode` in ('mileage','both') with a
+   * non-null `nextDueOdometer` milestone. Unlike findOverdue (the time axis), due-ness can't be
+   * decided in SQL: it depends on the vehicle's CURRENT odometer (max across expenses + odometer
+   * entries), which the trigger service fetches per vehicle. So this returns the candidate set; the
+   * service evaluates `currentOdometer >= nextDueOdometer` against each.
+   */
+  async findMileageTracking(userId: string): Promise<ReminderWithVehicles[]> {
+    try {
+      const reminderList = await this.db
+        .select()
+        .from(reminders)
+        .where(
+          and(
+            eq(reminders.userId, userId),
+            eq(reminders.isActive, true),
+            ne(reminders.triggerMode, 'time'),
+            isNotNull(reminders.nextDueOdometer)
+          )
+        );
+
+      return this.attachVehicleIds(reminderList);
+    } catch (error) {
+      logger.error('Failed to find mileage-tracking reminders', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to find mileage-tracking reminders', error);
+    }
+  }
+
+  /**
+   * Whether a mileage notification already exists for this reminder + odometer milestone.
+   * App-level guard for the mileage dedup (the C22 partial unique index
+   * `(reminderId, dueOdometer) WHERE dueOdometer IS NOT NULL` is the DB backstop). A mileage axis
+   * has no auto-re-arm — re-arm is the explicit mark-serviced path — so one notification per
+   * milestone is correct, and re-running the trigger must be a no-op.
+   */
+  async mileageNotificationExists(reminderId: string, dueOdometer: number): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: reminderNotifications.id })
+      .from(reminderNotifications)
+      .where(
+        and(
+          eq(reminderNotifications.reminderId, reminderId),
+          eq(reminderNotifications.dueOdometer, dueOdometer)
+        )
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  /**
+   * Insert a mileage-fired notification (null dueDate, dueOdometer set). Returns the created row,
+   * or null if the partial unique index rejects a concurrent duplicate (idempotent under races).
+   */
+  async createMileageNotification(
+    reminderId: string,
+    userId: string,
+    dueOdometer: number
+  ): Promise<ReminderNotification | null> {
+    try {
+      const [created] = await this.db
+        .insert(reminderNotifications)
+        .values({ reminderId, userId, dueDate: null, dueOdometer, isRead: false })
+        .returning();
+      return created ?? null;
+    } catch (error) {
+      // Unique-index violation = another pass already wrote this milestone; treat as a no-op.
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+        return null;
+      }
+      throw new DatabaseError('Failed to create mileage notification', error);
+    }
+  }
+
+  /**
    * Find all reminders associated with a specific vehicle for a user.
    */
   async findByVehicleId(vehicleId: string, userId: string): Promise<Reminder[]> {
@@ -199,13 +275,13 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
 
   /**
    * Create a reminder with associated vehicle junction rows in a single transaction.
-   * Sets nextDueDate = startDate.
+   * The caller supplies the final `nextDueDate` (= startDate for a time/both reminder, or null for a
+   * pure-mileage reminder — T4) and any mileage fields; this method no longer overrides it.
    */
   async createWithVehicles(data: NewReminder, vehicleIds: string[]): Promise<ReminderWithVehicles> {
     try {
       return await transaction(async (tx) => {
-        const reminderData = { ...data, nextDueDate: data.startDate };
-        const result = await tx.insert(reminders).values(reminderData).returning();
+        const result = await tx.insert(reminders).values(data).returning();
         const reminder = result[0];
 
         for (const vehicleId of vehicleIds) {
@@ -331,6 +407,32 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       .update(reminders)
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(reminders.id, id));
+  }
+
+  /**
+   * Apply a mark-serviced re-arm (D3) and return the updated row. The caller (route) has already
+   * computed the new axis values from the reminder's mode: for the mileage axis the new
+   * lastServiceOdometer (= current odometer) + nextDueOdometer; for the time axis the advanced
+   * nextDueDate. Both are optional so a pure-mileage or pure-time reminder only moves its own axis.
+   * `lastTriggeredAt` is stamped to now. Ownership-scoped (id + userId) so a cross-tenant id no-ops.
+   */
+  async markServiced(
+    id: string,
+    userId: string,
+    fields: {
+      lastServiceOdometer?: number;
+      nextDueOdometer?: number;
+      nextDueDate?: Date | null;
+    }
+  ): Promise<Reminder> {
+    const result = await this.db
+      .update(reminders)
+      .set({ ...fields, lastTriggeredAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(reminders.id, id), eq(reminders.userId, userId)))
+      .returning();
+    const reminder = result[0];
+    if (!reminder) throw new NotFoundError('Reminder');
+    return reminder;
   }
 
   // --------------------------------------------------------------------------
