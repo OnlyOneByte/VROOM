@@ -12,11 +12,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 25 |
 | deep-review | 5 | 28 |
 | guard | 6 | 27 |
-| bug | 3 | 23 |
+| bug | 3 | 29 |
 | arch | 5 | 24 |
 | infra | 6 | 26 |
 
-Current cycle: **28**
+Current cycle: **29**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -563,3 +563,25 @@ Current cycle: **28**
   closes the hang) or #10 (buildLoanBreakdown balance decrement — clear correctness fix, characterization
   test first). #14 needs an Angelo decision first (don't auto-fix a semantics call). T3 part 3/T4 resumes
   after the bug category is fed (it'll keep breaching until then).
+- **C29 (bug — #13: invalid intervalUnit no longer hangs the trigger)** — `bug` most-starved over
+  budget (cyc 23, starved-for 6 > 3) → forced pick. Took #13, the hang the C28 audit re-classified
+  (not just a no-op). TWO-PART defense-in-depth fix in trigger-service.ts: (1) `advanceCustom` now
+  throws `ValidationError` on an unknown intervalUnit instead of silently leaving the date unchanged
+  (the root cause — a no-op date makes the `while (nextDue <= now)` loops spin); (2) a NON-PROGRESS
+  BACKSTOP in `fastForwardPastNow` — if `computeNextDueDate` returns a date that didn't strictly
+  advance, throw rather than loop forever (guards the invariant directly, catches any future
+  non-advancing path, not just this one). Both throws land inside `processReminder`'s per-reminder
+  try/catch in `processOverdueReminders`, so a corrupt reminder becomes a `skipped` entry
+  (reason 'error'), NOT an endpoint crash/hang — well-formed reminders in the same batch still
+  process. Still defense-in-depth (Zod `intervalUnitSchema` blocks the create+update API paths;
+  reachable only via DB corruption/bypass), but the failure mode is now a clean skip. Pinned by
+  `trigger-bad-interval-unit.test.ts` (2: corrupt reminder reported in `skipped` not hanging — the
+  test COMPLETING is itself the anti-hang proof; + a corrupt reminder doesn't block a healthy one in
+  the same batch). Test-harness note: a vehicle-less reminder skips with reason 'no_vehicles' BEFORE
+  the date math, so the repro must link a vehicle to actually exercise the advance path. Verified:
+  tsc 0 · musl-biome clean · 923 pass/0 fail (+2, up from 921) · build bundled.
+  Next cycle (30): nothing over budget after this (feature starved-for 5 > 4 at cyc 30 — feature is
+  the one breaching) → back to `feature`, T3 part 3/T4 (mark-serviced re-arm D3 + Zod refinements D4 +
+  recheck-on-write D5 + vehicle-stats reconcile). Remaining decided bugs (#9 interestPaidYtd rename,
+  #10 loan-breakdown balance, #11 mobile fuel-stat wrap) stay queued; #14 still needs the Angelo
+  semantics decision (asked at end of C28 — buttons shown, no answer yet; don't auto-fix).

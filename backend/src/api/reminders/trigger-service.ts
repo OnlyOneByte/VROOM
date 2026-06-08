@@ -54,6 +54,14 @@ function advanceCustom(
       next.setFullYear(next.getFullYear() + intervalValue);
       clampToAnchorDay(next, anchorDay);
       break;
+    default:
+      // An unknown intervalUnit must NOT silently no-op: leaving `next` unchanged makes the
+      // catch-up / fast-forward `while (nextDue <= now)` loops spin forever (bug #13). Zod's
+      // intervalUnitSchema blocks bad values on create + update, so this only fires on DB
+      // corruption or a validation bypass — fail fast so the caller records a per-reminder skip.
+      throw new ValidationError(
+        `Invalid reminder intervalUnit "${intervalUnit}" (expected day|week|month|year)`
+      );
   }
 }
 
@@ -226,13 +234,23 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
       await reminderRepository.deactivate(reminder.id);
       return;
     }
-    nextDue = computeNextDueDate(
+    const advanced = computeNextDueDate(
       nextDue,
       reminder.frequency,
       reminder.intervalValue,
       reminder.intervalUnit,
       getAnchorDay(reminder)
     );
+    // Non-progress backstop (bug #13): this loop is bounded only by the date advancing past `now`,
+    // so a frequency/intervalUnit that fails to move the date forward would spin forever. advanceCustom
+    // now throws on a bad unit, but guard the invariant directly — if the date didn't strictly
+    // advance, bail rather than hang the trigger endpoint.
+    if (advanced <= nextDue) {
+      throw new ValidationError(
+        `Reminder ${reminder.id} did not advance (frequency "${reminder.frequency}") — aborting fast-forward`
+      );
+    }
+    nextDue = advanced;
   }
   await reminderRepository.advanceNextDueDate(reminder.id, previousDue, nextDue);
 }
