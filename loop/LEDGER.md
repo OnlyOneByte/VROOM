@@ -14,9 +14,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 41 |
 | bug | 3 | 44 |
 | arch | 5 | 43 |
-| infra | 6 | 40 |
+| infra | 6 | 47 |
 
-Current cycle: **46**
+Current cycle: **47**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -945,3 +945,18 @@ Current cycle: **46**
   maintenance-schedule e2e — promote the untracked reminder-mileage spec's coverage into the committed
   suite shape, closing the feature) OR continue toward closing the UI. bug #11 + arch settings-DROP/auth
   remain queued; #14/#16 await Angelo. Watch: deep-review + arch both breach ~cyc 47-48.
+- **C47 (infra — refresh CLAUDE.md maintenance-schedule status)** — BALANCE: `infra` breached (cyc 40,
+  starved-for 7 > 6), the only over-budget category (deep-review/guard/bug all sat exactly AT budget)
+  → infra wins. The orientation doc a fresh agent reads first was stale since C26: it described
+  maintenance-schedule as "backend nearly done, trigger engine DORMANT until T4, frontend T6–T9
+  follows" — but C31–C46 shipped all of T4/T5 (backend complete: mileage reminders API-creatable,
+  fire on trigger + on write, mark-serviced re-arm) AND frontend T6/T7/T8. A fresh agent would think
+  the feature's biggest chunk was unbuilt. Rewrote the block to reality: backend COMPLETE, frontend
+  T6–T8 shipped (T7/T8 eyes-on-pending), remaining = T9 e2e + the deferred vehicle-stats reconcile.
+  Also bumped the stale ~918 test-count floor to ~962 backend / ~345 frontend. Doc-only (no code);
+  verified the tree carries only CLAUDE.md. No build gate needed.
+  Next cycle (48): `deep-review` is most-starved over budget (cyc 42, starved-for 6 > 5 at cyc 48;
+  arch cyc 43 starved-for 5 = budget) → `deep-review` wins. Freshest unreviewed surface = the C45/C46
+  frontend mileage UI (ReminderForm branch + /reminders Serviced button) — an eyes-on/logic review
+  (fan out, verify vs source) that ALSO partially discharges the pending T7/T8 eyes-on. Then arch
+  (settings-DROP). bug #11 queued; #14/#16 await Angelo.

@@ -285,6 +285,10 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 
 ### infra
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**CLAUDE.md maintenance-schedule status refresh (C47)**~~ — *DONE C47: the orientation doc was
+  stale since C26 (said backend dormant-until-T4, frontend T6–T9 to-do) — but C31–C46 shipped the full
+  backend + frontend T6/T7/T8. Rewrote to: backend COMPLETE, frontend T6–T8 (T7/T8 eyes-on-pending),
+  remaining T9 + vehicle-stats reconcile. Bumped stale ~918 test floor → ~962 be / ~345 fe.*
 - ~~**Frontend `validate:local` (C40)**~~ — *DONE C40: added frontend `validate:local` =
   type-check && build && test (the CLAUDE.md local VERIFY gate as one command, mirroring the C33
   backend script). The existing `validate` is the CI-shaped lint gate; this is the local floor. CLAUDE.md

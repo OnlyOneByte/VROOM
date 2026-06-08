@@ -112,21 +112,22 @@ Highlights:
 - Backup/restore round-trips every table on the CSV path (schema-derived + coverage guards)
   and the Google Sheets path (header set is pinned by `sheets-header-coverage.test.ts`).
 - Two feature specs are signed off (backend-first, one `tasks.md` task per loop cycle):
-  - `.kiro/specs/maintenance-schedule/` (mileage+time service-interval reminders) is **mid-build**:
-    backend nearly done — T1 (additive mileage columns), T2 (`getCurrentOdometer`), T3 part 1 (the
-    nullable-date rebuild migration 0004 + partial mileage dedup index), and T3 part 2 (the
-    whichever-comes-first mileage trigger pass: emits a mileage notification when
-    `getCurrentOdometer >= nextDueOdometer`, no auto-re-arm) all shipped. The trigger engine is
-    **dormant** until **T4** wires routes + validation (no mileage reminder is API-creatable yet):
-    `POST /:id/mark-serviced` re-arm (D3), Zod refinements (D4 single-vehicle), `recheckMileageReminders`
-    on odometer write (D5), then the deferred `vehicle-stats.currentMileage` reconcile. Frontend
-    (T6–T9) follows. Track progress in its `tasks.md`.
+  - `.kiro/specs/maintenance-schedule/` (mileage+time service-interval reminders) — **backend COMPLETE,
+    frontend nearly done.** Backend (T1–T5): nullable-date rebuild migration 0004 + partial mileage
+    dedup index, `getCurrentOdometer`, whichever-comes-first trigger (fires on /trigger AND on
+    odometer/expense write via `recheckMileageReminders`), `POST /:id/mark-serviced` re-arm, D4 Zod
+    refinements (mileage reminders are API-creatable), backup round-trip guard. Frontend: T6 (types +
+    `markServiced` client), T7 (`ReminderForm` trigger-mode control + mileage branch), T8 (/reminders
+    milestone render + "Serviced" re-arm button) all shipped — **T7/T8 await an eyes-on screenshot**
+    (the Playwright harness is sandbox-denied in the autonomous loop; an untracked
+    `reminder-mileage.meshclaw.e2e.ts` captures it on regress.sh). **Remaining: T9** (commit the e2e)
+    + the deferred `vehicle-stats.currentMileage` reconcile (T3-part-3). Track in its `tasks.md`.
   - `.kiro/specs/import-trackers/` (Fuelly/Fuelio/Drivvo CSV via a mapping pre-pass over the
     hardened import pipeline) is **approved, not started** (T1+).
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides (last-measured
-  baseline in TODO.md: frontend ~59%, backend ~74% — the backend suite has grown to ~918 tests
-  since, so treat these as a floor, not a current reading) — fold into bug/guard/arch cycles,
-  don't regress it.
+  baseline in TODO.md: frontend ~59%, backend ~74% — the backend suite has grown to ~962 tests
+  + frontend ~345 since, so treat these as a floor, not a current reading) — fold into
+  bug/guard/arch cycles, don't regress it.
 - Open gaps: full in-process backend HTTP harness needs a DB-injection refactor (the
   `const sqlite = new Database(...)` singleton binds at import); screenshot visual-diffing is
   capture-only (no baseline compare); storage-backup-toggle E2E needs an OAuth provider (not
