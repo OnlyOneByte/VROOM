@@ -78,18 +78,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 - ~~**Backend: Sheets restore path**~~ — *DONE C3: found + fixed the clientId column-drop
   data-loss bug; added the schema-vs-headers coverage guard. CSV path confirmed safe.*
 
-### guard
-1. **Source-scan: no surviving hand-written `.default()` on a user-settable field in a `.partial()`
-   update schema.** The C31/C34 data-loss class — a Zod `.default(x)` survives `.partial()`, so a
-   `base.partial()` update schema injects `x` on an omitted field and clobbers the stored value (C34:
-   expense tags wiped on any edit). SCOPED by the C35 audit: (a) only HAND-WRITTEN Zod `.default()`
-   counts — `createInsertSchema` does NOT surface `.notNull().default()` DB columns as Zod defaults
-   (verified), so DB defaults are out of scope; (b) a literal-single-value default like
-   `actionMode: z.literal('automatic').default('automatic')` is EXEMPT (injecting the only legal value
-   clobbers nothing). C35 confirmed NO remaining real instances beyond the fixed expense tags — so this
-   scan is a forward-looking merge-surviving net (catches the NEXT one), not a fix for an open bug.
-   Per-instance behavioral guards exist for reminders triggerMode (C31) + expense tags (C34).
-   (low-now / med-ongoing — prevents a recurring silent data-loss class)
+- ~~**Class-level net: no clobbering `.default()` in a `.partial()` update schema**~~ — *DONE C41:
+  `partial-update-no-default-injection.test.ts` — a RUNTIME net (text-scan was unreliable: schemas
+  span files + chain .partial()) that imports each exported update schema, parses `{}`, and asserts no
+  injected key beyond the EXEMPT allowlist (actionMode literal-default, C35-harmless). Tests the real
+  invariant against the actual Zod objects; catches the NEXT instance of the C31/C34 class. Covers
+  updateReminder/Term/Policy/Claim. FUTURE: export the route-local updateExpense + odometer update
+  schemas to widen coverage.*
 - ~~**maintenance-fields backup round-trip**~~ — *DONE C27: `maintenance-fields-roundtrip.test.ts`
   (3 tests, real exportAsZip → restoreFromBackup) locks the C22/C25 columns (triggerMode,
   intervalMileage, lastServiceOdometer, nextDueOdometer, dueOdometer) + the nullable dates surviving

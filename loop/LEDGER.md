@@ -11,12 +11,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 39 |
 | deep-review | 5 | 35 |
-| guard | 6 | 34 |
+| guard | 6 | 41 |
 | bug | 3 | 38 |
 | arch | 5 | 36 |
 | infra | 6 | 40 |
 
-Current cycle: **40**
+Current cycle: **41**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -826,3 +826,23 @@ Current cycle: **40**
   breaches) → `deep-review` wins, NOT the T7 feature. Likely target: an eyes-on/HTTP review of a
   shipped surface (the live mileage API + the just-landed frontend null-date handling), or fan out per
   rule 7. T7 (ReminderForm mileage branch) resumes once deep-review is fed. #9/#11 queued; #14 Angelo.
+- **C41 (guard — class-level net for the .partial()+.default() data-loss class)** — BALANCE: both
+  guard (cyc 34, starved-for 7) AND deep-review (cyc 35, 6) over budget; most-starved = `guard` (7) →
+  it wins (my C40 note guessed deep-review; guard's raw starved-for was higher — keep computing from
+  the table). Built the class-level net filed across C34/C35: the data-loss class (a Zod `.default()`
+  survives `.partial()`, injecting + clobbering on an omitted-field update) bit twice (C31, C34) and
+  per-instance guards cover those — this catches the NEXT one. APPROACH DECISION: a text/regex
+  source-scan is unreliable here (schemas span files, `.partial()` is chained), so I used a RUNTIME
+  net instead — `partial-update-no-default-injection.test.ts` imports each exported update schema,
+  parses an empty `{}`, and asserts it injects no key beyond an EXEMPT allowlist. This tests the real
+  invariant ("an empty update overwrites nothing") directly against the actual Zod objects, surviving
+  any refactor. Verified-against-source scoping baked in: `actionMode` (z.literal single-value default,
+  C35-proven harmless) is the one allowlisted key; schemas with `.refine(keys>0)` (claim/term) early-
+  return on the legit empty-parse failure. Covers updateReminder/Term/Policy/Claim; the route-local
+  updateExpense (C34-fixed) + odometer schemas aren't exported (a future cycle could export them to
+  widen coverage). Verified via validate:local: EXIT 0 (tsc 0 · musl-biome clean · 957 pass/0 fail,
+  +4 · build bundled). No product code.
+  Next cycle (42): `deep-review` is now most-starved over budget (cyc 35, starved-for 7 > 5 at cyc 42)
+  → it wins. Eyes-on/HTTP review of a shipped surface — the live mileage API + the C39 frontend
+  null-date handling are the freshest unreviewed; fan out per rule 7, verify findings vs source. T7
+  (ReminderForm mileage branch) resumes after. #9/#11 bugs queued; #14 awaits Angelo.
