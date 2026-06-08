@@ -11,12 +11,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 16 |
 | deep-review | 5 | 14 |
-| guard | 6 | 13 |
+| guard | 6 | 20 |
 | bug | 3 | 14 |
 | arch | 5 | 18 |
 | infra | 6 | 19 |
 
-Current cycle: **19**
+Current cycle: **20**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -324,3 +324,21 @@ Current cycle: **19**
   fail if `photos/helpers.ts` reintroduces a private/inlined ownership check instead of the shared
   validators (locks in the single-source-of-truth). Or pin another recurring class. `deep-review`
   (cyc 14, starved-for 6 > 5) also breaches — runner-up if guard is satisfied cheaply.
+- **C20 (guard)** — `guard` breached budget (cyc 13, starved-for 7 > 6) → forced pick; queue empty,
+  so populated it with a merge-surviving source-scan locking in the C18 ownership dedup:
+  `photos/__tests__/ownership-uses-shared-validators.test.ts`. Asserts `photos/helpers.ts` (1) calls
+  all three shared validators (`validateVehicleOwnership`/`validateExpenseOwnership`/
+  `validateInsuranceOwnership`), (2) does NOT locally re-declare any of them (a `function`/`const`
+  with that name = a private copy that can drift; import-only doesn't match), and (3) does NOT
+  re-import `vehicleRepository`/`insurancePolicyRepository` (their return marks a re-inlined
+  vehicle/policy ownership check — the exact pre-C18 antipattern). Leaves the genuinely-inline
+  `insurance_claim`/`odometer_entry` cases + `validatePhotoOwnership` untouched (no shared validator
+  exists for those). This makes the security-adjacent single-source-of-truth invariant
+  MERGE-SURVIVING (an e2e/manual review wouldn't catch a silent re-duplication; a committed scan
+  does). Verified: tsc 0, Biome musl clean, 893 pass/0 fail (+4), build bundled. No product code.
+  Next cycle (21): `deep-review` breaches budget (cyc 14, starved-for 7 > 5) → MUST pick it. Take an
+  eyes-on UI sweep (vehicle Overview/ExpensesTable still wants a real screenshot pass; or analytics
+  route) or a backend correctness audit — fan out 2-3 Explore agents per the rule-7 style. `feature`
+  (cyc 16, starved-for 5 > 4) breaches right after → maintenance-schedule T3 is next once deep-review
+  clears. Queued bugs (#8 insurance $0, #9 interestPaidYtd, #10 flat loan balance, #11 mobile wrap,
+  #3 dead ScrollArea cap, CSV BOM/date/currency) remain fair game if a review surfaces nothing worse.

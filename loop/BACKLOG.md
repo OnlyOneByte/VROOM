@@ -80,6 +80,10 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 
 ### guard
 *(queue empty — re-populate as reviews surface new bug classes.)*
+- ~~**ownership-dedup guard**~~ — *DONE C20: source-scan `ownership-uses-shared-validators.test.ts`
+  locks in the C18 dedup — `photos/helpers.ts` must call the 3 shared validators, must NOT locally
+  re-declare them, must NOT re-import vehicleRepository/insurancePolicyRepository (inlined-check
+  marker). Makes the single-source-of-truth invariant merge-surviving.*
 - ~~**no-oldest-month-slice guard**~~ — *DONE C13: source-scan `no-oldest-month-slice.test.ts`
   pins the C11 class (a localeCompare month-sort must not chain into `.slice(0,N)`); excludes the
   legit numeric `.slice(0,50)` maintenance-timeline by anchoring on localeCompare.*
