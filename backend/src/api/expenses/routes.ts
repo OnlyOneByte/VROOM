@@ -21,6 +21,7 @@ import {
 } from '../../utils/validation';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
+import { reminderTriggerService } from '../reminders/trigger-service';
 import { preferencesRepository } from '../settings/repository';
 import { vehicleRepository } from '../vehicles/repository';
 import {
@@ -495,6 +496,13 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
     ...expenseData,
     userId: user.id,
   });
+
+  // D5: a mileaged expense is also a new odometer reading — re-check this vehicle's mileage reminders
+  // so a crossed milestone fires immediately. Only when mileage is present (getCurrentOdometer reads
+  // expenses.mileage); idempotent via the dedup, best-effort (never throws).
+  if (createdExpense.mileage != null) {
+    await reminderTriggerService.recheckMileageReminders(user.id, createdExpense.vehicleId);
+  }
 
   return c.json(
     {

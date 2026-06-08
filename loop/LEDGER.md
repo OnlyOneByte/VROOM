@@ -9,14 +9,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 32 |
+| feature | 4 | 37 |
 | deep-review | 5 | 35 |
 | guard | 6 | 34 |
 | bug | 3 | 34 |
 | arch | 5 | 36 |
 | infra | 6 | 33 |
 
-Current cycle: **36**
+Current cycle: **37**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -751,3 +751,23 @@ Current cycle: **36**
   moment an odometer/mileaged-expense write crosses its milestone, idempotent via the existing dedup).
   Arch #1 has 2 route files LEFT (auth: 7 try/catch, settings: 5) — each its own characterize-then-drop
   pair when arch next fires (~cyc 41). #14 still awaits the Angelo semantics decision.
+- **C37 (feature — maintenance-schedule T4 part 3: recheck-on-write, D5)** — `feature` forced (cyc 32,
+  starved-for 5 > 4). Final functional piece of T4: a mileage reminder now fires the MOMENT a new
+  reading crosses its milestone, not only on the next /trigger. Added trigger-service
+  `recheckMileageReminders(userId, vehicleId)` — fetches the user's mileage-tracking reminders,
+  filters to those linked to the written vehicle, runs the existing `processMileageReminder` on each
+  (reuse → idempotent via the C22 dedup key, so the login /trigger pass can't double-fire it).
+  Wired into TWO write paths: odometer-create route (always) + expense-create route (only when
+  `mileage != null`, since getCurrentOdometer reads expenses.mileage). Best-effort — recheck collects
+  skips, never throws, so a reminder hiccup can't fail the underlying write (which is already
+  persisted). No circular import (trigger-service imports odometer/repository, not routes; the routes
+  import trigger-service — one direction). Pinned by `recheck-on-write.test.ts` (5: odometer-write
+  fires immediately w/o /trigger, below-milestone silent, mileaged-expense fires, idempotent vs a
+  later /trigger, non-mileaged write silent). Verified via validate:local: EXIT 0 (tsc 0 · musl-biome
+  clean · 947 pass/0 fail, +4 · build bundled). T4 IS FUNCTIONALLY COMPLETE — mileage reminders:
+  creatable (C31) · re-arm via mark-serviced (C32) · fire on /trigger (C25) · fire on write (C37).
+  Next cycle (38): nothing over budget (bug cyc 34 starved-for 4 > 3 at cyc 38 — bug breaches) → `bug`
+  wins. Decided standalone: #10 (buildLoanBreakdown flat balance — characterization test first) or #9
+  (interestPaidYtd rename) or #11 (mobile fuel-stat wrap — UI). REMAINING maintenance-schedule:
+  T3-part-3 (vehicle-stats reconcile), T5 remaining (backup round-trip already done C27), frontend
+  T6–T9 (the whole UI — types/service/ReminderForm mileage branch/page+card/e2e). #14 awaits Angelo.

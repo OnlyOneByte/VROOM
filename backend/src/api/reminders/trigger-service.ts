@@ -296,6 +296,33 @@ class ReminderTriggerService {
   }
 
   /**
+   * Mileage re-check on write (D5): evaluate ONLY the given vehicle's mileage/both reminders right
+   * after a new odometer reading lands (a manual odometer entry or a mileaged expense), so a reminder
+   * fires the moment its milestone is crossed instead of waiting for the next /trigger or login pass.
+   * Reuses the same per-reminder mileage logic, so it's idempotent via the dedup key — the
+   * login-trigger path can't double-fire what this already wrote. Cheap + synchronous (no cron):
+   * filters the user's mileage-tracking reminders to those linked to this vehicle. Best-effort —
+   * skips are collected, never thrown, so a reminder hiccup can't fail the underlying write.
+   */
+  async recheckMileageReminders(userId: string, vehicleId: string): Promise<TriggerResult> {
+    const result: TriggerResult = { createdExpenses: [], notifications: [], skipped: [] };
+    const mileageReminders = await reminderRepository.findMileageTracking(userId);
+    for (const { reminder, vehicleIds } of mileageReminders) {
+      if (!vehicleIds.includes(vehicleId)) continue;
+      try {
+        await this.processMileageReminder(reminder, vehicleIds, result);
+      } catch (error) {
+        result.skipped.push({
+          reminderId: reminder.id,
+          reason: 'error',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+    return result;
+  }
+
+  /**
    * Mileage axis for one reminder: due when the linked vehicle's current odometer (max across
    * expenses + odometer entries) has reached nextDueOdometer. Emits ONE notification per milestone
    * (null dueDate, dueOdometer set), deduped so re-running the trigger is a no-op. There is NO

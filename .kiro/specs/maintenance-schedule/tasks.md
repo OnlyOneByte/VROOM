@@ -72,7 +72,13 @@
             time/both → nextDueDate advanced via computeNextDueDate. Rate-limited; `/:id/mark-serviced`
             static-suffix route. Pinned by `mark-serviced.test.ts` (5, incl. the end-to-end
             fire→service→not-due-again loop + cross-tenant 404). tsc 0 · musl-biome · 939 pass · build OK.
-      - [ ] **part 3 — `recheckMileageReminders` on odometer / mileaged-expense write (D5).** HTTP tests.
+      - [x] **part 3 (cycle 37) — `recheckMileageReminders` on odometer / mileaged-expense write (D5).**
+            trigger-service.recheckMileageReminders(userId, vehicleId) reuses processMileageReminder
+            (idempotent via dedup), wired into odometer-create (always) + expense-create (when
+            mileage != null). Best-effort (never throws → can't fail the write). Pinned by
+            recheck-on-write.test.ts (5). validate:local green (947 pass).
+      **T4 FUNCTIONALLY COMPLETE:** mileage reminders creatable (part 1/C31) · mark-serviced re-arm
+      (part 2/C32) · fire on /trigger (T3-part-2/C25) · fire on write (part 3/C37).
 
 ## Phase 2 — data safety
 - [~] **T5 (partial, cycle 15)** Added the 5 new columns to `SHEET_HEADERS` (reminders +
