@@ -98,8 +98,14 @@
       /reminders isDue + 2 render sites) — all fixed to treat a null date as not-time-due / render the
       odometer milestone instead. tsc 0 · build OK. Non-visual layer — no screenshot (mileage reminders
       aren't UI-creatable until T7).
-- [ ] **T7** `ReminderForm`: trigger-mode control + mileage branch (interval w/ unit label,
-      current-odometer hint, lastServiceOdometer), single-vehicle constraint.
+- [~] **T7 (cycle 45, visual eyes-on PENDING)** `ReminderForm`: "Trigger when" Select (time | mileage
+      | both) driving hasTimeAxis/hasMileageAxis; mileage branch = Service-interval input (distance-unit
+      suffix via getDistanceUnitLabel) + Last-serviced-at (defaults to current odometer when blank) +
+      hides time fields; D4 single-vehicle + positive-interval validation; payload sends triggerMode +
+      mileage fields; edit-path seeds them. Composed from the kit. tsc 0 · build · 345 tests · prettier.
+      ⚠️ Eyes-on screenshot NOT captured (Playwright sandbox-denied in autonomous ctx) — untracked
+      `reminder-mileage.meshclaw.e2e.ts` captures it on regress.sh; flagged to Angelo. Tick to [x] once
+      eyes-on confirmed.
 - [ ] **T8** `/reminders` page + `DueRemindersCard`: OR-in mileage due, render reason + gap with
       unit label, "Mark serviced" action. Four states + a11y.
 

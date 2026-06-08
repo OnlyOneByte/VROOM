@@ -14,8 +14,10 @@
 	import { appStore } from '$lib/stores/app.svelte';
 	import { dateOnlyToISO } from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
 	import type { ExpenseCategory, ReminderWithVehicles, Vehicle } from '$lib/types';
+	import type { TriggerMode } from '$lib/types/reminder';
 
 	interface Props {
 		open: boolean;
@@ -52,12 +54,30 @@
 	let kind = $state<ReminderKind>('notification');
 	let name = $state('');
 	let description = $state('');
+	// Trigger axis (maintenance-schedule): by time, by odometer mileage, or both. 'time' is the
+	// default + keeps the form behaving exactly as before. Mileage/both reveal the mileage fields and
+	// constrain to a single vehicle (the odometer is per-vehicle, D4).
+	let triggerMode = $state<TriggerMode>('time');
+	let intervalMileage = $state('');
+	let lastServiceOdometer = $state('');
 	let frequency = $state<Frequency>('monthly');
 	let intervalValue = $state('');
 	let intervalUnit = $state<IntervalUnit>('month');
 	let startDate = $state(new Date().toISOString().slice(0, 10));
 	let endDate = $state('');
 	let selectedVehicleIds = $state<string[]>([]);
+
+	// Which axes are active. The time fields (frequency/dates) only matter when the time axis is on;
+	// the mileage fields only when the mileage axis is on.
+	let hasTimeAxis = $derived(triggerMode === 'time' || triggerMode === 'both');
+	let hasMileageAxis = $derived(triggerMode === 'mileage' || triggerMode === 'both');
+
+	// The distance-unit label of the single selected vehicle (mileage requires exactly one). Falls
+	// back to 'mi' when no vehicle is resolved yet.
+	let mileageUnitLabel = $derived.by(() => {
+		const v = vehicles.find(veh => veh.id === selectedVehicleIds[0]);
+		return getDistanceUnitLabel(v?.unitPreferences?.distanceUnit ?? 'miles', true);
+	});
 	// Expense-type fields (only used/validated when kind === 'expense').
 	let expenseCategory = $state<ExpenseCategory>('financial');
 	let expenseAmount = $state('');
@@ -81,6 +101,11 @@
 			kind = r.type === 'expense' ? 'expense' : 'notification';
 			name = r.name;
 			description = r.description ?? '';
+			triggerMode = (['time', 'mileage', 'both'] as const).includes(r.triggerMode as TriggerMode)
+				? (r.triggerMode as TriggerMode)
+				: 'time';
+			intervalMileage = r.intervalMileage != null ? String(r.intervalMileage) : '';
+			lastServiceOdometer = r.lastServiceOdometer != null ? String(r.lastServiceOdometer) : '';
 			frequency = (FREQUENCIES as readonly string[]).includes(r.frequency)
 				? (r.frequency as Frequency)
 				: 'monthly';
@@ -100,6 +125,9 @@
 			kind = 'notification';
 			name = '';
 			description = '';
+			triggerMode = 'time';
+			intervalMileage = '';
+			lastServiceOdometer = '';
 			frequency = 'monthly';
 			intervalValue = '';
 			intervalUnit = 'month';
@@ -115,7 +143,7 @@
 
 	function toggleVehicle(id: string) {
 		selectedVehicleIds = selectedVehicleIds.includes(id)
-			? selectedVehicleIds.filter((v) => v !== id)
+			? selectedVehicleIds.filter(v => v !== id)
 			: [...selectedVehicleIds, id];
 	}
 
@@ -123,9 +151,25 @@
 		const e: Record<string, string> = {};
 		if (!name.trim()) e['name'] = 'Name is required';
 		if (selectedVehicleIds.length === 0) e['vehicleIds'] = 'Select at least one vehicle';
-		if (frequency === 'custom') {
+		// D4: the mileage axis is per-vehicle → exactly one vehicle when mileage is involved.
+		if (hasMileageAxis && selectedVehicleIds.length > 1) {
+			e['vehicleIds'] = 'A mileage reminder must track exactly one vehicle';
+		}
+		// Custom interval only matters when the time axis is active.
+		if (hasTimeAxis && frequency === 'custom') {
 			const n = parseInt(intervalValue, 10);
 			if (!Number.isInteger(n) || n < 1) e['intervalValue'] = 'Enter a positive interval';
+		}
+		// Mileage axis: a positive service interval is required (the milestone driver).
+		if (hasMileageAxis) {
+			const m = parseInt(intervalMileage, 10);
+			if (!Number.isInteger(m) || m < 1)
+				e['intervalMileage'] = 'Enter a positive distance interval';
+			if (lastServiceOdometer.trim() !== '') {
+				const last = parseInt(lastServiceOdometer, 10);
+				if (!Number.isInteger(last) || last < 0)
+					e['lastServiceOdometer'] = 'Enter a valid odometer reading';
+			}
 		}
 		if (endDate && startDate && new Date(endDate) <= new Date(startDate)) {
 			e['endDate'] = 'End date must be after the start date';
@@ -147,6 +191,14 @@
 				name: name.trim(),
 				description: description.trim() || null,
 				type: kind,
+				triggerMode,
+				// Mileage axis: send the interval when active, else null (clears on edit when switching to
+				// pure time). lastServiceOdometer is OMITTED when blank so the backend defaults it to the
+				// vehicle's current odometer (D4); sent when the user typed an explicit anchor.
+				intervalMileage: hasMileageAxis ? parseInt(intervalMileage, 10) : null,
+				...(hasMileageAxis && lastServiceOdometer.trim() !== ''
+					? { lastServiceOdometer: parseInt(lastServiceOdometer, 10) }
+					: {}),
 				frequency,
 				intervalValue: frequency === 'custom' ? parseInt(intervalValue, 10) : null,
 				intervalUnit: frequency === 'custom' ? intervalUnit : null,
@@ -190,7 +242,7 @@
 		</Dialog.Header>
 
 		<form
-			onsubmit={(e) => {
+			onsubmit={e => {
 				e.preventDefault();
 				handleSubmit();
 			}}
@@ -227,6 +279,36 @@
 				{#if errors['name']}<FormFieldError>{errors['name']}</FormFieldError>{/if}
 			</div>
 
+			<!-- Trigger axis: by time, by odometer mileage, or whichever comes first -->
+			<div class="space-y-2">
+				<Label for="reminder-trigger-mode">Trigger when</Label>
+				<Select.Root type="single" bind:value={triggerMode}>
+					<Select.Trigger id="reminder-trigger-mode" class="w-full">
+						{triggerMode === 'mileage'
+							? 'At a mileage interval'
+							: triggerMode === 'both'
+								? 'Time or mileage (whichever first)'
+								: 'On a time schedule'}
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="time" label="On a time schedule">On a time schedule</Select.Item>
+						<Select.Item value="mileage" label="At a mileage interval">
+							At a mileage interval
+						</Select.Item>
+						<Select.Item value="both" label="Time or mileage (whichever first)">
+							Time or mileage (whichever first)
+						</Select.Item>
+					</Select.Content>
+				</Select.Root>
+				<p class="text-xs text-muted-foreground">
+					{triggerMode === 'mileage'
+						? 'Due when the odometer reaches the next service milestone.'
+						: triggerMode === 'both'
+							? 'Due on the date OR the mileage milestone, whichever arrives first.'
+							: 'Due on a recurring date schedule.'}
+				</p>
+			</div>
+
 			<!-- Expense template (expense type only): category + amount + tags -->
 			{#if kind === 'expense'}
 				<div class="grid grid-cols-2 gap-3">
@@ -260,72 +342,125 @@
 								aria-invalid={!!errors['expenseAmount']}
 							/>
 						</div>
-						{#if errors['expenseAmount']}<FormFieldError>{errors['expenseAmount']}</FormFieldError>{/if}
+						{#if errors['expenseAmount']}<FormFieldError>{errors['expenseAmount']}</FormFieldError
+							>{/if}
 					</div>
 				</div>
 				<TagInput bind:tags={expenseTags} />
 			{/if}
 
-			<!-- Frequency -->
-			<div class="space-y-2">
-				<Label for="reminder-frequency">Frequency *</Label>
-				<Select.Root type="single" bind:value={frequency}>
-					<Select.Trigger id="reminder-frequency" class="w-full">
-						{frequency.charAt(0).toUpperCase() + frequency.slice(1)}
-					</Select.Trigger>
-					<Select.Content>
-						{#each FREQUENCIES as f (f)}
-							<Select.Item value={f} label={f.charAt(0).toUpperCase() + f.slice(1)}>
-								{f.charAt(0).toUpperCase() + f.slice(1)}
-							</Select.Item>
-						{/each}
-					</Select.Content>
-				</Select.Root>
-			</div>
-
-			<!-- Custom interval (only for custom frequency) -->
-			{#if frequency === 'custom'}
+			<!-- Mileage interval (mileage / both axes) -->
+			{#if hasMileageAxis}
 				<div class="grid grid-cols-2 gap-3">
 					<div class="space-y-2">
-						<Label for="reminder-interval-value">Every</Label>
-						<Input
-							id="reminder-interval-value"
-							type="number"
-							min="1"
-							bind:value={intervalValue}
-							placeholder="3"
-							aria-invalid={!!errors['intervalValue']}
-						/>
-						{#if errors['intervalValue']}<FormFieldError>{errors['intervalValue']}</FormFieldError>{/if}
+						<Label for="reminder-interval-mileage">Service interval *</Label>
+						<div class="relative">
+							<Input
+								id="reminder-interval-mileage"
+								type="number"
+								min="1"
+								bind:value={intervalMileage}
+								placeholder="5000"
+								class="pr-10"
+								aria-invalid={!!errors['intervalMileage']}
+							/>
+							<div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+								<span class="text-muted-foreground text-sm">{mileageUnitLabel}</span>
+							</div>
+						</div>
+						{#if errors['intervalMileage']}<FormFieldError
+								>{errors['intervalMileage']}</FormFieldError
+							>{/if}
 					</div>
 					<div class="space-y-2">
-						<Label for="reminder-interval-unit">Unit</Label>
-						<Select.Root type="single" bind:value={intervalUnit}>
-							<Select.Trigger id="reminder-interval-unit" class="w-full">
-								{intervalUnit}{intervalValue && parseInt(intervalValue, 10) > 1 ? 's' : ''}
-							</Select.Trigger>
-							<Select.Content>
-								{#each INTERVAL_UNITS as u (u)}
-									<Select.Item value={u} label={u}>{u}</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
+						<Label for="reminder-last-service">Last serviced at</Label>
+						<div class="relative">
+							<Input
+								id="reminder-last-service"
+								type="number"
+								min="0"
+								bind:value={lastServiceOdometer}
+								placeholder="current"
+								class="pr-10"
+								aria-invalid={!!errors['lastServiceOdometer']}
+							/>
+							<div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+								<span class="text-muted-foreground text-sm">{mileageUnitLabel}</span>
+							</div>
+						</div>
+						{#if errors['lastServiceOdometer']}<FormFieldError
+								>{errors['lastServiceOdometer']}</FormFieldError
+							>{/if}
 					</div>
 				</div>
+				<p class="text-xs text-muted-foreground -mt-2">
+					Leave “last serviced at” blank to use this vehicle’s latest odometer reading.
+				</p>
 			{/if}
 
-			<!-- Start date -->
-			<div class="space-y-2">
-				<Label for="reminder-start">Start date *</Label>
-				<DatePicker id="reminder-start" bind:value={startDate} placeholder="Select start date" />
-			</div>
+			<!-- Frequency (time / both axes) -->
+			{#if hasTimeAxis}
+				<div class="space-y-2">
+					<Label for="reminder-frequency">Frequency *</Label>
+					<Select.Root type="single" bind:value={frequency}>
+						<Select.Trigger id="reminder-frequency" class="w-full">
+							{frequency.charAt(0).toUpperCase() + frequency.slice(1)}
+						</Select.Trigger>
+						<Select.Content>
+							{#each FREQUENCIES as f (f)}
+								<Select.Item value={f} label={f.charAt(0).toUpperCase() + f.slice(1)}>
+									{f.charAt(0).toUpperCase() + f.slice(1)}
+								</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</div>
 
-			<!-- End date (optional) -->
-			<div class="space-y-2">
-				<Label for="reminder-end">End date (optional)</Label>
-				<DatePicker id="reminder-end" bind:value={endDate} placeholder="No end date" />
-				{#if errors['endDate']}<FormFieldError>{errors['endDate']}</FormFieldError>{/if}
-			</div>
+				<!-- Custom interval (only for custom frequency) -->
+				{#if frequency === 'custom'}
+					<div class="grid grid-cols-2 gap-3">
+						<div class="space-y-2">
+							<Label for="reminder-interval-value">Every</Label>
+							<Input
+								id="reminder-interval-value"
+								type="number"
+								min="1"
+								bind:value={intervalValue}
+								placeholder="3"
+								aria-invalid={!!errors['intervalValue']}
+							/>
+							{#if errors['intervalValue']}<FormFieldError>{errors['intervalValue']}</FormFieldError
+								>{/if}
+						</div>
+						<div class="space-y-2">
+							<Label for="reminder-interval-unit">Unit</Label>
+							<Select.Root type="single" bind:value={intervalUnit}>
+								<Select.Trigger id="reminder-interval-unit" class="w-full">
+									{intervalUnit}{intervalValue && parseInt(intervalValue, 10) > 1 ? 's' : ''}
+								</Select.Trigger>
+								<Select.Content>
+									{#each INTERVAL_UNITS as u (u)}
+										<Select.Item value={u} label={u}>{u}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Start date -->
+				<div class="space-y-2">
+					<Label for="reminder-start">Start date *</Label>
+					<DatePicker id="reminder-start" bind:value={startDate} placeholder="Select start date" />
+				</div>
+
+				<!-- End date (optional) -->
+				<div class="space-y-2">
+					<Label for="reminder-end">End date (optional)</Label>
+					<DatePicker id="reminder-end" bind:value={endDate} placeholder="No end date" />
+					{#if errors['endDate']}<FormFieldError>{errors['endDate']}</FormFieldError>{/if}
+				</div>
+			{/if}
 
 			<!-- Vehicles -->
 			<div class="space-y-2">
@@ -360,7 +495,12 @@
 			</div>
 
 			<Dialog.Footer>
-				<Button type="button" variant="outline" onclick={() => (open = false)} disabled={isSubmitting}>
+				<Button
+					type="button"
+					variant="outline"
+					onclick={() => (open = false)}
+					disabled={isSubmitting}
+				>
 					Cancel
 				</Button>
 				<Button type="submit" disabled={isSubmitting || vehicles.length === 0}>

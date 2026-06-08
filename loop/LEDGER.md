@@ -9,14 +9,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 39 |
+| feature | 4 | 45 |
 | deep-review | 5 | 42 |
 | guard | 6 | 41 |
 | bug | 3 | 44 |
 | arch | 5 | 43 |
 | infra | 6 | 40 |
 
-Current cycle: **44**
+Current cycle: **45**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -906,3 +906,24 @@ Current cycle: **44**
   → `feature` wins → maintenance-schedule **T7 (ReminderForm mileage branch)** — THE visual cycle,
   eyes-on screenshot required (ui-autoloop). Remaining: bug #11 (mobile fuel-stat wrap); arch
   settings-DROP + auth; #14/#16 await Angelo.
+- **C45 (feature — maintenance-schedule T7: ReminderForm mileage branch)** — `feature` forced (cyc 39,
+  starved-for 6 > 4). Built the mileage UI in ReminderForm.svelte: a "Trigger when" Select (On a time
+  schedule | At a mileage interval | Time or mileage whichever first) driving hasTimeAxis/hasMileageAxis
+  $derived; the mileage axis reveals a Service-interval input (suffixed with the selected vehicle's
+  distance-unit label via getDistanceUnitLabel) + a Last-serviced-at input (placeholder 'current',
+  hint "leave blank to use latest reading" — matches the C31 backend default), and HIDES the time
+  fields (frequency/dates); the time axis keeps the existing fields unchanged. Validation: D4
+  single-vehicle when mileage, positive intervalMileage required, time fields only validated when the
+  time axis is active. Payload sends triggerMode + intervalMileage (null when pure time) + omits
+  lastServiceOdometer when blank (backend defaults it). Edit-path seeds all three from the reminder;
+  composed entirely from the existing kit (Select/Input/Label/FormFieldError) — no new components/CSS.
+  VERIFIED: frontend tsc 0 · build ✓ · 345 unit tests · prettier clean. ⚠️ EYES-ON NOT CAPTURED — the
+  Playwright/browser harness is sandbox-denied in this autonomous context (the run auto-refused). Wrote
+  an untracked e2e (`reminder-mileage.meshclaw.e2e.ts`) that screenshots the mileage form + asserts the
+  reveal/hide + 'both' behavior when regress.sh runs; flagged the pending eyes-on to Angelo via
+  send_message (honest-over-precise: visual risk is low — kit-composed, adjacent-field-identical — but
+  not confirmed). NOT claiming T7 fully done until eyes-on; tasks.md marks it [~] visual-pending.
+  Next cycle (46): nothing over budget (deep-review cyc 42 starved-for 4; arch 3; all under). Highest-
+  leverage = continue the feature arc → **T8** (/reminders page + DueRemindersCard: OR-in mileage due,
+  render the milestone + gap with unit label, wire the "Mark serviced" button to reminderApi.markServiced;
+  four states + a11y) — also visual. Then T9 (e2e). bug #11 + arch settings-DROP/auth queued. #14/#16 Angelo.
