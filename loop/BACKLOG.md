@@ -22,10 +22,10 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
 ## Ranked queue (top = next)
 
 ### feature
-1. **Maintenance-schedule reminders** — define service intervals by mileage and/or time
-   (oil, tires, brakes…), surface "due" based on current odometer + last service. Needs a
-   spec (`.kiro/specs/maintenance-schedule/`) + design sign-off before build. *(highest
-   user value of the open features; builds on the shipped reminders + odometer engines.)*
+1. **Maintenance-schedule reminders** — spec DRAFTED C4 (`.kiro/specs/maintenance-schedule/`,
+   requirements+design+tasks). **BLOCKED on Angelo's D1–D6 sign-off** (flagged via send_message
+   C4). Once ratified, build is backend-first per tasks.md T1–T9. *(highest user value; reuses the
+   reminders + odometer engines; adds a mileage trigger axis + canonical current-odometer helper.)*
 2. **Import from other trackers** — CSV import from Fuelly/Fuelio/Drivvo/etc. (VROOM-native
    CSV round-trip already ships; this is mapping foreign schemas). Needs per-source column
    mapping design.

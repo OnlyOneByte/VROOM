@@ -9,13 +9,13 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | — |
+| feature | 4 | 4 |
 | deep-review | 5 | 3 |
 | guard | 6 | 2 |
 | bug | 3 | 3 |
 | infra | 6 | 1 |
 
-Current cycle: **3**
+Current cycle: **4**
 
 ## Cycle log
 - **C1 (infra)** — Bootstrapped the `loop/` scaffold the loop format depends on:
@@ -55,3 +55,21 @@ Current cycle: **3**
   Next cycle: `feature` (budget 4) and `infra` (CLAUDE.md stale refs) are the most starved.
   Prefer the cheap `infra` (CLAUDE.md still says "Biome can't run" + points at gitignored
   STATUS.md/LOOP.md — wrong for a fresh clone), or pick up a UI deep-review finding as a `bug`.
+- **C4 (feature → spec)** — `feature` was over budget (never touched, budget 4), so the rule
+  forced a feature pick. Its first loop phase is SPEC (build gated on Angelo sign-off), so the
+  increment is the spec, not code. Fanned out 2 Explore agents to scope the reuse surface:
+  (1) reminders engine is 100% time-based; mileage was never scoped/deferred; `reminder_vehicles`
+  junction + notification feed + ReminderForm/DueRemindersCard are reusable. (2) odometer is a
+  bare integer in the vehicle's distance unit (convert-on-read, no canonical unit); NO
+  "current odometer" helper exists (two competing notions: fuel-only `vehicle-stats.currentMileage`
+  vs the date-ordered `getHistory` UNION). Drafted `.kiro/specs/maintenance-schedule/`
+  {requirements,design,tasks}.md: extend reminders with a `triggerMode` + nullable mileage columns
+  (additive), a new max-by-value `getCurrentOdometer` helper, whichever-comes-first OR-logic,
+  mark-serviced re-arm, mileage-recheck-on-write, and R9 backup/Sheets-header coverage. Six open
+  product decisions (D1–D6) flagged for sign-off; recommended option given for each; tasks.md is
+  BLOCKED on T0. Flagged Angelo via send_message; did NOT block — moved on.
+  Verify (spec-only): cross-checked D1–D6 referenced consistently across all three files +
+  file:line groundings from the scoping pass. No build (no code).
+  Next cycle: with feature freshly touched, `infra` (cyc 1, budget 6) and `guard` (cyc 2) are
+  the next most-starved; or pick up a UI-review `bug` (the month-trend midnight-UTC date is a
+  cheap one-liner). The maintenance build itself stays blocked until D1–D6 sign-off.
