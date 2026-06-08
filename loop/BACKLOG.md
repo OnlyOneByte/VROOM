@@ -155,25 +155,7 @@ against current source before acting, then knock out the top one. Once these are
 go broader), run the AUDIT fan-out per rule 7 to repopulate. Obey the `arch` rules above —
 behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
 
-1. **Dedup ownership-validation: one source of truth.** `validateEntityOwnership` in
-   `backend/src/api/photos/helpers.ts` carries a PRIVATE `validateExpenseOwnership` copy and
-   re-inlines vehicle / insurance-policy / insurance-claim ownership checks that already exist
-   as exported helpers in `backend/src/utils/validation.ts` (`validateVehicleOwnership`,
-   `validateExpenseOwnership`, `validateInsuranceOwnership`). Two ownership-check
-   implementations that can DRIFT is a security-adjacent smell (one could be fixed and the
-   other not). Refactor: route the photos `entityType` switch through the shared validators
-   (keep the direct-`photos.user_id` `validatePhotoOwnership` as-is — it's a genuinely
-   different check on an existing-photo row). Behavior-preserving: same `NotFoundError`
-   per branch. **Test-anchor first**: the cross-tenant IDOR HTTP suite already exercises
-   photo-upload ownership — confirm it covers all four entityTypes; add the missing
-   characterization cases BEFORE refactoring if not. (highest value: dedup + safety)
-   **SAFETY NET IN PLACE (C17):** `photos/__tests__/entity-ownership-gate.test.ts` now pins the
-   gate's observable contract for ALL entity types (own→200, foreign→404, missing→404, unknown→400,
-   anon→401; 14 cases). **NEXT = EXECUTE the refactor:** route the `vehicle`/`expense`/
-   `insurance_policy` cases through `validateVehicleOwnership`/`validateExpenseOwnership`/
-   `validateInsuranceOwnership`; keep `insurance_claim` (transitive) + `odometer_entry` inline; keep
-   `validatePhotoOwnership` as-is. All 14 gate tests must stay green (behavior-preserving).
-2. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
+1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,
    while `expenses` and `providers` (1 each) lean on the shared Hono error middleware
    (`backend/src/middleware/`) + typed errors (`NotFoundError`/`ValidationError`/…). The
@@ -181,7 +163,7 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
    Refactor ONE route file per cycle (start with `sync`): drop the try/catch, throw the typed
    error, let the middleware shape the response. Behavior-preserving: assert identical status
    + body via the route's HTTP test (add coverage first if a handler is untested). (consistency)
-3. **Extract the frontend page load-state pattern.** ~14 `+page.svelte` files repeat the same
+2. **Extract the frontend page load-state pattern.** ~14 `+page.svelte` files repeat the same
    `isLoading` / `loadError` / `try → fetch → catch → toast + set error` triad (dashboard,
    expenses, reminders, insurance, analytics, vehicles/[id], settings, profile, …) — the exact
    class the `bug` queue keeps re-finding per page (load-failure-masquerades-as-empty-state).
@@ -190,6 +172,14 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
    it. Behavior-preserving per page; prove with that route's smoke + an eyes-on screenshot
    (no pixel moves). Bonus: structurally prevents the masquerade bug class. (dedup + bug-class
    prevention; do AFTER bug #1 fixes vehicle-detail so the helper reflects the correct shape)
+
+- ~~**Dedup ownership-validation: one source of truth.**~~ — *DONE C17+C18. C17 added the safety net
+  (`entity-ownership-gate.test.ts`, 14 cases pinning the gate's observable contract per entity type).
+  C18 executed the refactor: `photos/helpers.ts validateEntityOwnership` now routes vehicle/expense/
+  insurance_policy through the shared `validateVehicleOwnership`/`validateExpenseOwnership`/
+  `validateInsuranceOwnership` (utils/validation.ts); deleted the private dup + 2 inlined checks +
+  unused imports. Kept insurance_claim (transitive) + odometer_entry inline + validatePhotoOwnership
+  as-is. 3 ownership impls → 1; behavior-preserving (all gate tests + full 889 suite green, unchanged).*
 
 Seed audit angles for the rule-7 fan-out (once the above are done, or to go broader):
 - **Backend layering** — route handlers doing repository/business logic inline; missing or

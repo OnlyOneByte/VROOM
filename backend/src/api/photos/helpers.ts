@@ -1,10 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '../../db/connection';
-import { expenses, odometerEntries, photos } from '../../db/schema';
+import { odometerEntries, photos } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
+import {
+  validateExpenseOwnership,
+  validateInsuranceOwnership,
+  validateVehicleOwnership,
+} from '../../utils/validation';
 import { insuranceClaimRepository } from '../insurance/claims-repository';
-import { insurancePolicyRepository } from '../insurance/repository';
-import { vehicleRepository } from '../vehicles/repository';
 
 /**
  * Check photo ownership directly via photos.user_id.
@@ -19,17 +22,6 @@ export async function validatePhotoOwnership(photoId: string, userId: string): P
     .limit(1);
   const photo = rows[0];
   if (!photo || photo.userId !== userId) throw new NotFoundError('Photo');
-}
-
-async function validateExpenseOwnership(entityId: string, userId: string): Promise<void> {
-  const db = getDb();
-  const rows = await db
-    .select({ userId: expenses.userId })
-    .from(expenses)
-    .where(eq(expenses.id, entityId))
-    .limit(1);
-  const expense = rows[0];
-  if (!expense || expense.userId !== userId) throw new NotFoundError('Expense');
 }
 
 /**
@@ -51,22 +43,24 @@ export async function validateEntityOwnership(
 ): Promise<void> {
   switch (entityType) {
     case 'vehicle': {
-      const vehicle = await vehicleRepository.findByUserIdAndId(userId, entityId);
-      if (!vehicle) throw new NotFoundError('Vehicle');
+      // Shared validator throws NotFoundError('Vehicle') on miss/mismatch.
+      await validateVehicleOwnership(entityId, userId);
       break;
     }
     case 'insurance_policy': {
-      const policy = await insurancePolicyRepository.findById(entityId);
-      if (!policy || policy.userId !== userId) throw new NotFoundError('Insurance policy');
+      // Shared validator throws NotFoundError('Insurance policy') on miss/mismatch.
+      await validateInsuranceOwnership(entityId, userId);
       break;
     }
     case 'insurance_claim': {
-      // Claim ownership is transitive through its policy (claim → policy.userId).
+      // Claim ownership is transitive through its policy (claim → policy.userId);
+      // no shared validator exists for this indirection, so keep it inline.
       const ownerId = await insuranceClaimRepository.findOwnerUserId(entityId);
       if (ownerId !== userId) throw new NotFoundError('Insurance claim');
       break;
     }
     case 'expense': {
+      // Shared validator throws NotFoundError('Expense') on miss/mismatch.
       await validateExpenseOwnership(entityId, userId);
       break;
     }

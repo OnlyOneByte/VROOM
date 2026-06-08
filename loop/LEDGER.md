@@ -13,10 +13,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 14 |
 | guard | 6 | 13 |
 | bug | 3 | 14 |
-| arch | 5 | 17 |
+| arch | 5 | 18 |
 | infra | 6 | 12 |
 
-Current cycle: **17**
+Current cycle: **18**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -290,3 +290,21 @@ Current cycle: **17**
   odometer inline; keep `validatePhotoOwnership` as-is), all 14 gate tests must stay green. That's an
   `arch` pick again but it's the natural completion; alternatively take the starved `guard`/`deep-review`.
   Lean: complete arch #1 (the net exists, the value is in finishing it) UNLESS balance forces guard.
+- **C18 (arch — executed arch #1)** — nothing over budget (infra AT 6, breaches at 19); took the
+  highest-leverage item: COMPLETING arch #1 now that C17's safety net is in. Refactored
+  `photos/helpers.ts` `validateEntityOwnership` to route the `vehicle`/`expense`/`insurance_policy`
+  cases through the shared exported validators (`validateVehicleOwnership`/`validateExpenseOwnership`/
+  `validateInsuranceOwnership` in `utils/validation.ts`) instead of three private/inlined copies.
+  Deleted the duplicate private `validateExpenseOwnership` + the inlined vehicle.findByUserIdAndId and
+  policy.userId checks; dropped the now-unused `expenses`/`vehicleRepository`/`insurancePolicyRepository`
+  imports. Kept `insurance_claim` inline (transitive claim→policy ownership has no shared validator) and
+  `odometer_entry` inline (no shared validator) and `validatePhotoOwnership` as-is (genuinely different
+  check on an existing photo row). Collapsed 3 ownership impls → 1 source of truth, killing the
+  drift risk (security-adjacent). Behavior-preserving: same NotFoundError per branch, proven by the
+  C17 gate suite — **all 14 cases + claim's 3 stay green, full suite 889 pass/0 fail UNCHANGED**.
+  Verified: tsc 0, Biome musl clean, build bundled.
+  Next cycle (19): `infra` breaches budget (cyc 12, starved-for 7 > 6) → MUST pick `infra`. The infra
+  queue is empty — repopulate from a real need: candidates are a CLAUDE.md/loop-doc refresh (state has
+  moved: maintenance T1/T2 shipped, arch category active, 18 cycles in) or a loop-tooling improvement.
+  `guard` (cyc 13, starved-for 6 = budget, breaches at 19 too) is the close runner-up but infra is more
+  starved. Take infra; if the infra need is trivial, also knock the starved guard next.
