@@ -198,10 +198,19 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
      `errorHandler` through it, committed `error-handler.test.ts` (7 tests) proving the two paths are
      byte-identical for all 7 SyncErrorCodes + pinning every pre-existing branch (had ZERO coverage).
      Dormant + behavior-preserving today (all SyncErrors still caught locally).
-   - [ ] **part 2 — drop the try/catch.** Now safe: remove the hand-rolled try/catch from
-     `sync/routes.ts` (7 handlers), let SyncErrors propagate to `errorHandler`. Prove behavior-
-     identical via the sync route HTTP tests + the part-1 equivalence net. Then repeat for `auth`
-     (7) and `settings` (5) — one route file per cycle. (consistency)
+   - [x] **part 2a (C30) — characterize sync-route error behavior first.** GROUNDING CORRECTION
+     (again): the "clean drop" premise is wrong for NON-SyncError throws — handleSyncError wraps any
+     non-SyncError as 500 OPERATION_FAILED, but the central errorHandler maps a ZodError → 400
+     ValidationError + an AppError by statusCode, so a blind drop changes status codes (not
+     behavior-preserving). The sync routes had ZERO real HTTP-stack error coverage. Committed
+     `sync-route-errors.test.ts` (4 tests, real app.request) pinning today's status+body on the
+     SyncError paths + documenting the 500→400 divergence analytically. Test-only.
+   - [ ] **part 2b — drop the try/catch (now provable).** Remove the hand-rolled try/catch from
+     `sync/routes.ts` (7 handlers); let SyncErrors + the others propagate to `errorHandler`. The
+     SyncError-path assertions in sync-route-errors.test.ts stay green; UPDATE the divergent
+     assertions to 400 ValidationError IN THE SAME COMMIT (deliberate, reviewed status change — it's an
+     improvement, but a change). Then repeat for `auth` (7) and `settings` (5) — one route file per
+     cycle, each with its own characterize-then-drop pair if it lacks error coverage. (consistency)
 2. **Extract the frontend page load-state pattern.** ~14 `+page.svelte` files repeat the same
    `isLoading` / `loadError` / `try → fetch → catch → toast + set error` triad (dashboard,
    expenses, reminders, insurance, analytics, vehicles/[id], settings, profile, …) — the exact

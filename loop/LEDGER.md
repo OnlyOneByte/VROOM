@@ -13,10 +13,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 28 |
 | guard | 6 | 27 |
 | bug | 3 | 29 |
-| arch | 5 | 24 |
+| arch | 5 | 30 |
 | infra | 6 | 26 |
 
-Current cycle: **29**
+Current cycle: **30**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -585,3 +585,29 @@ Current cycle: **29**
   recheck-on-write D5 + vehicle-stats reconcile). Remaining decided bugs (#9 interestPaidYtd rename,
   #10 loan-breakdown balance, #11 mobile fuel-stat wrap) stay queued; #14 still needs the Angelo
   semantics decision (asked at end of C28 — buttons shown, no answer yet; don't auto-fix).
+- **C30 (arch — #1 part 2 prerequisite: characterize sync-route error behavior)** — BALANCE: the C29
+  forecast said "feature breaches next", but the table is the source of truth and BOTH breached at
+  cyc 30 — feature starved-for 5 > 4 AND arch starved-for 6 > 5. The rule picks the MOST starved →
+  `arch` (6) wins over feature (5); T3 part 3/T4 waits one more cycle. (Lesson: compute every category
+  from the table each cycle, don't trust last cycle's single-category forecast.) Took arch #1 part 2
+  (drop sync/routes.ts try/catch). APPLIED C24/C28 DISCIPLINE — verified the BACKLOG's "clean drop"
+  premise against source FIRST, and it's wrong the same way C24's was: handleSyncError + the central
+  errorHandler are byte-identical for a SyncError (proven C24), but for a NON-SyncError thrown inside a
+  handler they DIVERGE — handleSyncError's tail wraps any non-SyncError as 500 OPERATION_FAILED, while
+  errorHandler maps a ZodError → 400 ValidationError and an AppError by statusCode. So a blind drop
+  CHANGES status codes (500→400 for bad input) — not behavior-preserving, violates arch rule 2. AND
+  (rule 3) the sync routes had ZERO real HTTP-stack error coverage (existing "tests" are pure-logic
+  replicas). So this cycle is the test-only PREREQUISITE (mirrors C24→C25): committed
+  `sync-route-errors.test.ts` (4 tests through the real app.request stack) pinning today's status+body
+  at representative sites — SyncError paths (POST /sync invalid syncTypes → 400; unknown type → 400;
+  restore/from-provider missing Idempotency-Key → 400 via the middleware, already central) + the
+  health positive control. The non-SyncError DIVERGENCE is documented analytically in the file (the
+  app.request harness always JSON-stringifies the body + lacks a header arg, so an in-handler ZodError
+  can't be provoked through it) with the exact 500→400 change the part-2 drop will make. Now the drop
+  is provable: when the try/catch comes out, the SyncError assertions stay green and the divergent ones
+  get updated to 400 in the same commit — a deliberate, reviewed step. Verified: tsc 0 · musl-biome
+  clean · 927 pass/0 fail (+4, up from 923) · build bundled. Test-only; no product code touched.
+  Next cycle (31): `feature` is now most-starved over budget (cyc 25, starved-for 6 > 4) → it wins →
+  maintenance-schedule **T3 part 3/T4** (mark-serviced re-arm + Zod refinements + recheck-on-write +
+  vehicle-stats reconcile) — finally resumes. The arch drop (part 2 proper) is queued for the next
+  arch pick (~cyc 35), now safe against this net. #14 still awaits the Angelo semantics decision.
