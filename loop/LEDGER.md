@@ -12,11 +12,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 37 |
 | deep-review | 5 | 35 |
 | guard | 6 | 34 |
-| bug | 3 | 34 |
+| bug | 3 | 38 |
 | arch | 5 | 36 |
 | infra | 6 | 33 |
 
-Current cycle: **37**
+Current cycle: **38**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -771,3 +771,25 @@ Current cycle: **37**
   (interestPaidYtd rename) or #11 (mobile fuel-stat wrap — UI). REMAINING maintenance-schedule:
   T3-part-3 (vehicle-stats reconcile), T5 remaining (backup round-trip already done C27), frontend
   T6–T9 (the whole UI — types/service/ReminderForm mileage branch/page+card/e2e). #14 awaits Angelo.
+- **C38 (bug — #10: buildLoanBreakdown flat balance)** — `bug` forced (cyc 34, starved-for 4 > 3).
+  Fixed #10 (confirmed real + unfixed by the C28 audit): buildLoanBreakdown read each loan's balance
+  into a Map then NEVER decremented it across the 12-month loop → every month reported identical
+  interest/principal (interest never declined, principal never rose, a loan paying off mid-window
+  over-projected). The method does DB I/O (computeBalance), so to make the math test-anchored
+  (bug-rule: characterize first) I EXTRACTED the pure amortization into `buildAmortizationSchedule`
+  (analytics-charts.ts, alongside monthKeysInRange/effectiveMonthlyPremium): takes caller-resolved
+  {balance,apr,paymentAmount}[] + month-key labels, walks each balance down by its principal each
+  month, clamps principal to the remaining balance + skips paid-off loans (no negative interest /
+  phantom principal). buildLoanBreakdown now resolves balances via Promise.all + builds the 12 month
+  keys, then delegates. Pinned by `amortization-schedule.test.ts` (5: interest-declines/principal-
+  rises = the defining bug assertion, mid-window payoff clamp, multi-loan sum, no-input-mutation,
+  empty-loans). Verified via validate:local: EXIT 0 (tsc 0 · musl-biome clean · 952 pass/0 fail, +5 ·
+  build bundled). HARNESS GOTCHA (noted): running `bun test src/api/analytics src/utils` together
+  3-failed with "ALTER TABLE … ADD due_odometer" errno-1 (duplicate column) — a cross-suite migration
+  double-apply when two suites migrate the shared DB in one process; isolation + the full `bun test`
+  are both green. The canonical gate is full `bun test` / validate:local, NOT a narrowed multi-dir run.
+  Next cycle (39): nothing over budget (deep-review cyc 35 starved-for 4; arch cyc 36 starved-for 3;
+  all under). Highest-leverage = the maintenance-schedule FRONTEND (T6: types + service client for the
+  mileage fields + mark-serviced) — kicks off the UI arc that makes the now-complete backend usable;
+  it's a feature pick (feature starved-for 2, not yet breaching, but highest-leverage). Remaining bugs
+  #9 (interestPaidYtd rename) + #11 (mobile fuel-stat wrap) stay queued. #14 awaits Angelo.

@@ -13,6 +13,7 @@ import {
 import { DatabaseError, ValidationError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import {
+  buildAmortizationSchedule,
   buildCostPerDistanceChart,
   buildDayOfWeekPatterns,
   buildExpenseByCategory,
@@ -823,32 +824,22 @@ export class AnalyticsRepository {
 
     const { financingRepository } = await import('../financing/repository');
     const now = new Date();
-    const breakdown: FinancingData['loanBreakdown'] = [];
 
-    // Compute balances for all active loans
-    const loanBalances = new Map<string, number>();
-    for (const loan of activeLoans) {
-      const balance = await financingRepository.computeBalance(loan.id);
-      loanBalances.set(loan.id, balance);
-    }
+    // Resolve each loan's current balance, then hand the pure amortization helper the inputs +
+    // the 12 month-key labels. The helper walks each balance down by its principal each month
+    // (bug #10 — balances were previously read but never decremented, so all 12 months were equal).
+    const loans = await Promise.all(
+      activeLoans.map(async (loan) => ({
+        balance: await financingRepository.computeBalance(loan.id),
+        apr: loan.apr ?? 0,
+        paymentAmount: loan.paymentAmount,
+      }))
+    );
+    const monthKeys = Array.from({ length: 12 }, (_, m) =>
+      toMonthKey(new Date(now.getFullYear(), now.getMonth() + m, 1))
+    );
 
-    for (let m = 0; m < 12; m++) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() + m, 1);
-      let totalInterest = 0;
-      let totalPrincipal = 0;
-      for (const loan of activeLoans) {
-        const balance = loanBalances.get(loan.id) ?? 0;
-        const interest = balance * ((loan.apr ?? 0) / 100 / 12);
-        totalInterest += Math.max(0, interest);
-        totalPrincipal += Math.max(0, loan.paymentAmount - interest);
-      }
-      breakdown.push({
-        month: toMonthKey(monthDate),
-        interest: totalInterest,
-        principal: totalPrincipal,
-      });
-    }
-    return breakdown;
+    return buildAmortizationSchedule(loans, monthKeys);
   }
 
   // ---- Insurance helpers --------------------------------------------------

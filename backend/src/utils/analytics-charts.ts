@@ -181,6 +181,50 @@ export function effectiveMonthlyPremium(term: {
   return term.totalCost / monthsInTerm;
 }
 
+/** One loan's amortization inputs: current balance, annual rate %, fixed monthly payment. */
+export interface AmortizationLoan {
+  balance: number;
+  apr: number;
+  paymentAmount: number;
+}
+
+/**
+ * Amortization schedule: per-month total interest + principal across a set of loans (bug #10).
+ *
+ * Each month, a loan's interest = balance * (apr/100/12) and its principal = payment − interest;
+ * the balance is then REDUCED by that principal for the next month. The old buildLoanBreakdown
+ * computed interest off a balance it never decremented, so every one of the 12 months reported the
+ * SAME interest/principal (interest never declined, principal never rose, and a loan that pays off
+ * mid-window was over-projected). This walks the balance down month over month, clamping at 0 so a
+ * paid-off loan contributes nothing further (no negative interest, no phantom principal).
+ *
+ * Pure + caller-resolved (no DB): the caller supplies current balances and the month-key labels, so
+ * this is unit-testable. `monthKeys.length` months are emitted in order.
+ */
+export function buildAmortizationSchedule(
+  loans: AmortizationLoan[],
+  monthKeys: string[]
+): Array<{ month: string; interest: number; principal: number }> {
+  // Local running balances so we don't mutate the caller's inputs.
+  const balances = loans.map((l) => l.balance);
+
+  return monthKeys.map((month) => {
+    let totalInterest = 0;
+    let totalPrincipal = 0;
+    for (let i = 0; i < loans.length; i++) {
+      const balance = balances[i];
+      if (balance <= 0) continue; // paid off — contributes nothing
+      const interest = balance * (loans[i].apr / 100 / 12);
+      // Principal can't exceed the remaining balance (the final payment is smaller).
+      const principal = Math.min(Math.max(0, loans[i].paymentAmount - interest), balance);
+      totalInterest += Math.max(0, interest);
+      totalPrincipal += principal;
+      balances[i] = balance - principal;
+    }
+    return { month, interest: totalInterest, principal: totalPrincipal };
+  });
+}
+
 /** Normalize a date field that may be a Date or timestamp (Unix seconds). */
 function normalizeDate(d: Date | number | null): Date | null {
   if (d == null) return null;

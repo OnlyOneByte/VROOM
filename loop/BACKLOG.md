@@ -142,11 +142,10 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    CURRENT balance, then sums it as `interestPaidYtd` (`:1592`). Neither YTD nor "paid". Rename to
    `monthlyInterestEstimate` (smallest honest fix) or compute true YTD from payment history. (med)
    *(C28 audit: CONFIRMED still real + unfixed; line refs refreshed.)*
-10. **`buildLoanBreakdown` holds balance flat across 12 months** — `repository.ts:829-849` fetches each
-    loan balance ONCE into a Map then reads the same value every iteration, never decrementing by
-    principal — so every month is identical (interest doesn't decline, principal doesn't rise) and
-    loans that pay off mid-window are over-projected. Decrement `balance - (paymentAmount - interest)`
-    each iteration; stop at 0. (correctness, med) *(C28 audit: CONFIRMED still real + unfixed.)*
+- ~~**`buildLoanBreakdown` holds balance flat across 12 months (#10)**~~ — *DONE C38: extracted pure
+  `buildAmortizationSchedule` (analytics-charts.ts) that walks each balance down by principal/month +
+  clamps payoff; buildLoanBreakdown resolves balances then delegates. Pinned by
+  amortization-schedule.test.ts (5, incl. interest-declines/principal-rises + mid-window payoff).*
 11. **Mobile fuel-stat numbers wrap mid-value** — CONFIRMED C14 via screenshot+DOM probe: in
     `FuelEfficiencyStatsCard` the `StatCardGrid columns={3}` with dual-metric `text-2xl` StatCards =
     4 large numbers across 393px → `$97.80`→"$97"/".80", `25,850`→"25,"/"850". Same dual-metric
