@@ -216,6 +216,11 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 
 ### infra
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**Orientation-doc refresh (C26)**~~ — *DONE C26: CLAUDE.md current-state was stale (said
+  maintenance-schedule "T1+T2 shipped, next T3"; actually T1/T2/T3-part-1/T3-part-2 all shipped,
+  engine dormant until T4) → rewrote + spelled out the T4 surface; softened the coverage badge to a
+  TODO.md baseline (suite grew to ~918 tests). APIConventions.md error-handling updated for C24
+  (global handler is SyncError-aware via syncErrorResponse). Doc-only.*
 - ~~**CLAUDE.md post-sign-off refresh**~~ — *DONE C12: the stale "maintenance-schedule drafted/
   awaiting sign-off" line → both specs APPROVED/BUILD GO + the standing 90% coverage goal.*
 - ~~**CLAUDE.md stale refs**~~ — *DONE C5: corrected Biome (musl works), branch convention

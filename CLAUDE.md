@@ -107,13 +107,20 @@ Highlights:
   and the Google Sheets path (header set is pinned by `sheets-header-coverage.test.ts`).
 - Two feature specs are signed off (backend-first, one `tasks.md` task per loop cycle):
   - `.kiro/specs/maintenance-schedule/` (mileage+time service-interval reminders) is **mid-build**:
-    T1 (additive mileage columns migration) + T2 (`getCurrentOdometer` cross-source helper) shipped;
-    next is T3 (whichever-comes-first trigger logic + the deferred nextDueDate/dueDate nullable
-    rebuild). Track progress in its `tasks.md`.
+    backend nearly done — T1 (additive mileage columns), T2 (`getCurrentOdometer`), T3 part 1 (the
+    nullable-date rebuild migration 0004 + partial mileage dedup index), and T3 part 2 (the
+    whichever-comes-first mileage trigger pass: emits a mileage notification when
+    `getCurrentOdometer >= nextDueOdometer`, no auto-re-arm) all shipped. The trigger engine is
+    **dormant** until **T4** wires routes + validation (no mileage reminder is API-creatable yet):
+    `POST /:id/mark-serviced` re-arm (D3), Zod refinements (D4 single-vehicle), `recheckMileageReminders`
+    on odometer write (D5), then the deferred `vehicle-stats.currentMileage` reconcile. Frontend
+    (T6–T9) follows. Track progress in its `tasks.md`.
   - `.kiro/specs/import-trackers/` (Fuelly/Fuelio/Drivvo CSV via a mapping pre-pass over the
     hardened import pipeline) is **approved, not started** (T1+).
-- Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides (badges today:
-  frontend ~59%, backend ~74%) — fold into bug/guard/arch cycles, don't regress it.
+- Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides (last-measured
+  baseline in TODO.md: frontend ~59%, backend ~74% — the backend suite has grown to ~918 tests
+  since, so treat these as a floor, not a current reading) — fold into bug/guard/arch cycles,
+  don't regress it.
 - Open gaps: full in-process backend HTTP harness needs a DB-injection refactor (the
   `const sqlite = new Database(...)` singleton binds at import); screenshot visual-diffing is
   capture-only (no baseline compare); storage-backup-toggle E2E needs an OAuth provider (not

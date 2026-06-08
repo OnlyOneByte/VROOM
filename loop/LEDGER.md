@@ -14,9 +14,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 20 |
 | bug | 3 | 23 |
 | arch | 5 | 24 |
-| infra | 6 | 19 |
+| infra | 6 | 26 |
 
-Current cycle: **25**
+Current cycle: **26**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -491,3 +491,25 @@ Current cycle: **25**
   required when mileage), and `recheckMileageReminders` on odometer/mileaged-expense write (D5). Then
   the deferred T2 vehicle-stats.currentMileage reconcile. `guard` (cyc 20, starved-for 5 < 6) and
   `deep-review` (cyc 21, starved-for 4 < 5) approach budget — candidates if T4 needs a breather.
+- **C26 (infra — refresh stale orientation docs)** — BALANCE OVERRIDE: `infra` breached budget
+  (cyc 19, starved-for 7 > 6), the only over-budget category, so it outranks continuing T3 part 3
+  this cycle. The infra queue was empty → scoped a real "keep the machine running" item: the
+  orientation docs a fresh agent reads first had drifted out of sync with C22–C25, which actively
+  misleads every future cycle. Fixed: (1) CLAUDE.md "Current state & gaps" said maintenance-schedule
+  was "T1+T2 shipped; next is T3" — rewrote to reflect T1/T2/T3-part-1 (nullable rebuild migration
+  0004 + partial index)/T3-part-2 (mileage trigger pass) all shipped, engine dormant until T4 wires
+  routes+validation; spelled out the T4 surface (mark-serviced D3, refinements D4, recheck D5,
+  vehicle-stats reconcile). (2) Softened the coverage line — the frontend ~59%/backend ~74% badges
+  are a last-measured TODO.md baseline, not a current reading (the backend suite has grown to ~918
+  tests), so labeled them a floor + pointed to the source rather than asserting a stale specific.
+  (3) APIConventions.md steering "Error Handling" said "for sync ops use handleSyncError()" — updated
+  to reflect C24: the global handler is now SyncError-aware via the shared `syncErrorResponse()`, so
+  throwing a SyncError needs no local catch; noted the existing sync catch blocks + the queued arch #1
+  convergence. DECISION: did NOT run a fresh coverage pass (expensive, off-point for a doc-refresh
+  cycle) — flagged the figure as a baseline instead, honest over precise. Doc-only (no code touched);
+  verified the working tree carries only CLAUDE.md + APIConventions.md. No build gate needed.
+  Next cycle (27): back to `feature` (T3 still mid-build) → **T3 part 3/T4** (mark-serviced re-arm +
+  Zod refinements + recheck-on-write + vehicle-stats reconcile). `guard` (cyc 20, starved-for 7 > 6
+  at cyc 27) will ALSO be over budget next cycle — if both feature-continuation and guard contend,
+  guard wins the balance rule; a merge-surviving guard candidate: a source-scan that the mileage
+  trigger's no-auto-re-arm invariant (one notification per milestone) stays intact.
