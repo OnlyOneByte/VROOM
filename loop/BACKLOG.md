@@ -128,13 +128,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    real on a negative-offset host. Verify deploy TZ first, then bucket on UTC. (correctness, low-med)
 
 *(surfaced by the C14 deep review — financing/insurance analytics + vehicle-detail eyes-on)*
-9. **`interestPaidYtd` is mislabeled** — `repository.ts:761` computes ONE month's interest on the
-   CURRENT balance, then sums it as `interestPaidYtd` (`:1589`). Neither YTD nor "paid". Rename to
+9. **`interestPaidYtd` is mislabeled** — `repository.ts:763-764` computes ONE month's interest on the
+   CURRENT balance, then sums it as `interestPaidYtd` (`:1592`). Neither YTD nor "paid". Rename to
    `monthlyInterestEstimate` (smallest honest fix) or compute true YTD from payment history. (med)
-10. **`buildLoanBreakdown` holds balance flat across 12 months** — `repository.ts:~829` never
-    decrements the running balance, so every month is identical (interest doesn't decline, principal
-    doesn't rise) and loans that pay off mid-window are over-projected. Decrement balance each
-    iteration; stop at 0. (correctness, med)
+   *(C28 audit: CONFIRMED still real + unfixed; line refs refreshed.)*
+10. **`buildLoanBreakdown` holds balance flat across 12 months** — `repository.ts:829-849` fetches each
+    loan balance ONCE into a Map then reads the same value every iteration, never decrementing by
+    principal — so every month is identical (interest doesn't decline, principal doesn't rise) and
+    loans that pay off mid-window are over-projected. Decrement `balance - (paymentAmount - interest)`
+    each iteration; stop at 0. (correctness, med) *(C28 audit: CONFIRMED still real + unfixed.)*
 11. **Mobile fuel-stat numbers wrap mid-value** — CONFIRMED C14 via screenshot+DOM probe: in
     `FuelEfficiencyStatsCard` the `StatCardGrid columns={3}` with dual-metric `text-2xl` StatCards =
     4 large numbers across 393px → `$97.80`→"$97"/".80", `25,850`→"25,"/"850". Same dual-metric
@@ -142,10 +144,25 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 
 *(surfaced + VERIFIED by the C21 reminders/expenses backend audit — 4 agent "HIGH"s were false
 positives, debunked in LEDGER C21; these two are the real ones)*
-13. **`advanceCustom` switch has no `default`** — `reminders/trigger-service.ts:39-56`: an invalid
-    `intervalUnit` silently no-ops (nextDue never advances → re-processed until maxCatchUp truncates).
-    Zod blocks bad values at the route, so this is defense-in-depth only. Add
-    `default: throw new ValidationError(...)`. (robustness, low)
+13. **`advanceCustom` no-default → `fastForwardPastNow` INFINITE LOOP** — `reminders/trigger-service.ts`
+    `advanceCustom` (33-58) has cases day/week/month/year with NO default, so an invalid `intervalUnit`
+    leaves `next` UNCHANGED. Re-VERIFIED + severity RAISED by the C28 audit: this isn't just a "re-fire
+    until maxCatchUp" no-op — `fastForwardPastNow` (217-238) loops `while (nextDue <= now)` with NO
+    iteration counter, so a custom reminder with a corrupt `intervalUnit` that reaches fast-forward
+    HANGS the trigger endpoint (the catch-up loop is bounded by maxCatchUp, but fast-forward is not).
+    Reachable only via DB corruption / a future validation bypass (Zod `intervalUnitSchema` blocks the
+    create+update API paths today), so still defense-in-depth — but the failure mode is a hang, not a
+    silent no-op. Fix: `default: throw new ValidationError(...)` in advanceCustom (fail fast, both the
+    catch-up and fast-forward callers surface it as a skip), AND/OR an iteration cap in fastForwardPastNow.
+    (robustness, low likelihood / HIGH blast-radius)
+14. **Insurance `buildInsuranceDetails` counts an EXPIRED latest term as current premium** —
+    `analytics/repository.ts:884-893`: picks the latest term per ACTIVE policy by `endDate` descending
+    but never checks that endDate is in the future. An active policy whose latest term has lapsed (not
+    renewed) still contributes its stale `monthlyPremium` to `totalMonthlyPremiums`/trend. SEMANTICS
+    CALL, not a clear bug — "active policy, expired term" may legitimately mean "still owe / about to
+    renew". Surfaced C28; needs a product decision (filter to `endDate >= now`, or keep + document)
+    before fixing. No test covers buildInsuranceDetails at all — a characterization test should precede
+    any change. (correctness?, med — needs decision)
 - ~~**`fastForwardPastNow` ignores `endDate` (#12)**~~ — *DONE C25: folded into T3 part 2 — added the
   main loop's `if (endDate && nextDue > endDate) { deactivate; return }` guard inside fastForward;
   pinned by trigger-fastforward-enddate.test.ts (lapsed bounded reminder deactivates, not left active).*

@@ -10,13 +10,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 25 |
-| deep-review | 5 | 21 |
+| deep-review | 5 | 28 |
 | guard | 6 | 27 |
 | bug | 3 | 23 |
 | arch | 5 | 24 |
 | infra | 6 | 26 |
 
-Current cycle: **27**
+Current cycle: **28**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -535,3 +535,31 @@ Current cycle: **27**
   populated states, mobile+desktop) or the analytics route sweep — fan out 2-3 Explore agents per
   rule 7. `bug` (cyc 23, starved-for 5 > 3) is also over budget and would be next after deep-review.
   T3 part 3/T4 (mark-serviced + validation) resumes once the starved review/bug categories are fed.
+- **C28 (deep-review — backend correctness audit of the dormant mileage engine + insurance math)** —
+  BALANCE OVERRIDE: deep-review most-starved over budget (cyc 21, starved-for 7 > 5). Verification-only
+  cycle (like C21 — no product code; findings triaged into the bug queue). Fanned out 2 parallel
+  Explore agents: (a) the C22/C25 mileage trigger engine, (b) insurance/financing analytics + the C23
+  fix. APPLIED THE C21 LESSON — verified every agent finding against source before filing. RESULTS:
+  • Agent A flagged 1 real + escalated a known one. The mileage engine is AUDIT-CLEAN on the scary
+    axes — `both` fires once per axis (distinct dedup keys, no double-count), the mileage dedup is
+    genuinely idempotent (app-check + partial-index backstop + UNIQUE-violation→null), getCurrentOdometer
+    NULL/zero/cross-vehicle handling correct, findMileageTracking candidate set correct, the bug-#12
+    endDate fix correct. The ONE real finding: backlog bug #13 (`advanceCustom` no-default) — VERIFIED
+    + SEVERITY RAISED: it's not just a re-fire-until-maxCatchUp no-op, it's an INFINITE LOOP — an invalid
+    intervalUnit leaves nextDue unchanged and `fastForwardPastNow`'s `while (nextDue <= now)` has no
+    iteration cap → hang. Still defense-in-depth (Zod blocks the API create+update paths), reachable
+    only via DB corruption/validation bypass. Updated #13 in the backlog with the corrected failure mode.
+  • Agent B: C23 `effectiveMonthlyPremium` CORRECT (null/0/empty-span edges all handled, no NaN/Infinity);
+    accumulateMonthlyPremiums is consistent with the headline total (same value source). CONFIRMED bugs
+    #9 (interestPaidYtd mislabeled, :763-764/:1592) + #10 (buildLoanBreakdown flat balance, :829-849)
+    still real + unfixed; refreshed their stale line refs. NEW finding filed as #14: buildInsuranceDetails
+    counts an EXPIRED latest term as current premium (active policy, lapsed term → stale premium in the
+    total) — flagged as a SEMANTICS call (active-but-expired may legitimately still owe), needs a product
+    decision + a characterization test (buildInsuranceDetails has zero coverage) before any change.
+  Net: engine certified clean where it matters, 1 severity correction (#13), 1 new finding (#14), 2
+  confirmations (#9/#10). No code touched; LEDGER + BACKLOG only.
+  Next cycle (29): `bug` is now most-starved over budget (cyc 23, starved-for 6 > 3) → it wins. Top
+  real, decided, standalone bug: #13 (advanceCustom default + a fastForward iteration cap — small,
+  closes the hang) or #10 (buildLoanBreakdown balance decrement — clear correctness fix, characterization
+  test first). #14 needs an Angelo decision first (don't auto-fix a semantics call). T3 part 3/T4 resumes
+  after the bug category is fed (it'll keep breaching until then).
