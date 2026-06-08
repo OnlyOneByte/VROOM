@@ -10,12 +10,12 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | — |
-| deep-review | 5 | — |
+| deep-review | 5 | 3 |
 | guard | 6 | 2 |
-| bug | 3 | — |
+| bug | 3 | 3 |
 | infra | 6 | 1 |
 
-Current cycle: **2**
+Current cycle: **3**
 
 ## Cycle log
 - **C1 (infra)** — Bootstrapped the `loop/` scaffold the loop format depends on:
@@ -38,3 +38,20 @@ Current cycle: **2**
   Next cycle: still nothing over budget. Spread again — candidates: `deep-review` (vehicle
   Overview/ExpensesTable eyes-on, or Sheets restore path) or `infra` (CLAUDE.md stale
   refs). Prefer a deep-review to exercise that starved category before its budget bites.
+- **C3 (deep-review → bug)** — Fanned out 2 parallel Explore agents (Sheets restore path +
+  vehicle Overview/ExpensesTable). The Sheets agent surfaced a REAL data-safety bug
+  (quality-bar #1): the Sheets backup writes each table through a HAND-MAINTAINED column
+  list (`getXHeaders()`), and `expenses.clientId` (the offline-sync idempotency key) was
+  missing — so it was silently dropped on every Google Sheets backup→restore round-trip
+  and restored as null, while the schema-derived CSV path preserved it. Verified firsthand
+  + computed the full drift across all 15 tables (clientId was the ONLY one). Bugs jump the
+  queue → fixed this cycle: (1) centralized the 15 header arrays into one exported
+  `SHEET_HEADERS` map (single source of truth; deleted the 15 dead getters), added
+  `clientId`; (2) committed `sheets-header-coverage.test.ts` — a schema-vs-headers superset
+  guard (cycle-208/209 pattern) that bites today and pins the whole drift class. Verified:
+  tsc 0 errors · Biome (musl) clean · 846 pass/0 fail (incl. the real Sheets round-trip
+  test, now carrying clientId) · build bundled. The UI agent's findings are filed as
+  backlog items (none data-safety; logged below). marks this cycle infra-light, product-real.
+  Next cycle: `feature` (budget 4) and `infra` (CLAUDE.md stale refs) are the most starved.
+  Prefer the cheap `infra` (CLAUDE.md still says "Biome can't run" + points at gitignored
+  STATUS.md/LOOP.md — wrong for a fresh clone), or pick up a UI deep-review finding as a `bug`.

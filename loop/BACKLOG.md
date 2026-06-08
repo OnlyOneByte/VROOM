@@ -34,10 +34,10 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
 
 ### deep-review
 1. **Eyes-on sweep: vehicle Overview tab + ExpensesTable populated states** (mobile +
-   desktop) — not eyes-on'd this round; dense composite surfaces.
-2. **Backend: Sheets restore path** — column-order / header drift vs the CSV path (CSV side
-   is guarded by c208/209; Sheets is the untested sibling).
-3. **Analytics route eyes-on** (per-vehicle + cross-vehicle + year-end), states + a11y.
+   desktop) — code-reviewed C3 (findings below); still wants a real eyes-on screenshot pass.
+2. **Analytics route eyes-on** (per-vehicle + cross-vehicle + year-end), states + a11y.
+- ~~**Backend: Sheets restore path**~~ — *DONE C3: found + fixed the clientId column-drop
+  data-loss bug; added the schema-vs-headers coverage guard. CSV path confirmed safe.*
 
 ### guard
 *(queue empty — both seeded items shipped. Re-populate as reviews surface new bug classes.)*
@@ -48,7 +48,25 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### bug
-- *(none known — populated as reviews surface them)*
+*(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
+1. **Vehicle-detail load failure masquerades as empty state** — `loadSummary`/`fetchExpensesPage`
+   in `vehicles/[id]/+page.svelte` only toast on failure, leaving `summary=null`/`expenses=[]`
+   → renders "No expenses yet" instead of an error+retry. Same class fixed for dashboard/expenses;
+   add a `*LoadError` flag + retry surface. (medium)
+2. **Month-trend dates parsed midnight-UTC** — `vehicles/[id]/+page.svelte:~95`
+   `new Date(item.period + '-01')` shifts the Expense-Trend x-axis label back a month for
+   negative-offset users. Fix: use `parseMonthToDate(item.period)` (already used everywhere else).
+   (medium, one-line)
+3. **Vehicle-detail Expenses tab: page-local search/category filter over a 20-row server slice**
+   while header reads "All Expenses ({totalCount})" — matches on other pages invisible; the
+   in-table category Select is uncontrolled here (no `onCategoryChange`). Wire server-side
+   filtering (as `/expenses` does) or hide the controls when paginated. (medium)
+4. **Interpolated Tailwind `h-[{…}]` may no-op** — `ExpensesTable.svelte` ScrollArea
+   `class="h-[{scrollHeight}]"` + `ExpenseTrendChart.svelte` `h-[{CHART_HEIGHT}px]` aren't literal
+   class strings, so Tailwind v4 may not generate them (ScrollArea loses its 600px scroll cap).
+   Use inline `style="height: …"` like ChartCard. (low, overflow — verify in-browser first)
+5. **ExpensesTable combined-row re-sort lacks an id tiebreaker** — same-date/amount rows can
+   reorder vs the server's id-tiebroken order. Cosmetic flicker. (low)
 
 ### infra
 1. **CLAUDE.md stale refs** — it points at `STATUS.md` / `.meshclaw-autopilot/LOOP.md`, now
