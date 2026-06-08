@@ -97,7 +97,20 @@ const createExpenseSchema = createExpenseSchemaBase.refine(
 );
 
 // clientId is a create-only idempotency key; it must not be mutable via update.
-const updateExpenseSchema = createExpenseSchemaBase.omit({ clientId: true }).partial();
+// `tags` is overridden to drop the base `.default([])`: a Zod `.default()` SURVIVES `.partial()`, so
+// without this an update that OMITS tags would parse to `{ tags: [] }` and silently WIPE a tagged
+// expense's tags on any unrelated edit (e.g. changing just the amount). Re-declaring it as a plain
+// optional (no default) means an omitted `tags` stays undefined → dropped by the update, preserving
+// the stored value; an explicit array still replaces. (Data-loss class from C31; guarded cycle 34.)
+const updateExpenseSchema = createExpenseSchemaBase
+  .omit({ clientId: true })
+  .partial()
+  .extend({
+    tags: z
+      .array(z.string().min(1).max(CONFIG.validation.expense.tagMaxLength))
+      .max(CONFIG.validation.expense.maxTags)
+      .optional(),
+  });
 
 // Exported so the query-contract (search/limit/tags coercion) can be unit-tested
 // at the route boundary without standing up a server.

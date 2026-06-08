@@ -11,12 +11,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 32 |
 | deep-review | 5 | 28 |
-| guard | 6 | 27 |
-| bug | 3 | 29 |
+| guard | 6 | 34 |
+| bug | 3 | 34 |
 | arch | 5 | 30 |
 | infra | 6 | 33 |
 
-Current cycle: **33**
+Current cycle: **34**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -679,3 +679,25 @@ Current cycle: **33**
   Decided standalone bugs: #10 (buildLoanBreakdown flat balance — characterization test first, then
   decrement) or #9 (interestPaidYtd rename) or #11 (mobile fuel-stat wrap — UI). #14 still needs the
   Angelo semantics decision. T4 part 3 (recheck-on-write D5) resumes once bug is fed.
+- **C34 (guard → found+fixed a real data-loss bug; feeds guard AND bug)** — BALANCE: 3 categories over
+  budget (deep-review 6>5, guard 7>6, bug 5>3); most-starved = `guard` (7) → it wins (my C33 note
+  guessed bug; the table rules — guard's raw starved-for was higher). Scoped the highest-leverage
+  merge-surviving guard: generalize the C31 footgun (a Zod `.default()` SURVIVES `.partial()`, so an
+  update schema can inject the default on an omitted field). Surveyed the codebase's `.partial()`
+  schemas + `.default()` base fields → the at-risk instance is `updateExpenseSchema =
+  createExpenseSchemaBase.omit(...).partial()` whose base `tags` is `.optional().default([])`. Wrote
+  the guard FAILING-FIRST through the real route→repo→DB stack (create a tagged expense → PUT only the
+  amount → assert tags survive) — and it CONFIRMED A REAL BUG: editing any other field of a tagged
+  expense wiped its tags (the `.default([])` survived `.partial()`, injected `tags: []`, written
+  through by repository.update). Silent data loss on the most common edit path (quality-bar #1). FIX:
+  `updateExpenseSchema` re-declares `tags` as a plain `.optional()` (no default) via `.extend()`, so an
+  omitted tags stays undefined → dropped → stored value preserved; explicit array still replaces.
+  `update-preserves-tags.test.ts` (2) now green; the failing-first run is the proof it bites. Verified
+  via the new `bun run validate:local`: EXIT 0 (tsc 0 · musl-biome clean — caught + auto-fixed a
+  formatter reflow on the edit too · 942 pass/0 fail, +2 · build bundled). AUDIT NOTE for a future
+  cycle: the reminders `expenseTags` field + any other `.optional().default(x)` in a `.partial()`'d
+  schema may share the class — a broader source-scan guard (assert no `.partial()` update schema
+  carries a surviving `.default()`) would lock the whole class merge-surviving; filed as a guard idea.
+  Next cycle (35): nothing over budget (arch starved-for 5 = budget at cyc 35; bug just fed). Highest-
+  leverage = continue T4 part 3 (recheck-on-write D5), OR take the most-starved-at-budget arch (the
+  sync try/catch DROP, now safe behind the C30 net). #14 still awaits Angelo.

@@ -79,7 +79,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   data-loss bug; added the schema-vs-headers coverage guard. CSV path confirmed safe.*
 
 ### guard
-*(queue empty — re-populate as reviews surface new bug classes.)*
+1. **Source-scan: no surviving `.default()` in a `.partial()` update schema.** The C31/C34 data-loss
+   class — a Zod `.default(x)` survives `.partial()`, so a `base.partial()` update schema injects `x`
+   on an omitted field and clobbers the stored value (C34: expense tags wiped on any edit). A
+   merge-surviving static scan that flags any update schema built via `.partial()` whose base carries a
+   `.default()` (not re-declared optional) would lock the whole class. Per-instance behavioral guards
+   exist for reminders (C31) + expense tags (C34); this is the class-level net. (med — prevents a
+   recurring silent data-loss class)
 - ~~**maintenance-fields backup round-trip**~~ — *DONE C27: `maintenance-fields-roundtrip.test.ts`
   (3 tests, real exportAsZip → restoreFromBackup) locks the C22/C25 columns (triggerMode,
   intervalMileage, lastServiceOdometer, nextDueOdometer, dueOdometer) + the nullable dates surviving
@@ -152,6 +158,10 @@ positives, debunked in LEDGER C21; these two are the real ones)*
     renew". Surfaced C28; needs a product decision (filter to `endDate >= now`, or keep + document)
     before fixing. No test covers buildInsuranceDetails at all — a characterization test should precede
     any change. (correctness?, med — needs decision)
+- ~~**Expense update wipes tags (`.default([])` survives `.partial()`)**~~ — *DONE C34 (found by the
+  guard, failing-first): `updateExpenseSchema`'s base `tags: .optional().default([])` injected `[]` on
+  any edit omitting tags → silent data loss. Fixed by re-declaring `tags` as plain `.optional()` (no
+  default) via `.extend()`. Pinned by update-preserves-tags.test.ts. Class-level scan filed under guard.*
 - ~~**`advanceCustom` no-default → fastForward infinite loop (#13)**~~ — *DONE C29: two-part fix in
   trigger-service.ts — (1) `advanceCustom` throws ValidationError on an unknown intervalUnit (root
   cause: a no-op date spins the while loops); (2) a non-progress backstop in `fastForwardPastNow`
