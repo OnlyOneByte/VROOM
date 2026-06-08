@@ -8,7 +8,7 @@ import { commonSchemas } from '../../utils/validation';
 import { odometerRepository } from '../odometer/repository';
 import { vehicleRepository } from '../vehicles/repository';
 import { reminderRepository } from './repository';
-import { reminderTriggerService } from './trigger-service';
+import { computeNextDueDate, reminderTriggerService } from './trigger-service';
 import { createReminderSchema, updateReminderSchema } from './validation';
 
 const routes = new Hono();
@@ -61,6 +61,55 @@ routes.post('/trigger', triggerRateLimiter, async (c) => {
   const result = await reminderTriggerService.processOverdueReminders(user.id);
   return c.json({ success: true, data: result });
 });
+
+// POST /:id/mark-serviced — re-arm a reminder after a service (D3). A static suffix segment, so it
+// doesn't collide with GET/PUT /:id. Rate-limited like /trigger (it reads the odometer + writes).
+routes.post(
+  '/:id/mark-serviced',
+  triggerRateLimiter,
+  zValidator('param', commonSchemas.idParam),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+
+    const existing = await reminderRepository.findByIdAndUserId(id, user.id);
+    if (!existing) {
+      throw new NotFoundError('Reminder');
+    }
+    const { reminder, vehicleIds } = existing;
+
+    // Compute the re-arm per axis (D3). The route owns the math (it has the odometer repo +
+    // computeNextDueDate) to keep the repository free of a trigger-service import cycle.
+    const fields: { lastServiceOdometer?: number; nextDueOdometer?: number; nextDueDate?: Date } =
+      {};
+
+    // Mileage axis: anchor to the CURRENT odometer, recompute the milestone cache.
+    if (reminder.triggerMode === 'mileage' || reminder.triggerMode === 'both') {
+      const vehicleId = vehicleIds[0];
+      const current = vehicleId ? await odometerRepository.getCurrentOdometer(vehicleId) : null;
+      const lastServiceOdometer = current ?? reminder.lastServiceOdometer ?? 0;
+      fields.lastServiceOdometer = lastServiceOdometer;
+      fields.nextDueOdometer = lastServiceOdometer + (reminder.intervalMileage ?? 0);
+    }
+
+    // Time axis: advance nextDueDate one period from its current value (reuse the trigger math).
+    if (
+      (reminder.triggerMode === 'time' || reminder.triggerMode === 'both') &&
+      reminder.nextDueDate
+    ) {
+      fields.nextDueDate = computeNextDueDate(
+        reminder.nextDueDate,
+        reminder.frequency,
+        reminder.intervalValue,
+        reminder.intervalUnit,
+        reminder.startDate.getDate()
+      );
+    }
+
+    const updated = await reminderRepository.markServiced(id, user.id, fields);
+    return c.json({ success: true, data: updated });
+  }
+);
 
 // GET /notifications — list notifications (must be before /:id)
 routes.get('/notifications', async (c) => {

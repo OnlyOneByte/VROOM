@@ -409,6 +409,32 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       .where(eq(reminders.id, id));
   }
 
+  /**
+   * Apply a mark-serviced re-arm (D3) and return the updated row. The caller (route) has already
+   * computed the new axis values from the reminder's mode: for the mileage axis the new
+   * lastServiceOdometer (= current odometer) + nextDueOdometer; for the time axis the advanced
+   * nextDueDate. Both are optional so a pure-mileage or pure-time reminder only moves its own axis.
+   * `lastTriggeredAt` is stamped to now. Ownership-scoped (id + userId) so a cross-tenant id no-ops.
+   */
+  async markServiced(
+    id: string,
+    userId: string,
+    fields: {
+      lastServiceOdometer?: number;
+      nextDueOdometer?: number;
+      nextDueDate?: Date | null;
+    }
+  ): Promise<Reminder> {
+    const result = await this.db
+      .update(reminders)
+      .set({ ...fields, lastTriggeredAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(reminders.id, id), eq(reminders.userId, userId)))
+      .returning();
+    const reminder = result[0];
+    if (!reminder) throw new NotFoundError('Reminder');
+    return reminder;
+  }
+
   // --------------------------------------------------------------------------
   // Notification methods
   // --------------------------------------------------------------------------

@@ -66,10 +66,12 @@
             config maxIntervalMileage cap. Pinned by `create-mileage-reminder.test.ts` (7). LESSON:
             `triggerMode: .default('time')` survives `.partial()` and silently reverts mileage→time on
             update — use `.optional()`. tsc 0 · musl-biome · 934 pass · build OK.
-      - [ ] **part 2 — `POST /:id/mark-serviced` re-arm (D3).** mileage/both → lastServiceOdometer =
-            current odometer, recompute nextDueOdometer; time/both → advance nextDueDate, set
-            lastTriggeredAt. One optimistic-locked txn. This is what re-arms a fired mileage reminder
-            (today it stays due by design until this exists). HTTP tests.
+      - [x] **part 2 (cycle 32) — `POST /:id/mark-serviced` re-arm (D3).** repository.markServiced
+            (ownership-scoped optimistic update + lastTriggeredAt stamp); route computes per-axis:
+            mileage/both → lastServiceOdometer = getCurrentOdometer, nextDueOdometer recomputed;
+            time/both → nextDueDate advanced via computeNextDueDate. Rate-limited; `/:id/mark-serviced`
+            static-suffix route. Pinned by `mark-serviced.test.ts` (5, incl. the end-to-end
+            fire→service→not-due-again loop + cross-tenant 404). tsc 0 · musl-biome · 939 pass · build OK.
       - [ ] **part 3 — `recheckMileageReminders` on odometer / mileaged-expense write (D5).** HTTP tests.
 
 ## Phase 2 — data safety

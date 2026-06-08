@@ -9,14 +9,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 31 |
+| feature | 4 | 32 |
 | deep-review | 5 | 28 |
 | guard | 6 | 27 |
 | bug | 3 | 29 |
 | arch | 5 | 30 |
 | infra | 6 | 26 |
 
-Current cycle: **31**
+Current cycle: **32**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -639,3 +639,22 @@ Current cycle: **31**
   nextDueDate) — this is what lets a fired mileage reminder re-arm (today it stays due, by design,
   until this exists). Then recheck-on-write (D5) + the vehicle-stats reconcile. #14 still needs the
   Angelo semantics decision (queued, not auto-fixed).
+- **C32 (feature — maintenance-schedule T4 part 2: mark-serviced re-arm, D3)** — nothing over budget
+  (feature just touched cyc 31, but T4 mid-build → continue). Built `POST /:id/mark-serviced`, the
+  re-arm that closes the mileage loop: a fired mileage reminder has NO auto-re-arm (C25 design), so it
+  stays due until this endpoint moves the milestone. Repository: `markServiced(id, userId, fields)` —
+  an ownership-scoped optimistic update applying the caller-computed axis fields + stamping
+  lastTriggeredAt, returns the row (404 if id/user miss). Route owns the math (keeps the repo free of
+  a trigger-service import cycle): mileage/both → lastServiceOdometer := getCurrentOdometer (fallback
+  to the stored anchor if no reading), nextDueOdometer := that + intervalMileage; time/both → advance
+  nextDueDate one period via the reused `computeNextDueDate`. Rate-limited like /trigger; route placed
+  as `/:id/mark-serviced` (static suffix segment, no collision with GET/PUT /:id). Pinned by
+  `mark-serviced.test.ts` (5: mileage re-anchor + recompute, the end-to-end fire→service→not-due-again
+  loop, time advances date, both moves both axes, cross-tenant/missing id → 404). Verified: tsc 0 ·
+  musl-biome clean · 939 pass/0 fail (+5, up from 934) · build bundled.
+  Next cycle (33): nothing over budget (deep-review starved-for 5 = budget at cyc 33, others under) →
+  continue T4: **part 3 — `recheckMileageReminders` on odometer / mileaged-expense write (D5)** — fire
+  a mileage reminder the moment a new reading crosses its milestone (instead of only on the next
+  /trigger), idempotent via the existing dedup. Then T3-part-3 (vehicle-stats reconcile) + T5
+  remaining + frontend T6–T9. NOTE: deep-review hits budget at cyc 33 — if it's picked, the live
+  mileage create+trigger+re-arm surface is now worth an eyes-on/HTTP review. #14 still awaits Angelo.
