@@ -40,10 +40,12 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
 3. **Analytics route eyes-on** (per-vehicle + cross-vehicle + year-end), states + a11y.
 
 ### guard
-1. **EUR/unit visual guard in the harness** — set currency=EUR, assert insurance form labels
-   render € (pins the c202/203 cold-load fix end-to-end in regress, not just unit tests).
-2. **Category-grid no-wrap guard** — assert the expense CategorySelector labels don't wrap
-   (pins the c201 fix).
+*(queue empty — both seeded items shipped. Re-populate as reviews surface new bug classes.)*
+- ~~**EUR/unit visual guard**~~ — *already built before the loop (insurance-currency-label +
+  vehicle-form-unit-defaults e2e); confirmed cycle 2.*
+- ~~**Category-grid no-wrap guard**~~ — *DONE cycle 2: committed source-scan
+  `category-selector-labels.test.ts` (merge-surviving, single-word invariant) + runtime
+  e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### bug
 - *(none known — populated as reviews surface them)*
