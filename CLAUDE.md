@@ -21,6 +21,8 @@ this loop, then advance to the next item:
              the patterns in the steering docs exactly — runes, $lib/routes resolve(),
              polymorphic source_id/source_type for expense-linked records.
 3. VERIFY    Backend:  cd backend  && mise exec -- bun run validate
+             (validate's `check` step uses the dead glibc biome here — see Hard rules;
+              run tsc + musl-biome + `bun test` + build directly for a true green locally)
              Frontend: cd frontend && mise exec -- npm run type-check && npm run build
              E2E:      .meshclaw-tools/regress.sh   (route-smoke + axe + mobile + screenshots)
              UI proof: node .meshclaw-tools/shot.mjs <route> [mobile|desktop] [out.png]
@@ -40,16 +42,22 @@ this loop, then advance to the next item:
              for PR/merge. Then advance to the next ranked item.
 ```
 
-### Hard rules (inherited from .meshclaw-autopilot/LOOP.md)
+### Hard rules
 - Work ONLY in `/local/home/angryang/.meshclaw/workspace/VROOM`. Never commit to `main`;
-  branch as `autopilot/<task>` or `feat/<task>` off latest `origin/main`.
+  the autonomous loop works on the long-lived `claude-loop-dev` branch (cut off latest
+  `origin/main`); a human opens the PR and approves every merge. (One-off task branches may
+  still use `feat/<task>`.)
 - All node/bun commands run under `mise exec --` (node22+bun scoped via `mise.local.toml`;
   do not touch the global mise node18).
 - Git network ops need `env -u GIT_SSH_COMMAND` (sandbox injects a `-F /dev/null` that
   ignores `~/.ssh/config`). Commit identity: `OnlyOneByte` / the noreply email.
 - Stage ONE short path per `git add` (multi-path add trips the permission engine).
-- **Biome CLI can't run on this aarch64 AL2 host (GLIBC too old).** Apply Biome fixes by
-  hand from the rules in `CodeQualityRules.md`; CI is the lint source of truth.
+- **Biome on this aarch64 AL2 host: use the MUSL binary.** The default glibc CLI (what
+  `bun run check` invokes) is dead here (`GLIBC_2.29 not found`), but the musl build runs
+  fine: `backend/node_modules/@biomejs/cli-linux-arm64-musl/biome check --write <paths>`
+  auto-fixes format + organizeImports + safe lint. So `bun run validate` fails only at the
+  `check` step — run tsc, the musl biome, `bun test`, and `bun run build` directly to get a
+  full green. CI runs the glibc CLI and is the lint source of truth.
 - NEVER `git push` to `main`, force-push shared branches, run destructive ops, or read
   credential files. The human approves every merge.
 
@@ -85,12 +93,19 @@ this loop, then advance to the next item:
   (:5173, proxies `/api` → :3001).
 
 ## Current state & gaps
-For the live snapshot (branch, what's done, what's next, open gaps) read **`STATUS.md`**
-in the repo root — it's kept current each cycle and is the fastest way to orient.
-Highlights as of the offline-entries branch:
-- Reminders `/reminders` route is **built and wired** (the old "route missing" gap is closed).
-- Offline-entries foundation (client_id idempotency + migration 0001 + outbox sync) is committed.
-- Remaining gaps: full in-process backend HTTP test harness needs a DB-injection refactor
-  (the `const sqlite = new Database(...)` singleton binds at import); screenshot visual-diffing
-  is capture-only (no baseline comparison yet); storage-backup-toggle E2E needs an OAuth
-  provider (not headless-feasible).
+The autonomous loop steers from `loop/` (tracked): **`loop/NORTH_STAR.md`** (vision + quality
+bar), **`loop/BACKLOG.md`** (ranked queue by category), **`loop/LEDGER.md`** (per-cycle log +
+balance table). Read those three first to orient — they are the live snapshot.
+(Note: `STATUS.md`, `BRANCH_REVIEW.md`, and `.meshclaw-autopilot/` are gitignored agent working
+files, absent from a fresh clone — don't rely on them.)
+
+Highlights:
+- Reminders `/reminders` route is built and wired; offline-entries foundation (client_id
+  idempotency + outbox sync) is committed; insurance/claims, analytics, CSV import/export,
+  and pluggable storage providers (Drive/Sheets/Photos/S3) all ship.
+- Backup/restore round-trips every table on the CSV path (schema-derived + coverage guards)
+  and the Google Sheets path (header set is pinned by `sheets-header-coverage.test.ts`).
+- Open gaps: full in-process backend HTTP harness needs a DB-injection refactor (the
+  `const sqlite = new Database(...)` singleton binds at import); screenshot visual-diffing is
+  capture-only (no baseline compare); storage-backup-toggle E2E needs an OAuth provider (not
+  headless-feasible). Drafted-but-unbuilt: `.kiro/specs/maintenance-schedule/` (awaiting sign-off).

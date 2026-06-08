@@ -13,9 +13,9 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 3 |
 | guard | 6 | 2 |
 | bug | 3 | 3 |
-| infra | 6 | 1 |
+| infra | 6 | 5 |
 
-Current cycle: **4**
+Current cycle: **5**
 
 ## Cycle log
 - **C1 (infra)** — Bootstrapped the `loop/` scaffold the loop format depends on:
@@ -73,3 +73,17 @@ Current cycle: **4**
   Next cycle: with feature freshly touched, `infra` (cyc 1, budget 6) and `guard` (cyc 2) are
   the next most-starved; or pick up a UI-review `bug` (the month-trend midnight-UTC date is a
   cheap one-liner). The maintenance build itself stays blocked until D1–D6 sign-off.
+- **C5 (infra)** — Reconciled CLAUDE.md stale refs that actively mislead a fresh agent
+  (most-starved category). Four fixes, each verified against reality: (1) the "Biome CLI can't
+  run, fix by hand" claim → corrected to "use the musl binary" (`cli-linux-arm64-musl/biome`,
+  confirmed v2.4.16 runs; the glibc one `bun run check` calls is dead) + a VERIFY note that
+  `validate` fails only at `check`. (2) Branch convention `autopilot/<task>` → the long-lived
+  `claude-loop-dev` branch; dropped the "inherited from .meshclaw-autopilot/LOOP.md" header
+  (that file is gitignored now). (3) "read STATUS.md, kept current each cycle" → read the tracked
+  `loop/{NORTH_STAR,BACKLOG,LEDGER}.md`; noted STATUS.md/BRANCH_REVIEW.md/.meshclaw-autopilot are
+  gitignored and absent from a fresh clone. (4) Refreshed the highlights/gaps (insurance, CSV,
+  Sheets-header guard, maintenance spec awaiting sign-off). Verified: musl biome runs; loop/ +
+  the sheets guard are tracked; STATUS.md/BRANCH_REVIEW.md are NOT tracked. Docs-only, no build.
+  Next cycle: `guard` (cyc 2, budget 6) is now most-starved, then `deep-review` (cyc 3). A
+  cheap, high-value option is the month-trend midnight-UTC `bug` (one-line parseMonthToDate fix
+  + a guard) — pairs a starved `bug`/`deep-review` finding with a regression guard.

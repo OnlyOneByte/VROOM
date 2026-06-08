@@ -69,7 +69,7 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
    reorder vs the server's id-tiebroken order. Cosmetic flicker. (low)
 
 ### infra
-1. **CLAUDE.md stale refs** — it points at `STATUS.md` / `.meshclaw-autopilot/LOOP.md`, now
-   gitignored/removed; and says "Biome can't run" (the musl binary works). Reconcile so a
-   fresh clone orients correctly.
-2. **`loop/` scaffold + push.sh** — *DONE cycle 1.*
+*(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**CLAUDE.md stale refs**~~ — *DONE C5: corrected Biome (musl works), branch convention
+  (claude-loop-dev), STATUS.md→loop/ pointers, refreshed state/gaps. All claims verified.*
+- ~~**`loop/` scaffold + push.sh**~~ — *DONE cycle 1.*
