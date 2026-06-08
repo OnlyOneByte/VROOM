@@ -11,11 +11,11 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 4 |
 | deep-review | 5 | 3 |
-| guard | 6 | 2 |
-| bug | 3 | 3 |
+| guard | 6 | 6 |
+| bug | 3 | 6 |
 | infra | 6 | 5 |
 
-Current cycle: **5**
+Current cycle: **6**
 
 ## Cycle log
 - **C1 (infra)** — Bootstrapped the `loop/` scaffold the loop format depends on:
@@ -87,3 +87,19 @@ Current cycle: **5**
   Next cycle: `guard` (cyc 2, budget 6) is now most-starved, then `deep-review` (cyc 3). A
   cheap, high-value option is the month-trend midnight-UTC `bug` (one-line parseMonthToDate fix
   + a guard) — pairs a starved `bug`/`deep-review` finding with a regression guard.
+- **C6 (bug + guard)** — Fixed the month-trend midnight-UTC date bug (C3 UI-review finding #2;
+  `bug` was at-budget, `guard` most-starved — one increment advances both). `new Date(period +
+  '-01')` parses as midnight UTC → x-axis month label shifts back one for negative-offset users.
+  Routed through the sanctioned local-time `parseMonthToDate` on the vehicle-detail page.
+  Added TWO committed (merge-surviving) guards: (1) a `parseMonthToDate` unit test in
+  chart-formatters.test.ts (the helper had ZERO coverage despite every chart relying on it),
+  pinning local-midnight + correct rendered month; (2) a source-scan guard `no-utc-month-parse`
+  (cycle-205/206 pattern) that fails if any source reintroduces `new Date(<expr> + '-01')`.
+  The guard immediately EARNED ITS KEEP: it caught a SECOND live instance I'd missed —
+  dashboard/+page.svelte:87 `new Date(\`${t.period}-01\`)` — same bug, now fixed too. Tightened
+  the regex to exclude full literal dates (`'2024-01-01'`) so it flags only the concat/interp
+  antipattern. Verified: 6/6 new tests green, tsc 0 errors, build done, no remaining offenders.
+  Next cycle: `deep-review` (cyc 3, budget 5) is now most-starved → take an eyes-on UI sweep
+  (vehicle Overview/ExpensesTable, or analytics route) or a backend correctness audit. The
+  remaining UI-review bugs (load-masquerade error state, page-local vehicle-detail filter,
+  interpolated h-[…]) are still queued.

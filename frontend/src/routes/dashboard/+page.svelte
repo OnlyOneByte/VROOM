@@ -18,6 +18,7 @@
 	import { categoryLabels } from '$lib/utils/expense-helpers';
 	import { getCategoryColor as getCategoryChartColor } from '$lib/utils/chart-colors';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import { parseMonthToDate } from '$lib/utils/chart-formatters';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { expenseApi } from '$lib/services/expense-api';
 	import { reminderApi } from '$lib/services/reminder-api';
@@ -84,7 +85,9 @@
 	let trendChartData = $derived.by(() => {
 		if (!periodSummary?.monthlyTrend) return [];
 		return periodSummary.monthlyTrend.map(t => ({
-			date: new Date(`${t.period}-01`),
+			// Local-time parse: `new Date('YYYY-MM-01')` is midnight UTC and shifts the
+			// month label back one for negative-offset users (cycle 211).
+			date: parseMonthToDate(t.period),
 			amount: t.amount
 		}));
 	});
