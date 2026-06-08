@@ -133,10 +133,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    real on a negative-offset host. Verify deploy TZ first, then bucket on UTC. (correctness, low-med)
 
 *(surfaced by the C14 deep review — financing/insurance analytics + vehicle-detail eyes-on)*
-9. **`interestPaidYtd` is mislabeled** — `repository.ts:763-764` computes ONE month's interest on the
-   CURRENT balance, then sums it as `interestPaidYtd` (`:1592`). Neither YTD nor "paid". Rename to
-   `monthlyInterestEstimate` (smallest honest fix) or compute true YTD from payment history. (med)
-   *(C28 audit: CONFIRMED still real + unfixed; line refs refreshed.)*
+- ~~**`interestPaidYtd` is mislabeled (#9)**~~ — *DONE C44: the field was ONE month's interest on the
+  current balance, mislabeled as year-to-date-paid. Smallest honest fix = rename end-to-end
+  (backend FinancingData type + 4 impl sites, frontend FinancingResponse type + 2 UI labels) →
+  `monthlyInterestEstimate` / 'Est. Monthly Interest'. A true-YTD recompute (payment-history sum) was
+  out of scope (a feature, not a rename). No screenshot — pure label/field rename, no layout change.*
 - ~~**`buildLoanBreakdown` holds balance flat across 12 months (#10)**~~ — *DONE C38: extracted pure
   `buildAmortizationSchedule` (analytics-charts.ts) that walks each balance down by principal/month +
   clamps payoff; buildLoanBreakdown resolves balances then delegates. Pinned by

@@ -177,7 +177,10 @@ export interface FinancingData {
   summary: {
     totalMonthlyPayments: number;
     remainingBalance: number;
-    interestPaidYtd: number;
+    // One month's interest on each loan's CURRENT balance, summed across loans. Renamed from the
+    // misleading `interestPaidYtd` (bug #9): it is neither year-to-date nor actually paid — it's a
+    // forward estimate of this month's interest. True YTD-paid would need a payment-history sum.
+    monthlyInterestEstimate: number;
     activeCount: number;
     loanCount: number;
     leaseCount: number;
@@ -189,7 +192,8 @@ export interface FinancingData {
     monthlyPayment: number;
     remainingBalance: number;
     apr: number | null;
-    interestPaid: number;
+    // This month's interest on the current balance (see summary note) — renamed from `interestPaid`.
+    monthlyInterestEstimate: number;
     monthsRemaining: number;
   }>;
   monthlyTimeline: Array<{
@@ -731,7 +735,7 @@ export class AnalyticsRepository {
           monthlyPayment: 0,
           remainingBalance: 0,
           apr: null,
-          interestPaid: 0,
+          monthlyInterestEstimate: 0,
           monthsRemaining: 0,
         });
       }
@@ -761,7 +765,7 @@ export class AnalyticsRepository {
     vehicleNameMap: Map<string, string>,
     computedBalance: number
   ): FinancingData['vehicleDetails'][number] {
-    const interestPaid =
+    const monthlyInterestEstimate =
       fin.financingType === 'loan' && fin.apr ? (computedBalance * (fin.apr / 100)) / 12 : 0;
     const startDate =
       fin.startDate instanceof Date ? fin.startDate : new Date(fin.startDate as unknown as number);
@@ -777,7 +781,7 @@ export class AnalyticsRepository {
       monthlyPayment: fin.paymentAmount,
       remainingBalance: computedBalance,
       apr: fin.apr,
-      interestPaid,
+      monthlyInterestEstimate,
       monthsRemaining: Math.max(0, fin.termMonths - monthsElapsed),
     };
   }
@@ -1535,7 +1539,7 @@ export class AnalyticsRepository {
           summary: {
             totalMonthlyPayments: 0,
             remainingBalance: 0,
-            interestPaidYtd: 0,
+            monthlyInterestEstimate: 0,
             activeCount: 0,
             loanCount: 0,
             leaseCount: 0,
@@ -1580,7 +1584,10 @@ export class AnalyticsRepository {
         summary: {
           totalMonthlyPayments,
           remainingBalance,
-          interestPaidYtd: vehicleDetails.reduce((s, d) => s + d.interestPaid, 0),
+          monthlyInterestEstimate: vehicleDetails.reduce(
+            (s, d) => s + d.monthlyInterestEstimate,
+            0
+          ),
           activeCount: activeIds.size,
           loanCount,
           leaseCount,

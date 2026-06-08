@@ -12,11 +12,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 39 |
 | deep-review | 5 | 42 |
 | guard | 6 | 41 |
-| bug | 3 | 38 |
+| bug | 3 | 44 |
 | arch | 5 | 43 |
 | infra | 6 | 40 |
 
-Current cycle: **43**
+Current cycle: **44**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -888,3 +888,21 @@ Current cycle: **43**
   wins. Decided standalone: #9 (interestPaidYtd rename) or #11 (mobile fuel-stat wrap, UI+screenshot).
   arch #1 remaining: settings-DROP (now safe behind this net) + auth (characterize-then-drop). T7
   (ReminderForm) still the next feature pick. #14/#16 await Angelo semantics calls.
+- **C44 (bug — #9: interestPaidYtd is mislabeled)** — `bug` forced (cyc 38, starved-for 6 > 3). Took #9
+  (clean backend+label rename, no screenshot dependency, vs #11's UI work). THE BUG: the financing
+  analytics field `interestPaidYtd` (summary) + per-vehicle `interestPaid` are ONE month's interest on
+  the CURRENT balance (`balance * apr/100/12`) — neither year-to-date NOR actually paid; a forward
+  estimate mislabeled as historical fact. Took the backlog's "smallest honest fix" = rename, not a
+  true-YTD recompute (that needs payment-history summing — out of scope, would be a feature). Renamed
+  end-to-end across the boundary: backend `FinancingData` type (2 fields) + 4 impl sites (compute,
+  per-vehicle return, 'own' branch, empty-state, aggregation) → `monthlyInterestEstimate`; frontend
+  `FinancingResponse` type + the 2 UI labels ('Interest Paid YTD' → 'Est. Monthly Interest' subtitle
+  'on current loan balances'; per-vehicle 'Interest Paid' → 'Est. Monthly Interest'). Grep confirmed
+  zero remaining code/test refs to the old names (only the explaining comments). UI-touching but a
+  pure label/field rename (no layout change) → build + label text are the proof, no screenshot needed.
+  Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome · 961 pass · build) + frontend
+  validate:local EXIT 0 (tsc 0 · build · 345 pass).
+  Next cycle (45): nothing over budget (feature cyc 39 starved-for 6 > 4 at cyc 45 — feature breaches)
+  → `feature` wins → maintenance-schedule **T7 (ReminderForm mileage branch)** — THE visual cycle,
+  eyes-on screenshot required (ui-autoloop). Remaining: bug #11 (mobile fuel-stat wrap); arch
+  settings-DROP + auth; #14/#16 await Angelo.
