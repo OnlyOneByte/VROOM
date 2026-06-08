@@ -12,10 +12,10 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 4 |
 | deep-review | 5 | 7 |
 | guard | 6 | 6 |
-| bug | 3 | 7 |
+| bug | 3 | 8 |
 | infra | 6 | 5 |
 
-Current cycle: **7**
+Current cycle: **8**
 
 ## Cycle log
 - **C1 (infra)** — Bootstrapped the `loop/` scaffold the loop format depends on:
@@ -122,3 +122,18 @@ Current cycle: **7**
   queued `bug` (CSV-import BOM strip is a clean low-risk one-liner; idempotency / missed-fillup
   MPG are higher-severity data-safety) — or take `feature` before it breaches if maintenance
   sign-off has landed.
+- **C8 (bug — data-safety, 2 HIGH)** — Closed the two HIGH CSV-import data-safety bugs from C7's
+  review, which live in the same commit path (one coherent increment). (1) NO idempotency:
+  re-importing the same file used `create()` with no clientId → silently DUPLICATED every row.
+  Now each ready row gets a deterministic, `csv:`-namespaced, content+occurrence-keyed clientId
+  (two genuinely-identical rows both import; a re-imported file dedups perfectly). (2) Non-atomic
+  commit: bare per-row insert loop → a mid-batch failure left a half-imported file. New
+  `expenseRepository.importExpenses` wraps the idempotent inserts in ONE db.transaction
+  (all-or-nothing) and returns {imported, duplicates}; route surfaces duplicates. Backed by the
+  existing (userId, clientId) unique index. Pinned with 2 HTTP tests: re-import → imported:0/
+  duplicates:3/row-count unchanged; two identical rows in one file → both import. Verified: 849
+  pass/0 fail (+2), tsc 0, Biome musl clean, build bundled. Single/normal imports unchanged.
+  Next cycle (9): feature breaches budget (starved-for 5 > 4) → MUST pick feature. But the
+  maintenance build is blocked on D1–D6 sign-off; if unsigned, the eligible feature work is
+  drafting the #2 "import from other trackers" spec (Fuelly/Fuelio mapping) or recurring-expenses
+  — OR, if Angelo signed off, start maintenance T1. Check sign-off first; else draft + flag.

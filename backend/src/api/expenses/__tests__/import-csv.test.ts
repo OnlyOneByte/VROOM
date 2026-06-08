@@ -46,6 +46,7 @@ interface ImportResponse {
   data: {
     dryRun: boolean;
     imported: number;
+    duplicates?: number;
     readyCount: number;
     errorCount: number;
     totalRows: number;
@@ -79,6 +80,50 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(rows.length).toBe(2);
     expect(rows.find((r) => r.category === 'fuel')?.expenseAmount).toBe(52.4);
     expect(rows.find((r) => r.category === 'maintenance')?.expenseAmount).toBe(120);
+  });
+
+  test('re-importing the same file is idempotent (no duplicate rows; cycle 211)', async () => {
+    await seedVehicle('Daily Driver');
+    const csv = [
+      'date,vehicle,category,amount',
+      '2024-06-01T00:00:00.000Z,Daily Driver,misc,12.50',
+      '2024-06-02T00:00:00.000Z,Daily Driver,regulatory,40', // three distinct rows
+      '2024-06-02T00:00:00.000Z,Daily Driver,maintenance,75',
+    ].join('\n');
+
+    const first = await json<ImportResponse>(
+      await ctx.authed('POST', '/api/v1/expenses/import', { csv })
+    );
+    expect(first.data.imported).toBe(3);
+    expect(first.data.duplicates).toBe(0);
+    expect((await listExpenses()).length).toBe(3);
+
+    // Same file again: every row already exists by its deterministic clientId, so
+    // nothing is inserted and all are reported as duplicates — NOT duplicated.
+    const second = await json<ImportResponse>(
+      await ctx.authed('POST', '/api/v1/expenses/import', { csv })
+    );
+    expect(second.data.imported).toBe(0);
+    expect(second.data.duplicates).toBe(3);
+    expect((await listExpenses()).length).toBe(3); // still 3, not 6
+  });
+
+  test('two genuinely identical rows in ONE file both import (occurrence-keyed)', async () => {
+    await seedVehicle('Daily Driver');
+    // Same content twice — these are two real expenses (e.g. two $10 tolls same day),
+    // distinguished by occurrence index, so both must land.
+    const csv = [
+      'date,vehicle,category,amount',
+      '2024-06-01T00:00:00.000Z,Daily Driver,misc,10',
+      '2024-06-01T00:00:00.000Z,Daily Driver,misc,10',
+    ].join('\n');
+
+    const body = await json<ImportResponse>(
+      await ctx.authed('POST', '/api/v1/expenses/import', { csv })
+    );
+    expect(body.data.imported).toBe(2);
+    expect(body.data.duplicates).toBe(0);
+    expect((await listExpenses()).length).toBe(2);
   });
 
   test('dryRun validates + reports but writes NOTHING', async () => {

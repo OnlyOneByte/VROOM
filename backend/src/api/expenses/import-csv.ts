@@ -9,6 +9,7 @@
  * unit-testable without standing up a server.
  */
 
+import { createHash } from 'node:crypto';
 import { parse } from 'csv-parse/sync';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
@@ -36,6 +37,14 @@ export interface ImportableExpense {
   description: string | null;
   tags: string[];
   missedFillup: boolean;
+  /**
+   * Deterministic idempotency key (offline-sync style). Re-importing the same file is a
+   * no-op via createIdempotent's (userId, clientId) unique index. Derived from the row's
+   * content + its Nth-occurrence so two genuinely identical rows both import, while a
+   * re-import of the same file dedups perfectly regardless of row order. The `csv:` prefix
+   * keeps it from ever colliding with an offline cuid clientId or a manual NULL.
+   */
+  clientId: string;
 }
 
 export type ImportRowStatus = 'ready' | 'error';
@@ -222,8 +231,34 @@ function parseRow(
       description: descriptionResult.value,
       tags: tagsResult.value,
       missedFillup,
+      // Filled in by buildImportPlan, which has the occurrence counter.
+      clientId: '',
     },
   };
+}
+
+/**
+ * Deterministic idempotency key for an imported row: a hash of its identifying content
+ * plus the `occurrence` index (0 for the first identical row in the file, 1 for the next,
+ * …). Two genuinely-identical rows therefore get distinct keys (both import), while the
+ * same file re-imported produces the exact same keys in the same order → all dedup. The
+ * `csv:` prefix namespaces it away from offline cuid clientIds and manual NULLs.
+ */
+function deriveImportClientId(expense: ImportableExpense, occurrence: number): string {
+  const content = [
+    expense.vehicleId,
+    expense.category,
+    expense.expenseAmount,
+    expense.date.getTime(),
+    expense.mileage ?? '',
+    expense.volume ?? '',
+    expense.fuelType ?? '',
+    expense.description ?? '',
+    expense.tags.join(''),
+    expense.missedFillup ? '1' : '0',
+    occurrence,
+  ].join(' ');
+  return `csv:${createHash('sha256').update(content).digest('hex').slice(0, 32)}`;
 }
 
 /** Body schema for the import route. */
@@ -271,6 +306,10 @@ export function buildImportPlan(csv: string, vehicles: ImportVehicle[]): ImportP
     vehicleByName.set(`${v.year} ${v.make} ${v.model}`.toLowerCase(), v.id);
   }
 
+  // Counts how many times each content-key has been seen so far in THIS file, so
+  // identical rows get distinct occurrence indices (and thus distinct clientIds).
+  const occurrences = new Map<string, number>();
+
   const rows: ImportRowResult[] = records.map((record, i) => {
     // Denormalize the echoed raw cells too, so the preview UI shows the real values
     // (matches what parseRow sees via its own denormalizing `get`).
@@ -286,6 +325,12 @@ export function buildImportPlan(csv: string, vehicles: ImportVehicle[]): ImportP
     if ('error' in result) {
       return { row: rowNum, status: 'error' as const, message: result.error, raw };
     }
+    // Stamp a deterministic idempotency key based on content + how many identical rows
+    // we've already seen, so a re-import of the same file is a no-op.
+    const baseKey = deriveImportClientId(result.expense, 0);
+    const occurrence = occurrences.get(baseKey) ?? 0;
+    occurrences.set(baseKey, occurrence + 1);
+    result.expense.clientId = deriveImportClientId(result.expense, occurrence);
     return { row: rowNum, status: 'ready' as const, expense: result.expense, raw };
   });
 

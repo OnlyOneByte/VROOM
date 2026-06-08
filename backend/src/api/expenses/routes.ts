@@ -4,7 +4,7 @@ import { createInsertSchema } from 'drizzle-zod';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { expenses as expensesTable } from '../../db/schema';
+import { expenses as expensesTable, type NewExpense } from '../../db/schema';
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_DESCRIPTIONS,
@@ -431,17 +431,18 @@ routes.post('/import', zValidator('json', importCsvSchema), async (c) => {
 
   // Commit: insert only the rows that validated. Rows that errored are reported
   // back untouched so the user can fix and re-import just those.
-  let imported = 0;
-  for (const row of plan.rows) {
-    if (row.status === 'ready' && row.expense) {
-      await expenseRepository.create({ ...row.expense, userId: user.id });
-      imported += 1;
-    }
-  }
+  //
+  // Insert ATOMICALLY (all-or-nothing transaction) and IDEMPOTENTLY: each ready row carries
+  // a deterministic clientId, so re-importing the same file is a no-op — already-present
+  // rows are skipped and counted as duplicates rather than duplicated.
+  const readyRows = plan.rows
+    .filter((row) => row.status === 'ready' && row.expense)
+    .map((row) => ({ ...row.expense, userId: user.id }) as NewExpense);
+  const { imported, duplicates } = await expenseRepository.importExpenses(readyRows, user.id);
 
   return c.json({
     success: true,
-    data: { dryRun: false, imported, ...summarizeImportPlan(plan) },
+    data: { dryRun: false, imported, duplicates, ...summarizeImportPlan(plan) },
   });
 });
 
