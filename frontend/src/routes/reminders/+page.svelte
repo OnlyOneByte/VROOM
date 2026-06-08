@@ -18,6 +18,10 @@
 	import type { ReminderNotification, ReminderWithVehicles, Vehicle } from '$lib/types';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import {
+		isReminderTimeDue,
+		isMileageTracking as isMileageTrackingReminder
+	} from '$lib/utils/reminder-helpers';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
@@ -57,13 +61,9 @@
 	// Map vehicleId -> display name for quick lookup.
 	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
-	// A reminder is "due" when its nextDueDate is today or in the past. A pure-mileage reminder has a
-	// null nextDueDate — its due-ness is odometer-based (server-evaluated, surfaced via notifications),
-	// not a date comparison, so it's not "time-due" here. (Mileage due-state rendering lands in T8.)
-	function isDue(r: ReminderWithVehicles): boolean {
-		if (r.reminder.nextDueDate === null) return false;
-		return new Date(r.reminder.nextDueDate).getTime() <= Date.now();
-	}
+	// Time-due check + mileage-tracking detection live in reminder-helpers (null-safe, unit-tested):
+	// a pure-mileage reminder has a null nextDueDate and must never hit `new Date(...)` (= epoch).
+	const isDue = (r: ReminderWithVehicles) => isReminderTimeDue(r.reminder);
 
 	let dueReminders = $derived(reminders.filter(r => r.reminder.isActive && isDue(r)));
 	let upcomingReminders = $derived(reminders.filter(r => r.reminder.isActive && !isDue(r)));
@@ -196,10 +196,8 @@
 		return frequency.charAt(0).toUpperCase() + frequency.slice(1);
 	}
 
-	// A reminder tracks mileage (and so can be "marked serviced") when its triggerMode is mileage/both.
-	function isMileageTracking(r: ReminderWithVehicles): boolean {
-		return r.reminder.triggerMode === 'mileage' || r.reminder.triggerMode === 'both';
-	}
+	// Delegates to the tested helper (kept as a local so the template reads `isMileageTracking(item)`).
+	const isMileageTracking = (r: ReminderWithVehicles) => isMileageTrackingReminder(r.reminder);
 
 	onMount(load);
 </script>

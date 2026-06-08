@@ -11,12 +11,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 46 |
 | deep-review | 5 | 42 |
-| guard | 6 | 41 |
+| guard | 6 | 48 |
 | bug | 3 | 44 |
 | arch | 5 | 43 |
 | infra | 6 | 47 |
 
-Current cycle: **47**
+Current cycle: **48**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -960,3 +960,18 @@ Current cycle: **47**
   frontend mileage UI (ReminderForm branch + /reminders Serviced button) — an eyes-on/logic review
   (fan out, verify vs source) that ALSO partially discharges the pending T7/T8 eyes-on. Then arch
   (settings-DROP). bug #11 queued; #14/#16 await Angelo.
+- **C48 (guard — lock the frontend null-nextDueDate invariant)** — BALANCE: guard (cyc 41, starved-for
+  7) AND deep-review (cyc 42, 6) both over budget; most-starved = `guard` → it wins (my C47 note guessed
+  deep-review; guard's raw 7 > 6 — the table rules, keep computing all six). The C39 audit confirmed all
+  null-nextDueDate consumer sites are guarded, but there was NO committed test locking it — a future edit
+  re-introducing `new Date(reminder.nextDueDate)` on a pure-mileage reminder (null date → 1970 epoch →
+  wrongly "due", or a crash) would pass review. LOCKED IT, merge-surviving, via the extraction pattern
+  (not a fragile regex source-scan): created `reminder-helpers.ts` with exported null-safe
+  `isReminderTimeDue(reminder, now?)` + `isMileageTracking(reminder)`, routed the /reminders page's
+  inline `isDue` + the C46 page-local `isMileageTracking` through them (behavior-preserving — page
+  renders identically), and pinned with `reminder-helpers.test.ts` (5, incl. THE load-bearing assertion:
+  a null-nextDueDate reminder is never time-due). `now` is injectable for deterministic tests. Verified:
+  frontend validate:local EXIT 0 (tsc 0 · build · 350 tests, +5 · prettier clean).
+  Next cycle (49): `deep-review` is most-starved over budget (cyc 42, starved-for 7 > 5 at cyc 49) → it
+  wins → eyes-on/logic review of the C45/C46 frontend mileage UI (also partially discharges the pending
+  T7/T8 eyes-on). Then arch settings-DROP (cyc 43, breaches ~50). bug #11 queued; #14/#16 await Angelo.

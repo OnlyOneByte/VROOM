@@ -78,6 +78,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 - ~~**Backend: Sheets restore path**~~ — *DONE C3: found + fixed the clientId column-drop
   data-loss bug; added the schema-vs-headers coverage guard. CSV path confirmed safe.*
 
+- ~~**Lock the frontend null-nextDueDate invariant (C48)**~~ — *DONE C48: extracted null-safe
+  `isReminderTimeDue` + `isMileageTracking` to `reminder-helpers.ts`, routed the /reminders page
+  through them, pinned by `reminder-helpers.test.ts` (5, incl. the load-bearing "null nextDueDate is
+  never time-due" — guards against a future `new Date(null)`=1970-epoch deref the C39 nullable type
+  introduced). Behavior-preserving extraction.*
 - ~~**Class-level net: no clobbering `.default()` in a `.partial()` update schema**~~ — *DONE C41:
   `partial-update-no-default-injection.test.ts` — a RUNTIME net (text-scan was unreliable: schemas
   span files + chain .partial()) that imports each exported update schema, parses `{}`, and asserts no
