@@ -178,9 +178,18 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
    while `expenses` and `providers` (1 each) lean on the shared Hono error middleware
    (`backend/src/middleware/`) + typed errors (`NotFoundError`/`ValidationError`/…). The
    hand-rolled blocks are boilerplate that can diverge from the canonical error envelope.
-   Refactor ONE route file per cycle (start with `sync`): drop the try/catch, throw the typed
-   error, let the middleware shape the response. Behavior-preserving: assert identical status
-   + body via the route's HTTP test (add coverage first if a handler is untested). (consistency)
+   - [x] **part 1 (C24) — make the middleware able to shape SyncErrors.** GROUNDING CORRECTION:
+     `SyncError extends Error` (not `AppError`), and the central `errorHandler` had no SyncError
+     branch → a thrown SyncError would have become a generic 500 (losing its code→status map).
+     So the naive "just throw it" would have been a behavior change. Fixed first: extracted
+     `syncErrorResponse()` (single source of truth), routed both `handleSyncError` AND the central
+     `errorHandler` through it, committed `error-handler.test.ts` (7 tests) proving the two paths are
+     byte-identical for all 7 SyncErrorCodes + pinning every pre-existing branch (had ZERO coverage).
+     Dormant + behavior-preserving today (all SyncErrors still caught locally).
+   - [ ] **part 2 — drop the try/catch.** Now safe: remove the hand-rolled try/catch from
+     `sync/routes.ts` (7 handlers), let SyncErrors propagate to `errorHandler`. Prove behavior-
+     identical via the sync route HTTP tests + the part-1 equivalence net. Then repeat for `auth`
+     (7) and `settings` (5) — one route file per cycle. (consistency)
 2. **Extract the frontend page load-state pattern.** ~14 `+page.svelte` files repeat the same
    `isLoading` / `loadError` / `try → fetch → catch → toast + set error` triad (dashboard,
    expenses, reminders, insurance, analytics, vehicles/[id], settings, profile, …) — the exact

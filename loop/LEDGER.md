@@ -13,10 +13,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 21 |
 | guard | 6 | 20 |
 | bug | 3 | 23 |
-| arch | 5 | 18 |
+| arch | 5 | 24 |
 | infra | 6 | 19 |
 
-Current cycle: **23**
+Current cycle: **24**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -432,3 +432,30 @@ Current cycle: **23**
   due/not-due permutations. `bug` is now freshly serviced (cyc 23); `arch` is next-most-starved
   (cyc 18, starved-for 6 > 5) and will breach soon — its top item (converge `sync` route error
   handling on the central middleware) is a candidate if T3 part 2 stalls.
+- **C24 (arch — converge sync error handling, part 1: make the middleware SyncError-aware)** —
+  `arch` breached budget (cyc 18, starved-for 6 > 5) → forced pick. T3 part 2 waits one more cycle.
+  Took arch #1 (converge `sync` route error handling on the central middleware) — but FIRST verified
+  the BACKLOG item's premise against source (the C21 lesson), and it was WRONG in a load-bearing way:
+  the item said "drop the try/catch, throw the typed error, let the middleware shape it." But
+  `SyncError extends Error` (NOT `AppError`), and the central `errorHandler` had no SyncError branch —
+  so a thrown SyncError would fall through to the generic 500 path, turning today's
+  `SyncError(VALIDATION_ERROR)`→400 into a 500. Blindly doing the "refactor" would have been a
+  behavior change (violates arch rule 2). Also: arch rule 3 — the central handler had ZERO test
+  coverage, so a refactor against it had no safety net. SO this cycle is the load-bearing PREREQUISITE,
+  split per rule 1 (one small reviewable increment): (1) extracted `syncErrorResponse(error)` in
+  errors.ts as the single source of truth for SyncError→{body,status} shaping; (2) routed the existing
+  `handleSyncError` through it (identical output, preserved); (3) added a SyncError branch to the
+  central `errorHandler` using the SAME helper, so a SyncError now yields a byte-identical envelope
+  whether caught locally or by the middleware; (4) committed `error-handler.test.ts` (7 tests, the
+  handler had NONE before) pinning every existing branch (AppError subclasses, ZodError, HTTPException,
+  unknown→500) AND proving `handleSyncError(err)` === `errorHandler(err)` for all 7 SyncErrorCodes.
+  BEHAVIOR-PRESERVING: no SyncError reaches the middleware today (all 27 throw sites are caught in
+  local try/catch), so the new branch is DORMANT — it only activates next cycle when the per-route
+  try/catch is removed, and the equivalence test proves that removal is safe. Verified: tsc 0 ·
+  musl-biome clean · 912 pass/0 fail (+7, up from 905) · build bundled. No product behavior changed.
+  Next cycle (25): `feature` is most-starved (cyc 22, starved-for 3 < 4 — not yet over budget, but T3
+  is mid-build so the loop continues it) → maintenance-schedule **T3 part 2** (trigger whichever-comes-
+  first mileage logic + fold bug #12). ARCH FOLLOW-UP (part 2, when arch next fires ~cyc 29): now that
+  the middleware is SyncError-aware + pinned, drop the hand-rolled try/catch from sync/routes.ts (7
+  handlers) and let errors propagate to errorHandler — prove behavior-identical via the sync route
+  HTTP tests + the new equivalence net. Then repeat for `auth` (7) and `settings` (5).

@@ -161,6 +161,18 @@ export const handleDatabaseError = (error: unknown): AppError => {
   return new DatabaseError('A database error occurred');
 };
 
+/**
+ * Canonical SyncError → HTTP response shaping. Single source of truth used by BOTH the local
+ * `handleSyncError` (route catch blocks) and the global `errorHandler` middleware, so a SyncError
+ * produces a byte-identical envelope + status regardless of which path catches it. The body is the
+ * standard error envelope keyed on the SyncErrorCode; the status comes from ERROR_STATUS_MAP
+ * (defaulting to 500 for an unmapped code).
+ */
+export function syncErrorResponse(error: SyncError): { body: ErrorResponse; status: number } {
+  const status = ERROR_STATUS_MAP[error.code] || 500;
+  return { body: createErrorResponse(error.code, error.message, error.details), status };
+}
+
 export function handleSyncError(
   c: Context,
   error: unknown,
@@ -176,8 +188,8 @@ export function handleSyncError(
       code: error.code,
       details: error.details,
     });
-    const status = ERROR_STATUS_MAP[error.code] || 500;
-    return c.json(createErrorResponse(error.code, error.message, error.details), status as never);
+    const { body, status } = syncErrorResponse(error);
+    return c.json(body, status as never);
   }
 
   logger.error(`${operation} failed`, {
