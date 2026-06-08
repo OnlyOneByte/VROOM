@@ -18,6 +18,7 @@
 	import { categoryLabels } from '$lib/utils/expense-helpers';
 	import { getCategoryColor as getCategoryChartColor } from '$lib/utils/chart-colors';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import { parseMonthToDate } from '$lib/utils/chart-formatters';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { expenseApi } from '$lib/services/expense-api';
 	import { reminderApi } from '$lib/services/reminder-api';
@@ -84,7 +85,9 @@
 	let trendChartData = $derived.by(() => {
 		if (!periodSummary?.monthlyTrend) return [];
 		return periodSummary.monthlyTrend.map(t => ({
-			date: new Date(`${t.period}-01`),
+			// Local-time parse: `new Date('YYYY-MM-01')` is midnight UTC and shifts the
+			// month label back one for negative-offset users (cycle 211).
+			date: parseMonthToDate(t.period),
 			amount: t.amount
 		}));
 	});
@@ -126,6 +129,13 @@
 		const vehicleMap = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
 		return remindersList
 			.filter(r => r.reminder.isActive)
+			// This is the TIME-axis "due soon" widget. A pure-mileage reminder has a null nextDueDate
+			// (its due-ness is odometer-based, surfaced on the /reminders page) — exclude it here, and
+			// the narrowing lets the date math below treat nextDueDate as a string.
+			.filter(
+				(r): r is typeof r & { reminder: { nextDueDate: string } } =>
+					r.reminder.nextDueDate !== null
+			)
 			.filter(r => new Date(r.reminder.nextDueDate).getTime() <= horizon)
 			.sort(
 				(a, b) =>

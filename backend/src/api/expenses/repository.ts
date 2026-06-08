@@ -202,6 +202,55 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   /**
+   * Commit a batch of CSV-imported expenses ATOMICALLY and IDEMPOTENTLY.
+   *
+   * All inserts run in a single transaction, so a failure on any row rolls back the whole
+   * batch — the user never ends up with a half-imported file (and a fix-and-re-import can't
+   * double-write the rows that already committed). Each row carries a deterministic
+   * `clientId` (see import-csv.ts), so re-importing the same file is a no-op: a row whose
+   * (userId, clientId) already exists is skipped and counted as a duplicate rather than
+   * inserted again. The unique partial index on (userId, clientId) backs this at the DB level.
+   *
+   * Returns the count actually inserted and the count skipped as already-present duplicates.
+   */
+  async importExpenses(
+    rows: NewExpense[],
+    userId: string
+  ): Promise<{ imported: number; duplicates: number }> {
+    if (rows.length === 0) return { imported: 0, duplicates: 0 };
+    try {
+      return await this.db.transaction(async (tx) => {
+        let imported = 0;
+        let duplicates = 0;
+        for (const row of rows) {
+          const data = { ...row, userId };
+          if (data.clientId) {
+            const existing = await tx
+              .select({ id: expenses.id })
+              .from(expenses)
+              .where(and(eq(expenses.clientId, data.clientId), eq(expenses.userId, userId)))
+              .limit(1);
+            if (existing.length > 0) {
+              duplicates += 1;
+              continue;
+            }
+          }
+          await tx.insert(expenses).values(data);
+          imported += 1;
+        }
+        return { imported, duplicates };
+      });
+    } catch (error) {
+      logger.error('Failed to import expenses', {
+        userId,
+        rowCount: rows.length,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new DatabaseError('Failed to import expenses', error);
+    }
+  }
+
+  /**
    * Paginated find with SQL-level filtering, LIMIT/OFFSET, and totalCount.
    * Filters by expenses.userId directly.
    */

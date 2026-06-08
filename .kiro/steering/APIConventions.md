@@ -97,7 +97,7 @@ export const entityRepository = new EntityRepository(getDb());
 ### Error Handling
 - Use typed errors from `errors.ts`: `NotFoundError`, `ValidationError`, `ConflictError`, `DatabaseError`
 - Don't catch errors in routes unless you need to transform them — the global error handler catches `AppError` subclasses
-- For sync/Drive operations, use `handleSyncError()` from `errors.ts`
+- For sync/Drive operations, throw `SyncError` (from `errors.ts`). As of C24 the global error handler is `SyncError`-aware (maps each `SyncErrorCode` to its status via the shared `syncErrorResponse()`), so a thrown `SyncError` no longer needs a local catch. The existing `sync` route catch blocks still call `handleSyncError()` directly; converging them onto the global handler is a queued `arch` item (see BACKLOG arch #1)
 - Repository methods should throw `DatabaseError` for DB failures, with the original error as `details`
 
 ### Response Format

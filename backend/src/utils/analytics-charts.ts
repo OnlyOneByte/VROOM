@@ -82,6 +82,8 @@ export interface GeneralExpenseRow {
   date: Date | number | null;
   mileage: number | null;
   volume: number | null;
+  // Needed so the monthly MPG accumulator can skip multi-tank windows (matches FuelRow).
+  missedFillup: boolean;
 }
 
 interface VehicleMetrics {
@@ -130,6 +132,97 @@ export function computeEfficiencyPoint(
 /** Convert a date to a YYYY-MM month key. */
 export function toMonthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Every YYYY-MM month key from `start`'s month through `end`'s month, inclusive.
+ *
+ * The cursor is anchored to day-1 of each month: stepping a raw day-29..31 date with
+ * setMonth overshoots short months (Jan 31 -> "Feb 31" rolls to Mar 2/3), silently SKIPPING
+ * February. Anchoring to day-1 is rollover-safe and matches what toMonthKey reads (year+month
+ * only). Returns [] if either bound is null or start is after end.
+ */
+export function monthKeysInRange(start: Date | null, end: Date | null): string[] {
+  if (!start || !end) return [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth(), 1);
+  const keys: string[] = [];
+  while (cursor <= last) {
+    keys.push(toMonthKey(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return keys;
+}
+
+/**
+ * Effective monthly premium for an insurance term.
+ *
+ * A term may record its cost either as a recurring `monthlyCost` OR as a lump-sum `totalCost`
+ * (e.g. a "6-month policy = $1,200" entered as totalCost=1200, monthlyCost=null). The premium
+ * math must honour both: using `monthlyCost ?? 0` silently contributes $0 for every totalCost-only
+ * term, zeroing its premium total and trend (bug #8).
+ *
+ * Precedence: an explicit `monthlyCost` wins. Otherwise amortize `totalCost` across the term's
+ * span — `monthsInTerm = monthKeysInRange(start, end).length` (day-1 anchored, inclusive of both
+ * endpoint months, matching how the premium trend buckets). Returns 0 when neither cost is set or
+ * the term has no resolvable span to amortize across.
+ */
+export function effectiveMonthlyPremium(term: {
+  startDate: Date | null;
+  endDate: Date | null;
+  monthlyCost: number | null;
+  totalCost: number | null;
+}): number {
+  if (term.monthlyCost != null) return term.monthlyCost;
+  if (term.totalCost == null) return 0;
+
+  const monthsInTerm = monthKeysInRange(term.startDate, term.endDate).length;
+  if (monthsInTerm === 0) return 0;
+  return term.totalCost / monthsInTerm;
+}
+
+/** One loan's amortization inputs: current balance, annual rate %, fixed monthly payment. */
+export interface AmortizationLoan {
+  balance: number;
+  apr: number;
+  paymentAmount: number;
+}
+
+/**
+ * Amortization schedule: per-month total interest + principal across a set of loans (bug #10).
+ *
+ * Each month, a loan's interest = balance * (apr/100/12) and its principal = payment − interest;
+ * the balance is then REDUCED by that principal for the next month. The old buildLoanBreakdown
+ * computed interest off a balance it never decremented, so every one of the 12 months reported the
+ * SAME interest/principal (interest never declined, principal never rose, and a loan that pays off
+ * mid-window was over-projected). This walks the balance down month over month, clamping at 0 so a
+ * paid-off loan contributes nothing further (no negative interest, no phantom principal).
+ *
+ * Pure + caller-resolved (no DB): the caller supplies current balances and the month-key labels, so
+ * this is unit-testable. `monthKeys.length` months are emitted in order.
+ */
+export function buildAmortizationSchedule(
+  loans: AmortizationLoan[],
+  monthKeys: string[]
+): Array<{ month: string; interest: number; principal: number }> {
+  // Local running balances so we don't mutate the caller's inputs.
+  const balances = loans.map((l) => l.balance);
+
+  return monthKeys.map((month) => {
+    let totalInterest = 0;
+    let totalPrincipal = 0;
+    for (let i = 0; i < loans.length; i++) {
+      const balance = balances[i];
+      if (balance <= 0) continue; // paid off — contributes nothing
+      const interest = balance * (loans[i].apr / 100 / 12);
+      // Principal can't exceed the remaining balance (the final payment is smaller).
+      const principal = Math.min(Math.max(0, loans[i].paymentAmount - interest), balance);
+      totalInterest += Math.max(0, interest);
+      totalPrincipal += principal;
+      balances[i] = balance - principal;
+    }
+    return { month, interest: totalInterest, principal: totalPrincipal };
+  });
 }
 
 /** Normalize a date field that may be a Date or timestamp (Unix seconds). */
@@ -218,14 +311,18 @@ export function buildMonthlyConsumption(
     }
   });
 
-  return Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(0, 12)
-    .map(([month, data]) => ({
-      month,
-      efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
-      volume: data.volume,
-    }));
+  return (
+    Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      // Keep the most RECENT 12 months (slice from the end of the ascending sort). slice(0, 12)
+      // would keep the OLDEST 12 and hide the current period once a user has >12 months of data.
+      .slice(-12)
+      .map(([month, data]) => ({
+        month,
+        efficiency: data.effCount > 0 ? data.effSum / data.effCount : 0,
+        volume: data.volume,
+      }))
+  );
 }
 
 /** Build gas price history from fuel rows. */
@@ -317,6 +414,24 @@ export function computeAverageCosts(
   };
 }
 
+/**
+ * Miles driven between a consecutive fill-up pair, or null if the window isn't a valid
+ * distance measurement — mirroring computeEfficiencyPoint: a missed/partial fill-up (either
+ * row) spans multiple tanks, a non-positive delta is out-of-order/duplicate data, and an
+ * implausibly large gap (> cap) is bad data. Used so month aggregators can't fold a bogus
+ * window into MPG / cost-per-distance.
+ */
+function validMilesBetween(
+  current: { mileage: number | null; missedFillup: boolean },
+  previous: { mileage: number | null; missedFillup: boolean }
+): number | null {
+  if (current.missedFillup || previous.missedFillup) return null;
+  if (!current.mileage || !previous.mileage) return null;
+  const miles = current.mileage - previous.mileage;
+  if (miles <= 0 || miles > MAX_REASONABLE_MILES_BETWEEN_FILLUPS) return null;
+  return miles;
+}
+
 /** Accumulate cost-per-mile data from consecutive fuel expense pairs for a single vehicle. */
 function accumulateCostPerMile(
   vehicleRows: FuelExpenseRow[],
@@ -326,9 +441,8 @@ function accumulateCostPerMile(
     const current = vehicleRows[i];
     const previous = vehicleRows[i - 1];
     if (!current || !previous) continue;
-    if (!current.mileage || !previous.mileage) continue;
-    const miles = current.mileage - previous.mileage;
-    if (miles <= 0) continue;
+    const miles = validMilesBetween(current, previous);
+    if (miles === null) continue;
     const d = normalizeDate(current.date);
     if (!d) continue;
     const key = `${toMonthKey(d)}|${current.vehicleId}`;
@@ -880,18 +994,13 @@ function accumulateFuelRow(
   const entry = monthData.get(key) ?? { totalCost: 0, totalGallons: 0, totalMiles: 0, count: 0 };
   entry.totalCost += row.expenseAmount;
 
-  if (
-    prevRow &&
-    row.mileage != null &&
-    prevRow.mileage != null &&
-    row.volume != null &&
-    row.volume > 0
-  ) {
-    const miles = row.mileage - prevRow.mileage;
-    if (miles > 0) {
-      entry.totalMiles += miles;
-      entry.totalGallons += row.volume;
-    }
+  // Only fold a pair into the month's MPG when it's a valid distance window (skips missed
+  // fill-ups + over-cap gaps, mirroring computeEfficiencyPoint) AND this row has volume —
+  // else one tank's volume gets counted against two tanks' miles, inflating MPG.
+  const miles = prevRow ? validMilesBetween(row, prevRow) : null;
+  if (miles !== null && row.volume != null && row.volume > 0) {
+    entry.totalMiles += miles;
+    entry.totalGallons += row.volume;
   }
   entry.count++;
   monthData.set(key, entry);

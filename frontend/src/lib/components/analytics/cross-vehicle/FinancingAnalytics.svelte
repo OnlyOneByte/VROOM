@@ -75,9 +75,9 @@
 				subtitle: 'across all vehicles'
 			},
 			{
-				label: 'Interest Paid YTD',
-				value: formatCurrency(s.interestPaidYtd),
-				subtitle: 'on loans'
+				label: 'Est. Monthly Interest',
+				value: formatCurrency(s.monthlyInterestEstimate),
+				subtitle: 'on current loan balances'
 			},
 			{
 				label: 'Active Financing',
@@ -141,9 +141,9 @@
 												</p>
 											</div>
 											<div>
-												<p class="text-muted-foreground">Interest Paid</p>
+												<p class="text-muted-foreground">Est. Monthly Interest</p>
 												<p class="font-semibold text-destructive">
-													{formatCurrency(vehicle.interestPaid)}
+													{formatCurrency(vehicle.monthlyInterestEstimate)}
 												</p>
 											</div>
 										{/if}

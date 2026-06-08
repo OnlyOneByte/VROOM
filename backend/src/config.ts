@@ -234,6 +234,10 @@ export const CONFIG = {
       maxCatchUpOccurrences: 12,
       maxTags: 10,
       tagMaxLength: 50,
+      // Service-interval mileage (maintenance-schedule). Unitless integer in the vehicle's
+      // distanceUnit; cap generously (covers any realistic miles/km service interval) while
+      // blocking absurd values that would push nextDueOdometer past INTEGER range.
+      maxIntervalMileage: 1_000_000,
       // Cap the notification-history feed so a long-lapsed reminder that fired
       // many times can't return an unbounded list to the UI (newest-first).
       notificationsHistoryLimit: 100,

@@ -6,6 +6,7 @@ import { splitConfigSchema } from '../expenses/validation';
 const reminderTypeSchema = z.enum(['expense', 'notification']);
 const frequencySchema = z.enum(['weekly', 'monthly', 'yearly', 'custom']);
 const intervalUnitSchema = z.enum(['day', 'week', 'month', 'year']);
+const triggerModeSchema = z.enum(['time', 'mileage', 'both']);
 
 // Nullable DB-backed fields use .nullish() (accept undefined OR null), NOT
 // .optional() (undefined only). The update flow merges the existing DB row —
@@ -20,6 +21,20 @@ const reminderBaseSchema = z.object({
   frequency: frequencySchema,
   intervalValue: z.number().int().positive().nullish(),
   intervalUnit: intervalUnitSchema.nullish(),
+  // Maintenance-schedule (T4). triggerMode is OPTIONAL, not `.default('time')`: a default would
+  // survive `.partial()` on the update schema and silently flip an existing mileage reminder back to
+  // 'time' on any update that omits the field. Absent on create → the DB column default ('time')
+  // applies; absent on update → the merge keeps the existing value. intervalMileage/
+  // lastServiceOdometer are the mileage axis inputs; nextDueOdometer is SERVER-DERIVED (=
+  // lastServiceOdometer + intervalMileage) in the route, never client input. Refined per D4 below.
+  triggerMode: triggerModeSchema.optional(),
+  intervalMileage: z
+    .number()
+    .int()
+    .positive()
+    .max(CONFIG.validation.reminder.maxIntervalMileage)
+    .nullish(),
+  lastServiceOdometer: z.number().int().min(0).nullish(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date().nullish(),
   // Active/paused flag. Optional on create (defaults active in the DB); on
@@ -75,6 +90,32 @@ function refineExpenseType(data: ReminderRefineInput, ctx: z.RefinementCtx) {
       code: z.ZodIssueCode.custom,
       message: 'expenseAmount required for automatic expense reminders',
       path: ['expenseAmount'],
+    });
+  }
+}
+
+function refineMileageTrigger(data: ReminderRefineInput, ctx: z.RefinementCtx) {
+  // Only the mileage axis ('mileage' | 'both') has extra requirements (D4). 'time' (the default)
+  // is unconstrained here.
+  if (data.triggerMode !== 'mileage' && data.triggerMode !== 'both') return;
+
+  if (!data.intervalMileage) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'intervalMileage is required (positive) for a mileage reminder',
+      path: ['intervalMileage'],
+    });
+  }
+  // NOTE: lastServiceOdometer is NOT required from the client — the route defaults it to the
+  // vehicle's current odometer when omitted (D4). The field-level schema already constrains it to a
+  // non-negative int IF provided, so there's nothing to add here. (Earlier this required presence,
+  // which wrongly rejected the documented default-on-create behavior.)
+  // D4: a mileage axis tracks ONE vehicle (the odometer is per-vehicle).
+  if (data.vehicleIds && data.vehicleIds.length !== 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'A mileage reminder must be linked to exactly one vehicle',
+      path: ['vehicleIds'],
     });
   }
 }
@@ -137,6 +178,7 @@ export const createReminderSchema = reminderBaseSchema.superRefine((data, ctx) =
   refineExpenseType(data, ctx);
   refineDateRange(data, ctx);
   refineSplitConfig(data, ctx);
+  refineMileageTrigger(data, ctx);
 });
 
 // Note: `.partial()` cannot be called on a schema that already has refinements
@@ -148,4 +190,5 @@ export const updateReminderSchema = reminderBaseSchema.partial().superRefine((da
   refineExpenseType(data, ctx);
   refineDateRange(data, ctx);
   refineSplitConfig(data, ctx);
+  refineMileageTrigger(data, ctx);
 });

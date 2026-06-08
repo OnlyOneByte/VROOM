@@ -1,0 +1,120 @@
+# Maintenance-Schedule Reminders — Tasks
+
+> **UNBLOCKED: Angelo signed off D1–D6 (all ✅ recommended) cycle 12 — build is GO.** Ordering
+> follows CLAUDE.md (backend-first). Each task is one loop increment; verify (`bun run validate` /
+> `npm run type-check && build` / regress.sh + screenshot) before ticking.
+
+## Phase 0 — sign-off (this gates everything)
+- [x] **T0** Angelo ratified D1–D6 at the ✅ recommended option for each (cycle 12). Design
+      `[depends on Dx]` sections already assume those options, so no reconciliation needed; build T1+.
+
+## Phase 1 — backend foundation
+- [x] **T1 (cycle 15)** Migration `0003_many_jean_grey.sql` — ADDITIVE ONLY: added `triggerMode`
+      (default 'time'), `intervalMileage`, `lastServiceOdometer`, `nextDueOdometer` to `reminders`
+      and `dueOdometer` to `reminderNotifications` (5× `ALTER TABLE ADD COLUMN`, no table rebuild).
+      Pinned by `migration-0003.test.ts` (columns present, existing rows survive with defaults).
+      **DESCOPED from the original T1:** relaxing `nextDueDate`/`dueDate` to nullable + widening the
+      dedup index forces a SQLite table REBUILD that cascade-drops child notification rows; moved to
+      T3 where the trigger logic actually needs a null date. Until then NOT NULL stays correct (no
+      mileage-only reminder is created yet).
+- [~] **T2 (partial, cycle 16)** `OdometerRepository.getCurrentOdometer(vehicleId)` shipped =
+      `MAX(odometer)` across a UNION of `expenses.mileage` + `odometer_entries.odometer`, by value
+      (not by date), null when no reading, vehicle-scoped. Reuses the `getHistory` UNION shape.
+      Pinned by `get-current-odometer.test.ts` (8 cases: null-empty, single-source max, cross-source
+      max either way, NULL-mileage ignored, per-vehicle scoping, zero≠null). **DEFERRED to T3:** the
+      `vehicle-stats.currentMileage` reconcile — that field is computed inside a PERIOD-FILTERED,
+      fuel-only stats route, so swapping it to the all-sources/all-time MAX is a visible semantics
+      change (under a 7d filter "current mileage" would jump to the all-time odometer), not a
+      behavior-preserving reconcile. Do it in T3 alongside the mileage-due consumer, where the period
+      semantics can be decided deliberately.
+- [~] **T3 (in progress)** `trigger-service`: whichever-comes-first due logic (time OR mileage);
+      null-guard the time query; mileage dedup via `dueOdometer`.
+      - [x] **T3 part 1 (cycle 22) — the deferred migration.** Migration `0004_marvelous_the_fury.sql`
+            relaxes `reminders.next_due_date` + `reminder_notifications.due_date` to nullable.
+            **Index design CORRECTED vs the spec:** spec said widen to `(reminderId, dueDate,
+            dueOdometer)` — wrong, because SQLite treats NULLs as DISTINCT in a UNIQUE index, so that
+            would silently stop deduping time-only reminders (NULL dueOdometer). Instead kept
+            `rn_reminder_due_idx (reminderId, dueDate)` for the time axis + added a PARTIAL unique
+            `rn_reminder_odo_idx (reminderId, dueOdometer) WHERE dueOdometer IS NOT NULL` for mileage.
+            **HAND-AUTHORED** (C15 exception): drizzle's generated rebuild drops `reminders` while the
+            CASCADE children hold rows + `PRAGMA foreign_keys=OFF` is a no-op inside the migrator txn →
+            would wipe child rows. Safe order: stash children in `_hold_` tables → empty live children
+            → rebuild → refill. Proven by `migration-0004.test.ts` (5 tests, child rows survive
+            row-for-row with FKs ON). trigger-service null-guards a null `next_due_date` (no time
+            axis). tsc 0 · musl-biome clean · 898 pass · build OK.
+      - [x] **T3 part 2 (cycle 25)** trigger-service whichever-comes-first. Repository:
+            `findMileageTracking` (active `triggerMode != 'time'` + non-null `nextDueOdometer`),
+            `mileageNotificationExists` + `createMileageNotification` (null dueDate, dueOdometer set;
+            app-level dedup, partial-index backstop, UNIQUE-violation → no-op). trigger-service:
+            `processMileageReminder` runs a SEPARATE pass (the time `findOverdue` can't see mileage-due
+            rows), fires ONE notification when `getCurrentOdometer >= nextDueOdometer`. NO auto-re-arm
+            (re-arm = mark-serviced, D3/T4) → idempotent; `both` fires on both axes independently; D4
+            single-vehicle enforced at runtime (skip, not error). Mileage EXPENSE auto-creation
+            deferred (needs ratified re-arm semantics). FOLDED IN bug #12 (`fastForwardPastNow` now
+            honors endDate). Pinned: `trigger-mileage.test.ts` (5) + `trigger-fastforward-enddate.test.ts`
+            (1). tsc 0 · musl-biome · 918 pass · build OK. Engine dormant until T4 wires validation.
+      - [ ] **T3 part 3** the deferred T2 reconcile — decide `vehicle-stats.currentMileage` period
+            semantics and route it (or a new all-time field) through `getCurrentOdometer`.
+- [~] **T4 Routes + validation** (in progress):
+      - [x] **part 1 (cycle 31) — mileage reminders API-creatable.** validation.ts: `triggerMode`/
+            `intervalMileage`/`lastServiceOdometer` on reminderBaseSchema + `refineMileageTrigger`
+            (D4: mileage/both needs positive intervalMileage + exactly one vehicle; lastServiceOdometer
+            route-defaulted). routes.ts: `resolveMileageFields` defaults lastServiceOdometer to the
+            vehicle's current odometer + derives `nextDueOdometer` (server-side); pure-mileage create
+            persists `nextDueDate: null`; update recomputes the cache + flips nextDueDate when the
+            mileage axis is touched. repository.createWithVehicles no longer hard-overrides nextDueDate.
+            config maxIntervalMileage cap. Pinned by `create-mileage-reminder.test.ts` (7). LESSON:
+            `triggerMode: .default('time')` survives `.partial()` and silently reverts mileage→time on
+            update — use `.optional()`. tsc 0 · musl-biome · 934 pass · build OK.
+      - [x] **part 2 (cycle 32) — `POST /:id/mark-serviced` re-arm (D3).** repository.markServiced
+            (ownership-scoped optimistic update + lastTriggeredAt stamp); route computes per-axis:
+            mileage/both → lastServiceOdometer = getCurrentOdometer, nextDueOdometer recomputed;
+            time/both → nextDueDate advanced via computeNextDueDate. Rate-limited; `/:id/mark-serviced`
+            static-suffix route. Pinned by `mark-serviced.test.ts` (5, incl. the end-to-end
+            fire→service→not-due-again loop + cross-tenant 404). tsc 0 · musl-biome · 939 pass · build OK.
+      - [x] **part 3 (cycle 37) — `recheckMileageReminders` on odometer / mileaged-expense write (D5).**
+            trigger-service.recheckMileageReminders(userId, vehicleId) reuses processMileageReminder
+            (idempotent via dedup), wired into odometer-create (always) + expense-create (when
+            mileage != null). Best-effort (never throws → can't fail the write). Pinned by
+            recheck-on-write.test.ts (5). validate:local green (947 pass).
+      **T4 FUNCTIONALLY COMPLETE:** mileage reminders creatable (part 1/C31) · mark-serviced re-arm
+      (part 2/C32) · fire on /trigger (T3-part-2/C25) · fire on write (part 3/C37).
+
+## Phase 2 — data safety
+- [~] **T5 (partial, cycle 15)** Added the 5 new columns to `SHEET_HEADERS` (reminders +
+      reminderNotifications) the moment T1's migration landed, because the cycle-3
+      sheets-header-coverage guard fails otherwise (R9). CSV path is schema-derived → auto-covered.
+      **Remaining: DONE (C27)** — `maintenance-fields-roundtrip.test.ts` asserts every maintenance
+      field (triggerMode, intervalMileage, lastServiceOdometer, nextDueOdometer, dueOdometer + the
+      nullable dates) survives a real exportAsZip → restoreFromBackup, incl. the NULL-date-not-
+      coerced-to-0 cases. Seeds mileage reminders via sqlite (API creation lands in T4). Sheets-path
+      coverage is the SHEET_HEADERS guard (already updated in T5-partial).
+
+## Phase 3 — frontend
+- [x] **T6 (cycle 39)** Types + service client. `types/reminder.ts`: TriggerMode + mileage fields on
+      Reminder (triggerMode/intervalMileage/lastServiceOdometer/nextDueOdometer), nextDueDate nullable;
+      ReminderNotification dueDate nullable + dueOdometer added. `services/reminder-api.ts`:
+      markServiced(id). The nullable-date change surfaced 8 time-axis consumer sites (dashboard widget,
+      /reminders isDue + 2 render sites) — all fixed to treat a null date as not-time-due / render the
+      odometer milestone instead. tsc 0 · build OK. Non-visual layer — no screenshot (mileage reminders
+      aren't UI-creatable until T7).
+- [~] **T7 (cycle 45, visual eyes-on PENDING)** `ReminderForm`: "Trigger when" Select (time | mileage
+      | both) driving hasTimeAxis/hasMileageAxis; mileage branch = Service-interval input (distance-unit
+      suffix via getDistanceUnitLabel) + Last-serviced-at (defaults to current odometer when blank) +
+      hides time fields; D4 single-vehicle + positive-interval validation; payload sends triggerMode +
+      mileage fields; edit-path seeds them. Composed from the kit. tsc 0 · build · 345 tests · prettier.
+      ⚠️ Eyes-on screenshot NOT captured (Playwright sandbox-denied in autonomous ctx) — untracked
+      `reminder-mileage.meshclaw.e2e.ts` captures it on regress.sh; flagged to Angelo. Tick to [x] once
+      eyes-on confirmed.
+- [~] **T8 (C39 display + C46 action, eyes-on PENDING)** `/reminders` page: the milestone render +
+      null-date guards + notification dueOdometer display landed C39 (with the nullable-type fixes);
+      C46 added the "Serviced" re-arm Button (active mileage/both cards → reminderApi.markServiced,
+      per-reminder spinner, success toast) + isMileageTracking helper. DueRemindersCard left unchanged
+      — it's the TIME-axis due-soon widget by design (mileage due surfaces via notifications). tsc 0 ·
+      build · 345 tests · prettier. ⚠️ Eyes-on (incl. four-states/a11y of the mileage cards) PENDING —
+      same Playwright sandbox-deny; untracked reminder-mileage e2e asserts the Serviced button + screenshots.
+      Tick [x] once eyes-on confirmed.
+
+## Phase 4 — verify
+- [ ] **T9** E2E (mi + km vehicle, mileage-due flip on odometer write, mark-serviced re-arm) +
+      eyes-on screenshots of all four states. regress.sh green.

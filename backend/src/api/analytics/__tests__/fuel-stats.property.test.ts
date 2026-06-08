@@ -258,6 +258,95 @@ describe('Property 8: Monthly arrays bounded to 12 entries', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Regression (cycle 211): total distance is summed PER VEHICLE, not pooled.
+//
+// buildFuelStatsFromData previously did Math.max(allMileages) - Math.min(allMileages)
+// over EVERY vehicle's readings. For a user with two cars at different odometer ranges
+// (e.g. one at 12k mi, one at 95k mi) that returned ~83k — a garbage "distance driven"
+// on the dashboard summary. The fix groups by vehicle, computes max-min per car, and
+// sums. This pins that contract with a deterministic two-vehicle fixture.
+// ---------------------------------------------------------------------------
+describe('total distance is summed per vehicle (cycle 211 multi-vehicle regression)', () => {
+  test('two vehicles in disjoint odometer ranges sum per-car distance, not pooled max-min', async () => {
+    const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
+    seedUser(testDb.sqlite, user);
+
+    // Car A: low odometer band (10,000 -> 11,000 = 1,000 driven).
+    // Car B: high odometer band (90,000 -> 90,500 = 500 driven).
+    // Correct total = 1,500. Pooled max-min would be 90,500 - 10,000 = 80,500.
+    const carA: TestVehicle = {
+      id: 'veh-A',
+      userId: user.id,
+      make: 'Toyota',
+      model: 'Camry',
+      year: 2022,
+    };
+    const carB: TestVehicle = {
+      id: 'veh-B',
+      userId: user.id,
+      make: 'Honda',
+      model: 'Civic',
+      year: 2021,
+    };
+    seedVehicle(testDb.sqlite, carA);
+    seedVehicle(testDb.sqlite, carB);
+
+    const rows: TestExpense[] = [
+      {
+        id: 'a1',
+        vehicleId: 'veh-A',
+        category: 'fuel',
+        expenseAmount: 40,
+        date: new Date(2024, 0, 5),
+        mileage: 10000,
+        volume: 10,
+        fuelType: 'Regular',
+        missedFillup: false,
+      },
+      {
+        id: 'a2',
+        vehicleId: 'veh-A',
+        category: 'fuel',
+        expenseAmount: 42,
+        date: new Date(2024, 1, 5),
+        mileage: 11000,
+        volume: 11,
+        fuelType: 'Regular',
+        missedFillup: false,
+      },
+      {
+        id: 'b1',
+        vehicleId: 'veh-B',
+        category: 'fuel',
+        expenseAmount: 38,
+        date: new Date(2024, 0, 6),
+        mileage: 90000,
+        volume: 9,
+        fuelType: 'Regular',
+        missedFillup: false,
+      },
+      {
+        id: 'b2',
+        vehicleId: 'veh-B',
+        category: 'fuel',
+        expenseAmount: 39,
+        date: new Date(2024, 1, 6),
+        mileage: 90500,
+        volume: 9,
+        fuelType: 'Regular',
+        missedFillup: false,
+      },
+    ];
+    for (const r of rows) seedExpense(testDb.sqlite, r);
+
+    const result = await repo.getFuelStats(user.id, yearToRange(2024));
+
+    // Per-vehicle sum: (11000-10000) + (90500-90000) = 1500. NOT the pooled 80500.
+    expect(result.distance.totalDistance).toBe(1500);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Property 18: Gas price always positive
 // **Validates: Requirement 4.7**
 // ---------------------------------------------------------------------------

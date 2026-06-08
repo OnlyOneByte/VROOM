@@ -7,6 +7,7 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
+import { reminderTriggerService } from '../reminders/trigger-service';
 import { odometerRepository } from './repository';
 
 const routes = new Hono();
@@ -122,6 +123,11 @@ routes.post(
       recordedAt: data.recordedAt,
       note: data.note ?? null,
     });
+
+    // D5: a new reading may have crossed a mileage reminder's milestone — re-check this vehicle's
+    // mileage reminders now so the notification fires immediately, not only on the next /trigger.
+    // Best-effort (recheck never throws); the reading is already persisted.
+    await reminderTriggerService.recheckMileageReminders(user.id, vehicleId);
 
     return c.json({ success: true, data: entry, message: 'Odometer reading created' }, 201);
   }

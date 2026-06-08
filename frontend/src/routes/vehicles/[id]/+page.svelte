@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '$lib/routes';
+	import { parseMonthToDate } from '$lib/utils/chart-formatters';
 	import { onMount, type Component } from 'svelte';
 	import { Plus, FileText, Download } from '@lucide/svelte';
 	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
@@ -92,7 +93,9 @@
 	let expenseTrendData = $derived.by(() => {
 		if (!summary?.monthlyTrend.length) return [];
 		return summary.monthlyTrend.map(item => ({
-			date: new Date(item.period + '-01'),
+			// parseMonthToDate builds a LOCAL-midnight Date; `new Date('YYYY-MM-01')` parses as
+			// midnight UTC, which shifts the x-axis label back a month for negative-offset users.
+			date: parseMonthToDate(item.period),
 			amount: item.amount,
 			count: item.count
 		}));

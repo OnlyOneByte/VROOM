@@ -13,6 +13,8 @@ import {
   formatErrorResponse,
   handleDatabaseError,
   isAppError,
+  isSyncError,
+  syncErrorResponse,
   ValidationError,
 } from '../errors';
 import { logger } from '../utils/logger';
@@ -40,6 +42,16 @@ export const errorHandler: ErrorHandler = (err, c) => {
   // Handle Hono HTTP exceptions
   if (err instanceof HTTPException) {
     return c.json(createErrorResponse('HTTPException', err.message, err.cause), err.status);
+  }
+
+  // Handle sync/provider errors. SyncError extends Error (not AppError), so without this branch it
+  // would fall through to the generic 500 path below, losing its code→status mapping (a
+  // VALIDATION_ERROR would 500 instead of 400). syncErrorResponse is the SAME shaping the local
+  // handleSyncError uses, so a SyncError yields an identical envelope whether caught in a route
+  // catch block or here — letting route handlers safely drop their hand-rolled try/catch.
+  if (isSyncError(err)) {
+    const { body, status } = syncErrorResponse(err);
+    return c.json(body, status as 400 | 401 | 403 | 409 | 429 | 500 | 503);
   }
 
   // Handle application errors

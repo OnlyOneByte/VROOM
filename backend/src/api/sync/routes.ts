@@ -8,13 +8,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { userProviders } from '../../db/schema';
-import {
-  createErrorResponse,
-  createSuccessResponse,
-  handleSyncError,
-  SyncError,
-  SyncErrorCode,
-} from '../../errors';
+import { createErrorResponse, createSuccessResponse, SyncError, SyncErrorCode } from '../../errors';
 import { bodyLimit, idempotency, rateLimiter, requireAuth } from '../../middleware';
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
@@ -85,94 +79,78 @@ routes.post('/', syncRateLimiter, idempotency({ required: false }), async (c) =>
   const user = c.get('user');
   const userId = user.id;
 
-  try {
-    const body = await c.req.json();
-    validateSyncTypes(body.syncTypes);
-    const force = body.force === true;
+  const body = await c.req.json();
+  validateSyncTypes(body.syncTypes);
+  const force = body.force === true;
 
-    const result = await backupOrchestrator.execute(userId, user.displayName, force);
+  const result = await backupOrchestrator.execute(userId, user.displayName, force);
 
-    if (result.status === 'in_progress') {
-      return c.json(
-        createErrorResponse('BACKUP_IN_PROGRESS', 'A backup is already in progress'),
-        409
-      );
-    }
-
-    return c.json(createSuccessResponse(result, 'Sync completed'));
-  } catch (error) {
-    return handleSyncError(c, error, 'sync');
+  if (result.status === 'in_progress') {
+    return c.json(
+      createErrorResponse('BACKUP_IN_PROGRESS', 'A backup is already in progress'),
+      409
+    );
   }
+
+  return c.json(createSuccessResponse(result, 'Sync completed'));
 });
 
 routes.get('/status', async (c) => {
   const user = c.get('user');
-  try {
-    const settings = await preferencesRepository.getOrCreate(user.id);
-    const syncStatus = activityTracker.getSyncStatus(user.id);
-    const syncStateData = await syncStateRepository.getOrCreate(user.id);
+  const settings = await preferencesRepository.getOrCreate(user.id);
+  const syncStatus = activityTracker.getSyncStatus(user.id);
+  const syncStateData = await syncStateRepository.getOrCreate(user.id);
 
-    // Derive backup/sheets status from backupConfig
-    const config = settings.backupConfig as BackupConfig | null;
-    const providers = config?.providers;
-    const backupEnabled = providers ? Object.values(providers).some((p) => p.enabled) : false;
-    const sheetsSyncEnabled = providers
-      ? Object.values(providers).some((p) => p.sheetsSyncEnabled)
-      : false;
+  // Derive backup/sheets status from backupConfig
+  const config = settings.backupConfig as BackupConfig | null;
+  const providers = config?.providers;
+  const backupEnabled = providers ? Object.values(providers).some((p) => p.enabled) : false;
+  const sheetsSyncEnabled = providers
+    ? Object.values(providers).some((p) => p.sheetsSyncEnabled)
+    : false;
 
-    return c.json(
-      createSuccessResponse({
-        backupEnabled,
-        sheetsSyncEnabled,
-        syncOnInactivity: settings.syncOnInactivity,
-        syncInactivityMinutes: settings.syncInactivityMinutes,
-        lastSyncDate: syncStateData.lastSyncDate,
-        lastBackupDate: syncStateData.lastBackupDate,
-        lastDataChangeDate: syncStateData.lastDataChangeDate,
-        ...syncStatus,
-      })
-    );
-  } catch (error) {
-    return handleSyncError(c, error, 'get sync status');
-  }
+  return c.json(
+    createSuccessResponse({
+      backupEnabled,
+      sheetsSyncEnabled,
+      syncOnInactivity: settings.syncOnInactivity,
+      syncInactivityMinutes: settings.syncInactivityMinutes,
+      lastSyncDate: syncStateData.lastSyncDate,
+      lastBackupDate: syncStateData.lastBackupDate,
+      lastDataChangeDate: syncStateData.lastDataChangeDate,
+      ...syncStatus,
+    })
+  );
 });
 
 routes.get('/backups/providers', async (c) => {
   const user = c.get('user');
-  try {
-    const providerId = c.req.query('providerId');
+  const providerId = c.req.query('providerId');
 
-    if (providerId) {
-      const backups = await backupService.listBackups(user.id, providerId);
-      return c.json(createSuccessResponse(backups));
-    }
-
-    const allBackups = await backupService.listAllBackups(user.id);
-    return c.json(createSuccessResponse(allBackups));
-  } catch (error) {
-    return handleSyncError(c, error, 'list backups from providers');
+  if (providerId) {
+    const backups = await backupService.listBackups(user.id, providerId);
+    return c.json(createSuccessResponse(backups));
   }
+
+  const allBackups = await backupService.listAllBackups(user.id);
+  return c.json(createSuccessResponse(allBackups));
 });
 
 routes.get('/backups/download', backupRateLimiter, async (c) => {
   const user = c.get('user');
-  try {
-    const zipBuffer = await withTimeout(
-      backupService.exportAsZip(user.id),
-      OPERATION_TIMEOUTS.BACKUP,
-      'Backup export'
-    );
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    return new Response(zipBuffer, {
-      headers: {
-        'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="vroom-backup-${timestamp}.zip"`,
-        'Content-Length': zipBuffer.length.toString(),
-      },
-    });
-  } catch (error) {
-    return handleSyncError(c, error, 'download backup');
-  }
+  const zipBuffer = await withTimeout(
+    backupService.exportAsZip(user.id),
+    OPERATION_TIMEOUTS.BACKUP,
+    'Backup export'
+  );
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return new Response(zipBuffer, {
+    headers: {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="vroom-backup-${timestamp}.zip"`,
+      'Content-Length': zipBuffer.length.toString(),
+    },
+  });
 });
 
 routes.post(
@@ -181,51 +159,47 @@ routes.post(
   idempotency({ required: true }),
   async (c) => {
     const user = c.get('user');
-    try {
-      const body = restoreFromProviderSchema.parse(await c.req.json());
+    const body = restoreFromProviderSchema.parse(await c.req.json());
 
-      // Verify provider exists and is active
-      const db = getDb();
-      const providerRow = await db
-        .select()
-        .from(userProviders)
-        .where(
-          and(
-            eq(userProviders.id, body.providerId),
-            eq(userProviders.userId, user.id),
-            eq(userProviders.status, 'active')
-          )
+    // Verify provider exists and is active
+    const db = getDb();
+    const providerRow = await db
+      .select()
+      .from(userProviders)
+      .where(
+        and(
+          eq(userProviders.id, body.providerId),
+          eq(userProviders.userId, user.id),
+          eq(userProviders.status, 'active')
         )
-        .limit(1);
+      )
+      .limit(1);
 
-      if (!providerRow[0]) {
-        throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Provider not found or inactive');
-      }
-
-      let result: import('./restore').RestoreResponse;
-      if (body.sourceType === 'zip') {
-        const zipBuffer = await withTimeout(
-          backupService.downloadBackup(user.id, body.providerId, body.fileRef),
-          OPERATION_TIMEOUTS.RESTORE,
-          'Download backup from provider'
-        );
-        result = await withTimeout(
-          restoreService.restoreFromBackup(user.id, zipBuffer, body.mode),
-          OPERATION_TIMEOUTS.RESTORE,
-          'Restore from provider backup'
-        );
-      } else {
-        result = await withTimeout(
-          restoreService.restoreFromSheets(user.id, body.providerId, body.mode),
-          OPERATION_TIMEOUTS.RESTORE,
-          'Restore from provider sheets'
-        );
-      }
-
-      return c.json(createSuccessResponse(result, 'Restore operation completed'));
-    } catch (error) {
-      return handleSyncError(c, error, 'restore from provider');
+    if (!providerRow[0]) {
+      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'Provider not found or inactive');
     }
+
+    let result: import('./restore').RestoreResponse;
+    if (body.sourceType === 'zip') {
+      const zipBuffer = await withTimeout(
+        backupService.downloadBackup(user.id, body.providerId, body.fileRef),
+        OPERATION_TIMEOUTS.RESTORE,
+        'Download backup from provider'
+      );
+      result = await withTimeout(
+        restoreService.restoreFromBackup(user.id, zipBuffer, body.mode),
+        OPERATION_TIMEOUTS.RESTORE,
+        'Restore from provider backup'
+      );
+    } else {
+      result = await withTimeout(
+        restoreService.restoreFromSheets(user.id, body.providerId, body.mode),
+        OPERATION_TIMEOUTS.RESTORE,
+        'Restore from provider sheets'
+      );
+    }
+
+    return c.json(createSuccessResponse(result, 'Restore operation completed'));
   }
 );
 
@@ -236,41 +210,37 @@ routes.post(
   idempotency({ required: true }),
   async (c) => {
     const user = c.get('user');
-    try {
-      const formData = await c.req.formData();
-      const file = formData.get('file') as File | null;
-      const mode = (formData.get('mode') as string) || 'preview';
+    const formData = await c.req.formData();
+    const file = formData.get('file') as File | null;
+    const mode = (formData.get('mode') as string) || 'preview';
 
-      if (!file) {
-        throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'No file provided');
-      }
-
-      if (!CONFIG.backup.supportedModes.includes(mode as never)) {
-        throw new SyncError(
-          SyncErrorCode.VALIDATION_ERROR,
-          `Invalid mode. Supported: ${CONFIG.backup.supportedModes.join(', ')}`
-        );
-      }
-
-      const fileBuffer = Buffer.from(await file.arrayBuffer());
-      const sizeValidation = backupService.validateFileSize(fileBuffer.length);
-      if (!sizeValidation.valid) {
-        throw new SyncError(SyncErrorCode.VALIDATION_ERROR, sizeValidation.errors[0]);
-      }
-
-      const result = await withTimeout(
-        restoreService.restoreFromBackup(
-          user.id,
-          fileBuffer,
-          mode as 'preview' | 'merge' | 'replace'
-        ),
-        OPERATION_TIMEOUTS.RESTORE,
-        'Restore from backup'
-      );
-      return c.json(createSuccessResponse(result, 'Restore operation completed'));
-    } catch (error) {
-      return handleSyncError(c, error, 'restore from backup');
+    if (!file) {
+      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, 'No file provided');
     }
+
+    if (!CONFIG.backup.supportedModes.includes(mode as never)) {
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        `Invalid mode. Supported: ${CONFIG.backup.supportedModes.join(', ')}`
+      );
+    }
+
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const sizeValidation = backupService.validateFileSize(fileBuffer.length);
+    if (!sizeValidation.valid) {
+      throw new SyncError(SyncErrorCode.VALIDATION_ERROR, sizeValidation.errors[0]);
+    }
+
+    const result = await withTimeout(
+      restoreService.restoreFromBackup(
+        user.id,
+        fileBuffer,
+        mode as 'preview' | 'merge' | 'replace'
+      ),
+      OPERATION_TIMEOUTS.RESTORE,
+      'Restore from backup'
+    );
+    return c.json(createSuccessResponse(result, 'Restore operation completed'));
   }
 );
 
@@ -284,56 +254,52 @@ interface RestoreProviderInfo {
 
 routes.get('/restore/providers', syncRateLimiter, async (c) => {
   const user = c.get('user');
-  try {
-    const db = getDb();
-    const providers = await db
-      .select()
-      .from(userProviders)
-      .where(
-        and(
-          eq(userProviders.userId, user.id),
-          eq(userProviders.domain, 'storage'),
-          eq(userProviders.status, 'active')
-        )
-      );
+  const db = getDb();
+  const providers = await db
+    .select()
+    .from(userProviders)
+    .where(
+      and(
+        eq(userProviders.userId, user.id),
+        eq(userProviders.domain, 'storage'),
+        eq(userProviders.status, 'active')
+      )
+    );
 
-    const settings = await preferencesRepository.getOrCreate(user.id);
-    const config: BackupConfig = (settings.backupConfig as BackupConfig | null) ?? {
-      providers: {},
-    };
+  const settings = await preferencesRepository.getOrCreate(user.id);
+  const config: BackupConfig = (settings.backupConfig as BackupConfig | null) ?? {
+    providers: {},
+  };
 
-    const restoreProviders: RestoreProviderInfo[] = [];
+  const restoreProviders: RestoreProviderInfo[] = [];
 
-    for (const provider of providers) {
-      const providerConfig: ProviderBackupSettings | undefined = config.providers[provider.id];
-      if (!providerConfig) continue;
+  for (const provider of providers) {
+    const providerConfig: ProviderBackupSettings | undefined = config.providers[provider.id];
+    if (!providerConfig) continue;
 
-      const sourceTypes: ('zip' | 'sheets')[] = [];
+    const sourceTypes: ('zip' | 'sheets')[] = [];
 
-      if (providerConfig.enabled && providerConfig.lastBackupAt) {
-        sourceTypes.push('zip');
-      }
-      if (providerConfig.sheetsSyncEnabled && providerConfig.sheetsSpreadsheetId) {
-        sourceTypes.push('sheets');
-      }
-
-      if (sourceTypes.length === 0) continue;
-
-      const providerConfigJson = provider.config as Record<string, unknown> | null;
-
-      restoreProviders.push({
-        providerId: provider.id,
-        providerType: provider.providerType,
-        displayName: provider.displayName,
-        accountEmail: (providerConfigJson?.accountEmail as string) ?? '',
-        sourceTypes,
-      });
+    if (providerConfig.enabled && providerConfig.lastBackupAt) {
+      sourceTypes.push('zip');
+    }
+    if (providerConfig.sheetsSyncEnabled && providerConfig.sheetsSpreadsheetId) {
+      sourceTypes.push('sheets');
     }
 
-    return c.json(createSuccessResponse(restoreProviders));
-  } catch (error) {
-    return handleSyncError(c, error, 'list restore providers');
+    if (sourceTypes.length === 0) continue;
+
+    const providerConfigJson = provider.config as Record<string, unknown> | null;
+
+    restoreProviders.push({
+      providerId: provider.id,
+      providerType: provider.providerType,
+      displayName: provider.displayName,
+      accountEmail: (providerConfigJson?.accountEmail as string) ?? '',
+      sourceTypes,
+    });
   }
+
+  return c.json(createSuccessResponse(restoreProviders));
 });
 
 export { routes };

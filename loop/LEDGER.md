@@ -1,0 +1,977 @@
+# LEDGER — VROOM autonomous loop
+
+> Append-only cycle log + the balance table. Update BOTH every cycle:
+> bump the touched category's "last-touched cycle", then add a one-line log entry.
+
+## Balance table
+`starved-for = current cycle − last-touched`. If `starved-for > budget` for any category,
+the next increment MUST come from the most-starved over-budget category.
+
+| Category | Budget | Last touched (cycle) |
+|---|---:|---|
+| feature | 4 | 46 |
+| deep-review | 5 | 42 |
+| guard | 6 | 48 |
+| bug | 3 | 44 |
+| arch | 5 | 43 |
+| infra | 6 | 47 |
+
+Current cycle: **48**
+
+> `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
+> ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
+> the top one (dedup ownership-validation). Run the rule-7 audit fan-out once those clear.
+
+## Cycle log
+- **C1 (infra)** — Bootstrapped the `loop/` scaffold the loop format depends on:
+  NORTH_STAR.md (vision + quality bar + guardrails), BACKLOG.md (5 categories with
+  starvation budgets + seeded ranked queue), this LEDGER, and push.sh. No product code
+  touched; verified the scaffold is self-consistent (categories in BACKLOG == LEDGER table).
+  Next cycle: nothing is over budget yet, so take highest-leverage — the `infra` item
+  "CLAUDE.md stale refs" (cheap, unblocks fresh-clone orientation) or the top `guard`
+  (EUR visual guard). Prefer spreading: pick a non-infra category next.
+- **C2 (guard)** — Pinned the cycle-201 mobile-wrap fix. Found the top `guard` item
+  ("EUR/unit visual guard") was ALREADY built (insurance-currency-label +
+  vehicle-form-unit-defaults e2e), so took guard #2 (category-grid no-wrap, c201). Key
+  insight: an e2e spec is untracked-by-design (`*.meshclaw.e2e.ts`) so it doesn't survive
+  a merge — quality-bar #5 needs a MERGE-SURVIVING guard. Followed the cycle-205/206
+  source-scan pattern: committed `category-selector-labels.test.ts` (fast unit suite) that
+  asserts all six CategorySelector labels are single-word (a multi-word label wraps in the
+  2-col mobile grid). Also dropped a runtime e2e (untracked) that measures actual wrap.
+  Verified: guard unit test green (2/2), frontend type-check 0 errors, build done, e2e
+  passes against the real component. No product code touched.
+  Next cycle: still nothing over budget. Spread again — candidates: `deep-review` (vehicle
+  Overview/ExpensesTable eyes-on, or Sheets restore path) or `infra` (CLAUDE.md stale
+  refs). Prefer a deep-review to exercise that starved category before its budget bites.
+- **C3 (deep-review → bug)** — Fanned out 2 parallel Explore agents (Sheets restore path +
+  vehicle Overview/ExpensesTable). The Sheets agent surfaced a REAL data-safety bug
+  (quality-bar #1): the Sheets backup writes each table through a HAND-MAINTAINED column
+  list (`getXHeaders()`), and `expenses.clientId` (the offline-sync idempotency key) was
+  missing — so it was silently dropped on every Google Sheets backup→restore round-trip
+  and restored as null, while the schema-derived CSV path preserved it. Verified firsthand
+  + computed the full drift across all 15 tables (clientId was the ONLY one). Bugs jump the
+  queue → fixed this cycle: (1) centralized the 15 header arrays into one exported
+  `SHEET_HEADERS` map (single source of truth; deleted the 15 dead getters), added
+  `clientId`; (2) committed `sheets-header-coverage.test.ts` — a schema-vs-headers superset
+  guard (cycle-208/209 pattern) that bites today and pins the whole drift class. Verified:
+  tsc 0 errors · Biome (musl) clean · 846 pass/0 fail (incl. the real Sheets round-trip
+  test, now carrying clientId) · build bundled. The UI agent's findings are filed as
+  backlog items (none data-safety; logged below). marks this cycle infra-light, product-real.
+  Next cycle: `feature` (budget 4) and `infra` (CLAUDE.md stale refs) are the most starved.
+  Prefer the cheap `infra` (CLAUDE.md still says "Biome can't run" + points at gitignored
+  STATUS.md/LOOP.md — wrong for a fresh clone), or pick up a UI deep-review finding as a `bug`.
+- **C4 (feature → spec)** — `feature` was over budget (never touched, budget 4), so the rule
+  forced a feature pick. Its first loop phase is SPEC (build gated on Angelo sign-off), so the
+  increment is the spec, not code. Fanned out 2 Explore agents to scope the reuse surface:
+  (1) reminders engine is 100% time-based; mileage was never scoped/deferred; `reminder_vehicles`
+  junction + notification feed + ReminderForm/DueRemindersCard are reusable. (2) odometer is a
+  bare integer in the vehicle's distance unit (convert-on-read, no canonical unit); NO
+  "current odometer" helper exists (two competing notions: fuel-only `vehicle-stats.currentMileage`
+  vs the date-ordered `getHistory` UNION). Drafted `.kiro/specs/maintenance-schedule/`
+  {requirements,design,tasks}.md: extend reminders with a `triggerMode` + nullable mileage columns
+  (additive), a new max-by-value `getCurrentOdometer` helper, whichever-comes-first OR-logic,
+  mark-serviced re-arm, mileage-recheck-on-write, and R9 backup/Sheets-header coverage. Six open
+  product decisions (D1–D6) flagged for sign-off; recommended option given for each; tasks.md is
+  BLOCKED on T0. Flagged Angelo via send_message; did NOT block — moved on.
+  Verify (spec-only): cross-checked D1–D6 referenced consistently across all three files +
+  file:line groundings from the scoping pass. No build (no code).
+  Next cycle: with feature freshly touched, `infra` (cyc 1, budget 6) and `guard` (cyc 2) are
+  the next most-starved; or pick up a UI-review `bug` (the month-trend midnight-UTC date is a
+  cheap one-liner). The maintenance build itself stays blocked until D1–D6 sign-off.
+- **C5 (infra)** — Reconciled CLAUDE.md stale refs that actively mislead a fresh agent
+  (most-starved category). Four fixes, each verified against reality: (1) the "Biome CLI can't
+  run, fix by hand" claim → corrected to "use the musl binary" (`cli-linux-arm64-musl/biome`,
+  confirmed v2.4.16 runs; the glibc one `bun run check` calls is dead) + a VERIFY note that
+  `validate` fails only at `check`. (2) Branch convention `autopilot/<task>` → the long-lived
+  `claude-loop-dev` branch; dropped the "inherited from .meshclaw-autopilot/LOOP.md" header
+  (that file is gitignored now). (3) "read STATUS.md, kept current each cycle" → read the tracked
+  `loop/{NORTH_STAR,BACKLOG,LEDGER}.md`; noted STATUS.md/BRANCH_REVIEW.md/.meshclaw-autopilot are
+  gitignored and absent from a fresh clone. (4) Refreshed the highlights/gaps (insurance, CSV,
+  Sheets-header guard, maintenance spec awaiting sign-off). Verified: musl biome runs; loop/ +
+  the sheets guard are tracked; STATUS.md/BRANCH_REVIEW.md are NOT tracked. Docs-only, no build.
+  Next cycle: `guard` (cyc 2, budget 6) is now most-starved, then `deep-review` (cyc 3). A
+  cheap, high-value option is the month-trend midnight-UTC `bug` (one-line parseMonthToDate fix
+  + a guard) — pairs a starved `bug`/`deep-review` finding with a regression guard.
+- **C6 (bug + guard)** — Fixed the month-trend midnight-UTC date bug (C3 UI-review finding #2;
+  `bug` was at-budget, `guard` most-starved — one increment advances both). `new Date(period +
+  '-01')` parses as midnight UTC → x-axis month label shifts back one for negative-offset users.
+  Routed through the sanctioned local-time `parseMonthToDate` on the vehicle-detail page.
+  Added TWO committed (merge-surviving) guards: (1) a `parseMonthToDate` unit test in
+  chart-formatters.test.ts (the helper had ZERO coverage despite every chart relying on it),
+  pinning local-midnight + correct rendered month; (2) a source-scan guard `no-utc-month-parse`
+  (cycle-205/206 pattern) that fails if any source reintroduces `new Date(<expr> + '-01')`.
+  The guard immediately EARNED ITS KEEP: it caught a SECOND live instance I'd missed —
+  dashboard/+page.svelte:87 `new Date(\`${t.period}-01\`)` — same bug, now fixed too. Tightened
+  the regex to exclude full literal dates (`'2024-01-01'`) so it flags only the concat/interp
+  antipattern. Verified: 6/6 new tests green, tsc 0 errors, build done, no remaining offenders.
+  Next cycle: `deep-review` (cyc 3, budget 5) is now most-starved → take an eyes-on UI sweep
+  (vehicle Overview/ExpensesTable, or analytics route) or a backend correctness audit. The
+  remaining UI-review bugs (load-masquerade error state, page-local vehicle-detail filter,
+  interpolated h-[…]) are still queued.
+- **C7 (deep-review → bug + guard)** — Fanned out 2 Explore agents (CSV-import correctness +
+  analytics aggregation math). Both surfaced real bugs. Fixed the HIGHEST-severity one:
+  `buildFuelStatsFromData` (analytics/repository.ts) pooled odometer readings across ALL
+  vehicles into one max-min, so a multi-vehicle user saw a garbage `totalDistance` on the
+  dashboard summary (e.g. cars at 12k + 95k mi → ~83k "driven"). Wrong-but-plausible, on the
+  most-viewed surface. Fixed by grouping per vehicle and summing per-car ranges (mirrors the
+  existing computeConvertedTotalDistance). Pinned with a deterministic two-vehicle regression
+  test in fuel-stats.property.test.ts (1000+500 → 1500, not pooled 80500). Single-vehicle path
+  unchanged. Verified: 847 pass/0 fail (+1), tsc 0, Biome musl clean, build bundled.
+  The reviews surfaced more REAL bugs now queued (see BACKLOG bug list): CSV-import has no
+  idempotency (re-import duplicates rows), non-atomic partial commit, no BOM strip (Excel-edited
+  files fail wholesale), date-only midnight-UTC, currency column ignored; analytics has
+  missed-fillup MPG/cost-chart corruption, buildMonthlyConsumption slice(0,12) showing OLDEST
+  months, and local-tz month bucketing. Several are data-safety — strong candidates next cycles.
+  Next cycle (8): nothing over budget (deep-review & bug both fresh at 7, guard 6, infra 5,
+  feature 4 → feature starved-for 4 = AT budget, breaches at cycle 9). Prefer the highest-value
+  queued `bug` (CSV-import BOM strip is a clean low-risk one-liner; idempotency / missed-fillup
+  MPG are higher-severity data-safety) — or take `feature` before it breaches if maintenance
+  sign-off has landed.
+- **C8 (bug — data-safety, 2 HIGH)** — Closed the two HIGH CSV-import data-safety bugs from C7's
+  review, which live in the same commit path (one coherent increment). (1) NO idempotency:
+  re-importing the same file used `create()` with no clientId → silently DUPLICATED every row.
+  Now each ready row gets a deterministic, `csv:`-namespaced, content+occurrence-keyed clientId
+  (two genuinely-identical rows both import; a re-imported file dedups perfectly). (2) Non-atomic
+  commit: bare per-row insert loop → a mid-batch failure left a half-imported file. New
+  `expenseRepository.importExpenses` wraps the idempotent inserts in ONE db.transaction
+  (all-or-nothing) and returns {imported, duplicates}; route surfaces duplicates. Backed by the
+  existing (userId, clientId) unique index. Pinned with 2 HTTP tests: re-import → imported:0/
+  duplicates:3/row-count unchanged; two identical rows in one file → both import. Verified: 849
+  pass/0 fail (+2), tsc 0, Biome musl clean, build bundled. Single/normal imports unchanged.
+  Next cycle (9): feature breaches budget (starved-for 5 > 4) → MUST pick feature. But the
+  maintenance build is blocked on D1–D6 sign-off; if unsigned, the eligible feature work is
+  drafting the #2 "import from other trackers" spec (Fuelly/Fuelio mapping) or recurring-expenses
+  — OR, if Angelo signed off, start maintenance T1. Check sign-off first; else draft + flag.
+- **C9 (feature → spec)** — `feature` was over budget (starved-for 5 > 4) → forced pick. Checked
+  remote: NO maintenance sign-off landed (no commits since C8), so that build stays blocked. Per
+  spec-first, drafted the #2 feature spec instead: `.kiro/specs/import-trackers/` (import from
+  Fuelly/Fuelio/Drivvo). Key design: it's a server-side header+value MAPPING pre-pass that emits a
+  VROOM-native-shape CSV, then reuses the UNCHANGED buildImportPlan → importExpenses — so it
+  inherits ALL the safety I just hardened (cycle-8 idempotency/atomicity, formula-neutralize,
+  cross-tenant vehicle resolution, caps, per-row errors) rather than re-implementing them. Route
+  extension is backward-compatible (native path unchanged when no `mapping` sent). 5 open decisions
+  (D1–D5: units, category vocab, date formats, no-vehicle-column, preset set) flagged; recommended
+  option each; tasks.md T0 blocks build. Verify (spec-only): D1–D5 consistent across all 3 files,
+  groundings (EXPORT_COLUMNS, parseRow, importExpenses, unit-conversions) verified against source.
+  Flagged Angelo (now TWO specs awaiting sign-off: maintenance D1–D6 + import-trackers D1–D5).
+  Next cycle (10): feature touched (9) → most-starved becomes `guard` (cyc 6, breaches at 12) then
+  `deep-review` (cyc 7). Both build queues are sign-off-blocked; plenty of queued `bug`s (missed-
+  fillup MPG, slice(0,12), BOM strip) and guard/review work remain. Prefer a queued bug or a guard.
+- **C10 (bug + guard)** — Fixed the missed-fill-up MPG/cost corruption (queued bug #5 from C7's
+  analytics review). Two month-aggregating builders had drifted from the canonical
+  computeEfficiencyPoint contract: `accumulateFuelRow` (monthly MPG) and `accumulateCostPerMile`
+  (cost/distance) folded a missed/partial fill-up pair into the month — counting one tank's volume
+  against two tanks' miles (inflated MPG) / spiking cost-per-distance — with no missedFillup skip
+  and no MAX-miles cap. Extracted a shared `validMilesBetween(current, prev)` helper (skips
+  missedFillup either-row + non-positive + over-cap gaps) and routed both through it; also keeps
+  cognitive-complexity under the Biome max. Needed `missedFillup` added to GeneralExpenseRow + the
+  queryAllExpenses select (column already exists, notNull default false). Pinned with 5 unit tests
+  on the exported builders (missed pair → null/excluded; over-cap → excluded; clean pair → sane).
+  Verified: 854 pass/0 fail (+5), tsc 0, Biome musl clean, build bundled. Valid-data paths
+  unchanged (full analytics property suite green).
+  Next cycle (11): `guard` is most-starved (cyc 6, breaches at 12) → prefer a guard, or the next
+  queued `bug` (slice(0,12) oldest-months — clean one-liner + test; or the BOM strip). Both
+  feature builds remain sign-off-blocked (maintenance D1–D6, import-trackers D1–D5).
+- **C11 (bug + guard)** — Fixed buildMonthlyConsumption showing the OLDEST 12 months
+  (`.slice(0,12)` after an ascending sort → hides the current period once a user has >12 months
+  of fill-ups). Changed to `.slice(-12)` (most recent), matching every sibling monthly builder.
+  Also fixed the latent copy in repository.ts buildConvertedEfficiencyTrend (benign today —
+  year-end caps to ≤12 buckets — but same class). Pinned with 2 unit tests (14 months → latest
+  12, oldest dropped; ≤12 → all, ascending). Verified: 856 pass/0 fail (+2), tsc 0, Biome musl
+  clean, build bundled.
+  Next cycle (12): `guard` breaches budget (last cyc 6, starved-for 6 = budget) → MUST pick a
+  `guard`. The guard queue is empty, so populate it from a real bug class: candidates — a
+  committed source-scan that no analytics monthly builder uses `.slice(0, N)` (would have caught
+  C11), or extend `no-utc-month-parse` to the backend `toMonthKey`/import paths (bug #8 class).
+  Otherwise the remaining queued `bug`s (BOM strip, date-only/currency, tz bucketing) are fair game.
+- **C12 (infra)** — Balance forced it: `infra` was the only OVER-budget category (last cyc 5,
+  starved-for 7 > budget 6), so the rule required it over starting a feature build. (Between C11
+  and now: Angelo rebased the branch onto origin/main + signed off BOTH feature specs; I recorded
+  that out-of-band — lesson saved authorizing claude-loop-dev force-push, both specs flipped to
+  APPROVED/BUILD GO, 90% coverage goal added to TODO Misc, arch category added to the loop.)
+  This cycle's infra increment: reconciled the one now-stale CLAUDE.md line — "drafted-but-unbuilt
+  maintenance-schedule (awaiting sign-off)" → both specs APPROVED/ready-to-build + the standing 90%
+  coverage goal. Same fresh-clone-orientation class as C5. Docs-only; verified the claims match
+  reality (both requirements.md say APPROVED, coverage goal in TODO.md). No build.
+  Next cycle (13): nothing over budget (infra now 12). Most-starved: `deep-review` (cyc 7,
+  starved-for 6 > budget 5 → OVER next cycle) and `guard` (cyc 6, starved-for 7 > 6 → OVER).
+  Both breach at 13 → MUST pick the more-starved: `guard` (starved-for 7). Populate the guard
+  queue (e.g. the no-slice(0,N) source-scan) OR, since features are now BUILD GO and `feature`
+  is also climbing (starved-for 4 at cyc 13), weigh pulling maintenance T1. Guard is forced first.
+- **C13 (guard)** — `guard` was the most-starved over-budget category (last cyc 6, starved-for 7 >
+  budget 6; deep-review also breached at 6 but guard was more starved). Populated the empty guard
+  queue with a merge-surviving source-scan for the C11 bug class: `no-oldest-month-slice.test.ts`
+  fails if any analytics month series chains a `localeCompare` month-sort into `.slice(0, N)` (keeps
+  the OLDEST months / hides the current period). Anchored on `localeCompare` so it does NOT flag the
+  one legit `.slice(0, 50)` (maintenance timeline, sorted NUMERICALLY by daysRemaining) — proven by
+  the guard passing against source that contains both that legit slice and the fixed `.slice(-12)`
+  chains. Verified: tsc 0, Biome musl clean, 858 pass/0 fail (+2), build bundled. No product code.
+  Next cycle (14): `deep-review` is most-starved (cyc 7, starved-for 7 > budget 5 — OVER) → MUST
+  pick it. Take an eyes-on UI sweep (vehicle Overview/ExpensesTable still un-eyes-on'd) or a backend
+  correctness audit (fan out per the arch rule-7 style). `feature` (starved-for 5) breaches right
+  after — maintenance-schedule T1 (the DB migration) is next once deep-review clears.
+- **C14 (deep-review → bug)** — `deep-review` was most-starved over-budget (cyc 7, starved-for 7 >
+  budget 5). Fanned out 2 Explore agents: (a) financing/insurance analytics correctness; (b) eyes-on
+  vehicle Overview/ExpensesTable WITH real screenshots (cluster was up). The financing agent found a
+  HIGH bug — `accumulateMonthlyPremiums` stepped a raw term-start Date with setMonth(+1), so a term
+  starting day 29–31 OVERSHOOTS short months (Jan 31 → Mar 2/3) and SILENTLY SKIPS February's bucket
+  in the insurance monthlyPremiumTrend (the C6/C11 setMonth-rollover class, ~3/12 of start dates).
+  Fixed by extracting a pure `monthKeysInRange(start,end)` helper (day-1-anchored, rollover-safe) in
+  analytics-charts.ts and routing accumulateMonthlyPremiums through it. Pinned with 5 unit tests
+  (incl. Jan-31→Apr-30 keeps Feb; day-31 6-month term keeps all). Verified: tsc 0, Biome musl clean,
+  863 pass/0 fail (+5, full analytics suite green = behavior-preserving), build bundled.
+  The reviews surfaced more REAL findings now queued as `bug`s: financing — insurance shows $0 when
+  only totalCost (not monthlyCost) is set; interestPaidYtd is mislabeled (1-month estimate);
+  loan-breakdown holds balance flat (no amortization). UI eyes-on (CONFIRMED via screenshots) —
+  mobile fuel-stat numbers wrap mid-value ($97/.80) in the 3-col dual-metric StatCardGrid; the
+  ExpensesTable ScrollArea `h-[{scrollHeight}]` is a DEAD interpolated-Tailwind class (no CSS rule →
+  no 600px cap, latent unbounded-growth — confirms C3's interpolated-h-[] item as real).
+  Next cycle (15): `feature` is most-starved over-budget (cyc 9, starved-for 6 > budget 4) → MUST
+  pick it → maintenance-schedule **T1** (the additive DB migration), the first real build increment
+  of the signed-off feature. Follow tasks.md; DatabaseMigrations.md; db:init path (drizzle-kit push
+  fails under bun).
+- **C15 (feature → maintenance T1)** — `feature` was over budget (cyc 9, starved-for 6 > 4); both
+  feature builds signed off → started maintenance-schedule build at T1. Added the 4 mileage columns
+  to `reminders` (triggerMode default 'time', intervalMileage, lastServiceOdometer, nextDueOdometer)
+  + dueOdometer to reminderNotifications. **Key call: DESCOPED T1 to ADDITIVE-ONLY.** The spec's
+  original T1 also relaxed nextDueDate/dueDate to nullable + widened the dedup index — but that
+  forces a SQLite TABLE REBUILD, and the rebuild's `DROP TABLE reminders` cascade-drops child
+  reminder_notifications rows (proven: my migration-0003 survival test caught the notification row
+  vanishing). Rather than ship a data-dropping migration, I split: T1 = 5× `ALTER TABLE ADD COLUMN`
+  (zero data risk, generated `0003_many_jean_grey.sql`); the NOT-NULL relax moved to T3 (where the
+  trigger logic actually needs a null date, and the rebuild can be written + verified carefully).
+  Updated the SHEET_HEADERS (R9 / the cycle-3 guard fired on the new columns — fixed immediately,
+  that's T5-partial). migration-0003.test.ts pins columns + existing-row survival + defaults.
+  Verified: tsc 0, Biome musl clean, 867 pass/0 fail (+4), build bundled, full migration suite green.
+  Lesson worth keeping: a single drizzle migration that BOTH adds columns AND changes a constraint
+  on a parent table is dangerous (multi-rebuild → child cascade); keep migrations additive-only,
+  do constraint changes in their own carefully-verified migration.
+  Next cycle (16): nothing over budget (feature now 15). Most-starved: `arch` (cyc 11, starved-for
+  5 = budget 5 → breaches at 17) and `deep-review`/`bug` (both starved-for 2). Prefer continuing the
+  maintenance build (**T2**: getCurrentOdometer helper) since it's mid-feature and high-value, OR
+  take an `arch` audit-fanout to seed that queue before it bites. Lean T2 (continue the feature).
+- **C16 (feature → maintenance T2)** — nothing over budget; continued the mid-feature, high-value
+  maintenance build (arch was AT budget, not over). Shipped `OdometerRepository.getCurrentOdometer`
+  (design D2) = `MAX(odometer)` across a UNION of `expenses.mileage` + `odometer_entries.odometer`,
+  BY VALUE not date, null when no reading, vehicle-scoped — reusing the existing `getHistory` UNION
+  shape. This is the canonical "current odometer" the T3 mileage trigger needs; it reconciles the
+  fuel-only `vehicle-stats.currentMileage` (which ignores manual entries + non-fuel mileage).
+  Pinned by `get-current-odometer.test.ts` (8 cases). **Key call: DEFERRED the
+  `vehicle-stats.currentMileage` reconcile to T3.** That field is computed inside a PERIOD-FILTERED,
+  fuel-only stats route — swapping it to the all-sources/all-time MAX is a VISIBLE semantics change
+  (under a 7d filter, "current mileage" would jump to the all-time odometer), not a
+  behavior-preserving reconcile. Better decided deliberately in T3 next to the mileage-due consumer
+  than smuggled into a helper-add cycle. Verified: tsc 0, Biome musl clean, 875 pass/0 fail (+8),
+  build bundled.
+  Next cycle (17): `arch` is now OVER budget (cyc 11, starved-for 6 > budget 5) → MUST pick `arch`.
+  Take BACKLOG arch #1 (dedup ownership-validation: route the photos entityType switch through the
+  shared validators in utils/validation.ts) — test-anchor the cross-tenant IDOR suite covers all
+  four entityTypes FIRST, then refactor. Obey the arch rules (one small behavior-preserving refactor,
+  green→green). Or run the rule-7 audit fan-out if arch #1 no longer grounds against source.
+- **C17 (arch — safety net for arch #1)** — `arch` breached budget (cyc 11, starved-for 6 > 5) →
+  forced pick: BACKLOG arch #1 (dedup ownership-validation — `photos/helpers.ts`
+  `validateEntityOwnership` carries a private `validateExpenseOwnership` + inlines vehicle/policy
+  checks that duplicate the exported validators in `utils/validation.ts`). Per **arch rule 3**
+  (test-anchor BEFORE refactoring; if coverage is missing, ADD the characterization test first and
+  that cycle counts as arch/guard), I checked existing coverage: only the `insurance_claim` case had
+  an HTTP test of the ownership gate (`claim-photos-http.test.ts`); `vehicle`/`expense`/
+  `insurance_policy`/`odometer_entry` were UNtested through `validateEntityOwnership`. So this cycle
+  is the SAFETY NET, not the refactor: added `photos/__tests__/entity-ownership-gate.test.ts` — 14
+  HTTP cases pinning the gate's observable contract for EVERY entity type (own→200, foreign-user→404
+  no existence-leak, missing→404) + unknown-type→400 + anon→401. Drove it through `listPhotosForEntity`
+  (a GET exercises the exact gate an upload would, no storage provider needed). The refactor (route
+  the switch through the shared validators) lands NEXT cycle against this net as a pure
+  behavior-preserving change — keeps each commit cleanly reviewable. Verified: tsc 0, Biome musl
+  clean, 889 pass/0 fail (+14), build bundled. No product code touched.
+  Next cycle (18): nothing over budget (arch now 17). Most-starved: `guard` (cyc 13, starved-for 5 →
+  breaches at 19) and `deep-review` (cyc 14, starved-for 4). Highest-leverage: EXECUTE arch #1's
+  refactor now that the net is in — route the photos `entityType` switch through
+  `validateVehicleOwnership`/`validateExpenseOwnership`/`validateInsuranceOwnership` (keep claim +
+  odometer inline; keep `validatePhotoOwnership` as-is), all 14 gate tests must stay green. That's an
+  `arch` pick again but it's the natural completion; alternatively take the starved `guard`/`deep-review`.
+  Lean: complete arch #1 (the net exists, the value is in finishing it) UNLESS balance forces guard.
+- **C18 (arch — executed arch #1)** — nothing over budget (infra AT 6, breaches at 19); took the
+  highest-leverage item: COMPLETING arch #1 now that C17's safety net is in. Refactored
+  `photos/helpers.ts` `validateEntityOwnership` to route the `vehicle`/`expense`/`insurance_policy`
+  cases through the shared exported validators (`validateVehicleOwnership`/`validateExpenseOwnership`/
+  `validateInsuranceOwnership` in `utils/validation.ts`) instead of three private/inlined copies.
+  Deleted the duplicate private `validateExpenseOwnership` + the inlined vehicle.findByUserIdAndId and
+  policy.userId checks; dropped the now-unused `expenses`/`vehicleRepository`/`insurancePolicyRepository`
+  imports. Kept `insurance_claim` inline (transitive claim→policy ownership has no shared validator) and
+  `odometer_entry` inline (no shared validator) and `validatePhotoOwnership` as-is (genuinely different
+  check on an existing photo row). Collapsed 3 ownership impls → 1 source of truth, killing the
+  drift risk (security-adjacent). Behavior-preserving: same NotFoundError per branch, proven by the
+  C17 gate suite — **all 14 cases + claim's 3 stay green, full suite 889 pass/0 fail UNCHANGED**.
+  Verified: tsc 0, Biome musl clean, build bundled.
+  Next cycle (19): `infra` breaches budget (cyc 12, starved-for 7 > 6) → MUST pick `infra`. The infra
+  queue is empty — repopulate from a real need: candidates are a CLAUDE.md/loop-doc refresh (state has
+  moved: maintenance T1/T2 shipped, arch category active, 18 cycles in) or a loop-tooling improvement.
+  `guard` (cyc 13, starved-for 6 = budget, breaches at 19 too) is the close runner-up but infra is more
+  starved. Take infra; if the infra need is trivial, also knock the starved guard next.
+- **C19 (infra)** — `infra` breached budget (cyc 12, starved-for 7 > 6) → forced pick; queue empty,
+  so took the standing infra need: fresh-clone orientation accuracy. CLAUDE.md's "Current state &
+  gaps" still listed both feature specs as merely "Approved & ready to build" — stale now that the
+  maintenance-schedule build is mid-flight (T1 additive-migration C15, T2 getCurrentOdometer C16
+  both shipped). A fresh agent would mis-orient on what's done vs pending. Rewrote that bullet to
+  split the two specs by real status: maintenance-schedule **mid-build** (T1+T2 done, T3 next =
+  trigger logic + the deferred nullable rebuild), import-trackers **approved, not started** (T1+).
+  Same fresh-clone-orientation class as C5/C12. Verified the new claims against
+  `maintenance-schedule/tasks.md` (T1 [x], T2 [~], T3 [ ]) and `import-trackers/tasks.md` (T0 [x],
+  T1 [ ]). Docs-only; no build (no code touched). CLAUDE.md correctly defers category/budget detail
+  to loop/BACKLOG.md (the live snapshot) — nothing stale there.
+  Next cycle (20): `guard` breaches budget (cyc 13, starved-for 7 > 6) → MUST pick `guard`. Queue is
+  empty → populate from a real bug class. Strong candidate: a source-scan guard for the C18 dedup —
+  fail if `photos/helpers.ts` reintroduces a private/inlined ownership check instead of the shared
+  validators (locks in the single-source-of-truth). Or pin another recurring class. `deep-review`
+  (cyc 14, starved-for 6 > 5) also breaches — runner-up if guard is satisfied cheaply.
+- **C20 (guard)** — `guard` breached budget (cyc 13, starved-for 7 > 6) → forced pick; queue empty,
+  so populated it with a merge-surviving source-scan locking in the C18 ownership dedup:
+  `photos/__tests__/ownership-uses-shared-validators.test.ts`. Asserts `photos/helpers.ts` (1) calls
+  all three shared validators (`validateVehicleOwnership`/`validateExpenseOwnership`/
+  `validateInsuranceOwnership`), (2) does NOT locally re-declare any of them (a `function`/`const`
+  with that name = a private copy that can drift; import-only doesn't match), and (3) does NOT
+  re-import `vehicleRepository`/`insurancePolicyRepository` (their return marks a re-inlined
+  vehicle/policy ownership check — the exact pre-C18 antipattern). Leaves the genuinely-inline
+  `insurance_claim`/`odometer_entry` cases + `validatePhotoOwnership` untouched (no shared validator
+  exists for those). This makes the security-adjacent single-source-of-truth invariant
+  MERGE-SURVIVING (an e2e/manual review wouldn't catch a silent re-duplication; a committed scan
+  does). Verified: tsc 0, Biome musl clean, 893 pass/0 fail (+4), build bundled. No product code.
+  Next cycle (21): `deep-review` breaches budget (cyc 14, starved-for 7 > 5) → MUST pick it. Take an
+  eyes-on UI sweep (vehicle Overview/ExpensesTable still wants a real screenshot pass; or analytics
+  route) or a backend correctness audit — fan out 2-3 Explore agents per the rule-7 style. `feature`
+  (cyc 16, starved-for 5 > 4) breaches right after → maintenance-schedule T3 is next once deep-review
+  clears. Queued bugs (#8 insurance $0, #9 interestPaidYtd, #10 flat loan balance, #11 mobile wrap,
+  #3 dead ScrollArea cap, CSV BOM/date/currency) remain fair game if a review surfaces nothing worse.
+- **C21 (deep-review — reminders + expenses backend audit, fan-out)** — `deep-review` breached budget
+  (cyc 14, starved-for 7 > 5) → forced pick. Fanned out 2 Explore agents: (a) reminders trigger
+  engine, (b) expenses/split/import math. KEY OUTCOME: VERIFIED every "HIGH/CRITICAL" finding against
+  source before acting — and the top 4 were FALSE POSITIVES (this is why deep reviews verify):
+  • Reminders `setDate(1)` in monthly/yearly/custom recurrence (agent: "CRITICAL, breaks end-of-month")
+    — NOT a bug. `anchorDay`/`dayTarget` is captured (trigger-service.ts:71) BEFORE mutation;
+    `setDate(1)` is the deliberate guard against JS month-overflow (Jan 31 +1mo → Mar 3), and
+    `clampToAnchorDay` runs AFTER to restore the day clamped to the month's last day. The agent's
+    "fix" (remove setDate(1)) would INTRODUCE the rollover bug. Correct as-is.
+  • Expenses "split siblings double-counted in SUM" (agent: "HIGH, 2x inflated totals") — NOT a bug.
+    Each sibling row stores its own per-vehicle SHARE (split-service.ts:92-110 `expenseAmount:
+    allocation.amount`), so SUM(expenseAmount) over siblings = group total once (repository.ts:425
+    sums expenseAmount, not groupTotal). Agent assumed both siblings carry the full amount; they don't.
+  • Percentage-split "negative final allocation" — unreachable: floor() makes runningTotal ≤ true
+    partial, so the last share (total−runningTotal) is always ≥ true share > 0; clamp is dead code.
+  Two findings are GENUINELY REAL but minor, filed as bugs (below): (1) `fastForwardPastNow`
+  (trigger-service.ts:216) ignores `endDate` — a reminder past maxCatchUp with an uncrossed endDate
+  gets fast-forwarded past now without deactivating → "active" but dormant (low-med edge); (2)
+  `advanceCustom` switch has no `default` → invalid intervalUnit silently no-ops (low; Zod blocks it
+  at the route, defense-in-depth only). Deliberately did NOT fix #1 this cycle: it lives in the exact
+  trigger code maintenance-schedule T3 rewrites (mileage axis + nullable-date rebuild) — fixing now
+  then again in T3 is churn; folded it into T3's scope instead. No code touched; verification-only
+  cycle (LEDGER/BACKLOG only).
+  Next cycle (22): `feature` breaches budget (cyc 16, starved-for 6 > 4) → MUST pick feature →
+  maintenance-schedule **T3** (whichever-comes-first trigger logic + the deferred nextDueDate/dueDate
+  nullable rebuild + the T2 vehicle-stats reconcile). FOLD IN the C21 endDate-in-fastForward fix while
+  rewriting that code (it's the same function). High-value, mid-feature; both feature specs signed off.
+- **C22 (feature — maintenance-schedule T3, part 1: the high-risk nullable rebuild)** — `feature`
+  breached budget (cyc 16, starved-for 6 > 4) → forced pick → maintenance-schedule T3. T3 is large
+  (migration + trigger logic + routes + reconcile), so this cycle ships the BLOCKING GATE: the
+  deferred nullable migration that everything else builds on. Angelo authorized "high risk migrations
+  are fine" — so the NOT NULL relax deferred since T1 is now done properly (not deferred again), but
+  SAFELY (authorized ≠ reckless). Changes: schema.ts relaxes `reminders.next_due_date` +
+  `reminder_notifications.due_date` to nullable (mileage-only reminders/notifications carry no date);
+  added a PARTIAL unique index `rn_reminder_odo_idx (reminderId, dueOdometer) WHERE dueOdometer IS NOT
+  NULL` for the mileage dedup axis. KEY DESIGN CORRECTION vs the spec: the spec said "widen the dedup
+  index to (reminderId, dueDate, dueOdometer)" — that's WRONG. SQLite treats NULLs as DISTINCT in a
+  UNIQUE index, so a 3-col index with NULL dueOdometer would silently STOP deduping time-only
+  reminders. Kept `(reminderId, dueDate)` for the time axis + a separate PARTIAL index for mileage;
+  each axis dedups its own rows, neither breaks the other (pinned by a test that proves both).
+  THE C15 FOOTGUN, CONFIRMED LIVE: the nullable relax forces a SQLite table rebuild; drizzle's
+  generated 0004 does `DROP TABLE reminders` while `reminder_vehicles` + `reminder_notifications`
+  still hold rows. Both children CASCADE on delete, and the generated `PRAGMA foreign_keys=OFF` is a
+  NO-OP inside the migrator's transaction (connection.ts:84 wraps migrate() in a txn) — so the DROP
+  would silently wipe every child row. HAND-AUTHORED 0004 instead (the documented C15 exception to
+  "never edit generated SQL"; the schema is right, only drizzle's rebuild ORDER is unsafe for our FK
+  topology): stash both children in FK-free `_hold_` tables → empty live children so the cascade hits
+  0 rows → rebuild reminders → rebuild reminder_notifications → refill children from holding (reminder
+  ids preserved → FKs resolve) → drop holding. PROOF GATE: `migration-0004.test.ts` (5 tests) applies
+  0004 with foreign_keys ON inside the same BEGIN/COMMIT production uses, and asserts the reminder +
+  junction row + notification ALL survive row-for-row (the exact loss the naive rebuild causes), plus
+  the partial-index dedup behavior and NULL-date persistence. tsc surfaced 6 null-narrowing errors in
+  trigger-service (nextDue now Date|null) → guarded: a null next_due_date means "no time axis", return
+  early (findOverdue's `<= now` already excludes NULL rows via SQL 3-valued logic; this is the type
+  guard + defense-in-depth). Verified: tsc 0 · musl-biome clean · 898 pass/0 fail (+5 migration
+  tests, up from 893) · build bundled. No behavior change for existing time reminders (mileage-only
+  reminders aren't CREATABLE yet — that's the trigger/routes work).
+  Next cycle (23): `feature` still leads (just touched cyc 22, but T3 is mid-build and the loop
+  continues the same feature) → T3 part 2: trigger-service whichever-comes-first due logic (OR-in
+  mileage via getCurrentOdometer/nextDueOdometer + app-level dueOdometer dedup), FOLD IN the C21
+  endDate-in-fastForward bug #12 (same function being rewritten), unit tests for all due/not-due
+  permutations. Then T3 part 3 (routes: mark-serviced re-arm + Zod refinements + recheck-on-write +
+  the deferred vehicle-stats reconcile). Watch `bug` (cyc 14, starved-for 8 >> 3) — it's the most
+  starved; a queued bug (#8 insurance $0, #11 mobile wrap) can jump in if trigger work stalls.
+- **C23 (bug — insurance $0 for totalCost-only terms, #8)** — BALANCE OVERRIDE: `bug` was
+  starved-for 9 (cyc 23 − last-touched 14) vs budget 3 — the only over-budget category, exactly the
+  watch item C22 flagged. Rule 2 is mandatory, so T3 part 2 waits one cycle and I took the
+  highest-leverage standalone bug. (Bug #12 is explicitly "fold into T3" — doing it standalone now
+  then again in T3 is churn, so it stays deferred.) THE BUG (#8, data, med-high): `buildInsuranceDetails`
+  (`analytics/repository.ts:893`) computed `const monthlyPremium = latestTerm.monthlyCost ?? 0`. A
+  term entered as a lump sum (totalCost set, monthlyCost null — e.g. "6-month policy = $1,200") then
+  contributes **$0** to every premium total, per-vehicle detail, carrier total, and the monthly trend.
+  totalCost was SELECTed (:1637) but never consumed. FIX: extracted an exported pure helper
+  `effectiveMonthlyPremium(term)` to analytics-charts.ts — monthlyCost wins when set (incl. an
+  explicit 0); else amortize totalCost across the term span via `monthKeysInRange(start,end).length`
+  (the C14 day-1-anchored helper, so a day-29–31 start doesn't skip a month); 0 when neither cost nor
+  a resolvable span exists. Wired into :893 as the single choke point — `buildInsuranceVehicleEntries`
+  already takes `monthlyPremium` as a param and `accumulateMonthlyPremiums` reuses it, so the one-line
+  swap propagates to per-vehicle/carrier/trend/totals with no other edits. Pinned by
+  `effective-monthly-premium.test.ts` (7 cases: precedence, monthlyCost=0 honoured, totalCost
+  amortization, day-31 no-skip, single-month, neither-set, null-span div-by-zero guard). Verified:
+  tsc 0 · musl-biome clean · 905 pass/0 fail (+7, up from 898) · build bundled. No existing test
+  pinned the old `?? 0` behavior (analytics+insurance suites green unchanged).
+  Next cycle (24): back to `feature` (starved-for 2, but T3 is mid-build) → maintenance-schedule
+  **T3 part 2**: trigger-service whichever-comes-first (OR-in mileage via getCurrentOdometer ≥
+  nextDueOdometer; emit a mileage notification with null dueDate + dueOdometer, app-level dedup on
+  the C22 partial index), FOLD IN bug #12 (endDate-in-fastForward, same function). Unit tests for all
+  due/not-due permutations. `bug` is now freshly serviced (cyc 23); `arch` is next-most-starved
+  (cyc 18, starved-for 6 > 5) and will breach soon — its top item (converge `sync` route error
+  handling on the central middleware) is a candidate if T3 part 2 stalls.
+- **C24 (arch — converge sync error handling, part 1: make the middleware SyncError-aware)** —
+  `arch` breached budget (cyc 18, starved-for 6 > 5) → forced pick. T3 part 2 waits one more cycle.
+  Took arch #1 (converge `sync` route error handling on the central middleware) — but FIRST verified
+  the BACKLOG item's premise against source (the C21 lesson), and it was WRONG in a load-bearing way:
+  the item said "drop the try/catch, throw the typed error, let the middleware shape it." But
+  `SyncError extends Error` (NOT `AppError`), and the central `errorHandler` had no SyncError branch —
+  so a thrown SyncError would fall through to the generic 500 path, turning today's
+  `SyncError(VALIDATION_ERROR)`→400 into a 500. Blindly doing the "refactor" would have been a
+  behavior change (violates arch rule 2). Also: arch rule 3 — the central handler had ZERO test
+  coverage, so a refactor against it had no safety net. SO this cycle is the load-bearing PREREQUISITE,
+  split per rule 1 (one small reviewable increment): (1) extracted `syncErrorResponse(error)` in
+  errors.ts as the single source of truth for SyncError→{body,status} shaping; (2) routed the existing
+  `handleSyncError` through it (identical output, preserved); (3) added a SyncError branch to the
+  central `errorHandler` using the SAME helper, so a SyncError now yields a byte-identical envelope
+  whether caught locally or by the middleware; (4) committed `error-handler.test.ts` (7 tests, the
+  handler had NONE before) pinning every existing branch (AppError subclasses, ZodError, HTTPException,
+  unknown→500) AND proving `handleSyncError(err)` === `errorHandler(err)` for all 7 SyncErrorCodes.
+  BEHAVIOR-PRESERVING: no SyncError reaches the middleware today (all 27 throw sites are caught in
+  local try/catch), so the new branch is DORMANT — it only activates next cycle when the per-route
+  try/catch is removed, and the equivalence test proves that removal is safe. Verified: tsc 0 ·
+  musl-biome clean · 912 pass/0 fail (+7, up from 905) · build bundled. No product behavior changed.
+  Next cycle (25): `feature` is most-starved (cyc 22, starved-for 3 < 4 — not yet over budget, but T3
+  is mid-build so the loop continues it) → maintenance-schedule **T3 part 2** (trigger whichever-comes-
+  first mileage logic + fold bug #12). ARCH FOLLOW-UP (part 2, when arch next fires ~cyc 29): now that
+  the middleware is SyncError-aware + pinned, drop the hand-rolled try/catch from sync/routes.ts (7
+  handlers) and let errors propagate to errorHandler — prove behavior-identical via the sync route
+  HTTP tests + the new equivalence net. Then repeat for `auth` (7) and `settings` (5).
+- **C25 (feature — maintenance-schedule T3 part 2: whichever-comes-first mileage trigger + bug #12)** —
+  Nothing over budget (feature starved-for 3 < 4), but T3 is mid-build so the loop continues the
+  feature. Built the MILEAGE AXIS of the reminder trigger — the half that makes "whichever comes
+  first" real. DESIGN (grounded in the T3 spec + the C22 nullable schema): the time axis (`findOverdue`,
+  `nextDueDate <= now`) can't see mileage-only reminders (null date) or a `both` reminder that's
+  mileage-due-but-not-time-due, so added a SEPARATE pass. Repository: `findMileageTracking(userId)`
+  returns active `triggerMode != 'time'` reminders with a non-null `nextDueOdometer` (due-ness needs
+  the live odometer, not decidable in SQL); `mileageNotificationExists` + `createMileageNotification`
+  (null dueDate, dueOdometer set) for the app-level dedup, with the C22 partial unique index as the DB
+  backstop (UNIQUE-violation caught → no-op). trigger-service: new `processMileageReminder` — fetches
+  `getCurrentOdometer` (max across expenses.mileage + odometer_entries, the C16 helper), fires ONE
+  notification when `current >= nextDueOdometer`. KEY SEMANTICS: NO auto-re-arm on the mileage axis
+  (re-arm is the explicit mark-serviced path, D3/T4) — a mileage reminder stays due until serviced, so
+  re-triggering is idempotent (proven). A `both` reminder can fire on BOTH axes (distinct events,
+  distinct dedup keys); the passes run independently. D4 single-vehicle enforced at runtime (a !=1
+  vehicle mileage reminder is SKIPPED with a reason, not errored). SCOPE: mileage EXPENSE
+  auto-creation deferred — it needs ratified auto-re-arm semantics (not in D1–D6); this axis emits the
+  notification signal. The whole engine is dormant until T4 wires validation (no mileage reminder is
+  API-creatable yet), so it's safe to land fully built + tested. ALSO FOLDED IN bug #12 (C21 audit):
+  `fastForwardPastNow` ignored `endDate` — a bounded reminder lapsed past maxCatchUp (12) got
+  fast-forwarded past now and left "active" but permanently dormant. Added the same
+  `if (endDate && nextDue > endDate) { deactivate; return }` guard the main loop has. Pinned by
+  `trigger-mileage.test.ts` (5: due/not-due/idempotent-re-trigger/no-vehicle-skip/max-across-sources,
+  all through the real route→service→DB stack) + `trigger-fastforward-enddate.test.ts` (1: a lapsed
+  bounded weekly reminder past the cap is deactivated, not left active — fails against pre-fix code).
+  Verified: tsc 0 · musl-biome clean · 918 pass/0 fail (+6, up from 912) · build bundled.
+  Next cycle (26): `feature` just touched (cyc 25) but T3 still mid-build → **T3 part 3/T4**: routes +
+  validation — `POST /:id/mark-serviced` re-arm (D3: mileage → lastServiceOdometer = current, recompute
+  nextDueOdometer; time → advance nextDueDate), Zod refinements (D4 single-vehicle + intervalMileage
+  required when mileage), and `recheckMileageReminders` on odometer/mileaged-expense write (D5). Then
+  the deferred T2 vehicle-stats.currentMileage reconcile. `guard` (cyc 20, starved-for 5 < 6) and
+  `deep-review` (cyc 21, starved-for 4 < 5) approach budget — candidates if T4 needs a breather.
+- **C26 (infra — refresh stale orientation docs)** — BALANCE OVERRIDE: `infra` breached budget
+  (cyc 19, starved-for 7 > 6), the only over-budget category, so it outranks continuing T3 part 3
+  this cycle. The infra queue was empty → scoped a real "keep the machine running" item: the
+  orientation docs a fresh agent reads first had drifted out of sync with C22–C25, which actively
+  misleads every future cycle. Fixed: (1) CLAUDE.md "Current state & gaps" said maintenance-schedule
+  was "T1+T2 shipped; next is T3" — rewrote to reflect T1/T2/T3-part-1 (nullable rebuild migration
+  0004 + partial index)/T3-part-2 (mileage trigger pass) all shipped, engine dormant until T4 wires
+  routes+validation; spelled out the T4 surface (mark-serviced D3, refinements D4, recheck D5,
+  vehicle-stats reconcile). (2) Softened the coverage line — the frontend ~59%/backend ~74% badges
+  are a last-measured TODO.md baseline, not a current reading (the backend suite has grown to ~918
+  tests), so labeled them a floor + pointed to the source rather than asserting a stale specific.
+  (3) APIConventions.md steering "Error Handling" said "for sync ops use handleSyncError()" — updated
+  to reflect C24: the global handler is now SyncError-aware via the shared `syncErrorResponse()`, so
+  throwing a SyncError needs no local catch; noted the existing sync catch blocks + the queued arch #1
+  convergence. DECISION: did NOT run a fresh coverage pass (expensive, off-point for a doc-refresh
+  cycle) — flagged the figure as a baseline instead, honest over precise. Doc-only (no code touched);
+  verified the working tree carries only CLAUDE.md + APIConventions.md. No build gate needed.
+  Next cycle (27): back to `feature` (T3 still mid-build) → **T3 part 3/T4** (mark-serviced re-arm +
+  Zod refinements + recheck-on-write + vehicle-stats reconcile). `guard` (cyc 20, starved-for 7 > 6
+  at cyc 27) will ALSO be over budget next cycle — if both feature-continuation and guard contend,
+  guard wins the balance rule; a merge-surviving guard candidate: a source-scan that the mileage
+  trigger's no-auto-re-arm invariant (one notification per milestone) stays intact.
+- **C27 (guard — maintenance-fields backup round-trip lock)** — BALANCE OVERRIDE: three categories
+  were over budget at cyc 27 (deep-review 6>5, guard 7>6, bug 4>3); the rule picks the MOST starved
+  over-budget one → `guard` (starved-for 7). Exactly the heads-up C26 left. Guard queue was empty, so
+  picked the highest-leverage merge-surviving lock for the just-shipped C22/C25 work: a TRUE
+  backup→restore round-trip for the maintenance-schedule reminder fields (this is also T5's explicit
+  "Remaining" item — data-safety quality bar #1). RATIONALE: C22 added reminders.{triggerMode,
+  intervalMileage, lastServiceOdometer, nextDueOdometer} + reminderNotifications.dueOdometer and made
+  next_due_date/due_date nullable. The CSV backup is schema-derived so they SHOULD ride along — but
+  the `coerceRow` boundary (integer + nullable columns, and a NULL date that must NOT coerce to 0/"")
+  is exactly the C3 clientId silent-drop class, and nothing proved a mileage reminder survives
+  export→import. Committed `maintenance-fields-roundtrip.test.ts` (3 tests through the REAL exportAsZip
+  → restoreFromBackup stack, mileage reminders seeded via sqlite since T4 validation isn't wired):
+  (1) mileage-only reminder + mileage notification survive with all 4 mileage cols + NULL date/odo
+  intact; (2) a `both` reminder preserves both axes (real date AND mileage cols); (3) a plain time
+  reminder restores with mileage cols NULL (not coerced to 0) + its real date. The NULL-not-zero
+  assertions are the load-bearing ones — that's where coerce would silently mangle. Verified: tsc 0 ·
+  musl-biome clean · 921 pass/0 fail (+3, up from 918) · build bundled. No product code touched.
+  Next cycle (28): `deep-review` is now most-starved over budget (cyc 21, starved-for 7 > 5) → it wins
+  the balance rule, NOT feature. Take the top deep-review item (eyes-on vehicle Overview + ExpensesTable
+  populated states, mobile+desktop) or the analytics route sweep — fan out 2-3 Explore agents per
+  rule 7. `bug` (cyc 23, starved-for 5 > 3) is also over budget and would be next after deep-review.
+  T3 part 3/T4 (mark-serviced + validation) resumes once the starved review/bug categories are fed.
+- **C28 (deep-review — backend correctness audit of the dormant mileage engine + insurance math)** —
+  BALANCE OVERRIDE: deep-review most-starved over budget (cyc 21, starved-for 7 > 5). Verification-only
+  cycle (like C21 — no product code; findings triaged into the bug queue). Fanned out 2 parallel
+  Explore agents: (a) the C22/C25 mileage trigger engine, (b) insurance/financing analytics + the C23
+  fix. APPLIED THE C21 LESSON — verified every agent finding against source before filing. RESULTS:
+  • Agent A flagged 1 real + escalated a known one. The mileage engine is AUDIT-CLEAN on the scary
+    axes — `both` fires once per axis (distinct dedup keys, no double-count), the mileage dedup is
+    genuinely idempotent (app-check + partial-index backstop + UNIQUE-violation→null), getCurrentOdometer
+    NULL/zero/cross-vehicle handling correct, findMileageTracking candidate set correct, the bug-#12
+    endDate fix correct. The ONE real finding: backlog bug #13 (`advanceCustom` no-default) — VERIFIED
+    + SEVERITY RAISED: it's not just a re-fire-until-maxCatchUp no-op, it's an INFINITE LOOP — an invalid
+    intervalUnit leaves nextDue unchanged and `fastForwardPastNow`'s `while (nextDue <= now)` has no
+    iteration cap → hang. Still defense-in-depth (Zod blocks the API create+update paths), reachable
+    only via DB corruption/validation bypass. Updated #13 in the backlog with the corrected failure mode.
+  • Agent B: C23 `effectiveMonthlyPremium` CORRECT (null/0/empty-span edges all handled, no NaN/Infinity);
+    accumulateMonthlyPremiums is consistent with the headline total (same value source). CONFIRMED bugs
+    #9 (interestPaidYtd mislabeled, :763-764/:1592) + #10 (buildLoanBreakdown flat balance, :829-849)
+    still real + unfixed; refreshed their stale line refs. NEW finding filed as #14: buildInsuranceDetails
+    counts an EXPIRED latest term as current premium (active policy, lapsed term → stale premium in the
+    total) — flagged as a SEMANTICS call (active-but-expired may legitimately still owe), needs a product
+    decision + a characterization test (buildInsuranceDetails has zero coverage) before any change.
+  Net: engine certified clean where it matters, 1 severity correction (#13), 1 new finding (#14), 2
+  confirmations (#9/#10). No code touched; LEDGER + BACKLOG only.
+  Next cycle (29): `bug` is now most-starved over budget (cyc 23, starved-for 6 > 3) → it wins. Top
+  real, decided, standalone bug: #13 (advanceCustom default + a fastForward iteration cap — small,
+  closes the hang) or #10 (buildLoanBreakdown balance decrement — clear correctness fix, characterization
+  test first). #14 needs an Angelo decision first (don't auto-fix a semantics call). T3 part 3/T4 resumes
+  after the bug category is fed (it'll keep breaching until then).
+- **C29 (bug — #13: invalid intervalUnit no longer hangs the trigger)** — `bug` most-starved over
+  budget (cyc 23, starved-for 6 > 3) → forced pick. Took #13, the hang the C28 audit re-classified
+  (not just a no-op). TWO-PART defense-in-depth fix in trigger-service.ts: (1) `advanceCustom` now
+  throws `ValidationError` on an unknown intervalUnit instead of silently leaving the date unchanged
+  (the root cause — a no-op date makes the `while (nextDue <= now)` loops spin); (2) a NON-PROGRESS
+  BACKSTOP in `fastForwardPastNow` — if `computeNextDueDate` returns a date that didn't strictly
+  advance, throw rather than loop forever (guards the invariant directly, catches any future
+  non-advancing path, not just this one). Both throws land inside `processReminder`'s per-reminder
+  try/catch in `processOverdueReminders`, so a corrupt reminder becomes a `skipped` entry
+  (reason 'error'), NOT an endpoint crash/hang — well-formed reminders in the same batch still
+  process. Still defense-in-depth (Zod `intervalUnitSchema` blocks the create+update API paths;
+  reachable only via DB corruption/bypass), but the failure mode is now a clean skip. Pinned by
+  `trigger-bad-interval-unit.test.ts` (2: corrupt reminder reported in `skipped` not hanging — the
+  test COMPLETING is itself the anti-hang proof; + a corrupt reminder doesn't block a healthy one in
+  the same batch). Test-harness note: a vehicle-less reminder skips with reason 'no_vehicles' BEFORE
+  the date math, so the repro must link a vehicle to actually exercise the advance path. Verified:
+  tsc 0 · musl-biome clean · 923 pass/0 fail (+2, up from 921) · build bundled.
+  Next cycle (30): nothing over budget after this (feature starved-for 5 > 4 at cyc 30 — feature is
+  the one breaching) → back to `feature`, T3 part 3/T4 (mark-serviced re-arm D3 + Zod refinements D4 +
+  recheck-on-write D5 + vehicle-stats reconcile). Remaining decided bugs (#9 interestPaidYtd rename,
+  #10 loan-breakdown balance, #11 mobile fuel-stat wrap) stay queued; #14 still needs the Angelo
+  semantics decision (asked at end of C28 — buttons shown, no answer yet; don't auto-fix).
+- **C30 (arch — #1 part 2 prerequisite: characterize sync-route error behavior)** — BALANCE: the C29
+  forecast said "feature breaches next", but the table is the source of truth and BOTH breached at
+  cyc 30 — feature starved-for 5 > 4 AND arch starved-for 6 > 5. The rule picks the MOST starved →
+  `arch` (6) wins over feature (5); T3 part 3/T4 waits one more cycle. (Lesson: compute every category
+  from the table each cycle, don't trust last cycle's single-category forecast.) Took arch #1 part 2
+  (drop sync/routes.ts try/catch). APPLIED C24/C28 DISCIPLINE — verified the BACKLOG's "clean drop"
+  premise against source FIRST, and it's wrong the same way C24's was: handleSyncError + the central
+  errorHandler are byte-identical for a SyncError (proven C24), but for a NON-SyncError thrown inside a
+  handler they DIVERGE — handleSyncError's tail wraps any non-SyncError as 500 OPERATION_FAILED, while
+  errorHandler maps a ZodError → 400 ValidationError and an AppError by statusCode. So a blind drop
+  CHANGES status codes (500→400 for bad input) — not behavior-preserving, violates arch rule 2. AND
+  (rule 3) the sync routes had ZERO real HTTP-stack error coverage (existing "tests" are pure-logic
+  replicas). So this cycle is the test-only PREREQUISITE (mirrors C24→C25): committed
+  `sync-route-errors.test.ts` (4 tests through the real app.request stack) pinning today's status+body
+  at representative sites — SyncError paths (POST /sync invalid syncTypes → 400; unknown type → 400;
+  restore/from-provider missing Idempotency-Key → 400 via the middleware, already central) + the
+  health positive control. The non-SyncError DIVERGENCE is documented analytically in the file (the
+  app.request harness always JSON-stringifies the body + lacks a header arg, so an in-handler ZodError
+  can't be provoked through it) with the exact 500→400 change the part-2 drop will make. Now the drop
+  is provable: when the try/catch comes out, the SyncError assertions stay green and the divergent ones
+  get updated to 400 in the same commit — a deliberate, reviewed step. Verified: tsc 0 · musl-biome
+  clean · 927 pass/0 fail (+4, up from 923) · build bundled. Test-only; no product code touched.
+  Next cycle (31): `feature` is now most-starved over budget (cyc 25, starved-for 6 > 4) → it wins →
+  maintenance-schedule **T3 part 3/T4** (mark-serviced re-arm + Zod refinements + recheck-on-write +
+  vehicle-stats reconcile) — finally resumes. The arch drop (part 2 proper) is queued for the next
+  arch pick (~cyc 35), now safe against this net. #14 still awaits the Angelo semantics decision.
+- **C31 (feature — maintenance-schedule T4 part 1: mileage reminders are now API-creatable)** —
+  `feature` most-starved over budget (cyc 25, starved-for 6 > 4) → forced pick; T4 finally resumes.
+  Scoped to the FOUNDATIONAL slice that turns the dormant C25 engine LIVE: validation (D4) + the
+  create/update wiring for the mileage axis. (mark-serviced D3 re-arm + recheck-on-write D5 are
+  separate cycles.) Changes: (1) validation.ts — added `triggerMode`/`intervalMileage`/
+  `lastServiceOdometer` to reminderBaseSchema + `refineMileageTrigger` (D4: mileage/both requires a
+  positive intervalMileage + exactly one vehicle; lastServiceOdometer optional, route-defaulted).
+  (2) routes.ts — `resolveMileageFields` helper: defaults lastServiceOdometer to the vehicle's
+  current odometer when omitted, derives `nextDueOdometer = lastServiceOdometer + intervalMileage`
+  (server-side, never client input); pure-mileage create persists `nextDueDate: null`, both/time keep
+  startDate; update recomputes the cache + flips nextDueDate when the mileage axis is touched. (3)
+  repository.ts — createWithVehicles no longer hard-overrides `nextDueDate = startDate` (the caller
+  now supplies the correct value, null for pure mileage). (4) config.ts — maxIntervalMileage cap.
+  TWO SUBTLE FOOTGUNS CAUGHT BY THE TESTS (the value of writing them): (a) `refineMileageTrigger`
+  initially REQUIRED lastServiceOdometer, which wrongly rejected the documented default-on-create —
+  relaxed to route-defaulted. (b) `triggerMode: .default('time')` SURVIVES `.partial()` on the update
+  schema → it silently flipped an existing mileage reminder back to 'time' on any field update that
+  omitted triggerMode (cleared nextDueOdometer). Fixed to `.optional()` (DB column default handles
+  create-time absence; merge keeps existing on update). Pinned by `create-mileage-reminder.test.ts`
+  (7: derived nextDueOdometer, default-to-current-odometer, both keeps date, time has null mileage
+  cols, rejects no-interval, rejects multi-vehicle, update recomputes). Verified: tsc 0 · musl-biome
+  clean · 934 pass/0 fail (+7, up from 927) · build bundled.
+  Next cycle (32): nothing over budget after this (deep-review starved-for 4, bug 3=budget, others
+  under). Highest-leverage = continue T4: **mark-serviced re-arm** (D3 — `POST /:id/mark-serviced`:
+  mileage → lastServiceOdometer = current odometer, recompute nextDueOdometer; time/both → advance
+  nextDueDate) — this is what lets a fired mileage reminder re-arm (today it stays due, by design,
+  until this exists). Then recheck-on-write (D5) + the vehicle-stats reconcile. #14 still needs the
+  Angelo semantics decision (queued, not auto-fixed).
+- **C32 (feature — maintenance-schedule T4 part 2: mark-serviced re-arm, D3)** — nothing over budget
+  (feature just touched cyc 31, but T4 mid-build → continue). Built `POST /:id/mark-serviced`, the
+  re-arm that closes the mileage loop: a fired mileage reminder has NO auto-re-arm (C25 design), so it
+  stays due until this endpoint moves the milestone. Repository: `markServiced(id, userId, fields)` —
+  an ownership-scoped optimistic update applying the caller-computed axis fields + stamping
+  lastTriggeredAt, returns the row (404 if id/user miss). Route owns the math (keeps the repo free of
+  a trigger-service import cycle): mileage/both → lastServiceOdometer := getCurrentOdometer (fallback
+  to the stored anchor if no reading), nextDueOdometer := that + intervalMileage; time/both → advance
+  nextDueDate one period via the reused `computeNextDueDate`. Rate-limited like /trigger; route placed
+  as `/:id/mark-serviced` (static suffix segment, no collision with GET/PUT /:id). Pinned by
+  `mark-serviced.test.ts` (5: mileage re-anchor + recompute, the end-to-end fire→service→not-due-again
+  loop, time advances date, both moves both axes, cross-tenant/missing id → 404). Verified: tsc 0 ·
+  musl-biome clean · 939 pass/0 fail (+5, up from 934) · build bundled.
+  Next cycle (33): nothing over budget (deep-review starved-for 5 = budget at cyc 33, others under) →
+  continue T4: **part 3 — `recheckMileageReminders` on odometer / mileaged-expense write (D5)** — fire
+  a mileage reminder the moment a new reading crosses its milestone (instead of only on the next
+  /trigger), idempotent via the existing dedup. Then T3-part-3 (vehicle-stats reconcile) + T5
+  remaining + frontend T6–T9. NOTE: deep-review hits budget at cyc 33 — if it's picked, the live
+  mileage create+trigger+re-arm surface is now worth an eyes-on/HTTP review. #14 still awaits Angelo.
+- **C33 (infra — `validate:local` + `check:musl` scripts; CLAUDE.md refresh)** — BALANCE: the C32
+  forecast said "nothing over budget," but `infra` had breached (last-touched 26, budget 6 →
+  starved-for 7 > 6) AND `bug` was over (4 > 3); infra is most-starved → it wins. (Recurring lesson:
+  I keep under-forecasting the slow-budget categories — compute ALL six from the table each cycle.)
+  Infra queue empty → scoped a real loop-tooling item: every cycle manually runs 4 commands because
+  `bun run validate`'s `check` step invokes the dead glibc biome (GLIBC_2.29). Added package scripts
+  `check:musl` / `check:musl:fix` (the working musl binary over src/) + `validate:local` = type-check
+  && check:musl && test && build — the documented 4-step workaround as ONE command. DISCOVERY (the
+  payoff): running check:musl over the WHOLE tree surfaced a formatter reflow in my own C31 file
+  (create-mileage-reminder.test.ts — a long object literal) that the per-file C31 biome check missed
+  but CI's glibc biome would flag — auto-fixed (one tracked file, purely mechanical line-wrap; the 10
+  pre-existing noNonNullAssertion WARNINGS in other test files are unsafe-fix + non-blocking, left
+  alone — no scope creep into unrelated committed files). Refreshed CLAUDE.md VERIFY step + the Biome
+  hard-rule to point at validate:local/check:musl and to note "run check:musl over the whole tree
+  before committing — a per-file check can miss a reflow CI flags." Verified: `bun run validate:local`
+  EXIT 0 end-to-end (tsc 0 · musl-biome clean · 940 pass/0 fail · build bundled) — the new command IS
+  the cycle's verification.
+  Next cycle (34): `bug` is now most-starved over budget (cyc 29, starved-for 5 > 3) → it wins.
+  Decided standalone bugs: #10 (buildLoanBreakdown flat balance — characterization test first, then
+  decrement) or #9 (interestPaidYtd rename) or #11 (mobile fuel-stat wrap — UI). #14 still needs the
+  Angelo semantics decision. T4 part 3 (recheck-on-write D5) resumes once bug is fed.
+- **C34 (guard → found+fixed a real data-loss bug; feeds guard AND bug)** — BALANCE: 3 categories over
+  budget (deep-review 6>5, guard 7>6, bug 5>3); most-starved = `guard` (7) → it wins (my C33 note
+  guessed bug; the table rules — guard's raw starved-for was higher). Scoped the highest-leverage
+  merge-surviving guard: generalize the C31 footgun (a Zod `.default()` SURVIVES `.partial()`, so an
+  update schema can inject the default on an omitted field). Surveyed the codebase's `.partial()`
+  schemas + `.default()` base fields → the at-risk instance is `updateExpenseSchema =
+  createExpenseSchemaBase.omit(...).partial()` whose base `tags` is `.optional().default([])`. Wrote
+  the guard FAILING-FIRST through the real route→repo→DB stack (create a tagged expense → PUT only the
+  amount → assert tags survive) — and it CONFIRMED A REAL BUG: editing any other field of a tagged
+  expense wiped its tags (the `.default([])` survived `.partial()`, injected `tags: []`, written
+  through by repository.update). Silent data loss on the most common edit path (quality-bar #1). FIX:
+  `updateExpenseSchema` re-declares `tags` as a plain `.optional()` (no default) via `.extend()`, so an
+  omitted tags stays undefined → dropped → stored value preserved; explicit array still replaces.
+  `update-preserves-tags.test.ts` (2) now green; the failing-first run is the proof it bites. Verified
+  via the new `bun run validate:local`: EXIT 0 (tsc 0 · musl-biome clean — caught + auto-fixed a
+  formatter reflow on the edit too · 942 pass/0 fail, +2 · build bundled). AUDIT NOTE for a future
+  cycle: the reminders `expenseTags` field + any other `.optional().default(x)` in a `.partial()`'d
+  schema may share the class — a broader source-scan guard (assert no `.partial()` update schema
+  carries a surviving `.default()`) would lock the whole class merge-surviving; filed as a guard idea.
+  Next cycle (35): nothing over budget (arch starved-for 5 = budget at cyc 35; bug just fed). Highest-
+  leverage = continue T4 part 3 (recheck-on-write D5), OR take the most-starved-at-budget arch (the
+  sync try/catch DROP, now safe behind the C30 net). #14 still awaits Angelo.
+- **C35 (deep-review — audit the live mileage API + the .partial()/.default() class)** — BALANCE:
+  `deep-review` only over-budget category (cyc 28, starved-for 7 > 5) → forced. (My C34 note guessed
+  T4/arch; the table ruled — deep-review's 7 beat arch's at-budget 5.) Verification-only (no product
+  code; like C21/C28). Fanned out 2 Explore agents, VERIFIED every finding against source per the
+  C21/C28 lesson — which corrected one agent's reasoning. RESULTS:
+  • Agent A (mileage API C31/C32): CERTIFIED CLEAN on all 5 scrutinized areas. Spot-verified the
+    load-bearing one — a mileage reminder created with no odometer reading anchors at 0 → milestone =
+    interval, but `processMileageReminder` returns early on `currentOdometer === null`, so NO
+    false-immediate-fire (fires only once a real reading ≥ milestone appears). triggerMode switches
+    keep a consistent row (resolveMileageFields clears/sets per mode + flips nextDueDate); mark-serviced
+    axis guards correct; refineMileageTrigger enforces single-vehicle + intervalMileage on both create
+    AND the merged-revalidate update (no bypass); undefined triggerMode → startDate (not null). Good.
+  • Agent B (.partial()+.default() class): flagged reminders `actionMode` as a "REAL data-loss risk,
+    route-defended" — BOTH HALVES WRONG on verification (the C21 lesson in action). It is NOT
+    route-defended (the route writes {...reminderFields} from the parsed partialUpdate, which WOULD
+    carry an injected actionMode), but it's HARMLESS regardless: `actionMode: z.literal('automatic')`
+    has exactly ONE legal value, so injecting/writing 'automatic' clobbers nothing (the C34 class only
+    bites a USER-SETTABLE field). NO remaining real instances: expense tags fixed (C34); reminders
+    expenseTags is `.nullish()` (no default); vehicles/settings/odometer safe because drizzle-zod does
+    NOT extract DB column defaults into Zod + their routes merge explicitly. USEFUL STRUCTURAL FACT
+    (verified): createInsertSchema does NOT surface `.notNull().default(x)` DB columns as Zod
+    `.default()` — so DB defaults are not part of this class; only hand-written Zod `.default()` is.
+  Net: live mileage surface certified, class audit closed (0 new real bugs), 1 agent misread debunked.
+  The C34 class-level source-scan guard is still the right lock (now scoped: flag a hand-written Zod
+  `.default()` on a user-settable field in a `.partial()` update schema; literal-single-value defaults
+  like actionMode are exempt). No code touched; LEDGER/BACKLOG only.
+  Next cycle (36): `arch` is over budget (cyc 30, starved-for 6 > 5 at cyc 36) → it wins → the sync
+  try/catch DROP (arch #1 part 2b), now safe behind the C30 characterization net. `feature` (cyc 32,
+  starved-for 4 = budget) is next after. #14 still awaits the Angelo semantics decision.
+- **C36 (arch — #1 part 2b: drop the sync try/catch, converge on the central handler)** — `arch`
+  forced (cyc 30, starved-for 6 > 5). Executed the drop the C24→C30 sequence set up: removed the
+  hand-rolled `try/catch → handleSyncError` from all 7 `sync/routes.ts` handlers + the now-unused
+  handleSyncError import, so errors propagate to the central errorHandler (SyncError-aware since C24).
+  BEHAVIOR: SyncError paths byte-identical (C24-proven) → the C30 characterization assertions stayed
+  GREEN unchanged, proving no regression on the common case; non-SyncError paths IMPROVED as designed
+  (a ZodError/AppError thrown in a handler now returns its proper status — 400/401/etc — instead of
+  the old blanket 500 OPERATION_FAILED from handleSyncError's tail). This was an authorized, reviewed
+  behavior change (the arch-rule-2 exception flagged + net-built across C24/C30), not a silent one.
+  Updated `sync-route-errors.test.ts`: refreshed the header + divergence note to the post-drop
+  contract, and replaced the now-stale "part-2 WILL change this" analytic note with a LIVE assertion
+  (unauthenticated POST /sync → 401 AuthenticationError via the central handler — confirms it's the
+  single error path + an AppError keeps its statusCode, not flattened to 500). Verified via
+  `validate:local`: EXIT 0 (tsc 0 · musl-biome clean — auto-reflowed the de-indented handlers · 943
+  pass/0 fail · build bundled); the full 161-test sync suite green. `sync` is the first of the three
+  hand-rolled route files converged.
+  Next cycle (37): nothing over budget (feature cyc 32 starved-for 5 > 4 at cyc 37 — feature breaches)
+  → `feature` wins → maintenance-schedule T4 part 3 (recheck-on-write D5: fire a mileage reminder the
+  moment an odometer/mileaged-expense write crosses its milestone, idempotent via the existing dedup).
+  Arch #1 has 2 route files LEFT (auth: 7 try/catch, settings: 5) — each its own characterize-then-drop
+  pair when arch next fires (~cyc 41). #14 still awaits the Angelo semantics decision.
+- **C37 (feature — maintenance-schedule T4 part 3: recheck-on-write, D5)** — `feature` forced (cyc 32,
+  starved-for 5 > 4). Final functional piece of T4: a mileage reminder now fires the MOMENT a new
+  reading crosses its milestone, not only on the next /trigger. Added trigger-service
+  `recheckMileageReminders(userId, vehicleId)` — fetches the user's mileage-tracking reminders,
+  filters to those linked to the written vehicle, runs the existing `processMileageReminder` on each
+  (reuse → idempotent via the C22 dedup key, so the login /trigger pass can't double-fire it).
+  Wired into TWO write paths: odometer-create route (always) + expense-create route (only when
+  `mileage != null`, since getCurrentOdometer reads expenses.mileage). Best-effort — recheck collects
+  skips, never throws, so a reminder hiccup can't fail the underlying write (which is already
+  persisted). No circular import (trigger-service imports odometer/repository, not routes; the routes
+  import trigger-service — one direction). Pinned by `recheck-on-write.test.ts` (5: odometer-write
+  fires immediately w/o /trigger, below-milestone silent, mileaged-expense fires, idempotent vs a
+  later /trigger, non-mileaged write silent). Verified via validate:local: EXIT 0 (tsc 0 · musl-biome
+  clean · 947 pass/0 fail, +4 · build bundled). T4 IS FUNCTIONALLY COMPLETE — mileage reminders:
+  creatable (C31) · re-arm via mark-serviced (C32) · fire on /trigger (C25) · fire on write (C37).
+  Next cycle (38): nothing over budget (bug cyc 34 starved-for 4 > 3 at cyc 38 — bug breaches) → `bug`
+  wins. Decided standalone: #10 (buildLoanBreakdown flat balance — characterization test first) or #9
+  (interestPaidYtd rename) or #11 (mobile fuel-stat wrap — UI). REMAINING maintenance-schedule:
+  T3-part-3 (vehicle-stats reconcile), T5 remaining (backup round-trip already done C27), frontend
+  T6–T9 (the whole UI — types/service/ReminderForm mileage branch/page+card/e2e). #14 awaits Angelo.
+- **C38 (bug — #10: buildLoanBreakdown flat balance)** — `bug` forced (cyc 34, starved-for 4 > 3).
+  Fixed #10 (confirmed real + unfixed by the C28 audit): buildLoanBreakdown read each loan's balance
+  into a Map then NEVER decremented it across the 12-month loop → every month reported identical
+  interest/principal (interest never declined, principal never rose, a loan paying off mid-window
+  over-projected). The method does DB I/O (computeBalance), so to make the math test-anchored
+  (bug-rule: characterize first) I EXTRACTED the pure amortization into `buildAmortizationSchedule`
+  (analytics-charts.ts, alongside monthKeysInRange/effectiveMonthlyPremium): takes caller-resolved
+  {balance,apr,paymentAmount}[] + month-key labels, walks each balance down by its principal each
+  month, clamps principal to the remaining balance + skips paid-off loans (no negative interest /
+  phantom principal). buildLoanBreakdown now resolves balances via Promise.all + builds the 12 month
+  keys, then delegates. Pinned by `amortization-schedule.test.ts` (5: interest-declines/principal-
+  rises = the defining bug assertion, mid-window payoff clamp, multi-loan sum, no-input-mutation,
+  empty-loans). Verified via validate:local: EXIT 0 (tsc 0 · musl-biome clean · 952 pass/0 fail, +5 ·
+  build bundled). HARNESS GOTCHA (noted): running `bun test src/api/analytics src/utils` together
+  3-failed with "ALTER TABLE … ADD due_odometer" errno-1 (duplicate column) — a cross-suite migration
+  double-apply when two suites migrate the shared DB in one process; isolation + the full `bun test`
+  are both green. The canonical gate is full `bun test` / validate:local, NOT a narrowed multi-dir run.
+  Next cycle (39): nothing over budget (deep-review cyc 35 starved-for 4; arch cyc 36 starved-for 3;
+  all under). Highest-leverage = the maintenance-schedule FRONTEND (T6: types + service client for the
+  mileage fields + mark-serviced) — kicks off the UI arc that makes the now-complete backend usable;
+  it's a feature pick (feature starved-for 2, not yet breaching, but highest-leverage). Remaining bugs
+  #9 (interestPaidYtd rename) + #11 (mobile fuel-stat wrap) stay queued. #14 awaits Angelo.
+- **C39 (feature — maintenance-schedule frontend T6: types + service client)** — nothing over budget;
+  highest-leverage = kick off the UI arc that makes the now-complete backend usable. T6 is the
+  non-visual foundation (the layer T7+ build on). Frontend `types/reminder.ts`: added `TriggerMode`,
+  the mileage fields (triggerMode/intervalMileage/lastServiceOdometer/nextDueOdometer) to `Reminder`,
+  made `nextDueDate` nullable; on `ReminderNotification` made `dueDate` nullable + added `dueOdometer`.
+  `services/reminder-api.ts`: added `markServiced(id)` → POST /:id/mark-serviced. The nullable-date
+  type change correctly surfaced 8 consumer sites assuming non-null (svelte-check) — all TIME-axis:
+  fixed by treating a null date as "not time-due" (dashboard due-soon widget filters out pure-mileage
+  via a type-narrowing predicate; /reminders isDue returns false for null; the two render sites show
+  the odometer milestone instead of a date). Verified: frontend tsc 0 errors (7 pre-existing warnings
+  unchanged) · build OK. NO screenshot this cycle — the render branches only manifest for a mileage
+  reminder, which isn't UI-creatable until T7 (ReminderForm), so there's nothing new to show yet; the
+  tsc+build floor is right for this non-visual layer. No backend touched.
+  Next cycle (40): nothing over budget (deep-review cyc 35 starved-for 5 = budget at cyc 40; others
+  under). Continue the feature arc → **T7: ReminderForm mileage branch** — the trigger-mode control
+  (Time | Mileage | Both), intervalMileage input w/ the vehicle's distance-unit label, current-odometer
+  hint + editable lastServiceOdometer, single-vehicle constraint when mileage. THIS is the visual
+  cycle — compose from the kit, eyes-on screenshot required (ui-autoloop). T8 (page/card mileage due
+  rendering + Mark serviced button) + T9 (e2e) follow. #9/#11 bugs queued; #14 awaits Angelo.
+- **C40 (infra — frontend `validate:local`)** — BALANCE OVERRIDE: `infra` breached (cyc 33,
+  starved-for 7 > 6), the only over-budget category (deep-review + guard sat exactly AT budget, not
+  over) → infra wins, T7 waits one cycle. Symmetry gap with the C33 backend work: the frontend had
+  `validate` (lint + format:check + type-check + test, the CI-shaped gate) but NO single command for
+  the CLAUDE.md local VERIFY gate (type-check + build), so every frontend cycle ran those by hand and
+  the build step was easy to skip. Added `validate:local` = type-check && build && test (fail-fast
+  order) mirroring the backend. Verified the test step green FIRST (345 pass) before wiring, then ran
+  the new command end-to-end: EXIT 0 (tsc 0 · build ✓ · 345 pass). Refreshed CLAUDE.md's VERIFY step
+  to point Frontend at `npm run validate:local`. Well-timed: the T7–T9 frontend arc is the next 3
+  feature cycles, each now a one-command gate. No product code; package.json + CLAUDE.md only.
+  Next cycle (41): nothing over budget (deep-review cyc 35 starved-for 6 > 5 at cyc 41 — deep-review
+  breaches) → `deep-review` wins, NOT the T7 feature. Likely target: an eyes-on/HTTP review of a
+  shipped surface (the live mileage API + the just-landed frontend null-date handling), or fan out per
+  rule 7. T7 (ReminderForm mileage branch) resumes once deep-review is fed. #9/#11 queued; #14 Angelo.
+- **C41 (guard — class-level net for the .partial()+.default() data-loss class)** — BALANCE: both
+  guard (cyc 34, starved-for 7) AND deep-review (cyc 35, 6) over budget; most-starved = `guard` (7) →
+  it wins (my C40 note guessed deep-review; guard's raw starved-for was higher — keep computing from
+  the table). Built the class-level net filed across C34/C35: the data-loss class (a Zod `.default()`
+  survives `.partial()`, injecting + clobbering on an omitted-field update) bit twice (C31, C34) and
+  per-instance guards cover those — this catches the NEXT one. APPROACH DECISION: a text/regex
+  source-scan is unreliable here (schemas span files, `.partial()` is chained), so I used a RUNTIME
+  net instead — `partial-update-no-default-injection.test.ts` imports each exported update schema,
+  parses an empty `{}`, and asserts it injects no key beyond an EXEMPT allowlist. This tests the real
+  invariant ("an empty update overwrites nothing") directly against the actual Zod objects, surviving
+  any refactor. Verified-against-source scoping baked in: `actionMode` (z.literal single-value default,
+  C35-proven harmless) is the one allowlisted key; schemas with `.refine(keys>0)` (claim/term) early-
+  return on the legit empty-parse failure. Covers updateReminder/Term/Policy/Claim; the route-local
+  updateExpense (C34-fixed) + odometer schemas aren't exported (a future cycle could export them to
+  widen coverage). Verified via validate:local: EXIT 0 (tsc 0 · musl-biome clean · 957 pass/0 fail,
+  +4 · build bundled). No product code.
+  Next cycle (42): `deep-review` is now most-starved over budget (cyc 35, starved-for 7 > 5 at cyc 42)
+  → it wins. Eyes-on/HTTP review of a shipped surface — the live mileage API + the C39 frontend
+  null-date handling are the freshest unreviewed; fan out per rule 7, verify findings vs source. T7
+  (ReminderForm mileage branch) resumes after. #9/#11 bugs queued; #14 awaits Angelo.
+- **C42 (deep-review — mark-serviced/recheck backend + C39 frontend null-handling; fixed 1 real bug)**
+  — `deep-review` forced (cyc 35, starved-for 7 > 5). Fanned out 2 Explore agents, VERIFIED every
+  finding vs source (C21/C28/C35 lesson). RESULTS:
+  • Agent A (C39 frontend null-date handling): CLEAN — every nextDueDate/dueDate/dueOdometer/mileage
+    read site is guarded (page null-checks, dashboard type-narrowing predicate, DueRemindersCard gets
+    pre-filtered non-null props, ReminderForm null-coalesces expenseTags). 0 remaining. Good.
+  • Agent B (mark-serviced C32 + recheck C37): 1 REAL bug + 3 filed. FIXED THIS CYCLE (own-code bug,
+    small + the comment was actively false): recheckMileageReminders' `findMileageTracking` fetch was
+    OUTSIDE the per-reminder try/catch — it throws DatabaseError, and recheck runs AFTER the
+    odometer/expense write persists, so a DB hiccup would propagate + 500 a SUCCESSFUL write, breaking
+    the "never throws" contract the call sites rely on (they don't wrap it). Wrapped the fetch →
+    swallows to a skip + returns. Pinned by `recheck-query-failure.test.ts` (spyOn mockRejectedValue →
+    resolves with reason 'recheck_query_failed', doesn't throw). The other 3 verified findings filed,
+    NOT auto-fixed (judgment, not bugs): (1) markServiced is ownership-scoped, NOT value-CAS'd — the
+    C32 "optimistic-locked" comment OVERCLAIMS, but two concurrent user mark-serviced calls compute
+    the same result from the same row (no corruption), so it's a doc-accuracy fix; (2) mark-serviced
+    advances nextDueDate ONE period even from an overdue date (could "bounce" through the past) —
+    matches the trigger's own model + assumes a trigger ran first; a semantics decision; (3)
+    recheck-on-write is CREATE-only (not expense/odometer UPDATE) — a documented scope choice (D5 says
+    "create"). Verified: validate:local EXIT 0 (tsc 0 · musl-biome clean · 958 pass/0 fail, +1 · build).
+  Next cycle (43): nothing over budget (arch cyc 36 starved-for 7 > 5 at cyc 43 — arch breaches) →
+  `arch` wins → arch #1 part 2c (drop the `auth`/`settings` try/catch, characterize-then-drop per the
+  C30/C36 pattern). T7 (ReminderForm) is the next feature pick after. Filed bugs below; #14 Angelo.
+- **C43 (arch — #1 part 2c-characterize: pin settings-route error behavior)** — `arch` forced (cyc 36,
+  starved-for 7 > 5; bug also over at 5 but lower). Took the settings route (5 try/catch, smaller than
+  auth's 7). GROUNDING (vs source, before acting): settings is a DIFFERENT pattern from sync — it
+  doesn't use handleSyncError; it hand-rolls try/catch that rethrow as AppError with TRANSFORMED
+  messages (GET / masks ANY error as 'Failed to fetch settings' 500; PUT / maps ZodError →
+  AppError('Invalid settings data', 400)). The central errorHandler already shapes AppError, so most is
+  boilerplate — but the GET catch MASKS typed errors (a NotFoundError would surface as a generic 500)
+  and the PUT message is a transform, so dropping CHANGES responses (improvement, but a behavior
+  change). Per the C30/C36 pattern + arch rule 2/3 (settings had NO real HTTP-stack error coverage):
+  this cycle is CHARACTERIZE-FIRST. Committed `settings-route-errors.test.ts` (4: GET positive control,
+  PUT out-of-range syncInactivityMinutes → today's 'Invalid settings data' 400, PUT path-traversal
+  backupConfig → 400, PUT valid partial → 200) pinning today's behavior, with an inline note on the
+  exact code/message the drop will change. ALSO verified (C35 fact) updateSettingsSchema is a
+  `.partial()` of a createInsertSchema with no hand-written default → NOT a C41-class data-loss risk.
+  Verified via validate:local: EXIT 0 (tsc 0 · musl-biome clean · 961 pass/0 fail, +3 · build). Test-only.
+  Next cycle (44): nothing over budget (bug cyc 38 starved-for 6 > 3 at cyc 44 — bug breaches) → `bug`
+  wins. Decided standalone: #9 (interestPaidYtd rename) or #11 (mobile fuel-stat wrap, UI+screenshot).
+  arch #1 remaining: settings-DROP (now safe behind this net) + auth (characterize-then-drop). T7
+  (ReminderForm) still the next feature pick. #14/#16 await Angelo semantics calls.
+- **C44 (bug — #9: interestPaidYtd is mislabeled)** — `bug` forced (cyc 38, starved-for 6 > 3). Took #9
+  (clean backend+label rename, no screenshot dependency, vs #11's UI work). THE BUG: the financing
+  analytics field `interestPaidYtd` (summary) + per-vehicle `interestPaid` are ONE month's interest on
+  the CURRENT balance (`balance * apr/100/12`) — neither year-to-date NOR actually paid; a forward
+  estimate mislabeled as historical fact. Took the backlog's "smallest honest fix" = rename, not a
+  true-YTD recompute (that needs payment-history summing — out of scope, would be a feature). Renamed
+  end-to-end across the boundary: backend `FinancingData` type (2 fields) + 4 impl sites (compute,
+  per-vehicle return, 'own' branch, empty-state, aggregation) → `monthlyInterestEstimate`; frontend
+  `FinancingResponse` type + the 2 UI labels ('Interest Paid YTD' → 'Est. Monthly Interest' subtitle
+  'on current loan balances'; per-vehicle 'Interest Paid' → 'Est. Monthly Interest'). Grep confirmed
+  zero remaining code/test refs to the old names (only the explaining comments). UI-touching but a
+  pure label/field rename (no layout change) → build + label text are the proof, no screenshot needed.
+  Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome · 961 pass · build) + frontend
+  validate:local EXIT 0 (tsc 0 · build · 345 pass).
+  Next cycle (45): nothing over budget (feature cyc 39 starved-for 6 > 4 at cyc 45 — feature breaches)
+  → `feature` wins → maintenance-schedule **T7 (ReminderForm mileage branch)** — THE visual cycle,
+  eyes-on screenshot required (ui-autoloop). Remaining: bug #11 (mobile fuel-stat wrap); arch
+  settings-DROP + auth; #14/#16 await Angelo.
+- **C45 (feature — maintenance-schedule T7: ReminderForm mileage branch)** — `feature` forced (cyc 39,
+  starved-for 6 > 4). Built the mileage UI in ReminderForm.svelte: a "Trigger when" Select (On a time
+  schedule | At a mileage interval | Time or mileage whichever first) driving hasTimeAxis/hasMileageAxis
+  $derived; the mileage axis reveals a Service-interval input (suffixed with the selected vehicle's
+  distance-unit label via getDistanceUnitLabel) + a Last-serviced-at input (placeholder 'current',
+  hint "leave blank to use latest reading" — matches the C31 backend default), and HIDES the time
+  fields (frequency/dates); the time axis keeps the existing fields unchanged. Validation: D4
+  single-vehicle when mileage, positive intervalMileage required, time fields only validated when the
+  time axis is active. Payload sends triggerMode + intervalMileage (null when pure time) + omits
+  lastServiceOdometer when blank (backend defaults it). Edit-path seeds all three from the reminder;
+  composed entirely from the existing kit (Select/Input/Label/FormFieldError) — no new components/CSS.
+  VERIFIED: frontend tsc 0 · build ✓ · 345 unit tests · prettier clean. ⚠️ EYES-ON NOT CAPTURED — the
+  Playwright/browser harness is sandbox-denied in this autonomous context (the run auto-refused). Wrote
+  an untracked e2e (`reminder-mileage.meshclaw.e2e.ts`) that screenshots the mileage form + asserts the
+  reveal/hide + 'both' behavior when regress.sh runs; flagged the pending eyes-on to Angelo via
+  send_message (honest-over-precise: visual risk is low — kit-composed, adjacent-field-identical — but
+  not confirmed). NOT claiming T7 fully done until eyes-on; tasks.md marks it [~] visual-pending.
+  Next cycle (46): nothing over budget (deep-review cyc 42 starved-for 4; arch 3; all under). Highest-
+  leverage = continue the feature arc → **T8** (/reminders page + DueRemindersCard: OR-in mileage due,
+  render the milestone + gap with unit label, wire the "Mark serviced" button to reminderApi.markServiced;
+  four states + a11y) — also visual. Then T9 (e2e). bug #11 + arch settings-DROP/auth queued. #14/#16 Angelo.
+- **C46 (feature — maintenance-schedule T8: Mark-serviced button on /reminders)** — nothing over budget;
+  continued the feature arc. T8's display half (mileage milestone render + null-date guards on the
+  /reminders cards + notification dueOdometer render) already landed in C39 with the nullable-type
+  fixes; the dashboard DueRemindersCard is time-axis-only BY DESIGN (mileage due surfaces via
+  notifications, not the date-window widget) so it needs no change. So T8's remaining NEW piece = the
+  re-arm action: added `markServiced(item)` handler (per-reminder `servicingId` spinner, success toast
+  'reminder re-armed', reload) + `isMileageTracking()` helper, and a "Serviced" Button (Check icon /
+  RefreshCw spinner) on each ACTIVE mileage/both card, before Pause/Edit/Delete — wired to
+  reminderApi.markServiced (C39 client). Composed from the kit. Verified: frontend tsc 0 · build ·
+  345 tests · prettier clean. ⚠️ EYES-ON STILL PENDING (same Playwright sandbox-deny as C45) — extended
+  the untracked reminder-mileage e2e to assert the Serviced button shows + click re-arms + screenshot.
+  Both T7+T8 visuals will be confirmed in one pass when Angelo runs regress.sh / glances at /reminders
+  (flagged C45). T8 marked [~] until then.
+  Next cycle (47): `arch` is most-starved (cyc 43, starved-for 4 < 5 — not over yet; deep-review cyc 42
+  starved-for 5 = budget at cyc 47). Nothing strictly over budget at 47 → highest-leverage = T9 (the
+  maintenance-schedule e2e — promote the untracked reminder-mileage spec's coverage into the committed
+  suite shape, closing the feature) OR continue toward closing the UI. bug #11 + arch settings-DROP/auth
+  remain queued; #14/#16 await Angelo. Watch: deep-review + arch both breach ~cyc 47-48.
+- **C47 (infra — refresh CLAUDE.md maintenance-schedule status)** — BALANCE: `infra` breached (cyc 40,
+  starved-for 7 > 6), the only over-budget category (deep-review/guard/bug all sat exactly AT budget)
+  → infra wins. The orientation doc a fresh agent reads first was stale since C26: it described
+  maintenance-schedule as "backend nearly done, trigger engine DORMANT until T4, frontend T6–T9
+  follows" — but C31–C46 shipped all of T4/T5 (backend complete: mileage reminders API-creatable,
+  fire on trigger + on write, mark-serviced re-arm) AND frontend T6/T7/T8. A fresh agent would think
+  the feature's biggest chunk was unbuilt. Rewrote the block to reality: backend COMPLETE, frontend
+  T6–T8 shipped (T7/T8 eyes-on-pending), remaining = T9 e2e + the deferred vehicle-stats reconcile.
+  Also bumped the stale ~918 test-count floor to ~962 backend / ~345 frontend. Doc-only (no code);
+  verified the tree carries only CLAUDE.md. No build gate needed.
+  Next cycle (48): `deep-review` is most-starved over budget (cyc 42, starved-for 6 > 5 at cyc 48;
+  arch cyc 43 starved-for 5 = budget) → `deep-review` wins. Freshest unreviewed surface = the C45/C46
+  frontend mileage UI (ReminderForm branch + /reminders Serviced button) — an eyes-on/logic review
+  (fan out, verify vs source) that ALSO partially discharges the pending T7/T8 eyes-on. Then arch
+  (settings-DROP). bug #11 queued; #14/#16 await Angelo.
+- **C48 (guard — lock the frontend null-nextDueDate invariant)** — BALANCE: guard (cyc 41, starved-for
+  7) AND deep-review (cyc 42, 6) both over budget; most-starved = `guard` → it wins (my C47 note guessed
+  deep-review; guard's raw 7 > 6 — the table rules, keep computing all six). The C39 audit confirmed all
+  null-nextDueDate consumer sites are guarded, but there was NO committed test locking it — a future edit
+  re-introducing `new Date(reminder.nextDueDate)` on a pure-mileage reminder (null date → 1970 epoch →
+  wrongly "due", or a crash) would pass review. LOCKED IT, merge-surviving, via the extraction pattern
+  (not a fragile regex source-scan): created `reminder-helpers.ts` with exported null-safe
+  `isReminderTimeDue(reminder, now?)` + `isMileageTracking(reminder)`, routed the /reminders page's
+  inline `isDue` + the C46 page-local `isMileageTracking` through them (behavior-preserving — page
+  renders identically), and pinned with `reminder-helpers.test.ts` (5, incl. THE load-bearing assertion:
+  a null-nextDueDate reminder is never time-due). `now` is injectable for deterministic tests. Verified:
+  frontend validate:local EXIT 0 (tsc 0 · build · 350 tests, +5 · prettier clean).
+  Next cycle (49): `deep-review` is most-starved over budget (cyc 42, starved-for 7 > 5 at cyc 49) → it
+  wins → eyes-on/logic review of the C45/C46 frontend mileage UI (also partially discharges the pending
+  T7/T8 eyes-on). Then arch settings-DROP (cyc 43, breaches ~50). bug #11 queued; #14/#16 await Angelo.
