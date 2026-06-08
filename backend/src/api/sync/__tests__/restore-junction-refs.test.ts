@@ -16,7 +16,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -26,7 +31,11 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', { make: 'Honda', model: 'Civic', year: 2021 });
+  const res = await ctx.authed('POST', '/api/v1/vehicles', {
+    make: 'Honda',
+    model: 'Civic',
+    year: 2021,
+  });
   const body = await json<DataEnvelope<{ id: string }>>(res);
   expect(res.status, JSON.stringify(body)).toBeLessThan(300);
   return body.data.id;
@@ -52,10 +61,7 @@ describe('restore rejects junction rows that reference out-of-backup ids', () =>
 
     const zip = await backupService.exportAsZip(ctx.user.id);
     const archive = new AdmZip(zip);
-    const junctionCsv = archive
-      .getEntry('reminder_vehicles.csv')
-      ?.getData()
-      .toString('utf-8');
+    const junctionCsv = archive.getEntry('reminder_vehicles.csv')?.getData().toString('utf-8');
     expect(junctionCsv, 'export contains reminder_vehicles.csv').toBeTruthy();
     expect(junctionCsv as string, 'junction references the real vehicle').toContain(vehicleId);
 

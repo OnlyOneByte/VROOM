@@ -48,9 +48,7 @@ describe('FakeStorageProvider', () => {
     const p = new FakeStorageProvider();
     const ref = await p.upload(uploadParams());
     expect(await p.getExternalUrl(ref)).toMatch(/^fake:\/\//);
-    expect(
-      await p.getExternalUrl({ providerType: 'fake', externalId: 'missing' })
-    ).toBeNull();
+    expect(await p.getExternalUrl({ providerType: 'fake', externalId: 'missing' })).toBeNull();
   });
 
   test('delete removes the file', async () => {

@@ -28,6 +28,46 @@ export interface ResolvedProvider {
   folderPath: string;
 }
 
+// Per-providerType credential/config validation + construction. Extracted from the
+// createProviderInstance switch so each branch stays small and the dispatcher flat.
+function buildGoogleDriveProvider(credentials: Record<string, unknown>): StorageProvider {
+  const refreshToken = credentials.refreshToken;
+  if (typeof refreshToken !== 'string') {
+    throw new ValidationError('Invalid Google Drive credentials: missing refreshToken');
+  }
+  return new GoogleDriveProvider(refreshToken);
+}
+
+function buildGooglePhotosProvider(
+  credentials: Record<string, unknown>,
+  config: Record<string, unknown> | null
+): StorageProvider {
+  const refreshToken = credentials.refreshToken;
+  if (typeof refreshToken !== 'string') {
+    throw new ValidationError('Invalid Google Photos credentials: missing refreshToken');
+  }
+  // Reuse the cached VROOM album id from config (set on first upload) to skip the
+  // resolve-or-create round-trip.
+  const albumId = typeof config?.albumId === 'string' ? config.albumId : undefined;
+  return new GooglePhotosProvider(refreshToken, undefined, albumId);
+}
+
+function buildS3Provider(credentials: Record<string, unknown>, config: unknown): StorageProvider {
+  const accessKeyId = credentials.accessKeyId;
+  const secretAccessKey = credentials.secretAccessKey;
+  if (typeof accessKeyId !== 'string' || typeof secretAccessKey !== 'string') {
+    throw new ValidationError('Invalid S3 credentials: missing accessKeyId or secretAccessKey');
+  }
+  const s3Config = config as { endpoint: string; bucket: string; region: string };
+  if (!s3Config?.endpoint || !s3Config?.bucket || !s3Config?.region) {
+    throw new ValidationError('Invalid S3 config: missing endpoint, bucket, or region');
+  }
+  return new S3CompatProvider(
+    { accessKeyId, secretAccessKey },
+    { endpoint: s3Config.endpoint, bucket: s3Config.bucket, region: s3Config.region }
+  );
+}
+
 export class StorageProviderRegistry {
   constructor(private db: ReturnType<typeof getDb>) {}
 
@@ -183,41 +223,12 @@ export class StorageProviderRegistry {
     const credentials = JSON.parse(decrypted) as Record<string, unknown>;
 
     switch (row.providerType) {
-      case 'google-drive': {
-        const refreshToken = credentials.refreshToken;
-        if (typeof refreshToken !== 'string') {
-          throw new ValidationError('Invalid Google Drive credentials: missing refreshToken');
-        }
-        return new GoogleDriveProvider(refreshToken);
-      }
-      case 'google-photos': {
-        const refreshToken = credentials.refreshToken;
-        if (typeof refreshToken !== 'string') {
-          throw new ValidationError('Invalid Google Photos credentials: missing refreshToken');
-        }
-        // Reuse the cached VROOM album id from config (set on first upload) to skip
-        // the resolve-or-create round-trip.
-        const cfg = row.config as Record<string, unknown> | null;
-        const albumId = typeof cfg?.albumId === 'string' ? cfg.albumId : undefined;
-        return new GooglePhotosProvider(refreshToken, undefined, albumId);
-      }
-      case 's3': {
-        const accessKeyId = credentials.accessKeyId;
-        const secretAccessKey = credentials.secretAccessKey;
-        if (typeof accessKeyId !== 'string' || typeof secretAccessKey !== 'string') {
-          throw new ValidationError(
-            'Invalid S3 credentials: missing accessKeyId or secretAccessKey'
-          );
-        }
-        const config = row.config as { endpoint: string; bucket: string; region: string };
-        if (!config?.endpoint || !config?.bucket || !config?.region) {
-          throw new ValidationError('Invalid S3 config: missing endpoint, bucket, or region');
-        }
-        return new S3CompatProvider(
-          { accessKeyId, secretAccessKey },
-          { endpoint: config.endpoint, bucket: config.bucket, region: config.region }
-        );
-      }
+      case 'google-drive':
+        return buildGoogleDriveProvider(credentials);
+      case 'google-photos':
+        return buildGooglePhotosProvider(credentials, row.config as Record<string, unknown> | null);
+      case 's3':
+        return buildS3Provider(credentials, row.config);
       default:
         throw new ValidationError(`Unsupported provider type: ${row.providerType}`);
     }

@@ -11,8 +11,8 @@
  * proxies configured (the default), forwarded headers are ignored entirely.
  */
 
-import { getConnInfo } from 'hono/bun';
 import type { Context } from 'hono';
+import { getConnInfo } from 'hono/bun';
 import { CONFIG } from '../config';
 
 /** The socket peer IP, or undefined when unavailable (e.g. in-process `app.request()`). */

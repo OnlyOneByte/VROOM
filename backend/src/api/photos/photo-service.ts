@@ -146,7 +146,12 @@ export async function listPhotosByEntityType(
   const all = await photoRepository.findByUser(userId, entityType);
   const grouped: Record<string, Photo[]> = {};
   for (const photo of all) {
-    (grouped[photo.entityId] ??= []).push(photo);
+    const bucket = grouped[photo.entityId];
+    if (bucket) {
+      bucket.push(photo);
+    } else {
+      grouped[photo.entityId] = [photo];
+    }
   }
   return grouped;
 }

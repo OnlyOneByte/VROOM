@@ -39,7 +39,9 @@ export function neutralizeCsvCell<T>(value: T): T | string {
  * Neutralize every string cell in a record (numbers/booleans/etc. untouched).
  * Returns a new object; the input is not mutated.
  */
-export function neutralizeCsvRow<T extends Record<string, unknown>>(row: T): Record<string, unknown> {
+export function neutralizeCsvRow<T extends Record<string, unknown>>(
+  row: T
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(row)) {
     out[key] = neutralizeCsvCell(row[key]);

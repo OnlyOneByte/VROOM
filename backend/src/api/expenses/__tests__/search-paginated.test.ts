@@ -19,8 +19,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import type { AppDatabase } from '../../../db/connection';
-import * as schema from '../../../db/schema';
 import type { NewExpense } from '../../../db/schema';
+import * as schema from '../../../db/schema';
 import { ExpenseRepository } from '../repository';
 
 let sqliteDb: Database;
@@ -70,13 +70,9 @@ describe('findPaginated search', () => {
     // 25 filler rows so the match is pushed past a 20-row first page. Rows are
     // ordered by date desc, so make the match the OLDEST row.
     for (let i = 0; i < 25; i++) {
-      await repo.create(
-        input({ description: `filler ${i}`, date: new Date(2026, 0, 28 - i) })
-      );
+      await repo.create(input({ description: `filler ${i}`, date: new Date(2026, 0, 28 - i) }));
     }
-    await repo.create(
-      input({ description: 'rare needle expense', date: new Date(2025, 0, 1) })
-    );
+    await repo.create(input({ description: 'rare needle expense', date: new Date(2025, 0, 1) }));
 
     // Without search, page 1 (limit 20) would NOT contain the needle.
     const unfiltered = await repo.findPaginated({ userId: USER_A, limit: 20, offset: 0 });
@@ -111,7 +107,7 @@ describe('findPaginated search', () => {
     expect(byCategory.data[0]?.category).toBe('maintenance');
   });
 
-  test('search is user-scoped — never returns another user\'s rows', async () => {
+  test("search is user-scoped — never returns another user's rows", async () => {
     await repo.create(input({ userId: USER_A, vehicleId: VEHICLE_A, description: 'shared word' }));
     await repo.create(input({ userId: USER_B, vehicleId: VEHICLE_B, description: 'shared word' }));
 

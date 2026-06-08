@@ -117,7 +117,8 @@ export const CONFIG = {
   env: env.NODE_ENV as Environment,
   // Fake storage provider is allowed only outside production AND only when
   // explicitly opted in via ALLOW_FAKE_STORAGE — double-gated.
-  allowFakeStorageProvider: env.ALLOW_FAKE_STORAGE && (env.NODE_ENV as Environment) !== 'production',
+  allowFakeStorageProvider:
+    env.ALLOW_FAKE_STORAGE && (env.NODE_ENV as Environment) !== 'production',
   // Rate limiting is bypassed only outside production AND only when explicitly opted
   // in via DISABLE_RATE_LIMIT (the local E2E harness) — double-gated, can never
   // weaken production's abuse protection.

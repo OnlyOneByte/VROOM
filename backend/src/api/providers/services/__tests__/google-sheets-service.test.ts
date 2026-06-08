@@ -87,8 +87,16 @@ describe('GoogleSheetsService.createOrUpdateVroomSpreadsheet', () => {
 
   test('is idempotent — a second call reuses the same spreadsheet', async () => {
     const svc = makeSvc();
-    const first = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM/Backups', 'Demo User');
-    const second = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM/Backups', 'Demo User');
+    const first = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+    const second = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
 
     expect(second.id).toBe(first.id);
     const spreadsheetFiles = [...store.files.values()].filter(
@@ -118,8 +126,12 @@ describe('GoogleSheetsService.createOrUpdateVroomSpreadsheet', () => {
     // A second user with their own vehicle must not leak into this user's sheet.
     const { db } = await import('../../../../db/connection');
     const schema = await import('../../../../db/schema');
-    await db.insert(schema.users).values({ id: 'other-user', email: 'other@x.com', displayName: 'Other' });
-    await db.insert(schema.vehicles).values({ userId: 'other-user', make: 'Tesla', model: 'S', year: 2023 });
+    await db
+      .insert(schema.users)
+      .values({ id: 'other-user', email: 'other@x.com', displayName: 'Other' });
+    await db
+      .insert(schema.vehicles)
+      .values({ userId: 'other-user', make: 'Tesla', model: 'S', year: 2023 });
     await seedVehicle('Toyota', 'Camry', 2020);
 
     const info = await makeSvc().createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Demo User');
@@ -135,7 +147,11 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
   test('round-trips written data back into parsed records', async () => {
     await seedVehicle('Honda', 'Civic', 2019);
     const svc = makeSvc();
-    const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM/Backups', 'Demo User');
+    const info = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
 
     const data = await svc.readSpreadsheetData(info.id);
     expect(data.vehicles).toHaveLength(1);

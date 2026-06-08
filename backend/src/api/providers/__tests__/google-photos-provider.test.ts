@@ -6,10 +6,13 @@
  */
 
 import { beforeEach, describe, expect, test } from 'bun:test';
+import {
+  FakePhotosStore,
+  makeFakePhotosClient,
+} from '../../../test-helpers/fake-google-photos-client';
 import { GooglePhotosProvider } from '../domains/storage/google-photos-provider';
 import { capabilitiesOf } from '../domains/storage/storage-provider';
 import { GooglePhotosService } from '../services/google-photos-service';
-import { FakePhotosStore, makeFakePhotosClient } from '../../../test-helpers/fake-google-photos-client';
 
 let store: FakePhotosStore;
 let provider: GooglePhotosProvider;

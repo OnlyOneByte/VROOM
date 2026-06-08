@@ -17,7 +17,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -38,7 +43,10 @@ interface PolicyRow {
   terms: { id: string }[];
 }
 
-async function createPolicy(vehicleIds: string[], totalCost: number): Promise<{ policyId: string; termId: string }> {
+async function createPolicy(
+  vehicleIds: string[],
+  totalCost: number
+): Promise<{ policyId: string; termId: string }> {
   const res = await ctx.authed('POST', '/api/v1/insurance', {
     company: 'Acme Mutual',
     terms: [

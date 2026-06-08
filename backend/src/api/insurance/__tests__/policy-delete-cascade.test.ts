@@ -11,7 +11,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -36,13 +41,19 @@ function photoCount(entityType: string, entityId: string): number {
 }
 
 async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', { make: 'Toyota', model: 'Camry', year: 2022 });
+  const res = await ctx.authed('POST', '/api/v1/vehicles', {
+    make: 'Toyota',
+    model: 'Camry',
+    year: 2022,
+  });
   const body = await json<DataEnvelope<{ id: string }>>(res);
   expect(res.status, JSON.stringify(body)).toBeLessThan(300);
   return body.data.id;
 }
 
-async function seedPolicyWithClaim(vehicleId: string): Promise<{ policyId: string; claimId: string }> {
+async function seedPolicyWithClaim(
+  vehicleId: string
+): Promise<{ policyId: string; claimId: string }> {
   const pol = await ctx.authed('POST', '/api/v1/insurance', {
     company: 'Acme Mutual',
     terms: [
@@ -67,7 +78,7 @@ async function seedPolicyWithClaim(vehicleId: string): Promise<{ policyId: strin
 }
 
 describe('insurance policy deletion cascades photo cleanup to itself + claims', () => {
-  test('deleting a policy removes its own AND its claims\' photo rows (no orphans)', async () => {
+  test("deleting a policy removes its own AND its claims' photo rows (no orphans)", async () => {
     const vehicleId = await seedVehicle();
     const { policyId, claimId } = await seedPolicyWithClaim(vehicleId);
 

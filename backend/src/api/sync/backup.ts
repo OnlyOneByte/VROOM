@@ -349,7 +349,10 @@ export class BackupService {
     // Query insurance claims for user's policies
     const userInsuranceClaims =
       policyIds.length > 0
-        ? await db.select().from(insuranceClaims).where(inArray(insuranceClaims.policyId, policyIds))
+        ? await db
+            .select()
+            .from(insuranceClaims)
+            .where(inArray(insuranceClaims.policyId, policyIds))
         : [];
 
     // Query photos directly by userId
@@ -676,7 +679,9 @@ export class BackupService {
         claim.vehicleId !== '' &&
         !vehicleIds.has(String(claim.vehicleId))
       ) {
-        errors.push(`Insurance claim ${claim.id} references non-existent vehicle ${claim.vehicleId}`);
+        errors.push(
+          `Insurance claim ${claim.id} references non-existent vehicle ${claim.vehicleId}`
+        );
       }
     }
     return errors;

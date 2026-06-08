@@ -18,7 +18,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -28,7 +33,11 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', { make: 'Honda', model: 'Civic', year: 2021 });
+  const res = await ctx.authed('POST', '/api/v1/vehicles', {
+    make: 'Honda',
+    model: 'Civic',
+    year: 2021,
+  });
   const body = await json<DataEnvelope<{ id: string }>>(res);
   expect(res.status, JSON.stringify(body)).toBeLessThan(300);
   return body.data.id;

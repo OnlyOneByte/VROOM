@@ -14,7 +14,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 /** Shapes the assertions read off the reminder JSON envelopes. */
 interface ReminderRow {
@@ -92,7 +97,9 @@ describe('reminders HTTP routes', () => {
     // Resume round-trips too.
     const resumed = await ctx.authed('PUT', `/api/v1/reminders/${id}`, { isActive: true });
     expect(resumed.status).toBe(200);
-    expect((await json<DataEnvelope<ReminderWithJoins>>(resumed)).data.reminder.isActive).toBe(true);
+    expect((await json<DataEnvelope<ReminderWithJoins>>(resumed)).data.reminder.isActive).toBe(
+      true
+    );
   });
 
   test('POST with a vehicle the user does not own is rejected', async () => {

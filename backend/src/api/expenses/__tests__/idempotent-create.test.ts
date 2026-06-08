@@ -12,8 +12,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import type { AppDatabase } from '../../../db/connection';
-import * as schema from '../../../db/schema';
 import type { NewExpense } from '../../../db/schema';
+import * as schema from '../../../db/schema';
 import { expenses } from '../../../db/schema';
 import { ExpenseRepository } from '../repository';
 

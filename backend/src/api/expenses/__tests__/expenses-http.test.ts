@@ -43,7 +43,13 @@ async function seedVehicle(): Promise<string> {
   return body.data.id;
 }
 
-async function createExpense(vehicleId: string, category: string, amount: number, description: string, date: string) {
+async function createExpense(
+  vehicleId: string,
+  category: string,
+  amount: number,
+  description: string,
+  date: string
+) {
   // Fuel expenses require fuel amount + mileage (a create-schema refinement) —
   // provide them so the POST validates. Non-fuel categories don't need them.
   const fuelFields = category === 'fuel' ? { volume: 10, mileage: 30_000 } : {};
@@ -63,7 +69,13 @@ async function createExpense(vehicleId: string, category: string, amount: number
 describe('expenses HTTP search/pagination', () => {
   test('?search= matches description across the whole result set', async () => {
     const vehicleId = await seedVehicle();
-    await createExpense(vehicleId, 'maintenance', 75, 'Jiffy Lube oil change', '2026-01-10T12:00:00.000Z');
+    await createExpense(
+      vehicleId,
+      'maintenance',
+      75,
+      'Jiffy Lube oil change',
+      '2026-01-10T12:00:00.000Z'
+    );
     await createExpense(vehicleId, 'fuel', 45, 'Chevron gas', '2026-01-15T12:00:00.000Z');
     await createExpense(vehicleId, 'misc', 8, 'Highway toll', '2026-01-18T12:00:00.000Z');
 

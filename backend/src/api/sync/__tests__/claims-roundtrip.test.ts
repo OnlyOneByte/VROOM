@@ -16,7 +16,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -26,7 +31,11 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', { make: 'Toyota', model: 'Camry', year: 2022 });
+  const res = await ctx.authed('POST', '/api/v1/vehicles', {
+    make: 'Toyota',
+    model: 'Camry',
+    year: 2022,
+  });
   const body = await json<DataEnvelope<{ id: string }>>(res);
   expect(res.status, JSON.stringify(body)).toBeLessThan(300);
   return body.data.id;
@@ -129,6 +138,10 @@ describe('backup → restore round-trip preserves insurance claims', () => {
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(result.imported?.insuranceClaims).toBe(3);
     expect(claimRows()).toHaveLength(3);
-    expect(claimRows().map((r) => r.claim_type).sort()).toEqual(['collision', 'theft', 'weather']);
+    expect(
+      claimRows()
+        .map((r) => r.claim_type)
+        .sort()
+    ).toEqual(['collision', 'theft', 'weather']);
   });
 });

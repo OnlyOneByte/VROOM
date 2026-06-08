@@ -14,13 +14,13 @@
  */
 
 import { beforeEach, describe, expect, test } from 'bun:test';
+import type { Photo } from '../../../db/schema';
 import {
   createTestApp,
   type DataEnvelope,
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import type { Photo } from '../../../db/schema';
 
 let ctx: TestApp;
 
@@ -51,10 +51,25 @@ describe('GET /api/v1/photos?entityType= (batch list)', () => {
     expect(res.status).toBe(400);
   });
 
-  test('groups the session user\'s vehicle photos by entityId', async () => {
-    seedPhoto(ctx.sqlite, { id: 'p1', userId: ctx.user.id, entityType: 'vehicle', entityId: 'veh-1' });
-    seedPhoto(ctx.sqlite, { id: 'p2', userId: ctx.user.id, entityType: 'vehicle', entityId: 'veh-1' });
-    seedPhoto(ctx.sqlite, { id: 'p3', userId: ctx.user.id, entityType: 'vehicle', entityId: 'veh-2' });
+  test("groups the session user's vehicle photos by entityId", async () => {
+    seedPhoto(ctx.sqlite, {
+      id: 'p1',
+      userId: ctx.user.id,
+      entityType: 'vehicle',
+      entityId: 'veh-1',
+    });
+    seedPhoto(ctx.sqlite, {
+      id: 'p2',
+      userId: ctx.user.id,
+      entityType: 'vehicle',
+      entityId: 'veh-1',
+    });
+    seedPhoto(ctx.sqlite, {
+      id: 'p3',
+      userId: ctx.user.id,
+      entityType: 'vehicle',
+      entityId: 'veh-2',
+    });
 
     const res = await ctx.authed('GET', '/api/v1/photos?entityType=vehicle');
     expect(res.status).toBe(200);
@@ -65,12 +80,17 @@ describe('GET /api/v1/photos?entityType= (batch list)', () => {
     expect(body.data['veh-2']).toHaveLength(1);
   });
 
-  test('never returns another user\'s photos', async () => {
+  test("never returns another user's photos", async () => {
     // The harness seeds the session user; create a second user to own foreign photos.
     ctx.sqlite.run(
       `INSERT INTO users (id, email, display_name) VALUES ('other-user', 'other@test.com', 'Other')`
     );
-    seedPhoto(ctx.sqlite, { id: 'mine', userId: ctx.user.id, entityType: 'vehicle', entityId: 'veh-mine' });
+    seedPhoto(ctx.sqlite, {
+      id: 'mine',
+      userId: ctx.user.id,
+      entityType: 'vehicle',
+      entityId: 'veh-mine',
+    });
     seedPhoto(ctx.sqlite, {
       id: 'theirs',
       userId: 'other-user',
@@ -87,8 +107,18 @@ describe('GET /api/v1/photos?entityType= (batch list)', () => {
   });
 
   test('filters by entity type — expense photos excluded from a vehicle batch', async () => {
-    seedPhoto(ctx.sqlite, { id: 'veh', userId: ctx.user.id, entityType: 'vehicle', entityId: 'veh-1' });
-    seedPhoto(ctx.sqlite, { id: 'exp', userId: ctx.user.id, entityType: 'expense', entityId: 'exp-1' });
+    seedPhoto(ctx.sqlite, {
+      id: 'veh',
+      userId: ctx.user.id,
+      entityType: 'vehicle',
+      entityId: 'veh-1',
+    });
+    seedPhoto(ctx.sqlite, {
+      id: 'exp',
+      userId: ctx.user.id,
+      entityType: 'expense',
+      entityId: 'exp-1',
+    });
 
     const res = await ctx.authed('GET', '/api/v1/photos?entityType=vehicle');
     expect(res.status).toBe(200);

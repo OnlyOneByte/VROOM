@@ -21,8 +21,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import type { AppDatabase } from '../../../db/connection';
-import * as schema from '../../../db/schema';
 import type { NewExpense } from '../../../db/schema';
+import * as schema from '../../../db/schema';
 import { ExpenseRepository } from '../repository';
 
 let sqliteDb: Database;
@@ -137,7 +137,7 @@ describe('findPaginated sort', () => {
     expect(unique.size).toBe(30); // no overlap between pages, no gaps
   });
 
-  test('sort is user-scoped — never returns another user\'s rows', async () => {
+  test("sort is user-scoped — never returns another user's rows", async () => {
     await repo.create(input({ userId: USER_A, vehicleId: VEHICLE_A, expenseAmount: 100 }));
     await repo.create(input({ userId: USER_B, vehicleId: VEHICLE_B, expenseAmount: 999 }));
 

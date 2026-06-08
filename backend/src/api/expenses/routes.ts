@@ -340,7 +340,15 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   }
 
   const [rows, vehicles, prefs] = await Promise.all([
-    expenseRepository.findAll({ userId: user.id, vehicleId, category, startDate, endDate, search, tags }),
+    expenseRepository.findAll({
+      userId: user.id,
+      vehicleId,
+      category,
+      startDate,
+      endDate,
+      search,
+      tags,
+    }),
     vehicleRepository.findByUserId(user.id),
     // Read-only: an export must not create a preferences row as a side effect.
     preferencesRepository.getByUserId(user.id),

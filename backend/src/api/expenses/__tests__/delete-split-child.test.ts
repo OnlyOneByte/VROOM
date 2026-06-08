@@ -15,7 +15,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -35,7 +40,10 @@ interface SplitEnvelope {
   data: { siblings: Array<{ id: string; groupId: string; amount: number }>; groupId: string };
 }
 
-async function createEvenSplit(vehicleIds: string[], total: number): Promise<SplitEnvelope['data']> {
+async function createEvenSplit(
+  vehicleIds: string[],
+  total: number
+): Promise<SplitEnvelope['data']> {
   const res = await ctx.authed('POST', '/api/v1/expenses/split', {
     splitConfig: { method: 'even', vehicleIds },
     category: 'maintenance',

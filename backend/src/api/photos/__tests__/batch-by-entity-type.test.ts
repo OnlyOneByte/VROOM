@@ -71,13 +71,18 @@ function addPhoto(userId: string, entityType: string, entityId: string) {
 function groupByEntityId(photos: Photo[]): Record<string, Photo[]> {
   const grouped: Record<string, Photo[]> = {};
   for (const p of photos) {
-    (grouped[p.entityId] ??= []).push(p);
+    const bucket = grouped[p.entityId];
+    if (bucket) {
+      bucket.push(p);
+    } else {
+      grouped[p.entityId] = [p];
+    }
   }
   return grouped;
 }
 
 describe('batch photos by entity type', () => {
-  test('groups a user\'s vehicle photos by vehicleId', async () => {
+  test("groups a user's vehicle photos by vehicleId", async () => {
     await addPhoto(USER_A, 'vehicle', VEH_A1);
     await addPhoto(USER_A, 'vehicle', VEH_A1);
     await addPhoto(USER_A, 'vehicle', VEH_A2);
@@ -89,7 +94,7 @@ describe('batch photos by entity type', () => {
     expect(grouped[VEH_A2]).toHaveLength(1);
   });
 
-  test('never returns another user\'s photos', async () => {
+  test("never returns another user's photos", async () => {
     await addPhoto(USER_A, 'vehicle', VEH_A1);
     await addPhoto(USER_B, 'vehicle', VEH_B1);
 

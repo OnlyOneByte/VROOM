@@ -14,7 +14,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -40,7 +45,11 @@ function photoCount(entityType: string, entityId: string): number {
 }
 
 async function seedVehicle(): Promise<string> {
-  const res = await ctx.authed('POST', '/api/v1/vehicles', { make: 'Toyota', model: 'Camry', year: 2022 });
+  const res = await ctx.authed('POST', '/api/v1/vehicles', {
+    make: 'Toyota',
+    model: 'Camry',
+    year: 2022,
+  });
   const body = await json<DataEnvelope<{ id: string }>>(res);
   expect(res.status, JSON.stringify(body)).toBeLessThan(300);
   return body.data.id;
@@ -61,7 +70,7 @@ async function seedExpense(vehicleId: string): Promise<string> {
 }
 
 describe('vehicle deletion cascades photo cleanup to dependent entities', () => {
-  test('deleting a vehicle removes its expenses\' photo rows (no orphans)', async () => {
+  test("deleting a vehicle removes its expenses' photo rows (no orphans)", async () => {
     const vehicleId = await seedVehicle();
     const expenseId = await seedExpense(vehicleId);
 
@@ -97,7 +106,7 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
     ).toBe(0);
   });
 
-  test('deleting a vehicle removes its odometer entries\' photo rows (no orphans)', async () => {
+  test("deleting a vehicle removes its odometer entries' photo rows (no orphans)", async () => {
     const vehicleId = await seedVehicle();
 
     // Create an odometer entry for the vehicle (POST /api/v1/odometer/:vehicleId).

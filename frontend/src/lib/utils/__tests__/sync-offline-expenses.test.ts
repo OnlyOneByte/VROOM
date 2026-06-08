@@ -65,7 +65,7 @@ describe('syncOfflineExpenses', () => {
 		expect(mockFetch).toHaveBeenCalledTimes(2);
 		// Every POST body carries the idempotency key (so a retry can't duplicate).
 		for (const call of mockFetch.mock.calls) {
-			const body = JSON.parse((call[1] as RequestInit).body as string);
+			const body = JSON.parse((call[1] as { body?: string }).body as string);
 			expect(body.clientId).toMatch(/^cid-/);
 		}
 		// Queue fully drained on success.
@@ -110,7 +110,7 @@ describe('syncOfflineExpenses', () => {
 		expect(mockFetch).toHaveBeenCalledTimes(1);
 		const call = mockFetch.mock.calls[0];
 		expect(call).toBeDefined();
-		const body = JSON.parse((call![1] as RequestInit).body as string);
+		const body = JSON.parse((call![1] as { body?: string }).body as string);
 		expect(body.clientId).toBe('cid-ok');
 	});
 });

@@ -70,10 +70,15 @@ function expectDenied(res: Response, what: string): void {
 
 describe('cross-tenant authorization: user A cannot touch user B resources', () => {
   test("vehicle: A cannot GET/PUT/DELETE B's vehicle", async () => {
-    const vid = await idOf(await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 }));
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
 
     expectDenied(await ctx.authed('GET', `/api/v1/vehicles/${vid}`), 'GET vehicle');
-    expectDenied(await ctx.authed('PUT', `/api/v1/vehicles/${vid}`, { make: 'Hacked' }), 'PUT vehicle');
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/vehicles/${vid}`, { make: 'Hacked' }),
+      'PUT vehicle'
+    );
     expectDenied(await ctx.authed('DELETE', `/api/v1/vehicles/${vid}`), 'DELETE vehicle');
 
     // And the row is untouched: B still reads it with its real values.
@@ -84,7 +89,9 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
   });
 
   test("expense: A cannot GET/PUT/DELETE B's expense", async () => {
-    const vid = await idOf(await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 }));
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
     const eid = await idOf(
       await asB('POST', '/api/v1/expenses', {
         vehicleId: vid,
@@ -95,12 +102,17 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
 
     expectDenied(await ctx.authed('GET', `/api/v1/expenses/${eid}`), 'GET expense');
-    expectDenied(await ctx.authed('PUT', `/api/v1/expenses/${eid}`, { expenseAmount: 9999 }), 'PUT expense');
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/expenses/${eid}`, { expenseAmount: 9999 }),
+      'PUT expense'
+    );
     expectDenied(await ctx.authed('DELETE', `/api/v1/expenses/${eid}`), 'DELETE expense');
   });
 
   test("insurance: A cannot GET/PUT/DELETE B's policy, nor its claim", async () => {
-    const vid = await idOf(await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 }));
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
     const pid = await idOf(
       await asB('POST', '/api/v1/insurance', {
         company: 'B Mutual',
@@ -121,7 +133,10 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
 
     expectDenied(await ctx.authed('GET', `/api/v1/insurance/${pid}`), 'GET policy');
-    expectDenied(await ctx.authed('PUT', `/api/v1/insurance/${pid}`, { company: 'Hacked' }), 'PUT policy');
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/insurance/${pid}`, { company: 'Hacked' }),
+      'PUT policy'
+    );
     expectDenied(await ctx.authed('DELETE', `/api/v1/insurance/${pid}`), 'DELETE policy');
     // Claims are nested under the (unowned) policy.
     expectDenied(await ctx.authed('GET', `/api/v1/insurance/${pid}/claims`), 'GET claims');
@@ -136,7 +151,9 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
   });
 
   test("financing: A cannot DELETE/PATCH B's financing", async () => {
-    const vid = await idOf(await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 }));
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
     const fid = await idOf(
       await asB('POST', `/api/v1/financing/vehicles/${vid}/financing`, {
         financingType: 'loan',
@@ -157,7 +174,9 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
   });
 
   test("odometer: A cannot GET/PUT/DELETE B's odometer entry", async () => {
-    const vid = await idOf(await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 }));
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
     const oid = await idOf(
       await asB('POST', `/api/v1/odometer/${vid}`, {
         odometer: 31000,
@@ -166,14 +185,19 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     );
 
     expectDenied(await ctx.authed('GET', `/api/v1/odometer/entry/${oid}`), 'GET odometer entry');
-    expectDenied(await ctx.authed('PUT', `/api/v1/odometer/${oid}`, { odometer: 1 }), 'PUT odometer');
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/odometer/${oid}`, { odometer: 1 }),
+      'PUT odometer'
+    );
     expectDenied(await ctx.authed('DELETE', `/api/v1/odometer/${oid}`), 'DELETE odometer');
     // The vehicle-scoped list for B's vehicle is also denied to A.
     expectDenied(await ctx.authed('GET', `/api/v1/odometer/${vid}`), 'GET odometer list');
   });
 
   test("reminder: A cannot GET/PUT/DELETE B's reminder", async () => {
-    const vid = await idOf(await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 }));
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
     // The reminder create envelope is { data: { reminder, vehicleIds } } — the id
     // lives at data.reminder.id, NOT data.id (idOf would read undefined and the
     // test would pass for the wrong reason against /reminders/undefined).
@@ -190,13 +214,21 @@ describe('cross-tenant authorization: user A cannot touch user B resources', () 
     expect(rid, 'reminder id must be extracted from data.reminder.id').toBeTruthy();
 
     expectDenied(await ctx.authed('GET', `/api/v1/reminders/${rid}`), 'GET reminder');
-    expectDenied(await ctx.authed('PUT', `/api/v1/reminders/${rid}`, { isActive: false }), 'PUT reminder');
+    expectDenied(
+      await ctx.authed('PUT', `/api/v1/reminders/${rid}`, { isActive: false }),
+      'PUT reminder'
+    );
     expectDenied(await ctx.authed('DELETE', `/api/v1/reminders/${rid}`), 'DELETE reminder');
   });
 
   test("photo: A cannot list/upload to B's vehicle via the generic photo route", async () => {
-    const vid = await idOf(await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 }));
+    const vid = await idOf(
+      await asB('POST', '/api/v1/vehicles', { make: 'B', model: 'Car', year: 2022 })
+    );
     // A tries to read B's vehicle photos and to attach a photo to B's vehicle.
-    expectDenied(await ctx.authed('GET', `/api/v1/photos/vehicle/${vid}`), 'GET photos for B vehicle');
+    expectDenied(
+      await ctx.authed('GET', `/api/v1/photos/vehicle/${vid}`),
+      'GET photos for B vehicle'
+    );
   });
 });

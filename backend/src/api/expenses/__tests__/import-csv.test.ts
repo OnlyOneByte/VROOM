@@ -10,7 +10,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -119,7 +124,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(errors.every((e) => typeof e.message === 'string' && e.message.length > 0)).toBe(true);
   });
 
-  test('rejects a vehicle name NOT in the user\'s garage (no cross-tenant attachment)', async () => {
+  test("rejects a vehicle name NOT in the user's garage (no cross-tenant attachment)", async () => {
     await seedVehicle('Daily Driver');
     // "Someone Else's Car" is not in this user's fleet — the importer resolves
     // vehicles by name within findByUserId, so it can never attach to a vehicle
@@ -168,12 +173,16 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
 
   test('400 on an empty CSV (header only, no data rows)', async () => {
     await seedVehicle('Daily Driver');
-    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv: 'date,vehicle,category,amount' });
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', {
+      csv: 'date,vehicle,category,amount',
+    });
     expect(res.status).toBe(400);
   });
 
   test('400 when the user has no vehicles at all', async () => {
-    const csv = ['date,vehicle,category,amount', '2024-06-01T00:00:00.000Z,Whatever,misc,10'].join('\n');
+    const csv = ['date,vehicle,category,amount', '2024-06-01T00:00:00.000Z,Whatever,misc,10'].join(
+      '\n'
+    );
     const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
     expect(res.status).toBe(400);
   });

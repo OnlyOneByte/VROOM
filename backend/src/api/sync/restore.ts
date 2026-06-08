@@ -317,7 +317,9 @@ class RestoreService {
     if (data.insurance.length > 0) {
       await tx
         .insert(insurancePolicies)
-        .values(this.stampUserId(data.insurance, userId) as (typeof insurancePolicies.$inferInsert)[]);
+        .values(
+          this.stampUserId(data.insurance, userId) as (typeof insurancePolicies.$inferInsert)[]
+        );
     }
     // Insert insurance terms after policies (FK constraint)
     if (data.insuranceTerms?.length > 0) {
@@ -355,7 +357,10 @@ class RestoreService {
       await tx
         .insert(reminderNotifications)
         .values(
-          this.stampUserId(data.reminderNotifications, userId) as (typeof reminderNotifications.$inferInsert)[]
+          this.stampUserId(
+            data.reminderNotifications,
+            userId
+          ) as (typeof reminderNotifications.$inferInsert)[]
         );
     }
     if (data.expenses.length > 0) {
@@ -372,7 +377,9 @@ class RestoreService {
     if (data.userPreferences?.length > 0) {
       await tx
         .insert(userPreferences)
-        .values(this.stampUserId(data.userPreferences, userId) as (typeof userPreferences.$inferInsert)[]);
+        .values(
+          this.stampUserId(data.userPreferences, userId) as (typeof userPreferences.$inferInsert)[]
+        );
     }
     if (data.syncState?.length > 0) {
       await tx

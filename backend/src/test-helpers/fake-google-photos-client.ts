@@ -29,7 +29,10 @@ interface FaultRule {
   remaining: number;
 }
 
-export function photosApiError(code: number, message: string): Error & { code: number; status: number } {
+export function photosApiError(
+  code: number,
+  message: string
+): Error & { code: number; status: number } {
   const err = new Error(message) as Error & { code: number; status: number };
   err.code = code;
   err.status = code;

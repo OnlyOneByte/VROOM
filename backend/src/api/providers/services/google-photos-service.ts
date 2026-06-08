@@ -14,8 +14,8 @@
  * service logic with ZERO network, per .kiro/steering/TestingExternalAPIs.md.
  */
 
-import { google } from 'googleapis';
 import type { OAuth2Client } from 'google-auth-library';
+import { google } from 'googleapis';
 import { SyncError, SyncErrorCode } from '../../../errors';
 
 const PHOTOS_API = 'https://photoslibrary.googleapis.com';
@@ -137,7 +137,8 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
 
   async function accessToken(): Promise<string> {
     const { token } = await oauth2Client.getAccessToken();
-    if (!token) throw new SyncError(SyncErrorCode.AUTH_INVALID, 'Failed to obtain Google access token');
+    if (!token)
+      throw new SyncError(SyncErrorCode.AUTH_INVALID, 'Failed to obtain Google access token');
     return token;
   }
 
@@ -148,7 +149,9 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
     const res = await fetch(url, { ...init, headers });
     if (!res.ok) {
       throw new SyncError(
-        res.status === 401 || res.status === 403 ? SyncErrorCode.AUTH_INVALID : SyncErrorCode.NETWORK_ERROR,
+        res.status === 401 || res.status === 403
+          ? SyncErrorCode.AUTH_INVALID
+          : SyncErrorCode.NETWORK_ERROR,
         `Google Photos API ${res.status}: ${await res.text().catch(() => res.statusText)}`
       );
     }
@@ -170,7 +173,10 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
         body: new Uint8Array(buffer),
       });
       if (!res.ok) {
-        throw new SyncError(SyncErrorCode.NETWORK_ERROR, `Google Photos upload failed: ${res.status}`);
+        throw new SyncError(
+          SyncErrorCode.NETWORK_ERROR,
+          `Google Photos upload failed: ${res.status}`
+        );
       }
       return res.text(); // body IS the upload token
     },
@@ -181,9 +187,7 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           albumId,
-          newMediaItems: [
-            { description: fileName, simpleMediaItem: { fileName, uploadToken } },
-          ],
+          newMediaItems: [{ description: fileName, simpleMediaItem: { fileName, uploadToken } }],
         }),
       });
       const data = (await res.json()) as {
@@ -200,12 +204,16 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
     },
 
     async getMediaItem(mediaItemId) {
-      const res = await authedFetch(`${PHOTOS_API}/v1/mediaItems/${mediaItemId}`, { method: 'GET' });
+      const res = await authedFetch(`${PHOTOS_API}/v1/mediaItems/${mediaItemId}`, {
+        method: 'GET',
+      });
       return (await res.json()) as PhotosMediaItem;
     },
 
     async downloadMediaItem(mediaItemId) {
-      const res = await authedFetch(`${PHOTOS_API}/v1/mediaItems/${mediaItemId}`, { method: 'GET' });
+      const res = await authedFetch(`${PHOTOS_API}/v1/mediaItems/${mediaItemId}`, {
+        method: 'GET',
+      });
       const item = (await res.json()) as PhotosMediaItem;
       if (!item.baseUrl) {
         throw new SyncError(SyncErrorCode.NETWORK_ERROR, 'Media item has no baseUrl');
@@ -213,15 +221,21 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
       // `=d` returns the original bytes (download param).
       const bytes = await fetch(`${item.baseUrl}=d`);
       if (!bytes.ok) {
-        throw new SyncError(SyncErrorCode.NETWORK_ERROR, `Google Photos download failed: ${bytes.status}`);
+        throw new SyncError(
+          SyncErrorCode.NETWORK_ERROR,
+          `Google Photos download failed: ${bytes.status}`
+        );
       }
       return Buffer.from(await bytes.arrayBuffer());
     },
 
     async listAlbums() {
-      const res = await authedFetch(`${PHOTOS_API}/v1/albums?pageSize=50&excludeNonAppCreatedData=true`, {
-        method: 'GET',
-      });
+      const res = await authedFetch(
+        `${PHOTOS_API}/v1/albums?pageSize=50&excludeNonAppCreatedData=true`,
+        {
+          method: 'GET',
+        }
+      );
       const data = (await res.json()) as { albums?: PhotosAlbum[] };
       return data.albums ?? [];
     },

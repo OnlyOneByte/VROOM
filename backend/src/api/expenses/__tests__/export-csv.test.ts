@@ -9,7 +9,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -98,7 +103,13 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
     // Before cycle 186 the export ignored search, so a searched table + Export CSV
     // gave a BROADER file than the user was viewing. Now it matches.
     const vehicleId = await seedVehicle();
-    await createExpense(vehicleId, 'maintenance', 120, 'Jiffy Lube oil change', '2024-06-01T00:00:00.000Z');
+    await createExpense(
+      vehicleId,
+      'maintenance',
+      120,
+      'Jiffy Lube oil change',
+      '2024-06-01T00:00:00.000Z'
+    );
     await createExpense(vehicleId, 'fuel', 40, 'Shell top-up', '2024-06-02T00:00:00.000Z');
 
     const res = await ctx.authed('GET', '/api/v1/expenses/export?search=jiffy');

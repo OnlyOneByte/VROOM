@@ -5,8 +5,8 @@
  * `app.ts` (side-effect-free) so tests can drive it in-process.
  */
 
-import { app } from './app';
 import { startSyncWorker, stopSyncWorker } from './api/providers/sync-worker';
+import { app } from './app';
 import './api/sync/init';
 import { CONFIG } from './config';
 import { checkpointWAL, forceCheckpointWAL, runMigrations } from './db/connection';

@@ -102,9 +102,7 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
           totalPayments: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
         })
         .from(expenses)
-        .where(
-          and(eq(expenses.sourceType, 'financing'), inArray(expenses.sourceId, financingIds))
-        )
+        .where(and(eq(expenses.sourceType, 'financing'), inArray(expenses.sourceId, financingIds)))
         .groupBy(expenses.sourceId);
 
       const paymentsByFinancing = new Map<string, number>();
@@ -121,7 +119,10 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
 
       return balances;
     } catch (error) {
-      logger.error('Error batch-computing financing balances', { count: financingIds.length, error });
+      logger.error('Error batch-computing financing balances', {
+        count: financingIds.length,
+        error,
+      });
       throw new DatabaseError('Failed to compute financing balances', error);
     }
   }

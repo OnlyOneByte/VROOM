@@ -71,7 +71,10 @@ export function idOf(file: { id: string } | undefined | null): string {
 }
 
 /** A Gaxios-shaped error so service code that inspects `.code`/`.status` behaves as in prod. */
-export function googleApiError(code: number, message: string): Error & { code: number; status: number } {
+export function googleApiError(
+  code: number,
+  message: string
+): Error & { code: number; status: number } {
   const err = new Error(message) as Error & { code: number; status: number };
   err.code = code;
   err.status = code;
@@ -225,7 +228,9 @@ export function makeFakeDrive(store: FakeGoogleStore): drive_v3.Drive {
       const body = (params.requestBody ?? {}) as drive_v3.Schema$File;
       const media = params.media as { mimeType?: string; body?: unknown } | undefined;
       const content = media?.body ? await streamToBuffer(media.body) : Buffer.alloc(0);
-      const id = store.nextId(body.mimeType === 'application/vnd.google-apps.folder' ? 'folder' : 'file');
+      const id = store.nextId(
+        body.mimeType === 'application/vnd.google-apps.folder' ? 'folder' : 'file'
+      );
       const file: FakeFile = {
         id,
         name: body.name ?? 'untitled',
@@ -350,7 +355,10 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
     get(params: sheets_v4.Params$Resource$Spreadsheets$Get = {}) {
       store.maybeFail('spreadsheets.get');
       const ss = params.spreadsheetId ? store.spreadsheets.get(params.spreadsheetId) : undefined;
-      if (!ss) return Promise.reject(googleApiError(404, `Spreadsheet not found: ${params.spreadsheetId}`));
+      if (!ss)
+        return Promise.reject(
+          googleApiError(404, `Spreadsheet not found: ${params.spreadsheetId}`)
+        );
       return Promise.resolve({
         data: {
           spreadsheetId: params.spreadsheetId,
@@ -363,7 +371,10 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
     batchUpdate(params: sheets_v4.Params$Resource$Spreadsheets$Batchupdate = {}) {
       store.maybeFail('spreadsheets.batchUpdate');
       const ss = params.spreadsheetId ? store.spreadsheets.get(params.spreadsheetId) : undefined;
-      if (!ss) return Promise.reject(googleApiError(404, `Spreadsheet not found: ${params.spreadsheetId}`));
+      if (!ss)
+        return Promise.reject(
+          googleApiError(404, `Spreadsheet not found: ${params.spreadsheetId}`)
+        );
       const requests = (params.requestBody?.requests ?? []) as sheets_v4.Schema$Request[];
       for (const req of requests) {
         const title = req.addSheet?.properties?.title;
@@ -393,7 +404,8 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
       get(params: sheets_v4.Params$Resource$Spreadsheets$Values$Get = {}) {
         store.maybeFail('spreadsheets.values.get');
         const ss = params.spreadsheetId ? store.spreadsheets.get(params.spreadsheetId) : undefined;
-        const values = ss && params.range ? ss.values.get(sheetTitleFromRange(params.range)) : undefined;
+        const values =
+          ss && params.range ? ss.values.get(sheetTitleFromRange(params.range)) : undefined;
         return Promise.resolve({ data: { values: values ?? [] } });
       },
     },

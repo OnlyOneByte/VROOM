@@ -16,7 +16,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -50,9 +55,10 @@ async function createEntry(vehicleId: string, odometer: number, note?: string): 
 }
 
 function rowOdometer(id: string): { odometer: number; note: string | null } {
-  return ctx.sqlite
-    .query('SELECT odometer, note FROM odometer_entries WHERE id = ?')
-    .get(id) as { odometer: number; note: string | null };
+  return ctx.sqlite.query('SELECT odometer, note FROM odometer_entries WHERE id = ?').get(id) as {
+    odometer: number;
+    note: string | null;
+  };
 }
 
 describe('odometer PUT /:id (update contract)', () => {

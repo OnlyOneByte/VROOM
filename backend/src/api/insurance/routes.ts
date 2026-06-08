@@ -5,9 +5,9 @@ import { changeTracker, requireAuth } from '../../middleware';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
-import { createTermExpenses, updateTermExpenses } from './hooks';
 import { insuranceClaimRepository } from './claims-repository';
 import { createClaimSchema, updateClaimSchema } from './claims-validation';
+import { createTermExpenses, updateTermExpenses } from './hooks';
 import { insurancePolicyRepository } from './repository';
 import {
   addTermSchema,
@@ -53,9 +53,7 @@ routes.get('/expiring-soon', async (c) => {
   const daysAhead = Number.parseInt(c.req.query('days') || '30', 10);
   // Bound the result set so a user with many terms can't trigger an unbounded scan.
   const requestedLimit = Number.parseInt(c.req.query('limit') || '100', 10);
-  const limit = Number.isFinite(requestedLimit)
-    ? Math.min(Math.max(requestedLimit, 1), 200)
-    : 100;
+  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 200) : 100;
   const now = new Date();
   const endDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
   const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate, user.id, limit);

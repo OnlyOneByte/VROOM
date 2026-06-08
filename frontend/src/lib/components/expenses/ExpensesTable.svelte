@@ -266,7 +266,7 @@
 		// standalone rows; in controlled mode it re-imposes the server's chosen order
 		// onto the grouped view (consistent, since both use the same field+direction).
 		rows.sort((a, b) => {
-			let comparison = 0;
+			let comparison: number;
 			if (sortBy === 'amount') {
 				const amtA = a.type === 'standalone' ? a.expense.amount : a.totalAmount;
 				const amtB = b.type === 'standalone' ? b.expense.amount : b.totalAmount;

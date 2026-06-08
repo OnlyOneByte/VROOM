@@ -11,13 +11,13 @@
 
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { backupService } from '../../sync/backup';
-import type { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
+import type { BackupStrategyContext } from '../../sync/backup-strategy';
 import {
   GoogleDriveStrategy,
   type GoogleDriveStrategyDeps,
 } from '../backup-strategies/google-drive-strategy';
+import type { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
 import type { GoogleSheetsService } from '../services/google-sheets-service';
-import type { BackupStrategyContext } from '../../sync/backup-strategy';
 
 let mockUpload: ReturnType<typeof mock>;
 let mockCreateOrUpdate: ReturnType<typeof mock>;

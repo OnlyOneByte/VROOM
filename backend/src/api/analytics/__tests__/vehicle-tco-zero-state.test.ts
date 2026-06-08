@@ -16,7 +16,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -100,7 +105,10 @@ describe('vehicle TCO money math — zero/empty denominators stay finite', () =>
   test('a future purchaseDate does not produce a negative or non-finite cost-per-month', async () => {
     // A typo / pre-registration: purchaseDate in the future would make a naive
     // month-diff negative. The Math.max(1, …) clamp must keep costPerMonth sane.
-    const vehicleId = await seedVehicle({ purchaseDate: '2099-01-01T00:00:00.000Z', purchasePrice: 30000 });
+    const vehicleId = await seedVehicle({
+      purchaseDate: '2099-01-01T00:00:00.000Z',
+      purchasePrice: 30000,
+    });
     const tco = await getTCO(vehicleId);
 
     expectAllFinite(tco);

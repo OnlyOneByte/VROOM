@@ -44,7 +44,12 @@ async function seedVehicle(): Promise<string> {
   return body.data.id;
 }
 
-async function createExpense(vehicleId: string, amount: number, isoDate: string, category = 'misc') {
+async function createExpense(
+  vehicleId: string,
+  amount: number,
+  isoDate: string,
+  category = 'misc'
+) {
   const res = await ctx.authed('POST', '/api/v1/expenses', {
     vehicleId,
     category,

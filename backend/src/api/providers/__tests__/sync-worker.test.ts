@@ -3,10 +3,10 @@ import type { Photo, PhotoRef } from '../../../db/schema';
 import type { StorageRef } from '../domains/storage/storage-provider';
 import {
   processBatch,
+  type SyncWorkerDeps,
   shouldSkipDueToBackoff,
   startSyncWorker,
   stopSyncWorker,
-  type SyncWorkerDeps,
 } from '../sync-worker';
 
 // --- Collaborators are INJECTED, not mock.module'd ---

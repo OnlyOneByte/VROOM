@@ -66,11 +66,7 @@ export interface TestApp {
   /** `Cookie` header value carrying a valid Lucia session for `user`. */
   cookie: string;
   /** Issue an authenticated request (attaches the session cookie + JSON body). */
-  authed: (
-    method: string,
-    path: string,
-    body?: unknown
-  ) => Promise<Response>;
+  authed: (method: string, path: string, body?: unknown) => Promise<Response>;
   /** Issue an UNauthenticated request (no cookie) — for 401 assertions. */
   anon: (method: string, path: string, body?: unknown) => Promise<Response>;
   /** Close the in-memory DB. */
@@ -88,9 +84,7 @@ let migrated = false;
  * and a valid session. Data is reset on every call, so tests are isolated even
  * though the underlying DB/module singletons are shared for the process.
  */
-export async function createTestApp(
-  seedUser: Partial<TestUser> = {}
-): Promise<TestApp> {
+export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<TestApp> {
   // 1) Point the (not-yet-imported) DB singleton at the in-memory DB and force a
   //    non-production env BEFORE any DB-bound module is imported.
   process.env.NODE_ENV = 'test';
@@ -172,7 +166,9 @@ export async function createTestApp(
  */
 function resetAllTables(sqlite: import('bun:sqlite').Database): void {
   const rows = sqlite
-    .query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '__drizzle_migrations'")
+    .query(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '__drizzle_migrations'"
+    )
     .all() as { name: string }[];
   sqlite.run('PRAGMA foreign_keys = OFF');
   for (const { name } of rows) {

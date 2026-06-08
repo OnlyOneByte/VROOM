@@ -285,7 +285,10 @@ export class GoogleSheetsService {
     // Query insurance claims for user's policies
     const userInsuranceClaims =
       policyIds.length > 0
-        ? await db.select().from(insuranceClaims).where(inArray(insuranceClaims.policyId, policyIds))
+        ? await db
+            .select()
+            .from(insuranceClaims)
+            .where(inArray(insuranceClaims.policyId, policyIds))
         : [];
 
     // Query photos directly by userId

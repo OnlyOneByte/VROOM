@@ -20,13 +20,13 @@
  * registry maps, resolved to its exported variable name.
  */
 
+import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, test } from 'bun:test';
 import { getTableName } from 'drizzle-orm';
-import * as schema from '../../../db/schema';
 import { TABLE_SCHEMA_MAP } from '../../../config';
+import * as schema from '../../../db/schema';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RESTORE_SRC = readFileSync(join(HERE, '..', 'restore.ts'), 'utf-8');

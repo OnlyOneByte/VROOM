@@ -8,10 +8,15 @@
  */
 
 import { beforeEach, describe, expect, test } from 'bun:test';
-import type { StorageRef } from '../domains/storage/storage-provider';
+import {
+  FakeGoogleStore,
+  googleApiError,
+  idOf,
+  makeFakeDrive,
+} from '../../../test-helpers/fake-google-clients';
 import { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
+import type { StorageRef } from '../domains/storage/storage-provider';
 import { GoogleDriveService } from '../services/google-drive-service';
-import { FakeGoogleStore, googleApiError, idOf, makeFakeDrive } from '../../../test-helpers/fake-google-clients';
 
 let store: FakeGoogleStore;
 let provider: GoogleDriveProvider;

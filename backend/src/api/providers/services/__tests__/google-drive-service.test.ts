@@ -12,8 +12,12 @@
  */
 
 import { beforeEach, describe, expect, test } from 'bun:test';
+import {
+  FakeGoogleStore,
+  googleApiError,
+  makeFakeDrive,
+} from '../../../../test-helpers/fake-google-clients';
 import { GoogleDriveService } from '../google-drive-service';
-import { FakeGoogleStore, googleApiError, makeFakeDrive } from '../../../../test-helpers/fake-google-clients';
 
 let store: FakeGoogleStore;
 let svc: GoogleDriveService;
@@ -129,9 +133,9 @@ describe('GoogleDriveService — permissions', () => {
 describe('GoogleDriveService — error/resilience paths', () => {
   test('upload surfaces a 429 rate-limit error from the API', async () => {
     store.injectFault('files.create', googleApiError(429, 'Rate limit exceeded'));
-    await expect(
-      svc.uploadFile('x.zip', Buffer.from('x'), 'application/zip')
-    ).rejects.toThrow('Rate limit exceeded');
+    await expect(svc.uploadFile('x.zip', Buffer.from('x'), 'application/zip')).rejects.toThrow(
+      'Rate limit exceeded'
+    );
   });
 
   test('a 401 (expired token) on list propagates so callers can react', async () => {

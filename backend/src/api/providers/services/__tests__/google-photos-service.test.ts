@@ -8,12 +8,12 @@
  */
 
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { GooglePhotosService, VROOM_ALBUM_TITLE } from '../google-photos-service';
 import {
   FakePhotosStore,
   makeFakePhotosClient,
   photosApiError,
 } from '../../../../test-helpers/fake-google-photos-client';
+import { GooglePhotosService, VROOM_ALBUM_TITLE } from '../google-photos-service';
 
 let store: FakePhotosStore;
 let svc: GooglePhotosService;
@@ -99,7 +99,9 @@ describe('GooglePhotosService — error/resilience paths', () => {
 
   test('fault is consumed once — the next upload succeeds', async () => {
     store.injectFault('uploadBytes', photosApiError(429, 'slow down'), 1);
-    await expect(svc.uploadImage(Buffer.from('x'), 'image/jpeg', 'a.jpg')).rejects.toThrow('slow down');
+    await expect(svc.uploadImage(Buffer.from('x'), 'image/jpeg', 'a.jpg')).rejects.toThrow(
+      'slow down'
+    );
     const ok = await svc.uploadImage(Buffer.from('y'), 'image/jpeg', 'b.jpg');
     expect(ok.id).toBeTruthy();
   });

@@ -65,95 +65,139 @@ export class CsvImportError extends Error {}
 // same bounds the POST route enforces.
 const EXP = CONFIG.validation.expense;
 
-/**
- * Coerce + validate ONE raw CSV record (string-valued cells) into an
- * ImportableExpense, or return a human-readable error message. `date`, `category`,
- * and `amount` are required; everything else is optional and tolerant of the
- * blank cells the exporter writes for non-fuel rows.
- */
-function parseRow(
-  record: Record<string, string>,
-  vehicleByName: Map<string, string>
-): { expense: ImportableExpense } | { error: string } {
+type CellGetter = (key: string) => string;
+
+/** A cell reader that denormalizes formula-injection neutralization as it reads. */
+function makeCellGetter(record: Record<string, string>): CellGetter {
   // denormalizeCsvCell undoes the leading-' that the EXPORT adds to neutralize
   // formula-injection cells (CWE-1236), so a VROOM CSV round-trips faithfully: an
   // expense described `=SUM(...)` exports as `'=SUM(...)` and re-imports as
   // `=SUM(...)`, not `'=SUM(...)`. It only strips `'`+trigger, so a genuinely
   // apostrophe-led value (`'24 road trip`) is untouched. Applied to EVERY cell as
   // it's read — the symmetric inverse of how the export neutralizes every cell.
-  const get = (k: string) => denormalizeCsvCell((record[k] ?? '').trim());
+  return (k: string) => denormalizeCsvCell((record[k] ?? '').trim());
+}
 
-  // --- vehicle: match by name within the user's OWN fleet (never a file id) ---
-  const vehicleName = get('vehicle');
-  if (!vehicleName) return { error: 'Missing vehicle' };
-  const vehicleId = vehicleByName.get(vehicleName.toLowerCase());
-  if (!vehicleId) {
-    return { error: `No vehicle named "${vehicleName}" in your garage` };
+/** Required positive money amount within the configured max. */
+function parseAmount(raw: string): { value: number } | { error: string } {
+  const amount = Number(raw);
+  if (!raw || !Number.isFinite(amount) || amount <= 0) {
+    return { error: `Invalid amount "${raw}"` };
   }
+  if (amount > EXP.maxAmount) return { error: `Amount exceeds the ${EXP.maxAmount} maximum` };
+  return { value: amount };
+}
 
-  // --- category ---
-  const category = get('category').toLowerCase();
+/** Optional non-negative integer mileage (blank → null). */
+function parseMileage(raw: string): { value: number | null } | { error: string } {
+  if (!raw) return { value: null };
+  const m = Number(raw);
+  if (!Number.isInteger(m) || m < 0) return { error: `Invalid mileage "${raw}"` };
+  return { value: m };
+}
+
+/** Optional positive volume (blank → null). */
+function parseVolume(raw: string): { value: number | null } | { error: string } {
+  if (!raw) return { value: null };
+  const v = Number(raw);
+  if (!Number.isFinite(v) || v <= 0) return { error: `Invalid volume "${raw}"` };
+  return { value: v };
+}
+
+/** Required, known expense category (case-insensitive). */
+function parseCategory(
+  raw: string
+): { value: (typeof EXPENSE_CATEGORIES)[number] } | { error: string } {
+  const category = raw.toLowerCase();
   if (!EXPENSE_CATEGORIES.includes(category as (typeof EXPENSE_CATEGORIES)[number])) {
-    return { error: `Unknown category "${get('category')}"` };
+    return { error: `Unknown category "${raw}"` };
   }
+  return { value: category as (typeof EXPENSE_CATEGORIES)[number] };
+}
 
-  // --- amount ---
-  const amountRaw = get('amount');
-  const amount = Number(amountRaw);
-  if (!amountRaw || !Number.isFinite(amount) || amount <= 0) {
-    return { error: `Invalid amount "${amountRaw}"` };
-  }
-  if (amount > EXP.maxAmount) {
-    return { error: `Amount exceeds the ${EXP.maxAmount} maximum` };
-  }
+/** Required Date-parseable timestamp (ISO from our export, but any parseable string is fine). */
+function parseDate(raw: string): { value: Date } | { error: string } {
+  const date = new Date(raw);
+  if (!raw || Number.isNaN(date.getTime())) return { error: `Invalid date "${raw}"` };
+  return { value: date };
+}
 
-  // --- date (ISO from our export, but accept any Date-parseable string) ---
-  const dateRaw = get('date');
-  const date = new Date(dateRaw);
-  if (!dateRaw || Number.isNaN(date.getTime())) {
-    return { error: `Invalid date "${dateRaw}"` };
+/** Optional free-text bounded by maxLength (blank → null). */
+function parseBoundedString(
+  raw: string,
+  maxLength: number,
+  label: string
+): { value: string | null } | { error: string } {
+  const value = raw || null;
+  if (value && value.length > maxLength) {
+    return { error: `${label} exceeds ${maxLength} characters` };
   }
+  return { value };
+}
 
-  // --- optional numerics ---
-  let mileage: number | null = null;
-  const mileageRaw = get('mileage');
-  if (mileageRaw) {
-    const m = Number(mileageRaw);
-    if (!Number.isInteger(m) || m < 0) return { error: `Invalid mileage "${mileageRaw}"` };
-    mileage = m;
-  }
-
-  let volume: number | null = null;
-  const volumeRaw = get('volume');
-  if (volumeRaw) {
-    const v = Number(volumeRaw);
-    if (!Number.isFinite(v) || v <= 0) return { error: `Invalid volume "${volumeRaw}"` };
-    volume = v;
-  }
-
-  const fuelType = get('fuelType') || null;
-  if (fuelType && fuelType.length > EXP.fuelTypeMaxLength) {
-    return { error: `Fuel type exceeds ${EXP.fuelTypeMaxLength} characters` };
-  }
-
-  const description = get('description') || null;
-  if (description && description.length > EXP.descriptionMaxLength) {
-    return { error: `Description exceeds ${EXP.descriptionMaxLength} characters` };
-  }
-
-  // Tags: the export joins with "; ". Accept that plus a plain comma.
-  const tagsRaw = get('tags');
-  const tags = tagsRaw
-    ? tagsRaw
+/** Optional tag list (";" or "," separated), bounded by count + per-tag length. */
+function parseTags(raw: string): { value: string[] } | { error: string } {
+  const tags = raw
+    ? raw
         .split(/[;,]/)
         .map((t) => t.trim())
         .filter(Boolean)
     : [];
   if (tags.length > EXP.maxTags) return { error: `More than ${EXP.maxTags} tags` };
   for (const t of tags) {
-    if (t.length > EXP.tagMaxLength) return { error: `Tag "${t}" exceeds ${EXP.tagMaxLength} chars` };
+    if (t.length > EXP.tagMaxLength)
+      return { error: `Tag "${t}" exceeds ${EXP.tagMaxLength} chars` };
   }
+  return { value: tags };
+}
 
+/**
+ * Coerce + validate ONE raw CSV record (string-valued cells) into an
+ * ImportableExpense, or return a human-readable error message. `date`, `category`,
+ * and `amount` are required; everything else is optional and tolerant of the
+ * blank cells the exporter writes for non-fuel rows. Per-field parsing is delegated
+ * to the small helpers above to keep this orchestration flat.
+ */
+function parseRow(
+  record: Record<string, string>,
+  vehicleByName: Map<string, string>
+): { expense: ImportableExpense } | { error: string } {
+  const get = makeCellGetter(record);
+
+  // --- vehicle: match by name within the user's OWN fleet (never a file id) ---
+  const vehicleName = get('vehicle');
+  if (!vehicleName) return { error: 'Missing vehicle' };
+  const vehicleId = vehicleByName.get(vehicleName.toLowerCase());
+  if (!vehicleId) return { error: `No vehicle named "${vehicleName}" in your garage` };
+
+  // Each field is parsed by a small helper that returns {value} or {error}; bail on
+  // the first error so the body stays a flat sequence.
+  const categoryResult = parseCategory(get('category'));
+  if ('error' in categoryResult) return categoryResult;
+  const amountResult = parseAmount(get('amount'));
+  if ('error' in amountResult) return amountResult;
+  const dateResult = parseDate(get('date'));
+  if ('error' in dateResult) return dateResult;
+  const mileageResult = parseMileage(get('mileage'));
+  if ('error' in mileageResult) return mileageResult;
+  const volumeResult = parseVolume(get('volume'));
+  if ('error' in volumeResult) return volumeResult;
+  const fuelTypeResult = parseBoundedString(get('fuelType'), EXP.fuelTypeMaxLength, 'Fuel type');
+  if ('error' in fuelTypeResult) return fuelTypeResult;
+  const descriptionResult = parseBoundedString(
+    get('description'),
+    EXP.descriptionMaxLength,
+    'Description'
+  );
+  if ('error' in descriptionResult) return descriptionResult;
+  // Tags: the export joins with "; ". Accept that plus a plain comma.
+  const tagsResult = parseTags(get('tags'));
+  if ('error' in tagsResult) return tagsResult;
+
+  const category = categoryResult.value;
+  const mileage = mileageResult.value;
+  const volume = volumeResult.value;
+  const fuelType = fuelTypeResult.value;
   const missedFillup = /^(true|1|yes)$/i.test(get('missedFillup'));
 
   // Fuel rows need volume + mileage (the create route enforces the same; mirror it
@@ -169,14 +213,14 @@ function parseRow(
   return {
     expense: {
       vehicleId,
-      category: category as (typeof EXPENSE_CATEGORIES)[number],
-      expenseAmount: amount,
-      date,
+      category,
+      expenseAmount: amountResult.value,
+      date: dateResult.value,
       mileage,
       volume,
       fuelType,
-      description,
-      tags,
+      description: descriptionResult.value,
+      tags: tagsResult.value,
       missedFillup,
     },
   };

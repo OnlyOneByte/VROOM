@@ -10,7 +10,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -46,7 +51,9 @@ interface PolicyRow {
 }
 
 /** Seed a policy with one fully-populated term; return policy + term ids. */
-async function seedPolicyWithTerm(vehicleId: string): Promise<{ policyId: string; termId: string }> {
+async function seedPolicyWithTerm(
+  vehicleId: string
+): Promise<{ policyId: string; termId: string }> {
   const res = await ctx.authed('POST', '/api/v1/insurance', {
     company: 'Acme Mutual',
     terms: [
