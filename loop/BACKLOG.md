@@ -13,25 +13,59 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
 | **deep-review** | 5 | Eyes-on UI sweeps + backend correctness audits of already-shipped work. |
 | **guard** | 6 | Merge-surviving regression prevention (committed tests, source-scans). |
 | **bug** | 3 | A concrete defect found in review or reported. Always jump the queue when real. |
+| **arch** | 5 | **Behavior-preserving** structural improvement: dedup, extract shared helpers, tighten layer boundaries, kill dead code, simplify, cut complexity. NOT new behavior (that's `feature`), NOT defect fixes (that's `bug`). |
 | **infra** | 6 | Loop tooling, harness, CI, docs that keep the machine running. |
 
-`bug` has the tightest budget on purpose: a known defect should never sit.
+`bug` has the tightest budget on purpose: a known defect should never sit. `arch` at 5
+keeps structural improvement firing regularly — it compounds in value, and the per-cycle
+size cap (rule 1) keeps each increment small enough that frequent picks stay safe.
+
+### `arch` rules (READ before any arch increment — refactors are the highest-risk work here)
+1. **One coherent refactor per cycle, small.** A single rename / extract / merge / delete
+   with a clear before→after. Never a sweeping multi-file rewrite. If it can't be ONE
+   reviewable commit, it's too big — split it, or escalate per rule 6.
+2. **Behavior-preserving, full stop.** No observable change to API, UI, or stored data. If
+   you *want* to change behavior, it's a `bug` or `feature`, not `arch`.
+3. **Test-anchored both ways (green → green).** The touched code must already have tests
+   that pass BEFORE and pass UNCHANGED AFTER. If coverage is missing, the increment is to
+   ADD the characterization test FIRST (that cycle counts as `arch`/`guard`), THEN refactor
+   next cycle against the safety net.
+4. **Verify the full gate** every time: tsc 0 · musl biome clean · `bun test` green ·
+   `bun run build`. For any UI-touching refactor also run `regress.sh` + an eyes-on
+   screenshot and diff before/after — a refactor must not move a pixel.
+5. **No churn-for-churn.** Never reformat / re-order / rename for taste alone. Every arch
+   item must name a concrete payoff: removes duplication, deletes dead code, unblocks a
+   queued feature, drops a complexity score under the Biome max, or collapses N sources of
+   truth into one.
+6. **Big restructures need sign-off.** A cross-cutting change (new layer, dependency-flow
+   inversion, schema/money-type migration, framework/lib swap) is a DIRECTION call: write a
+   short `.kiro/specs/<refactor>/design.md`, `send_message` Angelo, and move on — never
+   self-authorize a structural change of that size.
+7. **Audits use fan-out.** To FIND arch work, spawn 2–3 parallel Explore agents (e.g.
+   backend layer-boundary + duplication; frontend component/store duplication; dead-code +
+   cyclomatic-complexity hotspots). Triage their findings into the `arch` queue below.
+   Finding ≠ doing: file them, then execute only the single top item this cycle.
 
 ---
 
 ## Ranked queue (top = next)
 
 ### feature
-1. **Maintenance-schedule reminders** — spec DRAFTED C4 (`.kiro/specs/maintenance-schedule/`,
-   requirements+design+tasks). **BLOCKED on Angelo's D1–D6 sign-off** (flagged via send_message
-   C4). Once ratified, build is backend-first per tasks.md T1–T9. *(highest user value; reuses the
-   reminders + odometer engines; adds a mileage trigger axis + canonical current-odometer helper.)*
-2. **Import from other trackers** — spec DRAFTED C9 (`.kiro/specs/import-trackers/`). **BLOCKED on
-   Angelo's D1–D5 sign-off** (flagged C9). Design: a server-side mapping pre-pass → VROOM-native CSV
-   → the UNCHANGED hardened import pipeline (inherits cycle-8 idempotency/atomicity + formula/tenant
-   safety). Backward-compatible route extension. Build per tasks.md T1–T6 once ratified.
+1. **Maintenance-schedule reminders** — spec APPROVED (Angelo signed off D1–D6, cycle 12). **BUILD
+   GO**, backend-first per `.kiro/specs/maintenance-schedule/tasks.md` T1→T9 (migration → current-
+   odometer helper → whichever-comes-first due logic → routes/validation + mark-serviced → Sheets-
+   header coverage → frontend → e2e). Highest user value; reuses the reminders + odometer engines.
+2. **Import from other trackers** — spec APPROVED (Angelo signed off D1–D5, cycle 12). **BUILD GO**,
+   backend-first per `.kiro/specs/import-trackers/tasks.md` T1→T6. Server-side mapping pre-pass →
+   VROOM-native CSV → the UNCHANGED hardened import pipeline (inherits cycle-8 idempotency/atomicity
+   + formula/tenant safety). Backward-compatible route extension.
 3. **Recurring expenses** beyond reminders — first-class recurring (insurance premium, loan
    payment, parking pass) with frequency + dashboard surfacing.
+
+> NOTE (cycle 12): both feature builds are large, MULTI-TASK efforts — one tasks.md task per loop
+> cycle, not one-and-done. They no longer gate the loop; pull T1 of the higher-value
+> maintenance-schedule next time `feature` is the balance pick. Also new: standing TODO Misc goal —
+> raise test coverage to 90% (frontend ~59% / backend ~74% today); fold into bug/guard/arch cycles.
 
 ### deep-review
 1. **Eyes-on sweep: vehicle Overview tab + ExpensesTable populated states** (mobile +
@@ -87,6 +121,53 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
   per-vehicle max-min; pinned by a two-vehicle regression test.*
 - ~~**Month-trend dates parsed midnight-UTC**~~ — *DONE C6: routed vehicle-detail + dashboard
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
+
+### arch
+*(NEW category. Three concrete items seeded below from a quick grounding scan — verify each
+against current source before acting, then knock out the top one. Once these are done (or to
+go broader), run the AUDIT fan-out per rule 7 to repopulate. Obey the `arch` rules above —
+behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
+
+1. **Dedup ownership-validation: one source of truth.** `validateEntityOwnership` in
+   `backend/src/api/photos/helpers.ts` carries a PRIVATE `validateExpenseOwnership` copy and
+   re-inlines vehicle / insurance-policy / insurance-claim ownership checks that already exist
+   as exported helpers in `backend/src/utils/validation.ts` (`validateVehicleOwnership`,
+   `validateExpenseOwnership`, `validateInsuranceOwnership`). Two ownership-check
+   implementations that can DRIFT is a security-adjacent smell (one could be fixed and the
+   other not). Refactor: route the photos `entityType` switch through the shared validators
+   (keep the direct-`photos.user_id` `validatePhotoOwnership` as-is — it's a genuinely
+   different check on an existing-photo row). Behavior-preserving: same `NotFoundError`
+   per branch. **Test-anchor first**: the cross-tenant IDOR HTTP suite already exercises
+   photo-upload ownership — confirm it covers all four entityTypes; add the missing
+   characterization cases BEFORE refactoring if not. (highest value: dedup + safety)
+2. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
+   `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,
+   while `expenses` and `providers` (1 each) lean on the shared Hono error middleware
+   (`backend/src/middleware/`) + typed errors (`NotFoundError`/`ValidationError`/…). The
+   hand-rolled blocks are boilerplate that can diverge from the canonical error envelope.
+   Refactor ONE route file per cycle (start with `sync`): drop the try/catch, throw the typed
+   error, let the middleware shape the response. Behavior-preserving: assert identical status
+   + body via the route's HTTP test (add coverage first if a handler is untested). (consistency)
+3. **Extract the frontend page load-state pattern.** ~14 `+page.svelte` files repeat the same
+   `isLoading` / `loadError` / `try → fetch → catch → toast + set error` triad (dashboard,
+   expenses, reminders, insurance, analytics, vehicles/[id], settings, profile, …) — the exact
+   class the `bug` queue keeps re-finding per page (load-failure-masquerades-as-empty-state).
+   Extract a shared helper/runes pattern (e.g. a `createLoadState<T>()` or a small
+   `<LoadBoundary>` snippet wrapping loading/error/retry) and migrate ONE page per cycle onto
+   it. Behavior-preserving per page; prove with that route's smoke + an eyes-on screenshot
+   (no pixel moves). Bonus: structurally prevents the masquerade bug class. (dedup + bug-class
+   prevention; do AFTER bug #1 fixes vehicle-detail so the helper reflects the correct shape)
+
+Seed audit angles for the rule-7 fan-out (once the above are done, or to go broader):
+- **Backend layering** — route handlers doing repository/business logic inline; missing or
+  leaky service layer; raw Drizzle queries outside repositories; cross-domain imports.
+- **Duplication** — copy-pasted logic that should be one shared helper (the recurring win
+  here: `buildExpenseConditions`, `validMilesBetween`, `parseMonthToDate`, `SHEET_HEADERS`
+  were all "N copies → one source of truth" — find the next one).
+- **Frontend** — near-duplicate components/stores; bespoke widgets that should compose from
+  the kit; repeated fetch/error/loading boilerplate that wants a shared pattern.
+- **Dead code & complexity** — unreferenced exports/files, `noExcessiveCognitiveComplexity`
+  hotspots near the Biome ceiling, deeply-nested conditionals worth flattening.
 
 ### infra
 *(queue empty — repopulate as loop tooling / docs needs surface.)*

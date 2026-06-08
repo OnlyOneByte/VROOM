@@ -13,9 +13,14 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 7 |
 | guard | 6 | 6 |
 | bug | 3 | 11 |
+| arch | 5 | 11 |
 | infra | 6 | 5 |
 
 Current cycle: **11**
+
+> `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
+> ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
+> the top one (dedup ownership-validation). Run the rule-7 audit fan-out once those clear.
 
 ## Cycle log
 - **C1 (infra)** — Bootstrapped the `loop/` scaffold the loop format depends on:

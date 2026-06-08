@@ -1,9 +1,9 @@
 # Maintenance-Schedule Reminders — Requirements
 
-> **Status: DRAFT — needs Angelo's sign-off on the open product decisions (D1–D6) before
-> any build.** This spec was drafted by the autonomous loop (cycle 4). It is grounded in
-> the existing reminders engine (`.kiro/specs/reminders-recurring-expenses/`) and the
-> odometer/unit model — see `design.md` for the file-level grounding. Nothing here is built.
+> **Status: APPROVED (Angelo signed off cycle 12) — D1–D6 all ratified at the ✅ recommended
+> option ("looks good to me. You can do it"). Build is UNBLOCKED; proceed per `tasks.md`.**
+> Drafted by the autonomous loop (cycle 4), grounded in the existing reminders engine
+> (`.kiro/specs/reminders-recurring-expenses/`) and the odometer/unit model — see `design.md`.
 
 ## Problem
 

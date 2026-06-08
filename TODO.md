@@ -283,6 +283,12 @@ a bare checkbox.
 
 
 ## Small Features, Bugs, UI, Misc
+- [ ] **GOAL: raise test coverage to 90% (backend + frontend).** Current badges: **frontend ~59%**,
+  **backend ~74%**. Drive both to **≥90%** line/branch coverage. Approach: target the
+  lowest-covered, highest-risk modules first (money/unit/date math, the import/backup/restore
+  data-safety paths, store/state logic) rather than chasing trivial getters. Prefer the existing
+  test seams — backend HTTP harness + property tests, frontend vitest + the meshclaw e2e harness.
+  Treat this as a standing background goal: most cycles should leave coverage flat-or-up, never down.
 - [x] **Tag suggestions from the user's previous tags (cycle 143)** — closes the long-standing
   in-code TODO (`ExpenseForm.svelte`: "Tag suggestions will be populated from user's previous tags").
   The tag input dropdown used to offer only the static `COMMON_EXPENSE_TAGS`; it now also surfaces the

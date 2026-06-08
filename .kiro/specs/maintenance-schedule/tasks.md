@@ -1,12 +1,12 @@
 # Maintenance-Schedule Reminders — Tasks
 
-> **BLOCKED: do not start until requirements D1–D6 are signed off by Angelo.** Ordering follows
-> CLAUDE.md (backend-first). Each task is one loop increment; verify (`bun run validate` /
+> **UNBLOCKED: Angelo signed off D1–D6 (all ✅ recommended) cycle 12 — build is GO.** Ordering
+> follows CLAUDE.md (backend-first). Each task is one loop increment; verify (`bun run validate` /
 > `npm run type-check && build` / regress.sh + screenshot) before ticking.
 
 ## Phase 0 — sign-off (this gates everything)
-- [ ] **T0** Angelo ratifies D1–D6 in `requirements.md` (or chooses alternatives). Update design
-      sections marked `[depends on Dx]` to match before any code.
+- [x] **T0** Angelo ratified D1–D6 at the ✅ recommended option for each (cycle 12). Design
+      `[depends on Dx]` sections already assume those options, so no reconciliation needed; build T1+.
 
 ## Phase 1 — backend foundation
 - [ ] **T1** Migration: add `triggerMode` (default 'time'), `intervalMileage`, `lastServiceOdometer`,

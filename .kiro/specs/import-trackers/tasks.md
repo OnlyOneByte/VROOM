@@ -1,12 +1,12 @@
 # Import from Other Trackers — Tasks
 
-> **BLOCKED: do not start until requirements D1–D5 are signed off.** Backend-first per CLAUDE.md.
-> Each task is one loop increment; verify before ticking. The whole feature is additive — the native
-> CSV-import path stays the default when no `mapping` is sent, so nothing here risks existing import.
+> **UNBLOCKED: Angelo signed off D1–D5 (all ✅ recommended) cycle 12 — build is GO.** Backend-first
+> per CLAUDE.md. Each task is one loop increment; verify before ticking. The whole feature is additive
+> — the native CSV-import path stays the default when no `mapping` is sent, so nothing here risks it.
 
 ## Phase 0 — sign-off (gates everything)
-- [ ] **T0** Angelo ratifies D1–D5 (units, category map, date formats, no-vehicle-column, preset set)
-      or chooses alternatives. Reconcile design `[depends on Dx]` sections before any code.
+- [x] **T0** Angelo ratified D1–D5 at the ✅ recommended option for each (cycle 12). Design
+      `[depends on Dx]` sections already assume those options; build T1+.
 
 ## Phase 1 — backend mapping core (pure, no I/O)
 - [ ] **T1** `import-mapping.ts`: `ColumnMapping` type + `applyMapping(foreignCsv, mapping)` →

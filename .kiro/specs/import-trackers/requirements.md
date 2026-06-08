@@ -1,9 +1,9 @@
 # Import from Other Trackers — Requirements
 
-> **Status: DRAFT — needs Angelo's sign-off on the open product decisions (D1–D5) before build.**
-> Drafted by the autonomous loop (cycle 9). It builds directly on the **already-hardened** VROOM
-> CSV-import path (cycles 190–192 + the cycle-8 idempotency/atomicity hardening). Nothing here is
-> built. Grounding (file:line) is in `design.md`.
+> **Status: APPROVED (Angelo signed off cycle 12) — D1–D5 all ratified at the ✅ recommended
+> option ("looks good to me. You can do it"). Build is UNBLOCKED; proceed per `tasks.md`.**
+> Drafted by the autonomous loop (cycle 9); builds directly on the **already-hardened** VROOM
+> CSV-import path (cycles 190–192 + the cycle-8 idempotency/atomicity hardening). Grounding in `design.md`.
 
 ## Problem
 

@@ -27,6 +27,12 @@ desktop is for review and analytics.
    do a thing (e.g. `ConfirmDialog`, `formatCurrency`).
 5. **Regression-proof under autonomous dev.** When a bug class is fixed, leave a
    merge-surviving guard (committed test / source-scan) so it can't silently return.
+6. **Architecturally clean.** Code stays readable and maintainable as it grows: one way to
+   do a thing, shared helpers over copy-paste, clear layer boundaries (route → service →
+   repository on the backend; component → store/state → service on the frontend), small
+   focused units, no dead code. Structural improvement is **continuous**, not a one-time
+   cleanup — but it is always **behavior-preserving** and **test-anchored** (see the `arch`
+   category's rules in BACKLOG.md).
 
 ## Non-negotiable guardrails (from CLAUDE.md)
 - Work only in this repo; branch `claude-loop-dev` off latest `origin/main`. **Never** commit/push to `main`; never force-push; human approves every merge.
