@@ -37,6 +37,7 @@ import {
   computeMpgAndCostPerMile,
   computePreviousYearComparison,
   computeRegularityScore,
+  effectiveMonthlyPremium,
   type FuelEfficiencyPoint,
   type FuelExpenseRow,
   type FuelRow,
@@ -890,7 +891,9 @@ export class AnalyticsRepository {
       })[0];
       if (!latestTerm) continue;
 
-      const monthlyPremium = latestTerm.monthlyCost ?? 0;
+      // Honour both cost shapes: an explicit monthlyCost, or a lump-sum totalCost amortized
+      // across the term span (bug #8 — `monthlyCost ?? 0` zeroed every totalCost-only term).
+      const monthlyPremium = effectiveMonthlyPremium(latestTerm);
       const annualPremium = monthlyPremium * 12;
       const coveredVehicleIds = [
         ...new Set(

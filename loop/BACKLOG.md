@@ -123,10 +123,6 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    real on a negative-offset host. Verify deploy TZ first, then bucket on UTC. (correctness, low-med)
 
 *(surfaced by the C14 deep review — financing/insurance analytics + vehicle-detail eyes-on)*
-8. **Insurance shows $0 when only `totalCost` (not `monthlyCost`) is set** — `getInsurance`/
-   `buildInsuranceDetails` (`repository.ts:~892`) does `monthlyCost ?? 0`; `totalCost` is selected
-   (`:1638`) but never used. A "6-month premium = $1,200" term (totalCost set, monthlyCost null)
-   contributes $0 to every premium total/trend. Fall back to `totalCost / monthsInTerm`. (data, med-high)
 9. **`interestPaidYtd` is mislabeled** — `repository.ts:761` computes ONE month's interest on the
    CURRENT balance, then sums it as `interestPaidYtd` (`:1589`). Neither YTD nor "paid". Rename to
    `monthlyInterestEstimate` (smallest honest fix) or compute true YTD from payment history. (med)
@@ -153,6 +149,9 @@ positives, debunked in LEDGER C21; these two are the real ones)*
     `intervalUnit` silently no-ops (nextDue never advances → re-processed until maxCatchUp truncates).
     Zod blocks bad values at the route, so this is defense-in-depth only. Add
     `default: throw new ValidationError(...)`. (robustness, low)
+- ~~**Insurance shows $0 when only `totalCost` is set**~~ — *DONE C23 (bug #8): extracted exported
+  `effectiveMonthlyPremium(term)` (monthlyCost wins, else totalCost / monthKeysInRange span);
+  wired into buildInsuranceDetails:893 single choke point; 7 unit tests.*
 - ~~**Insurance premium trend skips a month for day-29–31 term starts**~~ — *DONE C14: extracted
   day-1-anchored `monthKeysInRange` helper, routed accumulateMonthlyPremiums through it; 5 unit tests.*
 - ~~**buildMonthlyConsumption shows OLDEST 12 months**~~ — *DONE C11: slice(0,12)→slice(-12) in

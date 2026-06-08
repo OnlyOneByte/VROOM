@@ -12,11 +12,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 22 |
 | deep-review | 5 | 21 |
 | guard | 6 | 20 |
-| bug | 3 | 14 |
+| bug | 3 | 23 |
 | arch | 5 | 18 |
 | infra | 6 | 19 |
 
-Current cycle: **22**
+Current cycle: **23**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -406,3 +406,29 @@ Current cycle: **22**
   permutations. Then T3 part 3 (routes: mark-serviced re-arm + Zod refinements + recheck-on-write +
   the deferred vehicle-stats reconcile). Watch `bug` (cyc 14, starved-for 8 >> 3) — it's the most
   starved; a queued bug (#8 insurance $0, #11 mobile wrap) can jump in if trigger work stalls.
+- **C23 (bug — insurance $0 for totalCost-only terms, #8)** — BALANCE OVERRIDE: `bug` was
+  starved-for 9 (cyc 23 − last-touched 14) vs budget 3 — the only over-budget category, exactly the
+  watch item C22 flagged. Rule 2 is mandatory, so T3 part 2 waits one cycle and I took the
+  highest-leverage standalone bug. (Bug #12 is explicitly "fold into T3" — doing it standalone now
+  then again in T3 is churn, so it stays deferred.) THE BUG (#8, data, med-high): `buildInsuranceDetails`
+  (`analytics/repository.ts:893`) computed `const monthlyPremium = latestTerm.monthlyCost ?? 0`. A
+  term entered as a lump sum (totalCost set, monthlyCost null — e.g. "6-month policy = $1,200") then
+  contributes **$0** to every premium total, per-vehicle detail, carrier total, and the monthly trend.
+  totalCost was SELECTed (:1637) but never consumed. FIX: extracted an exported pure helper
+  `effectiveMonthlyPremium(term)` to analytics-charts.ts — monthlyCost wins when set (incl. an
+  explicit 0); else amortize totalCost across the term span via `monthKeysInRange(start,end).length`
+  (the C14 day-1-anchored helper, so a day-29–31 start doesn't skip a month); 0 when neither cost nor
+  a resolvable span exists. Wired into :893 as the single choke point — `buildInsuranceVehicleEntries`
+  already takes `monthlyPremium` as a param and `accumulateMonthlyPremiums` reuses it, so the one-line
+  swap propagates to per-vehicle/carrier/trend/totals with no other edits. Pinned by
+  `effective-monthly-premium.test.ts` (7 cases: precedence, monthlyCost=0 honoured, totalCost
+  amortization, day-31 no-skip, single-month, neither-set, null-span div-by-zero guard). Verified:
+  tsc 0 · musl-biome clean · 905 pass/0 fail (+7, up from 898) · build bundled. No existing test
+  pinned the old `?? 0` behavior (analytics+insurance suites green unchanged).
+  Next cycle (24): back to `feature` (starved-for 2, but T3 is mid-build) → maintenance-schedule
+  **T3 part 2**: trigger-service whichever-comes-first (OR-in mileage via getCurrentOdometer ≥
+  nextDueOdometer; emit a mileage notification with null dueDate + dueOdometer, app-level dedup on
+  the C22 partial index), FOLD IN bug #12 (endDate-in-fastForward, same function). Unit tests for all
+  due/not-due permutations. `bug` is now freshly serviced (cyc 23); `arch` is next-most-starved
+  (cyc 18, starved-for 6 > 5) and will breach soon — its top item (converge `sync` route error
+  handling on the central middleware) is a candidate if T3 part 2 stalls.

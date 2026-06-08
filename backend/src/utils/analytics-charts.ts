@@ -154,6 +154,33 @@ export function monthKeysInRange(start: Date | null, end: Date | null): string[]
   return keys;
 }
 
+/**
+ * Effective monthly premium for an insurance term.
+ *
+ * A term may record its cost either as a recurring `monthlyCost` OR as a lump-sum `totalCost`
+ * (e.g. a "6-month policy = $1,200" entered as totalCost=1200, monthlyCost=null). The premium
+ * math must honour both: using `monthlyCost ?? 0` silently contributes $0 for every totalCost-only
+ * term, zeroing its premium total and trend (bug #8).
+ *
+ * Precedence: an explicit `monthlyCost` wins. Otherwise amortize `totalCost` across the term's
+ * span — `monthsInTerm = monthKeysInRange(start, end).length` (day-1 anchored, inclusive of both
+ * endpoint months, matching how the premium trend buckets). Returns 0 when neither cost is set or
+ * the term has no resolvable span to amortize across.
+ */
+export function effectiveMonthlyPremium(term: {
+  startDate: Date | null;
+  endDate: Date | null;
+  monthlyCost: number | null;
+  totalCost: number | null;
+}): number {
+  if (term.monthlyCost != null) return term.monthlyCost;
+  if (term.totalCost == null) return 0;
+
+  const monthsInTerm = monthKeysInRange(term.startDate, term.endDate).length;
+  if (monthsInTerm === 0) return 0;
+  return term.totalCost / monthsInTerm;
+}
+
 /** Normalize a date field that may be a Date or timestamp (Unix seconds). */
 function normalizeDate(d: Date | number | null): Date | null {
   if (d == null) return null;
