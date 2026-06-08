@@ -4,11 +4,10 @@
 	import { Clock, ArrowRight } from '@lucide/svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import { formatCurrency, formatRelativeTime } from '$lib/utils/formatters';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import { categoryLabels, getCategoryColor, getCategoryIcon } from '$lib/utils/expense-helpers';
 	import type { ExpenseCategory } from '$lib/types';
 
 	interface RecentExpense {
@@ -26,15 +25,6 @@
 	}
 
 	let { expenses, isLoading = false }: Props = $props();
-
-	const categoryColors: Record<ExpenseCategory, string> = {
-		fuel: 'bg-chart-1/10 text-chart-1',
-		maintenance: 'bg-chart-5/10 text-chart-5',
-		financial: 'bg-chart-2/10 text-chart-2',
-		regulatory: 'bg-chart-4/10 text-chart-4',
-		enhancement: 'bg-chart-3/10 text-chart-3',
-		misc: 'bg-muted text-muted-foreground'
-	};
 </script>
 
 <Card.Root>
@@ -59,14 +49,26 @@
 		{:else if expenses.length > 0}
 			<div class="space-y-3">
 				{#each expenses as expense (expense.id)}
+					{@const CategoryIcon = getCategoryIcon(expense.category)}
 					<div
 						class="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
 					>
 						<div class="flex-1 min-w-0">
 							<div class="flex items-center gap-2 mb-1">
-								<Badge variant="secondary" class="{categoryColors[expense.category]} text-xs">
-									{categoryLabels[expense.category]}
-								</Badge>
+								<!-- Category as a colored icon chip + NEUTRAL label text. Coloring the
+								     label text itself (text-chart-N on a same-hue 10% tint) failed WCAG AA
+								     contrast — e.g. chart-2 #009689 on #e5f5f3 is only 3.26:1, and the
+								     lighter chart-4/5 tints fail worse. The color lives on the icon
+								     (graphical, exempt) so the category affordance survives at AA. Mirrors
+								     the canonical category row in ExpensesTable. -->
+								<span
+									class="flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium {getCategoryColor(
+										expense.category
+									)}"
+								>
+									<CategoryIcon class="h-3 w-3" />
+									<span class="text-foreground">{categoryLabels[expense.category]}</span>
+								</span>
 								<span class="text-sm font-medium truncate">{expense.vehicleName}</span>
 							</div>
 							{#if expense.description}

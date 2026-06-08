@@ -7,6 +7,7 @@
  */
 
 import { and, eq } from 'drizzle-orm';
+import { CONFIG } from '../../../../config';
 import { getDb } from '../../../../db/connection';
 import type { UserProvider } from '../../../../db/schema';
 import { userPreferences, userProviders } from '../../../../db/schema';
@@ -15,7 +16,9 @@ import type { PhotoCategory, StorageConfig } from '../../../../types';
 import { DEFAULT_STORAGE_CONFIG } from '../../../../types';
 import { decrypt } from '../../../../utils/encryption';
 import { joinStoragePath } from '../../../../utils/paths';
+import { FakeStorageProvider } from './fake-provider';
 import { GoogleDriveProvider } from './google-drive-provider';
+import { GooglePhotosProvider } from './google-photos-provider';
 import { S3CompatProvider } from './s3-compat-provider';
 import type { StorageProvider } from './storage-provider';
 
@@ -167,6 +170,15 @@ export class StorageProviderRegistry {
    * Decrypts credentials and switches on providerType.
    */
   createProviderInstance(row: UserProvider): StorageProvider {
+    // Fake provider carries no real credentials; short-circuit before decrypt.
+    // Double-gated: only outside production AND only when explicitly opted in.
+    if (row.providerType === 'fake') {
+      if (!CONFIG.allowFakeStorageProvider) {
+        throw new ValidationError('Fake storage provider is not enabled in this environment');
+      }
+      return new FakeStorageProvider();
+    }
+
     const decrypted = decrypt(row.credentials);
     const credentials = JSON.parse(decrypted) as Record<string, unknown>;
 
@@ -177,6 +189,17 @@ export class StorageProviderRegistry {
           throw new ValidationError('Invalid Google Drive credentials: missing refreshToken');
         }
         return new GoogleDriveProvider(refreshToken);
+      }
+      case 'google-photos': {
+        const refreshToken = credentials.refreshToken;
+        if (typeof refreshToken !== 'string') {
+          throw new ValidationError('Invalid Google Photos credentials: missing refreshToken');
+        }
+        // Reuse the cached VROOM album id from config (set on first upload) to skip
+        // the resolve-or-create round-trip.
+        const cfg = row.config as Record<string, unknown> | null;
+        const albumId = typeof cfg?.albumId === 'string' ? cfg.albumId : undefined;
+        return new GooglePhotosProvider(refreshToken, undefined, albumId);
       }
       case 's3': {
         const accessKeyId = credentials.accessKeyId;

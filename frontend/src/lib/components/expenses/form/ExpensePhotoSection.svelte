@@ -3,6 +3,7 @@
 	import { Upload, Trash2, ImagePlus, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import MediaCaptureDialog from '$lib/components/common/MediaCaptureDialog.svelte';
+	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
 	import { expenseApi } from '$lib/services/expense-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import type { Photo } from '$lib/types';
@@ -38,12 +39,26 @@
 		photos = [...photos, result as Photo];
 	}
 
-	async function handleDelete(photoId: string) {
+	// Styled confirm dialog (replaces native confirm()) — deletion is permanent
+	// (removes the file from storage too) and the trash button sits on a hover
+	// overlay where a misclick is easy.
+	let confirmOpen = $state(false);
+	let pendingDeleteId = $state<string | null>(null);
+
+	function requestDelete(photoId: string) {
+		pendingDeleteId = photoId;
+		confirmOpen = true;
+	}
+
+	async function performDelete() {
+		if (!pendingDeleteId) return;
+		const photoId = pendingDeleteId;
 		try {
 			await expenseApi.deletePhoto(entityType, entityId, photoId);
 			photos = photos.filter(p => p.id !== photoId);
 		} catch (err) {
 			handleErrorWithNotification(err, 'Failed to delete photo');
+			throw err; // keep the dialog open on failure
 		}
 	}
 </script>
@@ -100,7 +115,7 @@
 							variant="destructive"
 							size="sm"
 							class="h-7 text-xs"
-							onclick={() => handleDelete(photo.id)}
+							onclick={() => requestDelete(photo.id)}
 						>
 							<Trash2 class="h-3 w-3" />
 						</Button>
@@ -119,4 +134,11 @@
 	onUpload={file => expenseApi.uploadPhoto(entityType, entityId, file)}
 	onUploadComplete={handleUploadComplete}
 	onClose={() => (showUploadDialog = false)}
+/>
+
+<ConfirmDialog
+	bind:open={confirmOpen}
+	title="Delete photo?"
+	description="This permanently removes the photo from storage and cannot be undone."
+	onConfirm={performDelete}
 />

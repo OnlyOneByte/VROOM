@@ -20,7 +20,8 @@
 		LoaderCircle,
 		GitBranch,
 		Shield,
-		CreditCard
+		CreditCard,
+		Copy
 	} from '@lucide/svelte';
 	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
@@ -39,8 +40,10 @@
 	import { validateExpenseField } from './expense-form-validation';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import { formatCurrency, dateOnlyToISO } from '$lib/utils/formatters';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import { extractUniqueTags } from '$lib/utils/expense-filters';
+	import { COMMON_EXPENSE_TAGS } from '$lib/types';
 	import type {
 		ExpenseCategory,
 		ExpenseFormErrors,
@@ -58,6 +61,8 @@
 		preselectedCategory?: string | null;
 		preselectedFinancingId?: string | null;
 		preselectedAmount?: string | null;
+		preselectedDescription?: string | null;
+		preselectedTags?: string | null;
 	}
 
 	let {
@@ -66,7 +71,9 @@
 		preselectedVehicleId = null,
 		preselectedCategory = null,
 		preselectedFinancingId = null,
-		preselectedAmount = null
+		preselectedAmount = null,
+		preselectedDescription = null,
+		preselectedTags = null
 	}: Props = $props();
 
 	// Determine if we're in edit mode
@@ -132,6 +139,17 @@
 
 	let parsedTotalAmount = $derived(parseFloat(formData.amount) || 0);
 
+	// Tag suggestions: the static common tags PLUS the user's own previously-used
+	// tags (derived from the already-loaded vehicle expenses — no extra fetch).
+	// Common tags stay first (preserving the existing dropdown order); historical
+	// tags not already in the common list are appended. Closes the long-standing
+	// "populate from the user's previous tags" TODO.
+	let tagSuggestions = $derived.by(() => {
+		const historical = extractUniqueTags(allVehicleExpenses);
+		const commonSet = new Set<string>(COMMON_EXPENSE_TAGS);
+		return [...COMMON_EXPENSE_TAGS, ...historical.filter(t => !commonSet.has(t))];
+	});
+
 	// Get user settings for units
 	let settings = $derived(settingsStore.settings);
 	let volumeUnit = $derived(settings?.unitPreferences?.volumeUnit || 'gallons_us');
@@ -142,8 +160,6 @@
 	// Resolve distance label from vehicle unitPreferences, falling back to global settings
 	let effectiveDistanceUnit = $derived(vehicle?.unitPreferences?.distanceUnit ?? distanceUnit);
 	let distLabel = $derived(getDistanceUnitLabel(effectiveDistanceUnit, false));
-
-	// Tag suggestions will be populated from user's previous tags in the future
 
 	onMount(async () => {
 		await settingsStore.load();
@@ -161,6 +177,20 @@
 			if (preselectedAmount) {
 				formData.amount = preselectedAmount;
 			}
+			if (preselectedDescription) {
+				formData.description = preselectedDescription;
+			}
+			if (preselectedTags) {
+				// Comma-separated list from "Duplicate expense"; trim + drop blanks,
+				// honor the same 10-tag cap the TagInput enforces.
+				formData.tags = preselectedTags
+					.split(',')
+					.map(t => t.trim())
+					.filter(Boolean)
+					.slice(0, 10);
+			}
+			// Note: date deliberately stays today's date — a duplicate is a NEW
+			// occurrence of a recurring expense, not a copy of the original's date.
 		}
 
 		if (formData.vehicleId) {
@@ -452,18 +482,9 @@
 		isSubmitting = true;
 
 		try {
-			// Convert date string to ISO format at noon local time to avoid timezone issues
-			let dateISO: string;
-			if (formData.date) {
-				const parts = formData.date.split('-').map(Number);
-				const year = parts[0] ?? 0;
-				const month = parts[1] ?? 1;
-				const day = parts[2] ?? 1;
-				const localDate = new Date(year, month - 1, day, 12, 0, 0);
-				dateISO = localDate.toISOString();
-			} else {
-				dateISO = new Date().toISOString();
-			}
+			// Convert date string to ISO at noon local time to avoid timezone day-shift
+			// (see dateOnlyToISO). Shared with VehicleForm/odometer so all forms agree.
+			const dateISO = dateOnlyToISO(formData.date);
 
 			const expenseData = {
 				vehicleId: formData.vehicleId,
@@ -621,8 +642,11 @@
 		isDeleting = true;
 
 		try {
-			// For insurance-managed expenses, delete the parent group (cascades children)
-			if (isInsuranceManaged && groupId) {
+			// Any expense with a groupId is part of a split (insurance-managed or a
+			// user split): delete the parent group so every sibling goes. Deleting just
+			// expenseId would orphan the other vehicles' portions into a broken split —
+			// and the dialog above promises the whole split is removed.
+			if (groupId) {
 				await expenseApi.deleteSplitExpense(groupId);
 			} else {
 				await expenseApi.deleteExpense(expenseId);
@@ -647,6 +671,26 @@
 
 	function handleBack() {
 		gotoDynamic(returnTo);
+	}
+
+	// Whether this expense can be duplicated. Split groups and insurance-managed
+	// expenses are owned by other flows (the split editor / the policy term), so
+	// duplicating them as a plain single expense would be misleading — gate them out.
+	let canDuplicate = $derived(isEditMode && !isGroupEditMode && !isInsuranceManaged);
+
+	// Deep-link to a fresh expense form with the recurring fields pre-filled
+	// (vehicle / category / amount / description / tags). Date is intentionally
+	// omitted so the new entry defaults to today — a duplicate is the NEXT
+	// occurrence of a recurring expense (parking, tolls, registration), not a
+	// byte copy. Fuel/mileage fields are omitted too: those are reading-specific.
+	function handleDuplicate() {
+		const query: Record<string, string> = { returnTo };
+		if (formData.vehicleId) query['vehicleId'] = formData.vehicleId;
+		if (formData.category) query['category'] = formData.category;
+		if (formData.amount) query['amount'] = formData.amount;
+		if (formData.description) query['description'] = formData.description;
+		if (formData.tags.length > 0) query['tags'] = formData.tags.join(',');
+		gotoWithQuery(resolve(routes.expenseNew), query);
 	}
 
 	async function uploadPendingPhotos(entityId: string): Promise<void> {
@@ -746,7 +790,11 @@
 		<div class="space-y-6">
 			<!-- Header -->
 			<div class="flex items-center gap-4">
-				<button onclick={() => gotoDynamic(returnTo)} class="p-2 hover:bg-muted rounded-lg">
+				<button
+						aria-label="Go back"
+						onclick={() => gotoDynamic(returnTo)}
+						class="p-2 hover:bg-muted rounded-lg"
+					>
 					<ArrowLeft class="h-5 w-5" />
 				</button>
 				<div>
@@ -851,7 +899,11 @@
 		<div class="space-y-6 pb-32 sm:pb-24">
 			<!-- Header -->
 			<div class="flex items-center gap-4">
-				<button onclick={() => gotoDynamic(returnTo)} class="p-2 hover:bg-muted rounded-lg">
+				<button
+						aria-label="Go back"
+						onclick={() => gotoDynamic(returnTo)}
+						class="p-2 hover:bg-muted rounded-lg"
+					>
 					<ArrowLeft class="h-5 w-5" />
 				</button>
 
@@ -1185,7 +1237,12 @@
 				</div>
 
 				<!-- Tags -->
-				<TagInput bind:tags={formData.tags} error={errors['tags']} touched={touched['tags']} />
+				<TagInput
+					bind:tags={formData.tags}
+					error={errors['tags']}
+					touched={touched['tags']}
+					suggestions={tagSuggestions}
+				/>
 
 				<!-- Photos & Receipts -->
 				{#if isGroupEditMode && groupId && originalExpense}
@@ -1218,6 +1275,20 @@
 						>
 							<Trash2 class="h-5 w-5 sm:mr-2" />
 							<span class="hidden sm:inline font-semibold">Delete</span>
+						</Button>
+					{/if}
+
+					{#if canDuplicate}
+						<Button
+							type="button"
+							variant="outline"
+							onclick={handleDuplicate}
+							disabled={isSubmitting || isDeleting}
+							class="sm:rounded-full rounded-full shadow-lg transition-all duration-300 sm:hover:scale-105 h-14 sm:h-14 px-5 border-0 flex-shrink-0"
+							aria-label="Duplicate this expense"
+						>
+							<Copy class="h-5 w-5 sm:mr-2" />
+							<span class="hidden sm:inline font-semibold">Duplicate</span>
 						</Button>
 					{/if}
 
@@ -1260,6 +1331,9 @@
 					{#if isInsuranceManaged && groupId}
 						This will delete the insurance expense group and all its child expenses. This action
 						cannot be undone.
+					{:else if isGroupEditMode && groupId}
+						This is a split expense shared across multiple vehicles. Deleting it removes the entire
+						split — every vehicle's portion — not just one. This action cannot be undone.
 					{:else}
 						Are you sure you want to delete this expense? This action cannot be undone.
 					{/if}
@@ -1277,7 +1351,7 @@
 								{originalExpense.description || originalExpense.tags?.join(', ') || 'Expense'}
 							</p>
 							<p class="text-sm text-muted-foreground">
-								${originalExpense.amount.toFixed(2)} on {new Date(
+								{formatCurrency(originalExpense.amount)} on {new Date(
 									originalExpense.date
 								).toLocaleDateString()}
 							</p>

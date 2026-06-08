@@ -226,3 +226,68 @@ describe('Property 6: Financing payoff eligibility flag', () => {
     expect(balance <= 0.01).toBe(false);
   });
 });
+
+// ===========================================================================
+// Batch balance computation (computeBalances) — must match per-record computeBalance
+// ===========================================================================
+describe('computeBalances (batch) equivalence', () => {
+  test('batch result matches per-record computeBalance for many records', async () => {
+    // vehicle_financing has a UNIQUE(vehicle_id) constraint (one financing per
+    // vehicle), so each financing record needs its own vehicle.
+    let vehicleCounter = 0;
+    const newVehicle = (): string => {
+      const vid = `v-batch-${++vehicleCounter}`;
+      sqliteDb.run(
+        `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('${vid}', '${USER_ID}', 'Honda', 'Civic', 2021)`
+      );
+      return vid;
+    };
+    const finOn = (originalAmount: number, vehicleId: string): string => {
+      const id = `fin-batch-${++financingCounter}`;
+      sqliteDb.run(
+        `INSERT INTO vehicle_financing (id, vehicle_id, financing_type, provider, original_amount, term_months, start_date, payment_amount, is_active)
+         VALUES ('${id}', '${vehicleId}', 'loan', 'TestBank', ${originalAmount}, 60, ${Math.floor(Date.now() / 1000)}, 500, 1)`
+      );
+      return id;
+    };
+    const payOn = (amount: number, financingId: string, vehicleId: string): void => {
+      sqliteDb.run(
+        `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, source_type, source_id)
+         VALUES ('exp-fpb-${++expenseCounter}', '${vehicleId}', '${USER_ID}', 'financial', ${Math.floor(Date.now() / 1000)}, ${amount}, 'financing', '${financingId}')`
+      );
+    };
+
+    // Three financing records (distinct vehicles) with distinct payment profiles.
+    const vA = newVehicle();
+    const finA = finOn(10000, vA);
+    payOn(2500, finA, vA);
+    payOn(2500, finA, vA);
+    const vB = newVehicle();
+    const finB = finOn(5000, vB);
+    payOn(5000, finB, vB); // fully paid → clamps to 0
+    const vC = newVehicle();
+    const finC = finOn(8000, vC); // no payments
+    createNonFinancingExpense(999); // must not affect any balance
+
+    const expectedA = await repo.computeBalance(finA);
+    const expectedB = await repo.computeBalance(finB);
+    const expectedC = await repo.computeBalance(finC);
+
+    const batch = await repo.computeBalances([finA, finB, finC]);
+    expect(batch.get(finA)).toBe(expectedA);
+    expect(batch.get(finB)).toBe(expectedB);
+    expect(batch.get(finC)).toBe(expectedC);
+    expect(batch.get(finB)).toBe(0);
+    expect(batch.get(finC)).toBe(8000);
+  });
+
+  test('empty input returns an empty map', async () => {
+    const batch = await repo.computeBalances([]);
+    expect(batch.size).toBe(0);
+  });
+
+  test('non-existent financing id is omitted from the map', async () => {
+    const batch = await repo.computeBalances(['non-existent-id']);
+    expect(batch.has('non-existent-id')).toBe(false);
+  });
+});

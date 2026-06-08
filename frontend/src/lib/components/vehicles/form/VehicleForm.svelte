@@ -44,6 +44,7 @@
 	import FinancingFormSection from './FinancingFormSection.svelte';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { getLongFormLabel } from '$lib/utils/units';
+	import { dateOnlyToISO } from '$lib/utils/formatters';
 	import type {
 		Vehicle,
 		VehicleFinancing,
@@ -85,6 +86,23 @@
 	let distanceUnit = $state<DistanceUnit>(settingsStore.unitPreferences.distanceUnit);
 	let volumeUnit = $state<VolumeUnit>(settingsStore.unitPreferences.volumeUnit);
 	let chargeUnit = $state<ChargeUnit>(settingsStore.unitPreferences.chargeUnit);
+	// True once the user picks a unit OR edit-mode loads the vehicle's saved units, so
+	// the create-mode seeding effect below stops overriding their choice.
+	let unitsTouched = $state(false);
+
+	// Create mode: the $state initializers above run ONCE at mount, but the global
+	// settings store hydrates ASYNC in the root layout — so on a cold/direct load of
+	// /vehicles/new the initializers capture the USD/imperial DEFAULT, and a metric
+	// user would get "Miles · Gallons" pre-selected (and silently saved). Re-seed from
+	// the store once it resolves, but only while the user hasn't touched the units and
+	// only in create mode (edit mode populates from the vehicle, not global prefs). (cycle 204)
+	$effect(() => {
+		if (isEditMode || unitsTouched) return;
+		const prefs = settingsStore.unitPreferences;
+		distanceUnit = prefs.distanceUnit;
+		volumeUnit = prefs.volumeUnit;
+		chargeUnit = prefs.chargeUnit;
+	});
 
 	let distanceLabel = $derived(getLongFormLabel(distanceUnit));
 	let volumeLabel = $derived(getLongFormLabel(volumeUnit));
@@ -204,11 +222,13 @@
 		trackFuel = vehicle.trackFuel;
 		trackCharging = vehicle.trackCharging;
 
-		// Set unit preferences from vehicle data (edit mode)
+		// Set unit preferences from vehicle data (edit mode). Mark touched so the
+		// create-mode seeding effect never overrides the vehicle's own saved units.
 		if (vehicle.unitPreferences) {
 			distanceUnit = vehicle.unitPreferences.distanceUnit;
 			volumeUnit = vehicle.unitPreferences.volumeUnit;
 			chargeUnit = vehicle.unitPreferences.chargeUnit;
+			unitsTouched = true;
 		}
 
 		if (vehicle.financing?.isActive) {
@@ -341,8 +361,8 @@
 		isSubmitting = true;
 
 		try {
-			// Prepare vehicle data (dates as ISO strings, clean up null values)
-			const vehicleData = {
+			// Always-present (required) fields, shared by create and update.
+			const base = {
 				make: vehicleForm.make,
 				model: vehicleForm.model,
 				year: vehicleForm.year,
@@ -353,21 +373,45 @@
 					distanceUnit,
 					volumeUnit,
 					chargeUnit
-				},
-				licensePlate: vehicleForm.licensePlate || undefined,
-				nickname: vehicleForm.nickname || undefined,
-				vin: vehicleForm.vin ? vehicleForm.vin.toUpperCase() : undefined,
-				initialMileage: vehicleForm.initialMileage ?? undefined,
-				purchasePrice: vehicleForm.purchasePrice ?? undefined,
-				purchaseDate: vehicleForm.purchaseDate
-					? new Date(vehicleForm.purchaseDate).toISOString()
-					: undefined
+				}
 			};
+			// Raw optional values ('' / undefined when the field is empty).
+			const plate = vehicleForm.licensePlate || undefined;
+			const nick = vehicleForm.nickname || undefined;
+			const vinVal = vehicleForm.vin ? vehicleForm.vin.toUpperCase() : undefined;
+			const mileage = vehicleForm.initialMileage ?? undefined;
+			const price = vehicleForm.purchasePrice ?? undefined;
+			const pDate = vehicleForm.purchaseDate
+				? dateOnlyToISO(vehicleForm.purchaseDate)
+				: undefined;
 
-			// Update/create vehicle
-			const savedVehicle = isEditMode
-				? await vehicleApi.updateVehicle(vehicleId!, vehicleData)
-				: await vehicleApi.createVehicle(vehicleData);
+			// Update/create vehicle.
+			let savedVehicle: Vehicle;
+			if (isEditMode) {
+				// On EDIT, an emptied optional field must be sent as null so the
+				// column is actually CLEARED — JSON.stringify drops undefined, so
+				// omitting it would leave the old value intact (silent data loss).
+				savedVehicle = await vehicleApi.updateVehicle(vehicleId!, {
+					...base,
+					licensePlate: plate ?? null,
+					nickname: nick ?? null,
+					vin: vinVal ?? null,
+					initialMileage: mileage ?? null,
+					purchasePrice: price ?? null,
+					purchaseDate: pDate ?? null
+				});
+			} else {
+				// On CREATE there's nothing to clear → omit empty optionals.
+				savedVehicle = await vehicleApi.createVehicle({
+					...base,
+					licensePlate: plate,
+					nickname: nick,
+					vin: vinVal,
+					initialMileage: mileage,
+					purchasePrice: price,
+					purchaseDate: pDate
+				});
+			}
 
 			const finalVehicleId = isEditMode ? vehicleId! : savedVehicle.id;
 
@@ -380,7 +424,7 @@
 					provider: financingForm.provider,
 					originalAmount: Number(financingForm.originalAmount),
 					termMonths: Number(financingForm.termMonths),
-					startDate: new Date(financingForm.startDate).toISOString(),
+					startDate: dateOnlyToISO(financingForm.startDate),
 					paymentAmount: Number(financingForm.paymentAmount),
 					paymentFrequency: financingForm.frequency,
 					paymentDayOfMonth: Number(financingForm.dayOfMonth)
@@ -491,7 +535,7 @@
 		<div class="space-y-6">
 			<!-- Header -->
 			<div class="flex items-center gap-4">
-				<Button variant="outline" size="icon" onclick={handleBack}>
+				<Button variant="outline" size="icon" aria-label="Go back" onclick={handleBack}>
 					<ArrowLeft class="h-4 w-4" />
 				</Button>
 				<div>
@@ -744,7 +788,10 @@
 										type="single"
 										value={distanceUnit}
 										onValueChange={v => {
-											if (v) distanceUnit = v as DistanceUnit;
+											if (v) {
+												distanceUnit = v as DistanceUnit;
+												unitsTouched = true;
+											}
 										}}
 									>
 										<Select.Trigger id="distanceUnit" class="w-full">
@@ -763,7 +810,10 @@
 										type="single"
 										value={volumeUnit}
 										onValueChange={v => {
-											if (v) volumeUnit = v as VolumeUnit;
+											if (v) {
+												volumeUnit = v as VolumeUnit;
+												unitsTouched = true;
+											}
 										}}
 									>
 										<Select.Trigger id="volumeUnit" class="w-full">
@@ -785,7 +835,10 @@
 										type="single"
 										value={chargeUnit}
 										onValueChange={v => {
-											if (v) chargeUnit = v as ChargeUnit;
+											if (v) {
+												chargeUnit = v as ChargeUnit;
+												unitsTouched = true;
+											}
 										}}
 									>
 										<Select.Trigger id="chargeUnit" class="w-full">
@@ -868,8 +921,9 @@
 				<AlertDialogHeader>
 					<AlertDialogTitle>Delete Vehicle</AlertDialogTitle>
 					<AlertDialogDescription>
-						Are you sure you want to delete this vehicle? This will permanently delete the vehicle
-						and all associated expenses. This action cannot be undone.
+						Are you sure you want to delete this vehicle? This permanently deletes the vehicle and
+						everything attached to it — all expenses, fuel and charging history, odometer readings,
+						financing details, and uploaded photos. This action cannot be undone.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 

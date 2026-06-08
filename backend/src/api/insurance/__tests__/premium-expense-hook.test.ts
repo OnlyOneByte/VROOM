@@ -1,0 +1,141 @@
+/**
+ * In-process HTTP tests for the insurance premium → expense HOOK lifecycle
+ * (insurance/hooks.ts), which auto-creates a split expense across covered
+ * vehicles when a term carries a totalCost. terms-http.test only covers the
+ * clear-optional-field semantics; this auto-created-FINANCIAL-RECORD lifecycle
+ * had no HTTP characterization. Drives the real stack (route → hook →
+ * createSplitExpense / deleteBySource → DB) and reads rows off sqlite:
+ *   - policy create with a costed, 2-vehicle term → one insurance expense per
+ *     vehicle, even-split, tagged 'insurance', source_type='insurance_term'
+ *   - term update to a NEW totalCost → old auto-expenses gone, new ones at the
+ *     new amount (the delete-by-source + recreate path)
+ *   - term update to totalCost 0 → no auto-expenses remain
+ *   - term delete → auto-expenses removed
+ *
+ * createTestApp() rewrites env + dynamic-imports DB-bound modules, so keep static
+ * imports to the harness + bun:test.
+ */
+
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { createTestApp, type DataEnvelope, json, type TestApp } from '../../../test-helpers/http-client';
+
+let ctx: TestApp;
+
+beforeEach(async () => {
+  ctx = await createTestApp();
+});
+afterEach(() => ctx.close());
+
+async function seedVehicle(make: string): Promise<string> {
+  const res = await ctx.authed('POST', '/api/v1/vehicles', { make, model: 'Test', year: 2022 });
+  const body = await json<DataEnvelope<{ id: string }>>(res);
+  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
+  return body.data.id;
+}
+
+interface PolicyRow {
+  id: string;
+  terms: { id: string }[];
+}
+
+async function createPolicy(vehicleIds: string[], totalCost: number): Promise<{ policyId: string; termId: string }> {
+  const res = await ctx.authed('POST', '/api/v1/insurance', {
+    company: 'Acme Mutual',
+    terms: [
+      {
+        startDate: '2024-01-01T00:00:00.000Z',
+        endDate: '2025-01-01T00:00:00.000Z',
+        policyNumber: 'POL-9',
+        totalCost,
+        vehicleCoverage: { vehicleIds },
+      },
+    ],
+  });
+  const body = await json<DataEnvelope<PolicyRow>>(res);
+  expect(res.status, JSON.stringify(body)).toBe(201);
+  return { policyId: body.data.id, termId: body.data.terms[0]!.id };
+}
+
+interface InsExpenseRow {
+  id: string;
+  expense_amount: number;
+  vehicle_id: string;
+  category: string;
+  tags: string | null;
+  source_type: string | null;
+  source_id: string | null;
+}
+
+function autoExpensesForTerm(termId: string): InsExpenseRow[] {
+  return ctx.sqlite
+    .query(
+      'SELECT id, expense_amount, vehicle_id, category, tags, source_type, source_id FROM expenses WHERE source_type = ? AND source_id = ?'
+    )
+    .all('insurance_term', termId) as InsExpenseRow[];
+}
+
+describe('insurance premium → expense hook lifecycle', () => {
+  test('policy create with a costed 2-vehicle term auto-creates an even-split insurance expense per vehicle', async () => {
+    const v1 = await seedVehicle('Honda');
+    const v2 = await seedVehicle('Toyota');
+    const { termId } = await createPolicy([v1, v2], 1200);
+
+    const rows = autoExpensesForTerm(termId);
+    expect(rows).toHaveLength(2); // one sibling per covered vehicle
+    // Even split of 1200 across 2 → 600 each (integer-cents largest-remainder).
+    const total = rows.reduce((s, r) => s + r.expense_amount, 0);
+    expect(total).toBeCloseTo(1200, 2);
+    for (const r of rows) {
+      expect(r.expense_amount).toBeCloseTo(600, 2);
+      expect(r.category).toBe('financial');
+      expect(r.tags ?? '').toContain('insurance');
+      expect(r.source_type).toBe('insurance_term');
+      expect(r.source_id).toBe(termId);
+    }
+    expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2]));
+  });
+
+  test('updating the term cost regenerates the auto-expenses at the new amount', async () => {
+    const v1 = await seedVehicle('Honda');
+    const { policyId, termId } = await createPolicy([v1], 1000);
+    const before = autoExpensesForTerm(termId);
+    expect(before).toHaveLength(1);
+    expect(before[0]!.expense_amount).toBeCloseTo(1000, 2);
+    const beforeId = before[0]!.id;
+
+    const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
+      totalCost: 1500,
+    });
+    expect(res.status, await res.text()).toBeLessThan(300);
+
+    const after = autoExpensesForTerm(termId);
+    expect(after).toHaveLength(1);
+    expect(after[0]!.expense_amount).toBeCloseTo(1500, 2);
+    // Regenerated (delete-by-source + recreate), not mutated in place.
+    expect(after[0]!.id).not.toBe(beforeId);
+  });
+
+  test('updating the term cost to 0 removes the auto-expenses', async () => {
+    const v1 = await seedVehicle('Honda');
+    const { policyId, termId } = await createPolicy([v1], 800);
+    expect(autoExpensesForTerm(termId)).toHaveLength(1);
+
+    const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
+      totalCost: 0,
+    });
+    expect(res.status, await res.text()).toBeLessThan(300);
+
+    expect(autoExpensesForTerm(termId)).toHaveLength(0);
+  });
+
+  test('deleting the term removes its auto-expenses', async () => {
+    const v1 = await seedVehicle('Honda');
+    const { policyId, termId } = await createPolicy([v1], 900);
+    expect(autoExpensesForTerm(termId)).toHaveLength(1);
+
+    const res = await ctx.authed('DELETE', `/api/v1/insurance/${policyId}/terms/${termId}`);
+    expect(res.status, await res.text()).toBeLessThan(300);
+
+    expect(autoExpensesForTerm(termId)).toHaveLength(0);
+  });
+});

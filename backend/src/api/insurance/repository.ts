@@ -34,6 +34,28 @@ export interface CreateTermInput {
   vehicleCoverage: { vehicleIds: string[] };
 }
 
+/**
+ * Update shape for a term. Differs from CreateTermInput: the nullable value
+ * columns accept `null` to CLEAR them (vs `undefined`/absent = leave unchanged).
+ * startDate/endDate map to NOT NULL columns, so they're optional but never null.
+ */
+export interface UpdateTermInput {
+  startDate?: Date;
+  endDate?: Date;
+  policyNumber?: string | null;
+  coverageDescription?: string | null;
+  deductibleAmount?: number | null;
+  coverageLimit?: number | null;
+  agentName?: string | null;
+  agentPhone?: string | null;
+  agentEmail?: string | null;
+  totalCost?: number | null;
+  monthlyCost?: number | null;
+  premiumFrequency?: string | null;
+  paymentAmount?: number | null;
+  vehicleCoverage?: { vehicleIds: string[] };
+}
+
 export interface CreatePolicyData {
   company: string;
   terms: CreateTermInput[];
@@ -43,7 +65,8 @@ export interface CreatePolicyData {
 
 export interface UpdatePolicyData {
   company?: string;
-  notes?: string;
+  // null clears the notes column (vs undefined = leave unchanged).
+  notes?: string | null;
   isActive?: boolean;
 }
 
@@ -461,7 +484,7 @@ export class InsurancePolicyRepository {
   async updateTerm(
     policyId: string,
     termId: string,
-    updates: Partial<CreateTermInput>,
+    updates: UpdateTermInput,
     userId: string
   ): Promise<InsurancePolicyWithVehicles> {
     try {
@@ -680,7 +703,8 @@ export class InsurancePolicyRepository {
   async findExpiringTerms(
     startDate: Date,
     endDate: Date,
-    userId: string
+    userId: string,
+    limit = 100
   ): Promise<InsuranceTerm[]> {
     try {
       return await this.db
@@ -694,6 +718,7 @@ export class InsurancePolicyRepository {
           )
         )
         .orderBy(insuranceTerms.endDate)
+        .limit(limit)
         .then((rows) => rows.map((r) => r.term));
     } catch (error) {
       logger.error('Error finding expiring insurance terms', { error });

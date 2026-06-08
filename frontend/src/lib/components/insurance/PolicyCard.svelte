@@ -11,6 +11,7 @@
 	import ExpirationAlert from './ExpirationAlert.svelte';
 	import TermHistory from './TermHistory.svelte';
 	import DocumentViewer from './DocumentViewer.svelte';
+	import ClaimsSection from './ClaimsSection.svelte';
 	import { getLatestTerm } from '$lib/utils/insurance';
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
@@ -144,7 +145,12 @@
 
 		<!-- Documents (always visible) -->
 		<div class="mt-3 border-t border-border pt-3">
-			<DocumentViewer policyId={policy.id} />
+			<DocumentViewer entityType="insurance_policy" entityId={policy.id} />
+		</div>
+
+		<!-- Claims (always visible) -->
+		<div class="mt-3 border-t border-border pt-3">
+			<ClaimsSection policyId={policy.id} {vehicles} />
 		</div>
 	</CardContent>
 </Card>

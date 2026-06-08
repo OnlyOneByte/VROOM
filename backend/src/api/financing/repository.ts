@@ -6,7 +6,7 @@
  * Balance is computed on read: originalAmount - SUM(financing payment expenses).
  */
 
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewVehicleFinancing, VehicleFinancing } from '../../db/schema';
@@ -69,6 +69,60 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
     } catch (error) {
       logger.error('Error computing balance for financing', { financingId, error });
       throw new DatabaseError('Failed to compute financing balance', error);
+    }
+  }
+
+  /**
+   * Batch-compute balances for many financing records in two queries total
+   * (vs. computeBalance()'s 2 queries per record). Used by list endpoints to
+   * avoid an N+1 over a user's vehicles.
+   *
+   * Returns a Map keyed by financingId. financingIds with no matching record
+   * are omitted from the map (callers should treat a miss as "no balance").
+   */
+  async computeBalances(financingIds: string[]): Promise<Map<string, number>> {
+    const balances = new Map<string, number>();
+    if (financingIds.length === 0) {
+      return balances;
+    }
+    try {
+      // 1) Fetch the originalAmount for every requested financing record.
+      const records = await this.db
+        .select({
+          id: vehicleFinancing.id,
+          originalAmount: vehicleFinancing.originalAmount,
+        })
+        .from(vehicleFinancing)
+        .where(inArray(vehicleFinancing.id, financingIds));
+
+      // 2) Sum financing-payment expenses grouped by source_id, in one pass.
+      const paymentRows = await this.db
+        .select({
+          sourceId: expenses.sourceId,
+          totalPayments: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
+        })
+        .from(expenses)
+        .where(
+          and(eq(expenses.sourceType, 'financing'), inArray(expenses.sourceId, financingIds))
+        )
+        .groupBy(expenses.sourceId);
+
+      const paymentsByFinancing = new Map<string, number>();
+      for (const row of paymentRows) {
+        if (row.sourceId) {
+          paymentsByFinancing.set(row.sourceId, Number(row.totalPayments) || 0);
+        }
+      }
+
+      for (const record of records) {
+        const totalPayments = paymentsByFinancing.get(record.id) ?? 0;
+        balances.set(record.id, Math.max(0, record.originalAmount - totalPayments));
+      }
+
+      return balances;
+    } catch (error) {
+      logger.error('Error batch-computing financing balances', { count: financingIds.length, error });
+      throw new DatabaseError('Failed to compute financing balances', error);
     }
   }
 }

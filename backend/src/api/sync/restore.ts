@@ -8,6 +8,7 @@ import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import {
   expenses,
+  insuranceClaims,
   insurancePolicies,
   insuranceTerms,
   insuranceTermVehicles,
@@ -44,6 +45,7 @@ export interface ImportSummary {
   insurance: number;
   insuranceTerms: number;
   insuranceTermVehicles: number;
+  insuranceClaims: number;
   reminders: number;
   reminderVehicles: number;
   reminderNotifications: number;
@@ -96,6 +98,7 @@ class RestoreService {
       insurance: parsedBackup.insurance.length,
       insuranceTerms: parsedBackup.insuranceTerms?.length ?? 0,
       insuranceTermVehicles: parsedBackup.insuranceTermVehicles?.length ?? 0,
+      insuranceClaims: parsedBackup.insuranceClaims?.length ?? 0,
       reminders: parsedBackup.reminders?.length ?? 0,
       reminderVehicles: parsedBackup.reminderVehicles?.length ?? 0,
       reminderNotifications: parsedBackup.reminderNotifications?.length ?? 0,
@@ -121,7 +124,7 @@ class RestoreService {
       if (mode === 'replace') {
         await this.deleteUserData(tx, userId);
       }
-      await this.insertBackupData(tx, parsedBackup);
+      await this.insertBackupData(tx, parsedBackup, userId);
     });
 
     return { success: true, imported: summary };
@@ -183,6 +186,7 @@ class RestoreService {
       insurance: sheetData.insurance.length,
       insuranceTerms: sheetData.insuranceTerms?.length ?? 0,
       insuranceTermVehicles: sheetData.insuranceTermVehicles?.length ?? 0,
+      insuranceClaims: (sheetData as ParsedBackupData).insuranceClaims?.length ?? 0,
       reminders: (sheetData as ParsedBackupData).reminders?.length ?? 0,
       reminderVehicles: (sheetData as ParsedBackupData).reminderVehicles?.length ?? 0,
       reminderNotifications: (sheetData as ParsedBackupData).reminderNotifications?.length ?? 0,
@@ -208,7 +212,7 @@ class RestoreService {
       if (mode === 'replace') {
         await this.deleteUserData(tx, userId);
       }
-      await this.insertBackupData(tx, sheetData);
+      await this.insertBackupData(tx, sheetData, userId);
     });
 
     return { success: true, imported: summary };
@@ -262,7 +266,8 @@ class RestoreService {
       await tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, vehicleIds));
     }
 
-    // Delete insurance policies directly by userId (terms and junction rows cascade via FK)
+    // Delete insurance policies directly by userId (terms, junction rows, and
+    // claims all cascade via FK — claims.policy_id is ON DELETE cascade)
     await tx.delete(insurancePolicies).where(eq(insurancePolicies.userId, userId));
 
     // Delete reminders before vehicles (CASCADE handles reminder_vehicles + reminder_notifications)
@@ -275,11 +280,34 @@ class RestoreService {
     await tx.delete(vehicles).where(eq(vehicles.userId, userId));
   }
 
+  /**
+   * Force `userId` to the importing user on every owned row. The backup file is
+   * untrusted input: only metadata.userId is checked against the importer, and
+   * referential-integrity validation never covered the root tables (vehicles,
+   * insurance, photos, preferences, syncState). Without this, a crafted backup
+   * (metadata.userId = me, but vehicles[].userId = someone-else) would insert
+   * rows owned by another user. Stamping here is a no-op for legitimate backups
+   * (createBackup only ever emits rows owned by the creator = importer) and is
+   * the single chokepoint that holds regardless of which validators run.
+   */
+  private stampUserId<T extends Record<string, unknown>>(
+    rows: T[] | undefined,
+    userId: string
+  ): T[] {
+    return (rows ?? []).map((row) => ({ ...row, userId }));
+  }
+
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Sequential FK-ordered inserts for all backup tables
-  private async insertBackupData(tx: DrizzleTransaction, data: ParsedBackupData): Promise<void> {
+  private async insertBackupData(
+    tx: DrizzleTransaction,
+    data: ParsedBackupData,
+    userId: string
+  ): Promise<void> {
     // Data is already coerced by coerceRow (ZIP path via parseZipBackup, Sheets path via restoreFromSheets)
     if (data.vehicles.length > 0) {
-      await tx.insert(vehicles).values(data.vehicles as (typeof vehicles.$inferInsert)[]);
+      await tx
+        .insert(vehicles)
+        .values(this.stampUserId(data.vehicles, userId) as (typeof vehicles.$inferInsert)[]);
     }
     if (data.financing.length > 0) {
       await tx
@@ -289,7 +317,7 @@ class RestoreService {
     if (data.insurance.length > 0) {
       await tx
         .insert(insurancePolicies)
-        .values(data.insurance as (typeof insurancePolicies.$inferInsert)[]);
+        .values(this.stampUserId(data.insurance, userId) as (typeof insurancePolicies.$inferInsert)[]);
     }
     // Insert insurance terms after policies (FK constraint)
     if (data.insuranceTerms?.length > 0) {
@@ -303,9 +331,18 @@ class RestoreService {
         .insert(insuranceTermVehicles)
         .values(data.insuranceTermVehicles as (typeof insuranceTermVehicles.$inferInsert)[]);
     }
+    // Insert insurance claims after policies/terms/vehicles (policy FK + optional
+    // term_id/vehicle_id set-null FKs)
+    if ((data.insuranceClaims?.length ?? 0) > 0) {
+      await tx
+        .insert(insuranceClaims)
+        .values(data.insuranceClaims as (typeof insuranceClaims.$inferInsert)[]);
+    }
     // Insert reminders after vehicles (userId + vehicleId FKs)
     if ((data.reminders?.length ?? 0) > 0) {
-      await tx.insert(reminders).values(data.reminders as (typeof reminders.$inferInsert)[]);
+      await tx
+        .insert(reminders)
+        .values(this.stampUserId(data.reminders, userId) as (typeof reminders.$inferInsert)[]);
     }
     // Insert reminder vehicles after reminders and vehicles (junction FK)
     if ((data.reminderVehicles?.length ?? 0) > 0) {
@@ -317,28 +354,36 @@ class RestoreService {
     if ((data.reminderNotifications?.length ?? 0) > 0) {
       await tx
         .insert(reminderNotifications)
-        .values(data.reminderNotifications as (typeof reminderNotifications.$inferInsert)[]);
+        .values(
+          this.stampUserId(data.reminderNotifications, userId) as (typeof reminderNotifications.$inferInsert)[]
+        );
     }
     if (data.expenses.length > 0) {
-      await tx.insert(expenses).values(data.expenses as (typeof expenses.$inferInsert)[]);
+      await tx
+        .insert(expenses)
+        .values(this.stampUserId(data.expenses, userId) as (typeof expenses.$inferInsert)[]);
     }
     if (data.odometer?.length > 0) {
       await tx
         .insert(odometerEntries)
-        .values(data.odometer as (typeof odometerEntries.$inferInsert)[]);
+        .values(this.stampUserId(data.odometer, userId) as (typeof odometerEntries.$inferInsert)[]);
     }
     // Insert user preferences and sync state
     if (data.userPreferences?.length > 0) {
       await tx
         .insert(userPreferences)
-        .values(data.userPreferences as (typeof userPreferences.$inferInsert)[]);
+        .values(this.stampUserId(data.userPreferences, userId) as (typeof userPreferences.$inferInsert)[]);
     }
     if (data.syncState?.length > 0) {
-      await tx.insert(syncState).values(data.syncState as (typeof syncState.$inferInsert)[]);
+      await tx
+        .insert(syncState)
+        .values(this.stampUserId(data.syncState, userId) as (typeof syncState.$inferInsert)[]);
     }
     // Insert photos AFTER all entity tables so entityId references are valid
     if (data.photos?.length > 0) {
-      await tx.insert(photos).values(data.photos as (typeof photos.$inferInsert)[]);
+      await tx
+        .insert(photos)
+        .values(this.stampUserId(data.photos, userId) as (typeof photos.$inferInsert)[]);
     }
     // Insert photo_refs AFTER photos (photo_id FK references photos)
     // Filter out refs whose providerId doesn't exist in user_providers —

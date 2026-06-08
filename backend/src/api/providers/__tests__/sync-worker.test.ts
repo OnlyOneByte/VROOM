@@ -1,28 +1,28 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { Photo, PhotoRef } from '../../../db/schema';
 import type { StorageRef } from '../domains/storage/storage-provider';
+import {
+  processBatch,
+  shouldSkipDueToBackoff,
+  startSyncWorker,
+  stopSyncWorker,
+  type SyncWorkerDeps,
+} from '../sync-worker';
 
-// --- Mocks must be set up before importing the module under test ---
+// --- Collaborators are INJECTED, not mock.module'd ---
+//
+// This suite used to `mock.module('../../photos/photo-repository', ...)` (+ the
+// ref-repository and the registry). Bun's mock.module is process-global and
+// CANNOT be restored (mock.restore() only undoes mock() spies), so those stubs
+// leaked into every later file — a stubbed `photoRepository` missing
+// `findByUser` made real photos-route tests 500 in the full suite. The sync
+// worker now takes an optional `deps` arg (real default); tests pass fakes.
+// See .kiro/steering/TestingExternalAPIs.md (inject-don't-mock.module).
 
 const mockFindPendingOrFailed = mock<() => Promise<PhotoRef[]>>(() => Promise.resolve([]));
 const mockFindActiveByPhoto = mock<() => Promise<PhotoRef | null>>(() => Promise.resolve(null));
 const mockUpdateStatus = mock(() => Promise.resolve());
-
-mock.module('../../photos/photo-ref-repository', () => ({
-  photoRefRepository: {
-    findPendingOrFailed: mockFindPendingOrFailed,
-    findActiveByPhoto: mockFindActiveByPhoto,
-    updateStatus: mockUpdateStatus,
-  },
-}));
-
 const mockFindById = mock<() => Promise<Photo | null>>(() => Promise.resolve(null));
-
-mock.module('../../photos/photo-repository', () => ({
-  photoRepository: {
-    findById: mockFindById,
-  },
-}));
 
 const mockDownload = mock<() => Promise<Buffer>>(() => Promise.resolve(Buffer.from('photo-data')));
 const mockUpload = mock<() => Promise<StorageRef>>(() =>
@@ -45,60 +45,25 @@ function makeMockProvider(type = 'google-drive') {
 }
 
 const mockGetProvider = mock(() => Promise.resolve(makeMockProvider()));
+const mockResolveFolderPath = mock(() => Promise.resolve(''));
 
-mock.module('../domains/storage/registry', () => ({
-  storageProviderRegistry: {
-    getProviderInternal: mockGetProvider,
-    resolveProviderFolderPath: mock(() => Promise.resolve('')),
-  },
-}));
-
-let mockConfigEnabled = false;
-
-// Capture the real CONFIG before mocking so other modules that depend on
-// CONFIG.backup, CONFIG.validation, CONFIG.auth, etc. still work when tests
-// run in the same process.
-import {
-  getBackupTableKeys,
-  getRequiredBackupFiles,
-  CONFIG as REAL_CONFIG,
-  TABLE_FILENAME_MAP,
-  TABLE_SCHEMA_MAP,
-} from '../../../config';
-
-mock.module('../../../config', () => ({
-  CONFIG: {
-    ...REAL_CONFIG,
-    syncWorker: {
-      get enabled() {
-        return mockConfigEnabled;
-      },
-      pollIntervalMs: 30_000,
-      batchSize: 10,
+/** Build the injected deps bundle from the per-test mocks above. */
+function makeDeps(): SyncWorkerDeps {
+  return {
+    photoRefRepository: {
+      findPendingOrFailed: mockFindPendingOrFailed,
+      findActiveByPhoto: mockFindActiveByPhoto,
+      updateStatus: mockUpdateStatus,
     },
-  },
-  TABLE_SCHEMA_MAP,
-  TABLE_FILENAME_MAP,
-  getBackupTableKeys,
-  getRequiredBackupFiles,
-}));
-
-mock.module('../../../utils/logger', () => ({
-  logger: {
-    info: mock(() => {}),
-    debug: mock(() => {}),
-    warn: mock(() => {}),
-    error: mock(() => {}),
-  },
-}));
-
-// --- Import module under test AFTER mocks ---
-import {
-  processBatch,
-  shouldSkipDueToBackoff,
-  startSyncWorker,
-  stopSyncWorker,
-} from '../sync-worker';
+    photoRepository: {
+      findById: mockFindById,
+    },
+    registry: {
+      getProviderInternal: mockGetProvider,
+      resolveProviderFolderPath: mockResolveFolderPath,
+    },
+  } as unknown as SyncWorkerDeps;
+}
 
 // --- Test fixtures ---
 
@@ -203,37 +168,21 @@ describe('shouldSkipDueToBackoff', () => {
 });
 
 describe('startSyncWorker / stopSyncWorker', () => {
+  // CONFIG.syncWorker.enabled is false in NODE_ENV=test, so startSyncWorker is a
+  // no-op here — these assert the lifecycle is safe to call regardless.
   afterEach(() => {
     stopSyncWorker();
-    mockConfigEnabled = false;
   });
 
-  test('startSyncWorker is a no-op when CONFIG.syncWorker.enabled is false', () => {
-    mockConfigEnabled = false;
+  test('startSyncWorker is a no-op in the test environment (disabled)', () => {
     startSyncWorker();
-    // Calling stop should be safe (no interval to clear)
-    stopSyncWorker();
-  });
-
-  test('startSyncWorker sets up interval when enabled', () => {
-    mockConfigEnabled = true;
-    startSyncWorker();
-    // Calling stop should clear the interval without error
-    stopSyncWorker();
+    stopSyncWorker(); // safe even with no interval to clear
   });
 
   test('stopSyncWorker is safe to call multiple times', () => {
-    mockConfigEnabled = true;
     startSyncWorker();
     stopSyncWorker();
     stopSyncWorker(); // second call should not throw
-  });
-
-  test('startSyncWorker warns if already running', () => {
-    mockConfigEnabled = true;
-    startSyncWorker();
-    startSyncWorker(); // second call — should warn, not create duplicate
-    stopSyncWorker();
   });
 });
 
@@ -243,17 +192,19 @@ describe('processBatch', () => {
     mockFindActiveByPhoto.mockReset();
     mockFindById.mockReset();
     mockGetProvider.mockReset();
+    mockResolveFolderPath.mockReset();
     mockUpdateStatus.mockReset();
     mockDownload.mockReset();
     mockUpload.mockReset();
 
     // Default: no pending refs
     mockFindPendingOrFailed.mockResolvedValue([]);
+    mockResolveFolderPath.mockResolvedValue('');
   });
 
   test('does nothing when no pending refs exist', async () => {
     mockFindPendingOrFailed.mockResolvedValue([]);
-    await processBatch();
+    await processBatch(makeDeps());
     expect(mockFindPendingOrFailed).toHaveBeenCalledTimes(1);
     expect(mockUpdateStatus).not.toHaveBeenCalled();
   });
@@ -266,7 +217,7 @@ describe('processBatch', () => {
     });
     mockFindPendingOrFailed.mockResolvedValue([recentFailure]);
 
-    await processBatch();
+    await processBatch(makeDeps());
 
     // Should not attempt to process (no updateStatus calls)
     expect(mockUpdateStatus).not.toHaveBeenCalled();
@@ -278,7 +229,7 @@ describe('processBatch', () => {
     mockFindPendingOrFailed.mockResolvedValue([pendingRef]);
     mockFindActiveByPhoto.mockResolvedValue(null);
 
-    await processBatch();
+    await processBatch(makeDeps());
 
     expect(mockFindActiveByPhoto).toHaveBeenCalledWith('photo-1');
     expect(mockUpdateStatus).not.toHaveBeenCalled();
@@ -291,7 +242,7 @@ describe('processBatch', () => {
     mockFindActiveByPhoto.mockResolvedValue(activeRef);
     mockFindById.mockResolvedValue(null);
 
-    await processBatch();
+    await processBatch(makeDeps());
 
     expect(mockFindById).toHaveBeenCalledWith('photo-1');
     expect(mockUpdateStatus).not.toHaveBeenCalled();
@@ -319,7 +270,7 @@ describe('processBatch', () => {
       .mockResolvedValueOnce(targetProvider) // for path resolution
       .mockResolvedValueOnce(targetProvider); // for upload
 
-    await processBatch();
+    await processBatch(makeDeps());
 
     // Should have downloaded from source
     expect(mockDownload).toHaveBeenCalledWith({
@@ -364,7 +315,7 @@ describe('processBatch', () => {
       .mockResolvedValueOnce(targetProvider)
       .mockResolvedValueOnce(targetProvider);
 
-    await processBatch();
+    await processBatch(makeDeps());
 
     // Should mark as failed with incremented retry count and error message
     expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
@@ -388,7 +339,7 @@ describe('processBatch', () => {
     const provider = makeMockProvider('google-drive');
     mockGetProvider.mockResolvedValue(provider);
 
-    await processBatch();
+    await processBatch(makeDeps());
 
     expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
       status: 'failed',
@@ -419,7 +370,7 @@ describe('processBatch', () => {
       externalUrl: 'https://example.com/new',
     });
 
-    await processBatch();
+    await processBatch(makeDeps());
 
     // Both refs should have been updated to active
     expect(mockUpdateStatus).toHaveBeenCalledTimes(2);

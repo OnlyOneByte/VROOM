@@ -127,8 +127,8 @@
 		) {
 			items.push({
 				label: 'Mileage Overage',
-				value: excessMiles > 0 ? formatCurrency(overageCost) : '$0.00',
-				subtitle: `${excessMiles > 0 ? `${excessMiles.toLocaleString()} ${distLabel} over` : 'Within limit'} · $${financing.excessMileageFee.toFixed(2)}/${distLabel}`,
+				value: excessMiles > 0 ? formatCurrency(overageCost) : formatCurrency(0),
+				subtitle: `${excessMiles > 0 ? `${excessMiles.toLocaleString()} ${distLabel} over` : 'Within limit'} · ${formatCurrency(financing.excessMileageFee)}/${distLabel}`,
 				icon: TriangleAlert,
 				iconColor: excessMiles > 0 ? 'destructive' : 'chart-2'
 			});

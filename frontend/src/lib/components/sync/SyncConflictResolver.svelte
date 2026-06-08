@@ -11,6 +11,7 @@
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Button } from '$lib/components/ui/button';
 	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert';
+	import { formatCurrency } from '$lib/utils/formatters';
 
 	let showModal = $state(false);
 	let currentConflict = $state<SyncConflict | null>(null);
@@ -58,7 +59,7 @@
 	}
 
 	function formatAmount(amount: number): string {
-		return `${amount.toFixed(2)}`;
+		return formatCurrency(amount);
 	}
 </script>
 

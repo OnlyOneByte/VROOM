@@ -4,7 +4,10 @@ import { z } from 'zod';
 import { changeTracker, requireAuth } from '../../middleware';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
+import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { createTermExpenses, updateTermExpenses } from './hooks';
+import { insuranceClaimRepository } from './claims-repository';
+import { createClaimSchema, updateClaimSchema } from './claims-validation';
 import { insurancePolicyRepository } from './repository';
 import {
   addTermSchema,
@@ -22,6 +25,11 @@ const idParamSchema = z.object({
 const termParamsSchema = z.object({
   id: z.string().min(1, 'Insurance policy ID is required'),
   termId: z.string().min(1, 'Term ID is required'),
+});
+
+const claimParamsSchema = z.object({
+  id: z.string().min(1, 'Insurance policy ID is required'),
+  claimId: z.string().min(1, 'Claim ID is required'),
 });
 
 const vehiclePoliciesParamSchema = z.object({
@@ -43,10 +51,15 @@ routes.get('/', async (c) => {
 routes.get('/expiring-soon', async (c) => {
   const user = c.get('user');
   const daysAhead = Number.parseInt(c.req.query('days') || '30', 10);
+  // Bound the result set so a user with many terms can't trigger an unbounded scan.
+  const requestedLimit = Number.parseInt(c.req.query('limit') || '100', 10);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 200)
+    : 100;
   const now = new Date();
   const endDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
-  const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate, user.id);
-  return c.json({ success: true, data: terms, count: terms.length, daysAhead });
+  const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate, user.id, limit);
+  return c.json({ success: true, data: terms, count: terms.length, daysAhead, limit });
 });
 
 // GET /api/v1/insurance/vehicles/:vehicleId/policies — policies for a vehicle
@@ -123,6 +136,16 @@ routes.delete('/:id', zValidator('param', idParamSchema), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
   await validateInsuranceOwnership(id, user.id);
+
+  // Clean photos (provider files + DB) BEFORE deleting the policy. Deleting the
+  // policy FK-cascades its claims, but the photos table has no FK — so the
+  // policy's own documents AND its claims' documents (rows + external storage
+  // files) would orphan. Enumerate the claims while they still exist.
+  const claims = await insuranceClaimRepository.findByPolicyId(id);
+  const claimIds = claims.map((claim) => claim.id);
+  await deleteAllPhotosForEntity('insurance_policy', id, user.id);
+  await deletePhotosForEntities('insurance_claim', claimIds, user.id);
+
   await insurancePolicyRepository.delete(id, user.id);
   return c.json({ success: true, message: 'Insurance policy deleted successfully' });
 });
@@ -201,6 +224,58 @@ routes.delete('/:id/terms/:termId', zValidator('param', termParamsSchema), async
 
   const policy = await insurancePolicyRepository.deleteTerm(id, termId, user.id);
   return c.json({ success: true, data: policy, message: 'Term deleted successfully' });
+});
+
+// --- Claims (filed against a policy) ---
+
+// GET /api/v1/insurance/:id/claims — list claims for a policy
+routes.get('/:id/claims', zValidator('param', idParamSchema), async (c) => {
+  const user = c.get('user');
+  const { id } = c.req.valid('param');
+  await validateInsuranceOwnership(id, user.id);
+  const claims = await insuranceClaimRepository.findByPolicyId(id);
+  return c.json({ success: true, data: claims, count: claims.length });
+});
+
+// POST /api/v1/insurance/:id/claims — file a claim
+routes.post(
+  '/:id/claims',
+  zValidator('param', idParamSchema),
+  zValidator('json', createClaimSchema),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    await validateInsuranceOwnership(id, user.id);
+    const data = c.req.valid('json');
+    const claim = await insuranceClaimRepository.create(id, data);
+    return c.json({ success: true, data: claim, message: 'Claim filed successfully' }, 201);
+  }
+);
+
+// PUT /api/v1/insurance/:id/claims/:claimId — update a claim
+routes.put(
+  '/:id/claims/:claimId',
+  zValidator('param', claimParamsSchema),
+  zValidator('json', updateClaimSchema),
+  async (c) => {
+    const user = c.get('user');
+    const { id, claimId } = c.req.valid('param');
+    await validateInsuranceOwnership(id, user.id);
+    const updates = c.req.valid('json');
+    const claim = await insuranceClaimRepository.update(id, claimId, updates);
+    return c.json({ success: true, data: claim, message: 'Claim updated successfully' });
+  }
+);
+
+// DELETE /api/v1/insurance/:id/claims/:claimId — delete a claim
+routes.delete('/:id/claims/:claimId', zValidator('param', claimParamsSchema), async (c) => {
+  const user = c.get('user');
+  const { id, claimId } = c.req.valid('param');
+  await validateInsuranceOwnership(id, user.id);
+  // Clean the claim's documents (provider files + DB) before deleting the row.
+  await deleteAllPhotosForEntity('insurance_claim', claimId, user.id);
+  await insuranceClaimRepository.delete(id, claimId);
+  return c.json({ success: true, message: 'Claim deleted successfully' });
 });
 
 export { routes };

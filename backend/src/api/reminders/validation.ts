@@ -7,26 +7,35 @@ const reminderTypeSchema = z.enum(['expense', 'notification']);
 const frequencySchema = z.enum(['weekly', 'monthly', 'yearly', 'custom']);
 const intervalUnitSchema = z.enum(['day', 'week', 'month', 'year']);
 
+// Nullable DB-backed fields use .nullish() (accept undefined OR null), NOT
+// .optional() (undefined only). The update flow merges the existing DB row —
+// whose unset optional columns come back as `null` — and re-validates the
+// merged object with createReminderSchema; with .optional() those nulls fail
+// validation and EVERY update (incl. the pause/resume toggle) 400s.
 const reminderBaseSchema = z.object({
   name: z.string().min(1).max(CONFIG.validation.reminder.nameMaxLength),
-  description: z.string().max(CONFIG.validation.reminder.descriptionMaxLength).optional(),
+  description: z.string().max(CONFIG.validation.reminder.descriptionMaxLength).nullish(),
   type: reminderTypeSchema,
   actionMode: z.literal('automatic').default('automatic'),
   frequency: frequencySchema,
-  intervalValue: z.number().int().positive().optional(),
-  intervalUnit: intervalUnitSchema.optional(),
+  intervalValue: z.number().int().positive().nullish(),
+  intervalUnit: intervalUnitSchema.nullish(),
   startDate: z.coerce.date(),
-  endDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().nullish(),
+  // Active/paused flag. Optional on create (defaults active in the DB); on
+  // update this is what the pause/resume toggle flips — it must be accepted
+  // here or Zod strips it and the toggle silently no-ops.
+  isActive: z.boolean().optional(),
   vehicleIds: z.array(z.string().min(1)).min(1),
   // Expense template fields (required when type = 'expense')
-  expenseCategory: z.enum(EXPENSE_CATEGORIES).optional(),
+  expenseCategory: z.enum(EXPENSE_CATEGORIES).nullish(),
   expenseTags: z
     .array(z.string().min(1).max(CONFIG.validation.reminder.tagMaxLength))
     .max(CONFIG.validation.reminder.maxTags)
-    .optional(),
-  expenseAmount: z.number().positive().max(CONFIG.validation.reminder.maxExpenseAmount).optional(),
-  expenseDescription: z.string().max(CONFIG.validation.reminder.descriptionMaxLength).optional(),
-  expenseSplitConfig: splitConfigSchema.optional(),
+    .nullish(),
+  expenseAmount: z.number().positive().max(CONFIG.validation.reminder.maxExpenseAmount).nullish(),
+  expenseDescription: z.string().max(CONFIG.validation.reminder.descriptionMaxLength).nullish(),
+  expenseSplitConfig: splitConfigSchema.nullish(),
 });
 
 type ReminderInput = z.infer<typeof reminderBaseSchema>;
@@ -111,7 +120,7 @@ function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   }
 
   // Absolute allocations must sum to expenseAmount
-  if (data.expenseSplitConfig.method === 'absolute' && data.expenseAmount !== undefined) {
+  if (data.expenseSplitConfig.method === 'absolute' && data.expenseAmount != null) {
     const sum = data.expenseSplitConfig.allocations.reduce((acc, a) => acc + a.amount, 0);
     if (Math.abs(sum - data.expenseAmount) >= 0.001) {
       ctx.addIssue({

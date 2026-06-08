@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { routes, paramRoutes } from '$lib/routes';
 	import { onMount, type Component } from 'svelte';
-	import { Plus, FileText } from '@lucide/svelte';
+	import { Plus, FileText, Download } from '@lucide/svelte';
 	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
@@ -76,6 +76,9 @@
 	let totalCount = $state(0);
 	let isLoadingPage = $state(false);
 	let hasLoadedExpensesTab = $state(false);
+	// Server-side sort for the Expenses tab (default date desc).
+	let expenseSortBy = $state<'date' | 'amount'>('date');
+	let expenseSortDir = $state<'asc' | 'desc'>('desc');
 
 	// Photos state
 	let vehiclePhotos = $state<Photo[]>([]);
@@ -224,7 +227,9 @@
 		try {
 			const result = await expenseApi.getExpensesByVehicle(vehicleId, {
 				limit: pageSize,
-				offset
+				offset,
+				sortBy: expenseSortBy,
+				sortDir: expenseSortDir
 			});
 			expenses = result.data;
 			totalCount = result.pagination.totalCount;
@@ -234,6 +239,13 @@
 		} finally {
 			isLoadingPage = false;
 		}
+	}
+
+	/** Sort changed in the Expenses tab — re-fetch from page 0 so it spans all pages. */
+	function handleExpenseSortChange(by: 'date' | 'amount', dir: 'asc' | 'desc') {
+		expenseSortBy = by;
+		expenseSortDir = dir;
+		fetchExpensesPage(0);
 	}
 
 	async function loadVehicleStats() {
@@ -259,6 +271,20 @@
 	function clearFilters() {
 		searchTerm = '';
 		filters = {};
+	}
+
+	// Export THIS vehicle's expenses as CSV (server-generated, vehicle-scoped).
+	// Mirrors the global expenses page; the endpoint already filters by vehicleId.
+	let isExporting = $state(false);
+	async function handleExportCsv() {
+		isExporting = true;
+		try {
+			await expenseApi.downloadExpensesCsv({ vehicleId });
+		} catch (err) {
+			handleErrorWithNotification(err, 'Failed to export expenses');
+		} finally {
+			isExporting = false;
+		}
 	}
 
 	function handlePeriodChange(period: TimePeriod) {
@@ -455,8 +481,19 @@
 
 				<!-- Expense List -->
 				<CardFull.Root>
-					<CardFull.Header>
+					<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
 						<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
+						{#if totalCount > 0}
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={handleExportCsv}
+								disabled={isExporting}
+							>
+								<Download class="mr-2 h-4 w-4" />
+								{isExporting ? 'Exporting…' : 'Export CSV'}
+							</Button>
+						{/if}
 					</CardFull.Header>
 					<CardFull.Content>
 						<ExpensesTable
@@ -476,6 +513,9 @@
 							{pageSize}
 							{isLoadingPage}
 							onPageChange={handlePageChange}
+							activeSortBy={expenseSortBy}
+							activeSortDir={expenseSortDir}
+							onSortChange={handleExpenseSortChange}
 						/>
 					</CardFull.Content>
 				</CardFull.Root>

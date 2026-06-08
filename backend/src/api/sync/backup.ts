@@ -20,6 +20,7 @@ import { getDb } from '../../db/connection';
 import type { UserProvider } from '../../db/schema';
 import {
   expenses,
+  insuranceClaims,
   insurancePolicies,
   insuranceTerms,
   insuranceTermVehicles,
@@ -345,6 +346,12 @@ export class BackupService {
             .where(inArray(insuranceTermVehicles.termId, termIds))
         : [];
 
+    // Query insurance claims for user's policies
+    const userInsuranceClaims =
+      policyIds.length > 0
+        ? await db.select().from(insuranceClaims).where(inArray(insuranceClaims.policyId, policyIds))
+        : [];
+
     // Query photos directly by userId
     const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
 
@@ -390,6 +397,7 @@ export class BackupService {
       insurance: userInsurance,
       insuranceTerms: userInsuranceTerms,
       insuranceTermVehicles: userInsuranceTermVehicles,
+      insuranceClaims: userInsuranceClaims,
       odometer: userOdometer,
       photos: userPhotos,
       photoRefs: userPhotoRefs,
@@ -449,6 +457,19 @@ export class BackupService {
   async parseZipBackup(file: Buffer): Promise<ParsedBackupData> {
     const zip = new AdmZip(file);
     const zipEntries = zip.getEntries();
+
+    // Zip-bomb guard: bodyLimit caps the COMPRESSED upload, but getData() below
+    // inflates each entry. Sum the uncompressed sizes (read from the ZIP central
+    // directory — no inflation) and reject before decompressing anything if the
+    // total exceeds the cap. A real backup is CSV text well under this; a bomb is
+    // far over. (header.size is the uncompressed byte count for each entry.)
+    const totalUncompressed = zipEntries.reduce((sum, e) => sum + (e.header?.size ?? 0), 0);
+    if (totalUncompressed > CONFIG.backup.maxUncompressedSize) {
+      throw new ValidationError(
+        `Backup archive is too large when decompressed (${totalUncompressed} bytes exceeds the ${CONFIG.backup.maxUncompressedSize}-byte limit)`
+      );
+    }
+
     const fileNames = zipEntries.map((entry) => entry.entryName);
     const missingFiles = getRequiredBackupFiles().filter((file) => !fileNames.includes(file));
 
@@ -559,6 +580,7 @@ export class BackupService {
         termIds,
         vehicleIds
       ),
+      ...this.validateClaimRefs(backup.insuranceClaims ?? [], policyIds, termIds, vehicleIds),
       ...this.validateOdometerRefs(backup.odometer ?? [], vehicleIds),
       ...this.validatePhotoRefs(backup.photos ?? [], {
         vehicleIds,
@@ -629,6 +651,32 @@ export class BackupService {
     for (const term of termList) {
       if (!policyIds.has(String(term.policyId))) {
         errors.push(`Insurance term ${term.id} references non-existent policy ${term.policyId}`);
+      }
+    }
+    return errors;
+  }
+
+  private validateClaimRefs(
+    claimList: Record<string, unknown>[],
+    policyIds: Set<string>,
+    termIds: Set<string>,
+    vehicleIds: Set<string>
+  ): string[] {
+    const errors: string[] = [];
+    for (const claim of claimList) {
+      if (!policyIds.has(String(claim.policyId))) {
+        errors.push(`Insurance claim ${claim.id} references non-existent policy ${claim.policyId}`);
+      }
+      // termId / vehicleId are optional links; validate only when present.
+      if (claim.termId != null && claim.termId !== '' && !termIds.has(String(claim.termId))) {
+        errors.push(`Insurance claim ${claim.id} references non-existent term ${claim.termId}`);
+      }
+      if (
+        claim.vehicleId != null &&
+        claim.vehicleId !== '' &&
+        !vehicleIds.has(String(claim.vehicleId))
+      ) {
+        errors.push(`Insurance claim ${claim.id} references non-existent vehicle ${claim.vehicleId}`);
       }
     }
     return errors;

@@ -20,10 +20,12 @@
 
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { themeStore } from '$lib/stores/theme.svelte';
+	import { settingsStore } from '$lib/stores/settings.svelte';
 
 	let { children } = $props();
 
 	let vehiclesLoaded = $state(false);
+	let settingsLoaded = $state(false);
 
 	async function loadUserVehicles() {
 		if (vehiclesLoaded) return;
@@ -33,6 +35,22 @@
 			vehiclesLoaded = true;
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load vehicles:', error);
+		}
+	}
+
+	// Hydrate the settings store app-wide once authenticated. currencyUnit and unit
+	// preferences are GLOBAL display state — getCurrencySymbol()/formatCurrency() and
+	// unit formatters read settingsStore.settings, falling back to USD/imperial when
+	// it's null. Without this, a page that doesn't itself call settingsStore.load()
+	// (e.g. the insurance forms) showed "$" for a EUR/GBP user on a direct/refreshed
+	// load. Loading it here makes the symbol correct everywhere. (cycle 203)
+	async function loadUserSettings() {
+		if (settingsLoaded) return;
+		try {
+			await settingsStore.load();
+			settingsLoaded = true;
+		} catch (error) {
+			if (import.meta.env.DEV) console.error('Failed to load settings:', error);
 		}
 	}
 
@@ -75,6 +93,7 @@
 	$effect(() => {
 		if (authState.isAuthenticated && !authState.isLoading) {
 			loadUserVehicles();
+			loadUserSettings();
 		}
 	});
 

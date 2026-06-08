@@ -23,6 +23,27 @@ export interface Vehicle {
 	updatedAt: string;
 }
 
+/**
+ * Update payload for a vehicle. Unlike the read-model `Vehicle`, the nullable
+ * optional fields accept `null` to CLEAR them on edit (vs `undefined`/absent =
+ * leave unchanged). The backend `updateVehicleSchema` accepts nullish for these.
+ */
+export interface UpdateVehicleRequest {
+	make?: string;
+	model?: string;
+	year?: number;
+	vehicleType?: VehicleType;
+	trackFuel?: boolean;
+	trackCharging?: boolean;
+	licensePlate?: string | null;
+	nickname?: string | null;
+	vin?: string | null;
+	initialMileage?: number | null;
+	purchasePrice?: number | null;
+	purchaseDate?: string | null;
+	unitPreferences?: UnitPreferences;
+}
+
 export interface VehicleFinancing {
 	id: string;
 	vehicleId: string;

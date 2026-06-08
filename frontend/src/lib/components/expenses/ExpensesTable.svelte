@@ -73,6 +73,11 @@
 
 	type DisplayRow = ExpenseRow | GroupRow;
 
+	// Columns the table can sort by. Mirrors the backend allowlist (date|amount);
+	// the old client-only first-tag "type" sort had no server equivalent and was
+	// already dead (tableRows re-sorted by date regardless), so it's dropped.
+	type SortField = 'date' | 'amount';
+
 	interface Props {
 		expenses: Expense[];
 		vehicles?: Vehicle[];
@@ -91,6 +96,24 @@
 		pageSize?: number;
 		isLoadingPage?: boolean;
 		onPageChange?: (_offset: number) => void;
+		// Server-side sort (controlled mode). When onSortChange is provided, the
+		// sortable headers report intent to the parent (which re-fetches the page
+		// server-sorted) instead of sorting the current page client-side — the latter
+		// only reorders the visible slice, so "sort by amount" would surface the
+		// biggest expense ON THIS PAGE, not overall. activeSortBy/Dir drive the header
+		// indicator. With no onSortChange the table falls back to local client sort.
+		activeSortBy?: SortField;
+		activeSortDir?: 'asc' | 'desc';
+		onSortChange?: (_by: SortField, _dir: 'asc' | 'desc') => void;
+		// Server-side category filter (controlled mode), same opt-in shape as sort.
+		// When onCategoryChange is provided the category Select reports to the parent
+		// (which re-fetches the page server-filtered across ALL rows) instead of
+		// filtering the current page client-side — the latter only narrows the visible
+		// 20-row slice, so picking a category hides matching rows on other pages.
+		// activeCategory drives the trigger label. With no handler the table falls back
+		// to the local client-side category filter (used by the vehicle-detail tab).
+		activeCategory?: string;
+		onCategoryChange?: (_category: string) => void;
 	}
 
 	let {
@@ -110,34 +133,63 @@
 		currentOffset = 0,
 		pageSize = 20,
 		isLoadingPage = false,
-		onPageChange
+		onPageChange,
+		activeSortBy,
+		activeSortDir,
+		onSortChange,
+		activeCategory,
+		onCategoryChange
 	}: Props = $props();
+
+	// O(1) vehicle lookups — avoids an O(n) vehicles.find() per row per render
+	// (getVehicleForExpense is called at several render sites for every expense + child).
+	let vehicleMap = $derived(new Map(vehicles.map(v => [v.id, v])));
 
 	// Pagination derived values
 	let showPagination = $derived(totalCount !== undefined && onPageChange !== undefined);
 
 	const isMobile = new IsMobile();
 
-	// Sorting state
-	let sortBy = $state<'date' | 'amount' | 'type'>('date');
-	let sortOrder = $state<'asc' | 'desc'>('desc');
+	// Sorting. In controlled mode (onSortChange provided) the parent owns the sort
+	// and re-fetches the page server-sorted; the header indicator reads the active*
+	// props. In uncontrolled mode the table sorts the rows it was given locally.
+	let localSortBy = $state<SortField>('date');
+	let localSortOrder = $state<'asc' | 'desc'>('desc');
+	const controlled = $derived(onSortChange !== undefined);
+	const sortBy = $derived<SortField>(controlled ? (activeSortBy ?? 'date') : localSortBy);
+	const sortOrder = $derived<'asc' | 'desc'>(
+		controlled ? (activeSortDir ?? 'desc') : localSortOrder
+	);
 
-	// Category filter state
-	let categoryFilter = $state<string>('');
+	// Category filter. In controlled mode (onCategoryChange provided) the parent owns
+	// it and re-fetches the page server-filtered; the Select reads activeCategory. In
+	// uncontrolled mode the table filters the rows it was given locally.
+	let localCategoryFilter = $state<string>('');
+	const categoryControlled = $derived(onCategoryChange !== undefined);
+	const categoryFilter = $derived<string>(
+		categoryControlled ? (activeCategory ?? '') : localCategoryFilter
+	);
 
 	// Delete modal state
 	let showDeleteModal = $state(false);
 	let expenseToDelete = $state<Expense | null>(null);
 	let isDeleting = $state(false);
 
-	// Filtered and sorted expenses
+	// Filtered and sorted expenses.
+	// In controlled mode the server already sorted/filtered across the whole dataset,
+	// so we MUST preserve the received rows+order (re-doing it here would only act on
+	// the page slice and undo the point of going server-side). In uncontrolled mode we
+	// sort + category-filter the given rows locally.
 	let sortedExpenses = $derived.by(() => {
 		let filtered = [...expenses];
 
-		// Apply category filter
-		if (categoryFilter) {
+		// Apply category filter locally ONLY when the parent isn't doing it server-side
+		// (controlled mode already returns rows pre-filtered to the chosen category).
+		if (categoryFilter && !categoryControlled) {
 			filtered = filtered.filter(e => e.category === categoryFilter);
 		}
+
+		if (controlled) return filtered;
 
 		filtered.sort((a, b) => {
 			let comparison = 0;
@@ -149,13 +201,6 @@
 				case 'amount':
 					comparison = a.amount - b.amount;
 					break;
-				case 'type': {
-					// Sort by first tag
-					const aTag = a.tags?.[0] || '';
-					const bTag = b.tags?.[0] || '';
-					comparison = aTag.localeCompare(bTag);
-					break;
-				}
 			}
 
 			return sortOrder === 'asc' ? comparison : -comparison;
@@ -198,7 +243,7 @@
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- Set used within $derived computation, not mutated reactively
 			const vehicleNameSet = new Set<string>();
 			for (const child of children) {
-				const v = vehicles.find(vh => vh.id === child.vehicleId);
+				const v = vehicleMap.get(child.vehicleId);
 				if (v) vehicleNameSet.add(getVehicleDisplayName(v));
 			}
 			rows.push({
@@ -214,11 +259,23 @@
 			});
 		}
 
-		// Sort combined rows by date
+		// Re-order the combined rows by the ACTIVE sort field (not always date — the
+		// old hardcoded date sort here is what made the Amount header a no-op). Group
+		// rows use their representative value: total amount, or the group's date. This
+		// runs in both modes so a collapsed split group sits in the right place among
+		// standalone rows; in controlled mode it re-imposes the server's chosen order
+		// onto the grouped view (consistent, since both use the same field+direction).
 		rows.sort((a, b) => {
-			const dateA = a.type === 'standalone' ? a.expense.date : a.date;
-			const dateB = b.type === 'standalone' ? b.expense.date : b.date;
-			const comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
+			let comparison = 0;
+			if (sortBy === 'amount') {
+				const amtA = a.type === 'standalone' ? a.expense.amount : a.totalAmount;
+				const amtB = b.type === 'standalone' ? b.expense.amount : b.totalAmount;
+				comparison = amtA - amtB;
+			} else {
+				const dateA = a.type === 'standalone' ? a.expense.date : a.date;
+				const dateB = b.type === 'standalone' ? b.expense.date : b.date;
+				comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
+			}
 			return sortOrder === 'asc' ? comparison : -comparison;
 		});
 
@@ -243,12 +300,25 @@
 		}
 	}
 
-	function handleSort(newSortBy: typeof sortBy) {
-		if (sortBy === newSortBy) {
-			sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+	function handleSort(newSortBy: SortField) {
+		// Toggle direction when re-selecting the active column, else default to desc.
+		const nextDir: 'asc' | 'desc' =
+			sortBy === newSortBy ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'desc';
+		if (controlled) {
+			// Parent re-fetches the page server-sorted across the WHOLE dataset.
+			onSortChange?.(newSortBy, nextDir);
 		} else {
-			sortBy = newSortBy;
-			sortOrder = 'desc';
+			localSortBy = newSortBy;
+			localSortOrder = nextDir;
+		}
+	}
+
+	function handleCategoryChange(value: string) {
+		if (categoryControlled) {
+			// Parent re-fetches the page server-filtered across the WHOLE dataset.
+			onCategoryChange?.(value);
+		} else {
+			localCategoryFilter = value;
 		}
 	}
 
@@ -263,7 +333,15 @@
 		isDeleting = true;
 
 		try {
-			await expenseApi.deleteExpense(expenseToDelete.id);
+			// A split sibling carries a groupId; deleting it by its own id only removes
+			// that one row and orphans the rest of the split (the remaining rows no
+			// longer sum to the group total). Route it through the group-delete
+			// endpoint so every vehicle's portion goes — matching what the dialog says.
+			if (expenseToDelete.groupId) {
+				await expenseApi.deleteSplitExpense(expenseToDelete.groupId);
+			} else {
+				await expenseApi.deleteExpense(expenseToDelete.id);
+			}
 			await onDelete(expenseToDelete);
 
 			appStore.addNotification({
@@ -284,7 +362,7 @@
 	}
 
 	function getVehicleForExpense(expense: Expense): Vehicle | undefined {
-		return vehicles.find(v => v.id === expense.vehicleId);
+		return vehicleMap.get(expense.vehicleId);
 	}
 </script>
 
@@ -326,7 +404,7 @@
 				type="single"
 				value={categoryFilter}
 				onValueChange={v => {
-					categoryFilter = v;
+					handleCategoryChange(v);
 				}}
 			>
 				<Select.Trigger
@@ -601,7 +679,7 @@
 								type="single"
 								value={categoryFilter}
 								onValueChange={v => {
-									categoryFilter = v;
+									handleCategoryChange(v);
 								}}
 							>
 								<Select.Trigger
@@ -624,19 +702,7 @@
 								</Select.Content>
 							</Select.Root>
 						</TableHead>
-						<TableHead>
-							<Button
-								variant="ghost"
-								size="sm"
-								onclick={() => handleSort('type')}
-								class="h-8 px-2 -ml-2 hover:bg-muted"
-							>
-								Tags
-								{#if sortBy === 'type'}
-									<ArrowUpDown class="ml-1 h-3.5 w-3.5" />
-								{/if}
-							</Button>
-						</TableHead>
+						<TableHead>Tags</TableHead>
 						<TableHead class="w-full min-w-[100px]">Description</TableHead>
 						<TableHead class="text-right whitespace-nowrap">
 							<Button
@@ -884,7 +950,12 @@
 			<AlertDialogHeader>
 				<AlertDialogTitle>Delete Expense</AlertDialogTitle>
 				<AlertDialogDescription>
-					Are you sure you want to delete this expense? This action cannot be undone.
+					{#if expenseToDelete?.groupId}
+						This is a split expense shared across multiple vehicles. Deleting it removes the entire
+						split — every vehicle's portion — not just one. This action cannot be undone.
+					{:else}
+						Are you sure you want to delete this expense? This action cannot be undone.
+					{/if}
 				</AlertDialogDescription>
 			</AlertDialogHeader>
 

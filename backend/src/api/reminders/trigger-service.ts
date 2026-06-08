@@ -4,6 +4,7 @@ import { transaction } from '../../db/connection';
 import type { Expense, Reminder, ReminderNotification } from '../../db/schema';
 import { expenses, reminderNotifications } from '../../db/schema';
 import type { DrizzleTransaction, ReminderSplitConfig } from '../../db/types';
+import { ValidationError } from '../../errors';
 import { expenseSplitService } from '../expenses/split-service';
 import type { ReminderWithVehicles } from './repository';
 import { reminderRepository } from './repository';
@@ -105,12 +106,18 @@ async function createExpenseFromReminder(
   const category = reminder.expenseCategory ?? 'misc';
 
   if (!splitConfig) {
-    // Single-vehicle expense — use first (only) vehicle from junction
+    // Single-vehicle expense — use first (only) vehicle from junction.
+    // Guard against a reminder with no linked vehicle: vehicleId is NOT NULL,
+    // so inserting an undefined here would otherwise surface as an opaque DB error.
+    const vehicleId = vehicleIds[0];
+    if (!vehicleId) {
+      throw new ValidationError('Reminder has no linked vehicle to create an expense for');
+    }
     const [expense] = await tx
       .insert(expenses)
       .values({
         id: createId(),
-        vehicleId: vehicleIds[0],
+        vehicleId,
         userId: reminder.userId,
         category,
         tags: reminder.expenseTags ?? null,

@@ -33,7 +33,12 @@
 
 <div class="grid grid-cols-2 {gridCols} gap-4 {className ?? ''}">
 	{#each items as item (item.label)}
+		<!-- min-w-0: grid items default to min-width:auto and refuse to shrink below
+		     their content, which lets a wide StatCard (e.g. a dual-metric money card)
+		     blow out the track on the narrow 2-col mobile grid. This is the canonical
+		     CSS-grid overflow guard. -->
 		<StatCard
+			class="min-w-0"
 			label={item.label}
 			value={item.value}
 			unit={item.unit}

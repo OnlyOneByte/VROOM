@@ -6,6 +6,7 @@ import type { Table } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   expenses,
+  insuranceClaims,
   insurancePolicies,
   insuranceTerms,
   insuranceTermVehicles,
@@ -48,7 +49,34 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((val) => val?.split(',').map((origin) => origin.trim()) || []),
+  // Comma-separated IPs of trusted reverse proxies (e.g. your load balancer).
+  // `X-Forwarded-For` is ONLY honored when the request's actual socket IP is in
+  // this list — otherwise the spoofable header is ignored and the real socket IP
+  // is used. Empty by default (direct-exposure safe; no header is trusted).
+  TRUSTED_PROXY_IPS: z
+    .string()
+    .optional()
+    .transform((val) =>
+      (val ?? '')
+        .split(',')
+        .map((ip) => ip.trim())
+        .filter(Boolean)
+    ),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
+  // Allow the in-memory FakeStorageProvider (tests / local E2E only). Never set
+  // in production — the factory also hard-gates on env !== 'production'.
+  ALLOW_FAKE_STORAGE: z
+    .string()
+    .optional()
+    .transform((val) => val === '1' || val === 'true'),
+  // Disable in-memory rate limiting for the local E2E harness, whose own request
+  // volume (route-smoke hits every route + many API calls, repeated across runs)
+  // exhausts the 1000/15min global window and flakes late specs with 429s. Never
+  // set in production — double-gated on env !== 'production' below.
+  DISABLE_RATE_LIMIT: z
+    .string()
+    .optional()
+    .transform((val) => val === '1' || val === 'true'),
 });
 
 const parseEnv = () => {
@@ -87,6 +115,13 @@ const getDefaultCorsOrigins = (environment: Environment): string[] => {
 
 export const CONFIG = {
   env: env.NODE_ENV as Environment,
+  // Fake storage provider is allowed only outside production AND only when
+  // explicitly opted in via ALLOW_FAKE_STORAGE — double-gated.
+  allowFakeStorageProvider: env.ALLOW_FAKE_STORAGE && (env.NODE_ENV as Environment) !== 'production',
+  // Rate limiting is bypassed only outside production AND only when explicitly opted
+  // in via DISABLE_RATE_LIMIT (the local E2E harness) — double-gated, can never
+  // weaken production's abuse protection.
+  disableRateLimit: env.DISABLE_RATE_LIMIT && (env.NODE_ENV as Environment) !== 'production',
   server: { port: env.PORT, host: env.HOST },
   database: {
     url: env.DATABASE_URL,
@@ -128,6 +163,8 @@ export const CONFIG = {
   },
   rateLimit: {
     cleanupInterval: 60_000,
+    // Reverse proxies whose `X-Forwarded-For` we trust (see env TRUSTED_PROXY_IPS).
+    trustedProxyIps: env.TRUSTED_PROXY_IPS,
     global: { windowMs: 15 * 60 * 1000, limit: 1000, message: 'Too many requests' },
     auth: { windowMs: 15 * 60 * 1000, limit: 30 },
     sync: { windowMs: 15 * 60 * 1000, limit: 50, message: 'Too many sync requests' },
@@ -137,6 +174,11 @@ export const CONFIG = {
   },
   backup: {
     maxFileSize: 50 * 1024 * 1024,
+    // Cap on TOTAL uncompressed bytes across all entries in an uploaded backup
+    // ZIP. bodyLimit caps the compressed upload (maxFileSize); this guards the
+    // decompressed size so a zip bomb can't inflate to many GB and OOM the
+    // process. Generous vs any real backup (CSV text), tiny vs a bomb.
+    maxUncompressedSize: 200 * 1024 * 1024,
     currentVersion: '1.0.0',
     supportedModes: ['preview', 'replace', 'merge'] as const,
     defaultRetentionCount: 10,
@@ -159,6 +201,9 @@ export const CONFIG = {
       maxTags: 10,
       tagMaxLength: 50,
       fuelTypeMaxLength: 50,
+      // CSV import: hard cap on rows accepted in a single import request so a huge
+      // (or malicious) file can't exhaust memory/CPU parsing+validating row-by-row.
+      maxImportRows: 5000,
     },
     insurance: {
       companyMaxLength: 100,
@@ -188,6 +233,9 @@ export const CONFIG = {
       maxCatchUpOccurrences: 12,
       maxTags: 10,
       tagMaxLength: 50,
+      // Cap the notification-history feed so a long-lapsed reminder that fired
+      // many times can't return an unbounded list to the UI (newest-first).
+      notificationsHistoryLimit: 100,
     },
     settings: { maxBackupRetention: 100, maxSyncInactivityMinutes: 30 },
   },
@@ -200,6 +248,7 @@ export const TABLE_SCHEMA_MAP: Record<string, Table> = {
   insurance: insurancePolicies,
   insuranceTerms: insuranceTerms,
   insuranceTermVehicles: insuranceTermVehicles,
+  insuranceClaims: insuranceClaims,
   photos: photos,
   odometer: odometerEntries,
   photoRefs: photoRefs,
@@ -217,6 +266,7 @@ export const TABLE_FILENAME_MAP: Record<string, string> = {
   insurance: 'insurance_policies.csv',
   insuranceTerms: 'insurance_terms.csv',
   insuranceTermVehicles: 'insurance_term_vehicles.csv',
+  insuranceClaims: 'insurance_claims.csv',
   photos: 'photos.csv',
   odometer: 'odometer_entries.csv',
   photoRefs: 'photo_refs.csv',
@@ -235,6 +285,7 @@ export function getBackupTableKeys(): string[] {
 const OPTIONAL_BACKUP_FILES = new Set([
   'insurance_terms.csv',
   'insurance_term_vehicles.csv',
+  'insurance_claims.csv',
   'photos.csv',
   'odometer_entries.csv',
   'photo_refs.csv',

@@ -11,6 +11,8 @@ import fc from 'fast-check';
 import type { Expense, VehicleFinancing } from '$lib/types';
 import {
 	calculateAmortizationSchedule,
+	calculateMinimumPayment,
+	calculatePayoffDate,
 	derivePaymentEntries
 } from '$lib/utils/financing-calculations';
 
@@ -366,6 +368,102 @@ describe('Property 10: Principal and Interest Derivation', () => {
 				}
 			),
 			{ numRuns: 100 }
+		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// calculateMinimumPayment — the standard amortization formula
+//   M = P * [r(1+r)^n] / [(1+r)^n - 1]
+// The 0%-APR / lease / missing-input paths return null, which is what keeps the
+// (factor - 1) denominator from being a divide-by-zero (the cycle-168 class).
+// These were untested; the property suite above only covers derivePaymentEntries.
+// ---------------------------------------------------------------------------
+describe('calculateMinimumPayment', () => {
+	test('matches the closed-form amortization value for a known loan', () => {
+		// 20,000 at 6% APR over 60 months. Hand-computed: r=0.005, factor=1.005^60,
+		// M = 20000*0.005*factor/(factor-1) ≈ 386.66.
+		const m = calculateMinimumPayment(
+			makeFinancing({ originalAmount: 20_000, apr: 6, termMonths: 60 })
+		);
+		expect(m).not.toBeNull();
+		expect(m as number).toBeCloseTo(386.66, 1);
+	});
+
+	test('returns null at 0% APR (no interest formula → avoids the factor-1=0 divide)', () => {
+		expect(calculateMinimumPayment(makeFinancing({ apr: 0 }))).toBeNull();
+		expect(calculateMinimumPayment(makeFinancing({ apr: undefined }))).toBeNull();
+	});
+
+	test('returns null for a lease, or with non-positive amount/term', () => {
+		expect(calculateMinimumPayment(makeFinancing({ financingType: 'lease' }))).toBeNull();
+		expect(calculateMinimumPayment(makeFinancing({ originalAmount: 0 }))).toBeNull();
+		expect(calculateMinimumPayment(makeFinancing({ termMonths: 0 }))).toBeNull();
+	});
+
+	test('is always a positive finite number when it returns a value (no NaN/Infinity)', () => {
+		fc.assert(
+			fc.property(
+				fc.double({ min: 100, max: 200_000, noNaN: true, noDefaultInfinity: true }),
+				fc.double({ min: 0.1, max: 30, noNaN: true, noDefaultInfinity: true }),
+				fc.integer({ min: 1, max: 120 }),
+				(originalAmount, apr, termMonths) => {
+					const m = calculateMinimumPayment(makeFinancing({ originalAmount, apr, termMonths }));
+					if (m !== null) {
+						expect(Number.isFinite(m)).toBe(true);
+						expect(m).toBeGreaterThan(0);
+					}
+				}
+			),
+			{ numRuns: 200 }
+		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// calculatePayoffDate — has a distinct 0%-APR branch (simple division) and a
+// with-APR amortization loop guarded against a payment that doesn't cover
+// interest. Both return a valid Date (never NaN-time / Invalid Date).
+// ---------------------------------------------------------------------------
+describe('calculatePayoffDate', () => {
+	function isValidDate(d: Date): boolean {
+		return d instanceof Date && !Number.isNaN(d.getTime());
+	}
+
+	test('0% APR: returns a valid future date from the simple balance/payment division', () => {
+		const d = calculatePayoffDate(
+			makeFinancing({ apr: 0, computedBalance: 12_000, paymentAmount: 500 })
+		);
+		expect(isValidDate(d)).toBe(true);
+		expect(d.getTime()).toBeGreaterThan(Date.now());
+	});
+
+	test('with APR: returns a valid date for a normal amortizing loan', () => {
+		const d = calculatePayoffDate(
+			makeFinancing({ apr: 5, computedBalance: 10_000, paymentAmount: 400 })
+		);
+		expect(isValidDate(d)).toBe(true);
+	});
+
+	test('a paid-off balance (<= 0) returns a valid date (today), not Invalid Date', () => {
+		const d = calculatePayoffDate(makeFinancing({ computedBalance: 0 }));
+		expect(isValidDate(d)).toBe(true);
+	});
+
+	test('always returns a valid Date across random loan inputs (no Invalid Date)', () => {
+		fc.assert(
+			fc.property(
+				fc.double({ min: 0, max: 30, noNaN: true, noDefaultInfinity: true }),
+				fc.double({ min: 100, max: 100_000, noNaN: true, noDefaultInfinity: true }),
+				fc.double({ min: 50, max: 5_000, noNaN: true, noDefaultInfinity: true }),
+				(apr, computedBalance, paymentAmount) => {
+					const d = calculatePayoffDate(
+						makeFinancing({ apr, computedBalance, paymentAmount })
+					);
+					expect(isValidDate(d)).toBe(true);
+				}
+			),
+			{ numRuns: 200 }
 		);
 	});
 });
