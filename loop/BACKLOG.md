@@ -138,6 +138,21 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
     `FuelEfficiencyStatsCard` the `StatCardGrid columns={3}` with dual-metric `text-2xl` StatCards =
     4 large numbers across 393px → `$97.80`→"$97"/".80", `25,850`→"25,"/"850". Same dual-metric
     cramping class as the cycle-169 fix. Drop to fewer columns on mobile or smaller value text. (overflow, med)
+
+*(surfaced + VERIFIED by the C21 reminders/expenses backend audit — 4 agent "HIGH"s were false
+positives, debunked in LEDGER C21; these two are the real ones)*
+12. **`fastForwardPastNow` ignores `endDate`** — `reminders/trigger-service.ts:216-229`: when a
+    reminder is overdue past `maxCatchUpOccurrences` AND has an `endDate` not yet crossed within the
+    catch-up window, fast-forward advances `nextDueDate` past `now` with NO `endDate` check and NO
+    `deactivate()` — leaving a bounded reminder "active" but permanently dormant (never fires, never
+    closes). The main catch-up loop (`:269`) DOES check endDate; fastForward doesn't. Add the same
+    `if (endDate && nextDue > endDate) { deactivate; break }` inside the while. (correctness, low-med)
+    **→ FOLD INTO maintenance-schedule T3** (it rewrites this exact function for the mileage axis;
+    fixing now + again in T3 is churn).
+13. **`advanceCustom` switch has no `default`** — `reminders/trigger-service.ts:39-56`: an invalid
+    `intervalUnit` silently no-ops (nextDue never advances → re-processed until maxCatchUp truncates).
+    Zod blocks bad values at the route, so this is defense-in-depth only. Add
+    `default: throw new ValidationError(...)`. (robustness, low)
 - ~~**Insurance premium trend skips a month for day-29–31 term starts**~~ — *DONE C14: extracted
   day-1-anchored `monthKeysInRange` helper, routed accumulateMonthlyPremiums through it; 5 unit tests.*
 - ~~**buildMonthlyConsumption shows OLDEST 12 months**~~ — *DONE C11: slice(0,12)→slice(-12) in

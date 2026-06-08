@@ -10,13 +10,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 16 |
-| deep-review | 5 | 14 |
+| deep-review | 5 | 21 |
 | guard | 6 | 20 |
 | bug | 3 | 14 |
 | arch | 5 | 18 |
 | infra | 6 | 19 |
 
-Current cycle: **20**
+Current cycle: **21**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -342,3 +342,30 @@ Current cycle: **20**
   (cyc 16, starved-for 5 > 4) breaches right after → maintenance-schedule T3 is next once deep-review
   clears. Queued bugs (#8 insurance $0, #9 interestPaidYtd, #10 flat loan balance, #11 mobile wrap,
   #3 dead ScrollArea cap, CSV BOM/date/currency) remain fair game if a review surfaces nothing worse.
+- **C21 (deep-review — reminders + expenses backend audit, fan-out)** — `deep-review` breached budget
+  (cyc 14, starved-for 7 > 5) → forced pick. Fanned out 2 Explore agents: (a) reminders trigger
+  engine, (b) expenses/split/import math. KEY OUTCOME: VERIFIED every "HIGH/CRITICAL" finding against
+  source before acting — and the top 4 were FALSE POSITIVES (this is why deep reviews verify):
+  • Reminders `setDate(1)` in monthly/yearly/custom recurrence (agent: "CRITICAL, breaks end-of-month")
+    — NOT a bug. `anchorDay`/`dayTarget` is captured (trigger-service.ts:71) BEFORE mutation;
+    `setDate(1)` is the deliberate guard against JS month-overflow (Jan 31 +1mo → Mar 3), and
+    `clampToAnchorDay` runs AFTER to restore the day clamped to the month's last day. The agent's
+    "fix" (remove setDate(1)) would INTRODUCE the rollover bug. Correct as-is.
+  • Expenses "split siblings double-counted in SUM" (agent: "HIGH, 2x inflated totals") — NOT a bug.
+    Each sibling row stores its own per-vehicle SHARE (split-service.ts:92-110 `expenseAmount:
+    allocation.amount`), so SUM(expenseAmount) over siblings = group total once (repository.ts:425
+    sums expenseAmount, not groupTotal). Agent assumed both siblings carry the full amount; they don't.
+  • Percentage-split "negative final allocation" — unreachable: floor() makes runningTotal ≤ true
+    partial, so the last share (total−runningTotal) is always ≥ true share > 0; clamp is dead code.
+  Two findings are GENUINELY REAL but minor, filed as bugs (below): (1) `fastForwardPastNow`
+  (trigger-service.ts:216) ignores `endDate` — a reminder past maxCatchUp with an uncrossed endDate
+  gets fast-forwarded past now without deactivating → "active" but dormant (low-med edge); (2)
+  `advanceCustom` switch has no `default` → invalid intervalUnit silently no-ops (low; Zod blocks it
+  at the route, defense-in-depth only). Deliberately did NOT fix #1 this cycle: it lives in the exact
+  trigger code maintenance-schedule T3 rewrites (mileage axis + nullable-date rebuild) — fixing now
+  then again in T3 is churn; folded it into T3's scope instead. No code touched; verification-only
+  cycle (LEDGER/BACKLOG only).
+  Next cycle (22): `feature` breaches budget (cyc 16, starved-for 6 > 4) → MUST pick feature →
+  maintenance-schedule **T3** (whichever-comes-first trigger logic + the deferred nextDueDate/dueDate
+  nullable rebuild + the T2 vehicle-stats reconcile). FOLD IN the C21 endDate-in-fastForward fix while
+  rewriting that code (it's the same function). High-value, mid-feature; both feature specs signed off.
