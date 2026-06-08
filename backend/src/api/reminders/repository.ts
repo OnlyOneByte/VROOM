@@ -275,13 +275,13 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
 
   /**
    * Create a reminder with associated vehicle junction rows in a single transaction.
-   * Sets nextDueDate = startDate.
+   * The caller supplies the final `nextDueDate` (= startDate for a time/both reminder, or null for a
+   * pure-mileage reminder — T4) and any mileage fields; this method no longer overrides it.
    */
   async createWithVehicles(data: NewReminder, vehicleIds: string[]): Promise<ReminderWithVehicles> {
     try {
       return await transaction(async (tx) => {
-        const reminderData = { ...data, nextDueDate: data.startDate };
-        const result = await tx.insert(reminders).values(reminderData).returning();
+        const result = await tx.insert(reminders).values(data).returning();
         const reminder = result[0];
 
         for (const vehicleId of vehicleIds) {

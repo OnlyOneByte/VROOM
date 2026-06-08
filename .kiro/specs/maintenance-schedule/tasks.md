@@ -55,9 +55,22 @@
             (1). tsc 0 · musl-biome · 918 pass · build OK. Engine dormant until T4 wires validation.
       - [ ] **T3 part 3** the deferred T2 reconcile — decide `vehicle-stats.currentMileage` period
             semantics and route it (or a new all-time field) through `getCurrentOdometer`.
-- [ ] **T4** Routes + validation: extend create/update Zod refinements (D4 single-vehicle when
-      mileage); `POST /:id/mark-serviced` re-arm (D3); `recheckMileageReminders` on odometer/
-      mileaged-expense write (D5). HTTP tests.
+- [~] **T4 Routes + validation** (in progress):
+      - [x] **part 1 (cycle 31) — mileage reminders API-creatable.** validation.ts: `triggerMode`/
+            `intervalMileage`/`lastServiceOdometer` on reminderBaseSchema + `refineMileageTrigger`
+            (D4: mileage/both needs positive intervalMileage + exactly one vehicle; lastServiceOdometer
+            route-defaulted). routes.ts: `resolveMileageFields` defaults lastServiceOdometer to the
+            vehicle's current odometer + derives `nextDueOdometer` (server-side); pure-mileage create
+            persists `nextDueDate: null`; update recomputes the cache + flips nextDueDate when the
+            mileage axis is touched. repository.createWithVehicles no longer hard-overrides nextDueDate.
+            config maxIntervalMileage cap. Pinned by `create-mileage-reminder.test.ts` (7). LESSON:
+            `triggerMode: .default('time')` survives `.partial()` and silently reverts mileage→time on
+            update — use `.optional()`. tsc 0 · musl-biome · 934 pass · build OK.
+      - [ ] **part 2 — `POST /:id/mark-serviced` re-arm (D3).** mileage/both → lastServiceOdometer =
+            current odometer, recompute nextDueOdometer; time/both → advance nextDueDate, set
+            lastTriggeredAt. One optimistic-locked txn. This is what re-arms a fired mileage reminder
+            (today it stays due by design until this exists). HTTP tests.
+      - [ ] **part 3 — `recheckMileageReminders` on odometer / mileaged-expense write (D5).** HTTP tests.
 
 ## Phase 2 — data safety
 - [~] **T5 (partial, cycle 15)** Added the 5 new columns to `SHEET_HEADERS` (reminders +

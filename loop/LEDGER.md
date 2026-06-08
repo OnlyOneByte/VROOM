@@ -9,14 +9,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 25 |
+| feature | 4 | 31 |
 | deep-review | 5 | 28 |
 | guard | 6 | 27 |
 | bug | 3 | 29 |
 | arch | 5 | 30 |
 | infra | 6 | 26 |
 
-Current cycle: **30**
+Current cycle: **31**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -611,3 +611,31 @@ Current cycle: **30**
   maintenance-schedule **T3 part 3/T4** (mark-serviced re-arm + Zod refinements + recheck-on-write +
   vehicle-stats reconcile) — finally resumes. The arch drop (part 2 proper) is queued for the next
   arch pick (~cyc 35), now safe against this net. #14 still awaits the Angelo semantics decision.
+- **C31 (feature — maintenance-schedule T4 part 1: mileage reminders are now API-creatable)** —
+  `feature` most-starved over budget (cyc 25, starved-for 6 > 4) → forced pick; T4 finally resumes.
+  Scoped to the FOUNDATIONAL slice that turns the dormant C25 engine LIVE: validation (D4) + the
+  create/update wiring for the mileage axis. (mark-serviced D3 re-arm + recheck-on-write D5 are
+  separate cycles.) Changes: (1) validation.ts — added `triggerMode`/`intervalMileage`/
+  `lastServiceOdometer` to reminderBaseSchema + `refineMileageTrigger` (D4: mileage/both requires a
+  positive intervalMileage + exactly one vehicle; lastServiceOdometer optional, route-defaulted).
+  (2) routes.ts — `resolveMileageFields` helper: defaults lastServiceOdometer to the vehicle's
+  current odometer when omitted, derives `nextDueOdometer = lastServiceOdometer + intervalMileage`
+  (server-side, never client input); pure-mileage create persists `nextDueDate: null`, both/time keep
+  startDate; update recomputes the cache + flips nextDueDate when the mileage axis is touched. (3)
+  repository.ts — createWithVehicles no longer hard-overrides `nextDueDate = startDate` (the caller
+  now supplies the correct value, null for pure mileage). (4) config.ts — maxIntervalMileage cap.
+  TWO SUBTLE FOOTGUNS CAUGHT BY THE TESTS (the value of writing them): (a) `refineMileageTrigger`
+  initially REQUIRED lastServiceOdometer, which wrongly rejected the documented default-on-create —
+  relaxed to route-defaulted. (b) `triggerMode: .default('time')` SURVIVES `.partial()` on the update
+  schema → it silently flipped an existing mileage reminder back to 'time' on any field update that
+  omitted triggerMode (cleared nextDueOdometer). Fixed to `.optional()` (DB column default handles
+  create-time absence; merge keeps existing on update). Pinned by `create-mileage-reminder.test.ts`
+  (7: derived nextDueOdometer, default-to-current-odometer, both keeps date, time has null mileage
+  cols, rejects no-interval, rejects multi-vehicle, update recomputes). Verified: tsc 0 · musl-biome
+  clean · 934 pass/0 fail (+7, up from 927) · build bundled.
+  Next cycle (32): nothing over budget after this (deep-review starved-for 4, bug 3=budget, others
+  under). Highest-leverage = continue T4: **mark-serviced re-arm** (D3 — `POST /:id/mark-serviced`:
+  mileage → lastServiceOdometer = current odometer, recompute nextDueOdometer; time/both → advance
+  nextDueDate) — this is what lets a fired mileage reminder re-arm (today it stays due, by design,
+  until this exists). Then recheck-on-write (D5) + the vehicle-stats reconcile. #14 still needs the
+  Angelo semantics decision (queued, not auto-fixed).

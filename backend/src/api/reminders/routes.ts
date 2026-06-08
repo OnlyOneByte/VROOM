@@ -1,15 +1,49 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { CONFIG } from '../../config';
+import type { NewReminder } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
 import { commonSchemas } from '../../utils/validation';
+import { odometerRepository } from '../odometer/repository';
 import { vehicleRepository } from '../vehicles/repository';
 import { reminderRepository } from './repository';
 import { reminderTriggerService } from './trigger-service';
 import { createReminderSchema, updateReminderSchema } from './validation';
 
 const routes = new Hono();
+
+/**
+ * Resolve the server-derived mileage fields for a create/update (T4, D4). For a mileage/both
+ * reminder: default `lastServiceOdometer` to the vehicle's current odometer when the client omitted
+ * it, then derive `nextDueOdometer = lastServiceOdometer + intervalMileage` (the cache the trigger's
+ * mileage pass + the notification dedup key read). For a time reminder: clear all three. Validation
+ * has already guaranteed a mileage reminder has exactly one vehicle + a positive intervalMileage.
+ */
+async function resolveMileageFields(
+  data: {
+    triggerMode?: string;
+    intervalMileage?: number | null;
+    lastServiceOdometer?: number | null;
+  },
+  vehicleIds: string[]
+): Promise<{
+  intervalMileage: number | null;
+  lastServiceOdometer: number | null;
+  nextDueOdometer: number | null;
+}> {
+  if (data.triggerMode !== 'mileage' && data.triggerMode !== 'both') {
+    return { intervalMileage: null, lastServiceOdometer: null, nextDueOdometer: null };
+  }
+  const intervalMileage = data.intervalMileage ?? 0;
+  const lastServiceOdometer =
+    data.lastServiceOdometer ?? (await odometerRepository.getCurrentOdometer(vehicleIds[0])) ?? 0;
+  return {
+    intervalMileage,
+    lastServiceOdometer,
+    nextDueOdometer: lastServiceOdometer + intervalMileage,
+  };
+}
 
 // Apply middleware to all routes
 routes.use('*', requireAuth);
@@ -58,8 +92,16 @@ routes.post('/', zValidator('json', createReminderSchema), async (c) => {
   }
 
   const { vehicleIds, ...reminderData } = data;
+  const mileage = await resolveMileageFields(reminderData, vehicleIds);
   const result = await reminderRepository.createWithVehicles(
-    { ...reminderData, userId: user.id, nextDueDate: reminderData.startDate },
+    {
+      ...reminderData,
+      userId: user.id,
+      // A pure-mileage reminder has no time axis → null date (the trigger's time pass skips it; the
+      // mileage pass drives it). time/both keep nextDueDate = startDate as before.
+      nextDueDate: reminderData.triggerMode === 'mileage' ? null : reminderData.startDate,
+      ...mileage,
+    },
     vehicleIds
   );
 
@@ -134,10 +176,33 @@ routes.put(
     createReminderSchema.parse(merged);
 
     const { vehicleIds: mergedVehicleIds, ...reminderFields } = partialUpdate;
+    const updateFields: Partial<NewReminder> = { ...reminderFields };
+
+    // If this update touches the mileage axis (triggerMode / intervalMileage / lastServiceOdometer),
+    // recompute the derived nextDueOdometer cache + the nullable nextDueDate from the MERGED state,
+    // so the trigger's mileage pass + dedup key stay consistent. Switching to pure 'time' clears the
+    // mileage fields; switching to pure 'mileage' nulls the time date.
+    const touchesMileage =
+      reminderFields.triggerMode !== undefined ||
+      reminderFields.intervalMileage !== undefined ||
+      reminderFields.lastServiceOdometer !== undefined;
+    if (touchesMileage) {
+      const mileage = await resolveMileageFields(merged, merged.vehicleIds);
+      updateFields.intervalMileage = mileage.intervalMileage;
+      updateFields.lastServiceOdometer = mileage.lastServiceOdometer;
+      updateFields.nextDueOdometer = mileage.nextDueOdometer;
+      if (merged.triggerMode === 'mileage') {
+        updateFields.nextDueDate = null;
+      } else if (merged.triggerMode === 'time' || merged.triggerMode === 'both') {
+        // Leaving pure-mileage for a time-bearing mode: restore the time axis from startDate.
+        updateFields.nextDueDate = merged.nextDueDate ?? merged.startDate;
+      }
+    }
+
     const result = await reminderRepository.updateWithVehicles(
       id,
       user.id,
-      reminderFields,
+      updateFields,
       mergedVehicleIds
     );
 
