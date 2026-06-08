@@ -260,8 +260,16 @@ class ReminderTriggerService {
       return;
     }
 
+    // Time axis: a mileage-only reminder has a null next_due_date (T3) — it has no time periods to
+    // process here. findOverdue's `next_due_date <= now` already excludes NULL rows via SQL
+    // three-valued logic, so this is also the type guard that narrows nextDue to Date below. The
+    // mileage axis is processed separately (C23); a null date here means "no time work to do".
+    if (reminder.nextDueDate === null) {
+      return;
+    }
+
     const maxCatchUp = CONFIG.validation.reminder.maxCatchUpOccurrences;
-    let nextDue = reminder.nextDueDate;
+    let nextDue: Date = reminder.nextDueDate;
     let catchUpCount = 0;
 
     while (nextDue <= now && catchUpCount < maxCatchUp) {

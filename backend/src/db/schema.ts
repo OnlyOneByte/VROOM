@@ -443,10 +443,13 @@ export const reminders = sqliteTable(
     nextDueOdometer: integer('next_due_odometer'), // cache = lastServiceOdometer + intervalMileage
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     endDate: integer('end_date', { mode: 'timestamp' }), // null = runs forever
-    // NOTE (cycle 15, T3): a mileage-ONLY reminder has no date — relaxing this to nullable is
-    // deferred to T3 (it forces a table rebuild; T1 stays purely additive ADD COLUMN). Until
-    // then mileage-only reminders aren't created, so NOT NULL is still correct.
-    nextDueDate: integer('next_due_date', { mode: 'timestamp' }).notNull(),
+    // Nullable as of T3 (cycle 22): a mileage-ONLY reminder has no time axis, so it carries no
+    // next_due_date. The time-due query null-guards (`IS NOT NULL AND next_due_date <= now`) and
+    // the trigger loop skips a null date. Relaxing this from NOT NULL forced a SQLite table rebuild
+    // (migration 0004), hand-authored child-first so the reminder_vehicles / reminder_notifications
+    // ON DELETE CASCADE does not wipe child rows (the C15 lesson: PRAGMA foreign_keys=OFF is a
+    // no-op inside the migrator's transaction).
+    nextDueDate: integer('next_due_date', { mode: 'timestamp' }),
     expenseCategory: text('expense_category'),
     expenseTags: text('expense_tags', { mode: 'json' }).$type<string[]>(),
     expenseAmount: real('expense_amount'), // total amount, required when type='expense' + actionMode='automatic'
@@ -497,11 +500,11 @@ export const reminderNotifications = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    dueDate: integer('due_date', { mode: 'timestamp' }).notNull(), // the period this notification is for
-    // Milestone for a mileage-fired notification (cycle 15). Additive + nullable. Relaxing
-    // dueDate to nullable + widening the unique index to include dueOdometer is deferred to T3
-    // (it forces a table rebuild; T1 stays additive). Until mileage notifications exist, the
-    // (reminderId, dueDate) unique key is still correct.
+    // Nullable as of T3 (cycle 22): a mileage-fired notification has no time period, so it carries
+    // no due_date (its milestone lives in due_odometer instead). Exactly one of dueDate/dueOdometer
+    // is set per notification (time axis vs mileage axis).
+    dueDate: integer('due_date', { mode: 'timestamp' }), // the period this notification is for (time axis)
+    // Odometer milestone for a mileage-fired notification (cycle 15 column; activated T3, cycle 22).
     dueOdometer: integer('due_odometer'),
     isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -509,8 +512,16 @@ export const reminderNotifications = sqliteTable(
   },
   (table) => ({
     userUnreadIdx: index('rn_user_unread_idx').on(table.userId, table.isRead),
-    // Prevents duplicate notifications for the same reminder + period.
+    // Time axis: dedups one notification per reminder + period. dueDate is now nullable; SQLite
+    // treats NULLs as distinct in a UNIQUE index, so mileage rows (null dueDate) are not
+    // constrained here — they get their own index below.
     reminderDueIdx: uniqueIndex('rn_reminder_due_idx').on(table.reminderId, table.dueDate),
+    // Mileage axis: dedups one notification per reminder + odometer milestone. PARTIAL index
+    // (WHERE due_odometer IS NOT NULL) so it only constrains mileage rows — folding dueOdometer
+    // into the time index instead would break time-axis dedup (its NULL dueOdometer is distinct).
+    reminderOdoIdx: uniqueIndex('rn_reminder_odo_idx')
+      .on(table.reminderId, table.dueOdometer)
+      .where(sql`${table.dueOdometer} IS NOT NULL`),
   })
 );
 

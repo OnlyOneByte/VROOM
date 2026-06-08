@@ -29,6 +29,13 @@
       "when": 1780892459335,
       "tag": "0003_many_jean_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1780930491804,
+      "tag": "0004_marvelous_the_fury",
+      "breakpoints": true
     }
   ]
 }

@@ -27,13 +27,28 @@
       change (under a 7d filter "current mileage" would jump to the all-time odometer), not a
       behavior-preserving reconcile. Do it in T3 alongside the mileage-due consumer, where the period
       semantics can be decided deliberately.
-- [ ] **T3** `trigger-service`: whichever-comes-first due logic (time OR mileage); null-guard the
-      time query; mileage dedup via `dueOdometer`. **First: the deferred migration** — relax
-      `nextDueDate`/`dueDate` to nullable + widen the dedup index to (reminderId, dueDate,
-      dueOdometer). Write it carefully (table rebuild; verify child rows survive — the
-      migration-0003 harness lesson). Unit tests for all due/not-due permutations. **Also here:**
-      the deferred T2 reconcile — decide `vehicle-stats.currentMileage` period semantics and route it
-      (or a new all-time field) through `getCurrentOdometer`.
+- [~] **T3 (in progress)** `trigger-service`: whichever-comes-first due logic (time OR mileage);
+      null-guard the time query; mileage dedup via `dueOdometer`.
+      - [x] **T3 part 1 (cycle 22) — the deferred migration.** Migration `0004_marvelous_the_fury.sql`
+            relaxes `reminders.next_due_date` + `reminder_notifications.due_date` to nullable.
+            **Index design CORRECTED vs the spec:** spec said widen to `(reminderId, dueDate,
+            dueOdometer)` — wrong, because SQLite treats NULLs as DISTINCT in a UNIQUE index, so that
+            would silently stop deduping time-only reminders (NULL dueOdometer). Instead kept
+            `rn_reminder_due_idx (reminderId, dueDate)` for the time axis + added a PARTIAL unique
+            `rn_reminder_odo_idx (reminderId, dueOdometer) WHERE dueOdometer IS NOT NULL` for mileage.
+            **HAND-AUTHORED** (C15 exception): drizzle's generated rebuild drops `reminders` while the
+            CASCADE children hold rows + `PRAGMA foreign_keys=OFF` is a no-op inside the migrator txn →
+            would wipe child rows. Safe order: stash children in `_hold_` tables → empty live children
+            → rebuild → refill. Proven by `migration-0004.test.ts` (5 tests, child rows survive
+            row-for-row with FKs ON). trigger-service null-guards a null `next_due_date` (no time
+            axis). tsc 0 · musl-biome clean · 898 pass · build OK.
+      - [ ] **T3 part 2** trigger-service whichever-comes-first: OR-in mileage-due via
+            `getCurrentOdometer` ≥ `nextDueOdometer`; emit a mileage notification (null dueDate,
+            dueOdometer set) with app-level dedup on the partial index; FOLD IN bug #12
+            (`fastForwardPastNow` ignores `endDate` — same function). Unit tests for all due/not-due
+            permutations (time-only, mileage-only, both).
+      - [ ] **T3 part 3** the deferred T2 reconcile — decide `vehicle-stats.currentMileage` period
+            semantics and route it (or a new all-time field) through `getCurrentOdometer`.
 - [ ] **T4** Routes + validation: extend create/update Zod refinements (D4 single-vehicle when
       mileage); `POST /:id/mark-serviced` re-arm (D3); `recheckMileageReminders` on odometer/
       mileaged-expense write (D5). HTTP tests.

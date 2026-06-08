@@ -9,14 +9,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 16 |
+| feature | 4 | 22 |
 | deep-review | 5 | 21 |
 | guard | 6 | 20 |
 | bug | 3 | 14 |
 | arch | 5 | 18 |
 | infra | 6 | 19 |
 
-Current cycle: **21**
+Current cycle: **22**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -369,3 +369,40 @@ Current cycle: **21**
   maintenance-schedule **T3** (whichever-comes-first trigger logic + the deferred nextDueDate/dueDate
   nullable rebuild + the T2 vehicle-stats reconcile). FOLD IN the C21 endDate-in-fastForward fix while
   rewriting that code (it's the same function). High-value, mid-feature; both feature specs signed off.
+- **C22 (feature — maintenance-schedule T3, part 1: the high-risk nullable rebuild)** — `feature`
+  breached budget (cyc 16, starved-for 6 > 4) → forced pick → maintenance-schedule T3. T3 is large
+  (migration + trigger logic + routes + reconcile), so this cycle ships the BLOCKING GATE: the
+  deferred nullable migration that everything else builds on. Angelo authorized "high risk migrations
+  are fine" — so the NOT NULL relax deferred since T1 is now done properly (not deferred again), but
+  SAFELY (authorized ≠ reckless). Changes: schema.ts relaxes `reminders.next_due_date` +
+  `reminder_notifications.due_date` to nullable (mileage-only reminders/notifications carry no date);
+  added a PARTIAL unique index `rn_reminder_odo_idx (reminderId, dueOdometer) WHERE dueOdometer IS NOT
+  NULL` for the mileage dedup axis. KEY DESIGN CORRECTION vs the spec: the spec said "widen the dedup
+  index to (reminderId, dueDate, dueOdometer)" — that's WRONG. SQLite treats NULLs as DISTINCT in a
+  UNIQUE index, so a 3-col index with NULL dueOdometer would silently STOP deduping time-only
+  reminders. Kept `(reminderId, dueDate)` for the time axis + a separate PARTIAL index for mileage;
+  each axis dedups its own rows, neither breaks the other (pinned by a test that proves both).
+  THE C15 FOOTGUN, CONFIRMED LIVE: the nullable relax forces a SQLite table rebuild; drizzle's
+  generated 0004 does `DROP TABLE reminders` while `reminder_vehicles` + `reminder_notifications`
+  still hold rows. Both children CASCADE on delete, and the generated `PRAGMA foreign_keys=OFF` is a
+  NO-OP inside the migrator's transaction (connection.ts:84 wraps migrate() in a txn) — so the DROP
+  would silently wipe every child row. HAND-AUTHORED 0004 instead (the documented C15 exception to
+  "never edit generated SQL"; the schema is right, only drizzle's rebuild ORDER is unsafe for our FK
+  topology): stash both children in FK-free `_hold_` tables → empty live children so the cascade hits
+  0 rows → rebuild reminders → rebuild reminder_notifications → refill children from holding (reminder
+  ids preserved → FKs resolve) → drop holding. PROOF GATE: `migration-0004.test.ts` (5 tests) applies
+  0004 with foreign_keys ON inside the same BEGIN/COMMIT production uses, and asserts the reminder +
+  junction row + notification ALL survive row-for-row (the exact loss the naive rebuild causes), plus
+  the partial-index dedup behavior and NULL-date persistence. tsc surfaced 6 null-narrowing errors in
+  trigger-service (nextDue now Date|null) → guarded: a null next_due_date means "no time axis", return
+  early (findOverdue's `<= now` already excludes NULL rows via SQL 3-valued logic; this is the type
+  guard + defense-in-depth). Verified: tsc 0 · musl-biome clean · 898 pass/0 fail (+5 migration
+  tests, up from 893) · build bundled. No behavior change for existing time reminders (mileage-only
+  reminders aren't CREATABLE yet — that's the trigger/routes work).
+  Next cycle (23): `feature` still leads (just touched cyc 22, but T3 is mid-build and the loop
+  continues the same feature) → T3 part 2: trigger-service whichever-comes-first due logic (OR-in
+  mileage via getCurrentOdometer/nextDueOdometer + app-level dueOdometer dedup), FOLD IN the C21
+  endDate-in-fastForward bug #12 (same function being rewritten), unit tests for all due/not-due
+  permutations. Then T3 part 3 (routes: mark-serviced re-arm + Zod refinements + recheck-on-write +
+  the deferred vehicle-stats reconcile). Watch `bug` (cyc 14, starved-for 8 >> 3) — it's the most
+  starved; a queued bug (#8 insurance $0, #11 mobile wrap) can jump in if trigger work stalls.
