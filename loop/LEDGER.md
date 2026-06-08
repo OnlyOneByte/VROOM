@@ -9,14 +9,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 37 |
+| feature | 4 | 39 |
 | deep-review | 5 | 35 |
 | guard | 6 | 34 |
 | bug | 3 | 38 |
 | arch | 5 | 36 |
 | infra | 6 | 33 |
 
-Current cycle: **38**
+Current cycle: **39**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -793,3 +793,22 @@ Current cycle: **38**
   mileage fields + mark-serviced) — kicks off the UI arc that makes the now-complete backend usable;
   it's a feature pick (feature starved-for 2, not yet breaching, but highest-leverage). Remaining bugs
   #9 (interestPaidYtd rename) + #11 (mobile fuel-stat wrap) stay queued. #14 awaits Angelo.
+- **C39 (feature — maintenance-schedule frontend T6: types + service client)** — nothing over budget;
+  highest-leverage = kick off the UI arc that makes the now-complete backend usable. T6 is the
+  non-visual foundation (the layer T7+ build on). Frontend `types/reminder.ts`: added `TriggerMode`,
+  the mileage fields (triggerMode/intervalMileage/lastServiceOdometer/nextDueOdometer) to `Reminder`,
+  made `nextDueDate` nullable; on `ReminderNotification` made `dueDate` nullable + added `dueOdometer`.
+  `services/reminder-api.ts`: added `markServiced(id)` → POST /:id/mark-serviced. The nullable-date
+  type change correctly surfaced 8 consumer sites assuming non-null (svelte-check) — all TIME-axis:
+  fixed by treating a null date as "not time-due" (dashboard due-soon widget filters out pure-mileage
+  via a type-narrowing predicate; /reminders isDue returns false for null; the two render sites show
+  the odometer milestone instead of a date). Verified: frontend tsc 0 errors (7 pre-existing warnings
+  unchanged) · build OK. NO screenshot this cycle — the render branches only manifest for a mileage
+  reminder, which isn't UI-creatable until T7 (ReminderForm), so there's nothing new to show yet; the
+  tsc+build floor is right for this non-visual layer. No backend touched.
+  Next cycle (40): nothing over budget (deep-review cyc 35 starved-for 5 = budget at cyc 40; others
+  under). Continue the feature arc → **T7: ReminderForm mileage branch** — the trigger-mode control
+  (Time | Mileage | Both), intervalMileage input w/ the vehicle's distance-unit label, current-odometer
+  hint + editable lastServiceOdometer, single-vehicle constraint when mileage. THIS is the visual
+  cycle — compose from the kit, eyes-on screenshot required (ui-autoloop). T8 (page/card mileage due
+  rendering + Mark serviced button) + T9 (e2e) follow. #9/#11 bugs queued; #14 awaits Angelo.

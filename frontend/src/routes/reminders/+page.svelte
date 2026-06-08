@@ -49,8 +49,11 @@
 		new Map(vehicles.map((v) => [v.id, getVehicleDisplayName(v)]))
 	);
 
-	// A reminder is "due" when its nextDueDate is today or in the past.
+	// A reminder is "due" when its nextDueDate is today or in the past. A pure-mileage reminder has a
+	// null nextDueDate — its due-ness is odometer-based (server-evaluated, surfaced via notifications),
+	// not a date comparison, so it's not "time-due" here. (Mileage due-state rendering lands in T8.)
 	function isDue(r: ReminderWithVehicles): boolean {
+		if (r.reminder.nextDueDate === null) return false;
 		return new Date(r.reminder.nextDueDate).getTime() <= Date.now();
 	}
 
@@ -262,7 +265,11 @@
 							<div class="flex items-center gap-4 mt-2 text-sm text-muted-foreground flex-wrap">
 								<span class="inline-flex items-center gap-1">
 									<Calendar class="h-3.5 w-3.5" />
-									{due ? 'Due' : 'Next'}: {formatDate(item.reminder.nextDueDate)}
+									{#if item.reminder.nextDueDate !== null}
+										{due ? 'Due' : 'Next'}: {formatDate(item.reminder.nextDueDate)}
+									{:else if item.reminder.nextDueOdometer !== null}
+										Next: {item.reminder.nextDueOdometer.toLocaleString()} (odometer)
+									{/if}
 								</span>
 								{#if item.reminder.expenseAmount != null}
 									<span>{formatCurrency(item.reminder.expenseAmount)}</span>
@@ -379,7 +386,11 @@
 										{reminderNames.get(n.reminderId) ?? 'Reminder'}
 									</p>
 									<p class="text-xs text-muted-foreground">
-										Due {formatDate(n.dueDate)}
+										{#if n.dueDate !== null}
+											Due {formatDate(n.dueDate)}
+										{:else if n.dueOdometer !== null}
+											Due at {n.dueOdometer.toLocaleString()} (odometer)
+										{/if}
 									</p>
 								</div>
 							</div>

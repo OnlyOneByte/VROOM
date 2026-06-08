@@ -129,6 +129,13 @@
 		const vehicleMap = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
 		return remindersList
 			.filter(r => r.reminder.isActive)
+			// This is the TIME-axis "due soon" widget. A pure-mileage reminder has a null nextDueDate
+			// (its due-ness is odometer-based, surfaced on the /reminders page) — exclude it here, and
+			// the narrowing lets the date math below treat nextDueDate as a string.
+			.filter(
+				(r): r is typeof r & { reminder: { nextDueDate: string } } =>
+					r.reminder.nextDueDate !== null
+			)
 			.filter(r => new Date(r.reminder.nextDueDate).getTime() <= horizon)
 			.sort(
 				(a, b) =>

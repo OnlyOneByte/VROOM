@@ -91,7 +91,13 @@
       coverage is the SHEET_HEADERS guard (already updated in T5-partial).
 
 ## Phase 3 — frontend
-- [ ] **T6** Types + service client for the new fields + mark-serviced.
+- [x] **T6 (cycle 39)** Types + service client. `types/reminder.ts`: TriggerMode + mileage fields on
+      Reminder (triggerMode/intervalMileage/lastServiceOdometer/nextDueOdometer), nextDueDate nullable;
+      ReminderNotification dueDate nullable + dueOdometer added. `services/reminder-api.ts`:
+      markServiced(id). The nullable-date change surfaced 8 time-axis consumer sites (dashboard widget,
+      /reminders isDue + 2 render sites) — all fixed to treat a null date as not-time-due / render the
+      odometer milestone instead. tsc 0 · build OK. Non-visual layer — no screenshot (mileage reminders
+      aren't UI-creatable until T7).
 - [ ] **T7** `ReminderForm`: trigger-mode control + mileage branch (interval w/ unit label,
       current-odometer hint, lastServiceOdometer), single-vehicle constraint.
 - [ ] **T8** `/reminders` page + `DueRemindersCard`: OR-in mileage due, render reason + gap with
