@@ -9,14 +9,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 9 |
+| feature | 4 | 15 |
 | deep-review | 5 | 14 |
 | guard | 6 | 13 |
 | bug | 3 | 14 |
 | arch | 5 | 11 |
 | infra | 6 | 12 |
 
-Current cycle: **14**
+Current cycle: **15**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -230,3 +230,23 @@ Current cycle: **14**
   pick it → maintenance-schedule **T1** (the additive DB migration), the first real build increment
   of the signed-off feature. Follow tasks.md; DatabaseMigrations.md; db:init path (drizzle-kit push
   fails under bun).
+- **C15 (feature → maintenance T1)** — `feature` was over budget (cyc 9, starved-for 6 > 4); both
+  feature builds signed off → started maintenance-schedule build at T1. Added the 4 mileage columns
+  to `reminders` (triggerMode default 'time', intervalMileage, lastServiceOdometer, nextDueOdometer)
+  + dueOdometer to reminderNotifications. **Key call: DESCOPED T1 to ADDITIVE-ONLY.** The spec's
+  original T1 also relaxed nextDueDate/dueDate to nullable + widened the dedup index — but that
+  forces a SQLite TABLE REBUILD, and the rebuild's `DROP TABLE reminders` cascade-drops child
+  reminder_notifications rows (proven: my migration-0003 survival test caught the notification row
+  vanishing). Rather than ship a data-dropping migration, I split: T1 = 5× `ALTER TABLE ADD COLUMN`
+  (zero data risk, generated `0003_many_jean_grey.sql`); the NOT-NULL relax moved to T3 (where the
+  trigger logic actually needs a null date, and the rebuild can be written + verified carefully).
+  Updated the SHEET_HEADERS (R9 / the cycle-3 guard fired on the new columns — fixed immediately,
+  that's T5-partial). migration-0003.test.ts pins columns + existing-row survival + defaults.
+  Verified: tsc 0, Biome musl clean, 867 pass/0 fail (+4), build bundled, full migration suite green.
+  Lesson worth keeping: a single drizzle migration that BOTH adds columns AND changes a constraint
+  on a parent table is dangerous (multi-rebuild → child cascade); keep migrations additive-only,
+  do constraint changes in their own carefully-verified migration.
+  Next cycle (16): nothing over budget (feature now 15). Most-starved: `arch` (cyc 11, starved-for
+  5 = budget 5 → breaches at 17) and `deep-review`/`bug` (both starved-for 2). Prefer continuing the
+  maintenance build (**T2**: getCurrentOdometer helper) since it's mid-feature and high-value, OR
+  take an `arch` audit-fanout to seed that queue before it bites. Lean T2 (continue the feature).

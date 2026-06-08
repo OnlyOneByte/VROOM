@@ -434,8 +434,18 @@ export const reminders = sqliteTable(
     frequency: text('frequency').notNull(), // 'weekly' | 'monthly' | 'yearly' | 'custom'
     intervalValue: integer('interval_value'), // for custom: e.g. 3
     intervalUnit: text('interval_unit'), // 'day' | 'week' | 'month' | 'year'
+    // Maintenance-schedule (cycle 15, spec .kiro/specs/maintenance-schedule): a reminder may be
+    // due by time, by mileage, or by whichever-comes-first. These are additive + nullable/
+    // defaulted so existing reminders behave identically (triggerMode defaults to 'time').
+    triggerMode: text('trigger_mode').notNull().default('time'), // 'time' | 'mileage' | 'both'
+    intervalMileage: integer('interval_mileage'), // distance interval, in the vehicle's distanceUnit
+    lastServiceOdometer: integer('last_service_odometer'), // anchor for the mileage axis
+    nextDueOdometer: integer('next_due_odometer'), // cache = lastServiceOdometer + intervalMileage
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     endDate: integer('end_date', { mode: 'timestamp' }), // null = runs forever
+    // NOTE (cycle 15, T3): a mileage-ONLY reminder has no date — relaxing this to nullable is
+    // deferred to T3 (it forces a table rebuild; T1 stays purely additive ADD COLUMN). Until
+    // then mileage-only reminders aren't created, so NOT NULL is still correct.
     nextDueDate: integer('next_due_date', { mode: 'timestamp' }).notNull(),
     expenseCategory: text('expense_category'),
     expenseTags: text('expense_tags', { mode: 'json' }).$type<string[]>(),
@@ -488,13 +498,18 @@ export const reminderNotifications = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     dueDate: integer('due_date', { mode: 'timestamp' }).notNull(), // the period this notification is for
+    // Milestone for a mileage-fired notification (cycle 15). Additive + nullable. Relaxing
+    // dueDate to nullable + widening the unique index to include dueOdometer is deferred to T3
+    // (it forces a table rebuild; T1 stays additive). Until mileage notifications exist, the
+    // (reminderId, dueDate) unique key is still correct.
+    dueOdometer: integer('due_odometer'),
     isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   },
   (table) => ({
     userUnreadIdx: index('rn_user_unread_idx').on(table.userId, table.isRead),
-    // Prevents duplicate notifications for the same reminder + period
+    // Prevents duplicate notifications for the same reminder + period.
     reminderDueIdx: uniqueIndex('rn_reminder_due_idx').on(table.reminderId, table.dueDate),
   })
 );
