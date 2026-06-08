@@ -42,11 +42,17 @@
             → rebuild → refill. Proven by `migration-0004.test.ts` (5 tests, child rows survive
             row-for-row with FKs ON). trigger-service null-guards a null `next_due_date` (no time
             axis). tsc 0 · musl-biome clean · 898 pass · build OK.
-      - [ ] **T3 part 2** trigger-service whichever-comes-first: OR-in mileage-due via
-            `getCurrentOdometer` ≥ `nextDueOdometer`; emit a mileage notification (null dueDate,
-            dueOdometer set) with app-level dedup on the partial index; FOLD IN bug #12
-            (`fastForwardPastNow` ignores `endDate` — same function). Unit tests for all due/not-due
-            permutations (time-only, mileage-only, both).
+      - [x] **T3 part 2 (cycle 25)** trigger-service whichever-comes-first. Repository:
+            `findMileageTracking` (active `triggerMode != 'time'` + non-null `nextDueOdometer`),
+            `mileageNotificationExists` + `createMileageNotification` (null dueDate, dueOdometer set;
+            app-level dedup, partial-index backstop, UNIQUE-violation → no-op). trigger-service:
+            `processMileageReminder` runs a SEPARATE pass (the time `findOverdue` can't see mileage-due
+            rows), fires ONE notification when `getCurrentOdometer >= nextDueOdometer`. NO auto-re-arm
+            (re-arm = mark-serviced, D3/T4) → idempotent; `both` fires on both axes independently; D4
+            single-vehicle enforced at runtime (skip, not error). Mileage EXPENSE auto-creation
+            deferred (needs ratified re-arm semantics). FOLDED IN bug #12 (`fastForwardPastNow` now
+            honors endDate). Pinned: `trigger-mileage.test.ts` (5) + `trigger-fastforward-enddate.test.ts`
+            (1). tsc 0 · musl-biome · 918 pass · build OK. Engine dormant until T4 wires validation.
       - [ ] **T3 part 3** the deferred T2 reconcile — decide `vehicle-stats.currentMileage` period
             semantics and route it (or a new all-time field) through `getCurrentOdometer`.
 - [ ] **T4** Routes + validation: extend create/update Zod refinements (D4 single-vehicle when

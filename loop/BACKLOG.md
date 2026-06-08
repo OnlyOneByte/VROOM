@@ -137,18 +137,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 
 *(surfaced + VERIFIED by the C21 reminders/expenses backend audit — 4 agent "HIGH"s were false
 positives, debunked in LEDGER C21; these two are the real ones)*
-12. **`fastForwardPastNow` ignores `endDate`** — `reminders/trigger-service.ts:216-229`: when a
-    reminder is overdue past `maxCatchUpOccurrences` AND has an `endDate` not yet crossed within the
-    catch-up window, fast-forward advances `nextDueDate` past `now` with NO `endDate` check and NO
-    `deactivate()` — leaving a bounded reminder "active" but permanently dormant (never fires, never
-    closes). The main catch-up loop (`:269`) DOES check endDate; fastForward doesn't. Add the same
-    `if (endDate && nextDue > endDate) { deactivate; break }` inside the while. (correctness, low-med)
-    **→ FOLD INTO maintenance-schedule T3** (it rewrites this exact function for the mileage axis;
-    fixing now + again in T3 is churn).
 13. **`advanceCustom` switch has no `default`** — `reminders/trigger-service.ts:39-56`: an invalid
     `intervalUnit` silently no-ops (nextDue never advances → re-processed until maxCatchUp truncates).
     Zod blocks bad values at the route, so this is defense-in-depth only. Add
     `default: throw new ValidationError(...)`. (robustness, low)
+- ~~**`fastForwardPastNow` ignores `endDate` (#12)**~~ — *DONE C25: folded into T3 part 2 — added the
+  main loop's `if (endDate && nextDue > endDate) { deactivate; return }` guard inside fastForward;
+  pinned by trigger-fastforward-enddate.test.ts (lapsed bounded reminder deactivates, not left active).*
 - ~~**Insurance shows $0 when only `totalCost` is set**~~ — *DONE C23 (bug #8): extracted exported
   `effectiveMonthlyPremium(term)` (monthlyCost wins, else totalCost / monthKeysInRange span);
   wired into buildInsuranceDetails:893 single choke point; 7 unit tests.*

@@ -9,14 +9,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 22 |
+| feature | 4 | 25 |
 | deep-review | 5 | 21 |
 | guard | 6 | 20 |
 | bug | 3 | 23 |
 | arch | 5 | 24 |
 | infra | 6 | 19 |
 
-Current cycle: **24**
+Current cycle: **25**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -459,3 +459,35 @@ Current cycle: **24**
   the middleware is SyncError-aware + pinned, drop the hand-rolled try/catch from sync/routes.ts (7
   handlers) and let errors propagate to errorHandler — prove behavior-identical via the sync route
   HTTP tests + the new equivalence net. Then repeat for `auth` (7) and `settings` (5).
+- **C25 (feature — maintenance-schedule T3 part 2: whichever-comes-first mileage trigger + bug #12)** —
+  Nothing over budget (feature starved-for 3 < 4), but T3 is mid-build so the loop continues the
+  feature. Built the MILEAGE AXIS of the reminder trigger — the half that makes "whichever comes
+  first" real. DESIGN (grounded in the T3 spec + the C22 nullable schema): the time axis (`findOverdue`,
+  `nextDueDate <= now`) can't see mileage-only reminders (null date) or a `both` reminder that's
+  mileage-due-but-not-time-due, so added a SEPARATE pass. Repository: `findMileageTracking(userId)`
+  returns active `triggerMode != 'time'` reminders with a non-null `nextDueOdometer` (due-ness needs
+  the live odometer, not decidable in SQL); `mileageNotificationExists` + `createMileageNotification`
+  (null dueDate, dueOdometer set) for the app-level dedup, with the C22 partial unique index as the DB
+  backstop (UNIQUE-violation caught → no-op). trigger-service: new `processMileageReminder` — fetches
+  `getCurrentOdometer` (max across expenses.mileage + odometer_entries, the C16 helper), fires ONE
+  notification when `current >= nextDueOdometer`. KEY SEMANTICS: NO auto-re-arm on the mileage axis
+  (re-arm is the explicit mark-serviced path, D3/T4) — a mileage reminder stays due until serviced, so
+  re-triggering is idempotent (proven). A `both` reminder can fire on BOTH axes (distinct events,
+  distinct dedup keys); the passes run independently. D4 single-vehicle enforced at runtime (a !=1
+  vehicle mileage reminder is SKIPPED with a reason, not errored). SCOPE: mileage EXPENSE
+  auto-creation deferred — it needs ratified auto-re-arm semantics (not in D1–D6); this axis emits the
+  notification signal. The whole engine is dormant until T4 wires validation (no mileage reminder is
+  API-creatable yet), so it's safe to land fully built + tested. ALSO FOLDED IN bug #12 (C21 audit):
+  `fastForwardPastNow` ignored `endDate` — a bounded reminder lapsed past maxCatchUp (12) got
+  fast-forwarded past now and left "active" but permanently dormant. Added the same
+  `if (endDate && nextDue > endDate) { deactivate; return }` guard the main loop has. Pinned by
+  `trigger-mileage.test.ts` (5: due/not-due/idempotent-re-trigger/no-vehicle-skip/max-across-sources,
+  all through the real route→service→DB stack) + `trigger-fastforward-enddate.test.ts` (1: a lapsed
+  bounded weekly reminder past the cap is deactivated, not left active — fails against pre-fix code).
+  Verified: tsc 0 · musl-biome clean · 918 pass/0 fail (+6, up from 912) · build bundled.
+  Next cycle (26): `feature` just touched (cyc 25) but T3 still mid-build → **T3 part 3/T4**: routes +
+  validation — `POST /:id/mark-serviced` re-arm (D3: mileage → lastServiceOdometer = current, recompute
+  nextDueOdometer; time → advance nextDueDate), Zod refinements (D4 single-vehicle + intervalMileage
+  required when mileage), and `recheckMileageReminders` on odometer/mileaged-expense write (D5). Then
+  the deferred T2 vehicle-stats.currentMileage reconcile. `guard` (cyc 20, starved-for 5 < 6) and
+  `deep-review` (cyc 21, starved-for 4 < 5) approach budget — candidates if T4 needs a breather.
