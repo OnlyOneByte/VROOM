@@ -167,6 +167,12 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
    per branch. **Test-anchor first**: the cross-tenant IDOR HTTP suite already exercises
    photo-upload ownership — confirm it covers all four entityTypes; add the missing
    characterization cases BEFORE refactoring if not. (highest value: dedup + safety)
+   **SAFETY NET IN PLACE (C17):** `photos/__tests__/entity-ownership-gate.test.ts` now pins the
+   gate's observable contract for ALL entity types (own→200, foreign→404, missing→404, unknown→400,
+   anon→401; 14 cases). **NEXT = EXECUTE the refactor:** route the `vehicle`/`expense`/
+   `insurance_policy` cases through `validateVehicleOwnership`/`validateExpenseOwnership`/
+   `validateInsuranceOwnership`; keep `insurance_claim` (transitive) + `odometer_entry` inline; keep
+   `validatePhotoOwnership` as-is. All 14 gate tests must stay green (behavior-preserving).
 2. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,
    while `expenses` and `providers` (1 each) lean on the shared Hono error middleware

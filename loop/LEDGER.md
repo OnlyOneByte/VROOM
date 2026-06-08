@@ -13,10 +13,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 14 |
 | guard | 6 | 13 |
 | bug | 3 | 14 |
-| arch | 5 | 11 |
+| arch | 5 | 17 |
 | infra | 6 | 12 |
 
-Current cycle: **16**
+Current cycle: **17**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -268,3 +268,25 @@ Current cycle: **16**
   shared validators in utils/validation.ts) — test-anchor the cross-tenant IDOR suite covers all
   four entityTypes FIRST, then refactor. Obey the arch rules (one small behavior-preserving refactor,
   green→green). Or run the rule-7 audit fan-out if arch #1 no longer grounds against source.
+- **C17 (arch — safety net for arch #1)** — `arch` breached budget (cyc 11, starved-for 6 > 5) →
+  forced pick: BACKLOG arch #1 (dedup ownership-validation — `photos/helpers.ts`
+  `validateEntityOwnership` carries a private `validateExpenseOwnership` + inlines vehicle/policy
+  checks that duplicate the exported validators in `utils/validation.ts`). Per **arch rule 3**
+  (test-anchor BEFORE refactoring; if coverage is missing, ADD the characterization test first and
+  that cycle counts as arch/guard), I checked existing coverage: only the `insurance_claim` case had
+  an HTTP test of the ownership gate (`claim-photos-http.test.ts`); `vehicle`/`expense`/
+  `insurance_policy`/`odometer_entry` were UNtested through `validateEntityOwnership`. So this cycle
+  is the SAFETY NET, not the refactor: added `photos/__tests__/entity-ownership-gate.test.ts` — 14
+  HTTP cases pinning the gate's observable contract for EVERY entity type (own→200, foreign-user→404
+  no existence-leak, missing→404) + unknown-type→400 + anon→401. Drove it through `listPhotosForEntity`
+  (a GET exercises the exact gate an upload would, no storage provider needed). The refactor (route
+  the switch through the shared validators) lands NEXT cycle against this net as a pure
+  behavior-preserving change — keeps each commit cleanly reviewable. Verified: tsc 0, Biome musl
+  clean, 889 pass/0 fail (+14), build bundled. No product code touched.
+  Next cycle (18): nothing over budget (arch now 17). Most-starved: `guard` (cyc 13, starved-for 5 →
+  breaches at 19) and `deep-review` (cyc 14, starved-for 4). Highest-leverage: EXECUTE arch #1's
+  refactor now that the net is in — route the photos `entityType` switch through
+  `validateVehicleOwnership`/`validateExpenseOwnership`/`validateInsuranceOwnership` (keep claim +
+  odometer inline; keep `validatePhotoOwnership` as-is), all 14 gate tests must stay green. That's an
+  `arch` pick again but it's the natural completion; alternatively take the starved `guard`/`deep-review`.
+  Lean: complete arch #1 (the net exists, the value is in finishing it) UNLESS balance forces guard.
