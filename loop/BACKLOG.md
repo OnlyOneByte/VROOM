@@ -241,13 +241,18 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
      improved (proper status, not blanket 500) — authorized behavior change. sync-route-errors.test.ts
      updated to the post-drop contract + a live 401-via-central-handler assertion. validate:local green
      (943 pass), full 161-test sync suite green.
-   - [ ] **part 2c — repeat for `auth` (7 try/catch) + `settings` (5).** One route file per cycle. Each
-     LACKS real HTTP-stack error coverage, so do the C30/C36 pattern: characterize current behavior
-     first (a test through app.request pinning today's status+body), THEN drop the try/catch + update
-     the divergent assertions in the same commit. Check each route's throws: a handler that only ever
-     throws AppError subclasses (not SyncError) is already centrally-shaped, so its drop is a pure
-     no-op simplification; a SyncError/handleSyncError user gets the same 500→proper-status improvement
-     as sync. (consistency)
+   - [x] **part 2c-characterize settings (C43).** settings is a DIFFERENT pattern from sync — hand-rolled
+     try/catch rethrowing as AppError with transformed messages (GET / masks any error as 'Failed to
+     fetch settings' 500; PUT / maps ZodError → 'Invalid settings data' 400). Pinned today's behavior in
+     `settings-route-errors.test.ts` (4) with inline notes on what the drop will change. (Also verified
+     updateSettingsSchema carries no C41-class default.)
+   - [ ] **part 2c-drop settings.** Now safe: drop the 5 settings try/catch; let typed errors reach the
+     central handler (GET stops masking; PUT ZodError → central 400 ValidationError). Update the
+     `settings-route-errors.test.ts` 'Invalid settings data' assertion to the central message IN THE
+     SAME COMMIT. Keep any catch that adds REAL value (e.g. a genuine error transform a caller depends
+     on) — but GET/backup/restore are pure boilerplate masks.
+   - [ ] **part 2d — `auth` (7 try/catch).** Same characterize-then-drop pair; check its throw types
+     first (AppError subclasses are already centrally-shaped → drop is a no-op simplification). (consistency)
 2. **Extract the frontend page load-state pattern.** ~14 `+page.svelte` files repeat the same
    `isLoading` / `loadError` / `try → fetch → catch → toast + set error` triad (dashboard,
    expenses, reminders, insurance, analytics, vehicles/[id], settings, profile, …) — the exact

@@ -13,10 +13,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 42 |
 | guard | 6 | 41 |
 | bug | 3 | 38 |
-| arch | 5 | 36 |
+| arch | 5 | 43 |
 | infra | 6 | 40 |
 
-Current cycle: **42**
+Current cycle: **43**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -869,3 +869,22 @@ Current cycle: **42**
   Next cycle (43): nothing over budget (arch cyc 36 starved-for 7 > 5 at cyc 43 — arch breaches) →
   `arch` wins → arch #1 part 2c (drop the `auth`/`settings` try/catch, characterize-then-drop per the
   C30/C36 pattern). T7 (ReminderForm) is the next feature pick after. Filed bugs below; #14 Angelo.
+- **C43 (arch — #1 part 2c-characterize: pin settings-route error behavior)** — `arch` forced (cyc 36,
+  starved-for 7 > 5; bug also over at 5 but lower). Took the settings route (5 try/catch, smaller than
+  auth's 7). GROUNDING (vs source, before acting): settings is a DIFFERENT pattern from sync — it
+  doesn't use handleSyncError; it hand-rolls try/catch that rethrow as AppError with TRANSFORMED
+  messages (GET / masks ANY error as 'Failed to fetch settings' 500; PUT / maps ZodError →
+  AppError('Invalid settings data', 400)). The central errorHandler already shapes AppError, so most is
+  boilerplate — but the GET catch MASKS typed errors (a NotFoundError would surface as a generic 500)
+  and the PUT message is a transform, so dropping CHANGES responses (improvement, but a behavior
+  change). Per the C30/C36 pattern + arch rule 2/3 (settings had NO real HTTP-stack error coverage):
+  this cycle is CHARACTERIZE-FIRST. Committed `settings-route-errors.test.ts` (4: GET positive control,
+  PUT out-of-range syncInactivityMinutes → today's 'Invalid settings data' 400, PUT path-traversal
+  backupConfig → 400, PUT valid partial → 200) pinning today's behavior, with an inline note on the
+  exact code/message the drop will change. ALSO verified (C35 fact) updateSettingsSchema is a
+  `.partial()` of a createInsertSchema with no hand-written default → NOT a C41-class data-loss risk.
+  Verified via validate:local: EXIT 0 (tsc 0 · musl-biome clean · 961 pass/0 fail, +3 · build). Test-only.
+  Next cycle (44): nothing over budget (bug cyc 38 starved-for 6 > 3 at cyc 44 — bug breaches) → `bug`
+  wins. Decided standalone: #9 (interestPaidYtd rename) or #11 (mobile fuel-stat wrap, UI+screenshot).
+  arch #1 remaining: settings-DROP (now safe behind this net) + auth (characterize-then-drop). T7
+  (ReminderForm) still the next feature pick. #14/#16 await Angelo semantics calls.
