@@ -11,12 +11,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 9 |
 | deep-review | 5 | 7 |
-| guard | 6 | 6 |
+| guard | 6 | 13 |
 | bug | 3 | 11 |
 | arch | 5 | 11 |
 | infra | 6 | 12 |
 
-Current cycle: **12**
+Current cycle: **13**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -198,3 +198,15 @@ Current cycle: **12**
   Both breach at 13 → MUST pick the more-starved: `guard` (starved-for 7). Populate the guard
   queue (e.g. the no-slice(0,N) source-scan) OR, since features are now BUILD GO and `feature`
   is also climbing (starved-for 4 at cyc 13), weigh pulling maintenance T1. Guard is forced first.
+- **C13 (guard)** — `guard` was the most-starved over-budget category (last cyc 6, starved-for 7 >
+  budget 6; deep-review also breached at 6 but guard was more starved). Populated the empty guard
+  queue with a merge-surviving source-scan for the C11 bug class: `no-oldest-month-slice.test.ts`
+  fails if any analytics month series chains a `localeCompare` month-sort into `.slice(0, N)` (keeps
+  the OLDEST months / hides the current period). Anchored on `localeCompare` so it does NOT flag the
+  one legit `.slice(0, 50)` (maintenance timeline, sorted NUMERICALLY by daysRemaining) — proven by
+  the guard passing against source that contains both that legit slice and the fixed `.slice(-12)`
+  chains. Verified: tsc 0, Biome musl clean, 858 pass/0 fail (+2), build bundled. No product code.
+  Next cycle (14): `deep-review` is most-starved (cyc 7, starved-for 7 > budget 5 — OVER) → MUST
+  pick it. Take an eyes-on UI sweep (vehicle Overview/ExpensesTable still un-eyes-on'd) or a backend
+  correctness audit (fan out per the arch rule-7 style). `feature` (starved-for 5) breaches right
+  after — maintenance-schedule T1 (the DB migration) is next once deep-review clears.

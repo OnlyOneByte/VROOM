@@ -75,7 +75,10 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   data-loss bug; added the schema-vs-headers coverage guard. CSV path confirmed safe.*
 
 ### guard
-*(queue empty — both seeded items shipped. Re-populate as reviews surface new bug classes.)*
+*(queue empty — re-populate as reviews surface new bug classes.)*
+- ~~**no-oldest-month-slice guard**~~ — *DONE C13: source-scan `no-oldest-month-slice.test.ts`
+  pins the C11 class (a localeCompare month-sort must not chain into `.slice(0,N)`); excludes the
+  legit numeric `.slice(0,50)` maintenance-timeline by anchoring on localeCompare.*
 - ~~**EUR/unit visual guard**~~ — *already built before the loop (insurance-currency-label +
   vehicle-form-unit-defaults e2e); confirmed cycle 2.*
 - ~~**Category-grid no-wrap guard**~~ — *DONE cycle 2: committed source-scan
