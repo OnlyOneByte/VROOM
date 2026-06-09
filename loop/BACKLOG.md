@@ -191,11 +191,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    while header reads "All Expenses ({totalCount})" — matches on other pages invisible; the
    in-table category Select is uncontrolled here (no `onCategoryChange`). Wire server-side
    filtering (as `/expenses` does) or hide the controls when paginated. (medium)
-3. **ExpensesTable ScrollArea `h-[{scrollHeight}]` is a DEAD class — CONFIRMED C14 via DOM probe**
-   (`h-[600px]` present but no CSS rule generated → height is content-driven, the 600px cap +
-   internal scroll NEVER engage; latent unbounded growth on a >~20-row vehicle). Fix: inline
-   `style="height: …"` like ChartCard. The same interpolated-`h-[CHART_HEIGHT]` in ExpenseTrendChart/
-   FuelEfficiencyTrendChart is harmless (ChartCard sets real height via style) but worth the sweep. (med, overflow)
+- ~~**ExpensesTable ScrollArea `h-[{scrollHeight}]` is a DEAD class (#3)**~~ — *DONE C65: Tailwind can't
+   generate a rule for a runtime-interpolated arbitrary value, so `h-[{scrollHeight}]` produced NO CSS — the
+   600px cap + internal scroll never engaged and a many-row vehicle grew unbounded (CONFIRMED C14 via DOM
+   probe). Fixed: inline `style="height: {scrollHeight}"` (ScrollArea spreads style to the DOM; the ChartCard
+   idiom). MERGE-SURVIVING GUARD: `no-interpolated-arbitrary-class.test.ts` source-scans every `.svelte` for
+   `<util>-[…{…]` (static `h-[600px]` never matches). The two chart `h-[{CHART_HEIGHT}px]` are the SAME dead
+   class but HARMLESS (each passes `height={CHART_HEIGHT}` to its ChartCard wrapper, which sets the real height
+   in style) → excluded with a documented anchor, not edited (avoids a blocked eyes-on chart change). frontend
+   validate:local EXIT 0 (367 tests, +2). CAVEAT: eyes-on Playwright-blocked; fix is tsc/build-verified + the
+   proven ChartCard idiom.*
 4. **ExpensesTable combined-row re-sort lacks an id tiebreaker** — same-date/amount rows can
    reorder vs the server's id-tiebroken order. Cosmetic flicker. (low)
 

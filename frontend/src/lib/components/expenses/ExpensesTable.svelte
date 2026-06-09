@@ -654,7 +654,12 @@
 {:else}
 	<!-- Desktop: full table -->
 	<div class="rounded-md border bg-card overflow-hidden">
-		<ScrollArea class="h-[{scrollHeight}] w-full">
+		<!-- height MUST be an inline style, not `h-[{scrollHeight}]`: Tailwind only generates
+		     arbitrary-value classes it can see as STATIC literals at build time, so a runtime-
+		     interpolated `h-[600px]` produces no CSS rule (confirmed C14 via DOM probe) — the cap
+		     + internal scroll never engage and a many-row vehicle grows unbounded. Inline style is
+		     the ChartCard idiom for a dynamic height. -->
+		<ScrollArea class="w-full" style="height: {scrollHeight}">
 			<Table>
 				<TableHeader>
 					<TableRow>

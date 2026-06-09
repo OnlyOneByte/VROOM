@@ -21,11 +21,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 64 |
 | deep-review | 5 | 60 |
 | guard | 6 | 62 |
-| bug | 3 | 61 |
+| bug | 3 | 65 |
 | arch | 5 | 63 |
 | infra | 6 | 59 |
 
-Current cycle: **64**
+Current cycle: **65**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1252,3 +1252,19 @@ Current cycle: **64**
   applyMapping round-trip. Pure module, fully additive. Verified: backend validate:local EXIT 0 (tsc 0 ·
   musl-biome clean · 1006 pass/0 fail, +10 · build bundled). Next (65): recompute — `infra` most-starved
   (cyc 59, starved-for 6 = budget 6, AT) likely; deep-review (cyc 60, 5=5 AT) close behind.
+- **C65 (bug #3 — ExpensesTable dead interpolated `h-[{scrollHeight}]` class)** — recompute: `bug` was the
+  only STRICTLY-over category (cyc 61, starved-for 4 > 3) — infra+deep-review only sat AT budget — so bug won
+  by the tightest-over rule (NOT infra as the C64 forecast guessed; the standing mis-forecast lesson). Top bug
+  (lease/loan) PENDING ANGELO → took #3 (decided, fully verifiable). VERIFIED against source: ExpensesTable
+  line 657 `<ScrollArea class="h-[{scrollHeight}] w-full">` — Tailwind only emits arbitrary-value utilities it
+  sees as STATIC literals at build time, so a runtime-interpolated `h-[{scrollHeight}]` generates NO rule →
+  the 600px cap + internal scroll never engaged → a many-row vehicle grew unbounded (CONFIRMED C14 via DOM
+  probe). Fix: inline `style="height: {scrollHeight}"` (ScrollArea spreads style to the DOM; the ChartCard
+  idiom). MERGE-SURVIVING GUARD (quality-bar #5): `no-interpolated-arbitrary-class.test.ts` source-scans every
+  `.svelte` for `<util>-[…{…]` (static `h-[600px]` never matches; comment-strip so the explanatory comment
+  quoting the dead pattern doesn't self-trip). VERIFIED THE C14 "harmless charts" CLAIM against source: the
+  two `h-[{CHART_HEIGHT}px]` ARE the same dead class but masked (each passes `height={CHART_HEIGHT}` to its
+  ChartCard wrapper, which sets the real height) → excluded with a documented anchor, not edited (avoids a
+  blocked eyes-on chart change). frontend validate:local EXIT 0 (tsc 0 · build · 367 tests, +2 · prettier
+  clean). CAVEAT: eyes-on Playwright-blocked; fix is tsc/build-verified + the proven idiom. Next (66): recompute
+  — `infra` (cyc 59, 7 > 6, OVER) + `deep-review` (cyc 60, 6 > 5, OVER) both over; infra most-starved → wins.
