@@ -370,6 +370,13 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**Land NORTH_STAR loop-improvement #3 (C59)**~~ — *DONE C59: the FE→BE→DB→render E2E feature-DoD
+  rule (Angelo-approved 2026-06-09) was rolled out split — its BACKLOG "FEATURE DoD" pair landed C57 but the
+  NORTH_STAR quality-bar half was cut by a 503, leaving the vision file inconsistent. Added the round-trip-E2E
+  sentence to NORTH_STAR §3 (green build = FLOOR; harness-blocked E2E → "code-complete, eyes-on pending", not
+  done). Verified against the approved #3 wording, not a self-authored vision change. Also confirmed the cheap
+  half of the #5 cadence: zero stray untracked unit tests. All 5 loop-improvements now landed (#1 still needs
+  live shell). Doc-only.*
 - ~~**CLAUDE.md post-C52 orientation refresh (C53)**~~ — *DONE C53: "Current state" still listed the
   vehicle-stats reconcile (T3-part-3) as REMAINING, but C52 shipped it (additive `currentOdometer`) — a
   fresh agent would re-do done work. Rewrote to "T3-part-3 DONE, remaining T9 only", noted the two

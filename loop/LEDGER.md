@@ -23,9 +23,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 55 |
 | bug | 3 | 57 |
 | arch | 5 | 56 |
-| infra | 6 | 53 |
+| infra | 6 | 59 |
 
-Current cycle: **58**
+Current cycle: **59**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1159,3 +1159,19 @@ Current cycle: **58**
   Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 987 pass/0 fail, +14 · build bundled).
   Next (59): recompute all 6 — `deep-review` most-starved (cyc 54, starved-for 5 = budget) likely wins;
   T2 (presets + detectSource) is the next import-trackers increment when feature comes due again.
+- **C59 (infra — land the pre-authorized NORTH_STAR loop-improvement #3 straggler)** — BALANCE: nothing
+  strictly OVER; `infra` most-starved AT budget (cyc 53, starved-for 6 = 6, breaches next), and a verified
+  uncommitted doc edit was already sitting in the tree, so landing it IS the cleanest infra increment (a
+  dangling pre-authorized edit risks being lost or bundled into unrelated work). Angelo ratified loop-improvements
+  #2–#5 on 2026-06-09; the #3 rollout was split — its BACKLOG "FEATURE DoD" pair committed C57, but the
+  NORTH_STAR quality-bar half was cut by a 503. This adds the FE→BE→DB→render E2E feature-DoD sentence to
+  NORTH_STAR §3 (a green build is the FLOOR; a new capability isn't done until one round-trip E2E exercises
+  the FE↔BE seam where integrated bugs hide — harness-blocked → "code-complete, eyes-on pending", not done),
+  making the vision file consistent with the already-committed BACKLOG/LEDGER halves. NOT a self-authored
+  vision change — it's the approved edit, verified against the #3 wording before landing. Also confirmed (the
+  cheap half of the #5 cadence): zero stray untracked `*.test.ts` outside the by-design `*.meshclaw.e2e.ts`
+  set, so no coverage is silently dropping on merge. Doc-only, no build gate. ALL FIVE loop-improvements now
+  landed (#1 Playwright-unblock still needs live shell; #2 contract-guard shipped C55; #3 here; #4 coverage-
+  trend note; #5 branch-hygiene cadence). Next (60): recompute — `deep-review` most-starved (cyc 54, starved-
+  for 6 > budget 5, now OVER) → wins; a correctness/eyes-on review of a shipped surface (C58 import-mapping is
+  freshly landed but self-authored — higher independent value to review the vehicle Overview/ExpensesTable).
