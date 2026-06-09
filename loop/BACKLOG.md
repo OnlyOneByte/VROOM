@@ -120,6 +120,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Characterize `withTimeout` (0%-coverage utility, C82)**~~ — *DONE C82: steered by the C81 coverage
+  baseline to a concrete 0%-covered module. `utils/timeout.ts` (withTimeout + OPERATION_TIMEOUTS) is live in
+  the sync backup path (backup-orchestrator, sync/routes) — a hung Drive/Sheets call must fail as a typed
+  SyncError, not hang. Pinned the 3 race outcomes (value-resolves-wins / timeout→SyncError(NETWORK_ERROR)
+  with the "op timed out after Nms" message / the promise's OWN rejection wins — a real error isn't masked
+  as a timeout) + the 5 OPERATION_TIMEOUTS constants. Small real timeouts (10ms vs 200ms margins), no
+  fake-timer dep, deterministic. timeout.ts 0%→covered. 1055 BE pass (+5). cov: be ~78% / fe 63.7%.*
 - ~~**Insurance analytics (getInsurance/buildInsuranceDetails) audit (C73)**~~ — *DONE C73: the
   insurance-analytics path had ZERO test coverage. Read against source: cost-shape handling correct (bug #8
   effectiveMonthlyPremium — monthly + amortized-total both non-zero), latest-term-by-endDate selection +

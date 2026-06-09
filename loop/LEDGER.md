@@ -23,13 +23,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 70 |
-| deep-review | 5 | 77 |
+| deep-review | 5 | 82 |
 | guard | 6 | 80 |
 | bug | 3 | 71 |
 | arch | 5 | 79 |
 | infra | 6 | 81 |
 
-Current cycle: **81**
+Current cycle: **82**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1514,3 +1514,19 @@ Current cycle: **81**
   it doesn't change the broader picture — feature/bug remain Angelo-gated; the high-leverage moves are still
   the lease/loan approval + eyes-on/Playwright unblock + branch review. Next (82): deep-review (cyc 77, 5 =
   budget, most-starved actionable) — but if no clean target, will HOLD rather than churn. cov: be 77.8% / fe 63.7%
+- **C82 (deep-review — characterize `withTimeout`, the 0%-coverage timeout utility)** — feature (12) + bug
+  (11) blocked (8th cycle); most-starved ACTIONABLE = deep-review (cyc 77, AT budget). The C81 coverage
+  baseline turned "deep-review is thin" into a GROUNDED pick: `utils/timeout.ts` was at 0% yet is LIVE in the
+  sync backup path (backup-orchestrator, sync/routes) — a hung Drive/Sheets call must fail as a typed
+  SyncError, not hang forever. Read it + pinned the 3 race outcomes via timeout.test.ts (+5): the promise
+  value wins when it resolves first; a timeout throws SyncError(NETWORK_ERROR) with the "<op> timed out after
+  <ms>ms" message; the promise's OWN rejection wins when it rejects first (a real upstream error is NOT
+  masked as a timeout) + the 5 OPERATION_TIMEOUTS budgets. Small real timeouts (10ms vs 200ms), no
+  fake-timer dep, deterministic. Caught + fixed my own import-path bug pre-gate (../errors → ../../errors
+  from the deeper __tests__ dir). timeout.ts 0%→covered — the first concrete ratchet-move on a C81 low spot.
+  Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1055 pass/0 fail, +5 · build bundled).
+  NOTE: this is real (a live-but-untested utility now pinned), and the C81 baseline gives genuine runway on
+  the named low spots (frontend modules, pending-credentials.ts) — so the loop has non-churn coverage work
+  for a few cycles. But feature/bug stay Angelo-gated; the high-leverage moves remain the lease/loan approval
+  + eyes-on unblock + branch review. Next (83): recompute — arch (cyc 79, starved-for 4) likely; or a guard
+  steered to a frontend low-cov module. cov: be ~78% / fe 63.7%
