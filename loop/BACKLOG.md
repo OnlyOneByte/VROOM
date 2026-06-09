@@ -91,6 +91,22 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 1. **Eyes-on sweep: vehicle Overview tab + ExpensesTable populated states** (mobile +
    desktop) — code-reviewed C3 (findings below); still wants a real eyes-on screenshot pass.
 2. **Analytics route eyes-on** (per-vehicle + cross-vehicle + year-end), states + a11y.
+
+> **NOTE → T3 wiring (surfaced by the C60 import-mapping audit, for when import-trackers T3 lands):**
+> (a) `applyMapping`'s `target` param DEFAULTS to `{}` — if T3 passes `mapping.distanceUnit`/`volumeUnit`
+> (the FILE's units) but forgets `target` (the vehicle's units), values store UNCONVERTED yet labeled as
+> the vehicle's unit → silent unit corruption. T3 must always pass the resolved target vehicle's units.
+> (b) `normalizeDecimal` treats a lone comma as a DECIMAL separator unconditionally, so a US-thousands
+> value (`"1,234"`) becomes `1.234`. Fine for presets (comma-as-thousands handled at the preset layer),
+> but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
+> hint on `ColumnMapping` if manual mapping ships before presets cover it.
+
+- ~~**C58 import-mapping.ts backend audit (C60)**~~ — *DONE C60: adversarial read of the freshly-landed
+  (self-authored, un-reviewed) translation pre-pass. Verdict: CORRECT for its documented contract. Locked
+  two verified-but-uncovered branches with characterization guards (NORTH_STAR #5): ISO-with-explicit-tz
+  honored as an absolute instant (the one date branch that must NOT use local-time construction), and the
+  non-finite-mapped-value → defer-to-buildImportPlan-per-row-error contract (mapVolume/mapMileage don't
+  throw on garbage). +3 tests (987→990). Surfaced two T3-wiring risks (noted above), neither a C58 defect.*
 - ~~**Backend: Sheets restore path**~~ — *DONE C3: found + fixed the clientId column-drop
   data-loss bug; added the schema-vs-headers coverage guard. CSV path confirmed safe.*
 

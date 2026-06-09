@@ -228,3 +228,56 @@ describe('applyMapping → buildImportPlan round-trip (the consumable-output pro
     expect(exp.date.getDate()).toBe(15);
   });
 });
+
+// ── C60 deep-review: characterization guards for two verified-but-uncovered branches.
+// The C58 audit confirmed these behave correctly; pin them so a future edit can't
+// silently regress (NORTH_STAR quality-bar #5).
+
+describe('normalizeForeignDate — an ISO value with an explicit timezone is an absolute instant', () => {
+  test('a Z-suffixed ISO timestamp is honored as-is (NOT re-interpreted in local time)', () => {
+    // This is the one branch that must NOT use local-time construction: the value already
+    // names an absolute instant, so it round-trips through Date unchanged regardless of the
+    // runner's zone. (A date-ONLY iso value still takes the local-time path — covered above.)
+    const iso = '2024-03-15T08:30:00.000Z';
+    expect(normalizeForeignDate(iso, 'iso')).toBe(new Date(iso).toISOString());
+  });
+
+  test('an explicit +hh:mm offset is preserved as the same instant', () => {
+    // 2024-03-15T00:00+02:00 is 2024-03-14T22:00Z — the offset must be respected, not dropped.
+    expect(normalizeForeignDate('2024-03-15T00:00:00+02:00', 'iso')).toBe(
+      new Date('2024-03-15T00:00:00+02:00').toISOString()
+    );
+  });
+});
+
+describe('applyMapping — a non-finite mapped value is passed through for buildImportPlan to error', () => {
+  // mapVolume/mapMileage deliberately DON'T throw on garbage: they hand the raw value
+  // downstream so it surfaces as a normal per-row error (not a whole-file crash). This pins
+  // that contract end-to-end through the real buildImportPlan.
+  test('a non-numeric volume/mileage becomes a per-row error, not a thrown exception', () => {
+    const vehicles: ImportVehicle[] = [
+      { id: 'veh-1', make: 'Honda', model: 'Civic', year: 2020, nickname: 'Daily Driver' },
+    ];
+    const csv = [
+      'Date,Odo,Vol,Price,Type',
+      '2024-03-15,not-a-number,abc,42.00,fuel', // garbage odo + volume
+    ].join('\n');
+    const mapping: ColumnMapping = {
+      columns: { date: 'Date', mileage: 'Odo', volume: 'Vol', amount: 'Price', category: 'Type' },
+      targetVehicle: 'Daily Driver',
+      dateFormat: 'iso',
+      distanceUnit: DistanceUnit.MILES,
+      volumeUnit: VolumeUnit.GALLONS_US,
+    };
+    // applyMapping itself does not throw — the garbage passes through verbatim.
+    const native = applyMapping(csv, mapping, {
+      distanceUnit: DistanceUnit.MILES,
+      volumeUnit: VolumeUnit.GALLONS_US,
+    });
+    const plan = buildImportPlan(native.csv, vehicles);
+    // buildImportPlan reports it as a normal per-row error (fuel row needs valid volume+mileage).
+    expect(plan.readyCount).toBe(0);
+    expect(plan.errorCount).toBe(1);
+    expect(plan.rows[0].status).toBe('error');
+  });
+});

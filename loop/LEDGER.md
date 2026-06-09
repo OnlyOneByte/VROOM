@@ -19,13 +19,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 58 |
-| deep-review | 5 | 54 |
+| deep-review | 5 | 60 |
 | guard | 6 | 55 |
 | bug | 3 | 57 |
 | arch | 5 | 56 |
 | infra | 6 | 59 |
 
-Current cycle: **59**
+Current cycle: **60**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1175,3 +1175,18 @@ Current cycle: **59**
   trend note; #5 branch-hygiene cadence). Next (60): recompute — `deep-review` most-starved (cyc 54, starved-
   for 6 > budget 5, now OVER) → wins; a correctness/eyes-on review of a shipped surface (C58 import-mapping is
   freshly landed but self-authored — higher independent value to review the vehicle Overview/ExpensesTable).
+- **C60 (deep-review — adversarial audit of C58 import-mapping.ts)** — both queued deep-reviews (#1 vehicle
+  Overview, #2 analytics) are eyes-on/Playwright-blocked, so took the highest-leverage EXECUTABLE review: a
+  backend correctness audit of the freshest un-reviewed surface — C58's self-authored `import-mapping.ts`
+  (real edge-case logic in unit-convert/decimal/date parsing, zero independent review). VERDICT: CORRECT for
+  its documented contract — no defect. Pinned two verified-but-uncovered branches with characterization
+  guards (NORTH_STAR #5): (a) an ISO value with an explicit tz (Z or ±hh:mm) is honored as an absolute
+  instant — the ONE date branch that must NOT use local-time construction; (b) the non-finite-mapped-value
+  contract — mapVolume/mapMileage pass garbage through verbatim so it surfaces as a normal buildImportPlan
+  per-row error, never a whole-file crash. Running the focused test FIRST confirmed both assumptions held
+  (verify-against-source). +3 tests (987→990). Surfaced two latent T3-WIRING risks (not C58 defects, noted
+  in BACKLOG): applyMapping's `target` defaults to {} (T3 must pass the vehicle's units or values store
+  unconverted-but-relabeled), and normalizeDecimal treats a lone comma as decimal (a manual US-thousands
+  mapping would corrupt — fine once presets cover it). Verified: backend validate:local EXIT 0 (tsc 0 ·
+  musl-biome clean · 990 pass/0 fail · build bundled). Next (61): recompute — `guard` most-starved (cyc 55,
+  starved-for 6 = budget 6, AT) likely; bug AT (cyc 57, 4>3 OVER) jumps if a real defect is queued.
