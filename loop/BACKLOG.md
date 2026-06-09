@@ -202,9 +202,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    Numbers) keyed it as "﻿date" → record.date undefined → EVERY row failed a misleading "Invalid date".
    Anchored by a real-stack HTTP regression in import-csv.test.ts (BOM CSV imports cleanly; pre-fix
    imported:0/errorCount:1). validate:local EXIT 0 (962 pass).*
-6. **CSV import: date-only cells midnight-UTC** (`import-csv.ts:~120` `new Date(raw)`) + **currency
-   column silently ignored** on import — same class as C6; foreign/edited files commonly use
-   date-only and other currencies. (correctness, med)
+- ~~**CSV import: date-only cells midnight-UTC (#6a)**~~ — *DONE C61: `parseDate` did `new Date(raw)`, so a
+   bare `YYYY-MM-DD` (hand-edited/foreign file) parsed as UTC midnight → rolled the calendar day BACK for any
+   user west of UTC (cycle-6/11 class). Fix: detect date-only via regex + build from parts in LOCAL time;
+   full-ISO and other parseable strings keep their absolute-instant semantics via `new Date`. +2 HTTP tests
+   (date-only keeps local day; full-ISO instant un-regressed). validate:local EXIT 0 (992 pass). The
+   "**currency column silently ignored**" half (#6b) was investigated + DISMISSED: `currencyUnit` is a
+   USER-SETTINGS field (schema.ts:303), NOT per-expense — amounts store as bare numbers in the user's single
+   currency, so the export's `currency` column is informational and ignoring it on re-import is correct (no
+   per-expense currency to store; "converting" would be wrong). Not a bug.*
 7. **Analytics month bucketing uses local-tz `getMonth()`** (`analytics-charts.ts toMonthKey:~131`
    + heatmap/TCO/day-of-week/seasonal) — backend twin of the C6 class; benign if server runs UTC,
    real on a negative-offset host. Verify deploy TZ first, then bucket on UTC. (correctness, low-med)

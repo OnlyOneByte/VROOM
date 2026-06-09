@@ -126,8 +126,18 @@ function parseCategory(
 
 /** Required Date-parseable timestamp (ISO from our export, but any parseable string is fine). */
 function parseDate(raw: string): { value: Date } | { error: string } {
-  const date = new Date(raw);
-  if (!raw || Number.isNaN(date.getTime())) return { error: `Invalid date "${raw}"` };
+  if (!raw) return { error: `Invalid date "${raw}"` };
+  // A DATE-ONLY value (YYYY-MM-DD, no time component) must be built in LOCAL time
+  // (cycle-6/11 discipline): `new Date('2024-03-15')` parses as UTC midnight, which rolls
+  // the calendar day BACK for every user west of UTC. Our own export writes full ISO with a
+  // time, so a VROOM round-trip is unaffected — this guards a hand-edited or foreign
+  // date-only file imported on the native path. Anything else (full ISO with time/zone, or
+  // any other parseable string) keeps its original absolute-instant semantics via `new Date`.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(raw);
+  if (Number.isNaN(date.getTime())) return { error: `Invalid date "${raw}"` };
   return { value: date };
 }
 

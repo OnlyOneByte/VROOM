@@ -21,11 +21,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 58 |
 | deep-review | 5 | 60 |
 | guard | 6 | 55 |
-| bug | 3 | 57 |
+| bug | 3 | 61 |
 | arch | 5 | 56 |
 | infra | 6 | 59 |
 
-Current cycle: **60**
+Current cycle: **61**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1190,3 +1190,17 @@ Current cycle: **60**
   mapping would corrupt — fine once presets cover it). Verified: backend validate:local EXIT 0 (tsc 0 ·
   musl-biome clean · 990 pass/0 fail · build bundled). Next (61): recompute — `guard` most-starved (cyc 55,
   starved-for 6 = budget 6, AT) likely; bug AT (cyc 57, 4>3 OVER) jumps if a real defect is queued.
+- **C61 (bug #6a — CSV-import date-only midnight-UTC day-shift)** — `bug` OVER (cyc 57, starved-for 4 > 3,
+  tightest budget). Top bug (lease/loan) PENDING ANGELO, so took the next decided one. VERIFIED against
+  source: `parseDate` (import-csv.ts) did `new Date(raw)` — a bare `YYYY-MM-DD` (hand-edited or foreign file,
+  not our own export which writes full ISO) parses as UTC midnight → the calendar day rolls BACK for any user
+  west of UTC (the cycle-6/11 class, native-import twin of the C58 normalizeForeignDate fix). Fix: detect
+  date-only via `^\d{4}-\d{2}-\d{2}$` and build from parts in LOCAL time; full-ISO + any other parseable
+  string keep their absolute-instant semantics via `new Date`. +2 HTTP tests (date-only keeps local day in
+  any CI zone via the timezone-independent local-getter invariant; full-ISO instant un-regressed). The
+  bundled "#6b currency column silently ignored" half was INVESTIGATED + DISMISSED (not a bug): currencyUnit
+  is a USER-SETTINGS field (schema.ts:303), not per-expense — amounts store as bare numbers in the user's
+  single currency, so the export's `currency` column is informational and ignoring it on re-import is correct.
+  Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 992 pass/0 fail, +2 · build bundled).
+  Next (62): recompute — `guard` most-starved (cyc 55, starved-for 7 > 6, now OVER) → wins; the queued guard
+  is generalizing the FE↔BE contract-drift lock (loop-improvement #2) to another hand-assembled response.
