@@ -7,10 +7,14 @@
 > `cov: be <pct>% / fe <pct>%` (the last reading; carry the prior numbers forward + mark
 > `~` if you didn't re-measure this cycle). Re-measure (`bun test --coverage` / vitest
 > `--coverage`) at least on guard/arch/bug cycles that touch a module. The standing goal is
-> 90% both sides (baseline be ~74% / fe ~59%); when `guard` or `arch` is the balance pick and
-> nothing more urgent is queued, STEER it to the lowest-covered, highest-risk module rather
-> than picking blind — that turns the 90% goal into a ratchet instead of an aspiration.
-> Never let a cycle DROP coverage without naming why.
+> 90% both sides. **MEASURED BASELINE (C81, the first real reading — the rule had silently
+> lapsed C52–C80, no entry carried a cov: tag): be 77.8% line / 76.9% func · fe 63.7% line /
+> 60.6% func / 56% branch** (both up from the long-stale ~74%/~59% estimates, confirming the
+> test-adding cycles moved the needle — just unmeasured). When `guard`/`arch` is the pick and
+> nothing's more urgent, STEER it to the lowest-covered, highest-risk module (frontend is the
+> bigger gap; `backend/src/utils/timeout.ts` 0% + `pending-credentials.ts` 76% are concrete
+> low spots) — turns the 90% goal into a ratchet, not an aspiration. Never DROP coverage
+> without naming why.
 
 ## Balance table
 `starved-for = current cycle − last-touched`. If `starved-for > budget` for any category,
@@ -23,9 +27,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 80 |
 | bug | 3 | 71 |
 | arch | 5 | 79 |
-| infra | 6 | 76 |
+| infra | 6 | 81 |
 
-Current cycle: **80**
+Current cycle: **81**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1496,3 +1500,17 @@ Current cycle: **80**
   +2 · build bundled). Next (81): with #2 closed AND feature/bug/arch-#2 all blocked, the only actionable
   categories are infra (cyc 76, 5) / deep-review (cyc 77, 4) — and both are thin (sweep done C76, financing
   deep-review arch-DI-blocked). Genuinely at diminishing returns; will hold for a clean increment or re-flag.
+- **C81 (infra — measure the real coverage baseline; revive lapsed loop-improvement #4)** — feature (11) +
+  bug (10) blocked (7th cycle); most-starved ACTIONABLE = infra. Instead of asserting "infra is thin," I
+  VERIFIED a real gap against source: loop-improvement #4 ("end every cycle-log entry with a cov: tag,
+  re-measure on guard/arch/bug cycles") had SILENTLY LAPSED — NO entry C52–C80 carried a cov: tag, so the
+  "90% ratchet" was tracking nothing and the cited ~74%/~59% baseline was long stale. Ran a real pass both
+  sides: backend `bun test --coverage` = 77.8% line / 76.9% func; frontend `vitest --coverage` = 63.7% line
+  / 60.6% func / 56% branch — BOTH up from the stale estimates (the test-adding cycles DID move the needle,
+  just unmeasured). Recorded the measured baseline in the coverage-trend note + named concrete low spots to
+  steer future guard/arch picks (frontend overall; backend timeout.ts 0%, pending-credentials.ts 76%), and
+  re-anchored the rule with this entry's cov: tag. Doc-only (the measurement IS the work; suites unchanged at
+  1050 BE / 367 FE, all green). HONEST NOTE: this is a real infra fix (a lapsed loop mechanism revived), but
+  it doesn't change the broader picture — feature/bug remain Angelo-gated; the high-leverage moves are still
+  the lease/loan approval + eyes-on/Playwright unblock + branch review. Next (82): deep-review (cyc 77, 5 =
+  budget, most-starved actionable) — but if no clean target, will HOLD rather than churn. cov: be 77.8% / fe 63.7%
