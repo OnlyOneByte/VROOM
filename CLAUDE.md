@@ -120,13 +120,19 @@ Highlights:
     `markServiced` client), T7 (`ReminderForm` trigger-mode control + mileage branch), T8 (/reminders
     milestone render + "Serviced" re-arm button) all shipped — **T7/T8 await an eyes-on screenshot**
     (the Playwright harness is sandbox-denied in the autonomous loop; an untracked
-    `reminder-mileage.meshclaw.e2e.ts` captures it on regress.sh). **Remaining: T9** (commit the e2e)
-    + the deferred `vehicle-stats.currentMileage` reconcile (T3-part-3). Track in its `tasks.md`.
+    `reminder-mileage.meshclaw.e2e.ts` captures it on regress.sh). The deferred T3-part-3 vehicle-stats
+    reconcile is **DONE (C52)** — chose the additive path: GET /stats now also returns an all-time,
+    all-sources `currentOdometer` (via `getCurrentOdometer`), with the period-filtered + fuel-only
+    `currentMileage` left untouched (zero behavior change), pinned by `vehicle-stats-current-odometer.test.ts`.
+    **Remaining: T9 only** (promote the e2e + the T7/T8 eyes-on). Two follow-ons are flagged to Angelo
+    (deferred, not loop-blocking): lease/loan miles-used still consume the period-scoped `currentMileage`
+    and should switch to `currentOdometer` (a real but user-visible $ change), and the "Current Mileage"
+    stat-card display-semantics is a direction call. Track in its `tasks.md`.
   - `.kiro/specs/import-trackers/` (Fuelly/Fuelio/Drivvo CSV via a mapping pre-pass over the
     hardened import pipeline) is **approved, not started** (T1+).
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides (last-measured
-  baseline in TODO.md: frontend ~59%, backend ~74% — the backend suite has grown to ~962 tests
-  + frontend ~345 since, so treat these as a floor, not a current reading) — fold into
+  baseline in TODO.md: frontend ~59%, backend ~74% — the backend suite has grown to ~966 tests
+  + frontend ~355 since, so treat these as a floor, not a current reading) — fold into
   bug/guard/arch cycles, don't regress it.
 - Open gaps: full in-process backend HTTP harness needs a DB-injection refactor (the
   `const sqlite = new Database(...)` singleton binds at import); screenshot visual-diffing is

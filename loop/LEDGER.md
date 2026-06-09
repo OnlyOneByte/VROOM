@@ -14,9 +14,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 48 |
 | bug | 3 | 51 |
 | arch | 5 | 50 |
-| infra | 6 | 47 |
+| infra | 6 | 53 |
 
-Current cycle: **52**
+Current cycle: **53**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1063,3 +1063,12 @@ Current cycle: **52**
   true odometer is a display-semantics direction call. Both deferred — not blocking. Next cycle (53):
   recompute all 6 — `deep-review` (cyc 49, starved-for 4) and `infra` (cyc 47, starved-for 6 = budget) lead;
   deep-review likely wins. T9 (e2e + eyes-on) remains Playwright-sandbox-blocked here.
+- **C53 (infra — refresh stale CLAUDE.md orientation post-C52)** — recomputed all 6: nothing strictly
+  OVER budget; `infra` was most-starved AT budget (6 = 6, breaches next cycle), so took the recurring
+  highest-leverage infra item (the orientation-doc refresh, last done C47). VERIFIED the drift before
+  acting: CLAUDE.md "Current state" listed the vehicle-stats reconcile (T3-part-3) as REMAINING, but C52
+  shipped it — a fresh agent would re-do completed work. Rewrote that line to "T3-part-3 DONE (additive
+  currentOdometer); remaining T9 only", noted the two Angelo-flagged follow-ons (lease/loan consumer bug +
+  card display call), and bumped the stale test floors (~962→966 be / ~345→355 fe). Doc-only — working
+  tree carried only CLAUDE.md, no build gate needed. Next cycle (54): `deep-review` most-starved
+  (cyc 49, starved-for 5 = budget) → likely an eyes-on/logic review (T9 e2e still Playwright-blocked).

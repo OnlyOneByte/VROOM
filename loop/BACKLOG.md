@@ -300,6 +300,11 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 
 ### infra
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**CLAUDE.md post-C52 orientation refresh (C53)**~~ — *DONE C53: "Current state" still listed the
+  vehicle-stats reconcile (T3-part-3) as REMAINING, but C52 shipped it (additive `currentOdometer`) — a
+  fresh agent would re-do done work. Rewrote to "T3-part-3 DONE, remaining T9 only", noted the two
+  Angelo-flagged follow-ons (lease/loan consumer bug + card display call), bumped stale test floors
+  (~962→966 be / ~345→355 fe). Doc-only, verified drift against source before editing.*
 - ~~**CLAUDE.md maintenance-schedule status refresh (C47)**~~ — *DONE C47: the orientation doc was
   stale since C26 (said backend dormant-until-T4, frontend T6–T9 to-do) — but C31–C46 shipped the full
   backend + frontend T6/T7/T8. Rewrote to: backend COMPLETE, frontend T6–T8 (T7/T8 eyes-on-pending),
