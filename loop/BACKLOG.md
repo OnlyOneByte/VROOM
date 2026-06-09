@@ -82,6 +82,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 - ~~**Backend: Sheets restore path**~~ — *DONE C3: found + fixed the clientId column-drop
   data-loss bug; added the schema-vs-headers coverage guard. CSV path confirmed safe.*
 
+- ~~**FE↔BE contract-drift lock on the /stats response (C55)**~~ — *DONE C55: implements loop-improvement
+  proposal #2 for the freshest surface. The /stats response is hand-assembled in routes.ts
+  (`c.json({ period, ...stats, currentOdometer })`) with NO type binding to the frontend `VehicleStats`
+  contract — backend `calculateVehicleStats` returns 11 fields, the route adds period + currentOdometer
+  separately (C52 widened this). 3 HTTP cases in vehicle-stats-current-odometer.test.ts assert
+  `Object.keys(data).sort()` EXACTLY equals the 13-field frontend contract (bidirectional: dropped OR
+  unmirrored-added key both fail; shape-stable across empty/populated + all 5 periods). 969 BE pass.
+  FUTURE: generalize to other hand-assembled multi-field responses (the proposal's broader intent).*
 - ~~**Lock the frontend null-nextDueDate invariant (C48)**~~ — *DONE C48: extracted null-safe
   `isReminderTimeDue` + `isMileageTracking` to `reminder-helpers.ts`, routed the /reminders page
   through them, pinned by `reminder-helpers.test.ts` (5, incl. the load-bearing "null nextDueDate is

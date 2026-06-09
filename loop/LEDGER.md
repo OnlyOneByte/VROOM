@@ -11,12 +11,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 52 |
 | deep-review | 5 | 54 |
-| guard | 6 | 48 |
+| guard | 6 | 55 |
 | bug | 3 | 51 |
 | arch | 5 | 50 |
 | infra | 6 | 53 |
 
-Current cycle: **54**
+Current cycle: **55**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1087,3 +1087,17 @@ Current cycle: **54**
   first-class, traced, ready-to-execute bug entry in BACKLOG (promoted from a buried C52 feature-note line).
   Comment-only; frontend validate:local EXIT 0 (tsc 0 · build · 355 tests · prettier clean). Next cycle
   (55): recompute all 6 — `guard` most-starved (cyc 48, starved-for 7 > 6, OVER) → it wins.
+- **C55 (guard — FE↔BE contract-drift lock on the /stats response shape)** — implements loop-improvement
+  proposal #2 (the contract-drift guard Angelo flagged top-2) for the freshest surface. The /stats response
+  is hand-assembled in routes.ts (`c.json({ period, ...stats, currentOdometer })`) with ZERO type binding to
+  the frontend `VehicleStats` contract it must satisfy: backend `calculateVehicleStats` returns only 11
+  fields, the route adds `period` + `currentOdometer` separately (C52 added the latter to BOTH sides
+  independently — exactly the drift class). A refactor returning the calculator output directly, or
+  dropping/renaming a field, would silently diverge and the UI reads `undefined`. Added 3 HTTP cases to
+  vehicle-stats-current-odometer.test.ts asserting `Object.keys(data).sort()` EXACTLY equals
+  EXPECTED_STATS_FIELDS (the 13-field frontend contract, mirrored as the pin) — bidirectional: a dropped
+  key AND an unmirrored added key both fail; proven shape-stable across empty/populated and all 5 periods.
+  Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 969 pass/0 fail, +3 · build bundled).
+  Next cycle (56): recompute all 6 — `bug` most-starved over budget (cyc 51, starved-for 5 > 3) → it wins;
+  but the top bug (lease/loan miles-used) is PENDING ANGELO, so pick the next decided bug (#1 vehicle-detail
+  load-failure-masquerades-as-empty, or #3 ExpensesTable dead h-[] class).
