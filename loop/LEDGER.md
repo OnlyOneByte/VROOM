@@ -12,11 +12,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 46 |
 | deep-review | 5 | 49 |
 | guard | 6 | 48 |
-| bug | 3 | 44 |
+| bug | 3 | 51 |
 | arch | 5 | 50 |
 | infra | 6 | 47 |
 
-Current cycle: **50**
+Current cycle: **51**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1029,3 +1029,20 @@ Current cycle: **50**
   (mobile fuel-stat wrap, UI + screenshot — but Playwright is sandbox-blocked here, so a logic/source
   fix + the markup is the floor) is the main decided one; #14/#16 still await Angelo's semantics calls.
   Then `feature` → maintenance-schedule T9 e2e + the deferred vehicle-stats reconcile (the last pieces).
+- **C51 (bug — #5: CSV import strips a leading UTF-8 BOM)** — `bug` most-starved over budget (cyc 44,
+  starved-for 7 > 3 at cyc 51; feature also over at 5, bug won by raw starved-for). FIRST completed the
+  squash-merge rebase that interrupted last cycle: `origin/main` got #107 (squash of C1–C48) + 2
+  dependabot bumps, but it did NOT absorb C49/C50 source. Confirmed the divergence was only 11 files in
+  TWO DISJOINT sets — 4 dependabot files (main ahead) vs 7 of my files (branch ahead, C49+C50 + loop
+  docs), zero overlap — via `diff --stat` + `--diff-filter=AD` (no add/delete). Reset onto new main,
+  overlaid the 7 branch-ahead files from the backup ref (one path per checkout), verified BOTH gates
+  green against main's newer deps, committed `eb1c059`, force-pushed-with-lease (pinned to the observed
+  remote SHA) — branch now 0/0 with remote. Then popped the C51 stash (import-csv.ts identical old-tip
+  vs new-main, clean apply) and finished the fix: added `bom: true` to the csv-parse options in
+  buildImportPlan. WHY: the export's first column is `date`; a BOM-prefixed re-save (Excel/Sheets/Numbers)
+  keys it as "﻿date" → record.date undefined → EVERY row fails a misleading "Invalid date". Anchored
+  with a real-stack HTTP regression in import-csv.test.ts (BOM-prefixed CSV imports cleanly; pre-fix it
+  would be imported:0/errorCount:1). Verified: validate:local EXIT 0 (tsc 0 · musl-biome clean · 962
+  pass/0 fail, +1 · build bundled). Next cycle (52): recompute all 6 from this table — `deep-review` (cyc
+  49, starved-for 3) and `feature` (cyc 46, starved-for 6 > 4, OVER) lead; feature wins → maintenance T9
+  e2e + the deferred vehicle-stats reconcile. #11 (mobile fuel-stat wrap) + #14/#16 (Angelo) still queued.

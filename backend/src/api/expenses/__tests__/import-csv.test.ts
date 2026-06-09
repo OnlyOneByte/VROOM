@@ -82,6 +82,29 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(rows.find((r) => r.category === 'maintenance')?.expenseAmount).toBe(120);
   });
 
+  test('imports a BOM-prefixed CSV (Excel/Sheets/Numbers re-save); first column still resolves', async () => {
+    await seedVehicle('Daily Driver');
+    // Excel / Google Sheets / Numbers prepend a UTF-8 BOM (﻿) when they re-save a
+    // CSV as UTF-8. WITHOUT bom:true on the parser the BOM sticks to the FIRST header
+    // name, so the `date` column key becomes "﻿date" → record.date is undefined and
+    // EVERY row fails with a misleading "Invalid date" (cycle 51). bom:true strips it
+    // pre-parse, so a VROOM export survives a spreadsheet round-trip. (Pre-fix this test
+    // would see imported:0 / errorCount:1 with an "Invalid date" message.)
+    const csv = `﻿${[
+      'date,vehicle,category,amount',
+      '2024-06-01T00:00:00.000Z,Daily Driver,misc,12.50',
+    ].join('\n')}`;
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(1);
+    expect(body.data.readyCount).toBe(1);
+    expect(body.data.errorCount).toBe(0);
+    expect(body.data.rows.every((r) => r.status === 'ready')).toBe(true);
+    expect((await listExpenses()).length).toBe(1);
+  });
+
   test('re-importing the same file is idempotent (no duplicate rows; cycle 211)', async () => {
     await seedVehicle('Daily Driver');
     const csv = [

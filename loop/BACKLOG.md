@@ -127,9 +127,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    reorder vs the server's id-tiebroken order. Cosmetic flicker. (low)
 
 *(surfaced by the C7 backend deep review — CSV import + analytics math; ranked by severity)*
-5. **CSV import: no UTF-8 BOM strip** — `import-csv.ts:~245` `parse()` lacks `bom:true`; an
-   Excel/Sheets-edited export (BOM-prefixed) fails EVERY row with a misleading "Invalid date".
-   Add `bom: true`. (correctness, med — clean one-liner)
+- ~~**CSV import: no UTF-8 BOM strip (#5)**~~ — *DONE C51: added `bom: true` to the csv-parse options
+   in `buildImportPlan`. The export's first column is `date`, so a BOM-prefixed re-save (Excel/Sheets/
+   Numbers) keyed it as "﻿date" → record.date undefined → EVERY row failed a misleading "Invalid date".
+   Anchored by a real-stack HTTP regression in import-csv.test.ts (BOM CSV imports cleanly; pre-fix
+   imported:0/errorCount:1). validate:local EXIT 0 (962 pass).*
 6. **CSV import: date-only cells midnight-UTC** (`import-csv.ts:~120` `new Date(raw)`) + **currency
    column silently ignored** on import — same class as C6; foreign/edited files commonly use
    date-only and other currencies. (correctness, med)

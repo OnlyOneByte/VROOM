@@ -278,6 +278,9 @@ export function buildImportPlan(csv: string, vehicles: ImportVehicle[]): ImportP
   let records: Record<string, string>[];
   try {
     records = parse(csv, {
+      bom: true, // strip a leading UTF-8 BOM (Excel/Sheets/Numbers re-saves add one) so the
+      // FIRST header name isn't silently prefixed with ﻿ — otherwise that column's key
+      // never matches and every row fails its first required field with a misleading message.
       columns: true, // first row is the header
       skip_empty_lines: true,
       trim: true,
