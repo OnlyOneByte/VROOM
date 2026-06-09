@@ -45,3 +45,51 @@ describe('GET /api/v1/auth/me', () => {
     expect(Number.isNaN(parsed.getTime())).toBe(false);
   });
 });
+
+/**
+ * Convergence guard (C56, arch #1): the auth route does NOT hand-roll an error envelope —
+ * its validation handlers throw `HTTPException` directly and rely on the central
+ * `errorHandler` (error-handler.ts:43) to shape it as `{ success:false, error:{ code, message } }`.
+ * These pin that PATCH /me's 400 paths surface through that central handler with the canonical
+ * envelope (code 'HTTPException'), so a future "let's add a local try/catch back" or a handler
+ * change can't silently diverge from the shared shape. (Auth was verified already-converged — no
+ * try/catch drop was needed/safe; these lock that conclusion merge-surviving.)
+ */
+interface ErrorEnvelope {
+  success: false;
+  error: { code: string; message: string };
+}
+
+describe('PATCH /api/v1/auth/me — validation errors via the central handler (convergence guard)', () => {
+  test('401 without a session (requireAuth, before body parsing)', async () => {
+    const res = await ctx.anon('PATCH', '/api/v1/auth/me', { displayName: 'Whoever' });
+    expect(res.status).toBe(401);
+  });
+
+  test('missing displayName → 400 in the canonical envelope (code HTTPException)', async () => {
+    const res = await ctx.authed('PATCH', '/api/v1/auth/me', {});
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as ErrorEnvelope;
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('HTTPException');
+    expect(body.error.message).toBe('displayName is required');
+  });
+
+  test('out-of-range displayName → 400 with the length message', async () => {
+    const res = await ctx.authed('PATCH', '/api/v1/auth/me', { displayName: '' });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as ErrorEnvelope;
+    expect(body.error.message).toBe('displayName must be between 1 and 100 characters');
+  });
+
+  test('a valid displayName update still succeeds (200) — positive control', async () => {
+    const res = await ctx.authed('PATCH', '/api/v1/auth/me', { displayName: 'Renamed User' });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      success: boolean;
+      data: { user: { displayName: string } };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.user.displayName).toBe('Renamed User');
+  });
+});

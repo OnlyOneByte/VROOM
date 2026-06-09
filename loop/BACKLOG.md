@@ -287,9 +287,20 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
      assertion to the central message in the same commit; the positive-control + path-traversal-400
      tests stayed green. validate:local EXIT 0 (961 pass). The storage/backup `ValidationError`s (AppError
      subclass) flow through by their 400 statusCode unchanged.
-   - [ ] **part 2d — `auth` (7 try/catch).** LAST hand-rolled route file. Same characterize-then-drop pair;
-     check its throw types first (AppError subclasses are already centrally-shaped → drop is a no-op
-     simplification; any transformed message is the reviewed delta). (consistency)
+   - [x] **part 2d — `auth` (C56): VERIFIED ALREADY CONVERGED — no drop.** GROUNDING CORRECTION (the
+     "7 hand-rolled try/catch" premise was WRONG — that was a rough scan count). Read every block in
+     `auth/routes.ts`: the handlers that surface errors (`/me`, `/refresh`, `PATCH /me`,
+     `/providers/connect/google`) ALREADY throw `HTTPException` directly with NO try/catch — and the
+     central `errorHandler` shapes `HTTPException` (error-handler.ts:43) → already on the canonical
+     envelope. The 5 try/catch that DO exist are NOT envelope boilerplate; each is meaningful logic that
+     MUST stay: (1) `emailErr` (L164) UNIQUE-constraint recovery — retry update without email;
+     (2) `txErr` (L206) new-user-tx race recovery — look up the row a concurrent insert created;
+     (3) `err` (L368) + (4) `err` (L837) OAuth token-exchange → SPECIFIC redirect outcomes
+     (`no_email`/`provider_unavailable`/`exchange_failed`), control flow not error-shaping;
+     (5) JSON-parse guard (L472) → intentional 400 'Invalid JSON body'. Dropping ANY would be a behavior
+     change → violates the arch rules. So auth needs no convergence work; arch #1 is COMPLETE.
+   - **arch #1 CLOSED (C56).** sync (C36) + settings (C50) hand-rolled boilerplate dropped onto the central
+     handler; auth verified already-converged (above). No route file hand-rolls an error envelope anymore.
 2. **Extract the frontend page load-state pattern.** ~14 `+page.svelte` files repeat the same
    `isLoading` / `loadError` / `try → fetch → catch → toast + set error` triad (dashboard,
    expenses, reminders, insurance, analytics, vehicles/[id], settings, profile, …) — the exact

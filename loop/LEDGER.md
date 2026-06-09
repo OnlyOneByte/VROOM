@@ -13,10 +13,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 54 |
 | guard | 6 | 55 |
 | bug | 3 | 51 |
-| arch | 5 | 50 |
+| arch | 5 | 56 |
 | infra | 6 | 53 |
 
-Current cycle: **55**
+Current cycle: **56**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1101,3 +1101,20 @@ Current cycle: **55**
   Next cycle (56): recompute all 6 — `bug` most-starved over budget (cyc 51, starved-for 5 > 3) → it wins;
   but the top bug (lease/loan miles-used) is PENDING ANGELO, so pick the next decided bug (#1 vehicle-detail
   load-failure-masquerades-as-empty, or #3 ExpensesTable dead h-[] class).
+- **C56 (arch — #1 part 2d: VERIFIED auth already-converged → arch #1 CLOSED)** — BALANCE NOTE: recomputed
+  all 6; arch (cyc 50, starved-for 6) outranked bug (cyc 51, starved-for 5) by raw starved-for — the C55
+  forecast said "bug" but slow-budget arch breached higher (the standing mis-forecast lesson; always
+  recompute). Took arch #1 part 2d (the last route file, `auth`). GROUNDING CORRECTION: the BACKLOG's "7
+  hand-rolled try/catch, characterize-then-drop" premise was WRONG. Read every block in auth/routes.ts: the
+  error-surfacing handlers (`/me`, `/refresh`, `PATCH /me`, `/providers/connect`) ALREADY throw HTTPException
+  directly with NO try/catch, and the central errorHandler shapes HTTPException (error-handler.ts:43) → already
+  on the canonical envelope. The 5 try/catch that exist are business-logic recovery/redirect that MUST stay
+  (UNIQUE-constraint recovery L164/L206, OAuth token-exchange → specific redirect outcomes L368/L837, JSON
+  guard L472) — dropping any is a behavior change. So NO drop; auth is converged. Increment = correct the
+  BACKLOG premise + CLOSE arch #1 + a merge-surviving convergence guard: +4 PATCH /me cases in me-http.test.ts
+  pinning the 400 paths surface through the central handler in the canonical envelope (code 'HTTPException').
+  The positive control caught a real shape assumption (data.user.displayName, not data.displayName) — fixed
+  before commit. Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 973 pass/0 fail, +4 ·
+  build bundled). arch #1 DONE (sync C36 + settings C50 dropped; auth verified). Next cycle (57): recompute —
+  `bug` most-starved over budget (cyc 51, starved-for 6 > 3) → wins; top bug PENDING ANGELO, take next decided
+  (#1 load-failure-masquerade or #3 ExpensesTable dead h-[] class).
