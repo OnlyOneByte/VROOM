@@ -19,13 +19,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 64 |
-| deep-review | 5 | 60 |
+| deep-review | 5 | 67 |
 | guard | 6 | 62 |
 | bug | 3 | 65 |
 | arch | 5 | 63 |
 | infra | 6 | 66 |
 
-Current cycle: **66**
+Current cycle: **67**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1282,3 +1282,21 @@ Current cycle: **66**
   reviewer. BRANCH_REVIEW.md is gitignored → not in the commit (only the loop docs are). Verified: doc-only,
   no build gate; git facts confirmed via rev-list/diff/log. Next (67): recompute — `deep-review` most-starved
   (cyc 60, starved-for 7 > 5, OVER) → wins; an executable backend audit or (if unblocked) an eyes-on sweep.
+- **C67 (deep-review — audit the unpinned analytics-charts.ts builders)** — `deep-review` most-starved (cyc
+  60, 7 > 5, OVER). Both queued eyes-on sweeps are Playwright-blocked, so took the highest-leverage EXECUTABLE
+  review: the analytics pure-math layer (the richest historical defect vein — C7/C11/C14/C23). Found 6
+  date/bucketing builders with ZERO test references (buildDayOfWeekPatterns, buildSeasonalEfficiency,
+  buildMonthlyCostHeatmap, computeRegularityScore, computeMileageScore, computePreviousYearComparison).
+  FAN-OUT: 2 parallel Explore agents on distinct subsets + I read the date-sensitive ones directly. VERDICT:
+  CORRECT — no real defect. Both agents flagged `accumulateIntervalBuckets`'s in-place `vehicleRows.sort()`
+  as a HIGH "cross-chart side-effect" bug; per the standing C21/C60 rule (verify agent findings against
+  source — most "HIGH" ones are false positives) I checked the blast radius MYSELF: the sorted array is a
+  FRESHLY-GROUPED LOCAL array inside buildFillupIntervals (byVehicle map of new arrays), NOT the caller's
+  fuelRows — and the route's only other consumer of that same fuelRows (buildDayOfWeekPatterns) buckets by
+  getDay(), order-independent. So NO observable bug → downgraded. Still applied a defensive `[...vehicleRows]`
+  copy (behavior-identical hygiene, keeps the helper pure against a future caller) + locked all 6 with
+  characterization tests (analytics-charts-unpinned.test.ts, 15 cases: empty/single-elem no-NaN, divide-by-
+  zero guards, the newest-24-months slice direction = NOT the C11 oldest-bug, the no-mutation invariant).
+  Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1021 pass/0 fail, +15 · build bundled).
+  Next (68): recompute — `guard` most-starved (cyc 62, starved-for 6 = budget 6, AT) likely; arch (cyc 63,
+  5=5 AT) + feature (cyc 64, 4=4 AT) also AT — recompute all 6 at cycle start (slow-budget mis-forecast risk).

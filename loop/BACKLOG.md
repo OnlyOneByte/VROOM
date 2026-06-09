@@ -104,6 +104,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**analytics-charts.ts unpinned-builders audit (C67)**~~ — *DONE C67: fan-out (2 Explore agents) +
+  direct read of 6 date/bucketing builders with ZERO test references (buildDayOfWeekPatterns,
+  buildSeasonalEfficiency, buildMonthlyCostHeatmap, computeRegularityScore, computeMileageScore,
+  computePreviousYearComparison) — the historical analytics defect class. Verdict: CORRECT. Both agents
+  flagged `accumulateIntervalBuckets` in-place `.sort()` as a HIGH cross-chart bug; VERIFIED against source
+  (C21/C60 rule) and DOWNGRADED — it sorts a freshly-grouped LOCAL array, not the caller's fuelRows (the
+  route passes the same fuelRows to buildDayOfWeekPatterns, which is order-independent anyway), so no
+  observable bug. Applied a defensive `[...vehicleRows].sort()` (behavior-identical hygiene) + locked all
+  6 with characterization tests (analytics-charts-unpinned.test.ts, 15 cases: empty/single-elem no-NaN,
+  divide-by-zero guards, the newest-24-months slice direction, the no-mutation invariant). 1021 BE pass (+15).*
 - ~~**C58 import-mapping.ts backend audit (C60)**~~ — *DONE C60: adversarial read of the freshly-landed
   (self-authored, un-reviewed) translation pre-pass. Verdict: CORRECT for its documented contract. Locked
   two verified-but-uncovered branches with characterization guards (NORTH_STAR #5): ISO-with-explicit-tz

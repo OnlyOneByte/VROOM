@@ -840,7 +840,11 @@ function accumulateIntervalBuckets(
   vehicleRows: FuelExpenseRow[],
   buckets: Array<{ label: string; min: number; max: number; count: number }>
 ): void {
-  const sorted = vehicleRows.sort((a, b) => {
+  // Copy before sorting: today the caller passes a freshly-grouped local array so an
+  // in-place sort is harmless, but a defensive copy keeps this helper pure (no input
+  // mutation) so a future caller that passes a shared/order-significant array can't be
+  // bitten by a hidden reorder. Behavior-identical for the current call site.
+  const sorted = [...vehicleRows].sort((a, b) => {
     const da = normalizeDate(a.date);
     const db = normalizeDate(b.date);
     return (da?.getTime() ?? 0) - (db?.getTime() ?? 0);
