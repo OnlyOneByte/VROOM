@@ -98,6 +98,18 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 1. **Eyes-on sweep: vehicle Overview tab + ExpensesTable populated states** (mobile +
    desktop) — code-reviewed C3 (findings below); still wants a real eyes-on screenshot pass.
 2. **Analytics route eyes-on** (per-vehicle + cross-vehicle + year-end), states + a11y.
+3. **Pin `getFinancing` / financing-analytics math (TRACED C77, needs an arch DI first).** The financing
+   analytics path (`analytics/repository.ts` getFinancing → buildFinancingDetails → buildSingleFinancingDetail)
+   is effectively UNPINNED: its only test (cross-vehicle.property.test.ts "Property 23") is `test.skip`'d
+   because getFinancing dynamically imports the `financingRepository` SINGLETON and calls
+   `computeBalance(id)`, which binds to `getDb()` (the real connection), NOT the test's in-memory drizzle —
+   so the C73 insurance approach (new AnalyticsRepository(testDb.drizzle)) can't reach it. The real math
+   carries bug surface: `monthlyInterestEstimate = computedBalance*(apr/100)/12` (the C44-renamed field),
+   `monthsRemaining = max(0, termMonths − monthsElapsed)`, unfinanced→'own' classification. TO UNBLOCK
+   (arch, needs sign-off — bigger than one cycle): either DI `financingRepository` into AnalyticsRepository,
+   or give `computeBalance` an optional-db param, so the in-memory harness can drive it; THEN un-skip
+   Property 23 + add the math characterization. Filed as a traced finding (the C54 pattern) rather than
+   forcing an awkward singleton-bound test this cycle.
 
 > **NOTE → T3 wiring (surfaced by the C60 import-mapping audit, for when import-trackers T3 lands):**
 > (a) `applyMapping`'s `target` param DEFAULTS to `{}` — if T3 passes `mapping.distanceUnit`/`volumeUnit`

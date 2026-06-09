@@ -19,13 +19,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 70 |
-| deep-review | 5 | 73 |
+| deep-review | 5 | 77 |
 | guard | 6 | 74 |
 | bug | 3 | 71 |
 | arch | 5 | 75 |
 | infra | 6 | 76 |
 
-Current cycle: **76**
+Current cycle: **77**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1436,3 +1436,20 @@ Current cycle: **76**
   lease/loan unblock (flagged C71, no reply) is still the highest-leverage rebalance. Next (77): recompute —
   `feature` (cyc 70, starved-for 7 > 4) + `bug` (cyc 71, 6 > 3) deepening; if still blocked, deep-review
   (cyc 73, 4 < 5 under... ) / guard / arch are the actionable picks. Recompute all 6 live.
+- **C77 (deep-review — trace the unpinned financing-analytics path; file the unblock)** — BALANCE: feature
+  (7) + bug (6) deeply OVER but BOTH still blocked (re-verified: a feature-side T6 "extend date guard to
+  import-mapping" slice turned out REDUNDANT — C58+C60 already pin normalizeForeignDate, and on this UTC CI
+  host any added local-time value-assertion is VACUOUS since UTC-midnight == local-midnight; I WROTE then
+  REVERTED that test rather than commit churn). Fell back to the most-starved ACTIONABLE, deep-review.
+  TRACED the financing-analytics path: getFinancing → buildFinancingDetails → buildSingleFinancingDetail is
+  effectively UNPINNED — its only test (cross-vehicle Property 23) is `test.skip`'d because getFinancing
+  dynamically imports the financingRepository SINGLETON whose computeBalance binds to getDb() (real conn),
+  not the in-memory test drizzle, so the C73 insurance harness can't reach it; and summary-route.test.ts
+  MOCKS getSummary (doesn't exercise real compute). The math has bug surface (monthlyInterestEstimate, the
+  C44 field; monthsRemaining clamp; unfinanced→own). Unblocking needs an ARCH DI (inject the repo / optional-
+  db param) — bigger than one safe cycle + sign-off — so I FILED it as a traced, ranked deep-review backlog
+  item (the C54 pattern) rather than force an awkward singleton-bound test or churn. Doc-only (BACKLOG + loop
+  docs; the reverted test left the tree clean). NOTE: 3rd consecutive cycle where feature+bug are blocked and
+  the loop runs on the backend-verifiable categories — the lease/loan unblock + an eyes-on/Playwright unblock
+  + a branch review (26 green commits) are now the highest-leverage moves, all Angelo's. Next (78): recompute
+  — `guard` (cyc 74, starved-for 4) / `arch` (cyc 75, 3) the likely actionable picks; feature/bug still gated.
