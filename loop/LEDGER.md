@@ -24,12 +24,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 70 |
 | deep-review | 5 | 82 |
-| guard | 6 | 80 |
+| guard | 6 | 83 |
 | bug | 3 | 71 |
 | arch | 5 | 79 |
 | infra | 6 | 81 |
 
-Current cycle: **82**
+Current cycle: **83**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1530,3 +1530,18 @@ Current cycle: **82**
   for a few cycles. But feature/bug stay Angelo-gated; the high-leverage moves remain the lease/loan approval
   + eyes-on unblock + branch review. Next (83): recompute — arch (cyc 79, starved-for 4) likely; or a guard
   steered to a frontend low-cov module. cov: be ~78% / fe 63.7%
+- **C83 (guard — coverage-ratchet the pending-credentials OAuth store, a C81 low spot)** — feature (13) +
+  bug (12) blocked (9th cycle); nothing actionable strictly OVER, so highest-LEVERAGE: continued the C82
+  coverage-ratchet on a C81-named low spot — `utils/pending-credentials.ts` (76%), the in-memory OAuth
+  refresh-token staging store. SECURITY-relevant: a credential must not outlive its 10-min TTL, must consume
+  exactly once, and the store mustn't grow unbounded. The existing auth property test covers only the happy
+  store→consume→consume-again-null path; I pinned the UNCOVERED branches via pending-credentials.test.ts (+7):
+  TTL expiry (getPendingEmail fresh→email / expired→null; consumePending expired→null AND purges),
+  cleanupExpired-on-store, and (userId,nonce) consume scoping. Made expiry DETERMINISTIC by back-dating an
+  entry's createdAt via the test-only exposed Map (no timers, no Date mock — there's no setSystemTime idiom
+  in the repo). RATCHET MOVED: 76%→100% func / 92% line (only the 1000-entry max-size eviction L53-56 left,
+  not worth the seed cost — documented). Filed a NEW STANDING GUARD ANGLE in BACKLOG (coverage-ratchet the
+  named low spots: logger.ts 75% next, then frontend) so the loop has grounded non-churn guard work. Verified:
+  backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1062 pass/0 fail, +7 · build bundled). Next (84):
+  arch (cyc 79, starved-for 5 = budget, most-starved actionable) — arch #2 scaffold-misfit-blocked, so likely
+  another coverage-ratchet guard (logger.ts) or a fresh audit fan-out. feature/bug still gated. cov: be ~79% / fe 63.7%
