@@ -16,8 +16,16 @@
       path is unchanged and stays default when no mapping is sent. 14 unit tests incl. the timezone-independent
       local-day invariant AND a load-bearing `applyMapping`→`buildImportPlan` round-trip proving the emitted
       native CSV is consumable end-to-end. backend validate:local EXIT 0 (987 pass, +14).
-- [ ] **T2** `import-mapping-presets.ts`: static maps for Fuelly/Fuelio/Drivvo [D5] + `detectSource(headers)`.
-      Pure; unit-tested against each signature + an unknown file.
+- [x] **T2 (cycle 64)** `import-mapping-presets.ts`: static `MappingPreset` table for Fuelly/Fuelio/Drivvo
+      [D5] + `detectSource(headers)` + `presetToMapping(preset, targetVehicle)`. Detection is normalized
+      (lower-case + strip non-alphanumerics) + SUBSTRING-based on a DISTINCTIVE signature subset (Fuelly
+      `odometer`+`fillamount`, Fuelio `odo`+`litres`, Drivvo `totalprice`+`typeoffuel`) so real-world header
+      decoration doesn't defeat it and the presets don't cross-detect; unknown files → null (safe → manual
+      mapping). Pure; 10 unit tests (each signature, unknown/empty, drift tolerance, no-cross-detect,
+      every-preset-detects-its-own-columns self-consistency, presetToMapping→applyMapping round-trip).
+      backend validate:local EXIT 0 (1006 pass, +10). NOTE: column strings are best-effort from documented
+      exports — validating against a REAL Fuelly/Fuelio/Drivvo file is deferred to T6 (a mis-detect is the
+      safe failure: null → manual mapping, never a wrong auto-map).
 
 ## Phase 2 — route (backward-compatible)
 - [ ] **T3** Extend `POST /import` with optional `mapping`: when present, `applyMapping` then the

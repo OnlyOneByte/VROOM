@@ -65,12 +65,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    card display-semantics direction call. Both deferred, not blocking.*
 2. **Import from other trackers** — spec APPROVED (Angelo signed off D1–D5, cycle 12). **BUILD IN PROGRESS**,
    backend-first per `.kiro/specs/import-trackers/tasks.md`. **T1 DONE (C58):** `import-mapping.ts` — pure
-   `applyMapping(foreignCsv, mapping, target)` → VROOM-native CSV (rename + unit-convert into the target's
-   units + decimal-comma + category map/unmapped→misc + local-time dates + targetVehicle injection); 14 unit
-   tests incl. a `buildImportPlan` round-trip. Additive — native path untouched. **NEXT = T2:**
-   `import-mapping-presets.ts` (static Fuelly/Fuelio/Drivvo maps + `detectSource(headers)`, pure, unit-tested).
-   Then T3 route extension (optional `mapping` field → `applyMapping` then the existing flow) → T4/T5 frontend
-   mapping step → T6 e2e. The pre-pass design means everything downstream of `buildImportPlan` is reused as-is.
+   `applyMapping(foreignCsv, mapping, target)` → VROOM-native CSV (rename + unit-convert + decimal-comma +
+   category map + local-time dates + targetVehicle); 14 tests + `buildImportPlan` round-trip. **T2 DONE (C64):**
+   `import-mapping-presets.ts` — Fuelly/Fuelio/Drivvo `MappingPreset` table + `detectSource(headers)`
+   (normalized substring match on a distinctive signature subset; unknown → null → manual) + `presetToMapping`;
+   10 tests. **NEXT = T3:** extend `POST /import` with an optional `mapping` field — when present,
+   `applyMapping` then the EXISTING `buildImportPlan`/dryRun/`importExpenses` flow (no new write path);
+   surface `detectSource` + `unmappedCategories` for the client; HTTP tests (Fuelly/Fuelio fixture → preview →
+   commit; re-import no-op; metric→imperial; malformed row reported). Then T4/T5 frontend mapping step → T6 e2e
+   (incl. real-export signature validation). Backward-compatible: native path stays default when no mapping.
 3. **Recurring expenses** beyond reminders — first-class recurring (insurance premium, loan
    payment, parking pass) with frequency + dashboard surfacing.
 

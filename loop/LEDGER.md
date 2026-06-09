@@ -18,14 +18,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 58 |
+| feature | 4 | 64 |
 | deep-review | 5 | 60 |
 | guard | 6 | 62 |
 | bug | 3 | 61 |
 | arch | 5 | 63 |
 | infra | 6 | 59 |
 
-Current cycle: **63**
+Current cycle: **64**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1235,3 +1235,20 @@ Current cycle: **63**
   FIRST to prove the unproven rune-in-test path before relying on it. Verified: frontend validate:local
   EXIT 0 (tsc 0 · build · 365 tests, +10 · prettier clean). Next (64): recompute — `feature` most-starved
   (cyc 58, starved-for 6 > 4, OVER) → wins; import-trackers T2 (presets + detectSource, pure + unit-tested).
+- **C64 (feature — import-trackers T2: tracker presets + detectSource)** — `feature` most-starved (cyc 58,
+  starved-for 6 > 4, OVER). Built `import-mapping-presets.ts`: a static `MappingPreset` table for
+  Fuelly/Fuelio/Drivvo (D5-ratified set) — each a ready ColumnMapping (columns + dateFormat + units +
+  categoryMap) + a header SIGNATURE — plus `detectSource(headers)` (auto-pick the preset) and
+  `presetToMapping(preset, targetVehicle)` (→ a valid T1 ColumnMapping). Detection is NORMALIZED (lower-case +
+  strip non-alphanumerics) + SUBSTRING-based on a DISTINCTIVE signature subset (Fuelly odometer+fillamount,
+  Fuelio odo+litres, Drivvo totalprice+typeoffuel) so real header decoration (`Odo (km)`, BOM, spacing) doesn't
+  defeat it and the three don't cross-detect; unknown files → null (safe → manual mapping). GROUNDING CALL:
+  D5 ratified the SET but the requirements don't pin exact header strings, and the design defers real-export
+  validation to T6 — so rather than fabricate exact signatures (a wrong one = silent never-match), I built the
+  MECHANISM with drift-tolerant matching + flagged real-export validation as a T6 prerequisite (mis-detect is
+  the safe failure). Caught + fixed my own first-draft bug pre-test: exact-token matching would've made Fuelio
+  (`Data`/`Odo (km)`) never match — switched to substring. 10 unit tests incl. the self-consistency check
+  (every preset detects its OWN seeded columns), no-cross-detect, drift tolerance, and a presetToMapping→
+  applyMapping round-trip. Pure module, fully additive. Verified: backend validate:local EXIT 0 (tsc 0 ·
+  musl-biome clean · 1006 pass/0 fail, +10 · build bundled). Next (65): recompute — `infra` most-starved
+  (cyc 59, starved-for 6 = budget 6, AT) likely; deep-review (cyc 60, 5=5 AT) close behind.
