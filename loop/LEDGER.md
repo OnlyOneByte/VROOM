@@ -20,12 +20,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 58 |
 | deep-review | 5 | 60 |
-| guard | 6 | 55 |
+| guard | 6 | 62 |
 | bug | 3 | 61 |
 | arch | 5 | 56 |
 | infra | 6 | 59 |
 
-Current cycle: **61**
+Current cycle: **62**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1204,3 +1204,19 @@ Current cycle: **61**
   Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 992 pass/0 fail, +2 · build bundled).
   Next (62): recompute — `guard` most-starved (cyc 55, starved-for 7 > 6, now OVER) → wins; the queued guard
   is generalizing the FE↔BE contract-drift lock (loop-improvement #2) to another hand-assembled response.
+- **C62 (guard — extend the FE↔BE contract-drift lock to GET /vehicles list)** — `guard` most-starved
+  (cyc 55, starved-for 7 > 6, OVER). Continued loop-improvement #2 (C55 locked /stats). PICKED the highest-
+  leverage drift surface: the /vehicles list route hand-assembles each financed vehicle (routes.ts:140-153),
+  spreading the repository financing row and INJECTING two computed fields the repository never stores —
+  `computedBalance` (financingRepository.computeBalances) + `eligibleForPayoff`. The frontend `VehicleFinancing`
+  contract (vehicle.ts:65-66) declares both, and the FE reads `computedBalance` for payoff-date math, the
+  payment planner, lease metrics, and the financing-form payoff display — yet NOTHING pinned the route still
+  emits them (a refactor returning findByUserId raw would silently drop both → every consumer falls back to
+  `?? 0` → payoff logic breaks with no failing test). New vehicles-list-financing-contract.test.ts (3 cases):
+  computed keys present + typed + base fields survive the spread; a fresh 20k loan is NOT eligible-for-payoff
+  (anchors the computed SEMANTICS, not just key presence); a no-financing vehicle omits the object. A wrong
+  seed path (mounted at /api/v1/financing/vehicles/:id/financing, not /api/v1/vehicles/:id/financing) failed
+  the test LOUDLY first — proof it exercises the real enrichment branch, not a vacuous pass. Verified: backend
+  validate:local EXIT 0 (tsc 0 · musl-biome clean · 995 pass/0 fail, +3 · build bundled). Next (63): recompute
+  — `arch` most-starved (cyc 56, starved-for 7 > 5, OVER) → wins; arch #1 closed, so it's arch #2 (frontend
+  load-state extraction, now with C57 + the C3 vehicle-detail pattern as concrete instances) or an audit fan-out.

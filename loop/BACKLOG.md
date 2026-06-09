@@ -149,16 +149,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
-1. **Generalize the FE↔BE contract-drift guard to every hand-assembled response.** C55 locked
-   ONE surface (`/stats`): a route that hand-builds its JSON (`c.json({...})`) with no type
-   binding to the frontend contract silently drifts when one side adds/drops/renames a field —
-   the recurring defect family here (`.optional()` vs `.nullish()`, dropped `clientId`, the
-   `interestPaidYtd` rename touching 6 sites). One guard per cycle: pick a route whose response
-   the frontend types as a named contract, add an `Object.keys(data).sort()` EXACT-equality HTTP
-   assertion against that contract's keys (bidirectional — a dropped OR an unmirrored-added key
-   both fail), shape-stable across empty/populated. Candidates: `/vehicles` list, `/expenses`
-   page, `/insurance` policy+terms, `/financing`, `/reminders`. Each is one `guard` increment;
-   stop when the hand-assembled-response surfaces are covered. *(implements loop-improvement #2)*
+1. **Generalize the FE↔BE contract-drift guard to every hand-assembled response.** A route that
+   hand-builds its JSON (`c.json({...})`) with no type binding to the frontend contract silently
+   drifts when one side adds/drops/renames a field — the recurring defect family here
+   (`.optional()` vs `.nullish()`, dropped `clientId`, the `interestPaidYtd` rename touching 6
+   sites). One guard per cycle: pick a route whose response the frontend types as a named
+   contract, add an HTTP assertion against that contract's keys, shape-stable across
+   empty/populated. **DONE so far:** `/stats` exact-key equality (C55); **`/vehicles` list enriched
+   financing** — the route-injected `computedBalance` + `eligibleForPayoff` the FE reads for payoff
+   math (C62). **Remaining candidates:** `/expenses` page, `/insurance` policy+terms, `/financing`
+   detail, `/reminders`. Stop when the hand-assembled-response surfaces are covered. *(loop-improvement #2)*
 
 ### bug
 > **PENDING ANGELO (confirmed + traced C54, do NOT execute unilaterally — user-visible $ change):**
