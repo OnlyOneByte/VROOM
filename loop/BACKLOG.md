@@ -408,6 +408,13 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**#5 branch-hygiene sweep — BRANCH_REVIEW.md refresh (C66)**~~ — *DONE C66: first FULL run of the standing
+  #5 cadence (C59 did only the untracked-test half). (1) zero stray untracked unit tests; (2) green baseline
+  via validate:local (regress.sh Playwright-blocked); (3) the digest was BADLY stale — it described the OLD
+  `feat/offline-entries` branch at 154 commits, but that squash-merged into origin/main and claude-loop-dev
+  was rebased onto it, so the live branch is only 16 commits (C51–C65) off origin/main. Rewrote from real
+  `git log origin/main..HEAD`: correct branch/scope/base, themed, with eyes-on-pending + Angelo-pending
+  call-outs. BRANCH_REVIEW.md is gitignored (not committed). Next sweep due ~C76.*
 - ~~**Land NORTH_STAR loop-improvement #3 (C59)**~~ — *DONE C59: the FE→BE→DB→render E2E feature-DoD
   rule (Angelo-approved 2026-06-09) was rolled out split — its BACKLOG "FEATURE DoD" pair landed C57 but the
   NORTH_STAR quality-bar half was cut by a 503, leaving the vision file inconsistent. Added the round-trip-E2E

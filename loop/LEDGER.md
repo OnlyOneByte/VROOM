@@ -23,9 +23,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 62 |
 | bug | 3 | 65 |
 | arch | 5 | 63 |
-| infra | 6 | 59 |
+| infra | 6 | 66 |
 
-Current cycle: **65**
+Current cycle: **66**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1268,3 +1268,17 @@ Current cycle: **65**
   blocked eyes-on chart change). frontend validate:local EXIT 0 (tsc 0 · build · 367 tests, +2 · prettier
   clean). CAVEAT: eyes-on Playwright-blocked; fix is tsc/build-verified + the proven idiom. Next (66): recompute
   — `infra` (cyc 59, 7 > 6, OVER) + `deep-review` (cyc 60, 6 > 5, OVER) both over; infra most-starved → wins.
+- **C66 (infra — #5 branch-hygiene sweep: BRANCH_REVIEW.md refresh)** — `infra` most-starved (cyc 59, 7 > 6,
+  OVER); the standing #5 cadence (every ~10 cycles, 60+ commits deep toward one human PR) had NEVER run as a
+  full sweep (C59 did only the cheap untracked-test half). Three parts: (1) stray untracked unit tests OUTSIDE
+  the by-design `*.meshclaw.e2e.ts` set — ZERO (clean); (2) green baseline — regress.sh Playwright-blocked, so
+  backend+frontend validate:local stand in (1006 BE + 367 FE, all green this arc); (3) BRANCH_REVIEW.md
+  refresh — it was BADLY stale: described the OLD `feat/offline-entries` branch at 154 commits, but that work
+  was squash-merged into origin/main and claude-loop-dev was rebased onto the squash (eb1c059), so the live
+  branch is only 16 commits (C51–C65, 28 files +2339/−202) cleanly off origin/main. Rewrote the digest from
+  REAL `git log origin/main..HEAD` (not memory): correct branch/scope/base, themed by feature(import T1+T2,
+  stats reconcile)/bug(BOM, load-masquerade, date-only, dead-class)/guard(×3)/arch(#1 closed, #2 scaffold)/
+  deep-review, with the eyes-on-pending UI fixes + the two Angelo-pending decisions called out for the
+  reviewer. BRANCH_REVIEW.md is gitignored → not in the commit (only the loop docs are). Verified: doc-only,
+  no build gate; git facts confirmed via rev-list/diff/log. Next (67): recompute — `deep-review` most-starved
+  (cyc 60, starved-for 7 > 5, OVER) → wins; an executable backend audit or (if unblocked) an eyes-on sweep.
