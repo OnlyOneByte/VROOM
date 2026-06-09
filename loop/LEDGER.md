@@ -20,12 +20,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 70 |
 | deep-review | 5 | 77 |
-| guard | 6 | 78 |
+| guard | 6 | 80 |
 | bug | 3 | 71 |
 | arch | 5 | 79 |
 | infra | 6 | 76 |
 
-Current cycle: **79**
+Current cycle: **80**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1481,3 +1481,18 @@ Current cycle: **79**
   moves (lease/loan approval, eyes-on/Playwright unblock, branch review, the arch-DI + scaffold-reshape
   direction calls) are all Angelo's. Next (80): if still no input, infra (cyc 76, 4) / deep-review (cyc 77,
   3) are the actionable picks — but flagging that further cycles are low-yield until something unblocks.
+- **C80 (guard — lock the LAST contract-drift surface; CLOSE loop-improvement #2)** — feature (10) + bug (9)
+  extreme-OVER but blocked (6th cycle). Per the C79 commitment (take a cycle only for a genuinely-clean,
+  non-churn increment), found ONE: the final hand-assembled response, getVehicleHealth — a COMPLETING
+  increment, not a marginal add. It hand-assembles a 6-field literal (repository.ts:1713) with no type
+  binding to the frontend VehicleHealthResponse (types/analytics.ts:199); per-vehicle.property.test.ts pins
+  the SCORE MATH (the 0.4/0.35/0.25 weighted formula) but NOT the key shape (the C78 year-end situation).
+  Added a drift-guard describe (+2): exact top-level keys vs the frontend contract + a no-data finite-number
+  invariant (no NaN escape). Verified vs the VehicleHealthResponse interface + confirmed getVehicleHealth
+  queries via this.db (no financing-singleton trap, unlike C77). This CLOSES loop-improvement #2: every
+  hand-assembled surface (/stats, /vehicles list, single-financing, /analytics/insurance, year-end,
+  vehicle-health) is now key-shape locked; the non-targets (/reminders, /expenses page) verified as clean
+  repo pass-throughs. Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1050 pass/0 fail,
+  +2 · build bundled). Next (81): with #2 closed AND feature/bug/arch-#2 all blocked, the only actionable
+  categories are infra (cyc 76, 5) / deep-review (cyc 77, 4) — and both are thin (sweep done C76, financing
+  deep-review arch-DI-blocked). Genuinely at diminishing returns; will hold for a clean increment or re-flag.

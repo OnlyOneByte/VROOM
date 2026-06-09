@@ -435,3 +435,41 @@ describe('Property 15: Cost per month formula', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// FE↔BE response contract-drift guard for getVehicleHealth — the FINAL hand-assembled surface
+// in loop-improvement #2 (C55 /stats, C62 /vehicles list, C68 single-financing, C74
+// /analytics/insurance, C78 /analytics/year-end). getVehicleHealth hand-assembles a 6-field
+// literal (repository.ts:1713) with NO type binding to the frontend VehicleHealthResponse
+// (types/analytics.ts:199). Property 10 above pins the SCORE MATH but NOT the key shape, so a
+// dropped/renamed field would silently break the health card. Exact top-level key equality.
+// ---------------------------------------------------------------------------
+const VEHICLE_HEALTH_KEYS = [
+  'vehicleId',
+  'vehicleName',
+  'overallScore',
+  'maintenanceRegularity',
+  'mileageIntervalAdherence',
+  'insuranceCoverage',
+].sort();
+
+describe('getVehicleHealth — FE↔BE response contract shape (drift guard)', () => {
+  test('the response has exactly the frontend VehicleHealthResponse top-level keys', async () => {
+    const { userId, vehicle } = setupUserAndVehicle({});
+    const result = await repo.getVehicleHealth(userId, vehicle.id);
+    expect(Object.keys(result).sort()).toEqual(VEHICLE_HEALTH_KEYS);
+  });
+
+  test('every score field is a finite number (no NaN escape on a no-data vehicle)', async () => {
+    const { userId, vehicle } = setupUserAndVehicle({});
+    const result = await repo.getVehicleHealth(userId, vehicle.id);
+    for (const k of [
+      'overallScore',
+      'maintenanceRegularity',
+      'mileageIntervalAdherence',
+      'insuranceCoverage',
+    ] as const) {
+      expect(Number.isFinite(result[k]), k).toBe(true);
+    }
+  });
+});

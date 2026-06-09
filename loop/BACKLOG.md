@@ -187,21 +187,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
-1. **Generalize the FE↔BE contract-drift guard to every hand-assembled response.** A route that
-   hand-builds its JSON (`c.json({...})`) with no type binding to the frontend contract silently
-   drifts when one side adds/drops/renames a field — the recurring defect family here
-   (`.optional()` vs `.nullish()`, dropped `clientId`, the `interestPaidYtd` rename touching 6
-   sites). One guard per cycle: pick a route whose response the frontend types as a named
-   contract, add an HTTP assertion against that contract's keys, shape-stable across
-   empty/populated. **DONE so far:** `/stats` exact-key equality (C55); **`/vehicles` list enriched
-   financing** (C62); **single-financing GET enriched shape** (C68); **`/analytics/insurance` hand-assembled
-   InsuranceData** — nested summary + 3 derived arrays (vehicleDetails/monthlyPremiumTrend/costByCarrier),
-   top-level + summary + item-shape keys locked vs the frontend `InsuranceResponse` (C74); **`/analytics/
-   year-end` hand-assembled 11-field YearEndData** — top-level keys + the null-not-absent invariant locked
-   vs the frontend `YearEndResponse` (the existing Property-24/25 tests pin the math, not the shape) (C78).
-   **Remaining candidates:** `/analytics` per-vehicle. (`/reminders` + `/expenses` page are CLEAN repository
-   pass-throughs — `data: <repo result>`, no route-injected fields — so NOT drift surfaces; verified C78.)
-   Stop when the hand-assembled-response surfaces are covered. *(loop-improvement #2)*
+- ~~**Generalize the FE↔BE contract-drift guard to every hand-assembled response (loop-improvement #2) —
+   COMPLETE (C80).**~~ — *A route that hand-builds its JSON with no type binding to the frontend contract
+   silently drifts when a field is added/dropped/renamed (the `.optional()`-vs-`.nullish()`, dropped-clientId,
+   interestPaidYtd-rename family). ALL hand-assembled response surfaces are now key-shape locked vs their
+   named frontend contract: `/stats` (C55), `/vehicles` list enriched financing (C62), single-financing GET
+   (C68), `/analytics/insurance` (C74), `/analytics/year-end` (C78), and `/analytics` per-vehicle
+   getVehicleHealth (C80 — the last one). VERIFIED the non-targets too: `/reminders` + `/expenses` page are
+   CLEAN repository pass-throughs (no route-injected fields → not drift surfaces). Proposal #2 fully landed.
+   FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
 > **PENDING ANGELO (confirmed + traced C54, do NOT execute unilaterally — user-visible $ change):**
