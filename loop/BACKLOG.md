@@ -404,6 +404,17 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
      lands as "code-complete, eyes-on pending" until the harness is unblocked or Angelo glances. Bonus:
      structurally prevents the masquerade bug class once a page is on it.
 
+- ~~**Dedup the repeated query-if-nonempty guard in google-sheets-service (C75).**~~ — *DONE C75: rule-7
+  fan-out (2 agents: layering + complexity). The Sheets backup builder `updateSpreadsheetWithUserData`
+  repeated `ids.length > 0 ? await db.select()…where(inArray(col, ids)) : []` 4× (insurance terms, term-
+  vehicles, claims, reminder-vehicles). Extracted a typed `queryIfNonEmpty<T>(ids, () => query)` private
+  helper (closure form, simpler than the agent's db-passing signature); collapses the guard to one named
+  place. Behavior-identical (skips a pointless `inArray(col, [])` round-trip exactly as before). REJECTED the
+  layering finding (extract ONE raw `db.delete` from providers/routes.ts into a repo) — the agent itself
+  noted 5 OTHER raw queries in that file are left inline, so extracting just one is churn that makes the file
+  MORE inconsistent (arch rule 5). green→green: full suite (incl. google-sheets-service round-trip test) 1046
+  pass, unchanged. NOTE: the single-suite run hit the C38 cross-suite migration flake (duplicate due_odometer)
+  — NOT my change; the canonical gate is full `validate:local`, which is green.*
 - ~~**Dedup the stats-period → start-date switch (C69).**~~ — *DONE C69: the identical period-to-Date
   day-offset switch was duplicated in vehicles/routes.ts (stats) + expenses/repository.ts (query filter).
   Extracted `getPeriodStartDate(period, now?)` + `StatsPeriod` type to utils/calculations.ts ('all'→null,

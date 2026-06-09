@@ -437,6 +437,19 @@ export class GoogleSheetsService {
     }
   }
 
+  /**
+   * Run a child query only when there are parent ids to query by, else return []. Collapses the
+   * repeated `ids.length > 0 ? await db.select()…where(inArray(col, ids)) : []` guard (avoids a
+   * pointless `inArray(col, [])` round-trip) into one named place. Behavior-identical to the
+   * inline ternary it replaces.
+   */
+  private async queryIfNonEmpty<T>(
+    ids: readonly unknown[],
+    query: () => Promise<T[]>
+  ): Promise<T[]> {
+    return ids.length > 0 ? query() : [];
+  }
+
   private async updateSpreadsheetWithUserData(
     spreadsheetId: string,
     userId: string
@@ -463,29 +476,20 @@ export class GoogleSheetsService {
 
     // Query insurance terms for user's policies
     const policyIds = userInsurance.map((p) => p.id);
-    const userInsuranceTerms =
-      policyIds.length > 0
-        ? await db.select().from(insuranceTerms).where(inArray(insuranceTerms.policyId, policyIds))
-        : [];
+    const userInsuranceTerms = await this.queryIfNonEmpty(policyIds, () =>
+      db.select().from(insuranceTerms).where(inArray(insuranceTerms.policyId, policyIds))
+    );
 
     // Query junction rows for user's insurance terms
     const termIds = userInsuranceTerms.map((t) => t.id);
-    const userInsuranceTermVehicles =
-      termIds.length > 0
-        ? await db
-            .select()
-            .from(insuranceTermVehicles)
-            .where(inArray(insuranceTermVehicles.termId, termIds))
-        : [];
+    const userInsuranceTermVehicles = await this.queryIfNonEmpty(termIds, () =>
+      db.select().from(insuranceTermVehicles).where(inArray(insuranceTermVehicles.termId, termIds))
+    );
 
     // Query insurance claims for user's policies
-    const userInsuranceClaims =
-      policyIds.length > 0
-        ? await db
-            .select()
-            .from(insuranceClaims)
-            .where(inArray(insuranceClaims.policyId, policyIds))
-        : [];
+    const userInsuranceClaims = await this.queryIfNonEmpty(policyIds, () =>
+      db.select().from(insuranceClaims).where(inArray(insuranceClaims.policyId, policyIds))
+    );
 
     // Query photos directly by userId
     const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
@@ -511,13 +515,9 @@ export class GoogleSheetsService {
     const userReminders = await db.select().from(reminders).where(eq(reminders.userId, userId));
 
     const reminderIds = userReminders.map((r) => r.id);
-    const userReminderVehicles =
-      reminderIds.length > 0
-        ? await db
-            .select()
-            .from(reminderVehicles)
-            .where(inArray(reminderVehicles.reminderId, reminderIds))
-        : [];
+    const userReminderVehicles = await this.queryIfNonEmpty(reminderIds, () =>
+      db.select().from(reminderVehicles).where(inArray(reminderVehicles.reminderId, reminderIds))
+    );
     const userReminderNotifications = await db
       .select()
       .from(reminderNotifications)

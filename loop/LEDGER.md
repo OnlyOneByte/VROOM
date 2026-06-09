@@ -22,10 +22,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 73 |
 | guard | 6 | 74 |
 | bug | 3 | 71 |
-| arch | 5 | 69 |
+| arch | 5 | 75 |
 | infra | 6 | 72 |
 
-Current cycle: **74**
+Current cycle: **75**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1403,3 +1403,20 @@ Current cycle: **74**
   EXIT 0 (tsc 0 · musl-biome clean · 1046 pass/0 fail, +2 · build bundled). Next (75): recompute — `arch`
   most-starved (cyc 69, starved-for 6 > 5, OVER) → wins; arch #2 step 2 (page migration onto createLoadState,
   UI-eyes-on) OR a rule-7 fan-out for a non-UI backend dedup/dead-code target (the C69 pattern).
+- **C75 (arch — dedup the query-if-nonempty guard in google-sheets-service)** — `arch` most-starved (cyc 69,
+  6 > 5, OVER). arch #2 step 2 is UI-eyes-on-blocked, so per rule 7 fanned out 2 Explore agents (layering +
+  complexity — DIFFERENT angles than C69's dup+dead-code, to avoid re-surfacing). Picked the COMPLEXITY find:
+  `updateSpreadsheetWithUserData` repeated `ids.length > 0 ? await db.select()…where(inArray(col,ids)) : []`
+  4× (insurance terms/term-vehicles/claims/reminder-vehicles). Extracted a typed `queryIfNonEmpty<T>(ids,
+  () => query)` private helper (closure form — simpler than the agent's db-passing signature). VERIFIED the
+  pattern uniformity against source first (grep'd all `length > 0` — confirmed the financing/odometer
+  innerJoins are a different shape, correctly left alone; the only non-inArray hits are unrelated). Behavior-
+  identical (skips the pointless `inArray(col, [])` round-trip exactly as before). REJECTED the layering find
+  (extract ONE raw db.delete from providers/routes.ts) — the agent itself noted 5 OTHER raw queries stay
+  inline there, so extracting one makes the file MORE inconsistent (arch rule 5: no churn-for-churn). PROOF:
+  green→green — the google-sheets-service round-trip test passed before+after (in the FULL suite; the
+  single-suite run hit the known C38 cross-suite migration flake, NOT my change — canonical gate is full
+  validate:local). Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1046 pass/0 fail,
+  unchanged count · build bundled). Next (76): recompute — `feature` (cyc 70, starved-for 6 > 4, OVER) +
+  `bug` (cyc 71, 5 > 3, OVER) both over; feature's T4 is frontend-eyes-on, bug is Angelo-blocked — so likely
+  fall back to the most-starved ACTIONABLE (infra cyc 72 / deep-review cyc 73). Recompute all 6 live.
