@@ -135,10 +135,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > projected excess fee is period-independent. *Sibling display call (#card semantics) stays with Angelo.*
 
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
-1. **Vehicle-detail load failure masquerades as empty state** — `loadSummary`/`fetchExpensesPage`
-   in `vehicles/[id]/+page.svelte` only toast on failure, leaving `summary=null`/`expenses=[]`
-   → renders "No expenses yet" instead of an error+retry. Same class fixed for dashboard/expenses;
-   add a `*LoadError` flag + retry surface. (medium)
+- ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
+   (Overview) + `fetchExpensesPage` (Expenses tab) in `vehicles/[id]/+page.svelte` only toasted on
+   failure, leaving `summary=null`/`expenses=[]` → the empty state rendered, so a returning user whose
+   fetch failed thought their data vanished (four-states: error ≠ empty). Added `summaryLoadError` +
+   `expensesLoadError` flags + error+retry branches that take PRECEDENCE over the empty states
+   (`{#if error && !isLoading} … {:else if !hasData}`), mirroring the dashboard/analytics idiom. frontend
+   validate:local EXIT 0 (355 tests). CAVEAT: eyes-on screenshot Playwright-blocked here (pure tsc-checked
+   conditional mirroring a shipped pattern). Motivates arch #2 (frontend load-state extraction) — this is
+   its 2nd concrete instance.*
 2. **Vehicle-detail Expenses tab: page-local search/category filter over a 20-row server slice**
    while header reads "All Expenses ({totalCount})" — matches on other pages invisible; the
    in-table category Select is uncontrolled here (no `onCategoryChange`). Wire server-side

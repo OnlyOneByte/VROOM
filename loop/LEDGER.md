@@ -12,11 +12,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 52 |
 | deep-review | 5 | 54 |
 | guard | 6 | 55 |
-| bug | 3 | 51 |
+| bug | 3 | 57 |
 | arch | 5 | 56 |
 | infra | 6 | 53 |
 
-Current cycle: **56**
+Current cycle: **57**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1118,3 +1118,19 @@ Current cycle: **56**
   build bundled). arch #1 DONE (sync C36 + settings C50 dropped; auth verified). Next cycle (57): recompute —
   `bug` most-starved over budget (cyc 51, starved-for 6 > 3) → wins; top bug PENDING ANGELO, take next decided
   (#1 load-failure-masquerade or #3 ExpensesTable dead h-[] class).
+- **C57 (bug #1 — vehicle-detail load failure masquerades as empty state)** — top bug (lease/loan miles-used)
+  is PENDING ANGELO, so took the next decided one. VERIFIED against source: `loadSummary` (Overview) and
+  `fetchExpensesPage` (Expenses tab) in vehicles/[id]/+page.svelte only toast on failure, leaving
+  `summary=null` / `expenses=[]` → the Overview renders "No expenses yet" and the Expenses tab renders the
+  empty table, so a returning user whose fetch failed thinks their data vanished (NORTH_STAR four-states:
+  error ≠ empty). Fix mirrors the proven dashboard/analytics idiom: added `summaryLoadError` +
+  `expensesLoadError` flags (set in each catch, cleared at the top of each load), and error+retry branches
+  that take PRECEDENCE over the empty states (`{#if error && !isLoading} … {:else if !hasData}`). Retry
+  re-invokes the same loader; period-change/delete paths already call the loaders (which clear the flag), so
+  recovery is clean. Verified: frontend validate:local EXIT 0 (tsc 0 · build · 355 tests · prettier clean).
+  CAVEAT (same as T7/T8): UI-state change, eyes-on screenshot Playwright-sandbox-blocked here — but the
+  error-over-empty precedence is a pure tsc-checked conditional mirroring a shipped pattern. Next cycle (58):
+  recompute all 6 — `feature` most-starved over budget (cyc 52, starved-for 6 > 4) → wins; only T9 (e2e +
+  eyes-on, Playwright-blocked) remains on maintenance-schedule, so likely import-trackers T1 (the other
+  approved spec) OR flag T9's blocker. arch #1 is closed; #2 (frontend load-state extraction) now has C57 as
+  a second concrete instance motivating it.
