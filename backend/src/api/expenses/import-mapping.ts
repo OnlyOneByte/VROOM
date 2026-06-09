@@ -1,0 +1,270 @@
+/**
+ * Import-from-other-trackers: the header+value translation PRE-PASS (spec
+ * `import-trackers` T1). A foreign CSV (Fuelly / Fuelio / Drivvo / …) plus a
+ * `ColumnMapping` is turned into a CSV in VROOM's OWN native shape, which the
+ * EXISTING `buildImportPlan` then validates/previews/commits unchanged. So every
+ * downstream guarantee — per-row validation, formula-injection denormalize,
+ * cross-tenant-safe vehicle resolution, idempotent re-import, atomic commit — is
+ * inherited for free (see `import-csv.ts`). This module is PURE (no DB, no Hono):
+ * raw text + a mapping in, native CSV text out, so the whole translation contract
+ * is unit-testable without a server.
+ *
+ * The native target columns are exactly the subset `parseRow` reads:
+ *   date,vehicle,category,amount,mileage,volume,fuelType,description,tags,missedFillup
+ */
+
+import { parse } from 'csv-parse/sync';
+import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../../db/types';
+import type { DistanceUnit, VolumeUnit } from '../../types';
+import { convertDistance, convertVolume } from '../../utils/unit-conversions';
+
+/** A native VROOM column a foreign header can be mapped onto. */
+export type NativeField =
+  | 'date'
+  | 'vehicle'
+  | 'category'
+  | 'amount'
+  | 'mileage'
+  | 'volume'
+  | 'fuelType'
+  | 'description'
+  | 'tags'
+  | 'missedFillup';
+
+/** How the foreign file encodes dates (D3). `epoch` accepts unix seconds or millis. */
+export type ImportDateFormat = 'iso' | 'mdy' | 'dmy' | 'epoch';
+
+/**
+ * Instructions for translating ONE foreign file into VROOM's native shape. Built by
+ * the client (auto-filled from a preset in T2, or hand-mapped). All transforms are
+ * declarative — the route (T3) just hands this to `applyMapping`.
+ */
+export interface ColumnMapping {
+  /** Preset id this came from ('fuelly' | 'fuelio' | 'drivvo'), or undefined for manual. */
+  source?: string;
+  /** VROOM field → the foreign header that supplies it. Unmapped fields stay blank. */
+  columns: Partial<Record<NativeField, string>>;
+  /** Vehicle name to stamp on every row when the file has no vehicle column (D4). */
+  targetVehicle?: string;
+  /** Date encoding in the file (D3). */
+  dateFormat: ImportDateFormat;
+  /** The FILE's distance unit (D1). Conversion needs both this and the target's unit. */
+  distanceUnit?: DistanceUnit;
+  /** The FILE's volume unit (D1). */
+  volumeUnit?: VolumeUnit;
+  /** Foreign category word (lower-cased) → VROOM enum (D2). Unmatched → `misc` + a note. */
+  categoryMap?: Record<string, ExpenseCategory>;
+}
+
+/**
+ * The destination vehicle's units — mapped values are converted INTO these (D1), since
+ * VROOM stores each expense in its vehicle's own unit (no canonical storage unit; see
+ * `unit-conversions.ts`). Omit a unit (or pass nothing) to skip that conversion — values
+ * then pass through unchanged. The route (T3) supplies the resolved target vehicle's units.
+ */
+export interface TargetUnits {
+  distanceUnit?: DistanceUnit;
+  volumeUnit?: VolumeUnit;
+}
+
+export interface ApplyMappingResult {
+  /** Native-shape CSV text, ready to hand to `buildImportPlan` verbatim. */
+  csv: string;
+  /**
+   * Distinct foreign category words that had no mapping and were bucketed to `misc`
+   * (D2's "unmapped → misc + a VISIBLE note, never a silent guess"). The route surfaces
+   * these so the user knows which values to remap.
+   */
+  unmappedCategories: string[];
+}
+
+/** Raised for whole-file problems (unparseable). Per-value issues are left for `buildImportPlan`. */
+export class CsvMappingError extends Error {}
+
+/** Native output column order (the subset `parseRow` consumes). */
+const NATIVE_HEADER: NativeField[] = [
+  'date',
+  'vehicle',
+  'category',
+  'amount',
+  'mileage',
+  'volume',
+  'fuelType',
+  'description',
+  'tags',
+  'missedFillup',
+];
+
+/**
+ * European decimal-comma → dot. `1.234,56` (dot thousands + comma decimal) → `1234.56`;
+ * a lone `12,50` → `12.50`. A value with neither, or only dots, is returned unchanged.
+ * (A lone comma is treated as the decimal separator per the decimal-comma decision; a
+ * preset that uses comma-as-thousands is handled at the preset layer, not here.)
+ */
+function normalizeDecimal(raw: string): string {
+  const s = raw.trim();
+  if (!s) return s;
+  const hasDot = s.includes('.');
+  const hasComma = s.includes(',');
+  if (hasDot && hasComma) return s.replace(/\./g, '').replace(',', '.');
+  if (hasComma) return s.replace(',', '.');
+  return s;
+}
+
+/** A unix epoch (seconds, or millis when |n| ≥ 1e12) → ISO, or null if not finite/valid. */
+function epochToIso(n: number): string | null {
+  if (!Number.isFinite(n)) return null;
+  const ms = Math.abs(n) >= 1e12 ? n : n * 1000;
+  const dt = new Date(ms);
+  return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+}
+
+/**
+ * Normalize a foreign date string to an ISO instant per `format`, built in LOCAL time.
+ * Returns the raw string unchanged when it can't be parsed, so `buildImportPlan`'s own
+ * `parseDate` reports a normal per-row "Invalid date" rather than this throwing.
+ *
+ * The local-time construction is mandatory (cycle-6/11 discipline): handing a date-only
+ * string to `new Date('YYYY-MM-DD')` parses it as UTC midnight, which rolls the calendar
+ * day BACK for every user west of UTC. Building the Date from numeric parts keeps the
+ * user's intended day. An ISO value that already carries an explicit timezone (Z or
+ * ±hh:mm) is an absolute instant and is honored as-is.
+ */
+export function normalizeForeignDate(raw: string, format: ImportDateFormat): string {
+  const s = raw.trim();
+  if (!s) return '';
+
+  if (format === 'epoch') return epochToIso(Number(s)) ?? s;
+
+  if (format === 'iso' && /\d{4}-\d{2}-\d{2}t.*([z]|[+-]\d{2}:?\d{2})$/i.test(s)) {
+    const dt = new Date(s);
+    return Number.isNaN(dt.getTime()) ? s : dt.toISOString();
+  }
+
+  const [datePart, timePart = ''] = s.split(/[ t]/i);
+  const nums = datePart.split(/[/.-]/).map(Number);
+  if (nums.length < 3 || nums.some((n) => !Number.isInteger(n))) return s;
+
+  let year: number;
+  let month: number;
+  let day: number;
+  if (format === 'mdy') [month, day, year] = nums;
+  else if (format === 'dmy') [day, month, year] = nums;
+  else [year, month, day] = nums; // iso (no timezone)
+  if (year < 100) year += 2000;
+
+  const [hh = 0, mm = 0, ss = 0] = timePart.split(':').map((t) => Number.parseInt(t, 10) || 0);
+
+  const dt = new Date(year, month - 1, day, hh, mm, ss);
+  return Number.isNaN(dt.getTime()) ? s : dt.toISOString();
+}
+
+/** Map a foreign category word to a VROOM enum (D2). Returns the fallback word when it misses. */
+function mapCategory(
+  raw: string,
+  categoryMap: Record<string, ExpenseCategory> | undefined
+): { value: string; unmapped?: string } {
+  const word = raw.trim();
+  // A blank category stays blank → buildImportPlan reports "Unknown category"; we never
+  // invent a category for an empty cell (only NAMED-but-unrecognized words fall back).
+  if (!word) return { value: '' };
+  const lc = word.toLowerCase();
+  if ((EXPENSE_CATEGORIES as readonly string[]).includes(lc)) return { value: lc };
+  const mapped = categoryMap?.[lc] ?? categoryMap?.[word];
+  if (mapped) return { value: mapped };
+  return { value: 'misc', unmapped: word };
+}
+
+/** Decimal-normalize then convert a volume into the target's unit (when both units are known). */
+function mapVolume(raw: string, from: VolumeUnit | undefined, to: VolumeUnit | undefined): string {
+  const s = normalizeDecimal(raw);
+  if (!s) return '';
+  const n = Number(s);
+  if (!Number.isFinite(n)) return raw; // let buildImportPlan error it
+  if (!from || !to) return String(n);
+  return String(Number(convertVolume(n, from, to).toFixed(3)));
+}
+
+/**
+ * Decimal-normalize then convert a mileage into the target's unit, rounded to an integer
+ * (native `parseMileage` requires a whole number; the rounding is the documented A1 loss).
+ */
+function mapMileage(
+  raw: string,
+  from: DistanceUnit | undefined,
+  to: DistanceUnit | undefined
+): string {
+  const s = normalizeDecimal(raw);
+  if (!s) return '';
+  const n = Number(s);
+  if (!Number.isFinite(n)) return raw; // let buildImportPlan error it
+  const dist = from && to ? convertDistance(n, from, to) : n;
+  return String(Math.round(dist));
+}
+
+/** RFC-4180 cell escaping: quote + double internal quotes when a cell holds `,` `"` or a newline. */
+function csvCell(value: string): string {
+  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+function stringifyNative(rows: Record<NativeField, string>[]): string {
+  const lines = [NATIVE_HEADER.join(',')];
+  for (const row of rows) {
+    lines.push(NATIVE_HEADER.map((h) => csvCell(row[h] ?? '')).join(','));
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Translate a foreign CSV into VROOM's native CSV using `mapping`, converting units into
+ * `target` (the destination vehicle's units). Pure: returns the native CSV text plus the
+ * set of category words that fell back to `misc`. Throws `CsvMappingError` only when the
+ * file itself is unparseable; every per-value problem is deferred to `buildImportPlan`.
+ */
+export function applyMapping(
+  foreignCsv: string,
+  mapping: ColumnMapping,
+  target: TargetUnits = {}
+): ApplyMappingResult {
+  let records: Record<string, string>[];
+  try {
+    records = parse(foreignCsv, {
+      bom: true,
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+      relax_column_count: true,
+    });
+  } catch (err) {
+    throw new CsvMappingError(
+      `Could not parse the file: ${err instanceof Error ? err.message : 'unknown error'}`
+    );
+  }
+
+  const cols = mapping.columns;
+  const read = (rec: Record<string, string>, field: NativeField): string => {
+    const header = cols[field];
+    return header ? (rec[header] ?? '') : '';
+  };
+
+  const unmapped = new Set<string>();
+  const outRows = records.map((rec) => {
+    const category = mapCategory(read(rec, 'category'), mapping.categoryMap);
+    if (category.unmapped) unmapped.add(category.unmapped);
+    return {
+      date: normalizeForeignDate(read(rec, 'date'), mapping.dateFormat),
+      // Inject the chosen target vehicle when the file has no vehicle column (D4).
+      vehicle: cols.vehicle ? read(rec, 'vehicle') : (mapping.targetVehicle ?? ''),
+      category: category.value,
+      amount: normalizeDecimal(read(rec, 'amount')),
+      mileage: mapMileage(read(rec, 'mileage'), mapping.distanceUnit, target.distanceUnit),
+      volume: mapVolume(read(rec, 'volume'), mapping.volumeUnit, target.volumeUnit),
+      fuelType: read(rec, 'fuelType'),
+      description: read(rec, 'description'),
+      tags: read(rec, 'tags'),
+      missedFillup: read(rec, 'missedFillup'),
+    } satisfies Record<NativeField, string>;
+  });
+
+  return { csv: stringifyNative(outRows), unmappedCategories: [...unmapped].sort() };
+}

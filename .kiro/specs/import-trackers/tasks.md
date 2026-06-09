@@ -9,10 +9,13 @@
       `[depends on Dx]` sections already assume those options; build T1+.
 
 ## Phase 1 — backend mapping core (pure, no I/O)
-- [ ] **T1** `import-mapping.ts`: `ColumnMapping` type + `applyMapping(foreignCsv, mapping)` →
-      native-shape CSV. Unit conversion (reuse `unit-conversions.ts`), decimal-comma, category map
-      (+ unmapped→misc flag), **local-time** date normalization per `dateFormat`. Unit tests incl. a
-      non-UTC-zone date case.
+- [x] **T1 (cycle 58)** `import-mapping.ts`: `ColumnMapping` type + `applyMapping(foreignCsv, mapping, target)`
+      → native-shape CSV. Unit conversion INTO the target vehicle's units (reuses `unit-conversions.ts`),
+      decimal-comma, category map (+ `unmappedCategories` visible flag), **local-time** date normalization
+      across iso/mdy/dmy/epoch (cycle-6/11 discipline). Pure (no DB/Hono); fully additive — the native import
+      path is unchanged and stays default when no mapping is sent. 14 unit tests incl. the timezone-independent
+      local-day invariant AND a load-bearing `applyMapping`→`buildImportPlan` round-trip proving the emitted
+      native CSV is consumable end-to-end. backend validate:local EXIT 0 (987 pass, +14).
 - [ ] **T2** `import-mapping-presets.ts`: static maps for Fuelly/Fuelio/Drivvo [D5] + `detectSource(headers)`.
       Pure; unit-tested against each signature + an unknown file.
 

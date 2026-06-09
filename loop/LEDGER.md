@@ -2,6 +2,15 @@
 
 > Append-only cycle log + the balance table. Update BOTH every cycle:
 > bump the touched category's "last-touched cycle", then add a one-line log entry.
+>
+> **COVERAGE TREND (loop-improvement #4): end every cycle-log entry with a `cov:` tag** —
+> `cov: be <pct>% / fe <pct>%` (the last reading; carry the prior numbers forward + mark
+> `~` if you didn't re-measure this cycle). Re-measure (`bun test --coverage` / vitest
+> `--coverage`) at least on guard/arch/bug cycles that touch a module. The standing goal is
+> 90% both sides (baseline be ~74% / fe ~59%); when `guard` or `arch` is the balance pick and
+> nothing more urgent is queued, STEER it to the lowest-covered, highest-risk module rather
+> than picking blind — that turns the 90% goal into a ratchet instead of an aspiration.
+> Never let a cycle DROP coverage without naming why.
 
 ## Balance table
 `starved-for = current cycle − last-touched`. If `starved-for > budget` for any category,
@@ -9,14 +18,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 52 |
+| feature | 4 | 58 |
 | deep-review | 5 | 54 |
 | guard | 6 | 55 |
 | bug | 3 | 57 |
 | arch | 5 | 56 |
 | infra | 6 | 53 |
 
-Current cycle: **57**
+Current cycle: **58**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1134,3 +1143,19 @@ Current cycle: **57**
   eyes-on, Playwright-blocked) remains on maintenance-schedule, so likely import-trackers T1 (the other
   approved spec) OR flag T9's blocker. arch #1 is closed; #2 (frontend load-state extraction) now has C57 as
   a second concrete instance motivating it.
+- **C58 (feature — import-trackers T1: the translation pre-pass)** — maintenance-schedule has only T9 left
+  (Playwright-blocked), so opened the OTHER approved spec (import-trackers, backend-first per its tasks.md).
+  T1 = `import-mapping.ts`: pure `ColumnMapping` type + `applyMapping(foreignCsv, mapping, target)` →
+  VROOM-NATIVE CSV that the EXISTING `buildImportPlan` consumes UNCHANGED, so all downstream safety (per-row
+  validation, formula denormalize, cross-tenant vehicle resolution, idempotent re-import, atomic commit) is
+  inherited free. Implements rename + unit-convert INTO the target vehicle's units (D1, reuses
+  unit-conversions.ts) + decimal-comma + category map (unmapped→misc + a VISIBLE `unmappedCategories` note,
+  D2) + local-time date normalization across iso/mdy/dmy/epoch (D3, the cycle-6/11 discipline — never
+  `new Date('YYYY-MM-DD')`) + no-vehicle-column → targetVehicle (D4). Pure (no DB/Hono), fully additive — the
+  native import path is untouched and stays the default when no mapping is sent. 14 unit tests incl. the
+  load-bearing applyMapping→buildImportPlan round-trip (a Fuelio-shaped metric file maps+converts into a
+  plan that imports clean) + the timezone-independent local-day invariant. tsc caught an optional-chain
+  arithmetic null (exp?.date.getMonth()+1) — narrowed with a guard, no non-null assertion (repo lints it).
+  Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 987 pass/0 fail, +14 · build bundled).
+  Next (59): recompute all 6 — `deep-review` most-starved (cyc 54, starved-for 5 = budget) likely wins;
+  T2 (presets + detectSource) is the next import-trackers increment when feature comes due again.

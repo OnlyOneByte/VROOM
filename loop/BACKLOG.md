@@ -63,10 +63,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    *Follow-ons flagged to Angelo (C52): lease/loan miles-used consume period-scoped `currentMileage`
    (understates overage under a non-'all' window) → switch to `currentOdometer`; + the "Current Mileage"
    card display-semantics direction call. Both deferred, not blocking.*
-2. **Import from other trackers** — spec APPROVED (Angelo signed off D1–D5, cycle 12). **BUILD GO**,
-   backend-first per `.kiro/specs/import-trackers/tasks.md` T1→T6. Server-side mapping pre-pass →
-   VROOM-native CSV → the UNCHANGED hardened import pipeline (inherits cycle-8 idempotency/atomicity
-   + formula/tenant safety). Backward-compatible route extension.
+2. **Import from other trackers** — spec APPROVED (Angelo signed off D1–D5, cycle 12). **BUILD IN PROGRESS**,
+   backend-first per `.kiro/specs/import-trackers/tasks.md`. **T1 DONE (C58):** `import-mapping.ts` — pure
+   `applyMapping(foreignCsv, mapping, target)` → VROOM-native CSV (rename + unit-convert into the target's
+   units + decimal-comma + category map/unmapped→misc + local-time dates + targetVehicle injection); 14 unit
+   tests incl. a `buildImportPlan` round-trip. Additive — native path untouched. **NEXT = T2:**
+   `import-mapping-presets.ts` (static Fuelly/Fuelio/Drivvo maps + `detectSource(headers)`, pure, unit-tested).
+   Then T3 route extension (optional `mapping` field → `applyMapping` then the existing flow) → T4/T5 frontend
+   mapping step → T6 e2e. The pre-pass design means everything downstream of `buildImportPlan` is reused as-is.
 3. **Recurring expenses** beyond reminders — first-class recurring (insurance premium, loan
    payment, parking pass) with frequency + dashboard surfacing.
 
@@ -74,6 +78,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > cycle, not one-and-done. They no longer gate the loop; pull T1 of the higher-value
 > maintenance-schedule next time `feature` is the balance pick. Also new: standing TODO Misc goal —
 > raise test coverage to 90% (frontend ~59% / backend ~74% today); fold into bug/guard/arch cycles.
+>
+> **FEATURE DoD (loop-improvement #3): a feature is NOT done until one E2E exercises the real
+> FE→BE→DB→render round trip for the new capability** — not just backend HTTP tests + frontend
+> unit tests in isolation. Integrated UI/backend bugs (reminderApi.create called from nowhere
+> cyc 151–165; the FE-sends-`undefined`/BE-skips clear-field class) hide precisely in the seam
+> the round-trip E2E covers. If the E2E is Playwright-sandbox-blocked here, the task stays at
+> "code-complete, T9/eyes-on pending" (as maintenance T7–T9 are) — it does NOT count as done,
+> and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
 1. **Eyes-on sweep: vehicle Overview tab + ExpensesTable populated states** (mobile +
@@ -119,6 +131,18 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 - ~~**Category-grid no-wrap guard**~~ — *DONE cycle 2: committed source-scan
   `category-selector-labels.test.ts` (merge-surviving, single-word invariant) + runtime
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
+
+### guard
+1. **Generalize the FE↔BE contract-drift guard to every hand-assembled response.** C55 locked
+   ONE surface (`/stats`): a route that hand-builds its JSON (`c.json({...})`) with no type
+   binding to the frontend contract silently drifts when one side adds/drops/renames a field —
+   the recurring defect family here (`.optional()` vs `.nullish()`, dropped `clientId`, the
+   `interestPaidYtd` rename touching 6 sites). One guard per cycle: pick a route whose response
+   the frontend types as a named contract, add an `Object.keys(data).sort()` EXACT-equality HTTP
+   assertion against that contract's keys (bidirectional — a dropped OR an unmirrored-added key
+   both fail), shape-stable across empty/populated. Candidates: `/vehicles` list, `/expenses`
+   page, `/insurance` policy+terms, `/financing`, `/reminders`. Each is one `guard` increment;
+   stop when the hand-assembled-response surfaces are covered. *(implements loop-improvement #2)*
 
 ### bug
 > **PENDING ANGELO (confirmed + traced C54, do NOT execute unilaterally — user-visible $ change):**
@@ -336,6 +360,15 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
   hotspots near the Biome ceiling, deeply-nested conditionals worth flattening.
 
 ### infra
+> **STANDING CADENCE (loop-improvement #5): every ~10 cycles, run a branch-hygiene sweep** — the
+> loop is now 50+ commits deep on `claude-loop-dev` headed for one big human PR. Each sweep:
+> (1) `git status` for untracked `*.test.ts` OUTSIDE the by-design-untracked set (`*.meshclaw.e2e.ts`)
+> — bun discovers tests by filesystem, so an untracked spec counts locally every cycle but VANISHES
+> on merge, silently dropping its coverage (confirmed cyc 200); commit or delete any stray;
+> (2) full `regress.sh` for a clean green baseline; (3) refresh `BRANCH_REVIEW.md` (gitignored), grouping
+> commits since the last refresh by theme so the eventual PR stays reviewable. Counts as one `infra`
+> increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
+
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
 - ~~**CLAUDE.md post-C52 orientation refresh (C53)**~~ — *DONE C53: "Current state" still listed the
   vehicle-stats reconcile (T3-part-3) as REMAINING, but C52 shipped it (additive `currentOdometer`) — a
