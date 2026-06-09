@@ -377,11 +377,20 @@ routes.get(
       vehicle.trackCharging
     );
 
+    // `stats.currentMileage` is period-filtered + fuel-only (MAX over the filtered fuel
+    // expenses), so it can drop/disappear under a 7d/30d window and never sees manual
+    // odometer entries. `currentOdometer` is the canonical ALL-TIME, ALL-SOURCES reading
+    // (the D2 helper the mileage trigger uses) — period-independent by design, so a
+    // consumer that needs the vehicle's true odometer (lease overage, loan miles-used)
+    // can use it instead of the period-scoped stat. Additive: currentMileage is unchanged.
+    const currentOdometer = await odometerRepository.getCurrentOdometer(id);
+
     return c.json({
       success: true,
       data: {
         period,
         ...stats,
+        currentOdometer,
       },
     });
   }

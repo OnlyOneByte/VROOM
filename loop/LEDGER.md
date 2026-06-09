@@ -9,14 +9,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 46 |
+| feature | 4 | 52 |
 | deep-review | 5 | 49 |
 | guard | 6 | 48 |
 | bug | 3 | 51 |
 | arch | 5 | 50 |
 | infra | 6 | 47 |
 
-Current cycle: **51**
+Current cycle: **52**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1046,3 +1046,20 @@ Current cycle: **51**
   pass/0 fail, +1 · build bundled). Next cycle (52): recompute all 6 from this table — `deep-review` (cyc
   49, starved-for 3) and `feature` (cyc 46, starved-for 6 > 4, OVER) lead; feature wins → maintenance T9
   e2e + the deferred vehicle-stats reconcile. #11 (mobile fuel-stat wrap) + #14/#16 (Angelo) still queued.
+- **C52 (feature — maintenance-schedule T3 part 3: the deferred vehicle-stats reconcile)** — added the
+  canonical all-time `currentOdometer` to GET /vehicles/:id/stats via the D2 `getCurrentOdometer(id)`
+  helper (all-sources MAX: expenses ∪ manual odometer entries, period-INDEPENDENT). ADDITIVE — existing
+  `currentMileage` (period-filtered + fuel-only) is untouched, so zero behavior change to current
+  consumers. Frontend `VehicleStats` type gained the optional field + doc-comments distinguishing the two.
+  Anchored by a NEW real-stack HTTP test (vehicle-stats-current-odometer.test.ts, 4 cases) pinning the two
+  properties that separate it from currentMileage: period-independence (a 7d window that zeroes
+  currentMileage leaves currentOdometer intact) + cross-source MAX (a manual 18000 entry that the fuel-only
+  stat ignores). Backend property test had ZERO currentMileage assertions, so nothing pre-pinned this.
+  Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 966 pass/0 fail, +4 · build bundled);
+  frontend validate:local EXIT 0 (tsc 0 · build · 355 tests). NOTE → Angelo (sent): two follow-ons surfaced
+  here — (1) lease/loan miles-used CONSUME the period-scoped `currentMileage`, so a non-'all' stats period
+  silently understates overage; switching those consumers to `currentOdometer` is the real fix (a bug, but
+  user-visible $ change). (2) Whether the "Current Mileage" stat CARD should stay period-scoped or show the
+  true odometer is a display-semantics direction call. Both deferred — not blocking. Next cycle (53):
+  recompute all 6 — `deep-review` (cyc 49, starved-for 4) and `infra` (cyc 47, starved-for 6 = budget) lead;
+  deep-review likely wins. T9 (e2e + eyes-on) remains Playwright-sandbox-blocked here.

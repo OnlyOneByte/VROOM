@@ -51,14 +51,18 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 ## Ranked queue (top = next)
 
 ### feature
-1. **Maintenance-schedule reminders** — spec APPROVED; BUILD IN PROGRESS per
-   `.kiro/specs/maintenance-schedule/tasks.md`. **T1 DONE (C15):** additive migration
-   `0003_many_jean_grey.sql` (mileage columns + dueOdometer) + SHEET_HEADERS (T5-partial).
-   **T2 DONE (C16):** `getCurrentOdometer(vehicleId)` = MAX-by-value UNION over expenses.mileage +
-   odometer_entries (8 unit tests); vehicle-stats reconcile deferred to T3 (period-semantics call).
-   **NEXT = T3:** trigger-service whichever-comes-first due logic + the deferred nextDueDate/dueDate
-   nullable rebuild (table rebuild — verify child rows survive) + the vehicle-stats reconcile. Then
-   T4 routes → T6–T9 frontend/e2e.
+1. **Maintenance-schedule reminders** — spec APPROVED; **NEAR-COMPLETE** per
+   `.kiro/specs/maintenance-schedule/tasks.md`. Backend 100% (T1–T5): migration + `getCurrentOdometer`
+   (T1/T2), trigger engine whichever-comes-first + nullable rebuild (T3 parts 1–2, C22/C25), routes
+   (T4, C31/C32/C37), backup round-trip guard (T5, C27). Frontend functionally complete (T6–T8, C39/
+   C45/C46/C48/C49). **T3 part 3 DONE (C52):** the deferred vehicle-stats reconcile — added the
+   canonical all-time `currentOdometer` to GET /stats (additive; `currentMileage` untouched), 4 HTTP
+   tests pin period-independence + cross-source MAX. **REMAINING: T9 only** — promote the mileage e2e
+   into the committed suite + the T7/T8 eyes-on screenshots; both Playwright-sandbox-blocked here, so
+   T9 awaits either an unblocked Playwright or Angelo's glance at `/reminders`.
+   *Follow-ons flagged to Angelo (C52): lease/loan miles-used consume period-scoped `currentMileage`
+   (understates overage under a non-'all' window) → switch to `currentOdometer`; + the "Current Mileage"
+   card display-semantics direction call. Both deferred, not blocking.*
 2. **Import from other trackers** — spec APPROVED (Angelo signed off D1–D5, cycle 12). **BUILD GO**,
    backend-first per `.kiro/specs/import-trackers/tasks.md` T1→T6. Server-side mapping pre-pass →
    VROOM-native CSV → the UNCHANGED hardened import pipeline (inherits cycle-8 idempotency/atomicity
