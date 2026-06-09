@@ -10,13 +10,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 46 |
-| deep-review | 5 | 42 |
+| deep-review | 5 | 49 |
 | guard | 6 | 48 |
 | bug | 3 | 44 |
-| arch | 5 | 43 |
+| arch | 5 | 50 |
 | infra | 6 | 47 |
 
-Current cycle: **48**
+Current cycle: **50**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -975,3 +975,57 @@ Current cycle: **48**
   Next cycle (49): `deep-review` is most-starved over budget (cyc 42, starved-for 7 > 5 at cyc 49) → it
   wins → eyes-on/logic review of the C45/C46 frontend mileage UI (also partially discharges the pending
   T7/T8 eyes-on). Then arch settings-DROP (cyc 43, breaches ~50). bug #11 queued; #14/#16 await Angelo.
+- **C49 (deep-review → found+fixed 1 real display bug; the C45/C46 mileage UI)** — `deep-review` most-
+  starved over budget (cyc 42, starved-for 7 > 5; arch 6 + bug 5 also over, deep-review won by raw
+  starved-for). Reviewed the freshest unreviewed surface — the C45 ReminderForm mileage branch + C46
+  /reminders Serviced button + C48 reminder-helpers — reading each in full AND verifying the form's
+  payload against the backend `reminderBaseSchema`/route (the C21/C28/C35/C42 verify-before-acting
+  lesson). RESULT: form payload valid (pure-mileage still sends a required frequency/startDate, which
+  the route converts to nextDueDate: null), null-handling on the page all guarded (C39/C48). ONE REAL
+  bug found by cross-referencing form→backend→card: a pure-mileage reminder still carries frequency
+  ='monthly' (backend requires it, form sends its default), and the /reminders card rendered that
+  frequency UNCONDITIONALLY (`<Badge>{frequencyLabel(item)}</Badge>`) → a misleading "Monthly" badge on
+  an oil-change-every-5,000-mi reminder whose time axis is INERT (engine is odometer-driven, nextDueDate
+  null). Low-med, decided (no product question — just wrong), label-only fix. FIXED via the C48
+  extraction pattern: added exported, tested `frequencyLabel(reminder): string | null` (+ `hasTimeAxis`)
+  to reminder-helpers.ts — returns null when no time axis; routed the page's inline frequencyLabel
+  through it and gated the Badge on non-null. Behavior-preserving for time/both (badge still renders);
+  the inert-schedule badge is suppressed for pure-mileage. CAUGHT MYSELF mid-edit adding an "Every 5,000
+  mi" interval badge with a HARDCODED 'mi' unit (the C204 hardcoded-unit class — wrong for km users) and
+  removed it (the milestone already shows correctly on the card's odometer line). Pinned by 5 new helper
+  tests (hasTimeAxis time|both, frequencyLabel Monthly/custom/both, + the load-bearing null-for-pure-
+  mileage assertion). Verified: frontend validate:local EXIT 0 (tsc 0 · build · 355 tests, +5 · prettier
+  clean). Also partially discharges the pending T7/T8 eyes-on — the form/card LOGIC is now reviewed +
+  pinned, though a literal screenshot is still Playwright-sandbox-blocked.
+  Next cycle (50): `arch` is most-starved over budget (cyc 43, starved-for 7 > 5 at cyc 50; bug cyc 44
+  starved-for 6 > 3 also over — arch wins by raw starved-for) → arch settings-DROP (the C43
+  characterize-then-drop pair: drop the 5 settings try/catch, let the SyncError-aware central handler
+  shape responses; the C43 net makes it safe + the GET-masks-500 / PUT-message changes are the reviewed
+  delta). Then `bug` (#11 mobile fuel-stat wrap, or #16/#14 if Angelo has answered). T9 e2e + vehicle-
+  stats reconcile remain the last maintenance-schedule pieces.
+- **C50 (arch — #1 part 2c-drop: converge settings error handling on the central handler)** — `arch`
+  most-starved over budget (cyc 43, starved-for 7 > 5; bug also over at 6, arch won by raw starved-for).
+  Executed the drop the C43 characterization set up. VERIFIED the exact delta vs source first (the
+  C24/C30/C36 pattern): read settings/routes.ts + the C43 test + the central errorHandler before
+  touching anything. Dropped the hand-rolled try/catch from all 4 settings handlers (GET /, PUT /,
+  POST /backup, POST /restore) + removed the now-unused `AppError`/`logger` imports (kept `ValidationError`
+  — still used by the storage/backup validators at :49/:61/:67/:94). BEHAVIOR DELTA, all reviewed +
+  intended (arch rule 2 authorized exception, net-built C43): (1) PUT ZodError → was
+  AppError('Invalid settings data', 400), now the central handler's ValidationError('Invalid request
+  data', 400) — STATUS UNCHANGED (400), only the transformed message standardizes; (2) GET / no longer
+  MASKS a typed error as a blanket 500 — a NotFoundError/ValidationError now reaches its real status
+  (improvement); (3) POST /backup likewise; (4) POST /restore's catch was dead (its try body only
+  returns, can't throw) → pure boilerplate removal. The storage/backup ValidationErrors (AppError
+  subclass) flow through the handler by their 400 statusCode unchanged. Updated the ONE C43 assertion
+  the drop changes (PUT message → 'Invalid request data'); the SyncError-style positive controls + the
+  path-traversal 400 stayed GREEN unchanged, proving the common paths are preserved. Dropped a
+  speculative `code === 'VALIDATION_ERROR'` assertion after verifying AppError carries no `code` field
+  (the envelope code is derived in formatErrorResponse) — didn't over-assert an unverified shape.
+  Verified: validate:local EXIT 0 (tsc 0 · musl-biome clean, auto-reflowed the de-indented handlers ·
+  961 pass/0 fail · build bundled). `sync` (C36) + `settings` (C50) now converged; `auth` (7 try/catch)
+  is the LAST hand-rolled route file — its own characterize-then-drop pair for a future arch cycle.
+  Next cycle (51): `bug` is most-starved over budget (cyc 44, starved-for 7 > 3 at cyc 51; feature cyc
+  46 starved-for 5 > 4 also over — bug wins by raw starved-for) → take a decided standalone bug. #11
+  (mobile fuel-stat wrap, UI + screenshot — but Playwright is sandbox-blocked here, so a logic/source
+  fix + the markup is the floor) is the main decided one; #14/#16 still await Angelo's semantics calls.
+  Then `feature` → maintenance-schedule T9 e2e + the deferred vehicle-stats reconcile (the last pieces).

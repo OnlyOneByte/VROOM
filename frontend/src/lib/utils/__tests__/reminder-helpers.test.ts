@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isMileageTracking, isReminderTimeDue } from '../reminder-helpers';
+import { frequencyLabel, hasTimeAxis, isMileageTracking, isReminderTimeDue } from '../reminder-helpers';
 import type { Reminder } from '$lib/types/reminder';
 
 /**
@@ -68,5 +68,40 @@ describe('isMileageTracking', () => {
 		expect(isMileageTracking(mk({ triggerMode: 'mileage' }))).toBe(true);
 		expect(isMileageTracking(mk({ triggerMode: 'both' }))).toBe(true);
 		expect(isMileageTracking(mk({ triggerMode: 'time' }))).toBe(false);
+	});
+});
+
+describe('hasTimeAxis', () => {
+	it('true for time and both, false for mileage', () => {
+		expect(hasTimeAxis(mk({ triggerMode: 'time' }))).toBe(true);
+		expect(hasTimeAxis(mk({ triggerMode: 'both' }))).toBe(true);
+		expect(hasTimeAxis(mk({ triggerMode: 'mileage' }))).toBe(false);
+	});
+});
+
+describe('frequencyLabel', () => {
+	it('capitalizes a standard frequency for a time reminder', () => {
+		expect(frequencyLabel(mk({ triggerMode: 'time', frequency: 'monthly' }))).toBe('Monthly');
+		expect(frequencyLabel(mk({ triggerMode: 'time', frequency: 'yearly' }))).toBe('Yearly');
+	});
+
+	it('renders a custom interval (pluralizing > 1)', () => {
+		expect(
+			frequencyLabel(mk({ frequency: 'custom', intervalValue: 3, intervalUnit: 'month' }))
+		).toBe('Every 3 months');
+		expect(
+			frequencyLabel(mk({ frequency: 'custom', intervalValue: 1, intervalUnit: 'week' }))
+		).toBe('Every 1 week');
+	});
+
+	it('a both reminder keeps its real schedule label', () => {
+		expect(frequencyLabel(mk({ triggerMode: 'both', frequency: 'weekly' }))).toBe('Weekly');
+	});
+
+	it('is null for a pure-mileage reminder — the inert stored frequency must NOT render', () => {
+		// The load-bearing assertion: a pure-mileage reminder still carries frequency='monthly'
+		// (backend requires one, the form sends its default), but the time axis is inert — showing
+		// "Monthly" would be a lie. null lets the card omit the badge.
+		expect(frequencyLabel(mk({ triggerMode: 'mileage', frequency: 'monthly' }))).toBeNull();
 	});
 });

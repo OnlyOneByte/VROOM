@@ -252,13 +252,17 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
      fetch settings' 500; PUT / maps ZodError → 'Invalid settings data' 400). Pinned today's behavior in
      `settings-route-errors.test.ts` (4) with inline notes on what the drop will change. (Also verified
      updateSettingsSchema carries no C41-class default.)
-   - [ ] **part 2c-drop settings.** Now safe: drop the 5 settings try/catch; let typed errors reach the
-     central handler (GET stops masking; PUT ZodError → central 400 ValidationError). Update the
-     `settings-route-errors.test.ts` 'Invalid settings data' assertion to the central message IN THE
-     SAME COMMIT. Keep any catch that adds REAL value (e.g. a genuine error transform a caller depends
-     on) — but GET/backup/restore are pure boilerplate masks.
-   - [ ] **part 2d — `auth` (7 try/catch).** Same characterize-then-drop pair; check its throw types
-     first (AppError subclasses are already centrally-shaped → drop is a no-op simplification). (consistency)
+   - [x] **part 2c-drop settings (C50).** Dropped the 4 settings try/catch (GET / PUT / backup / restore)
+     + removed the now-unused `AppError`/`logger` imports (`ValidationError` kept — used by the storage/
+     backup validators). PUT ZodError → central 400 `ValidationError('Invalid request data')` (status
+     unchanged 400, only the transformed message standardized); GET/backup stop masking typed errors as
+     500; restore's catch was dead (try body only returns). Updated the one C43 `settings-route-errors`
+     assertion to the central message in the same commit; the positive-control + path-traversal-400
+     tests stayed green. validate:local EXIT 0 (961 pass). The storage/backup `ValidationError`s (AppError
+     subclass) flow through by their 400 statusCode unchanged.
+   - [ ] **part 2d — `auth` (7 try/catch).** LAST hand-rolled route file. Same characterize-then-drop pair;
+     check its throw types first (AppError subclasses are already centrally-shaped → drop is a no-op
+     simplification; any transformed message is the reviewed delta). (consistency)
 2. **Extract the frontend page load-state pattern.** ~14 `+page.svelte` files repeat the same
    `isLoading` / `loadError` / `try → fetch → catch → toast + set error` triad (dashboard,
    expenses, reminders, insurance, analytics, vehicles/[id], settings, profile, …) — the exact

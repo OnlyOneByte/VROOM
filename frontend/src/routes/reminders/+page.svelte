@@ -20,7 +20,8 @@
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import {
 		isReminderTimeDue,
-		isMileageTracking as isMileageTrackingReminder
+		isMileageTracking as isMileageTrackingReminder,
+		frequencyLabel as reminderFrequencyLabel
 	} from '$lib/utils/reminder-helpers';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -188,13 +189,10 @@
 		}
 	}
 
-	function frequencyLabel(r: ReminderWithVehicles): string {
-		const { frequency, intervalValue, intervalUnit } = r.reminder;
-		if (frequency === 'custom' && intervalValue && intervalUnit) {
-			return `Every ${intervalValue} ${intervalUnit}${intervalValue > 1 ? 's' : ''}`;
-		}
-		return frequency.charAt(0).toUpperCase() + frequency.slice(1);
-	}
+	// Recurrence label, or null for a pure-mileage reminder (no time axis → the stored
+	// frequency is inert and showing it would be a misleading "Monthly" badge). Delegates
+	// to the tested helper; kept as a local so the template reads `frequencyLabel(item)`.
+	const frequencyLabel = (r: ReminderWithVehicles) => reminderFrequencyLabel(r.reminder);
 
 	// Delegates to the tested helper (kept as a local so the template reads `isMileageTracking(item)`).
 	const isMileageTracking = (r: ReminderWithVehicles) => isMileageTrackingReminder(r.reminder);
@@ -274,7 +272,9 @@
 						<div class="min-w-0">
 							<div class="flex items-center gap-2 flex-wrap">
 								<span class="font-semibold truncate">{item.reminder.name}</span>
-								<Badge variant="secondary">{frequencyLabel(item)}</Badge>
+								{#if frequencyLabel(item)}
+									<Badge variant="secondary">{frequencyLabel(item)}</Badge>
+								{/if}
 								{#if item.reminder.type === 'expense'}
 									<Badge variant="outline">Expense</Badge>
 								{:else}

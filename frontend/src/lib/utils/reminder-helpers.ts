@@ -21,3 +21,26 @@ export function isReminderTimeDue(reminder: Reminder, now: number = Date.now()):
 export function isMileageTracking(reminder: Reminder): boolean {
 	return reminder.triggerMode === 'mileage' || reminder.triggerMode === 'both';
 }
+
+/** Whether a reminder has a time axis (triggerMode time|both) — i.e. a recurrence schedule applies. */
+export function hasTimeAxis(reminder: Reminder): boolean {
+	return reminder.triggerMode === 'time' || reminder.triggerMode === 'both';
+}
+
+/**
+ * Human label for a reminder's recurrence frequency — or null when there is no time axis.
+ *
+ * A pure-mileage reminder ('mileage') still carries a `frequency` column (the backend
+ * `reminderBaseSchema` requires one and the form sends its 'monthly' default), but that schedule is
+ * INERT — the engine drives the reminder purely by odometer and `nextDueDate` is null. Rendering the
+ * stored frequency for such a reminder shows a misleading "Monthly" badge. Returns null so the caller
+ * can omit the badge entirely for pure-mileage; 'both' keeps its real schedule label.
+ */
+export function frequencyLabel(reminder: Reminder): string | null {
+	if (!hasTimeAxis(reminder)) return null;
+	const { frequency, intervalValue, intervalUnit } = reminder;
+	if (frequency === 'custom' && intervalValue && intervalUnit) {
+		return `Every ${intervalValue} ${intervalUnit}${intervalValue > 1 ? 's' : ''}`;
+	}
+	return frequency.charAt(0).toUpperCase() + frequency.slice(1);
+}
