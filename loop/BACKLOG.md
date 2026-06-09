@@ -113,6 +113,19 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### bug
+> **PENDING ANGELO (confirmed + traced C54, do NOT execute unilaterally — user-visible $ change):**
+> **Lease/loan miles-used consume the period-scoped `currentMileage`.** `FinanceTab.svelte` passes
+> `vehicleStatsData?.currentMileage` to both `PaymentMetricsGrid` (loan `mileageUsed`, line ~151) and
+> `LeaseMetricsCard` (`currentMileage` → `calculateLeaseMetrics`, line ~173). But `vehicleStatsData` is
+> fetched with the user's stats-period selector (`selectedStatsPeriod`, default `'all'`), and
+> `currentMileage` is period-filtered + fuel-only. So picking "7d"/"30d" on the Overview tab silently
+> **understates lease overage and loan miles-used** (and neither ever sees manual odometer entries).
+> Miles-used is inherently all-time → the fix is a call-site swap to the C52 all-time `currentOdometer`
+> field (`vehicleStatsData?.currentOdometer`). `calculateLeaseMetrics` itself is correct + well-tested;
+> the landmine is documented inline at both FinanceTab call sites (C54). Decided fix, just needs the nod
+> (it changes a displayed $ figure). When approved: swap both sites + a regression test asserting the
+> projected excess fee is period-independent. *Sibling display call (#card semantics) stays with Angelo.*
+
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 1. **Vehicle-detail load failure masquerades as empty state** — `loadSummary`/`fetchExpensesPage`
    in `vehicles/[id]/+page.svelte` only toast on failure, leaving `summary=null`/`expenses=[]`

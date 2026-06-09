@@ -10,13 +10,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 52 |
-| deep-review | 5 | 49 |
+| deep-review | 5 | 54 |
 | guard | 6 | 48 |
 | bug | 3 | 51 |
 | arch | 5 | 50 |
 | infra | 6 | 53 |
 
-Current cycle: **53**
+Current cycle: **54**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1072,3 +1072,18 @@ Current cycle: **53**
   card display call), and bumped the stale test floors (~962→966 be / ~345→355 fe). Doc-only — working
   tree carried only CLAUDE.md, no build gate needed. Next cycle (54): `deep-review` most-starved
   (cyc 49, starved-for 5 = budget) → likely an eyes-on/logic review (T9 e2e still Playwright-blocked).
+- **C54 (deep-review — CONFIRM + trace the C52-suspected lease/loan miles-used bug)** — the two top
+  deep-review queue items are eyes-on screenshot passes (Playwright-sandbox-blocked), so took the
+  actionable highest-leverage target: rigorously verify the bug I flagged to Angelo in C52. TRACED end
+  to end against source: `FinanceTab.svelte` passes `vehicleStatsData?.currentMileage` to both
+  `PaymentMetricsGrid` (loan mileageUsed, ~L151) and `LeaseMetricsCard` (→ `calculateLeaseMetrics`, ~L173);
+  `vehicleStatsData` is fetched with the user-controlled `selectedStatsPeriod` (default 'all', so the
+  default is correct) via the Overview PeriodSelector → `$effect` refetch (L173-185); `currentMileage` is
+  period-filtered + fuel-only. CONFIRMED: choosing 7d/30d on Overview silently understates lease overage /
+  loan miles-used (and ignores manual odometer entries). `calculateLeaseMetrics` itself is correct +
+  well-tested (lease-metrics.test.ts) — the defect is purely the call-site source. Fix = swap to the C52
+  all-time `currentOdometer`, but it's a USER-VISIBLE $ change already flagged to Angelo → did NOT execute
+  (loop rule 7). Increment: behavior-preserving inline NOTE breadcrumbs at BOTH FinanceTab call sites + a
+  first-class, traced, ready-to-execute bug entry in BACKLOG (promoted from a buried C52 feature-note line).
+  Comment-only; frontend validate:local EXIT 0 (tsc 0 · build · 355 tests · prettier clean). Next cycle
+  (55): recompute all 6 — `guard` most-starved (cyc 48, starved-for 7 > 6, OVER) → it wins.

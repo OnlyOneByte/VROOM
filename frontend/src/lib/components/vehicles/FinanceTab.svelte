@@ -141,6 +141,12 @@
 		{/if}
 
 		{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
+			<!-- NOTE (C54 deep-review, confirmed bug — pending Angelo's call): `currentMileage` is
+			     PERIOD-SCOPED + fuel-only, and `vehicleStatsData` is fetched with the user's stats-period
+			     selector. So choosing "7d"/"30d" on the Overview tab silently understates miles-used here
+			     (and it never sees manual odometer entries). Miles-used is inherently all-time → the fix is
+			     to consume `vehicleStatsData?.currentOdometer` (the C52 all-time field). Held: user-visible
+			     $ change. See loop/BACKLOG.md bug "lease/loan miles-used consume period-scoped currentMileage". -->
 			<PaymentMetricsGrid
 				financing={vehicle.financing}
 				{totalInterestPaid}
@@ -168,6 +174,10 @@
 	{/if}
 
 	{#if vehicle.financing.financingType === 'lease'}
+		<!-- NOTE (C54 deep-review): same confirmed period-scope bug as PaymentMetricsGrid above —
+		     `currentMileage` is period-filtered + fuel-only, so a non-'all' stats period understates
+		     lease mileageUsed and the projected excess-fee $. Fix (pending Angelo): pass
+		     `vehicleStatsData?.currentOdometer` (all-time). calculateLeaseMetrics itself is correct/tested. -->
 		<LeaseMetricsCard
 			financing={vehicle.financing}
 			currentMileage={vehicleStatsData?.currentMileage ?? vehicle.initialMileage ?? null}
