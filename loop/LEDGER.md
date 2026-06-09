@@ -21,11 +21,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 70 |
 | deep-review | 5 | 67 |
 | guard | 6 | 68 |
-| bug | 3 | 65 |
+| bug | 3 | 71 |
 | arch | 5 | 69 |
 | infra | 6 | 66 |
 
-Current cycle: **70**
+Current cycle: **71**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1350,3 +1350,18 @@ Current cycle: **70**
   rule); T4–T6 are frontend/eyes-on, Playwright-blocked here. Next (71): recompute — `bug` (cyc 65, 6 > 3,
   OVER, tightest) + `deep-review` (cyc 67, 4 = budget... under) — bug most-starved but STILL blocked; if no
   executable bug, `infra` (cyc 66, 5 > ... ) / `guard` are the actionable fallbacks. Recompute all 6 live.
+- **C71 (bug #15 — correct the false "optimistic-locked" mark-serviced claim)** — `bug` the ONLY over-budget
+  category (cyc 65, starved-for 6 > 3) so I MUST pick it; re-examined the whole queue for an executable item
+  rather than fall back. Findings: #2/#4/#11 are UI-eyes-on-blocked; #7 (analytics local-tz getMonth) is NOT
+  a clean fix — VERIFIED toMonthKey AND monthKeysInRange are BOTH local-time + match the frontend's C6
+  local-time intent, so "bucket on UTC" would INTRODUCE a divergence (a direction call, not a bug); #14/#16/
+  #17 are PENDING DECISION. The one decided, fully-verifiable, no-eyes-on item was #15 (doc-accuracy). Took
+  the lighter option (correct the claim, not add a CAS guard — no data risk: concurrent mark-serviced calls
+  compute the SAME re-armed values from the same row, so CAS would only collapse a redundant write). VERIFIED
+  the false claim's LOCATION against source: repository.ts markServiced comment was ALREADY accurate
+  ("ownership-scoped"), the route had NO claim — the overclaim lived ONLY in design.md:83. Rewrote it to the
+  real ownership-scoped single-statement update + why no CAS is needed. Doc-only, no build gate. NOTE: the
+  bug queue is now structurally stuck — every remaining bug is either eyes-on-blocked, PENDING ANGELO, or a
+  semantics decision; `bug` will keep coming up most-starved-but-unactionable until Angelo unblocks lease/loan
+  or #14/#16. FLAGGED again this cycle. Next (72): recompute — `deep-review` (cyc 67, 5 = 5 AT) + `infra`
+  (cyc 66, 6 = 6 AT) likely lead; both actionable (executable backend audit / loop-doc upkeep).

@@ -265,13 +265,13 @@ positives, debunked in LEDGER C21; these two are the real ones)*
     any change. (correctness?, med — needs decision)
 
 *(surfaced + VERIFIED by the C42 mark-serviced/recheck audit — 1 fixed in-cycle, these 3 filed)*
-15. **`markServiced` comment overclaims "optimistic-locked"** — `repository.ts` markServiced is
-    ownership-scoped (`where id + userId`), NOT value-CAS'd like advanceNextDueDate
-    (`where nextDueDate = expected`). Two concurrent user mark-serviced calls both succeed; they
-    compute the SAME result from the same row so there's no corruption — but the C32 comment +
-    design.md claim "optimistic-locked transaction" is false. Either add a CAS guard on the pre-call
-    nextDueDate/nextDueOdometer, or (lighter) correct the comment to "ownership-scoped". (doc-accuracy
-    / low — no data risk; pick one)
+- ~~**`markServiced` overclaims "optimistic-locked" (#15)**~~ — *DONE C71: took the lighter (decided)
+    option — corrected the false claim rather than add a CAS guard (no data risk to fix: two concurrent
+    mark-serviced calls compute the SAME re-armed values from the same source row, so a CAS would only
+    collapse a redundant write, not prevent loss). VERIFIED against source first: the repository.ts
+    markServiced comment was ALREADY accurate ("ownership-scoped"); the route had NO claim; the false
+    "optimistic-locked transaction" lived ONLY in design.md:83. Rewrote it to describe the real
+    ownership-scoped single-statement update + why no CAS is needed. Doc-only.*
 16. **mark-serviced advances nextDueDate one period even from an overdue date** — `routes.ts:100`
     computeNextDueDate from the CURRENT (possibly past) nextDueDate advances by ONE period, so marking
     an overdue reminder serviced without first running /trigger can leave it still in the past

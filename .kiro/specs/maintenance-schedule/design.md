@@ -80,7 +80,12 @@ In `trigger-service.ts`, extend the overdue pass:
 New route `POST /api/v1/reminders/:id/mark-serviced` (rate-limited like `/trigger`):
 - mileage/both: `lastServiceOdometer := getCurrentOdometer(vehicle)`, recompute `nextDueOdometer`.
 - time/both: `nextDueDate := computeNextDueDate(nextDueDate, freq)` (reuse), set `lastTriggeredAt`.
-- All in one optimistic-locked transaction (reuse the repository's advance pattern).
+- One OWNERSHIP-SCOPED update (`where id + userId`), single statement (`repository.markServiced`).
+  NOTE (corrected C71): this is NOT value-CAS optimistic-locked like `advanceNextDueDate`
+  (`where nextDueDate = expected`). Two concurrent mark-serviced calls both succeed, but they
+  compute the SAME re-armed values from the same source row, so there is no lost-update corruption —
+  a CAS guard would only collapse the redundant second write, not prevent data loss. (Earlier drafts
+  called this "optimistic-locked"; that overclaimed the guarantee. See bug #15.)
 
 ### Mileage re-check on write (D5, R8)
 
