@@ -22,10 +22,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 60 |
 | guard | 6 | 62 |
 | bug | 3 | 61 |
-| arch | 5 | 56 |
+| arch | 5 | 63 |
 | infra | 6 | 59 |
 
-Current cycle: **62**
+Current cycle: **63**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1220,3 +1220,18 @@ Current cycle: **62**
   validate:local EXIT 0 (tsc 0 · musl-biome clean · 995 pass/0 fail, +3 · build bundled). Next (63): recompute
   — `arch` most-starved (cyc 56, starved-for 7 > 5, OVER) → wins; arch #1 closed, so it's arch #2 (frontend
   load-state extraction, now with C57 + the C3 vehicle-detail pattern as concrete instances) or an audit fan-out.
+- **C63 (arch #2 step 1 — extract the frontend load-state scaffold)** — `arch` most-starved (cyc 56,
+  starved-for 7 > 5, OVER). arch #1 CLOSED, so arch #2 (the ~14-page `isLoading`/`loadError`/try-catch-toast
+  triad — the exact class the bug queue keeps re-finding as load-failure-masquerades-as-empty). The full
+  per-page MIGRATION is UI-touching → eyes-on-blocked here, so per arch rule 3 (build the safety-net/scaffold
+  FIRST, migrate next cycle against it) this cycle extracted ONLY the primitive: `createLoadState<T>()` in
+  `load-state.svelte.ts` — `data`/`isLoading`/`error`/`isError` getters + `run(loader)` reproducing the
+  try/catch/finally verbatim (onError side-effect, `e instanceof Error ? .message : fallback`, prior-data-kept-
+  on-failure, isLoading reset in finally) + `set`/`clearError`. No page touched → behavior-preserving by
+  construction (new unused module), no eyes-on needed. 10 unit tests pin the contract a later migration will
+  rely on. NOTABLE: this established `.svelte.ts` rune modules ARE unit-testable here (zero prior
+  `.svelte.test.ts` existed — confirmed runes compile under the `sveltekit()` vitest plugin with synchronous
+  `$state` access, no `$effect`), which de-risks every future arch #2 migration step. Ran the focused test
+  FIRST to prove the unproven rune-in-test path before relying on it. Verified: frontend validate:local
+  EXIT 0 (tsc 0 · build · 365 tests, +10 · prettier clean). Next (64): recompute — `feature` most-starved
+  (cyc 58, starved-for 6 > 4, OVER) → wins; import-trackers T2 (presets + detectSource, pure + unit-tested).

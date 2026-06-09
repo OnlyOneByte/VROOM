@@ -356,11 +356,19 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
    `isLoading` / `loadError` / `try → fetch → catch → toast + set error` triad (dashboard,
    expenses, reminders, insurance, analytics, vehicles/[id], settings, profile, …) — the exact
    class the `bug` queue keeps re-finding per page (load-failure-masquerades-as-empty-state).
-   Extract a shared helper/runes pattern (e.g. a `createLoadState<T>()` or a small
-   `<LoadBoundary>` snippet wrapping loading/error/retry) and migrate ONE page per cycle onto
-   it. Behavior-preserving per page; prove with that route's smoke + an eyes-on screenshot
-   (no pixel moves). Bonus: structurally prevents the masquerade bug class. (dedup + bug-class
-   prevention; do AFTER bug #1 fixes vehicle-detail so the helper reflects the correct shape)
+   - [x] **step 1 — extract the scaffold (C63).** `createLoadState<T>()` in
+     `frontend/src/lib/utils/load-state.svelte.ts` — a rune primitive with `data`/`isLoading`/
+     `error`/`isError` getters + `run(loader)` (the try/catch/finally verbatim: onError side-effect,
+     message via `e instanceof Error ? .message : fallback`, prior data kept on failure, isLoading
+     reset in finally) + `set`/`clearError`. Pinned by 10 unit tests (`load-state.svelte.test.ts`) —
+     ALSO established that `.svelte.ts` rune modules are unit-testable here (no prior precedent; runes
+     compile under the `sveltekit()` vitest plugin, synchronous `$state` access, no `$effect`). No page
+     touched → no eyes-on needed (new unused module). frontend validate:local EXIT 0 (365 tests, +10).
+   - [ ] **step 2+ — migrate ONE page per cycle onto it**, starting with vehicle-detail (the C57 shape
+     this helper mirrors). Behavior-preserving per page; UI-touching → prove with that route's smoke +
+     an eyes-on screenshot (no pixel moves) — currently Playwright-sandbox-blocked, so a migration cycle
+     lands as "code-complete, eyes-on pending" until the harness is unblocked or Angelo glances. Bonus:
+     structurally prevents the masquerade bug class once a page is on it.
 
 - ~~**Dedup ownership-validation: one source of truth.**~~ — *DONE C17+C18. C17 added the safety net
   (`entity-ownership-gate.test.ts`, 14 cases pinning the gate's observable contract per entity type).
