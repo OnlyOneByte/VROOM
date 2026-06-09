@@ -129,10 +129,16 @@ Highlights:
     and should switch to `currentOdometer` (a real but user-visible $ change), and the "Current Mileage"
     stat-card display-semantics is a direction call. Track in its `tasks.md`.
   - `.kiro/specs/import-trackers/` (Fuelly/Fuelio/Drivvo CSV via a mapping pre-pass over the
-    hardened import pipeline) is **approved, not started** (T1+).
+    hardened import pipeline) — **backend COMPLETE (T1–T3), frontend not started.** T1 (C58)
+    `import-mapping.ts` pure `applyMapping` (rename + unit-convert + decimal-comma + category map +
+    local-time dates); T2 (C64) `import-mapping-presets.ts` (preset table + `detectSource`); T3 (C70)
+    `POST /import` gained an optional `mapping` (+ `POST /import/detect`) — backward-compatible, the
+    native CSV path is unchanged when no mapping is sent. **Remaining: T4/T5 (frontend mapping-step
+    dialog) + T6 e2e** (incl. real-export signature validation) — eyes-on/Playwright-blocked, so the
+    feature is code-complete-but-not-DONE per the feature-DoD rule.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides (last-measured
-  baseline in TODO.md: frontend ~59%, backend ~74% — the backend suite has grown to ~966 tests
-  + frontend ~355 since, so treat these as a floor, not a current reading) — fold into
+  baseline in TODO.md: frontend ~59%, backend ~74% — the backend suite has grown to ~1038 tests
+  + frontend ~367 since, so treat these as a floor, not a current reading) — fold into
   bug/guard/arch cycles, don't regress it.
 - Open gaps: full in-process backend HTTP harness needs a DB-injection refactor (the
   `const sqlite = new Database(...)` singleton binds at import); screenshot visual-diffing is

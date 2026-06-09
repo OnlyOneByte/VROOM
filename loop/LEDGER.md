@@ -23,9 +23,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 68 |
 | bug | 3 | 71 |
 | arch | 5 | 69 |
-| infra | 6 | 66 |
+| infra | 6 | 72 |
 
-Current cycle: **71**
+Current cycle: **72**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1365,3 +1365,14 @@ Current cycle: **71**
   semantics decision; `bug` will keep coming up most-starved-but-unactionable until Angelo unblocks lease/loan
   or #14/#16. FLAGGED again this cycle. Next (72): recompute — `deep-review` (cyc 67, 5 = 5 AT) + `infra`
   (cyc 66, 6 = 6 AT) likely lead; both actionable (executable backend audit / loop-doc upkeep).
+- **C72 (infra — refresh stale CLAUDE.md orientation post-C58–C71)** — BALANCE: nothing strictly OVER;
+  `infra` + `deep-review` both AT budget, `infra` most-starved (breaches next). Took the recurring
+  highest-leverage infra item (orientation-doc refresh, last C53/C66) since it was genuinely stale and a
+  fresh agent reads CLAUDE.md first. VERIFIED the drift against source before editing: (1) import-trackers
+  was listed "approved, NOT STARTED (T1+)" but T1 (C58) + T2 (C64) + T3 (C70) shipped — backend COMPLETE;
+  rewrote to backend-done / T4–T6-frontend-eyes-on-remaining, mirroring the maintenance-schedule entry's
+  honest DoD framing. (2) test floors cited "~966 be / ~355 fe" — now 1038/367 (+72/+12 across C52–C71);
+  bumped. Doc-only, no build gate (working tree carried only CLAUDE.md). Next (73): recompute — `deep-review`
+  (cyc 67, starved-for 6 > 5, now OVER) → wins; an executable backend correctness audit of a fresh surface
+  (the C70 route extension is freshly-landed + self-authored — higher independent value than re-reviewing it,
+  so likely the insurance/financing analytics math or another unpinned repository path).

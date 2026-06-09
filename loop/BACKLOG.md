@@ -434,6 +434,10 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**CLAUDE.md orientation refresh post-C58–C71 (C72)**~~ — *DONE C72: "Current state" listed
+  import-trackers as "approved, NOT STARTED" but T1–T3 shipped (backend complete) — a fresh agent would
+  re-plan done work; rewrote to backend-done / T4–T6-frontend-remaining with the honest eyes-on DoD. Also
+  bumped stale test floors (~966→1038 be / ~355→367 fe). Verified drift against source first; doc-only.*
 - ~~**#5 branch-hygiene sweep — BRANCH_REVIEW.md refresh (C66)**~~ — *DONE C66: first FULL run of the standing
   #5 cadence (C59 did only the untracked-test half). (1) zero stray untracked unit tests; (2) green baseline
   via validate:local (regress.sh Playwright-blocked); (3) the digest was BADLY stale — it described the OLD
