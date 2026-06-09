@@ -413,11 +413,17 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
      ALSO established that `.svelte.ts` rune modules are unit-testable here (no prior precedent; runes
      compile under the `sveltekit()` vitest plugin, synchronous `$state` access, no `$effect`). No page
      touched → no eyes-on needed (new unused module). frontend validate:local EXIT 0 (365 tests, +10).
-   - [ ] **step 2+ — migrate ONE page per cycle onto it**, starting with vehicle-detail (the C57 shape
-     this helper mirrors). Behavior-preserving per page; UI-touching → prove with that route's smoke +
-     an eyes-on screenshot (no pixel moves) — currently Playwright-sandbox-blocked, so a migration cycle
-     lands as "code-complete, eyes-on pending" until the harness is unblocked or Angelo glances. Bonus:
-     structurally prevents the masquerade bug class once a page is on it.
+   - [ ] **step 2+ — migrate ONE page per cycle onto it.** UI-touching → eyes-on-blocked. **C79 SCOPING
+     FINDING (blocks this until the scaffold is reshaped):** `createLoadState<T>()` wraps ONE `data: T`, but
+     the real pages don't fit that shape — vehicle-detail has TWO load pairs entangled with pagination
+     state (currentOffset/totalCount/pageSize) + shares isLoadingStats across summary+fuelEfficiency; the
+     dashboard's one loader populates ~6 separate $state vars (stats/overviews/recentExpenses/dueReminders/
+     photos) from a single fetch, not one `data`. So a faithful migration is NOT the clean 1:1 swap the
+     scaffold assumes — it would reshape working code for marginal dedup (churn). **Two honest paths, both
+     need a direction call:** (a) reshape `createLoadState` into a leaner `{ isLoading, error, run }`
+     loading/error pair WITHOUT owning `data` (pages keep their own data $state) — fits every page, smaller
+     win; or (b) accept the scaffold only fits future SINGLE-resource pages and don't retrofit. Flag Angelo;
+     don't force a misfit migration. Bonus (if reshaped): structurally prevents the masquerade bug class.
 
 - ~~**Dedup the repeated query-if-nonempty guard in google-sheets-service (C75).**~~ — *DONE C75: rule-7
   fan-out (2 agents: layering + complexity). The Sheets backup builder `updateSpreadsheetWithUserData`

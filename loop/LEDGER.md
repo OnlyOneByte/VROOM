@@ -22,10 +22,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 77 |
 | guard | 6 | 78 |
 | bug | 3 | 71 |
-| arch | 5 | 75 |
+| arch | 5 | 79 |
 | infra | 6 | 76 |
 
-Current cycle: **78**
+Current cycle: **79**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1466,3 +1466,18 @@ Current cycle: **78**
   Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1048 pass/0 fail, +2 · build bundled).
   Next (79): recompute — `arch` (cyc 75, starved-for 4) likely most-starved actionable; feature (cyc 70, 9) +
   bug (cyc 71, 8) still gated on Angelo. The contract-drift queue is nearly exhausted (1 surface left).
+- **C79 (arch — scope arch #2 step 2; record the createLoadState misfit; ESCALATE)** — BALANCE: feature (9)
+  + bug (8) extreme-OVER but blocked (5th cycle); most-starved ACTIONABLE = arch (cyc 75, 4). Rather than
+  manufacture a 5th marginal guard/dedup (churn — the contract-drift vein is down to 1 surface, the C69/C75
+  audit finds are spent, guard was just touched C78), I scoped arch #2 step 2 (the page migration onto the
+  C63 createLoadState scaffold) PROPERLY for the first time and found WHY no page has migrated: the scaffold
+  wraps ONE `data: T`, but real pages don't fit — vehicle-detail has 2 load pairs entangled with pagination
+  + a shared isLoadingStats; dashboard sets ~6 separate $state vars from one fetch. A faithful migration
+  would reshape working code for marginal dedup (churn, arch rule 5). RECORDED this as a step-2-blocking
+  finding in BACKLOG with two direction-call paths (reshape createLoadState to a data-less {isLoading,error,
+  run} pair, or don't retrofit) — a genuine behavior-preserving STRUCTURAL finding that stops a future cycle
+  blindly attempting the misfit migration. Doc-only. ESCALATED to Angelo: 5 straight cycles with feature+bug
+  blocked, guard/arch veins thinning — the loop has hit honest diminishing returns and the high-leverage
+  moves (lease/loan approval, eyes-on/Playwright unblock, branch review, the arch-DI + scaffold-reshape
+  direction calls) are all Angelo's. Next (80): if still no input, infra (cyc 76, 4) / deep-review (cyc 77,
+  3) are the actionable picks — but flagging that further cycles are low-yield until something unblocks.
