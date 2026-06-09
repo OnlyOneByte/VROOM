@@ -14,8 +14,9 @@
  */
 
 import { parse } from 'csv-parse/sync';
+import { z } from 'zod';
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../../db/types';
-import type { DistanceUnit, VolumeUnit } from '../../types';
+import { DistanceUnit, VolumeUnit } from '../../types';
 import { convertDistance, convertVolume } from '../../utils/unit-conversions';
 
 /** A native VROOM column a foreign header can be mapped onto. */
@@ -55,6 +56,40 @@ export interface ColumnMapping {
   /** Foreign category word (lower-cased) → VROOM enum (D2). Unmatched → `misc` + a note. */
   categoryMap?: Record<string, ExpenseCategory>;
 }
+
+// A foreign header name mapped onto a native field: bounded, non-empty when present.
+const mappedHeader = z.string().min(1).max(200).optional();
+
+/**
+ * Zod validator for a `ColumnMapping` arriving on the import route (T3). Bounds every field so a
+ * client can't smuggle oversized/garbage values past the translation pre-pass: column header names
+ * are length-capped, the date format + units are enums, and category-map VALUES must be real
+ * `ExpenseCategory`s (an unknown value would otherwise reach `applyMapping` and be emitted verbatim,
+ * then rejected per-row — bounding here gives a clean 400 instead). Keys (foreign words) are free text.
+ *
+ * `columns` is spelled out field-by-field as OPTIONAL (not `z.record(z.enum(...))`, which Zod treats
+ * as exhaustive and would reject a partial mapping) — matching `Partial<Record<NativeField,string>>`.
+ */
+export const columnMappingSchema = z.object({
+  source: z.string().max(64).optional(),
+  columns: z.object({
+    date: mappedHeader,
+    vehicle: mappedHeader,
+    category: mappedHeader,
+    amount: mappedHeader,
+    mileage: mappedHeader,
+    volume: mappedHeader,
+    fuelType: mappedHeader,
+    description: mappedHeader,
+    tags: mappedHeader,
+    missedFillup: mappedHeader,
+  }),
+  targetVehicle: z.string().max(200).optional(),
+  dateFormat: z.enum(['iso', 'mdy', 'dmy', 'epoch']),
+  distanceUnit: z.enum(DistanceUnit).optional(),
+  volumeUnit: z.enum(VolumeUnit).optional(),
+  categoryMap: z.record(z.string().max(200), z.enum(EXPENSE_CATEGORIES)).optional(),
+});
 
 /**
  * The destination vehicle's units — mapped values are converted INTO these (D1), since

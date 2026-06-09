@@ -69,11 +69,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    category map + local-time dates + targetVehicle); 14 tests + `buildImportPlan` round-trip. **T2 DONE (C64):**
    `import-mapping-presets.ts` — Fuelly/Fuelio/Drivvo `MappingPreset` table + `detectSource(headers)`
    (normalized substring match on a distinctive signature subset; unknown → null → manual) + `presetToMapping`;
-   10 tests. **NEXT = T3:** extend `POST /import` with an optional `mapping` field — when present,
-   `applyMapping` then the EXISTING `buildImportPlan`/dryRun/`importExpenses` flow (no new write path);
-   surface `detectSource` + `unmappedCategories` for the client; HTTP tests (Fuelly/Fuelio fixture → preview →
-   commit; re-import no-op; metric→imperial; malformed row reported). Then T4/T5 frontend mapping step → T6 e2e
-   (incl. real-export signature validation). Backward-compatible: native path stays default when no mapping.
+   10 tests. **T3 DONE (C70):** `POST /import` gained an optional `mapping` (Zod `columnMappingSchema`) →
+   resolve target vehicle units → `applyMapping` → the EXISTING flow (no new write path); `unmappedCategories`
+   in the response; new `POST /import/detect`. Backward-compat (no mapping → native path unchanged); 9 HTTP
+   tests; caught + fixed a Zod-v4 exhaustive-record bug. **NEXT = T4/T5 (FRONTEND, eyes-on):** import-dialog
+   mapping step — detected-source banner, per-field column dropdowns from the file headers, unit/date-format/
+   target-vehicle pickers, category-remap table; reuse the existing preview/commit step; four-states + a11y +
+   mobile. Then T6 e2e (incl. real-export signature validation). NOTE: T4–T6 are Playwright-eyes-on-blocked
+   here, so the BACKEND of import-trackers (T1–T3) is complete but the feature isn't DONE until the FE→BE→DB
+   round-trip e2e runs (feature-DoD rule) — lands "code-complete, eyes-on pending" like maintenance T7–T9.
 3. **Recurring expenses** beyond reminders — first-class recurring (insurance premium, loan
    payment, parking pass) with frequency + dashboard surfacing.
 

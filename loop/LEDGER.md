@@ -18,14 +18,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 64 |
+| feature | 4 | 70 |
 | deep-review | 5 | 67 |
 | guard | 6 | 68 |
 | bug | 3 | 65 |
 | arch | 5 | 69 |
 | infra | 6 | 66 |
 
-Current cycle: **69**
+Current cycle: **70**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1330,3 +1330,23 @@ Current cycle: **69**
   1029 pass/0 fail, +5 · build bundled). Next (70): recompute — `feature` (cyc 64, starved-for 6 > 4, OVER)
   + `bug` (cyc 65, 5 > 3, OVER) both over; bug has the tighter budget → likely bug, but its top items are
   PENDING ANGELO (lease/loan) / UI-eyes-on (#2 filter) — may need feature (import-trackers T3) instead.
+- **C70 (feature — import-trackers T3: the backward-compatible route extension)** — BALANCE: `bug` + `feature`
+  both OVER; bug is tighter (3) BUT its queue is fully blocked (lease/loan PENDING ANGELO; #2 filter is
+  UI-eyes-on; #4 cosmetic) — no executable decided bug, so took the next-most-starved ACTIONABLE category,
+  `feature` (the don't-force-a-blocked-pick rule). Extended `POST /import` with an optional `mapping` (new
+  Zod `columnMappingSchema` in import-mapping.ts): when present → resolve the target vehicle's units from its
+  unitPreferences → `applyMapping` → the EXISTING buildImportPlan/dryRun/importExpenses flow UNCHANGED (no new
+  write path; idempotency/atomicity/tenant-safety all inherited). Added `unmappedCategories` to the response
+  + a new `POST /import/detect` (header names → preset|null) for the client. BACKWARD-COMPAT: no mapping →
+  native path byte-identical. C60 WIRING RISK HANDLED: units convert toward the resolved targetVehicle (a
+  `resolveTargetUnits` helper matching nickname / "year make model"); no match → {} → conversion skipped
+  (never a guessed unit). PROVE-IT-BITES PAID OFF: running the focused test FIRST caught a real schema bug —
+  `z.record(z.enum(NativeField), …)` is EXHAUSTIVE in Zod v4 (rejected a partial `columns` object, 400'd
+  every mapped import) → rewrote `columns` as explicit per-field optionals. 9 HTTP tests (preview/commit,
+  metric→imperial conversion, idempotent re-import, unmapped-category surface, malformed-row per-row,
+  unparseable→400, detect preset/null, native backward-compat). Verified: backend validate:local EXIT 0
+  (tsc 0 · musl-biome clean · 1038 pass/0 fail, +9 · build bundled). NOTE: backend of import-trackers
+  (T1–T3) is now COMPLETE, but the feature is NOT done until the T6 FE→BE→DB round-trip e2e runs (feature-DoD
+  rule); T4–T6 are frontend/eyes-on, Playwright-blocked here. Next (71): recompute — `bug` (cyc 65, 6 > 3,
+  OVER, tightest) + `deep-review` (cyc 67, 4 = budget... under) — bug most-starved but STILL blocked; if no
+  executable bug, `infra` (cyc 66, 5 > ... ) / `guard` are the actionable fallbacks. Recompute all 6 live.

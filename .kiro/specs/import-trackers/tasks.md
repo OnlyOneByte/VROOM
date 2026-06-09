@@ -28,10 +28,16 @@
       safe failure: null → manual mapping, never a wrong auto-map).
 
 ## Phase 2 — route (backward-compatible)
-- [ ] **T3** Extend `POST /import` with optional `mapping`: when present, `applyMapping` then the
-      EXISTING `buildImportPlan`/dryRun/`importExpenses` flow (no new write path). Add source detection
-      for the client. HTTP tests: Fuelly + Fuelio fixtures → preview → commit; re-import no-op;
-      metric→imperial conversion; malformed row reported.
+- [x] **T3 (cycle 70)** Extended `POST /import` with an optional `mapping` (Zod `columnMappingSchema`):
+      when present, resolve the target vehicle's units → `applyMapping` → the EXISTING
+      `buildImportPlan`/dryRun/`importExpenses` flow (no new write path). `unmappedCategories` added to the
+      response. Added `POST /import/detect` (header names → preset or null) for the client. BACKWARD-COMPAT:
+      no `mapping` → the native path runs unchanged. C60 wiring risk handled: units convert toward the
+      resolved targetVehicle's unitPreferences (skipped when no match, never a guess). 9 HTTP tests
+      (Fuelio preview/commit, metric→imperial conversion, idempotent re-import, unmapped-category surface,
+      malformed-row per-row, unparseable→400, detect preset/null, native backward-compat). CAUGHT a real
+      schema bug pre-merge: `z.record(z.enum(NativeField))` is EXHAUSTIVE in Zod v4 (rejected a partial
+      `columns`) → rewrote as explicit per-field optionals. backend validate:local EXIT 0 (1038 pass, +9).
 
 ## Phase 3 — frontend
 - [ ] **T4** Import-dialog mapping step: detected-source banner, per-field column dropdowns from the

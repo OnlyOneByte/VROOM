@@ -30,6 +30,13 @@ import {
   importCsvSchema,
   summarizeImportPlan,
 } from './import-csv';
+import {
+  applyMapping,
+  CsvMappingError,
+  columnMappingSchema,
+  type TargetUnits,
+} from './import-mapping';
+import { detectSource } from './import-mapping-presets';
 import { expenseRepository } from './repository';
 import { createSplitExpenseSchema, updateSplitSchema } from './validation';
 
@@ -417,18 +424,68 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
 // validated and its vehicle resolved to one the USER OWNS by name — never a
 // file-provided id (cross-tenant-write class, cycle 145). dryRun:true validates +
 // reports only (the UI previews, then commits); dryRun:false inserts the ready rows.
-routes.post('/import', zValidator('json', importCsvSchema), async (c) => {
+// Backward-compatible: when no `mapping` is sent the native VROOM-CSV path runs unchanged;
+// when present, a foreign tracker file is translated to the native shape first (T3).
+const importBodySchema = importCsvSchema.extend({
+  mapping: columnMappingSchema.optional(),
+});
+
+/**
+ * Resolve the units to convert a mapped import INTO, from the chosen target vehicle's
+ * unitPreferences (matched by nickname or "year make model", case-insensitively — the same names
+ * buildImportPlan resolves rows against). Returns {} when no targetVehicle is given or it doesn't
+ * match a vehicle the user owns, so applyMapping then skips conversion (values pass through) rather
+ * than converting toward a guessed unit.
+ */
+function resolveTargetUnits(
+  targetVehicle: string | undefined,
+  vehicles: Awaited<ReturnType<typeof vehicleRepository.findByUserId>>
+): TargetUnits {
+  if (!targetVehicle) return {};
+  const wanted = targetVehicle.trim().toLowerCase();
+  const match = vehicles.find(
+    (v) =>
+      v.nickname?.toLowerCase() === wanted ||
+      `${v.year} ${v.make} ${v.model}`.toLowerCase() === wanted
+  );
+  if (!match) return {};
+  return {
+    distanceUnit: match.unitPreferences.distanceUnit,
+    volumeUnit: match.unitPreferences.volumeUnit,
+  };
+}
+
+routes.post('/import', zValidator('json', importBodySchema), async (c) => {
   const user = c.get('user');
-  const { csv, dryRun } = c.req.valid('json');
+  const { csv, dryRun, mapping } = c.req.valid('json');
 
   const vehicles = await vehicleRepository.findByUserId(user.id);
   if (vehicles.length === 0) {
     throw new ValidationError('Add a vehicle before importing expenses');
   }
 
+  // Foreign-tracker path (T3): translate to native CSV first, then the EXISTING flow runs
+  // unchanged. Unit conversion needs the TARGET vehicle's units — resolve them from the chosen
+  // targetVehicle so values aren't stored unconverted-but-relabeled (the C60-flagged risk). When
+  // the file has its own vehicle column (no targetVehicle), conversion is skipped: a multi-vehicle
+  // file may span differing units, so we don't guess — values pass through and the user is told.
+  let importCsv = csv;
+  let unmappedCategories: string[] = [];
+  if (mapping) {
+    const target = resolveTargetUnits(mapping.targetVehicle, vehicles);
+    try {
+      const result = applyMapping(csv, mapping, target);
+      importCsv = result.csv;
+      unmappedCategories = result.unmappedCategories;
+    } catch (err) {
+      if (err instanceof CsvMappingError) throw new ValidationError(err.message);
+      throw err;
+    }
+  }
+
   let plan: ReturnType<typeof buildImportPlan>;
   try {
-    plan = buildImportPlan(csv, vehicles);
+    plan = buildImportPlan(importCsv, vehicles);
   } catch (err) {
     // File-level problems (unparseable / empty / too many rows) → 400, not 500.
     if (err instanceof CsvImportError) throw new ValidationError(err.message);
@@ -439,7 +496,7 @@ routes.post('/import', zValidator('json', importCsvSchema), async (c) => {
   if (dryRun) {
     return c.json({
       success: true,
-      data: { dryRun: true, imported: 0, ...summarizeImportPlan(plan) },
+      data: { dryRun: true, imported: 0, unmappedCategories, ...summarizeImportPlan(plan) },
     });
   }
 
@@ -456,8 +513,20 @@ routes.post('/import', zValidator('json', importCsvSchema), async (c) => {
 
   return c.json({
     success: true,
-    data: { dryRun: false, imported, duplicates, ...summarizeImportPlan(plan) },
+    data: { dryRun: false, imported, duplicates, unmappedCategories, ...summarizeImportPlan(plan) },
   });
+});
+
+// POST /api/expenses/import/detect - identify a known tracker from the uploaded file's headers,
+// so the client can pre-fill the mapping step. Body carries only the header names (not the data).
+// Returns the matched preset (id/label + its default mapping) or null → manual mapping (T3).
+const detectSourceSchema = z.object({
+  headers: z.array(z.string().max(200)).min(1).max(100),
+});
+routes.post('/import/detect', zValidator('json', detectSourceSchema), (c) => {
+  const { headers } = c.req.valid('json');
+  const preset = detectSource(headers);
+  return c.json({ success: true, data: preset });
 });
 
 // POST /api/expenses - Create a new expense
