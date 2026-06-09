@@ -20,12 +20,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 70 |
 | deep-review | 5 | 77 |
-| guard | 6 | 74 |
+| guard | 6 | 78 |
 | bug | 3 | 71 |
 | arch | 5 | 75 |
 | infra | 6 | 76 |
 
-Current cycle: **77**
+Current cycle: **78**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1453,3 +1453,16 @@ Current cycle: **77**
   the loop runs on the backend-verifiable categories — the lease/loan unblock + an eyes-on/Playwright unblock
   + a branch review (26 green commits) are now the highest-leverage moves, all Angelo's. Next (78): recompute
   — `guard` (cyc 74, starved-for 4) / `arch` (cyc 75, 3) the likely actionable picks; feature/bug still gated.
+- **C78 (guard — lock the /analytics/year-end response contract)** — BALANCE: bug (7) + feature (8) deeply
+  OVER but still blocked (re-checked: reminders list is a CLEAN repo pass-through, not a drift surface; no
+  new executable feature/bug). Took the most-starved ACTIONABLE, `guard`. Continued loop-improvement #2:
+  getYearEnd hand-assembles an 11-field object literal (repository.ts:1889) with NO type binding to the
+  frontend YearEndResponse (types/analytics.ts:237); the existing Property-24/25 tests pin the MATH but NOT
+  the key shape. Added a drift-guard describe to year-end.property.test.ts (+2): exact top-level key set vs
+  the frontend contract + the null-not-absent invariant for biggestExpense/previousYearComparison (the FE
+  reads them unconditionally). Verified the key set against the YearEndResponse interface before asserting.
+  WHILE HERE confirmed + documented that /reminders + /expenses-page are CLEAN repository pass-throughs (no
+  route-injected fields → not drift surfaces), narrowing the guard queue to just /analytics per-vehicle.
+  Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1048 pass/0 fail, +2 · build bundled).
+  Next (79): recompute — `arch` (cyc 75, starved-for 4) likely most-starved actionable; feature (cyc 70, 9) +
+  bug (cyc 71, 8) still gated on Angelo. The contract-drift queue is nearly exhausted (1 surface left).

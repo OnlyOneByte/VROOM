@@ -170,3 +170,44 @@ describe('Property 25: Year-over-year percentage change formula', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// FE↔BE response contract-drift guard (loop-improvement #2; C55 /stats, C62 /vehicles list,
+// C68 single-financing, C74 /analytics/insurance — this locks /analytics/year-end). getYearEnd
+// hand-assembles an 11-field object literal (repository.ts:1889) with NO type binding to the
+// frontend YearEndResponse (types/analytics.ts:237). The existing Property-24/25 tests pin the
+// MATH (biggest-expense, YoY %) but NOT the key shape, so a dropped/renamed field would silently
+// break the year-end view with no failing test. Exact top-level key equality (shape is built
+// from a fixed literal, so it's data-independent — an empty-vehicle case is sufficient).
+// ---------------------------------------------------------------------------
+const YEAR_END_KEYS = [
+  'year',
+  'totalSpent',
+  'categoryBreakdown',
+  'efficiencyTrend',
+  'biggestExpense',
+  'previousYearComparison',
+  'vehicleCount',
+  'totalDistance',
+  'avgEfficiency',
+  'costPerDistance',
+  'units',
+].sort();
+
+describe('getYearEnd — FE↔BE response contract shape (drift guard)', () => {
+  test('the response has exactly the frontend YearEndResponse top-level keys', async () => {
+    const { userId } = setupUserAndVehicle();
+    const result = await repo.getYearEnd(userId, TEST_YEAR);
+    expect(Object.keys(result).sort()).toEqual(YEAR_END_KEYS);
+  });
+
+  test('biggestExpense/previousYearComparison are null on an empty year (not absent keys)', async () => {
+    const { userId } = setupUserAndVehicle();
+    const result = await repo.getYearEnd(userId, TEST_YEAR);
+    // The keys must be PRESENT (= null), not omitted — the frontend reads them unconditionally.
+    expect(result.biggestExpense).toBeNull();
+    expect(result.previousYearComparison).toBeNull();
+    expect(Object.hasOwn(result, 'biggestExpense')).toBe(true);
+    expect(Object.hasOwn(result, 'previousYearComparison')).toBe(true);
+  });
+});

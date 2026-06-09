@@ -196,9 +196,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    empty/populated. **DONE so far:** `/stats` exact-key equality (C55); **`/vehicles` list enriched
    financing** (C62); **single-financing GET enriched shape** (C68); **`/analytics/insurance` hand-assembled
    InsuranceData** — nested summary + 3 derived arrays (vehicleDetails/monthlyPremiumTrend/costByCarrier),
-   top-level + summary + item-shape keys locked vs the frontend `InsuranceResponse` (C74). **Remaining
-   candidates:** `/expenses` page, `/analytics` per-vehicle + year-end, `/reminders`. Stop when the
-   hand-assembled-response surfaces are covered. *(loop-improvement #2)*
+   top-level + summary + item-shape keys locked vs the frontend `InsuranceResponse` (C74); **`/analytics/
+   year-end` hand-assembled 11-field YearEndData** — top-level keys + the null-not-absent invariant locked
+   vs the frontend `YearEndResponse` (the existing Property-24/25 tests pin the math, not the shape) (C78).
+   **Remaining candidates:** `/analytics` per-vehicle. (`/reminders` + `/expenses` page are CLEAN repository
+   pass-throughs — `data: <repo result>`, no route-injected fields — so NOT drift surfaces; verified C78.)
+   Stop when the hand-assembled-response surfaces are covered. *(loop-improvement #2)*
 
 ### bug
 > **PENDING ANGELO (confirmed + traced C54, do NOT execute unilaterally — user-visible $ change):**
