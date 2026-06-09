@@ -23,9 +23,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 74 |
 | bug | 3 | 71 |
 | arch | 5 | 75 |
-| infra | 6 | 72 |
+| infra | 6 | 76 |
 
-Current cycle: **75**
+Current cycle: **76**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1420,3 +1420,19 @@ Current cycle: **75**
   unchanged count · build bundled). Next (76): recompute — `feature` (cyc 70, starved-for 6 > 4, OVER) +
   `bug` (cyc 71, 5 > 3, OVER) both over; feature's T4 is frontend-eyes-on, bug is Angelo-blocked — so likely
   fall back to the most-starved ACTIONABLE (infra cyc 72 / deep-review cyc 73). Recompute all 6 live.
+- **C76 (infra — #5 branch-hygiene sweep, BRANCH_REVIEW.md refresh)** — BALANCE: `feature` (cyc 70, 6 > 4)
+  + `bug` (cyc 71, 5 > 3) both OVER, but BOTH BLOCKED: re-checked the feature queue against source —
+  maintenance T9 (eyes-on) + import-trackers T4 (frontend eyes-on) both Playwright-blocked, recurring-expenses
+  (#3) has no spec (drafting one is a flag-Angelo action, and 2 specs are already mid-flight blocked, so a 3rd
+  adds queue depth w/o throughput); bug queue Angelo-blocked. So fell back to the most-starved ACTIONABLE:
+  `infra` — and the #5 branch-hygiene sweep was explicitly due ("Next sweep due ~C76" per the BACKLOG note,
+  last C66, branch now 26 commits). Sweep: (1) stray untracked unit tests outside *.meshclaw.e2e.ts — ZERO;
+  (2) green baseline — full validate:local (1046 BE + 367 FE, green; regress.sh Playwright-blocked); (3)
+  BRANCH_REVIEW.md (gitignored) refresh — header 16→26 commits / +3589/−287, appended §16 covering C66–C75
+  (import-trackers T2/T3, the 2 contract guards, 2 arch dedups, 2 characterization deep-reviews, 2 doc
+  refreshes), and corrected the stale "T1+T2 inert until T3" merge note to "backend T1–T3 complete, inert
+  until a client sends a mapping". Doc-only (BRANCH_REVIEW gitignored → commit carries only loop docs). NOTE:
+  feature + bug remain blocked — the loop has run on guard/deep-review/arch/infra for ~10 cycles; the
+  lease/loan unblock (flagged C71, no reply) is still the highest-leverage rebalance. Next (77): recompute —
+  `feature` (cyc 70, starved-for 7 > 4) + `bug` (cyc 71, 6 > 3) deepening; if still blocked, deep-review
+  (cyc 73, 4 < 5 under... ) / guard / arch are the actionable picks. Recompute all 6 live.

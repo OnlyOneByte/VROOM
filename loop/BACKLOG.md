@@ -456,6 +456,12 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**#5 branch-hygiene sweep — BRANCH_REVIEW.md refresh (C76)**~~ — *DONE C76: due per the C66 note
+  (~10 cycles, branch now 26 commits). (1) zero stray untracked unit tests; (2) full validate:local green
+  (1046 BE + 367 FE; regress.sh Playwright-blocked); (3) digest header 16→26 commits / +3589/−287, appended
+  §16 (C66–C75: import-trackers T2/T3, 2 contract guards, 2 arch dedups, 2 characterization deep-reviews, 2
+  doc refreshes) + corrected the stale "T1+T2 inert until T3" merge note. BRANCH_REVIEW.md is gitignored.
+  Next sweep due ~C86.*
 - ~~**CLAUDE.md orientation refresh post-C58–C71 (C72)**~~ — *DONE C72: "Current state" listed
   import-trackers as "approved, NOT STARTED" but T1–T3 shipped (backend complete) — a fresh agent would
   re-plan done work; rewrote to backend-done / T4–T6-frontend-remaining with the honest eyes-on DoD. Also
