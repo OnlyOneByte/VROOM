@@ -389,6 +389,17 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
      lands as "code-complete, eyes-on pending" until the harness is unblocked or Angelo glances. Bonus:
      structurally prevents the masquerade bug class once a page is on it.
 
+- ~~**Dedup the stats-period → start-date switch (C69).**~~ — *DONE C69: the identical period-to-Date
+  day-offset switch was duplicated in vehicles/routes.ts (stats) + expenses/repository.ts (query filter).
+  Extracted `getPeriodStartDate(period, now?)` + `StatsPeriod` type to utils/calculations.ts ('all'→null,
+  bounded→now−N days). Both call sites wired through it; expenses keeps its defensive `?? new Date(0)`
+  fallback (behavior-identical — that branch is unreachable for the fixed 5-value enum anyway). Surfaced
+  by a rule-7 fan-out (2 Explore agents); VERIFIED the agents' "subtle default divergence" concern against
+  source (the `new Date(0)` vs `null` defaults sit in never-reached branches behind a `period!=='all'`
+  guard / the 'all' case), so the extraction is safe. +5 unit tests; both call sites' existing property
+  tests stayed green (the green→green proof). 1029 BE pass (+5). NOTE: the OTHER agent finding (delete dead
+  `handleSyncError`) was REJECTED — it's the byte-identical oracle the C24 equivalence test asserts against;
+  removing it is churn-for-churn (arch rule 5), not a payoff.*
 - ~~**Dedup ownership-validation: one source of truth.**~~ — *DONE C17+C18. C17 added the safety net
   (`entity-ownership-gate.test.ts`, 14 cases pinning the gate's observable contract per entity type).
   C18 executed the refactor: `photos/helpers.ts validateEntityOwnership` now routes vehicle/expense/

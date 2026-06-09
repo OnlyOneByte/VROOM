@@ -7,6 +7,7 @@ import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, photos, vehicles } from '../../db/schema';
 import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import { DatabaseError, NotFoundError } from '../../errors';
+import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import type { PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
@@ -384,24 +385,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       // Build date filter based on period
       const period = filters.period ?? 'all';
       if (period !== 'all') {
-        const now = new Date();
-        let startDate: Date;
-        switch (period) {
-          case '7d':
-            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            break;
-          case '30d':
-            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            break;
-          case '90d':
-            startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-            break;
-          case '1y':
-            startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-            break;
-          default:
-            startDate = new Date(0);
-        }
+        // Shared one-source-of-truth window (see calculations.ts). The `?? new Date(0)` keeps
+        // the prior defensive fallback for a value outside the 5 known periods (unreachable in
+        // practice — period is a fixed enum — but behavior-identical to the old default branch).
+        const startDate = getPeriodStartDate(period) ?? new Date(0);
         periodConditions.push(gte(expenses.date, startDate));
       }
 

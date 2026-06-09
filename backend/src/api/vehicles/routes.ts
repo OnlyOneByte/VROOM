@@ -8,6 +8,7 @@ import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../types';
+import { getPeriodStartDate } from '../../utils/calculations';
 import { commonSchemas } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
@@ -338,27 +339,8 @@ routes.get(
       category: 'fuel',
     });
 
-    // Filter by time period
-    const now = new Date();
-    let startDate: Date | null = null;
-
-    switch (period) {
-      case '7d':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case '30d':
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      case '90d':
-        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-        break;
-      case '1y':
-        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        startDate = null;
-        break;
-    }
+    // Filter by time period (null for 'all' = no lower bound). Shared one-source-of-truth window.
+    const startDate = getPeriodStartDate(period);
 
     const filteredFuelExpenses = startDate
       ? fuelExpenses.filter((e) => new Date(e.date) >= (startDate as Date))

@@ -22,10 +22,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 67 |
 | guard | 6 | 68 |
 | bug | 3 | 65 |
-| arch | 5 | 63 |
+| arch | 5 | 69 |
 | infra | 6 | 66 |
 
-Current cycle: **68**
+Current cycle: **69**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1314,3 +1314,19 @@ Current cycle: **68**
   1024 pass/0 fail, +3 · build bundled). Next (69): recompute — `arch` (cyc 63, starved-for 6 > 5, now OVER)
   + `feature` (cyc 64, 5 > 4, OVER) both over; arch most-starved → arch #2 step 2 (migrate a page onto
   createLoadState — UI-touching/eyes-on) OR an audit-fan-out arch item if a non-UI one surfaces.
+- **C69 (arch — dedup the stats-period → start-date switch)** — `arch` most-starved (cyc 63, 6 > 5, OVER).
+  arch #2 step 2 (page migration onto createLoadState) is UI-touching → eyes-on-blocked, so per rule 7 I
+  fanned out 2 Explore agents for a NON-UI backend target. Picked DEDUP over the agents' other find: the
+  identical period→Date day-offset switch was copy-pasted in vehicles/routes.ts (stats filter) +
+  expenses/repository.ts (query filter). Extracted `getPeriodStartDate(period, now?)` + `StatsPeriod` to
+  utils/calculations.ts ('all'→null, bounded→now−N days); wired both sites; expenses keeps its `?? new
+  Date(0)` defensive fallback (behavior-identical — unreachable for the fixed enum). VERIFIED the agents'
+  "subtle default divergence" worry against source (C21/C60 rule): the `new Date(0)` vs `null` defaults sit
+  in never-reached branches (behind `period!=='all'` / the 'all' case), so the extraction is safe. +5 unit
+  tests for the helper; both call sites' EXISTING property tests stayed green = the green→green
+  behavior-preserving proof (arch rule 3). REJECTED the 2nd agent finding (delete dead handleSyncError): it's
+  the byte-identical ORACLE the C24 equivalence test asserts against — deleting it is churn-for-churn (arch
+  rule 5: name a payoff), not a win. Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean ·
+  1029 pass/0 fail, +5 · build bundled). Next (70): recompute — `feature` (cyc 64, starved-for 6 > 4, OVER)
+  + `bug` (cyc 65, 5 > 3, OVER) both over; bug has the tighter budget → likely bug, but its top items are
+  PENDING ANGELO (lease/loan) / UI-eyes-on (#2 filter) — may need feature (import-trackers T3) instead.
