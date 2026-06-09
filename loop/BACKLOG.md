@@ -108,6 +108,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Insurance analytics (getInsurance/buildInsuranceDetails) audit (C73)**~~ — *DONE C73: the
+  insurance-analytics path had ZERO test coverage. Read against source: cost-shape handling correct (bug #8
+  effectiveMonthlyPremium — monthly + amortized-total both non-zero), latest-term-by-endDate selection +
+  inactive-policy exclusion correct. CONFIRMED the open #14 behavior (an expired latest term on an active
+  policy still counts toward current premium — buildInsuranceDetails never checks endDate >= now). Pinned the
+  CURRENT behavior (incl. the #14 expired-term case, flagged as the one to flip when Angelo decides) via
+  insurance-details.test.ts (6 cases through public getInsurance over a real DB). NOTE-also-spotted (not
+  fixed, no decision): coveredVehicleIds spans ALL terms' junctions not just the latest term's — a vehicle
+  dropped from the current term but on an old one still shows. 1044 BE pass (+6).*
 - ~~**analytics-charts.ts unpinned-builders audit (C67)**~~ — *DONE C67: fan-out (2 Explore agents) +
   direct read of 6 date/bucketing builders with ZERO test references (buildDayOfWeekPatterns,
   buildSeasonalEfficiency, buildMonthlyCostHeatmap, computeRegularityScore, computeMileageScore,
@@ -261,8 +270,9 @@ positives, debunked in LEDGER C21; these two are the real ones)*
     renewed) still contributes its stale `monthlyPremium` to `totalMonthlyPremiums`/trend. SEMANTICS
     CALL, not a clear bug — "active policy, expired term" may legitimately mean "still owe / about to
     renew". Surfaced C28; needs a product decision (filter to `endDate >= now`, or keep + document)
-    before fixing. No test covers buildInsuranceDetails at all — a characterization test should precede
-    any change. (correctness?, med — needs decision)
+    before fixing. **C73 UPDATE: the characterization net now EXISTS** — `insurance-details.test.ts` pins
+    the current "expired-term-still-counts" behavior (the test to flip when decided), so a future #14 fix is
+    safe. STILL needs Angelo's product decision before changing. (correctness?, med — needs decision)
 
 *(surfaced + VERIFIED by the C42 mark-serviced/recheck audit — 1 fixed in-cycle, these 3 filed)*
 - ~~**`markServiced` overclaims "optimistic-locked" (#15)**~~ — *DONE C71: took the lighter (decided)

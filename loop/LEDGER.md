@@ -19,13 +19,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 70 |
-| deep-review | 5 | 67 |
+| deep-review | 5 | 73 |
 | guard | 6 | 68 |
 | bug | 3 | 71 |
 | arch | 5 | 69 |
 | infra | 6 | 72 |
 
-Current cycle: **72**
+Current cycle: **73**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1376,3 +1376,17 @@ Current cycle: **72**
   (cyc 67, starved-for 6 > 5, now OVER) → wins; an executable backend correctness audit of a fresh surface
   (the C70 route extension is freshly-landed + self-authored — higher independent value than re-reviewing it,
   so likely the insurance/financing analytics math or another unpinned repository path).
+- **C73 (deep-review — audit the unpinned insurance analytics path)** — `deep-review` most-starved (cyc 67,
+  6 > 5, OVER). Both queued eyes-on sweeps Playwright-blocked → took the highest-leverage EXECUTABLE review:
+  getInsurance/buildInsuranceDetails (analytics/repository.ts), which had ZERO test coverage AND carries the
+  open #14 question. Read against source: cost-shape handling CORRECT (bug #8 effectiveMonthlyPremium — both
+  explicit monthlyCost and amortized totalCost paths non-zero), latest-term-by-endDate + inactive-policy
+  exclusion correct. CONFIRMED #14: the latest term is picked by endDate descending with NO endDate >= now
+  check, so an active policy whose latest term LAPSED still adds its stale premium — a SEMANTICS call (pending
+  Angelo), NOT a unilateral fix (rule 7). Increment = pin the CURRENT behavior with insurance-details.test.ts
+  (6 cases through public getInsurance over a real in-memory DB: monthly + amortized cost shapes, latest-term
+  wins, inactive excluded, the #14 expired-term-counted case flagged as the one to flip, empty-state) — so a
+  future #14 decision is a safe change against a net. Also SPOTTED (noted, not fixed): coveredVehicleIds spans
+  ALL terms' junctions, not just the latest term's. Verified: backend validate:local EXIT 0 (tsc 0 ·
+  musl-biome clean · 1044 pass/0 fail, +6 · build bundled). Next (74): recompute — `guard` most-starved (cyc
+  68, starved-for 6 = budget 6, AT) likely; arch (cyc 69, 5=5 AT) close. Recompute all 6 live.
