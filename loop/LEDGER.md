@@ -20,12 +20,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 64 |
 | deep-review | 5 | 67 |
-| guard | 6 | 62 |
+| guard | 6 | 68 |
 | bug | 3 | 65 |
 | arch | 5 | 63 |
 | infra | 6 | 66 |
 
-Current cycle: **67**
+Current cycle: **68**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1300,3 +1300,17 @@ Current cycle: **67**
   Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1021 pass/0 fail, +15 · build bundled).
   Next (68): recompute — `guard` most-starved (cyc 62, starved-for 6 = budget 6, AT) likely; arch (cyc 63,
   5=5 AT) + feature (cyc 64, 4=4 AT) also AT — recompute all 6 at cycle start (slow-budget mis-forecast risk).
+- **C68 (guard — lock the single-financing GET enriched contract)** — BALANCE: four categories sat exactly
+  AT budget (feature 4=4, bug 3=3, guard 6=6, arch 5=5), none STRICTLY over. Tie-break: the top decided bug
+  (#2 vehicle-detail page-local filter) is UI-touching → eyes-on-blocked, and the lease/loan bug is PENDING
+  ANGELO, so the highest-leverage FULLY-VERIFIABLE pick was `guard` (also most-starved at 6). Continued
+  loop-improvement #2: the single-financing GET (`/financing/vehicles/:id/financing`) runs `enrichWithBalance`
+  (routes.ts:82), injecting the SAME `computedBalance` + `eligibleForPayoff` as the C62 /vehicles list — but
+  on a SEPARATE surface (the one FinanceTab fetches directly), with no guard. A refactor returning the raw row
+  would drop both → FE payoff math falls back to `?? 0` silently. New financing-get-contract.test.ts (3 cases:
+  computed keys present + typed + base fields survive the spread; fresh 20k loan NOT eligible-for-payoff =
+  the computed SEMANTICS; no-financing → data:null). Used the correct `/api/v1/financing/vehicles/...` mount
+  path (the C62 doubled-path lesson). Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean ·
+  1024 pass/0 fail, +3 · build bundled). Next (69): recompute — `arch` (cyc 63, starved-for 6 > 5, now OVER)
+  + `feature` (cyc 64, 5 > 4, OVER) both over; arch most-starved → arch #2 step 2 (migrate a page onto
+  createLoadState — UI-touching/eyes-on) OR an audit-fan-out arch item if a non-UI one surfaces.
