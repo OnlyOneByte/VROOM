@@ -196,10 +196,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 ### guard
 > **NEW STANDING ANGLE (C83): coverage-ratchet on the C81-named low spots.** With loop-improvement #2
 > closed and the audit veins thin, a grounded non-churn guard pick is to steer at a low-covered, high-risk
-> module (per the revived #4 rule). DONE: `timeout.ts` 0%→covered (C82, deep-review), `pending-credentials.ts`
-> 76%→100%/92% (C83 — the TTL-expiry/cleanup/consume-once branches of the OAuth credential store; only the
-> 1000-entry max-size eviction at L53-56 left, not worth the seed cost). NEXT low spots: `logger.ts` (75%),
-> then the frontend modules (overall 63.7%, the bigger gap). Pick one per cycle when guard is the balance.
+> module (per the revived #4 rule). PRIORITIZE high-RISK pure logic over trivial passthroughs (e.g. SKIP
+> `logger.ts` 75% — its only gaps are emoji-prefix wrappers, coverage theater). DONE: `timeout.ts` 0%→covered
+> (C82), `pending-credentials.ts` 76%→100%/92% (C83, OAuth-store TTL/cleanup), `expenses/validation.ts`
+> 50%→100%/100% (C84 — the split money-math refinements: %-sum=100, absolute-sum=total, source both-or-neither).
+> NEXT high-value pure-logic low spots: `reminders/validation.ts` (64% — intervalUnit/trigger-mode refinements),
+> `db/sql-helpers.ts` (33% func), `middleware/idempotency.ts` (43%); then the frontend modules (overall 63.7%).
+> Route/integration files (auth/providers/sync routes at <50%) need the full HTTP harness — lower ROI, skip
+> unless a specific bug. Pick one high-value module per cycle when guard is the balance.
 - ~~**Generalize the FE↔BE contract-drift guard to every hand-assembled response (loop-improvement #2) —
    COMPLETE (C80).**~~ — *A route that hand-builds its JSON with no type binding to the frontend contract
    silently drifts when a field is added/dropped/renamed (the `.optional()`-vs-`.nullish()`, dropped-clientId,

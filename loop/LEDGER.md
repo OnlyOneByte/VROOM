@@ -24,12 +24,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 70 |
 | deep-review | 5 | 82 |
-| guard | 6 | 83 |
+| guard | 6 | 84 |
 | bug | 3 | 71 |
 | arch | 5 | 79 |
 | infra | 6 | 81 |
 
-Current cycle: **83**
+Current cycle: **84**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1545,3 +1545,19 @@ Current cycle: **83**
   backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1062 pass/0 fail, +7 · build bundled). Next (84):
   arch (cyc 79, starved-for 5 = budget, most-starved actionable) — arch #2 scaffold-misfit-blocked, so likely
   another coverage-ratchet guard (logger.ts) or a fresh audit fan-out. feature/bug still gated. cov: be ~79% / fe 63.7%
+- **C84 (guard — coverage-ratchet expenses/validation.ts, the split money-math refinements)** — feature (14)
+  + bug (13) blocked (10th cycle). Most-starved ACTIONABLE was arch (cyc 79, AT budget) — but I did NOT force
+  it: arch #2 (page migration) is scaffold-misfit-blocked, and the createLoadState RESHAPE is a DIRECTION
+  CALL I already flagged (C79) + escalated — acting on it unilaterally would violate arch rule 6 + my own
+  recorded decision. So took the next actionable, guard, via the C83 standing angle. REJECTED the named-next
+  `logger.ts` (its only gaps are emoji-prefix wrappers + a level-gated singleton fixed at import — coverage
+  theater + awkward) in favor of a HIGHER-VALUE low spot from the C81 list: `expenses/validation.ts` at 50%
+  func — the split-expense Zod refinements, which guard real money-math. Pinned the uncovered branches via
+  split-validation-schema.test.ts (+10): percentage-sum-must-be-100, absolute-allocations-must-sum-to-total,
+  source-fields-both-or-neither, + the update-path skips the absolute check when totalAmount is omitted. Pure
+  schema (safeParse), no harness. RATCHET MOVED: 50%/73% → 100%/100%. Updated the standing angle to prioritize
+  high-risk pure logic over passthroughs + named the next real targets (reminders/validation 64%, sql-helpers
+  33%, idempotency 43%). Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1072 pass/0 fail,
+  +10 · build bundled). Next (85): recompute — arch (cyc 79, starved-for 6 > 5, now OVER) most-starved but
+  still misfit/direction-blocked; deep-review (cyc 82, 3) or another high-value coverage guard the actionable
+  fallback. feature/bug Angelo-gated. cov: be ~80% / fe 63.7%
