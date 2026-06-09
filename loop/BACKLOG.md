@@ -182,10 +182,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    sites). One guard per cycle: pick a route whose response the frontend types as a named
    contract, add an HTTP assertion against that contract's keys, shape-stable across
    empty/populated. **DONE so far:** `/stats` exact-key equality (C55); **`/vehicles` list enriched
-   financing** (C62); **single-financing GET enriched shape** — `enrichWithBalance` injects the same
-   `computedBalance` + `eligibleForPayoff` on the endpoint FinanceTab fetches directly (C68). **Remaining
-   candidates:** `/expenses` page, `/insurance` policy+terms, `/reminders`. Stop when the hand-assembled-
-   response surfaces are covered. *(loop-improvement #2)*
+   financing** (C62); **single-financing GET enriched shape** (C68); **`/analytics/insurance` hand-assembled
+   InsuranceData** — nested summary + 3 derived arrays (vehicleDetails/monthlyPremiumTrend/costByCarrier),
+   top-level + summary + item-shape keys locked vs the frontend `InsuranceResponse` (C74). **Remaining
+   candidates:** `/expenses` page, `/analytics` per-vehicle + year-end, `/reminders`. Stop when the
+   hand-assembled-response surfaces are covered. *(loop-improvement #2)*
 
 ### bug
 > **PENDING ANGELO (confirmed + traced C54, do NOT execute unilaterally — user-visible $ change):**

@@ -179,3 +179,60 @@ describe('getInsurance — empty / no-data', () => {
     expect(result.costByCarrier).toEqual([]);
   });
 });
+
+// FE↔BE contract-drift guard for the GET /analytics/insurance response (loop-improvement #2;
+// C55 /stats, C62 /vehicles list, C68 single-financing — this locks the hand-assembled
+// InsuranceData). getInsurance hand-builds a nested summary + 3 derived arrays with NO type
+// binding to the frontend InsuranceResponse (types/analytics.ts:180); a dropped/renamed key
+// silently breaks the analytics tab. Exact-key equality, shape-stable across empty + populated.
+const INSURANCE_TOP_KEYS = [
+  'summary',
+  'vehicleDetails',
+  'monthlyPremiumTrend',
+  'costByCarrier',
+].sort();
+const SUMMARY_KEYS = ['totalMonthlyPremiums', 'totalAnnualPremiums', 'activePoliciesCount'].sort();
+const VEHICLE_DETAIL_KEYS = [
+  'vehicleId',
+  'vehicleName',
+  'carrier',
+  'monthlyPremium',
+  'annualPremium',
+  'deductible',
+  'coverageType',
+].sort();
+
+describe('getInsurance — FE↔BE response contract shape (drift guard)', () => {
+  test('the EMPTY response has exactly the frontend InsuranceResponse top-level + summary keys', async () => {
+    const result = await repo.getInsurance(USER);
+    expect(Object.keys(result).sort()).toEqual(INSURANCE_TOP_KEYS);
+    expect(Object.keys(result.summary).sort()).toEqual(SUMMARY_KEYS);
+  });
+
+  test('a POPULATED response keeps the same top-level/summary keys + the vehicleDetails + array item shapes', async () => {
+    policy('p1', 'GEICO');
+    term({
+      id: 't1',
+      policyId: 'p1',
+      startMs: now - 30 * MS_DAY,
+      endMs: now + 335 * MS_DAY,
+      monthlyCost: 100,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+
+    const result = await repo.getInsurance(USER);
+    expect(Object.keys(result).sort()).toEqual(INSURANCE_TOP_KEYS);
+    expect(Object.keys(result.summary).sort()).toEqual(SUMMARY_KEYS);
+
+    expect(result.vehicleDetails.length).toBeGreaterThan(0);
+    expect(Object.keys(result.vehicleDetails[0]).sort()).toEqual(VEHICLE_DETAIL_KEYS);
+
+    expect(result.costByCarrier.length).toBeGreaterThan(0);
+    expect(Object.keys(result.costByCarrier[0]).sort()).toEqual(
+      ['carrier', 'annualPremium', 'vehicleCount'].sort()
+    );
+
+    expect(result.monthlyPremiumTrend.length).toBeGreaterThan(0);
+    expect(Object.keys(result.monthlyPremiumTrend[0]).sort()).toEqual(['month', 'premiums'].sort());
+  });
+});

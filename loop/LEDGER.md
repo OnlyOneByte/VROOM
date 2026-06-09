@@ -20,12 +20,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 70 |
 | deep-review | 5 | 73 |
-| guard | 6 | 68 |
+| guard | 6 | 74 |
 | bug | 3 | 71 |
 | arch | 5 | 69 |
 | infra | 6 | 72 |
 
-Current cycle: **73**
+Current cycle: **74**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1390,3 +1390,16 @@ Current cycle: **73**
   ALL terms' junctions, not just the latest term's. Verified: backend validate:local EXIT 0 (tsc 0 ·
   musl-biome clean · 1044 pass/0 fail, +6 · build bundled). Next (74): recompute — `guard` most-starved (cyc
   68, starved-for 6 = budget 6, AT) likely; arch (cyc 69, 5=5 AT) close. Recompute all 6 live.
+- **C74 (guard — lock the /analytics/insurance response contract)** — BALANCE: four categories AT budget
+  (guard 6=6, arch 5=5, feature 4=4, bug 3=3), none strictly over; `guard` most-starved (breaches first) AND
+  fully actionable (vs bug, still blocked). Continued loop-improvement #2, riding C73's fresh knowledge of
+  getInsurance: GET /analytics/insurance hand-assembles a nested `summary` + 3 derived arrays
+  (vehicleDetails/monthlyPremiumTrend/costByCarrier) with NO type binding to the frontend `InsuranceResponse`
+  (types/analytics.ts:180) — a dropped/renamed key silently breaks the analytics insurance tab. Extended C73's
+  insurance-details.test.ts with a drift-guard describe (+2 cases): exact top-level + nested summary keys vs
+  the frontend contract (empty AND populated), plus the vehicleDetails (7-key) / costByCarrier (3-key) /
+  monthlyPremiumTrend (2-key) array-item shapes. Verified the vehicleDetails keys against
+  buildInsuranceVehicleEntries source before asserting (matched exactly). Verified: backend validate:local
+  EXIT 0 (tsc 0 · musl-biome clean · 1046 pass/0 fail, +2 · build bundled). Next (75): recompute — `arch`
+  most-starved (cyc 69, starved-for 6 > 5, OVER) → wins; arch #2 step 2 (page migration onto createLoadState,
+  UI-eyes-on) OR a rule-7 fan-out for a non-UI backend dedup/dead-code target (the C69 pattern).
