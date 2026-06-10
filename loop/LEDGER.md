@@ -44,12 +44,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 173 |
-| guard | 6 | 169 |
+| guard | 6 | 175 |
 | bug | 3 | 174 |
 | arch | 5 | 172 |
 | infra | 6 | 171 |
 
-Current cycle: **174**
+Current cycle: **175**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3133,3 +3133,22 @@ Current cycle: **174**
   real regardless; real-world trigger frequency depends on that unverified FE detail (filed as a follow-on note). green→green:
   backend validate:local **EXIT 0 — 1218 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean, build bundled. #60 CLOSED.
   Split-service vein now fully consumed (both C173 agents triaged). cov: be 82.70%+ (carry; +3 BE) / fe 70.18% (carry)
+- **C175 (guard): pin pwa.ts getPlatformInfo UA-classification + promptInstall accept/dismiss branches** — BALANCE: `feature` was
+  the only over-budget category (cyc 170 → starved-for 5 > 4), but ALL 5 feature items remain blocked — maintenance T9 /
+  import-trackers T4–T6 / recurring-expenses T4–T8 are eyes-on-Playwright-blocked, money-cents T0 + trips T0 are Angelo-sign-off-gated
+  and BOTH gates are already escalated (C164/C165, no change since → re-nagging would be noise, and the protocol says don't block).
+  Honest starvation. FELL THROUGH to highest-leverage actionable; no other category over budget; AT the 5/3 spawn cap so stayed
+  INLINE (no fresh deep-review/arch fan-out). PICK = the standing guard coverage-ratchet (due C176 anyway), steered to a verified-
+  firsthand gap. `pwa.ts` getPlatformInfo() is the ONLY pure branching logic in the file and had ZERO tests, yet it decides which
+  PWA-install instructions a user sees (iOS Share-sheet vs Android/desktop native prompt); its heuristics are subtle + regression-
+  prone: the iPadOS-13+-as-MacIntel+touch masquerade (maxTouchPoints>1 — else a desktop Mac mis-detects as iPad) and isChromium
+  EXCLUDING Opera via !/OPR/ despite Opera's "Chrome/" token. The existing suite also ADMITTED (in a comment) it never reached
+  promptInstall's accept/dismiss outcome branches (couldn't populate the module-internal deferredPrompt). FIX (guard-only, no product
+  code): +8 getPlatformInfo cases (iPhone→ios; iPad-MacIntel-touch→ios; MacIntel-no-touch→desktop [the negative control]; Android
+  Chrome; desktop Chrome; Edge→Chromium; Opera→NOT-Chromium [load-bearing]; Firefox→non-Chromium desktop) + 2 promptInstall cases
+  driven the REAL way (fire the captured beforeinstallprompt handler to set deferredPrompt, THEN promptInstall → dismissed=false /
+  accepted=true+canInstall cleared). Replaced window.navigator wholesale per-test (the harness's own 'sw not supported' technique) +
+  restored it in afterEach — did NOT flip the $app/environment browser global (the C38/C91 cross-suite-leak trap). green→green: FE
+  validate:local **EXIT 0 — 513 pass (+10)**, tsc 0, build done; ALSO ran the CI-only legs validate:local skips — eslint EXIT 0 +
+  prettier --check EXIT 0 on the touched file (CI runs the full `validate` = lint+format+type-check+test). cov: fe 70.18%+ (carry;
+  +10 FE, pwa.ts getPlatformInfo 0%→covered) / be 82.70% (carry)

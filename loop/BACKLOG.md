@@ -332,8 +332,10 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > sync test uses mock.module (the C38/C91 cross-suite-flake trap), so it's NOT a clean guard pick; defer until a DI seam exists or
 > accept the gap. FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
 > the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
-> `.svelte.ts`/store/util modules still thin, e.g. settings.svelte.ts 10% [but that's the filed handleError arch pick] / pwa.ts
-> 56% / sync-manager.ts 58%). (SKIP navigation.ts — thin goto
+> `.svelte.ts`/store/util modules still thin, e.g. settings.svelte.ts 10% [but that's the filed handleError arch pick] /
+> sync-manager.ts 58%). ~~pwa.ts 56%~~ DONE C175 — getPlatformInfo() (the file's only pure branching logic) 0%→covered + the
+> promptInstall accept/dismiss branches the old suite admitted it couldn't reach; +10 (iPad-MacIntel-touch masquerade, Opera-not-
+> Chromium !/OPR/, the maxTouchPoints>1 desktop negative control). (SKIP navigation.ts — thin goto
 > wrappers, coverage theater.) Route/
 > integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
 > (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch
