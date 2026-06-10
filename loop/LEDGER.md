@@ -27,9 +27,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 98 |
 | bug | 3 | 97 |
 | arch | 5 | 99 |
-| infra | 6 | 93 |
+| infra | 6 | 100 |
 
-Current cycle: **99**
+Current cycle: **100**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1848,3 +1848,16 @@ Current cycle: **99**
   validate:local EXIT 0 (tsc 0 · musl-biome clean · 1109 pass / 0 fail · build bundled). Next (100): `infra` most-starved
   (cyc 93 starved-for 7 > 6 → breaches) — the #5 branch-hygiene sweep is due (last C86, branch now ~46 commits) or a
   CLAUDE.md refresh; deep-review (cyc 94, 6 > 5) also breaches. cov: be ~80% / fe 63.7%
+- **C100 (infra — #5 branch-hygiene sweep, the milestone cycle)** — BALANCE: `infra` most-starved over budget (cyc 93,
+  starved-for 7 > 6), edging deep-review (6); the #5 sweep was due (last C86, ~14 cycles, branch now 46 commits) — a clean
+  milestone-appropriate infra pick. All three sweep parts: (1) STRAY UNTRACKED TESTS — zero outside the by-design
+  `*.meshclaw.e2e.ts` set (the other untracked entries are gitignored dirs: .meshclaw-tools/, test-results/, __screenshots__/,
+  mise.local.toml); nothing would silently drop coverage on merge. (2) GREEN BASELINE — backend validate:local EXIT 0 at C99
+  (1109 BE pass), unchanged since (no code this cycle); regress.sh Playwright still sandbox-blocked (the standing limit, as
+  C76/C86). (3) BRANCH_REVIEW.md REFRESH — header 36→46 commits, status block 1076→1109 BE / 367→379 FE, appended §18 (C86–C99:
+  recurring-expenses spec drafted+signed-off+T1 started, bugs #4/#18, the C90/C92/C99 arch dedups, the C87/C91/C98 coverage
+  ratchet, the C93 doc refresh) + refreshed the Suggested-merge footer (noted recurring-expenses as the 2nd mid-build feature,
+  near-zero merge risk: only 2 small verified bug fixes are user-visible). BRANCH_REVIEW.md is gitignored (the refresh IS the
+  deliverable). Doc-only — no code, no build gate (the C86/C76/C66 sweep pattern). Next (101): `deep-review` most-starved over
+  budget (cyc 94, starved-for 7 > 5) → it wins; fan out per rule 7, verify vs source (the C99 arch dedup + the recurring-
+  expenses T1 surface are fresh-unreviewed), OR continue feature recurring-expenses T2. Next #5 sweep due ~C110. cov: be ~80% / fe 63.7%

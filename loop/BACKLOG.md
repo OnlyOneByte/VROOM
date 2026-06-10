@@ -589,7 +589,13 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > commits since the last refresh by theme so the eventual PR stays reviewable. Counts as one `infra`
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
-*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C96.)*
+*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C110.)*
+- ~~**#5 branch-hygiene sweep — BRANCH_REVIEW.md refresh (C100, milestone)**~~ — *DONE C100: due per the C86 note
+  (~14 cycles, branch now 46 commits). (1) zero stray untracked unit tests (all untracked are the by-design
+  `*.meshclaw.e2e.ts` set + gitignored dirs); (2) green baseline — backend validate:local EXIT 0 (1109 BE / 379 FE;
+  regress.sh Playwright-blocked); (3) digest header 36→46 commits, status 1076→1109 BE / 367→379 FE, appended §18
+  (C86–C99: recurring-expenses spec+sign-off+T1, bugs #4/#18, the C90/C92/C99 arch dedups, the C87/C91/C98 coverage
+  ratchet, C93 doc refresh) + refreshed the merge footer. BRANCH_REVIEW.md is gitignored. Next sweep ~C110.*
 - ~~**CLAUDE.md orientation refresh post-C81–C92 (C93)**~~ — *DONE C93: 2 actively-misleading drifts fixed
   (the C5/C47/C72 class). (1) The coverage line cited a stale ~74%/~59% / ~1038-test floor → corrected to the
   real C81 MEASURED baseline (be 77.8% / fe 63.7% line) + the loop-improvement #4 per-cycle cov: tag + ~1100/
