@@ -24,12 +24,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 88 |
 | deep-review | 5 | 87 |
-| guard | 6 | 85 |
+| guard | 6 | 91 |
 | bug | 3 | 89 |
 | arch | 5 | 90 |
 | infra | 6 | 86 |
 
-Current cycle: **90**
+Current cycle: **91**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1679,3 +1679,23 @@ Current cycle: **90**
   as a coverage guard). Next (91): nothing over budget after this (guard cyc 85 starved-for 6 = budget at 91;
   deep-review cyc 87, 4). Highest-leverage = the providers-routes HTTP net (sets up the C91+ formatter dedup AND
   ratchets a named low spot), or another coverage guard (sql-helpers 33%). feature/bug remain Angelo-gated. cov: be ~80% / fe 63.7%
+- **C91 (guard — providers-routes HTTP characterization net, the safety-net half of the C90 dedup)** — BALANCE:
+  nothing over budget; `guard` AT budget (cyc 85, starved-for 6 = budget, breaches at 92) and it's ALSO the
+  highest-leverage pick — the C90-filed providers-routes net feeds guard one cycle early AND sets up next arch's
+  formatter dedup AND ratchets a C81 low spot (providers routes 0% HTTP coverage). Triple-win. Wrote
+  providers-routes-http.test.ts (+13) through the real stack via the createTestApp harness: pins the OBSERVABLE
+  CONTRACT the upcoming dedup must preserve — the exact 8-key response shape of all 3 hand-assembled formatters
+  (GET list / POST create / PUT update) + the load-bearing SECURITY invariant that `credentials` is never
+  echoed back — plus auth (401 anon), ownership (404 another-user, no existence leak), domain-guard (400 auth),
+  zValidator (400 bad type), and DELETE 204+disappears. REAL DEBUGGING (not papered over): first run 8-failed —
+  root-caused to CONFIG being a process-cached env SNAPSHOT built at the first config import, so a `fake`-provider
+  create (gated on CONFIG.allowFakeStorageProvider) 400s in the full 148-file suite no matter when my file sets
+  ALLOW_FAKE_STORAGE (an earlier file already froze it false). FIX: create an `s3` provider instead — the POST
+  handler treats any non-google-drive type identically (encrypt→insert, no network; registry instantiation only
+  on /:id/test, not called here), and s3 needs NO env gate → the net is independent of cross-file import order
+  (green in isolation AND in suite). Verified: backend validate:local EXIT 0 (tsc 0 · musl-biome clean [autofixed
+  an import reflow] · 1100 pass/0 fail, +13 · build bundled). The C92 formatter extraction now lands green→green
+  against this net. Next (92): nothing over budget (deep-review cyc 87 starved-for 5 = budget at 92; arch cyc 90,
+  2). Highest-leverage = EXECUTE the formatter dedup (arch, now safe behind this net — extract formatProvider
+  response, +the :583/:599 photoRef count helper + the :466 raw delete fold in naturally), OR the starved
+  deep-review. feature/bug remain Angelo-gated. cov: be ~80% (providers routes now covered) / fe 63.7%

@@ -213,13 +213,18 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > `financing/hooks.ts` 0%→100% func (C85 — onFinancingDeactivated: payoff/delete SEVERS the source link on
 > linked expenses but KEEPS the rows; remaining gap is the best-effort catch block, not cleanly inducible via
 > the HTTP harness); `reminders/validation.ts` 64%→100%/100% (C87 — the 6 cross-field refinements:
-> custom-frequency, expense-type, mileage-trigger D4 single-vehicle, date-range, split-config sums/match).
+> custom-frequency, expense-type, mileage-trigger D4 single-vehicle, date-range, split-config sums/match);
+> `providers/routes.ts` 0%→covered HTTP (C91 — the GET/POST/PUT/DELETE characterization net: response key-shape
+> of all 3 hand-assembled formatters + the credentials-never-echoed security invariant + auth/ownership/domain
+> guards; ALSO the safety net for the C92 formatter dedup. Used an `s3` provider to dodge the fake-provider
+> CONFIG-import-order gate — see LEDGER C91).
 > NEXT high-value pure-logic low spots: `db/sql-helpers.ts` (33% func), `middleware/idempotency.ts` (43%),
 > `middleware/rate-limit.ts` (75%/60%); then the frontend modules (overall 63.7%, the bigger gap). Route/
-> integration files (auth/providers/sync routes at <50%) need the full HTTP harness — lower ROI, skip unless
-> a specific bug. Pick one high-value module per cycle when guard is the balance. (Verified C85: the
-> 0%-coverage files — financing/hooks, auth/providers/*, *routes.ts — are all LIVE-but-hard-to-test, NOT dead
-> code, so there's no dead-code arch removal hiding there.)
+> integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
+> (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch
+> safety-net (as providers did). Pick one high-value module per cycle when guard is the balance. (Verified C85:
+> the 0%-coverage files — financing/hooks, auth/providers/*, *routes.ts — are all LIVE-but-hard-to-test, NOT
+> dead code, so there's no dead-code arch removal hiding there.)
 - ~~**Generalize the FE↔BE contract-drift guard to every hand-assembled response (loop-improvement #2) —
    COMPLETE (C80).**~~ — *A route that hand-builds its JSON with no type binding to the frontend contract
    silently drifts when a field is added/dropped/renamed (the `.optional()`-vs-`.nullish()`, dropped-clientId,
@@ -499,15 +504,16 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
   unused imports. Kept insurance_claim (transitive) + odometer_entry inline + validatePhotoOwnership
   as-is. 3 ownership impls → 1; behavior-preserving (all gate tests + full 889 suite green, unchanged).*
 
-3. **Dedup the 3× provider response formatter (FILED C90, needs an HTTP net first).** `providers/routes.ts`
-   formats the same 9-field provider object at THREE sites (:159 GET list, :309 POST create, :374 PUT update) —
-   only the source var name differs. A clean `formatProviderResponse(row)` extraction (27 lines → one). BUT
-   `providers/routes.ts` has NO HTTP test coverage (a C81-named <50% low spot), so per arch rule 3 this is a
-   TWO-cycle play (the C17→C18 / C24→C36 pattern): cycle 1 = add the providers-routes HTTP characterization net
-   (GET/POST/PUT/DELETE — also a coverage-guard win), cycle 2 = the formatter extraction green→green. Take the
-   net first when arch (or a coverage guard) is the pick. (Also spotted, lower priority: the active-vs-failed
-   photoRef count queries :583/:599 differ only by a status filter → `countPhotoRefsByStatus(status)`; and a lone
-   raw `db.delete(userProviders)` at :466 vs the repo pattern — both fold naturally into the same net+pass.)
+3. **Dedup the 3× provider response formatter (NET DONE C91 → READY TO EXECUTE).** `providers/routes.ts`
+   formats the same 8-field provider object at THREE sites (:159 GET list, :308 POST create, :373 PUT update) —
+   only the source var name differs. Extract `formatProviderResponse(row)` (27 lines → one). The safety net is
+   now IN: **C91 added providers-routes-http.test.ts (+13)** pinning the exact 8-key response shape of all 3
+   sites + the credentials-never-echoed invariant + auth/ownership/domain/zValidator guards — so the extraction
+   lands green→green (the C18/C36 second-half). NEXT ARCH PICK: do the extraction; fold in the two lower-priority
+   spotted items in the same pass since the net covers them — the active-vs-failed photoRef count queries
+   :583/:599 differ only by a status filter → `countPhotoRefsByStatus(status)`; and the lone raw
+   `db.delete(userProviders)` at :466 (note: a C75 cycle declined extracting ONE of providers' raw queries as
+   churn — but the formatter+count dedup is the coherent set, and the delete folds in cleanly alongside).
 
 Seed audit angles for the rule-7 fan-out (once the above are done, or to go broader):
 - **Backend layering** — route handlers doing repository/business logic inline; missing or
