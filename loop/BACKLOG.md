@@ -261,11 +261,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > CONFIG.disableRateLimit===false so the net can't go vacuous — the C77/C91 trap). **Both middleware low spots now covered.**
 > `frontend utils/memoize.ts` 0%→covered (C118 — the FIRST FE ratchet pick: memoizeMulti cache-hit/distinct-args/JSON-value
 > identity/MAX_CACHE_SIZE eviction-cascade + debounce collapse-to-one-trailing-call via vi fake timers; +7. The gate caught
-> a wrong eviction-model assumption — the code was right). NEXT high-value low spots
-> **(re-anchored to the C107 real reading — be 81.1% line / fe 61.4% line; FE now decisively the bigger gap, flat vs C81):**
+> a wrong eviction-model assumption — the code was right).
+> `frontend vehicle-form-validation.ts` 15%→covered (C125 — the C124 FE report's lowest pure-logic module: the two
+> DB-gating validators; +10 covering year boundary 1900..now+2, VIN regex+length band, the financing own-skip + loan-only
+> APR band + term boundary). NEXT high-value low spots
+> **(re-anchored to the C124 reading — be 81.8% line / fe 62.0% line; FE STILL the bigger gap):**
 > backend — `body-limit.ts` (35% line size-enforcement branch), `sync/restore.ts`+`sync/routes.ts` (~32–61%,
-> HTTP-harness-tractable); FRONTEND (the bigger gap — keep steering FE guard cycles here) — the other untested pure-logic
-> utils (navigation.ts, error-handling beyond extract-error-message) + the components/routes deficit. Route/
+> HTTP-harness-tractable); FRONTEND (keep steering FE guard cycles here) — from the C124 report: `formatters.ts` (31% — the
+> date-formatting branches) + `error-handling.ts` (34%) + `api-client.ts`/`expense-api.ts` (mock-heavier) + the
+> components/routes deficit. (SKIP navigation.ts — thin goto wrappers, coverage theater.) Route/
 > integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
 > (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch
 > safety-net (as providers did). Pick one high-value module per cycle when guard is the balance. (Verified C85:

@@ -35,12 +35,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 122 |
 | deep-review | 5 | 120 |
-| guard | 6 | 118 |
+| guard | 6 | 125 |
 | bug | 3 | 121 |
 | arch | 5 | 123 |
 | infra | 6 | 124 |
 
-Current cycle: **124**
+Current cycle: **125**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2297,3 +2297,17 @@ Current cycle: **124**
   sweep pattern); coverage artifacts + BRANCH_REVIEW.md are gitignored. Next (125): nothing forced (guard cyc 118 / bug cyc
   121 breach next) → highest-leverage; FE coverage (the measured gap) or the filed analytics-unit-prefs arch dedup. cov:
   be 81.8% / fe 62.0% (MEASURED C124)
+- **C125 (guard — characterize FE vehicle-form-validation.ts 15% → covered; FE ratchet)** — BALANCE: two breached (guard
+  cyc 118 starved-for 7, bug cyc 121 starved-for 4); highest-ABSOLUTE → guard (7). The C124 re-measure reconfirmed FE is the
+  bigger gap (62.0% vs be 81.8%) with the standing "steer FE guard cycles there"; used the C124 FE coverage report to pick a
+  GROUNDED target. SURVEY: navigation.ts (untested) is thin SvelteKit-goto wrappers → SKIP (mock-heavy, coverage theater,
+  the C118 vehicle-helpers discipline); the report's lowest pure-logic module was `...validation.ts` 15% line/8% branch →
+  vehicle-form-validation.ts (the OTHER one, expense-form-validation, was covered C103). It's the C82 class: two PURE
+  validators (validateVehicleFields, validateFinancingFields) that GATE what vehicle/financing data enters the DB, almost
+  entirely untested. SHIPPED: vehicle-form-validation.test.ts (+10): make/model required, the year boundary (1900..now+2,
+  computed vs `now` → host-independent, sidesteps C77), VIN regex + 11–17 length band, negative mileage/price guards;
+  financing own-skip short-circuit, provider/amount/term/startDate/payment required, the LOAN-ONLY APR 0–50 band (a lease
+  with a wild apr is NOT flagged), term 1–600 boundary. Verified: frontend validate:local EXIT 0 — 405 pass / 0 fail (+10),
+  tsc 0, build OK. FE ratchet continues (3rd FE guard pick: C118 memoize, C119 capitalize-dedup, C125 this). Next (126):
+  `bug` most-starved over budget (cyc 121, starved-for 5 > 3) → re-verify the queue; #24 CSV decimal is decision-gated, #27
+  Angelo-gated, so a fresh fan-out may be needed (the C103/C90 pattern). cov: be 81.8% / fe ~62%+ (FE +1 module)
