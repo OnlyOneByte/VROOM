@@ -46,7 +46,7 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 161 |
 | guard | 6 | 163 |
 | bug | 3 | 162 |
-| arch | 5 | 160 |
+| arch | 5 | 166 |
 | infra | 6 | 164 |
 
 Current cycle: **150**
@@ -2998,3 +2998,17 @@ Current cycle: **150**
   features that are all backend-done + eyes-on-tail-only). Spec-only, no code → no build gate (the C4/C9/C146 convention; all
   groundings verified vs source). Re-escalation folded into the C164 ask (which horizon to spec) — NOT a new blocking message.
   cov: be 82.70% / fe 70.18% (carry, spec-only cycle)
+- **C166 (arch): converge settings.svelte.ts handleError onto the shared extractErrorMessage — 9 sites → the C90 helper** —
+  BALANCE: two over budget → most-starved (absolute) wins → `arch` (cyc 160, starved-for 6) > `bug` (4). Took the FE runner-up
+  the C160 audit fan-out filed (the cleaner of the two primed picks: a pure delete-and-replace onto an ALREADY-tested helper, no
+  new helper to author; the BE validateOdometerOwnership pick needs a 404 test written from scratch — deferred). THE DUP:
+  settings.svelte.ts:18 defined a local `handleError(error) = error instanceof Error ? error.message : 'An unexpected error
+  occurred'` — byte-identical to the shared `extractErrorMessage(error, fallback)` (error-handling.ts:13, the C90/C137 helper),
+  called 9× in the store. VERIFIED firsthand: same error-wins precedence (NOT the inverted handleApiError:120 fallback-wins
+  contract — the C90 exclusion the helper's own doc comment flags). FIX: deleted the local helper, imported extractErrorMessage,
+  replaced all 9 sites with `extractErrorMessage(err, UNEXPECTED_ERROR)` (the fallback hoisted to a named const). Behavior-
+  preserving (byte-identical). Test-anchored by extractErrorMessage's existing extract-error-message.test.ts + the green→green
+  full FE suite (the C160 precedent — the store has no test file, and adding one [mocking settingsApi + $state runes] is heavier
+  than this dedup warrants). green→green: frontend validate:local **EXIT 0 — 492 pass (unchanged = behavior-preserving)**, tsc 0,
+  build done. ARCH QUEUE: BE validateOdometerOwnership remains the one primed pick. cov: fe 70.18% / be 82.70% (carry; no net
+  test delta — behavior-preserving)

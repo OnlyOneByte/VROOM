@@ -874,12 +874,12 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     validateExpenseOwnership, slots into the validateXOwnership family) + wired all 5 (3 consume entity, 2 guard-only) + dropped
     the dead NotFoundError import. Test-anchored by EXISTING 404 coverage (mark-serviced.test.ts:173 + materialized-expenses-route)
     passing green through the helper. green→green 1206 pass (behavior-preserving).* **ARCH QUEUE again empty of clean picks.**
-  - **NEXT arch pick (filed C160 from the same fan-out — FE runner-up):** `settings.svelte.ts`'s local `handleError(error)` (:18-20,
-    `error instanceof Error ? error.message : 'An unexpected error occurred'`) is a redundant reimplementation of the already-merged
-    `extractErrorMessage` (C90/C137); called 9× in that store. Replace the local helper with `extractErrorMessage(err, 'An
-    unexpected error occurred')` (error-wins precedence — NOT the inverted error-handling.ts:120 helper, the C90 exclusion). Pure
-    `.svelte.ts`, behavior-preserving; the store has no test file, so add a tiny characterization test. (auth.svelte.ts already
-    migrated; settings was the one holdout.)
+  - ~~**FE runner-up (filed C160): settings.svelte.ts handleError → extractErrorMessage**~~ — *DONE C166: the local
+    `handleError(error) = error instanceof Error ? error.message : 'An unexpected error occurred'` (:18) was byte-identical to the
+    shared `extractErrorMessage` (C90/C137, error-wins — NOT the inverted handleApiError:120). Deleted the local helper, imported
+    extractErrorMessage, replaced all 9 call sites with `extractErrorMessage(err, UNEXPECTED_ERROR)` (fallback hoisted to a named
+    const). Behavior-preserving; anchored by extractErrorMessage's existing test + green→green FE suite (the C160 precedent — store
+    has no test file; adding one is heavier than the dedup warrants). green→green fe 492 pass (unchanged).*
   - **Also filed C160 (backend audit runner-up):** `validateOdometerOwnership` — the `const entry = await
     odometerRepository.findById(id); if (!entry || entry.userId !== user.id) throw new NotFoundError('Odometer entry')` guard
     repeated 3× in odometer/routes.ts (GET /entry/:id:99, PUT:146, DELETE:165), byte-identical. A DIFFERENT repo contract than the
