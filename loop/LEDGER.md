@@ -26,10 +26,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 87 |
 | guard | 6 | 85 |
 | bug | 3 | 89 |
-| arch | 5 | 79 |
+| arch | 5 | 90 |
 | infra | 6 | 86 |
 
-Current cycle: **89**
+Current cycle: **90**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1656,3 +1656,26 @@ Current cycle: **89**
   No backend touched. Next (90): bug freshly fed (89); arch still most-starved over budget (cyc 79, 11 > 5) but
   direction-blocked (page-migration misfit, reshape pending the C79 call) → verify then take the next coverage
   guard (sql-helpers 33% / idempotency 43%). feature/bug remain Angelo-gated. cov: be ~80% / fe 63.7%
+- **C90 (arch — dedup the `instanceof Error ? .message : fallback` idiom into extractErrorMessage)** — BALANCE:
+  `arch` the only over-budget category (cyc 79, starved-for 11 > 5) → forced. KEY REFRAME: I'd been punting arch
+  to coverage-guards citing "direction-blocked," but that block is SPECIFIC to arch #2 (the C79 createLoadState
+  page-migration misfit — a real pending direction call). arch #1 CLOSED at C56, so per arch rule 7 the proper
+  move is the AUDIT FAN-OUT to repopulate, not punt. Fanned out 2 Explore agents (backend dedup/layering +
+  frontend pure-logic dedup). Backend surfaced a real 3× provider-response-formatter dup (providers/routes.ts
+  :159/:309/:374) but it's UNTESTED → that's a 2-cycle safety-net-first play (C17/C24 pattern), filed not taken.
+  Frontend surfaced the better one-cycle item: the `<err> instanceof Error ? <err>.message : <literal>` idiom
+  hand-repeated across catch blocks. APPLIED the C21/C28/C35 verify-against-source rule and it MATTERED: the
+  agent listed 5 sites, but error-handling.ts:106 is `fallbackMessage || (instanceof Error ? .message : '...')`
+  — the fallback takes PRECEDENCE there (opposite ordering), so folding it in would INVERT semantics (arch
+  rule 2 violation) → EXCLUDED it. Verified the other 4 read identically against source (load-state.svelte.ts
+  :91, auth.svelte.ts :98 + :116, sync-manager.ts:224 — error-message-wins ordering). Extracted
+  `extractErrorMessage(error, fallback)` to error-handling.ts (with a doc note on why handleApiError does NOT
+  use it), routed all 4 through it. Anchored by extract-error-message.test.ts (+4): Error-message-wins, subclass
+  unwrap, non-Error fallback (string/obj/undefined/null/number), and the load-bearing empty-Error-message
+  returns '' (branch on TYPE not truthiness). Complete one-cycle behavior-preserving dedup — no dangling
+  follow-up, no .svelte markup (pure .ts/.svelte.ts → no eyes-on needed). Verified: frontend validate:local
+  EXIT 0 (tsc 0 · build ✓ · 379 pass/0 fail, +4). FILED for next arch: the provider-formatter dedup needs its
+  HTTP characterization net first (providers routes are <50% covered — also a C81 low spot, so it double-counts
+  as a coverage guard). Next (91): nothing over budget after this (guard cyc 85 starved-for 6 = budget at 91;
+  deep-review cyc 87, 4). Highest-leverage = the providers-routes HTTP net (sets up the C91+ formatter dedup AND
+  ratchets a named low spot), or another coverage guard (sql-helpers 33%). feature/bug remain Angelo-gated. cov: be ~80% / fe 63.7%

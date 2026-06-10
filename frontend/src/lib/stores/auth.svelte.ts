@@ -1,5 +1,6 @@
 import type { User } from '../types/index.js';
 import { apiClient, getApiBaseUrl } from '$lib/services/api-client';
+import { extractErrorMessage } from '$lib/utils/error-handling';
 import { browser } from '$app/environment';
 
 function createAuthStore() {
@@ -95,7 +96,7 @@ function createAuthStore() {
 				user = null;
 				isAuthenticated = false;
 				token = null;
-				error = err instanceof Error ? err.message : 'Token refresh failed';
+				error = extractErrorMessage(err, 'Token refresh failed');
 				throw err;
 			}
 		},
@@ -113,7 +114,7 @@ function createAuthStore() {
 				const { appStore } = await import('./app.svelte');
 				appStore.reset();
 			} catch (err) {
-				error = err instanceof Error ? err.message : 'Logout failed';
+				error = extractErrorMessage(err, 'Logout failed');
 			}
 		}
 	};

@@ -461,6 +461,14 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
      win; or (b) accept the scaffold only fits future SINGLE-resource pages and don't retrofit. Flag Angelo;
      don't force a misfit migration. Bonus (if reshaped): structurally prevents the masquerade bug class.
 
+- ~~**Dedup the `instanceof Error ? .message : fallback` idiom (C90).**~~ — *DONE C90: rule-7 fan-out (2
+  agents). The `<err> instanceof Error ? <err>.message : <literal>` catch-block idiom was hand-repeated; extracted
+  `extractErrorMessage(error, fallback)` to utils/error-handling.ts and routed the 4 genuinely-identical sites
+  through it (load-state.svelte.ts:91, auth.svelte.ts:98 + :116, sync-manager.ts:224). VERIFIED against source
+  (C21/C28/C35 rule): EXCLUDED error-handling.ts:106 — its `fallbackMessage || (...)` gives the caller's message
+  PRECEDENCE (opposite ordering), so folding it in would invert semantics (arch rule 2). Pure .ts/.svelte.ts → no
+  eyes-on. Anchored by extract-error-message.test.ts (+4, incl. the load-bearing empty-Error-message→'' = branch
+  on TYPE not truthiness). Complete one-cycle behavior-preserving dedup. frontend validate:local EXIT 0 (379 pass).*
 - ~~**Dedup the repeated query-if-nonempty guard in google-sheets-service (C75).**~~ — *DONE C75: rule-7
   fan-out (2 agents: layering + complexity). The Sheets backup builder `updateSpreadsheetWithUserData`
   repeated `ids.length > 0 ? await db.select()…where(inArray(col, ids)) : []` 4× (insurance terms, term-
@@ -490,6 +498,16 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
   `validateInsuranceOwnership` (utils/validation.ts); deleted the private dup + 2 inlined checks +
   unused imports. Kept insurance_claim (transitive) + odometer_entry inline + validatePhotoOwnership
   as-is. 3 ownership impls → 1; behavior-preserving (all gate tests + full 889 suite green, unchanged).*
+
+3. **Dedup the 3× provider response formatter (FILED C90, needs an HTTP net first).** `providers/routes.ts`
+   formats the same 9-field provider object at THREE sites (:159 GET list, :309 POST create, :374 PUT update) —
+   only the source var name differs. A clean `formatProviderResponse(row)` extraction (27 lines → one). BUT
+   `providers/routes.ts` has NO HTTP test coverage (a C81-named <50% low spot), so per arch rule 3 this is a
+   TWO-cycle play (the C17→C18 / C24→C36 pattern): cycle 1 = add the providers-routes HTTP characterization net
+   (GET/POST/PUT/DELETE — also a coverage-guard win), cycle 2 = the formatter extraction green→green. Take the
+   net first when arch (or a coverage guard) is the pick. (Also spotted, lower priority: the active-vs-failed
+   photoRef count queries :583/:599 differ only by a status filter → `countPhotoRefsByStatus(status)`; and a lone
+   raw `db.delete(userProviders)` at :466 vs the repo pattern — both fold naturally into the same net+pass.)
 
 Seed audit angles for the rule-7 fan-out (once the above are done, or to go broader):
 - **Backend layering** — route handlers doing repository/business logic inline; missing or

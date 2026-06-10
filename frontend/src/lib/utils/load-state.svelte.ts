@@ -25,6 +25,8 @@
  * `.svelte` consumer reads `state.isLoading` reactively.
  */
 
+import { extractErrorMessage } from './error-handling';
+
 export interface LoadStateOptions<T> {
 	/** Seed value before the first successful load (defaults to null). */
 	initial?: T | null;
@@ -88,7 +90,7 @@ export function createLoadState<T>(options: LoadStateOptions<T> = {}): LoadState
 				return value;
 			} catch (e) {
 				options.onError?.(e);
-				error = e instanceof Error ? e.message : fallback;
+				error = extractErrorMessage(e, fallback);
 				return null;
 			} finally {
 				isLoading = false;
