@@ -833,8 +833,20 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     as `reminder.startDate.getDate()`, identical to getAnchorDay; comment said "reuse the trigger math"). COMPLETE 4→1 (no inline
     site left → no C75/C92/C99 partial-churn). Exported the wrapper (folds getAnchorDay in), wired all 4, swapped routes.ts's
     import + stale comment. Pure/backend-only/behavior-preserving/cents-independent. +3 delegation tests (rule 3). green→green
-    1192 pass (+3).* **ARCH QUEUE again EMPTY of clean single-cycle picks** — next arch cycle should run the rule-7 AUDIT fan-out
-    to repopulate (or take the deferred roundToCents once Playwright/cents-migration unblocks it).
+    1192 pass (+3).*
+  - ~~**`validateReminderOwnership` — the inline reminder ownership guard, 5 sites → 1 (C160)**~~ — *DONE C160: a rule-7 AUDIT
+    fan-out (2 agents) surfaced it as the best clean pick. The `const x = await reminderRepository.findByIdAndUserId(id, user.id);
+    if (!x) throw new NotFoundError('Reminder')` guard repeated 5× in reminders/routes.ts (mark-serviced/GET:id/GET:id/expenses/
+    PUT/DELETE) — VERIFIED byte-identical firsthand. Added validateReminderOwnership to utils/validation.ts (mirrors
+    validateExpenseOwnership, slots into the validateXOwnership family) + wired all 5 (3 consume entity, 2 guard-only) + dropped
+    the dead NotFoundError import. Test-anchored by EXISTING 404 coverage (mark-serviced.test.ts:173 + materialized-expenses-route)
+    passing green through the helper. green→green 1206 pass (behavior-preserving).* **ARCH QUEUE again empty of clean picks.**
+  - **NEXT arch pick (filed C160 from the same fan-out — FE runner-up):** `settings.svelte.ts`'s local `handleError(error)` (:18-20,
+    `error instanceof Error ? error.message : 'An unexpected error occurred'`) is a redundant reimplementation of the already-merged
+    `extractErrorMessage` (C90/C137); called 9× in that store. Replace the local helper with `extractErrorMessage(err, 'An
+    unexpected error occurred')` (error-wins precedence — NOT the inverted error-handling.ts:120 helper, the C90 exclusion). Pure
+    `.svelte.ts`, behavior-preserving; the store has no test file, so add a tiny characterization test. (auth.svelte.ts already
+    migrated; settings was the one holdout.)
   - **Next arch pick when one is due:** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the
     eyes-on + pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the
     ~57 logging sites is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.

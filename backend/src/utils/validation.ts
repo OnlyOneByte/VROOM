@@ -72,6 +72,7 @@ export const commonSchemas = {
 import { expenseRepository } from '../api/expenses/repository';
 import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
+import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
 import { vehicleRepository } from '../api/vehicles/repository';
 import type { Expense, InsurancePolicy, Vehicle, VehicleFinancing } from '../db/schema';
 import { NotFoundError } from '../errors';
@@ -165,6 +166,23 @@ export async function validateInsuranceOwnership(
   }
 
   return insurance;
+}
+
+/**
+ * Validate that a reminder belongs to the user, returning it (with its vehicleIds). The userId-scoped
+ * counterpart to the inline `findByIdAndUserId` guard the reminder routes repeated 5×; mirrors the
+ * validateExpenseOwnership shape (findByIdAndUserId → NotFoundError → return entity).
+ * @throws NotFoundError if the reminder is not found or doesn't belong to the user
+ */
+export async function validateReminderOwnership(
+  reminderId: string,
+  userId: string
+): Promise<ReminderWithVehicles> {
+  const reminder = await reminderRepository.findByIdAndUserId(reminderId, userId);
+  if (!reminder) {
+    throw new NotFoundError('Reminder');
+  }
+  return reminder;
 }
 
 /**

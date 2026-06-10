@@ -43,7 +43,7 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 155 |
 | guard | 6 | 156 |
 | bug | 3 | 158 |
-| arch | 5 | 153 |
+| arch | 5 | 160 |
 | infra | 6 | 159 |
 
 Current cycle: **150**
@@ -2904,3 +2904,19 @@ Current cycle: **150**
   TWO remaining (Sheets #36/#37) and refreshed the lower-sev list (#45/#51/#53). Doc-only — no build gate (the C5/C47/C117/C131/
   C145 convention; every claim verified vs source/LEDGER). Next CLAUDE.md refresh ~C174; #5 sweep next ~C162. cov: be 82.0% /
   fe 70.09% (carry, doc-only cycle)
+- **C160 (arch): extract `validateReminderOwnership` — the inline reminder ownership guard, 5 sites → 1** — BALANCE: `arch` the
+  only over-budget category (cyc 153, starved-for 7) → forced. The queue was "EMPTY of clean picks" → ran the **rule-7 AUDIT
+  fan-out** (2 Explore agents: backend + frontend dedup scans, each with the already-done exclusions + a skeptic mandate). Both
+  delivered ranked findings with verified false-positives rejected (FE photo/thumbnail/query-builder "dups" differ structurally;
+  financing HTTPException sites are the documented C106 exclusion). BEST PICK (backend): the inline
+  `const x = await reminderRepository.findByIdAndUserId(id, user.id); if (!x) throw new NotFoundError('Reminder')` guard repeated
+  **5×** in reminders/routes.ts (mark-serviced:86, GET/:id:181, GET/:id/expenses:195, PUT:215, DELETE:275). VERIFIED all 5
+  byte-identical firsthand + confirmed findByIdAndUserId returns ReminderWithVehicles|null. FIX (the established C99/C113/C141
+  convergence pattern): added `validateReminderOwnership(id, userId): Promise<ReminderWithVehicles>` to utils/validation.ts (a
+  byte-for-byte mirror of the existing validateExpenseOwnership, slotting into the validateXOwnership family) + wired all 5 sites
+  (3 consume the entity, 2 guard-only) + removed the now-dead NotFoundError import (the C123 dead-import class — biome
+  noUnusedImports enforced it). Test-anchored (rule 3) by EXISTING 404 coverage: mark-serviced.test.ts:173 ("non-existent /
+  cross-tenant id returns 404") + reminder-materialized-expenses-route.test.ts both pass green THROUGH the new helper — the
+  convergence preserved the 404 contract. green→green: backend validate:local **EXIT 0 — 1206 pass / 1 skip / 0 fail** (unchanged
+  = behavior-preserving), tsc 0, musl-biome clean, build bundled. Filed the FE runner-up (settings.svelte.ts handleError →
+  extractErrorMessage, 9 sites) as the next arch pick. cov: be 82.0% / fe 70.09% (carry; behavior-preserving, no net test delta)

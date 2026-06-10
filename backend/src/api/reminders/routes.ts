@@ -2,9 +2,12 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { CONFIG } from '../../config';
 import type { NewReminder } from '../../db/schema';
-import { NotFoundError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
-import { commonSchemas, validateVehicleIdsOwned } from '../../utils/validation';
+import {
+  commonSchemas,
+  validateReminderOwnership,
+  validateVehicleIdsOwned,
+} from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
 import { recurringCostSummary } from './reminder-cost';
@@ -83,11 +86,7 @@ routes.post(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const existing = await reminderRepository.findByIdAndUserId(id, user.id);
-    if (!existing) {
-      throw new NotFoundError('Reminder');
-    }
-    const { reminder, vehicleIds } = existing;
+    const { reminder, vehicleIds } = await validateReminderOwnership(id, user.id);
 
     // Compute the re-arm per axis (D3). The route owns the math (it has the odometer repo +
     // advanceReminderDueDate) to keep the repository free of a trigger-service import cycle.
@@ -178,10 +177,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const result = await reminderRepository.findByIdAndUserId(id, user.id);
-  if (!result) {
-    throw new NotFoundError('Reminder');
-  }
+  const result = await validateReminderOwnership(id, user.id);
 
   return c.json({ success: true, data: result });
 });
@@ -192,10 +188,7 @@ routes.get('/:id/expenses', zValidator('param', commonSchemas.idParam), async (c
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const existing = await reminderRepository.findByIdAndUserId(id, user.id);
-  if (!existing) {
-    throw new NotFoundError('Reminder');
-  }
+  await validateReminderOwnership(id, user.id);
 
   const materialized = await expenseRepository.findBySource('reminder', id, user.id);
   return c.json({ success: true, data: materialized });
@@ -212,10 +205,7 @@ routes.put(
     const partialUpdate = c.req.valid('json');
 
     // Fetch existing reminder (scoped to user)
-    const existing = await reminderRepository.findByIdAndUserId(id, user.id);
-    if (!existing) {
-      throw new NotFoundError('Reminder');
-    }
+    const existing = await validateReminderOwnership(id, user.id);
 
     // If vehicleIds are being updated, verify ownership
     if (partialUpdate.vehicleIds) {
@@ -272,10 +262,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const existing = await reminderRepository.findByIdAndUserId(id, user.id);
-  if (!existing) {
-    throw new NotFoundError('Reminder');
-  }
+  await validateReminderOwnership(id, user.id);
 
   // T3/D2 (recurring-expenses): a 'expense'-type reminder auto-materializes real expense rows
   // (sourceType:'reminder', sourceId:reminder.id). Those are HISTORY — deleting the reminder must
