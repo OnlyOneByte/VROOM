@@ -50,9 +50,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 181 |
 | bug | 3 | 180 |
 | arch | 5 | 182 |
-| infra | 6 | 176 |
+| infra | 6 | 183 |
 
-Current cycle: **182**
+Current cycle: **183**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3292,3 +3292,13 @@ Current cycle: **182**
   list + financing-GET contract tests + the property test, all green THROUGH the change (green→green). green→green: backend
   validate:local **EXIT 0 — 1236 pass / 1 skip / 0 fail (+1)**, tsc 0, musl-biome clean, build bundled. cov: be 82.78%+ (carry) / fe
   73.89% (carry). (Agent's serializeSessionUser #1 filed below as the next arch candidate.)
+- **C183 (infra): CLAUDE.md orientation refresh (post-C171 drift, C172–C182)** — BALANCE: two over budget — `feature` (cyc 170,
+  starved-for 13, blocked 8th cycle, escalated) + `infra` (cyc 176, starved-for 7 > 6). Feature blocked → fell to `infra` (forced;
+  `bug` was only AT budget 3=3, not over). The #5 sweep isn't due (last C176, ~C186); the CLAUDE.md refresh (last C171, "next ~C184")
+  is the more-due infra increment — one cycle early but infra is forced NOW + it's the highest-value infra task available. Doc-only —
+  no build gate (standing convention; every claim verified vs LEDGER/source per the C145 convention). FIXED 5 drifts: (1) coverage
+  re-measure C164→C176 figures (be 82.70→82.74 line; fe 70.18→73.89 line / 66.9→73.61 func / 62.9→66.08 branch); (2) FE-guard ratchet
+  list +C175 pwa.ts; (3) FE low spots — dropped pwa.ts (DONE C175), kept sync-manager ~58%; (4) BE low spots — added backup-orchestrator
+  0→50% C181 (+ the coverage-theater warning) + named analytics/routes.ts 15% func as the highest-value next pick; (5) suite size
+  ~1211/~503 → ~1236/~513; + the MED-fix line now notes #48 sweep COMPLETED C180 (findByVehicleIdPaginated) + adds #59/#25. No code
+  touched. cov: be 82.74% line / fe 73.89% line (carry, doc-only). Next CLAUDE.md refresh ~C194; #5 sweep next ~C186.
