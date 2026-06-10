@@ -930,7 +930,16 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     DELETE). Added validateOdometerOwnership to utils/validation.ts (mirrors validateInsuranceOwnership — findById + post-filter,
     NOT findByIdAndUserId) + wired all 3 (GET consumes entry, PUT/DELETE guard-only) + dropped the dead NotFoundError import. Wrote
     the anchoring 404 tests the caveat flagged: +3 not-found cases in update-route.test.ts (GET/PUT/DELETE → 404). green→green 1214
-    pass (+3).* **ARCH QUEUE again empty of primed picks — next arch cycle runs a rule-7 audit fan-out to repopulate.**
+    pass (+3).*
+  - ~~**Shared `buildLocalDate` — the date echo-check, 2 import paths → 1 (C177)**~~ — *DONE C177: a STRONGER lead than a fresh
+    fan-out — my own C173 #59 fix added an echo-check to import-csv.ts parseDate that explicitly "mirrors the mapping path's
+    buildLocalDate" (import-mapping.ts, C115/#23). VERIFIED firsthand both sites run the IDENTICAL "construct local Date + NaN-check
+    + echo getFullYear/getMonth/getDate" guard — two pure-`.ts`, cents-INDEPENDENT impls of one algorithm. Extracted the canonical
+    `buildLocalDate(y,m,d,hh=0,mm=0,ss=0): Date|null` to new sibling `expenses/local-date.ts`; wired both callers (import-mapping
+    deletes its copy + imports; import-csv's inline check → a call mapping null→its existing {error}). Behavior-preserving (time
+    defaults to 0 = local midnight ≡ `new Date(y,m-1,d)`; no circular import). Anchored by the EXISTING #59 + #23 out-of-range suites
+    (green→green through the extraction) + new local-date.test.ts (+7). green→green 1225 pass (+7).* **ARCH QUEUE again empty of
+    primed picks — next arch cycle runs a rule-7 audit fan-out to repopulate (spawn-gated — confirm the cap is clear first).**
   - **Next arch pick when one is due:** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the
     eyes-on + pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the
     ~57 logging sites is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.

@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, isElectricFuelType } from '../../db/types';
 import { denormalizeCsvCell } from '../../utils/csv-safety';
+import { buildLocalDate } from './local-date';
 
 /** A vehicle the importing user owns — the ONLY rows we'll attach expenses to. */
 export interface ImportVehicle {
@@ -135,22 +136,12 @@ function parseDate(raw: string): { value: Date } | { error: string } {
   // any other parseable string) keeps its original absolute-instant semantics via `new Date`.
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
   if (dateOnly) {
-    const year = Number(dateOnly[1]);
-    const month = Number(dateOnly[2]);
-    const day = Number(dateOnly[3]);
-    const date = new Date(year, month - 1, day);
-    // ECHO-CHECK the constructed parts against the input (bug #23 / #59 — the same guard the mapping path's
-    // buildLocalDate uses): `new Date(2024, 12, 45)` (i.e. "2024-13-45") never NaNs — it silently ROLLS
-    // FORWARD to 2025-02-14. NaN alone can't catch that; verify Y/M/D round-trip so an out-of-range
-    // date-only cell is rejected with a clean per-row error instead of storing a wrong date.
-    if (
-      Number.isNaN(date.getTime()) ||
-      date.getFullYear() !== year ||
-      date.getMonth() !== month - 1 ||
-      date.getDate() !== day
-    ) {
-      return { error: `Invalid date "${raw}"` };
-    }
+    // buildLocalDate constructs in LOCAL time AND echo-checks the parts, so an out-of-range
+    // cell like "2024-13-45" (which `new Date` silently ROLLS FORWARD to 2025-02-14) returns
+    // null → a clean per-row "Invalid date" instead of a stored wrong date (bug #23 / #59).
+    // Shared with the mapping path's normalizeForeignDate so the two importers can't drift.
+    const date = buildLocalDate(Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3]));
+    if (!date) return { error: `Invalid date "${raw}"` };
     return { value: date };
   }
   const date = new Date(raw);

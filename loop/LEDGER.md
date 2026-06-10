@@ -49,10 +49,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 173 |
 | guard | 6 | 175 |
 | bug | 3 | 174 |
-| arch | 5 | 172 |
+| arch | 5 | 177 |
 | infra | 6 | 176 |
 
-Current cycle: **176**
+Current cycle: **177**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3175,3 +3175,22 @@ Current cycle: **176**
   settings-api + pwa guard ratchets, trips spec drafted, CLAUDE.md refresh**)**, + the offline-entries hygiene note in the reviewer
   call-outs. BRANCH_REVIEW.md gitignored (refreshed, not committed). Doc/measurement-only — NO code change. Next #5 sweep ~C186;
   CLAUDE.md refresh next ~C184 (last C171). cov: be 82.74% line / fe 73.89% line (RE-MEASURED)
+- **C177 (arch): extract shared `buildLocalDate` — the date echo-check, 2 import paths → 1 source of truth** — BALANCE: `feature`
+  the only category STRICTLY over budget (cyc 170 → starved-for 7 > 4) but blocked for the 4th cycle running (eyes-on-Playwright /
+  Angelo-T0-gated, both escalated → honest starvation, don't re-nag). Fell through; `arch` was most-starved among the rest (cyc 172,
+  starved-for 5 = budget, due THIS cycle — matched the C176 forecast). Stayed INLINE — no spawn (didn't assume the 5/3 cap reset; an
+  inline dedup needs none). The arch queue's clean dedup picks were all consumed (C160→C166/C172 runner-ups landed), so rule 7 calls
+  for a fresh fan-out — but I had a STRONGER lead from my OWN recent work: C173's #59 fix added an echo-check to import-csv.ts parseDate
+  that the commit explicitly noted "mirrors the mapping path's buildLocalDate" (import-mapping.ts, C115/#23). VERIFIED firsthand both
+  sites run the IDENTICAL "construct local Date + NaN-check + echo-check getFullYear/getMonth/getDate" guard — two pure-`.ts`,
+  cents-migration-INDEPENDENT implementations of one algorithm (the ideal arch candidate: clears the eyes-on + pending-migration
+  constraints that rule out most FE/money picks). EXTRACT: new sibling module `expenses/local-date.ts` houses the canonical
+  `buildLocalDate(y,m,d,hh=0,mm=0,ss=0): Date|null` (time defaults to 0 → a date-only caller gets local midnight, byte-identical to
+  `new Date(y,m-1,d)`). Wired BOTH callers: import-mapping.ts deletes its local copy + imports (normalizeForeignDate unchanged);
+  import-csv.ts parseDate's inline echo-check → a `buildLocalDate(...)` call that maps null→its existing `{error}` return (caller keeps
+  its own {value}|{error} shaping — the C90 extractErrorMessage pattern: helper stays the leaner primitive). Behavior-preserving (arch
+  rule 2): verified `new Date(y,m-1,d)` ≡ local-midnight; no cross-import before (no circular risk). TEST-ANCHORED (rule 3): the
+  EXISTING import-csv #59 + import-mapping #23 out-of-range suites are the green→green oracle (both stayed green THROUGH the extraction),
+  + new local-date.test.ts (+7: in-range build, time-default-midnight, explicit-time, month>12 rejected, Feb-30 rejected, month-0
+  rejected, leap-day 2024-02-29 ok / 2023-02-29 rejected). green→green: backend validate:local **EXIT 0 — 1225 pass / 1 skip / 0 fail
+  (+7)**, tsc 0, musl-biome clean, build bundled. cov: be 82.74%+ (carry; +7 BE) / fe 73.89% (carry)

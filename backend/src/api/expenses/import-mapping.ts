@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
 import { convertDistance, convertVolume } from '../../utils/unit-conversions';
+import { buildLocalDate } from './local-date';
 
 /** A native VROOM column a foreign header can be mapped onto. */
 export type NativeField =
@@ -165,28 +166,6 @@ function epochToIso(n: number): string | null {
  * user's intended day. An ISO value that already carries an explicit timezone (Z or
  * ±hh:mm) is an absolute instant and is honored as-is.
  */
-/**
- * Build a LOCAL-time Date from explicit parts, returning null if any part is out of range or
- * impossible. JS `new Date(2024, 44, 13)` (month 45) is a VALID Date ~3.7yr later and
- * `new Date(2024, 1, 30)` (Feb 30) rolls to March — so we ECHO-CHECK the constructed parts against
- * the input (cycle-114 review, bug #23). A null return means the caller keeps the raw string so
- * `buildImportPlan`'s `parseDate` reports a clean per-row "Invalid date" rather than storing a
- * silently-rolled-over wrong date.
- */
-function buildLocalDate(
-  year: number,
-  month: number,
-  day: number,
-  hh: number,
-  mm: number,
-  ss: number
-): Date | null {
-  const dt = new Date(year, month - 1, day, hh, mm, ss);
-  if (Number.isNaN(dt.getTime())) return null;
-  const echoes = dt.getFullYear() === year && dt.getMonth() === month - 1 && dt.getDate() === day;
-  return echoes ? dt : null;
-}
-
 export function normalizeForeignDate(raw: string, format: ImportDateFormat): string {
   const s = raw.trim();
   if (!s) return '';
