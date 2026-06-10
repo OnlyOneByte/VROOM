@@ -46,13 +46,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 173 |
+| deep-review | 5 | 179 |
 | guard | 6 | 175 |
 | bug | 3 | 178 |
 | arch | 5 | 177 |
 | infra | 6 | 176 |
 
-Current cycle: **178**
+Current cycle: **179**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3212,3 +3212,27 @@ Current cycle: **178**
   regression to the normal multi-vehicle split). Existing latest-term-selection + #8 + #14 + drift-guard cases stayed green (aggregates
   untouched). One biome reflow on the edited block autofixed (check:musl:fix). green→green: backend validate:local **EXIT 0 — 1227
   pass / 1 skip / 0 fail (+2)**, tsc 0, musl-biome clean, build bundled. #25 CLOSED. cov: be 82.74%+ (carry; +2 BE) / fe 73.89% (carry)
+- **C179 (deep-review → guard): audit the VEHICLE lifecycle vein; certified CLEAN + closed a C41-net coverage gap** — BALANCE: TWO
+  over budget — `feature` (cyc 170, starved-for 9, most-starved) + `deep-review` (cyc 173, starved-for 6 > 5). Feature blocked for the
+  4th cycle running (escalated) → fell to `deep-review` (forced, matched the C178 forecast). The 3 queued deep-review items are
+  Playwright-eyes-on-blocked (×2) or arch-DI-gated (getFinancing) → per the established pattern, a FRESH backend-correctness audit on
+  an UN-audited vein. SPAWN ATTEMPT: tried a 2-agent spawn_run fan-out (vehicle-lifecycle + odometer-write veins) — both returned
+  `HTTP Error 400` and did NOT register in spawn_list (transport failure, not a queue). Rather than burn the cycle debugging the spawn
+  transport, did the audit INLINE (higher-fidelity anyway — verify-firsthand means I'd re-read every agent finding vs source
+  regardless). VEIN: vehicle CRUD + delete-cascade (vehicles/routes.ts + repository.ts, 375+90 lines). **CERTIFIED CLEAN (all
+  verified firsthand):** (1) DELETE /:id — validateVehicleOwnership-guarded, cleans photos for the vehicle + its expense/odometer
+  children (the no-FK photos table, correctly avoiding the C167 orphan class) BEFORE delete, then relies on DB FK-cascade for
+  expenses/odometer/financing/insurance-junctions/reminder-junctions — VERIFIED every child table has `onDelete:'cascade'`
+  (schema.ts:70/159/210/352/482; insurance_claims is `set null` by design) AND that `PRAGMA foreign_keys = ON` IS set on the prod
+  connection (connection.ts:28) → cascade actually FIRES (the load-bearing assumption — without the pragma, delete would orphan every
+  child row); (2) PUT /:id — the updateVehicleSchema `.partial()` over a table with FOUR .default() columns (vehicleType/trackFuel/
+  trackCharging/unitPreferences) is SAFE from the C31/C41 clobber class: PROVED firsthand via a throwaway probe that
+  `updateVehicleSchema.parse({})` injects `[]` (drizzle-zod doesn't surface DB defaults as Zod defaults — the C35 scope-note holds for
+  vehicles too); probe deleted after. **THE ONE FINDING (deep-review → guard increment): the C41 default-injection net
+  (partial-update-no-default-injection.test.ts) did NOT cover updateVehicleSchema** — its own note flagged this future gap, and it's
+  the HIGHEST-RISK createInsertSchema-based instance (4 default cols; a future drizzle-zod bump or hand-added .default() could silently
+  revert an EV to vehicleType:'gas' or flip trackFuel on a nickname-only PUT). CLOSED IT: exported updateVehicleSchema from the route +
+  added it to the net's UPDATE_SCHEMAS (5 pass, was 4) — pins the assumption instead of just documenting it. Behavior-preserving (an
+  `export` keyword + 1 test entry, zero runtime change). green→green: backend validate:local **EXIT 0 — 1228 pass / 1 skip / 0 fail
+  (+1)**, tsc 0, musl-biome clean, build bundled. cov: be 82.74%+ (carry; +1 BE) / fe 73.89% (carry). (The odometer-write vein —
+  agent B's intended scope — remains un-audited; next deep-review cycle, inline if spawn stays down.)

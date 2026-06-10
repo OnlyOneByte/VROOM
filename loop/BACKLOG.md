@@ -179,6 +179,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Vehicle lifecycle vein audit (C179)**~~ — *DONE C179: inline audit (spawn_run hit an HTTP 400 transport failure → did it
+  firsthand, higher-fidelity anyway) of vehicles/routes.ts + repository.ts. CERTIFIED CLEAN: (1) DELETE /:id avoids the C167 orphan
+  class — cleans vehicle + expense + odometer photos (no-FK table) before delete, then DB FK-cascade handles the rest; VERIFIED every
+  vehicle-child FK is `onDelete:'cascade'` (schema:70/159/210/352/482; insurance_claims `set null` by design) AND `PRAGMA foreign_keys
+  = ON` on the prod connection (connection.ts:28) so the cascade FIRES; (2) PUT updateVehicleSchema is SAFE from the C31/C41 clobber
+  class — proved firsthand `parse({})` injects `[]` (drizzle-zod doesn't surface the 4 .default() cols as Zod defaults). The one
+  finding → a guard increment: the C41 net didn't cover updateVehicleSchema (highest-risk createInsertSchema instance) → exported it +
+  added to partial-update-no-default-injection.test.ts (5 pass). green→green 1228 pass (+1). **NEXT deep-review vein: the ODOMETER
+  write path + recheck-mileage-reminders seam** (agent B's intended scope, un-run due to the spawn failure) — inline if spawn stays down.*
 - ~~**Certify financing math + split/cascade primitives; pin source-survives-edit (C101)**~~ — *DONE C101: 2-agent
   fan-out on fresh backend-correctness surfaces. (A) Financing/loan balance + amortization math AUDIT-CLEAN — computeBalance
   is payment-history-based (max(0, original−Σpayments), not naive amortization), buildAmortizationSchedule decrements

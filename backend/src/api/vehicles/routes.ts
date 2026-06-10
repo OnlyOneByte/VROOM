@@ -93,7 +93,12 @@ const createVehicleSchema = baseVehicleSchema
     unitPreferences: unitPreferencesSchema.optional(),
   });
 
-const updateVehicleSchema = baseVehicleSchema
+// Exported so the C41 `.partial()`+`.default()` no-clobber net can assert against it directly
+// (partial-update-no-default-injection.test.ts) — it's a createInsertSchema(...).partial() over a
+// table with four .default() columns (vehicleType/trackFuel/trackCharging/unitPreferences), the exact
+// shape that class targets. Safe today (drizzle-zod doesn't surface DB defaults as Zod defaults), but
+// the highest-risk uncovered instance, so it belongs under the standing guard.
+export const updateVehicleSchema = baseVehicleSchema
   .omit({
     id: true,
     userId: true,
