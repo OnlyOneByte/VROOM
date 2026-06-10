@@ -12,6 +12,23 @@ const MUTEX_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const MUTEX_MAX_SIZE = 500;
 const backupMutex = new Map<string, number>();
 
+/**
+ * The providers a backup run will fan out to: enabled (ZIP) OR sheetsSyncEnabled. Pure +
+ * exported so the orchestrator and its tests share ONE source of truth — previously the test
+ * re-implemented this filter locally and asserted against the copy, leaving the real branch
+ * uncovered (coverage theater, C181). execute() calls this so the test now pins real code.
+ */
+export function filterEnabledProviders(config: BackupConfig): [string, ProviderBackupSettings][] {
+  return Object.entries(config.providers).filter(
+    ([, s]) => s.enabled || s.sheetsSyncEnabled === true
+  );
+}
+
+/** A ZIP is generated only if at least one selected provider has enabled=true (Sheets-only skips it). */
+export function needsZipGeneration(enabledProviders: [string, ProviderBackupSettings][]): boolean {
+  return enabledProviders.some(([, s]) => s.enabled);
+}
+
 function acquireMutex(userId: string): boolean {
   const now = Date.now();
   const existing = backupMutex.get(userId);
@@ -66,9 +83,7 @@ export class BackupOrchestrator {
         providers: {},
       };
 
-      const enabledProviders: [string, ProviderBackupSettings][] = Object.entries(
-        config.providers
-      ).filter(([, s]) => s.enabled || s.sheetsSyncEnabled === true);
+      const enabledProviders = filterEnabledProviders(config);
 
       // No enabled providers
       if (enabledProviders.length === 0) {
@@ -77,7 +92,7 @@ export class BackupOrchestrator {
       }
 
       // Conditional ZIP generation — only if any provider has enabled=true
-      const needsZip = enabledProviders.some(([, s]) => s.enabled);
+      const needsZip = needsZipGeneration(enabledProviders);
       let zipBuffer: Buffer | null = null;
       if (needsZip) {
         try {

@@ -47,12 +47,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 179 |
-| guard | 6 | 175 |
+| guard | 6 | 181 |
 | bug | 3 | 180 |
 | arch | 5 | 177 |
 | infra | 6 | 176 |
 
-Current cycle: **180**
+Current cycle: **181**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3253,3 +3253,24 @@ Current cycle: **180**
   One biome reflow autofixed. green→green: backend validate:local **EXIT 0 — 1231 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome
   clean, build bundled. Odometer vein now FULLY audited + the #48 sweep COMPLETE (all 3 read methods scoped). cov: be 82.74%+ (carry;
   +3 BE) / fe 73.89% (carry)
+- **C181 (guard): convert backup-orchestrator's COVERAGE-THEATER test to real coverage + pin the provider-selection filters** —
+  BALANCE: only `feature` strictly over budget (cyc 170, starved-for 11, blocked 6th cycle running) → fell through; `guard` AT budget
+  (cyc 175, starved-for 6 = 6, due this cycle, matched the C180 forecast) + most-starved actionable → guard pick. Steered the
+  coverage-ratchet to the lowest-covered, highest-RISK module: MEASURED firsthand (not the stale tag) — `backup-orchestrator.ts` was
+  **0.00% func / 6.97% line**, by far the worst substantive backend module, AND it's the data-safety-critical backup orchestration
+  core (NORTH_STAR #1; #42/#43/#44 live here). ROOT CAUSE (read firsthand): there's a backup-orchestrator.test.ts with 17 green tests
+  — but it's **COVERAGE THEATER**: it RE-IMPLEMENTS the orchestrator's logic LOCALLY (acquireMutex/filterEnabledProviders/
+  needsZipGeneration/collectResults/simulateFanOut are all COPIES in the test file) and asserts against the copies, never importing or
+  calling the real module → real code stays 0% while the suite "passes." The exact NORTH_STAR #5 anti-pattern (a guard that doesn't
+  guard real code; a copy↔source divergence goes uncaught). FIX (the honest conversion): EXTRACTED the two cleanly-pure filters
+  `filterEnabledProviders` + `needsZipGeneration` as EXPORTED fns in the orchestrator + rewired execute() to call them (behavior-
+  preserving — same logic, now one source of truth), then pointed the test's import at the REAL exports + added 4 edge-case assertions
+  (empty config; strict `=== true` on sheetsSyncEnabled so a disabled/omitted provider drops out — the don't-back-up-a-disabled-
+  provider guard; Sheets-only needs-no-ZIP; ZIP+Sheets-only needs-ZIP). RESULT: backup-orchestrator.ts **0% → 50% func** (the provider-
+  selection logic that decides WHAT gets backed up is now pinned against real source). HONESTLY DOWN-SCOPED + DOCUMENTED in the test
+  header: execute()'s body (lines 54-222) stays getDb()-singleton-bound + dynamic-import-bound → not reachable from an in-memory
+  harness without the C38/C91 process-global mock.module trap (the SAME limit deep-review #3 hit on getFinancing); the remaining sims
+  (acquireMutex/collectResults/simulateFanOut) are left as flagged behavioral mirrors, NOT falsely claimed as real coverage. Two biome
+  reflows autofixed. green→green: backend validate:local **EXIT 0 — 1235 pass / 1 skip / 0 fail (+4 net)**, tsc 0, musl-biome clean,
+  build bundled. cov: be 82.78% line (re-measured this run; +backup-orchestrator 0→50% func) / fe 73.89% (carry). NEXT guard low spots:
+  analytics/routes.ts (15% func — GET-handler response assembly), sync/routes.ts (50%/31%), activity-tracker.ts (53%/44%).

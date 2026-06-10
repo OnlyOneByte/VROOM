@@ -340,12 +340,21 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > restore paths [double-restore guard] + listBackupsFromProvider encodeURIComponent + uploadBackup FormData + downloadBackup via
 > apiClient.raw. tsc caught a real test-type bug [Partial<UserSettings> nested-object trap]. **FE SERVICE LAYER now 100%
 > module-covered — api-client C143 + expense-api C149 + reminder-api C163 + settings-api C169 + error-handling C137.**)
+> `sync/backup-orchestrator.ts` 0%→50% func (C181 — the data-safety backup core, worst-covered substantive BE module. ROOT CAUSE was
+> COVERAGE THEATER: backup-orchestrator.test.ts RE-IMPLEMENTED the orchestrator's logic locally + asserted against the copies, never
+> touching the real module [NORTH_STAR #5 anti-pattern]. FIX: extracted `filterEnabledProviders` + `needsZipGeneration` as exported
+> pure fns + rewired execute() to call them, pointed the test at the REAL exports + 4 edge cases [empty config; strict `=== true`
+> sheetsSyncEnabled; Sheets-only-no-ZIP; ZIP+Sheets-needs-ZIP]. execute()'s body stays getDb-singleton-bound [the deep-review #3 DI
+> limit] → honestly documented, not falsely claimed. **WATCH FOR THIS PATTERN: a green test that re-implements logic locally is NOT
+> coverage** — grep a 0%-covered module's test for local copies of its functions.)
 > NEXT high-value low spots
 > **(C152 re-measure — be 82.02% line / fe 70.09% line; FE STILL the bigger gap but closing — broke 70%):**
-> backend — ~~`body-limit.ts`~~ DONE C156; `sync/routes.ts` (~32%, HTTP-harness-tractable) is the remaining named backend low
-> spot. NOTE (C163): `restore.ts:160-246` (restoreFromSheets) is uncovered but needs a process-global Sheets-service mock — NO
-> sync test uses mock.module (the C38/C91 cross-suite-flake trap), so it's NOT a clean guard pick; defer until a DI seam exists or
-> accept the gap. FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
+> backend — ~~`body-limit.ts`~~ DONE C156; ~~`backup-orchestrator.ts` 0%~~ now 50% func C181 (execute() body still DI-blocked).
+> REMAINING named BE low spots (C181 re-measure): **`analytics/routes.ts` 15% func / 42% line** (the GET-handler response assembly —
+> C107-named; HTTP-harness-tractable via createTestApp, the highest-value remaining), `sync/routes.ts` (50%/31%, HTTP-harness),
+> `activity-tracker.ts` (53%/44%). NOTE (C163): `restore.ts:160-246` (restoreFromSheets) is uncovered but needs a process-global
+> Sheets-service mock — NO sync test uses mock.module (the C38/C91 cross-suite-flake trap), so it's NOT a clean guard pick; defer
+> until a DI seam exists or accept the gap. FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
 > the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
 > `.svelte.ts`/store/util modules still thin, e.g. settings.svelte.ts 10% [but that's the filed handleError arch pick] /
 > sync-manager.ts 58%). ~~pwa.ts 56%~~ DONE C175 — getPlatformInfo() (the file's only pure branching logic) 0%→covered + the

@@ -4,16 +4,26 @@
  * conditional ZIP, parallel with timeout, lastBackupAt + sheetsSpreadsheetId
  * persistence, updateSyncDate, empty providers, skip unregistered strategy.
  *
- * Tests the pure orchestration logic by simulating the orchestrator's behavior
- * without requiring full module mocking of dynamic imports.
+ * C181: `filterEnabledProviders` + `needsZipGeneration` are now imported from the REAL
+ * orchestrator module (it was previously coverage theater — the test re-implemented those
+ * filters locally and asserted against the copies, so the real branches stayed 0%-covered
+ * and a divergence between copy and source would go uncaught). execute() now calls these same
+ * exported functions, so these assertions pin real code. The remaining sims (acquireMutex,
+ * collectResults, simulateFanOut) still mirror logic embedded inside execute()'s body, which
+ * is bound to getDb()/dynamic-imports and not reachable from an in-memory harness without the
+ * C38/C91 process-global mock.module trap (the same singleton-bound limit deep-review #3 hit
+ * on getFinancing) — left as behavioral mirrors + flagged, not falsely claimed as real coverage.
  */
 
 import { describe, expect, test } from 'bun:test';
 import type { BackupConfig, ProviderBackupSettings } from '../../../types';
+import { filterEnabledProviders, needsZipGeneration } from '../backup-orchestrator';
 import type { BackupOrchestratorResult, BackupStrategyResult } from '../backup-strategy';
 
 // ---------------------------------------------------------------------------
-// Pure logic extracted from BackupOrchestrator for testability
+// Local mirrors of logic still embedded inside execute() (not yet extractable without
+// the getDb-singleton DI work) — see the file header. filterEnabledProviders +
+// needsZipGeneration are the REAL exports above, not mirrors.
 // ---------------------------------------------------------------------------
 
 const MUTEX_TTL_MS = 5 * 60 * 1000;
@@ -26,18 +36,6 @@ function acquireMutex(mutexMap: Map<string, number>, userId: string, now: number
   }
   mutexMap.set(userId, now);
   return true;
-}
-
-/** Simulates the provider filter: enabled OR sheetsSyncEnabled. */
-function filterEnabledProviders(config: BackupConfig): [string, ProviderBackupSettings][] {
-  return Object.entries(config.providers).filter(
-    ([, s]) => s.enabled || s.sheetsSyncEnabled === true
-  );
-}
-
-/** Simulates conditional ZIP decision. */
-function needsZipGeneration(enabledProviders: [string, ProviderBackupSettings][]): boolean {
-  return enabledProviders.some(([, s]) => s.enabled);
 }
 
 /** Simulates result collection and config updates. */
@@ -378,5 +376,49 @@ describe('BackupOrchestrator', () => {
     const enabled = filterEnabledProviders(config);
     expect(enabled).toHaveLength(1);
     expect(enabled[0][0]).toBe('prov-1');
+  });
+});
+
+// C181: edge cases pinning the REAL exported filters directly (the assertions above repurpose them
+// too; these add the boundaries those don't cover). Guards the real backup-run provider selection.
+describe('filterEnabledProviders / needsZipGeneration (real exports — edge cases)', () => {
+  test('an empty config selects no providers and needs no ZIP', () => {
+    const enabled = filterEnabledProviders({ providers: {} });
+    expect(enabled).toEqual([]);
+    expect(needsZipGeneration(enabled)).toBe(false);
+  });
+
+  test('sheetsSyncEnabled uses STRICT === true — a falsy/omitted flag with enabled=false is excluded', () => {
+    // The filter is `s.enabled || s.sheetsSyncEnabled === true`. A provider that is neither
+    // enabled nor explicitly sheets-sync must NOT be selected (else a disabled provider would
+    // get backed up). Pins the strict-equality so `undefined`/`false` both correctly drop out.
+    const config: BackupConfig = {
+      providers: {
+        off: { enabled: false, folderPath: 'B', retentionCount: 1 }, // no sheetsSyncEnabled → omitted
+        sheetsOff: { enabled: false, folderPath: 'B', retentionCount: 1, sheetsSyncEnabled: false },
+      },
+    };
+    expect(filterEnabledProviders(config)).toEqual([]);
+  });
+
+  test('a Sheets-only provider is selected but needs NO ZIP (enabled=false → ZIP skipped)', () => {
+    const config: BackupConfig = {
+      providers: {
+        sheetsOnly: { enabled: false, folderPath: 'B', retentionCount: 1, sheetsSyncEnabled: true },
+      },
+    };
+    const enabled = filterEnabledProviders(config);
+    expect(enabled).toHaveLength(1);
+    expect(needsZipGeneration(enabled)).toBe(false); // the data-cost guard: don't build a ZIP nobody uploads
+  });
+
+  test('a ZIP-enabled provider alongside a Sheets-only one DOES need a ZIP', () => {
+    const config: BackupConfig = {
+      providers: {
+        zip: { enabled: true, folderPath: 'B', retentionCount: 1 },
+        sheetsOnly: { enabled: false, folderPath: 'B', retentionCount: 1, sheetsSyncEnabled: true },
+      },
+    };
+    expect(needsZipGeneration(filterEnabledProviders(config))).toBe(true);
   });
 });
