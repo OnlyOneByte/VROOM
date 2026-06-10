@@ -42,7 +42,7 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 157 |
 | deep-review | 5 | 161 |
 | guard | 6 | 156 |
-| bug | 3 | 158 |
+| bug | 3 | 162 |
 | arch | 5 | 160 |
 | infra | 6 | 159 |
 
@@ -2939,3 +2939,18 @@ Current cycle: **150**
   build done. FILED agent B's finding as #56 (computeAverageCosts.perFillup divides by withCost.length, double-counting split fuel
   siblings — the #18 class left open in this one field; a one-line predicate swap to isFillup). cov: fe 70.09%+ (carry; +2 FE) /
   be 82.0% (carry)
+- **C162 (bug #56): computeAverageCosts.perFillup no longer inflated by split fuel siblings** — BALANCE: two over budget; most-
+  starved (absolute) = `feature` (cyc 157, starved-for 5) > `bug` (4). But feature is BLOCKED (all 3 in-flight at eyes-on tails;
+  money-cents T0-gated; both approved items #27/lease-loan already shipped — only a 5th gated spec remains, lower-value than a
+  clean verified bug). Per the don't-force-a-blocked-pick rule → fell to the next over-budget category `bug`, which had the
+  freshly-filed verified #56. THE BUG (filed C161, verified firsthand C162): computeAverageCosts (analytics-charts.ts:405)
+  computed perFillup = sum(expenseAmount over expenseAmount>0 rows) / (count of those rows). A split fuel expense materializes one
+  sibling PER VEHICLE — each with a positive cost share but volume=null — so a 2-way split fillup counted as 2 in the denominator,
+  understating "avg cost/fillup" ~Nx (the #18 class, left open in this one field after C97 fixed the COUNT). FIX: restrict BOTH
+  numerator + denominator to volume-bearing rows (`volume != null && volume > 0`) — the same isFillup predicate the fuel-stats
+  COUNT uses; a null-volume sibling counts as 0 fillups, so its share drops out of perFillup too (a cost-in-numerator/not-in-
+  denominator mismatch would inflate it). `withCost`/`totalSpending` (the avgCostPerDay numerator) left UNCHANGED — split shares
+  still sum to the true total there. Verified the common path is byte-equivalent (unsplit: volume>0 && cost>0 both hold). +3 tests
+  in analytics-charts-unpinned.test.ts (split fillup → volume-bearing only [$55 not $47.5]; unsplit unchanged [$50]; all-split →
+  null, no div-by-zero). green→green: backend validate:local **EXIT 0 — 1209 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome
+  clean (one reflow autofixed), build bundled. #56 CLOSED. cov: be 82.0%+ (carry; +3 BE) / fe 70.09% (carry)

@@ -18,6 +18,7 @@ import {
   buildFillupIntervals,
   buildMonthlyCostHeatmap,
   buildSeasonalEfficiency,
+  computeAverageCosts,
   computeMileageScore,
   computePreviousYearComparison,
   computeRegularityScore,
@@ -194,5 +195,49 @@ describe('buildFillupIntervals — input is not mutated (C67 hygiene fix)', () =
     ]);
     const bucket = out.find((b) => b.intervalLabel === '22+ days');
     expect(bucket?.count).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeAverageCosts.perFillup — #56 (C162): avg cost/fillup must divide by the FILLUP COUNT, not the
+// row count. A split fuel expense creates one sibling per vehicle (cost share + volume=null), so a
+// row-based denominator overcounts a split fillup as N → understated avg cost/fillup. Restrict numerator
+// + denominator to volume-bearing rows (matching the C97 #18 count fix). Pure function, no DB.
+// ---------------------------------------------------------------------------
+describe('computeAverageCosts.perFillup — split fuel siblings do not inflate the denominator (#56)', () => {
+  const YEAR_START = d(2024, 1, 1);
+  const YEAR_END = d(2025, 1, 1);
+  const NOW = d(2024, 6, 1);
+
+  test('a split fillup (N null-volume siblings) counts as the volume-bearing fillups only', () => {
+    // Two REAL fillups ($50 vol 10, $60 vol 12) + a split fillup materialized as 2 siblings ($40 each,
+    // volume=null). Pre-fix: perFillup = (50+60+40+40)/4 = 47.5 (4 rows). Post-fix: only the 2
+    // volume-bearing rows count → (50+60)/2 = 55.
+    const rows: FuelExpenseRow[] = [
+      fuelRow({ expenseAmount: 50, volume: 10 }),
+      fuelRow({ expenseAmount: 60, volume: 12 }),
+      fuelRow({ expenseAmount: 40, volume: null }), // split sibling
+      fuelRow({ expenseAmount: 40, volume: null }), // split sibling
+    ];
+    const { perFillup } = computeAverageCosts(rows, [], YEAR_START, YEAR_END, NOW);
+    expect(perFillup).toBeCloseTo(55, 5);
+  });
+
+  test('unsplit fillups are unchanged (volume>0 && cost>0 both hold → old behavior on the common path)', () => {
+    const rows: FuelExpenseRow[] = [
+      fuelRow({ expenseAmount: 40, volume: 10 }),
+      fuelRow({ expenseAmount: 60, volume: 15 }),
+    ];
+    const { perFillup } = computeAverageCosts(rows, [], YEAR_START, YEAR_END, NOW);
+    expect(perFillup).toBeCloseTo(50, 5);
+  });
+
+  test('all-split (no volume-bearing rows) → perFillup is null, not a divide-by-zero or 0', () => {
+    const rows: FuelExpenseRow[] = [
+      fuelRow({ expenseAmount: 40, volume: null }),
+      fuelRow({ expenseAmount: 40, volume: null }),
+    ];
+    const { perFillup } = computeAverageCosts(rows, [], YEAR_START, YEAR_END, NOW);
+    expect(perFillup).toBeNull();
   });
 });

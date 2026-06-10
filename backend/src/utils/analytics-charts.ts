@@ -403,10 +403,17 @@ export function computeAverageCosts(
   avgCostPerDay: number | null;
 } {
   const withCost = fuelRows.filter((r) => r.expenseAmount > 0);
+  // avg cost/fillup must be cost-of-fillups ÷ fillup-count, both over the SAME basis. A split fuel
+  // expense creates one sibling PER VEHICLE — each carrying its cost share but volume=null
+  // (createSiblings never sets volume) — so a row-based count overcounts a split fillup as N,
+  // understating avg cost/fillup ~Nx (#56, the #18 class for this field). Restrict BOTH the numerator
+  // and denominator to volume-bearing rows (a real fillup has a volume), matching the isFillup predicate
+  // the fuel-stats COUNT already uses (C97): a null-volume split sibling counts as 0 fillups there, so
+  // its share must drop out of perFillup too (else cost-in-numerator / count-not-in-denominator inflates
+  // it). For an unsplit fillup volume>0 && cost>0 both hold, so this equals the old value on the common path.
+  const fillups = fuelRows.filter((r) => r.volume != null && r.volume > 0);
   const perFillup =
-    withCost.length > 0
-      ? withCost.reduce((s, r) => s + r.expenseAmount, 0) / withCost.length
-      : null;
+    fillups.length > 0 ? fillups.reduce((s, r) => s + r.expenseAmount, 0) / fillups.length : null;
   const daysSoFar = Math.max(
     1,
     Math.ceil((Math.min(now.getTime(), yearEnd.getTime()) - yearStart.getTime()) / 86400000)

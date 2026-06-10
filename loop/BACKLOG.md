@@ -624,15 +624,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   principal + a climbing balance into the displayed amortization table AND derivePaymentEntries' totalPrincipalPaid/totalInterestPaid
   (FinanceTab:58,67). FIX: `if (principalAmount <= 0) break;` (mirrors the siblings). +2 tests (amortization-negative-guard.test.ts:
   under-funded loan → no negative principal + non-increasing balance; healthy loan still amortizes to 0). green→green fe 477 pass (+2).*
-- **#56 (MED, displayed-figure) — `computeAverageCosts.perFillup` double-counts split fuel siblings in its denominator.**
-  analytics-charts.ts:405-409: `withCost = fuelRows.filter(r => r.expenseAmount > 0); perFillup = sum(expenseAmount) /
-  withCost.length`. Bug #18 was fixed only for the fillup COUNT (switched to `isFillup = volume != null && volume > 0`,
-  repository.ts:1319), but perFillup still divides by `withCost.length` — a split fuel sibling carries positive expenseAmount + NULL
-  volume (split-service.ts:96, no fuel-category restriction), so a 2-way split fillup counts as 2 in the denominator → "Avg cost/
-  fillup" understated ~Nx for split-fuel users (numerator is correct; count is correct via isFillup; only perFillup's divisor is
-  wrong). VERIFIED via the C161 agent + the C155/C97 split-sibling grounding. FIX (one-line, the committed #18 pattern): filter
-  `withCost` by the same `isFillup` volume-bearing predicate, not `expenseAmount > 0`. Pure backend, fully verifiable. A clean
-  future bug-cycle pick.
+- ~~**#56 (MED, displayed-figure) — `computeAverageCosts.perFillup` double-counts split fuel siblings in its denominator.**~~ —
+  *DONE C162: analytics-charts.ts:405 computed perFillup = sum(expenseAmount over cost>0 rows) / count(those rows); a split fuel
+  sibling carries positive expenseAmount + NULL volume, so a 2-way split fillup counted as 2 → "Avg cost/fillup" understated ~Nx
+  (the #18 class, left open in this field after C97 fixed the COUNT). FIX: restrict BOTH numerator + denominator to volume-bearing
+  rows (`volume != null && volume > 0`, the isFillup predicate) — a null-volume sibling = 0 fillups, so its share drops out of
+  perFillup too. withCost/totalSpending (avgCostPerDay numerator) left unchanged (split shares sum to true total there). +3 tests
+  (split → $55 not $47.5; unsplit unchanged $50; all-split → null). green→green 1209 pass (+3).*
 
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
