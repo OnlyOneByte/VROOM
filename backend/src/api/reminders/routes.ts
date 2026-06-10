@@ -30,7 +30,8 @@ async function resolveMileageFields(
     intervalMileage?: number | null;
     lastServiceOdometer?: number | null;
   },
-  vehicleIds: string[]
+  vehicleIds: string[],
+  userId: string
 ): Promise<{
   intervalMileage: number | null;
   lastServiceOdometer: number | null;
@@ -41,7 +42,9 @@ async function resolveMileageFields(
   }
   const intervalMileage = data.intervalMileage ?? 0;
   const lastServiceOdometer =
-    data.lastServiceOdometer ?? (await odometerRepository.getCurrentOdometer(vehicleIds[0])) ?? 0;
+    data.lastServiceOdometer ??
+    (await odometerRepository.getCurrentOdometer(vehicleIds[0], userId)) ??
+    0;
   return {
     intervalMileage,
     lastServiceOdometer,
@@ -96,7 +99,9 @@ routes.post(
     // Mileage axis: anchor to the CURRENT odometer, recompute the milestone cache.
     if (reminder.triggerMode === 'mileage' || reminder.triggerMode === 'both') {
       const vehicleId = vehicleIds[0];
-      const current = vehicleId ? await odometerRepository.getCurrentOdometer(vehicleId) : null;
+      const current = vehicleId
+        ? await odometerRepository.getCurrentOdometer(vehicleId, user.id)
+        : null;
       const lastServiceOdometer = current ?? reminder.lastServiceOdometer ?? 0;
       fields.lastServiceOdometer = lastServiceOdometer;
       fields.nextDueOdometer = lastServiceOdometer + (reminder.intervalMileage ?? 0);
@@ -140,7 +145,7 @@ routes.post('/', zValidator('json', createReminderSchema), async (c) => {
   await validateVehicleIdsOwned(data.vehicleIds, user.id);
 
   const { vehicleIds, ...reminderData } = data;
-  const mileage = await resolveMileageFields(reminderData, vehicleIds);
+  const mileage = await resolveMileageFields(reminderData, vehicleIds, user.id);
   const result = await reminderRepository.createWithVehicles(
     {
       ...reminderData,
@@ -234,7 +239,7 @@ routes.put(
       reminderFields.intervalMileage !== undefined ||
       reminderFields.lastServiceOdometer !== undefined;
     if (touchesMileage) {
-      const mileage = await resolveMileageFields(merged, merged.vehicleIds);
+      const mileage = await resolveMileageFields(merged, merged.vehicleIds, user.id);
       updateFields.intervalMileage = mileage.intervalMileage;
       updateFields.lastServiceOdometer = mileage.lastServiceOdometer;
       updateFields.nextDueOdometer = mileage.nextDueOdometer;

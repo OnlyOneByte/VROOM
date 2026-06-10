@@ -382,7 +382,10 @@ class ReminderTriggerService {
       return;
     }
 
-    const currentOdometer = await odometerRepository.getCurrentOdometer(vehicleIds[0]);
+    const currentOdometer = await odometerRepository.getCurrentOdometer(
+      vehicleIds[0],
+      reminder.userId
+    );
     if (currentOdometer === null || currentOdometer < reminder.nextDueOdometer) {
       return; // not yet due
     }

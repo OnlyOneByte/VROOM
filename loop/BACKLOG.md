@@ -591,10 +591,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   mileage/`both` reminder fires immediately + mark-serviced/resolveMileageFields anchor to the bad value + lease/loan inflated. A
   separate later good reading does NOT fix it (only correcting the bad row does). VERIFIED C144. FIX (design): latest-by-date or a
   sanity-cap reconciliation — needs a call since MAX-by-value is the ratified D2 behavior.
-- **#48 (LOW, hardening) — getCurrentOdometer / getHistory are vehicle-scoped but NOT userId-scoped.** odometer/repository.ts:
-  138-157/:73-124 filter on vehicle_id only; every live caller validates ownership first (no current leak), but the method would
-  return another user's reading if ever called with an unvalidated vehicleId (the C109 detectConflicts class). VERIFIED C144.
-  FIX: add a userId param as belt-and-braces.
+- ~~**#48 (LOW, hardening) — getCurrentOdometer / getHistory are vehicle-scoped but NOT userId-scoped.**~~ — *DONE C168:
+  odometer/repository.ts getCurrentOdometer (:138) + getHistory (:73) filtered on vehicle_id only (the C109/#52 tenant class) — no
+  live leak (callers validate ownership first), but a latent boundary. FIX: added a userId param to both + ANDed `user_id =
+  ${userId}` into every WHERE leg (6: 2 getCurrentOdometer + 4 getHistory incl. the COUNT subqueries); threaded userId through all
+  5 production callers (reminders/routes ×2 via resolveMileageFields + trigger-service via reminder.userId + vehicles/routes
+  /stats + odometer/routes history) + both test files. +1 cross-tenant regression test (another user's reading → null under our
+  userId; owner still reads it). green→green 1211 pass (+1).*
 
 **NEW — surfaced + verified-against-source by the C150 deep-review fan-out (reminder recurrence date-advance + insurance multi-term attribution). KEY: agent B's headline MED "null-endDate term sorts last → wrong premium" was a FALSE POSITIVE — insuranceTerms.endDate is `.notNull()` (schema.ts:129), so a null endDate CANNOT exist and that sort branch is unreachable dead code (caught firsthand: the NOT NULL constraint rejected the test insert; the C21/C77 vacuity rule). effectiveMonthlyPremium / inactive-exclusion / costByCarrier dedup / per-vehicle div-guard / overlapping-month accumulation all CERTIFIED CLEAN. #50 (real) FIXED in-cycle; #51 filed. Reminder agent's findings land with its delayed event.**
 - ~~**#50 (LOW) — insurance latest-term pick was DB-row-order dependent on an endDate tie.**~~ — *DONE C150: `buildInsuranceDetails`

@@ -82,7 +82,7 @@ routes.get(
     );
     const offset = query.offset ?? 0;
 
-    const { data, totalCount } = await odometerRepository.getHistory(vehicleId, {
+    const { data, totalCount } = await odometerRepository.getHistory(vehicleId, user.id, {
       limit,
       offset,
     });

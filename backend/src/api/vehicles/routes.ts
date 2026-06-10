@@ -359,7 +359,7 @@ routes.get(
     // (the D2 helper the mileage trigger uses) — period-independent by design, so a
     // consumer that needs the vehicle's true odometer (lease overage, loan miles-used)
     // can use it instead of the period-scoped stat. Additive: currentMileage is unchanged.
-    const currentOdometer = await odometerRepository.getCurrentOdometer(id);
+    const currentOdometer = await odometerRepository.getCurrentOdometer(id, user.id);
 
     return c.json({
       success: true,

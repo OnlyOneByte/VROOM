@@ -45,7 +45,7 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 165 |
 | deep-review | 5 | 167 |
 | guard | 6 | 163 |
-| bug | 3 | 162 |
+| bug | 3 | 168 |
 | arch | 5 | 166 |
 | infra | 6 | 164 |
 
@@ -3030,3 +3030,18 @@ Current cycle: **150**
   held, DI not mock.module) + filed its strongest (F1: non-idempotent Drive/Photos retry on the upload-then-DB-write await gap) as
   #58 MED. green→green: backend validate:local **EXIT 0 — 1210 pass / 1 skip / 0 fail (+1)**, tsc 0, musl-biome clean, build
   bundled. #57 CLOSED. cov: be 82.70%+ (carry; +1 BE) / fe 70.18% (carry)
+- **C168 (bug #48): userId-scope getCurrentOdometer + getHistory (cross-tenant defense-in-depth)** — BALANCE: `bug` the only
+  over-budget category (cyc 162, starved-for 6, badly over) → forced. Triaged the queue: the freshly-filed #58 (sync-worker
+  idempotency) + #47 (MAX-by-value poisoning) + #45/#51/#53 all need a DECISION/approach call (not clean one-cycle). The cleanest
+  FULLY-DECIDED unblocked pick was **#48** — odometer/repository.ts getCurrentOdometer (:138) + getHistory (:73) filter on
+  vehicle_id ONLY, not userId (the C109 detectConflicts / #52 tenant class). No current leak (every live caller validates vehicle
+  ownership first), but a latent boundary: an unvalidated vehicleId would return another user's reading + (for getCurrentOdometer)
+  poison the mileage-reminder axis. VERIFIED both methods firsthand (raw sql UNION over expenses + odometer_entries; both tables
+  have a user_id column). FIX: added a userId param to both + ANDed `user_id = ${userId}` into every WHERE leg (6 total: 2
+  getCurrentOdometer + 4 getHistory incl. the 2 COUNT subqueries). Threaded userId through all 5 production callers (reminders/
+  routes ×2 via the resolveMileageFields helper + trigger-service processMileageReminder via reminder.userId + vehicles/routes
+  GET /stats + odometer/routes GET history) + both test files (tsc caught zero misses — the C113 floor). Merge-surviving net: +1
+  cross-tenant regression test in get-current-odometer.test.ts (another user's reading on a queried vehicleId → null under our
+  userId; OTHER_USER still reads their own → 77000, so the scope isn't over-broad). green→green: backend validate:local **EXIT 0
+  — 1211 pass / 1 skip / 0 fail (+1)**, tsc 0, musl-biome clean, build bundled. #48 CLOSED. cov: be 82.70%+ (carry; +1 BE) / fe
+  70.18% (carry)
