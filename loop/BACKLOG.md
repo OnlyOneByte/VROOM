@@ -519,11 +519,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   as successful, and change-gating means the ZIP isn't retried until the next data change. `capabilities.zip.success=false` is in
   the payload but neither scheduling nor the route surfaces it. VERIFIED C144. DECISION: should a ZIP failure mark the whole run
   unsuccessful (so it retries), or surface a partial-success warning? Needs Angelo's call on backup success semantics + retry.
+  **ARCC-GROUNDED (queried C144.5):** SAX-04 Outcome 1 sets `FailureModes.systemError → FAIL_SAFE` and lists "failing open
+  instead of closed" as the #1 pitfall; Outcome 3 best-practice is "monitor + alert on backup failure with immediate
+  notification." Reporting success when the data archive failed = failing OPEN → the policy-aligned resolution is the
+  mark-unsuccessful/retry option (or at minimum surface a non-silent partial-failure warning), NOT silent success.
 - **#44 (MED — needs a decision) — route returns 200 "Sync completed" when EVERY provider failed.** sync/routes.ts:86-95 — the
   orchestrator result has no top-level success flag; when all providers fail (anySuccess=false, nothing persists) the route still
   `createSuccessResponse(result, 'Sync completed')` → 200. The caller must inspect per-provider `results[*].success` to learn
   nothing backed up. VERIFIED C144. FIX (decision): add a top-level status ('ok'|'partial'|'failed') + non-2xx (or an explicit
   failure flag) when anySuccess===false. (Pairs naturally with #43 — both are "surface backup failure honestly" calls.)
+  **ARCC-GROUNDED (C144.5):** same SAX-04 fail-closed / surface-failure posture — a 200 "completed" on a total failure is the
+  fail-open pitfall; the policy direction is an explicit failure status, not a silent 200.
 - **#49 (LOW) — activity-tracker `handleInactivity` finally clobbers a concurrent `recordActivity`.** activity-tracker.ts:67-83 —
   handleInactivity captures `activity` then in finally writes that OLD object back (syncInProgress=false); if recordActivity
   installed a fresh object during the awaited performAutoSync, its fresh lastActivity is reverted → can prematurely age out a
