@@ -40,7 +40,7 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 151 |
-| deep-review | 5 | 150 |
+| deep-review | 5 | 155 |
 | guard | 6 | 149 |
 | bug | 3 | 154 |
 | arch | 5 | 153 |
@@ -2826,3 +2826,21 @@ Current cycle: **150**
   bucket=0, breakdown sums; unpriced+financed → payments counted, total=$1,000). green→green: backend validate:local **EXIT 0 —
   1194 pass / 1 skip / 0 fail (+2)**, tsc 0, musl-biome clean (one reflow autofixed), build bundled. #27 CLOSED. cov: be 82.0%+
   (carry; +2 BE) / fe 70.09% (carry)
+- **C155 (deep-review → bug #52: userId-scope the split delete/regenerate writes — cross-tenant defense-in-depth)** — BALANCE:
+  nothing strictly over budget (feature/deep-review/guard tied AT budget, all breach C156); highest-leverage = `deep-review`
+  (its fan-outs keep surfacing real defects — #27/#39/#41/#42/#50; vs a 5th gated feature spec or a thinning guard gap). Fresh
+  2-agent fan-out on UN-audited backend-correctness veins: (A) the expenses-repository query/filter/search/pagination/aggregation
+  path, (B) fuel-stats + fuel-efficiency math. PRE-READ both surfaces myself (C67) — the pre-read already debunked the likely
+  "search-OR widens past userId scope" HIGH (the search is a single pre-parenthesized `(desc LIKE ? OR cat LIKE ?)` AND-joined
+  with the userId scope) + confirmed the C97 fuel-fillup-count fix held. Agent A CERTIFIED the whole filter/sort/pagination/
+  aggregation core CLEAN (count==rows WHERE, allowlisted sort, split SUM not double-counted, all reads userId-scoped) and
+  surfaced the one real, verified, clean finding — **#52 (MED, security)**: `deleteSplitExpense:720` + `updateSplitExpense:771`
+  key their destructive `delete(expenses).where(eq(groupId))` on groupId ALONE, while their guarding SELECTs are userId-scoped —
+  ownership check + destructive write on DIFFERENT predicates. NOT exploitable today (groupId is a server cuid2, single-owner;
+  the SELECT throws NotFoundError first), but a latent cross-tenant boundary if a group ever held cross-user siblings. VERIFIED
+  both sites firsthand. FIX (the C109 detectConflicts tenant-scope class): AND `eq(expenses.userId, userId)` into both deletes —
+  behavior-identical today, closes the boundary at the write. +2 regression tests (inject a same-groupId sibling owned by USER_2,
+  delete/update as USER_1 → the foreign row SURVIVES; pre-fix it would be cross-deleted). green→green: backend validate:local
+  **EXIT 0 — 1196 pass / 1 skip / 0 fail (+2)**, tsc 0, musl-biome clean, build bundled. Filed agent-A F3 (endDate inclusivity
+  is server-TZ-conditional, UTC-prod-mitigated) as LOW #53. Agent B (fuel-stats) findings pending its delayed completion event →
+  will triage/file then. cov: be 82.0%+ (carry; +2 BE) / fe 70.09% (carry)

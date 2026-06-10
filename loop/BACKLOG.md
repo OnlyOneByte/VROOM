@@ -590,6 +590,22 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   internally inconsistent. Arguably intentional (it IS active). VERIFIED C150. FIX (if desired): count only policies with a term,
   or surface a "no current term" state. Low.
 
+**NEW — surfaced + verified-against-source by the C155 deep-review fan-out (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent's findings land with its delayed event.**
+- ~~**#52 (MED, security defense-in-depth) — split delete/regenerate keyed the destructive write on groupId alone.**~~ — *DONE
+  C155: `deleteSplitExpense` (repository.ts:720) + `updateSplitExpense` step 2 (:771) ran `delete(expenses).where(eq(groupId))`
+  while their guarding SELECTs (:704/:743) were userId-scoped — ownership check + destructive write on DIFFERENT predicates. NOT
+  exploitable today (groupId is a server cuid2, single-owner; the SELECT throws NotFoundError first), but a latent cross-tenant
+  boundary if a group ever held cross-user siblings (a future merge/import path). FIX (the C109 tenant-scope class): AND
+  `eq(expenses.userId, userId)` into both deletes — behavior-identical today, closes the boundary at the write. +2 regression
+  tests (inject a same-groupId sibling owned by USER_2 → delete/update as USER_1 → the foreign row SURVIVES). validate:local EXIT
+  0, 1196 pass.*
+- **#53 (LOW, latent, UTC-prod-mitigated) — expense date-range upper bound inclusivity is server-TZ-conditional.**
+  `endOfDayIfDateOnly` (repository.ts:59-64) extends an `endDate` to 23:59:59.999 only when the Date sits at LOCAL midnight, but
+  the route coerces `?endDate=YYYY-MM-DD` via `z.coerce.date()` → `new Date("…")` parses date-only as UTC midnight. On a non-UTC
+  server the extension doesn't fire → a "through Mar 31" filter silently drops same-day expenses (the list + the CSV export
+  identically). Mitigated if prod runs UTC (the documented assumption). VERIFIED C155. FIX (if desired): detect date-only at the
+  route (string-shape) and build the bound from local parts, or normalize to local midnight before the helper. Low.
+
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
    (Overview) + `fetchExpensesPage` (Expenses tab) in `vehicles/[id]/+page.svelte` only toasted on

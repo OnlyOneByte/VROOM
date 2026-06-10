@@ -716,8 +716,14 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           .delete(photos)
           .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, siblingIds)));
 
-        // Delete all sibling expense rows
-        await tx.delete(expenses).where(eq(expenses.groupId, groupId));
+        // Delete all sibling expense rows. AND the userId scope (not groupId alone): the read above is
+        // userId-scoped, so the destructive write must match it — keeping ownership and deletion on the
+        // SAME predicate. Behavior-identical today (groupId is a server cuid2, single-owner), but a
+        // defense-in-depth boundary so a future cross-user group can never be cross-deleted (the C109
+        // detectConflicts tenant-scope class).
+        await tx
+          .delete(expenses)
+          .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
       });
     } catch (error) {
       logger.error('Failed to delete split expense', {
@@ -767,8 +773,11 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
         const photoIds = oldPhotos.map((p) => p.id);
 
-        // 2. Delete old siblings
-        await tx.delete(expenses).where(eq(expenses.groupId, groupId));
+        // 2. Delete old siblings (userId-scoped to match the read above — same predicate for the
+        // ownership check and the destructive write; see deleteSplitExpense for the rationale).
+        await tx
+          .delete(expenses)
+          .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
 
         // 3. Insert new siblings with same groupId
         const newSiblings = await expenseSplitService.createSiblings(tx, {

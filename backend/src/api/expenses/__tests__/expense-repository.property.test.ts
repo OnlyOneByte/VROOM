@@ -344,3 +344,77 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// #52 (C155 deep-review): split DELETE/regenerate must be userId-scoped, not groupId-alone.
+// deleteSplitExpense + updateSplitExpense each user-scope their guarding SELECT but, pre-fix, keyed the
+// destructive `delete(expenses).where(eq(groupId))` on groupId ALONE — the ownership check and the
+// write on DIFFERENT predicates. Not exploitable today (groupId is a server cuid2, single-owner), but a
+// latent cross-tenant boundary if a group ever held siblings under two userIds. These tests pin the
+// boundary at the destructive write: a same-groupId sibling owned by ANOTHER user must survive both ops.
+// ---------------------------------------------------------------------------
+describe('#52: split delete/update is userId-scoped at the destructive write (cross-tenant safety)', () => {
+  const USER_2 = 'test-user-2';
+
+  /** Seed a second user owning vehicle v-other, and inject a sibling under THAT user sharing `groupId`. */
+  function injectForeignSibling(groupId: string, id: string): void {
+    sqliteDb.run(
+      `INSERT INTO users (id, email, display_name) VALUES ('${USER_2}', 'user2@test.com', 'User Two')`
+    );
+    sqliteDb.run(
+      `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v-other', '${USER_2}', 'Honda', 'Civic', 2021)`
+    );
+    // A row that (pathologically) shares user 1's groupId but belongs to user 2.
+    sqliteDb.run(
+      `INSERT INTO expenses (id, user_id, vehicle_id, category, expense_amount, date, group_id)
+       VALUES ('${id}', '${USER_2}', 'v-other', 'financial', 99, 1718000000, '${groupId}')`
+    );
+  }
+
+  test('deleteSplitExpense(groupId, USER_ID) must NOT delete another user’s same-groupId row', async () => {
+    const siblings = await repo.createSplitExpense(
+      {
+        splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2'] },
+        category: 'financial',
+        date: new Date(2024, 5, 15),
+        totalAmount: 100,
+      },
+      USER_ID
+    );
+    const groupId = siblings[0]?.groupId as string;
+    injectForeignSibling(groupId, 'foreign-del');
+
+    await repo.deleteSplitExpense(groupId, USER_ID);
+
+    // User 1's siblings are gone; user 2's same-groupId row SURVIVES (delete was userId-scoped).
+    const mine = await db.select().from(expenses).where(eq(expenses.userId, USER_ID));
+    expect(mine.length).toBe(0);
+    const foreign = await db.select().from(expenses).where(eq(expenses.id, 'foreign-del'));
+    expect(foreign.length).toBe(1);
+  });
+
+  test('updateSplitExpense(groupId, USER_ID) must NOT delete another user’s same-groupId row', async () => {
+    const siblings = await repo.createSplitExpense(
+      {
+        splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2'] },
+        category: 'financial',
+        date: new Date(2024, 5, 15),
+        totalAmount: 100,
+      },
+      USER_ID
+    );
+    const groupId = siblings[0]?.groupId as string;
+    injectForeignSibling(groupId, 'foreign-upd');
+
+    await repo.updateSplitExpense(
+      groupId,
+      { splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2', 'v-3'] }, totalAmount: 120 },
+      USER_ID
+    );
+
+    // User 2's same-groupId row is untouched by user 1's regenerate.
+    const foreign = await db.select().from(expenses).where(eq(expenses.id, 'foreign-upd'));
+    expect(foreign.length).toBe(1);
+    expect(foreign[0]?.userId).toBe(USER_2);
+  });
+});
