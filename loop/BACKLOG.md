@@ -531,6 +531,17 @@ against current source before acting, then knock out the top one. Once these are
 go broader), run the AUDIT fan-out per rule 7 to repopulate. Obey the `arch` rules above —
 behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
 
+- **NEXT PICK (filed C119, from the rule-7 backend fan-out — VERIFIED byte-identical, top-ranked):** the
+  provider ownership-lookup block is hand-repeated at **5 sites** in `api/providers/routes.ts` (~360/446/491/515/575) —
+  `const existing = await db.select().from(userProviders).where(and(eq(userProviders.id, id), eq(userProviders.userId,
+  user.id))).limit(1); if (!existing[0]) throw new NotFoundError('Provider');` — executable code byte-identical (only a
+  comment + indentation differ). All 5 sites consume the returned row afterward (`existing[0].domain`,
+  `createProviderInstance(existing[0])`), so extract `findOwnedProviderOrThrow(db, id, userId): Promise<UserProvider>`
+  (returns the row). DIFFERENT table than `validateVehicleOwnership` (userProviders, not vehicles) — genuinely untouched.
+  `UserProvider` + `NotFoundError` already imported. One file, returns-the-row drop-in → provably behavior-preserving.
+  (Also surfaced, lower priority: analytics getUserUnits/getVehicleUnits share a byte-identical parse-default tail [2 sites,
+  C119 #2]; `MS_PER_DAY` magic literal in 3 spellings across 4 files [C119 #3, NOT byte-identical — per-site verify].)
+
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,
    while `expenses` and `providers` (1 each) lean on the shared Hono error middleware
@@ -608,6 +619,14 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
      win; or (b) accept the scaffold only fits future SINGLE-resource pages and don't retrofit. Flag Angelo;
      don't force a misfit migration. Bonus (if reshaped): structurally prevents the masquerade bug class.
 
+- ~~**Extract a `capitalize` FE helper from 5 hand-rolled sites (C119).**~~ — *DONE C119: rule-7 fan-out (backend +
+  frontend agents); took the FE candidate (doubles down on the C107/C118 FE-is-the-bigger-gap steer). The
+  `<x>.charAt(0).toUpperCase() + <x>.slice(1)` idiom was byte-identical at 5 sites — ClaimsSection.svelte had even
+  hand-written a LOCAL `titleCase` (this formalizes a helper a component already wanted), + ReminderForm.svelte ×3 +
+  FinancingAnalytics.svelte (inside a `=== 'own' ? 'Owned' : …` ternary, preserved). Added `export function capitalize(s)`
+  to formatters.ts, removed ClaimsSection's local titleCase (4 calls rerouted), wired the other 4. VERIFIED all 5 vs source
+  (C69). +3 tests (basic, empty/already-cap no-op, only-first-char). green→green: frontend validate:local EXIT 0 (395 pass,
+  +3), tsc 0. Pure string fn, no reactivity — no eyes-on.*
 - ~~**Dedup the `instanceof Error ? .message : fallback` idiom (C90).**~~ — *DONE C90: rule-7 fan-out (2
   agents). The `<err> instanceof Error ? <err>.message : <literal>` catch-block idiom was hand-repeated; extracted
   `extractErrorMessage(error, fallback)` to utils/error-handling.ts and routed the 4 genuinely-identical sites

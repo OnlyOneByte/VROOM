@@ -12,7 +12,7 @@
 	import { LoaderCircle } from '@lucide/svelte';
 	import { reminderApi } from '$lib/services/reminder-api';
 	import { appStore } from '$lib/stores/app.svelte';
-	import { dateOnlyToISO } from '$lib/utils/formatters';
+	import { capitalize, dateOnlyToISO } from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
@@ -404,12 +404,12 @@
 					<Label for="reminder-frequency">Frequency *</Label>
 					<Select.Root type="single" bind:value={frequency}>
 						<Select.Trigger id="reminder-frequency" class="w-full">
-							{frequency.charAt(0).toUpperCase() + frequency.slice(1)}
+							{capitalize(frequency)}
 						</Select.Trigger>
 						<Select.Content>
 							{#each FREQUENCIES as f (f)}
-								<Select.Item value={f} label={f.charAt(0).toUpperCase() + f.slice(1)}>
-									{f.charAt(0).toUpperCase() + f.slice(1)}
+								<Select.Item value={f} label={capitalize(f)}>
+									{capitalize(f)}
 								</Select.Item>
 							{/each}
 						</Select.Content>

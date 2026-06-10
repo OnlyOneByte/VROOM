@@ -35,10 +35,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 114 |
 | guard | 6 | 118 |
 | bug | 3 | 115 |
-| arch | 5 | 113 |
+| arch | 5 | 119 |
 | infra | 6 | 117 |
 
-Current cycle: **118**
+Current cycle: **119**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2198,3 +2198,17 @@ Current cycle: **118**
   — 392 pass / 0 fail (+7), tsc 0, build OK. FE ratchet started. Next (119): `deep-review` most-starved over budget (cyc 114,
   starved-for 5 = budget at 119... recompute) → highest-leverage. cov: be ~81% / fe ~62% (FE +1 module covered; re-measure
   due ~C120)
+- **C119 (arch — extract `capitalize` FE helper from 5 hand-rolled sites; rule-7 fan-out)** — BALANCE: two breached (arch
+  cyc 113 starved-for 6, bug cyc 115 starved-for 4); highest-ABSOLUTE → arch (6) > bug (4). C99 arc complete + arch #2
+  direction-blocked, so per rule 7 fanned out 2 Explore agents (backend + frontend dedup). Took the FE candidate — doubles
+  down on the C107/C118 "FE is the bigger gap" steer. VERIFIED all 5 sites vs source (C69 diff-before-extract):
+  `<x>.charAt(0).toUpperCase() + <x>.slice(1)` byte-identical at ClaimsSection.svelte:86-88 (a LOCAL `titleCase` already
+  hand-written — this formalizes the helper a component already wanted), ReminderForm.svelte:407/411/412, FinancingAnalytics
+  .svelte:117-118 (inside a `=== 'own' ? 'Owned' : ...` ternary — extracting just the capitalize call preserves it). Added
+  `export function capitalize(s)` to formatters.ts (no collision), removed ClaimsSection's local titleCase (4 calls rerouted),
+  wired the other 4 inline sites. +3 unit tests (capitalize: basic, empty/already-capitalized no-op, only-first-char). GREEN→
+  GREEN: component + formatters suites stayed green; frontend validate:local EXIT 0 — 395 pass / 0 fail (+3), tsc 0, build OK.
+  The backend agent's #1 (provider ownership lookup repeated 5× in providers/routes.ts — byte-identical, returns-the-row
+  drop-in, DIFFERENT table than validateVehicleOwnership) is FILED as the next arch pick. Next (120 — milestone): nothing
+  forced (deep-review cyc 114 / bug cyc 115 breach next) → highest-leverage; #5 sweep + coverage re-measure both due ~C120.
+  cov: be ~81% / fe ~62% (carry; re-measure due C120)

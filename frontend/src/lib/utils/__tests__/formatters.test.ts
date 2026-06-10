@@ -14,6 +14,7 @@
 
 import { describe, expect, test } from 'vitest';
 import {
+	capitalize,
 	formatCurrency,
 	formatDate,
 	dateOnlyToISO,
@@ -107,5 +108,22 @@ describe('dateOnlyToISO', () => {
 		// Empty string / undefined → a valid ISO timestamp (no throw, no NaN).
 		expect(() => new Date(dateOnlyToISO('')).toISOString()).not.toThrow();
 		expect(Number.isNaN(new Date(dateOnlyToISO(undefined)).getTime())).toBe(false);
+	});
+});
+
+describe('capitalize (C119 — extracted from 5 hand-rolled sites)', () => {
+	test('upper-cases the first character, leaving the rest unchanged', () => {
+		expect(capitalize('loan')).toBe('Loan');
+		expect(capitalize('monthly')).toBe('Monthly');
+		expect(capitalize('lease')).toBe('Lease');
+	});
+
+	test('is a no-op on an empty string and leaves an already-capitalized word', () => {
+		expect(capitalize('')).toBe('');
+		expect(capitalize('Owned')).toBe('Owned');
+	});
+
+	test('only touches the first character (does not lower-case the rest)', () => {
+		expect(capitalize('mDY')).toBe('MDY');
 	});
 });
