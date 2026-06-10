@@ -23,7 +23,10 @@
 > error-handling FE ratchet arc DELIVERED; still the bigger gap but closing).** **RE-MEASURED AGAIN C152 (the #5-sweep
 > coverage re-measure): be 82.02% line / 82.51% func (func up from C138's 81.81%; +25 BE tests C139–C151); fe 70.09% line /
 > 66.77% func / 62.85% branch (UP +4.8 line / +4.2 branch from C138 — the C143 api-client + C149 expense-api service-layer
-> ratchet BROKE 70% line for the first time; FE still the bigger gap but closing fast).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> ratchet BROKE 70% line for the first time; FE still the bigger gap but closing fast).** **RE-MEASURED AGAIN C164 (the #5-sweep
+> re-measure): be 82.70% line / 82.51% func (line up from C152's 82.02 — the C154–C162 BE fixes); fe 70.18% line / 66.88% func /
+> 62.85% branch (the C163 reminder-api ratchet — FE SERVICE LAYER now FULLY covered: api-client/expense-api/reminder-api/error-
+> handling; remaining FE gap is the components/routes deficit, largely eyes-on).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -44,7 +47,7 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 163 |
 | bug | 3 | 162 |
 | arch | 5 | 160 |
-| infra | 6 | 159 |
+| infra | 6 | 164 |
 
 Current cycle: **150**
 
@@ -2967,3 +2970,17 @@ Current cycle: **150**
   survive a truthiness bug would drop) + getNotifications unreadOnly gating. green→green: frontend validate:local **EXIT 0 — 492
   pass (+15)**, tsc 0, build done. FE service layer now fully covered (api-client C143 + expense-api C149 + reminder-api C163 +
   error-handling C137). cov: fe 70.1%+ (carry; +15 FE) / be 82.0% (carry)
+- **C164 (infra): the #5 branch-hygiene sweep + coverage re-measure (overdue — last C152, branch now 116 commits) + feature-
+  starvation escalation to Angelo** — BALANCE: `feature` the ONLY over-budget category (cyc 157, starved-for 7, badly over) →
+  forced. But I HONESTLY exhausted the buildable-feature search: all 3 in-flight features eyes-on-blocked; money-cents HARD-gated
+  at T0 (needs Angelo's D1-D5 before ANY build, incl. prep — confirmed in tasks.md); the unspecced horizon (trips/sharing/OCR)
+  all need a design call (OCR conflicts with privacy-first self-hosting → external vision dep). Manufacturing a 5th speculative
+  spec = low-leverage busywork, so per "don't-force-a-blocked-pick" + "draft, flag, MOVE ON" → ESCALATED the feature-starvation
+  reality to Angelo (ratify money-cents T0? which horizon to spec next?) via send_message, then took the overdue infra sweep this
+  cycle (non-blocking). The 3-part sweep: (1) STRAY-TEST SCAN — zero untracked unit/spec tests (only the by-design e2e set +
+  .meshclaw-tools harness); (2) GREEN BASELINE + RE-MEASURE — backend bun test --coverage EXIT 0 (1209 pass), be 82.70% line /
+  82.51% func (line up from C152 82.02); frontend 492 pass, fe 70.18% line / 66.88% func / 62.85% branch (FE service layer now
+  FULLY covered); (3) BRANCH_REVIEW.md refresh — header 101→116 commits, status 1189→1209 BE / 470→492 FE + fresh cov, appended
+  §23 (C152–C163: both Angelo-approved HIGHs #27/lease-loan SHIPPED, +#54/#52 HIGHs, #55/#56 MEDs, 2 arch dedups, FE service layer
+  fully covered), reviewer checklist updated (#27 + lease/loan now SHIPPED not pending). BRANCH_REVIEW.md gitignored. Doc/
+  measurement-only — no code change. Next sweep ~C174; CLAUDE.md refresh next ~C174. cov: be 82.70% line / fe 70.18% line (re-measured)
