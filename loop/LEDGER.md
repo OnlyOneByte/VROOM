@@ -29,7 +29,9 @@
 > handling; remaining FE gap is the components/routes deficit, largely eyes-on).** **RE-MEASURED AGAIN C176 (the #5-sweep re-measure):
 > be 82.74% line / 82.49% func (line creeping up from C164's 82.70 — the C167–C174 BE fixes); fe 73.89% line / 73.61% func / 66.08%
 > branch (UP SHARPLY +3.7 line / +6.7 func / +3.2 branch from C164 — the C166 settings-store + C169 settings-api + C175 pwa.ts FE
-> ratchets delivered; FE still the bigger gap but closing fast).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> ratchets delivered; FE still the bigger gap but closing fast).** **RE-MEASURED AGAIN C186 (the #5-sweep re-measure): be 83.41% line /
+> 83.74% func (up from C176's 82.74/82.49 — the C178/#25 + C180/#48 + C181/orchestrator + C184/#26c + C185/analytics-routes BE
+> additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C176 — every C178–C185 cycle was backend, so FE didn't move).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -50,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 181 |
 | bug | 3 | 184 |
 | arch | 5 | 182 |
-| infra | 6 | 183 |
+| infra | 6 | 186 |
 
-Current cycle: **185**
+Current cycle: **186**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3334,3 +3336,16 @@ Current cycle: **185**
   exercised at the repo layer by the property tests). Test-only, no production change. One biome reflow autofixed. green→green: backend
   validate:local **EXIT 0 — 1245 pass / 1 skip / 0 fail (+8)**, tsc 0, musl-biome clean, build bundled. cov: be 82.74%+ (carry; +8 BE,
   analytics/routes 15→59% line) / fe 73.89% (carry).
+- **C186 (infra — #5 branch-hygiene sweep + coverage re-measure; due by cadence)** — BALANCE: only `feature` over budget (cyc 170,
+  starved-for 16, blocked 11th cycle, escalated) → fell through to highest-leverage actionable; no other category over budget, so free
+  pick → the #5 sweep was DUE (last C176, 10 cycles, branch 128→138 commits-ahead). Inline, doc/measurement-only — no code change.
+  THE 3-PART SWEEP: **(1) STRAY-TEST SCAN** — same set as C176, no NEW strays: `.kiro/specs/offline-entries/` (already flagged to
+  Angelo C176, his track/keep-local call — re-flagged in BRANCH_REVIEW §25, no re-nag) + the expected harness/playwright-config/
+  test-results/mise.local.toml. **(2) GREEN BASELINE + RE-MEASURE** — backend `bun test --coverage` (1245 pass / 0 fail), **be 83.41%
+  line / 83.74% func** (UP from C176's 82.74/82.49 — the C178/#25 + C180/#48 + C181/orchestrator + C184/#26c + C185/analytics-routes
+  additions); frontend `vitest --coverage` (513 pass / 0 fail), **fe 73.89% line / 73.61% func / 66.08% branch** (FLAT vs C176 — every
+  C178–C185 cycle was backend). **(3) BRANCH_REVIEW.md REFRESH** (gitignored) — header 128→138 commits-ahead, status 1218→1245 BE /
+  513 FE + fresh cov, appended **§25 (C176–C185:** #25/#48-completion/#26c bugs, the buildLocalDate + isEligibleForPayoff arch dedups,
+  the backup-orchestrator + analytics-routes COVERAGE-THEATER fixes, the vehicle-lifecycle audit, CLAUDE.md refresh**)**. NOTE: the
+  coverage-theater pattern recurred 3× this window (C181/C182/C185) — flagged in §25 as worth a systematic sweep someday. Next #5 sweep
+  ~C196; CLAUDE.md refresh next ~C194. cov: be 83.41% line / fe 73.89% line (RE-MEASURED).
