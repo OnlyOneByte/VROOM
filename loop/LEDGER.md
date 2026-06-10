@@ -17,7 +17,10 @@
 > — frontend product code [components/routes] OUTGREW its tests; FE is now decisively the bigger
 > gap).** **RE-MEASURED AGAIN C124: be 81.78% line / 82.17% func (creeping up — C111/C116/C121/C122/C123
 > backend tests); fe 62.03% line / 60.48% func / 52.47% branch (creeping up — the C118 memoize + C119
-> capitalize FE ratchet; STILL the bigger gap).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> capitalize FE ratchet; STILL the bigger gap).** **RE-MEASURED AGAIN C138 (the #5-sweep coverage re-measure): be 82.25% line /
+> 81.81% func (line creeping up — C136 restore guard etc.; func ~flat as product code grew); fe 65.32% line / 61.76% func /
+> 58.70% branch (UP +3.3 line / +6.2 branch from C124 — the C125 vehicle-form + C130 formatters + C134 reminder-api + C137
+> error-handling FE ratchet arc DELIVERED; still the bigger gap but closing).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -38,9 +41,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 137 |
 | bug | 3 | 136 |
 | arch | 5 | 135 |
-| infra | 6 | 131 |
+| infra | 6 | 138 |
 
-Current cycle: **137**
+Current cycle: **138**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2513,3 +2516,21 @@ Current cycle: **137**
   construction — the full handleApiError matrix + map + class + side-effect — and the C124 whole-suite reading stays the cov:
   anchor.) NEXT FE low spots (C124): api-client.ts/expense-api.ts (mock-heavier) + the components/routes deficit. cov: be
   81.8% (carry) / fe ~63%+ (carry; +8 FE — error-handling.ts 34%→well-covered, not whole-suite-re-measured)
+- **C138 (infra — #5 branch-hygiene sweep, overdue; + the due coverage re-measure)** — BALANCE: recomputed all six — TWO over
+  budget (infra cyc 131 starved-for 7 > 6; deep-review cyc 132 starved-for 6 > 5); most-starved wins → `infra` (7) > dr (6).
+  Matches the C137 forecast. This is the loop-improvement #5 sweep (last C124, branch now git-authoritative 85 commits off
+  origin/main — my per-cycle running tally had drifted ~1, the sweep corrects to git truth). THREE STEPS: (1) untracked-stray
+  check — zero stray tracked-worthy files; every untracked entry is the by-design `*.meshclaw.e2e.ts` set + e2e screenshots/
+  results + the Playwright config + known-gitignored dirs (.kiro/specs/offline-entries, .meshclaw-tools, mise.local.toml). No
+  unit/spec .test.ts stranded outside VCS (which would silently drop coverage on merge). (2) GREEN BASELINE + the DUE coverage
+  re-measure (loop-improvement #4, last real reading C124): backend bun test --coverage EXIT 0 (1164 pass / 0 fail / 1 skip),
+  frontend vitest --coverage EXIT 0 (435 pass). RESULT: be 82.25% line / 81.81% func (up from C124's 81.78/82.17 — line
+  creeping up via the C136 restore guard + accumulated tests; func ~flat as product grew); FE 65.32% line / 61.76% func /
+  58.70% branch (UP +3.3 line / +6.2 branch from C124's 62.03/60.48/52.47 — the C125 vehicle-form + C130 formatters + C134
+  reminder-api + C137 error-handling ratchet arc DELIVERED; FE still the bigger gap but closing). regress.sh Playwright-blocked
+  (unchanged). Updated the COVERAGE TREND header with the C138 reading. (3) BRANCH_REVIEW.md refresh (gitignored): header
+  71→85 commits + status to 1164 BE / 435 FE + the C138 coverage; appended §21 (C124–C137: #21 data-safety wipe-guard + #35/
+  #32a security hygiene + #36/#37 two more Sheets HIGHs found + recurring-expenses FE client seams + 2 arch dedups + the FE
+  ratchet arc); refreshed the reviewer checklist (now THREE HIGHs gated: #27 + #36 + #37, plus #21-shrink) + the merge footer.
+  Doc/measurement-only — no product code; the green baseline IS the verification. Next sweep ~C148. cov: be 82.25% / fe 65.32%
+  (both freshly re-measured C138)

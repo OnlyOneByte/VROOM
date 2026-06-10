@@ -839,7 +839,15 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > commits since the last refresh by theme so the eventual PR stays reviewable. Counts as one `infra`
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
-*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C134.)*
+*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C148.)*
+- ~~**#5 branch-hygiene sweep + coverage re-measure (C138)**~~ — *DONE C138 (overdue; last C124, branch now git-authoritative
+  85 commits off origin/main). (1) zero stray untracked unit/spec tests (all untracked = the by-design `*.meshclaw.e2e.ts` set +
+  e2e screenshots/results + the Playwright config + gitignored dirs); (2) green baseline + coverage re-measure — backend bun
+  test --coverage EXIT 0 (1164 BE), frontend vitest --coverage EXIT 0 (435 FE); regress.sh Playwright-blocked; (3)
+  BRANCH_REVIEW.md refresh — header 71→85, status 1155→1164 BE / 395→435 FE, appended §21 (C124–C137), reviewer checklist now
+  THREE HIGHs gated (#27 + #36 + #37) + #21-shrink. RE-MEASURE: be 82.25% line / 81.81% func (up from C124 81.78/82.17); fe
+  65.32% line / 61.76% func / 58.70% branch (UP +3.3 line / +6.2 branch from C124 — the C125/C130/C134/C137 FE ratchet arc
+  delivered). Updated the COVERAGE TREND header. Next sweep ~C148.*
 - ~~**#5 branch-hygiene sweep + coverage re-measure (C124)**~~ — *DONE C124 (overdue; last C110, branch now 71 commits).
   (1) zero stray untracked unit/spec tests; (2) green baseline — backend validate:local EXIT 0 (1155 BE / 395 FE; regress.sh
   Playwright-blocked); (3) BRANCH_REVIEW.md refresh — header 56→71, status 1123→1155 BE / 385→395 FE, appended §20 (C110–C123),
