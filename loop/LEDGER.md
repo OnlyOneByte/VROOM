@@ -43,7 +43,7 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 165 |
-| deep-review | 5 | 161 |
+| deep-review | 5 | 167 |
 | guard | 6 | 163 |
 | bug | 3 | 162 |
 | arch | 5 | 166 |
@@ -3012,3 +3012,21 @@ Current cycle: **150**
   than this dedup warrants). green→green: frontend validate:local **EXIT 0 — 492 pass (unchanged = behavior-preserving)**, tsc 0,
   build done. ARCH QUEUE: BE validateOdometerOwnership remains the one primed pick. cov: fe 70.18% / be 82.70% (carry; no net
   test delta — behavior-preserving)
+- **C167 (deep-review → bug #57, HIGH): deleting an insurance policy orphaned its premium expenses** — BALANCE: two over budget →
+  most-starved (absolute) wins → `deep-review` (cyc 161, starved-for 6) > `bug` (5). Fresh 2-agent fan-out on UN-audited veins:
+  (A) the insurance WRITE + premium→expense materialization (the less-audited counterpart to the C73/C150 READ audits), (B)
+  photos + sync-worker (user-data + retry/concurrency). PRE-READ hooks.ts myself (C67): debunked my own "createTermExpenses not
+  idempotent" hypothesis (the 2 create sites are distinct new terms; PUT uses delete-then-recreate). Agent A surfaced the real
+  HIGH: **#57** — premium expenses link to terms by plain TEXT sourceType/sourceId (NO FK; schema.ts:233-234), and the DELETE-
+  policy route (routes.ts:133) cleans PHOTOS (which also lack an FK) but NEVER deleteBySource the premium expenses → the term
+  cascade-deletes but the $1200 expense row PERSISTS with a dangling sourceId, still summed into TCO insuranceCost FOREVER
+  (analytics categorizes any financial + sourceType:'insurance_term' row, no term-exists check) + leaks its expense photos. The
+  asymmetry is the proof: DELETE-term (routes:221) + UPDATE-term (hooks:70) both deleteBySource; only parent-policy delete didn't.
+  VERIFIED firsthand (the route's own comment even notes the photos-no-FK cleanup, but omits the identical expenses-no-FK case).
+  FIX: enumerate the policy's terms (insurancePolicyRepository.findById → terms) before delete + deleteBySource('insurance_term',
+  term.id, userId) per term, mirroring the existing claim-photo cleanup block. +1 regression test in policy-delete-cascade.test.ts
+  (costed term → premium expense materializes → policy delete → 0 insurance_term expenses; pre-fix the orphan survived). Agent B
+  CERTIFIED the photos/sync path mostly clean (retry bound finite retryCount<3, cross-tenant delete/serve blocked, nosniff #35
+  held, DI not mock.module) + filed its strongest (F1: non-idempotent Drive/Photos retry on the upload-then-DB-write await gap) as
+  #58 MED. green→green: backend validate:local **EXIT 0 — 1210 pass / 1 skip / 0 fail (+1)**, tsc 0, musl-biome clean, build
+  bundled. #57 CLOSED. cov: be 82.70%+ (carry; +1 BE) / fe 70.18% (carry)

@@ -649,6 +649,23 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   perFillup too. withCost/totalSpending (avgCostPerDay numerator) left unchanged (split shares sum to true total there). +3 tests
   (split → $55 not $47.5; unsplit unchanged $50; all-split → null). green→green 1209 pass (+3).*
 
+**NEW — surfaced + verified-against-source by the C167 deep-review fan-out (insurance WRITE + premium→expense materialization · photos + sync-worker). #57 (HIGH) FIXED in-cycle; #58 filed. Agent A CERTIFIED clean: premium→expense idempotency (#13 class — create-once, update delete-then-recreate), term-vehicle junction ownership (validateVehicleIdsOwned), claim CRUD ownership, FK cascade, #8/#39 money/date. Agent B CERTIFIED clean: retry bound finite (retryCount<3), cross-tenant delete/serve blocked, nosniff #35 held, DI not mock.module, listing userId-scoped.**
+- ~~**#57 (HIGH, displayed-$ + data-safety) — deleting an insurance policy orphaned its auto-materialized premium expenses.**~~ —
+  *DONE C167: premium expenses link to terms by plain TEXT sourceType/sourceId (NO FK, schema.ts:233-234); the DELETE-policy route
+  (routes.ts:133) cleaned PHOTOS but never deleteBySource the premium expenses → the term cascade-deleted but the expense row
+  PERSISTED with a dangling sourceId, still summed into TCO insuranceCost forever (analytics has no term-exists check) + leaking
+  its expense photos. Asymmetry-proof: DELETE-term (:221) + UPDATE-term (hooks:70) both deleteBySource; only parent-policy delete
+  didn't. FIX: enumerate the policy's terms (findById→terms) + deleteBySource('insurance_term', term.id, userId) per term before
+  delete, mirroring the claim-photo cleanup block. +1 regression test (costed term → premium expense → policy delete → 0 orphans).
+  green→green 1210 pass.*
+- **#58 (MED, data-safety) — sync-worker retry is non-idempotent for Google Drive/Photos on the upload→DB-write await gap.**
+  providers/sync-worker.ts:212-253 (processSingleRef): `upload()` then `updateStatus()` are NOT atomic. If upload succeeds but
+  updateStatus throws (DB lock/timeout, crash/restart in the gap), the ref stays pending/failed with storageRef='' and the remote
+  blob is never recorded → the next retry uploads AGAIN. S3 is SAFE (deterministic buildKey → overwrite, idempotent), but Drive/
+  Photos mint a new fileId per call → duplicate remote files, the earlier orphaned (no ref → never cleaned). VERIFIED via the C167
+  agent (read the actual loop + provider upload). Narrow window (hence MED). FIX: a recorded idempotency key (deterministic remote
+  name, or persist a pre-claim/storageRef before upload). Pure backend, but needs an approach choice (per-provider). Filed.
+
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
    (Overview) + `fetchExpensesPage` (Expenses tab) in `vehicles/[id]/+page.svelte` only toasted on
