@@ -15,7 +15,9 @@
 > was overdue): be 81.10% line / 81.84% func (up ~+4 from C81 — the C82–C106 ratchet delivered) ·
 > fe 61.41% line / 59.31% func / 52.24% branch (essentially FLAT vs C81's 63.7%, even slightly down
 > — frontend product code [components/routes] OUTGREW its tests; FE is now decisively the bigger
-> gap).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> gap).** **RE-MEASURED AGAIN C124: be 81.78% line / 82.17% func (creeping up — C111/C116/C121/C122/C123
+> backend tests); fe 62.03% line / 60.48% func / 52.47% branch (creeping up — the C118 memoize + C119
+> capitalize FE ratchet; STILL the bigger gap).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -36,9 +38,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 118 |
 | bug | 3 | 121 |
 | arch | 5 | 123 |
-| infra | 6 | 117 |
+| infra | 6 | 124 |
 
-Current cycle: **123**
+Current cycle: **124**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2281,3 +2283,17 @@ Current cycle: **123**
   pass, same as C122 = behavior-preserving. Verified: backend validate:local EXIT 0, build bundled. (The 10 noNonNullAssertion
   warnings in other test files are pre-existing, not from this change.) Next (124): `infra` most-starved over budget (cyc 117,
   starved-for 7 > 6) → #5 sweep next due ~C120 (overdue) or a doc need. cov: be ~81% / fe ~62% (carry)
+- **C124 (infra — #5 branch-hygiene sweep [overdue] + the deferred coverage re-measure)** — BALANCE: `infra` most-starved
+  over budget (cyc 117, starved-for 7 > 6). Folded both due items in. SWEEP: (1) zero stray untracked unit/spec tests
+  (all untracked are the by-design *.meshclaw.e2e.ts set); (2) green baseline — backend validate:local EXIT 0 at C123
+  (1155 BE), unchanged since; regress.sh Playwright-blocked; (3) BRANCH_REVIEW.md refresh — header 56→71 commits, status
+  1123→1155 BE / 385→395 FE + the C124 coverage, appended §20 (C110–C123: recurring-expenses backend finish [T6/T7], the
+  #23/#28 bug fixes, the C113/C119/C123 arch dedups, the C105/C112/C118 coverage ratchet incl. the first FE module, and the
+  C120 first-HIGH find), refreshed the reviewer checklist to FOUR Angelo decisions (now leading with #27 the TCO HIGH) +
+  the merge footer. RE-MEASURE (loop-improvement #4, deferred since C120): ran bun test --coverage + vitest --coverage —
+  **be 81.78% line / 82.17% func** (up from C107's 81.10/81.84 — the C111/C116/C121/C122/C123 backend tests); **fe 62.03%
+  line / 60.48% func / 52.47% branch** (up from C107's 61.41 — the C118 memoize + C119 capitalize FE ratchet is creeping
+  the needle; still the bigger gap). Updated the COVERAGE TREND header. Doc-only (no code → no build gate, the C100/C110
+  sweep pattern); coverage artifacts + BRANCH_REVIEW.md are gitignored. Next (125): nothing forced (guard cyc 118 / bug cyc
+  121 breach next) → highest-leverage; FE coverage (the measured gap) or the filed analytics-unit-prefs arch dedup. cov:
+  be 81.8% / fe 62.0% (MEASURED C124)

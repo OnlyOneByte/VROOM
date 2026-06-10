@@ -747,7 +747,13 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > commits since the last refresh by theme so the eventual PR stays reviewable. Counts as one `infra`
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
-*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C120.)*
+*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C134.)*
+- ~~**#5 branch-hygiene sweep + coverage re-measure (C124)**~~ — *DONE C124 (overdue; last C110, branch now 71 commits).
+  (1) zero stray untracked unit/spec tests; (2) green baseline — backend validate:local EXIT 0 (1155 BE / 395 FE; regress.sh
+  Playwright-blocked); (3) BRANCH_REVIEW.md refresh — header 56→71, status 1123→1155 BE / 385→395 FE, appended §20 (C110–C123),
+  reviewer checklist now FOUR Angelo decisions (leads with #27 the TCO HIGH). RE-MEASURE (loop-improvement #4, deferred since
+  C120): be 81.78% line / 82.17% func (up from C107 81.10/81.84); fe 62.03% line / 60.48% func / 52.47% branch (up from C107
+  61.41 — the C118/C119 FE ratchet; still the bigger gap). Updated the COVERAGE TREND header. Doc-only. Next sweep ~C134.*
 - ~~**#5 branch-hygiene sweep — BRANCH_REVIEW.md refresh (C110, milestone)**~~ — *DONE C110: due per the C100 note
   (~10 cycles, branch now 56 commits). (1) zero stray untracked unit/spec tests (all untracked are the by-design
   `*.meshclaw.e2e.ts` set + gitignored dirs); (2) green baseline — backend validate:local EXIT 0 (1123 BE / 385 FE;
