@@ -444,13 +444,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   volume/mileage). VERIFIED C114. This is the ratified decimal-comma design choice (a lone comma IS decimal); the harm is a
   manually-mapped US-thousands file. DECISION: add a per-file "decimal separator" hint to the mapping (dot vs comma), or
   detect-and-warn — needs Angelo's call on scope before a fix.
-- **#25 (MED) — insurance per-vehicle attribution: LATEST-term premium ÷ ALL-terms vehicle count.** analytics/repository.ts:
-  895-948 — `monthlyPremium = effectiveMonthlyPremium(latestTerm)` (latest term only) but `coveredVehicleIds` spans EVERY
-  term's junctions, and `perVehicleMonthly = monthlyPremium / coveredVehicleIds.length`. So when coverage CHANGED across
-  terms (old covered {A,B,C}, latest covers {A}): A is attributed premium/3 (understated 3×), dropped B+C each get a phantom
-  premium/3, and costByCarrier.vehicleCount over-reports. AGGREGATE totalMonthly/AnnualPremiums are CORRECT (added once per
-  policy) — a mis-DISTRIBUTION, not a mis-total. VERIFIED C114. FIX: scope coveredVehicleIds to the LATEST term's junctions
-  (the term the premium is computed from), so the divisor + attribution match the premium's term.
+- ~~**#25 (MED) — insurance per-vehicle attribution: LATEST-term premium ÷ ALL-terms vehicle count.**~~ — *DONE C178: VERIFIED
+  firsthand vs source — analytics/repository.ts:924 `monthlyPremium = effectiveMonthlyPremium(latestTerm)` (latest term only) but
+  :926 built `coveredVehicleIds` from `junctionRows.filter(j => policyTerms.some(t => t.id === j.termId))` (EVERY term's junctions),
+  then :977 `perVehicleMonthly = monthlyPremium / coveredVehicleIds.length`. So when coverage CHANGED across terms (old {A,B,C},
+  latest {A}): A understated 3×, dropped B+C got phantom premium/3, costByCarrier.vehicleCount over-reported. Aggregate
+  totalMonthly/Annual CORRECT (added once per policy) — a mis-DISTRIBUTION. FIX (one-line, non-gated): scope the filter to
+  `j.termId === latestTerm.id` (the term the premium came from), so divisor + attribution match it. +2 tests (the #25 regression:
+  old {veh-1,veh-2} + latest {veh-1} @ $120 → only veh-1 @ full $120, carrier count 1; + an unchanged-coverage control proving the
+  normal multi-vehicle split still splits). green→green 1227 pass (+2).*
 - **#26 (LOW, insurance nuances, C114)** — three small ones, none data-safety: (a) totalCost amortization + monthly trend
   use `monthKeysInRange` which is INCLUSIVE of both endpoint months, so a 6-mo policy entered as Jan 1→Jul 1 (renewal-day
   endDate) amortizes over 7 months (internally consistent — totals reconcile — but a ±1-day data-entry choice shifts the

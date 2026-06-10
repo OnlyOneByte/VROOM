@@ -923,12 +923,14 @@ export class AnalyticsRepository {
       // across the term span (bug #8 — `monthlyCost ?? 0` zeroed every totalCost-only term).
       const monthlyPremium = effectiveMonthlyPremium(latestTerm);
       const annualPremium = monthlyPremium * 12;
+      // Scope the covered vehicles to the LATEST term's junctions — the same term the premium is
+      // computed from (#25). Spanning EVERY term's junctions mis-distributes when coverage changed
+      // across terms: if an old term covered {A,B,C} and the latest covers {A}, dividing the latest
+      // premium by 3 understates A and invents a phantom premium for the dropped B,C (and inflates
+      // costByCarrier.vehicleCount). Aggregate totals are unaffected (added once per policy); this
+      // only fixes the per-vehicle + per-carrier DISTRIBUTION.
       const coveredVehicleIds = [
-        ...new Set(
-          junctionRows
-            .filter((j) => policyTerms.some((t) => t.id === j.termId))
-            .map((j) => j.vehicleId)
-        ),
+        ...new Set(junctionRows.filter((j) => j.termId === latestTerm.id).map((j) => j.vehicleId)),
       ];
 
       totalMonthlyPremiums += monthlyPremium;

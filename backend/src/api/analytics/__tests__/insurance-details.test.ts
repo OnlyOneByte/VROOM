@@ -171,6 +171,88 @@ describe('getInsurance — latest-term selection', () => {
   });
 });
 
+describe('getInsurance — #25: per-vehicle attribution scopes to the LATEST term, not all terms', () => {
+  // The premium is the LATEST term's (line ~924); coveredVehicleIds MUST be that same term's
+  // junctions. Pre-fix it spanned EVERY term's junctions, so a policy whose coverage shrank across
+  // terms mis-distributed: the latest premium got divided by the (larger) all-terms vehicle count,
+  // understating the still-covered vehicle and inventing phantom premiums for dropped ones.
+  test('a vehicle dropped from the latest term gets NO premium; the kept vehicle gets the FULL latest premium', async () => {
+    seedVehicle(testDb.sqlite, {
+      id: 'veh-2',
+      userId: USER,
+      make: 'Toyota',
+      model: 'Corolla',
+      year: 2021,
+    });
+    policy('p1', 'GEICO');
+    // OLD term covered BOTH veh-1 and veh-2.
+    term({
+      id: 'old',
+      policyId: 'p1',
+      startMs: now - 400 * MS_DAY,
+      endMs: now - 40 * MS_DAY,
+      monthlyCost: 80,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'old', vehicleId: 'veh-1' });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'old', vehicleId: 'veh-2' });
+    // LATEST term renewed covering ONLY veh-1 (veh-2 was dropped) at $120/mo.
+    term({
+      id: 'new',
+      policyId: 'p1',
+      startMs: now - 30 * MS_DAY,
+      endMs: now + 335 * MS_DAY,
+      monthlyCost: 120,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'new', vehicleId: 'veh-1' });
+
+    const result = await repo.getInsurance(USER);
+
+    // The aggregate is unchanged — added once per policy regardless of distribution.
+    expect(result.summary.totalMonthlyPremiums).toBeCloseTo(120, 2);
+
+    // Only veh-1 appears in vehicleDetails, carrying the FULL $120 (pre-fix: veh-1 AND veh-2 each
+    // appeared at $60 — half the premium, plus a phantom entry for the no-longer-covered veh-2).
+    const ids = result.vehicleDetails.map((d) => d.vehicleId).sort();
+    expect(ids).toEqual(['veh-1']);
+    const veh1 = result.vehicleDetails.find((d) => d.vehicleId === 'veh-1');
+    expect(veh1?.monthlyPremium).toBeCloseTo(120, 2);
+    expect(veh1?.annualPremium).toBeCloseTo(1440, 2);
+
+    // costByCarrier counts only the latest term's vehicles (pre-fix: 2).
+    expect(result.costByCarrier).toHaveLength(1);
+    expect(result.costByCarrier[0]?.vehicleCount).toBe(1);
+  });
+
+  test('when coverage is UNCHANGED across terms, a multi-vehicle split is still correct (no regression)', async () => {
+    // Control: both terms cover {veh-1, veh-2}, latest premium $120 → each vehicle $60. The fix must
+    // not disturb the normal multi-vehicle split — only the changed-coverage case above.
+    seedVehicle(testDb.sqlite, {
+      id: 'veh-2',
+      userId: USER,
+      make: 'Toyota',
+      model: 'Corolla',
+      year: 2021,
+    });
+    policy('p1', 'GEICO');
+    term({
+      id: 'new',
+      policyId: 'p1',
+      startMs: now - 30 * MS_DAY,
+      endMs: now + 335 * MS_DAY,
+      monthlyCost: 120,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'new', vehicleId: 'veh-1' });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'new', vehicleId: 'veh-2' });
+
+    const result = await repo.getInsurance(USER);
+    expect(result.summary.totalMonthlyPremiums).toBeCloseTo(120, 2);
+    const ids = result.vehicleDetails.map((d) => d.vehicleId).sort();
+    expect(ids).toEqual(['veh-1', 'veh-2']);
+    for (const d of result.vehicleDetails) expect(d.monthlyPremium).toBeCloseTo(60, 2);
+    expect(result.costByCarrier[0]?.vehicleCount).toBe(2);
+  });
+});
+
 describe('getInsurance — #14 OPEN QUESTION: an expired latest term still counts (pending Angelo)', () => {
   // This pins the CURRENT behavior, NOT an endorsement of it. buildInsuranceDetails picks the
   // latest term by endDate but does NOT check endDate >= now, so an ACTIVE policy whose latest

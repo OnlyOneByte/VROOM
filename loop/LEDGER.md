@@ -48,11 +48,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 173 |
 | guard | 6 | 175 |
-| bug | 3 | 174 |
+| bug | 3 | 178 |
 | arch | 5 | 177 |
 | infra | 6 | 176 |
 
-Current cycle: **177**
+Current cycle: **178**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3194,3 +3194,21 @@ Current cycle: **177**
   + new local-date.test.ts (+7: in-range build, time-default-midnight, explicit-time, month>12 rejected, Feb-30 rejected, month-0
   rejected, leap-day 2024-02-29 ok / 2023-02-29 rejected). green→green: backend validate:local **EXIT 0 — 1225 pass / 1 skip / 0 fail
   (+7)**, tsc 0, musl-biome clean, build bundled. cov: be 82.74%+ (carry; +7 BE) / fe 73.89% (carry)
+- **C178 (bug → #25): insurance per-vehicle attribution scopes to the LATEST term, not ALL terms** — BALANCE: TWO over budget —
+  `feature` (cyc 170, starved-for 8, most-starved) + `bug` (cyc 174, starved-for 4 > 3). Feature blocked for the 4th cycle running
+  (eyes-on / Angelo-T0-gated, both escalated) → per "don't-force-a-blocked-pick" fell to the next over-budget category = `bug` (which
+  HAS an actionable, non-decision-gated item — unlike the gated HIGHs #36/#37 + the decision-gated #24/#29/#45/#47). Inline, no spawn.
+  PICK = #25 (filed C114, MED, displayed-$). VERIFIED FIRSTHAND vs source (C67/C150 — line numbers drift, ~half of filed findings
+  need re-confirm): analytics/repository.ts:924 `monthlyPremium = effectiveMonthlyPremium(latestTerm)` (LATEST term's premium) but
+  :926-932 built `coveredVehicleIds` from `junctionRows.filter(j => policyTerms.some(t => t.id === j.termId))` — EVERY term's
+  junctions — then :977 `perVehicleMonthly = monthlyPremium / coveredVehicleIds.length`. So a policy whose coverage SHRANK across
+  terms (old covered {A,B}, latest {A}) divided the latest premium by the all-terms count: A understated (½ instead of full), dropped
+  B got a PHANTOM premium it's no longer insured under, costByCarrier.vehicleCount over-counted. Aggregate totalMonthly/Annual
+  CORRECT (added once per policy, :934) — a mis-DISTRIBUTION, not a mis-total. FIX (one-line, non-gated, mechanical): scope the filter
+  to `j.termId === latestTerm.id` (the term the premium came from). Confirmed junctionRows shape `{termId, vehicleId}` + that the
+  query loads all the policy's termIds before acting. +2 tests in insurance-details.test.ts: (1) the #25 regression — old term {veh-1,
+  veh-2} + latest {veh-1} @ $120 → only veh-1 in vehicleDetails @ full $120 (pre-fix: both @ $60 + phantom veh-2), carrier
+  vehicleCount 1 (pre-fix 2); (2) UNCHANGED-coverage control — both terms {veh-1,veh-2} @ $120 → each $60, count 2 (proves no
+  regression to the normal multi-vehicle split). Existing latest-term-selection + #8 + #14 + drift-guard cases stayed green (aggregates
+  untouched). One biome reflow on the edited block autofixed (check:musl:fix). green→green: backend validate:local **EXIT 0 — 1227
+  pass / 1 skip / 0 fail (+2)**, tsc 0, musl-biome clean, build bundled. #25 CLOSED. cov: be 82.74%+ (carry; +2 BE) / fe 73.89% (carry)
