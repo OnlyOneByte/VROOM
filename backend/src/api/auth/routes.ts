@@ -20,6 +20,30 @@ import { validateAndRefreshSession } from './utils';
 const routes = new Hono();
 
 /**
+ * The session-user shape returned by GET /me and POST /refresh — id/email/displayName plus
+ * ISO-or-null timestamps. Extracted (C187) so the two handlers share ONE serializer instead of
+ * the byte-identical 5-field block they each inlined; structurally typed so it accepts both the
+ * `c.get('user')` row and validateAndRefreshSession's `result.user`. NOTE: deliberately NOT used
+ * by PATCH /me (emits only id/email/displayName — no timestamps) or GET /accounts (a different
+ * created-at fallback) — those are different shapes, folding them in would change a response.
+ */
+function serializeSessionUser(u: {
+  id: string;
+  email: string;
+  displayName: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}) {
+  return {
+    id: u.id,
+    email: u.email,
+    displayName: u.displayName,
+    createdAt: u.createdAt?.toISOString() ?? null,
+    updatedAt: u.updatedAt?.toISOString() ?? null,
+  };
+}
+
+/**
  * OAuth State Storage
  *
  * IMPORTANT: This is an in-memory store and will be lost on server restart.
@@ -460,13 +484,7 @@ routes.get('/me', async (c) => {
   return c.json({
     success: true,
     data: {
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        createdAt: user.createdAt?.toISOString() ?? null,
-        updatedAt: user.updatedAt?.toISOString() ?? null,
-      },
+      user: serializeSessionUser(user),
       session: {
         id: session.id,
         expiresAt: session.expiresAt,
@@ -559,13 +577,7 @@ routes.post('/refresh', async (c) => {
   return c.json({
     success: true,
     data: {
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        displayName: result.user.displayName,
-        createdAt: result.user.createdAt?.toISOString() ?? null,
-        updatedAt: result.user.updatedAt?.toISOString() ?? null,
-      },
+      user: serializeSessionUser(result.user),
       session: {
         id: result.session.id,
         expiresAt: result.session.expiresAt,

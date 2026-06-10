@@ -47,6 +47,36 @@ describe('GET /api/v1/auth/me', () => {
 });
 
 /**
+ * POST /refresh success-body shape (C187): GET /me and POST /refresh emit the SAME session-user
+ * block, now via the shared `serializeSessionUser` helper. GET /me's body is pinned above, but the
+ * /refresh success body had NO field-shape assertion (the C182-scout caveat) — so a /refresh-only
+ * regression (or a helper-wiring slip at that site) would have gone uncaught. This pins it: a valid
+ * session refreshes to 200 with the full id/email/displayName/createdAt-ISO/updatedAt-ISO + session.
+ */
+describe('POST /api/v1/auth/refresh — success body shape', () => {
+  test('refreshes a valid session to 200 with the full serialized user + session', async () => {
+    const res = await ctx.authed('POST', '/api/v1/auth/refresh');
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as MeResponse & {
+      data: { user: { updatedAt: string | null } };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.user.id).toBe(ctx.user.id);
+    expect(body.data.user.email).toBe(ctx.user.email);
+    expect(typeof body.data.user.displayName).toBe('string');
+    // The shared serializer emits ISO-or-null timestamps (not the raw Date / not dropped).
+    expect(body.data.user.createdAt).toBeTruthy();
+    expect(Number.isNaN(new Date(body.data.user.createdAt as string).getTime())).toBe(false);
+    expect(body.data.user.updatedAt).toBeTruthy();
+    expect(Number.isNaN(new Date(body.data.user.updatedAt as string).getTime())).toBe(false);
+    // Session re-issued.
+    expect(body.data.session.id).toBeTruthy();
+    expect(body.data.session.expiresAt).toBeTruthy();
+  });
+});
+
+/**
  * Convergence guard (C56, arch #1): the auth route does NOT hand-roll an error envelope —
  * its validation handlers throw `HTTPException` directly and rely on the central
  * `errorHandler` (error-handler.ts:43) to shape it as `{ success:false, error:{ code, message } }`.

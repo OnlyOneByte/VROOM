@@ -979,14 +979,14 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     candidate; I independently found + chose THIS one (3 sites vs 2, all 3 test-anchored, collapses a correctness rule). Extracted both
     as exported decls in financing/repository.ts (beside computeBalance) + wired all 3 + converted the property test's 4 local `<= 0.01`
     copies to the real export + boundary test. Behavior-preserving, anchored by the existing contract tests. green→green 1236 pass (+1).*
-    **ARCH QUEUE: one primed pick filed below (serializeSessionUser); else a fresh rule-7 fan-out.**
-  - **Next arch pick (PRIMED, from the C182 scout a11fa350):** `serializeSessionUser(u)` — a byte-identical 6-field user-serialization
-    block (`{id,email,displayName,createdAt?.toISOString()??null,updatedAt?.toISOString()??null}`) at auth/routes.ts:463-469 (GET /me)
-    + :562-568 (POST /refresh). Behavior-preserving, pure. CAVEAT (verify firsthand before acting): GET /me is test-anchored
-    (me-http.test.ts pins createdAt ISO), but the /refresh success body has NO field-shape assertion — so add one when extracting (the
-    /refresh site would otherwise be unanchored). Do NOT fold in the PATCH /me (:510, no timestamps) or /accounts (:588, different null
-    fallback) near-misses — different shapes.
-  - **Else (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
+  - ~~**`serializeSessionUser(u)` — the auth session-user block, 2 sites → 1 (PRIMED by the C182 scout; C187)**~~ — *DONE C187:
+    VERIFIED firsthand the 5-field block `{id,email,displayName,createdAt?.toISOString()??null,updatedAt?.toISOString()??null}` is
+    byte-identical at auth/routes.ts GET /me (:463, src `user`) + POST /refresh (:562, src `result.user`); the PATCH /me + /accounts
+    near-misses correctly stay EXCLUDED (different shapes). Extracted `serializeSessionUser` (structurally typed → accepts both sources)
+    + wired both. CLOSED the caveat's gap: /refresh's success body was UNANCHORED → added a POST /refresh success-body shape test to
+    me-http.test.ts. Behavior-preserving, green→green 1246 pass (+1).* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out
+    (spawn cap permitting) or an inline scout.**
+  - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
     pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the ~57 logging sites
     is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.
 

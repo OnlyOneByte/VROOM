@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 185 |
 | guard | 6 | 181 |
 | bug | 3 | 184 |
-| arch | 5 | 182 |
+| arch | 5 | 187 |
 | infra | 6 | 186 |
 
-Current cycle: **186**
+Current cycle: **187**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3349,3 +3349,17 @@ Current cycle: **186**
   the backup-orchestrator + analytics-routes COVERAGE-THEATER fixes, the vehicle-lifecycle audit, CLAUDE.md refresh**)**. NOTE: the
   coverage-theater pattern recurred 3× this window (C181/C182/C185) — flagged in §25 as worth a systematic sweep someday. Next #5 sweep
   ~C196; CLAUDE.md refresh next ~C194. cov: be 83.41% line / fe 73.89% line (RE-MEASURED).
+- **C187 (arch): extract `serializeSessionUser` — the auth session-user block, 2 sites → 1 (the C182-scout primed pick)** — BALANCE:
+  only `feature` strictly over budget (cyc 170, starved-for 17, blocked 12th cycle, escalated) → fell through; `arch` + `guard` both AT
+  budget (5=5 / 6=6, due). Took the PRIMED arch pick (the C182 scout a11fa350's #1, filed in BACKLOG with its caveat) — needs no
+  scouting, runnable INLINE (respecting the 6/3 spawn cap). VERIFIED firsthand (C67/C150 — agent finding, lines drift): the 5-field
+  block `{id, email, displayName, createdAt?.toISOString()??null, updatedAt?.toISOString()??null}` is byte-identical at auth/routes.ts
+  GET /me (:463, source `user`) + POST /refresh (:562, source `result.user`); CONFIRMED the two near-misses stay EXCLUDED — PATCH /me
+  (:510, only id/email/displayName, no timestamps) + GET /accounts (:589, `row.createdAt ? … : new Date().toISOString()` fallback) are
+  DIFFERENT shapes (folding either would change a response). FIX: added `serializeSessionUser(u)` (structurally typed on
+  {id,email,displayName,createdAt:Date|null,updatedAt:Date|null} so it accepts both sources) + wired both sites. CLOSED THE CAVEAT'S
+  GAP: the scout flagged /refresh's success body as UNANCHORED (only /me was tested) — added a POST /refresh success-body shape test to
+  me-http.test.ts (+1: valid session → 200 + full id/email/displayName/createdAt-ISO/updatedAt-ISO + session). Behavior-preserving
+  (arch rule 2 — identical field set + coercion); anchored by the EXISTING me-http /me test + the NEW /refresh test, green THROUGH the
+  change. green→green: backend validate:local **EXIT 0 — 1246 pass / 1 skip / 0 fail (+1)**, tsc 0, musl-biome clean, build bundled.
+  ARCH QUEUE empty again — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or inline scout. cov: be 83.41%+ (carry) / fe 73.89% (carry).
