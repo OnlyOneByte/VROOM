@@ -117,6 +117,19 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    `reminderApi.getRecurringCost()` → `RecurringCostSummary` type, +tests; REMAINING = the dashboard widget MARKUP that calls
    getRecurringCost() + renders it, eyes-on**; T8 round-trip E2E. Lands "code-complete, eyes-on pending" like maintenance T9 /
    import-trackers T4–T6 — the backend is fully built + characterized, so a human or unblocked Playwright closes the visible tail.
+4. **Money: float→integer-cents migration** — spec DRAFTED C146 (`.kiro/specs/money-cents-migration/`), **awaiting Angelo
+   sign-off (D1–D5); BUILD-BLOCKED on T0** (arch rule 6: a money-type migration is a direction call). The NORTH_STAR horizon
+   item — money is `real` (float) across 14 columns/6 tables → silent drift in TCO sums, split allocations, amortization
+   (split-service ALREADY round-trips through cents at :34/58/60 then stores float, so the code wants this). **KEY: this is the
+   ONLY signed-off-horizon feature buildable WITHOUT Playwright** — a backend money-type migration is fully verifiable via
+   validate:local, so once T0 clears it runs to DONE entirely in the loop (unlike the 3 eyes-on-blocked features above). Grounded
+   C146 (2-agent fan-out + firsthand). THE data-safety crux (NORTH_STAR #1): an OLD float-dollars backup restored into the cents
+   schema is SILENTLY corrupted 100× (coerceRow parseInt('12.34')→12¢) because validateBackupData only compares an unchanged
+   version string — mitigation = bump CONFIG.backup.currentVersion (fail-closed) + a version-gated ×100 restore shim (ARCC
+   SAX-04 fail-closed, per C144.5). Migration itself is LOW-risk (in-place UPDATE ROUND(*100), no rebuild/no FK-cascade — the
+   0003 class, NOT the 0004 footgun). T0 sign-off → T1 schema+migration+test, T2 backup-version+shim [the data-safety core], T3
+   input-edge, T4 repo/analytics math, T5 split-native-cents, T6 display-edge (API boundary → FE dollar contract unchanged), T7
+   sweep. ESCALATED C146 (non-blocking).
 
 > NOTE (cycle 12): both feature builds are large, MULTI-TASK efforts — one tasks.md task per loop
 > cycle, not one-and-done. They no longer gate the loop; pull T1 of the higher-value

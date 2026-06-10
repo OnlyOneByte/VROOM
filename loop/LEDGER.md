@@ -36,14 +36,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 140 |
+| feature | 4 | 146 |
 | deep-review | 5 | 144 |
 | guard | 6 | 143 |
 | bug | 3 | 144 |
 | arch | 5 | 141 |
 | infra | 6 | 145 |
 
-Current cycle: **145**
+Current cycle: **146**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2671,3 +2671,23 @@ Current cycle: **145**
   the #36/#37 Sheets HIGHs, the new #43/#44 backup-honesty pair (with the C144.5 ARCC grounding), + #45/#21-shrink. Doc-only
   (verified every claim against the loop files); no build gate needed (the C5/C26/C47/C72/C93/C117/C131 convention). Next
   CLAUDE.md refresh ~C160; #5 sweep ~C148. cov: be 82.25% / fe 65.32% (carry — doc-only cycle)
+- **C146 (feature → SPEC — float→integer-cents money migration; the NORTH_STAR horizon item)** — BALANCE: `feature` the ONLY
+  over-budget category (cyc 140, starved-for 6 > 4; matches the C144/C145 forecast). ALL three in-flight features are now at
+  eyes-on-ONLY tails (every non-eyes-on slice — backend + FE client wrappers + gates — exhausted by C128/C134/C140), so
+  manufacturing another marginal pure-logic slice = churn. The legitimate non-eyes-on feature increment is the SPEC-FIRST phase:
+  drafted the NORTH_STAR-listed float→cents money migration — the ONE horizon feature buildable WITHOUT Playwright (a backend
+  money-type migration is fully verifiable via validate:local), so it breaks the loop's eyes-on logjam. Per arch rule 6 a
+  money-type migration is a DIRECTION call → spec + escalate, build-gated on T0. GROUNDED via a 2-agent scoping fan-out +
+  firsthand reads (no assumptions): money is `real` (float) across 14 columns / 6 tables (confirmed complete, apr/volume
+  excluded); migrations run from ./drizzle wrapped in one txn (connection.ts:84) + an idempotent runDataMigration precedent;
+  split-service ALREADY round-trips through cents internally (Math.round(*100)→/100 at :34/58/60) then stores float — the code
+  already wants cents. THE load-bearing finding (verified vs source): an OLD float-dollars backup restored into a cents schema
+  is SILENTLY corrupted 100× — coerceRow routes `12.34` through parseInt → 12 cents ($0.12) — and validateBackupData only
+  compares an unchanged version string `'1.0.0'`, so it passes into corruption (NORTH_STAR #1). Mitigation in the spec: bump
+  CONFIG.backup.currentVersion → '2.0.0' (fail-closed) + a version-gated ×100 coercion shim on a money-column allowlist (recovery
+  path) — aligns with the C144.5 ARCC SAX-04 fail-closed posture. Wrote .kiro/specs/money-cents-migration/{requirements,design,
+  tasks}.md (D1–D5 open: scope/export-rep/old-backup/migration-shape/rollout; T0 sign-off gate → T1 schema+migration+test, T2
+  backup-version+shim+roundtrip [the data-safety core], T3 input-edge cents transform, T4 repo/analytics math, T5 split-native-
+  cents, T6 display-edge at the API boundary [keeps the FE dollar contract → NO eyes-on], T7 green sweep). Migration is LOW-risk
+  (in-place UPDATE ROUND(*100), no rebuild/no FK-cascade — the 0003 class, NOT the 0004 footgun). ESCALATING to Angelo
+  (non-blocking). Spec-only — no code, no build gate (the C4/C9 spec-cycle convention). cov: be 82.25% / fe 65.32% (carry)
