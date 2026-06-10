@@ -41,7 +41,7 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 157 |
 | deep-review | 5 | 161 |
-| guard | 6 | 156 |
+| guard | 6 | 163 |
 | bug | 3 | 162 |
 | arch | 5 | 160 |
 | infra | 6 | 159 |
@@ -2954,3 +2954,16 @@ Current cycle: **150**
   in analytics-charts-unpinned.test.ts (split fillup → volume-bearing only [$55 not $47.5]; unsplit unchanged [$50]; all-split →
   null, no div-by-zero). green→green: backend validate:local **EXIT 0 — 1209 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome
   clean (one reflow autofixed), build bundled. #56 CLOSED. cov: be 82.0%+ (carry; +3 BE) / fe 70.09% (carry)
+- **C163 (guard): coverage-ratchet `reminder-api.ts` (FE service-layer sibling at ~12% line)** — BALANCE: two over budget →
+  most-starved (absolute) wins → `guard` (cyc 156, starved-for 7) > `feature` (6); feature is the same eyes-on-blocked
+  situation (only a 5th gated spec), so guard is both rule-correct + higher-leverage. STEERED by a real coverage measure (not a
+  guess): ran sync-module + FE coverage. The sync low spots (restore.ts:160-246 = restoreFromSheets, routes.ts) need a
+  process-global Sheets-service mock — which NO sync test uses (the C38/C91 cross-suite-flake trap), so NOT a clean pick (filed
+  the restoreFromSheets gap as a note). The FE measure surfaced `reminder-api.ts` at **12% line** — the service-layer SIBLING the
+  C143 (api-client) / C149 (expense-api) ratchet left behind; the existing test (C134) covered only 2 of 11 methods (the T6/T7
+  seams). EXTENDED it (didn't clobber): added post/put/delete to the existing vi.mock (file-scoped, NOT the process-global
+  mock.module trap) + **+15 tests** driving the 9 uncovered methods (create/list/getById/update/delete/trigger/markServiced/
+  getNotifications/markNotificationRead) + the load-bearing `buildReminderQuery` (the `isActive !== undefined` edge — `false` MUST
+  survive a truthiness bug would drop) + getNotifications unreadOnly gating. green→green: frontend validate:local **EXIT 0 — 492
+  pass (+15)**, tsc 0, build done. FE service layer now fully covered (api-client C143 + expense-api C149 + reminder-api C163 +
+  error-handling C137). cov: fe 70.1%+ (carry; +15 FE) / be 82.0% (carry)

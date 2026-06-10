@@ -307,12 +307,20 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > over→413 PAYLOAD_TOO_LARGE/handler-not-run/MB-message, EXACT-boundary passes (strict `>`), no-Content-Length passthrough
 > (chunked gap), malformed-NaN passthrough, custom-message override, multi-MB formatting. **Backend middleware trio now all
 > covered — idempotency C105 + rate-limit C112 + body-limit C156.**)
+> `services/reminder-api.ts` 12%→covered (C163 — the FE service-layer sibling the C143/C149 ratchet left behind; the C134 test
+> covered only 2 of 11 methods. +15 driving the other 9 [create/list/getById/update/delete/trigger/markServiced/getNotifications/
+> markNotificationRead] + buildReminderQuery [the isActive!==undefined edge: `false` must survive] via the file-scoped vi.mock
+> apiClient stub. **FE SERVICE LAYER now FULLY covered — api-client C143 + expense-api C149 + reminder-api C163 + error-handling
+> C137.**)
 > NEXT high-value low spots
 > **(C152 re-measure — be 82.02% line / fe 70.09% line; FE STILL the bigger gap but closing — broke 70%):**
-> backend — ~~`body-limit.ts`~~ DONE C156; `sync/restore.ts`+`sync/routes.ts` (~32–61%,
-> HTTP-harness-tractable) are the remaining named backend low spots; FRONTEND — the FE SERVICE layer is now well-covered (error-handling C137 + api-client C143 +
-> expense-api C149); the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
-> `.svelte.ts`/store/util modules still thin). (SKIP navigation.ts — thin goto
+> backend — ~~`body-limit.ts`~~ DONE C156; `sync/routes.ts` (~32%, HTTP-harness-tractable) is the remaining named backend low
+> spot. NOTE (C163): `restore.ts:160-246` (restoreFromSheets) is uncovered but needs a process-global Sheets-service mock — NO
+> sync test uses mock.module (the C38/C91 cross-suite-flake trap), so it's NOT a clean guard pick; defer until a DI seam exists or
+> accept the gap. FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
+> the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
+> `.svelte.ts`/store/util modules still thin, e.g. settings.svelte.ts 10% [but that's the filed handleError arch pick] / pwa.ts
+> 56% / sync-manager.ts 58%). (SKIP navigation.ts — thin goto
 > wrappers, coverage theater.) Route/
 > integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
 > (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch
