@@ -31,14 +31,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 104 |
+| feature | 4 | 111 |
 | deep-review | 5 | 108 |
 | guard | 6 | 105 |
 | bug | 3 | 109 |
 | arch | 5 | 106 |
 | infra | 6 | 110 |
 
-Current cycle: **110**
+Current cycle: **111**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2066,3 +2066,22 @@ Current cycle: **110**
   unblocking Playwright (the standing #1 improvement). Next (111): `guard` most-starved over budget (cyc 105, starved-for
   6 = budget at 111; deep-review/arch also near) → the C107-re-anchored ratchet (rate-limit.ts 60%, or FE which is now the
   measured gap). cov: be 81.1% / fe 61.4% (carry C107)
+- **C111 (feature — recurring-expenses T7 BACKEND CORE: recurring-cost normalizer, the non-eyes-on half)** — BALANCE:
+  `feature` the only OVER category (cyc 104, starved-for 7 > 4 — and structurally climbing since it's eyes-on-blocked, so
+  C110's forecast of guard was wrong; recomputed the full table). Per the C90 rule I owed a real search for an actionable
+  NON-eyes-on slice before punting again (C110 parked the FE tails). Found one: T7 (recurring-cost visibility, R5/D4) has a
+  PURE backend core — "derive on read; amount × normalized-to-monthly frequency" — that lands test-first without Playwright
+  (the dashboard widget renders it later, eyes-on), exactly how T1–T3 shipped backend-before-UI. GROUNDED first (NORTH_STAR
+  #4, don't reinvent): no run-rate/normalization helper exists (computeNextDueDate ADVANCES a date, a different concern);
+  read the reminders schema (frequency 'weekly'|'monthly'|'yearly'|'custom' + intervalValue/intervalUnit; type:'expense' +
+  isActive + expenseAmount) and computeNextDueDate's frequency interpretation to MIRROR it. SHIPPED: reminder-cost.ts (pure,
+  no DB) — occurrencesPerYear(freq, iv, unit) on an occurrences-PER-YEAR÷12 basis so the 4 frequencies stay mutually
+  consistent (weekly 365.25/7÷12, monthly 1, yearly 1/12, custom converts per unit + scales inversely); monthlyRunRate
+  (reminder) (only active positive-amount expense reminders contribute — notification/inactive/null-amount/un-fireable
+  interval → 0, never a divide-by-zero); recurringCostSummary(reminders[]) → {count, monthlyTotal}. NET: reminder-cost.test
+  .ts (+10) — frequency consistency, custom per-unit conversion, the 0-contributors, the aggregate, empty-set; the Reminder
+  fixture matches the real schema type (tsc-proven). THE GATE EARNED ITS KEEP (biome reflow autofixed). Verified: backend
+  validate:local EXIT 0 — 1133 pass / 0 fail (+10), build bundled. T7's backend core is built + pinned; the T7 dashboard
+  widget + the T4/T5/T6/T8 tails remain eyes-on (Playwright-blocked). Next (112): `guard` most-starved over budget (cyc 105,
+  starved-for 7 > 6) → the C107-re-anchored ratchet (rate-limit.ts 60% line, or FE — the measured gap). cov: be ~81% /
+  fe 61.4% (carry C107; backend +1 pure module)

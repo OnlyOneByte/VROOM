@@ -47,6 +47,11 @@
 - [ ] **T7 — Recurring-cost visibility (R5, D4).** Dashboard "upcoming recurring costs" + monthly
       recurring run-rate (derive on read; amount × normalized-to-monthly frequency); a "Recurring
       expenses" lens over the existing expense-type reminders (no migration). Eyes-on screenshot.
+      **BACKEND CORE DONE (C111):** `reminder-cost.ts` (pure, no DB) — `occurrencesPerYear` /
+      `monthlyRunRate(reminder)` / `recurringCostSummary(reminders[])`→{count,monthlyTotal}, on an
+      occurrences-per-year÷12 basis mirroring `computeNextDueDate`'s frequency interpretation; only
+      active positive-amount expense reminders contribute. +10 unit tests (reminder-cost.test.ts).
+      **REMAINING (eyes-on):** the dashboard widget/lens that renders the summary + a route to expose it.
 
 ### Done-when (feature-DoD)
 
