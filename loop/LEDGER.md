@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 185 |
-| guard | 6 | 181 |
+| guard | 6 | 188 |
 | bug | 3 | 184 |
 | arch | 5 | 187 |
 | infra | 6 | 186 |
 
-Current cycle: **187**
+Current cycle: **188**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3363,3 +3363,18 @@ Current cycle: **187**
   (arch rule 2 — identical field set + coercion); anchored by the EXISTING me-http /me test + the NEW /refresh test, green THROUGH the
   change. green→green: backend validate:local **EXIT 0 — 1246 pass / 1 skip / 0 fail (+1)**, tsc 0, musl-biome clean, build bundled.
   ARCH QUEUE empty again — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or inline scout. cov: be 83.41%+ (carry) / fe 73.89% (carry).
+- **C188 (guard): HTTP success-path coverage for sync/routes.ts (the 31%-line low spot)** — BALANCE: THREE over budget — `feature`
+  (cyc 170, starved-for 18, blocked 13th cycle, escalated) + `guard` (cyc 181, starved-for 7) + `bug` (cyc 184, starved-for 4).
+  Feature blocked → among the over-budget rest, MOST-STARVED wins → `guard` (7 > bug's 4). Inline (6/3 spawn cap). Steered the ratchet
+  to the worst-covered route file: MEASURED firsthand (C186 log) — `sync/routes.ts` 50% func / **31.66% line**, the backup/restore
+  data-safety HTTP surface (NORTH_STAR #1). The existing sync-route-errors.test.ts (C30/C36) covers the ERROR paths; the uncovered 31%
+  is the SUCCESS/derivation handlers. Read firsthand to pick the HTTP-harness-TRACTABLE ones (no provider network, no mock.module trap):
+  GET /status (the backupEnabled/sheetsSyncEnabled derivation from backupConfig), GET /restore/providers (the sourceTypes zip/sheets
+  derivation + skip-when-neither), POST / (no-provider success envelope) — deliberately LEFT the byte/provider-bound paths
+  (backups/download, restore-from-provider/backup — the C163 restoreFromSheets mock-trap territory). ADDED sync-route-success.test.ts
+  (+7) driving the REAL routes via createTestApp() with raw-seeded backup_config + a user_providers row: status both-flags-false /
+  enabled→backupEnabled / sheets-only→sheetsSyncEnabled; restore-providers both-sourceTypes / enabled-but-no-lastBackupAt→skipped /
+  no-config→skipped (continue branch); POST valid syncTypes + no providers→200. RESULT: sync/routes.ts 50→72.22% func / 31.66→59.04%
+  line (errors+success combined). Test-only, no production change. green→green: backend validate:local **EXIT 0 — 1253 pass / 1 skip /
+  0 fail (+7)**, tsc 0, musl-biome clean, build bundled. cov: be 83.41%+ (carry; +7 BE, sync/routes 31.66→59% line) / fe 73.89% (carry).
+  NEXT guard low spot: `activity-tracker.ts` (53%/44%, timer-bound — less clean) or the components/routes FE deficit (eyes-on).
