@@ -555,11 +555,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   cost/mile). VERIFIED C144. This is the SAME period-scoped-stats semantics family as the already-filed Angelo-gated lease/loan
   `currentMileage` bug + the "Current Mileage card display-semantics" direction call — what SHOULD "cost/mile for the last 7 days"
   mean (in-window delta? all-time?). Decide the whole stats-period contract together; not a clean unilateral fix.
-- **#46 (MED) — negative `totalMileage` when the in-window max reading is below `initialMileage`.** vehicle-stats.ts:138
-  `latestMileage - initialMileage` has no monotonicity guard, so a backdated/mistyped reading (e.g. 45000 when initialMileage
-  50000) returns a NEGATIVE distance to the client (costPerMile's `>0` guard saves cost/mile, but the distance shows wrong).
-  VERIFIED C144. FIX: clamp totalMileage at 0 (or surface a data-warning). Clean-ish, but confirm it shouldn't instead flag the
-  bad reading.
+- ~~**#46 (MED) — negative `totalMileage` when the in-window max reading is below `initialMileage`.**~~ — *DONE C148:
+  vehicle-stats.ts:138 `latestMileage - initialMileage` had no floor → a backdated/mistyped reading below initialMileage (e.g.
+  45000 vs 50000) surfaced a NEGATIVE distance verbatim. FIX: `Math.max(0, latestMileage - initialMileage)` — correct under ANY
+  #45 windowing (a driven distance is non-negative regardless), so no churn when #45 lands. +3 guards in
+  vehicle-stats.property.test.ts (below→0 [the regression] + currentMileage still surfaced + costPerMile null; above→real
+  positive; exact-boundary→0). validate:local EXIT 0, 1185 pass. (Chose the clamp over a data-warning — the negative was the
+  defect; flagging the bad reading is a separate UX feature, not needed to fix the wrong number.)*
 - **#47 (MED, partly by-design) — getCurrentOdometer MAX-by-value lets one typo'd high reading poison the reminder axis.**
   odometer/repository.ts:138-157 takes MAX(odometer) by VALUE not date (D2 design, pinned by get-current-odometer.test.ts), so a
   fuel/odometer row mistyped as 999999 makes getCurrentOdometer return 999999 FOREVER (until that row is corrected) → every

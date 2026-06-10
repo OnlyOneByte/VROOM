@@ -39,11 +39,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 146 |
 | deep-review | 5 | 144 |
 | guard | 6 | 143 |
-| bug | 3 | 144 |
+| bug | 3 | 148 |
 | arch | 5 | 147 |
 | infra | 6 | 145 |
 
-Current cycle: **147**
+Current cycle: **148**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2709,3 +2709,15 @@ Current cycle: **147**
   subclass, empty-message-branches-on-type, non-Error→String() incl. null/undefined/object). green→green: backend validate:local
   EXIT 0 — 1182 pass / 0 fail (+4), tsc 0, musl-biome clean, build bundled (the 3 wired sites behavior-identical = full suite
   unchanged). roundToCents RE-FILED with the eyes-on caveat. cov: be 82.25% (carry; +4 BE) / fe 65.32% (carry)
+- **C148 (bug #46 — clamp negative totalMileage in vehicle-stats)** — BALANCE: `bug` the ONLY over-budget category (cyc 144,
+  starved-for 4 > 3; matches the C147 forecast). The #5 sweep is ~due but infra isn't over budget → the rule forces bug. Triaged
+  the queue: most items are Angelo-gated (#36/#37/#43/#44/#45) or design-calls (#47); the cleanest VERIFIED, UNBLOCKED one is #46
+  (a C144-filed finding). THE BUG: `calculateMileageStats` (vehicle-stats.ts:138) did `totalMileage = latestMileage -
+  initialMileage` with no floor — a backdated/mistyped reading BELOW initialMileage (or the only in-window reading < the purchase
+  odometer) surfaced a NEGATIVE distance to the client verbatim (e.g. 45000 − 50000 = −5000 mi). KEY: this is INDEPENDENT of the
+  gated #45 period-semantics question — a driven distance is non-negative under ANY windowing decision, so the fix won't churn
+  when #45 lands. FIX: `Math.max(0, latestMileage - initialMileage)`. The costPerMile guard (`> 0`) already protected cost/mile;
+  this clamps the distance itself. MERGE-SURVIVING net: +3 in vehicle-stats.property.test.ts (below-initialMileage → 0 not −5000
+  [the regression] + currentMileage still surfaced + costPerMile null; normal above-initial still computes the real positive
+  distance; exact-boundary → 0). Verified: backend validate:local EXIT 0 — 1185 pass / 0 fail (+3), tsc 0, musl-biome clean,
+  build bundled. #46 CLOSED. cov: be 82.25% (carry; +3 BE) / fe 65.32% (carry)
