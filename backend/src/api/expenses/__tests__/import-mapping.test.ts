@@ -173,6 +173,38 @@ describe('normalizeForeignDate — local-time discipline across formats (D3)', (
   });
 });
 
+describe('normalizeForeignDate — out-of-range parts do NOT silently roll over (C115, bug #23)', () => {
+  // JS `new Date(2024, 44, 13)` is a VALID Date ~3.7yr later, and `new Date(2024, 1, 30)` (Feb 30)
+  // rolls to March — so before the echo-check these stored a wrong date with no error. The contract:
+  // an out-of-range/impossible date returns the RAW string so buildImportPlan's parseDate errors the
+  // row (the deferred-error contract), never a silently-rolled-over wrong date.
+  test('an out-of-range month/day is returned raw, not rolled forward', () => {
+    expect(normalizeForeignDate('13/45/2024', 'dmy')).toBe('13/45/2024'); // day 13, month 45
+    expect(normalizeForeignDate('25/03/2024', 'mdy')).toBe('25/03/2024'); // month 25 (wrong format pick)
+  });
+
+  test('an impossible calendar day (Feb 30) is returned raw, not rolled into March', () => {
+    expect(normalizeForeignDate('02/30/2024', 'mdy')).toBe('02/30/2024');
+  });
+
+  test('an empty date segment is returned raw, not coerced to a rolled-over date', () => {
+    // "2024--15" → [2024, 0, 15]: Number('')===0 is an integer, so the old guard passed it →
+    // new Date(2024, -1, 15) = Dec 2023. The echo-check (month 0 ≠ -1) now rejects it.
+    expect(normalizeForeignDate('2024--15', 'iso')).toBe('2024--15');
+  });
+
+  test('a valid in-range date still normalizes (the guard does not over-reject)', () => {
+    // Regression guard: the fix must not break the happy path — a real date still round-trips to
+    // the intended local calendar day (not the raw string).
+    const d = new Date(normalizeForeignDate('12/31/2024', 'mdy'));
+    expect({ y: d.getFullYear(), m: d.getMonth() + 1, day: d.getDate() }).toEqual({
+      y: 2024,
+      m: 12,
+      day: 31,
+    });
+  });
+});
+
 describe('applyMapping — whole-file errors', () => {
   test('throws CsvMappingError on an unparseable file', () => {
     // An unterminated quote is a hard parse error.

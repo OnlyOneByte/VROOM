@@ -323,13 +323,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   were all CERTIFIED CLEAN.)
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
-- **#23 (MED, top pick — cleanest fix) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**
-  `normalizeForeignDate` (import-mapping.ts:181-194) validates only integer-ness (`nums.some((n) => !Number.isInteger(n))`)
-  then builds `new Date(year, month-1, day)` — JS Date rolls out-of-range parts over rather than NaN-ing, so a `dmy` row
-  `13/45/2024` → a valid date ~3.7yr later, stored silently; picking the wrong format (mdy on a dd/mm file) rolls `25/03`
-  forward with no error; `"2024--15"` → Dec 2023. VERIFIED against source C114. FIX: a 1–12 month / 1–31 day range guard
-  before construction (or a post-construct getMonth()/getDate() echo check) → converts these to a clean per-row "Invalid
-  date" error instead of a silent wrong date. A clean, well-scoped, host-independent unit-testable fix.
+- ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:
+  normalizeForeignDate validated only integer-ness then `new Date(year, month-1, day)` — JS rolls out-of-range parts over
+  (13/45/2024 → ~3.7yr later; wrong-format 25/03 rolled forward; Feb 30 → March; "2024--15" → Dec 2023), all stored
+  silently. FIX: an ECHO-CHECK extracted into `buildLocalDate(...)→Date|null` — construct the local Date, verify
+  getFullYear/getMonth/getDate match the input; on mismatch return the RAW string so buildImportPlan's parseDate reports a
+  clean per-row "Invalid date" (the deferred-error contract). The helper extraction also fixed the biome complexity ceiling
+  the inline guard tripped. +4 tests (out-of-range/Feb-30/empty-segment return raw; valid date still normalizes — the
+  over-reject guard); host-independent. validate:local EXIT 0, 1142 pass (+4).*
 - **#24 (MED — needs a product decision) — CSV import: comma-as-thousands corrupts numbers.** `normalizeDecimal`
   (import-mapping.ts:139-147) treats a lone comma as the decimal separator, so a US-style `"1,234"` (thousands, no decimal)
   → `"1.234"` → 1.234, which is finite+positive so `parseAmount` accepts it — a $1,234 expense imports as $1.23 (same for

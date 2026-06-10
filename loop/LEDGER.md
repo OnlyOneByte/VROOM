@@ -34,11 +34,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 111 |
 | deep-review | 5 | 114 |
 | guard | 6 | 112 |
-| bug | 3 | 109 |
+| bug | 3 | 115 |
 | arch | 5 | 113 |
 | infra | 6 | 110 |
 
-Current cycle: **114**
+Current cycle: **115**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2142,3 +2142,17 @@ Current cycle: **114**
   latest-term race; findExpiringTerms lacks an isActive filter). No code change (rule-7 verification cycle); all → BACKLOG
   bug queue. Next (115): `bug` most-starved over budget (cyc 109, starved-for 6 > 3) → #23 (the cleanest grounded fix — a
   date range guard) is the strongest pick. cov: be ~81% / fe 61.4% (carry C107)
+- **C115 (bug #23 — CSV import: out-of-range date silently rolled over → now a clean per-row error)** — BALANCE: `bug`
+  most-starved over budget (cyc 109, starved-for 6 > 3). Picked the C114-filed #23 (the cleanest grounded fix; the rest of
+  the new bug block is decision-gated (#24) or a bigger insurance change (#25/#26)). THE BUG: normalizeForeignDate
+  (import-mapping.ts) validated only integer-ness then did `new Date(year, month-1, day)` — JS rolls out-of-range parts over
+  rather than NaN-ing, so a `dmy` row 13/45/2024 stored a date ~3.7yr later, a wrong-format-pick rolled 25/03 forward, Feb 30
+  rolled to March, and "2024--15" (Number('')=0) → Dec 2023 — all silently. FIX: an ECHO-CHECK — construct the local Date,
+  then verify getFullYear/getMonth/getDate match the input parts; on mismatch return the RAW string so buildImportPlan's
+  parseDate reports a clean per-row "Invalid date" (the deferred-error contract this module already uses for non-finite
+  numbers). Extracted into a `buildLocalDate(...)→Date|null` helper — which ALSO resolved the biome complexity ceiling the
+  inline guard tripped (16>15; the gate earned its keep). MERGE-SURVIVING net: import-mapping.test.ts (+4) — out-of-range
+  month/day returns raw, Feb 30 returns raw, empty-segment returns raw, AND a valid in-range date still normalizes (the
+  over-reject regression guard). Host-independent (no TZ/now dependency in the assertions). Verified: backend validate:local
+  EXIT 0 — 1142 pass / 0 fail (+4), build bundled. #23 CLOSED. Next (116): nothing forced (feature/infra breach next) →
+  highest-leverage. cov: be ~81% / fe 61.4% (carry C107)
