@@ -34,13 +34,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 128 |
-| deep-review | 5 | 126 |
+| deep-review | 5 | 132 |
 | guard | 6 | 130 |
 | bug | 3 | 127 |
 | arch | 5 | 129 |
 | infra | 6 | 131 |
 
-Current cycle: **131**
+Current cycle: **132**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2403,3 +2403,25 @@ Current cycle: **131**
   a fresh agent doesn't trip over the headline-money double-count + the other 3 gated decisions. Doc-only (no code → no build
   gate, the C93/C117 pattern). Next (132): nothing forced (bug cyc 127 starved-for 5 next, deep-review cyc 126) →
   highest-leverage. cov: be 81.8% / fe ~63%+ (carry)
+- **C132 (deep-review — audit the photo-storage/credential + Sheets-backup-write paths; found 2 more HIGHs)** — BALANCE:
+  two breached (deep-review cyc 126 starved-for 6, bug cyc 127 starved-for 5); highest-ABSOLUTE → deep-review (6). Rule-7
+  fan-out on 2 fresh high-risk surfaces with no prior dedicated read. EVERY finding verified vs source (C67; I pre-read
+  encryption.ts + the Sheets write block myself). PHOTO/CREDENTIAL = CERTIFIED CLEAN on the security core: encryption.ts is
+  textbook AES-256-GCM (per-call random IV :39, key from PROVIDER_ENCRYPTION_KEY env :14, auth-tag verified) — agent's
+  crypto class clean; secrets never echoed (formatProviderResponse strips credentials, the C91 invariant holds); cross-tenant
+  fully scoped (findOwnedProviderOrThrow + validateEntityOwnership + per-op entityType/Id asserts). Photo MEDs filed: #33
+  (delete-side external-byte orphans — best-effort provider delete logs+continues, ref already gone → unreconcilable; +
+  provider-delete leaves dangling photo rows), #34 (upload not atomic — bytes→row→ref, no txn/compensating delete), #35
+  (download response lacks X-Content-Type-Options: nosniff + trusts client-asserted MIME — a stored-content-sniff vector;
+  the cleanest one-line fix). SHEETS-WRITE = cross-tenant CLEAN (all 15 queries userId-scoped/owned-parent-joined) +
+  round-trip completeness GUARDED (sheets-header-coverage.test pins it, sourceType/sourceId + maintenance fields present),
+  but TWO HIGHs VERIFIED: **#36 (HIGH)** valueInputOption:'USER_ENTERED' (:605) + formatValue does NO leading-token
+  neutralization (:610-616) → a description "=1+1" is EVALUATED to 2 by Sheets (silent round-trip CORRUPTION) AND
+  =IMPORTRANGE/=HYPERLINK formulas execute on open (injection); one-line fix = 'RAW' kills both. **#37 (HIGH)** the per-tab
+  clear-then-write (:592→:602) over the single REUSED backup spreadsheet is non-atomic + unversioned → a mid-flight failure
+  leaves an empty/half-written tab that DESTROYED the only prior good backup (worse than the ZIP path, which retains copies).
+  + #38 (LOW latent): the A:Z 26-col clear range ceiling (reminders at 25 cols — a 27th silently truncates the write range).
+  ESCALATED #36/#37 to Angelo (security HIGH + backup-corruption HIGH; the 'RAW' fix is a clean next-bug-cycle candidate w/
+  an ARCC consult). No code change (rule-7 verification cycle); all → BACKLOG bug queue. Next (133): `bug` most-starved over
+  budget (cyc 127, starved-for 6 > 3) → #35 (the nosniff one-liner) is the cleanest unblocked; #36 'RAW' is bigger but
+  security-touching. cov: be 81.8% / fe ~63%+ (carry)

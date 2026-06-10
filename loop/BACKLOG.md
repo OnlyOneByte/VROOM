@@ -318,6 +318,23 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > price as the cost, payments as balance-transfer). Each changes the displayed TCO differently + needs different data. When
 > decided: fix + a regression test that a financed vehicle's TCO doesn't double-count principal. ESCALATED via Slack C120.
 
+> **#36 (HIGH, found + VERIFIED C132; ESCALATED) — Sheets backup writes with `USER_ENTERED` → formula injection +
+> silent round-trip corruption.** `google-sheets-service.ts` `updateSheet` writes `valueInputOption: 'USER_ENTERED'`
+> (:605) and `formatValue` (:610-616) does NO leading-token neutralization (`return String(value)`). So Sheets PARSES every
+> cell as if typed: a user's `expenses.description = "=1+1"` is EVALUATED to `2` (read back as 2 → silent data mutation on
+> round-trip), and `=IMPORTRANGE`/`=HYPERLINK`/`=IMAGE` formulas EXECUTE on open (injection; self-affecting but real). FIX
+> (one line, closes BOTH): `valueInputOption: 'RAW'` preserves literals losslessly + disables formula evaluation. Likely the
+> next bug-cycle pick — but it's a security + backup-fidelity change, so ARCC-consult first (the secure-coding / output-
+> encoding angle). The CSV export path (backup.ts convertToCSV) is also unguarded but lower-risk (no live evaluation).
+> **#37 (HIGH, found + VERIFIED C132; ESCALATED) — Sheets backup is a non-atomic in-place rewrite that can destroy the only
+> good copy.** `updateSheet` does `clear(A:Z)` (:592) THEN `update` (:602) per tab, all 15 tabs in a `Promise.all` (:526),
+> over the SINGLE reused backup spreadsheet (found-or-reused, NOT versioned — unlike the ZIP path which retains copies). A
+> mid-flight failure (failed update after a succeeded clear) leaves an EMPTY/half-written tab AND has already overwritten the
+> prior good backup → restore would silently apply a truncated dataset. FIX: write to a fresh spreadsheet (or staging tabs)
+> + swap only after all 15 writes succeed, or batch all ranges into ONE `values.batchUpdate` (atomic API call). Bigger than
+> a one-liner → likely needs an approach call. (NOTE: the restore READ derives userId from the first vehicle row :694 — the
+> C108 audit confirmed restore.ts validateUserId gates it, so not a cross-tenant hole, but worth keeping in view.)
+
 **NEW — surfaced + verified-against-source by the C108 deep-review fan-out (restore + mileage paths). All MED, none HIGH; none data-safety on the WRITE path (cross-tenant write-stamp + atomicity + the 5 mileage classes were CERTIFIED CLEAN). Unblocked — ranked for a future bug cycle:**
 - ~~**#20 (MED) — `detectConflicts` is not tenant-scoped → cross-tenant READ leak in merge mode.**~~ — *DONE C109:
   detectConflicts probed `WHERE id IN (backup ids)` with no ownership filter + returned the full existing row as
@@ -421,6 +438,28 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   issue); (c) `resolveNewUser` (routes.ts:200-202) `auth_error=email_exists` reveals account existence — but only to a caller
   who already completed OAuth + proved they own that email, so no arbitrary enumeration (and no-merge is the correct
   anti-takeover posture; likely WONTFIX). VERIFIED C126.
+
+**NEW — surfaced + verified-against-source by the C132 deep-review fan-out (photo-storage/credentials + Sheets-backup-write). The credential/crypto/cross-tenant cores were CERTIFIED CLEAN (encryption.ts textbook AES-256-GCM w/ per-call IV; secrets stripped; all ops userId-scoped). The 2 HIGHs (#36/#37, Sheets) are in the PENDING-ANGELO block above. Unblocked MEDs/LOW:**
+- **#35 (MED, cleanest fix — top unblocked pick) — photo download lacks `X-Content-Type-Options: nosniff` + trusts
+  client-asserted MIME.** `photos/routes.ts:83-89` serves the thumbnail with `Content-Type` = the stored (client-supplied
+  at upload, never sniffed) `mimeType` + `Cross-Origin-Resource-Policy: cross-origin`, but NO `nosniff`. A file whose bytes
+  are HTML/script but declared `image/png` is served cross-origin without nosniff → a stored-content-sniffing vector. FIX:
+  add `'X-Content-Type-Options': 'nosniff'` to the response headers (one line; ideally also magic-byte sniff the upload).
+  VERIFIED C132. Security-touching → ARCC-consult before the fix.
+- **#33 (MED) — delete-side external-byte orphans.** `photo-service.ts:257-275` deletes the provider bytes in a try/catch
+  that only `logger.warn`s on failure, then UNCONDITIONALLY deletes the ref + photo row → if the provider delete fails
+  (network/expired token) the S3/Drive object is orphaned AND the ref is gone (unreconcilable). Same in
+  `deleteRefsFromProviders`. ALSO: DELETE /providers/:id (routes.ts:467-487) drops the provider + photoRefs but never the
+  external bytes NOR the `photos` rows → dangling photo rows that 422 forever. VERIFIED C132. FIX: a reconcile/retry queue
+  for failed external deletes, + cascade the photos rows on provider delete.
+- **#34 (MED) — photo upload is not atomic.** `uploadPhotoForEntity` (photo-service.ts:62-91) does bytes→photo row→ref with
+  no txn + no compensating delete: a DB failure after `provider.upload` orphans the external bytes; a ref-insert failure
+  after the photo row leaves a 422 dangling row. FIX: wrap the 2 inserts in a txn + best-effort `provider.delete` the
+  just-uploaded object on failure. VERIFIED C132.
+- **#38 (LOW, latent) — Sheets write range hard-capped at `A:Z` (26 cols)** (google-sheets-service.ts:594 + the :604
+  `String.fromCharCode(64 + headers.length)`); the widest table (reminders) is at 25 cols — a 27th column produces an
+  invalid A1 ref (charCode 91 = `[`) and silently truncates the clear/write range. Not a bug today; guard before the next
+  reminders/expenses column addition. VERIFIED C132.
 
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
