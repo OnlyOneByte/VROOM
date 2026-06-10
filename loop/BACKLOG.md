@@ -696,8 +696,12 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
   **ARCH QUEUE EMPTY of clean single-cycle picks.** `MS_PER_DAY` (the lone remaining filed idea) is grounded as NOT
   byte-identical — ~20+ sites across BE+FE in 3 spellings with divergent semantics (pure day-divisor vs a 30-day-MONTH
   approximation); collapsing it is a sweeping multi-file rewrite (arch rule 1) and the FE half was already rejected as churn
-  (C99) → leave it. **Next arch pick = another rule-7 fan-out** (the C141 BE agent's #2 ytdSpending sum-reduce is a candidate
-  but borderline-churn at 7 divergent sites; the FE agent's findings, when its event lands, may seed a cleaner one).
+  (C99) → leave it. **Next arch pick:** the C141 FE fan-out agent (8651c0ff, event landed post-C141) surfaced a clean
+  candidate — **`Math.round(x * 100) / 100` round-to-2-decimals at ~8 byte-identical FE sites** (financing-calculations.ts:456,
+  VehicleForm.svelte:299-301, ExpensesTable.svelte:237, +others) → a pure-logic `roundToCents(x)` helper (no eyes-on, unit-
+  testable). VERIFY-FIRST per arch discipline (read all 8 sites + confirm none is a divergent rounding, e.g. floor/ceil or a
+  different precision, before extracting). Take this top next arch cycle. (The BE agent's #2 ytdSpending sum-reduce stays a
+  lower-value fallback — borderline-churn at 7 divergent sites.)
 
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,
