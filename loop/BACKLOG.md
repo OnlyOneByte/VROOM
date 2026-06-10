@@ -286,15 +286,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > projected excess fee is period-independent. *Sibling display call (#card semantics) stays with Angelo.*
 
 **NEW — surfaced + verified-against-source by the C108 deep-review fan-out (restore + mileage paths). All MED, none HIGH; none data-safety on the WRITE path (cross-tenant write-stamp + atomicity + the 5 mileage classes were CERTIFIED CLEAN). Unblocked — ranked for a future bug cycle:**
-- **#20 (MED, top pick) — `detectConflicts` is not tenant-scoped → cross-tenant READ leak in merge mode.**
-  `restore.ts:235` does `this.db.select().from(table).where(inArray(table.id, ids))` with NO `userId`/ownership filter,
-  then returns the full existing DB row as `localData` (restore.ts:240) in the `conflicts` HTTP response (restore.ts:119).
-  An attacker who submits a merge-mode restore whose row ids COLLIDE with a victim's gets the victim's full row contents
-  back (VIN, expense amounts, etc.). Low practical exploitability (ids are cuid2-random, unguessable) but a genuine
-  tenant-isolation gap — same CLASS as the C145 restore userId-stamp leak. FIX (bug-cycle, not a one-liner): scope each of
-  the 6 conflict tables by ownership — vehicles/expenses/insurancePolicies/photos are userId-direct (`eq(table.userId,
-  userId)`); vehicleFinancing (vehicleId FK) + photoRefs (photoId FK) need an owned-id subquery/join. + a regression test
-  that another user's colliding id is NOT returned. VERIFIED real against source C108.
+- ~~**#20 (MED) — `detectConflicts` is not tenant-scoped → cross-tenant READ leak in merge mode.**~~ — *DONE C109:
+  detectConflicts probed `WHERE id IN (backup ids)` with no ownership filter + returned the full existing row as
+  `localData` in the merge `conflicts` response, so a colliding id surfaced another tenant's row (VIN/amounts) — same class
+  as the C145 write-stamp. FIX: threaded `userId` in + a per-table `scope` predicate — eq(table.userId, userId) for the 4
+  userId-direct tables (vehicles/expenses/insurancePolicies/photos); inArray(fk, ownedParentIds) for financing (vehicleId)
+  + photoRefs (photoId), owned-parent ids fetched once; folded into `where(and(inArray(table.id, ids), scope))`. Re-verified
+  the schema ownership columns vs source first (C67). MERGE-SURVIVING net: restore-conflict-tenant-scope.test.ts (+2) — a
+  cross-tenant id collision leaks nothing (victim's row never echoed, untouched in DB, post-fix merge correctly hits the PK
+  constraint not an overwrite) + a self-collision still reports a conflict (feature intact). validate:local EXIT 0, 1123
+  pass (+2). Low exploitability (cuid2 ids) but the tenant-isolation gap is closed at the query.*
 - **#21 (MED) — replace-mode + an empty-but-valid backup = silent TOTAL data wipe.** `restoreFromBackup` mode='replace'
   (restore.ts:124-127) runs `deleteUserData` then `insertBackupData`; validation (backup.ts) only requires
   metadata.version/userId, so a corrupt/truncated download with empty data arrays passes, wipes everything, inserts nothing

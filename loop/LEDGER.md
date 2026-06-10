@@ -34,11 +34,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 104 |
 | deep-review | 5 | 108 |
 | guard | 6 | 105 |
-| bug | 3 | 103 |
+| bug | 3 | 109 |
 | arch | 5 | 106 |
 | infra | 6 | 107 |
 
-Current cycle: **108**
+Current cycle: **109**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2025,3 +2025,23 @@ Current cycle: **108**
   verification cycle); all findings → BACKLOG bug queue for a future bug cycle. Next (109): nothing forced (feature/bug
   breach next) → highest-leverage; #20 (the verified tenant-scope leak) is the strongest bug-queue pick. cov: be 81.1% /
   fe 61.4% (carry C107)
+- **C109 (bug #20 — fix the detectConflicts cross-tenant READ leak in merge-mode restore)** — BALANCE: `bug` most-starved
+  over budget (cyc 103, starved-for 6 > 3), beat feature (5). Picked the C108-surfaced + verified #20 (the strongest
+  grounded item — the rest of the bug queue is Angelo-gated or eyes-on). RE-VERIFIED the schema ownership columns myself
+  against source (the C67 discipline, not trusting the agent's table): vehicles/expenses/insurancePolicies/photos own via a
+  userId column; vehicleFinancing (vehicleId FK) + photoRefs (photoId FK) own indirectly. THE LEAK: detectConflicts
+  (restore.ts) probed `SELECT * ... WHERE id IN (backup ids)` with NO ownership filter, then returned the full existing row
+  as `localData` in the merge `conflicts` response — a colliding id surfaced another tenant's row (VIN/amounts). FIX:
+  threaded `userId` into detectConflicts + a per-table `scope` predicate — eq(table.userId, userId) for the 4 userId-direct
+  tables; inArray(fk, ownedParentIds) for financing/photoRefs (owned vehicle/photo ids fetched once up front), folded into
+  `where(and(inArray(table.id, ids), scope))`. Same class as the C145 write-stamp; low exploitability (cuid2 ids
+  unguessable) but a real tenant-isolation gap, now closed at the query. MERGE-SURVIVING net: restore-conflict-tenant-scope
+  .test.ts (+2, mirrors the restore-userid-stamp harness) — (1) a backup vehicle id tampered to COLLIDE with a seeded
+  victim's id reports NO leak (the victim's 'Ferrari' never appears in conflicts; the row is untouched in the DB — and the
+  post-fix merge correctly hits the PK constraint on insert rather than overwriting, so the test tolerates that secure
+  throw); (2) a genuine SELF-collision still reports a conflict (feature intact, not over-scoped). THE GATE EARNED ITS KEEP:
+  first run the test 500'd on a UNIQUE-constraint throw (post-fix merge tries to insert the colliding id) — refined the
+  assertion to accept either the leak-free conflicts OR the secure PK-throw (both prove no leak/overwrite). (Biome reflow
+  autofixed twice.) Verified: backend validate:local EXIT 0 — 1123 pass / 0 fail (+2), build bundled. #20 CLOSED. Next
+  (110): nothing forced (feature cyc 104 = budget at 110; infra #5 sweep due ~C110) → highest-leverage feature, or the #5
+  branch-hygiene sweep. cov: be 81.1% / fe 61.4% (carry C107)

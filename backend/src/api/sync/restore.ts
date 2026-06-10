@@ -2,7 +2,7 @@
  * Restore Service - Handles data restoration from backups and Google Sheets
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { TABLE_SCHEMA_MAP } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
@@ -114,7 +114,7 @@ class RestoreService {
     }
 
     if (mode === 'merge') {
-      const conflicts = await this.detectConflicts(parsedBackup);
+      const conflicts = await this.detectConflicts(parsedBackup, userId);
       if (conflicts.length > 0) {
         return { success: false, conflicts };
       }
@@ -202,7 +202,7 @@ class RestoreService {
     }
 
     if (mode === 'merge') {
-      const conflicts = await this.detectConflicts(sheetData);
+      const conflicts = await this.detectConflicts(sheetData, userId);
       if (conflicts.length > 0) {
         return { success: false, conflicts };
       }
@@ -218,21 +218,69 @@ class RestoreService {
     return { success: true, imported: summary };
   }
 
-  private async detectConflicts(data: ParsedBackupData): Promise<Conflict[]> {
+  private async detectConflicts(data: ParsedBackupData, userId: string): Promise<Conflict[]> {
     const conflicts: Conflict[] = [];
+
+    // Tenant-scope every conflict probe: a conflict is only a conflict against THE IMPORTER'S OWN
+    // rows. Without this, a merge-mode restore whose ids collide with another user's rows would
+    // return that user's full row contents in `localData` — a cross-tenant read leak (C109, same
+    // class as the C145 restore write-stamp). vehicles/expenses/insurancePolicies/photos own via a
+    // userId column; vehicleFinancing/photoRefs own indirectly via a FK to an owned parent, so scope
+    // those by the importer's owned vehicle/photo ids (fetched once below).
+    const userVehicleRows = await this.db
+      .select({ id: vehicles.id })
+      .from(vehicles)
+      .where(eq(vehicles.userId, userId));
+    const userVehicleIds = userVehicleRows.map((v) => v.id);
+    const userPhotoRows = await this.db
+      .select({ id: photos.id })
+      .from(photos)
+      .where(eq(photos.userId, userId));
+    const userPhotoIds = userPhotoRows.map((p) => p.id);
+
     const tables = [
-      { data: data.vehicles, table: vehicles, name: 'vehicles' },
-      { data: data.expenses, table: expenses, name: 'expenses' },
-      { data: data.financing, table: vehicleFinancing, name: 'vehicle_financing' },
-      { data: data.insurance, table: insurancePolicies, name: 'insurance_policies' },
-      { data: data.photos ?? [], table: photos, name: 'photos' },
-      { data: data.photoRefs ?? [], table: photoRefs, name: 'photo_refs' },
+      {
+        data: data.vehicles,
+        table: vehicles,
+        name: 'vehicles',
+        scope: eq(vehicles.userId, userId),
+      },
+      {
+        data: data.expenses,
+        table: expenses,
+        name: 'expenses',
+        scope: eq(expenses.userId, userId),
+      },
+      {
+        data: data.financing,
+        table: vehicleFinancing,
+        name: 'vehicle_financing',
+        // Owns via vehicleId → an empty owned-vehicle set must match nothing (inArray([]) is false).
+        scope: inArray(vehicleFinancing.vehicleId, userVehicleIds),
+      },
+      {
+        data: data.insurance,
+        table: insurancePolicies,
+        name: 'insurance_policies',
+        scope: eq(insurancePolicies.userId, userId),
+      },
+      { data: data.photos ?? [], table: photos, name: 'photos', scope: eq(photos.userId, userId) },
+      {
+        data: data.photoRefs ?? [],
+        table: photoRefs,
+        name: 'photo_refs',
+        // Owns via photoId → scope to the importer's photos.
+        scope: inArray(photoRefs.photoId, userPhotoIds),
+      },
     ];
 
-    for (const { data: items, table, name } of tables) {
+    for (const { data: items, table, name, scope } of tables) {
       if (items.length === 0) continue;
       const ids = items.map((item) => String(item.id));
-      const existing = await this.db.select().from(table).where(inArray(table.id, ids));
+      const existing = await this.db
+        .select()
+        .from(table)
+        .where(and(inArray(table.id, ids), scope));
       conflicts.push(
         ...existing.map((e) => ({
           table: name,
