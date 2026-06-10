@@ -247,8 +247,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > CONFIG-import-order gate — see LEDGER C91).
 > `db/sql-helpers.ts` 33%→covered (C98 — the 3 dialect date fragments extractMonth/formatYearMonth/toDateTimeString,
 > executed via real Drizzle selects over a seeded expense; pins the `unixepoch` invariant whose omission caused the
-> blank-chart/$0-average + garbage-month bugs the doc comments record). NEXT high-value pure-logic low spots:
-> `middleware/idempotency.ts` (43%), `middleware/rate-limit.ts` (75%/60%); then the frontend modules (overall 63.7%,
+> blank-chart/$0-average + garbage-month bugs the doc comments record).
+> `middleware/idempotency.ts` 43%→covered (C105 — the double-charge guard; +7 via a minimal-Hono app + a per-app
+> handler-run counter: method gating (GET bypass), key gating (required→400 / optional→passthrough), cache-hit replay
+> (handler NOT re-run), user-scoping (`${userId}:${key}` — no cross-user collision), the only-cache-2xx invariant
+> (a 500 is NOT cached → re-run not replayed forever), and TTL expiry via setSystemTime). NEXT high-value pure-logic low spots:
+> `middleware/rate-limit.ts` (75%/60%); then the frontend modules (overall 63.7%,
 > the bigger gap). Route/
 > integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
 > (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch

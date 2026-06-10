@@ -24,12 +24,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 104 |
 | deep-review | 5 | 101 |
-| guard | 6 | 98 |
+| guard | 6 | 105 |
 | bug | 3 | 103 |
 | arch | 5 | 99 |
 | infra | 6 | 100 |
 
-Current cycle: **104**
+Current cycle: **105**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1941,3 +1941,21 @@ Current cycle: **104**
   tail (Playwright-blocked here), so the feature is at the same "backend-done, eyes-on-pending" state as maintenance/
   import-trackers. Next (105): `guard` most-starved over budget (cyc 98, starved-for 7 > 6) → the C83 coverage-ratchet's
   next low spot (middleware/idempotency.ts 43% or rate-limit.ts 60%). cov: be ~80% / fe ~64%
+- **C105 (guard — characterize middleware/idempotency.ts 43% → covered)** — BALANCE: `guard` most-starved over budget
+  (cyc 98, starved-for 7 > 6), beat `arch` (6) — the "compute all six from the table" rule again. PICK: the C83
+  coverage-ratchet's top named low spot, middleware/idempotency.ts at 43% — the double-charge / duplicate-record guard
+  (money-relevant), whose caching/replay/TTL core was NEVER directly tested (only the required-key 400 path, incidentally,
+  via sync-route-errors.test.ts at the route level). High-risk pure logic, untested — the C82 class. SHIPPED:
+  idempotency.test.ts (+7) through a minimal-Hono app (the error-handler.test.ts harness convention) with a per-app
+  counter that reveals whether the handler ACTUALLY ran — a replayed cache hit must NOT increment it. Pins every branch:
+  (1) method gating — GET bypasses entirely (a key on a safe method is ignored); (2) key gating — missing key throws 400
+  VALIDATION_ERROR when required (handler never runs), passes through when optional; (3) cache-hit replay — a duplicate
+  POST returns the byte-identical cached body WITHOUT re-running the handler; (4) user-scoping — two users sharing one key
+  do NOT collide (the `${userId}:${key}` store key); (5) only-cache-2xx — a 500 is NOT cached, so a transient failure
+  gets re-run not replayed forever (the load-bearing invariant); (6) TTL expiry — via setSystemTime, an entry past the 24h
+  TTL is evicted on read so the handler runs again. THE GATE EARNED ITS KEEP: first run failed on a tsc error — my
+  `Parameters<Parameters<Hono['post']>[1]>[0]` type gymnastics for the handler param don't resolve against Hono's
+  overloaded post; fixed by typing it as Hono's `Context` directly (mirroring error-handler.test.ts inline handlers).
+  (Also a biome reflow autofixed.) Verified: backend validate:local EXIT 0 — 1121 pass / 0 fail (+7) · build bundled.
+  Next (106): `arch` most-starved over budget (cyc 99, starved-for 7 > 5) → the C99 follow-on (converge expenses/financing/
+  vehicles route ownership checks on validateVehicleOwnership), or rule-7 fan-out. cov: be ~81% / fe ~64%
