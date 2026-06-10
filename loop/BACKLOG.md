@@ -72,12 +72,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    10 tests. **T3 DONE (C70):** `POST /import` gained an optional `mapping` (Zod `columnMappingSchema`) →
    resolve target vehicle units → `applyMapping` → the EXISTING flow (no new write path); `unmappedCategories`
    in the response; new `POST /import/detect`. Backward-compat (no mapping → native path unchanged); 9 HTTP
-   tests; caught + fixed a Zod-v4 exhaustive-record bug. **NEXT = T4/T5 (FRONTEND, eyes-on):** import-dialog
-   mapping step — detected-source banner, per-field column dropdowns from the file headers, unit/date-format/
+   tests; caught + fixed a Zod-v4 exhaustive-record bug. **FE CLIENT METHODS DONE (C140):** `expenseApi.importExpensesCsv`
+   now takes an optional `mapping` (backward-compat — native path request byte-identical) + new `detectImportSource(headers)`;
+   + `src/lib/types/import-mapping.ts` (ImportColumnMapping/ImportMappingPreset mirroring the backend) + ExpenseImportResult
+   gained `duplicates?`/`unmappedCategories?`; +5 tests (expense-import-mapping.test.ts). **NEXT = T4/T5 (FRONTEND MARKUP, eyes-on):**
+   import-dialog mapping step — detected-source banner, per-field column dropdowns from the file headers, unit/date-format/
    target-vehicle pickers, category-remap table; reuse the existing preview/commit step; four-states + a11y +
-   mobile. Then T6 e2e (incl. real-export signature validation). NOTE: T4–T6 are Playwright-eyes-on-blocked
-   here, so the BACKEND of import-trackers (T1–T3) is complete but the feature isn't DONE until the FE→BE→DB
-   round-trip e2e runs (feature-DoD rule) — lands "code-complete, eyes-on pending" like maintenance T7–T9.
+   mobile (now has its detect + mapping-aware client methods to call). Then T6 e2e (incl. real-export signature validation).
+   NOTE: T4–T6 are Playwright-eyes-on-blocked here, so the BACKEND of import-trackers (T1–T3) + the FE client slice (C140) are
+   complete but the feature isn't DONE until the FE→BE→DB round-trip e2e runs (feature-DoD rule) — lands "code-complete, eyes-on
+   pending" like maintenance T7–T9.
 3. **Recurring expenses** — spec **APPROVED (Angelo signed off D1–D4, C94)**; **BACKEND COMPLETE (T0–T3); T4–T8 are the
    eyes-on frontend tail** per `.kiro/specs/recurring-expenses/`. KEY GROUNDING (verified against source C88, re-certified C94):
    the recurring-expense ENGINE ALREADY EXISTS — an `type:'expense'` reminder auto-creates real expense rows

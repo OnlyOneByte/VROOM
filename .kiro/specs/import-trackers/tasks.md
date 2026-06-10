@@ -43,6 +43,10 @@
 - [ ] **T4** Import-dialog mapping step: detected-source banner, per-field column dropdowns from the
       file headers, unit/date-format/target-vehicle pickers, category-remap table. Reuse the existing
       preview/commit step. Types + service wiring.
+      - [x] **Types + service wiring DONE (C140, non-eyes-on):** `src/lib/types/import-mapping.ts`
+            (ImportColumnMapping/ImportMappingPreset/NativeImportField mirroring the backend) +
+            `expenseApi.importExpensesCsv(csv, dryRun, mapping?)` (backward-compat) +
+            `detectImportSource(headers)`; +5 tests. REMAINING = the dialog MARKUP (eyes-on).
 - [ ] **T5** Four-states + a11y + mobile; compose from the kit.
 
 ## Phase 4 — verify

@@ -36,14 +36,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 134 |
+| feature | 4 | 140 |
 | deep-review | 5 | 139 |
 | guard | 6 | 137 |
 | bug | 3 | 139 |
 | arch | 5 | 135 |
 | infra | 6 | 138 |
 
-Current cycle: **139**
+Current cycle: **140**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2558,3 +2558,22 @@ Current cycle: **139**
     boundary in / next-day-midnight out, startDate lower bound unaffected, non-midnight endDate honored verbatim, findAll/export
     shares it. Verified: backend validate:local EXIT 0 — 1169 pass / 0 fail (+5), tsc 0, musl-biome clean (autofix reflowed the
     test's long lines — the C33 whole-tree class), build bundled. cov: be 82.25% (carry; +5 BE) / fe 65.32% (carry)
+- **C140 (feature — import-trackers T4/T5 FE client slice: mapping-aware import + detectSource)** — BALANCE: `feature` the ONLY
+  over-budget category (cyc 134, starved-for 6 > 4; matches the C139 forecast). The feature tails are all eyes-on/Playwright-
+  blocked → applied the C128/C134 precedent: ship the PURE-LOGIC slice the eyes-on shell consumes. FOUND the C134-class gap: the
+  import-trackers T3 backend (C70) added a `mapping` param to POST /import + a POST /import/detect endpoint, but the FE client
+  `importExpensesCsv` only sent `{csv, dryRun}` (no mapping) and had NO detect method — yet the eyes-on T4/T5 mapping dialog
+  CONSUMES both. So this is the concrete unblock for that tail. Added: (1) `src/lib/types/import-mapping.ts` (new domain file +
+  barrel export) — `ImportColumnMapping` / `ImportMappingPreset` / `NativeImportField` / `ImportDateFormat` / `ImportPresetId`,
+  MIRRORING the backend `ColumnMapping` / `MappingPreset` / `columnMappingSchema` exactly (grounded vs source C67 — every field,
+  unit type, dateFormat enum verified); (2) extended `importExpensesCsv(csv, dryRun, mapping?)` — backward-compat: the native
+  path omits the mapping key so its request is BYTE-IDENTICAL to before (only spreads `{mapping}` when provided); (3) added
+  `detectImportSource(headers): Promise<ImportMappingPreset|null>`; (4) extended `ExpenseImportResult` with the foreign-only
+  `duplicates?`/`unmappedCategories?` the route returns. Pinned by expense-import-mapping.test.ts (+5, the mocked-apiClient
+  pattern): native path sends ONLY {csv,dryRun} (the load-bearing backward-compat — explicit `'mapping' in body === false`),
+  dryRun defaults false, foreign path threads the mapping verbatim + surfaces unmappedCategories, detect posts only headers +
+  passes preset/null through. THE GATE earned its keep: ExpenseImportResult is exported from expense-api.ts (not the types
+  barrel) — tsc caught my wrong-source import → split the type-only import. Verified: frontend validate:local EXIT 0 —
+  type-check 0, build done, 440 pass (+5). NON-eyes-on (pure .ts service + types, no markup). REMAINING import-trackers = only
+  the eyes-on T4/T5 mapping-dialog markup (now has its detect + mapping-aware client methods to call) + T6 e2e. cov: be 82.25%
+  (carry) / fe 65.32% (carry; +5 FE service tests)
