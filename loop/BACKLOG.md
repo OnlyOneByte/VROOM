@@ -477,13 +477,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   `j.termId === latestTerm.id` (the term the premium came from), so divisor + attribution match it. +2 tests (the #25 regression:
   old {veh-1,veh-2} + latest {veh-1} @ $120 → only veh-1 @ full $120, carrier count 1; + an unchanged-coverage control proving the
   normal multi-vehicle split still splits). green→green 1227 pass (+2).*
-- **#26 (LOW, insurance nuances, C114)** — three small ones, none data-safety: (a) totalCost amortization + monthly trend
-  use `monthKeysInRange` which is INCLUSIVE of both endpoint months, so a 6-mo policy entered as Jan 1→Jul 1 (renewal-day
-  endDate) amortizes over 7 months (internally consistent — totals reconcile — but a ±1-day data-entry choice shifts the
-  displayed monthly premium); (b) an open-ended (null endDate) `monthlyCost` term contributes to totals but is DROPPED from
-  monthlyPremiumTrend (accumulateMonthlyPremiums returns early on null endDate) AND sorts LAST in the latest-term race
-  (null endDate → 0); (c) findExpiringTerms (insurance/repository.ts:703-727) has no `isActive` filter, so terms of
-  cancelled policies show as "expiring." All VERIFIED C114.
+- **#26 (LOW, insurance nuances, C114) — (c) DONE C184; (a)+(b) remain.** three small ones, none data-safety: (a) totalCost
+  amortization + monthly trend use `monthKeysInRange` which is INCLUSIVE of both endpoint months, so a 6-mo policy entered as
+  Jan 1→Jul 1 (renewal-day endDate) amortizes over 7 months (internally consistent — totals reconcile — but a ±1-day data-entry
+  choice shifts the displayed monthly premium); (b) an open-ended (null endDate) `monthlyCost` term contributes to totals but is
+  DROPPED from monthlyPremiumTrend (accumulateMonthlyPremiums returns early on null endDate) AND sorts LAST in the latest-term race
+  (null endDate → 0). All VERIFIED C114. ~~(c) findExpiringTerms has no `isActive` filter, so terms of cancelled policies show as
+  "expiring."~~ — *DONE C184: VERIFIED firsthand — `findExpiringTerms` (repository.ts:703, backs GET /expiring-soon) filtered
+  endDate-BETWEEN + userId but NOT isActive → a cancelled policy's in-range term still nagged "renew soon." FIX: ANDed
+  `eq(insurancePolicies.isActive, true)` (the :741 per-vehicle-coverage pattern); behavior-preserving for active policies. +1 test
+  (cancelled-policy term excluded while a same-window active term still shows). green→green 1237 pass (+1).*
 
 **NEW — surfaced + verified-against-source by the C120 deep-review fan-out (TCO aggregation + offline-sync). #27 (HIGH) is in the PENDING ANGELO block above (accounting decision); these two are unblocked MED:**
 - ~~**#28 (MED) — TCO `purchasePrice`/`ownershipMonths` ignore the year window.**~~ — *DONE C121: getVehicleTCO

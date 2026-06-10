@@ -414,6 +414,39 @@ describe('Property 12: Expiring terms date range query', () => {
     );
     expect(expiring.length).toBe(0);
   });
+
+  // #26c (C184): a term on a CANCELLED (isActive=false) policy must NOT surface as "expiring soon" —
+  // GET /expiring-soon is an upcoming-renewal nag, and a policy the user cancelled isn't being renewed.
+  // Pre-fix the query joined policies but never filtered isActive, so a cancelled policy's in-range term
+  // still showed. An ACTIVE policy's term in the same window must still appear (the filter isn't over-broad).
+  test('excludes terms of INACTIVE policies; an active policy’s in-range term still shows (#26c)', async () => {
+    const rangeStart = new Date('2031-01-01');
+    const rangeEnd = new Date('2031-12-31');
+    const termIn = (s: string, e: string) => ({
+      startDate: new Date(s),
+      endDate: new Date(e),
+      vehicleCoverage: { vehicleIds: [VEHICLE_IDS[0]] },
+    });
+
+    // Active policy with a term expiring inside the window — SHOULD appear.
+    const active = await repo.create(
+      { company: 'ActiveCo', terms: [termIn('2031-01-01', '2031-06-30')], isActive: true },
+      USER_ID
+    );
+    // Cancelled policy with a term expiring in the SAME window — must NOT appear.
+    const cancelled = await repo.create(
+      { company: 'CancelledCo', terms: [termIn('2031-02-01', '2031-07-31')], isActive: false },
+      USER_ID
+    );
+
+    const expiring = await repo.findExpiringTerms(rangeStart, rangeEnd, USER_ID);
+    const ids = new Set(expiring.map((t) => t.id));
+
+    expect(ids.has(active.terms[0].id)).toBe(true); // active renewal still surfaced
+    for (const t of cancelled.terms) {
+      expect(ids.has(t.id)).toBe(false); // cancelled policy's term excluded
+    }
+  });
 });
 
 // ===========================================================================

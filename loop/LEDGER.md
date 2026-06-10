@@ -48,11 +48,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 179 |
 | guard | 6 | 181 |
-| bug | 3 | 180 |
+| bug | 3 | 184 |
 | arch | 5 | 182 |
 | infra | 6 | 183 |
 
-Current cycle: **183**
+Current cycle: **184**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3302,3 +3302,18 @@ Current cycle: **183**
   0→50% C181 (+ the coverage-theater warning) + named analytics/routes.ts 15% func as the highest-value next pick; (5) suite size
   ~1211/~503 → ~1236/~513; + the MED-fix line now notes #48 sweep COMPLETED C180 (findByVehicleIdPaginated) + adds #59/#25. No code
   touched. cov: be 82.74% line / fe 73.89% line (carry, doc-only). Next CLAUDE.md refresh ~C194; #5 sweep next ~C186.
+- **C184 (bug → #26c): `findExpiringTerms` excludes CANCELLED policies' terms** — BALANCE: two over budget — `feature` (cyc 170,
+  starved-for 14, blocked 9th cycle, escalated) + `bug` (cyc 180, starved-for 4 > 3). Feature blocked → fell to `bug` (forced;
+  deep-review was only AT budget 5=5, not over). Inline (at the 6/3 spawn cap — no fan-out). Triaged the unblocked bug queue for the
+  cleanest non-decision-gated item: #26c over #31 (fuel pair-by-date, already guarded → no wrong output) + #38 (latent, not a bug
+  today); skipped the gated #29/#30/#40/#43/#44/#45/#47 + the reconcile-queue-needing #33/#34. #26c (LOW, displayed-data, VERIFIED
+  firsthand vs source — C114 finding, line numbers drift): `findExpiringTerms` (insurance/repository.ts:703) joins
+  insuranceTerms→insurancePolicies + filters endDate-BETWEEN + userId, but had NO `isActive` predicate → a CANCELLED policy's term
+  whose endDate lands in the window still surfaced on GET /expiring-soon (routes.ts:51, the upcoming-renewal nag), telling the user a
+  policy they've cancelled needs renewing. FIX: ANDed `eq(insurancePolicies.isActive, true)` — the EXACT pattern the per-vehicle
+  coverage query at :741 already uses; behavior-preserving for active policies. Confirmed the single production caller
+  (/expiring-soon) wants active-only. +1 regression test (seed an active policy + a cancelled policy with terms in the SAME window →
+  the cancelled term is excluded, the active term still shows — proving the filter isn't over-broad). Existing Property-12 tests (all
+  seed isActive:true) stayed green THROUGH the change. green→green: backend validate:local **EXIT 0 — 1237 pass / 1 skip / 0 fail
+  (+1)**, tsc 0, musl-biome clean, build bundled. #26c CLOSED (#26 a/b remain — both LOW, internally-consistent display nuances).
+  cov: be 82.74%+ (carry; +1 BE) / fe 73.89% (carry).
