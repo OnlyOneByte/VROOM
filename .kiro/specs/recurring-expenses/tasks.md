@@ -43,7 +43,11 @@
       skip-when-offline). Document the optional cron-hits-the-endpoint path for self-host deployments.
 - [ ] **T6 — Source traceability UI (R3).** "Recurring" badge on expense rows where
       `sourceType==='reminder'`, linking to the source reminder; from the reminder, a "materialized N
-      expenses" view. Eyes-on screenshot.
+      expenses" view. Eyes-on screenshot. **BACKEND SEAM DONE (C122):** `GET /reminders/:id/expenses`
+      → `expenseRepository.findBySource('reminder', id, user.id)` → the materialized rows (ownership-
+      checked, user-scoped); +4 HTTP tests (reminder-materialized-expenses-route.test.ts). The "N
+      expenses" view fetches this. **REMAINING (eyes-on):** the badge + the view UI. (The badge's read
+      data — sourceType/sourceId on the expense list — was already surfaced at T1/C96.)
 - [ ] **T7 — Recurring-cost visibility (R5, D4).** Dashboard "upcoming recurring costs" + monthly
       recurring run-rate (derive on read; amount × normalized-to-monthly frequency); a "Recurring
       expenses" lens over the existing expense-type reminders (no migration). Eyes-on screenshot.

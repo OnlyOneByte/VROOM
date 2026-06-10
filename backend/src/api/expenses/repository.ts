@@ -146,6 +146,25 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return result[0] ?? null;
   }
 
+  /**
+   * All expenses materialized from a source (e.g. a recurring-expense reminder), scoped to a user
+   * and ordered by date. The READ counterpart to clearSource/deleteBySource — backs the recurring-
+   * expenses T6 "this reminder materialized N expenses" view. Returns [] when nothing is linked.
+   */
+  async findBySource(sourceType: string, sourceId: string, userId: string): Promise<Expense[]> {
+    return this.db
+      .select()
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.sourceType, sourceType),
+          eq(expenses.sourceId, sourceId),
+          eq(expenses.userId, userId)
+        )
+      )
+      .orderBy(asc(expenses.date));
+  }
+
   /** IDs of all expenses for a vehicle (for photo cascade cleanup on delete). */
   async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
     const rows = await this.db

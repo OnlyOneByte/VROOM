@@ -31,14 +31,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 116 |
+| feature | 4 | 122 |
 | deep-review | 5 | 120 |
 | guard | 6 | 118 |
 | bug | 3 | 121 |
 | arch | 5 | 119 |
 | infra | 6 | 117 |
 
-Current cycle: **121**
+Current cycle: **122**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2251,3 +2251,18 @@ Current cycle: **121**
   (+6), build bundled. #28 CLOSED. NOTE: #27 (the bigger principal double-count) is the SAME function + Angelo-gated; when
   decided, fix alongside. Next (122): nothing forced (feature cyc 116 / arch cyc 119... recompute) → highest-leverage; the
   filed provider-ownership arch dedup or recurring-expenses backend are candidates. cov: be ~81% / fe ~62% (carry)
+- **C122 (feature — recurring-expenses T6: GET /reminders/:id/expenses, the non-eyes-on backend seam)** — BALANCE:
+  `feature` most-starved over budget (cyc 116, starved-for 6 > 4). FE tails eyes-on-blocked, so per the C111/C116 pattern I
+  advanced via the next NON-eyes-on slice: the read endpoint the T6 "this reminder materialized N expenses" UI will fetch.
+  GROUNDED: clearSource/deleteBySource (mutate-by-source) exist but there was NO findBySource (read-by-source). SHIPPED:
+  (1) expenseRepository.findBySource(sourceType, sourceId, userId) → Expense[] ordered by date (the read counterpart to
+  clear/deleteBySource, same (sourceType,sourceId,userId) scoping; [] when nothing linked); (2) GET /reminders/:id/expenses
+  (a /:id sub-path, no collision) — ownership-check via findByIdAndUserId then findBySource('reminder', id, user.id). Raw
+  Expense rows serialize (no mapper, C80 clean pass-through). MERGE-SURVIVING net: reminder-materialized-expenses-route
+  .test.ts (+4) through the real stack — expense reminder → trigger → GET returns the source-linked rows ($125.50); a
+  notification reminder → []; non-existent id → 404; another user's reminder → 404 (no cross-tenant read). THE GATE EARNED
+  ITS KEEP: first run the notification test 400'd — reminder-create REQUIRES vehicleIds even for notification type (ZodError);
+  added a vehicleId. (Biome reflow autofixed.) Verified: backend validate:local EXIT 0 — 1155 pass / 0 fail (+4), build
+  bundled. recurring-expenses backend is now T1–T3 + T6(read seam) + T7 — only the T4/T5 + the T6/T7 WIDGETS + T8 e2e remain
+  eyes-on. Next (123): `arch` most-starved over budget (cyc 119, starved-for 4... recompute) or guard → highest-leverage; the
+  filed provider-ownership dedup is the queued arch pick. cov: be ~81% / fe ~62% (carry)

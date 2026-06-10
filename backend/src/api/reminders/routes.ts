@@ -198,6 +198,21 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   return c.json({ success: true, data: result });
 });
 
+// GET /:id/expenses — the expense rows this reminder has materialized (recurring-expenses T6 backend:
+// the "this reminder created N expenses" view). Ownership-checked, then read by source link.
+routes.get('/:id/expenses', zValidator('param', commonSchemas.idParam), async (c) => {
+  const user = c.get('user');
+  const { id } = c.req.valid('param');
+
+  const existing = await reminderRepository.findByIdAndUserId(id, user.id);
+  if (!existing) {
+    throw new NotFoundError('Reminder');
+  }
+
+  const materialized = await expenseRepository.findBySource('reminder', id, user.id);
+  return c.json({ success: true, data: materialized });
+});
+
 // PUT /:id — update reminder
 routes.put(
   '/:id',
