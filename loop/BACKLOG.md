@@ -616,6 +616,24 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   compatible) and exported it. +3 tests (2 cars, close odometers + interleaved dates → no phantom point; per-vehicle trends still
   computed; single-vehicle scoping unchanged). green→green 1206 pass (+3).*
 
+**NEW — surfaced + verified-against-source by the C161 deep-review fan-out (FE financing-calculations.ts math + backend analytics money rollups). Both agents returned a real, verified, MED, displayed-figure finding; #55 FIXED in-cycle, #56 filed. Agent B CERTIFIED clean: ytdSpending (correct half-open local year, split-safe SUM), category-% (div-guarded, sums to 100), fleetHealthScore (div-guarded, no NaN), avgEfficiency (per-vehicle, no #54-class pooling), vehicleCostComparison. Agent A CERTIFIED clean: calculatePayoffDate, calculateMinimumPayment, calculateExtraPaymentImpact, calculateLeaseMetrics div-guards.**
+- ~~**#55 (MED, displayed-figure) — calculateAmortizationSchedule had no negative-amortization guard.**~~ — *DONE C161:
+  financing-calculations.ts:91 computed `principalAmount = Math.min(paymentAmount − interest, balance)` but, UNLIKE its siblings
+  calculatePayoffDate:238 + calculateExtraPaymentImpact:311 (both bail on `principalAmount <= 0`), omitted the guard. When payment
+  < monthly interest, principal goes NEGATIVE and `balance − principalAmount` GROWS the balance every period → rows with negative
+  principal + a climbing balance into the displayed amortization table AND derivePaymentEntries' totalPrincipalPaid/totalInterestPaid
+  (FinanceTab:58,67). FIX: `if (principalAmount <= 0) break;` (mirrors the siblings). +2 tests (amortization-negative-guard.test.ts:
+  under-funded loan → no negative principal + non-increasing balance; healthy loan still amortizes to 0). green→green fe 477 pass (+2).*
+- **#56 (MED, displayed-figure) — `computeAverageCosts.perFillup` double-counts split fuel siblings in its denominator.**
+  analytics-charts.ts:405-409: `withCost = fuelRows.filter(r => r.expenseAmount > 0); perFillup = sum(expenseAmount) /
+  withCost.length`. Bug #18 was fixed only for the fillup COUNT (switched to `isFillup = volume != null && volume > 0`,
+  repository.ts:1319), but perFillup still divides by `withCost.length` — a split fuel sibling carries positive expenseAmount + NULL
+  volume (split-service.ts:96, no fuel-category restriction), so a 2-way split fillup counts as 2 in the denominator → "Avg cost/
+  fillup" understated ~Nx for split-fuel users (numerator is correct; count is correct via isFillup; only perFillup's divisor is
+  wrong). VERIFIED via the C161 agent + the C155/C97 split-sibling grounding. FIX (one-line, the committed #18 pattern): filter
+  `withCost` by the same `isFillup` volume-bearing predicate, not `expenseAmount > 0`. Pure backend, fully verifiable. A clean
+  future bug-cycle pick.
+
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
    (Overview) + `fetchExpensesPage` (Expenses tab) in `vehicles/[id]/+page.svelte` only toasted on

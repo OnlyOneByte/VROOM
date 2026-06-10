@@ -40,7 +40,7 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 157 |
-| deep-review | 5 | 155 |
+| deep-review | 5 | 161 |
 | guard | 6 | 156 |
 | bug | 3 | 158 |
 | arch | 5 | 160 |
@@ -2920,3 +2920,22 @@ Current cycle: **150**
   convergence preserved the 404 contract. green→green: backend validate:local **EXIT 0 — 1206 pass / 1 skip / 0 fail** (unchanged
   = behavior-preserving), tsc 0, musl-biome clean, build bundled. Filed the FE runner-up (settings.svelte.ts handleError →
   extractErrorMessage, 9 sites) as the next arch pick. cov: be 82.0% / fe 70.09% (carry; behavior-preserving, no net test delta)
+- **C161 (deep-review → bug #55: negative-amortization guard in calculateAmortizationSchedule)** — BALANCE: `deep-review` the only
+  over-budget category (cyc 155, starved-for 6 > 5) → forced. Fresh 2-agent fan-out on UN-audited verifiable veins: (A) FE
+  financing-calculations.ts math (the FinanceTab loan/lease displayed $), (B) backend analytics money rollups (getQuickStats
+  ytdSpending / getCrossVehicle / fleet health). PRE-READ both (C67): debunked nothing false but flagged the derivePaymentEntries
+  scheduled-vs-actual split (agent confirmed LOW/by-design) + confirmed ytdSpending's year boundary is the correct half-open local
+  interval. BOTH agents returned a real, verified, MED, displayed-figure, single-cycle finding. TOOK agent A's (more egregious
+  output): **#55** — `calculateAmortizationSchedule` (:91) computes `principalAmount = Math.min(paymentAmount − interest,
+  balance)` but, UNLIKE its two siblings calculatePayoffDate (:238) + calculateExtraPaymentImpact (:311) which both bail on
+  `principalAmount <= 0`, OMITS the guard. When payment < monthly interest, principal goes NEGATIVE and `balance −
+  principalAmount` GROWS the balance every period → the schedule emits rows with negative principal + a climbing balance into the
+  displayed amortization table AND into derivePaymentEntries' totalPrincipalPaid/totalInterestPaid (FinanceTab:58,67). VERIFIED
+  firsthand + confirmed the sibling-guard asymmetry. FIX: add `if (principalAmount <= 0) break;` (mirrors the siblings; bounded
+  for-loop so it was output-corruption not a hang). Merge-surviving net: +2 in amortization-negative-guard.test.ts (under-funded
+  loan → no negative principal + non-increasing balance [pre-fix: 60 rows of −2450, −2511…]; healthy loan still amortizes to 0 —
+  guard doesn't over-fire). Used a NEW focused test file (the existing property test uses tab-indent the Edit tool couldn't match;
+  a separate regression file is equally merge-surviving). green→green: frontend validate:local **EXIT 0 — 477 pass (+2)**, tsc 0,
+  build done. FILED agent B's finding as #56 (computeAverageCosts.perFillup divides by withCost.length, double-counting split fuel
+  siblings — the #18 class left open in this one field; a one-line predicate swap to isFillup). cov: fe 70.09%+ (carry; +2 FE) /
+  be 82.0% (carry)

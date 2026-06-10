@@ -89,6 +89,19 @@ function calculateAmortizationScheduleImpl(
 		for (let i = 1; i <= totalPayments; i++) {
 			const interestAmount = remainingBalance * monthlyRate;
 			const principalAmount = Math.min(financing.paymentAmount - interestAmount, remainingBalance);
+
+			// Negative-amortization guard (C161): if the payment doesn't cover the period's interest,
+			// principalAmount is negative and `remainingBalance - principalAmount` would GROW the balance
+			// every period — emitting rows with negative principal + a climbing balance into the displayed
+			// amortization table (and into derivePaymentEntries' totalPrincipalPaid/totalInterestPaid).
+			// Stop the schedule, mirroring the sibling guards in calculatePayoffDate (:238) and
+			// calculateExtraPaymentImpact (:311). The loan never amortizes under this payment, so there's
+			// no meaningful further schedule to project.
+			if (principalAmount <= 0) {
+				if (DEV) console.warn('calculateAmortizationSchedule: payment does not cover interest');
+				break;
+			}
+
 			remainingBalance = Math.max(0, remainingBalance - principalAmount);
 			const paymentDate = calculatePaymentDate(startDate, i, financing.paymentFrequency);
 
