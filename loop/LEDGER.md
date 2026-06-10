@@ -22,14 +22,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 70 |
+| feature | 4 | 88 |
 | deep-review | 5 | 87 |
 | guard | 6 | 85 |
 | bug | 3 | 71 |
 | arch | 5 | 79 |
 | infra | 6 | 86 |
 
-Current cycle: **87**
+Current cycle: **88**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1602,3 +1602,35 @@ Current cycle: **87**
   EXIT 0 (tsc 0 · musl-biome clean · 1087 pass/0 fail, +11 · build bundled). NEXT coverage low spots:
   sql-helpers (33%), idempotency (43%), rate-limit (75%/60%), then frontend. Next (88): recompute — guard
   (cyc 85, 3) / arch (still blocked) / another coverage guard. feature/bug Angelo-gated. cov: be ~80% / fe 63.7%
+- **C88 (feature → spec — recurring-expenses, drafted + flagged)** — BALANCE: three categories over budget at
+  cyc 88 — feature (cyc 70, starved-for 18 >> 4), bug (cyc 71, 17 >> 3), arch (cyc 79, 9 > 5); MOST starved =
+  `feature` (18) → it wins (this is also the 14th cycle feature/bug have been Angelo-gated, and the
+  coverage-ratchet escape hatch is no longer balance-legal — guard/deep-review are both UNDER budget now). Both
+  feature BUILDS are eyes-on/Playwright-blocked (maintenance T9, import-trackers T4–T6), so the actionable
+  feature increment is the C4/C9 spec-draft move on a NORTH_STAR horizon item: backlog feature #3,
+  **recurring expenses**. KEY OUTCOME — the C21/C28/C35 verify-before-acting lesson paid off hard: fanned out
+  2 Explore agents and they CONFLICTED on the crux (does the reminder engine already auto-create expenses?).
+  Rather than trust either, I READ trigger-service.ts directly — and it OVERTURNED my own stale mental model:
+  `processReminder:407` branches on `type==='expense'` → `processExpensePeriod:176` → `createExpenseFromReminder
+  :108`, which INSERTS real expense rows (single :125-143 or multi-vehicle split via expenseSplitService
+  :148-163) stamped sourceType:'reminder', on the reminder's frequency, in the same txn that advances
+  nextDueDate. **The recurring-expense engine ALREADY EXISTS.** So Agent B's "new recurring_expenses table +
+  scheduler" would REINVENT it (NORTH_STAR #4 violation) — rejected. A 3rd focused agent + a source grep
+  confirmed the THREE real, verified gaps: (1) materialization is manual-button-ONLY (reminders/+page.svelte
+  :97-114, no cron/on-open) → a self-host PWA silently under-counts TCO if the user forgets to click; (2)
+  ReminderForm omits expenseSplitConfig (:52-53) → no multi-vehicle recurring cost; (3) no traceability from an
+  auto-created expense back to its source. Also grounded the R4 cascade on real primitives: expenses/repository
+  has deleteBySource (:483) + clearSource (:530), and sourceType:'reminder' is a live create-route enum
+  (routes.ts:80) — clearSource is the keep-history verb. Drafted `.kiro/specs/recurring-expenses/`
+  {requirements,design,tasks}.md: extend the existing engine (NOT a new table/scheduler), 4 decisions (D1
+  materialization cadence without a cron / D2 keep-past-history on delete / D3 reuse the split widget / D4 v1
+  order), recommended option each, T0 blocks build. CRUCIALLY the spec's T1–T3 are backend/non-eyes-on
+  (traceability response + contract guard, split characterization, cascade-safe delete) — so this feature is
+  one the loop can ADVANCE while Playwright is blocked, directly addressing why feature starved (both in-flight
+  features are stuck at eyes-on tails). Flagged Angelo via send_message (now THREE specs in flight:
+  maintenance T9-only, import-trackers T4–T6, recurring-expenses D1–D4). Verify (spec-only, the C4/C9 pattern):
+  D1–D4 referenced consistently across all 3 files, R1–R7↔T0–T8 mapped, every file:line grounding verified
+  against source I read this cycle. No build (no code). Next (89): bug is now most-starved over budget (cyc 71,
+  starved-for 18 >> 3) but its top items are ALL Angelo-gated (lease/loan $ change, #14 #16 semantics calls) —
+  so the actionable pick is arch (cyc 79, 10, still direction-blocked → verify) or the next coverage guard
+  (sql-helpers 33%). feature/bug remain gated. cov: be ~80% / fe 63.7%

@@ -78,8 +78,18 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    mobile. Then T6 e2e (incl. real-export signature validation). NOTE: T4–T6 are Playwright-eyes-on-blocked
    here, so the BACKEND of import-trackers (T1–T3) is complete but the feature isn't DONE until the FE→BE→DB
    round-trip e2e runs (feature-DoD rule) — lands "code-complete, eyes-on pending" like maintenance T7–T9.
-3. **Recurring expenses** beyond reminders — first-class recurring (insurance premium, loan
-   payment, parking pass) with frequency + dashboard surfacing.
+3. **Recurring expenses** — spec DRAFTED (C88), **awaiting Angelo sign-off on D1–D4** per
+   `.kiro/specs/recurring-expenses/`. KEY GROUNDING (verified against source C88, corrected a stale model):
+   the recurring-expense ENGINE ALREADY EXISTS — an `type:'expense'` reminder auto-creates real expense rows
+   (single or multi-vehicle split, sourceType:'reminder') on its frequency via `trigger-service.ts`
+   processReminder:407 → createExpenseFromReminder:108, and those flow into TCO automatically. So the spec
+   EXTENDS the engine (NOT a new table/scheduler — that would reinvent it, NORTH_STAR #4). The 3 verified gaps:
+   (1) materialization is manual-button-ONLY (no cron/on-open → self-host PWA under-counts TCO); (2) ReminderForm
+   omits expenseSplitConfig (no multi-vehicle recurring cost); (3) no source traceability. D1 (materialization
+   cadence w/o a cron — ✅ client-side opportunistic trigger on app open, idempotent), D2 (keep past history on
+   delete — ✅ clearSource not deleteBySource), D3 (reuse the split widget), D4 (v1 order). **T1–T3 are
+   backend/non-eyes-on** (traceability response+contract guard, split characterization, cascade-safe delete) →
+   the loop can ADVANCE this while Playwright is blocked, once D1–D4 are signed off. T4–T8 eyes-on.
 
 > NOTE (cycle 12): both feature builds are large, MULTI-TASK efforts — one tasks.md task per loop
 > cycle, not one-and-done. They no longer gate the loop; pull T1 of the higher-value
