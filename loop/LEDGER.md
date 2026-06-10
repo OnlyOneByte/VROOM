@@ -42,7 +42,7 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 157 |
+| feature | 4 | 165 |
 | deep-review | 5 | 161 |
 | guard | 6 | 163 |
 | bug | 3 | 162 |
@@ -2984,3 +2984,17 @@ Current cycle: **150**
   §23 (C152–C163: both Angelo-approved HIGHs #27/lease-loan SHIPPED, +#54/#52 HIGHs, #55/#56 MEDs, 2 arch dedups, FE service layer
   fully covered), reviewer checklist updated (#27 + lease/loan now SHIPPED not pending). BRANCH_REVIEW.md gitignored. Doc/
   measurement-only — no code change. Next sweep ~C174; CLAUDE.md refresh next ~C174. cov: be 82.70% line / fe 70.18% line (re-measured)
+- **C165 (feature → spec: trips & location, a NORTH_STAR horizon item)** — BALANCE: `feature` the ONLY over-budget category (cyc
+  157, starved-for 8, SEVERELY over — deferred 4 straight cycles C161–C164). No Angelo response yet to the C164 escalation;
+  money-cents T0 still unratified. Couldn't keep dodging — and the NORTH_STAR EXPLICITLY authorizes the move: horizon items "need
+  spec + design sign-off before build — draft, flag Angelo, move on." So I drafted the next horizon spec (correcting my C164
+  over-hesitation — a grounded spec is a real reusable artifact, not busywork). PICKED trips & location as the draft: it's the
+  LOWEST-architectural-risk of the 3 unspecced (additive `trips` table mirroring odometerEntries; NO ownership-model change
+  [unlike vehicle-sharing]; NO external dep [unlike receipt-OCR's vision API]; free-text location only, GPS deferred). GROUNDED
+  against the real schema (odometerEntries:344) + every established pattern (userId-scope C155/#52, validateXOwnership C160,
+  backup round-trip C145/C146 + coverage guards, analytics groupByVehicle div-guard, the #46 distance clamp, C61/#39 tz dates).
+  Wrote requirements.md (R1–R6 + D1–D6 open decisions) / design.md (§1 schema … §7 risk fence) / tasks.md (T0 gate → T1–T5
+  loop-buildable backend → T6 eyes-on). KEY: trips is a GOOD unblock candidate — T1–T5 are loop-buildable (unlike the 3 in-flight
+  features that are all backend-done + eyes-on-tail-only). Spec-only, no code → no build gate (the C4/C9/C146 convention; all
+  groundings verified vs source). Re-escalation folded into the C164 ask (which horizon to spec) — NOT a new blocking message.
+  cov: be 82.70% / fe 70.18% (carry, spec-only cycle)

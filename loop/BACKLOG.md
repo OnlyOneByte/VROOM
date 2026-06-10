@@ -130,6 +130,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    0003 class, NOT the 0004 footgun). T0 sign-off → T1 schema+migration+test, T2 backup-version+shim [the data-safety core], T3
    input-edge, T4 repo/analytics math, T5 split-native-cents, T6 display-edge (API boundary → FE dollar contract unchanged), T7
    sweep. ESCALATED C146 (non-blocking).
+5. **Trips & location** — spec DRAFTED C165 (`.kiro/specs/trips-location/`), **awaiting Angelo sign-off (D1–D6); BUILD-BLOCKED
+   on T0** (is this the right next horizon item? + odometer-linkage / rate-model / purpose-taxonomy / free-text-vs-GPS / build-
+   order calls). A NORTH_STAR horizon item; the LOWEST-architectural-risk of the 3 unspecced (additive `trips` table mirroring
+   odometerEntries; NO ownership-model change [unlike vehicle-sharing]; NO external dep [unlike receipt-OCR vision API]; free-text
+   location only, GPS deferred to a v2). Killer use case = business-mileage / reimbursement report. Grounded C165 vs the real
+   schema (odometerEntries:344) + every established pattern (userId-scope, validateXOwnership C160, backup round-trip C145/C146 +
+   coverage guards, analytics groupByVehicle div-guard, #46 distance clamp, C61/#39 tz dates). **KEY: a GOOD unblock candidate —
+   T1–T5 (schema/repo/routes/backup/analytics) are loop-buildable backend-first, only T6 UI is eyes-on; unlike the 3 in-flight
+   features that are backend-DONE + eyes-on-tail-only.** Folded into the C164 horizon-steer escalation (non-blocking).
 
 > NOTE (cycle 12): both feature builds are large, MULTI-TASK efforts — one tasks.md task per loop
 > cycle, not one-and-done. They no longer gate the loop; pull T1 of the higher-value
