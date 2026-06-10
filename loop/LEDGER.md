@@ -23,13 +23,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 70 |
-| deep-review | 5 | 82 |
+| deep-review | 5 | 87 |
 | guard | 6 | 85 |
 | bug | 3 | 71 |
 | arch | 5 | 79 |
 | infra | 6 | 86 |
 
-Current cycle: **86**
+Current cycle: **87**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1589,3 +1589,16 @@ Current cycle: **86**
   gitignored → commit carries only loop docs). Next sweep ~C96. Next (87): recompute — arch (cyc 79, starved-
   for 8) most-starved but direction-blocked; deep-review (cyc 82, 5 = budget) or another high-value coverage
   guard (reminders/validation 64%) the actionable pick. feature/bug Angelo-gated (12 cycles). cov: be ~80% / fe 63.7%
+- **C87 (deep-review — pin the reminders/validation cross-field refinements)** — feature (17) + bug (16)
+  blocked (13th cycle); arch most-starved + OVER (cyc 79, 8 > 5) but direction-blocked. Took the next
+  actionable, deep-review (cyc 82, AT budget), via the C81-grounded coverage angle: `reminders/validation.ts`
+  at 64% func — its uncovered branches are the 6 cross-field REFINEMENT failure paths (the correctness guards
+  that reject a malformed reminder), the C29/C31 defect class. The existing update-validation test covers only
+  the isActive toggle, so zero overlap. Pinned each refinement's accept+reject + exact message via
+  reminder-refinements.test.ts (+11): custom-frequency (intervalValue/Unit required), expense-type
+  (category/amount required), mileage-trigger D4 (intervalMileage required + exactly-one-vehicle; 'time'
+  unconstrained), date-range (endDate>startDate), split-config (vehicleId-match + %-sum=100 + absolute-sum=
+  expenseAmount). Pure Zod safeParse, no harness. RATCHET: 64% → 100%/100%. Verified: backend validate:local
+  EXIT 0 (tsc 0 · musl-biome clean · 1087 pass/0 fail, +11 · build bundled). NEXT coverage low spots:
+  sql-helpers (33%), idempotency (43%), rate-limit (75%/60%), then frontend. Next (88): recompute — guard
+  (cyc 85, 3) / arch (still blocked) / another coverage guard. feature/bug Angelo-gated. cov: be ~80% / fe 63.7%

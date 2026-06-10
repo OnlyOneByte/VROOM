@@ -202,12 +202,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > 50%→100%/100% (C84 — the split money-math refinements: %-sum=100, absolute-sum=total, source both-or-neither);
 > `financing/hooks.ts` 0%→100% func (C85 — onFinancingDeactivated: payoff/delete SEVERS the source link on
 > linked expenses but KEEPS the rows; remaining gap is the best-effort catch block, not cleanly inducible via
-> the HTTP harness). NEXT high-value pure-logic low spots: `reminders/validation.ts` (64% — intervalUnit/
-> trigger-mode refinements), `db/sql-helpers.ts` (33% func), `middleware/idempotency.ts` (43%); then the
-> frontend modules (overall 63.7%). Route/integration files (auth/providers/sync routes at <50%) need the
-> full HTTP harness — lower ROI, skip unless a specific bug. Pick one high-value module per cycle when guard
-> is the balance. (Verified C85: the 0%-coverage files — financing/hooks, auth/providers/*, *routes.ts — are
-> all LIVE-but-hard-to-test, NOT dead code, so there's no dead-code arch removal hiding there.)
+> the HTTP harness); `reminders/validation.ts` 64%→100%/100% (C87 — the 6 cross-field refinements:
+> custom-frequency, expense-type, mileage-trigger D4 single-vehicle, date-range, split-config sums/match).
+> NEXT high-value pure-logic low spots: `db/sql-helpers.ts` (33% func), `middleware/idempotency.ts` (43%),
+> `middleware/rate-limit.ts` (75%/60%); then the frontend modules (overall 63.7%, the bigger gap). Route/
+> integration files (auth/providers/sync routes at <50%) need the full HTTP harness — lower ROI, skip unless
+> a specific bug. Pick one high-value module per cycle when guard is the balance. (Verified C85: the
+> 0%-coverage files — financing/hooks, auth/providers/*, *routes.ts — are all LIVE-but-hard-to-test, NOT dead
+> code, so there's no dead-code arch removal hiding there.)
 - ~~**Generalize the FE↔BE contract-drift guard to every hand-assembled response (loop-improvement #2) —
    COMPLETE (C80).**~~ — *A route that hand-builds its JSON with no type binding to the frontend contract
    silently drifts when a field is added/dropped/renamed (the `.optional()`-vs-`.nullish()`, dropped-clientId,
