@@ -37,13 +37,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 146 |
-| deep-review | 5 | 144 |
+| deep-review | 5 | 150 |
 | guard | 6 | 149 |
 | bug | 3 | 148 |
 | arch | 5 | 147 |
 | infra | 6 | 145 |
 
-Current cycle: **149**
+Current cycle: **150**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2735,3 +2735,22 @@ Current cycle: **149**
   frontend validate:local EXIT 0 — type-check 0, build done, 470 pass (+13). NEXT FE low spot (C124): the components/routes
   deficit (the remaining gap now that error-handling/api-client/expense-api services are covered). cov: be 82.25% (carry) / fe
   65.32%+ (carry; +13 FE — expense-api.ts service layer low→well-covered, not whole-suite-re-measured)
+- **C150 (deep-review → bug #50 — deterministic insurance latest-term tiebreak; + DEBUNKED a false-positive HIGH)** — BALANCE:
+  `deep-review` the ONLY over-budget category (cyc 144, starved-for 6 > 5; matches the C149 forecast). #5 sweep overdue but infra
+  not over → dr forced, sweep takes C151. Named dr items eyes-on/sign-off-blocked → fresh backend-correctness fan-out (2 Explore
+  agents): (A) reminder recurrence date-advance, (B) insurance multi-term attribution. PRE-READ both surfaces myself (C67) — and
+  the pre-read ALREADY debunked a hypothesis: anchor-DRIFT in computeNextDueDate is impossible because all 3 call sites thread
+  the STABLE `getAnchorDay(reminder)=startDate.getDate()` (not the clamped current day). THE KEY OUTCOME (the verify-discipline
+  paying off): agent B's headline MED Finding 1 (a null-endDate ongoing term sorts LAST → wrong premium) is a FALSE POSITIVE —
+  insuranceTerms.endDate is `.notNull()` in schema.ts:129, so a null endDate CANNOT exist; the `instanceof Date ? … : 0` branch
+  is defensive DEAD code, never reachable. Caught it firsthand (the test couldn't even seed it — NOT NULL constraint rejected the
+  insert) + confirmed against the schema → REVERTED the null→Infinity churn (don't fix an impossible state, the C21/C77 vacuity
+  rule). KEPT the one GENUINELY-real finding (agent B Finding 2, #50): two terms sharing an endDate had a DB-row-order-dependent
+  (nondeterministic) latest-term pick — the term query has no ORDER BY + the comparator returned 0 on a tie. FIX: tiebreak by
+  the later startDate (the more-current term). Agent B also verified CLEAN: per-vehicle div-by-zero guard, effectiveMonthlyPremium
+  precedence, inactive-policy exclusion, costByCarrier cross-policy dedup, overlapping-month accumulation. MERGE-SURVIVING net:
+  +1 in insurance-details.test.ts (equal-endDate → the later-starting term's premium wins, deterministically). green→green:
+  backend validate:local EXIT 0 — 1187 pass / 0 fail (+1), tsc 0, musl-biome clean, build bundled (existing latest-term tests
+  unchanged = behavior-preserving for the common single-/distinct-endDate path). Agent A (reminders) findings pending its delayed
+  completion event → will triage/file then. Filed agent-B LOW #51 (active-policy-with-no-terms inflates activePoliciesCount while
+  contributing $0). cov: be 82.25% (carry; +1 BE) / fe 65.32% (carry)

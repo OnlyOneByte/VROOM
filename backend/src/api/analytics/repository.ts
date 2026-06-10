@@ -904,9 +904,17 @@ export class AnalyticsRepository {
       // Get the latest term for this policy
       const policyTerms = termRows.filter((t) => t.policyId === policy.id);
       const latestTerm = policyTerms.sort((a, b) => {
+        // Latest term = newest endDate (descending). insuranceTerms.endDate is NOT NULL (schema), so
+        // the instanceof guard is purely defensive — a null can't occur in practice (treated as epoch).
         const aEnd = a.endDate instanceof Date ? a.endDate.getTime() : 0;
         const bEnd = b.endDate instanceof Date ? b.endDate.getTime() : 0;
-        return bEnd - aEnd;
+        if (bEnd !== aEnd) return bEnd - aEnd;
+        // Deterministic tiebreak when two terms share an endDate (e.g. a mid-term correction): the
+        // later-STARTING term is the more current one (#50 — without this the pick was DB-row-order
+        // dependent / nondeterministic, since the term query has no ORDER BY).
+        const aStart = a.startDate instanceof Date ? a.startDate.getTime() : 0;
+        const bStart = b.startDate instanceof Date ? b.startDate.getTime() : 0;
+        return bStart - aStart;
       })[0];
       if (!latestTerm) continue;
 

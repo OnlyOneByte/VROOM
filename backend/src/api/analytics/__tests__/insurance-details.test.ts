@@ -129,6 +129,31 @@ describe('getInsurance — latest-term selection', () => {
     expect(result.summary.totalMonthlyPremiums).toBeCloseTo(120, 2); // the newer term's premium
   });
 
+  test('equal-endDate terms break the tie by the later startDate (deterministic, #50)', async () => {
+    // Two terms share an endDate (e.g. a mid-term correction); the later-STARTING one is the current
+    // coverage and must win regardless of DB row order.
+    policy('p1', 'GEICO');
+    const sharedEnd = now + 335 * MS_DAY;
+    term({
+      id: 'earlier-start',
+      policyId: 'p1',
+      startMs: now - 60 * MS_DAY,
+      endMs: sharedEnd,
+      monthlyCost: 100,
+    });
+    term({
+      id: 'later-start',
+      policyId: 'p1',
+      startMs: now - 20 * MS_DAY,
+      endMs: sharedEnd,
+      monthlyCost: 130,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'later-start', vehicleId: 'veh-1' });
+
+    const result = await repo.getInsurance(USER);
+    expect(result.summary.totalMonthlyPremiums).toBeCloseTo(130, 2); // the later-starting term
+  });
+
   test('an INACTIVE policy is excluded from the premium totals', async () => {
     policy('p1', 'GEICO', false); // inactive
     term({

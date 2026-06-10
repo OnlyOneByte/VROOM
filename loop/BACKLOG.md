@@ -578,6 +578,18 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   return another user's reading if ever called with an unvalidated vehicleId (the C109 detectConflicts class). VERIFIED C144.
   FIX: add a userId param as belt-and-braces.
 
+**NEW — surfaced + verified-against-source by the C150 deep-review fan-out (reminder recurrence date-advance + insurance multi-term attribution). KEY: agent B's headline MED "null-endDate term sorts last → wrong premium" was a FALSE POSITIVE — insuranceTerms.endDate is `.notNull()` (schema.ts:129), so a null endDate CANNOT exist and that sort branch is unreachable dead code (caught firsthand: the NOT NULL constraint rejected the test insert; the C21/C77 vacuity rule). effectiveMonthlyPremium / inactive-exclusion / costByCarrier dedup / per-vehicle div-guard / overlapping-month accumulation all CERTIFIED CLEAN. #50 (real) FIXED in-cycle; #51 filed. Reminder agent's findings land with its delayed event.**
+- ~~**#50 (LOW) — insurance latest-term pick was DB-row-order dependent on an endDate tie.**~~ — *DONE C150: `buildInsuranceDetails`
+  (analytics/repository.ts:906) sorted terms by endDate desc but returned 0 on a tie, and the term query has no ORDER BY → two
+  terms sharing an endDate (e.g. a mid-term correction with different monthlyCost) picked nondeterministically by storage order.
+  FIX: tiebreak by the later startDate (the more-current term). +1 test (equal-endDate → later-starting term's premium wins).
+  validate:local EXIT 0, 1187 pass. (The null-endDate "Finding 1" was debunked — endDate is NOT NULL, branch unreachable.)*
+- **#51 (LOW, consistency) — an active policy with NO terms inflates activePoliciesCount while contributing $0.**
+  analytics/repository.ts:911 `if (!latestTerm) continue;` skips a term-less policy for premium/vehicle entries, but
+  activePoliciesCount is the raw count of active policies (:~1702) → the card can show "1 active policy / $0.00 / empty details" —
+  internally inconsistent. Arguably intentional (it IS active). VERIFIED C150. FIX (if desired): count only policies with a term,
+  or surface a "no current term" state. Low.
+
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
    (Overview) + `fetchExpensesPage` (Expenses tab) in `vehicles/[id]/+page.svelte` only toasted on
