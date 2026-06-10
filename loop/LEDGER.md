@@ -24,12 +24,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 70 |
 | deep-review | 5 | 82 |
-| guard | 6 | 84 |
+| guard | 6 | 85 |
 | bug | 3 | 71 |
 | arch | 5 | 79 |
 | infra | 6 | 81 |
 
-Current cycle: **84**
+Current cycle: **85**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1561,3 +1561,19 @@ Current cycle: **84**
   +10 · build bundled). Next (85): recompute — arch (cyc 79, starved-for 6 > 5, now OVER) most-starved but
   still misfit/direction-blocked; deep-review (cyc 82, 3) or another high-value coverage guard the actionable
   fallback. feature/bug Angelo-gated. cov: be ~80% / fe 63.7%
+- **C85 (guard — coverage-ratchet financing/hooks.ts, the deactivation data-integrity hook)** — feature (15)
+  + bug (14) blocked (11th cycle). arch most-starved + now OVER (cyc 79, 6 > 5) — but VERIFIED again it has no
+  self-authorizable increment: page-migration misfit-blocked, reshape is the pending C79 direction call, AND I
+  checked whether the 0%-coverage files were DEAD code (a legit arch removal) — they're all LIVE
+  (financing/hooks ← routes.ts, auth/providers/* ← auth routes + a registry test), just harness-hard, so no
+  dead-code win. Took the next actionable (guard) via the C83 angle. Picked `financing/hooks.ts` (0% func) —
+  the onFinancingDeactivated DATA-INTEGRITY hook: on payoff (PUT /:id/payoff) or delete, it must SEVER the
+  source link (clear sourceType/sourceId) on the financing's auto-generated expenses while KEEPING the rows.
+  Pinned end-to-end through both real routes via financing-deactivate-hook.test.ts (+4): payoff severs +
+  row survives; delete severs; no-linked-expenses payoff is a clean no-op (200); an unrelated expense is
+  untouched. Used the C68 HTTP-harness pattern so the singleton-bound clearSource hits the test DB. RATCHET:
+  0%→100% func / 69% line (the remaining gap is the best-effort catch block — not cleanly inducible via HTTP,
+  and the never-throws contract is implicitly proven by the green happy/no-op paths; documented). Verified:
+  backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1076 pass/0 fail, +4 · build bundled). Next (86):
+  the #5 branch-hygiene sweep is due (~C86, last C76, branch now 34 commits) — a clean infra pick; else the
+  next coverage target (reminders/validation 64%). arch stays direction-blocked; feature/bug gated. cov: be ~80% / fe 63.7%
