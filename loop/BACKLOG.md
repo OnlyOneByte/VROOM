@@ -847,6 +847,12 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     unexpected error occurred')` (error-wins precedence — NOT the inverted error-handling.ts:120 helper, the C90 exclusion). Pure
     `.svelte.ts`, behavior-preserving; the store has no test file, so add a tiny characterization test. (auth.svelte.ts already
     migrated; settings was the one holdout.)
+  - **Also filed C160 (backend audit runner-up):** `validateOdometerOwnership` — the `const entry = await
+    odometerRepository.findById(id); if (!entry || entry.userId !== user.id) throw new NotFoundError('Odometer entry')` guard
+    repeated 3× in odometer/routes.ts (GET /entry/:id:99, PUT:146, DELETE:165), byte-identical. A DIFFERENT repo contract than the
+    reminder helper (findById + explicit userId post-filter, like validateInsuranceOwnership — NOT findByIdAndUserId), so its own
+    helper. CAVEAT (arch rule 3): odometer routes have NO existing 404/cross-user not-found test, so this pick must WRITE the
+    anchoring test (the C160 reminder pick rode existing 404 coverage; this one doesn't). Slightly more work but still one clean cycle.
   - **Next arch pick when one is due:** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the
     eyes-on + pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the
     ~57 logging sites is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.
