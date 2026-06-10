@@ -111,7 +111,7 @@ Highlights:
   and pluggable storage providers (Drive/Sheets/Photos/S3) all ship.
 - Backup/restore round-trips every table on the CSV path (schema-derived + coverage guards)
   and the Google Sheets path (header set is pinned by `sheets-header-coverage.test.ts`).
-- Two feature specs are signed off (backend-first, one `tasks.md` task per loop cycle):
+- Three feature specs are signed off (backend-first, one `tasks.md` task per loop cycle):
   - `.kiro/specs/maintenance-schedule/` (mileage+time service-interval reminders) — **backend COMPLETE,
     frontend nearly done.** Backend (T1–T5): nullable-date rebuild migration 0004 + partial mileage
     dedup index, `getCurrentOdometer`, whichever-comes-first trigger (fires on /trigger AND on
@@ -136,12 +136,24 @@ Highlights:
     native CSV path is unchanged when no mapping is sent. **Remaining: T4/T5 (frontend mapping-step
     dialog) + T6 e2e** (incl. real-export signature validation) — eyes-on/Playwright-blocked, so the
     feature is code-complete-but-not-DONE per the feature-DoD rule.
-- Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. The real
-  measured baseline is **backend 77.8% line / frontend 63.7% line (C81)** — not the older
-  ~74%/~59% TODO.md estimate. loop-improvement #4 now records a `cov:` tag on every LEDGER
-  cycle entry and ratchets the C81-named low spots on guard/arch/bug cycles. Suite size today:
-  **~1100 backend tests / ~379 frontend** (a floor — grows most cycles). Don't regress coverage;
-  name why if a cycle drops it.
+  - `.kiro/specs/recurring-expenses/` (recurring expense reminders auto-materialize expense rows) —
+    **backend COMPLETE (T1–T3 + T7), frontend not started.** KEY GROUNDING: the engine ALREADY EXISTS —
+    a `type:'expense'` reminder auto-creates real expense rows (single or multi-vehicle split,
+    `sourceType:'reminder'`) on its frequency via `trigger-service.ts` (C94 deep-review CERTIFIED it
+    clean), so the spec EXTENDS it, never a new table/scheduler (NORTH_STAR #4). T1 (C96) source-
+    traceability API test; T2 (C102) split-materialization characterization; T3 (C104) cascade-safe
+    delete via `clearSource` (keep history, sever link, D2); T7 backend = `reminder-cost.ts`
+    (`recurringCostSummary`, C111) + `GET /reminders/recurring-cost` (C116, the monthly run-rate the
+    dashboard widget fetches). **Remaining: T4 (multi-vehicle split in ReminderForm), T5 (client
+    opportunistic trigger on app-open — the backend seam is the existing `POST /reminders/trigger`),
+    T6 (Recurring badge), the T7 widget, T8 e2e** — all eyes-on/Playwright-blocked.
+- Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
+  (re-measured C107, not an estimate): **backend 81.1% line / 81.8% func · frontend 61.4% line / 59.3%
+  func** — backend climbed ~+4 since the C81 baseline (the ratchet delivered); **frontend is now the
+  bigger gap** (essentially flat vs C81 — product code outgrew its tests), so steer FE guard cycles
+  there. loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry and ratchets the named
+  low spots on guard/arch/bug cycles. Suite size today: **~1145 backend tests / ~385 frontend** (a
+  floor — grows most cycles). Don't regress coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
   in-memory SQLite DB with a seeded user + a real Lucia session cookie (`ctx.authed/anon`); it's

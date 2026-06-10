@@ -36,9 +36,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 112 |
 | bug | 3 | 115 |
 | arch | 5 | 113 |
-| infra | 6 | 110 |
+| infra | 6 | 117 |
 
-Current cycle: **116**
+Current cycle: **117**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2171,3 +2171,14 @@ Current cycle: **116**
   complete; only the T7 dashboard WIDGET (eyes-on) + the T4/T5/T6/T8 tails remain Playwright-blocked. Next (117): `infra`
   most-starved over budget (cyc 110, starved-for 7 > 6) → #5 sweep is next due ~C120, so likely a CLAUDE.md orientation
   refresh or another infra need. cov: be ~81% / fe 61.4% (carry C107)
+- **C117 (infra — CLAUDE.md orientation refresh; the C93/C72 anti-drift class)** — BALANCE: `infra` most-starved over
+  budget (cyc 110, starved-for 7 > 6); the #5 sweep isn't due (~C120), so the high-value infra increment was a CLAUDE.md
+  refresh (last C93, 24 cycles ago — a stale entry-point misleads a fresh agent). Fixed THREE actively-misleading drifts
+  (verified vs source/LEDGER, the C93 fix-only-real-drift discipline, no cosmetic churn): (1) recurring-expenses was ENTIRELY
+  ABSENT — the doc said "Two feature specs signed off" + listed only maintenance/import-trackers, but recurring-expenses
+  (D1–D4 signed off C94) is now the MOST backend-complete feature (T1–T3 + T7); added it as the 3rd bullet with the
+  load-bearing "engine already exists, EXTEND it" grounding + the T1/T2/T3/T7-backend cycle map + the eyes-on remaining tail.
+  (2) Stale coverage — cited "77.8%/63.7% (C81)"; corrected to the C107 re-measure (be 81.1% line/81.8% func, fe 61.4%/59.3%)
+  + the key steer that FRONTEND is now the bigger gap. (3) Stale suite size ~1100/~379 → ~1145/~385. Doc-only (no code → no
+  build gate, the C93/C100 pattern). Next (118): nothing forced (deep-review cyc 114, guard cyc 112 breach next) →
+  highest-leverage. cov: be ~81% / fe 61.4% (carry C107)

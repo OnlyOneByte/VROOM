@@ -716,6 +716,12 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
   regress.sh Playwright-blocked); (3) digest header 36→46 commits, status 1076→1109 BE / 367→379 FE, appended §18
   (C86–C99: recurring-expenses spec+sign-off+T1, bugs #4/#18, the C90/C92/C99 arch dedups, the C87/C91/C98 coverage
   ratchet, C93 doc refresh) + refreshed the merge footer. BRANCH_REVIEW.md is gitignored. Next sweep ~C110.*
+- ~~**CLAUDE.md orientation refresh post-C93–C116 (C117)**~~ — *DONE C117: 3 actively-misleading drifts fixed
+  (verified vs source/LEDGER, no churn). (1) recurring-expenses was ABSENT — "Two feature specs" + only
+  maintenance/import-trackers listed; it's now the most backend-complete feature (T1–T3+T7), added as the 3rd bullet
+  with the "engine exists, EXTEND it" grounding. (2) Coverage 77.8%/63.7% (C81) → the C107 re-measure (be 81.1%/81.8%,
+  fe 61.4%/59.3%) + the FE-is-now-the-bigger-gap steer. (3) Suite ~1100/~379 → ~1145/~385. Doc-only. Next CLAUDE.md
+  refresh ~C130 or after the next big arc.*
 - ~~**CLAUDE.md orientation refresh post-C81–C92 (C93)**~~ — *DONE C93: 2 actively-misleading drifts fixed
   (the C5/C47/C72 class). (1) The coverage line cited a stale ~74%/~59% / ~1038-test floor → corrected to the
   real C81 MEASURED baseline (be 77.8% / fe 63.7% line) + the loop-improvement #4 per-cycle cov: tag + ~1100/
