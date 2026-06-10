@@ -376,6 +376,18 @@ positives, debunked in LEDGER C21; these two are the real ones)*
     next /trigger. Matches D5's "after a create" wording — a documented scope choice. Expand to UPDATE
     routes only if the product wants edit-triggered rechecks. (by-design gap)
 
+*(surfaced + VERIFIED by the C103 fresh-bug fan-out — the known queue was all-gated, so hunted a new one)*
+- ~~**Expense-form date validation rejects TODAY for positive-UTC-offset users (C103)**~~ — *DONE C103:
+  `expense-form-validation.ts:36-38` did `new Date(value) > new Date()` — `new Date('YYYY-MM-DD')` parses as UTC midnight,
+  so for a user at a positive UTC offset today's picked date landed on tomorrow-morning-local and the Date-instant compare
+  wrongly rejected TODAY as "in the future" (the C6/C61 local-vs-UTC class). Fixed to compare CALENDAR-DAY strings (picker
+  value is already local 'YYYY-MM-DD'; today's local day via the getFullYear/getMonth/getDate idiom this file already uses
+  at :96/:109) — timezone-safe + host-independent (sidesteps the C77 UTC-host vacuity trap). Guard:
+  expense-form-validation-date.test.ts (+6, today accepted = the regression, future rejected). frontend validate:local
+  EXIT 0 (385 pass). Found via a 2-agent fan-out; the OTHER agent finding (getSummary Date→gte seconds/ms mismatch) was a
+  FALSE POSITIVE — expenses.date is mode:'timestamp', Drizzle auto-converts Date↔seconds (verified vs source). CAVEAT:
+  UI-touching but pure .ts, no markup; TZ-safe compare can't be shown in a screenshot, so the unit test is the gate.*
+
 *(surfaced + VERIFIED by the C94 reminder→expense materialization deep-review — engine certified clean;
 these two are the only findings, both verified against source: 1 real low-sev bug, 1 needs-decision)*
 - ~~**Cross-fleet fuel fillup COUNT inflated by a split fuel expense (#18)**~~ — *DONE C97: a split fuel

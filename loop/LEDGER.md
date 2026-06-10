@@ -25,11 +25,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 102 |
 | deep-review | 5 | 101 |
 | guard | 6 | 98 |
-| bug | 3 | 97 |
+| bug | 3 | 103 |
 | arch | 5 | 99 |
 | infra | 6 | 100 |
 
-Current cycle: **102**
+Current cycle: **103**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1901,3 +1901,25 @@ Current cycle: **102**
   (the queue is otherwise Angelo-gated: lease/loan + #14/#16/#19) — re-verify the queue against source per the C89 lesson;
   if genuinely all-gated, the actionable pick is recurring-expenses T3 (cascade-safe delete, backend, the C101-certified
   clearSource path) or a guard. cov: be ~80% / fe 63.7%
+- **C103 (bug — expense-form date validation rejects TODAY for positive-UTC-offset users)** — BALANCE: `bug` most-starved
+  over budget (cyc 97, starved-for 6 > 3). The known queue is genuinely Angelo-gated (lease/loan $, #14/#16/#19 semantics,
+  #2/#11 eyes-on, #17 by-design), so per the C90 refinement I FANNED OUT (2 Explore agents) to find a fresh UNBLOCKED bug
+  rather than force a gated one. VERIFIED both findings vs source (C21/C28/C67 — one was a false HIGH):
+  • Agent A "getSummary passes a Date to gte() → seconds-vs-ms mismatch, breaks summary every request" = FALSE POSITIVE.
+    expenses.date is `integer({ mode: 'timestamp' })` (schema.ts:213) — Drizzle AUTO-converts Date↔seconds at the driver, so
+    `gte(expenses.date, dateObj)` is the CORRECT intended usage (the heavily-tested buildExpenseConditions list path does the
+    same). The agent's "line 346 does /1000" is a different raw-SQL path. Dismissed, not filed.
+  • Agent B (REAL, unblocked, the C6/C61 class): expense-form-validation.ts:36-38 did `new Date(value) > new Date()` for the
+    future-date guard. `new Date('YYYY-MM-DD')` parses as UTC midnight, so for a user at a POSITIVE UTC offset today's picked
+    date lands on tomorrow-morning-local and the Date-instant compare wrongly rejects TODAY as "in the future." FIX: compare
+    CALENDAR-DAY strings — the picker value is already local 'YYYY-MM-DD'; today's local day via the getFullYear/getMonth/
+    getDate parts idiom this same file already uses for mileage ordering (:96/:109); string compare is timezone-safe +
+    host-independent (sidesteps the C77 UTC-host vacuity trap — the bug was a time-of-day mismatch, eliminated by date-only
+    compare). MERGE-SURVIVING GUARD: new expense-form-validation-date.test.ts (+6) — today accepted (the regression),
+    past accepted, tomorrow/far-future rejected, empty required; derives "today" from local parts exactly as the validator,
+    so it holds on any host. CAVEAT (NORTH_STAR #3): UI-touching but pure .ts logic, no markup; correctness is the TZ-safe
+    compare which a screenshot can't show (TZ-dependent) — the unit test is the right gate (the C89/C61 non-visual class).
+    Verified: frontend validate:local EXIT 0 — 385 pass / 0 fail (+6) · tsc 0 · build OK. THE GATE EARNED ITS KEEP: caught my
+    bun:test import (frontend is vitest) + a strict-null destructure; both fixed. Next (104): nothing over budget (guard cyc 98
+    starved-for 6 = budget at 104; arch cyc 99, 5 = budget). Highest-leverage = recurring-expenses T3 (cascade-safe delete,
+    backend, the C101-certified clearSource path) — continues the advanceable feature. cov: be ~80% / fe ~64%
