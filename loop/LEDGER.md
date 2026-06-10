@@ -26,7 +26,10 @@
 > ratchet BROKE 70% line for the first time; FE still the bigger gap but closing fast).** **RE-MEASURED AGAIN C164 (the #5-sweep
 > re-measure): be 82.70% line / 82.51% func (line up from C152's 82.02 — the C154–C162 BE fixes); fe 70.18% line / 66.88% func /
 > 62.85% branch (the C163 reminder-api ratchet — FE SERVICE LAYER now FULLY covered: api-client/expense-api/reminder-api/error-
-> handling; remaining FE gap is the components/routes deficit, largely eyes-on).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> handling; remaining FE gap is the components/routes deficit, largely eyes-on).** **RE-MEASURED AGAIN C176 (the #5-sweep re-measure):
+> be 82.74% line / 82.49% func (line creeping up from C164's 82.70 — the C167–C174 BE fixes); fe 73.89% line / 73.61% func / 66.08%
+> branch (UP SHARPLY +3.7 line / +6.7 func / +3.2 branch from C164 — the C166 settings-store + C169 settings-api + C175 pwa.ts FE
+> ratchets delivered; FE still the bigger gap but closing fast).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -47,9 +50,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 175 |
 | bug | 3 | 174 |
 | arch | 5 | 172 |
-| infra | 6 | 171 |
+| infra | 6 | 176 |
 
-Current cycle: **175**
+Current cycle: **176**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3152,3 +3155,23 @@ Current cycle: **175**
   validate:local **EXIT 0 — 513 pass (+10)**, tsc 0, build done; ALSO ran the CI-only legs validate:local skips — eslint EXIT 0 +
   prettier --check EXIT 0 on the touched file (CI runs the full `validate` = lint+format+type-check+test). cov: fe 70.18%+ (carry;
   +10 FE, pwa.ts getPlatformInfo 0%→covered) / be 82.70% (carry)
+- **C176 (infra — #5 branch-hygiene sweep [overdue] + coverage re-measure; surfaced an untracked-spec hygiene finding)** — BALANCE:
+  `feature` the only over-budget category (cyc 170 → starved-for 6 > 4), but blocked for the 3rd cycle running (eyes-on-Playwright /
+  Angelo-T0-gated, both escalated C164/C165, nothing changed → honest starvation, don't re-nag). Fell through; among the rest INFRA
+  was most-starved (cyc 171, starved-for 5, due C177) AND the #5 sweep was overdue (last C164, ~12 cycles / 128 commits-ahead vs the
+  ~10-cycle cadence) — a concrete due obligation, edging arch (4, queue-empty). Inline, no spawn. THE 3-PART SWEEP: **(1) stray-test
+  scan** — and it EARNED its keep this cycle: found `.kiro/specs/offline-entries/` (4 docs, dated 2026-06-05, pre-loop) is the ONLY
+  untracked `.kiro/specs/` dir. Investigated firsthand (NOT a stray to delete): its implementation IS committed/tracked (TODO #8 ✅ —
+  `client_id` column + partial unique index `expenses_user_client_idx`, `createIdempotent`/`findByClientId`, migration
+  `0001_blushing_juggernaut.sql`, `idempotent-create.test.ts` — the SAME idempotency infra #59/#52 rely on), and TODO.md:19-22 cites its
+  tasks.md as the deferred-follow-ups record. So the docs arguably belong in git, BUT they're Angelo-authored design content (not loop
+  output) → per "don't unilaterally commit unauthored specs," FLAGGED to Angelo for a track/keep-local call rather than acting. Other
+  untracked items all expected (.meshclaw-tools/, *.meshclaw.e2e.ts, playwright.meshclaw.config.ts, test-results/, mise.local.toml).
+  **(2) GREEN BASELINE + RE-MEASURE** — backend `bun test --coverage` EXIT 0 (1218 pass / 1 skip / 0 fail), **be 82.74% line / 82.49%
+  func** (line up from C164's 82.70 — the C167–C174 BE fixes); frontend `vitest --coverage` EXIT 0 (513 pass), **fe 73.89% line /
+  73.61% func / 66.08% branch** (UP +3.7 line / +6.7 func / +3.2 branch from C164 — the C166 settings-store + C169 settings-api + C175
+  pwa FE ratchets DELIVERED; FE closing the gap fast). **(3) BRANCH_REVIEW.md REFRESH** — header 116→128 commits-ahead, status 1209→1218
+  BE / 492→513 FE + fresh cov, appended **§24 (C164–C175:** #57 HIGH shipped, #59/#60 MED data-safety bugs, the odometer dedup arch,
+  settings-api + pwa guard ratchets, trips spec drafted, CLAUDE.md refresh**)**, + the offline-entries hygiene note in the reviewer
+  call-outs. BRANCH_REVIEW.md gitignored (refreshed, not committed). Doc/measurement-only — NO code change. Next #5 sweep ~C186;
+  CLAUDE.md refresh next ~C184 (last C171). cov: be 82.74% line / fe 73.89% line (RE-MEASURED)
