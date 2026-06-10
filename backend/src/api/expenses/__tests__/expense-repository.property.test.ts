@@ -231,6 +231,56 @@ describe('Property 5 (Design): Split expense update preserves groupId and migrat
     );
   });
 
+  // C101 (deep-review): a reminder-materialized split must STAY linked to its reminder
+  // across an edit. updateSplitExpense deletes old siblings + inserts new ones, copying
+  // sourceType/sourceId from the first old sibling (repository.ts:739-740) — but nothing
+  // pinned it, and recurring-expenses T3 (cascade-safe delete, which keys on sourceId)
+  // depends on this invariant holding. Deterministic fixture: the invariant is "source
+  // survives the edit", not a distribution property.
+  test('update preserves sourceType/sourceId on the new siblings (reminder link survives an edit)', async () => {
+    const reminderId = createId();
+
+    const oldSiblings = await repo.createSplitExpense(
+      {
+        splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2'] },
+        category: 'financial',
+        date: new Date(2024, 5, 15),
+        totalAmount: 150,
+        sourceType: 'reminder',
+        sourceId: reminderId,
+      },
+      USER_ID
+    );
+    const groupId = oldSiblings[0]?.groupId as string;
+    expect(groupId).toBeTruthy();
+    // Sanity: the created siblings carry the source link.
+    for (const s of oldSiblings) {
+      expect(s.sourceType).toBe('reminder');
+      expect(s.sourceId).toBe(reminderId);
+    }
+
+    // Edit the split (different vehicle set + total) — the source link must persist.
+    const newSiblings = await repo.updateSplitExpense(
+      groupId,
+      { splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2', 'v-3'] }, totalAmount: 180 },
+      USER_ID
+    );
+
+    expect(newSiblings.length).toBe(3);
+    for (const s of newSiblings) {
+      expect(s.sourceType).toBe('reminder');
+      expect(s.sourceId).toBe(reminderId);
+    }
+
+    // Verify from the DB too (not just the returned rows).
+    const dbRows = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
+    expect(dbRows.length).toBe(3);
+    for (const row of dbRows) {
+      expect(row.sourceType).toBe('reminder');
+      expect(row.sourceId).toBe(reminderId);
+    }
+  });
+
   test('photos from old siblings migrate to the first new sibling', async () => {
     await fc.assert(
       fc.asyncProperty(

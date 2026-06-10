@@ -23,13 +23,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 96 |
-| deep-review | 5 | 94 |
+| deep-review | 5 | 101 |
 | guard | 6 | 98 |
 | bug | 3 | 97 |
 | arch | 5 | 99 |
 | infra | 6 | 100 |
 
-Current cycle: **100**
+Current cycle: **101**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1861,3 +1861,26 @@ Current cycle: **100**
   deliverable). Doc-only — no code, no build gate (the C86/C76/C66 sweep pattern). Next (101): `deep-review` most-starved over
   budget (cyc 94, starved-for 7 > 5) → it wins; fan out per rule 7, verify vs source (the C99 arch dedup + the recurring-
   expenses T1 surface are fresh-unreviewed), OR continue feature recurring-expenses T2. Next #5 sweep due ~C110. cov: be ~80% / fe 63.7%
+- **C101 (deep-review — certify financing math + split/cascade primitives; pin the T3-critical source-survives-edit gap)** —
+  BALANCE: `deep-review` most-starved over budget (cyc 94, starved-for 7 > 5) → forced. Verification cycle (C21/C28/C35
+  pattern). Fanned out 2 Explore agents on FRESH backend-correctness surfaces that de-risk pending work: (A) financing/loan
+  balance + amortization math (money-touching, feeds the pending lease/loan fix); (B) expense split edit/delete + the
+  clearSource/deleteBySource cascade primitives (recurring-expenses T3 builds on these). VERIFIED every finding vs source —
+  the discipline earned its keep (both "CRITICAL/MAJOR" flags were FALSE HIGHs):
+  • Agent A: AUDIT-CLEAN. computeBalance is correctly payment-history-based (max(0, original − Σpayments), well-tested via
+    financing-balance.property); buildAmortizationSchedule decrements properly (bug #10 fixed C38); div-by-zero guarded;
+    future-startDate + apr-null + payoff-clamp all safe. One COSMETIC finding (monthsElapsed ignores day-of-month →
+    monthsRemaining is a ±1-month display approximation, no $-derived value uses it) — NOT filed (no displayed-$ impact).
+  • Agent B: split/cascade primitives CERTIFIED. clearSource NULLs source + KEEPS rows; deleteBySource removes rows + photos
+    in a txn; BOTH correctly userId-scoped (no cross-tenant) — verified vs source (repository.ts:483-553). Its "#1 absolute-
+    split unvalidated" + "#2 percentage rounding fairness" were FALSE HIGHs (Zod validates sum==total at the API layer per
+    validation.ts:64-72; the penny-to-last-vehicle is standard money-split, sum exact). The ONE genuine, actionable finding
+    (#3): updateSplitExpense correctly preserves sourceType/sourceId across an edit (copies from firstOld, repository.ts:739-
+    740) but NOTHING pinned it — and recurring-expenses T3 (cascade-delete keys on sourceId) depends on a reminder-linked
+    split STAYING linked across an edit. Closed it (the C73 audit-then-pin pattern): added a deterministic test to
+    expense-repository.property.test.ts — create an even split with sourceType:'reminder', edit it (2→3 vehicles, total
+    150→180), assert all new siblings + the DB rows still carry sourceType:'reminder' + the same sourceId. Net: both surfaces
+    certified clean, 2 false HIGHs debunked, 1 real T3-de-risking gap closed. Verified: backend validate:local EXIT 0 — 1110
+    pass / 0 fail (+1) · build bundled. Next (102): `feature` most-starved over budget (cyc 96, starved-for 6 > 4) →
+    recurring-expenses **T2** (split-materialization characterization, backend/non-eyes-on) — now doubly de-risked (this cycle
+    certified the split primitives). `bug` (cyc 97, 5 > 3) next. cov: be ~80% / fe 63.7%

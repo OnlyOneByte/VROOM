@@ -139,6 +139,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Certify financing math + split/cascade primitives; pin source-survives-edit (C101)**~~ — *DONE C101: 2-agent
+  fan-out on fresh backend-correctness surfaces. (A) Financing/loan balance + amortization math AUDIT-CLEAN — computeBalance
+  is payment-history-based (max(0, original−Σpayments), not naive amortization), buildAmortizationSchedule decrements
+  properly (bug #10 fixed), div-by-zero guarded; 1 cosmetic monthsElapsed day-of-month finding (no displayed-$ impact, not
+  filed). (B) Split edit/delete + clearSource/deleteBySource CERTIFIED — both userId-scoped, clearSource keeps rows +
+  deleteBySource removes rows+photos in a txn (verified repository.ts:483-553). 2 agent "CRITICAL/MAJOR" flags were FALSE
+  HIGHs (absolute-sum validated by Zod at the API layer; percentage penny-to-last is standard). The 1 genuine finding: a
+  reminder-linked split's sourceType/sourceId survives updateSplitExpense (copied from firstOld) but was UNPINNED — and T3
+  cascade-delete keys on sourceId. Closed with a deterministic test in expense-repository.property.test.ts (create
+  sourceType:'reminder' split → edit 2→3 vehicles → assert source link persists on new siblings + DB rows). validate:local
+  EXIT 0 (1110 pass, +1). De-risks recurring-expenses T2/T3.*
 - ~~**Characterize `withTimeout` (0%-coverage utility, C82)**~~ — *DONE C82: steered by the C81 coverage
   baseline to a concrete 0%-covered module. `utils/timeout.ts` (withTimeout + OPERATION_TIMEOUTS) is live in
   the sync backup path (backup-orchestrator, sync/routes) — a hung Drive/Sheets call must fail as a typed
