@@ -26,10 +26,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 101 |
 | guard | 6 | 105 |
 | bug | 3 | 103 |
-| arch | 5 | 99 |
+| arch | 5 | 106 |
 | infra | 6 | 100 |
 
-Current cycle: **105**
+Current cycle: **106**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1959,3 +1959,20 @@ Current cycle: **105**
   (Also a biome reflow autofixed.) Verified: backend validate:local EXIT 0 — 1121 pass / 0 fail (+7) · build bundled.
   Next (106): `arch` most-starved over budget (cyc 99, starved-for 7 > 5) → the C99 follow-on (converge expenses/financing/
   vehicles route ownership checks on validateVehicleOwnership), or rule-7 fan-out. cov: be ~81% / fe ~64%
+- **C106 (arch — converge expenses/routes.ts ownership checks on validateVehicleOwnership, the C99 follow-on)** —
+  BALANCE: `arch` the only over-budget category (cyc 99, starved-for 7 > 5). PICK: the C99 follow-on — C99 converged
+  analytics/routes.ts (6 of 13 inline `findByUserIdAndId + NotFoundError('Vehicle')` sites) and filed the remaining 3
+  route files (expenses/financing/vehicles) as the next arch increments. VERIFY-AGAINST-SOURCE (the C69/C99 diff-before-
+  extract discipline) screened all three: financing/routes.ts is a TRAP — its two sites throw `HTTPException(404,
+  {message:'Vehicle not found'})`, NOT `NotFoundError('Vehicle')`, so converging it would CHANGE the error envelope
+  (code 'HTTPException' → 'NotFoundError') — NOT behavior-preserving, EXCLUDED (the exact C69 "not byte-identical" win).
+  Scoped to expenses/routes.ts (arch rule 1, one file/cycle): 4 sites, all byte-identical to the validator
+  (findByUserIdAndId(user.id, X) + if(!vehicle) throw NotFoundError('Vehicle'), vehicle DISCARDED) — 2 mandatory
+  (create:538 via expenseData.vehicleId, list:593) + 2 optional (summary:301, export:356, kept inside their
+  `if (vehicleId)` guards). All collapse to `await validateVehicleOwnership(X, user.id)`. Dropped the now-unused
+  `NotFoundError` import (kept `ValidationError`, still used at :547/:550); `vehicleRepository` STAYS imported (still used
+  at :373/:442/:462 for findByUserId + type annotations) — tsc confirmed both. GREEN→GREEN PROOF: expenses route +
+  property suites stayed green UNCHANGED — 1121 pass, same as C105 = behavior-preserving. Verified: backend
+  validate:local EXIT 0, build bundled. REMAINING: vehicles/routes.ts (mixed shapes — some bare throws at :208/:251
+  without an adjacent find; needs per-site verification) filed as the next arch increment; financing EXCLUDED by design.
+  Next (107): nothing forced (deep-review/bug/infra breach next) → highest-leverage. cov: be ~81% / fe ~64%

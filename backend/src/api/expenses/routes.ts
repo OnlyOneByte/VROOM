@@ -10,7 +10,7 @@ import {
   EXPENSE_CATEGORY_DESCRIPTIONS,
   EXPENSE_CATEGORY_LABELS,
 } from '../../db/types';
-import { NotFoundError, ValidationError } from '../../errors';
+import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
 import { buildPaginatedResponse } from '../../utils/pagination';
@@ -18,6 +18,7 @@ import {
   commonSchemas,
   validateExpenseOwnership,
   validateFuelExpenseData,
+  validateVehicleOwnership,
 } from '../../utils/validation';
 import { financingRepository } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
@@ -299,10 +300,7 @@ routes.get('/summary', zValidator('query', summaryQuerySchema), async (c) => {
 
   // If vehicleId provided, verify user owns the vehicle
   if (vehicleId) {
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-    if (!vehicle) {
-      throw new NotFoundError('Vehicle');
-    }
+    await validateVehicleOwnership(vehicleId, user.id);
   }
 
   const summary = await expenseRepository.getSummary({
@@ -354,10 +352,7 @@ routes.get('/export', zValidator('query', exportQuerySchema), async (c) => {
   const { vehicleId, category, startDate, endDate, search, tags } = c.req.valid('query');
 
   if (vehicleId) {
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-    if (!vehicle) {
-      throw new NotFoundError('Vehicle');
-    }
+    await validateVehicleOwnership(vehicleId, user.id);
   }
 
   const [rows, vehicles, prefs] = await Promise.all([
@@ -535,10 +530,7 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const expenseData = c.req.valid('json');
 
   // Verify vehicle exists and belongs to user
-  const vehicle = await vehicleRepository.findByUserIdAndId(user.id, expenseData.vehicleId);
-  if (!vehicle) {
-    throw new NotFoundError('Vehicle');
-  }
+  await validateVehicleOwnership(expenseData.vehicleId, user.id);
 
   // Validate: if sourceType is provided, verify the referenced entity exists
   if (expenseData.sourceType === 'financing') {
@@ -590,10 +582,7 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
 
   // If vehicleId filter is provided, verify user owns the vehicle
   if (query.vehicleId) {
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, query.vehicleId);
-    if (!vehicle) {
-      throw new NotFoundError('Vehicle');
-    }
+    await validateVehicleOwnership(query.vehicleId, user.id);
   }
 
   const { data, totalCount } = await expenseRepository.findPaginated({

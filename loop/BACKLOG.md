@@ -586,14 +586,15 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
    (C75 reasoning, arch rule 5). If a providersRepository is ever introduced, route ALL its raw queries through
    it as one coherent change — not piecemeal.*
 
-- **Converge the REMAINING 3 route files on `validateVehicleOwnership` (C99 follow-on — next arch pick).** C99 converged
-  `analytics/routes.ts` (6 sites). The same byte-identical inline pattern (`const vehicle = await
-  vehicleRepository.findByUserIdAndId(user.id, vehicleId); if (!vehicle) throw new NotFoundError('Vehicle')`) still lives in
-  **expenses/routes.ts** (4 sites: ~301/356/538/593 — note the summary/export/paginated ones are OPTIONAL, wrapped in
-  `if (query.vehicleId)`, keep the guard), **financing/routes.ts** (2 sites: ~100/129), **vehicles/routes.ts** (1 site: ~330).
-  All test-covered; the helper exists (utils/validation.ts:83). One file per arch cycle (the C36/C50 pattern), verify
-  byte-identical vs source first (some sites discard the return, some may use it — check), green→green. Drop the now-unused
-  NotFoundError/vehicleRepository imports per file as they fall out (tsc confirms).
+- **Converge the REMAINING route file(s) on `validateVehicleOwnership` (C99 follow-on — next arch pick).** C99 converged
+  `analytics/routes.ts` (6 sites); C106 converged **expenses/routes.ts** (4 sites: 301/356/538/593, optional ones kept
+  inside their `if (vehicleId)` guards; dropped the unused NotFoundError import). STILL OPEN: **vehicles/routes.ts** —
+  has `findByUserIdAndId + NotFoundError('Vehicle')` sites (~287/330) but ALSO bare `throw NotFoundError('Vehicle')` at
+  ~208/251 that may NOT have an adjacent find (verify per-site; some sites may USE the returned vehicle, not discard it —
+  those keep the binding via `const v = await validateVehicleOwnership(...)`). **financing/routes.ts EXCLUDED (C106):** its
+  2 sites throw `HTTPException(404, {message:'Vehicle not found'})`, NOT `NotFoundError('Vehicle')` — converging would
+  change the error envelope (NOT behavior-preserving; the C69 "not byte-identical" exclusion). One file per arch cycle
+  (the C36/C50 pattern), verify byte-identical vs source first, green→green, drop unused imports as they fall out (tsc confirms).
 - ~~**Converge `analytics/routes.ts` on shared `validateVehicleOwnership` (C99).**~~ — *DONE C99: rule-7 fan-out found the
   inline `findByUserIdAndId` + `NotFoundError('Vehicle')` ownership check hand-repeated at 13 sites across 4 route files; a
   shared `validateVehicleOwnership` already existed (used by odometer/insurance/photos). Scoped to analytics (6 sites — the
