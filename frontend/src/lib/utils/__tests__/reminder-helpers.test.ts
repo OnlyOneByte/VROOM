@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { frequencyLabel, hasTimeAxis, isMileageTracking, isReminderTimeDue } from '../reminder-helpers';
+import {
+	frequencyLabel,
+	hasTimeAxis,
+	isMileageTracking,
+	isReminderTimeDue,
+	shouldTriggerRecurringExpenses
+} from '../reminder-helpers';
 import type { Reminder } from '$lib/types/reminder';
 
 /**
@@ -103,5 +109,35 @@ describe('frequencyLabel', () => {
 		// (backend requires one, the form sends its default), but the time axis is inert — showing
 		// "Monthly" would be a lie. null lets the card omit the badge.
 		expect(frequencyLabel(mk({ triggerMode: 'mileage', frequency: 'monthly' }))).toBeNull();
+	});
+});
+
+describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate, C128)', () => {
+	const base = { isAuthed: true, isOnline: true, lastRunMs: null as number | null, now: NOW };
+
+	it('triggers when authed + online + never run before', () => {
+		expect(shouldTriggerRecurringExpenses({ ...base, lastRunMs: null })).toBe(true);
+	});
+
+	it('does NOT trigger when not authed, or offline (regardless of lastRun)', () => {
+		expect(shouldTriggerRecurringExpenses({ ...base, isAuthed: false })).toBe(false);
+		expect(shouldTriggerRecurringExpenses({ ...base, isOnline: false })).toBe(false);
+	});
+
+	it('skips when the last run was already TODAY (the user local calendar day)', () => {
+		// Earlier the same local day → debounced.
+		const earlierToday = Date.parse('2024-06-15T06:30:00.000Z');
+		expect(shouldTriggerRecurringExpenses({ ...base, lastRunMs: earlierToday })).toBe(false);
+	});
+
+	it('triggers when the last run was a PRIOR day', () => {
+		const yesterday = Date.parse('2024-06-14T23:00:00.000Z');
+		expect(shouldTriggerRecurringExpenses({ ...base, lastRunMs: yesterday })).toBe(true);
+	});
+
+	it('offline beats the never-run case (offline always skips)', () => {
+		expect(
+			shouldTriggerRecurringExpenses({ ...base, isOnline: false, lastRunMs: null })
+		).toBe(false);
 	});
 });

@@ -103,7 +103,9 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    reminder → trigger → DELETE → rows remain with source nulled; notification delete is a no-op. **BACKEND T1–T3 COMPLETE.**
    **REMAINING = T4–T8 (frontend, eyes-on, Playwright-blocked here):** T4 multi-vehicle split in ReminderForm (reuse the
    expense-split widget); T5 reliable materialization (client-side opportunistic trigger on app open/focus, debounced — D1;
-   the backend seam `POST /reminders/trigger` is already built + deeply tested); T6 source-traceability UI ("Recurring"
+   the backend seam `POST /reminders/trigger` + client `reminderApi.trigger()` are built, and the GATE
+   `shouldTriggerRecurringExpenses` is DONE C128 [+5 tests]; REMAINING = the eyes-on app-init/focus hook that calls the gate +
+   POSTs trigger()); T6 source-traceability UI ("Recurring"
    badge + link, reading the C96-surfaced sourceType) — **its BACKEND SEAM is DONE (C122): `GET /reminders/:id/expenses` →
    findBySource, +4 HTTP tests; only the badge+view UI is eyes-on**; **T7 recurring-cost projection/lens (D4) — BACKEND COMPLETE (core
    C111 `reminder-cost.ts` +10 tests; route C116 `GET /reminders/recurring-cost` +3 HTTP tests); REMAINING = the dashboard
@@ -599,9 +601,11 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
   (returns the row, userId-scoped, local DbInstance type). MIXED SHAPE (C113 pattern): 3 sites use the row (.domain /
   createProviderInstance) → keep `const existing = [await …]`; 2 existence-only (backfill, sync) → discard form. The gate
   earned its keep — biome noUnusedVariables enforced the split. green→green vs the C91 13-test providers net (1155 pass,
-  unchanged). validate:local EXIT 0.* NEXT ARCH PICKS (filed C119, lower priority): analytics getUserUnits/getVehicleUnits
+  unchanged). validate:local EXIT 0.* NEXT ARCH PICKS (lower priority): analytics getUserUnits/getVehicleUnits
   share a byte-identical parse-default tail [2 sites, C119 #2]; `MS_PER_DAY` magic literal in 3 spellings across 4 files
-  [C119 #3, NOT byte-identical — per-site verify before collapsing].
+  [C119 #3, NOT byte-identical — per-site verify before collapsing]; `reminder-helpers.ts:45` has the SAME
+  `frequency.charAt(0).toUpperCase()+frequency.slice(1)` idiom C119 extracted as `capitalize()` but this file wasn't in
+  C119's 5 sites [filed C128 — a 1-site follow-on; route it through the existing `capitalize` from formatters.ts].
 
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,

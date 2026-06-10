@@ -33,14 +33,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 122 |
+| feature | 4 | 128 |
 | deep-review | 5 | 126 |
 | guard | 6 | 125 |
 | bug | 3 | 127 |
 | arch | 5 | 123 |
 | infra | 6 | 124 |
 
-Current cycle: **127**
+Current cycle: **128**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2351,3 +2351,18 @@ Current cycle: **127**
   1158 pass / 0 fail (+3), build bundled. #32a CLOSED; #32b (refresh orphan-session) + #32c (email-exists disclosure) + #31
   remain (all LOW/LOW-MED). Next (128): nothing forced (feature cyc 122 / deep-review cyc 126... recompute) → highest-leverage.
   cov: be 81.8% / fe 62.0% (carry)
+- **C128 (feature — recurring-expenses T5 gate: shouldTriggerRecurringExpenses, the non-eyes-on decision core)** — BALANCE:
+  `feature` most-starved over budget (cyc 122, starved-for 6 > 4). Per the C111/C116/C122 pattern, advanced via the next
+  NON-eyes-on slice: T5's spec-defined PURE gate ("unit-test the gate: single-call / skip-when-recent / skip-when-offline").
+  GROUNDED (NORTH_STAR #4, avoid the C79 dead-scaffold misfit): the backend seam (POST /reminders/trigger) + the client
+  (reminderApi.trigger(), reminder-api.ts:54) BOTH already exist — the only genuine T5 gap is the debounce DECISION the
+  app-init hook calls. Added `shouldTriggerRecurringExpenses({isAuthed, isOnline, lastRunMs, now?})` to reminder-helpers.ts
+  (the established pure-fn-with-injectable-now home): true only when authed + online + (never-run OR last run on a PRIOR
+  LOCAL day); the once-per-day debounce compares local Y/M/D parts (host-independent, sidesteps C77). MERGE-SURVIVING net:
+  reminder-helpers.test.ts (+5): never-run→trigger, unauthed/offline→skip, earlier-same-local-day→skip, prior-day→trigger,
+  offline-beats-never-run. Verified: frontend validate:local EXIT 0 — 410 pass / 0 fail (+5), tsc 0, build OK. CAVEAT
+  (NORTH_STAR #3, honest): this is the DECISION CORE, not T5 done — the eyes-on hook that reads navigator.onLine/auth/
+  localStorage + calls trigger() on this gate's `true` is still Playwright-blocked, so T5 stays "logic-complete, eyes-on
+  pending". NOTED for a future arch pick: reminder-helpers.ts:45 has the same charAt(0).toUpperCase()+slice(1) idiom C119
+  extracted as capitalize() but this file wasn't in C119's 5 sites — a small follow-on dedup (not folded in: arch rule 1,
+  + this is a feature cycle). Next (129): nothing forced → highest-leverage. cov: be 81.8% / fe ~62%+ (FE +5 tests)

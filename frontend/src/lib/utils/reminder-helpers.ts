@@ -22,6 +22,36 @@ export function isMileageTracking(reminder: Reminder): boolean {
 	return reminder.triggerMode === 'mileage' || reminder.triggerMode === 'both';
 }
 
+/**
+ * The opportunistic-materialization gate for recurring expenses (recurring-expenses T5/D1 — the pure
+ * decision the app-init/focus hook calls before POSTing `reminderApi.trigger()`). Returns true only
+ * when ALL hold: the user is authed, the browser is online, and the last trigger was NOT already today
+ * (the user's LOCAL calendar day). The once-per-day debounce avoids hammering /trigger on every app
+ * open while still materializing due recurring expenses promptly (D1: client-side, no cron).
+ *
+ * `lastRunMs` is the stored timestamp (localStorage) of the previous trigger, or null if never run.
+ * `now`/`lastRunMs` are epoch ms and INJECTED → deterministic + host-independent (the same-local-day
+ * comparison is done via local Y/M/D parts, sidestepping the C77 UTC-host vacuity trap). The eyes-on
+ * hook owns reading/writing localStorage + the navigator.onLine/auth signals; this is just the policy.
+ */
+export function shouldTriggerRecurringExpenses(opts: {
+	isAuthed: boolean;
+	isOnline: boolean;
+	lastRunMs: number | null;
+	now?: number;
+}): boolean {
+	if (!opts.isAuthed || !opts.isOnline) return false;
+	const now = opts.now ?? Date.now();
+	if (opts.lastRunMs === null) return true; // never run → trigger
+	const a = new Date(opts.lastRunMs);
+	const b = new Date(now);
+	const sameLocalDay =
+		a.getFullYear() === b.getFullYear() &&
+		a.getMonth() === b.getMonth() &&
+		a.getDate() === b.getDate();
+	return !sameLocalDay; // skip if already triggered today (the user's local calendar day)
+}
+
 /** Whether a reminder has a time axis (triggerMode time|both) — i.e. a recurrence schedule applies. */
 export function hasTimeAxis(reminder: Reminder): boolean {
 	return reminder.triggerMode === 'time' || reminder.triggerMode === 'both';

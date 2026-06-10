@@ -41,6 +41,11 @@
       app init/focus, debounced once per session/day (localStorage timestamp), authed + online only;
       keep the manual button + a "N due" nudge. Unit-test the gate (single call / skip-when-recent /
       skip-when-offline). Document the optional cron-hits-the-endpoint path for self-host deployments.
+      **GATE DONE (C128):** `shouldTriggerRecurringExpenses({isAuthed,isOnline,lastRunMs,now?})` in
+      reminder-helpers.ts — the pure decision (authed+online+(never-run OR prior-local-day)); +5 unit
+      tests. The backend (`POST /reminders/trigger`) + client (`reminderApi.trigger()`) already existed.
+      **REMAINING (eyes-on):** the app-init/focus hook that reads navigator.onLine/auth/localStorage,
+      calls the gate, and POSTs trigger() on true (+ the "N due" nudge + manual button wiring).
 - [ ] **T6 — Source traceability UI (R3).** "Recurring" badge on expense rows where
       `sourceType==='reminder'`, linking to the source reminder; from the reminder, a "materialized N
       expenses" view. Eyes-on screenshot. **BACKEND SEAM DONE (C122):** `GET /reminders/:id/expenses`
