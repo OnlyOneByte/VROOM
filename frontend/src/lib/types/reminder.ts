@@ -71,3 +71,15 @@ export interface TriggerResult {
 	notifications: ReminderNotification[];
 	skipped: Array<{ reminderId: string; reason: string; message?: string }>;
 }
+
+/**
+ * The monthly recurring run-rate across a user's active expense reminders (recurring-expenses T7).
+ * Mirrors the backend `recurringCostSummary` shape (reminders/reminder-cost.ts) — the dashboard
+ * "recurring costs" widget renders this; fetched via `reminderApi.getRecurringCost()`.
+ */
+export interface RecurringCostSummary {
+	/** Count of active expense reminders contributing a positive monthly run-rate. */
+	count: number;
+	/** Total normalized monthly run-rate across those reminders (currency/month). */
+	monthlyTotal: number;
+}

@@ -107,9 +107,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    `shouldTriggerRecurringExpenses` is DONE C128 [+5 tests]; REMAINING = the eyes-on app-init/focus hook that calls the gate +
    POSTs trigger()); T6 source-traceability UI ("Recurring"
    badge + link, reading the C96-surfaced sourceType) — **its BACKEND SEAM is DONE (C122): `GET /reminders/:id/expenses` →
-   findBySource, +4 HTTP tests; only the badge+view UI is eyes-on**; **T7 recurring-cost projection/lens (D4) — BACKEND COMPLETE (core
-   C111 `reminder-cost.ts` +10 tests; route C116 `GET /reminders/recurring-cost` +3 HTTP tests); REMAINING = the dashboard
-   widget that fetches /recurring-cost + renders it, eyes-on**; T8 round-trip E2E. Lands "code-complete, eyes-on pending" like maintenance T9 /
+   findBySource, +4 HTTP tests; FE CLIENT METHOD DONE (C134): `reminderApi.getMaterializedExpenses(id)`, +tests; only the
+   badge+view MARKUP is eyes-on**; **T7 recurring-cost projection/lens (D4) — BACKEND COMPLETE (core
+   C111 `reminder-cost.ts` +10 tests; route C116 `GET /reminders/recurring-cost` +3 HTTP tests); FE CLIENT METHOD DONE (C134):
+   `reminderApi.getRecurringCost()` → `RecurringCostSummary` type, +tests; REMAINING = the dashboard widget MARKUP that calls
+   getRecurringCost() + renders it, eyes-on**; T8 round-trip E2E. Lands "code-complete, eyes-on pending" like maintenance T9 /
    import-trackers T4–T6 — the backend is fully built + characterized, so a human or unblocked Playwright closes the visible tail.
 
 > NOTE (cycle 12): both feature builds are large, MULTI-TASK efforts — one tasks.md task per loop

@@ -51,8 +51,9 @@
       expenses" view. Eyes-on screenshot. **BACKEND SEAM DONE (C122):** `GET /reminders/:id/expenses`
       → `expenseRepository.findBySource('reminder', id, user.id)` → the materialized rows (ownership-
       checked, user-scoped); +4 HTTP tests (reminder-materialized-expenses-route.test.ts). The "N
-      expenses" view fetches this. **REMAINING (eyes-on):** the badge + the view UI. (The badge's read
-      data — sourceType/sourceId on the expense list — was already surfaced at T1/C96.)
+      expenses" view fetches this. **FE CLIENT METHOD DONE (C134):** `reminderApi.getMaterializedExpenses(id)
+      : Promise<Expense[]>` (+ reminder-api.test.ts). **REMAINING (eyes-on):** the badge + the view MARKUP.
+      (The badge's read data — sourceType/sourceId on the expense list — was already surfaced at T1/C96.)
 - [ ] **T7 — Recurring-cost visibility (R5, D4).** Dashboard "upcoming recurring costs" + monthly
       recurring run-rate (derive on read; amount × normalized-to-monthly frequency); a "Recurring
       expenses" lens over the existing expense-type reminders (no migration). Eyes-on screenshot.
@@ -62,8 +63,9 @@
       active positive-amount expense reminders contribute. +10 unit tests (reminder-cost.test.ts).
       **ROUTE DONE (C116):** `GET /api/v1/reminders/recurring-cost` → findByUserId(type:'expense') →
       recurringCostSummary → {count, monthlyTotal}; +3 HTTP tests (recurring-cost-route.test.ts:
-      monthly+yearly sum, empty→zero, user-scoped). **BACKEND T7 COMPLETE. REMAINING (eyes-on):** the
-      dashboard widget/lens that fetches GET /recurring-cost + renders it.
+      monthly+yearly sum, empty→zero, user-scoped). **FE CLIENT METHOD DONE (C134):** `reminderApi.getRecurringCost()`
+      → `RecurringCostSummary` type (+ reminder-api.test.ts). **BACKEND T7 COMPLETE. REMAINING (eyes-on):** the
+      dashboard widget/lens MARKUP that calls getRecurringCost() + renders it.
 
 ### Done-when (feature-DoD)
 

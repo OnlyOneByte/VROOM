@@ -33,14 +33,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 128 |
+| feature | 4 | 134 |
 | deep-review | 5 | 132 |
 | guard | 6 | 130 |
 | bug | 3 | 133 |
 | arch | 5 | 129 |
 | infra | 6 | 131 |
 
-Current cycle: **133**
+Current cycle: **134**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2442,3 +2442,23 @@ Current cycle: **133**
   fail (+2), build bundled. #35 CLOSED. The bigger photo MEDs (#33 orphans, #34 atomicity) + the Sheets HIGHs (#36/#37,
   Angelo-gated) remain. Next (134 — milestone): nothing forced (feature cyc 128 / deep-review cyc 132 breach); #5 sweep due
   ~C134. cov: be 81.8% / fe ~63%+ (carry)
+- **C134 (feature — recurring-expenses: FE client methods for the done T6/T7 backend seams)** — BALANCE: recomputed all six
+  from the table — `feature` the ONLY over-budget category (cyc 128, starved-for 6 > 4); the prior forecast under-counted it,
+  the table rules (the standing C30/C33/C34 "compute every category each cycle" lesson). So feature is forced over the
+  ~C134-due #5 branch-hygiene sweep (infra cyc 131, starved-for 3, NOT over). The feature tails are all eyes-on/Playwright-
+  blocked — applied the C128 precedent (when feature is forced + the tail is eyes-on, ship the PURE-LOGIC slice the eyes-on
+  shell will consume). FOUND THE SLICE: `reminder-api.ts` (the FE client service) was MISSING methods for the two backend
+  seams already built + characterized — T6 `GET /reminders/:id/expenses` (C122) + T7 `GET /reminders/recurring-cost` (C116) —
+  even though the eyes-on T6 "materialized N expenses" view + T7 dashboard widget both CONSUME them. So the methods are the
+  concrete unblock for that tail. Added `reminderApi.getMaterializedExpenses(id): Promise<Expense[]>` + `getRecurringCost():
+  Promise<RecurringCostSummary>` (thin wrappers — apiClient.get already unwraps the {success,data} envelope, grounded vs
+  source); added the `RecurringCostSummary` FE type to types/reminder.ts MIRRORING the backend reminder-cost.ts shape
+  ({count, monthlyTotal}). All response shapes + the Expense.sourceType/sourceId fields + the {success,data} envelope verified
+  against backend source FIRST (C67 discipline). Pinned by `reminder-api.test.ts` (+6, the analytics-api.test.ts mocked-
+  apiClient pattern — first reminder-api test): exact path interpolation (guards a wrong-segment typo), the source-link
+  survives the wrapper untouched (the T6 badge reads it), empty-array + zero-summary passthrough, and 404/503 propagation (no
+  swallowing). THE GATE EARNED ITS KEEP: noUncheckedIndexedAccess flagged `result[0].sourceType` → optional-chained (no
+  non-null assertion, which the codebase warns on). Verified: frontend validate:local EXIT 0 — type-check 0, build done, 427
+  pass (+6). NON-eyes-on (pure .ts service + type, no markup). REMAINING T6/T7 = only the eyes-on UI (badge/view + dashboard
+  widget) that now has its client method to call; T4/T5/T8 still eyes-on. cov: be 81.8% (carry) / fe ~63%+ (carry; +6 FE
+  service tests)
