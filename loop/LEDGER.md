@@ -32,13 +32,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 116 |
-| deep-review | 5 | 114 |
+| deep-review | 5 | 120 |
 | guard | 6 | 118 |
 | bug | 3 | 115 |
 | arch | 5 | 119 |
 | infra | 6 | 117 |
 
-Current cycle: **119**
+Current cycle: **120**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2212,3 +2212,28 @@ Current cycle: **119**
   drop-in, DIFFERENT table than validateVehicleOwnership) is FILED as the next arch pick. Next (120 — milestone): nothing
   forced (deep-review cyc 114 / bug cyc 115 breach next) → highest-leverage; #5 sweep + coverage re-measure both due ~C120.
   cov: be ~81% / fe ~62% (carry; re-measure due C120)
+- **C120 (deep-review — adversarial audit of the TCO aggregation + offline-sync paths; found the loop's first HIGH)** —
+  BALANCE: two breached (deep-review cyc 114 starved-for 6, bug cyc 115 starved-for 5); highest-ABSOLUTE → deep-review (6) >
+  bug (5). The #5 sweep is a SOFT cadence note (infra only starved-for 3, not forced) — balance rule wins (the
+  compute-all-six lesson). Verification-only cycle; rule-7 fan-out on 2 fresh high-risk surfaces (TCO grand-total aggregation;
+  offline-outbox/clientId idempotency). EVERY finding verified vs source (the C67 discipline; I pre-read the TCO charts +
+  caught my OWN false-positive — costPerDistance :475 is guarded by the :468 totalMiles>0 filter). **FOUND THE LOOP'S FIRST
+  HIGH (#27, verified):** getVehicleTCO totalCost = purchasePrice + financingInterest + ... (repository.ts:1782-1788), but the
+  `financingInterest` bucket sums the WHOLE financing-sourced expense row (categorizeTCOExpenses:1006-1007), and those rows
+  are FULL loan PAYMENTS (principal+interest) — proven by computeBalance = originalAmount − SUM(financing expenseAmount)
+  (financing/repository.ts:68, payments pay down principal). So for a financed vehicle with a purchasePrice set, the PRINCIPAL
+  is counted TWICE (once as purchasePrice, once inside the payments retiring it) — materially inflating the headline TCO. The
+  bucket NAME reveals the intended design (purchasePrice + interest-only), but the impl adds the whole payment. NOT a
+  mechanical fix — it's an accounting-model DECISION (purchasePrice+interest-only vs downPayment+allPayments vs
+  purchasePrice+(payments−principal); interest isn't separately stored) that changes a displayed $ figure → ESCALATED to
+  Angelo, filed #27. Also filed #28 (MED): purchasePrice + ownershipMonths are added/divided UNwindowed while a year-filtered
+  TCO windows the expenses (a 2024 TCO absorbs the full lifetime purchase price ÷ full-ownership months — mismatched
+  numerator/denominator). And #29 (MED, sync): BaseRepository.update keys on `id` ONLY (utils/repository.ts:62-66) — no
+  updatedAt/version guard, so an offline edit replayed after a newer online edit is a silent LWW lost-update with no 409
+  (design call — LWW is legitimate, but undocumented + no conflict signal). CERTIFIED CLEAN: TCO split (siblings-only, no
+  parent double-count), insurance (single source), sign/bucket-exhaustiveness reconciles, div-by-zero (ownershipMonths
+  Math.max(1,…) + totalMiles>0 guards), unit normalization (convertDistance per vehicle); sync idempotent-return dedup,
+  (userId,clientId) tenant scoping, per-row outbox semantics, userId stamping. No code change (rule-7 verification cycle).
+  Next (121): `bug` most-starved over budget (cyc 115, starved-for 6 > 3) → #28 (the windowed-purchasePrice fix, the cleanest
+  grounded TCO one) — #27 is the bigger prize but Angelo-gated. cov: be ~81% / fe ~62% (carry; re-measure deferred to a guard
+  cycle)

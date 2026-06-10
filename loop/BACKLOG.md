@@ -294,6 +294,20 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > (it changes a displayed $ figure). When approved: swap both sites + a regression test asserting the
 > projected excess fee is period-independent. *Sibling display call (#card semantics) stays with Angelo.*
 
+> **PENDING ANGELO — #27 (HIGH, the loop's first; found + VERIFIED C120; an ACCOUNTING-MODEL decision, do NOT pick
+> unilaterally — it changes the headline TCO $):** **TCO double-counts a financed vehicle's principal.** `getVehicleTCO`
+> (analytics/repository.ts:1782-1788) computes `totalCost = (purchasePrice ?? 0) + costs.financingInterest + insurance +
+> fuel + maintenance + other`, but the `financingInterest` bucket sums the WHOLE financing-sourced expense row
+> (`categorizeTCOExpenses:1006-1007` — `financial` + `sourceType==='financing'` → `+= row.expenseAmount`), and those rows
+> are FULL loan PAYMENTS (principal + interest) — proven by `computeBalance = originalAmount − SUM(financing expenseAmount)`
+> (financing/repository.ts:68: payments pay down principal). So a financed vehicle with a `purchasePrice` set counts the
+> principal TWICE (purchasePrice + the payments retiring it): a $30k car with ~$33k of payments reports TCO ≈ $63k. The
+> bucket NAME (`financingInterest`) reveals the intended design = purchasePrice + interest-ONLY. **Decision needed (interest
+> isn't separately stored):** (a) purchasePrice + (payments − principal-paid-to-date) [interest only]; (b) drop purchasePrice,
+> count downPayment + all payments; (c) keep purchasePrice, EXCLUDE financing-sourced rows from the total (treat the asset
+> price as the cost, payments as balance-transfer). Each changes the displayed TCO differently + needs different data. When
+> decided: fix + a regression test that a financed vehicle's TCO doesn't double-count principal. ESCALATED via Slack C120.
+
 **NEW — surfaced + verified-against-source by the C108 deep-review fan-out (restore + mileage paths). All MED, none HIGH; none data-safety on the WRITE path (cross-tenant write-stamp + atomicity + the 5 mileage classes were CERTIFIED CLEAN). Unblocked — ranked for a future bug cycle:**
 - ~~**#20 (MED) — `detectConflicts` is not tenant-scoped → cross-tenant READ leak in merge mode.**~~ — *DONE C109:
   detectConflicts probed `WHERE id IN (backup ids)` with no ownership filter + returned the full existing row as
@@ -354,6 +368,24 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   monthlyPremiumTrend (accumulateMonthlyPremiums returns early on null endDate) AND sorts LAST in the latest-term race
   (null endDate → 0); (c) findExpiringTerms (insurance/repository.ts:703-727) has no `isActive` filter, so terms of
   cancelled policies show as "expiring." All VERIFIED C114.
+
+**NEW — surfaced + verified-against-source by the C120 deep-review fan-out (TCO aggregation + offline-sync). #27 (HIGH) is in the PENDING ANGELO block above (accounting decision); these two are unblocked MED:**
+- **#28 (MED, top unblocked pick) — TCO `purchasePrice`/`ownershipMonths` ignore the year window.** `getVehicleTCO`
+  (analytics/repository.ts:1762-1788): when `year` is supplied, the expense conditions window-filter (gte/lt on
+  expenses.date), but `purchasePrice` is added to `totalCost` UNCONDITIONALLY, and `ownershipMonths` is purchaseDate→now
+  (`:1797-1801`), never year-bounded. So a TCO scoped to e.g. 2024 returns only 2024's expenses PLUS the full lifetime
+  purchase price, then divides by full-ownership months → an inflated, mismatched per-year/per-month figure. VERIFIED C120.
+  FIX: when `year` is set, either exclude `purchasePrice` from the windowed total (it's an acquisition cost, not a recurring
+  yearly cost) or bound `ownershipMonths` to the window — needs a small scope call, but the cleanest is to omit purchasePrice
+  from a year-scoped TCO (+ a test that a non-purchase year's TCO excludes it). NOTE: closely related to #27 — fix together.
+- **#29 (MED, design call) — silent last-writer-wins on PUT (no optimistic-concurrency guard).** `BaseRepository.update`
+  (utils/repository.ts:62-66) keys the UPDATE on `id` ONLY — it WRITES `updatedAt` but never READS it as a guard. So an
+  offline edit (queued T0) replayed after an online edit (committed T1>T0) to the same row silently overwrites the newer
+  values with stale ones, no 409, no conflict signal (`expense` PUT is not idempotency-keyed — clientId is stripped from
+  updates; the Idempotency-Key mw is only on sync/restore routes; detectConflicts is restore-only). VERIFIED C120. LWW is a
+  legitimate PWA model, but undocumented + no signal — DECISION: keep LWW (document it) or add an `updatedAt`/version
+  precondition to PUT (WHERE id=? AND updated_at=?) + 409 on mismatch. (CERTIFIED CLEAN this cycle: TCO split/insurance/
+  sign/div-by-zero/unit; sync idempotent-return dedup, (userId,clientId) scoping, per-row outbox, userId stamping.)
 
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
