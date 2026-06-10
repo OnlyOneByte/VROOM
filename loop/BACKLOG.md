@@ -657,7 +657,16 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > commits since the last refresh by theme so the eventual PR stays reviewable. Counts as one `infra`
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
-*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C110.)*
+*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C120.)*
+- ~~**#5 branch-hygiene sweep — BRANCH_REVIEW.md refresh (C110, milestone)**~~ — *DONE C110: due per the C100 note
+  (~10 cycles, branch now 56 commits). (1) zero stray untracked unit/spec tests (all untracked are the by-design
+  `*.meshclaw.e2e.ts` set + gitignored dirs); (2) green baseline — backend validate:local EXIT 0 (1123 BE / 385 FE;
+  regress.sh Playwright-blocked); (3) digest header 46→56 commits, status 1109→1123 BE / 379→385 FE + the C107 measured
+  coverage (be 81.1% / fe 61.4%), appended §19 (C100–C109: recurring-expenses T2/T3 backend finish, #20 restore leak fix +
+  #103 date-TZ fix, C106 arch convergence, C105 idempotency net, C101/C108 deep-review certs, C107 re-measure) + refreshed
+  the merge footer to THREE mid-build features. BRANCH_REVIEW.md is gitignored. ALSO this cycle: confirmed the `feature`
+  category is eyes-on-EXHAUSTED (all 3 builds backend-complete, FE tails Playwright-blocked; the backend seams they depend
+  on are built+characterized) — escalated to Angelo that unblocking Playwright is the real lever. Next sweep ~C120.*
 - ~~**Real coverage re-measurement + ratchet re-anchor (loop-improvement #4, C107)**~~ — *DONE C107: the cov: tags had
   carried forward stale ~81%/~64% ESTIMATES since the C81 baseline through 25+ ratchet cycles. Ran bun test --coverage +
   vitest --run --coverage. RESULT: be 81.10% line / 81.84% func (up ~+4 from C81 — the C82–C106 ratchet delivered);

@@ -36,9 +36,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 105 |
 | bug | 3 | 109 |
 | arch | 5 | 106 |
-| infra | 6 | 107 |
+| infra | 6 | 110 |
 
-Current cycle: **109**
+Current cycle: **110**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2045,3 +2045,24 @@ Current cycle: **109**
   autofixed twice.) Verified: backend validate:local EXIT 0 — 1123 pass / 0 fail (+2), build bundled. #20 CLOSED. Next
   (110): nothing forced (feature cyc 104 = budget at 110; infra #5 sweep due ~C110) → highest-leverage feature, or the #5
   branch-hygiene sweep. cov: be 81.1% / fe 61.4% (carry C107)
+- **C110 (infra — #5 branch-hygiene sweep, the milestone cycle; feature category found eyes-on-EXHAUSTED)** — BALANCE:
+  `feature` was technically most-starved over budget (cyc 104, starved-for 6 > 4), BUT grounding it (per the C90 "don't
+  force a wrong-class pick" rule) showed ALL THREE features are backend-complete + eyes-on(Playwright)-blocked: maintenance
+  T9, import-trackers T4–T6, recurring-expenses T4–T8. I verified the one remaining backend SEAM each FE tail depends on is
+  already built + characterized — notably recurring-expenses T5's client hook will POST to `POST /reminders/trigger`
+  (routes.ts:60 → processOverdueReminders), which has DEEP coverage (trigger-expense/mileage/idempotency-cas/fastforward).
+  So the feature category's actionable BACKEND work is genuinely exhausted; forcing a frontend task just hits the sandbox
+  wall. Pivoted to the milestone-appropriate #5 branch-hygiene sweep (due ~C110, last C100, branch now 56 commits ≈ 10
+  cycles), per the C80 "take the milestone even when blocked" lesson. ALL THREE sweep parts: (1) ZERO stray untracked
+  unit/spec tests outside the by-design `*.meshclaw.e2e.ts` set — nothing would silently drop coverage on merge;
+  (2) green baseline — backend validate:local EXIT 0 at C109 (1123 BE), unchanged since; regress.sh Playwright still
+  sandbox-blocked (the standing limit, per C76/C86/C100); (3) BRANCH_REVIEW.md refresh — header 46→56 commits, status
+  1109→1123 BE / 379→385 FE + the C107 measured coverage (be 81.1% / fe 61.4%, FE now the bigger gap), appended §19
+  (C100–C109: recurring-expenses T2/T3 backend finish, bug #20 restore cross-tenant leak fix + #103 date-TZ fix, the C106
+  arch convergence + financing-EXCLUDED note, C105 idempotency net, C101/C108 deep-review certifications, C107 re-measure),
+  refreshed the merge footer to THREE mid-build features + the restore-security-hardening framing. Doc-only — BRANCH_REVIEW
+  .md is gitignored (the refresh IS the deliverable), so only the 2 loop docs commit; no build gate (the sweep pattern).
+  ESCALATION: flagged to Angelo that the feature category is now eyes-on-blocked across all 3 builds — the real lever is
+  unblocking Playwright (the standing #1 improvement). Next (111): `guard` most-starved over budget (cyc 105, starved-for
+  6 = budget at 111; deep-review/arch also near) → the C107-re-anchored ratchet (rate-limit.ts 60%, or FE which is now the
+  measured gap). cov: be 81.1% / fe 61.4% (carry C107)
