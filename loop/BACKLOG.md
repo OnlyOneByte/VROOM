@@ -440,12 +440,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   anti-takeover posture; likely WONTFIX). VERIFIED C126.
 
 **NEW — surfaced + verified-against-source by the C132 deep-review fan-out (photo-storage/credentials + Sheets-backup-write). The credential/crypto/cross-tenant cores were CERTIFIED CLEAN (encryption.ts textbook AES-256-GCM w/ per-call IV; secrets stripped; all ops userId-scoped). The 2 HIGHs (#36/#37, Sheets) are in the PENDING-ANGELO block above. Unblocked MEDs/LOW:**
-- **#35 (MED, cleanest fix — top unblocked pick) — photo download lacks `X-Content-Type-Options: nosniff` + trusts
-  client-asserted MIME.** `photos/routes.ts:83-89` serves the thumbnail with `Content-Type` = the stored (client-supplied
-  at upload, never sniffed) `mimeType` + `Cross-Origin-Resource-Policy: cross-origin`, but NO `nosniff`. A file whose bytes
-  are HTML/script but declared `image/png` is served cross-origin without nosniff → a stored-content-sniffing vector. FIX:
-  add `'X-Content-Type-Options': 'nosniff'` to the response headers (one line; ideally also magic-byte sniff the upload).
-  VERIFIED C132. Security-touching → ARCC-consult before the fix.
+- ~~**#35 (MED) — photo download lacks `X-Content-Type-Options: nosniff` + trusts client-asserted MIME.**~~ — *DONE C133:
+  added `'X-Content-Type-Options': 'nosniff'` to the thumbnail-serve Response (photos/routes.ts). ARCC-consulted FIRST
+  (Secure-HTTP-Headers makes nosniff MANDATORY; Secure-File-Uploads = "don't trust Content-Type / mitigate MIME sniff").
+  Guard: photo-serve-headers.test.ts (+2 source-scan — the 200-byte-serve calls the real provider download(), not
+  in-harness-testable, so pin the header literal in the serve block, per the no-*-source-scan convention). validate:local
+  EXIT 0, 1160 pass. The deeper magic-byte upload sniffing (Apache-Tika-style) is the larger follow-on, NOT done — folds in
+  with #34.*
 - **#33 (MED) — delete-side external-byte orphans.** `photo-service.ts:257-275` deletes the provider bytes in a try/catch
   that only `logger.warn`s on failure, then UNCONDITIONALLY deletes the ref + photo row → if the provider delete fails
   (network/expired token) the S3/Drive object is orphaned AND the ref is gone (unreconcilable). Same in

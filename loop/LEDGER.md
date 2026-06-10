@@ -36,11 +36,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 128 |
 | deep-review | 5 | 132 |
 | guard | 6 | 130 |
-| bug | 3 | 127 |
+| bug | 3 | 133 |
 | arch | 5 | 129 |
 | infra | 6 | 131 |
 
-Current cycle: **132**
+Current cycle: **133**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2425,3 +2425,20 @@ Current cycle: **132**
   an ARCC consult). No code change (rule-7 verification cycle); all → BACKLOG bug queue. Next (133): `bug` most-starved over
   budget (cyc 127, starved-for 6 > 3) → #35 (the nosniff one-liner) is the cleanest unblocked; #36 'RAW' is bigger but
   security-touching. cov: be 81.8% / fe ~63%+ (carry)
+- **C133 (bug #35 — add X-Content-Type-Options: nosniff to the photo-serve response)** — BALANCE: `bug` most-starved over
+  budget (cyc 127, starved-for 6 > 3). Picked the C132-filed #35 (cleanest unblocked; #36 'RAW' is the higher-impact HIGH
+  but bigger). SECURITY-TRIGGER (serving user-uploaded files / content-type) → queried ARCC FIRST per the skill (before any
+  code edit): Secure-HTTP-Headers makes `X-Content-Type-Options: nosniff` a MANDATORY response header "to prevent MIME type
+  sniffing"; Secure-File-Uploads + "Securely Serving a File" say "do not trust Content-Type / mitigate MIME sniffing". So
+  the fix is policy-required, not just intuition. THE GAP (verified C132 + re-confirmed): the thumbnail serve
+  (photos/routes.ts:83-89) set Content-Type from the stored CLIENT-asserted mimeType + CORP:cross-origin but NO nosniff → a
+  file whose bytes are HTML/script but declared image/png could be MIME-sniffed + executed. FIX: added
+  `'X-Content-Type-Options': 'nosniff'` to the Response headers (+ a comment citing ARCC). MERGE-SURVIVING net: a SOURCE-SCAN
+  guard photo-serve-headers.test.ts (+2) — the 200-byte-serve path calls the real provider download() (network, not
+  in-harness-testable; the property tests model it), so per the codebase's no-*-source-scan convention I pin the header
+  literal in the serve block (header present + in the `new Response(buffer,…)` block alongside the mimeType Content-Type). THE
+  GATE EARNED ITS KEEP: my 1st guard draft used a brittle 400-char slice that the added comment pushed the header past → 1
+  fail; rewrote to anchor on the block boundary (indexOf '});'). Verified: backend validate:local EXIT 0 — 1160 pass / 0
+  fail (+2), build bundled. #35 CLOSED. The bigger photo MEDs (#33 orphans, #34 atomicity) + the Sheets HIGHs (#36/#37,
+  Angelo-gated) remain. Next (134 — milestone): nothing forced (feature cyc 128 / deep-review cyc 132 breach); #5 sweep due
+  ~C134. cov: be 81.8% / fe ~63%+ (carry)
