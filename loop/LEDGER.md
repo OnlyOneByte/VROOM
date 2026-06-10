@@ -2849,4 +2849,4 @@ Current cycle: **150**
     (no vehicleId in the SELECT, ordered by date only, computeEfficiencyPoint has no same-vehicle guard) → a phantom MPG point
     when two cars have close odometers; reachable via /fuel-efficiency with no vehicleId. FILED (not fixed — a fresh
     increment for a future bug/deep-review cycle; needs the query reshape + a regression test). Its div-guard/split-sibling
-    checks matched my C155 pre-read (clean). No commit this triage — BACKLOG-only filing folded into the next push.*
+    checks matched my C155 pre-read (clean). Committed `01175d6` (BACKLOG #54 + this triage note, doc-only).*
