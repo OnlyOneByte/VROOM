@@ -10,11 +10,20 @@
 > 90% both sides. **MEASURED BASELINE (C81, the first real reading — the rule had silently
 > lapsed C52–C80, no entry carried a cov: tag): be 77.8% line / 76.9% func · fe 63.7% line /
 > 60.6% func / 56% branch** (both up from the long-stale ~74%/~59% estimates, confirming the
-> test-adding cycles moved the needle — just unmeasured). When `guard`/`arch` is the pick and
-> nothing's more urgent, STEER it to the lowest-covered, highest-risk module (frontend is the
-> bigger gap; `backend/src/utils/timeout.ts` 0% + `pending-credentials.ts` 76% are concrete
-> low spots) — turns the 90% goal into a ratchet, not an aspiration. Never DROP coverage
-> without naming why.
+> test-adding cycles moved the needle — just unmeasured). **RE-MEASURED C107 (the cov: tags had
+> carried forward stale `~81%/~64%` estimates since C81 through 25+ ratchet cycles — a true reading
+> was overdue): be 81.10% line / 81.84% func (up ~+4 from C81 — the C82–C106 ratchet delivered) ·
+> fe 61.41% line / 59.31% func / 52.24% branch (essentially FLAT vs C81's 63.7%, even slightly down
+> — frontend product code [components/routes] OUTGREW its tests; FE is now decisively the bigger
+> gap).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
+> (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
+> `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
+> `analytics/routes.ts` (43% line — C99/C106 covered the ownership *validators*, but the GET handlers'
+> full response assembly is still unexercised); frontend — the broad components/routes deficit (steer
+> FE guard cycles here). OAuth providers (github/google/auth routes, 0–40%) are live-but-network-bound
+> (the C85 hard-to-test class) — lower priority. Turns the 90% goal into a ratchet, not an aspiration.
+> Never DROP coverage without naming why.
 
 ## Balance table
 `starved-for = current cycle − last-touched`. If `starved-for > budget` for any category,
@@ -27,9 +36,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 105 |
 | bug | 3 | 103 |
 | arch | 5 | 106 |
-| infra | 6 | 100 |
+| infra | 6 | 107 |
 
-Current cycle: **106**
+Current cycle: **107**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1976,3 +1985,19 @@ Current cycle: **106**
   validate:local EXIT 0, build bundled. REMAINING: vehicles/routes.ts (mixed shapes — some bare throws at :208/:251
   without an adjacent find; needs per-site verification) filed as the next arch increment; financing EXCLUDED by design.
   Next (107): nothing forced (deep-review/bug/infra breach next) → highest-leverage. cov: be ~81% / fe ~64%
+- **C107 (infra — real coverage RE-MEASUREMENT + ratchet re-anchor, loop-improvement #4)** — BALANCE: `infra` most-starved
+  over budget (cyc 100, starved-for 7), beating deep-review (6) + bug (4). The #5 sweep isn't due (~C110), and the
+  highest-leverage infra increment was a TRUE coverage reading: the `cov:` tags had carried forward stale `~81%/~64%`
+  ESTIMATES since the C81 baseline, through 25+ test-adding ratchet cycles (C82–C106) — measurement hygiene overdue, and it
+  re-aims the ratchet's "next lowest module" pick. Ran `bun test --coverage` (backend) + `vitest --run --coverage`
+  (frontend). RESULT: **be 81.10% line / 81.84% func** (up ~+4 from C81's 77.8/76.9 — the ratchet demonstrably delivered);
+  **fe 61.41% line / 59.31% func / 52.24% branch** (essentially FLAT vs C81's 63.7%, even slightly DOWN — the frontend
+  product code [components/routes] outgrew its tests; FE is now decisively the bigger gap, confirming the C81 steer). Faithful
+  per loop-improvement #4 — NOT dropping coverage silently: the FE flat/slightly-down number is named, not hidden. CURRENT
+  low spots captured for the ratchet (refreshed the COVERAGE TREND header): be — rate-limit.ts (60% line, the named next
+  target), body-limit.ts (35% line size-enforcement branch), sync/restore+routes (~32–61%, C91-s3-seam-tractable),
+  analytics/routes.ts (43% — C99/C106 covered the ownership validators, NOT the GET handlers' response assembly); fe — the
+  broad components/routes deficit. OAuth providers (0–40%) are live-but-network-bound (the C85 hard-to-test class), lower
+  priority. Doc-only (measurement + header re-anchor, no code change → no build gate, the C100 sweep pattern); coverage
+  artifacts are gitignored. Next (108): `deep-review` most-starved over budget (cyc 101, starved-for 7 > 5) → fan-out per
+  rule 7. cov: be 81.1% / fe 61.4% (MEASURED C107)

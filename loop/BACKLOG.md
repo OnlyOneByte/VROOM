@@ -251,9 +251,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > `middleware/idempotency.ts` 43%→covered (C105 — the double-charge guard; +7 via a minimal-Hono app + a per-app
 > handler-run counter: method gating (GET bypass), key gating (required→400 / optional→passthrough), cache-hit replay
 > (handler NOT re-run), user-scoping (`${userId}:${key}` — no cross-user collision), the only-cache-2xx invariant
-> (a 500 is NOT cached → re-run not replayed forever), and TTL expiry via setSystemTime). NEXT high-value pure-logic low spots:
-> `middleware/rate-limit.ts` (75%/60%); then the frontend modules (overall 63.7%,
-> the bigger gap). Route/
+> (a 500 is NOT cached → re-run not replayed forever), and TTL expiry via setSystemTime). NEXT high-value pure-logic low spots
+> **(re-anchored to the C107 real reading — be 81.1% line / fe 61.4% line; FE now decisively the bigger gap, flat vs C81):**
+> `middleware/rate-limit.ts` (60% line — the named next target), `body-limit.ts` (35% line size-enforcement branch),
+> `sync/restore.ts`+`sync/routes.ts` (~32–61%, HTTP-harness-tractable); then the **frontend** components/routes deficit
+> (61.4% line — steer FE guard cycles here). Route/
 > integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
 > (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch
 > safety-net (as providers did). Pick one high-value module per cycle when guard is the balance. (Verified C85:
@@ -625,6 +627,13 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
 *(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C110.)*
+- ~~**Real coverage re-measurement + ratchet re-anchor (loop-improvement #4, C107)**~~ — *DONE C107: the cov: tags had
+  carried forward stale ~81%/~64% ESTIMATES since the C81 baseline through 25+ ratchet cycles. Ran bun test --coverage +
+  vitest --run --coverage. RESULT: be 81.10% line / 81.84% func (up ~+4 from C81 — the C82–C106 ratchet delivered);
+  fe 61.41% line / 59.31% func / 52.24% branch (FLAT vs C81's 63.7%, slightly down — FE product code outgrew its tests,
+  now decisively the bigger gap). Re-anchored the C83 ratchet header + the COVERAGE TREND header to the real reading +
+  current low spots (rate-limit 60%, body-limit 35%, sync routes, analytics GET handlers; FE components/routes). Doc-only,
+  no build gate (the C100 measurement pattern). Next coverage re-measure ~C120 or after a big test-adding arc.*
 - ~~**#5 branch-hygiene sweep — BRANCH_REVIEW.md refresh (C100, milestone)**~~ — *DONE C100: due per the C86 note
   (~14 cycles, branch now 46 commits). (1) zero stray untracked unit tests (all untracked are the by-design
   `*.meshclaw.e2e.ts` set + gitignored dirs); (2) green baseline — backend validate:local EXIT 0 (1109 BE / 379 FE;
