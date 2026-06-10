@@ -34,11 +34,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 116 |
 | deep-review | 5 | 120 |
 | guard | 6 | 118 |
-| bug | 3 | 115 |
+| bug | 3 | 121 |
 | arch | 5 | 119 |
 | infra | 6 | 117 |
 
-Current cycle: **120**
+Current cycle: **121**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2237,3 +2237,17 @@ Current cycle: **120**
   Next (121): `bug` most-starved over budget (cyc 115, starved-for 6 > 3) → #28 (the windowed-purchasePrice fix, the cleanest
   grounded TCO one) — #27 is the bigger prize but Angelo-gated. cov: be ~81% / fe ~62% (carry; re-measure deferred to a guard
   cycle)
+- **C121 (bug #28 — year-scoped TCO no longer adds the full lifetime purchasePrice ÷ full-ownership months)** — BALANCE:
+  `bug` most-starved over budget (cyc 115, starved-for 6 > 3). Picked the C120-filed #28 (the cleanest UNBLOCKED TCO fix;
+  #27 the principal-double-count HIGH stays Angelo-gated). THE BUG: getVehicleTCO (analytics/repository.ts:1762-1817)
+  window-filters detailedExpenses when `year` is set, but added `purchasePrice` to totalCost UNCONDITIONALLY + computed
+  ownershipMonths as purchaseDate→now (never year-bounded) — so a 2024-scoped TCO absorbed the full lifetime acquisition
+  cost AND divided that windowed numerator by full-ownership months. FIX (two matched halves): (1) `includePurchase = !year`
+  — purchasePrice (a one-time acquisition cost) is only in the all-time total, not a per-year one; (2) extracted + exported
+  `monthsOwnedInYear(ownershipStart, now, year)` (pure, injected `now` — host-independent, no Date.now) and use it for the
+  year-scoped ownershipMonths so costPerMonth divides by a matching ≤12-month span. Both clamp ≥1. MERGE-SURVIVING net:
+  tco-months-owned.test.ts (+6): full-year=12, mid-year(Jul)=6, in-progress-year=3, future-year=0, before-ownership=0,
+  single-month=1 — the boundary set, all host-independent. Verified: backend validate:local EXIT 0 — 1151 pass / 0 fail
+  (+6), build bundled. #28 CLOSED. NOTE: #27 (the bigger principal double-count) is the SAME function + Angelo-gated; when
+  decided, fix alongside. Next (122): nothing forced (feature cyc 116 / arch cyc 119... recompute) → highest-leverage; the
+  filed provider-ownership arch dedup or recurring-expenses backend are candidates. cov: be ~81% / fe ~62% (carry)

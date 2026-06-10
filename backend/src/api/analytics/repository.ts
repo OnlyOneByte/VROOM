@@ -53,6 +53,21 @@ import { convertDistance, convertEfficiency } from '../../utils/unit-conversions
 
 export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
 
+/**
+ * How many calendar months of `year` the vehicle was owned, bounded by [ownershipStart, now]
+ * (C121/#28). Used to divide a YEAR-scoped TCO total by a matching span instead of full-ownership
+ * months. Inclusive of both endpoint months: a vehicle owned all of `year` → 12; bought in July of
+ * `year` → 6 (Jul–Dec); a FUTURE year (start after year-end) or one entirely before ownership → 0.
+ * Pure (no Date.now() inside — `now` is injected by the caller), so it's host-independent + testable.
+ */
+export function monthsOwnedInYear(ownershipStart: Date, now: Date, year: number): number {
+  const yearStartMonth = ownershipStart.getFullYear() < year ? 0 : ownershipStart.getMonth();
+  const yearEndMonth = now.getFullYear() > year ? 11 : now.getMonth();
+  // The vehicle wasn't owned during `year` at all (bought after it, or `now` precedes it).
+  if (ownershipStart.getFullYear() > year || now.getFullYear() < year) return 0;
+  return Math.max(0, yearEndMonth - yearStartMonth + 1);
+}
+
 // ---------------------------------------------------------------------------
 // Data interfaces for each analytics endpoint
 // ---------------------------------------------------------------------------
@@ -1779,8 +1794,13 @@ export class AnalyticsRepository {
         .orderBy(asc(expenses.date));
 
       const costs = this.categorizeTCOExpenses(detailedExpenses);
+      // C121/#28: purchasePrice is a one-time ACQUISITION cost, not a recurring yearly one. A
+      // year-scoped TCO window-filters the expenses (above), so adding the full lifetime purchasePrice
+      // to a single year's total would inflate every year alike (and a year that didn't include the
+      // purchase would still absorb it). Include it only in the all-time (no-`year`) total.
+      const includePurchase = !year;
       const totalCost =
-        (purchasePrice ?? 0) +
+        (includePurchase ? (purchasePrice ?? 0) : 0) +
         costs.financingInterest +
         costs.insuranceCost +
         costs.fuelCost +
@@ -1794,11 +1814,16 @@ export class AnalyticsRepository {
           : purchaseDate
             ? new Date(purchaseDate as unknown as number)
             : now;
-      const ownershipMonths = Math.max(
-        1,
-        (now.getFullYear() - ownershipStart.getFullYear()) * 12 +
-          (now.getMonth() - ownershipStart.getMonth())
-      );
+      // costPerMonth must divide the (windowed) total by a matching span. All-time → purchase→now.
+      // Year-scoped → the months of THAT year the vehicle was owned (≤12), so a year-filtered
+      // numerator isn't divided by a full-ownership denominator (#28). Both clamp to ≥1.
+      const ownershipMonths = year
+        ? Math.max(1, monthsOwnedInYear(ownershipStart, now, year))
+        : Math.max(
+            1,
+            (now.getFullYear() - ownershipStart.getFullYear()) * 12 +
+              (now.getMonth() - ownershipStart.getMonth())
+          );
       const mileages = detailedExpenses
         .filter((r) => r.mileage != null)
         .map((r) => r.mileage as number);

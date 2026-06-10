@@ -370,14 +370,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   cancelled policies show as "expiring." All VERIFIED C114.
 
 **NEW — surfaced + verified-against-source by the C120 deep-review fan-out (TCO aggregation + offline-sync). #27 (HIGH) is in the PENDING ANGELO block above (accounting decision); these two are unblocked MED:**
-- **#28 (MED, top unblocked pick) — TCO `purchasePrice`/`ownershipMonths` ignore the year window.** `getVehicleTCO`
-  (analytics/repository.ts:1762-1788): when `year` is supplied, the expense conditions window-filter (gte/lt on
-  expenses.date), but `purchasePrice` is added to `totalCost` UNCONDITIONALLY, and `ownershipMonths` is purchaseDate→now
-  (`:1797-1801`), never year-bounded. So a TCO scoped to e.g. 2024 returns only 2024's expenses PLUS the full lifetime
-  purchase price, then divides by full-ownership months → an inflated, mismatched per-year/per-month figure. VERIFIED C120.
-  FIX: when `year` is set, either exclude `purchasePrice` from the windowed total (it's an acquisition cost, not a recurring
-  yearly cost) or bound `ownershipMonths` to the window — needs a small scope call, but the cleanest is to omit purchasePrice
-  from a year-scoped TCO (+ a test that a non-purchase year's TCO excludes it). NOTE: closely related to #27 — fix together.
+- ~~**#28 (MED) — TCO `purchasePrice`/`ownershipMonths` ignore the year window.**~~ — *DONE C121: getVehicleTCO
+  window-filtered the expenses when `year` was set but added `purchasePrice` to totalCost UNCONDITIONALLY + computed
+  ownershipMonths as purchaseDate→now (never year-bounded), so a 2024 TCO absorbed the full lifetime purchase price ÷
+  full-ownership months. FIX (two matched halves): (1) `includePurchase = !year` — purchasePrice (a one-time acquisition
+  cost) only in the all-time total; (2) extracted + exported `monthsOwnedInYear(ownershipStart, now, year)` (pure, injected
+  now → host-independent) for the year-scoped divisor so costPerMonth divides by a matching ≤12-mo span. +6 unit tests
+  (tco-months-owned.test.ts: full-year=12, mid-year=6, in-progress=3, future=0, before-ownership=0, single-month=1).
+  validate:local EXIT 0, 1151 pass (+6). NOTE: #27 (principal double-count) is the SAME function + still Angelo-gated.*
 - **#29 (MED, design call) — silent last-writer-wins on PUT (no optimistic-concurrency guard).** `BaseRepository.update`
   (utils/repository.ts:62-66) keys the UPDATE on `id` ONLY — it WRITES `updatedAt` but never READS it as a guard. So an
   offline edit (queued T0) replayed after an online edit (committed T1>T0) to the same row silently overwrites the newer
