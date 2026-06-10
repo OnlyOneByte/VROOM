@@ -392,6 +392,30 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   precondition to PUT (WHERE id=? AND updated_at=?) + 409 on mismatch. (CERTIFIED CLEAN this cycle: TCO split/insurance/
   sign/div-by-zero/unit; sync idempotent-return dedup, (userId,clientId) scoping, per-row outbox, userId stamping.)
 
+**NEW — surfaced + verified-against-source by the C126 deep-review fan-out (auth/session + fuel-efficiency). AUTH = WELL-HARDENED (no HIGH/MED, consistent with C56); FUEL = no HIGH (every divide guarded, missed-fillup dropped, first-row excluded, convertEfficiency direction correct). The findings, ranked:**
+- **#30 (MED, scope-gated) — the fuel-efficiency OUTLIER FILTER is unit-unaware.** `analytics-charts.ts:8-10`
+  `MAX_REASONABLE_MILES_BETWEEN_FILLUPS=1000` / `MIN_VALID_MPG=5` / `MAX_VALID_MPG=100` are IMPERIAL constants (the comment
+  says "must match frontend expense-helpers.ts"), but they're applied to NATIVE stored values BEFORE unit conversion
+  (`isRealisticEfficiency:106` on the km/L value computed `:121`; `validMilesBetween:431` on the raw km delta). So a
+  metric-storing vehicle gets a mis-shaped filter: a thirsty truck ~9.4 mpg ≈ 4 km/L is wrongly dropped as `<5`, and a legit
+  >1000 km inter-fillup gap is dropped. Aggregate arithmetic is still correct; only the OUTLIER cull is mis-calibrated.
+  VERIFIED C126. **SCOPE CONFIRM NEEDED before any fix:** does VROOM store per-vehicle native units (then this is reachable)
+  or convert-to-canonical on write (then it's moot)? AND it's a shared FE/BE invariant (the same constants live in
+  expense-helpers.ts) — a fix must touch both or it drifts. Not a clean unilateral fix → needs the scope call.
+- **#31 (LOW-MED) — fuel pair ordering is by DATE, not odometer.** Every pairing path sorts by `date.getTime()` then pairs
+  consecutive rows; the math assumes odometer increases with date. A backdated entry (or two same-date fillups in
+  odometer-descending order) yields a non-positive delta → SAFELY DROPPED by the `miles <= 0` guard (no wrong value reaches a
+  chart/average), but a legitimate interval is silently lost. VERIFIED C126. FIX (if desired): sort each vehicle's rows by
+  `(mileage ?? date)` before pairing, or pair by odometer order. Low urgency — guards prevent any incorrect output.
+- **#32 (LOW ×3, auth hygiene — none exploitable) —** (a) `/me` (routes.ts:443-447) + `/refresh` (`:534-538`) throw 401 on a
+  bad session but skip `deleteCookie`, diverging from requireAuth (a dead cookie lingers; not replayable — already invalid
+  server-side); (b) `validateAndRefreshSession` (utils.ts:57-96) — if `invalidateSession` throws AFTER `createSession`
+  succeeds, the catch returns the still-valid OLD session and the new one orphans until its 30-day expiry (same-user session
+  sprawl, not a priv issue); (c) `resolveNewUser` (routes.ts:200-202) `auth_error=email_exists` reveals account existence —
+  but only to a caller who already completed OAuth + proved they own that email, so no arbitrary enumeration (and no-merge is
+  the correct anti-takeover posture). VERIFIED C126. Cheapest cleanup: have /me + /refresh deleteCookie on 401 to mirror
+  requireAuth.
+
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
    (Overview) + `fetchExpensesPage` (Expenses tab) in `vehicles/[id]/+page.svelte` only toasted on

@@ -34,13 +34,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 122 |
-| deep-review | 5 | 120 |
+| deep-review | 5 | 126 |
 | guard | 6 | 125 |
 | bug | 3 | 121 |
 | arch | 5 | 123 |
 | infra | 6 | 124 |
 
-Current cycle: **125**
+Current cycle: **126**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2311,3 +2311,26 @@ Current cycle: **125**
   tsc 0, build OK. FE ratchet continues (3rd FE guard pick: C118 memoize, C119 capitalize-dedup, C125 this). Next (126):
   `bug` most-starved over budget (cyc 121, starved-for 5 > 3) → re-verify the queue; #24 CSV decimal is decision-gated, #27
   Angelo-gated, so a fresh fan-out may be needed (the C103/C90 pattern). cov: be 81.8% / fe ~62%+ (FE +1 module)
+- **C126 (deep-review — adversarial audit of the AUTH/session + fuel-efficiency paths; rule-7 fan-out)** — BALANCE: two
+  breached (deep-review cyc 120 starved-for 6, bug cyc 121 starved-for 5); highest-ABSOLUTE → deep-review (6) > bug (5),
+  correcting the C125 forecast (compute-all-six). Verification cycle; 2 Explore agents on fresh high-risk surfaces with no
+  prior dedicated read: auth/session (Lucia validate/refresh/cookie + the guards — SECURITY) + the fuel-efficiency/MPG/
+  cost-per-distance math. EVERY finding verified vs source (C67; I pre-read validMilesBetween + buildFuelEfficiencyAndCost +
+  the MPG constants myself). AUTH = WELL-HARDENED, no HIGH/MED (consistent with the C56 auth-converged finding): CERTIFIED
+  clean — fresh session id on login (no fixation), cookie attrs httpOnly/secure-in-prod/sameSite-Lax, logout + requireAuth
+  deleteCookie, expired sessions fail closed via Lucia (no past-expiresAt validate window), refresh creates-before-
+  invalidates (crash-safe), optionalAuth never sets user on failure (per-request ctx, no stale carryover), all cross-user
+  paths userId-scoped + the link/provider CSRF checks; NO password path so enumeration/timing N/A by construction. FUEL =
+  no HIGH; div-by-zero guarded at every site, missed-fillup dropped both sides, first-row excluded (loops start i=1),
+  sort-before-pair, convertEfficiency direction correct (no inverse bug). FILED (verified, none HIGH): #30 (MED) the
+  efficiency outlier filter is UNIT-UNAWARE — MIN/MAX_VALID_MPG (5/100) + MAX_REASONABLE_MILES_BETWEEN_FILLUPS (1000) are
+  imperial constants (the file comment even says "must match frontend") applied to NATIVE stored values PRE-conversion, so a
+  metric-storing vehicle's km/L + km gaps get filtered against an MPG/mile window (mis-shaped; aggregate math still right).
+  NEEDS SCOPE CONFIRM (does VROOM store metric, or convert-on-write to a canonical unit?) + it's a shared FE/BE invariant —
+  not a clean unilateral fix. #31 (LOW-MED) pair ordering is by DATE not odometer — a backdated entry yields a non-positive
+  delta that's safely DROPPED (no wrong value), but a legit interval is silently lost. #32 (LOW, auth hygiene ×3): /me +
+  /refresh skip deleteCookie on bad session (diverge from requireAuth); a refresh-failure catch can orphan the new session
+  (same-user, not a priv issue); OAuth email-collision reveals existence (but only to a caller who already owns the email).
+  No code change (rule-7 verification cycle); all → BACKLOG bug queue. Next (127): `bug` most-starved over budget (cyc 121,
+  starved-for 6 > 3) → #30 is the most concrete UNBLOCKED-ish, but scope-gated; re-verify + possibly fan out. cov: be 81.8%
+  / fe 62.0% (carry)
