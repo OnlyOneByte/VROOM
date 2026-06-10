@@ -271,11 +271,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > APR band + term boundary).
 > `frontend formatters.ts` 31%→well-covered (C130 — the two user-facing relative-time formatters + formatNumber/formatDate;
 > +11 covering Today/Yesterday/days/weeks/months/years + Just-now/m/h/d buckets + the future-clamp Math.max(0,…) guards,
-> all driven relative-to-now so they're host-independent). NEXT high-value low spots
+> all driven relative-to-now so they're host-independent).
+> `frontend error-handling.ts` 34%→well-covered (C137 — the C124 top FE low spot + load-bearing: every page's catch routes
+> through handleErrorWithNotification → handleApiError, the user-facing error copy; +8 covering the ApiError class + the 3-way
+> handleApiError branch [VroomError→friendly-or-own / network-TypeError / unknown-fallback] + the error-code→friendly map +
+> the notification side-effect, driven through the exported entry with the store mocked so assertions check the USER's message.
+> extractErrorMessage was already pinned C90). NEXT high-value low spots
 > **(re-anchored to the C124 reading — be 81.8% line / fe 62.0% line; FE STILL the bigger gap):**
 > backend — `body-limit.ts` (35% line size-enforcement branch), `sync/restore.ts`+`sync/routes.ts` (~32–61%,
-> HTTP-harness-tractable); FRONTEND (keep steering FE guard cycles here) — from the C124 report: `error-handling.ts` (34%)
-> + `api-client.ts`/`expense-api.ts` (mock-heavier) + the components/routes deficit. (SKIP navigation.ts — thin goto
+> HTTP-harness-tractable); FRONTEND (keep steering FE guard cycles here) — from the C124 report: `api-client.ts`/`expense-api.ts`
+> (mock-heavier) + the components/routes deficit. (SKIP navigation.ts — thin goto
 > wrappers, coverage theater.) Route/
 > integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
 > (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch

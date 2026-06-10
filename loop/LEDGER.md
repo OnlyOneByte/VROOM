@@ -35,12 +35,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 134 |
 | deep-review | 5 | 132 |
-| guard | 6 | 130 |
+| guard | 6 | 137 |
 | bug | 3 | 136 |
 | arch | 5 | 135 |
 | infra | 6 | 131 |
 
-Current cycle: **136**
+Current cycle: **137**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2495,3 +2495,21 @@ Current cycle: **136**
   pre-fix-wipe assertion); + preview/merge controls (data untouched) + a non-empty replace still works (guard not over-broad).
   Verified: backend validate:local EXIT 0 — 1164 pass / 0 fail (+4), tsc 0, musl-biome clean, build bundled. #21 CLOSED
   (shrink-threshold half remains filed). cov: be 81.8% (carry; +4 BE) / fe ~63%+ (carry)
+- **C137 (guard — coverage-ratchet error-handling.ts, the C124 top FE low spot)** — BALANCE: recomputed all six — `guard` the
+  ONLY over-budget category (cyc 130, starved-for 7 > 6; matches the C136 forecast). It wins the tie over infra's at-budget #5
+  sweep (starved-for 6 = budget, breaches 138) on raw starved-for. Took the C83 coverage-ratchet angle steered at the C124
+  report's top FE low spot: `error-handling.ts` (34% line) — LOAD-BEARING (every page's catch routes through
+  `handleErrorWithNotification` → the private `handleApiError`, the user-facing error copy), high-risk pure logic (not
+  passthrough theater). `extractErrorMessage` was already pinned (C90); the uncovered 34% was the `ApiError` class + the 3-way
+  handleApiError branch (VroomError→friendly-or-own / network-TypeError / unknown-fallback) + the error-code→friendly map +
+  the notification side-effect. Added `error-handling.test.ts` (+8): drove the FULL branch matrix through the EXPORTED
+  handleErrorWithNotification (mocking `$lib/stores/app.svelte` + spying addNotification — the analytics-api.test.ts pattern —
+  so the assertions check the message the USER would see), + ApiError class (default code API_ERROR / backend-code override /
+  details), + the context-prefix path. KEY behavioral pins: a KNOWN code shows the friendly copy NOT the raw backend text;
+  an UNMAPPED code falls back to the error's own message; a non-Error throw → the generic 'unexpected error' copy. THE GATE
+  earned its keep: noUncheckedIndexedAccess flagged `mock.calls[0][0]` → routed through a typed `notified()` helper with a
+  defined-check (no non-null assertion, which the codebase warns on). Verified: frontend validate:local EXIT 0 — type-check 0,
+  build done, 435 pass (+8). (A scoped per-file coverage re-measure was declined; the module is now well-covered by
+  construction — the full handleApiError matrix + map + class + side-effect — and the C124 whole-suite reading stays the cov:
+  anchor.) NEXT FE low spots (C124): api-client.ts/expense-api.ts (mock-heavier) + the components/routes deficit. cov: be
+  81.8% (carry) / fe ~63%+ (carry; +8 FE — error-handling.ts 34%→well-covered, not whole-suite-re-measured)
