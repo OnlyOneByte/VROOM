@@ -492,11 +492,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   The core fleetHealthScore is UNAFFECTED (that path uses neutral-50 defaults, not this radar). This is a relative-comparison
   RADAR DISPLAY semantics call (how to render "no data" — exclude the vehicle / grey it / neutral-midpoint), not a mechanical
   correctness fix → needs a product decision before any change. Secondary analytics surface.
-- **#41 (LOW) — expense search doesn't escape LIKE wildcards `%`/`_`.** repository.ts:106-111 (`buildExpenseConditions`) builds
-  `%${search.toLowerCase()}%` with no ESCAPE clause, so a search for "50%" → pattern `%50%%` matches every row containing "50"
-  (the trailing `%` is a wildcard), and "oil_change" matches "oilXchange" (`_` = any single char). VERIFIED C139. Parameterized
-  (no injection) + user-scoped (only over-matches the user's own rows) → over-matching search UX, not data-loss/security. FIX:
-  escape `%`/`_`/`\` in the term + append `ESCAPE '\'` to each LIKE. Clean unilateral fix for a future bug cycle.
+- ~~**#41 (LOW) — expense search doesn't escape LIKE wildcards `%`/`_`.**~~ — *DONE C142: scope-checked first — the ONLY
+  user-input LIKE in product source is this one expenses search site (the 2 other LIKEs are test files with literal patterns),
+  so it's a single-site fix not a class. `buildExpenseConditions` built `%${search}%` with no ESCAPE → "50%" matched every row
+  containing "50", "oil_change" matched "oilXchange". FIX: escape `\`/`%`/`_` in the term (regex, backslash-first) + `ESCAPE '\'`
+  on both LIKEs. +5 guards in search-paginated.test.ts (literal "50%"/`_`/bare-"%"/backslash + normal-search-still-works).
+  validate:local EXIT 0, 1175 pass. Parameterized so never a security issue — this closed the over-matching UX.*
 
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`

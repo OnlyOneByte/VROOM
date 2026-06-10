@@ -103,11 +103,16 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
   }
   // Free-text search over description + category (case-insensitive). LIKE is
   // case-insensitive for ASCII in SQLite by default; lower() handles mixed case too.
+  // Escape the LIKE metacharacters (`%` `_` and the escape char `\`) in the user's term so a
+  // search for a literal "50%" or "oil_change" matches the TEXT, not a wildcard — without the
+  // ESCAPE clause a `%` means "any chars" (over-matches every row) and `_` means "any one char"
+  // (bug #41). Order matters: escape `\` FIRST so we don't double-escape the ones we just added.
   const search = filters.search?.trim();
   if (search) {
-    const pattern = `%${search.toLowerCase()}%`;
+    const escaped = search.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const pattern = `%${escaped}%`;
     conditions.push(
-      sql`(lower(${expenses.description}) LIKE ${pattern} OR lower(${expenses.category}) LIKE ${pattern})`
+      sql`(lower(${expenses.description}) LIKE ${pattern} ESCAPE '\\' OR lower(${expenses.category}) LIKE ${pattern} ESCAPE '\\')`
     );
   }
 

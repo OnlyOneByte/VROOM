@@ -39,11 +39,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 140 |
 | deep-review | 5 | 139 |
 | guard | 6 | 137 |
-| bug | 3 | 139 |
+| bug | 3 | 142 |
 | arch | 5 | 141 |
 | infra | 6 | 138 |
 
-Current cycle: **141**
+Current cycle: **142**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2597,3 +2597,19 @@ Current cycle: **141**
   — 1170 pass / 0 fail (+1), tsc 0, musl-biome clean, build bundled (the create-path test stayed green = Site A behavior
   preserved; the new test pins Site B). ARCH QUEUE now empty of clean picks (MS_PER_DAY stays filed as too-sprawling); next arch
   fires another rule-7 fan-out. cov: be 82.25% (carry; +1 BE) / fe 65.32% (carry)
+  - *(C141.5 docs commit `6c5f930`: filed the C141 FE fan-out's surfaced `roundToCents` candidate (8 byte-identical FE sites)
+    as the primed next-arch pick so it survives summarization — loop bookkeeping, no category touched.)*
+- **C142 (bug #41 — escape LIKE wildcards in expense search)** — BALANCE: nothing strictly over budget; `guard` + `bug` both
+  breach at C143. Highest-leverage among clean/decided options = the C139-filed #41 (it feeds the at-budget `bug`, tightest
+  budget by design, and was already grounded firsthand). SCOPE-CHECKED FIRST (grep): the ONLY user-input LIKE in product source
+  is the single expenses search site (repository.ts:110) — the 2 other LIKEs are test files with hardcoded literal patterns, no
+  user input → #41 is a single-site fix, NOT a class. THE BUG: `buildExpenseConditions` built `%${search.toLowerCase()}%` with
+  no ESCAPE clause, so a search for "50%" → `%50%%` matched every row containing "50" (`%` = any chars), and "oil_change"
+  matched "oilXchange" (`_` = any one char). Parameterized (no injection) + user-scoped (only over-matches the user's own rows)
+  → over-matching search UX, not data-loss/security. FIX: escape `\` `%` `_` in the term (regex `/[\\%_]/g` → `\$&`; backslash
+  FIRST so the just-added escapes aren't double-escaped) + append `ESCAPE '\\'` to BOTH LIKEs so the escaped chars match
+  literally. MERGE-SURVIVING net: extended search-paginated.test.ts (+5, the file explicitly noted "no metacharacter case"):
+  literal "50%" matches only the "50%" row not "...50..." (the regression), "_" literal not any-char, a BARE "%" no longer
+  matches every row, a backslash matches literally (escape-char not double-applied), and a normal metachar-free search still
+  substring-matches. Verified: backend validate:local EXIT 0 — 1175 pass / 0 fail (+5), tsc 0, musl-biome clean, build bundled.
+  #41 CLOSED. cov: be 82.25% (carry; +5 BE) / fe 65.32% (carry)
