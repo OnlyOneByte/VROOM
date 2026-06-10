@@ -44,7 +44,7 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 156 |
 | bug | 3 | 158 |
 | arch | 5 | 153 |
-| infra | 6 | 152 |
+| infra | 6 | 159 |
 
 Current cycle: **150**
 
@@ -2891,3 +2891,16 @@ Current cycle: **150**
   dates, 1 row each → NO phantom point [pre-fix: 1]; per-vehicle trends still computed [2 points, 25 + 30 MPG]; single-vehicle
   scoping unchanged). green→green: backend validate:local **EXIT 0 — 1206 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean
   (one reflow autofixed), build bundled. #54 CLOSED. cov: be 82.0%+ (carry; +3 BE) / fe 70.09% (carry)
+- **C159 (infra): CLAUDE.md orientation refresh (4 drifts fixed post-C145)** — BALANCE: two over budget → most-starved
+  (absolute) wins → `infra` (cyc 152, starved-for 7) > `arch` (6). The #5 sweep was just C152 (next ~C162); the CLAUDE.md
+  refresh was due ~C160 (C145 cadence) and C155–C158 landed substantial drift (+10 commits, 2 HIGHs closed, 2 approvals shipped).
+  4 drifts a fresh agent would mis-orient on, each verified vs the C146–C158 LEDGER (the C117/C131/C145 anti-drift discipline,
+  no churn): (1) maintenance "lease/loan follow-on still pending Angelo / should switch to currentOdometer" → DONE C157 (FinanceTab
+  consumes all-time currentOdometer via resolveCurrentOdometer); (2) coverage cited the stale C138 reading (82.25/65.3) + named
+  expense-api.ts as a "next FE low spot" — but C152 re-measured (82.0 line / 82.5 func BE; **fe 70.1 line — broke 70%**), C149
+  closed expense-api, C156 added body-limit → updated figures, re-pointed FE to components/routes + BE to sync/restore, noted the
+  middleware trio is complete; (3) suite size ~1178/~457 → **1206/475**; (4) the Pending-Angelo block listed **#27 as a still-open
+  HIGH** ("THREE HIGHs") — but C154 CLOSED #27 and C158 CLOSED #54 → added a "Loop-found HIGHs now CLOSED" line + trimmed to the
+  TWO remaining (Sheets #36/#37) and refreshed the lower-sev list (#45/#51/#53). Doc-only — no build gate (the C5/C47/C117/C131/
+  C145 convention; every claim verified vs source/LEDGER). Next CLAUDE.md refresh ~C174; #5 sweep next ~C162. cov: be 82.0% /
+  fe 70.09% (carry, doc-only cycle)

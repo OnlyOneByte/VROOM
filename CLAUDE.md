@@ -124,10 +124,10 @@ Highlights:
     reconcile is **DONE (C52)** — chose the additive path: GET /stats now also returns an all-time,
     all-sources `currentOdometer` (via `getCurrentOdometer`), with the period-filtered + fuel-only
     `currentMileage` left untouched (zero behavior change), pinned by `vehicle-stats-current-odometer.test.ts`.
-    **Remaining: T9 only** (promote the e2e + the T7/T8 eyes-on). Two follow-ons are flagged to Angelo
-    (deferred, not loop-blocking): lease/loan miles-used still consume the period-scoped `currentMileage`
-    and should switch to `currentOdometer` (a real but user-visible $ change), and the "Current Mileage"
-    stat-card display-semantics is a direction call. Track in its `tasks.md`.
+    **Remaining: T9 only** (promote the e2e + the T7/T8 eyes-on). The lease/loan follow-on is now DONE
+    (C157, Angelo-approved C151): FinanceTab's loan miles-used + lease overage consume the all-time
+    `currentOdometer` via the pure `resolveCurrentOdometer` helper (the FinanceTab visual render stays
+    eyes-on). The "Current Mileage" stat-card display-semantics remains a direction call for Angelo.
   - `.kiro/specs/import-trackers/` (Fuelly/Fuelio/Drivvo CSV via a mapping pre-pass over the
     hardened import pipeline) — **backend COMPLETE (T1–T3) + the FE client slice (C140); only the
     eyes-on dialog markup remains.** T1 (C58) `import-mapping.ts` pure `applyMapping` (rename +
@@ -156,14 +156,16 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C138, not an estimate): **backend 82.25% line / 81.8% func · frontend 65.3% line / 61.8%
-  func / 58.7% branch** — backend climbed ~+4½ since the C81 baseline; **frontend is still the bigger gap
-  but closing fast** (62.0→65.3 line since C124) under a sustained FE-guard ratchet (C118 memoize, C119
-  capitalize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts, C143 api-client.ts),
-  so keep steering FE guard cycles there (next FE low spots: `expense-api.ts` glue + the components/routes
-  deficit — error-handling.ts + api-client.ts are now DONE). loop-improvement #4 records a `cov:` tag on
-  every LEDGER cycle entry. Suite size today: **~1178 backend tests / ~457 frontend** (a floor — grows
-  most cycles). Don't regress coverage; name why if a cycle drops it.
+  (re-measured C152, not an estimate): **backend 82.0% line / 82.5% func · frontend 70.1% line / 66.8%
+  func / 62.9% branch** — backend steady ~82%; **frontend broke 70% line for the first time** (65.3→70.1
+  since C138) under a sustained FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130
+  formatters, C137 error-handling.ts, C143 api-client.ts, C149 expense-api.ts) — the FE SERVICE layer is
+  now well-covered, so the remaining FE gap is the **components/routes deficit** (largely eyes-on; prefer
+  the few thin pure-`.ts`/`.svelte.ts`/store/util modules). Backend middleware trio all covered now
+  (idempotency C105, rate-limit C112, body-limit C156); next BE low spots are `sync/restore.ts`+
+  `sync/routes.ts`. loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry. Suite size today:
+  **~1206 backend tests / ~475 frontend** (a floor — grows most cycles). Don't regress coverage; name why
+  if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
   in-memory SQLite DB with a seeded user + a real Lucia session cookie (`ctx.authed/anon`); it's
@@ -177,13 +179,17 @@ Highlights:
   capture-only (no baseline compare); storage-backup-toggle + the eyes-on UI tails
   (maintenance T7–T9, import-trackers T4–T6, recurring-expenses T4–T8) need Playwright/an OAuth
   provider — sandbox-blocked in the loop, so those land "code-complete, eyes-on pending."
+- Loop-found HIGHs now CLOSED: **#27** (TCO financed-principal double-count) fixed C154 (Angelo-approved
+  option c — keep purchasePrice, exclude financing-payment rows when price is counted); **#54** (fuel-
+  efficiency trend paired rows across vehicles in the fleet view) fixed C158 (per-vehicle pairing via
+  `forEachVehiclePair`).
 - Pending an Angelo decision (filed, NOT auto-fixed — each changes a displayed $/HTTP behavior or is a
-  product call). THREE HIGHs: **#27** (TCO double-counts a financed vehicle's principal — needs an
-  accounting-model choice), **#36** (Sheets backup writes `USER_ENTERED` → formula injection + silent
-  round-trip corruption; ARCC-consult before fixing), **#37** (Sheets backup is a non-atomic in-place
-  rewrite that can destroy the only good copy). Plus the backup-honesty pair **#43** (a ZIP-fail-but-
-  Sheets-ok run is marked success + won't retry) + **#44** (HTTP 200 when all providers fail) — both
-  ARCC-grounded C144.5 as the SAX-04 fail-open pitfall, direction = surface failure honestly; **#45**
-  (period-scoped totalMileage/costPerMile) grouped with the lease/loan `currentOdometer` swap + the
-  "Current Mileage card" semantics call; #19 (TCO trend scope), #24 (CSV decimal separator), #21-shrink.
-  See `loop/BACKLOG.md` bug queue for the full list + grounding.
+  product call). TWO HIGHs, both in the Google Sheets backup path: **#36** (writes `USER_ENTERED` →
+  formula injection + silent round-trip corruption; ARCC-consult before fixing), **#37** (non-atomic
+  in-place rewrite that can destroy the only good copy). Plus the backup-honesty pair **#43** (a ZIP-fail-
+  but-Sheets-ok run is marked success + won't retry) + **#44** (HTTP 200 when all providers fail) — both
+  ARCC-grounded C144.5 as the SAX-04 fail-open pitfall, direction = surface failure honestly. Lower-sev:
+  **#45** (period-scoped totalMileage/costPerMile) + the "Current Mileage card" semantics call; #19 (TCO
+  trend scope), #24 (CSV decimal separator), #21-shrink, #51 (term-less active policy count), #53 (endDate
+  inclusivity server-TZ-conditional, UTC-mitigated). See `loop/BACKLOG.md` bug queue for the full list +
+  grounding.
