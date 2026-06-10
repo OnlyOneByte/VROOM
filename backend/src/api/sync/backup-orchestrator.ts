@@ -193,7 +193,13 @@ export class BackupOrchestrator {
       if (anySuccess) {
         await preferencesRepository.update(userId, { backupConfig: updatedConfig });
         const { syncStateRepository } = await import('../settings/repository');
-        await syncStateRepository.updateSyncDate(userId);
+        // Stamp lastSyncDate from the run's START timestamp (the snapshot anchor — taken before the
+        // change-check + ZIP export above), NOT a fresh end-of-run time. A long backup can run for
+        // minutes; a data change made mid-run (after the snapshot) must stay "unsynced" so the NEXT
+        // backup captures it. Stamping end-of-run would mark that change already-synced and silently
+        // drop it from every future backup (C144 #42). Using the start timestamp (slightly before the
+        // actual L85 snapshot) errs safe: at worst a redundant re-backup, never a lost change.
+        await syncStateRepository.updateSyncDate(userId, new Date(timestamp));
         await syncStateRepository.updateBackupDate(userId);
       }
 

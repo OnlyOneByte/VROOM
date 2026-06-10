@@ -504,6 +504,54 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   on both LIKEs. +5 guards in search-paginated.test.ts (literal "50%"/`_`/bare-"%"/backslash + normal-search-still-works).
   validate:local EXIT 0, 1175 pass. Parameterized so never a security issue — this closed the over-matching UX.*
 
+**NEW — surfaced + verified-against-source by the C144 deep-review fan-out (backup orchestration/scheduling + vehicle-stats/odometer). The scary concurrency paths (mutex check-then-act atomic, finally-release + TTL self-heal, Promise.allSettled per-provider isolation, withTimeout hang-cap) AND getCurrentOdometer (vehicle-scoped UNION, null-safe MAX, unit-consistent) were all CERTIFIED CLEAN. #42 (data-safety, clean) FIXED in-cycle; the rest filed:**
+- ~~**#42 (HIGH, data-safety) — backup drops a data change made DURING the run.**~~ — *DONE C144: `updateSyncDate` stamped
+  `lastSyncDate = new Date()` (END of run), but the ZIP snapshots the DB near the START; a long run (10min timeout) means an
+  edit made after the snapshot but before the end-stamp gets `lastDataChangeDate < lastSyncDate` → hasChangesSinceLastSync false
+  → silently dropped from ALL future backups (NORTH_STAR #1). FIX: `updateSyncDate(userId, syncedAt = new Date())` + the
+  orchestrator passes its START `timestamp` (errs safe — at worst a redundant re-backup, never a lost change). +3 regression
+  tests (settings-repository.property.test.ts: snapshot-stamp keeps a mid-run edit unsynced + a negative control). validate:local
+  EXIT 0, 1178 pass.*
+- **#43 (HIGH? — needs a decision) — ZIP upload fails but Sheets sync succeeds → the run is marked SUCCESS + won't retry.**
+  backup-orchestrator.ts:80-92 + a provider with both `enabled` (ZIP) and `sheetsSyncEnabled`: if exportAsZip throws, zipBuffer
+  stays null, the strategy's ZIP leg returns success:false but the Sheets leg succeeds → strategy `success = anySuccess` true →
+  orchestrator sets lastBackupAt + advances lastSyncDate. So the user's actual DATA ARCHIVE (ZIP) failed to upload, the run reads
+  as successful, and change-gating means the ZIP isn't retried until the next data change. `capabilities.zip.success=false` is in
+  the payload but neither scheduling nor the route surfaces it. VERIFIED C144. DECISION: should a ZIP failure mark the whole run
+  unsuccessful (so it retries), or surface a partial-success warning? Needs Angelo's call on backup success semantics + retry.
+- **#44 (MED — needs a decision) — route returns 200 "Sync completed" when EVERY provider failed.** sync/routes.ts:86-95 — the
+  orchestrator result has no top-level success flag; when all providers fail (anySuccess=false, nothing persists) the route still
+  `createSuccessResponse(result, 'Sync completed')` → 200. The caller must inspect per-provider `results[*].success` to learn
+  nothing backed up. VERIFIED C144. FIX (decision): add a top-level status ('ok'|'partial'|'failed') + non-2xx (or an explicit
+  failure flag) when anySuccess===false. (Pairs naturally with #43 — both are "surface backup failure honestly" calls.)
+- **#49 (LOW) — activity-tracker `handleInactivity` finally clobbers a concurrent `recordActivity`.** activity-tracker.ts:67-83 —
+  handleInactivity captures `activity` then in finally writes that OLD object back (syncInProgress=false); if recordActivity
+  installed a fresh object during the awaited performAutoSync, its fresh lastActivity is reverted → can prematurely age out a
+  user in cleanupInactiveUsers. Stale-state edge, not data loss. VERIFIED C144.
+- **#45 (HIGH-ish, but a SEMANTICS decision — grouped with the gated currentMileage/lease-loan + "Current Mileage card" calls) —
+  vehicle-stats totalMileage/costPerMile mix a period-FILTERED numerator with an ALL-TIME denominator.** vehicle-stats.ts:129-143
+  — the /stats route passes period-filtered `fuelExpenses` but the unfiltered all-time `vehicle.initialMileage`, so for any
+  period!=='all': totalMileage = (in-window MAX mileage) − (lifetime purchase odometer), and costPerMile = (in-window cost) /
+  (lifetime miles) — a windowed numerator over an all-time denominator (e.g. a 7d view shows ~85,000 mi distance + a ~100×-too-low
+  cost/mile). VERIFIED C144. This is the SAME period-scoped-stats semantics family as the already-filed Angelo-gated lease/loan
+  `currentMileage` bug + the "Current Mileage card display-semantics" direction call — what SHOULD "cost/mile for the last 7 days"
+  mean (in-window delta? all-time?). Decide the whole stats-period contract together; not a clean unilateral fix.
+- **#46 (MED) — negative `totalMileage` when the in-window max reading is below `initialMileage`.** vehicle-stats.ts:138
+  `latestMileage - initialMileage` has no monotonicity guard, so a backdated/mistyped reading (e.g. 45000 when initialMileage
+  50000) returns a NEGATIVE distance to the client (costPerMile's `>0` guard saves cost/mile, but the distance shows wrong).
+  VERIFIED C144. FIX: clamp totalMileage at 0 (or surface a data-warning). Clean-ish, but confirm it shouldn't instead flag the
+  bad reading.
+- **#47 (MED, partly by-design) — getCurrentOdometer MAX-by-value lets one typo'd high reading poison the reminder axis.**
+  odometer/repository.ts:138-157 takes MAX(odometer) by VALUE not date (D2 design, pinned by get-current-odometer.test.ts), so a
+  fuel/odometer row mistyped as 999999 makes getCurrentOdometer return 999999 FOREVER (until that row is corrected) → every
+  mileage/`both` reminder fires immediately + mark-serviced/resolveMileageFields anchor to the bad value + lease/loan inflated. A
+  separate later good reading does NOT fix it (only correcting the bad row does). VERIFIED C144. FIX (design): latest-by-date or a
+  sanity-cap reconciliation — needs a call since MAX-by-value is the ratified D2 behavior.
+- **#48 (LOW, hardening) — getCurrentOdometer / getHistory are vehicle-scoped but NOT userId-scoped.** odometer/repository.ts:
+  138-157/:73-124 filter on vehicle_id only; every live caller validates ownership first (no current leak), but the method would
+  return another user's reading if ever called with an unvalidated vehicleId (the C109 detectConflicts class). VERIFIED C144.
+  FIX: add a userId param as belt-and-braces.
+
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
    (Overview) + `fetchExpensesPage` (Expenses tab) in `vehicles/[id]/+page.svelte` only toasted on

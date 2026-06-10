@@ -122,12 +122,20 @@ export class SyncStateRepository {
     }
   }
 
-  async updateSyncDate(userId: string): Promise<void> {
+  /**
+   * Stamp `lastSyncDate` — the watermark `hasChangesSinceLastSync` compares `lastDataChangeDate`
+   * against. `syncedAt` MUST be the moment the synced data was SNAPSHOTTED (when the backup ZIP was
+   * generated), NOT the moment the run finished: a long run can take minutes, and any data change made
+   * AFTER the snapshot but BEFORE completion would otherwise be stamped as "already synced" (its
+   * lastDataChangeDate < a fresh end-of-run lastSyncDate) and silently dropped from all future backups
+   * (C144 #42). Defaults to now for callers with no snapshot semantics.
+   */
+  async updateSyncDate(userId: string, syncedAt: Date = new Date()): Promise<void> {
     try {
       await this.getOrCreate(userId);
       await this.db
         .update(syncState)
-        .set({ lastSyncDate: new Date() })
+        .set({ lastSyncDate: syncedAt })
         .where(eq(syncState.userId, userId));
     } catch (error) {
       if (error instanceof DatabaseError) throw error;

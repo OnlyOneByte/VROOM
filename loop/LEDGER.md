@@ -37,13 +37,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 140 |
-| deep-review | 5 | 139 |
+| deep-review | 5 | 144 |
 | guard | 6 | 143 |
-| bug | 3 | 142 |
+| bug | 3 | 144 |
 | arch | 5 | 141 |
 | infra | 6 | 138 |
 
-Current cycle: **143**
+Current cycle: **144**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2628,3 +2628,30 @@ Current cycle: **143**
   non-null/any). Verified: frontend validate:local EXIT 0 — type-check 0, build done, 457 pass (+17). NEXT FE low spot (C124):
   expense-api.ts (mock-heavier) + the components/routes deficit. cov: be 82.25% (carry) / fe 65.32%+ (carry; +17 FE —
   api-client.ts low→well-covered, not whole-suite-re-measured)
+- **C144 (deep-review → bug #42 — backup stamps lastSyncDate end-of-run, silently drops a mid-run data change)** — BALANCE:
+  nothing strictly over budget; feature/deep-review/infra tied at-budget (all breach C145). Highest-leverage = deep-review (its
+  fan-outs keep surfacing real defects a screenshot misses — #39/#41 last round). Named dr items eyes-on/sign-off-blocked → a
+  fresh backend-correctness fan-out (2 Explore agents) on un-swept veins: (A) backup ORCHESTRATION/scheduling (not content), (B)
+  vehicle-stats + odometer. VERIFIED every finding vs source FIRST (C67 — I pre-read both surfaces + confirmed the load-bearing
+  claims firsthand). RESULTS:
+  • Agent A: certified-clean the scary concurrency paths (mutex check-then-act is await-free → atomic; released in finally; TTL
+    self-heal; Promise.allSettled isolates per-provider failure; withTimeout caps hangs) — matched my pre-read. 2 HIGH +2 lower.
+    FIXED the verified, clean, data-safety one (#42): `updateSyncDate` set `lastSyncDate = new Date()` (END of run), but the ZIP
+    snapshots the DB near the START; a long run (BACKUP timeout 10min) means an edit made AFTER the snapshot but BEFORE the
+    end-stamp gets `lastDataChangeDate < lastSyncDate` → `hasChangesSinceLastSync` false → SILENTLY dropped from all future
+    backups (NORTH_STAR #1). Traced the full chain in source (repository.ts:118 compare, :130 stamp; orchestrator:44 timestamp,
+    :85 snapshot, :196 stamp). FIX: `updateSyncDate(userId, syncedAt = new Date())` + orchestrator passes its START `timestamp`
+    (slightly before the L85 snapshot → errs SAFE: at worst a redundant re-backup, never a lost change). The other 3 agent-A
+    findings are DECISIONS, not clean fixes → filed: #43 (ZIP-fail-but-Sheets-ok marked success → false-success + skip-retry),
+    #44 (route returns 200 "Sync completed" when ALL providers fail), + a LOW activity-tracker clobber.
+  • Agent B (vehicle-stats/odometer): certified getCurrentOdometer CLEAN (vehicle-scoped UNION, null-safe MAX, unit-consistent
+    per-vehicle — matched my pre-read). 4 findings, NONE a clean unilateral fix: Finding 1 (HIGH — totalMileage/costPerMile mix
+    a period-FILTERED numerator with an all-time initialMileage denominator → wrong for 4/5 period options) is REAL + VERIFIED
+    (route passes filtered fuelExpenses + unfiltered vehicle.initialMileage) but it's the SAME semantics family as the
+    already-filed Angelo-gated period-scoped currentMileage / "Current Mileage card" decision → filed #45 GROUPED with it; +
+    #46 (negative totalMileage when a reading < initialMileage), #47 (MAX-by-value lets one typo'd 999999 reading poison the
+    reminder axis until corrected — pinned-as-design), #48 (getCurrentOdometer not userId-scoped — LOW hardening, no live leak).
+  MERGE-SURVIVING net for #42: +3 in settings-repository.property.test.ts — a mid-run edit stamped against SNAPSHOT-time still
+  reports unsynced (the regression) + a negative control (end-of-run stamp loses it, proving the param matters) + exact-timestamp
+  persist + the now-default backward-compat. Verified: backend validate:local EXIT 0 — 1178 pass / 0 fail (+3), tsc 0,
+  musl-biome clean, build bundled. #42 CLOSED. cov: be 82.25% (carry; +3 BE) / fe 65.32% (carry)
