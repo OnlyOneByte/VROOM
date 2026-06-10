@@ -331,6 +331,19 @@ export class AnalyticsRepository {
     this.vehicleNameCache.set(cacheKey, { data, timestamp: now });
   }
 
+  /**
+   * Resolve a single fetched row's stored unit preferences to a usable value, falling back to the
+   * defaults when the row is absent OR its stored prefs don't parse (C129 dedup of the byte-identical
+   * tail shared by getUserUnits + getVehicleUnits). NOTE: this is the FALLBACK-on-bad-prefs semantics;
+   * getAllVehicleUnits deliberately does NOT use it — it THROWS on invalid prefs, so folding it in here
+   * would silently swallow a real data error (the C90 inverted-semantics exclusion).
+   */
+  private resolveUnitsOrDefault(row: { unitPreferences: unknown } | undefined): UnitPreferences {
+    if (!row) return { ...DEFAULT_UNIT_PREFERENCES };
+    const parsed = parseUnitPreferences(row.unitPreferences);
+    return parsed ?? { ...DEFAULT_UNIT_PREFERENCES };
+  }
+
   /** Read the user's global unit preferences from user_preferences. */
   async getUserUnits(userId: string): Promise<UnitPreferences> {
     try {
@@ -340,11 +353,7 @@ export class AnalyticsRepository {
         .where(eq(userPreferences.userId, userId))
         .limit(1);
 
-      const row = rows[0];
-      if (!row) return { ...DEFAULT_UNIT_PREFERENCES };
-
-      const parsed = parseUnitPreferences(row.unitPreferences);
-      return parsed ?? { ...DEFAULT_UNIT_PREFERENCES };
+      return this.resolveUnitsOrDefault(rows[0]);
     } catch (error) {
       throw new DatabaseError('Failed to read user unit preferences', error);
     }
@@ -359,11 +368,7 @@ export class AnalyticsRepository {
         .where(eq(vehicles.id, vehicleId))
         .limit(1);
 
-      const row = rows[0];
-      if (!row) return { ...DEFAULT_UNIT_PREFERENCES };
-
-      const parsed = parseUnitPreferences(row.unitPreferences);
-      return parsed ?? { ...DEFAULT_UNIT_PREFERENCES };
+      return this.resolveUnitsOrDefault(rows[0]);
     } catch (error) {
       throw new DatabaseError('Failed to read vehicle unit preferences', error);
     }

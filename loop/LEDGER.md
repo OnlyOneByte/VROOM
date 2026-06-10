@@ -37,10 +37,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 126 |
 | guard | 6 | 125 |
 | bug | 3 | 127 |
-| arch | 5 | 123 |
+| arch | 5 | 129 |
 | infra | 6 | 124 |
 
-Current cycle: **128**
+Current cycle: **129**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2366,3 +2366,15 @@ Current cycle: **128**
   pending". NOTED for a future arch pick: reminder-helpers.ts:45 has the same charAt(0).toUpperCase()+slice(1) idiom C119
   extracted as capitalize() but this file wasn't in C119's 5 sites — a small follow-on dedup (not folded in: arch rule 1,
   + this is a feature cycle). Next (129): nothing forced → highest-leverage. cov: be 81.8% / fe ~62%+ (FE +5 tests)
+- **C129 (arch — dedup the unit-prefs resolve tail in analytics/repository.ts; the filed C119 #2)** — BALANCE: `arch` most-
+  starved over budget (cyc 123, starved-for 6 > 5). Took the C119-filed #2 (a ready, pre-scouted pick). VERIFIED vs source
+  (C69/C75 diff-before-extract): getUserUnits (335) + getVehicleUnits (354) share a BYTE-IDENTICAL 4-line tail (`const row =
+  rows[0]; if (!row) return {...DEFAULT}; const parsed = parseUnitPreferences(row.unitPreferences); return parsed ??
+  {...DEFAULT}`); they differ only in the query (table/col/where) + the error-message string (left in place). Extracted a
+  private `resolveUnitsOrDefault(row)`. CRITICAL EXCLUSION (the C90 inverted-semantics catch): getAllVehicleUnits (373) does
+  NOT share it — it THROWS a ValidationError on invalid prefs rather than falling back to default, so folding it in would
+  silently swallow a real data error; left untouched + documented why in the helper doc-comment. green→green: the analytics
+  unit-prefs suites (analytics-units.property.test.ts etc.) stayed green UNCHANGED — 1158 pass, same as C127 = behavior-
+  preserving. Verified: backend validate:local EXIT 0, build bundled. Remaining filed arch picks: MS_PER_DAY literal (C119
+  #3, NOT byte-identical — per-site verify); the reminder-helpers.ts:45 capitalize 1-site follow-on (C128). Next (130 —
+  milestone): nothing forced (guard cyc 125 / infra cyc 124 breach next) → highest-leverage. cov: be 81.8% / fe 62.0% (carry)

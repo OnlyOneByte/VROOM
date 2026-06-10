@@ -601,11 +601,13 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
   (returns the row, userId-scoped, local DbInstance type). MIXED SHAPE (C113 pattern): 3 sites use the row (.domain /
   createProviderInstance) → keep `const existing = [await …]`; 2 existence-only (backfill, sync) → discard form. The gate
   earned its keep — biome noUnusedVariables enforced the split. green→green vs the C91 13-test providers net (1155 pass,
-  unchanged). validate:local EXIT 0.* NEXT ARCH PICKS (lower priority): analytics getUserUnits/getVehicleUnits
-  share a byte-identical parse-default tail [2 sites, C119 #2]; `MS_PER_DAY` magic literal in 3 spellings across 4 files
-  [C119 #3, NOT byte-identical — per-site verify before collapsing]; `reminder-helpers.ts:45` has the SAME
-  `frequency.charAt(0).toUpperCase()+frequency.slice(1)` idiom C119 extracted as `capitalize()` but this file wasn't in
-  C119's 5 sites [filed C128 — a 1-site follow-on; route it through the existing `capitalize` from formatters.ts].
+  unchanged). validate:local EXIT 0.* NEXT ARCH PICKS (lower priority): ~~analytics getUserUnits/getVehicleUnits
+  share a byte-identical parse-default tail [2 sites, C119 #2]~~ — *DONE C129: extracted private `resolveUnitsOrDefault(row)`;
+  EXCLUDED getAllVehicleUnits (throws on invalid prefs, not fallback — the C90 inverted-semantics catch). green→green 1158
+  pass.* Remaining: `MS_PER_DAY` magic literal in 3 spellings across 4 files [C119 #3, NOT byte-identical — per-site verify
+  before collapsing]; `reminder-helpers.ts:45` has the SAME `frequency.charAt(0).toUpperCase()+frequency.slice(1)` idiom
+  C119 extracted as `capitalize()` but this file wasn't in C119's 5 sites [filed C128 — a 1-site follow-on; route it through
+  the existing `capitalize` from formatters.ts].
 
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,
