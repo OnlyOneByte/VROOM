@@ -2,12 +2,11 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { CONFIG } from '../../config';
 import type { NewReminder } from '../../db/schema';
-import { NotFoundError, ValidationError } from '../../errors';
+import { NotFoundError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
-import { commonSchemas } from '../../utils/validation';
+import { commonSchemas, validateVehicleIdsOwned } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
-import { vehicleRepository } from '../vehicles/repository';
 import { recurringCostSummary } from './reminder-cost';
 import { reminderRepository } from './repository';
 import { computeNextDueDate, reminderTriggerService } from './trigger-service';
@@ -145,12 +144,7 @@ routes.post('/', zValidator('json', createReminderSchema), async (c) => {
   const data = c.req.valid('json');
 
   // Verify vehicle ownership — all vehicleIds must belong to the user
-  const userVehicles = await vehicleRepository.findByUserId(user.id);
-  const ownedVehicleIds = new Set(userVehicles.map((v) => v.id));
-  const invalidIds = data.vehicleIds.filter((id: string) => !ownedVehicleIds.has(id));
-  if (invalidIds.length > 0) {
-    throw new ValidationError(`Vehicles not found or not owned: ${invalidIds.join(', ')}`);
-  }
+  await validateVehicleIdsOwned(data.vehicleIds, user.id);
 
   const { vehicleIds, ...reminderData } = data;
   const mileage = await resolveMileageFields(reminderData, vehicleIds);
@@ -231,14 +225,7 @@ routes.put(
 
     // If vehicleIds are being updated, verify ownership
     if (partialUpdate.vehicleIds) {
-      const userVehicles = await vehicleRepository.findByUserId(user.id);
-      const ownedVehicleIds = new Set(userVehicles.map((v) => v.id));
-      const invalidIds = partialUpdate.vehicleIds.filter(
-        (vid: string) => !ownedVehicleIds.has(vid)
-      );
-      if (invalidIds.length > 0) {
-        throw new ValidationError(`Vehicles not found or not owned: ${invalidIds.join(', ')}`);
-      }
+      await validateVehicleIdsOwned(partialUpdate.vehicleIds, user.id);
     }
 
     // Merge partial update with existing to re-validate the full object

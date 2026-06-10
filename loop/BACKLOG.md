@@ -687,8 +687,17 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
   idiom C119 extracted as `capitalize()` [filed C128]~~ — *DONE C135: routed frequencyLabel (:75) through the shared
   `capitalize` from formatters.ts (1 import + 1 call swap). Verified byte-identical + test-anchored (frequencyLabel's
   'monthly'→'Monthly' tests are the green→green net) + no circular import (formatters imports only settingsStore). green→green
-  427 pass unchanged.* Remaining: `MS_PER_DAY` magic literal in 3 spellings across 4 files [C119 #3, NOT byte-identical —
-  per-site verify before collapsing]; else run a rule-7 fan-out to repopulate the arch queue.
+  427 pass unchanged.* ~~plural multi-vehicle ownership check duplicated in reminders/routes.ts [C141 rule-7 fan-out]~~ —
+  *DONE C141: extracted `validateVehicleIdsOwned(vehicleIds, userId)` to utils/validation.ts (beside the single-vehicle
+  validator); the create (:148) + update (:234) sites — VERIFIED byte-identical firsthand incl. the exact ValidationError
+  string — collapsed to a 1-line call. Distinct from the excluded single-vehicle validateVehicleOwnership (plural set-membership
+  → ValidationError-list vs single → NotFoundError). Removed the now-dead vehicleRepository + ValidationError imports (C123
+  class). Added a PUT-foreign-vehicle-rejected test (arch rule 3 — the update site was uncovered). green→green 1170 pass (+1).*
+  **ARCH QUEUE EMPTY of clean single-cycle picks.** `MS_PER_DAY` (the lone remaining filed idea) is grounded as NOT
+  byte-identical — ~20+ sites across BE+FE in 3 spellings with divergent semantics (pure day-divisor vs a 30-day-MONTH
+  approximation); collapsing it is a sweeping multi-file rewrite (arch rule 1) and the FE half was already rejected as churn
+  (C99) → leave it. **Next arch pick = another rule-7 fan-out** (the C141 BE agent's #2 ytdSpending sum-reduce is a candidate
+  but borderline-churn at 7 divergent sites; the FE agent's findings, when its event lands, may seed a cleaner one).
 
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,

@@ -40,10 +40,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 139 |
 | guard | 6 | 137 |
 | bug | 3 | 139 |
-| arch | 5 | 135 |
+| arch | 5 | 141 |
 | infra | 6 | 138 |
 
-Current cycle: **140**
+Current cycle: **141**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2577,3 +2577,23 @@ Current cycle: **140**
   type-check 0, build done, 440 pass (+5). NON-eyes-on (pure .ts service + types, no markup). REMAINING import-trackers = only
   the eyes-on T4/T5 mapping-dialog markup (now has its detect + mapping-aware client methods to call) + T6 e2e. cov: be 82.25%
   (carry) / fe 65.32% (carry; +5 FE service tests)
+- **C141 (arch — extract `validateVehicleIdsOwned`: the plural multi-vehicle ownership check, 2 sites → 1)** — BALANCE: `arch`
+  the ONLY over-budget category (cyc 135, starved-for 6 > 5; matches the C140 forecast). The lone filed pick (`MS_PER_DAY`) is
+  flagged NOT byte-identical — I grounded it FIRST (grep): ~20+ sites across BE+FE in 3 spellings AND divergent semantics (pure
+  day-divisor vs a 30-day-MONTH approximation), collapsing it = the sweeping multi-file rewrite arch rule 1 forbids + C99
+  already rejected the FE half as churn. So per the BACKLOG fallback, ran a rule-7 fan-out (2 Explore agents, BE + FE
+  duplication). Backend agent's #1 was the clean pick: the PLURAL "owned-id Set → filter invalid → ValidationError listing the
+  bad ids" block, hand-repeated at reminders/routes.ts create (:148-153) + update (:234-241). VERIFIED BYTE-IDENTICAL FIRSTHAND
+  (the C24/C30/C90 lesson — read both sites): same findByUserId→Set→filter(!has)→ValidationError with the IDENTICAL error
+  string; only the cosmetic param name (id/vid) + input array differ (both → the helper's param). GENUINELY DISTINCT from the
+  excluded single-vehicle `validateVehicleOwnership` (that's findByUserIdAndId→Vehicle, throws NotFoundError; this is the plural
+  set-membership→ValidationError-list — different query, different error contract). Extracted `validateVehicleIdsOwned(vehicleIds,
+  userId): Promise<void>` into utils/validation.ts beside its single-vehicle sibling (vehicleRepository + ValidationError
+  already imported there — no new deps). Both sites collapsed to a 1-line call. The C123 dead-import situation recurred: both
+  `vehicleRepository` + `ValidationError` became unused in reminders/routes.ts after the swap (biome noUnusedVariables would
+  fail) → removed both imports. ARCH RULE 3 (test-anchor both ways): create-path throw was already covered
+  (reminders-http.test.ts:105 foreign vehicle → 4xx); the UPDATE path (Site B) was NOT → ADDED a PUT-foreign-vehicleId-rejected
+  test (+1) before relying on the convergence (also makes the dedup merge-surviving). green→green: backend validate:local EXIT 0
+  — 1170 pass / 0 fail (+1), tsc 0, musl-biome clean, build bundled (the create-path test stayed green = Site A behavior
+  preserved; the new test pins Site B). ARCH QUEUE now empty of clean picks (MS_PER_DAY stays filed as too-sprawling); next arch
+  fires another rule-7 fan-out. cov: be 82.25% (carry; +1 BE) / fe 65.32% (carry)

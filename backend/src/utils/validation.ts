@@ -92,6 +92,25 @@ export async function validateVehicleOwnership(
 }
 
 /**
+ * Validate that EVERY vehicleId in a set belongs to the user (the plural, ValidationError-listing
+ * counterpart to the single `validateVehicleOwnership`). Fetches the user's fleet once, then reports
+ * all non-owned ids together. Used where a request attaches a list of vehicles (e.g. a reminder's
+ * vehicleIds on create/update).
+ * @throws ValidationError listing every id not found or not owned.
+ */
+export async function validateVehicleIdsOwned(
+  vehicleIds: readonly string[],
+  userId: string
+): Promise<void> {
+  const userVehicles = await vehicleRepository.findByUserId(userId);
+  const ownedVehicleIds = new Set(userVehicles.map((v) => v.id));
+  const invalidIds = vehicleIds.filter((id) => !ownedVehicleIds.has(id));
+  if (invalidIds.length > 0) {
+    throw new ValidationError(`Vehicles not found or not owned: ${invalidIds.join(', ')}`);
+  }
+}
+
+/**
  * Validate that an expense belongs to the user (via direct userId column)
  * @throws NotFoundError if expense not found or doesn't belong to user
  */
