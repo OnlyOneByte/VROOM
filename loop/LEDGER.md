@@ -31,14 +31,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 111 |
+| feature | 4 | 116 |
 | deep-review | 5 | 114 |
 | guard | 6 | 112 |
 | bug | 3 | 115 |
 | arch | 5 | 113 |
 | infra | 6 | 110 |
 
-Current cycle: **115**
+Current cycle: **116**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2156,3 +2156,18 @@ Current cycle: **115**
   over-reject regression guard). Host-independent (no TZ/now dependency in the assertions). Verified: backend validate:local
   EXIT 0 — 1142 pass / 0 fail (+4), build bundled. #23 CLOSED. Next (116): nothing forced (feature/infra breach next) →
   highest-leverage. cov: be ~81% / fe 61.4% (carry C107)
+- **C116 (feature — recurring-expenses T7: GET /reminders/recurring-cost route, the non-eyes-on backend seam)** — BALANCE:
+  `feature` most-starved over budget (cyc 111, starved-for 5 > 4). FE tails are eyes-on-blocked, so per the C111 pattern I
+  advanced via the next NON-eyes-on slice: the HTTP route that exposes the C111 recurringCostSummary helper — the seam the
+  T7 dashboard widget (eyes-on) will fetch, HTTP-characterizable now. GROUNDED first: confirmed the static-suffix-before-/:id
+  route pattern (POST /trigger, GET /notifications) + that reminderRepository.findByUserId(userId, {type:'expense'}) returns
+  ReminderWithVehicles[] (each .reminder is the full row recurringCostSummary takes). SHIPPED: GET /recurring-cost (placed
+  before /:id) → findByUserId(user.id, {type:'expense'}) → recurringCostSummary(rows.map(r => r.reminder)) → {count,
+  monthlyTotal}. Read-only derivation over existing rows (NO new table, NORTH_STAR #4); no import cycle (reminders/routes →
+  reminder-cost, one-directional). MERGE-SURVIVING net: recurring-cost-route.test.ts (+3) through the real stack — a $100
+  monthly + $1200 yearly expense reminder → count 2, monthlyTotal $200 (notification ignored); a fresh user → clean zero;
+  user-scoped (a 2nd user sees only their own empty set). THE GATE EARNED ITS KEEP (biome reflow autofixed). Verified:
+  backend validate:local EXIT 0 — 1145 pass / 0 fail (+3), build bundled. T7 backend (core C111 + route C116) is now
+  complete; only the T7 dashboard WIDGET (eyes-on) + the T4/T5/T6/T8 tails remain Playwright-blocked. Next (117): `infra`
+  most-starved over budget (cyc 110, starved-for 7 > 6) → #5 sweep is next due ~C120, so likely a CLAUDE.md orientation
+  refresh or another infra need. cov: be ~81% / fe 61.4% (carry C107)

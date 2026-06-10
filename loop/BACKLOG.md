@@ -104,9 +104,9 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    **REMAINING = T4–T8 (frontend, eyes-on, Playwright-blocked here):** T4 multi-vehicle split in ReminderForm (reuse the
    expense-split widget); T5 reliable materialization (client-side opportunistic trigger on app open/focus, debounced — D1;
    the backend seam `POST /reminders/trigger` is already built + deeply tested); T6 source-traceability UI ("Recurring"
-   badge + link, reading the C96-surfaced sourceType); **T7 recurring-cost projection/lens (D4) — BACKEND CORE DONE C111**
-   (`reminder-cost.ts`: monthlyRunRate / recurringCostSummary, +10 tests; REMAINING = the dashboard widget + a route to
-   expose the summary, eyes-on); T8 round-trip E2E. Lands "code-complete, eyes-on pending" like maintenance T9 /
+   badge + link, reading the C96-surfaced sourceType); **T7 recurring-cost projection/lens (D4) — BACKEND COMPLETE (core
+   C111 `reminder-cost.ts` +10 tests; route C116 `GET /reminders/recurring-cost` +3 HTTP tests); REMAINING = the dashboard
+   widget that fetches /recurring-cost + renders it, eyes-on**; T8 round-trip E2E. Lands "code-complete, eyes-on pending" like maintenance T9 /
    import-trackers T4–T6 — the backend is fully built + characterized, so a human or unblocked Playwright closes the visible tail.
 
 > NOTE (cycle 12): both feature builds are large, MULTI-TASK efforts — one tasks.md task per loop

@@ -51,7 +51,10 @@
       `monthlyRunRate(reminder)` / `recurringCostSummary(reminders[])`→{count,monthlyTotal}, on an
       occurrences-per-year÷12 basis mirroring `computeNextDueDate`'s frequency interpretation; only
       active positive-amount expense reminders contribute. +10 unit tests (reminder-cost.test.ts).
-      **REMAINING (eyes-on):** the dashboard widget/lens that renders the summary + a route to expose it.
+      **ROUTE DONE (C116):** `GET /api/v1/reminders/recurring-cost` → findByUserId(type:'expense') →
+      recurringCostSummary → {count, monthlyTotal}; +3 HTTP tests (recurring-cost-route.test.ts:
+      monthly+yearly sum, empty→zero, user-scoped). **BACKEND T7 COMPLETE. REMAINING (eyes-on):** the
+      dashboard widget/lens that fetches GET /recurring-cost + renders it.
 
 ### Done-when (feature-DoD)
 

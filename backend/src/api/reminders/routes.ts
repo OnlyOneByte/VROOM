@@ -8,6 +8,7 @@ import { commonSchemas } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
 import { vehicleRepository } from '../vehicles/repository';
+import { recurringCostSummary } from './reminder-cost';
 import { reminderRepository } from './repository';
 import { computeNextDueDate, reminderTriggerService } from './trigger-service';
 import { createReminderSchema, updateReminderSchema } from './validation';
@@ -61,6 +62,16 @@ routes.post('/trigger', triggerRateLimiter, async (c) => {
   const user = c.get('user');
   const result = await reminderTriggerService.processOverdueReminders(user.id);
   return c.json({ success: true, data: result });
+});
+
+// GET /recurring-cost — the monthly recurring run-rate across the user's active expense reminders
+// (recurring-expenses T7 backend, R5/D4). A read-only derivation over existing rows (NO new table):
+// the dashboard "recurring costs" widget (T7 eyes-on) fetches this. Static suffix → before /:id.
+routes.get('/recurring-cost', async (c) => {
+  const user = c.get('user');
+  const expenseReminders = await reminderRepository.findByUserId(user.id, { type: 'expense' });
+  const summary = recurringCostSummary(expenseReminders.map((r) => r.reminder));
+  return c.json({ success: true, data: summary });
 });
 
 // POST /:id/mark-serviced — re-arm a reminder after a service (D3). A static suffix segment, so it
