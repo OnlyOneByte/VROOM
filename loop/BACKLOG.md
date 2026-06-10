@@ -285,6 +285,36 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > (it changes a displayed $ figure). When approved: swap both sites + a regression test asserting the
 > projected excess fee is period-independent. *Sibling display call (#card semantics) stays with Angelo.*
 
+**NEW — surfaced + verified-against-source by the C108 deep-review fan-out (restore + mileage paths). All MED, none HIGH; none data-safety on the WRITE path (cross-tenant write-stamp + atomicity + the 5 mileage classes were CERTIFIED CLEAN). Unblocked — ranked for a future bug cycle:**
+- **#20 (MED, top pick) — `detectConflicts` is not tenant-scoped → cross-tenant READ leak in merge mode.**
+  `restore.ts:235` does `this.db.select().from(table).where(inArray(table.id, ids))` with NO `userId`/ownership filter,
+  then returns the full existing DB row as `localData` (restore.ts:240) in the `conflicts` HTTP response (restore.ts:119).
+  An attacker who submits a merge-mode restore whose row ids COLLIDE with a victim's gets the victim's full row contents
+  back (VIN, expense amounts, etc.). Low practical exploitability (ids are cuid2-random, unguessable) but a genuine
+  tenant-isolation gap — same CLASS as the C145 restore userId-stamp leak. FIX (bug-cycle, not a one-liner): scope each of
+  the 6 conflict tables by ownership — vehicles/expenses/insurancePolicies/photos are userId-direct (`eq(table.userId,
+  userId)`); vehicleFinancing (vehicleId FK) + photoRefs (photoId FK) need an owned-id subquery/join. + a regression test
+  that another user's colliding id is NOT returned. VERIFIED real against source C108.
+- **#21 (MED) — replace-mode + an empty-but-valid backup = silent TOTAL data wipe.** `restoreFromBackup` mode='replace'
+  (restore.ts:124-127) runs `deleteUserData` then `insertBackupData`; validation (backup.ts) only requires
+  metadata.version/userId, so a corrupt/truncated download with empty data arrays passes, wipes everything, inserts nothing
+  — atomically (the txn commits the empty state). No "payload must be non-empty / not implausibly smaller than current"
+  sanity guard. FIX: reject replace-mode when the parsed payload is empty (or add a min-row / confirm-shrink guard). Also a
+  small product decision (how aggressive a shrink to block). VERIFIED against source C108.
+- **#22 (MED, hardening) — zip-bomb guard trusts the attacker-declared `header.size`.** `backup.ts:469` sums
+  `e.header?.size` from the ZIP central directory (attacker-controlled in an uploaded archive) and checks it before
+  `getData()`. A forged archive can declare a small size while the deflate stream inflates large. The 50MB COMPRESSED
+  bodyLimit (routes.ts:209) is the real backstop on the UPLOAD path — but the provider DOWNLOAD path (downloadBackup) has
+  no such cap, relying solely on this spoofable check. FIX: enforce a hard running byte-cap DURING inflation, not from the
+  declared size. VERIFIED against source C108.
+- **Mileage Findings A/B (MED → delayed-fire only, NOT lost) — no IMMEDIATE recheck on PUT-update.** Editing an expense's
+  mileage (expenses/routes.ts PUT /:id) or a manual odometer entry (odometer/routes.ts PUT /:id) to push a vehicle past a
+  milestone does NOT call `recheckMileageReminders` (recheck is wired only on CREATE). The crossed reminder fires on the
+  next periodic /trigger or login pass — eventually-consistent, nothing permanently lost, so the D5 "fires the moment
+  crossed" guarantee silently doesn't hold for edits. FIX: add the same best-effort recheck after both update paths.
+  VERIFIED against source C108. (The 5 hunted mileage defect classes — double-fire, boundary, cross-vehicle, stale, throw —
+  were all CERTIFIED CLEAN.)
+
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
    (Overview) + `fetchExpensesPage` (Expenses tab) in `vehicles/[id]/+page.svelte` only toasted on

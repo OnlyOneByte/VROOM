@@ -32,13 +32,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 104 |
-| deep-review | 5 | 101 |
+| deep-review | 5 | 108 |
 | guard | 6 | 105 |
 | bug | 3 | 103 |
 | arch | 5 | 106 |
 | infra | 6 | 107 |
 
-Current cycle: **107**
+Current cycle: **108**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2001,3 +2001,27 @@ Current cycle: **107**
   priority. Doc-only (measurement + header re-anchor, no code change → no build gate, the C100 sweep pattern); coverage
   artifacts are gitignored. Next (108): `deep-review` most-starved over budget (cyc 101, starved-for 7 > 5) → fan-out per
   rule 7. cov: be 81.1% / fe 61.4% (MEASURED C107)
+- **C108 (deep-review — adversarial audit of the backup-RESTORE + mileage-RECHECK paths; rule-7 fan-out)** — BALANCE:
+  `deep-review` most-starved over budget (cyc 101, starved-for 7 > 5), beat bug (5). Verification-only cycle (no product
+  code; findings → queues). Per rule 7, fanned out 2 Explore agents on FRESH high-risk backend-correctness surfaces the
+  C107 reading flagged — sync/restore (writes user data, security-critical, 61% line) + the D5 mileage-recheck/odometer
+  path. EVERY finding verified against source (the C21/C28/C35/C67 discipline — neither agent found a HIGH; ~half of agent
+  flags would be false). CERTIFIED CLEAN (positive evidence): (a) restore cross-tenant WRITE — every user_id table is
+  force-stamped to the importer via stampUserId (restore.ts:293-298), schema cross-checked table-by-table; the C145 gap
+  stays closed. (b) restore ATOMICITY — wipe+insert wrapped in one db.transaction (restore.ts:123-128), FK-ordered deletes,
+  rollback on mid-restore failure. (c) restore idempotency — idempotency({required:true}) mw + id-preserving inserts.
+  (d) ALL 5 mileage classes — double-fire (dual dedup on (reminderId,nextDueOdometer): app-guard mileageNotificationExists
+  + DB partial-unique backstop), boundary (currentOdometer >= nextDueOdometer, `<` guard fires on equality), cross-vehicle
+  bleed (vehicleIds.includes(vehicleId) filter + per-vehicle MAX odometer scoped WHERE vehicle_id=), stale-odometer (recheck
+  runs AFTER the expense insert, reads the just-written row), best-effort (can't throw — C42 fetch wrap + per-reminder
+  try/catch; null≠NaN). FILED (verified real, all MED, none HIGH): #20 detectConflicts (restore.ts:235) is NOT userId-scoped
+  + returns the full existing row as localData → cross-tenant READ leak in merge mode (low exploitability: cuid2 ids
+  unguessable, but a real tenant-isolation gap; correct fix spans 6 heterogeneous tables — 4 userId-direct + financing/
+  photoRefs FK-owned — so it's a bug-cycle fix, not a one-liner); #21 replace-mode + an empty-but-valid backup = silent
+  TOTAL WIPE (no min-payload sanity guard; also a small product decision); #22 zip-bomb guard (backup.ts:469) trusts the
+  attacker-declared header.size (spoofable; the 50MB compressed bodyLimit is the real backstop on the upload path, but the
+  provider download path lacks it — hardening); + mileage Findings A/B (no IMMEDIATE recheck on expense/odometer PUT-update
+  — delayed-fire, eventually caught by the periodic /trigger pass, so nothing is permanently lost). No code change (rule-7
+  verification cycle); all findings → BACKLOG bug queue for a future bug cycle. Next (109): nothing forced (feature/bug
+  breach next) → highest-leverage; #20 (the verified tenant-scope leak) is the strongest bug-queue pick. cov: be 81.1% /
+  fe 61.4% (carry C107)
