@@ -144,15 +144,19 @@ Highlights:
     traceability API test; T2 (C102) split-materialization characterization; T3 (C104) cascade-safe
     delete via `clearSource` (keep history, sever link, D2); T7 backend = `reminder-cost.ts`
     (`recurringCostSummary`, C111) + `GET /reminders/recurring-cost` (C116, the monthly run-rate the
-    dashboard widget fetches). **Remaining: T4 (multi-vehicle split in ReminderForm), T5 (client
-    opportunistic trigger on app-open — the backend seam is the existing `POST /reminders/trigger`),
-    T6 (Recurring badge), the T7 widget, T8 e2e** — all eyes-on/Playwright-blocked.
+    dashboard widget fetches); T6 read-seam = `expenseRepository.findBySource` + `GET /reminders/:id/
+    expenses` (C122, the "materialized N expenses" list); T5 gate = pure `shouldTriggerRecurringExpenses`
+    in reminder-helpers.ts (C128). **EVERY non-eyes-on backend slice across T1–T7 is now built/
+    characterized.** **Remaining is ALL eyes-on/Playwright-blocked:** T4 multi-vehicle split in
+    ReminderForm; the T5 app-init/focus hook (calls the gate → `POST /reminders/trigger`); T6 "Recurring"
+    badge + view UI; the T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C107, not an estimate): **backend 81.1% line / 81.8% func · frontend 61.4% line / 59.3%
-  func** — backend climbed ~+4 since the C81 baseline (the ratchet delivered); **frontend is now the
-  bigger gap** (essentially flat vs C81 — product code outgrew its tests), so steer FE guard cycles
-  there. loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry and ratchets the named
-  low spots on guard/arch/bug cycles. Suite size today: **~1145 backend tests / ~385 frontend** (a
+  (re-measured C124, not an estimate): **backend 81.8% line / 82.2% func · frontend 62.0% line / 60.5%
+  func** — backend climbed ~+4½ since the C81 baseline (the ratchet delivered); **frontend is the bigger
+  gap** but is now CREEPING UP under a sustained FE-guard ratchet (C118 memoize, C119 capitalize, C125
+  vehicle-form-validation, C130 formatters), so keep steering FE guard cycles there (next FE low spots:
+  error-handling.ts, the api-client/expense-api services, components/routes). loop-improvement #4 records
+  a `cov:` tag on every LEDGER cycle entry. Suite size today: **~1158 backend tests / ~421 frontend** (a
   floor — grows most cycles). Don't regress coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
@@ -165,5 +169,10 @@ Highlights:
   in-memory because `computeBalance` binds the real-DB singleton, not the test drizzle (the C77
   Property-23 skip — needs a repo-DI refactor, flagged for sign-off); screenshot visual-diffing is
   capture-only (no baseline compare); storage-backup-toggle + the eyes-on UI tails
-  (maintenance T7–T9, import-trackers T4–T6) need Playwright/an OAuth provider — sandbox-blocked
-  in the loop, so those land "code-complete, eyes-on pending."
+  (maintenance T7–T9, import-trackers T4–T6, recurring-expenses T4–T8) need Playwright/an OAuth
+  provider — sandbox-blocked in the loop, so those land "code-complete, eyes-on pending."
+- Pending an Angelo decision (filed, NOT auto-fixed — each changes a displayed $ or is a product call):
+  **#27 (HIGH) — TCO double-counts a financed vehicle's principal** (getVehicleTCO adds purchasePrice +
+  the full financing-payment rows; needs an accounting-model choice before the headline TCO figure
+  changes); plus lease/loan `currentOdometer` swap, #19 (TCO trend scope), #24 (CSV decimal separator).
+  See `loop/BACKLOG.md` bug queue for the full list + grounding.

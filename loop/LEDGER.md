@@ -38,9 +38,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 130 |
 | bug | 3 | 127 |
 | arch | 5 | 129 |
-| infra | 6 | 124 |
+| infra | 6 | 131 |
 
-Current cycle: **130**
+Current cycle: **131**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2391,3 +2391,15 @@ Current cycle: **130**
   validate:local EXIT 0 — 421 pass / 0 fail (+11), tsc 0, build OK. 4th consecutive FE-advancing pick (C118 memoize, C119
   capitalize, C125 vehicle-validation, C130 formatters). Next (131): nothing forced (infra cyc 124 / bug cyc 127 breach) →
   highest-leverage. cov: be 81.8% / fe ~63%+ (FE +11 tests; re-measure due ~C134 sweep)
+- **C131 (infra — CLAUDE.md orientation refresh; the C93/C117 anti-drift class)** — BALANCE: two breached (infra cyc 124
+  starved-for 7, bug cyc 127 starved-for 4); highest-ABSOLUTE → infra (7). #5 sweep not due (~C134), coverage re-measured
+  C124 → the actionable infra increment was a CLAUDE.md refresh (last C117, 14 cycles ago, real drift since). Fixed THREE
+  drifts (verified vs source/LEDGER, the C93 fix-only-real-drift discipline): (1) recurring-expenses bullet — its "Remaining"
+  list mis-stated T5/T6 as wholly unstarted, but C122 (T6 read-seam: findBySource + GET /reminders/:id/expenses) + C128 (T5
+  pure gate shouldTriggerRecurringExpenses) landed since; rewrote to "EVERY non-eyes-on backend slice T1–T7 built; remaining
+  is ALL eyes-on". (2) Coverage — C107 reading (be 81.1/fe 61.4, 1145/385) → the C124 re-measure (be 81.8/82.2, fe 62.0/60.5,
+  1158/421) + the FE-is-creeping-up-under-the-ratchet steer (C118/C119/C125/C130) + next FE low spots. (3) Open gaps — added
+  recurring-expenses T4–T8 to the eyes-on tail list + a NEW "Pending an Angelo decision" line surfacing #27 (the TCO HIGH) so
+  a fresh agent doesn't trip over the headline-money double-count + the other 3 gated decisions. Doc-only (no code → no build
+  gate, the C93/C117 pattern). Next (132): nothing forced (bug cyc 127 starved-for 5 next, deep-review cyc 126) →
+  highest-leverage. cov: be 81.8% / fe ~63%+ (carry)

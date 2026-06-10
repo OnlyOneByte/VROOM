@@ -814,6 +814,11 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
   regress.sh Playwright-blocked); (3) digest header 36→46 commits, status 1076→1109 BE / 367→379 FE, appended §18
   (C86–C99: recurring-expenses spec+sign-off+T1, bugs #4/#18, the C90/C92/C99 arch dedups, the C87/C91/C98 coverage
   ratchet, C93 doc refresh) + refreshed the merge footer. BRANCH_REVIEW.md is gitignored. Next sweep ~C110.*
+- ~~**CLAUDE.md orientation refresh post-C117–C130 (C131)**~~ — *DONE C131: 3 drifts fixed (verified vs source/LEDGER).
+  (1) recurring-expenses "Remaining" list mis-stated T5/T6 as unstarted → rewrote to "every non-eyes-on backend slice T1–T7
+  built (T6 read-seam C122, T5 gate C128); remaining ALL eyes-on". (2) Coverage C107→C124 re-measure (be 81.8/fe 62.0,
+  1158/421) + the FE-creeping-up steer. (3) Open gaps: added recurring-expenses T4–T8 to the eyes-on list + a new
+  "Pending Angelo decision" line surfacing #27 (TCO HIGH) + the 3 other gated calls. Doc-only. Next refresh ~C145.*
 - ~~**CLAUDE.md orientation refresh post-C93–C116 (C117)**~~ — *DONE C117: 3 actively-misleading drifts fixed
   (verified vs source/LEDGER, no churn). (1) recurring-expenses was ABSENT — "Two feature specs" + only
   maintenance/import-trackers listed; it's now the most backend-complete feature (T1–T3+T7), added as the 3rd bullet
