@@ -36,11 +36,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 122 |
 | deep-review | 5 | 126 |
 | guard | 6 | 125 |
-| bug | 3 | 121 |
+| bug | 3 | 127 |
 | arch | 5 | 123 |
 | infra | 6 | 124 |
 
-Current cycle: **126**
+Current cycle: **127**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2334,3 +2334,20 @@ Current cycle: **126**
   No code change (rule-7 verification cycle); all → BACKLOG bug queue. Next (127): `bug` most-starved over budget (cyc 121,
   starved-for 6 > 3) → #30 is the most concrete UNBLOCKED-ish, but scope-gated; re-verify + possibly fan out. cov: be 81.8%
   / fe 62.0% (carry)
+- **C127 (bug #32a — /me + /refresh now clear the session cookie on a bad-session 401)** — BALANCE: `bug` most-starved over
+  budget (cyc 121, starved-for 6 > 3). Re-verified the queue (C89 don't-trust-the-label): #24/#27/#30 are decision/scope-
+  gated, but #31 + #32 (filed C126) are UNBLOCKED. Chose #32a over #31 because #31's "fix" (sort pairs by odometer not date)
+  is a genuine BEHAVIOR CHANGE (recovers intervals the current code safely drops) + needs null-mileage handling — not a clean
+  bug fix; #32a is a small, behavior-ALIGNING, ARCC-grounded hygiene fix with a clear correct answer. SECURITY-TRIGGER →
+  queried ARCC FIRST (secure_cookie_handling + secure-token/session-fixation): confirms a dead session cookie should be
+  cleared (OWASP session-mgmt) + the existing cookie attrs (Secure/HttpOnly/SameSite=Lax/Path) are policy-correct. THE GAP:
+  /me (routes.ts:445) + /refresh (:536) threw 401 on an invalid session but never deleteCookie, diverging from requireAuth +
+  logout. FIX: added the canonical deleteCookie (mirroring the logout handler :514 exactly — path/secure/httpOnly/maxAge/
+  sameSite) before the 401 throw at both sites. Hygiene, not a vuln (the session is already server-side-invalid, not
+  replayable) — but it stops the browser re-sending a known-dead cookie. MERGE-SURVIVING net: extended me-http.test.ts (+3):
+  /me + /refresh with a garbage-value session cookie → 401 AND a clearing Set-Cookie (Max-Age=0 / epoch-Expires), + a
+  missing-cookie 401 stays plain. THE GATE EARNED ITS KEEP: tsc caught ctx.app.request returning Response|Promise<Response>
+  (the Hono union) — fixed by making the helper async. (Biome reflow autofixed.) Verified: backend validate:local EXIT 0 —
+  1158 pass / 0 fail (+3), build bundled. #32a CLOSED; #32b (refresh orphan-session) + #32c (email-exists disclosure) + #31
+  remain (all LOW/LOW-MED). Next (128): nothing forced (feature cyc 122 / deep-review cyc 126... recompute) → highest-leverage.
+  cov: be 81.8% / fe 62.0% (carry)

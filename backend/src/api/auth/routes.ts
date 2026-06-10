@@ -443,6 +443,17 @@ routes.get('/me', async (c) => {
   const { session, user } = await lucia.validateSession(sessionId);
 
   if (!session) {
+    // Clear the now-invalid session cookie so the dead token doesn't linger in the browser
+    // (C127/#32a — align with requireAuth + the logout handler; OWASP session-mgmt hygiene per ARCC
+    // secure-cookie-handling). The session is already invalid server-side, so this is hygiene, not a
+    // replay fix — but it stops the client from re-sending a known-dead cookie on every request.
+    deleteCookie(c, lucia.sessionCookieName, {
+      path: '/',
+      secure: CONFIG.env === 'production',
+      httpOnly: true,
+      maxAge: CONFIG.auth.cookieMaxAge,
+      sameSite: 'Lax',
+    });
     throw new HTTPException(401, { message: 'Invalid session' });
   }
 
@@ -534,6 +545,14 @@ routes.post('/refresh', async (c) => {
   const result = await validateAndRefreshSession(sessionId, lucia, c);
 
   if (!result) {
+    // Clear the now-invalid session cookie (C127/#32a — mirror /me + requireAuth + logout).
+    deleteCookie(c, lucia.sessionCookieName, {
+      path: '/',
+      secure: CONFIG.env === 'production',
+      httpOnly: true,
+      maxAge: CONFIG.auth.cookieMaxAge,
+      sameSite: 'Lax',
+    });
     throw new HTTPException(401, { message: 'Invalid session' });
   }
 

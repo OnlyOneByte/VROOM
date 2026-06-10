@@ -93,3 +93,52 @@ describe('PATCH /api/v1/auth/me — validation errors via the central handler (c
     expect(body.data.user.displayName).toBe('Renamed User');
   });
 });
+
+/**
+ * Hygiene guard (C127, #32a — surfaced by the C126 auth deep-review): GET /me and POST /refresh threw
+ * 401 on an INVALID/expired session cookie but never cleared it, diverging from requireAuth + logout.
+ * A dead session cookie should be cleared so the browser stops re-sending it (OWASP session-mgmt; ARCC
+ * secure-cookie-handling). These pin that a bad-session 401 now also emits a clearing Set-Cookie.
+ *
+ * The session is already invalid server-side (not replayable) — this is hygiene, not a vuln fix — but
+ * the cleared cookie is the documented contract, so it's pinned merge-surviving.
+ */
+describe('bad-session 401 clears the session cookie (C127 #32a)', () => {
+  // A request carrying the real session-cookie NAME but a garbage value → an invalid session.
+  async function withGarbageSession(method: string, path: string): Promise<Response> {
+    const cookieName = ctx.cookie.split('=')[0];
+    return ctx.app.request(path, {
+      method,
+      headers: { Cookie: `${cookieName}=not-a-real-session-id`, 'Sec-Fetch-Site': 'same-origin' },
+    });
+  }
+
+  // Hono's deleteCookie clears by setting an expired Set-Cookie for the name → the header carries the
+  // cookie name + a Max-Age=0 / Expires-in-the-past directive.
+  function clearsSessionCookie(res: Response): boolean {
+    const setCookie = res.headers.get('set-cookie') ?? '';
+    const cookieName = ctx.cookie.split('=')[0];
+    return (
+      setCookie.includes(cookieName) &&
+      (setCookie.toLowerCase().includes('max-age=0') ||
+        setCookie.includes('Expires=Thu, 01 Jan 1970'))
+    );
+  }
+
+  test('GET /me with an invalid session → 401 + a clearing Set-Cookie', async () => {
+    const res = await withGarbageSession('GET', '/api/v1/auth/me');
+    expect(res.status).toBe(401);
+    expect(clearsSessionCookie(res)).toBe(true);
+  });
+
+  test('POST /refresh with an invalid session → 401 + a clearing Set-Cookie', async () => {
+    const res = await withGarbageSession('POST', '/api/v1/auth/refresh');
+    expect(res.status).toBe(401);
+    expect(clearsSessionCookie(res)).toBe(true);
+  });
+
+  test('a MISSING session (no cookie) is still a plain 401 (no clear needed — nothing to clear)', async () => {
+    const res = await ctx.anon('GET', '/api/v1/auth/me');
+    expect(res.status).toBe(401);
+  });
+});

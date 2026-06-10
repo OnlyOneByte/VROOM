@@ -407,14 +407,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   odometer-descending order) yields a non-positive delta → SAFELY DROPPED by the `miles <= 0` guard (no wrong value reaches a
   chart/average), but a legitimate interval is silently lost. VERIFIED C126. FIX (if desired): sort each vehicle's rows by
   `(mileage ?? date)` before pairing, or pair by odometer order. Low urgency — guards prevent any incorrect output.
-- **#32 (LOW ×3, auth hygiene — none exploitable) —** (a) `/me` (routes.ts:443-447) + `/refresh` (`:534-538`) throw 401 on a
-  bad session but skip `deleteCookie`, diverging from requireAuth (a dead cookie lingers; not replayable — already invalid
-  server-side); (b) `validateAndRefreshSession` (utils.ts:57-96) — if `invalidateSession` throws AFTER `createSession`
-  succeeds, the catch returns the still-valid OLD session and the new one orphans until its 30-day expiry (same-user session
-  sprawl, not a priv issue); (c) `resolveNewUser` (routes.ts:200-202) `auth_error=email_exists` reveals account existence —
-  but only to a caller who already completed OAuth + proved they own that email, so no arbitrary enumeration (and no-merge is
-  the correct anti-takeover posture). VERIFIED C126. Cheapest cleanup: have /me + /refresh deleteCookie on 401 to mirror
-  requireAuth.
+- **#32 (LOW ×3, auth hygiene — none exploitable). (a) DONE C127; (b)+(c) remain.** ~~(a) `/me` + `/refresh` throw 401 on a
+  bad session but skip `deleteCookie`~~ — *DONE C127: added the canonical deleteCookie (mirroring the logout handler) before
+  the 401 throw at both sites; ARCC-grounded (secure_cookie_handling / OWASP session-mgmt). +3 HTTP tests (garbage-session
+  → 401 + clearing Set-Cookie; missing-cookie stays plain 401). validate:local EXIT 0, 1158 pass.* STILL OPEN:
+  (b) `validateAndRefreshSession` (utils.ts:57-96) — if `invalidateSession` throws AFTER `createSession` succeeds, the catch
+  returns the still-valid OLD session and the new one orphans until its 30-day expiry (same-user session sprawl, not a priv
+  issue); (c) `resolveNewUser` (routes.ts:200-202) `auth_error=email_exists` reveals account existence — but only to a caller
+  who already completed OAuth + proved they own that email, so no arbitrary enumeration (and no-merge is the correct
+  anti-takeover posture; likely WONTFIX). VERIFIED C126.
 
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
