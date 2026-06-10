@@ -1042,6 +1042,45 @@ export class AnalyticsRepository {
     return { financingInterest, insuranceCost, fuelCost, maintenanceCost, otherCosts };
   }
 
+  /**
+   * Assemble the TCO total from the categorized buckets, applying two accounting rules:
+   *
+   * - #28 (C121): purchasePrice is a one-time ACQUISITION cost — include it only in the all-time
+   *   (no-`year`) total, never in a year-scoped window (whose expenses are already date-filtered).
+   * - #27 (C154, Angelo-approved option c): the `financingInterest` bucket sums WHOLE financing-sourced
+   *   expense rows — full loan/lease payments (principal + interest), not interest alone (computeBalance
+   *   proves payments retire principal: financing/repository.ts:68). Counting both purchasePrice AND those
+   *   payments double-counts the principal (a $30k car with ~$33k of payments → TCO ≈ $63k). So when
+   *   purchasePrice is counted, EXCLUDE the financing-payment rows (they retire the already-counted price,
+   *   a balance-transfer, not new spend). When purchasePrice is NOT counted (no price, or a year window),
+   *   the financing outflow IS the cost signal for that window, so keep it.
+   *
+   * Returns `countedFinancingInterest` — the financing value actually included (0 when excluded) — so the
+   * caller can report a bucket that matches the total (keeps the breakdown summing: Property 14 / Req 10.2).
+   */
+  private computeTCOTotal(
+    costs: {
+      financingInterest: number;
+      insuranceCost: number;
+      fuelCost: number;
+      maintenanceCost: number;
+      otherCosts: number;
+    },
+    purchasePrice: number | null,
+    year?: number
+  ): { totalCost: number; countedFinancingInterest: number } {
+    const purchaseInTotal = year ? 0 : (purchasePrice ?? 0);
+    const countedFinancingInterest = purchaseInTotal > 0 ? 0 : costs.financingInterest;
+    const totalCost =
+      purchaseInTotal +
+      countedFinancingInterest +
+      costs.insuranceCost +
+      costs.fuelCost +
+      costs.maintenanceCost +
+      costs.otherCosts;
+    return { totalCost, countedFinancingInterest };
+  }
+
   // ---- Public API methods -------------------------------------------------
 
   /** Compute fuel efficiency trend from sequential fuel expenses. */
@@ -1807,18 +1846,11 @@ export class AnalyticsRepository {
         .orderBy(asc(expenses.date));
 
       const costs = this.categorizeTCOExpenses(detailedExpenses);
-      // C121/#28: purchasePrice is a one-time ACQUISITION cost, not a recurring yearly one. A
-      // year-scoped TCO window-filters the expenses (above), so adding the full lifetime purchasePrice
-      // to a single year's total would inflate every year alike (and a year that didn't include the
-      // purchase would still absorb it). Include it only in the all-time (no-`year`) total.
-      const includePurchase = !year;
-      const totalCost =
-        (includePurchase ? (purchasePrice ?? 0) : 0) +
-        costs.financingInterest +
-        costs.insuranceCost +
-        costs.fuelCost +
-        costs.maintenanceCost +
-        costs.otherCosts;
+      const { totalCost, countedFinancingInterest } = this.computeTCOTotal(
+        costs,
+        purchasePrice,
+        year
+      );
 
       const now = new Date();
       const ownershipStart =
@@ -1848,6 +1880,9 @@ export class AnalyticsRepository {
         vehicleName,
         purchasePrice,
         ...costs,
+        // Override the raw bucket with the COUNTED value (0 when excluded under #27 option c) so the
+        // returned financingInterest matches what the total includes — keeps the breakdown summing.
+        financingInterest: countedFinancingInterest,
         totalCost,
         ownershipMonths,
         totalDistance,

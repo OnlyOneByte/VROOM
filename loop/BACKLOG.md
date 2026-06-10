@@ -340,24 +340,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > (it changes a displayed $ figure). When approved: swap both sites + a regression test asserting the
 > projected excess fee is period-independent. *Sibling display call (#card semantics) stays with Angelo.*
 
-> **✅ APPROVED BY ANGELO 2026-06-10 (C151) — "TCO Principal … approved." The accounting-model decision is now UNBLOCKED.
-> Angelo approved the FIX but did not name which option (a/b/c); the principled default is (c) — keep `purchasePrice` as the
-> acquisition cost and EXCLUDE financing-sourced expense rows from the total (the payments retire the price already counted),
-> which needs NO new data and removes the double-count cleanly. A future cycle implements + regression-tests it; if Angelo
-> prefers (a) interest-only or (b) drop-purchasePrice, that's a one-line steer. Logged as a lesson.**
-> **PENDING ANGELO — #27 (HIGH, the loop's first; found + VERIFIED C120; an ACCOUNTING-MODEL decision, do NOT pick
-> unilaterally — it changes the headline TCO $):** **TCO double-counts a financed vehicle's principal.** `getVehicleTCO`
-> (analytics/repository.ts:1782-1788) computes `totalCost = (purchasePrice ?? 0) + costs.financingInterest + insurance +
-> fuel + maintenance + other`, but the `financingInterest` bucket sums the WHOLE financing-sourced expense row
-> (`categorizeTCOExpenses:1006-1007` — `financial` + `sourceType==='financing'` → `+= row.expenseAmount`), and those rows
-> are FULL loan PAYMENTS (principal + interest) — proven by `computeBalance = originalAmount − SUM(financing expenseAmount)`
-> (financing/repository.ts:68: payments pay down principal). So a financed vehicle with a `purchasePrice` set counts the
-> principal TWICE (purchasePrice + the payments retiring it): a $30k car with ~$33k of payments reports TCO ≈ $63k. The
-> bucket NAME (`financingInterest`) reveals the intended design = purchasePrice + interest-ONLY. **Decision needed (interest
-> isn't separately stored):** (a) purchasePrice + (payments − principal-paid-to-date) [interest only]; (b) drop purchasePrice,
-> count downPayment + all payments; (c) keep purchasePrice, EXCLUDE financing-sourced rows from the total (treat the asset
-> price as the cost, payments as balance-transfer). Each changes the displayed TCO differently + needs different data. When
-> decided: fix + a regression test that a financed vehicle's TCO doesn't double-count principal. ESCALATED via Slack C120.
+> ~~**#27 (HIGH, the loop's first; found+VERIFIED C120, escalated, APPROVED by Angelo C151) — TCO double-counts a financed
+> vehicle's principal.**~~ — *DONE C154 (Angelo-approved option c). `getVehicleTCO` summed `purchasePrice` + the `financingInterest`
+> bucket, but that bucket sums WHOLE financing-sourced rows (full loan payments = principal + interest, proven by computeBalance =
+> originalAmount − SUM(financing expenseAmount), financing/repository.ts:68) → a $30k car + ~$33k payments reported TCO ≈ $63k. FIX
+> (implemented as a CONDITIONAL — the key subtlety): exclude the financing-payment rows from the total ONLY when purchasePrice is
+> counted (they retire the already-counted price); when purchasePrice is NOT counted (no price, or a year-scoped view per #28), the
+> financing outflow IS the cost signal → keep it (an unconditional exclude would have NEW-undercounted an unpriced financed vehicle).
+> Extracted `computeTCOTotal(costs, purchasePrice, year)` (also dropped getVehicleTCO complexity 16→<15); report the financing
+> bucket as the COUNTED value (0 when excluded) so the breakdown stays internally consistent (Property 14 / Req 10.2). +2
+> regression tests (the double-count had ZERO coverage — Property 14's generator never emits sourceType:'financing'). green→green
+> 1194 pass (+2).*
 
 > **#36 (HIGH, found + VERIFIED C132; ESCALATED) — Sheets backup writes with `USER_ENTERED` → formula injection +
 > silent round-trip corruption.** `google-sheets-service.ts` `updateSheet` writes `valueInputOption: 'USER_ENTERED'`

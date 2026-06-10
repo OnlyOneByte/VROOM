@@ -42,7 +42,7 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 151 |
 | deep-review | 5 | 150 |
 | guard | 6 | 149 |
-| bug | 3 | 148 |
+| bug | 3 | 154 |
 | arch | 5 | 153 |
 | infra | 6 | 152 |
 
@@ -2808,3 +2808,21 @@ Current cycle: **150**
   (delegation-equivalence across weekly/monthly/yearly/custom; Jan-31 stable-anchor re-anchor; the bug-#13 throws propagate).
   green→green: backend validate:local **EXIT 0 — 1192 pass / 1 skip / 0 fail (+3)**, tsc 0 (caught nothing — clean), musl-biome
   clean (one long-line reflow autofixed), build bundled. cov: be 82.0%+ (carry; +3 BE) / fe 70.09% (carry)
+- **C154 (bug #27, HIGH — the loop's FIRST HIGH, Angelo-approved C151): TCO no longer double-counts a financed vehicle's
+  principal** — BALANCE: `bug` the only over-budget category + most-starved by far (cyc 148, starved-for 6 > 3) → forced. The
+  freshly-approved headline target. THE BUG (found+verified C120, escalated, approved C151): `getVehicleTCO` summed `purchasePrice`
+  + the `financingInterest` bucket, but that bucket sums WHOLE financing-sourced expense rows — full loan payments (principal +
+  interest), proven by computeBalance = originalAmount − SUM(financing expenseAmount) (financing/repository.ts:68). So a financed
+  vehicle with a purchasePrice counted the principal TWICE ($30k car + ~$33k payments → TCO ≈ $63k). FIX (Angelo-approved option
+  c, implemented as a CONDITIONAL — the key subtlety): exclude the financing-payment rows from the total ONLY when purchasePrice
+  is counted (they retire the already-counted price); when purchasePrice is NOT counted (no price recorded, or a year-scoped view
+  per #28), the financing outflow IS the cost signal → keep it (an UNCONDITIONAL exclude would have introduced a NEW undercount
+  for an unpriced financed vehicle). GROUNDED firsthand: PerVehicleTab.svelte:112 renders only `totalCost` (no per-bucket
+  breakdown shown), and Property 14 (Req 10.2) asserts total == sum of buckets — so I report the financing bucket as the COUNTED
+  value (0 when excluded) to keep the breakdown internally consistent. Extracted `computeTCOTotal(costs, purchasePrice, year)`
+  (also drops getVehicleTCO's cognitive complexity 16→under-15 — biome enforced it; the #27/#28 model is now a named, isolated
+  unit). KEY COVERAGE GAP CLOSED: Property 14's generator never emits sourceType:'financing' rows (seedExpense omits source_type),
+  so the double-count had ZERO regression coverage → +2 dedicated tests (priced+financed → payments excluded, total=$30,060,
+  bucket=0, breakdown sums; unpriced+financed → payments counted, total=$1,000). green→green: backend validate:local **EXIT 0 —
+  1194 pass / 1 skip / 0 fail (+2)**, tsc 0, musl-biome clean (one reflow autofixed), build bundled. #27 CLOSED. cov: be 82.0%+
+  (carry; +2 BE) / fe 70.09% (carry)
