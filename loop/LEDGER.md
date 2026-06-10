@@ -43,7 +43,7 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 150 |
 | guard | 6 | 149 |
 | bug | 3 | 148 |
-| arch | 5 | 147 |
+| arch | 5 | 153 |
 | infra | 6 | 152 |
 
 Current cycle: **150**
@@ -2794,3 +2794,17 @@ Current cycle: **150**
   loop-buildable) with only #36/#37 HIGHs still Angelo-gated. BRANCH_REVIEW.md is gitignored. Doc/measurement-only — no code
   change, no build gate beyond the two coverage runs. Next sweep ~C162; CLAUDE.md refresh next ~C160. cov: be 82.02% line /
   82.51% func (re-measured) / fe 70.09% line (re-measured)
+- **C153 (arch): extract `advanceReminderDueDate(reminder, from)` — the reminder-due-date advance, 4 sites → 1** — BALANCE:
+  two over budget → most-starved (absolute) wins → `arch` (cyc 147, starved-for 6) > `bug` (5), by the C152 precedent. The
+  arch queue was marked "EMPTY of clean picks" (C147), so I HONESTLY re-evaluated before falling to the juicier approved #27
+  (avoid motivated reasoning): my own C151 hoist had left FOUR byte-identical `computeNextDueDate(nextDue, reminder.frequency,
+  reminder.intervalValue, reminder.intervalUnit, getAnchorDay(reminder))` blocks. VERIFIED all four firsthand (C141 discipline):
+  processExpensePeriod:207, processNotificationPeriod:228, fastForwardPastNow:264 (var `advanced`, identical RHS), AND
+  routes.ts:111 (the mark-serviced re-arm — spelled the anchor inline as `reminder.startDate.getDate()`, semantically identical
+  to getAnchorDay; the comment literally says "reuse the trigger math"). A COMPLETE 4→1 convergence (no inline site left behind
+  → avoids the C75/C92/C99 partial-churn anti-pattern). FIX: exported `advanceReminderDueDate(reminder, from)` in trigger-service
+  (folds getAnchorDay in), wired all 4 sites; swapped routes.ts's import + the stale comment from computeNextDueDate. Pure (no
+  DB), backend-only, behavior-preserving, cents-migration-independent. Test-anchored (rule 3): +3 in compute-next-due-date.property.test.ts
+  (delegation-equivalence across weekly/monthly/yearly/custom; Jan-31 stable-anchor re-anchor; the bug-#13 throws propagate).
+  green→green: backend validate:local **EXIT 0 — 1192 pass / 1 skip / 0 fail (+3)**, tsc 0 (caught nothing — clean), musl-biome
+  clean (one long-line reflow autofixed), build bundled. cov: be 82.0%+ (carry; +3 BE) / fe 70.09% (carry)

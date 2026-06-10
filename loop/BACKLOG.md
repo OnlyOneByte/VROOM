@@ -807,6 +807,15 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     round MONEY (SplitConfigEditor:40, ExpensesTable:237, VehicleForm:299-301) that the **cents-migration T5/T6 will rework** →
     extracting now is churn-or-unverifiable. DEFER until either Playwright unblocks (so the component sites are verifiable) OR the
     cents migration lands (which subsumes the money-rounding sites). Not a clean single-cycle pick today.
+  - ~~**`advanceReminderDueDate(reminder, from)` — the reminder-due-date advance, 4 sites → 1 (C153)**~~ — *DONE C153: my own
+    C151 hoist had left FOUR byte-identical `computeNextDueDate(nextDue, reminder.frequency, reminder.intervalValue,
+    reminder.intervalUnit, getAnchorDay(reminder))` blocks. VERIFIED all four firsthand: trigger-service processExpensePeriod:207
+    + processNotificationPeriod:228 + fastForwardPastNow:264, AND routes.ts:111 (mark-serviced re-arm — spelled the anchor inline
+    as `reminder.startDate.getDate()`, identical to getAnchorDay; comment said "reuse the trigger math"). COMPLETE 4→1 (no inline
+    site left → no C75/C92/C99 partial-churn). Exported the wrapper (folds getAnchorDay in), wired all 4, swapped routes.ts's
+    import + stale comment. Pure/backend-only/behavior-preserving/cents-independent. +3 delegation tests (rule 3). green→green
+    1192 pass (+3).* **ARCH QUEUE again EMPTY of clean single-cycle picks** — next arch cycle should run the rule-7 AUDIT fan-out
+    to repopulate (or take the deferred roundToCents once Playwright/cents-migration unblocks it).
   - **Next arch pick when one is due:** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the
     eyes-on + pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the
     ~57 logging sites is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.

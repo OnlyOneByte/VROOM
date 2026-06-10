@@ -119,6 +119,23 @@ export function computeNextDueDate(
   return next;
 }
 
+/**
+ * Advance a reminder's due date one period from `from`, using the reminder's own frequency config.
+ * Thin wrapper over computeNextDueDate that binds the four `reminder.*` fields + the stable anchor day
+ * (startDate's day-of-month, NOT the possibly-clamped current day — see getAnchorDay) so the catch-up,
+ * notification, fast-forward, and mark-serviced re-arm paths can't drift in how they unpack a reminder.
+ * Throws (via computeNextDueDate) on a corrupt frequency / non-positive interval — bug #13.
+ */
+export function advanceReminderDueDate(reminder: Reminder, from: Date): Date {
+  return computeNextDueDate(
+    from,
+    reminder.frequency,
+    reminder.intervalValue,
+    reminder.intervalUnit,
+    getAnchorDay(reminder)
+  );
+}
+
 // ============================================================================
 // Expense Creation
 // ============================================================================
@@ -204,13 +221,7 @@ async function processExpensePeriod(
   // synchronously and does NOT roll it back when a throw escapes the async transaction callback, so a
   // throw *after* createExpenseFromReminder would still leak one persisted dupe — proven by the C151
   // regression test that pre-hoist asserted 1, not 0.)
-  const advancedDue = computeNextDueDate(
-    nextDue,
-    reminder.frequency,
-    reminder.intervalValue,
-    reminder.intervalUnit,
-    getAnchorDay(reminder)
-  );
+  const advancedDue = advanceReminderDueDate(reminder, nextDue);
   return transaction(async (tx) => {
     const created = await createExpenseFromReminder(tx, { reminder, vehicleIds }, nextDue);
     await reminderRepository.advanceNextDueDateTx(tx, reminder.id, nextDue, advancedDue, now);
@@ -225,13 +236,7 @@ async function processNotificationPeriod(
 ): Promise<{ created: ReminderNotification; advancedDue: Date }> {
   // Validate/compute the advance BEFORE the insert (see processExpensePeriod) so a corrupt reminder
   // throws before a notification row is written — no leaked dupe on the non-rollback path.
-  const advancedDue = computeNextDueDate(
-    nextDue,
-    reminder.frequency,
-    reminder.intervalValue,
-    reminder.intervalUnit,
-    getAnchorDay(reminder)
-  );
+  const advancedDue = advanceReminderDueDate(reminder, nextDue);
   return transaction(async (tx) => {
     const [created] = await tx
       .insert(reminderNotifications)
@@ -261,13 +266,7 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
       await reminderRepository.deactivate(reminder.id);
       return;
     }
-    const advanced = computeNextDueDate(
-      nextDue,
-      reminder.frequency,
-      reminder.intervalValue,
-      reminder.intervalUnit,
-      getAnchorDay(reminder)
-    );
+    const advanced = advanceReminderDueDate(reminder, nextDue);
     // Non-progress backstop (bug #13): this loop is bounded only by the date advancing past `now`,
     // so a frequency/intervalUnit that fails to move the date forward would spin forever. advanceCustom
     // now throws on a bad unit, but guard the invariant directly — if the date didn't strictly

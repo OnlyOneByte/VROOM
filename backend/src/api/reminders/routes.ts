@@ -9,7 +9,7 @@ import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
 import { recurringCostSummary } from './reminder-cost';
 import { reminderRepository } from './repository';
-import { computeNextDueDate, reminderTriggerService } from './trigger-service';
+import { advanceReminderDueDate, reminderTriggerService } from './trigger-service';
 import { createReminderSchema, updateReminderSchema } from './validation';
 
 const routes = new Hono();
@@ -90,7 +90,7 @@ routes.post(
     const { reminder, vehicleIds } = existing;
 
     // Compute the re-arm per axis (D3). The route owns the math (it has the odometer repo +
-    // computeNextDueDate) to keep the repository free of a trigger-service import cycle.
+    // advanceReminderDueDate) to keep the repository free of a trigger-service import cycle.
     const fields: { lastServiceOdometer?: number; nextDueOdometer?: number; nextDueDate?: Date } =
       {};
 
@@ -108,13 +108,7 @@ routes.post(
       (reminder.triggerMode === 'time' || reminder.triggerMode === 'both') &&
       reminder.nextDueDate
     ) {
-      fields.nextDueDate = computeNextDueDate(
-        reminder.nextDueDate,
-        reminder.frequency,
-        reminder.intervalValue,
-        reminder.intervalUnit,
-        reminder.startDate.getDate()
-      );
+      fields.nextDueDate = advanceReminderDueDate(reminder, reminder.nextDueDate);
     }
 
     const updated = await reminderRepository.markServiced(id, user.id, fields);
