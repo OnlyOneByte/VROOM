@@ -474,6 +474,26 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   invalid A1 ref (charCode 91 = `[`) and silently truncates the clear/write range. Not a bug today; guard before the next
   reminders/expenses column addition. VERIFIED C132.
 
+**NEW — surfaced + verified-against-source by the C139 deep-review fan-out (dashboard headline math + expense-list query path). The fleetHealthScore/getQuickStats/getVehicleHealth core + the classic query traps (count-vs-list, hasMore/limit/offset, sortBy injection/DoS, tags-AND, list==export) were all CERTIFIED CLEAN. #39 (the data-correctness one) FIXED in-cycle; these two filed:**
+- ~~**#39 (MED) — expense-list endDate boundary drops same-day rows.**~~ — *DONE C139: `buildExpenseConditions` used
+  `lte(date, endDate)`, but the UI DatePicker sends a date-only YYYY-MM-DD → z.coerce.date() → LOCAL midnight (start of day),
+  so a "through Mar 31" filter dropped every Mar-31 expense not at exactly midnight (C6/C61/C103 local-vs-UTC class; VERIFIED
+  the FE sends date-only). FIX: `endOfDayIfDateOnly(d)` extends a local-midnight endDate to 23:59:59.999 local (inclusive whole
+  day), honors a mid-day timestamp verbatim; host-independent; one chokepoint fixes list + CSV export (keeps list==export).
+  date-range-boundary.test.ts (+5). validate:local EXIT 0, 1169 pass.*
+- **#40 (MED, needs a product decision) — `buildVehicleRadar` ranks MISSING data as an EXTREME score.** analytics-charts.ts:
+  706-760 — a vehicle with no data for a metric keeps its initialized 0, which `normalizeScore` then ranks against the fleet
+  min/max: a never-serviced car → reliability 100 (inverted maintenanceCount=0 = "best"); a car with no fuel pairs →
+  fuelEfficiency 0 (worst). So "I never logged it" reads as simultaneously best-reliability and worst-efficiency. VERIFIED C139.
+  The core fleetHealthScore is UNAFFECTED (that path uses neutral-50 defaults, not this radar). This is a relative-comparison
+  RADAR DISPLAY semantics call (how to render "no data" — exclude the vehicle / grey it / neutral-midpoint), not a mechanical
+  correctness fix → needs a product decision before any change. Secondary analytics surface.
+- **#41 (LOW) — expense search doesn't escape LIKE wildcards `%`/`_`.** repository.ts:106-111 (`buildExpenseConditions`) builds
+  `%${search.toLowerCase()}%` with no ESCAPE clause, so a search for "50%" → pattern `%50%%` matches every row containing "50"
+  (the trailing `%` is a wildcard), and "oil_change" matches "oilXchange" (`_` = any single char). VERIFIED C139. Parameterized
+  (no injection) + user-scoped (only over-matches the user's own rows) → over-matching search UX, not data-loss/security. FIX:
+  escape `%`/`_`/`\` in the term + append `ESCAPE '\'` to each LIKE. Clean unilateral fix for a future bug cycle.
+
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
    (Overview) + `fetchExpensesPage` (Expenses tab) in `vehicles/[id]/+page.svelte` only toasted on

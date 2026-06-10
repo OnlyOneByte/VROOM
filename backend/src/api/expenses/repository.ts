@@ -50,6 +50,20 @@ const EXPENSE_SORT_COLUMNS = {
 } as const;
 
 /**
+ * If `d` falls exactly on LOCAL midnight (the date-only `YYYY-MM-DD` DatePicker signature), return
+ * the inclusive end of that local day (23:59:59.999); otherwise return `d` unchanged. Detection +
+ * construction use local Y/M/D parts (not a hardcoded UTC instant), so the behavior is
+ * host-independent — a date-only end bound covers its whole day on any server timezone, and a
+ * deliberate mid-day timestamp is left alone. See the `endDate` note in buildExpenseConditions.
+ */
+function endOfDayIfDateOnly(d: Date): Date {
+  const isLocalMidnight =
+    d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0;
+  if (!isLocalMidnight) return d;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+}
+
+/**
  * Build the shared WHERE conditions for an expense query (everything EXCEPT the
  * userId scope, which the caller ANDs in). Used by BOTH findPaginated and findAll so
  * the list table and the CSV export filter identically — a divergence here is exactly
@@ -70,7 +84,14 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
     conditions.push(gte(expenses.date, filters.startDate));
   }
   if (filters.endDate) {
-    conditions.push(lte(expenses.date, filters.endDate));
+    // `endDate` from the UI is a date-only `YYYY-MM-DD` (the DatePicker), coerced to LOCAL
+    // midnight (00:00:00.000) — the START of that day. A bare `lte(date, midnight)` therefore
+    // drops every same-day expense not stamped at exactly midnight, so a "through Mar 31" filter
+    // silently hides all of Mar 31 (the C6/C61/C103 local-vs-UTC boundary class, here on the
+    // most-used list + the CSV export — both route through this one builder). Treat a midnight
+    // endDate as INCLUSIVE of the whole local day by extending it to 23:59:59.999 local; a
+    // non-midnight endDate (a deliberate full timestamp) is honored as-is.
+    conditions.push(lte(expenses.date, endOfDayIfDateOnly(filters.endDate)));
   }
   // SQL-level tag filtering via json_each (a row must carry EVERY listed tag).
   if (filters.tags?.length) {

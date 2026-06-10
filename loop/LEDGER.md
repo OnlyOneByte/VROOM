@@ -37,13 +37,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 134 |
-| deep-review | 5 | 132 |
+| deep-review | 5 | 139 |
 | guard | 6 | 137 |
-| bug | 3 | 136 |
+| bug | 3 | 139 |
 | arch | 5 | 135 |
 | infra | 6 | 138 |
 
-Current cycle: **138**
+Current cycle: **139**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2534,3 +2534,27 @@ Current cycle: **138**
   ratchet arc); refreshed the reviewer checklist (now THREE HIGHs gated: #27 + #36 + #37, plus #21-shrink) + the merge footer.
   Doc/measurement-only — no product code; the green baseline IS the verification. Next sweep ~C148. cov: be 82.25% / fe 65.32%
   (both freshly re-measured C138)
+- **C139 (deep-review → bug #39 — expense-list endDate boundary drops same-day rows)** — BALANCE: TWO over budget (deep-review
+  cyc 132 starved-for 7 > 5; feature cyc 134 starved-for 5 > 4); most-starved wins → `deep-review` (7) > feature (5). Matches
+  the C138 forecast. Named dr items all eyes-on/sign-off-blocked → fresh backend-correctness fan-out (the C108/C114/C120/C126/
+  C132 pattern) on 2 un-audited high-value veins: (A) dashboard headline math (getQuickStats / fleetHealthScore / scorers),
+  (B) the expense-list query path (filter/sort/pagination — the most-used page). 2 Explore agents; VERIFIED every finding vs
+  source (C67 — agents pointed analytics-charts at the wrong dir + I confirmed paths myself). RESULTS:
+  • Agent A (headline math): the fleetHealthScore/getQuickStats/getVehicleHealth core CERTIFIED CLEAN (weights 0.4+0.35+0.25=1.0,
+    divisor gated >0, avgEfficiency null-on-empty, normalizeScore clamps + max===min→50 guard, both scorers bounded). 1 real
+    MED — buildVehicleRadar ranks a vehicle with MISSING data (initialized 0) as an EXTREME (a never-serviced car → reliability
+    100; no fuel pairs → efficiency 0). VERIFIED real, but it's a relative-comparison-radar DISPLAY semantics call (how to render
+    "no data") on a secondary surface → FILED #40, needs a product decision (not a mechanical fix).
+  • Agent B (expense query): 2 real findings + verified CLEAN the classic traps (count-vs-list share baseWhere; hasMore/limit/
+    offset math; sortBy enum-allowlisted → no injection/DoS; tags AND; list==export). FIXED the higher-value one THIS cycle
+    (bugs jump the queue): #39 — `buildExpenseConditions` endDate used `lte(date, endDate)`, but the UI DatePicker sends a
+    date-only YYYY-MM-DD → z.coerce.date() → LOCAL midnight (START of day), so a "through Mar 31" filter DROPPED every Mar-31
+    expense not at exactly midnight (the C6/C61/C103 local-vs-UTC class; VERIFIED the FE sends date-only by reading the picker
+    binding). FIX: extracted `endOfDayIfDateOnly(d)` — a LOCAL-midnight value extends to 23:59:59.999 local (inclusive whole
+    day); a deliberate mid-day timestamp honored verbatim. host-independent (local Y/M/D, sidesteps C77). One chokepoint fixes
+    BOTH list + CSV export (preserves list==export). The OTHER finding — search doesn't escape LIKE `%`/`_` (a search for "50%"
+    over-matches) — FILED #41 (real, lower-value: over-matching not data-loss; parameterized so no injection). MERGE-SURVIVING
+    net: date-range-boundary.test.ts (+5, the search-paginated harness): afternoon-on-endDate INCLUDED (the regression), last-ms
+    boundary in / next-day-midnight out, startDate lower bound unaffected, non-midnight endDate honored verbatim, findAll/export
+    shares it. Verified: backend validate:local EXIT 0 — 1169 pass / 0 fail (+5), tsc 0, musl-biome clean (autofix reflowed the
+    test's long lines — the C33 whole-tree class), build bundled. cov: be 82.25% (carry; +5 BE) / fe 65.32% (carry)
