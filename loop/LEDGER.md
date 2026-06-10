@@ -27,9 +27,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 91 |
 | bug | 3 | 89 |
 | arch | 5 | 92 |
-| infra | 6 | 86 |
+| infra | 6 | 93 |
 
-Current cycle: **92**
+Current cycle: **93**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1718,3 +1718,21 @@ Current cycle: **92**
   budget (cyc 87, starved-for 6 > 5) → it wins. Eyes-on/backend audit of a shipped surface (fan out per rule 7,
   verify findings vs source); the C88 recurring-expenses spec premise or the C89/C90/C91 arc are fresh
   unreviewed. feature/bug remain Angelo-gated (the 3 specs + lease/loan). cov: be ~80% / fe 63.7%
+- **C93 (infra — CLAUDE.md orientation refresh: correct 2 actively-misleading drifts)** — BALANCE: five
+  categories AT-or-over budget; my C92 note guessed deep-review, but the TABLE ruled — `infra` had the highest
+  raw starved-for (cyc 86, 7 > 6) so it WINS over deep-review (6) (the recurring "compute all six, don't trust
+  last cycle's single-category forecast" lesson, again). Chose the orientation-refresh infra item over the #5
+  sweep (not due till ~C96) on EVIDENCE of real drift, not speculation — read CLAUDE.md and found 2 claims that
+  actively mislead a fresh agent (the C5/C47/C72 class): (1) the coverage line cited a stale "~74%/~59%, ~1038/
+  ~367 tests" floor → corrected to the real C81 MEASURED baseline (be 77.8% / fe 63.7% line) + noted
+  loop-improvement #4's per-cycle cov: tag + ~1100/~379 suite size; (2) the "Open gaps" line claimed "full
+  in-process backend HTTP harness needs a DB-injection refactor (the new Database(...) singleton binds at
+  import)" — FLATLY WRONG now: C91 proved createTestApp() exists + works (1100 tests run through it, the
+  providers net added last cycle). Rewrote it to DOCUMENT the harness (createTestApp/ctx.authed, real Lucia
+  session, the CONFIG-snapshot import-order caveat from C91) and NARROW the real remaining DI gap to the
+  specific one — analytics computeBalance binds the real-DB singleton (the C77 Property-23 skip). VERIFIED both
+  new claims against source (read http-client.ts in full C91; cross-checked the computeBalance gap against
+  BACKLOG deep-review #3 — consistent). Left the maintenance/import-trackers status lines unchanged (accurate
+  since the C72 refresh). Docs-only; no code, no build gate (the C5/C12/C47/C53/C72 pattern). Next (94):
+  deep-review most-starved over budget (cyc 87, starved-for 7 > 5) → it wins (deferred from C93 by the infra
+  breach). Fan out per rule 7, verify vs source; the C88–C92 arc is fresh-unreviewed. feature/bug Angelo-gated. cov: be ~80% / fe 63.7%

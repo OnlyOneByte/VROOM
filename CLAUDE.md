@@ -136,11 +136,22 @@ Highlights:
     native CSV path is unchanged when no mapping is sent. **Remaining: T4/T5 (frontend mapping-step
     dialog) + T6 e2e** (incl. real-export signature validation) — eyes-on/Playwright-blocked, so the
     feature is code-complete-but-not-DONE per the feature-DoD rule.
-- Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides (last-measured
-  baseline in TODO.md: frontend ~59%, backend ~74% — the backend suite has grown to ~1038 tests
-  + frontend ~367 since, so treat these as a floor, not a current reading) — fold into
-  bug/guard/arch cycles, don't regress it.
-- Open gaps: full in-process backend HTTP harness needs a DB-injection refactor (the
-  `const sqlite = new Database(...)` singleton binds at import); screenshot visual-diffing is
-  capture-only (no baseline compare); storage-backup-toggle E2E needs an OAuth provider (not
-  headless-feasible).
+- Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. The real
+  measured baseline is **backend 77.8% line / frontend 63.7% line (C81)** — not the older
+  ~74%/~59% TODO.md estimate. loop-improvement #4 now records a `cov:` tag on every LEDGER
+  cycle entry and ratchets the C81-named low spots on guard/arch/bug cycles. Suite size today:
+  **~1100 backend tests / ~379 frontend** (a floor — grows most cycles). Don't regress coverage;
+  name why if a cycle drops it.
+- Testing infra that DOES exist: an in-process backend HTTP harness —
+  `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
+  in-memory SQLite DB with a seeded user + a real Lucia session cookie (`ctx.authed/anon`); it's
+  how the route-level tests run (e.g. `providers-routes-http.test.ts`, C91). NOTE: `CONFIG` is a
+  process-cached env snapshot read at first import, so env-gated branches (e.g.
+  `ALLOW_FAKE_STORAGE`) can't be flipped per-file in the full suite — pick a path that doesn't
+  need the gate (C91 used an `s3` provider, not `fake`).
+- Open gaps: the analytics financing path (`getFinancing`→`computeBalance`) is still unpinnable
+  in-memory because `computeBalance` binds the real-DB singleton, not the test drizzle (the C77
+  Property-23 skip — needs a repo-DI refactor, flagged for sign-off); screenshot visual-diffing is
+  capture-only (no baseline compare); storage-backup-toggle + the eyes-on UI tails
+  (maintenance T7–T9, import-trackers T4–T6) need Playwright/an OAuth provider — sandbox-blocked
+  in the loop, so those land "code-complete, eyes-on pending."

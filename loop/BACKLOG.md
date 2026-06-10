@@ -537,7 +537,14 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > commits since the last refresh by theme so the eventual PR stays reviewable. Counts as one `infra`
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
-*(queue empty — repopulate as loop tooling / docs needs surface.)*
+*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C96.)*
+- ~~**CLAUDE.md orientation refresh post-C81–C92 (C93)**~~ — *DONE C93: 2 actively-misleading drifts fixed
+  (the C5/C47/C72 class). (1) The coverage line cited a stale ~74%/~59% / ~1038-test floor → corrected to the
+  real C81 MEASURED baseline (be 77.8% / fe 63.7% line) + the loop-improvement #4 per-cycle cov: tag + ~1100/
+  ~379 suite. (2) The "Open gaps" line claimed the in-process HTTP harness doesn't exist yet (needs a DB-injection
+  refactor) — FLATLY WRONG: C91 proved createTestApp() works (1100 tests run through it). Rewrote to DOCUMENT the
+  harness + the CONFIG-snapshot import-order caveat, and narrowed the real DI gap to the specific one (analytics
+  computeBalance singleton, the C77 Property-23 skip). Verified both claims against source; doc-only.*
 - ~~**#5 branch-hygiene sweep — BRANCH_REVIEW.md refresh (C86)**~~ — *DONE C86: due per the C76 note
   (~10 cycles, branch now 36 commits). (1) zero stray untracked unit tests; (2) full validate:local green
   (1076 BE + 367 FE); (3) digest header 26→36 commits / +4355/−287, appended §17 (C76–C85: loop-improvement
