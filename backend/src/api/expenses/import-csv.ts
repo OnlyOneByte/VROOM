@@ -134,9 +134,26 @@ function parseDate(raw: string): { value: Date } | { error: string } {
   // date-only file imported on the native path. Anything else (full ISO with time/zone, or
   // any other parseable string) keeps its original absolute-instant semantics via `new Date`.
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
-  const date = dateOnly
-    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
-    : new Date(raw);
+  if (dateOnly) {
+    const year = Number(dateOnly[1]);
+    const month = Number(dateOnly[2]);
+    const day = Number(dateOnly[3]);
+    const date = new Date(year, month - 1, day);
+    // ECHO-CHECK the constructed parts against the input (bug #23 / #59 — the same guard the mapping path's
+    // buildLocalDate uses): `new Date(2024, 12, 45)` (i.e. "2024-13-45") never NaNs — it silently ROLLS
+    // FORWARD to 2025-02-14. NaN alone can't catch that; verify Y/M/D round-trip so an out-of-range
+    // date-only cell is rejected with a clean per-row error instead of storing a wrong date.
+    if (
+      Number.isNaN(date.getTime()) ||
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day
+    ) {
+      return { error: `Invalid date "${raw}"` };
+    }
+    return { value: date };
+  }
+  const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return { error: `Invalid date "${raw}"` };
   return { value: date };
 }

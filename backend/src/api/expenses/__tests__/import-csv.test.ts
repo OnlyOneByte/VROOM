@@ -130,6 +130,29 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(stored.getDate()).toBe(15);
   });
 
+  test('an OUT-OF-RANGE date-only cell is REJECTED, not silently rolled forward (#59)', async () => {
+    await seedVehicle('Daily Driver');
+    // `new Date(2024, 12, 45)` ("2024-13-45") never NaNs — it rolls to 2025-02-14. The native parseDate
+    // now echo-checks the constructed Y/M/D (the buildLocalDate guard the mapping path had), so an
+    // impossible date-only value is rejected with a per-row error instead of importing a wrong date.
+    const csv = [
+      'date,vehicle,category,amount',
+      '2024-13-45,Daily Driver,fuel,40.00', // month 13 + day 45 → would roll to 2025-02-14 pre-fix
+      '2024-02-30,Daily Driver,misc,10.00', // Feb 30 → would roll to Mar 1 pre-fix
+    ].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    // Both rows rejected; nothing imported (pre-fix both would import at rolled-forward dates).
+    expect(body.data.imported).toBe(0);
+    expect(body.data.errorCount).toBe(2);
+    expect(
+      body.data.rows.every((r) => (r.message ?? '').toLowerCase().includes('invalid date'))
+    ).toBe(true);
+    expect(await listExpenses()).toHaveLength(0);
+  });
+
   test('a full-ISO timestamp keeps its absolute instant (date-only fix does not regress it)', async () => {
     await seedVehicle('Daily Driver');
     // The date-only branch must NOT capture full ISO values — those name an absolute instant and

@@ -43,7 +43,7 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 167 |
+| deep-review | 5 | 173 |
 | guard | 6 | 169 |
 | bug | 3 | 168 |
 | arch | 5 | 172 |
@@ -3094,3 +3094,19 @@ Current cycle: **150**
   green→green: backend validate:local **EXIT 0 — 1214 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean (one import reflow
   autofixed), build bundled. **ARCH QUEUE now EMPTY of primed picks** — next arch cycle runs a fresh rule-7 audit fan-out to
   repopulate. cov: be 82.70%+ (carry; +3 BE) / fe 70.18% (carry)
+- **C173 (deep-review → bug #59): native CSV-import parseDate now echo-checks date-only (rejects out-of-range, not silent roll)**
+  — BALANCE: two over budget → most-starved (absolute) wins → `deep-review` (cyc 167, starved-for 6) > `bug` (5). Fresh 2-agent
+  fan-out on UN-audited veins: (A) the native CSV-import pipeline (less-audited than the C60 mapping pre-pass), (B) the
+  split-service allocation core (underpins recurring/insurance but never got a dedicated review). PRE-READ both (C67): debunked my
+  own split-percentage-over-100 hypothesis (refineSplitConfig enforces sum=100 ±0.001 at the Zod layer — unreachable) +
+  confirmed computeEvenSplit is provably exact (cents floor + remainder distribution). Agent B's report not yet landed (delayed —
+  will triage); agent A surfaced the real finding. **#59:** native parseDate (import-csv.ts:136) builds a date-only value in LOCAL
+  time (the C61 trap correctly avoided) but its ONLY validity check is Number.isNaN — and `new Date(2024,12,45)` ("2024-13-45")
+  never NaNs, it silently ROLLS FORWARD to 2025-02-14 (skewing TCO/monthly-trend/year-scoped analytics). The #23/#39 echo-check
+  fix was applied to the MAPPING path (buildLocalDate, C115) but NEVER ported to the native path. VERIFIED firsthand + mirrored
+  buildLocalDate's exact guard. FIX: echo-check the constructed Y/M/D against the input parts; mismatch → the clean per-row
+  "Invalid date" error (full-ISO branch unchanged — round-trips an absolute instant). +1 regression test (2024-13-45 + 2024-02-30
+  → both rejected, errorCount 2, imported 0; pre-fix both imported at rolled dates). Agent A also CERTIFIED clean: BOM (C51),
+  money-no-NaN-corruption, formula-denormalize symmetry, idempotency (clientId dedup), cross-tenant vehicle resolution. green→green:
+  backend validate:local **EXIT 0 — 1215 pass / 1 skip / 0 fail (+1)**, tsc 0, musl-biome clean (one reflow autofixed), build
+  bundled. #59 CLOSED. cov: be 82.70%+ (carry; +1 BE) / fe 70.18% (carry)

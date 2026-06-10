@@ -673,6 +673,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   agent (read the actual loop + provider upload). Narrow window (hence MED). FIX: a recorded idempotency key (deterministic remote
   name, or persist a pre-claim/storageRef before upload). Pure backend, but needs an approach choice (per-provider). Filed.
 
+**NEW — surfaced + verified-against-source by the C173 deep-review fan-out (native CSV-import pipeline · split-service allocation core). #59 (MED) FIXED in-cycle. Agent A CERTIFIED clean: BOM strip (C51 held), money parsing (no NaN→0 corruption, thousands-sep rejected not coerced), formula-injection denormalize (symmetric round-trip), idempotency (clientId sha256 dedup + partial unique index), cross-tenant vehicle resolution (name-map from the user's own fleet only). Split-service agent (B) findings land with its delayed event; my C67 pre-read already confirmed computeEvenSplit exact + refineSplitConfig enforces percentage-sum=100 at the Zod layer.**
+- ~~**#59 (MED, data-safety + displayed-$) — native CSV-import parseDate silently rolled forward an out-of-range date-only cell.**~~
+  — *DONE C173: import-csv.ts:136 built a date-only value in LOCAL time (the C61 trap avoided) but checked ONLY Number.isNaN —
+  and `new Date(2024,12,45)` ("2024-13-45") never NaNs, it rolls to 2025-02-14 (skewing TCO/trend/year analytics). The #23/#39
+  echo-check was applied to the MAPPING path (buildLocalDate, C115) but never ported to the native path. FIX: echo-check the
+  constructed Y/M/D against the input parts → mismatch returns the clean per-row "Invalid date" error (full-ISO branch unchanged).
+  +1 regression test (2024-13-45 + 2024-02-30 both rejected, imported 0). green→green 1215 pass.*
+
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
    (Overview) + `fetchExpensesPage` (Expenses tab) in `vehicles/[id]/+page.svelte` only toasted on
