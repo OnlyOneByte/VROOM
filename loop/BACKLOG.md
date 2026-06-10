@@ -258,10 +258,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > limiter: window-open, up-to-limit pass, over-limit 429 with all 4 X-RateLimit-*/Retry-After headers + the
 > RATE_LIMIT_EXCEEDED body, per-key isolation, window-reset via setSystemTime; + a precondition test asserting
 > CONFIG.disableRateLimit===false so the net can't go vacuous — the C77/C91 trap). **Both middleware low spots now covered.**
-> NEXT high-value low spots
+> `frontend utils/memoize.ts` 0%→covered (C118 — the FIRST FE ratchet pick: memoizeMulti cache-hit/distinct-args/JSON-value
+> identity/MAX_CACHE_SIZE eviction-cascade + debounce collapse-to-one-trailing-call via vi fake timers; +7. The gate caught
+> a wrong eviction-model assumption — the code was right). NEXT high-value low spots
 > **(re-anchored to the C107 real reading — be 81.1% line / fe 61.4% line; FE now decisively the bigger gap, flat vs C81):**
-> `body-limit.ts` (35% line size-enforcement branch), `sync/restore.ts`+`sync/routes.ts` (~32–61%, HTTP-harness-tractable);
-> then the **frontend** components/routes deficit (61.4% line — steer FE guard cycles here, it's now the bigger gap). Route/
+> backend — `body-limit.ts` (35% line size-enforcement branch), `sync/restore.ts`+`sync/routes.ts` (~32–61%,
+> HTTP-harness-tractable); FRONTEND (the bigger gap — keep steering FE guard cycles here) — the other untested pure-logic
+> utils (navigation.ts, error-handling beyond extract-error-message) + the components/routes deficit. Route/
 > integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
 > (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch
 > safety-net (as providers did). Pick one high-value module per cycle when guard is the balance. (Verified C85:

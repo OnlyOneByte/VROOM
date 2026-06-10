@@ -33,12 +33,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 116 |
 | deep-review | 5 | 114 |
-| guard | 6 | 112 |
+| guard | 6 | 118 |
 | bug | 3 | 115 |
 | arch | 5 | 113 |
 | infra | 6 | 117 |
 
-Current cycle: **117**
+Current cycle: **118**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2182,3 +2182,19 @@ Current cycle: **117**
   + the key steer that FRONTEND is now the bigger gap. (3) Stale suite size ~1100/~379 → ~1145/~385. Doc-only (no code → no
   build gate, the C93/C100 pattern). Next (118): nothing forced (deep-review cyc 114, guard cyc 112 breach next) →
   highest-leverage. cov: be ~81% / fe 61.4% (carry C107)
+- **C118 (guard — characterize FE utils/memoize.ts 0% → covered; FIRST frontend ratchet pick)** — BALANCE: nothing over
+  budget (guard/bug/arch all AT); free highest-leverage pick. The C107 reading + the C117 CLAUDE.md steer both name FRONTEND
+  as the decisively bigger coverage gap (61.4% vs be 81%), so a FE guard pick on high-risk pure logic is the highest-leverage
+  move (attacks the measured gap + the standing angle, vitest/non-eyes-on). SURVEY: most FE money/math utils already have
+  tests; the untested high-RISK one is memoize.ts — two REUSABLE primitives (memoizeMulti + debounce) with zero direct
+  coverage, where a bug silently corrupts every consumer (stale/wrong-key cache; dropped/early debounced call). The C82 class
+  (skipped trivial vehicle-helpers.ts — a 1-line display passthrough, coverage theater). SHIPPED: memoize.test.ts (+7):
+  memoizeMulti cache-hit-doesn't-re-invoke, distinct-args-independent, JSON-VALUE identity (equal-shape objects hit), and the
+  MAX_CACHE_SIZE=100 eviction; debounce collapse-to-one-trailing-call + latest-args + reset-on-each-call + separated-calls,
+  via vi.useFakeTimers. THE GATE EARNED ITS KEEP (genuinely): my eviction test asserted calls=102 but got 103 — re-reasoning
+  proved the CODE is correct and MY model was wrong (every over-cap insert evicts one more oldest key, so square(0)'s insert
+  ALSO evicts the now-oldest key 1 → square(1) is also a miss). Fixed the test to the real eviction-cascade behavior + a
+  self-documenting comment (a real characterization catch — the subtle bit pinned). Verified: frontend validate:local EXIT 0
+  — 392 pass / 0 fail (+7), tsc 0, build OK. FE ratchet started. Next (119): `deep-review` most-starved over budget (cyc 114,
+  starved-for 5 = budget at 119... recompute) → highest-leverage. cov: be ~81% / fe ~62% (FE +1 module covered; re-measure
+  due ~C120)
