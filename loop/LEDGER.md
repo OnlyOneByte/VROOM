@@ -26,10 +26,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 87 |
 | guard | 6 | 91 |
 | bug | 3 | 89 |
-| arch | 5 | 90 |
+| arch | 5 | 92 |
 | infra | 6 | 86 |
 
-Current cycle: **91**
+Current cycle: **92**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1699,3 +1699,22 @@ Current cycle: **91**
   2). Highest-leverage = EXECUTE the formatter dedup (arch, now safe behind this net — extract formatProvider
   response, +the :583/:599 photoRef count helper + the :466 raw delete fold in naturally), OR the starved
   deep-review. feature/bug remain Angelo-gated. cov: be ~80% (providers routes now covered) / fe 63.7%
+- **C92 (arch — EXECUTE the providers dedup, green→green behind the C91 net)** — BALANCE: nothing over budget
+  (four categories AT budget, breach at 93); highest-leverage = the deliberately-staged second half of the
+  C91 setup (the C18/C36 net-then-refactor pattern). Two genuine "N copies → one helper" dedups in
+  providers/routes.ts: (1) the 8-field provider response object hand-assembled IDENTICALLY at 3 sites
+  (GET list, POST create, PUT update) → extracted `formatProviderResponse(row: UserProvider)` (credentials
+  deliberately omitted — the security invariant the C91 net pins); (2) the synced-vs-failed photoRef count
+  queries in /sync-status, byte-identical except the status filter → `countPhotoRefsByStatus(db, id, status,
+  entityTypes)`. ~50 lines of dup → 2 named helpers. SCOPE CALL (C75 reasoning): did NOT extract the lone raw
+  `db.delete(userProviders)` :466 into a repo — the WHOLE file uses raw db.* inline (no providersRepository
+  exists), so extracting one op makes the file MORE inconsistent (arch rule 5 churn); the formatter+count are
+  the coherent in-file set. tsc CAUGHT a real type bug (the gate earning its keep): `photoRefs.status` is a
+  literal union `'active'|'pending'|'failed'`, so my first `status: string` param was too wide for eq() —
+  tightened the signature to the union (the call sites pass narrowing literals). green→green PROOF: the C91
+  net's 13 provider assertions (response key-shape, credentials-never-echoed, sync-status counts) stayed GREEN
+  UNCHANGED through the refactor = behavior-preserving. Verified: backend validate:local EXIT 0 (tsc 0 ·
+  musl-biome clean · 1100 pass/0 fail, unchanged · build bundled). Next (93): deep-review most-starved over
+  budget (cyc 87, starved-for 6 > 5) → it wins. Eyes-on/backend audit of a shipped surface (fan out per rule 7,
+  verify findings vs source); the C88 recurring-expenses spec premise or the C89/C90/C91 arc are fresh
+  unreviewed. feature/bug remain Angelo-gated (the 3 specs + lease/loan). cov: be ~80% / fe 63.7%

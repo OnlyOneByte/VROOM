@@ -504,16 +504,17 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
   unused imports. Kept insurance_claim (transitive) + odometer_entry inline + validatePhotoOwnership
   as-is. 3 ownership impls → 1; behavior-preserving (all gate tests + full 889 suite green, unchanged).*
 
-3. **Dedup the 3× provider response formatter (NET DONE C91 → READY TO EXECUTE).** `providers/routes.ts`
-   formats the same 8-field provider object at THREE sites (:159 GET list, :308 POST create, :373 PUT update) —
-   only the source var name differs. Extract `formatProviderResponse(row)` (27 lines → one). The safety net is
-   now IN: **C91 added providers-routes-http.test.ts (+13)** pinning the exact 8-key response shape of all 3
-   sites + the credentials-never-echoed invariant + auth/ownership/domain/zValidator guards — so the extraction
-   lands green→green (the C18/C36 second-half). NEXT ARCH PICK: do the extraction; fold in the two lower-priority
-   spotted items in the same pass since the net covers them — the active-vs-failed photoRef count queries
-   :583/:599 differ only by a status filter → `countPhotoRefsByStatus(status)`; and the lone raw
-   `db.delete(userProviders)` at :466 (note: a C75 cycle declined extracting ONE of providers' raw queries as
-   churn — but the formatter+count dedup is the coherent set, and the delete folds in cleanly alongside).
+- ~~**Dedup the 3× provider response formatter + the 2× photoRef count query (C91 net → C92 execute).**~~ —
+   *DONE C92 (the C18/C36 net-then-refactor second half): (1) the 8-field provider response object hand-assembled
+   identically at 3 sites (GET list / POST create / PUT update) → `formatProviderResponse(row: UserProvider)`
+   (credentials deliberately omitted — the security invariant); (2) the synced-vs-failed photoRef count queries
+   in /sync-status, byte-identical bar the status filter → `countPhotoRefsByStatus(db, id, status, entityTypes)`.
+   ~50 lines of dup → 2 helpers. green→green: the C91 net's 13 assertions stayed green UNCHANGED. tsc caught a
+   real type bug (photoRefs.status is a literal union, not string — tightened the param). backend validate:local
+   EXIT 0 (1100 pass). DELIBERATELY did NOT extract the lone raw `db.delete(userProviders)` :466 into a repo —
+   the whole file uses raw db.* inline (no providersRepository), so extracting one op makes it MORE inconsistent
+   (C75 reasoning, arch rule 5). If a providersRepository is ever introduced, route ALL its raw queries through
+   it as one coherent change — not piecemeal.*
 
 Seed audit angles for the rule-7 fan-out (once the above are done, or to go broader):
 - **Backend layering** — route handlers doing repository/business logic inline; missing or
