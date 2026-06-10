@@ -330,20 +330,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
-> **✅ APPROVED BY ANGELO 2026-06-10 (C151) — ready to execute (the swap both call sites + period-independence
-> regression test; eyes-on for the FinanceTab UI render, but the call-site swap + test are loop-buildable).**
-> **PENDING ANGELO (confirmed + traced C54, do NOT execute unilaterally — user-visible $ change):**
-> **Lease/loan miles-used consume the period-scoped `currentMileage`.** `FinanceTab.svelte` passes
-> `vehicleStatsData?.currentMileage` to both `PaymentMetricsGrid` (loan `mileageUsed`, line ~151) and
-> `LeaseMetricsCard` (`currentMileage` → `calculateLeaseMetrics`, line ~173). But `vehicleStatsData` is
-> fetched with the user's stats-period selector (`selectedStatsPeriod`, default `'all'`), and
-> `currentMileage` is period-filtered + fuel-only. So picking "7d"/"30d" on the Overview tab silently
-> **understates lease overage and loan miles-used** (and neither ever sees manual odometer entries).
-> Miles-used is inherently all-time → the fix is a call-site swap to the C52 all-time `currentOdometer`
-> field (`vehicleStatsData?.currentOdometer`). `calculateLeaseMetrics` itself is correct + well-tested;
-> the landmine is documented inline at both FinanceTab call sites (C54). Decided fix, just needs the nod
-> (it changes a displayed $ figure). When approved: swap both sites + a regression test asserting the
-> projected excess fee is period-independent. *Sibling display call (#card semantics) stays with Angelo.*
+> ~~**Lease/loan miles-used consume the period-scoped `currentMileage`** (traced C54, APPROVED Angelo C151)~~ — *DONE C157
+> (CODE-COMPLETE, EYES-ON-PENDING for the FinanceTab visual). `FinanceTab.svelte` fed `vehicleStatsData?.currentMileage`
+> (period-scoped + fuel-only — shrinks under a 7d/30d stats selection, ignores manual odometer entries) into both
+> `PaymentMetricsGrid` (loan mileageUsed) + `LeaseMetricsCard` (lease overage → excess-fee $), silently understating both under
+> a non-'all' period. FIX (verified semantics vs source — VehicleStats type + GET /stats both document currentOdometer as the
+> canonical ALL-TIME, all-sources, period-INDEPENDENT reading, C52): swap both sites to `currentOdometer`. Extracted a pure
+> `resolveCurrentOdometer(currentOdometer, currentMileage, initialMileage)` helper (financing-calculations.ts) so both sites
+> derive identically + the logic is unit-testable (the .svelte render is eyes-on). +5 tests pinning the selection contract
+> (currentOdometer wins over a lower period-scoped currentMileage; fallbacks; `??`-not-`||` zero-reading honored). green→green
+> frontend validate:local EXIT 0, 475 pass (+5). Only the FinanceTab visual render remains eyes-on (Playwright-blocked).*
 
 > ~~**#27 (HIGH, the loop's first; found+VERIFIED C120, escalated, APPROVED by Angelo C151) — TCO double-counts a financed
 > vehicle's principal.**~~ — *DONE C154 (Angelo-approved option c). `getVehicleTCO` summed `purchasePrice` + the `financingInterest`

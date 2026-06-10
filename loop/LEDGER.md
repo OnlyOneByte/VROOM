@@ -39,7 +39,7 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 151 |
+| feature | 4 | 157 |
 | deep-review | 5 | 155 |
 | guard | 6 | 156 |
 | bug | 3 | 154 |
@@ -2862,3 +2862,19 @@ Current cycle: **150**
   (5.00MB cap / 10.00MB received). maxSize/message come from the config ARG (no frozen-CONFIG vacuity trap). green→green: backend
   validate:local **EXIT 0 — 1203 pass / 1 skip / 0 fail (+7)**, tsc 0, musl-biome clean, build bundled. Backend middleware trio
   now all covered (idempotency C105 + rate-limit C112 + body-limit C156). cov: be 82.0%+ (carry; +7 BE) / fe 70.09% (carry)
+- **C157 (feature → bug: lease/loan miles-used now consume the ALL-TIME `currentOdometer`, Angelo-approved C151)** — BALANCE:
+  `feature` the only over-budget category (cyc 151, starved-for 6 > 4) → forced. In-flight features are eyes-on tails + money-cents
+  is T0-gated, so the buildable feature increment is the **approved lease/loan currentOdometer swap** (the call-site swap + a
+  regression test are loop-buildable; only the FinanceTab render is eyes-on). THE BUG (found+traced C54, approved C151):
+  FinanceTab fed `vehicleStatsData?.currentMileage` — which is PERIOD-SCOPED + fuel-only (shrinks under a 7d/30d stats-period
+  selection, ignores manual odometer entries) — into BOTH `PaymentMetricsGrid` (loan mileageUsed) + `LeaseMetricsCard` (lease
+  overage → projected excess-fee $). Miles-used is inherently all-time, so a non-'all' period silently UNDERSTATED both. FIX
+  (verified semantics firsthand vs source — VehicleStats type + GET /stats route both document currentOdometer as the canonical
+  ALL-TIME, all-sources, period-INDEPENDENT reading, C52): swap both sites to `currentOdometer`. Rather than duplicate the
+  `currentOdometer ?? currentMileage ?? initialMileage` selection at both sites, extracted a pure `resolveCurrentOdometer(...)`
+  helper in financing-calculations.ts (a small arch win + makes the logic unit-testable, since the .svelte render is eyes-on).
+  Merge-surviving net: +5 in lease-metrics.test.ts pinning the selection contract (currentOdometer wins over a lower period-scoped
+  currentMileage [the bug case]; null/undefined fallbacks; initialMileage fallback; null when nothing; the `??`-not-`||` zero-reading
+  honored). green→green: frontend validate:local **EXIT 0 — 475 pass (+5)**, tsc 0, build done. CODE-COMPLETE, EYES-ON-PENDING for
+  the FinanceTab visual (NORTH_STAR #3 — Playwright-blocked here), but the all-time-odometer LOGIC is now pinned. cov: fe 70.09%+
+  (carry; +5 FE) / be 82.0% (carry)

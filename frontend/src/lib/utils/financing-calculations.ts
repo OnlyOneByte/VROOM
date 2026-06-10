@@ -337,6 +337,22 @@ function calculateExtraPaymentImpactImpl(
 
 export const calculateExtraPaymentImpact = memoizeMulti(calculateExtraPaymentImpactImpl);
 
+/**
+ * Resolve the odometer reading to use for lease overage / loan miles-used (C157, bug #lease-loan,
+ * Angelo-approved C151). Miles-used is inherently ALL-TIME, so it must prefer the canonical all-sources,
+ * period-independent `currentOdometer` (GET /stats, C52) over the period-scoped + fuel-only
+ * `currentMileage` (which shrinks under a 7d/30d stats window and ignores manual odometer entries).
+ * Falls back currentOdometer → currentMileage → initialMileage → null. Pure + host-independent so both
+ * FinanceTab call sites (PaymentMetricsGrid mileageUsed, LeaseMetricsCard) derive miles identically.
+ */
+export function resolveCurrentOdometer(
+	currentOdometer: number | null | undefined,
+	currentMileage: number | null | undefined,
+	initialMileage: number | null | undefined
+): number | null {
+	return currentOdometer ?? currentMileage ?? initialMileage ?? null;
+}
+
 export function calculateLeaseMetrics(
 	financing: VehicleFinancing,
 	currentMileage: number | null,
