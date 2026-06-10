@@ -1,6 +1,6 @@
 # Recurring Expenses — Requirements
 
-> **Status: DRAFT — awaiting Angelo sign-off on D1–D4.** Drafted by the autonomous loop (cycle 88).
+> **Status: APPROVED — Angelo signed off D1–D4 (cycle 94); all recommended options ratified.** Drafted by the autonomous loop (cycle 88).
 > **Key grounding (verified against source, not assumed):** the recurring-expense *engine already
 > exists* — an `type: 'expense'` reminder auto-creates real expense rows on its frequency. This spec
 > therefore **closes the gaps on the existing engine** (exposure, reliable materialization,
@@ -90,9 +90,9 @@ parallel scheduler.
 - **Mileage-axis auto-expense.** The mileage trigger only notifies today (`processMileageReminder` emits
   a notification, never an expense) — keeping that as-is; recurring *expenses* are the time axis.
 
-## Open product decisions — **NEED ANGELO'S SIGN-OFF**
+## Open product decisions — **✅ RATIFIED (Angelo, cycle 94)**
 
-> Recommended option (✅) each. Build is blocked until ratified.
+> Recommended option (✅) each — all four approved as recommended. Build unblocked (T0 done).
 
 - **D1 — Materialization cadence without a cron (the central call).** How do due recurring expenses get
   created if the user doesn't click the button? Options: (a) **auto-run the due-trigger on app

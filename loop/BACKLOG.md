@@ -78,18 +78,27 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    mobile. Then T6 e2e (incl. real-export signature validation). NOTE: T4–T6 are Playwright-eyes-on-blocked
    here, so the BACKEND of import-trackers (T1–T3) is complete but the feature isn't DONE until the FE→BE→DB
    round-trip e2e runs (feature-DoD rule) — lands "code-complete, eyes-on pending" like maintenance T7–T9.
-3. **Recurring expenses** — spec DRAFTED (C88), **awaiting Angelo sign-off on D1–D4** per
-   `.kiro/specs/recurring-expenses/`. KEY GROUNDING (verified against source C88, corrected a stale model):
+3. **Recurring expenses** — spec **APPROVED (Angelo signed off D1–D4, C94)**; **T0 done, T1 is the next backend
+   build** per `.kiro/specs/recurring-expenses/`. KEY GROUNDING (verified against source C88, re-certified C94):
    the recurring-expense ENGINE ALREADY EXISTS — an `type:'expense'` reminder auto-creates real expense rows
    (single or multi-vehicle split, sourceType:'reminder') on its frequency via `trigger-service.ts`
-   processReminder:407 → createExpenseFromReminder:108, and those flow into TCO automatically. So the spec
-   EXTENDS the engine (NOT a new table/scheduler — that would reinvent it, NORTH_STAR #4). The 3 verified gaps:
-   (1) materialization is manual-button-ONLY (no cron/on-open → self-host PWA under-counts TCO); (2) ReminderForm
-   omits expenseSplitConfig (no multi-vehicle recurring cost); (3) no source traceability. D1 (materialization
-   cadence w/o a cron — ✅ client-side opportunistic trigger on app open, idempotent), D2 (keep past history on
-   delete — ✅ clearSource not deleteBySource), D3 (reuse the split widget), D4 (v1 order). **T1–T3 are
-   backend/non-eyes-on** (traceability response+contract guard, split characterization, cascade-safe delete) →
-   the loop can ADVANCE this while Playwright is blocked, once D1–D4 are signed off. T4–T8 eyes-on.
+   processReminder:407 → createExpenseFromReminder:108, and those flow into TCO automatically (the C94 deep-review
+   CERTIFIED this path CLEAN). So the spec EXTENDS the engine (NOT a new table/scheduler — that would reinvent it,
+   NORTH_STAR #4). The 3 verified gaps: (1) materialization is manual-button-ONLY (no cron/on-open → self-host PWA
+   under-counts TCO); (2) ReminderForm omits expenseSplitConfig (no multi-vehicle recurring cost); (3) no source
+   traceability. RATIFIED: D1 (✅ client-side opportunistic trigger on app open, idempotent — no cron), D2 (✅ keep
+   past history on delete via clearSource not deleteBySource), D3 (✅ reuse the existing split widget), D4 (✅
+   backend-first v1 order). **T1 DONE (C96):** grounding found the read-path surfacing was already a no-op — all expense
+   reads use bare `.select()`, `buildPaginatedResponse` passes rows verbatim, and the frontend `Expense` type already
+   declares `sourceType?`/`sourceId?` (expense.ts:57-58); a contract-drift guard is NOT warranted (C80 — GET /expenses is a
+   clean repository pass-through, not a hand-assembled response). The one genuine deliverable shipped: `expense-source-
+   traceability.test.ts` (+3) pins the OBSERVABLE API contract (the existing trigger-expense test only checked the DB row,
+   which a dropped mapper would pass while breaking the T6 badge) — GET list + GET /:id echo sourceType='reminder'/sourceId
+   for a materialized expense; a manual expense reports null. **NEXT = T2 (backend/non-eyes-on):** split-materialization
+   characterization — pin that an expense-type reminder with an even/percentage/absolute `expenseSplitConfig` fires → N
+   sibling rows with correct shares + `sourceType:'reminder'` (trigger-service.ts:148-163), anchoring T4 before any form
+   change. Then T3 (cascade-safe delete via clearSource — keep history). T4–T8 eyes-on. **This is the feature the loop can
+   ADVANCE while Playwright is blocked** (unlike maintenance T9 / import-trackers T4–T6, both stuck at eyes-on tails).
 
 > NOTE (cycle 12): both feature builds are large, MULTI-TASK efforts — one tasks.md task per loop
 > cycle, not one-and-done. They no longer gate the loop; pull T1 of the higher-value
@@ -348,6 +357,30 @@ positives, debunked in LEDGER C21; these two are the real ones)*
     CREATE, not their UPDATE (PUT). Editing a reading upward across a milestone won't fire until the
     next /trigger. Matches D5's "after a create" wording — a documented scope choice. Expand to UPDATE
     routes only if the product wants edit-triggered rechecks. (by-design gap)
+
+*(surfaced + VERIFIED by the C94 reminder→expense materialization deep-review — engine certified clean;
+these two are the only findings, both verified against source: 1 real low-sev bug, 1 needs-decision)*
+- ~~**Cross-fleet fuel fillup COUNT inflated by a split fuel expense (#18)**~~ — *DONE C97: a split fuel
+    expense creates N sibling rows but only the AMOUNT is split — siblings carry volume=null
+    (ExpenseSplitService.createSiblings, verified). So the cross-fleet `getFuelStats` (no vehicleId) counting
+    raw `fuelRows.length` reported one logical fillup as N. FIX (cleaner than dedup-on-groupId, which isn't even
+    SELECTed): a "fillup" is a fuel PURCHASE with a volume → count only volume-bearing rows via `isFillup(r) =
+    r.volume != null && r.volume > 0` (the predicate fillupDetails already uses). Applied to currentYear/Month/
+    prevMonth in buildFuelStatsFromData + `COUNT(CASE WHEN volume > 0 THEN 1 END)` in queryFuelAggregates
+    (prev-year, for year-over-year consistency). Volume/cost SUMS were always correct (null contributes 0) —
+    only counts were wrong. Behavior-preserving for non-split data (a real fillup has a volume). Guard:
+    deterministic regression in fuel-stats.property.test.ts (2 real fillups + a 2-car split → cross-fleet
+    currentYear fillups == 2 not 4, gallons == 19 unchanged). validate:local EXIT 0 (1104 pass, +1).*
+
+19. **TCO monthly-trend chart omits non-major-category expenses** — `buildTCOMonthlyTrend`
+    (analytics-charts.ts:953-961) is a 4-bucket chart (financing/insurance/fuel/maintenance, no "other"),
+    so a `category` outside those four (financial/regulatory/enhancement/misc) is omitted from THIS trend
+    chart. NOT a bug + NOT reminder-specific: the financing/insurance branches require
+    `sourceType==='financing'/'insurance_term'`, so a MANUALLY-entered `financial` expense (sourceType null)
+    is omitted identically; and the dollars are NOT lost from TCO totals (`categorizeTCOExpenses` routes
+    them to otherCosts). SEMANTICS CALL (#14-class): should ad-hoc/recurring `financial` etc. expenses
+    appear in the financing/insurance trend, or is the 4-bucket scope intentional? Needs a product
+    decision before any change. (needs decision — chart scope, not a defect)
 - ~~**recheckMileageReminders could 500 a successful write (C42)**~~ — *DONE C42 (found by the audit):
   the findMileageTracking fetch was outside the per-reminder try/catch + throws DatabaseError; recheck
   runs after the write persists, so a DB hiccup propagated + 500'd the (successful) write, breaking the

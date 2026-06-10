@@ -640,9 +640,13 @@ export class AnalyticsRepository {
       lt(expenses.date, new Date(range.end * 1000)),
     ];
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
+    // COUNT only volume-bearing rows so the previous-year fillup count matches the
+    // in-memory isFillup predicate in buildFuelStatsFromData (a split fuel sibling has
+    // volume=null and is not a fillup — bug #18). The gallons SUM is unaffected (null
+    // volume contributes nothing) but is kept explicit for symmetry.
     const result = await this.db
       .select({
-        count: sql<number>`COUNT(*)`,
+        count: sql<number>`COUNT(CASE WHEN ${expenses.volume} > 0 THEN 1 END)`,
         totalGallons: sql<number>`COALESCE(SUM(${expenses.volume}), 0)`,
       })
       .from(expenses)
@@ -1235,13 +1239,23 @@ export class AnalyticsRepository {
 
     const toDate = (r: FuelExpenseRow) =>
       r.date instanceof Date ? r.date : new Date(r.date as unknown as number);
-    const currentYearFillups = fuelRows.length;
+    // A "fillup" is a fuel PURCHASE — it carries an actual volume. A split fuel expense
+    // creates one sibling row per vehicle, but only the amount is split: siblings have
+    // volume=null (see ExpenseSplitService.createSiblings). Counting raw rows would inflate
+    // the fillup count by (#vehicles − 1) per split fillup in the cross-fleet view (bug #18).
+    // Count only volume-bearing rows — the same predicate fillupDetails already uses — so a
+    // split fillup counts once and a volume-less row never counts as a fillup. The volume/
+    // cost SUMS were always correct (null volume contributes 0); only the COUNTS were wrong.
+    const isFillup = (r: FuelExpenseRow) => r.volume != null && r.volume > 0;
+    const currentYearFillups = fuelRows.filter(isFillup).length;
     const previousYearFillups = prevYearAgg.count;
     const currentMonthFillups = fuelRows.filter(
-      (r) => toDate(r).getMonth() === currentMonth
+      (r) => isFillup(r) && toDate(r).getMonth() === currentMonth
     ).length;
     const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const prevMonthFillups = fuelRows.filter((r) => toDate(r).getMonth() === prevMonth).length;
+    const prevMonthFillups = fuelRows.filter(
+      (r) => isFillup(r) && toDate(r).getMonth() === prevMonth
+    ).length;
 
     const sumGallons = (rows: FuelExpenseRow[]) => rows.reduce((s, r) => s + (r.volume ?? 0), 0);
     const currentYearGallons = sumGallons(fuelRows);

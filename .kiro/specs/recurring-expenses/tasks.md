@@ -1,13 +1,13 @@
 # Recurring Expenses — Tasks
 
-> **Status: BLOCKED on T0 (D1–D4 sign-off).** One task per loop cycle, not one-and-done — same
+> **Status: T0 SIGNED OFF (D1–D4 ratified C94) — T1 is the next backend build.** One task per loop cycle, not one-and-done — same
 > multi-cycle shape as maintenance-schedule / import-trackers. Each task is independently verified
 > (`bun run validate` / frontend `validate:local` / eyes-on + the round-trip E2E per the feature-DoD
 > rule). The engine is reused unchanged throughout — see `design.md` grounding.
 
-- [ ] **T0 — Sign-off gate.** Angelo ratifies D1–D4 in `requirements.md`. **Blocks all build tasks.**
-      (The whole premise — extend the existing expense-reminder engine, do NOT build a new
-      `recurring_expenses` table/scheduler — is the load-bearing decision to confirm first.)
+- [x] **T0 — Sign-off gate (APPROVED C94).** Angelo ratified D1–D4 in `requirements.md` (all recommended
+      options). **Build unblocked.** (The load-bearing premise — extend the existing expense-reminder engine,
+      do NOT build a new `recurring_expenses` table/scheduler — is confirmed.)
 
 ### Backend / trust-first (D4 order)
 

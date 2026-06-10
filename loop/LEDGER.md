@@ -22,14 +22,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 88 |
-| deep-review | 5 | 87 |
+| feature | 4 | 96 |
+| deep-review | 5 | 94 |
 | guard | 6 | 91 |
-| bug | 3 | 89 |
+| bug | 3 | 97 |
 | arch | 5 | 92 |
 | infra | 6 | 93 |
 
-Current cycle: **93**
+Current cycle: **97**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1736,3 +1736,79 @@ Current cycle: **93**
   since the C72 refresh). Docs-only; no code, no build gate (the C5/C12/C47/C53/C72 pattern). Next (94):
   deep-review most-starved over budget (cyc 87, starved-for 7 > 5) → it wins (deferred from C93 by the infra
   breach). Fan out per rule 7, verify vs source; the C88–C92 arc is fresh-unreviewed. feature/bug Angelo-gated. cov: be ~80% / fe 63.7%
+- **C94 (deep-review — certify the reminder→expense time-axis materialization engine; + record Angelo's D1–D4 sign-off)** —
+  BALANCE: deep-review most-starved over budget (cyc 87, starved-for 7 > 5) → forced (deferred from C93 by the infra breach).
+  Verification-only (no product code, like C21/C28/C35; findings → the bug/decision queues). Audited the reminder→expense
+  AUTO-MATERIALIZATION path the C88 recurring-expenses spec depends on (`createExpenseFromReminder`/`processExpensePeriod`/the
+  catch-up loop) — the TIME axis (split allocation, catch-up idempotency, endDate boundary) had never had a dedicated
+  adversarial read (the mileage axis got C28/C35). Fanned out 2 Explore agents; VERIFIED every finding vs source (C21/C28/C35).
+  • Agent A: AUDIT-CLEAN — CAS/dedup idempotency (no double-materialize on re-trigger), catch-up cap, per-vehicle split shares
+    sum to the total ONCE (each sibling stores its own share — the C21 finding re-confirmed), endDate boundary, and
+    `sourceType:'reminder'` stamping all CORRECT + well-grounded. The engine the just-approved spec EXTENDS is certified.
+  • Agent B raised 2 "BUG"s + 1 "miscategorization" — verified each against source:
+    – Issue #1/#5 (the two CONTRADICTED each other — a tell): `buildTCOMonthlyTrend` (analytics-charts.ts:953-961) is a
+      4-bucket chart (financing/insurance/fuel/maintenance, NO "other"), so a `category='financial'` expense is omitted from
+      THIS trend chart. NOT a bug + NOT reminder-specific: the financing/insurance branches require
+      `sourceType==='financing'/'insurance_term'`, so a MANUALLY-entered financial expense (sourceType null) is omitted
+      identically, and fuel/maintenance reminder-expenses DO show. NOT lost from TCO totals (`categorizeTCOExpenses` routes it
+      to otherCosts). Filed as a #14-class NEEDS-DECISION item (chart scope), not fixed unilaterally.
+    – Issue #2 (fuel fillup-count inflation): `currentYearFillups = fuelRows.length` counts split fuel SIBLING rows as N
+      fillups, not 1. VERIFIED REAL + REACHABLE — `createSplitExpenseSchema` has `category: z.string().min(1)` (NO fuel
+      restriction, confirmed this cycle), so a fuel expense IS splittable across vehicles. But NARROW/LOW-SEV: only the
+      CROSS-FLEET fuel view (`queryFuelExpenses` with no vehicleId) over-counts; the per-vehicle path (`getFuelStats(…,
+      vehicleId)`) sees 1 sibling = 1 (correct); and only COUNT-derived metrics (fillup count → $/fillup, gal/fillup
+      averages) skew — the gallon/cost SUMS are right (shares sum correctly). Requires a user to split ONE fillup across
+      cars (semantically unusual). Filed as a real low-sev bug (#18; fix: count distinct parent expense ids, not rows).
+  Net: engine CERTIFIED clean where it matters, 1 low-sev bug filed (#18), 1 needs-decision filed (#19) — Agent A's verdict
+  de-risks the just-approved spec. ALSO THIS CYCLE: Angelo SIGNED OFF recurring-expenses **D1–D4** (all recommended options) →
+  flipped requirements.md to APPROVED + ticked tasks.md T0; T1–T3 are backend/non-eyes-on so the feature is finally
+  ADVANCEABLE (the unlock that ends the long feature/bug Angelo-gate on this spec). No code; spec + loop docs only, no build
+  gate (the C21/C28/C35 + C4/C9 pattern). Next (95): `feature` most-starved over budget (cyc 88, starved-for 7 > 4) → it wins
+  AND for the first time has an UNBLOCKED backend task — recurring-expenses **T1** (surface sourceType/sourceId on the expense
+  read path + the FE↔BE contract-drift guard + a reminder-materialized `sourceType` test). `bug` (cyc 89, 6 > 3) is
+  next-most-starved (the new #18 is a queued candidate). cov: be ~80% / fe 63.7%
+- **C96 (feature — recurring-expenses T1: lock the expense-source traceability contract on the READ path)** —
+  BALANCE: `feature` most-starved over budget (cyc 88, starved-for 8 > 4) → forced; and for the first time the build is
+  ACTIONABLE (T0 signed off C94). Grounded T1 first (the C56 "verify the premise before building" discipline — read-only,
+  no commit): the C88 spec assumed T1 needs to "surface sourceType/sourceId if missing on the read path." VERIFIED against
+  source it's a NO-OP — already surfaced: (a) all expense reads (`findByIdAndUserId`/`findPaginated`/`findAll`) use bare
+  `.select()` → every column incl. sourceType/sourceId; (b) `buildPaginatedResponse(data,…)` passes rows through VERBATIM (no
+  mapper/strip); (c) the frontend `Expense` type already declares `sourceType?`/`sourceId?` (expense.ts:57-58). AND a
+  contract-drift guard is NOT warranted (C80 lesson — GET /expenses is a CONFIRMED clean repository pass-through, not a
+  hand-assembled response; the guard pattern only applies to route-injected fields). So T1 reduced to ONE genuine, distinct
+  deliverable: `trigger-expense.test.ts` already pins source_type at the DB-ROW level (reads straight off sqlite, line 65) —
+  but that stays green even if a future response-mapper STRIPPED the field, silently breaking the T6 "Recurring" badge + T3
+  cascade UI that key off the RESPONSE. Wrote `expense-source-traceability.test.ts` (+3) pinning the OBSERVABLE API contract
+  (the C91-class positive-surfacing test): GET /expenses list echoes sourceType='reminder'/sourceId for a reminder-
+  materialized expense; GET /:id echoes the source link; a manual expense reports null (value reflects reality, not a
+  hardcoded literal). Mirrors the proven trigger-expense harness (createTestApp → real route→trigger→insert→GET-serialize→
+  sqlite). THE GATE EARNED ITS KEEP TWICE: first run the manual-expense create 400'd (I used the response field `amount`;
+  the create API wants `expenseAmount`), then 400'd again ("fuel expenses require fuel amount + mileage" — a category
+  cross-field rule) → switched to `category:'misc'` (a plain manual expense, no fuel refinement). Verified: backend
+  validate:local EXIT 0 — 1103 pass / 0 fail (+3) · build bundled. T1 DONE; T2 (split-materialization characterization) +
+  T3 (cascade-safe delete via clearSource) are the next backend, both non-eyes-on. NOTE: the C94 + C96 commits are PENDING —
+  git-commit was declined across C94/C95/C96 (3 cycles, 2 command forms), so the doc + spec + test edits are on-disk
+  UNCOMMITTED on claude-loop-dev; flagged to Angelo. Next (97): `bug` most-starved over budget (cyc 89, starved-for 8 > 3)
+  → its top UNBLOCKED item is the new #18 (cross-fleet fuel fillup count — pure-logic, count distinct parent ids), the
+  lease/loan + #14/#16/#19 remain Angelo-gated. cov: be ~80% / fe 63.7%
+- **C97 (bug — #18: cross-fleet fuel fillup COUNT inflated by split fuel siblings)** — BALANCE: `bug` most-starved over
+  budget (cyc 89, starved-for 8 > 3) → forced; #18 (filed C94) is its only UNBLOCKED item (lease/loan + #14/#16/#19 stay
+  Angelo-gated). VERIFY-AGAINST-SOURCE refined the fix (C21/C28/C35, applied to my own C94 finding): read
+  `ExpenseSplitService.createSiblings` (split-service.ts:92-108) — a split fuel sibling sets only `expenseAmount`; `volume`/
+  `mileage`/`fuelType` are absent → SQL-default NULL. So C94's "sums are correct" CONFIRMED (null volume contributes 0 to
+  `sumGallons` + distance skips null mileage) and the bug is PURELY the count. That also revealed the CLEANER fix than
+  dedup-on-groupId (groupId isn't even SELECTed by queryFuelExpenses): a "fillup" is a fuel PURCHASE with a volume, so count
+  only volume-bearing rows — the SAME `volume != null && > 0` predicate `fillupDetails.volumes` already uses. Fixed BOTH
+  count paths for year-over-year consistency: (1) `buildFuelStatsFromData` — extracted `isFillup(r)` and applied it to
+  currentYear/currentMonth/prevMonth fillup counts (repository.ts:~1238); (2) `queryFuelAggregates` (the prev-year count) —
+  `COUNT(*)` → `COUNT(CASE WHEN volume > 0 THEN 1 END)` to match the in-memory predicate. The volume SUM kept explicit
+  (unaffected — null contributes nothing). NARROW + behavior-preserving for non-split data: a real single-vehicle fillup
+  always has a volume → still counts; per-vehicle path unchanged. MERGE-SURVIVING GUARD (NORTH_STAR #5): appended a
+  deterministic regression to fuel-stats.property.test.ts (mirrors the cycle-211 distance fixture) — 2 real fillups + a
+  fuel expense split across 2 cars (volume-null siblings) → cross-fleet `fillups.currentYear === 2` (pre-fix 4) +
+  `volume.currentYear === 19` (sum unchanged, the "sums were always right" proof). Verified: backend validate:local EXIT 0
+  — 1104 pass / 0 fail (+1) · build bundled. #18 CLOSED. NOTE: commits still PENDING (git-commit declined C94–C96, treated
+  as a standing session block; flagged to Angelo via Slack this cycle) — C94/C96/C97 edits are on-disk UNCOMMITTED on
+  claude-loop-dev. Next (98): nothing over budget (guard cyc 91 starved-for 6 = budget at 98; arch cyc 92, 6 > 5 → arch
+  breaches) → `arch` most-starved (fan-out per rule 7), or continue feature recurring-expenses T2 (split-materialization
+  characterization, backend/non-eyes-on). cov: be ~80% / fe 63.7%
