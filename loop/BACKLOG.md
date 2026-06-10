@@ -648,11 +648,30 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   terms sharing an endDate (e.g. a mid-term correction with different monthlyCost) picked nondeterministically by storage order.
   FIX: tiebreak by the later startDate (the more-current term). +1 test (equal-endDate → later-starting term's premium wins).
   validate:local EXIT 0, 1187 pass. (The null-endDate "Finding 1" was debunked — endDate is NOT NULL, branch unreachable.)*
-- **#51 (LOW, consistency) — an active policy with NO terms inflates activePoliciesCount while contributing $0.**
+- **#51 (LOW, consistency — ESCALATED to Angelo C189) — an active policy with NO terms inflates activePoliciesCount while contributing $0.**
   analytics/repository.ts:911 `if (!latestTerm) continue;` skips a term-less policy for premium/vehicle entries, but
   activePoliciesCount is the raw count of active policies (:~1702) → the card can show "1 active policy / $0.00 / empty details" —
-  internally inconsistent. Arguably intentional (it IS active). VERIFIED C150. FIX (if desired): count only policies with a term,
-  or surface a "no current term" state. Low.
+  internally inconsistent. Arguably intentional (it IS active). VERIFIED C150 + re-confirmed firsthand C189. **ESCALATED C189
+  (send_message): product-semantics call — count-only-with-term / surface-"no current term" / leave-as-is. Awaiting Angelo; not
+  loop-decidable.**
+
+**NEW — surfaced + verified-against-source by the C189 inline deep-review of the expense WRITE path (expenses/routes.ts POST/PUT; bug-cycle pivot when the queue was all weak/gated). The create/update validation asymmetry class (the create path guards a thing the update path doesn't):**
+- ~~**#61 (MED, within-tenant integrity) — expense PUT didn't re-validate a CHANGED vehicleId.**~~ — *DONE C189: POST /expenses
+  validateVehicleOwnership(vehicleId) (:533) but PUT /:id `update(id, updateData)` (:641) wrote a changed vehicleId through UNVALIDATED
+  → a user could reassign their (owned) expense to a vehicle they DON'T own (stays their row, references a non-owned vehicle →
+  corrupts their analytics attribution; within-tenant, all reads userId-scoped so NOT a cross-tenant leak). FIX: when
+  updateData.vehicleId is present AND differs, validateVehicleOwnership (mirror create). +3 tests (foreign→404 + no bad write;
+  own-second→200; no-vehicleId→200). green→green 1256 pass (+3).*
+- **#62 (MED, latent integrity — filed C189) — expense create/PUT only validate the `financing` sourceType, not `insurance_term`/`reminder`.**
+  POST /expenses (routes.ts:536-543) validates sourceType==='financing' (entity exists + active + sourceId matches), but the schema
+  (:81) also accepts `insurance_term` + `reminder` — for those, an ARBITRARY sourceId is persisted UNVALIDATED (and the PUT path
+  validates none). NOT a cross-tenant hole (findBySource/deleteBySource/clearSource are all userId-scoped — verified firsthand
+  :537), so the blast radius is WITHIN-tenant: (a) analytics may bucket a forged-link manual expense as insurance/recurring-sourced;
+  (b) if the arbitrary sourceId matches a real term/reminder of theirs, deleting that parent cascade-deletes this manual expense too
+  (surprising loss of a manual entry). Latent (the FE never sets these on a manual create — they're hook-only), so it's a hardening
+  gap, not a live UX bug. FIX (clean, non-gated): reject `insurance_term`/`reminder` sourceType on the manual create+update paths
+  (they're system-hook-only), OR validate the referenced term/reminder exists + is owned (mirror the financing branch). Likely the
+  next bug-cycle pick.
 
 **NEW — surfaced + verified-against-source by the C155 deep-review fan-out (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent (delayed event, triaged post-C155): its Finding 1 → **#54 (HIGH, VERIFIED firsthand)** filed below; its div-guard/split-sibling checks matched my C155 pre-read (isFillup volume>0, fillupDetails length-guards, per-vehicle distance — clean).**
 - ~~**#52 (MED, security defense-in-depth) — split delete/regenerate keyed the destructive write on groupId alone.**~~ — *DONE

@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 185 |
 | guard | 6 | 188 |
-| bug | 3 | 184 |
+| bug | 3 | 189 |
 | arch | 5 | 187 |
 | infra | 6 | 186 |
 
-Current cycle: **188**
+Current cycle: **189**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3378,3 +3378,19 @@ Current cycle: **188**
   line (errors+success combined). Test-only, no production change. green→green: backend validate:local **EXIT 0 — 1253 pass / 1 skip /
   0 fail (+7)**, tsc 0, musl-biome clean, build bundled. cov: be 83.41%+ (carry; +7 BE, sync/routes 31.66→59% line) / fe 73.89% (carry).
   NEXT guard low spot: `activity-tracker.ts` (53%/44%, timer-bound — less clean) or the components/routes FE deficit (eyes-on).
+- **C189 (bug → #61): expense PUT validates a vehicle REASSIGNMENT (mirror the create-path ownership guard)** — BALANCE: two over
+  budget — `feature` (cyc 170, starved-for 19, blocked 14th cycle, escalated) + `bug` (cyc 184, starved-for 5 > 3) → `bug` forced.
+  Inline (6/3 spawn cap). Triaged the bug queue HONESTLY: the remaining filed items are all weak — #31 (fuel pair-by-date) is a GUARDED
+  non-defect (verified firsthand: forEachVehiclePair doesn't even sort — callers pre-sort by (vehicleId,date); validMilesBetween drops
+  a non-positive delta by design → NO wrong output, and the filed "sort by odometer" fix would disturb the C126/C155/C158-audited
+  efficiency math for zero correctness gain → LEAVE IT); #51 (term-less active-policy count) is a product-semantics CALL → ESCALATED to
+  Angelo (send_message, 3 options), didn't decide unilaterally. Per "don't-force-a-blocked-pick" I did NOT manufacture a risky/gated
+  change — instead a FRESH inline deep-review of the un-audited expense WRITE path (expenses/routes.ts POST/PUT) surfaced TWO real
+  create/update validation-asymmetry findings: **#61 (MED, fixed this cycle)** + **#62 (filed)**. #61: POST validates
+  validateVehicleOwnership(vehicleId) but PUT (:641 update(id, updateData)) did NOT re-validate a CHANGED vehicleId → a user could PUT
+  their (owned) expense's vehicleId to a vehicle they DON'T own — stays their row but references a non-owned vehicle, corrupting their
+  analytics attribution (within-tenant — all reads userId-scoped, NOT a cross-tenant leak; verified firsthand). FIX: when
+  updateData.vehicleId is present AND differs from existing, validateVehicleOwnership (exactly mirroring create). +3 tests
+  (foreign-vehicle PUT→404 + the bad write never lands; own-second-vehicle→200 [not over-broad]; no-vehicleId PUT→200 [no regression]).
+  green→green: backend validate:local **EXIT 0 — 1256 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean (1 reflow autofixed),
+  build bundled. #61 CLOSED. cov: be 83.41%+ (carry; +3 BE) / fe 73.89% (carry).

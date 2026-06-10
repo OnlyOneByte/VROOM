@@ -627,6 +627,15 @@ routes.put(
     const updateData = c.req.valid('json');
     const existingExpense = await validateExpenseOwnership(id, user.id);
 
+    // If the edit reassigns the expense to a different vehicle, that vehicle must be the user's
+    // too — mirror the create-path guard (#61). Without this, a PUT could point the (owned) expense
+    // at a vehicleId the user doesn't own: it stays their row but references a non-owned vehicle,
+    // corrupting their analytics attribution (within-tenant — all reads are userId-scoped, so it's
+    // not a cross-tenant leak, but it IS a real integrity gap the create path already prevents).
+    if (updateData.vehicleId && updateData.vehicleId !== existingExpense.vehicleId) {
+      await validateVehicleOwnership(updateData.vehicleId, user.id);
+    }
+
     const finalCategory =
       updateData.category !== undefined ? updateData.category : existingExpense.category;
     const finalMileage =
