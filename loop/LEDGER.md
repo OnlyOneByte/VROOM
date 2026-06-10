@@ -35,12 +35,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 128 |
 | deep-review | 5 | 126 |
-| guard | 6 | 125 |
+| guard | 6 | 130 |
 | bug | 3 | 127 |
 | arch | 5 | 129 |
 | infra | 6 | 124 |
 
-Current cycle: **129**
+Current cycle: **130**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2378,3 +2378,16 @@ Current cycle: **129**
   preserving. Verified: backend validate:local EXIT 0, build bundled. Remaining filed arch picks: MS_PER_DAY literal (C119
   #3, NOT byte-identical — per-site verify); the reminder-helpers.ts:45 capitalize 1-site follow-on (C128). Next (130 —
   milestone): nothing forced (guard cyc 125 / infra cyc 124 breach next) → highest-leverage. cov: be 81.8% / fe 62.0% (carry)
+- **C130 (guard — characterize FE formatters.ts relative-time + number/date; the C124-named top FE low spot)** — BALANCE:
+  nothing over budget (bug + infra AT); free highest-leverage. The C124 reading named formatters.ts (31% line) as the top FE
+  pure-logic low spot, and FE remains the measured gap (62.0% vs be 81.8%) — so the FE ratchet continues (guard breaches next
+  anyway). The existing formatters.test.ts covered formatCurrency/getCurrencySymbol/dateOnlyToISO/capitalize but NOT the two
+  user-facing relative-time formatters, formatNumber, or formatDate. SHIPPED: +11 tests — formatNumber (default/0/3
+  decimals), formatDate ("Mon D, YYYY" + ISO-instant, offset-tolerant), formatRelativeTime (null→Never; Today/Yesterday/
+  days/weeks/months/years buckets; + a FUTURE-clamp test pinning the load-bearing Math.max(0,…) guard so a regression can't
+  produce a negative bucket), formatCompactRelativeTime (Never; Just-now/m/h/d buckets + future-clamp). HOST-INDEPENDENT
+  (the C77 discipline): the time formatters use Date.now()/new Date() internally with no injectable now, so every assertion
+  drives them with dates computed RELATIVE to now (Date.now() − N·day), never hardcoded instants. Verified: frontend
+  validate:local EXIT 0 — 421 pass / 0 fail (+11), tsc 0, build OK. 4th consecutive FE-advancing pick (C118 memoize, C119
+  capitalize, C125 vehicle-validation, C130 formatters). Next (131): nothing forced (infra cyc 124 / bug cyc 127 breach) →
+  highest-leverage. cov: be 81.8% / fe ~63%+ (FE +11 tests; re-measure due ~C134 sweep)
