@@ -42,7 +42,7 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 157 |
 | deep-review | 5 | 155 |
 | guard | 6 | 156 |
-| bug | 3 | 154 |
+| bug | 3 | 158 |
 | arch | 5 | 153 |
 | infra | 6 | 152 |
 
@@ -2878,3 +2878,16 @@ Current cycle: **150**
   honored). green→green: frontend validate:local **EXIT 0 — 475 pass (+5)**, tsc 0, build done. CODE-COMPLETE, EYES-ON-PENDING for
   the FinanceTab visual (NORTH_STAR #3 — Playwright-blocked here), but the all-time-odometer LOGIC is now pinned. cov: fe 70.09%+
   (carry; +5 FE) / be 82.0% (carry)
+- **C158 (bug #54, HIGH): getFuelEfficiencyTrend no longer pairs fuel rows ACROSS vehicles in the fleet view** — BALANCE: `bug`
+  the only over-budget category (cyc 154, starved-for 4 > 3) → forced. The freshly-filed #54 (verified firsthand C155.5 from the
+  C155 fuel-stats fan-out). THE BUG: getFuelEfficiencyTrend ordered fuel rows by DATE ONLY (no vehicle group, vehicleId not even
+  selected) and paired rows[i]/rows[i-1]; in the fleet view (/fuel-efficiency with NO vehicleId — reachable, vehicleId optional)
+  consecutive rows can be DIFFERENT cars → computeEfficiencyPoint subtracts two cars' odometers → a phantom MPG point when they
+  have close odometers (12,000 & 12,100 → 100mi/10gal → a plausible 10 MPG that survives the [5,100] filter). FIX: select
+  vehicleId, order by (vehicleId, date), and pair only WITHIN each vehicle — reusing the EXISTING forEachVehiclePair helper (the
+  same per-vehicle pairing computeMpgAndCostPerMile already uses) rather than hand-rolling. To reuse it I generic-ized it +
+  groupByVehicle over `T extends {vehicleId}` (they only read vehicleId; backward-compatible — existing FuelExpenseRow callers
+  unaffected) and exported it. Merge-surviving net: +3 in cross-vehicle.property.test.ts (2 cars, close odometers + interleaved
+  dates, 1 row each → NO phantom point [pre-fix: 1]; per-vehicle trends still computed [2 points, 25 + 30 MPG]; single-vehicle
+  scoping unchanged). green→green: backend validate:local **EXIT 0 — 1206 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean
+  (one reflow autofixed), build bundled. #54 CLOSED. cov: be 82.0%+ (carry; +3 BE) / fe 70.09% (carry)

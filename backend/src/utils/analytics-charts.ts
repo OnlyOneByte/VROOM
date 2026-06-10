@@ -237,8 +237,8 @@ function normalizeDate(d: Date | number | null): Date | null {
 }
 
 /** Group fuel expense rows by vehicleId. */
-export function groupByVehicle(rows: FuelExpenseRow[]): Map<string, FuelExpenseRow[]> {
-  const byVehicle = new Map<string, FuelExpenseRow[]>();
+export function groupByVehicle<T extends { vehicleId: string }>(rows: T[]): Map<string, T[]> {
+  const byVehicle = new Map<string, T[]>();
   for (const row of rows) {
     const arr = byVehicle.get(row.vehicleId) ?? [];
     arr.push(row);
@@ -247,10 +247,16 @@ export function groupByVehicle(rows: FuelExpenseRow[]): Map<string, FuelExpenseR
   return byVehicle;
 }
 
-/** Iterate consecutive fuel pairs within each vehicle group. */
-function forEachVehiclePair(
-  rows: FuelExpenseRow[],
-  callback: (current: FuelExpenseRow, previous: FuelExpenseRow) => void
+/**
+ * Iterate consecutive fuel pairs WITHIN each vehicle group. Generic over any row carrying `vehicleId`
+ * (it only reads that for grouping; the pairing is type-agnostic). Grouping by vehicle first is what
+ * stops a date-ordered multi-vehicle list from pairing two DIFFERENT cars' consecutive rows — the
+ * cross-vehicle pooling hazard (#54): `current.mileage − previous.mileage` across cars is meaningless.
+ * Exported so getFuelEfficiencyTrend can reuse the exact same per-vehicle pairing as the MPG/cost charts.
+ */
+export function forEachVehiclePair<T extends { vehicleId: string }>(
+  rows: T[],
+  callback: (current: T, previous: T) => void
 ): void {
   for (const vehicleRows of groupByVehicle(rows).values()) {
     for (let i = 1; i < vehicleRows.length; i++) {

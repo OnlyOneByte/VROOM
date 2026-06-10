@@ -43,6 +43,7 @@ import {
   type FuelExpenseRow,
   type FuelRow,
   findBiggestExpense,
+  forEachVehiclePair,
   type GeneralExpenseRow,
   groupByVehicle,
   monthKeysInRange,
@@ -1095,6 +1096,11 @@ export class AnalyticsRepository {
       if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
       const rows = await this.db
         .select({
+          // vehicleId is REQUIRED for the fleet view (no vehicleId arg): without grouping, the
+          // date-ordered multi-vehicle list would pair two DIFFERENT cars' consecutive rows and
+          // subtract their odometers → a phantom efficiency point (#54). forEachVehiclePair groups
+          // by vehicle first, mirroring the MPG/cost charts (computeMpgAndCostPerMile).
+          vehicleId: expenses.vehicleId,
           date: expenses.date,
           mileage: expenses.mileage,
           volume: expenses.volume,
@@ -1104,16 +1110,13 @@ export class AnalyticsRepository {
         .from(expenses)
         .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
         .where(and(...conditions))
-        .orderBy(asc(expenses.date));
+        .orderBy(asc(expenses.vehicleId), asc(expenses.date));
       if (rows.length < 2) return [];
       const points: FuelEfficiencyPoint[] = [];
-      for (let i = 1; i < rows.length; i++) {
-        const current = rows[i];
-        const previous = rows[i - 1];
-        if (!current || !previous) continue;
+      forEachVehiclePair(rows, (current, previous) => {
         const point = computeEfficiencyPoint(current as FuelRow, previous as FuelRow);
         if (point) points.push(point);
-      }
+      });
       return points;
     } catch (error) {
       logger.error('Failed to compute fuel efficiency trend', {

@@ -606,20 +606,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   server the extension doesn't fire → a "through Mar 31" filter silently drops same-day expenses (the list + the CSV export
   identically). Mitigated if prod runs UTC (the documented assumption). VERIFIED C155. FIX (if desired): detect date-only at the
   route (string-shape) and build the bound from local parts, or normalize to local midnight before the helper. Low.
-- **#54 (HIGH — VERIFIED firsthand C155, displayed-chart correctness) — `getFuelEfficiencyTrend` pairs consecutive fuel rows
-  ACROSS vehicles in the fleet view.** `analytics/repository.ts:1096-1117`: the query orders by `date` ONLY (no vehicle group),
-  does NOT select `vehicleId`, and the loop pairs `rows[i]`/`rows[i-1]` → `computeEfficiencyPoint` computes
-  `current.mileage − previous.mileage`. When called WITHOUT `vehicleId` (the `/fuel-efficiency` fleet view, routes.ts:175 —
-  `vehicleId` is OPTIONAL, so this path is reachable for any multi-vehicle user), consecutive rows can be DIFFERENT cars, so a
-  B-after-A pair subtracts two cars' odometers. `computeEfficiencyPoint` (analytics-charts.ts:110-130) has NO same-vehicle guard
-  (it can't — vehicleId isn't even selected); its bounds filter (milesDriven ≤ MAX_REASONABLE, [5,100] MPG) does NOT catch the
-  case when two cars have CLOSE odometers (e.g. 12,000 & 12,100 → 100 mi / 10 gal → a plausible 10 MPG phantom point on the
-  displayed fleet chart). This is exactly the cross-vehicle pooling hazard the REST of the file avoids (getFuelStats builds
-  `fuelRowsByVehicle`; computeMpgAndCostPerMile groups by vehicle). FIX: select `vehicleId`, order by `(vehicleId, date)`, and
-  only pair rows within the same vehicle (skip the boundary pair) — OR group rows by vehicle first (mirror the getFuelStats
-  pattern) and compute per-vehicle trends. Needs a regression test (2 vehicles, interleaved dates, close odometers → no
-  cross-vehicle point). Pure backend, fully verifiable. NOT yet fixed — landed as a delayed event after C155 closed; a future
-  bug/deep-review cycle implements it.
+- ~~**#54 (HIGH — VERIFIED firsthand C155.5, displayed-chart correctness) — `getFuelEfficiencyTrend` pairs consecutive fuel rows
+  ACROSS vehicles in the fleet view.**~~ — *DONE C158: the query ordered by `date` ONLY (no vehicle group; vehicleId not even
+  selected) and paired rows[i]/rows[i-1] → in the fleet view (/fuel-efficiency with NO vehicleId, reachable for any multi-vehicle
+  user) consecutive rows could be DIFFERENT cars → computeEfficiencyPoint subtracts two cars' odometers → a phantom MPG point when
+  they have close odometers (12,000 & 12,100 → 100mi/10gal → a plausible 10 MPG surviving the [5,100] filter). FIX: select
+  vehicleId, order by `(vehicleId, date)`, pair only WITHIN each vehicle via the EXISTING `forEachVehiclePair` helper (the same
+  per-vehicle pairing computeMpgAndCostPerMile uses) — generic-ized it + groupByVehicle over `T extends {vehicleId}` (backward-
+  compatible) and exported it. +3 tests (2 cars, close odometers + interleaved dates → no phantom point; per-vehicle trends still
+  computed; single-vehicle scoping unchanged). green→green 1206 pass (+3).*
 
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
