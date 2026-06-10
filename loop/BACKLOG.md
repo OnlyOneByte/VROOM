@@ -348,12 +348,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   cross-tenant id collision leaks nothing (victim's row never echoed, untouched in DB, post-fix merge correctly hits the PK
   constraint not an overwrite) + a self-collision still reports a conflict (feature intact). validate:local EXIT 0, 1123
   pass (+2). Low exploitability (cuid2 ids) but the tenant-isolation gap is closed at the query.*
-- **#21 (MED) — replace-mode + an empty-but-valid backup = silent TOTAL data wipe.** `restoreFromBackup` mode='replace'
-  (restore.ts:124-127) runs `deleteUserData` then `insertBackupData`; validation (backup.ts) only requires
-  metadata.version/userId, so a corrupt/truncated download with empty data arrays passes, wipes everything, inserts nothing
-  — atomically (the txn commits the empty state). No "payload must be non-empty / not implausibly smaller than current"
-  sanity guard. FIX: reject replace-mode when the parsed payload is empty (or add a min-row / confirm-shrink guard). Also a
-  small product decision (how aggressive a shrink to block). VERIFIED against source C108.
+- ~~**#21 (MED) — replace-mode + an empty-but-valid backup = silent TOTAL data wipe.**~~ — *DONE C136 (the DECIDED half):
+  re-VERIFIED vs source — validateBackupData (backup.ts:523) checks only metadata + per-row schema + referential integrity, so
+  an empty-but-valid backup (every data array empty) passes clean; a `replace` restore then deleteUserData-wipes everything +
+  insertBackupData-inserts-nothing, atomically committing the empty state (NORTH_STAR #1 violation, on BOTH restoreFromBackup
+  ZIP + restoreFromSheets). FIX: private `assertReplaceNotEmpty(summary, mode)` sums all ImportSummary row-counts, throws
+  SyncError(VALIDATION_ERROR) on a 0-row replace; wired into both methods after the merge check, before the txn (one chokepoint
+  — both build the identical summary). preview/merge unaffected. restore-empty-replace-guard.test.ts (+4): empty replace throws
+  + existing vehicle SURVIVES (load-bearing) + preview/merge controls + non-empty replace still works. validate:local EXIT 0,
+  1164 pass (+4).* **STILL FILED (the product-decision half): the partial-SHRINK guard** — reject a replace whose payload is
+  implausibly SMALLER than current (e.g. 3 rows replacing 3000), not just empty. Needs Angelo's call on how aggressive a shrink
+  to block (a legit large delete is a valid replace). The empty case is now closed; the shrink case is a separate threshold.
 - **#22 (MED, hardening) — zip-bomb guard trusts the attacker-declared `header.size`.** `backup.ts:469` sums
   `e.header?.size` from the ZIP central directory (attacker-controlled in an uploaded archive) and checks it before
   `getData()`. A forged archive can declare a small size while the deflate stream inflates large. The 50MB COMPRESSED

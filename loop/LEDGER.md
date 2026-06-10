@@ -36,11 +36,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 134 |
 | deep-review | 5 | 132 |
 | guard | 6 | 130 |
-| bug | 3 | 133 |
+| bug | 3 | 136 |
 | arch | 5 | 135 |
 | infra | 6 | 131 |
 
-Current cycle: **135**
+Current cycle: **136**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2478,3 +2478,20 @@ Current cycle: **135**
   .ts, no markup/reactivity → no eyes-on. ARCH NEXT PICK: only `MS_PER_DAY` (3 spellings/4 files, NOT byte-identical — per-site
   verify before collapsing) remains filed; else a rule-7 fan-out to repopulate. cov: be 81.8% / fe ~63%+ (carry; no new tests —
   a behavior-preserving refactor under the existing net)
+- **C136 (bug #21 — replace-mode + empty-but-valid backup = silent TOTAL data wipe; data-safety)** — BALANCE: recomputed all
+  six — NOTHING strictly over budget (my C135 forecast over-stated guard: 6 > 6 is false). So highest-leverage; guard + bug
+  both breach at C137. Fed `bug` now (tightest budget by design — "a known defect should never sit"; quality-bar #1 No silent
+  loss). Took #21, the ONLY data-safety item queued. VERIFIED THE PREMISE vs source FIRST (C108 discipline): validateBackupData
+  (backup.ts:523) checks ONLY metadata + per-row schema + referential integrity — an empty-but-valid backup (every data array
+  empty, valid metadata/version — a truncated/corrupt download) passes CLEAN; then a `replace` restore runs deleteUserData
+  (wipes everything) then insertBackupData (every `.length > 0` guard false → inserts nothing), committing the empty state
+  atomically. REAL, on BOTH paths (restoreFromBackup ZIP + restoreFromSheets). FIX: added private `assertReplaceNotEmpty
+  (summary, mode)` — sums all ImportSummary row-counts, throws SyncError(VALIDATION_ERROR) if a `replace` carries 0 total rows;
+  preview (read-only) + merge (never deletes) pass through. Wired into BOTH restore methods after the merge-conflict check,
+  before the txn (both already build the identical `summary`, so it's one chokepoint). DECIDED-half only — the partial-SHRINK
+  threshold (reject a backup implausibly smaller than current) stays #21's filed product-decision half, noted in the helper
+  doc. MERGE-SURVIVING net: restore-empty-replace-guard.test.ts (+4, the restore-userid-stamp harness): export a ZIP from the
+  still-EMPTY user (valid 0-row backup) → seed a vehicle → replace-restore throws + the vehicle SURVIVES (the load-bearing
+  pre-fix-wipe assertion); + preview/merge controls (data untouched) + a non-empty replace still works (guard not over-broad).
+  Verified: backend validate:local EXIT 0 — 1164 pass / 0 fail (+4), tsc 0, musl-biome clean, build bundled. #21 CLOSED
+  (shrink-threshold half remains filed). cov: be 81.8% (carry; +4 BE) / fe ~63%+ (carry)

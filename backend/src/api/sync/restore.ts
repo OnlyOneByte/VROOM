@@ -120,6 +120,8 @@ class RestoreService {
       }
     }
 
+    this.assertReplaceNotEmpty(summary, mode);
+
     await this.db.transaction(async (tx) => {
       if (mode === 'replace') {
         await this.deleteUserData(tx, userId);
@@ -128,6 +130,31 @@ class RestoreService {
     });
 
     return { success: true, imported: summary };
+  }
+
+  /**
+   * Guard against a silent TOTAL wipe (NORTH_STAR #1: no silent loss). Replace-mode deletes ALL of
+   * the user's data, then inserts the backup. `validateBackupData` only checks metadata + per-row
+   * schema + referential integrity, so an empty-but-valid backup (every data array empty — a
+   * truncated/corrupt download) passes clean, and a replace restore would delete everything and
+   * insert nothing, atomically committing the empty state. Reject a replace whose payload carries
+   * ZERO rows across all tables; preview (read-only) and merge (never deletes) are unaffected. There
+   * is no legitimate "replace all my data with nothing" restore — clearing data is a separate,
+   * explicit operation. (A partial-shrink guard — rejecting a backup implausibly smaller than the
+   * current data — is a separate product decision, filed as bug #21's threshold half.)
+   */
+  private assertReplaceNotEmpty(
+    summary: ImportSummary,
+    mode: 'replace' | 'merge' | 'preview'
+  ): void {
+    if (mode !== 'replace') return;
+    const totalRows = Object.values(summary).reduce((sum, n) => sum + n, 0);
+    if (totalRows === 0) {
+      throw new SyncError(
+        SyncErrorCode.VALIDATION_ERROR,
+        'Refusing to replace all data with an empty backup (0 rows): this would delete everything and restore nothing. The backup is likely truncated or corrupt.'
+      );
+    }
   }
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Restore orchestration requires sequential validation and data insertion steps
@@ -207,6 +234,8 @@ class RestoreService {
         return { success: false, conflicts };
       }
     }
+
+    this.assertReplaceNotEmpty(summary, mode);
 
     await this.db.transaction(async (tx) => {
       if (mode === 'replace') {
