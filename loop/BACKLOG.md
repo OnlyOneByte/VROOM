@@ -319,8 +319,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > `services/reminder-api.ts` 12%→covered (C163 — the FE service-layer sibling the C143/C149 ratchet left behind; the C134 test
 > covered only 2 of 11 methods. +15 driving the other 9 [create/list/getById/update/delete/trigger/markServiced/getNotifications/
 > markNotificationRead] + buildReminderQuery [the isActive!==undefined edge: `false` must survive] via the file-scoped vi.mock
-> apiClient stub. **FE SERVICE LAYER now FULLY covered — api-client C143 + expense-api C149 + reminder-api C163 + error-handling
-> C137.**)
+> apiClient stub.)
+> `services/settings-api.ts` 7%→covered (C169 — the LAST FE service-layer sibling; +11 driving all 9 methods + the load-bearing
+> restoreFromProvider zip-vs-sheets body branch [zip includes fileRef, sheets OMITS it] + the Idempotency-Key header on both
+> restore paths [double-restore guard] + listBackupsFromProvider encodeURIComponent + uploadBackup FormData + downloadBackup via
+> apiClient.raw. tsc caught a real test-type bug [Partial<UserSettings> nested-object trap]. **FE SERVICE LAYER now 100%
+> module-covered — api-client C143 + expense-api C149 + reminder-api C163 + settings-api C169 + error-handling C137.**)
 > NEXT high-value low spots
 > **(C152 re-measure — be 82.02% line / fe 70.09% line; FE STILL the bigger gap but closing — broke 70%):**
 > backend — ~~`body-limit.ts`~~ DONE C156; `sync/routes.ts` (~32%, HTTP-harness-tractable) is the remaining named backend low

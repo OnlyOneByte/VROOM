@@ -44,7 +44,7 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 165 |
 | deep-review | 5 | 167 |
-| guard | 6 | 163 |
+| guard | 6 | 169 |
 | bug | 3 | 168 |
 | arch | 5 | 166 |
 | infra | 6 | 164 |
@@ -3045,3 +3045,16 @@ Current cycle: **150**
   userId; OTHER_USER still reads their own → 77000, so the scope isn't over-broad). green→green: backend validate:local **EXIT 0
   — 1211 pass / 1 skip / 0 fail (+1)**, tsc 0, musl-biome clean, build bundled. #48 CLOSED. cov: be 82.70%+ (carry; +1 BE) / fe
   70.18% (carry)
+- **C169 (guard): coverage-ratchet `settings-api.ts` (the last FE service-layer sibling at ~7% line)** — BALANCE: nothing
+  strictly over budget; feature + guard tied AT budget (both breach C170). Took GUARD — a real coverage increment (the C124 FE
+  measured priority) over a 6th gated feature spec (feature is the same eyes-on/T0-blocked situation, already escalated C164 +
+  trips drafted C165). THE PICK: settings-api.ts at ~7% line — the LAST FE service-layer sibling the C143/C149/C163 ratchet left
+  behind. +11 tests (the proven file-scoped vi.mock(apiClient) pattern, NOT process-global mock.module) driving all 9 methods +
+  the LOAD-BEARING bits: restoreFromProvider's zip-vs-sheets body branch (zip includes fileRef, sheets OMITS it) + the
+  Idempotency-Key header on BOTH restore paths (the double-restore data-safety guard), listBackupsFromProvider's encodeURIComponent
+  (special chars in providerId), uploadBackup's FormData assembly, downloadBackup via apiClient.raw. tsc caught a real test bug
+  (updateSettings takes Partial<UserSettings> — a nested `unitPreferences:{distanceUnit}` is NOT a valid partial since
+  UnitPreferences needs all 3 fields; switched to currencyUnit) — the gate earning its keep. green→green: frontend validate:local
+  **EXIT 0 — 503 pass (+11)**, tsc 0, build done. **FE SERVICE LAYER now 100% module-covered** (api-client C143 + expense-api
+  C149 + reminder-api C163 + settings-api C169 + analytics-api partial + error-handling C137). cov: fe 70.18%+ (carry; +11 FE) /
+  be 82.70% (carry)
