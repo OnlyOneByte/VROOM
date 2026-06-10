@@ -25,11 +25,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 88 |
 | deep-review | 5 | 87 |
 | guard | 6 | 85 |
-| bug | 3 | 71 |
+| bug | 3 | 89 |
 | arch | 5 | 79 |
 | infra | 6 | 86 |
 
-Current cycle: **88**
+Current cycle: **89**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1634,3 +1634,25 @@ Current cycle: **88**
   starved-for 18 >> 3) but its top items are ALL Angelo-gated (lease/loan $ change, #14 #16 semantics calls) —
   so the actionable pick is arch (cyc 79, 10, still direction-blocked → verify) or the next coverage guard
   (sql-helpers 33%). feature/bug remain gated. cov: be ~80% / fe 63.7%
+- **C89 (bug — #4: ExpensesTable sort lacks a stable id tiebreaker)** — BALANCE: bug most-starved over budget
+  (cyc 71, starved-for 18 >> 3); arch also over (cyc 79, 10 > 5) but still direction-blocked. APPLIED the
+  verify-against-source discipline to my OWN backlog annotation ("bug queue all gated") rather than reflexively
+  pivoting — and it was stale: most of the bug queue IS gated (lease/loan $ change, #14/#16 semantics calls,
+  #2/#11 eyes-on), but #4 (combined-row re-sort lacks an id tiebreaker) is UNBLOCKED, pure-logic, unit-testable.
+  Read ExpensesTable.svelte + confirmed: both sort sites (the flat sortedExpenses :194, and the combined
+  tableRows re-sort :268) compared only by date/amount and returned 0 on a tie → equal-key rows fell back to
+  JS engine ordering / the standalone-then-group array-build order (grouping itself reorders same-key rows vs.
+  the server). The server orders by `dir(sortColumn), dir(id)` (expenses/repository.ts:287 — id tiebreak
+  inherits the sort DIRECTION). FIX: extracted a pure `compareExpenseRows(a,b,by,dir)` + `SortableRow` to
+  expense-helpers.ts that folds the id tiebreak into the raw comparison BEFORE the asc/desc flip (so a desc
+  sort breaks ties id-desc, matching the server — a naive post-flip localeCompare would always break ascending
+  and diverge). Wired both sites through it; group rows use their representative date/totalAmount + the first
+  child's id as the stable key. MERGE-SURVIVING GUARD (NORTH_STAR #5): compare-expense-rows.test.ts (+8) pins
+  primary sort, the load-bearing tiebreak DIRECTION (date/amount × asc/desc), and input-order-independence
+  (two orderings of tied rows → same output = the exact #4 invariant). Verified: frontend validate:local EXIT 0
+  (tsc 0 · build ✓ · 375 pass/0 fail, +8). CAVEAT (UI-touching, NORTH_STAR #3): the fix's correctness is sort
+  DETERMINISM, which a screenshot fundamentally can't show (equal-key rows render identically; only their
+  relative order stabilizes) — the unit test is the right + sufficient gate here, like the C39 non-visual layer.
+  No backend touched. Next (90): bug freshly fed (89); arch still most-starved over budget (cyc 79, 11 > 5) but
+  direction-blocked (page-migration misfit, reshape pending the C79 call) → verify then take the next coverage
+  guard (sql-helpers 33% / idempotency 43%). feature/bug remain Angelo-gated. cov: be ~80% / fe 63.7%

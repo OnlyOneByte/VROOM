@@ -268,8 +268,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    in style) → excluded with a documented anchor, not edited (avoids a blocked eyes-on chart change). frontend
    validate:local EXIT 0 (367 tests, +2). CAVEAT: eyes-on Playwright-blocked; fix is tsc/build-verified + the
    proven ChartCard idiom.*
-4. **ExpensesTable combined-row re-sort lacks an id tiebreaker** — same-date/amount rows can
-   reorder vs the server's id-tiebroken order. Cosmetic flicker. (low)
+- ~~**ExpensesTable combined-row re-sort lacks an id tiebreaker (#4)**~~ — *DONE C89: both sort sites
+   (flat sortedExpenses :194 + the combined tableRows re-sort :268) compared only by date/amount and
+   returned 0 on a tie, so equal-key rows fell back to JS engine ordering / the standalone-then-group
+   array-build order (grouping reorders same-key rows vs. the server). Extracted a pure
+   `compareExpenseRows(a,b,by,dir)` + `SortableRow` to expense-helpers.ts mirroring the server's
+   `dir(sortColumn), dir(id)` (repository.ts:287) — id tiebreak folded into the raw comparison BEFORE the
+   asc/desc flip, so it inherits the sort direction (a naive post-flip localeCompare would always break
+   ascending + diverge on desc). Both sites wired through it; group rows key off the first child's id.
+   MERGE-SURVIVING GUARD: compare-expense-rows.test.ts (+8) pins the tiebreak direction + input-order
+   independence (the exact #4 invariant). frontend validate:local EXIT 0 (375 pass). CAVEAT: sort
+   DETERMINISM can't be shown in a screenshot — the unit test is the right gate (C39 non-visual class).*
 
 *(surfaced by the C7 backend deep review — CSV import + analytics math; ranked by severity)*
 - ~~**CSV import: no UTF-8 BOM strip (#5)**~~ — *DONE C51: added `bom: true` to the csv-parse options
