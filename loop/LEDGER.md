@@ -38,12 +38,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 146 |
 | deep-review | 5 | 144 |
-| guard | 6 | 143 |
+| guard | 6 | 149 |
 | bug | 3 | 148 |
 | arch | 5 | 147 |
 | infra | 6 | 145 |
 
-Current cycle: **148**
+Current cycle: **149**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2721,3 +2721,17 @@ Current cycle: **148**
   [the regression] + currentMileage still surfaced + costPerMile null; normal above-initial still computes the real positive
   distance; exact-boundary → 0). Verified: backend validate:local EXIT 0 — 1185 pass / 0 fail (+3), tsc 0, musl-biome clean,
   build bundled. #46 CLOSED. cov: be 82.25% (carry; +3 BE) / fe 65.32% (carry)
+- **C149 (guard — coverage-ratchet expense-api.ts, the C124 FE low spot)** — BALANCE: nothing strictly over budget; `guard` +
+  `deep-review` tied at-budget (both breach C150). Took `guard` (highest-leverage: the FE coverage ratchet is the standing
+  measured priority; the dr fan-out was just C144 + the bug queue is already gate-saturated so more findings wouldn't help).
+  C124-named next FE low spot: `expense-api.ts`. `buildExpenseQuery` was already pinned (build-expense-query.test.ts) so the
+  uncovered LAYER is the method→endpoint wiring + the backend↔frontend TRANSFORM those methods drive. Added expense-api.test.ts
+  (+13, the api-client/reminder-api mocked-apiClient pattern): getExpense maps expenseAmount→amount + volume→volume(gas)/
+  charge(electric)-by-fuelType; getAllExpenses/getExpensesByVehicle drive getPaginated + per-row transform + pagination
+  passthrough + vehicleId-in-query; createExpense maps amount→expenseAmount + OMITS an empty description (create payload
+  unchanged); updateExpense sends an emptied description as NULL (the clear-field bug-class this repo fixed); downloadExpensesCsv
+  throws on non-ok + on success fetches the export URL with filters (tags comma-joined) → blob → clicks a download anchor (stubbed
+  the jsdom-absent URL.createObjectURL + the anchor click); split create/delete + deleteExpense endpoint wiring. Verified:
+  frontend validate:local EXIT 0 — type-check 0, build done, 470 pass (+13). NEXT FE low spot (C124): the components/routes
+  deficit (the remaining gap now that error-handling/api-client/expense-api services are covered). cov: be 82.25% (carry) / fe
+  65.32%+ (carry; +13 FE — expense-api.ts service layer low→well-covered, not whole-suite-re-measured)

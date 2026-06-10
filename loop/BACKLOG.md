@@ -298,11 +298,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > request/requestFull; the 3 sibling tests all MOCK it so its internals were unexercised; +17 driving the REAL methods via a
 > global.fetch stub — envelope unwrap incl. the `data:0` falsy-present edge, non-JSON/204 passthrough, all 3 error-message
 > branches + array-details→validationErrors, FormData/Content-Type gating, getPaginated full-envelope, withPagination).
+> `frontend expense-api.ts` service layer low→well-covered (C149 — the method→endpoint wiring + the backend↔frontend transform
+> the methods drive [buildExpenseQuery was already pinned]; +13: getExpense amount/volume/charge-by-fuelType mapping, list
+> getPaginated passthrough + per-row transform, create OMITS empty description / update sends NULL [the clear-field class],
+> downloadExpensesCsv blob→anchor + non-ok throw, split/delete wiring).
 > NEXT high-value low spots
 > **(C138 re-measure — be 82.25% line / fe 65.32% line; FE STILL the bigger gap but closing):**
 > backend — `body-limit.ts` (35% line size-enforcement branch), `sync/restore.ts`+`sync/routes.ts` (~32–61%,
-> HTTP-harness-tractable); FRONTEND (keep steering FE guard cycles here) — from the C124 report: `expense-api.ts`
-> (the transformer/pagination glue — mock-heavier) + the components/routes deficit. (SKIP navigation.ts — thin goto
+> HTTP-harness-tractable); FRONTEND — the FE SERVICE layer is now well-covered (error-handling C137 + api-client C143 +
+> expense-api C149); the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
+> `.svelte.ts`/store/util modules still thin). (SKIP navigation.ts — thin goto
 > wrappers, coverage theater.) Route/
 > integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
 > (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch
