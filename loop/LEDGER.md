@@ -47,7 +47,7 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 169 |
 | bug | 3 | 168 |
 | arch | 5 | 166 |
-| infra | 6 | 164 |
+| infra | 6 | 171 |
 
 Current cycle: **150**
 
@@ -3070,3 +3070,13 @@ Current cycle: **150**
   T5 gate + T6/T7 seams) is complete — only the eyes-on UI tail remains, so the feature-starvation is honest, not a missed
   buildable slice. Spec-doc-only — no code, no build gate (the C4/C9 convention; verified the test exists firsthand). Re-escalation
   NOT re-sent (folded into the standing C164/C165 asks). cov: carry (doc-only cycle)
+- **C171 (infra): CLAUDE.md orientation refresh (3 drifts fixed post-C159)** — BALANCE: `infra` the only over-budget category
+  (cyc 164, starved-for 7) → forced. The #5 sweep was just C164 (next ~C174); the CLAUDE.md refresh (last C159) is the more-due
+  infra item + counts drifted +12 cycles. 3 drifts, each verified vs the C160–C170 LEDGER (the C117/C131/C145/C159 anti-drift
+  discipline, no churn): (1) coverage cited the stale C152 reading (82.0/70.1) + "FE service layer well-covered" → C164
+  re-measured (be 82.70 line / fe 70.18), and the FE service layer is now **100% module-covered** (C163 reminder-api + C169
+  settings-api completed it) → updated figures, the ratchet list, the "100% module-covered" status, and re-pointed the BE low spot
+  to sync/routes.ts (~32%) with the restore.ts mock caveat; (2) suite size ~1206/~475 → **1211/503**; (3) the closed-HIGHs line
+  listed only #27/#54 → added **#57** (C167 insurance policy-delete premium-expense orphan) + the MED fixes #52/#55/#56/#48
+  (C155–C168). Doc-only — no build gate (the standing convention; every claim verified vs source/LEDGER). Next CLAUDE.md refresh
+  ~C184; #5 sweep next ~C174. cov: be 82.70% / fe 70.18% (carry, doc-only)

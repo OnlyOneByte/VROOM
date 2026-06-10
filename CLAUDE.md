@@ -156,16 +156,18 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C152, not an estimate): **backend 82.0% line / 82.5% func · frontend 70.1% line / 66.8%
-  func / 62.9% branch** — backend steady ~82%; **frontend broke 70% line for the first time** (65.3→70.1
-  since C138) under a sustained FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130
-  formatters, C137 error-handling.ts, C143 api-client.ts, C149 expense-api.ts) — the FE SERVICE layer is
-  now well-covered, so the remaining FE gap is the **components/routes deficit** (largely eyes-on; prefer
-  the few thin pure-`.ts`/`.svelte.ts`/store/util modules). Backend middleware trio all covered now
-  (idempotency C105, rate-limit C112, body-limit C156); next BE low spots are `sync/restore.ts`+
-  `sync/routes.ts`. loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry. Suite size today:
-  **~1206 backend tests / ~475 frontend** (a floor — grows most cycles). Don't regress coverage; name why
-  if a cycle drops it.
+  (re-measured C164, not an estimate): **backend 82.70% line / 82.5% func · frontend 70.18% line / 66.9%
+  func / 62.9% branch** — backend steady ~82%; frontend climbed 65.3→70.2 since C138 under a sustained
+  FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
+  C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts). **The FE SERVICE
+  layer is now 100% module-covered** (api-client + expense-api + reminder-api + settings-api + error-
+  handling); the remaining FE gap is the **components/routes deficit** (largely eyes-on; prefer the few
+  thin pure-`.ts`/`.svelte.ts`/store/util modules — e.g. pwa.ts ~56%, sync-manager.ts ~58%). Backend
+  middleware trio all covered (idempotency C105, rate-limit C112, body-limit C156); the next BE low spot
+  is `sync/routes.ts` (~32%; NOTE: `restore.ts` restoreFromSheets needs a process-global Sheets mock the
+  sync suite avoids — see C163). loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
+  Suite size today: **~1211 backend tests / ~503 frontend** (a floor — grows most cycles). Don't regress
+  coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
   in-memory SQLite DB with a seeded user + a real Lucia session cookie (`ctx.authed/anon`); it's
@@ -182,7 +184,10 @@ Highlights:
 - Loop-found HIGHs now CLOSED: **#27** (TCO financed-principal double-count) fixed C154 (Angelo-approved
   option c — keep purchasePrice, exclude financing-payment rows when price is counted); **#54** (fuel-
   efficiency trend paired rows across vehicles in the fleet view) fixed C158 (per-vehicle pairing via
-  `forEachVehiclePair`).
+  `forEachVehiclePair`); **#57** (deleting an insurance policy orphaned its auto-materialized premium
+  expenses — still summed into TCO forever, no FK) fixed C167 (deleteBySource per term before delete).
+  Plus the MED fixes #52/#55/#56/#48 (split-delete tenant-scope, amortization neg-guard, perFillup split
+  inflation, odometer userId-scope) all landed C155–C168.
 - Pending an Angelo decision (filed, NOT auto-fixed — each changes a displayed $/HTTP behavior or is a
   product call). TWO HIGHs, both in the Google Sheets backup path: **#36** (writes `USER_ENTERED` →
   formula injection + silent round-trip corruption; ARCC-consult before fixing), **#37** (non-atomic

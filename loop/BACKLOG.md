@@ -1087,7 +1087,7 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > commits since the last refresh by theme so the eventual PR stays reviewable. Counts as one `infra`
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
-*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep DONE C164 (branch 116 commits, be 82.70%/fe 70.18% line; §23 appended C152–C163), next due ~C174; CLAUDE.md refresh DONE C159, next ~C174. NOTE C164: feature category is chronically starved (eyes-on-blocked + money-cents T0-gated) — escalated to Angelo for a horizon-spec steer + the T0 ratify.)*
+*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep DONE C164 (branch 116 commits; §23), next due ~C174; CLAUDE.md refresh DONE C171 (3 drifts: coverage re-measure + FE-service-layer-100%, suite 1211/503, #57 closed), next ~C184. NOTE C164/C165: feature chronically starved (eyes-on-blocked + money-cents/trips both T0-gated) — escalated to Angelo for a horizon-spec steer + the T0 ratify; trips T1–T5 are loop-buildable once cleared.)*
 - ~~**#5 branch-hygiene sweep + coverage re-measure (C152)**~~ — *DONE C152 (overdue; last C138, branch now 101 commits / 14
   cycles of drift). (1) zero stray untracked unit/spec tests (all untracked = the by-design `*.meshclaw.e2e.ts` set + `.meshclaw-tools/`
   harness + screenshots/snapshots + gitignored dirs); (2) green baseline + re-measure — backend bun test --coverage EXIT 0
