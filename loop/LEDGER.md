@@ -22,14 +22,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 102 |
+| feature | 4 | 104 |
 | deep-review | 5 | 101 |
 | guard | 6 | 98 |
 | bug | 3 | 103 |
 | arch | 5 | 99 |
 | infra | 6 | 100 |
 
-Current cycle: **103**
+Current cycle: **104**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1923,3 +1923,21 @@ Current cycle: **103**
     bun:test import (frontend is vitest) + a strict-null destructure; both fixed. Next (104): nothing over budget (guard cyc 98
     starved-for 6 = budget at 104; arch cyc 99, 5 = budget). Highest-leverage = recurring-expenses T3 (cascade-safe delete,
     backend, the C101-certified clearSource path) — continues the advanceable feature. cov: be ~80% / fe ~64%
+- **C104 (feature — recurring-expenses T3: cascade-safe delete, keep history + sever link)** — BALANCE: nothing over budget
+  (guard + arch AT budget, breach next); highest-leverage = recurring-expenses T3, the advanceable backend feature on the
+  C101-certified clearSource path. Grounded the gap: the reminder DELETE /:id (routes.ts:263) had NO source-cascade wiring,
+  so deleting a recurring-expense reminder ORPHANED its materialized expense rows (sourceId → a now-deleted reminder). Per
+  D2 (ratified C94: keep past history, sever the link — NORTH_STAR #1 no silent loss), wired
+  `expenseRepository.clearSource('reminder', id, user.id)` into the DELETE handler between the ownership check and the
+  reminder delete (best-effort try/catch — a clearSource hiccup must not block the delete the user asked for; the rows just
+  keep a harmless dangling sourceId). Mirrors the C85 onFinancingDeactivated idiom. No circular import (reminders/routes →
+  expenses/repository is one-directional). MERGE-SURVIVING net: delete-reminder-cascade.test.ts (+2) through the real
+  route→trigger→delete stack — (1) create expense reminder → trigger (materialize) → DELETE → assert the reminder is gone
+  BUT the expense rows REMAIN (same count, $125.50) with sourceType/sourceId NULLED + nothing still linked; (2) a
+  notification reminder delete is a clean no-op (materializes nothing). THE GATE EARNED ITS KEEP: first run failed on the
+  2nd test — I assumed a 'maintenance' reminder type, but the enum is 'expense'|'notification' (ZodError 400); switched to
+  'notification'. (Also a biome reflow autofixed.) Verified: backend validate:local EXIT 0 — 1114 pass / 0 fail (+2) ·
+  build bundled. T3 DONE; tasks.md ticked. recurring-expenses BACKEND (T1–T3) now COMPLETE — T4–T8 are the eyes-on frontend
+  tail (Playwright-blocked here), so the feature is at the same "backend-done, eyes-on-pending" state as maintenance/
+  import-trackers. Next (105): `guard` most-starved over budget (cyc 98, starved-for 7 > 6) → the C83 coverage-ratchet's
+  next low spot (middleware/idempotency.ts 43% or rate-limit.ts 60%). cov: be ~80% / fe ~64%

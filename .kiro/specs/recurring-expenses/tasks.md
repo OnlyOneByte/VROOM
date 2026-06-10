@@ -23,10 +23,13 @@
       `sourceType:'reminder'`/`sourceId` (the path at `trigger-service.ts:147-163`). Grouped by groupId so
       the overdue catch-up months assert independently. Anchors T4 before any form change. validate:local
       EXIT 0 (1112 pass).
-- [ ] **T3 — Cascade-safe delete (R4, D2).** On reminder delete/deactivate, sever the link on
-      already-materialized rows via `clearSource('reminder', id, userId)` (keep history; do NOT
-      `deleteBySource`). Mirror the C85 `onFinancingDeactivated` idiom for consistency. HTTP test:
-      delete a source → past expense rows remain, link nulled, no future materialization. *(Backend.)*
+- [x] **T3 — Cascade-safe delete (R4, D2) — DONE C104.** Wired `expenseRepository.clearSource('reminder',
+      id, user.id)` into `DELETE /reminders/:id` (routes.ts) between the ownership check and the reminder
+      delete — best-effort (try/catch so a clearSource hiccup can't block the delete). Keeps history, NULLs
+      the link; mirrors the C85 `onFinancingDeactivated` idiom. HTTP test (delete-reminder-cascade.test.ts,
+      +2): expense reminder → trigger → DELETE → rows REMAIN ($125.50, same count) with sourceType/sourceId
+      nulled + nothing still linked; notification reminder delete is a clean no-op. validate:local EXIT 0
+      (1114 pass). **Backend T1–T3 COMPLETE.**
 
 ### Frontend (eyes-on; Playwright-blocked here → "code-complete, eyes-on pending")
 

@@ -5,6 +5,7 @@ import type { NewReminder } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
 import { commonSchemas } from '../../utils/validation';
+import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
 import { vehicleRepository } from '../vehicles/repository';
 import { reminderRepository } from './repository';
@@ -267,6 +268,18 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const existing = await reminderRepository.findByIdAndUserId(id, user.id);
   if (!existing) {
     throw new NotFoundError('Reminder');
+  }
+
+  // T3/D2 (recurring-expenses): a 'expense'-type reminder auto-materializes real expense rows
+  // (sourceType:'reminder', sourceId:reminder.id). Those are HISTORY — deleting the reminder must
+  // NOT delete them (NORTH_STAR #1, no silent loss). Sever the link (keep the rows) via clearSource,
+  // mirroring the C85 onFinancingDeactivated idiom. Best-effort: a clearSource hiccup must not block
+  // the delete the user asked for (the rows simply keep a now-dangling sourceId, harmless). Scoped to
+  // the user. No-op for non-expense reminders (they materialize nothing, so 0 rows match).
+  try {
+    await expenseRepository.clearSource('reminder', id, user.id);
+  } catch {
+    // swallow — the reminder delete below is the user's actual intent
   }
 
   await reminderRepository.delete(id);
