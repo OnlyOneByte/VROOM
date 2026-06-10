@@ -32,13 +32,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 111 |
-| deep-review | 5 | 108 |
+| deep-review | 5 | 114 |
 | guard | 6 | 112 |
 | bug | 3 | 109 |
 | arch | 5 | 113 |
 | infra | 6 | 110 |
 
-Current cycle: **113**
+Current cycle: **114**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2117,3 +2117,28 @@ Current cycle: **113**
   bundled. **The C99 ownership-convergence arc is COMPLETE** (analytics/expenses/vehicles converged; financing excluded by
   design). Next (114): nothing forced (deep-review cyc 108 = budget at 113... recompute next cycle) → highest-leverage. cov:
   be ~81% / fe 61.4% (carry C107)
+- **C114 (deep-review — adversarial audit of the CSV-import + insurance-cost paths; rule-7 fan-out)** — BALANCE: TWO
+  categories breached (deep-review cyc 108 starved-for 6; bug cyc 109 starved-for 5); per the C107 highest-ABSOLUTE rule,
+  deep-review (6) > bug (5). Verification-only cycle (no product code; findings → bug queue). Fanned out 2 Explore agents on
+  fresh high-risk surfaces with NO prior dedicated read: the untrusted-CSV import/mapping path (import-trackers T1–T3 was
+  "backend complete" but never audited) + the insurance premium/cost computation (C73 touched it, but only #14 was filed).
+  EVERY finding verified against source (the C67 discipline — NEITHER agent found a HIGH; I pre-read import-mapping.ts +
+  the insurance attribution block myself). CERTIFIED CLEAN (positive evidence): CSV path — cross-tenant vehicle resolution
+  (targetVehicle is a NAME resolved only within the importer's fleet), userId double-stamp (route + repo), transaction
+  atomicity (single db.transaction, only 'ready' rows inserted), idempotency (deterministic clientId + unique index),
+  CSV-injection-on-export (neutralizeCsvCell), unit-conversion direction/single-pass, the C61 local-day class (built from
+  parts in local time); insurance — div-by-zero guarded (monthsInTerm===0 + null-bound monthKeysInRange), no
+  monthly-vs-total double-count (effectiveMonthlyPremium precedence is exclusive; totals add once per policy), year-boundary
+  trend correct. FILED (verified real, all MED/LOW, none HIGH): #23 CSV date roll-over (normalizeForeignDate validates only
+  integer-ness, no 1–12/1–31 range check → new Date(2024,44,13) silently rolls forward instead of erroring; a wrong
+  format-pick or bad row stores a garbage date — VERIFIED at import-mapping.ts:181-194; clean fix = a range guard or a
+  post-construct getMonth/getDate echo check); #24 CSV comma-as-thousands ('1,234'→1.234 corrupts amount/volume/mileage,
+  passes validation — VERIFIED at normalizeDecimal:139-147; the documented decimal-comma choice, harm is a manually-mapped
+  US-thousands file → needs a disambiguation decision); #25 insurance per-vehicle attribution uses the LATEST-term premium
+  but the ALL-terms coverage set as the divisor (repository.ts:895-948 — VERIFIED: when coverage changed across terms, the
+  current vehicle is understated and dropped vehicles get a phantom share + costByCarrier.vehicleCount over-reports; AGGREGATE
+  totals are CORRECT, it's a mis-DISTRIBUTION not a mis-total — MED); + insurance LOWs (inclusive-month off-by-one on a
+  renewal-day endDate; open-ended null-endDate term contributes to totals but drops from the trend + sorts last in the
+  latest-term race; findExpiringTerms lacks an isActive filter). No code change (rule-7 verification cycle); all → BACKLOG
+  bug queue. Next (115): `bug` most-starved over budget (cyc 109, starved-for 6 > 3) → #23 (the cleanest grounded fix — a
+  date range guard) is the strongest pick. cov: be ~81% / fe 61.4% (carry C107)

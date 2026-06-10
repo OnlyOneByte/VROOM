@@ -322,6 +322,35 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   VERIFIED against source C108. (The 5 hunted mileage defect classes — double-fire, boundary, cross-vehicle, stale, throw —
   were all CERTIFIED CLEAN.)
 
+**NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
+- **#23 (MED, top pick — cleanest fix) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**
+  `normalizeForeignDate` (import-mapping.ts:181-194) validates only integer-ness (`nums.some((n) => !Number.isInteger(n))`)
+  then builds `new Date(year, month-1, day)` — JS Date rolls out-of-range parts over rather than NaN-ing, so a `dmy` row
+  `13/45/2024` → a valid date ~3.7yr later, stored silently; picking the wrong format (mdy on a dd/mm file) rolls `25/03`
+  forward with no error; `"2024--15"` → Dec 2023. VERIFIED against source C114. FIX: a 1–12 month / 1–31 day range guard
+  before construction (or a post-construct getMonth()/getDate() echo check) → converts these to a clean per-row "Invalid
+  date" error instead of a silent wrong date. A clean, well-scoped, host-independent unit-testable fix.
+- **#24 (MED — needs a product decision) — CSV import: comma-as-thousands corrupts numbers.** `normalizeDecimal`
+  (import-mapping.ts:139-147) treats a lone comma as the decimal separator, so a US-style `"1,234"` (thousands, no decimal)
+  → `"1.234"` → 1.234, which is finite+positive so `parseAmount` accepts it — a $1,234 expense imports as $1.23 (same for
+  volume/mileage). VERIFIED C114. This is the ratified decimal-comma design choice (a lone comma IS decimal); the harm is a
+  manually-mapped US-thousands file. DECISION: add a per-file "decimal separator" hint to the mapping (dot vs comma), or
+  detect-and-warn — needs Angelo's call on scope before a fix.
+- **#25 (MED) — insurance per-vehicle attribution: LATEST-term premium ÷ ALL-terms vehicle count.** analytics/repository.ts:
+  895-948 — `monthlyPremium = effectiveMonthlyPremium(latestTerm)` (latest term only) but `coveredVehicleIds` spans EVERY
+  term's junctions, and `perVehicleMonthly = monthlyPremium / coveredVehicleIds.length`. So when coverage CHANGED across
+  terms (old covered {A,B,C}, latest covers {A}): A is attributed premium/3 (understated 3×), dropped B+C each get a phantom
+  premium/3, and costByCarrier.vehicleCount over-reports. AGGREGATE totalMonthly/AnnualPremiums are CORRECT (added once per
+  policy) — a mis-DISTRIBUTION, not a mis-total. VERIFIED C114. FIX: scope coveredVehicleIds to the LATEST term's junctions
+  (the term the premium is computed from), so the divisor + attribution match the premium's term.
+- **#26 (LOW, insurance nuances, C114)** — three small ones, none data-safety: (a) totalCost amortization + monthly trend
+  use `monthKeysInRange` which is INCLUSIVE of both endpoint months, so a 6-mo policy entered as Jan 1→Jul 1 (renewal-day
+  endDate) amortizes over 7 months (internally consistent — totals reconcile — but a ±1-day data-entry choice shifts the
+  displayed monthly premium); (b) an open-ended (null endDate) `monthlyCost` term contributes to totals but is DROPPED from
+  monthlyPremiumTrend (accumulateMonthlyPremiums returns early on null endDate) AND sorts LAST in the latest-term race
+  (null endDate → 0); (c) findExpiringTerms (insurance/repository.ts:703-727) has no `isActive` filter, so terms of
+  cancelled policies show as "expiring." All VERIFIED C114.
+
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
    (Overview) + `fetchExpensesPage` (Expenses tab) in `vehicles/[id]/+page.svelte` only toasted on
