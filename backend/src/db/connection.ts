@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { CONFIG } from '../config';
 import { DatabaseError } from '../errors';
+import { extractErrorMessage } from '../utils/error-handling';
 import { logger } from '../utils/logger';
 import * as schema from './schema.js';
 
@@ -88,7 +89,7 @@ export async function runMigrations() {
     const { runDataMigration } = await import('./data-migration');
     await runDataMigration(sqlite);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = extractErrorMessage(error);
     const cause = error instanceof Error && 'cause' in error ? error.cause : undefined;
     logger.error('Migration failed', { error: message, cause });
     throw error;

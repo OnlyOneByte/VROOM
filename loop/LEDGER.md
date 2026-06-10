@@ -40,10 +40,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 144 |
 | guard | 6 | 143 |
 | bug | 3 | 144 |
-| arch | 5 | 141 |
+| arch | 5 | 147 |
 | infra | 6 | 145 |
 
-Current cycle: **146**
+Current cycle: **147**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2691,3 +2691,21 @@ Current cycle: **146**
   cents, T6 display-edge at the API boundary [keeps the FE dollar contract → NO eyes-on], T7 green sweep). Migration is LOW-risk
   (in-place UPDATE ROUND(*100), no rebuild/no FK-cascade — the 0003 class, NOT the 0004 footgun). ESCALATING to Angelo
   (non-blocking). Spec-only — no code, no build gate (the C4/C9 spec-cycle convention). cov: be 82.25% / fe 65.32% (carry)
+- **C147 (arch — create the backend `extractErrorMessage` seam, wire the 3 value-capture sites)** — BALANCE: `arch` the ONLY
+  over-budget category (cyc 141, starved-for 6 > 5; matches the C146 forecast). DUE-DILIGENCE on the primed pick FIRST (grounded
+  every site, the C141/C69/C90 verify-before-extract discipline): the C141-filed `roundToCents` is NOT a clean pick now — its
+  only pure-`.ts` site is financing-calculations.ts:456; the other ~7 are `.svelte` (eyes-on-BLOCKED here) AND several round
+  MONEY (SplitConfigEditor/ExpensesTable/VehicleForm) that the pending cents-migration T5/T6 will rework → extracting now =
+  churn or unverifiable. The C141 #2 ytdSpending reduce also COLLIDES with cents-migration T4. So I hunted a pure-`.ts`,
+  verifiable, migration-INDEPENDENT dedup: the `error instanceof Error ? error.message : String(error)` idiom is hand-rolled
+  ~60× across the backend with NO canonical helper (the FE has one — C90 extractErrorMessage — the BE doesn't). Converting all 60
+  is too big (arch rule 1) + most are `logger.error({error:…})` structured-log sites (a distinct idiom, not value-extraction).
+  So scoped to the CLEAN subset: created `utils/error-handling.ts` `extractErrorMessage(error)` (the missing canonical seam,
+  mirroring FE C90) + wired the 3 VALUE-capture sites (connection.ts:91 migration-fail message, index.ts:23 startup, sync-
+  worker.ts:261 photoRef errorMessage column) — all byte-identical, all where the message is captured as a value not logged.
+  The txn-fail site (connection.ts:74) stays inline — its fallback is `'Unknown error'` not `String(error)`, NOT byte-identical
+  (the C90 inverted-semantics discipline). Net payoff: creates the one-source-of-truth the backend lacked + a convergence target
+  the ~57 logging sites can adopt incrementally; removes 3 hand-rolls. Pinned by error-handling.test.ts (+4: Error→message,
+  subclass, empty-message-branches-on-type, non-Error→String() incl. null/undefined/object). green→green: backend validate:local
+  EXIT 0 — 1182 pass / 0 fail (+4), tsc 0, musl-biome clean, build bundled (the 3 wired sites behavior-identical = full suite
+  unchanged). roundToCents RE-FILED with the eyes-on caveat. cov: be 82.25% (carry; +4 BE) / fe 65.32% (carry)

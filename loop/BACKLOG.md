@@ -769,12 +769,21 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
   **ARCH QUEUE EMPTY of clean single-cycle picks.** `MS_PER_DAY` (the lone remaining filed idea) is grounded as NOT
   byte-identical — ~20+ sites across BE+FE in 3 spellings with divergent semantics (pure day-divisor vs a 30-day-MONTH
   approximation); collapsing it is a sweeping multi-file rewrite (arch rule 1) and the FE half was already rejected as churn
-  (C99) → leave it. **Next arch pick:** the C141 FE fan-out agent (8651c0ff, event landed post-C141) surfaced a clean
-  candidate — **`Math.round(x * 100) / 100` round-to-2-decimals at ~8 byte-identical FE sites** (financing-calculations.ts:456,
-  VehicleForm.svelte:299-301, ExpensesTable.svelte:237, +others) → a pure-logic `roundToCents(x)` helper (no eyes-on, unit-
-  testable). VERIFY-FIRST per arch discipline (read all 8 sites + confirm none is a divergent rounding, e.g. floor/ceil or a
-  different precision, before extracting). Take this top next arch cycle. (The BE agent's #2 ytdSpending sum-reduce stays a
-  lower-value fallback — borderline-churn at 7 divergent sites.)
+  (C99) → leave it.
+  - ~~**backend `extractErrorMessage` seam (C147)**~~ — *DONE C147: the `error instanceof Error ? error.message : String(error)`
+    idiom is hand-rolled ~60× across the backend with NO canonical helper (the FE has one — C90). Created
+    `utils/error-handling.ts extractErrorMessage(error)` + wired the 3 byte-identical VALUE-capture sites (connection.ts:91,
+    index.ts:23, sync-worker.ts:261); the ~57 `logger.error({error:…})` structured-log sites are a DISTINCT idiom left to
+    converge incrementally (not value-extraction); connection.ts:74 stays inline (fallback `'Unknown error'`, not byte-identical).
+    +4 unit tests. green→green 1182 pass. Creates the one-source-of-truth + a convergence target.*
+  - **`roundToCents(x)` [`Math.round(x*100)/100`] — RE-FILED with an EYES-ON + cents-migration caveat (re-grounded C147).** Of
+    the ~8 sites, only financing-calculations.ts:456 is pure-`.ts`; the other ~7 are `.svelte` (eyes-on-BLOCKED here) and several
+    round MONEY (SplitConfigEditor:40, ExpensesTable:237, VehicleForm:299-301) that the **cents-migration T5/T6 will rework** →
+    extracting now is churn-or-unverifiable. DEFER until either Playwright unblocks (so the component sites are verifiable) OR the
+    cents migration lands (which subsumes the money-rounding sites). Not a clean single-cycle pick today.
+  - **Next arch pick when one is due:** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the
+    eyes-on + pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the
+    ~57 logging sites is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.
 
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,
