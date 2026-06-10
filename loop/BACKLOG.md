@@ -280,11 +280,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > through handleErrorWithNotification → handleApiError, the user-facing error copy; +8 covering the ApiError class + the 3-way
 > handleApiError branch [VroomError→friendly-or-own / network-TypeError / unknown-fallback] + the error-code→friendly map +
 > the notification side-effect, driven through the exported entry with the store mocked so assertions check the USER's message.
-> extractErrorMessage was already pinned C90). NEXT high-value low spots
-> **(re-anchored to the C124 reading — be 81.8% line / fe 62.0% line; FE STILL the bigger gap):**
+> extractErrorMessage was already pinned C90).
+> `frontend api-client.ts` low→well-covered (C143 — THE most load-bearing FE module: every API call routes through
+> request/requestFull; the 3 sibling tests all MOCK it so its internals were unexercised; +17 driving the REAL methods via a
+> global.fetch stub — envelope unwrap incl. the `data:0` falsy-present edge, non-JSON/204 passthrough, all 3 error-message
+> branches + array-details→validationErrors, FormData/Content-Type gating, getPaginated full-envelope, withPagination).
+> NEXT high-value low spots
+> **(C138 re-measure — be 82.25% line / fe 65.32% line; FE STILL the bigger gap but closing):**
 > backend — `body-limit.ts` (35% line size-enforcement branch), `sync/restore.ts`+`sync/routes.ts` (~32–61%,
-> HTTP-harness-tractable); FRONTEND (keep steering FE guard cycles here) — from the C124 report: `api-client.ts`/`expense-api.ts`
-> (mock-heavier) + the components/routes deficit. (SKIP navigation.ts — thin goto
+> HTTP-harness-tractable); FRONTEND (keep steering FE guard cycles here) — from the C124 report: `expense-api.ts`
+> (the transformer/pagination glue — mock-heavier) + the components/routes deficit. (SKIP navigation.ts — thin goto
 > wrappers, coverage theater.) Route/
 > integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
 > (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch

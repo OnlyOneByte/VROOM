@@ -38,12 +38,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 140 |
 | deep-review | 5 | 139 |
-| guard | 6 | 137 |
+| guard | 6 | 143 |
 | bug | 3 | 142 |
 | arch | 5 | 141 |
 | infra | 6 | 138 |
 
-Current cycle: **142**
+Current cycle: **143**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2613,3 +2613,18 @@ Current cycle: **142**
   matches every row, a backslash matches literally (escape-char not double-applied), and a normal metachar-free search still
   substring-matches. Verified: backend validate:local EXIT 0 — 1175 pass / 0 fail (+5), tsc 0, musl-biome clean, build bundled.
   #41 CLOSED. cov: be 82.25% (carry; +5 BE) / fe 65.32% (carry)
+- **C143 (guard — coverage-ratchet api-client.ts, the C124 FE low spot)** — BALANCE: nothing strictly over budget (C142 forecast
+  over-stated guard: 6 > 6 false); `guard` breaches next cycle (C144). Took the standing FE coverage-ratchet (the measured bigger
+  gap) at the C124-named next low spot: `api-client.ts` — THE most load-bearing FE module (every API call routes through
+  `request`/`requestFull`). The 3 sibling service tests all `vi.mock('../api-client')`, so its real internals were NEVER
+  exercised (hence the low C124 reading). Added api-client.test.ts (+17): stubs global.fetch (the auth.test.ts pattern) +
+  vi.mock('$env/dynamic/public') and drives the REAL apiClient methods, covering: the {success,data} envelope unwrap INCL. the
+  load-bearing `data: 0` falsy-but-present edge (uses `!== undefined`, not truthiness) + the no-data-field passthrough; the
+  non-JSON/204 return-Response-as-is path; ALL 3 error-message branches (nested error.message / top-level errorBody.message /
+  status fallback when the body isn't JSON) + array-details→{validationErrors}; method+credentials+Content-Type header gating
+  INCL. the FormData skip (must NOT set Content-Type, must not stringify); getPaginated's full-envelope (NO unwrap) + its error
+  path; withPagination (limit+offset / offset=0-included / bare-url). THE GATE earned its keep: tsc flagged 7 `err is unknown`
+  errors from a `.catch((e) => e as ApiError)` cast that didn't narrow → extracted a typed `captureError(promise)` helper (no
+  non-null/any). Verified: frontend validate:local EXIT 0 — type-check 0, build done, 457 pass (+17). NEXT FE low spot (C124):
+  expense-api.ts (mock-heavier) + the components/routes deficit. cov: be 82.25% (carry) / fe 65.32%+ (carry; +17 FE —
+  api-client.ts low→well-covered, not whole-suite-re-measured)
