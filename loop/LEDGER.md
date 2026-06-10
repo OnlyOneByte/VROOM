@@ -26,10 +26,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 94 |
 | guard | 6 | 98 |
 | bug | 3 | 97 |
-| arch | 5 | 92 |
+| arch | 5 | 99 |
 | infra | 6 | 93 |
 
-Current cycle: **98**
+Current cycle: **99**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1829,3 +1829,22 @@ Current cycle: **98**
   sql-helpers.ts 33%→covered. Next (99): nothing over budget (arch cyc 92 starved-for 7 > 5 at 99 → arch breaches) →
   `arch` most-starved (fan-out per rule 7), OR continue feature recurring-expenses T2 (split-materialization characterization,
   backend/non-eyes-on, the highest-leverage feature-advancing pick). cov: be ~80% / fe 63.7%
+- **C99 (arch — converge analytics routes on the shared `validateVehicleOwnership`)** — BALANCE: `arch` most-starved over
+  budget (cyc 92, starved-for 7 > 5). arch #2 (createLoadState reshape) is direction-blocked pending the C79 call, so per
+  arch RULE 7 ran the AUDIT FAN-OUT (2 Explore agents: backend dedup/layering + frontend pure-logic) to find a fresh
+  actionable item — the C90 pattern. Backend surfaced the clear winner: the inline `const vehicle = await
+  vehicleRepository.findByUserIdAndId(user.id, vehicleId); if (!vehicle) throw new NotFoundError('Vehicle')` pattern
+  hand-repeated at 13 sites across 4 route files, while a shared exported `validateVehicleOwnership(vehicleId, userId)`
+  (utils/validation.ts:83) ALREADY EXISTS + is used by odometer/insurance/photos. (Frontend candidate — MS_PER_DAY magic-
+  number consolidation — REJECTED as churn-for-churn, arch rule 5: a readability nicety, no real payoff.) VERIFIED vs
+  source (C21/C28/C90): the inline pattern is byte-identical to the helper (same findByUserIdAndId arg order, same
+  NotFoundError('Vehicle')); routes discard the returned vehicle (they re-query via the repository), so dropping the local
+  binding is behavior-identical. SCOPE CALL (arch rule 1 — one small reviewable commit, NOT sweeping; the C36/C50 one-file-
+  per-cycle convergence pattern): scoped to `analytics/routes.ts` ONLY — the densest cluster (6 of the 13 sites, all
+  test-covered); filed the other 3 files as the next arch increments. Converted all 6 (3 mandatory: vehicle-health/-tco/
+  -expenses; 3 optional: fuel-stats/-advanced/-efficiency, keeping their `if (vehicleId)` guards), swapped imports
+  (NotFoundError + vehicleRepository now unused in the file → removed; tsc confirmed). green→green PROOF: the analytics
+  route + property suites stayed GREEN UNCHANGED (1109 pass, same as C98) = behavior-preserving. Verified: backend
+  validate:local EXIT 0 (tsc 0 · musl-biome clean · 1109 pass / 0 fail · build bundled). Next (100): `infra` most-starved
+  (cyc 93 starved-for 7 > 6 → breaches) — the #5 branch-hygiene sweep is due (last C86, branch now ~46 commits) or a
+  CLAUDE.md refresh; deep-review (cyc 94, 6 > 5) also breaches. cov: be ~80% / fe 63.7%
