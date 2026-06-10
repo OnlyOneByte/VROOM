@@ -16,10 +16,13 @@
       path, surface them; **lock the new key-shape with the FE↔BE contract-drift guard** (loop-improvement
       #2 pattern). Pin a backend test that a reminder-materialized expense reports `sourceType:'reminder'`.
       *(Largely non-eyes-on — a response/type + guard.)*
-- [ ] **T2 — Split materialization characterization (R6).** If not already pinned, add the
-      characterization that an expense-type reminder with an even / percentage / absolute
-      `expenseSplitConfig` fires → N sibling expense rows with correct shares + `sourceType:'reminder'`
-      (the path at `trigger-service.ts:148-163`). Anchors T4 before any form change. *(Backend test only.)*
+- [x] **T2 — Split materialization characterization (R6) — DONE C102.** Extended
+      `trigger-expense.test.ts` (+2): an even-split ($100 across 2 vehicles → 2× $50) and a
+      percentage-split (75/25 of $200 → $150/$50) expense reminder fires → N sibling rows with correct
+      shares summing to the template amount, shared groupId, `split_method`, and every sibling stamped
+      `sourceType:'reminder'`/`sourceId` (the path at `trigger-service.ts:147-163`). Grouped by groupId so
+      the overdue catch-up months assert independently. Anchors T4 before any form change. validate:local
+      EXIT 0 (1112 pass).
 - [ ] **T3 — Cascade-safe delete (R4, D2).** On reminder delete/deactivate, sever the link on
       already-materialized rows via `clearSource('reminder', id, userId)` (keep history; do NOT
       `deleteBySource`). Mirror the C85 `onFinancingDeactivated` idiom for consistency. HTTP test:

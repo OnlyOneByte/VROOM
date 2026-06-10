@@ -22,14 +22,14 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 96 |
+| feature | 4 | 102 |
 | deep-review | 5 | 101 |
 | guard | 6 | 98 |
 | bug | 3 | 97 |
 | arch | 5 | 99 |
 | infra | 6 | 100 |
 
-Current cycle: **101**
+Current cycle: **102**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1884,3 +1884,20 @@ Current cycle: **101**
     pass / 0 fail (+1) · build bundled. Next (102): `feature` most-starved over budget (cyc 96, starved-for 6 > 4) →
     recurring-expenses **T2** (split-materialization characterization, backend/non-eyes-on) — now doubly de-risked (this cycle
     certified the split primitives). `bug` (cyc 97, 5 > 3) next. cov: be ~80% / fe 63.7%
+- **C102 (feature — recurring-expenses T2: split-materialization characterization)** — BALANCE: `feature` most-starved over
+  budget (cyc 96, starved-for 6 > 4) → forced; the actionable backend/non-eyes-on task is recurring-expenses T2 (now doubly
+  de-risked: C101 certified the split primitives). Grounded the gap first: `expenseSplitConfig` is referenced in
+  validation/trigger-service but NO trigger test FIRES a split expense reminder and checks the materialized rows — C96's
+  trigger-expense.test.ts covered only the SINGLE-expense path; reminder-refinements.test.ts is schema-only. Verified the
+  path vs source: a time-axis expense reminder CAN carry multiple vehicles (the D4 single-vehicle rule fires only for
+  mileage/both, validation.ts:114) + an expenseSplitConfig (even/percentage/absolute, same discriminated union as manual
+  splits); on trigger, createExpenseFromReminder:147-163 → computeAllocations → createSiblings → N rows each its share,
+  shared groupId, sourceType:'reminder'. Extended trigger-expense.test.ts (+2) with a split-materialization describe block:
+  (1) even split $100 across 2 vehicles → 2 siblings of $50 summing to 100, both source-linked, distinct vehicles, group_total
+  100, split_method 'even' — grouped by groupId so the overdue catch-up months each assert independently; (2) percentage
+  75/25 of $200 → v1=$150, v2=$50, summing to 200, source-linked. Pins the path recurring-expenses T4 (multi-vehicle split
+  in the form) materializes through. Verified: backend validate:local EXIT 0 — 1112 pass / 0 fail (+2) · build bundled.
+  T2 DONE; tasks.md ticked. Next (103): `bug` most-starved over budget (cyc 97, starved-for 6 > 3) → its top UNBLOCKED item
+  (the queue is otherwise Angelo-gated: lease/loan + #14/#16/#19) — re-verify the queue against source per the C89 lesson;
+  if genuinely all-gated, the actionable pick is recurring-expenses T3 (cascade-safe delete, backend, the C101-certified
+  clearSource path) or a guard. cov: be ~80% / fe 63.7%

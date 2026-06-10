@@ -78,7 +78,7 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    mobile. Then T6 e2e (incl. real-export signature validation). NOTE: T4–T6 are Playwright-eyes-on-blocked
    here, so the BACKEND of import-trackers (T1–T3) is complete but the feature isn't DONE until the FE→BE→DB
    round-trip e2e runs (feature-DoD rule) — lands "code-complete, eyes-on pending" like maintenance T7–T9.
-3. **Recurring expenses** — spec **APPROVED (Angelo signed off D1–D4, C94)**; **T0 done, T1 is the next backend
+3. **Recurring expenses** — spec **APPROVED (Angelo signed off D1–D4, C94)**; **T0–T2 done, T3 is the next backend
    build** per `.kiro/specs/recurring-expenses/`. KEY GROUNDING (verified against source C88, re-certified C94):
    the recurring-expense ENGINE ALREADY EXISTS — an `type:'expense'` reminder auto-creates real expense rows
    (single or multi-vehicle split, sourceType:'reminder') on its frequency via `trigger-service.ts`
@@ -94,11 +94,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    clean repository pass-through, not a hand-assembled response). The one genuine deliverable shipped: `expense-source-
    traceability.test.ts` (+3) pins the OBSERVABLE API contract (the existing trigger-expense test only checked the DB row,
    which a dropped mapper would pass while breaking the T6 badge) — GET list + GET /:id echo sourceType='reminder'/sourceId
-   for a materialized expense; a manual expense reports null. **NEXT = T2 (backend/non-eyes-on):** split-materialization
-   characterization — pin that an expense-type reminder with an even/percentage/absolute `expenseSplitConfig` fires → N
-   sibling rows with correct shares + `sourceType:'reminder'` (trigger-service.ts:148-163), anchoring T4 before any form
-   change. Then T3 (cascade-safe delete via clearSource — keep history). T4–T8 eyes-on. **This is the feature the loop can
-   ADVANCE while Playwright is blocked** (unlike maintenance T9 / import-trackers T4–T6, both stuck at eyes-on tails).
+   for a materialized expense; a manual expense reports null. **T2 DONE (C102):** split-materialization characterization —
+   extended trigger-expense.test.ts (+2) with even ($100→2×$50) + percentage (75/25 of $200→$150/$50) split reminders
+   firing → N siblings, correct shares summing to the template, shared groupId, all sourceType:'reminder' (the
+   trigger-service.ts:147-163 path; anchors T4). **NEXT = T3 (backend/non-eyes-on):** cascade-safe delete (R4, D2) — on
+   reminder delete/deactivate, sever the link on already-materialized rows via `clearSource('reminder', id, userId)` (KEEP
+   history; do NOT deleteBySource); mirror the C85 onFinancingDeactivated idiom; HTTP test: delete source → past rows
+   remain, link nulled, no future materialization. The clearSource primitive was CERTIFIED C101 (userId-scoped, keeps
+   rows). Then T4–T8 eyes-on. **This is the feature the loop can ADVANCE while Playwright is blocked** (unlike maintenance
+   T9 / import-trackers T4–T6, both stuck at eyes-on tails).
 
 > NOTE (cycle 12): both feature builds are large, MULTI-TASK efforts — one tasks.md task per loop
 > cycle, not one-and-done. They no longer gate the loop; pull T1 of the higher-value

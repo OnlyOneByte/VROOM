@@ -158,3 +158,117 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
     expect(reminderRow(reminderId).is_active).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// recurring-expenses T2 (C102): split-materialization characterization.
+//
+// An expense-type reminder can carry an expenseSplitConfig (even/percentage/absolute);
+// when it fires, createExpenseFromReminder routes through expenseSplitService.createSiblings
+// (trigger-service.ts:147-163) → ONE sibling row per vehicle, each its own share, sharing a
+// groupId, all stamped sourceType='reminder'/sourceId=reminder. The single-expense path was
+// pinned above (C96); the SPLIT path — the half recurring-expenses T4 (multi-vehicle split in
+// the form) materializes through — had no trigger-level test. This pins that the shares are
+// correct, sum to the template amount, and every sibling carries the source link.
+// ---------------------------------------------------------------------------
+
+/** Seed two vehicles, return their ids. */
+async function seedTwoVehicles(): Promise<[string, string]> {
+  const a = await seedVehicle();
+  const b = await seedVehicle();
+  return [a, b];
+}
+
+interface SplitRowDb extends ExpenseRowDb {
+  group_id: string | null;
+  group_total: number | null;
+  split_method: string | null;
+}
+
+function splitRowsForReminder(reminderId: string): SplitRowDb[] {
+  return ctx.sqlite
+    .query(
+      'SELECT id, category, expense_amount, tags, source_type, source_id, vehicle_id, group_id, group_total, split_method FROM expenses WHERE source_type = ? AND source_id = ? ORDER BY vehicle_id'
+    )
+    .all('reminder', reminderId) as SplitRowDb[];
+}
+
+describe('expense-reminder trigger — split materialization (recurring-expenses T2)', () => {
+  test('an even-split expense reminder materializes one sibling per vehicle, shares summing to the amount, all source-linked', async () => {
+    const [v1, v2] = await seedTwoVehicles();
+    const reminderId = await createOverdueExpenseReminder(v1, {
+      vehicleIds: [v1, v2],
+      expenseAmount: 100,
+      expenseSplitConfig: { method: 'even', vehicleIds: [v1, v2] },
+    });
+
+    const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
+    expect(res.status).toBe(200);
+
+    // First period materializes 2 siblings (one per vehicle). The reminder may catch up
+    // additional months (overdue since Jan 2024) — assert on the FIRST period's group.
+    const rows = splitRowsForReminder(reminderId);
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+
+    // Group the rows by groupId; each group is one period's split.
+    const byGroup = new Map<string, SplitRowDb[]>();
+    for (const r of rows) {
+      const g = r.group_id ?? 'none';
+      byGroup.set(g, [...(byGroup.get(g) ?? []), r]);
+    }
+    // Every group: 2 siblings, $50 each, summing to the $100 template, both source-linked.
+    for (const siblings of byGroup.values()) {
+      expect(siblings).toHaveLength(2);
+      const sum = siblings.reduce((s, r) => s + r.expense_amount, 0);
+      expect(sum).toBeCloseTo(100, 2);
+      for (const r of siblings) {
+        expect(r.expense_amount).toBeCloseTo(50, 2);
+        expect(r.split_method).toBe('even');
+        expect(r.group_total).toBeCloseTo(100, 2);
+        expect(r.source_type).toBe('reminder');
+        expect(r.source_id).toBe(reminderId);
+      }
+      // Siblings cover distinct vehicles.
+      expect(new Set(siblings.map((r) => r.vehicle_id)).size).toBe(2);
+    }
+  });
+
+  test('a percentage-split expense reminder materializes shares by percentage, summing to the amount', async () => {
+    const [v1, v2] = await seedTwoVehicles();
+    const reminderId = await createOverdueExpenseReminder(v1, {
+      vehicleIds: [v1, v2],
+      expenseAmount: 200,
+      expenseSplitConfig: {
+        method: 'percentage',
+        allocations: [
+          { vehicleId: v1, percentage: 75 },
+          { vehicleId: v2, percentage: 25 },
+        ],
+      },
+    });
+
+    const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
+    expect(res.status).toBe(200);
+
+    const rows = splitRowsForReminder(reminderId);
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+
+    const byGroup = new Map<string, SplitRowDb[]>();
+    for (const r of rows) {
+      const g = r.group_id ?? 'none';
+      byGroup.set(g, [...(byGroup.get(g) ?? []), r]);
+    }
+    for (const siblings of byGroup.values()) {
+      expect(siblings).toHaveLength(2);
+      const sum = siblings.reduce((s, r) => s + r.expense_amount, 0);
+      expect(sum).toBeCloseTo(200, 2);
+      // v1 gets 75% = 150, v2 gets 25% = 50.
+      const byVehicle = new Map(siblings.map((r) => [r.vehicle_id, r.expense_amount]));
+      expect(byVehicle.get(v1)).toBeCloseTo(150, 2);
+      expect(byVehicle.get(v2)).toBeCloseTo(50, 2);
+      for (const r of siblings) {
+        expect(r.split_method).toBe('percentage');
+        expect(r.source_id).toBe(reminderId);
+      }
+    }
+  });
+});
