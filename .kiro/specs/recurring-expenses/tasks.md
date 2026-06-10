@@ -11,11 +11,18 @@
 
 ### Backend / trust-first (D4 order)
 
-- [ ] **T1 — Grounding check + traceability response (R3, A1).** Confirm whether the expense GET
-      response and the frontend `Expense` type carry `sourceType`/`sourceId`. If missing on the read
-      path, surface them; **lock the new key-shape with the FE↔BE contract-drift guard** (loop-improvement
-      #2 pattern). Pin a backend test that a reminder-materialized expense reports `sourceType:'reminder'`.
-      *(Largely non-eyes-on — a response/type + guard.)*
+- [x] **T1 — Grounding check + traceability response (R3, A1) — DONE C96.** Grounding found the read path
+      was ALREADY a no-op: all expense reads use bare `.select()` (every column incl. sourceType/sourceId)
+      and `buildPaginatedResponse` passes rows verbatim — no mapper to fix; the frontend `Expense` type
+      already declares `sourceType?`/`sourceId?` (expense.ts:57-58). Per C80, a contract-drift guard is NOT
+      warranted on a clean repository pass-through (it's not a hand-assembled response). The genuine
+      deliverable shipped: `expense-source-traceability.test.ts` pins the OBSERVABLE HTTP contract through
+      the real stack (route→trigger→split/insert→DB→GET serialize) — a materialized expense echoes
+      `sourceType:'reminder'`/`sourceId` in the response (the C91 positive-contract class; the existing
+      trigger-expense.test.ts only checked the DB row, which a dropped mapper would pass while breaking the
+      T6 badge), and a manual expense reports null. validate:local EXIT 0 (1103 pass, +3). *(C170: ticked —
+      the checkbox was stale; T1 shipped C96. With this, ALL recurring-expenses BACKEND tasks [T1–T3 + T5
+      gate + T6/T7 seams] are complete — only the eyes-on UI tail [T4/T5-hook/T6/T7 markup + T8 e2e] remains.)*
 - [x] **T2 — Split materialization characterization (R6) — DONE C102.** Extended
       `trigger-expense.test.ts` (+2): an even-split ($100 across 2 vehicles → 2× $50) and a
       percentage-split (75/25 of $200 → $150/$50) expense reminder fires → N sibling rows with correct

@@ -42,7 +42,7 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 165 |
+| feature | 4 | 170 |
 | deep-review | 5 | 167 |
 | guard | 6 | 169 |
 | bug | 3 | 168 |
@@ -3058,3 +3058,15 @@ Current cycle: **150**
   **EXIT 0 — 503 pass (+11)**, tsc 0, build done. **FE SERVICE LAYER now 100% module-covered** (api-client C143 + expense-api
   C149 + reminder-api C163 + settings-api C169 + analytics-api partial + error-handling C137). cov: fe 70.18%+ (carry; +11 FE) /
   be 82.70% (carry)
+- **C170 (feature → spec reconcile: tick recurring-expenses T1 done — it shipped C96, checkbox was stale)** — BALANCE: `feature`
+  the only over-budget category (cyc 165, starved-for 5 > 4) → forced. HONESTLY re-checked for a buildable slice before falling
+  through (don't-force-a-blocked rule): money-cents + trips both T0-gated (Angelo, escalated C164/C165); the 3 in-flight features
+  eyes-on-blocked. But found a genuine non-eyes-on feature increment: recurring-expenses tasks.md T1 was UNCHECKED `[ ]` despite
+  shipping C96 — a stale checkbox. VERIFIED firsthand (the C150 don't-trust-memory discipline): `expense-source-traceability.test.ts`
+  EXISTS (6130 bytes) + covers exactly the T1 deliverable (the read-path HTTP contract — a materialized expense echoes
+  sourceType:'reminder'/sourceId through the real route→trigger→DB→serialize stack; manual → null). Ticked T1 [x] with the C96
+  grounding (read path was already a clean no-op pass-through → no contract-drift guard warranted per C80; the genuine deliverable
+  was the observable-contract test). This RECONCILES the spec with reality + CONFIRMS recurring-expenses' entire BACKEND (T1–T3 +
+  T5 gate + T6/T7 seams) is complete — only the eyes-on UI tail remains, so the feature-starvation is honest, not a missed
+  buildable slice. Spec-doc-only — no code, no build gate (the C4/C9 convention; verified the test exists firsthand). Re-escalation
+  NOT re-sent (folded into the standing C164/C165 asks). cov: carry (doc-only cycle)
