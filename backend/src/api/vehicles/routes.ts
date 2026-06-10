@@ -9,7 +9,7 @@ import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../types';
 import { getPeriodStartDate } from '../../utils/calculations';
-import { commonSchemas } from '../../utils/validation';
+import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
 import { financingRepository } from '../financing/repository';
@@ -284,10 +284,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const { id } = c.req.valid('param');
 
   // Check if vehicle exists and belongs to user
-  const existingVehicle = await vehicleRepository.findByUserIdAndId(user.id, id);
-  if (!existingVehicle) {
-    throw new NotFoundError('Vehicle');
-  }
+  await validateVehicleOwnership(id, user.id);
 
   // Cascade delete all photos (provider files + DB) BEFORE removing the vehicle.
   // The photos table links to entities by (entity_type, entity_id) strings with
@@ -327,10 +324,7 @@ routes.get(
     const { period } = c.req.valid('query');
 
     // Verify vehicle exists and belongs to user
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, id);
-    if (!vehicle) {
-      throw new NotFoundError('Vehicle');
-    }
+    const vehicle = await validateVehicleOwnership(id, user.id);
 
     // Get all fuel expenses for this vehicle
     const fuelExpenses = await expenseRepository.findAll({

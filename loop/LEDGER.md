@@ -35,10 +35,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 108 |
 | guard | 6 | 112 |
 | bug | 3 | 109 |
-| arch | 5 | 106 |
+| arch | 5 | 113 |
 | infra | 6 | 110 |
 
-Current cycle: **112**
+Current cycle: **113**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2101,3 +2101,19 @@ Current cycle: **112**
   middleware low spots (idempotency C105, rate-limit C112) now covered. Next (113): `arch` most-starved over budget (cyc 106,
   starved-for 7 > 5) → the C106 follow-on (vehicles/routes.ts ownership convergence — mixed shapes, verify per-site) or
   rule-7 fan-out. cov: be ~81% / fe 61.4% (carry C107; backend +1 module covered)
+- **C113 (arch — converge vehicles/routes.ts ownership checks on validateVehicleOwnership; COMPLETES the C99 arc)** —
+  BALANCE: `arch` most-starved over budget (cyc 106, starved-for 7 > 5), beat bug (4). The C106 follow-on — the LAST of the
+  C99 three route files (analytics C99, expenses C106, financing EXCLUDED as the HTTPException trap). PER-SITE VERIFICATION
+  (the C69/C106 discipline — the file was flagged mixed-shape): 4 NotFoundError('Vehicle') sites, only 2 convertible. GET
+  /:id (:205) + PUT /:id (:249) use `findByIdWithAccess` (the SHARED-ACCESS lookup, NOT findByUserIdAndId) AND use the
+  returned vehicle (GET enriches financing; PUT reads licensePlate/unitPreferences) → EXCLUDED (different semantics + result
+  used). DELETE /:id (:287, binding unused → discard form) + GET /:id/stats (:330) are findByUserIdAndId + throw → CONVERTED.
+  THE GATE EARNED ITS KEEP: my pre-edit awk scan said the stats `vehicle` binding was unused, but tsc caught 3 uses at
+  :351-353 (vehicle.initialMileage/trackFuel/trackCharging fed to calculateVehicleStats) — so the validator's RETURN value
+  is needed there; fixed to `const vehicle = await validateVehicleOwnership(id, user.id)` (the validator returns Promise
+  <Vehicle>, so capturing it is byte-equivalent). DELETE stays the discard form. NotFoundError + vehicleRepository imports
+  STAY (still used at the 2 excluded sites + delete/findByLicensePlate). GREEN→GREEN PROOF: vehicles route + property suites
+  stayed green UNCHANGED — 1138 pass, same as C112 = behavior-preserving. Verified: backend validate:local EXIT 0, build
+  bundled. **The C99 ownership-convergence arc is COMPLETE** (analytics/expenses/vehicles converged; financing excluded by
+  design). Next (114): nothing forced (deep-review cyc 108 = budget at 113... recompute next cycle) → highest-leverage. cov:
+  be ~81% / fe 61.4% (carry C107)

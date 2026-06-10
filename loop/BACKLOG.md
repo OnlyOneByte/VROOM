@@ -625,15 +625,15 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
    (C75 reasoning, arch rule 5). If a providersRepository is ever introduced, route ALL its raw queries through
    it as one coherent change — not piecemeal.*
 
-- **Converge the REMAINING route file(s) on `validateVehicleOwnership` (C99 follow-on — next arch pick).** C99 converged
-  `analytics/routes.ts` (6 sites); C106 converged **expenses/routes.ts** (4 sites: 301/356/538/593, optional ones kept
-  inside their `if (vehicleId)` guards; dropped the unused NotFoundError import). STILL OPEN: **vehicles/routes.ts** —
-  has `findByUserIdAndId + NotFoundError('Vehicle')` sites (~287/330) but ALSO bare `throw NotFoundError('Vehicle')` at
-  ~208/251 that may NOT have an adjacent find (verify per-site; some sites may USE the returned vehicle, not discard it —
-  those keep the binding via `const v = await validateVehicleOwnership(...)`). **financing/routes.ts EXCLUDED (C106):** its
-  2 sites throw `HTTPException(404, {message:'Vehicle not found'})`, NOT `NotFoundError('Vehicle')` — converging would
-  change the error envelope (NOT behavior-preserving; the C69 "not byte-identical" exclusion). One file per arch cycle
-  (the C36/C50 pattern), verify byte-identical vs source first, green→green, drop unused imports as they fall out (tsc confirms).
+- ~~**Converge the REMAINING route files on `validateVehicleOwnership` (C99 follow-on).**~~ — *DONE — the ARC IS COMPLETE
+  (analytics C99 · expenses C106 · vehicles C113; financing EXCLUDED by design). **C113 closed vehicles/routes.ts:** per-site
+  verification (the file was mixed-shape) converted the 2 byte-identical sites — DELETE /:id (:287, binding unused → discard
+  form) + GET /:id/stats (:330, captures the return: `const vehicle = await validateVehicleOwnership(...)` since the stats
+  handler uses vehicle.initialMileage/trackFuel/trackCharging — tsc caught this after a pre-edit scan missed it). EXCLUDED
+  GET /:id (:205) + PUT /:id (:249): they use `findByIdWithAccess` (SHARED-access lookup, not findByUserIdAndId) AND use the
+  returned vehicle — different semantics, correctly left. NotFoundError + vehicleRepository imports stay (the excluded sites
+  still use them). green→green 1138 pass unchanged. **financing/routes.ts stays EXCLUDED** — its 2 sites throw
+  `HTTPException(404)`, not `NotFoundError('Vehicle')`; converging would change the error envelope (the C69 exclusion).*
 - ~~**Converge `analytics/routes.ts` on shared `validateVehicleOwnership` (C99).**~~ — *DONE C99: rule-7 fan-out found the
   inline `findByUserIdAndId` + `NotFoundError('Vehicle')` ownership check hand-repeated at 13 sites across 4 route files; a
   shared `validateVehicleOwnership` already existed (used by odometer/insurance/photos). Scoped to analytics (6 sites — the
