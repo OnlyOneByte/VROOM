@@ -984,7 +984,15 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > commits since the last refresh by theme so the eventual PR stays reviewable. Counts as one `infra`
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
-*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C148; CLAUDE.md refresh next ~C160.)*
+*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep DONE C152 (branch 101 commits, be 82.0%/fe 70.1% line), next due ~C162; CLAUDE.md refresh next ~C160.)*
+- ~~**#5 branch-hygiene sweep + coverage re-measure (C152)**~~ — *DONE C152 (overdue; last C138, branch now 101 commits / 14
+  cycles of drift). (1) zero stray untracked unit/spec tests (all untracked = the by-design `*.meshclaw.e2e.ts` set + `.meshclaw-tools/`
+  harness + screenshots/snapshots + gitignored dirs); (2) green baseline + re-measure — backend bun test --coverage EXIT 0
+  (1189 BE / 1 skip), frontend vitest --coverage 470 FE; (3) BRANCH_REVIEW.md refresh — header 85→101, status 1164→1189 BE /
+  435→470 FE, appended §22 (C138–C151), reviewer checklist now reflects #27 + lease/loan APPROVED C151 (only #36/#37 HIGHs still
+  gated). RE-MEASURE: be 82.02% line / 82.51% func (func up from C138's 81.81%); fe 70.09% line / 66.77% func / 62.85% branch
+  (UP +4.8 line / +4.2 branch from C138 — the C143/C149 service-layer ratchet broke 70% line). Updated the COVERAGE TREND
+  header. Doc/measurement-only. Next sweep ~C162.*
 - ~~**CLAUDE.md orientation refresh post-C131–C144 (C145)**~~ — *DONE C145: 5 drifts fixed (verified vs source/LEDGER, no churn).
   (1) import-trackers "frontend not started" → FE client slice shipped C140; (2) recurring-expenses "frontend not started" →
   T6/T7 FE client methods shipped C134; (3) coverage cited stale C124 (81.8/62.0) + named error-handling/api-client as next low

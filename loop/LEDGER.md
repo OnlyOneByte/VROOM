@@ -20,7 +20,10 @@
 > capitalize FE ratchet; STILL the bigger gap).** **RE-MEASURED AGAIN C138 (the #5-sweep coverage re-measure): be 82.25% line /
 > 81.81% func (line creeping up — C136 restore guard etc.; func ~flat as product code grew); fe 65.32% line / 61.76% func /
 > 58.70% branch (UP +3.3 line / +6.2 branch from C124 — the C125 vehicle-form + C130 formatters + C134 reminder-api + C137
-> error-handling FE ratchet arc DELIVERED; still the bigger gap but closing).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> error-handling FE ratchet arc DELIVERED; still the bigger gap but closing).** **RE-MEASURED AGAIN C152 (the #5-sweep
+> coverage re-measure): be 82.02% line / 82.51% func (func up from C138's 81.81%; +25 BE tests C139–C151); fe 70.09% line /
+> 66.77% func / 62.85% branch (UP +4.8 line / +4.2 branch from C138 — the C143 api-client + C149 expense-api service-layer
+> ratchet BROKE 70% line for the first time; FE still the bigger gap but closing fast).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -41,7 +44,7 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 149 |
 | bug | 3 | 148 |
 | arch | 5 | 147 |
-| infra | 6 | 145 |
+| infra | 6 | 152 |
 
 Current cycle: **150**
 
@@ -2776,3 +2779,18 @@ Current cycle: **150**
   cycle: Angelo APPROVED **#27 (TCO principal double-count)** + **lease/loan currentOdometer** — both un-gated in BACKLOG (saved
   as lessons); a future bug/feature cycle implements each (#27 default = option (c) exclude financing-sourced rows). cov: be
   82.25%+ (carry; +3 BE) / fe 65.32% (carry)
+- **C152 (infra): the #5 branch-hygiene sweep + coverage re-measure (overdue — last C138, branch now 101 commits / 14 cycles
+  of drift)** — BALANCE: two over budget → most-starved wins → `infra` (cyc 145, starved-for 7) > `bug` (4); matches the
+  C150/C151 forecast. The three-part sweep: (1) STRAY-TEST SCAN — `git status --untracked-files=all` shows ZERO untracked
+  unit/spec `*.test.ts` (the only test-like untracked files are the by-design `*.meshclaw.e2e.ts` set + `.meshclaw-tools/`
+  harness); nothing vanishes on merge. (2) GREEN BASELINE + RE-MEASURE (loop-improvement #4): backend `bun test --coverage`
+  EXIT 0 — 1189 pass / 1 skip; **be 82.02% line / 82.51% func** (func +0.7 from C138's 81.81%). frontend `vitest run --coverage`
+  470 pass; **fe 70.09% line / 66.77% func / 62.85% branch** (UP +4.8 line / +4.2 branch from C138's 65.32/58.70 — the C143
+  api-client + C149 expense-api service-layer ratchet BROKE 70% line for the first time). Updated the COVERAGE TREND header.
+  (3) BRANCH_REVIEW.md refresh — header 85→101 commits, status 1164→1189 BE / 435→470 FE + fresh coverage, appended **§22
+  (C138–C151:** #42 backup snapshot-stamp + bug-#13 dupe-flood completion [both data-safety], #39/#41/#46/#50 bug fixes, the
+  money-cents migration spec, import-trackers FE client, 2 arch seams [validateVehicleIdsOwned + backend extractErrorMessage],
+  the FE service-layer ratchet); reviewer checklist now reflects **#27 + lease/loan APPROVED C151** (moved out of pending →
+  loop-buildable) with only #36/#37 HIGHs still Angelo-gated. BRANCH_REVIEW.md is gitignored. Doc/measurement-only — no code
+  change, no build gate beyond the two coverage runs. Next sweep ~C162; CLAUDE.md refresh next ~C160. cov: be 82.02% line /
+  82.51% func (re-measured) / fe 70.09% line (re-measured)
