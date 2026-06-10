@@ -27,9 +27,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 85 |
 | bug | 3 | 71 |
 | arch | 5 | 79 |
-| infra | 6 | 81 |
+| infra | 6 | 86 |
 
-Current cycle: **85**
+Current cycle: **86**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1577,3 +1577,15 @@ Current cycle: **85**
   backend validate:local EXIT 0 (tsc 0 · musl-biome clean · 1076 pass/0 fail, +4 · build bundled). Next (86):
   the #5 branch-hygiene sweep is due (~C86, last C76, branch now 34 commits) — a clean infra pick; else the
   next coverage target (reminders/validation 64%). arch stays direction-blocked; feature/bug gated. cov: be ~80% / fe 63.7%
+- **C86 (infra — #5 branch-hygiene sweep, BRANCH_REVIEW.md refresh)** — feature (16) + bug (15) blocked (12th
+  cycle); arch most-starved + OVER (cyc 79, 7 > 5) but still direction-blocked (page-migration misfit, reshape
+  pending C79). The #5 sweep was due (~C86, last C76) and is a clean actionable infra pick. Sweep: (1) stray
+  untracked unit tests outside *.meshclaw.e2e.ts — ZERO; (2) green baseline — 1076 BE + 367 FE (regress.sh
+  Playwright-blocked); (3) BRANCH_REVIEW.md (gitignored) refresh — header 26→36 commits / +4355/−287, appended
+  §17 (C76–C85: the contract-drift CLOSURE [year-end C78 + getVehicleHealth C80 → loop-improvement #2 done],
+  the C81 coverage-baseline revival, the C82–C85 coverage-ratchet arc [timeout/pending-creds/split-validation/
+  financing-hook], + the C77/C79 direction-call findings), and noted the C76–C85 arc is overwhelmingly
+  test/guard hardening with ZERO product-behavior change → near-zero merge risk. Doc-only (BRANCH_REVIEW
+  gitignored → commit carries only loop docs). Next sweep ~C96. Next (87): recompute — arch (cyc 79, starved-
+  for 8) most-starved but direction-blocked; deep-review (cyc 82, 5 = budget) or another high-value coverage
+  guard (reminders/validation 64%) the actionable pick. feature/bug Angelo-gated (12 cycles). cov: be ~80% / fe 63.7%

@@ -492,6 +492,11 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
 *(queue empty — repopulate as loop tooling / docs needs surface.)*
+- ~~**#5 branch-hygiene sweep — BRANCH_REVIEW.md refresh (C86)**~~ — *DONE C86: due per the C76 note
+  (~10 cycles, branch now 36 commits). (1) zero stray untracked unit tests; (2) full validate:local green
+  (1076 BE + 367 FE); (3) digest header 26→36 commits / +4355/−287, appended §17 (C76–C85: loop-improvement
+  #2 CLOSED, coverage-baseline revival, the C82–C85 coverage arc, C77/C79 direction-call findings) + noted
+  the arc is test/guard hardening with zero product change. BRANCH_REVIEW.md is gitignored. Next sweep ~C96.*
 - ~~**#5 branch-hygiene sweep — BRANCH_REVIEW.md refresh (C76)**~~ — *DONE C76: due per the C66 note
   (~10 cycles, branch now 26 commits). (1) zero stray untracked unit tests; (2) full validate:local green
   (1046 BE + 367 FE; regress.sh Playwright-blocked); (3) digest header 16→26 commits / +3589/−287, appended
