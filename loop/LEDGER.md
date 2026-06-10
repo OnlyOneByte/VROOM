@@ -46,7 +46,7 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 167 |
 | guard | 6 | 169 |
 | bug | 3 | 168 |
-| arch | 5 | 166 |
+| arch | 5 | 172 |
 | infra | 6 | 171 |
 
 Current cycle: **150**
@@ -3080,3 +3080,17 @@ Current cycle: **150**
   listed only #27/#54 → added **#57** (C167 insurance policy-delete premium-expense orphan) + the MED fixes #52/#55/#56/#48
   (C155–C168). Doc-only — no build gate (the standing convention; every claim verified vs source/LEDGER). Next CLAUDE.md refresh
   ~C184; #5 sweep next ~C174. cov: be 82.70% / fe 70.18% (carry, doc-only)
+- **C172 (arch): extract `validateOdometerOwnership` — the inline odometer ownership guard, 3 sites → 1** — BALANCE: two over
+  budget → most-starved (absolute) wins → `arch` (cyc 166, starved-for 6) > `bug` (4). Took the one primed arch pick (the C160
+  audit's BE runner-up). The `const entry = await odometerRepository.findById(id); if (!entry || entry.userId !== user.id) throw
+  new NotFoundError('Odometer entry')` guard repeated **3× byte-identical** in odometer/routes.ts (GET /entry/:id:99, PUT:146,
+  DELETE:165). VERIFIED all 3 firsthand + confirmed findById returns OdometerEntry|null (BaseRepository generic). A DIFFERENT repo
+  contract than the C160 reminder helper (findById + explicit userId post-filter — the validateInsuranceOwnership shape, NOT
+  findByIdAndUserId), so its own helper. FIX: added `validateOdometerOwnership(entryId, userId): Promise<OdometerEntry>` to
+  utils/validation.ts (mirrors validateInsuranceOwnership) + wired all 3 (GET consumes entry, PUT/DELETE guard-only) + dropped the
+  now-dead NotFoundError import (C123/C160 class; biome enforced). Test-anchored (rule 3 — the C160 caveat: odometer routes had NO
+  404 test): +3 not-found 404 tests in update-route.test.ts (GET/PUT/DELETE :id → 404 for a non-existent id), pinning the helper's
+  throw at all 3 sites (the cross-tenant leg stays covered by the cycle-138 IDOR suite, which passes green through the helper).
+  green→green: backend validate:local **EXIT 0 — 1214 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean (one import reflow
+  autofixed), build bundled. **ARCH QUEUE now EMPTY of primed picks** — next arch cycle runs a fresh rule-7 audit fan-out to
+  repopulate. cov: be 82.70%+ (carry; +3 BE) / fe 70.18% (carry)

@@ -72,9 +72,16 @@ export const commonSchemas = {
 import { expenseRepository } from '../api/expenses/repository';
 import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
+import { odometerRepository } from '../api/odometer/repository';
 import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
 import { vehicleRepository } from '../api/vehicles/repository';
-import type { Expense, InsurancePolicy, Vehicle, VehicleFinancing } from '../db/schema';
+import type {
+  Expense,
+  InsurancePolicy,
+  OdometerEntry,
+  Vehicle,
+  VehicleFinancing,
+} from '../db/schema';
 import { NotFoundError } from '../errors';
 
 /**
@@ -183,6 +190,23 @@ export async function validateReminderOwnership(
     throw new NotFoundError('Reminder');
   }
   return reminder;
+}
+
+/**
+ * Validate that an odometer entry belongs to the user, returning it. The userId-scoped counterpart to
+ * the inline `findById` + `entry.userId !== userId` guard the odometer routes repeated 3×; mirrors the
+ * validateInsuranceOwnership shape (findById has no userId arg, so re-check the column post-fetch).
+ * @throws NotFoundError if the entry is not found or doesn't belong to the user
+ */
+export async function validateOdometerOwnership(
+  entryId: string,
+  userId: string
+): Promise<OdometerEntry> {
+  const entry = await odometerRepository.findById(entryId);
+  if (!entry || entry.userId !== userId) {
+    throw new NotFoundError('Odometer entry');
+  }
+  return entry;
 }
 
 /**

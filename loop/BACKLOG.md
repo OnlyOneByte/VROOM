@@ -904,12 +904,12 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     extractErrorMessage, replaced all 9 call sites with `extractErrorMessage(err, UNEXPECTED_ERROR)` (fallback hoisted to a named
     const). Behavior-preserving; anchored by extractErrorMessage's existing test + green→green FE suite (the C160 precedent — store
     has no test file; adding one is heavier than the dedup warrants). green→green fe 492 pass (unchanged).*
-  - **Also filed C160 (backend audit runner-up):** `validateOdometerOwnership` — the `const entry = await
-    odometerRepository.findById(id); if (!entry || entry.userId !== user.id) throw new NotFoundError('Odometer entry')` guard
-    repeated 3× in odometer/routes.ts (GET /entry/:id:99, PUT:146, DELETE:165), byte-identical. A DIFFERENT repo contract than the
-    reminder helper (findById + explicit userId post-filter, like validateInsuranceOwnership — NOT findByIdAndUserId), so its own
-    helper. CAVEAT (arch rule 3): odometer routes have NO existing 404/cross-user not-found test, so this pick must WRITE the
-    anchoring test (the C160 reminder pick rode existing 404 coverage; this one doesn't). Slightly more work but still one clean cycle.
+  - ~~**validateOdometerOwnership (filed C160 backend audit runner-up)**~~ — *DONE C172: the `findById + entry.userId !==
+    user.id → NotFoundError('Odometer entry')` guard repeated 3× byte-identical in odometer/routes.ts (GET /entry/:id, PUT,
+    DELETE). Added validateOdometerOwnership to utils/validation.ts (mirrors validateInsuranceOwnership — findById + post-filter,
+    NOT findByIdAndUserId) + wired all 3 (GET consumes entry, PUT/DELETE guard-only) + dropped the dead NotFoundError import. Wrote
+    the anchoring 404 tests the caveat flagged: +3 not-found cases in update-route.test.ts (GET/PUT/DELETE → 404). green→green 1214
+    pass (+3).* **ARCH QUEUE again empty of primed picks — next arch cycle runs a rule-7 audit fan-out to repopulate.**
   - **Next arch pick when one is due:** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the
     eyes-on + pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the
     ~57 logging sites is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.
