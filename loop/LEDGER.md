@@ -41,7 +41,7 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 151 |
 | deep-review | 5 | 155 |
-| guard | 6 | 149 |
+| guard | 6 | 156 |
 | bug | 3 | 154 |
 | arch | 5 | 153 |
 | infra | 6 | 152 |
@@ -2850,3 +2850,15 @@ Current cycle: **150**
     when two cars have close odometers; reachable via /fuel-efficiency with no vehicleId. FILED (not fixed — a fresh
     increment for a future bug/deep-review cycle; needs the query reshape + a regression test). Its div-guard/split-sibling
     checks matched my C155 pre-read (clean). Committed `01175d6` (BACKLOG #54 + this triage note, doc-only).*
+- **C156 (guard): coverage-ratchet `middleware/body-limit.ts` (the C138-named backend low spot)** — BALANCE: two over budget
+  → most-starved (absolute) wins → `guard` (cyc 149, starved-for 7) > `feature` (5), by the C152/C153 precedent. THE PICK:
+  body-limit.ts sat ~35% line — a DoS guard wired LIVE in TWO places (app.ts:41 global + sync/routes.ts:209 backup upload,
+  maxSize=CONFIG.backup.maxFileSize; reachability CONFIRMED, not dead code) yet only its happy path was incidentally exercised.
+  Mirrored the proven C105/C112 middleware-net pattern (minimal Hono app + a handler-run counter that proves whether next()
+  ran). +7 in body-limit.test.ts pinning the full contract: under-limit→200/handler-runs; over-limit→413 PAYLOAD_TOO_LARGE with
+  the MB-formatted message + handler NOT run; EXACTLY-at-limit→passes (the check is strict `size > maxSize` — the boundary a
+  refactor could flip); no-Content-Length→passthrough (the chunked/streaming gap, documented — the uncompressed-size guards
+  backstop the backup path); malformed (NaN) Content-Length→passthrough; custom-message override; multi-MB message formatting
+  (5.00MB cap / 10.00MB received). maxSize/message come from the config ARG (no frozen-CONFIG vacuity trap). green→green: backend
+  validate:local **EXIT 0 — 1203 pass / 1 skip / 0 fail (+7)**, tsc 0, musl-biome clean, build bundled. Backend middleware trio
+  now all covered (idempotency C105 + rate-limit C112 + body-limit C156). cov: be 82.0%+ (carry; +7 BE) / fe 70.09% (carry)

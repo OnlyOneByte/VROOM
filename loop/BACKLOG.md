@@ -302,10 +302,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > the methods drive [buildExpenseQuery was already pinned]; +13: getExpense amount/volume/charge-by-fuelType mapping, list
 > getPaginated passthrough + per-row transform, create OMITS empty description / update sends NULL [the clear-field class],
 > downloadExpensesCsv blob→anchor + non-ok throw, split/delete wiring).
+> `middleware/body-limit.ts` 35%→covered (C156 — the C138-named backend low spot; the DoS guard wired live at app.ts:41 +
+> sync/routes.ts:209 but only its happy path was hit; +7 via the C105/C112 minimal-Hono+handler-counter pattern: under→200,
+> over→413 PAYLOAD_TOO_LARGE/handler-not-run/MB-message, EXACT-boundary passes (strict `>`), no-Content-Length passthrough
+> (chunked gap), malformed-NaN passthrough, custom-message override, multi-MB formatting. **Backend middleware trio now all
+> covered — idempotency C105 + rate-limit C112 + body-limit C156.**)
 > NEXT high-value low spots
-> **(C138 re-measure — be 82.25% line / fe 65.32% line; FE STILL the bigger gap but closing):**
-> backend — `body-limit.ts` (35% line size-enforcement branch), `sync/restore.ts`+`sync/routes.ts` (~32–61%,
-> HTTP-harness-tractable); FRONTEND — the FE SERVICE layer is now well-covered (error-handling C137 + api-client C143 +
+> **(C152 re-measure — be 82.02% line / fe 70.09% line; FE STILL the bigger gap but closing — broke 70%):**
+> backend — ~~`body-limit.ts`~~ DONE C156; `sync/restore.ts`+`sync/routes.ts` (~32–61%,
+> HTTP-harness-tractable) are the remaining named backend low spots; FRONTEND — the FE SERVICE layer is now well-covered (error-handling C137 + api-client C143 +
 > expense-api C149); the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
 > `.svelte.ts`/store/util modules still thin). (SKIP navigation.ts — thin goto
 > wrappers, coverage theater.) Route/
