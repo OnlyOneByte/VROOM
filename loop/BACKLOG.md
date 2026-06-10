@@ -325,6 +325,8 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> **✅ APPROVED BY ANGELO 2026-06-10 (C151) — ready to execute (the swap both call sites + period-independence
+> regression test; eyes-on for the FinanceTab UI render, but the call-site swap + test are loop-buildable).**
 > **PENDING ANGELO (confirmed + traced C54, do NOT execute unilaterally — user-visible $ change):**
 > **Lease/loan miles-used consume the period-scoped `currentMileage`.** `FinanceTab.svelte` passes
 > `vehicleStatsData?.currentMileage` to both `PaymentMetricsGrid` (loan `mileageUsed`, line ~151) and
@@ -338,6 +340,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > (it changes a displayed $ figure). When approved: swap both sites + a regression test asserting the
 > projected excess fee is period-independent. *Sibling display call (#card semantics) stays with Angelo.*
 
+> **✅ APPROVED BY ANGELO 2026-06-10 (C151) — "TCO Principal … approved." The accounting-model decision is now UNBLOCKED.
+> Angelo approved the FIX but did not name which option (a/b/c); the principled default is (c) — keep `purchasePrice` as the
+> acquisition cost and EXCLUDE financing-sourced expense rows from the total (the payments retire the price already counted),
+> which needs NO new data and removes the double-count cleanly. A future cycle implements + regression-tests it; if Angelo
+> prefers (a) interest-only or (b) drop-purchasePrice, that's a one-line steer. Logged as a lesson.**
 > **PENDING ANGELO — #27 (HIGH, the loop's first; found + VERIFIED C120; an ACCOUNTING-MODEL decision, do NOT pick
 > unilaterally — it changes the headline TCO $):** **TCO double-counts a financed vehicle's principal.** `getVehicleTCO`
 > (analytics/repository.ts:1782-1788) computes `totalCost = (purchasePrice ?? 0) + costs.financingInterest + insurance +

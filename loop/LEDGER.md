@@ -36,7 +36,7 @@ the next increment MUST come from the most-starved over-budget category.
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 146 |
+| feature | 4 | 151 |
 | deep-review | 5 | 150 |
 | guard | 6 | 149 |
 | bug | 3 | 148 |
@@ -2754,3 +2754,25 @@ Current cycle: **150**
   unchanged = behavior-preserving for the common single-/distinct-endDate path). Agent A (reminders) findings pending its delayed
   completion event → will triage/file then. Filed agent-B LOW #51 (active-policy-with-no-terms inflates activePoliciesCount while
   contributing $0). cov: be 82.25% (carry; +1 BE) / fe 65.32% (carry)
+- **C151 (feature → recurring-expenses ENGINE hardening: complete bug #13, the catch-up dupe-flood — root-caused a leaked
+  dupe + Angelo APPROVED #27 + lease/loan)** — BALANCE: `feature` the only over-budget category (cyc 146, starved-for 5 > 4).
+  In-flight features all at eyes-on tails + money-cents gated → the buildable feature increment is the recurring-expenses
+  engine itself (its materialization is backend). Triaged the C150 reminders agent (A, `3e21c241`): its Finding 1 is a REAL
+  incomplete-fix gap in bug #13 — the C29 hardening guarded `advanceCustom` (bad unit) + `fastForwardPastNow` (backstop) but
+  left TWO reachable holes in the MAIN catch-up loop: (a) a corrupt top-level `frequency` ('monthy') hits `computeNextDueDate`'s
+  switch with NO `default` → returns the date UNCHANGED; (b) `intervalValue=0` (`?? 1` doesn't replace 0) → custom advance
+  no-ops. Either way `while (nextDue <= now)` re-fires, materializing up to `maxCatchUp`=12 DUPLICATE expense rows (wrong money,
+  NORTH_STAR #1) before the backstop. VERIFIED both holes firsthand (C67). FIX, two layers: (1) ROOT-CAUSE throws — `default:
+  throw` in computeNextDueDate's frequency switch + `intervalValue <= 0` throw in advanceCustom (both mirror #13's bad-unit
+  throw; land in processReminder's per-reminder try/catch as a clean `skipped`). (2) THE NON-OBVIOUS BUG the regression test
+  caught: my first cut threw AFTER createExpenseFromReminder inside the transaction, ASSUMING the throw rolls back the insert —
+  it does NOT. better-sqlite3 runs the INSERT synchronously and does not roll it back when a throw escapes the ASYNC transaction
+  callback, so 1 dupe still persisted (test asserted 0, got 1). FIX: hoist the pure `computeNextDueDate` call ABOVE the insert in
+  BOTH processExpensePeriod + processNotificationPeriod → a corrupt reminder throws before ANY row is written. ZERO dupes,
+  guaranteed, independent of rollback semantics. MERGE-SURVIVING net: +3 in trigger-nonprogress-frequency.test.ts (corrupt
+  frequency → 0 expenses + skip; intervalValue=0 → 0 + skip; a corrupt reminder doesn't block a well-formed one in the same
+  batch). green→green: backend validate:local **EXIT 0 — 1189 pass / 1 skip / 0 fail**, tsc 0, musl-biome clean (one
+  long-SQL-line reflow autofixed), build bundled. ALSO this
+  cycle: Angelo APPROVED **#27 (TCO principal double-count)** + **lease/loan currentOdometer** — both un-gated in BACKLOG (saved
+  as lessons); a future bug/feature cycle implements each (#27 default = option (c) exclude financing-sourced rows). cov: be
+  82.25%+ (carry; +3 BE) / fe 65.32% (carry)
