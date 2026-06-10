@@ -33,12 +33,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 111 |
 | deep-review | 5 | 108 |
-| guard | 6 | 105 |
+| guard | 6 | 112 |
 | bug | 3 | 109 |
 | arch | 5 | 106 |
 | infra | 6 | 110 |
 
-Current cycle: **111**
+Current cycle: **112**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2085,3 +2085,19 @@ Current cycle: **111**
   widget + the T4/T5/T6/T8 tails remain eyes-on (Playwright-blocked). Next (112): `guard` most-starved over budget (cyc 105,
   starved-for 7 > 6) → the C107-re-anchored ratchet (rate-limit.ts 60% line, or FE — the measured gap). cov: be ~81% /
   fe 61.4% (carry C107; backend +1 pure module)
+- **C112 (guard — characterize middleware/rate-limit.ts 60% → covered)** — BALANCE: `guard` most-starved over budget (cyc
+  105, starved-for 7 > 6), beat arch (6). PICK: the C107-re-anchored ratchet's top named backend low spot, rate-limit.ts at
+  60% line — the abuse-prevention middleware, whose limit-exceeded 429 path (with its Retry-After + X-RateLimit-* headers, a
+  client-readable contract) + window-reset were uncovered. Mirrors the C105 idempotency net (both middleware, minimal-Hono
+  harness). VACUITY GUARD (the C77/C91 trap): windowMs/limit/keyGenerator come from the config ARG (harness-controlled), but
+  `disableRateLimit` is a frozen CONFIG singleton — if a harness ever set DISABLE_RATE_LIMIT, every limit assertion would
+  vacuously pass. Verified DISABLE_RATE_LIMIT is set by NOTHING in the repo (only read in config.ts) → false in the test
+  process; ALSO added an explicit precondition test asserting CONFIG.disableRateLimit===false so the net can never silently
+  go vacuous. SHIPPED: rate-limit.test.ts (+5) through a minimal-Hono app with a fixed-key tiny-window limiter: (1)
+  precondition (limiting ACTIVE); (2) up-to-limit pass, over-limit 429 with all 4 headers (X-RateLimit-Limit/Remaining/Reset
+  + Retry-After); (3) 429 body carries RATE_LIMIT_EXCEEDED + retryAfter>0; (4) per-key isolation (one key's exhaustion
+  doesn't 429 another); (5) window reset via setSystemTime (resetTime < now → fresh window passes). THE GATE EARNED ITS KEEP
+  (biome reflow autofixed). Verified: backend validate:local EXIT 0 — 1138 pass / 0 fail (+5), build bundled. Both
+  middleware low spots (idempotency C105, rate-limit C112) now covered. Next (113): `arch` most-starved over budget (cyc 106,
+  starved-for 7 > 5) → the C106 follow-on (vehicles/routes.ts ownership convergence — mixed shapes, verify per-site) or
+  rule-7 fan-out. cov: be ~81% / fe 61.4% (carry C107; backend +1 module covered)

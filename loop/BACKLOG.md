@@ -253,11 +253,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > `middleware/idempotency.ts` 43%→covered (C105 — the double-charge guard; +7 via a minimal-Hono app + a per-app
 > handler-run counter: method gating (GET bypass), key gating (required→400 / optional→passthrough), cache-hit replay
 > (handler NOT re-run), user-scoping (`${userId}:${key}` — no cross-user collision), the only-cache-2xx invariant
-> (a 500 is NOT cached → re-run not replayed forever), and TTL expiry via setSystemTime). NEXT high-value pure-logic low spots
+> (a 500 is NOT cached → re-run not replayed forever), and TTL expiry via setSystemTime).
+> `middleware/rate-limit.ts` 60%→covered (C112 — the abuse guard; +5 via a minimal-Hono app with a fixed-key tiny-window
+> limiter: window-open, up-to-limit pass, over-limit 429 with all 4 X-RateLimit-*/Retry-After headers + the
+> RATE_LIMIT_EXCEEDED body, per-key isolation, window-reset via setSystemTime; + a precondition test asserting
+> CONFIG.disableRateLimit===false so the net can't go vacuous — the C77/C91 trap). **Both middleware low spots now covered.**
+> NEXT high-value low spots
 > **(re-anchored to the C107 real reading — be 81.1% line / fe 61.4% line; FE now decisively the bigger gap, flat vs C81):**
-> `middleware/rate-limit.ts` (60% line — the named next target), `body-limit.ts` (35% line size-enforcement branch),
-> `sync/restore.ts`+`sync/routes.ts` (~32–61%, HTTP-harness-tractable); then the **frontend** components/routes deficit
-> (61.4% line — steer FE guard cycles here). Route/
+> `body-limit.ts` (35% line size-enforcement branch), `sync/restore.ts`+`sync/routes.ts` (~32–61%, HTTP-harness-tractable);
+> then the **frontend** components/routes deficit (61.4% line — steer FE guard cycles here, it's now the bigger gap). Route/
 > integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
 > (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch
 > safety-net (as providers did). Pick one high-value module per cycle when guard is the balance. (Verified C85:
