@@ -24,12 +24,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 96 |
 | deep-review | 5 | 94 |
-| guard | 6 | 91 |
+| guard | 6 | 98 |
 | bug | 3 | 97 |
 | arch | 5 | 92 |
 | infra | 6 | 93 |
 
-Current cycle: **97**
+Current cycle: **98**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -1812,3 +1812,20 @@ Current cycle: **97**
   claude-loop-dev. Next (98): nothing over budget (guard cyc 91 starved-for 6 = budget at 98; arch cyc 92, 6 > 5 → arch
   breaches) → `arch` most-starved (fan-out per rule 7), or continue feature recurring-expenses T2 (split-materialization
   characterization, backend/non-eyes-on). cov: be ~80% / fe 63.7%
+- **C98 (guard — characterize sql-helpers.ts, the 33%-covered dialect SQL fragments)** — BALANCE: `guard` most-starved
+  over budget (cyc 91, starved-for 7 > 6); my C97 note guessed arch but the TABLE ruled — guard (7) > arch (6) (the
+  recurring "compute all six" lesson). Took the C83 coverage-ratchet standing angle's top named low spot:
+  `db/sql-helpers.ts` (33% func) — 3 tiny dialect-aware date helpers (extractMonth/formatYearMonth/toDateTimeString) that
+  are the ONLY SQLite-specific raw SQL in the codebase, NEVER directly tested (only incidentally via analytics queries),
+  and whose doc comments record TWO real past bugs from one root cause: omitting `'unixepoch'` makes SQLite read the
+  seconds-epoch column as a Julian day → garbage months (extractMonth) + collapsed GROUP BY buckets → blank charts + $0
+  monthly average (formatYearMonth). Wrote `sql-helpers.test.ts` (+5) executing each fragment via a real Drizzle select
+  over a seeded expense (the analytics createTestDb harness — full schema, seedExpense stores date as seconds): extractMonth
+  March→3 + Jan/Dec boundaries; formatYearMonth →'2024-03' + the load-bearing distinct-months-stay-distinct (the exact
+  monthly-trend regression); toDateTimeString →'2024-03-15 00:00:00'. Pins the `unixepoch` invariant merge-surviving (a
+  regression dropping it changes these outputs). Pure characterization, no product code. THE GATE EARNED ITS KEEP: first
+  run failed on musl-biome formatting only (import reorder + a chained select reflow) — ran check:musl:fix (the documented
+  CLAUDE.md autofix path), re-ran green. Verified: backend validate:local EXIT 0 — 1109 pass / 0 fail (+5) · build bundled.
+  sql-helpers.ts 33%→covered. Next (99): nothing over budget (arch cyc 92 starved-for 7 > 5 at 99 → arch breaches) →
+  `arch` most-starved (fan-out per rule 7), OR continue feature recurring-expenses T2 (split-materialization characterization,
+  backend/non-eyes-on, the highest-leverage feature-advancing pick). cov: be ~80% / fe 63.7%

@@ -227,8 +227,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > of all 3 hand-assembled formatters + the credentials-never-echoed security invariant + auth/ownership/domain
 > guards; ALSO the safety net for the C92 formatter dedup. Used an `s3` provider to dodge the fake-provider
 > CONFIG-import-order gate — see LEDGER C91).
-> NEXT high-value pure-logic low spots: `db/sql-helpers.ts` (33% func), `middleware/idempotency.ts` (43%),
-> `middleware/rate-limit.ts` (75%/60%); then the frontend modules (overall 63.7%, the bigger gap). Route/
+> `db/sql-helpers.ts` 33%→covered (C98 — the 3 dialect date fragments extractMonth/formatYearMonth/toDateTimeString,
+> executed via real Drizzle selects over a seeded expense; pins the `unixepoch` invariant whose omission caused the
+> blank-chart/$0-average + garbage-month bugs the doc comments record). NEXT high-value pure-logic low spots:
+> `middleware/idempotency.ts` (43%), `middleware/rate-limit.ts` (75%/60%); then the frontend modules (overall 63.7%,
+> the bigger gap). Route/
 > integration files need the full HTTP harness — but C91 PROVED the createTestApp harness makes them tractable
 > (the `s3` seam sidesteps real OAuth), so a route file IS a fair coverage pick when it doubles as an arch
 > safety-net (as providers did). Pick one high-value module per cycle when guard is the balance. (Verified C85:
