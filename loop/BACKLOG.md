@@ -156,7 +156,9 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 ### deep-review
 1. **Eyes-on sweep: vehicle Overview tab + ExpensesTable populated states** (mobile +
    desktop) — code-reviewed C3 (findings below); still wants a real eyes-on screenshot pass.
-2. **Analytics route eyes-on** (per-vehicle + cross-vehicle + year-end), states + a11y.
+2. **Analytics route eyes-on** (per-vehicle + cross-vehicle + year-end), states + a11y. *(C185: the BACKEND HTTP layer is now
+   audited + covered — analytics-routes-http.test.ts certified the ownership guards fire [foreign vehicleId → 404, no cross-tenant
+   analytics leak] + auth-gating + envelope, analytics/routes.ts 15→59% func. The remaining piece is the eyes-on UI render — Playwright-blocked.)*
 3. **Pin `getFinancing` / financing-analytics math (TRACED C77, needs an arch DI first).** The financing
    analytics path (`analytics/repository.ts` getFinancing → buildFinancingDetails → buildSingleFinancingDetail)
    is effectively UNPINNED: its only test (cross-vehicle.property.test.ts "Property 23") is `test.skip`'d
@@ -349,12 +351,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > coverage** — grep a 0%-covered module's test for local copies of its functions.)
 > NEXT high-value low spots
 > **(C152 re-measure — be 82.02% line / fe 70.09% line; FE STILL the bigger gap but closing — broke 70%):**
-> backend — ~~`body-limit.ts`~~ DONE C156; ~~`backup-orchestrator.ts` 0%~~ now 50% func C181 (execute() body still DI-blocked).
-> REMAINING named BE low spots (C181 re-measure): **`analytics/routes.ts` 15% func / 42% line** (the GET-handler response assembly —
-> C107-named; HTTP-harness-tractable via createTestApp, the highest-value remaining), `sync/routes.ts` (50%/31%, HTTP-harness),
-> `activity-tracker.ts` (53%/44%). NOTE (C163): `restore.ts:160-246` (restoreFromSheets) is uncovered but needs a process-global
-> Sheets-service mock — NO sync test uses mock.module (the C38/C91 cross-suite-flake trap), so it's NOT a clean guard pick; defer
-> until a DI seam exists or accept the gap. FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
+> backend — ~~`body-limit.ts`~~ DONE C156; ~~`backup-orchestrator.ts` 0%~~ now 50% func C181 (execute() body still DI-blocked);
+> ~~`analytics/routes.ts` 15%~~ now 58.82% func / 59.40% line C185 (analytics-routes-http.test.ts +8 driving the REAL routes via
+> createTestApp — auth 401, the vehicle-scoped ownership-guard 404s [C109/#52 cross-tenant], the optional-vehicleId branch, the success
+> envelope; ALSO certified the analytics-route ownership guards clean as a deep-review). REMAINING named BE low spots: `sync/routes.ts`
+> (50%/31%, HTTP-harness), `activity-tracker.ts` (53%/44%). NOTE (C163): `restore.ts:160-246` (restoreFromSheets) is uncovered but needs
+> a process-global Sheets-service mock — NO sync test uses mock.module (the C38/C91 cross-suite-flake trap), so it's NOT a clean guard
+> pick; defer until a DI seam exists or accept the gap. FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
 > the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
 > `.svelte.ts`/store/util modules still thin, e.g. settings.svelte.ts 10% [but that's the filed handleError arch pick] /
 > sync-manager.ts 58%). ~~pwa.ts 56%~~ DONE C175 — getPlatformInfo() (the file's only pure branching logic) 0%→covered + the

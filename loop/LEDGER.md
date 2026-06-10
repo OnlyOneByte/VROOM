@@ -46,13 +46,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 179 |
+| deep-review | 5 | 185 |
 | guard | 6 | 181 |
 | bug | 3 | 184 |
 | arch | 5 | 182 |
 | infra | 6 | 183 |
 
-Current cycle: **184**
+Current cycle: **185**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3317,3 +3317,20 @@ Current cycle: **184**
   seed isActive:true) stayed green THROUGH the change. green→green: backend validate:local **EXIT 0 — 1237 pass / 1 skip / 0 fail
   (+1)**, tsc 0, musl-biome clean, build bundled. #26c CLOSED (#26 a/b remain — both LOW, internally-consistent display nuances).
   cov: be 82.74%+ (carry; +1 BE) / fe 73.89% (carry).
+- **C185 (deep-review → guard): audit + HTTP-cover the analytics ROUTE handlers (the 15%-func low spot)** — BALANCE: two over budget
+  — `feature` (cyc 170, starved-for 15, blocked 10th cycle, escalated) + `deep-review` (cyc 179, starved-for 6 > 5). Feature blocked →
+  fell to `deep-review` (forced). INLINE (at the 6/3 spawn cap — no fan-out). Two-birds pick (the C91 precedent: a route file is a fair
+  coverage pick when it doubles as an audit-net): the named coverage low spot `analytics/routes.ts` (15% func / 42% line, C181 re-measure)
+  IS the deep-review surface. **AUDIT (firsthand, CERTIFIED CLEAN):** read all 13 GET handlers — thin pass-throughs to analyticsRepository
+  (userId-scoped internally, certified across C73/C99/C106/C155/C158/C162/C178); the 6 vehicle-scoped endpoints
+  (fuel-stats/fuel-advanced/vehicle-health/vehicle-tco/vehicle-expenses/fuel-efficiency) call validateVehicleOwnership before the repo —
+  the required-id ones always, the optional-id ones only `if (vehicleId)` (correct: omitted = all-the-user's-fleet). NO cross-tenant hole.
+  **WHY only 15% covered:** the existing summary-route.test.ts RECONSTRUCTS a minimal app inline (mocked repo + fake auth) — it never
+  drives the real module (the C181/C182 coverage-theater shape AGAIN). **GUARD:** added analytics-routes-http.test.ts (+8) driving the
+  REAL routes via createTestApp() over in-memory SQLite (the C91 pattern): anon→401; financing/insurance→{success,data} 200;
+  vehicle-tco owned→200; vehicle-tco + vehicle-health + fuel-efficiency FOREIGN vehicleId→404 (the C109/#52 cross-tenant guard FIRES —
+  no analytics leak by id-guessing); fuel-efficiency NO vehicleId→200 (optional-guard branch); vehicle-tco missing required id→400.
+  RESULT: analytics/routes.ts 15%→58.82% func / 42%→59.40% line from this test alone (remaining uncovered = the date-range endpoints,
+  exercised at the repo layer by the property tests). Test-only, no production change. One biome reflow autofixed. green→green: backend
+  validate:local **EXIT 0 — 1245 pass / 1 skip / 0 fail (+8)**, tsc 0, musl-biome clean, build bundled. cov: be 82.74%+ (carry; +8 BE,
+  analytics/routes 15→59% line) / fe 73.89% (carry).
