@@ -12,7 +12,7 @@ import { getPeriodStartDate } from '../../utils/calculations';
 import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
-import { financingRepository } from '../financing/repository';
+import { financingRepository, isEligibleForPayoff } from '../financing/repository';
 import { odometerRepository } from '../odometer/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { preferencesRepository } from '../settings/repository';
@@ -151,7 +151,7 @@ routes.get('/', async (c) => {
         financing: {
           ...v.financing,
           computedBalance,
-          eligibleForPayoff: computedBalance <= 0.01,
+          eligibleForPayoff: isEligibleForPayoff(computedBalance),
         },
       };
     }
@@ -227,7 +227,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
       financing: {
         ...vehicle.financing,
         computedBalance,
-        eligibleForPayoff: computedBalance <= 0.01,
+        eligibleForPayoff: isEligibleForPayoff(computedBalance),
       },
     };
   }

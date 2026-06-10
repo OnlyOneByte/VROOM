@@ -49,10 +49,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 179 |
 | guard | 6 | 181 |
 | bug | 3 | 180 |
-| arch | 5 | 177 |
+| arch | 5 | 182 |
 | infra | 6 | 176 |
 
-Current cycle: **181**
+Current cycle: **182**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3274,3 +3274,21 @@ Current cycle: **181**
   reflows autofixed. green→green: backend validate:local **EXIT 0 — 1235 pass / 1 skip / 0 fail (+4 net)**, tsc 0, musl-biome clean,
   build bundled. cov: be 82.78% line (re-measured this run; +backup-orchestrator 0→50% func) / fe 73.89% (carry). NEXT guard low spots:
   analytics/routes.ts (15% func — GET-handler response assembly), sync/routes.ts (50%/31%), activity-tracker.ts (53%/44%).
+- **C182 (arch): extract `isEligibleForPayoff` + `PAYOFF_BALANCE_THRESHOLD` — the payoff rule, 3 sites → 1** — BALANCE: only
+  `feature` strictly over budget (cyc 170, starved-for 12, blocked 7th cycle running) → fell through; `arch` + `infra` both AT budget
+  (5=5 / 6=6, both due, breach C183). Picked `arch` (genuine high-leverage dedup work; queue empty since C177) over `infra` (CLAUDE.md
+  refresh near-due ~C184 but not yet, sweep just C176) — infra becomes next cycle's forced pick. SPAWN RECOVERED: a single arch-scout
+  (a11fa350) registered cleanly this time (no HTTP 400 — the C179/C180 transport failure was transient). It returned #1 = a
+  serializeSessionUser dedup (2 auth sites). I ALSO scouted independently (verify-firsthand prep while it ran) + found a STRONGER
+  candidate: `eligibleForPayoff: computedBalance <= 0.01` triplicated at vehicles/routes.ts:154 + :230 + financing/routes.ts:89.
+  CHOSE MINE over the agent's #1 — 3 sites vs 2, ALL 3 fully test-anchored (the agent honestly flagged its /refresh site as
+  unanchored), and it collapses a BUSINESS RULE + magic number (the payoff threshold — a wrong value is a correctness bug; a
+  serialization shape is already guarded by contract tests). VERIFIED all 3 firsthand (the replace_all initially caught only :154
+  [10-space indent]; :230 has 8-space indent — verified + fixed separately, the kind of subtlety the firsthand check exists for). FIX:
+  added exported `PAYOFF_BALANCE_THRESHOLD = 0.01` + `isEligibleForPayoff(balance)` to financing/repository.ts (beside computeBalance,
+  which produces the balance it consumes); wired all 3 sites + threaded the import. ALSO converted the financing-balance property test's
+  4 LOCAL `<= 0.01` copies (the C181 theater pattern again — same find!) to call the real export + added a boundary test (exactly 0.01 →
+  eligible, 0.0101 → not). Behavior-preserving (arch rule 2 — identical threshold/comparison); test-anchored by the EXISTING vehicles-
+  list + financing-GET contract tests + the property test, all green THROUGH the change (green→green). green→green: backend
+  validate:local **EXIT 0 — 1236 pass / 1 skip / 0 fail (+1)**, tsc 0, musl-biome clean, build bundled. cov: be 82.78%+ (carry) / fe
+  73.89% (carry). (Agent's serializeSessionUser #1 filed below as the next arch candidate.)

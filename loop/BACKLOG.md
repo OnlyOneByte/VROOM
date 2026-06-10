@@ -966,11 +966,23 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     `buildLocalDate(y,m,d,hh=0,mm=0,ss=0): Date|null` to new sibling `expenses/local-date.ts`; wired both callers (import-mapping
     deletes its copy + imports; import-csv's inline check → a call mapping null→its existing {error}). Behavior-preserving (time
     defaults to 0 = local midnight ≡ `new Date(y,m-1,d)`; no circular import). Anchored by the EXISTING #59 + #23 out-of-range suites
-    (green→green through the extraction) + new local-date.test.ts (+7). green→green 1225 pass (+7).* **ARCH QUEUE again empty of
-    primed picks — next arch cycle runs a rule-7 audit fan-out to repopulate (spawn-gated — confirm the cap is clear first).**
-  - **Next arch pick when one is due:** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the
-    eyes-on + pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the
-    ~57 logging sites is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.
+    (green→green through the extraction) + new local-date.test.ts (+7). green→green 1225 pass (+7).*
+  - ~~**`isEligibleForPayoff` + `PAYOFF_BALANCE_THRESHOLD` — the payoff rule, 3 sites → 1 (C182)**~~ — *DONE C182: the
+    `eligibleForPayoff: computedBalance <= 0.01` idiom was triplicated inline at vehicles/routes.ts:154 + :230 + financing/routes.ts:89
+    (a business rule + magic number, no single source). A clean arch-scout (spawn a11fa350 recovered) returned a serializeSessionUser
+    candidate; I independently found + chose THIS one (3 sites vs 2, all 3 test-anchored, collapses a correctness rule). Extracted both
+    as exported decls in financing/repository.ts (beside computeBalance) + wired all 3 + converted the property test's 4 local `<= 0.01`
+    copies to the real export + boundary test. Behavior-preserving, anchored by the existing contract tests. green→green 1236 pass (+1).*
+    **ARCH QUEUE: one primed pick filed below (serializeSessionUser); else a fresh rule-7 fan-out.**
+  - **Next arch pick (PRIMED, from the C182 scout a11fa350):** `serializeSessionUser(u)` — a byte-identical 6-field user-serialization
+    block (`{id,email,displayName,createdAt?.toISOString()??null,updatedAt?.toISOString()??null}`) at auth/routes.ts:463-469 (GET /me)
+    + :562-568 (POST /refresh). Behavior-preserving, pure. CAVEAT (verify firsthand before acting): GET /me is test-anchored
+    (me-http.test.ts pins createdAt ISO), but the /refresh success body has NO field-shape assertion — so add one when extracting (the
+    /refresh site would otherwise be unanchored). Do NOT fold in the PATCH /me (:510, no timestamps) or /accounts (:588, different null
+    fallback) near-misses — different shapes.
+  - **Else (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
+    pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the ~57 logging sites
+    is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.
 
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,
