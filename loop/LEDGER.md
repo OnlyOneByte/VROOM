@@ -41,9 +41,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 143 |
 | bug | 3 | 144 |
 | arch | 5 | 141 |
-| infra | 6 | 138 |
+| infra | 6 | 145 |
 
-Current cycle: **144**
+Current cycle: **145**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2655,3 +2655,19 @@ Current cycle: **144**
   reports unsynced (the regression) + a negative control (end-of-run stamp loses it, proving the param matters) + exact-timestamp
   persist + the now-default backward-compat. Verified: backend validate:local EXIT 0 — 1178 pass / 0 fail (+3), tsc 0,
   musl-biome clean, build bundled. #42 CLOSED. cov: be 82.25% (carry; +3 BE) / fe 65.32% (carry)
+  - *(C144.5 docs commit `db9ba28`: the security-assistance skill fired on the delayed a675163e event [user-data backup +
+    credential-decryption domain] → queried ARCC FIRST per the mandatory flow; SAX-04 Outcome 1 [FailureModes.systemError →
+    FAIL_SAFE; "failing open" = #1 pitfall] + Outcome 3 [alert on backup failure] directly confirm #43/#44 are fail-open
+    defects. Recorded the policy grounding on both filed items — fix stays Angelo-gated. No category touched.)*
+- **C145 (infra — CLAUDE.md orientation refresh; the C117/C131 anti-drift class)** — BALANCE: TWO over budget (infra cyc 138
+  starved-for 7 > 6; feature cyc 140 starved-for 5 > 4); most-starved wins → `infra` (7) > feature (5). Matches the C144 forecast.
+  The infra cadence: CLAUDE.md refresh was due ~C145 (per the C131 note); the #5 sweep was just C138 (next ~C148). Fixed 5
+  drifts a fresh agent would mis-orient on, each VERIFIED vs source/LEDGER (no churn — the C117/C131 discipline): (1)
+  import-trackers "frontend not started" → the FE client slice shipped C140 (types + mapping-aware importExpensesCsv +
+  detectImportSource); (2) recurring-expenses "frontend not started" → the T6/T7 FE client methods shipped C134; (3) coverage
+  line cited the stale C124 reading (81.8/62.0) + named error-handling/api-client as "next low spots" — but C138 re-measured
+  (82.25/65.32) and C137/C143 CLOSED both named targets → updated figures + re-pointed next-low-spot to expense-api.ts +
+  components/routes; (4) suite size ~1158/~421 → 1178/457; (5) Pending-Angelo line listed only #27 + lease/loan/#19/#24 — added
+  the #36/#37 Sheets HIGHs, the new #43/#44 backup-honesty pair (with the C144.5 ARCC grounding), + #45/#21-shrink. Doc-only
+  (verified every claim against the loop files); no build gate needed (the C5/C26/C47/C72/C93/C117/C131 convention). Next
+  CLAUDE.md refresh ~C160; #5 sweep ~C148. cov: be 82.25% / fe 65.32% (carry — doc-only cycle)

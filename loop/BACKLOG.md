@@ -936,7 +936,13 @@ Seed audit angles for the rule-7 fan-out (once the above are done, or to go broa
 > commits since the last refresh by theme so the eventual PR stays reviewable. Counts as one `infra`
 > increment; the most recent sweep cycle is noted in the LEDGER so the next is easy to time.
 
-*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C148.)*
+*(queue empty — repopulate as loop tooling / docs needs surface. #5 branch-hygiene sweep next due ~C148; CLAUDE.md refresh next ~C160.)*
+- ~~**CLAUDE.md orientation refresh post-C131–C144 (C145)**~~ — *DONE C145: 5 drifts fixed (verified vs source/LEDGER, no churn).
+  (1) import-trackers "frontend not started" → FE client slice shipped C140; (2) recurring-expenses "frontend not started" →
+  T6/T7 FE client methods shipped C134; (3) coverage cited stale C124 (81.8/62.0) + named error-handling/api-client as next low
+  spots — but C138 re-measured (82.25/65.32) + C137/C143 closed both → updated + re-pointed to expense-api.ts/components; (4)
+  suite ~1158/~421 → 1178/457; (5) Pending-Angelo line missing #36/#37 + the new #43/#44 (ARCC-grounded) + #45/#21-shrink →
+  added. Doc-only. Next CLAUDE.md refresh ~C160.*
 - ~~**#5 branch-hygiene sweep + coverage re-measure (C138)**~~ — *DONE C138 (overdue; last C124, branch now git-authoritative
   85 commits off origin/main). (1) zero stray untracked unit/spec tests (all untracked = the by-design `*.meshclaw.e2e.ts` set +
   e2e screenshots/results + the Playwright config + gitignored dirs); (2) green baseline + coverage re-measure — backend bun

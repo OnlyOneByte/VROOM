@@ -129,15 +129,18 @@ Highlights:
     and should switch to `currentOdometer` (a real but user-visible $ change), and the "Current Mileage"
     stat-card display-semantics is a direction call. Track in its `tasks.md`.
   - `.kiro/specs/import-trackers/` (Fuelly/Fuelio/Drivvo CSV via a mapping pre-pass over the
-    hardened import pipeline) — **backend COMPLETE (T1–T3), frontend not started.** T1 (C58)
-    `import-mapping.ts` pure `applyMapping` (rename + unit-convert + decimal-comma + category map +
-    local-time dates); T2 (C64) `import-mapping-presets.ts` (preset table + `detectSource`); T3 (C70)
-    `POST /import` gained an optional `mapping` (+ `POST /import/detect`) — backward-compatible, the
-    native CSV path is unchanged when no mapping is sent. **Remaining: T4/T5 (frontend mapping-step
-    dialog) + T6 e2e** (incl. real-export signature validation) — eyes-on/Playwright-blocked, so the
+    hardened import pipeline) — **backend COMPLETE (T1–T3) + the FE client slice (C140); only the
+    eyes-on dialog markup remains.** T1 (C58) `import-mapping.ts` pure `applyMapping` (rename +
+    unit-convert + decimal-comma + category map + local-time dates); T2 (C64) `import-mapping-presets.ts`
+    (preset table + `detectSource`); T3 (C70) `POST /import` gained an optional `mapping` (+
+    `POST /import/detect`) — backward-compatible, the native CSV path is unchanged when no mapping is
+    sent. FE client (C140): `src/lib/types/import-mapping.ts` + `expenseApi.importExpensesCsv(csv, dryRun,
+    mapping?)` (backward-compat) + `detectImportSource(headers)`. **Remaining: the T4/T5 mapping-step
+    dialog MARKUP + T6 e2e** (incl. real-export signature validation) — eyes-on/Playwright-blocked, so the
     feature is code-complete-but-not-DONE per the feature-DoD rule.
   - `.kiro/specs/recurring-expenses/` (recurring expense reminders auto-materialize expense rows) —
-    **backend COMPLETE (T1–T3 + T7), frontend not started.** KEY GROUNDING: the engine ALREADY EXISTS —
+    **backend COMPLETE (T1–T3 + T7) + the T6/T7 FE client methods (C134); only the eyes-on UI remains.**
+    KEY GROUNDING: the engine ALREADY EXISTS —
     a `type:'expense'` reminder auto-creates real expense rows (single or multi-vehicle split,
     `sourceType:'reminder'`) on its frequency via `trigger-service.ts` (C94 deep-review CERTIFIED it
     clean), so the spec EXTENDS it, never a new table/scheduler (NORTH_STAR #4). T1 (C96) source-
@@ -146,18 +149,21 @@ Highlights:
     (`recurringCostSummary`, C111) + `GET /reminders/recurring-cost` (C116, the monthly run-rate the
     dashboard widget fetches); T6 read-seam = `expenseRepository.findBySource` + `GET /reminders/:id/
     expenses` (C122, the "materialized N expenses" list); T5 gate = pure `shouldTriggerRecurringExpenses`
-    in reminder-helpers.ts (C128). **EVERY non-eyes-on backend slice across T1–T7 is now built/
-    characterized.** **Remaining is ALL eyes-on/Playwright-blocked:** T4 multi-vehicle split in
-    ReminderForm; the T5 app-init/focus hook (calls the gate → `POST /reminders/trigger`); T6 "Recurring"
-    badge + view UI; the T7 dashboard widget; T8 round-trip e2e.
+    in reminder-helpers.ts (C128). The T6/T7 FE CLIENT METHODS are also done (C134): `reminderApi.
+    getMaterializedExpenses(id)` + `getRecurringCost()` + the `RecurringCostSummary` type. **EVERY
+    non-eyes-on slice (backend T1–T7 + the FE client wrappers) is now built/characterized.** **Remaining
+    is ALL eyes-on/Playwright-blocked MARKUP:** T4 multi-vehicle split in ReminderForm; the T5
+    app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
+    T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C124, not an estimate): **backend 81.8% line / 82.2% func · frontend 62.0% line / 60.5%
-  func** — backend climbed ~+4½ since the C81 baseline (the ratchet delivered); **frontend is the bigger
-  gap** but is now CREEPING UP under a sustained FE-guard ratchet (C118 memoize, C119 capitalize, C125
-  vehicle-form-validation, C130 formatters), so keep steering FE guard cycles there (next FE low spots:
-  error-handling.ts, the api-client/expense-api services, components/routes). loop-improvement #4 records
-  a `cov:` tag on every LEDGER cycle entry. Suite size today: **~1158 backend tests / ~421 frontend** (a
-  floor — grows most cycles). Don't regress coverage; name why if a cycle drops it.
+  (re-measured C138, not an estimate): **backend 82.25% line / 81.8% func · frontend 65.3% line / 61.8%
+  func / 58.7% branch** — backend climbed ~+4½ since the C81 baseline; **frontend is still the bigger gap
+  but closing fast** (62.0→65.3 line since C124) under a sustained FE-guard ratchet (C118 memoize, C119
+  capitalize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts, C143 api-client.ts),
+  so keep steering FE guard cycles there (next FE low spots: `expense-api.ts` glue + the components/routes
+  deficit — error-handling.ts + api-client.ts are now DONE). loop-improvement #4 records a `cov:` tag on
+  every LEDGER cycle entry. Suite size today: **~1178 backend tests / ~457 frontend** (a floor — grows
+  most cycles). Don't regress coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
   in-memory SQLite DB with a seeded user + a real Lucia session cookie (`ctx.authed/anon`); it's
@@ -171,8 +177,13 @@ Highlights:
   capture-only (no baseline compare); storage-backup-toggle + the eyes-on UI tails
   (maintenance T7–T9, import-trackers T4–T6, recurring-expenses T4–T8) need Playwright/an OAuth
   provider — sandbox-blocked in the loop, so those land "code-complete, eyes-on pending."
-- Pending an Angelo decision (filed, NOT auto-fixed — each changes a displayed $ or is a product call):
-  **#27 (HIGH) — TCO double-counts a financed vehicle's principal** (getVehicleTCO adds purchasePrice +
-  the full financing-payment rows; needs an accounting-model choice before the headline TCO figure
-  changes); plus lease/loan `currentOdometer` swap, #19 (TCO trend scope), #24 (CSV decimal separator).
+- Pending an Angelo decision (filed, NOT auto-fixed — each changes a displayed $/HTTP behavior or is a
+  product call). THREE HIGHs: **#27** (TCO double-counts a financed vehicle's principal — needs an
+  accounting-model choice), **#36** (Sheets backup writes `USER_ENTERED` → formula injection + silent
+  round-trip corruption; ARCC-consult before fixing), **#37** (Sheets backup is a non-atomic in-place
+  rewrite that can destroy the only good copy). Plus the backup-honesty pair **#43** (a ZIP-fail-but-
+  Sheets-ok run is marked success + won't retry) + **#44** (HTTP 200 when all providers fail) — both
+  ARCC-grounded C144.5 as the SAX-04 fail-open pitfall, direction = surface failure honestly; **#45**
+  (period-scoped totalMileage/costPerMile) grouped with the lease/loan `currentOdometer` swap + the
+  "Current Mileage card" semantics call; #19 (TCO trend scope), #24 (CSV decimal separator), #21-shrink.
   See `loop/BACKLOG.md` bug queue for the full list + grounding.
