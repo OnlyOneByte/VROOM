@@ -564,16 +564,15 @@ against current source before acting, then knock out the top one. Once these are
 go broader), run the AUDIT fan-out per rule 7 to repopulate. Obey the `arch` rules above —
 behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
 
-- **NEXT PICK (filed C119, from the rule-7 backend fan-out — VERIFIED byte-identical, top-ranked):** the
-  provider ownership-lookup block is hand-repeated at **5 sites** in `api/providers/routes.ts` (~360/446/491/515/575) —
-  `const existing = await db.select().from(userProviders).where(and(eq(userProviders.id, id), eq(userProviders.userId,
-  user.id))).limit(1); if (!existing[0]) throw new NotFoundError('Provider');` — executable code byte-identical (only a
-  comment + indentation differ). All 5 sites consume the returned row afterward (`existing[0].domain`,
-  `createProviderInstance(existing[0])`), so extract `findOwnedProviderOrThrow(db, id, userId): Promise<UserProvider>`
-  (returns the row). DIFFERENT table than `validateVehicleOwnership` (userProviders, not vehicles) — genuinely untouched.
-  `UserProvider` + `NotFoundError` already imported. One file, returns-the-row drop-in → provably behavior-preserving.
-  (Also surfaced, lower priority: analytics getUserUnits/getVehicleUnits share a byte-identical parse-default tail [2 sites,
-  C119 #2]; `MS_PER_DAY` magic literal in 3 spellings across 4 files [C119 #3, NOT byte-identical — per-site verify].)
+- ~~**Converge providers/routes.ts ownership lookups on a helper (filed C119).**~~ — *DONE C123: the 7-line
+  `select().from(userProviders).where(and(eq id, eq userId)).limit(1); if (!existing[0]) throw NotFoundError('Provider')`
+  block (5 sites: PATCH/DELETE/health/backfill/sync) → `findOwnedProviderOrThrow(db, id, userId): Promise<UserProvider>`
+  (returns the row, userId-scoped, local DbInstance type). MIXED SHAPE (C113 pattern): 3 sites use the row (.domain /
+  createProviderInstance) → keep `const existing = [await …]`; 2 existence-only (backfill, sync) → discard form. The gate
+  earned its keep — biome noUnusedVariables enforced the split. green→green vs the C91 13-test providers net (1155 pass,
+  unchanged). validate:local EXIT 0.* NEXT ARCH PICKS (filed C119, lower priority): analytics getUserUnits/getVehicleUnits
+  share a byte-identical parse-default tail [2 sites, C119 #2]; `MS_PER_DAY` magic literal in 3 spellings across 4 files
+  [C119 #3, NOT byte-identical — per-site verify before collapsing].
 
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,

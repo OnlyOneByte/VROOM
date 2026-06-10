@@ -34,6 +34,28 @@ type DbInstance =
   | Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
 
 /**
+ * Fetch the provider owned by `userId` with id `id`, or throw NotFoundError('Provider') (C123 arch).
+ * The ownership-check + 404 was hand-repeated byte-identically at 5 route handlers (PATCH/DELETE/
+ * health/backfill/sync); each then uses the returned row, so this RETURNS it. Scoped to userId — a
+ * provider not owned by the caller is indistinguishable from a missing one (no cross-tenant probe).
+ */
+async function findOwnedProviderOrThrow(
+  db: DbInstance,
+  id: string,
+  userId: string
+): Promise<UserProvider> {
+  const existing = await db
+    .select()
+    .from(userProviders)
+    .where(and(eq(userProviders.id, id), eq(userProviders.userId, userId)))
+    .limit(1);
+  if (!existing[0]) {
+    throw new NotFoundError('Provider');
+  }
+  return existing[0];
+}
+
+/**
  * Count photos of a given entity type owned by a specific user.
  * v2: uses direct photos.user_id instead of multi-branch entity JOINs.
  */
@@ -357,15 +379,7 @@ routes.put(
     const db = getDb();
 
     // Ownership check: verify provider belongs to user
-    const existing = await db
-      .select()
-      .from(userProviders)
-      .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
-      .limit(1);
-
-    if (!existing[0]) {
-      throw new NotFoundError('Provider');
-    }
+    const existing = [await findOwnedProviderOrThrow(db, id, user.id)];
 
     // Domain guard: auth providers are managed through /auth routes only
     if (existing[0].domain === 'auth') {
@@ -443,15 +457,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const db = getDb();
 
   // Ownership check
-  const existing = await db
-    .select()
-    .from(userProviders)
-    .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
-    .limit(1);
-
-  if (!existing[0]) {
-    throw new NotFoundError('Provider');
-  }
+  const existing = [await findOwnedProviderOrThrow(db, id, user.id)];
 
   // Domain guard: auth providers are managed through /auth routes only
   if (existing[0].domain === 'auth') {
@@ -488,15 +494,7 @@ routes.post('/:id/test', zValidator('param', commonSchemas.idParam), async (c) =
   const db = getDb();
 
   // Ownership check
-  const existing = await db
-    .select()
-    .from(userProviders)
-    .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
-    .limit(1);
-
-  if (!existing[0]) {
-    throw new NotFoundError('Provider');
-  }
+  const existing = [await findOwnedProviderOrThrow(db, id, user.id)];
 
   const providerInstance = storageProviderRegistry.createProviderInstance(existing[0]);
   const healthy = await providerInstance.healthCheck();
@@ -511,16 +509,8 @@ routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (
 
   const db = getDb();
 
-  // Ownership check
-  const existing = await db
-    .select()
-    .from(userProviders)
-    .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
-    .limit(1);
-
-  if (!existing[0]) {
-    throw new NotFoundError('Provider');
-  }
+  // Ownership check (the throw is the guard; this handler doesn't use the row)
+  await findOwnedProviderOrThrow(db, id, user.id);
 
   // Load storage config to find enabled categories for this provider
   const prefs = await preferencesRepository.getOrCreate(user.id);
@@ -571,16 +561,8 @@ routes.get('/:id/sync-status', zValidator('param', commonSchemas.idParam), async
 
   const db = getDb();
 
-  // Ownership check
-  const existing = await db
-    .select()
-    .from(userProviders)
-    .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
-    .limit(1);
-
-  if (!existing[0]) {
-    throw new NotFoundError('Provider');
-  }
+  // Ownership check (the throw is the guard; this handler doesn't use the row)
+  await findOwnedProviderOrThrow(db, id, user.id);
 
   const result: Record<string, { total: number; synced: number; failed: number }> = {};
 

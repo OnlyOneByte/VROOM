@@ -35,10 +35,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 120 |
 | guard | 6 | 118 |
 | bug | 3 | 121 |
-| arch | 5 | 119 |
+| arch | 5 | 123 |
 | infra | 6 | 117 |
 
-Current cycle: **122**
+Current cycle: **123**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2266,3 +2266,18 @@ Current cycle: **122**
   bundled. recurring-expenses backend is now T1–T3 + T6(read seam) + T7 — only the T4/T5 + the T6/T7 WIDGETS + T8 e2e remain
   eyes-on. Next (123): `arch` most-starved over budget (cyc 119, starved-for 4... recompute) or guard → highest-leverage; the
   filed provider-ownership dedup is the queued arch pick. cov: be ~81% / fe ~62% (carry)
+- **C123 (arch — converge providers/routes.ts ownership lookups on findOwnedProviderOrThrow)** — BALANCE: nothing over
+  budget (infra AT, breaches next); free highest-leverage = the C119-filed + pre-verified provider-ownership dedup (the C91
+  HTTP net already covers providers/routes.ts → lands against an existing safety net, the C17/C91 net-then-dedup pattern).
+  RE-VERIFIED all 5 sites byte-identical vs source (C69): the 7-line `select().from(userProviders).where(and(eq id, eq
+  userId)).limit(1); if (!existing[0]) throw NotFoundError('Provider')` block at PATCH:360/DELETE:446/health:491/
+  backfill:515/sync:575. Extracted `findOwnedProviderOrThrow(db, id, userId): Promise<UserProvider>` (returns the row;
+  userId-scoped — a non-owned provider is indistinguishable from missing, no cross-tenant probe; uses the local DbInstance
+  type, NOT AppDatabase — match local convention). MIXED SHAPE (the C113 pattern): 3 sites USE the returned row
+  (PATCH/DELETE .domain guard, health createProviderInstance) → keep `const existing = [await ...]`; 2 are existence-check-
+  ONLY (backfill, sync) → discard form `await findOwnedProviderOrThrow(...)`. THE GATE EARNED ITS KEEP: biome
+  noUnusedVariables flagged the 2 existence-only sites where the `existing` binding was dead — the linter ENFORCED the
+  C113 split I'd otherwise have to eyeball. green→green: the C91 13-test providers net + suite stayed green UNCHANGED — 1155
+  pass, same as C122 = behavior-preserving. Verified: backend validate:local EXIT 0, build bundled. (The 10 noNonNullAssertion
+  warnings in other test files are pre-existing, not from this change.) Next (124): `infra` most-starved over budget (cyc 117,
+  starved-for 7 > 6) → #5 sweep next due ~C120 (overdue) or a doc need. cov: be ~81% / fe ~62% (carry)
