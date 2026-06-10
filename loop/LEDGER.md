@@ -45,11 +45,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 173 |
 | guard | 6 | 169 |
-| bug | 3 | 168 |
+| bug | 3 | 174 |
 | arch | 5 | 172 |
 | infra | 6 | 171 |
 
-Current cycle: **150**
+Current cycle: **174**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3110,3 +3110,26 @@ Current cycle: **150**
   money-no-NaN-corruption, formula-denormalize symmetry, idempotency (clientId dedup), cross-tenant vehicle resolution. green→green:
   backend validate:local **EXIT 0 — 1215 pass / 1 skip / 0 fail (+1)**, tsc 0, musl-biome clean (one reflow autofixed), build
   bundled. #59 CLOSED. cov: be 82.70%+ (carry; +1 BE) / fe 70.18% (carry)
+- **C174 (bug → #60): absolute split EDIT recomputes groupTotal from allocations (no stale-header inconsistency)** — BALANCE:
+  `bug` over budget (cyc 168 → starved-for 6 > 3) AND most-starved → FORCED pick. The pick was HANDED to me by C173's split-service
+  agent B (0242f1dc), whose delayed completion event landed this cycle: I triaged it firsthand (C67 — agent HIGHs are ~50% false)
+  against three source files before acting. My C173 pre-read had only cleared the CREATE/percentage vein (computeEvenSplit exact +
+  refineSplitConfig sum=100); agent B found a DIFFERENT, real vein I'd missed — the absolute-method UPDATE path. **#60 (data-safety +
+  displayed-$, VERIFIED firsthand):** the trace — updateSplitSchema makes `totalAmount` OPTIONAL (validation.ts:102) AND gates its
+  absolute-sum refinement on `totalAmount !== undefined` (:64), so an absolute edit that OMITS the total passes validation; then
+  updateSplitExpense (repository.ts:762) falls back `data.totalAmount ?? firstOld.groupTotal ?? …` → the STALE old groupTotal; then
+  computeAllocations' absolute branch (split-service.ts:19-23) returns the allocations VERBATIM. Net: create absolute 30/30 (total
+  $60) → edit to 40/40 with no totalAmount → two siblings each stamped groupTotal=$60 while the legs sum to $80, a persistent stored
+  inconsistency surfaced verbatim by the split header (routes.ts:177/207) and a violation of the documented Property 3 ("legs sum to
+  groupTotal", split-service.property.test.ts:441 — its tests only exercise create/total-present paths, so this slipped). FIX
+  (minimal, method-aware, pure): for the ABSOLUTE method the total is DEFINITIONALLY the sum of allocations, so derive it
+  (`Math.round(Σamount*100)/100`) instead of trusting the omitted/stale value; even/percentage carry no absolute amounts so they
+  KEEP the caller-or-stored total to divide. Behavior-preserving where total IS sent (validation already forces sum===total → identical
+  value). +3 regression tests in expense-repository.property.test.ts: (1) absolute edit, no total → groupTotal & legs both $80
+  (the #60 regression); (2) absolute edit WITH matching total → unchanged (fix is a no-op when total sent); (3) even-split edit,
+  no total → still reuses stored $60 (behavior-preservation control proving the fix is scoped to absolute). HONEST CAVEAT: I
+  confirmed the BACKEND produces the corrupt state whenever an absolute update omits totalAmount (the API contract permits it); I did
+  NOT verify whether the current FE actually omits it on absolute edits (agent B's "ordinary UI editing" claim) — the backend gap is
+  real regardless; real-world trigger frequency depends on that unverified FE detail (filed as a follow-on note). green→green:
+  backend validate:local **EXIT 0 — 1218 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean, build bundled. #60 CLOSED.
+  Split-service vein now fully consumed (both C173 agents triaged). cov: be 82.70%+ (carry; +3 BE) / fe 70.18% (carry)

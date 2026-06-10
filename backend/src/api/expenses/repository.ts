@@ -759,7 +759,22 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       if (!firstOld) {
         throw new NotFoundError('Split expense');
       }
-      const totalAmount = data.totalAmount ?? firstOld.groupTotal ?? firstOld.expenseAmount;
+      // For an ABSOLUTE split the total is DEFINITIONALLY the sum of the per-vehicle
+      // allocations, so derive it from them rather than trusting an omitted `totalAmount`
+      // or the stale stored `groupTotal`. updateSplitSchema makes `totalAmount` optional
+      // AND gates its absolute-sum refinement on it being present (validation.ts:64,102),
+      // so an absolute edit that omits `totalAmount` would otherwise fall back to the OLD
+      // groupTotal — stamping every sibling with a header that no longer matches the legs
+      // (edit 30/30→40/40 with no total keeps groupTotal=60 while the legs sum to 80, a
+      // persistent stored inconsistency that violates Property 3: legs sum to groupTotal).
+      // When `totalAmount` IS sent for absolute, validation already forces sum===total, so
+      // this yields the identical value (no behavior change). Even/percentage carry no
+      // absolute amounts in the config → they still need the caller's total to divide.
+      const totalAmount =
+        data.splitConfig.method === 'absolute'
+          ? Math.round(data.splitConfig.allocations.reduce((sum, a) => sum + a.amount, 0) * 100) /
+            100
+          : (data.totalAmount ?? firstOld.groupTotal ?? firstOld.expenseAmount);
       const allocations = expenseSplitService.computeAllocations(data.splitConfig, totalAmount);
       const splitMethod: SplitMethod = data.splitConfig.method;
       const oldSiblingIds = oldSiblings.map((s) => s.id);

@@ -418,3 +418,127 @@ describe('#52: split delete/update is userId-scoped at the destructive write (cr
     expect(foreign[0]?.userId).toBe(USER_2);
   });
 });
+
+// #60 (deep-review C173 agent B, VERIFIED firsthand C174): editing an ABSOLUTE split via
+// updateSplitExpense WITHOUT a `totalAmount` must recompute groupTotal from the new
+// allocations — not fall back to the stale stored groupTotal. updateSplitSchema makes
+// totalAmount optional AND gates its absolute-sum refinement on it being present, so an
+// absolute edit can legitimately arrive with no total; pre-fix that fell back to the OLD
+// groupTotal, stamping every sibling with a header that no longer matched the legs (the
+// Property 3 "legs sum to groupTotal" invariant). These are deterministic invariants, not
+// distribution properties, so plain fixtures (not fast-check) are the right gate.
+describe('#60: absolute split edit recomputes groupTotal from allocations (no stale header)', () => {
+  /** Create an absolute split (validation forces sum===total at create), return its groupId. */
+  async function createAbsolute(
+    allocations: Array<{ vehicleId: string; amount: number }>
+  ): Promise<string> {
+    const total = allocations.reduce((s, a) => s + a.amount, 0);
+    const siblings = await repo.createSplitExpense(
+      {
+        splitConfig: { method: 'absolute', allocations },
+        category: 'financial',
+        date: new Date(2024, 5, 15),
+        totalAmount: total,
+      },
+      USER_ID
+    );
+    return siblings[0]?.groupId as string;
+  }
+
+  test('absolute edit with NO totalAmount stores groupTotal = sum(new allocations), legs reconcile', async () => {
+    // Start: v-1 $30 / v-2 $30 → groupTotal 60.
+    const groupId = await createAbsolute([
+      { vehicleId: 'v-1', amount: 30 },
+      { vehicleId: 'v-2', amount: 30 },
+    ]);
+
+    // Edit the allocations UP to $40/$40 but OMIT totalAmount (the reachable API shape).
+    const newSiblings = await repo.updateSplitExpense(
+      groupId,
+      {
+        splitConfig: {
+          method: 'absolute',
+          allocations: [
+            { vehicleId: 'v-1', amount: 40 },
+            { vehicleId: 'v-2', amount: 40 },
+          ],
+        },
+      },
+      USER_ID
+    );
+
+    // Pre-fix: groupTotal stayed 60 while the legs summed to 80 (a stored inconsistency).
+    // Post-fix: groupTotal is derived from the new allocations → 80, matching the legs.
+    const legsSum = newSiblings.reduce((s, r) => s + r.expenseAmount, 0);
+    expect(legsSum).toBe(80);
+    for (const s of newSiblings) {
+      expect(s.groupTotal).toBe(80);
+    }
+
+    // Verify from the DB too, not just the returned rows (the header is what analytics reads).
+    const dbRows = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
+    expect(dbRows.length).toBe(2);
+    const dbLegsSum = dbRows.reduce((s, r) => s + r.expenseAmount, 0);
+    expect(dbLegsSum).toBe(80);
+    for (const row of dbRows) {
+      expect(row.groupTotal).toBe(80);
+    }
+  });
+
+  test('absolute edit WITH a matching totalAmount is unchanged (the fix is a no-op when total is sent)', async () => {
+    const groupId = await createAbsolute([
+      { vehicleId: 'v-1', amount: 30 },
+      { vehicleId: 'v-2', amount: 30 },
+    ]);
+
+    // Validation forces sum===total when total is present, so 45+35=80 is the only legal total.
+    const newSiblings = await repo.updateSplitExpense(
+      groupId,
+      {
+        splitConfig: {
+          method: 'absolute',
+          allocations: [
+            { vehicleId: 'v-1', amount: 45 },
+            { vehicleId: 'v-2', amount: 35 },
+          ],
+        },
+        totalAmount: 80,
+      },
+      USER_ID
+    );
+
+    for (const s of newSiblings) {
+      expect(s.groupTotal).toBe(80);
+    }
+    expect(newSiblings.reduce((s, r) => s + r.expenseAmount, 0)).toBe(80);
+  });
+
+  test('even-split edit with NO totalAmount still falls back to the stored groupTotal (fix scoped to absolute)', async () => {
+    // Behavior-preservation control: even/percentage carry no per-vehicle amounts, so they
+    // MUST keep using the caller-or-stored total to divide. An omitted total on an even edit
+    // therefore still reuses the old groupTotal (60) — the fix must not change this path.
+    const siblings = await repo.createSplitExpense(
+      {
+        splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2'] },
+        category: 'financial',
+        date: new Date(2024, 5, 15),
+        totalAmount: 60,
+      },
+      USER_ID
+    );
+    const groupId = siblings[0]?.groupId as string;
+
+    const newSiblings = await repo.updateSplitExpense(
+      groupId,
+      { splitConfig: { method: 'even', vehicleIds: ['v-1', 'v-2', 'v-3'] } },
+      USER_ID
+    );
+
+    // Still divides the stored 60 across the new vehicle set (20/20/20).
+    expect(newSiblings.length).toBe(3);
+    for (const s of newSiblings) {
+      expect(s.groupTotal).toBe(60);
+    }
+    expect(newSiblings.reduce((s, r) => s + r.expenseAmount, 0)).toBe(60);
+  });
+});

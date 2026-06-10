@@ -673,13 +673,24 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   agent (read the actual loop + provider upload). Narrow window (hence MED). FIX: a recorded idempotency key (deterministic remote
   name, or persist a pre-claim/storageRef before upload). Pure backend, but needs an approach choice (per-provider). Filed.
 
-**NEW — surfaced + verified-against-source by the C173 deep-review fan-out (native CSV-import pipeline · split-service allocation core). #59 (MED) FIXED in-cycle. Agent A CERTIFIED clean: BOM strip (C51 held), money parsing (no NaN→0 corruption, thousands-sep rejected not coerced), formula-injection denormalize (symmetric round-trip), idempotency (clientId sha256 dedup + partial unique index), cross-tenant vehicle resolution (name-map from the user's own fleet only). Split-service agent (B) findings land with its delayed event; my C67 pre-read already confirmed computeEvenSplit exact + refineSplitConfig enforces percentage-sum=100 at the Zod layer.**
+**NEW — surfaced + verified-against-source by the C173 deep-review fan-out (native CSV-import pipeline · split-service allocation core). #59 (MED, agent A) FIXED C173; #60 (MED, agent B) FIXED C174. Agent A CERTIFIED clean: BOM strip (C51 held), money parsing (no NaN→0 corruption, thousands-sep rejected not coerced), formula-injection denormalize (symmetric round-trip), idempotency (clientId sha256 dedup + partial unique index), cross-tenant vehicle resolution (name-map from the user's own fleet only). Agent B (split-service, delayed event triaged C174) CERTIFIED clean: computeEvenSplit exact (cents floor + remainder distribution), refineSplitConfig enforces percentage-sum=100 ±0.001 + absolute-sum=total (when total present) at the Zod layer, createSiblings copies sourceType/sourceId; the ONE real finding was #60.**
 - ~~**#59 (MED, data-safety + displayed-$) — native CSV-import parseDate silently rolled forward an out-of-range date-only cell.**~~
   — *DONE C173: import-csv.ts:136 built a date-only value in LOCAL time (the C61 trap avoided) but checked ONLY Number.isNaN —
   and `new Date(2024,12,45)` ("2024-13-45") never NaNs, it rolls to 2025-02-14 (skewing TCO/trend/year analytics). The #23/#39
   echo-check was applied to the MAPPING path (buildLocalDate, C115) but never ported to the native path. FIX: echo-check the
   constructed Y/M/D against the input parts → mismatch returns the clean per-row "Invalid date" error (full-ISO branch unchanged).
   +1 regression test (2024-13-45 + 2024-02-30 both rejected, imported 0). green→green 1215 pass.*
+- ~~**#60 (MED, data-safety + displayed-$) — absolute split EDIT without `totalAmount` kept a stale groupTotal (legs ≠ header).**~~
+  — *DONE C174: updateSplitSchema makes totalAmount OPTIONAL (validation.ts:102) AND gates its absolute-sum refinement on it being
+  present (:64), so an absolute edit can omit the total + pass validation; updateSplitExpense (repository.ts:762) then fell back to
+  the STALE firstOld.groupTotal while computeAllocations' absolute branch returns the new allocations verbatim → create 30/30 ($60)
+  → edit 40/40 no-total → siblings stamped groupTotal=$60 but legs sum $80 (persistent stored inconsistency surfaced by the header
+  at routes.ts:177/207; violates Property 3 — whose tests only cover create/total-present paths). FIX (method-aware, pure): for
+  ABSOLUTE derive total = round(Σallocations*100)/100 (definitionally the sum); even/percentage keep the caller-or-stored total to
+  divide. No-op when total IS sent (validation forces sum===total). +3 tests (no-total→groupTotal&legs both $80; with-total→unchanged;
+  even-split-no-total→still reuses stored $60, scoping control). green→green 1218 pass (+3). HONEST CAVEAT: backend gap confirmed
+  firsthand; whether the current FE actually omits totalAmount on absolute edits is UNVERIFIED (the real-world trigger frequency
+  hinges on it) — folded into a FE-eyes-on follow-on note, doesn't gate the backend correctness fix.*
 
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
