@@ -5,7 +5,7 @@
  * combining expenses.mileage and odometer_entries.odometer.
  */
 
-import { count, desc, eq, sql } from 'drizzle-orm';
+import { and, count, desc, eq, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
@@ -43,21 +43,25 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
 
   async findByVehicleIdPaginated(
     vehicleId: string,
+    userId: string,
     limit: number,
     offset: number
   ): Promise<{ data: OdometerEntry[]; totalCount: number }> {
+    // userId-scope BOTH legs (#48 — completes the C168 sweep, which scoped getHistory +
+    // getCurrentOdometer but missed THIS method): the route validates vehicle ownership
+    // first, but scoping here means an unvalidated vehicleId can never surface another
+    // user's manual entries (the C109/#52 tenant class). vehicle_id AND user_id together.
+    const where = and(eq(odometerEntries.vehicleId, vehicleId), eq(odometerEntries.userId, userId));
+
     const data = await this.db
       .select()
       .from(odometerEntries)
-      .where(eq(odometerEntries.vehicleId, vehicleId))
+      .where(where)
       .orderBy(desc(odometerEntries.recordedAt))
       .limit(limit)
       .offset(offset);
 
-    const [result] = await this.db
-      .select({ count: count() })
-      .from(odometerEntries)
-      .where(eq(odometerEntries.vehicleId, vehicleId));
+    const [result] = await this.db.select({ count: count() }).from(odometerEntries).where(where);
 
     return { data, totalCount: result?.count ?? 0 };
   }

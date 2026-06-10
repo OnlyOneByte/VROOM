@@ -59,6 +59,7 @@ routes.get(
 
     const { data, totalCount } = await odometerRepository.findByVehicleIdPaginated(
       vehicleId,
+      user.id,
       limit,
       offset
     );

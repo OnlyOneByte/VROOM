@@ -48,11 +48,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 179 |
 | guard | 6 | 175 |
-| bug | 3 | 178 |
+| bug | 3 | 180 |
 | arch | 5 | 177 |
 | infra | 6 | 176 |
 
-Current cycle: **179**
+Current cycle: **180**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3236,3 +3236,20 @@ Current cycle: **179**
   `export` keyword + 1 test entry, zero runtime change). green→green: backend validate:local **EXIT 0 — 1228 pass / 1 skip / 0 fail
   (+1)**, tsc 0, musl-biome clean, build bundled. cov: be 82.74%+ (carry; +1 BE) / fe 73.89% (carry). (The odometer-write vein —
   agent B's intended scope — remains un-audited; next deep-review cycle, inline if spawn stays down.)
+- **C180 (bug → #48 completion): userId-scope `findByVehicleIdPaginated` — the last unscoped odometer read leg** — BALANCE: only
+  `feature` over budget (cyc 170, starved-for 10, blocked 5th cycle running) → fell to highest-leverage actionable. Picked up the
+  C179-carried-over ODOMETER-WRITE-vein audit (agent B's un-run scope), done INLINE (spawn 400'd last cycle; inline is the reliable +
+  higher-fidelity path). Audited odometer/routes.ts + repository.ts adversarially. **CERTIFIED CLEAN (firsthand):** PUT updateSchema =
+  createSchema.partial() — PROVED via throwaway probe that the field-level future-date `.refine` SURVIVES .partial() (future recordedAt
+  rejected on update), negative odometer rejected, empty update a clean no-op (no .default() → C41-safe); probe deleted. getHistory +
+  getCurrentOdometer both userId-scoped (C168), correct UNION/MAX-by-value. The PUT-update recheck gap (Mileage Finding A/B) is the
+  DOCUMENTED D5 by-design scope choice (#17) — not a fresh defect. **THE FINDING (#48 completion, the C109/#52 tenant class):
+  `findByVehicleIdPaginated` (the backing query for GET /:vehicleId) filtered on `vehicle_id` ALONE on BOTH the data + count legs** —
+  C168 userId-scoped getHistory + getCurrentOdometer but MISSED this third method (its own note said "verify ALL methods, no leg
+  missed" — this was the missed leg). Not live-exploitable (route validates vehicle ownership first), but the identical latent
+  cross-tenant boundary C168 set out to close. FIX: added a `userId` param + ANDed `eq(userId)` into both legs (shared `where`),
+  threaded `user.id` through the one route caller. +3 tests (new find-by-vehicle-paginated.test.ts: newest-first + totalCount; limit/
+  offset; the #48 cross-tenant case — a foreign same-vehicleId row leaks into NEITHER data NOR count [pre-fix totalCount would be 2]).
+  One biome reflow autofixed. green→green: backend validate:local **EXIT 0 — 1231 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome
+  clean, build bundled. Odometer vein now FULLY audited + the #48 sweep COMPLETE (all 3 read methods scoped). cov: be 82.74%+ (carry;
+  +3 BE) / fe 73.89% (carry)

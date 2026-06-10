@@ -186,8 +186,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   = ON` on the prod connection (connection.ts:28) so the cascade FIRES; (2) PUT updateVehicleSchema is SAFE from the C31/C41 clobber
   class — proved firsthand `parse({})` injects `[]` (drizzle-zod doesn't surface the 4 .default() cols as Zod defaults). The one
   finding → a guard increment: the C41 net didn't cover updateVehicleSchema (highest-risk createInsertSchema instance) → exported it +
-  added to partial-update-no-default-injection.test.ts (5 pass). green→green 1228 pass (+1). **NEXT deep-review vein: the ODOMETER
-  write path + recheck-mileage-reminders seam** (agent B's intended scope, un-run due to the spawn failure) — inline if spawn stays down.*
+  added to partial-update-no-default-injection.test.ts (5 pass). green→green 1228 pass (+1).*
+- ~~**Odometer write-path + recheck-seam vein audit (C180)**~~ — *DONE C180 (inline, the C179-carried-over vein): audited
+  odometer/routes.ts + repository.ts. CERTIFIED CLEAN firsthand: PUT updateSchema's field-level future-date .refine SURVIVES
+  .partial() (probed), negative-odometer rejected, empty-update no-op (C41-safe); getHistory + getCurrentOdometer userId-scoped
+  (C168), correct UNION/MAX. PUT-recheck gap = the documented D5 by-design choice (#17), not a defect. THE FINDING → #48 completion:
+  findByVehicleIdPaginated (backs GET /:vehicleId) filtered vehicle_id ALONE on both data+count legs — the leg C168's #48 sweep
+  MISSED. Added userId param + ANDed eq(userId) into both legs + threaded user.id through the route; +3 tests incl. the cross-tenant
+  case. green→green 1231 pass (+3). **#48 sweep now COMPLETE — all 3 odometer read methods userId-scoped.**)*
 - ~~**Certify financing math + split/cascade primitives; pin source-survives-edit (C101)**~~ — *DONE C101: 2-agent
   fan-out on fresh backend-correctness surfaces. (A) Financing/loan balance + amortization math AUDIT-CLEAN — computeBalance
   is payment-history-based (max(0, original−Σpayments), not naive amortization), buildAmortizationSchedule decrements
@@ -614,7 +620,9 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   ${userId}` into every WHERE leg (6: 2 getCurrentOdometer + 4 getHistory incl. the COUNT subqueries); threaded userId through all
   5 production callers (reminders/routes ×2 via resolveMileageFields + trigger-service via reminder.userId + vehicles/routes
   /stats + odometer/routes history) + both test files. +1 cross-tenant regression test (another user's reading → null under our
-  userId; owner still reads it). green→green 1211 pass (+1).*
+  userId; owner still reads it). green→green 1211 pass (+1).* **COMPLETED C180: the C179→C180 odometer audit found C168 had MISSED
+  a 3rd read method — `findByVehicleIdPaginated` (backs GET /:vehicleId) still filtered vehicle_id alone on both data+count legs.
+  Scoped it (userId param + eq(userId) on both legs + route threading) + 3 tests. ALL odometer read methods now userId-scoped.*
 
 **NEW — surfaced + verified-against-source by the C150 deep-review fan-out (reminder recurrence date-advance + insurance multi-term attribution). KEY: agent B's headline MED "null-endDate term sorts last → wrong premium" was a FALSE POSITIVE — insuranceTerms.endDate is `.notNull()` (schema.ts:129), so a null endDate CANNOT exist and that sort branch is unreachable dead code (caught firsthand: the NOT NULL constraint rejected the test insert; the C21/C77 vacuity rule). effectiveMonthlyPremium / inactive-exclusion / costByCarrier dedup / per-vehicle div-guard / overlapping-month accumulation all CERTIFIED CLEAN. #50 (real) FIXED in-cycle; #51 filed. Reminder agent's findings land with its delayed event.**
 - ~~**#50 (LOW) — insurance latest-term pick was DB-row-order dependent on an endDate tie.**~~ — *DONE C150: `buildInsuranceDetails`
