@@ -2844,3 +2844,9 @@ Current cycle: **150**
   **EXIT 0 — 1196 pass / 1 skip / 0 fail (+2)**, tsc 0, musl-biome clean, build bundled. Filed agent-A F3 (endDate inclusivity
   is server-TZ-conditional, UTC-prod-mitigated) as LOW #53. Agent B (fuel-stats) findings pending its delayed completion event →
   will triage/file then. cov: be 82.0%+ (carry; +2 BE) / fe 70.09% (carry)
+  - *C155.5 (post-cycle triage, delayed event): the fuel-stats agent (c7bf2ea7) landed after C155 closed. Its Finding 1 →
+    **#54 (HIGH), VERIFIED firsthand**: getFuelEfficiencyTrend pairs consecutive fuel rows ACROSS vehicles in the fleet view
+    (no vehicleId in the SELECT, ordered by date only, computeEfficiencyPoint has no same-vehicle guard) → a phantom MPG point
+    when two cars have close odometers; reachable via /fuel-efficiency with no vehicleId. FILED (not fixed — a fresh
+    increment for a future bug/deep-review cycle; needs the query reshape + a regression test). Its div-guard/split-sibling
+    checks matched my C155 pre-read (clean). No commit this triage — BACKLOG-only filing folded into the next push.*

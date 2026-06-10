@@ -590,7 +590,7 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   internally inconsistent. Arguably intentional (it IS active). VERIFIED C150. FIX (if desired): count only policies with a term,
   or surface a "no current term" state. Low.
 
-**NEW — surfaced + verified-against-source by the C155 deep-review fan-out (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent's findings land with its delayed event.**
+**NEW — surfaced + verified-against-source by the C155 deep-review fan-out (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent (delayed event, triaged post-C155): its Finding 1 → **#54 (HIGH, VERIFIED firsthand)** filed below; its div-guard/split-sibling checks matched my C155 pre-read (isFillup volume>0, fillupDetails length-guards, per-vehicle distance — clean).**
 - ~~**#52 (MED, security defense-in-depth) — split delete/regenerate keyed the destructive write on groupId alone.**~~ — *DONE
   C155: `deleteSplitExpense` (repository.ts:720) + `updateSplitExpense` step 2 (:771) ran `delete(expenses).where(eq(groupId))`
   while their guarding SELECTs (:704/:743) were userId-scoped — ownership check + destructive write on DIFFERENT predicates. NOT
@@ -605,6 +605,20 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   server the extension doesn't fire → a "through Mar 31" filter silently drops same-day expenses (the list + the CSV export
   identically). Mitigated if prod runs UTC (the documented assumption). VERIFIED C155. FIX (if desired): detect date-only at the
   route (string-shape) and build the bound from local parts, or normalize to local midnight before the helper. Low.
+- **#54 (HIGH — VERIFIED firsthand C155, displayed-chart correctness) — `getFuelEfficiencyTrend` pairs consecutive fuel rows
+  ACROSS vehicles in the fleet view.** `analytics/repository.ts:1096-1117`: the query orders by `date` ONLY (no vehicle group),
+  does NOT select `vehicleId`, and the loop pairs `rows[i]`/`rows[i-1]` → `computeEfficiencyPoint` computes
+  `current.mileage − previous.mileage`. When called WITHOUT `vehicleId` (the `/fuel-efficiency` fleet view, routes.ts:175 —
+  `vehicleId` is OPTIONAL, so this path is reachable for any multi-vehicle user), consecutive rows can be DIFFERENT cars, so a
+  B-after-A pair subtracts two cars' odometers. `computeEfficiencyPoint` (analytics-charts.ts:110-130) has NO same-vehicle guard
+  (it can't — vehicleId isn't even selected); its bounds filter (milesDriven ≤ MAX_REASONABLE, [5,100] MPG) does NOT catch the
+  case when two cars have CLOSE odometers (e.g. 12,000 & 12,100 → 100 mi / 10 gal → a plausible 10 MPG phantom point on the
+  displayed fleet chart). This is exactly the cross-vehicle pooling hazard the REST of the file avoids (getFuelStats builds
+  `fuelRowsByVehicle`; computeMpgAndCostPerMile groups by vehicle). FIX: select `vehicleId`, order by `(vehicleId, date)`, and
+  only pair rows within the same vehicle (skip the boundary pair) — OR group rows by vehicle first (mirror the getFuelStats
+  pattern) and compute per-vehicle trends. Needs a regression test (2 vehicles, interleaved dates, close odometers → no
+  cross-vehicle point). Pure backend, fully verifiable. NOT yet fixed — landed as a delayed event after C155 closed; a future
+  bug/deep-review cycle implements it.
 
 *(surfaced by the C3 vehicle-detail UI review — ranked by severity; all real, none data-safety)*
 - ~~**Vehicle-detail load failure masquerades as empty state (#1)**~~ — *DONE C57: `loadSummary`
