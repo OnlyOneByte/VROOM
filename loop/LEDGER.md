@@ -37,10 +37,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 132 |
 | guard | 6 | 130 |
 | bug | 3 | 133 |
-| arch | 5 | 129 |
+| arch | 5 | 135 |
 | infra | 6 | 131 |
 
-Current cycle: **134**
+Current cycle: **135**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -2462,3 +2462,19 @@ Current cycle: **134**
   pass (+6). NON-eyes-on (pure .ts service + type, no markup). REMAINING T6/T7 = only the eyes-on UI (badge/view + dashboard
   widget) that now has its client method to call; T4/T5/T8 still eyes-on. cov: be 81.8% (carry) / fe ~63%+ (carry; +6 FE
   service tests)
+- **C135 (arch — route reminder-helpers.ts frequencyLabel through the shared `capitalize`; C128-filed follow-on)** — BALANCE:
+  recomputed all six — `arch` the ONLY over-budget category (cyc 129, starved-for 6 > 5; matches the C134 forecast). guard was
+  AT budget (cyc 130, starved-for 5 = 6 next cycle), not over → arch wins. Took the C128-filed follow-on (the cleaner of the 2
+  ready arch picks; the other, `MS_PER_DAY`, is flagged NOT byte-identical → needs per-site care, deferred per arch rule 1's
+  one-small-refactor cap). THE DEDUP: `frequencyLabel` (reminder-helpers.ts:75) hand-rolled `frequency.charAt(0).toUpperCase()
+  + frequency.slice(1)` — BYTE-IDENTICAL to the `capitalize(s)` C119 extracted to formatters.ts (:50), but this file wasn't in
+  C119's 5 sites. Routed it through the shared helper (1 import + 1 call swap), so the last copy of that idiom in the reminder
+  path is now the single source of truth. VERIFIED FIRST (arch rules 2/3): (a) byte-identical — capitalize is exactly
+  charAt(0).toUpperCase()+slice(1), no semantic shift; (b) test-anchored — frequencyLabel has a green net
+  (reminder-helpers.test.ts:88-111: 'monthly'→'Monthly'/'yearly'→'Yearly'/'weekly'→'Weekly' directly exercise :75), so this is
+  a green→green proof; (c) NO circular import — formatters.ts imports only settingsStore (grounded vs source), so
+  reminder-helpers→formatters is acyclic (C119 already proved this graph via ReminderForm). green→green: frontend validate:local
+  EXIT 0 — type-check 0, build done, 427 pass UNCHANGED (the frequencyLabel tests pass identically = behavior-preserving). Pure
+  .ts, no markup/reactivity → no eyes-on. ARCH NEXT PICK: only `MS_PER_DAY` (3 spellings/4 files, NOT byte-identical — per-site
+  verify before collapsing) remains filed; else a rule-7 fan-out to repopulate. cov: be 81.8% / fe ~63%+ (carry; no new tests —
+  a behavior-preserving refactor under the existing net)

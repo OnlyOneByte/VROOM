@@ -1,4 +1,5 @@
 import type { Reminder } from '$lib/types/reminder';
+import { capitalize } from './formatters';
 
 /**
  * Whether a reminder is TIME-due: its nextDueDate is now or in the past.
@@ -72,5 +73,5 @@ export function frequencyLabel(reminder: Reminder): string | null {
 	if (frequency === 'custom' && intervalValue && intervalUnit) {
 		return `Every ${intervalValue} ${intervalUnit}${intervalValue > 1 ? 's' : ''}`;
 	}
-	return frequency.charAt(0).toUpperCase() + frequency.slice(1);
+	return capitalize(frequency);
 }

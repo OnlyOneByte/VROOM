@@ -649,10 +649,12 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
   unchanged). validate:local EXIT 0.* NEXT ARCH PICKS (lower priority): ~~analytics getUserUnits/getVehicleUnits
   share a byte-identical parse-default tail [2 sites, C119 #2]~~ — *DONE C129: extracted private `resolveUnitsOrDefault(row)`;
   EXCLUDED getAllVehicleUnits (throws on invalid prefs, not fallback — the C90 inverted-semantics catch). green→green 1158
-  pass.* Remaining: `MS_PER_DAY` magic literal in 3 spellings across 4 files [C119 #3, NOT byte-identical — per-site verify
-  before collapsing]; `reminder-helpers.ts:45` has the SAME `frequency.charAt(0).toUpperCase()+frequency.slice(1)` idiom
-  C119 extracted as `capitalize()` but this file wasn't in C119's 5 sites [filed C128 — a 1-site follow-on; route it through
-  the existing `capitalize` from formatters.ts].
+  pass.* ~~`reminder-helpers.ts` frequencyLabel hand-rolls the SAME `frequency.charAt(0).toUpperCase()+frequency.slice(1)`
+  idiom C119 extracted as `capitalize()` [filed C128]~~ — *DONE C135: routed frequencyLabel (:75) through the shared
+  `capitalize` from formatters.ts (1 import + 1 call swap). Verified byte-identical + test-anchored (frequencyLabel's
+  'monthly'→'Monthly' tests are the green→green net) + no circular import (formatters imports only settingsStore). green→green
+  427 pass unchanged.* Remaining: `MS_PER_DAY` magic literal in 3 spellings across 4 files [C119 #3, NOT byte-identical —
+  per-site verify before collapsing]; else run a rule-7 fan-out to repopulate the arch queue.
 
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,
