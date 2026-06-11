@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 185 |
 | guard | 6 | 188 |
-| bug | 3 | 189 |
+| bug | 3 | 190 |
 | arch | 5 | 187 |
 | infra | 6 | 186 |
 
-Current cycle: **189**
+Current cycle: **190**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3394,3 +3394,19 @@ Current cycle: **189**
   (foreign-vehicle PUT→404 + the bad write never lands; own-second-vehicle→200 [not over-broad]; no-vehicleId PUT→200 [no regression]).
   green→green: backend validate:local **EXIT 0 — 1256 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean (1 reflow autofixed),
   build bundled. #61 CLOSED. cov: be 83.41%+ (carry; +3 BE) / fe 73.89% (carry).
+- **C190 (bug → #62): restrict the manual expense route's `sourceType` to `financing` only (system-only links can't be forged)** —
+  BALANCE: only `feature` strictly over budget (cyc 170, starved-for 20, blocked 15th cycle, escalated) → fell through to
+  highest-leverage actionable (no other category OVER — deep-review only AT 5). Took the PRIMED #62 (filed C189, the create/update
+  validation-asymmetry pair's second half) over a speculative fresh audit — higher-confidence leverage, and deep-review (at budget)
+  is forced next cycle anyway. Inline (6/3 spawn cap). VERIFIED THE FIX SHAPE FIRSTHAND before acting: `insurance_term` expenses are
+  created via `expenseRepository.createSplitExpense` (insurance/hooks.ts:33) + `reminder` expenses via a direct `tx.insert` /
+  createSiblings (trigger-service.ts:160/186) — BOTH bypass the POST/PUT route entirely. So the route enum accepting those two was
+  PURE over-permissiveness (only `financing` is legitimately route-set, + already fully validated :536). FIX (Option A, zero-risk):
+  `sourceType: z.enum(['financing','insurance_term','reminder'])` → `z.literal('financing')` on the route's create/update schema —
+  closes the forge (#62: a hand-crafted POST/PUT could stamp an UNVALIDATED insurance_term/reminder link on the caller's own row →
+  skewed source-bucketed analytics + a matching sourceId would cascade-delete the manual expense when its parent is removed; within-
+  tenant, all source ops userId-scoped so NOT cross-tenant). Confirmed NO test sends those via the route (the traceability test uses
+  POST /reminders/trigger, not POST /expenses) + the 2 existing traceability reads stayed GREEN (the system DB-direct writes are
+  unaffected). +4 tests (POST reminder→400, POST insurance_term→400, PUT reminder→400, no-source create→201 control). green→green:
+  backend validate:local **EXIT 0 — 1260 pass / 1 skip / 0 fail (+4)**, tsc 0, musl-biome clean, build bundled. #62 CLOSED — the
+  C189 expense-write-path audit's findings (#61 C189 + #62 C190) are now BOTH landed. cov: be 83.41%+ (carry; +4 BE) / fe 73.89% (carry).

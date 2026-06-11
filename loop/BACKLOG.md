@@ -662,16 +662,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   corrupts their analytics attribution; within-tenant, all reads userId-scoped so NOT a cross-tenant leak). FIX: when
   updateData.vehicleId is present AND differs, validateVehicleOwnership (mirror create). +3 tests (foreign→404 + no bad write;
   own-second→200; no-vehicleId→200). green→green 1256 pass (+3).*
-- **#62 (MED, latent integrity — filed C189) — expense create/PUT only validate the `financing` sourceType, not `insurance_term`/`reminder`.**
-  POST /expenses (routes.ts:536-543) validates sourceType==='financing' (entity exists + active + sourceId matches), but the schema
-  (:81) also accepts `insurance_term` + `reminder` — for those, an ARBITRARY sourceId is persisted UNVALIDATED (and the PUT path
-  validates none). NOT a cross-tenant hole (findBySource/deleteBySource/clearSource are all userId-scoped — verified firsthand
-  :537), so the blast radius is WITHIN-tenant: (a) analytics may bucket a forged-link manual expense as insurance/recurring-sourced;
-  (b) if the arbitrary sourceId matches a real term/reminder of theirs, deleting that parent cascade-deletes this manual expense too
-  (surprising loss of a manual entry). Latent (the FE never sets these on a manual create — they're hook-only), so it's a hardening
-  gap, not a live UX bug. FIX (clean, non-gated): reject `insurance_term`/`reminder` sourceType on the manual create+update paths
-  (they're system-hook-only), OR validate the referenced term/reminder exists + is owned (mirror the financing branch). Likely the
-  next bug-cycle pick.
+- ~~**#62 (MED, latent integrity — filed C189) — expense create/PUT only validate the `financing` sourceType, not `insurance_term`/`reminder`.**~~
+  — *DONE C190 (Option A): VERIFIED firsthand that `insurance_term` expenses are created via `expenseRepository.createSplitExpense`
+  (insurance/hooks.ts:33) + `reminder` expenses via a direct tx.insert/createSiblings (trigger-service.ts:160/186) — BOTH bypass the
+  POST/PUT route, so the route enum accepting those was pure over-permissiveness (only `financing` is legitimately route-set + already
+  validated :536). FIX: `sourceType: z.enum([financing,insurance_term,reminder])` → `z.literal('financing')` on the route create/update
+  schema. Confirmed NO test POSTs those via the route + the 2 traceability reads stayed green (system DB-direct writes unaffected). +4
+  tests (POST reminder/insurance_term→400, PUT reminder→400, no-source create→201). green→green 1260 pass (+4).*
 
 **NEW — surfaced + verified-against-source by the C155 deep-review fan-out (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent (delayed event, triaged post-C155): its Finding 1 → **#54 (HIGH, VERIFIED firsthand)** filed below; its div-guard/split-sibling checks matched my C155 pre-read (isFillup volume>0, fillupDetails length-guards, per-vehicle distance — clean).**
 - ~~**#52 (MED, security defense-in-depth) — split delete/regenerate keyed the destructive write on groupId alone.**~~ — *DONE

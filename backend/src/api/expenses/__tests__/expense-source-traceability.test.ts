@@ -144,3 +144,68 @@ describe('expense source traceability (recurring-expenses T1 — read-path surfa
     expect(body.data.sourceId ?? null).toBeNull();
   });
 });
+
+/**
+ * #62 (C190): the manual create/update route accepts ONLY sourceType 'financing' (which it fully
+ * validates). 'insurance_term' + 'reminder' expenses are created exclusively by system paths that
+ * BYPASS this route (insurance hooks / the reminder trigger — verified firsthand), so accepting them
+ * on the manual route was pure over-permissiveness: a hand-crafted POST/PUT could forge an UNVALIDATED
+ * source link on the caller's own row (skews source-bucketed analytics + a matching sourceId would
+ * cascade-delete the manual expense when its parent is removed). These pin the enum restriction.
+ */
+describe('#62 — manual expense route rejects system-only sourceTypes', () => {
+  test('POST with sourceType "reminder" is rejected 400 (system-only — never via the manual route)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 20,
+      date: '2024-03-10T00:00:00.000Z',
+      sourceType: 'reminder',
+      sourceId: 'forged-reminder-id',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('POST with sourceType "insurance_term" is rejected 400 too', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'financial',
+      expenseAmount: 30,
+      date: '2024-03-10T00:00:00.000Z',
+      sourceType: 'insurance_term',
+      sourceId: 'forged-term-id',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('PUT with sourceType "reminder" is rejected 400 (the update path is restricted too)', async () => {
+    const vehicleId = await seedVehicle();
+    const createRes = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 15,
+      date: '2024-03-11T00:00:00.000Z',
+    });
+    const created = await json<DataEnvelope<ExpenseResponse>>(createRes);
+    expect(createRes.status, JSON.stringify(created)).toBe(201);
+
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${created.data.id}`, {
+      sourceType: 'reminder',
+      sourceId: 'forged-reminder-id',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('a plain manual expense with NO source still creates fine (the enum restriction is not over-broad)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 18,
+      date: '2024-03-12T00:00:00.000Z',
+    });
+    expect(res.status).toBe(201);
+  });
+});

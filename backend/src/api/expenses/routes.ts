@@ -78,7 +78,15 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
     // it — the clear-optional-field class (cycles 82-85). BaseRepository.update
     // writes null through to the column; undefined is still dropped (create omits it).
     .nullish(),
-  sourceType: z.enum(['financing', 'insurance_term', 'reminder']).optional(),
+  // Manual create/update accepts ONLY 'financing' as a source link — and the POST handler fully
+  // validates it (the referenced financing exists, is active, and sourceId matches). 'insurance_term'
+  // + 'reminder' expenses are created EXCLUSIVELY by system paths that bypass this route (insurance
+  // hooks via createSplitExpense; the reminder trigger via a direct tx.insert), so accepting them here
+  // was pure over-permissiveness: a hand-crafted POST/PUT could forge an UNVALIDATED insurance_term/
+  // reminder link on the caller's own row (#62 — within-tenant integrity: skews source-bucketed
+  // analytics, and a real matching sourceId would cascade-delete the manual expense when its parent is
+  // removed). Restricting the enum to 'financing' closes that with zero impact on the system paths.
+  sourceType: z.literal('financing').optional(),
   sourceId: z.string().min(1).optional(),
   // Offline idempotency key — client-generated UUID. Optional; present only for
   // expenses created via the offline outbox.
