@@ -7,13 +7,20 @@ import type { OfflineExpense } from '../offline-storage';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// Mock offline storage functions
-vi.mock('../offline-storage', () => ({
-	loadOfflineExpenses: vi.fn(),
-	saveOfflineExpenses: vi.fn(),
-	markExpenseAsSynced: vi.fn(),
-	clearSyncedExpenses: vi.fn()
-}));
+// Mock the localStorage-touching offline-storage functions, but keep the REAL
+// offlineExpenseToBackend (C205): it's a pure mapper with no side-effects, and stubbing it
+// would (a) make these tests assert against a fake transform and (b) break the sync paths that
+// now route through it (they'd call `undefined`). importActual pulls in the genuine mapper.
+vi.mock('../offline-storage', async () => {
+	const actual = await vi.importActual<typeof import('../offline-storage')>('../offline-storage');
+	return {
+		offlineExpenseToBackend: actual.offlineExpenseToBackend,
+		loadOfflineExpenses: vi.fn(),
+		saveOfflineExpenses: vi.fn(),
+		markExpenseAsSynced: vi.fn(),
+		clearSyncedExpenses: vi.fn()
+	};
+});
 
 import { loadOfflineExpenses } from '../offline-storage';
 

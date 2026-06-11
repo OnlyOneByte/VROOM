@@ -42,6 +42,35 @@ export interface OfflineExpense {
 	version?: string; // Storage format version
 }
 
+/**
+ * Map a stored offline-outbox entry to the backend request shape via the shared transformer.
+ *
+ * SINGLE SOURCE OF TRUTH for the OfflineExpense → toBackendExpense field mapping. This block was
+ * copy-pasted at 3 sync sites (syncOfflineExpenses here + sync-manager's syncSingleExpense and
+ * resolveConflict keep_local), and that drift is exactly how #66 happened — `fuelType` was added to
+ * the online path but missed in the duplicated offline copies, so an offline electric expense's
+ * `charge` silently vanished on sync (toBackendExpense routes charge↔volume SOLELY on fuelType).
+ * Collapsing the three copies into one keeps the offline sync payload in lockstep, so a future field
+ * can't be carried in one copy and forgotten in another. `tags` is a required `string[]` on
+ * OfflineExpense, so no `|| []` guard is needed (the prior site-1 guard was a defensive no-op).
+ */
+export function offlineExpenseToBackend(
+	expense: OfflineExpense
+): ReturnType<typeof toBackendExpense> {
+	return toBackendExpense({
+		vehicleId: expense.vehicleId,
+		tags: expense.tags,
+		category: expense.category as ExpenseCategory,
+		amount: expense.amount,
+		date: expense.date,
+		mileage: expense.mileage,
+		volume: expense.volume,
+		charge: expense.charge,
+		fuelType: expense.fuelType,
+		description: expense.description
+	});
+}
+
 // Load offline expenses from localStorage
 export function loadOfflineExpenses(): OfflineExpense[] {
 	if (!browser) return [];
@@ -157,21 +186,8 @@ export async function syncOfflineExpenses(): Promise<void> {
 				continue;
 			}
 
-			// Transform to backend format using API transformer
-			const backendExpense = toBackendExpense({
-				vehicleId: expense.vehicleId,
-				tags: expense.tags || [],
-				category: expense.category as ExpenseCategory,
-				amount: expense.amount,
-				date: expense.date,
-				mileage: expense.mileage,
-				volume: expense.volume,
-				charge: expense.charge,
-				// Required for the charge↔volume discriminant (#66): omitting it makes an
-				// electric expense's charge vanish on sync.
-				fuelType: expense.fuelType,
-				description: expense.description
-			});
+			// Transform to backend format using the shared offline→backend mapper (#66 single source).
+			const backendExpense = offlineExpenseToBackend(expense);
 
 			// Send the idempotency key so a retried POST returns the original row.
 			await apiClient.post('/api/v1/expenses', { ...backendExpense, clientId: expense.clientId });

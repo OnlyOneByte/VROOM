@@ -1080,7 +1080,18 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     had noted-but-excluded, now its own clean dedup). EXCLUDED the :923 latest-term sort (different `: 0` fallback + startDate tiebreak
     — still the C182-#2 trap). Extracted `sortByVehicleThenDate` to analytics-charts.ts beside forEachVehiclePair; date-key kept VERBATIM
     (FuelExpenseRow.date is Date|number|null, never string → number=epoch-ms + Number(null)=0 unchanged). +3 tests; existing analytics
-    suites green through. green→green 1272 pass (+3).* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or an inline scout.**
+    suites green through. green→green 1272 pass (+3).*
+  - ~~**`offlineExpenseToBackend` — the OfflineExpense→toBackendExpense field mapping, 3 sites → 1 (C205 inline scout)**~~ — *DONE C205:
+    a STRONG fresh lead from the C204 #66 fix — the 10-field OfflineExpense→toBackendExpense mapping was copy-pasted at 3 sync sites
+    (offline-storage syncOfflineExpenses + sync-manager syncSingleExpense + resolveConflict keep_local), and that drift is EXACTLY how #66
+    happened (fuelType added to the online path, missed in the duplicated copies → an offline electric charge silently dropped on sync).
+    VERIFIED firsthand all 3 map the same fields, differing only in a defensive `tags || []` no-op (tags is a required string[]) + the source
+    var → behaviorally identical. Extracted exported `offlineExpenseToBackend(e)` to offline-storage.ts (beside the type) + wired all 3 +
+    removed the now-dead toBackendExpense + ExpenseCategory imports from sync-manager. PAYOFF: collapses the triplication that bred #66 so a
+    future field can't be carried in one copy and forgotten in another (NORTH_STAR #6 + regression-prevention). +3 direct helper tests (core
+    mapping; the electric-charge #66 invariant at the dedup boundary; liquid control); existing sync suites green through. Caught + fixed a
+    test-mock gap (sync-manager.test.ts vi.mock stubbed only 4 fns → importActual keeps the REAL pure mapper, a net improvement). green→green
+    FE 545 pass (+3), tsc 0, build OK; prettier + eslint clean.* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or an inline scout.**
   - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
     pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the ~57 logging sites
     is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.

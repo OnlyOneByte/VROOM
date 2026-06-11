@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 204 |
 | guard | 6 | 201 |
 | bug | 3 | 202 |
-| arch | 5 | 200 |
+| arch | 5 | 205 |
 | infra | 6 | 203 |
 
-Current cycle: **204**
+Current cycle: **205**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3628,3 +3628,20 @@ Current cycle: **204**
   data-loss fixed + unit-pinned end-to-end; the .svelte change is mechanical data-passing (tsc/build-verified, no markup), but the full
   offline-create→sync→render round-trip for an electric charge is Playwright-eyes-on-BLOCKED here → lands code-complete/eyes-on-pending per
   the feature-DoD rule, correctness locked by the transform + outbox unit guards. cov: fe 77.79%+ (carry; +5 FE) / be 84.06% (carry).
+- **C205 (arch): extract offlineExpenseToBackend — the OfflineExpense→toBackendExpense mapping, 3 sites → 1** — BALANCE: `feature`
+  most-starved (cyc 170, starved-for 35, blocked 30th — milestone) but blocked → fell through; `arch` AT budget (cyc 200, starved-for 5 = 5)
+  was the most-starved actionable (longer-waiting than `bug` at 3). Inline scout (arch queue empty; spawn cap/flake — C194/C200 precedent).
+  STRONG fresh lead from C204: the OfflineExpense→toBackendExpense field-mapping block was copy-pasted at 3 sync sites (offline-storage
+  syncOfflineExpenses + sync-manager syncSingleExpense + resolveConflict keep_local) — and that drift is EXACTLY how #66 happened (fuelType
+  added to the online path, missed in the duplicated offline copies). VERIFIED firsthand all 3 map the same 10 fields, differing only in a
+  defensive `tags || []` no-op (tags is a required string[] on OfflineExpense) + the source var (expense vs conflict.localExpense) → behaviorally
+  identical. Extracted exported `offlineExpenseToBackend(e: OfflineExpense)` to offline-storage.ts (beside the type it maps) + wired all 3 +
+  removed the now-dead `toBackendExpense` + `ExpenseCategory` imports from sync-manager (biome/eslint noUnusedVariables — confirmed clean).
+  PAYOFF (NORTH_STAR #6 + concrete regression-prevention): collapses the triplication that bred #66 so a future field can't be carried in one
+  copy and forgotten in another. Test-anchored (arch rule 3): the EXISTING sync-manager + sync-offline-expenses suites green THROUGH the
+  substitution + 3 new direct helper tests (core field mapping; the electric-charge #66 invariant at the dedup boundary; liquid-fuel control).
+  CAUGHT + FIXED a test-mock gap firsthand (verify-in-isolation paid off): sync-manager.test.ts `vi.mock('../offline-storage')` stubbed only 4
+  fns, so the new helper was undefined → 3 failures; fixed with importActual to keep the REAL pure mapper (stubbing it would assert against a
+  fake transform) — a net IMPROVEMENT (the test now exercises the genuine transform). green→green: FE validate:local EXIT 0 — 545 pass (+3),
+  tsc 0, build OK; prettier (auto-fixed the helper-signature reflow) + eslint clean on all touched files. cov: fe 77.79%+ (carry; +3 FE) /
+  be 84.06% (carry).

@@ -11,10 +11,13 @@ import {
 	type SyncConflict,
 	type SyncConfig
 } from './sync-state.svelte';
-import { loadOfflineExpenses, saveOfflineExpenses, type OfflineExpense } from '../offline-storage';
+import {
+	loadOfflineExpenses,
+	saveOfflineExpenses,
+	offlineExpenseToBackend,
+	type OfflineExpense
+} from '../offline-storage';
 import { extractErrorMessage } from '$lib/utils/error-handling';
-import type { ExpenseCategory } from '$lib/types';
-import { toBackendExpense } from '$lib/services/api-transformer';
 import { apiClient } from '$lib/services/api-client';
 import { browser } from '$app/environment';
 
@@ -205,20 +208,7 @@ class SyncManager {
 				};
 			}
 
-			const backendExpense = toBackendExpense({
-				vehicleId: expense.vehicleId,
-				tags: expense.tags,
-				category: expense.category as ExpenseCategory,
-				amount: expense.amount,
-				date: expense.date,
-				mileage: expense.mileage,
-				volume: expense.volume,
-				charge: expense.charge,
-				// Required for the charge↔volume discriminant (#66): omitting it makes an
-				// electric expense's charge vanish on sync.
-				fuelType: expense.fuelType,
-				description: expense.description
-			});
+			const backendExpense = offlineExpenseToBackend(expense);
 
 			// Send the idempotency key so a retried POST returns the original row
 			// instead of creating a duplicate.
@@ -289,19 +279,7 @@ class SyncManager {
 		try {
 			switch (resolution) {
 				case 'keep_local': {
-					const backendExpense = toBackendExpense({
-						vehicleId: conflict.localExpense.vehicleId,
-						tags: conflict.localExpense.tags,
-						category: conflict.localExpense.category as ExpenseCategory,
-						amount: conflict.localExpense.amount,
-						date: conflict.localExpense.date,
-						mileage: conflict.localExpense.mileage,
-						volume: conflict.localExpense.volume,
-						charge: conflict.localExpense.charge,
-						// Required for the charge↔volume discriminant (#66).
-						fuelType: conflict.localExpense.fuelType,
-						description: conflict.localExpense.description
-					});
+					const backendExpense = offlineExpenseToBackend(conflict.localExpense);
 					try {
 						await apiClient.post('/api/v1/expenses', {
 							...backendExpense,

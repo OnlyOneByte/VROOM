@@ -7,6 +7,7 @@ import {
 	getPendingExpenses,
 	markExpenseAsSynced,
 	clearSyncedExpenses,
+	offlineExpenseToBackend,
 	type OfflineExpense
 } from '../offline-storage';
 
@@ -364,5 +365,48 @@ describe('Offline Storage', () => {
 			expect(savedData).toHaveLength(1);
 			expect(savedData[0].id).toBe('expense-2');
 		});
+	});
+});
+
+/**
+ * offlineExpenseToBackend (C205 arch dedup) — the SINGLE SOURCE for the OfflineExpense →
+ * toBackendExpense mapping that the 3 sync sites (syncOfflineExpenses + sync-manager's
+ * syncSingleExpense / resolveConflict) now all call. Pins the full field mapping at the dedup
+ * boundary so the #66 class (a field carried in one copy, forgotten in another) can't reopen.
+ */
+describe('offlineExpenseToBackend — shared offline→backend mapping', () => {
+	const base: OfflineExpense = {
+		id: 'off-1',
+		vehicleId: 'vehicle-1',
+		tags: ['fuel'],
+		category: 'fuel',
+		amount: 42.5,
+		date: '2024-03-01',
+		mileage: 12000,
+		timestamp: 1700000000000,
+		synced: false
+	};
+
+	it('maps the core fields (amount→expenseAmount, vehicleId, category, date, mileage, tags)', () => {
+		const out = offlineExpenseToBackend(base);
+		expect(out.expenseAmount).toBe(42.5);
+		expect(out.vehicleId).toBe('vehicle-1');
+		expect(out.category).toBe('fuel');
+		expect(out.date).toBe('2024-03-01');
+		expect(out.mileage).toBe(12000);
+		expect(out.tags).toEqual(['fuel']);
+	});
+
+	it('carries an ELECTRIC charge through (the #66 invariant, now at the dedup boundary)', () => {
+		const out = offlineExpenseToBackend({ ...base, charge: 55, fuelType: 'Electric' });
+		// charge routes to the backend `volume` field BECAUSE fuelType is carried + electric
+		expect(out.volume).toBe(55);
+		expect(out.fuelType).toBe('Electric');
+	});
+
+	it('keeps a liquid-fuel volume on the volume field', () => {
+		const out = offlineExpenseToBackend({ ...base, volume: 40, fuelType: 'Diesel' });
+		expect(out.volume).toBe(40);
+		expect(out.fuelType).toBe('Diesel');
 	});
 });
