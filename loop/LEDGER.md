@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 215 |
-| guard | 6 | 212 |
+| guard | 6 | 217 |
 | bug | 3 | 214 |
 | arch | 5 | 216 |
 | infra | 6 | 213 |
 
-Current cycle: **216**
+Current cycle: **217**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3818,3 +3818,16 @@ Current cycle: **216**
   inside + end excluded; the 365-day non-leap). VERIFY-FIRSTHAND: ran in isolation FIRST — 12 green, the leap-year/half-open assumptions
   confirmed. green→green: backend validate:local EXIT 0 — 1296 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. cov: be
   84.14%+ (carry; +3 BE) / fe 79.22% (carry). ARCH QUEUE thin — next arch cycle prefers a fan-out over forcing a micro-dedup.
+- **C217 (guard): cover auth.ts requireAuth — the untested per-page route guard (the ~56% FE low spot)** — BALANCE: `feature` most-starved
+  (cyc 170, starved-for 47, blocked 42nd) but blocked → fell through; nothing else strictly OVER budget → highest-leverage; `guard` was the
+  most-starved actionable (cyc 212, starved-for 5 — the C216 forecast). Took the primed FE low spot: auth.ts ~56%. IDENTIFIED firsthand: the
+  existing auth.test.ts covered isPublicRoute/isProtectedRoute/handleRouteProtection thoroughly but `requireAuth` was ENTIRELY untested (not
+  even imported) — the ~44% gap. requireAuth is the per-page guard a protected page-load awaits; a regression either bounces an authenticated
+  user (broken page) or fails to bounce a logged-out one (security-load-bearing). +4 cases driving the REAL authStore (setUser/clearUser/
+  setLoading — the ProtectedRoute.test.ts convention, not a mock, so the genuine state machine runs): synchronous authed→resolves-true/no-
+  redirect; synchronous unauthed→resolves-false + goto('/auth'); + BOTH loading-POLL paths (setLoading(true) → enter the setTimeout(check,50)
+  loop → resolve mid-poll authenticated [resolves true] / unauthenticated [resolves false + redirect], driven via vi.useFakeTimers +
+  advanceTimersByTimeAsync). VERIFY-FIRSTHAND: ran in isolation FIRST — 16 green (was 12, +4), the fake-timer poll both resolve correctly.
+  green→green: FE validate:local EXIT 0 — 580 pass (+4), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. auth.ts
+  ~56%→well-covered. cov: fe 79.22%+ (carry; +4 FE) / be 84.14% (carry). Next FE guard low spot: sync-manager.ts ~56% (timer/network-bound — less
+  clean) — the FE pure/service modules are now essentially all covered; the rest is the components/routes deficit (eyes-on).

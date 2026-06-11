@@ -372,8 +372,10 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > the electric-vs-liquid unit gating, + validateMileage monotonicity); ~~`analytics-api.ts` ~36% func~~ DONE C212 (+19: the 13 method→endpoint
 > wirings + getDefaultDateRange [unix-seconds, 1yr window] + buildQuery optional-param edges; the existing test covered only getSummary's fallback);
 > `sync-manager.ts` ~56% (timer/network-bound — less
-> clean), `auth.ts` ~56%; `settings.svelte.ts` ~11% is the filed handleError arch pick (deferred). **NEXT FE guard pick (no primed): auth.ts
-> ~56% (then sync-manager.ts ~56%, timer/network-bound — less clean).** The components/routes deficit is
+> clean), ~~`auth.ts` ~56%~~ DONE C217 (+4: requireAuth — the previously-untested per-page guard's sync authed/unauthed branches + BOTH
+> loading-poll paths via fake timers; the existing test covered only route-classification + handleRouteProtection);
+> `settings.svelte.ts` ~11% is the filed handleError arch pick (deferred). **NEXT FE guard pick (no primed): sync-manager.ts
+> ~56% (timer/network-bound — less clean); the FE pure/service modules are now essentially all covered.** The components/routes deficit is
 > the bulk + largely eyes-on.** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
 > the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
 > `.svelte.ts`/store/util modules still thin, e.g. settings.svelte.ts 10% [but that's the filed handleError arch pick] /
