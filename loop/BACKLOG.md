@@ -549,6 +549,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   validate-first is what actually guarantees no-mutation on a bad id), switch to `this.db.transaction` (DI-consistent with expenses/insurance;
   404 propagates instead of a wrapped 500; production this.db===getDb() so behavior-preserving). +3 direct-repo tests over a migrated in-memory DB
   (set-cover-entity-scope.test.ts — closes the coverage-theater gap). NON-VACUOUS (foreign-entity + unknown-id RED pre-fix). green→green 1319 pass (+3).*
+- **#79 (LOW, data-hygiene / NORTH_STAR #1-adjacent — found C231 deep-review; ESCALATED to Angelo C231, product-gated) — a malformed fuel offline
+  entry is stuck in the outbox FOREVER.** `syncOfflineExpenses` (offline-storage.ts:177-187) `continue`-skips a fuel entry missing volume/charge or
+  mileage → it's never `markExpenseAsSynced`'d → the trailing `clearSyncedExpenses()` (drops only synced===true) leaves it PENDING, silently
+  re-skipped on every future sync with no user signal (a user write that never lands + no notification). VERIFIED firsthand + pinned by a
+  characterization test (C231 — the existing malformed-fuel test only asserted "not POSTed", never the entry's fate). DECISION (send_message'd
+  Angelo): (a) drop it + toast "couldn't sync N entries", (b) move to a surfaced "failed/needs-attention" bucket, or (c) leave-as-is IF the
+  ExpenseForm already blocks queuing an invalid fuel entry offline (worth confirming). Not loop-decidable — awaiting Angelo. (Both audited surfaces
+  this cycle — split-service allocation math + offline-outbox idempotency — were CERTIFIED CLEAN.)
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:

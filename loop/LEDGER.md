@@ -4030,3 +4030,23 @@ Current cycle: **227**
   coverage-theater lesson (the property tests never drove the real setCoverPhoto). DOCS-ONLY (CLAUDE.md only — verified `git diff --name-only`
   shows just CLAUDE.md), no source touched → no build gate (the C195/C213/C224 doc-refresh precedent). Next CLAUDE.md refresh ~C240; next #5
   sweep ~C234. cov: be 84.25% / fe 80.33% (carry — no code, no re-measure this cycle).
+- **C231 (deep-review): expense split-service allocation math + offline-outbox idempotency — both CERTIFIED CLEAN; filed #79 (stuck malformed
+  offline entry) + pinned its current behavior** — BALANCE: `deep-review` OVER budget (cyc 225, starved-for 6 > 5, FORCED — the C230 forecast).
+  spawn_run fan-out hit the HTTP 400 transport failure (the C179 precedent) → did it inline, higher-fidelity. TWO data-safety surfaces audited
+  firsthand: (A) SPLIT-SERVICE (split-service.ts + repository createSplitExpense/updateSplitExpense) — CERTIFIED CLEAN: even split = largest-
+  remainder cents (Math.round total→cents, floor base, first `remainderCents` siblings get +1¢) sums EXACTLY; percentage = floor-all-but-last +
+  last absorbs the clamped remainder; absolute = verbatim with validation enforcing sum===total; updateSplitExpense DERIVES the absolute total
+  from the legs (not the stale groupTotal — the C-documented Property-3 fix) + carries groupId/sourceType/sourceId from firstOld; siblings carry
+  null volume/mileage by design (C97). NOT coverage-theater — split-service.property.test.ts drives the REAL computeAllocations + pins the sum
+  invariant for all 3 methods. (B) OFFLINE-OUTBOX IDEMPOTENCY (offline-storage.ts syncOfflineExpenses + repository createIdempotent/importExpenses)
+  — CERTIFIED CLEAN: the `(userId,clientId)` UNIQUE PARTIAL index (schema.ts:262 `WHERE client_id IS NOT NULL`; migration 0001) backs a pre-check +
+  race-recovery re-read; clientId is userId-scoped (no cross-tenant collision); the deterministic clientId backfill (C202) + the #66 fuelType
+  single-source mapper hold; batch import is atomic (one txn). Odometer has NO clientId — but the outbox is EXPENSE-ONLY (offline.svelte.ts queues
+  only OfflineExpense), so that's not a live gap (CERTIFIED, not a defect). THE one finding → #79 (LOW, data-hygiene, ESCALATED): a malformed fuel
+  offline entry (no volume/charge or no mileage) is `continue`-skipped in syncOfflineExpenses → never markExpenseAsSynced'd → clearSyncedExpenses
+  (drops only synced===true) leaves it PENDING forever, silently re-skipped every sync, no user signal (a user write that never lands + no signal,
+  NORTH_STAR #1-adjacent). The resolution (drop+toast / failed-bucket / confirm the form already blocks it) is a PRODUCT call → send_message'd
+  Angelo. Decision-free increment this cycle: a CHARACTERIZATION test pinning the current stuck-forever behavior (the existing malformed-fuel test
+  asserted only "not POSTed", never what happens to the entry after) so a fix can't change it unnoticed — +1, drives the REAL syncOfflineExpenses
+  over the stateful localStorage mock (two syncs → entry persists unsynced, never POSTed). green→green: frontend validate:local EXIT 0 — 586 pass
+  (+1), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. cov: fe 80.33%+ (carry; +1 FE) / be 84.25% (carry).
