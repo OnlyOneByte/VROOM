@@ -181,6 +181,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Auth session-refresh + OAuth callback vein audit (C225)**~~ — *DONE C225: inline audit of the auth surface C56/C126 certified for
+  session/email but NOT the OAuth-callback + refresh paths. CERTIFIED CLEAN firsthand: (1) validateAndRefreshSession create-before-invalidate
+  ordering correct; both callers pass `c` so no live cookie-loss; C32(b) orphan edge = documented sprawl note. (2) requireAuth deletes cookie +
+  401s on null (C127). (3) OAuth state CSRF/PKCE: validateLoginState requires store-present + flowType-undefined + single-use delete; the
+  callback VALIDATES STATE BEFORE the token exchange + binds the codeVerifier (PKCE), and is ALREADY guarded by auth-routes.property.test.ts. (4)
+  resolveNewUser email-conflict + txn + UNIQUE-race-recovery; the findByProviderIdentity lookup queries the SAME userProviders table the insert
+  writes with a byte-matching WHERE → a returning user is found (no new-row-per-login bug). NO fix + NO new test (invariants already pinned —
+  more would be coverage-theater). Lone note: oauthStateStore is in-memory → breaks under horizontal scaling (documented; self-host PWA is
+  single-instance, a scaling-arch limitation not a bug). Record-only (the C179/C191 clean-cert precedent).*
 - ~~**Vehicle lifecycle vein audit (C179)**~~ — *DONE C179: inline audit (spawn_run hit an HTTP 400 transport failure → did it
   firsthand, higher-fidelity anyway) of vehicles/routes.ts + repository.ts. CERTIFIED CLEAN: (1) DELETE /:id avoids the C167 orphan
   class — cleans vehicle + expense + odometer photos (no-FK table) before delete, then DB FK-cascade handles the rest; VERIFIED every

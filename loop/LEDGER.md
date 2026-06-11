@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 220 |
+| deep-review | 5 | 225 |
 | guard | 6 | 223 |
 | bug | 3 | 222 |
 | arch | 5 | 221 |
 | infra | 6 | 224 |
 
-Current cycle: **224**
+Current cycle: **225**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3932,3 +3932,20 @@ Current cycle: **224**
   userId-scope, the C216/C221 dedups, the C217/C223 guard ratchet, #75 mpg-ordering; recurring theme = "guard/middleware wired on most paths but
   missed one" for #71+#74), fixed the stale "23 commits" → "34 commits (C190–C223)" in Suggested-merge. Doc/measurement-only, no product code.
   Next sweep ~C234; next CLAUDE.md refresh ~C232 (last C219). cov: be 84.25% / fe 80.33% (FRESH C224 reading).
+- **C225 (deep-review): auth session-refresh + OAuth callback (state/CSRF/PKCE + new-user resolution) — CERTIFIED CLEAN, no fix needed** —
+  BALANCE: `feature` most-starved (cyc 170, starved-for 55, blocked 50th — milestone) but blocked → fell through; `deep-review` AT budget (cyc
+  220, starved-for 5 = 5, due — vs bug also at 3=3 but deep-review waited longer; the C224 forecast). Inline review of the auth surface C56/C126
+  certified for SESSION/email but NOT the OAuth-callback + session-refresh paths. CERTIFIED CLEAN firsthand, FOUR sub-paths: (1)
+  validateAndRefreshSession (utils.ts) — create-new-before-invalidate-old ordering is correct; the `c?`-optional cookie-set-last has NO live
+  cookie-loss path because BOTH callers (middleware/auth.ts:35 + routes.ts:563 /refresh) pass `c`; the C32(b) invalidate-throws-orphans-new
+  edge is the documented sprawl note (not a priv issue). (2) requireAuth middleware — deletes the cookie + 401s on null (C127), sets ctx on
+  success; optionalAuth correctly swallows. (3) OAuth state/CSRF/PKCE: validateLoginState requires the state be in the in-mem store (proves
+  this-server-minted) + flowType-undefined (a link-state can't replay at the login callback) + single-use delete; the generic callback
+  VALIDATES STATE BEFORE the token exchange (:418 before :424) + exchanges with the state-bound codeVerifier (PKCE) — order-correct,
+  CSRF-protected, and ALREADY guarded by auth-routes.property.test.ts (flowType discrimination + route-order + rate-limiter). (4) resolveNewUser
+  — email-conflict guard (no implicit merge), txn-atomic user+provider insert, UNIQUE-constraint race-recovery; VERIFIED the
+  findByProviderIdentity lookup queries the SAME userProviders table the insert writes, with a BYTE-MATCHING WHERE (domain:'auth' +
+  providerType + providerAccountId) → a returning OAuth user is correctly found (no new-row-per-login bug). NO fix + NO new test (the structural
+  invariants are already pinned — adding more would be coverage-theater, the C181 anti-pattern). The lone note: oauthStateStore is in-memory →
+  OAuth breaks under horizontal scaling (documented :54; the self-host PWA is single-instance per NORTH_STAR — a scaling-arch limitation, not a
+  correctness bug). Record-only (the C179/C191 clean-certification precedent), no build gate (no code touched). cov: be 84.25% / fe 80.33% (carry).
