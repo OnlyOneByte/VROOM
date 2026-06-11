@@ -208,3 +208,58 @@ describe('DELETE /api/v1/providers/:id', () => {
     other.close();
   });
 });
+
+/**
+ * #63 (C192): the PUT/DELETE destructive writes are scoped on (id AND userId), not id alone. The
+ * findOwnedProviderOrThrow guard already 404s a foreign id (the tests above), so this is
+ * defense-in-depth — but the write predicate must ALSO be tenant-scoped so a future guard-drop can't
+ * become a cross-tenant write (the C109/#52 class, closed at split C155 + odometer C168/C180). Raw-seed
+ * a FOREIGN user's provider that COEXISTS in the shared DB (a second createTestApp would reset it) and
+ * prove our destructive ops can't touch it.
+ */
+describe('#63 — provider PUT/DELETE writes are tenant-scoped (foreign row survives)', () => {
+  /** Seed a provider owned by ANOTHER user directly; returns its id. */
+  function seedForeignProvider(id: string): void {
+    ctx.sqlite.run(
+      `INSERT INTO users (id, email, display_name) VALUES ('u-foreign-63', 'f63@test.com', 'Foreign 63')`
+    );
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
+       VALUES (?, 'u-foreign-63', 'storage', 's3', 'Foreign Provider', 'enc-blob', 'active')`,
+      [id]
+    );
+  }
+
+  /** True iff a provider row with this id still exists (any owner). */
+  function providerExists(id: string): boolean {
+    const rows = ctx.sqlite.query('SELECT id FROM user_providers WHERE id = ?').all(id);
+    return rows.length === 1;
+  }
+
+  test('our DELETE of a foreign provider id 404s AND the foreign row SURVIVES', async () => {
+    seedForeignProvider('prov-foreign-del');
+    const res = await ctx.authed('DELETE', '/api/v1/providers/prov-foreign-del');
+    expect(res.status).toBe(404); // the guard
+    expect(providerExists('prov-foreign-del')).toBe(true); // the write predicate — never touched it
+  });
+
+  test('our PUT of a foreign provider id 404s AND the foreign row is UNCHANGED', async () => {
+    seedForeignProvider('prov-foreign-put');
+    const res = await ctx.authed('PUT', '/api/v1/providers/prov-foreign-put', {
+      displayName: 'hijacked',
+    });
+    expect(res.status).toBe(404);
+    // The foreign row keeps its original displayName — the update predicate excluded it.
+    const row = ctx.sqlite
+      .query('SELECT display_name FROM user_providers WHERE id = ?')
+      .get('prov-foreign-put') as { display_name: string } | undefined;
+    expect(row?.display_name).toBe('Foreign Provider');
+  });
+
+  test('our OWN provider still deletes (204) — the tenant scope is not over-broad', async () => {
+    const created = await createProvider();
+    const del = await ctx.authed('DELETE', `/api/v1/providers/${created.id}`);
+    expect(del.status).toBe(204);
+    expect(providerExists(created.id)).toBe(false);
+  });
+});

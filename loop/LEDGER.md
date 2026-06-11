@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 191 |
 | guard | 6 | 188 |
-| bug | 3 | 190 |
+| bug | 3 | 192 |
 | arch | 5 | 187 |
 | infra | 6 | 186 |
 
-Current cycle: **191**
+Current cycle: **192**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3431,3 +3431,16 @@ Current cycle: **191**
   C109/#52 class the loop closed at split (C155) + odometer (C168/C180): a future guard-drop/reorder would expose it. Clean non-gated
   fix = AND eq(userProviders.userId) into both write predicates (behavior-identical today). NO code change this cycle (deep-review =
   find-not-fix; #63 is a bug-cycle pick). cov: be 83.41% / fe 73.89% (carry, read-only audit).
+- **C192 (bug → #63): tenant-scope the provider PUT/DELETE destructive writes (the C191 audit's finding)** — BALANCE: only `feature`
+  strictly PAST budget (cyc 170, starved-for 22, blocked 17th cycle) → fell through to highest-leverage actionable (arch/infra only AT
+  budget, not past). Took #63 (verified+filed C191) — clean, non-gated, security-relevant, mechanically identical to C155/C180, and it
+  COMPLETES the C191 providers audit (audit→fix). Inline (6/3 spawn cap). LOCAL-ONLY (push still gated on Angelo's C190.5 force-push
+  call — flagged, not blocking). #63 (LOW, defense-in-depth, C109/#52 class): providers/routes.ts PUT update (:404) + DELETE (:484)
+  keyed `where(eq(userProviders.id, id))` ALONE; findOwnedProviderOrThrow guards one layer up (not exploitable), but a future
+  guard-drop/reorder would expose a cross-tenant write. FIX: ANDed `eq(userProviders.userId, user.id)` into BOTH write predicates
+  (behavior-identical today — the guard already proves ownership; mirrors C155 split + C168/C180 odometer). +3 tests in
+  providers-routes-http.test.ts via raw-seeded COEXISTING foreign provider (a 2nd createTestApp resets the DB, so the existing
+  cross-user tests couldn't assert survival): foreign DELETE→404 + foreign row SURVIVES; foreign PUT→404 + displayName UNCHANGED; own
+  delete→204 (not over-broad). These pin the WRITE PREDICATE itself, not just the guard. One biome reflow autofixed. green→green:
+  backend validate:local **EXIT 0 — 1263 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean, build bundled. #63 CLOSED — the C191
+  providers-audit finding now landed. cov: be 83.41%+ (carry; +3 BE) / fe 73.89% (carry).

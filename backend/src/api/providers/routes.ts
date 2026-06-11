@@ -398,10 +398,14 @@ routes.put(
       updates.credentials = encrypt(JSON.stringify(body.credentials));
     }
 
+    // Scope the destructive write on BOTH id AND userId (#63 — the C109/#52 class). The
+    // findOwnedProviderOrThrow guard above already proves ownership, so this is behavior-identical
+    // today; ANDing userId here keeps the write itself tenant-scoped so a future guard-drop/reorder
+    // can't turn it into a cross-tenant update (mirrors the C155 split + C168/C180 odometer fixes).
     const result = await db
       .update(userProviders)
       .set(updates)
-      .where(eq(userProviders.id, id))
+      .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
       .returning();
 
     const updated = result[0];
@@ -480,8 +484,12 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     }
   }
 
-  // Delete the provider row
-  await db.delete(userProviders).where(eq(userProviders.id, id));
+  // Delete the provider row — scoped on BOTH id AND userId (#63, the C109/#52 class). Ownership is
+  // already proven by findOwnedProviderOrThrow above, so this is behavior-identical today; the
+  // tenant-scoped predicate keeps the destructive write safe under a future guard-drop/reorder.
+  await db
+    .delete(userProviders)
+    .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)));
 
   return c.body(null, 204);
 });
