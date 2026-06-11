@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 225 |
 | guard | 6 | 223 |
-| bug | 3 | 222 |
+| bug | 3 | 226 |
 | arch | 5 | 221 |
 | infra | 6 | 224 |
 
-Current cycle: **225**
+Current cycle: **226**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3949,3 +3949,21 @@ Current cycle: **225**
   invariants are already pinned — adding more would be coverage-theater, the C181 anti-pattern). The lone note: oauthStateStore is in-memory →
   OAuth breaks under horizontal scaling (documented :54; the self-host PWA is single-instance per NORTH_STAR — a scaling-arch limitation, not a
   correctness bug). Record-only (the C179/C191 clean-certification precedent), no build gate (no code touched). cov: be 84.25% / fe 80.33% (carry).
+- **C226 (bug → #76): switching an expense's category away from fuel left stale volume/charge/fuelType/mileage in form-state, riding onto a
+  non-fuel row** — BALANCE: `feature` most-starved (cyc 170, starved-for 56, blocked 51st) but blocked → fell through; `bug` FORCED (cyc 222,
+  starved-for 4 > 3; arch only AT-budget 5=5). Hunted FRESH surfaces + CERTIFIED CLEAN firsthand (C21/C77 — not manufactured): the
+  insurance-CLAIM write path (POST/PUT/DELETE all ownership-gated; update/delete scope WHERE id+policyId [C155 class clean]; findOwnerUserId's
+  claimId-only key is the correct owner-resolver, not a tenant read). THE live one — #76, VERIFIED UI-reachable firsthand: ExpenseForm's
+  `selectCategory` resets the financing source on switch-away-from-financial (:358) but did NOT clear the fuel fields on switch-away-from-fuel —
+  so a user who fills fuel inputs then switches to misc/maintenance submits with `expenseData.volume/charge/fuelType/mileage` STILL populated
+  (the inputs hide via showFuelFields but formData values persist; expenseData :489 sends them regardless of category). Impact: inert in
+  analytics (every fuel query filters category='fuel', :616/:683/:1116/:1928 — a stray volume on a misc row is never read), BUT a real
+  data-hygiene leak + a stray `mileage` feeds getCurrentOdometer CROSS-CATEGORY (odometer/repository.ts:151 — no category filter). FIX
+  (decision-free, mirrors the EXISTING financing-reset idiom in the same handler): `if (categoryValue !== 'fuel') { clear volume/charge/fuelType/
+  mileage/missedFillup }`. Behavior-preserving (a real fuel expense keeps its fields; only switch-AWAY clears). GUARD: +1 source-scan
+  (category-switch-clears-fuel-fields.test.ts — the C133/C220 + sibling category-selector-labels precedent, since selectCategory mutates Svelte
+  component state, not unit-testable without mount; pins the clear-block inside selectCategory). NON-VACUOUS: confirmed RED with the block
+  reverted. CAVEAT: the full select→clear→submit round-trip is eyes-on/Playwright-BLOCKED → code-complete/source-pinned/eyes-on-pending per the
+  feature-DoD rule. (Process: my first guard draft used bun:test/import.meta.dir [the BACKEND source-scan idiom] → vitest rejected it; fixed to
+  vitest + fileURLToPath, the FE sibling convention.) green→green: FE validate:local EXIT 0 — 585 pass (+1), tsc 0, build OK; prettier + eslint
+  clean. cov: fe 80.33%+ (carry; +1 FE) / be 84.25% (carry).

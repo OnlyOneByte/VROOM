@@ -524,6 +524,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   segments mis-paired). FIX (behavior-preserving — sorting an already-sorted copy is idempotent; closes the class): sort `[...unorderedExpenses]`
   by date inside calculateAverageMpg. +3 tests (chronological avg=31; SHUFFLED + reversed yield the SAME 31); NON-VACUOUS (RED with the sort
   reverted). green→green 1309 pass (+3). (calculateMileageStats uses Math.max — order-independent, untouched.)*
+- ~~**#76 (LOW, data-hygiene — found C226 hunting the expense-form category switch) — switching an expense away from `fuel` left stale
+  volume/charge/fuelType/mileage in form-state, riding onto a non-fuel row.**~~ — *DONE C226: ExpenseForm's `selectCategory` reset the
+  financing source on switch-away-from-financial but NOT the fuel fields on switch-away-from-fuel — the inputs hide (showFuelFields) but
+  formData values PERSIST + ride along on submit. Inert in analytics (every fuel query filters category='fuel' — a stray volume on a misc row is
+  never read), BUT a real hygiene leak + a stray `mileage` feeds getCurrentOdometer cross-category (no category filter). VERIFIED UI-reachable.
+  FIX (decision-free, mirrors the existing financing-reset idiom in the same handler): clear volume/charge/fuelType/mileage/missedFillup when
+  categoryValue !== 'fuel'. +1 source-scan guard (the C133/C220 precedent — selectCategory is Svelte component state, not unit-testable without
+  mount; pins the clear-block); NON-VACUOUS (RED with the block reverted). green→green FE 585 pass (+1). CAVEAT: the full
+  select→clear→submit round-trip is eyes-on/Playwright-blocked → code-complete/source-pinned/eyes-on-pending. ALSO certified clean this cycle:
+  the insurance-CLAIM write path (ownership-gated, writes id+policyId-scoped [C155 clean], findOwnerUserId is the correct owner-resolver).*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:

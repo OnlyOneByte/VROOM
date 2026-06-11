@@ -359,6 +359,20 @@
 			sourceType = null;
 			sourceId = null;
 		}
+
+		// Clear fuel-only fields when switching AWAY from fuel (#76, mirroring the financing-source
+		// reset above). The fuel inputs hide via `showFuelFields`, but their formData values otherwise
+		// PERSIST and ride along on submit — stamping a stale volume/charge/fuelType onto a non-fuel
+		// row (inert in analytics, which filter category='fuel', but a real data-hygiene leak), and a
+		// stray mileage would feed getCurrentOdometer cross-category. A fuel expense keeps its fields;
+		// only the switch-away clears them.
+		if (categoryValue !== 'fuel') {
+			formData.volume = '';
+			formData.charge = '';
+			formData.fuelType = '';
+			formData.mileage = '';
+			formData.missedFillup = false;
+		}
 	}
 
 	// Reload vehicle data when vehicle selection changes (not on initial mount — onMount handles that)
