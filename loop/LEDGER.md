@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 199 |
+| deep-review | 5 | 204 |
 | guard | 6 | 201 |
 | bug | 3 | 202 |
 | arch | 5 | 200 |
 | infra | 6 | 203 |
 
-Current cycle: **203**
+Current cycle: **204**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3607,3 +3607,24 @@ Current cycle: **203**
   C201 form-validation guard, C200 sortByVehicleThenDate dedup, C197/C199 deep-review certs), fixed the stale "116 themed commits" →
   "13 commits (C190–C202)" in Suggested-merge + refreshed the arc paragraph. Doc/measurement-only, no product code. Next sweep ~C213;
   next CLAUDE.md refresh ~C203-onward (last C193). cov: be 84.06% / fe 77.79% (FRESH C203 reading).
+- **C204 (deep-review → #66): offline-created ELECTRIC charge silently dropped on sync (fuelType never carried in the outbox)** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 34, blocked 29th) but blocked → fell through; `deep-review` AT budget (cyc 199, starved-for
+  5 = 5, due) → the most-starved actionable. Inline focused review (spawn cap/flake — C179/C189/C199 precedent). SURFACE: the FE
+  api-transformer (toBackendExpense/fromBackendExpense), the FE↔BE expense serialization seam every create/update/offline-sync flows
+  through (the C202 #65 hunt touched it but never audited it); pure-`.ts` → reviewable + unit-testable without eyes-on. The transform reads
+  CLEAN (symmetric volume/charge gating, 0-value edge handled, every field mapped) — BUT tracing it against the offline path surfaced a real,
+  reachable, HIGH data-safety bug (#66, NORTH_STAR #1 + #2/EV-correctness). VERIFIED FIRSTHAND end-to-end: (1) toBackendExpense decides
+  volume-vs-charge SOLELY via isElectricFuelType(fuelType); (2) the `OfflineExpense` type had NO fuelType field + BOTH ExpenseForm.svelte
+  addOfflineExpense sites (:565/:605) omit it (even though :601 just computed it); (3) the 2 sync-transform callers (offline-storage
+  syncOfflineExpenses + sync-manager) call toBackendExpense WITHOUT fuelType. Net: an offline ELECTRIC charging expense (charge set,
+  fuelType absent) → isElectricFuelType(undefined)=false → the volume-only else-branch → volume undefined → the CHARGE IS SILENTLY DROPPED
+  from the POST (broken mi/kWh + cost/charge); AND every offline-synced expense loses its fuelType label. The offline fuel-validation
+  (volume OR charge) lets a charge-only electric entry through into the lossy transform. FIX (root-cause, threads fuelType end-to-end):
+  added fuelType? to OfflineExpense + carried it through all 4 propagation sites (both addOfflineExpense outbox objects + both
+  toBackendExpense sync callers + the resolveConflict keep_local path). GUARDS (+5): api-transformer.property.test.ts — the discriminant
+  REGRESSION (electric WITHOUT fuelType drops charge — documents the bug) + WITH fuelType maps charge→volume + Level-2(AC) + a liquid-fuel
+  negative control; offline-storage.test.ts — addOfflineExpense persists fuelType into the outbox. green→green: FE validate:local EXIT 0 —
+  542 pass (+5), tsc 0, build OK; prettier (auto-fixed the .svelte reflow) + eslint clean on all touched files. HONEST CAVEAT: root-cause
+  data-loss fixed + unit-pinned end-to-end; the .svelte change is mechanical data-passing (tsc/build-verified, no markup), but the full
+  offline-create→sync→render round-trip for an electric charge is Playwright-eyes-on-BLOCKED here → lands code-complete/eyes-on-pending per
+  the feature-DoD rule, correctness locked by the transform + outbox unit guards. cov: fe 77.79%+ (carry; +5 FE) / be 84.06% (carry).

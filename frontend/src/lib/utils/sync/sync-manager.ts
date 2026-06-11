@@ -214,6 +214,9 @@ class SyncManager {
 				mileage: expense.mileage,
 				volume: expense.volume,
 				charge: expense.charge,
+				// Required for the charge↔volume discriminant (#66): omitting it makes an
+				// electric expense's charge vanish on sync.
+				fuelType: expense.fuelType,
 				description: expense.description
 			});
 
@@ -295,6 +298,8 @@ class SyncManager {
 						mileage: conflict.localExpense.mileage,
 						volume: conflict.localExpense.volume,
 						charge: conflict.localExpense.charge,
+						// Required for the charge↔volume discriminant (#66).
+						fuelType: conflict.localExpense.fuelType,
 						description: conflict.localExpense.description
 					});
 					try {

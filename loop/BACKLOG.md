@@ -711,6 +711,20 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   sync-offline-expenses tests tolerate it (no write-on-read added). +2 guards in offline-storage.test.ts (the load-bearing read-twice→
   SAME-clientId stability invariant + an existing-key-never-re-minted control). green→green FE validate:local EXIT 0, 537 pass (+2);
   prettier + eslint clean.*
+- ~~**#66 (HIGH, offline data-safety + EV-correctness / NORTH_STAR #1+#2 — found C204 via a fresh deep-review of the FE api-transformer
+  seam) — an offline-created ELECTRIC charging expense silently dropped its `charge` on sync (fuelType never carried in the outbox).**~~ —
+  *DONE C204: `toBackendExpense` (api-transformer.ts) decides the charge↔volume mapping SOLELY via `isElectricFuelType(fuelType)`, but the
+  `OfflineExpense` type had NO fuelType field, BOTH ExpenseForm.svelte addOfflineExpense sites (:565/:605) omitted it, and the 2
+  sync-transform callers (offline-storage syncOfflineExpenses + sync-manager) called toBackendExpense WITHOUT it. So an offline electric
+  expense (charge set, fuelType absent) → `isElectricFuelType(undefined)`=false → the volume-only else-branch → volume undefined → the
+  CHARGE silently vanished from the POST (broken mi/kWh + cost/charge); AND every offline-synced expense lost its fuelType label. The
+  offline fuel-validation (volume OR charge) admits a charge-only electric entry straight into the lossy transform. VERIFIED firsthand
+  end-to-end. FIX (root-cause, threads fuelType end-to-end): added `fuelType?` to OfflineExpense + carried it through all 4 propagation
+  sites (both outbox objects + both sync toBackendExpense callers + resolveConflict keep_local). +5 guards (api-transformer: the
+  discriminant regression [electric-without-fuelType drops charge] + with-fuelType maps charge→volume + Level-2(AC) + liquid negative
+  control; offline-storage: outbox persists fuelType). green→green FE validate:local EXIT 0, 542 pass (+5); prettier + eslint clean.
+  CAVEAT: root-cause fixed + unit-pinned; the offline→sync→render E2E for an electric charge is Playwright-eyes-on-BLOCKED here → lands
+  code-complete/eyes-on-pending per the feature-DoD rule.*
 
 > [stray prior-edit run-on — the C155 deep-review block header, preserved for the audit trail:] (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent (delayed event, triaged post-C155): its Finding 1 → **#54 (HIGH, VERIFIED firsthand)** filed below; its div-guard/split-sibling checks matched my C155 pre-read (isFillup volume>0, fillupDetails length-guards, per-vehicle distance — clean).**
 - ~~**#52 (MED, security defense-in-depth) — split delete/regenerate keyed the destructive write on groupId alone.**~~ — *DONE

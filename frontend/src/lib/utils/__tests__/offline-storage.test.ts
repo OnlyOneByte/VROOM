@@ -163,6 +163,25 @@ describe('Offline Storage', () => {
 			expect(savedData[0].timestamp).toBeTypeOf('number');
 		});
 
+		it('persists fuelType into the outbox so an electric charge survives sync (#66)', () => {
+			// The sync transform (toBackendExpense) routes charge→volume ONLY when fuelType is
+			// electric; if the outbox drops fuelType, an offline electric charging expense syncs
+			// with no energy value (NORTH_STAR #1/#2). addOfflineExpense MUST carry it.
+			addOfflineExpense({
+				vehicleId: 'vehicle-1',
+				tags: ['fuel'],
+				category: 'fuel',
+				amount: 30.0,
+				date: '2024-03-01',
+				charge: 42,
+				fuelType: 'Electric'
+			});
+
+			const savedData = JSON.parse(localStorageMock.setItem.mock.calls[0][1]);
+			expect(savedData[0].fuelType).toBe('Electric');
+			expect(savedData[0].charge).toBe(42);
+		});
+
 		it('should append to existing expenses', () => {
 			const existingExpenses: OfflineExpense[] = [
 				{

@@ -571,7 +571,9 @@
 						description: expenseData.description ?? '',
 						...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
 						...(expenseData.volume !== undefined && { volume: expenseData.volume }),
-						...(expenseData.charge !== undefined && { charge: expenseData.charge })
+						...(expenseData.charge !== undefined && { charge: expenseData.charge }),
+						// Carry fuelType: the sync transform needs it to keep an electric charge (#66).
+						...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType })
 					});
 
 					requestBackgroundSync('expense-sync');
@@ -611,7 +613,9 @@
 					description: expenseData.description ?? '',
 					...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
 					...(expenseData.volume !== undefined && { volume: expenseData.volume }),
-					...(expenseData.charge !== undefined && { charge: expenseData.charge })
+					...(expenseData.charge !== undefined && { charge: expenseData.charge }),
+					// Carry fuelType: the sync transform needs it to keep an electric charge (#66).
+					...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType })
 				});
 				requestBackgroundSync('expense-sync');
 
@@ -791,10 +795,10 @@
 			<!-- Header -->
 			<div class="flex items-center gap-4">
 				<button
-						aria-label="Go back"
-						onclick={() => gotoDynamic(returnTo)}
-						class="p-2 hover:bg-muted rounded-lg"
-					>
+					aria-label="Go back"
+					onclick={() => gotoDynamic(returnTo)}
+					class="p-2 hover:bg-muted rounded-lg"
+				>
 					<ArrowLeft class="h-5 w-5" />
 				</button>
 				<div>
@@ -900,10 +904,10 @@
 			<!-- Header -->
 			<div class="flex items-center gap-4">
 				<button
-						aria-label="Go back"
-						onclick={() => gotoDynamic(returnTo)}
-						class="p-2 hover:bg-muted rounded-lg"
-					>
+					aria-label="Go back"
+					onclick={() => gotoDynamic(returnTo)}
+					class="p-2 hover:bg-muted rounded-lg"
+				>
 					<ArrowLeft class="h-5 w-5" />
 				</button>
 

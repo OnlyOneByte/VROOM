@@ -28,6 +28,14 @@ export interface OfflineExpense {
 	mileage?: number;
 	volume?: number; // For fuel expenses
 	charge?: number; // For electric charging
+	/**
+	 * Fuel/charge type (e.g. 'Diesel', 'Electric', 'Level 2 (AC)'). MUST be carried in the
+	 * outbox: the sync transform (toBackendExpense) decides volume-vs-charge SOLELY from
+	 * isElectricFuelType(fuelType), so without it an offline ELECTRIC expense's `charge` is
+	 * silently dropped on sync (isElectricFuelType(undefined)=false → the volume-only branch),
+	 * and every synced expense loses its fuelType label (#66, NORTH_STAR #1/#2 data safety).
+	 */
+	fuelType?: string;
 	description?: string;
 	timestamp: number;
 	synced: boolean;
@@ -159,6 +167,9 @@ export async function syncOfflineExpenses(): Promise<void> {
 				mileage: expense.mileage,
 				volume: expense.volume,
 				charge: expense.charge,
+				// Required for the charge↔volume discriminant (#66): omitting it makes an
+				// electric expense's charge vanish on sync.
+				fuelType: expense.fuelType,
 				description: expense.description
 			});
 
