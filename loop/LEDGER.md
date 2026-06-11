@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 185 |
+| deep-review | 5 | 191 |
 | guard | 6 | 188 |
 | bug | 3 | 190 |
 | arch | 5 | 187 |
 | infra | 6 | 186 |
 
-Current cycle: **190**
+Current cycle: **191**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3410,3 +3410,24 @@ Current cycle: **190**
   unaffected). +4 tests (POST reminder→400, POST insurance_term→400, PUT reminder→400, no-source create→201 control). green→green:
   backend validate:local **EXIT 0 — 1260 pass / 1 skip / 0 fail (+4)**, tsc 0, musl-biome clean, build bundled. #62 CLOSED — the
   C189 expense-write-path audit's findings (#61 C189 + #62 C190) are now BOTH landed. cov: be 83.41%+ (carry; +4 BE) / fe 73.89% (carry).
+- **C190.5 (ops — REBASE onto squashed main, at Angelo's request)** — Angelo squash-merged claude-loop-dev → main ("Claude loop dev
+  (#108)", origin/main 94a155e→0fa0d49), absorbing C51–C189. Recovered C190 (it was mid-commit when he interjected; a stale script had
+  mislabeled it "C189" + dropped its test file → amended to the correct C190 with the test, tagged `pre-rebase-c190-safety`). VERIFIED
+  the squash captured through C189 (C189's reassignment guard IS in origin/main) + that the ENTIRE branch-vs-main diff is exactly
+  C190's 4 files → C190 is the sole un-merged increment. Rebased clean: `reset --hard origin/main` + `cherry-pick` C190 → branch now
+  0-behind / 1-ahead of origin/main (6ad1af4 on 0fa0d49). Re-verified GREEN on the new base (validate:local EXIT 0, 1260 pass).
+  **PUSH BLOCKED ON ANGELO:** the stale origin/claude-loop-dev (old C189 tip) is NOT an ancestor → updating it needs a FORCE-PUSH
+  (forbidden autonomously). send_message'd the options; C190 safe locally + tagged. NOT a balance-category cycle (an ops interjection).
+- **C191 (deep-review): audit the providers/routes.ts credential-CRUD vein; certified CLEAN + filed #63** — BALANCE: two over budget —
+  `feature` (cyc 170, starved-for 21, blocked 16th cycle) + `deep-review` (cyc 185, starved-for 6 > 5). Feature blocked → `deep-review`
+  forced. Inline (6/3 spawn cap). LOCAL-ONLY cycle (push still gated on Angelo's force-push call from C190.5 — flagged, didn't block per
+  step 7). Vein: providers/routes.ts (credential-handling CRUD, 57.52% line — a real low spot + security-sensitive). **CERTIFIED CLEAN
+  (firsthand):** credentials never leak (formatProviderResponse omits them; all 3 response paths [GET/POST/PUT] route through it — C91/
+  C132 held); PUT preserves the encrypted blob on a credential-less update (`if (body.credentials !== undefined)` :397 — no clobber) +
+  re-encrypts when present; every mutation ownership-scoped via findOwnedProviderOrThrow (id AND userId, :50); auth-provider guard on
+  PUT/DELETE; storage/backup config cleanup on delete; deleteByProvider keys on providerId alone but is transitively safe (FK to an
+  already-proven-owned provider). **FILED #63 (LOW, defense-in-depth):** the PUT update (:404) + DELETE (:484) destructive writes key
+  `where(eq(id))` ALONE — not id AND userId. Guarded one layer up by findOwnedProviderOrThrow (NOT exploitable today), but the exact
+  C109/#52 class the loop closed at split (C155) + odometer (C168/C180): a future guard-drop/reorder would expose it. Clean non-gated
+  fix = AND eq(userProviders.userId) into both write predicates (behavior-identical today). NO code change this cycle (deep-review =
+  find-not-fix; #63 is a bug-cycle pick). cov: be 83.41% / fe 73.89% (carry, read-only audit).
