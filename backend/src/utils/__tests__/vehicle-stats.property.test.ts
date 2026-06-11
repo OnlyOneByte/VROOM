@@ -401,3 +401,42 @@ describe('Property 5: Stats tracking flag gating', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression (#46, C148): totalMileage is clamped at 0 — a driven distance can never be negative.
+// A backdated/mistyped reading BELOW initialMileage (or the only in-window reading lower than the
+// purchase odometer) must NOT surface a negative totalMileage. Correct under any #45 windowing.
+// ---------------------------------------------------------------------------
+
+describe('totalMileage non-negative clamp (#46)', () => {
+  test('a reading below initialMileage yields totalMileage 0, not a negative distance', () => {
+    // Only reading is 45000 but the vehicle was purchased at 50000 (mistyped/backdated row).
+    const expenses: FuelExpense[] = [
+      makeFuelExpense({ mileage: 45000, volume: 10, missedFillup: false, index: 0 }),
+    ];
+    const stats = calculateVehicleStats(expenses, 50000, true, false);
+    // Pre-fix this was 45000 - 50000 = -5000 returned verbatim.
+    expect(stats.totalMileage).toBe(0);
+    expect(stats.currentMileage).toBe(45000); // the reading itself is still surfaced
+    // costPerMile must stay null when there's no positive distance (no divide-by-≤0).
+    expect(stats.costPerMile).toBeNull();
+  });
+
+  test('a normal reading above initialMileage still computes the real positive distance', () => {
+    const expenses: FuelExpense[] = [
+      makeFuelExpense({ mileage: 12000, volume: 10, missedFillup: false, index: 0 }),
+    ];
+    const stats = calculateVehicleStats(expenses, 10000, true, false);
+    expect(stats.totalMileage).toBe(2000);
+    expect(stats.currentMileage).toBe(12000);
+  });
+
+  test('a reading exactly at initialMileage yields totalMileage 0 (boundary)', () => {
+    const expenses: FuelExpense[] = [
+      makeFuelExpense({ mileage: 30000, volume: 10, missedFillup: false, index: 0 }),
+    ];
+    const stats = calculateVehicleStats(expenses, 30000, true, false);
+    expect(stats.totalMileage).toBe(0);
+    expect(stats.costPerMile).toBeNull();
+  });
+});

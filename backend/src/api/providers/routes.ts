@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
-import { photoRefs, photos, userProviders } from '../../db/schema';
+import { photoRefs, photos, type UserProvider, userProviders } from '../../db/schema';
 import { ConflictError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import type { PhotoCategory, StorageConfig } from '../../types';
@@ -32,6 +32,28 @@ const routes = new Hono();
 type DbInstance =
   | ReturnType<typeof getDb>
   | Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
+
+/**
+ * Fetch the provider owned by `userId` with id `id`, or throw NotFoundError('Provider') (C123 arch).
+ * The ownership-check + 404 was hand-repeated byte-identically at 5 route handlers (PATCH/DELETE/
+ * health/backfill/sync); each then uses the returned row, so this RETURNS it. Scoped to userId — a
+ * provider not owned by the caller is indistinguishable from a missing one (no cross-tenant probe).
+ */
+async function findOwnedProviderOrThrow(
+  db: DbInstance,
+  id: string,
+  userId: string
+): Promise<UserProvider> {
+  const existing = await db
+    .select()
+    .from(userProviders)
+    .where(and(eq(userProviders.id, id), eq(userProviders.userId, userId)))
+    .limit(1);
+  if (!existing[0]) {
+    throw new NotFoundError('Provider');
+  }
+  return existing[0];
+}
 
 /**
  * Count photos of a given entity type owned by a specific user.
@@ -72,6 +94,54 @@ async function findUserPhotoIds(
     .select({ id: photos.id })
     .from(photos)
     .where(and(...conditions));
+}
+
+/**
+ * Count photoRefs for a provider in a given status ('active' | 'failed'), scoped to the
+ * given entity types. The synced-vs-failed counts in /sync-status differ ONLY by the status
+ * filter, so they share one helper (C92 dedup) rather than two byte-identical joined queries.
+ */
+async function countPhotoRefsByStatus(
+  db: DbInstance,
+  providerId: string,
+  status: 'active' | 'pending' | 'failed',
+  entityTypes: string[]
+): Promise<number> {
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(photoRefs)
+    .innerJoin(photos, eq(photoRefs.photoId, photos.id))
+    .where(
+      and(
+        eq(photoRefs.providerId, providerId),
+        eq(photoRefs.status, status),
+        sql`${photos.entityType} IN (${sql.join(
+          entityTypes.map((t) => sql`${t}`),
+          sql`, `
+        )})`
+      )
+    );
+
+  return result[0]?.count ?? 0;
+}
+
+/**
+ * Shape a provider row for the API response. The credentials column is deliberately
+ * OMITTED — secrets are never returned to the frontend (pinned by providers-routes-http.test.ts,
+ * C91). Single source of truth for the GET-list / POST-create / PUT-update responses, which
+ * previously hand-assembled this identical 8-field object three times (C92 dedup).
+ */
+function formatProviderResponse(row: UserProvider) {
+  return {
+    id: row.id,
+    domain: row.domain,
+    providerType: row.providerType,
+    displayName: row.displayName,
+    status: row.status,
+    config: row.config ?? {},
+    lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
+    createdAt: row.createdAt?.toISOString() ?? null,
+  };
 }
 
 // Apply middleware to all routes
@@ -156,16 +226,7 @@ routes.get('/', async (c) => {
     .where(domain ? and(baseCondition, eq(userProviders.domain, domain)) : baseCondition);
 
   // Strip credentials from response — never return secrets to the frontend
-  const data = rows.map((row) => ({
-    id: row.id,
-    domain: row.domain,
-    providerType: row.providerType,
-    displayName: row.displayName,
-    status: row.status,
-    config: row.config ?? {},
-    lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
-    createdAt: row.createdAt?.toISOString() ?? null,
-  }));
+  const data = rows.map(formatProviderResponse);
 
   return c.json({ success: true, data });
 });
@@ -302,22 +363,7 @@ routes.post('/', zValidator('json', createProviderSchema), async (c) => {
     await preferencesRepository.update(user.id, { storageConfig });
   }
 
-  return c.json(
-    {
-      success: true,
-      data: {
-        id: created.id,
-        domain: created.domain,
-        providerType: created.providerType,
-        displayName: created.displayName,
-        status: created.status,
-        config: created.config ?? {},
-        lastSyncAt: created.lastSyncAt?.toISOString() ?? null,
-        createdAt: created.createdAt?.toISOString() ?? null,
-      },
-    },
-    201
-  );
+  return c.json({ success: true, data: formatProviderResponse(created) }, 201);
 });
 
 // PUT /api/v1/providers/:id — update provider
@@ -333,15 +379,7 @@ routes.put(
     const db = getDb();
 
     // Ownership check: verify provider belongs to user
-    const existing = await db
-      .select()
-      .from(userProviders)
-      .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
-      .limit(1);
-
-    if (!existing[0]) {
-      throw new NotFoundError('Provider');
-    }
+    const existing = [await findOwnedProviderOrThrow(db, id, user.id)];
 
     // Domain guard: auth providers are managed through /auth routes only
     if (existing[0].domain === 'auth') {
@@ -368,19 +406,7 @@ routes.put(
 
     const updated = result[0];
 
-    return c.json({
-      success: true,
-      data: {
-        id: updated.id,
-        domain: updated.domain,
-        providerType: updated.providerType,
-        displayName: updated.displayName,
-        status: updated.status,
-        config: updated.config ?? {},
-        lastSyncAt: updated.lastSyncAt?.toISOString() ?? null,
-        createdAt: updated.createdAt?.toISOString() ?? null,
-      },
-    });
+    return c.json({ success: true, data: formatProviderResponse(updated) });
   }
 );
 
@@ -431,15 +457,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const db = getDb();
 
   // Ownership check
-  const existing = await db
-    .select()
-    .from(userProviders)
-    .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
-    .limit(1);
-
-  if (!existing[0]) {
-    throw new NotFoundError('Provider');
-  }
+  const existing = [await findOwnedProviderOrThrow(db, id, user.id)];
 
   // Domain guard: auth providers are managed through /auth routes only
   if (existing[0].domain === 'auth') {
@@ -476,15 +494,7 @@ routes.post('/:id/test', zValidator('param', commonSchemas.idParam), async (c) =
   const db = getDb();
 
   // Ownership check
-  const existing = await db
-    .select()
-    .from(userProviders)
-    .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
-    .limit(1);
-
-  if (!existing[0]) {
-    throw new NotFoundError('Provider');
-  }
+  const existing = [await findOwnedProviderOrThrow(db, id, user.id)];
 
   const providerInstance = storageProviderRegistry.createProviderInstance(existing[0]);
   const healthy = await providerInstance.healthCheck();
@@ -499,16 +509,8 @@ routes.post('/:id/backfill', zValidator('param', commonSchemas.idParam), async (
 
   const db = getDb();
 
-  // Ownership check
-  const existing = await db
-    .select()
-    .from(userProviders)
-    .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
-    .limit(1);
-
-  if (!existing[0]) {
-    throw new NotFoundError('Provider');
-  }
+  // Ownership check (the throw is the guard; this handler doesn't use the row)
+  await findOwnedProviderOrThrow(db, id, user.id);
 
   // Load storage config to find enabled categories for this provider
   const prefs = await preferencesRepository.getOrCreate(user.id);
@@ -559,16 +561,8 @@ routes.get('/:id/sync-status', zValidator('param', commonSchemas.idParam), async
 
   const db = getDb();
 
-  // Ownership check
-  const existing = await db
-    .select()
-    .from(userProviders)
-    .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
-    .limit(1);
-
-  if (!existing[0]) {
-    throw new NotFoundError('Provider');
-  }
+  // Ownership check (the throw is the guard; this handler doesn't use the row)
+  await findOwnedProviderOrThrow(db, id, user.id);
 
   const result: Record<string, { total: number; synced: number; failed: number }> = {};
 
@@ -579,42 +573,10 @@ routes.get('/:id/sync-status', zValidator('param', commonSchemas.idParam), async
       total += await countUserPhotos(db, entityType, user.id);
     }
 
-    // Count active refs for this provider in this category
-    const syncedResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(photoRefs)
-      .innerJoin(photos, eq(photoRefs.photoId, photos.id))
-      .where(
-        and(
-          eq(photoRefs.providerId, id),
-          eq(photoRefs.status, 'active'),
-          sql`${photos.entityType} IN (${sql.join(
-            entityTypes.map((t) => sql`${t}`),
-            sql`, `
-          )})`
-        )
-      );
-
-    // Count failed refs
-    const failedResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(photoRefs)
-      .innerJoin(photos, eq(photoRefs.photoId, photos.id))
-      .where(
-        and(
-          eq(photoRefs.providerId, id),
-          eq(photoRefs.status, 'failed'),
-          sql`${photos.entityType} IN (${sql.join(
-            entityTypes.map((t) => sql`${t}`),
-            sql`, `
-          )})`
-        )
-      );
-
     result[category] = {
       total,
-      synced: syncedResult[0]?.count ?? 0,
-      failed: failedResult[0]?.count ?? 0,
+      synced: await countPhotoRefsByStatus(db, id, 'active', entityTypes),
+      failed: await countPhotoRefsByStatus(db, id, 'failed', entityTypes),
     };
   }
 

@@ -13,7 +13,7 @@ import {
 } from '../../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
 import { onFinancingDeactivated } from './hooks';
-import { financingRepository } from './repository';
+import { financingRepository, isEligibleForPayoff } from './repository';
 
 const routes = new Hono();
 
@@ -86,7 +86,7 @@ async function enrichWithBalance(
   return {
     ...financing,
     computedBalance,
-    eligibleForPayoff: computedBalance <= 0.01,
+    eligibleForPayoff: isEligibleForPayoff(computedBalance),
   };
 }
 

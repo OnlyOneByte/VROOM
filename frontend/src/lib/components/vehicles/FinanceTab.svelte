@@ -19,7 +19,8 @@
 	import {
 		calculateAmortizationSchedule,
 		calculatePayoffDate,
-		derivePaymentEntries
+		derivePaymentEntries,
+		resolveCurrentOdometer
 	} from '$lib/utils/financing-calculations';
 	import type { Vehicle, VehicleStats, DerivedPaymentEntry } from '$lib/types';
 
@@ -141,6 +142,11 @@
 		{/if}
 
 		{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
+			<!-- C157 (bug, Angelo-approved C151): loan miles-used consumes the ALL-TIME `currentOdometer`,
+			     NOT the period-scoped + fuel-only `currentMileage`. Miles-used is inherently all-time, so a
+			     "7d"/"30d" stats-period selection must not shrink it (and it must see manual odometer entries
+			     too). `currentOdometer` is the canonical all-sources, period-independent reading (C52); falls
+			     back to currentMileage then initialMileage if it's somehow absent. See LEDGER C157. -->
 			<PaymentMetricsGrid
 				financing={vehicle.financing}
 				{totalInterestPaid}
@@ -150,8 +156,11 @@
 				{amortizationSchedule}
 				mileageUsed={Math.max(
 					0,
-					(vehicleStatsData?.currentMileage ?? vehicle.initialMileage ?? 0) -
-						(vehicle.initialMileage ?? 0)
+					(resolveCurrentOdometer(
+						vehicleStatsData?.currentOdometer,
+						vehicleStatsData?.currentMileage,
+						vehicle.initialMileage
+					) ?? 0) - (vehicle.initialMileage ?? 0)
 				)}
 				unitPreferences={vehicle.unitPreferences}
 			/>
@@ -168,9 +177,18 @@
 	{/if}
 
 	{#if vehicle.financing.financingType === 'lease'}
+		<!-- C157 (bug, Angelo-approved C151): same fix as PaymentMetricsGrid — lease overage consumes the
+		     ALL-TIME, all-sources `currentOdometer`, not the period-scoped + fuel-only `currentMileage`, so a
+		     non-'all' stats period can't understate the projected excess-fee $. calculateLeaseMetrics itself
+		     is correct/tested; this only corrects its odometer input. Falls back to currentMileage then
+		     initialMileage. See LEDGER C157. -->
 		<LeaseMetricsCard
 			financing={vehicle.financing}
-			currentMileage={vehicleStatsData?.currentMileage ?? vehicle.initialMileage ?? null}
+			currentMileage={resolveCurrentOdometer(
+				vehicleStatsData?.currentOdometer,
+				vehicleStatsData?.currentMileage,
+				vehicle.initialMileage
+			)}
 			initialMileage={vehicle.initialMileage ?? null}
 			unitPreferences={vehicle.unitPreferences}
 		/>

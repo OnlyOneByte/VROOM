@@ -21,12 +21,19 @@
  * createInsertSchema does NOT surface `.notNull().default()` DB columns as Zod defaults. Update
  * schemas that are hand-built `z.object(...)` (not `base.partial()`) — updateTerm/Policy/Claim —
  * can't carry a surviving default unless one is written, so they're covered by the same assertion.
+ * C179: `updateVehicleSchema` is a `createInsertSchema(vehiclesTable).omit(...).partial()` over a table
+ * with FOUR .default() columns (vehicleType/trackFuel/trackCharging/unitPreferences) — the highest-risk
+ * createInsertSchema-based instance. Added here (it had to be EXPORTED from the route to assert against
+ * it) so the drizzle-zod-doesn't-surface-defaults assumption is PINNED, not just documented: if a future
+ * drizzle-zod bump (or a hand-added .default()) ever started injecting `vehicleType:'gas'`/`trackFuel`,
+ * a PUT editing only the nickname would silently revert an EV to gas — this test would catch it.
  */
 
 import { describe, expect, test } from 'bun:test';
 import { updateClaimSchema } from '../insurance/claims-validation';
 import { updatePolicySchema, updateTermSchema } from '../insurance/validation';
 import { updateReminderSchema } from '../reminders/validation';
+import { updateVehicleSchema } from '../vehicles/routes';
 
 // A default key is allowed ONLY if injecting its fixed value can't clobber a user choice (a
 // literal-single-value default). Keep this list tiny + justified — adding to it is a deliberate
@@ -41,6 +48,7 @@ const UPDATE_SCHEMAS: Array<{ name: string; schema: { safeParse: (v: unknown) =>
   { name: 'updateTermSchema', schema: updateTermSchema },
   { name: 'updatePolicySchema', schema: updatePolicySchema },
   { name: 'updateClaimSchema', schema: updateClaimSchema },
+  { name: 'updateVehicleSchema', schema: updateVehicleSchema },
 ];
 
 describe('update schemas inject no clobbering default on an empty update (.partial()+.default() class)', () => {

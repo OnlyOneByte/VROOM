@@ -11,6 +11,7 @@
 
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
@@ -262,5 +263,54 @@ describe('Independence: preferences and sync state', () => {
     expect(colNames).toContain('last_sync_date');
     expect(colNames).toContain('last_data_change_date');
     expect(colNames).toContain('last_backup_date');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression (C144 #42): updateSyncDate must stamp lastSyncDate from the SNAPSHOT time, not
+// end-of-run — else a data change made DURING a long backup is silently dropped from all future
+// backups. A backup snapshots the DB at T_snap; if it finishes at T_end and stamps lastSyncDate=T_end,
+// an edit at T_edit (T_snap < T_edit < T_end) gets lastDataChangeDate=T_edit < T_end → marked
+// "already synced" forever. Stamping from T_snap keeps that edit "unsynced" for the next run.
+// ---------------------------------------------------------------------------
+
+describe('SyncStateRepository.updateSyncDate snapshot-time semantics (#42)', () => {
+  test('a change made AFTER the snapshot but BEFORE the run stamps still reports unsynced', async () => {
+    const tSnap = new Date('2026-01-01T10:00:00.000Z'); // backup snapshot (ZIP generated)
+    const tEdit = new Date('2026-01-01T10:02:00.000Z'); // user edits mid-run
+    const tEnd = new Date('2026-01-01T10:05:00.000Z'); // run finishes
+
+    // The mid-run edit lands first (set lastDataChangeDate = tEdit directly — markDataChanged stamps
+    // `now`, which isn't injectable; a direct write models "the edit happened at tEdit" deterministically).
+    await syncRepo.getOrCreate(USER_ID);
+    await db
+      .update(schema.syncState)
+      .set({ lastDataChangeDate: tEdit })
+      .where(eq(schema.syncState.userId, USER_ID));
+    // …then the run completes and stamps lastSyncDate from the SNAPSHOT time, not tEnd.
+    await syncRepo.updateSyncDate(USER_ID, tSnap);
+
+    // The edit (tEdit > tSnap) must still count as a pending change for the NEXT backup.
+    expect(await syncRepo.hasChangesSinceLastSync(USER_ID)).toBe(true);
+
+    // Negative control: had we stamped end-of-run (tEnd > tEdit), the change would be lost.
+    await syncRepo.updateSyncDate(USER_ID, tEnd);
+    expect(await syncRepo.hasChangesSinceLastSync(USER_ID)).toBe(false);
+  });
+
+  test('updateSyncDate persists the exact timestamp passed', async () => {
+    const t = new Date('2026-03-15T08:30:00.000Z');
+    await syncRepo.updateSyncDate(USER_ID, t);
+    const row = await syncRepo.getOrCreate(USER_ID);
+    expect(row.lastSyncDate?.getTime()).toBe(t.getTime());
+  });
+
+  test('updateSyncDate defaults to ~now when no timestamp is given (backward-compat)', async () => {
+    const before = Date.now();
+    await syncRepo.updateSyncDate(USER_ID);
+    const row = await syncRepo.getOrCreate(USER_ID);
+    const stamped = row.lastSyncDate?.getTime() ?? 0;
+    expect(stamped).toBeGreaterThanOrEqual(before - 1000);
+    expect(stamped).toBeLessThanOrEqual(Date.now() + 1000);
   });
 });

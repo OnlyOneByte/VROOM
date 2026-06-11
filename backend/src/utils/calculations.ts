@@ -129,3 +129,29 @@ export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[])
   const sum = milesPerKwhValues.reduce((acc, val) => acc + val, 0);
   return sum / milesPerKwhValues.length;
 }
+
+// ============================================================================
+// STATS PERIOD
+// ============================================================================
+
+/** The fixed stats-period selector shared by GET /vehicles/:id/stats and the expenses repository. */
+export type StatsPeriod = '7d' | '30d' | '90d' | '1y' | 'all';
+
+const PERIOD_DAYS: Record<Exclude<StatsPeriod, 'all'>, number> = {
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+  '1y': 365,
+};
+
+/**
+ * Start-of-window Date for a stats period, or null for 'all' (no lower bound). This was the
+ * identical day-offset switch duplicated in vehicles/routes.ts and expenses/repository.ts;
+ * extracted here so the window is one source of truth. 'all' → null (the caller applies no
+ * date filter); each bounded period → now − N days. A caller that needs an epoch sentinel
+ * instead of null for an out-of-range value can `?? new Date(0)` at the call site.
+ */
+export function getPeriodStartDate(period: StatsPeriod, now: Date = new Date()): Date | null {
+  if (period === 'all') return null;
+  return new Date(now.getTime() - PERIOD_DAYS[period] * 24 * 60 * 60 * 1000);
+}

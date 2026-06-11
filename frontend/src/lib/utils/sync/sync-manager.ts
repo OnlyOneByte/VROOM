@@ -12,6 +12,7 @@ import {
 	type SyncConfig
 } from './sync-state.svelte';
 import { loadOfflineExpenses, saveOfflineExpenses, type OfflineExpense } from '../offline-storage';
+import { extractErrorMessage } from '$lib/utils/error-handling';
 import type { ExpenseCategory } from '$lib/types';
 import { toBackendExpense } from '$lib/services/api-transformer';
 import { apiClient } from '$lib/services/api-client';
@@ -221,7 +222,7 @@ class SyncManager {
 			await apiClient.post('/api/v1/expenses', { ...backendExpense, clientId: expense.clientId });
 			return { success: true };
 		} catch (error) {
-			return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+			return { success: false, error: extractErrorMessage(error, 'Unknown error') };
 		}
 	}
 

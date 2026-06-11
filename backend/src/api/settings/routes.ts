@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { getDb } from '../../db/connection';
 import { userPreferences, userProviders } from '../../db/schema';
-import { AppError, ValidationError } from '../../errors';
+import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import {
   ChargeUnit,
@@ -14,7 +14,6 @@ import {
   type UnitPreferences,
   VolumeUnit,
 } from '../../types';
-import { logger } from '../../utils/logger';
 import { preferencesRepository, syncStateRepository } from './repository';
 
 /**
@@ -221,19 +220,14 @@ const updateSettingsSchema = baseSettingsSchema
  * Get user settings (creates default if not exists)
  */
 routes.get('/', async (c) => {
-  try {
-    const user = c.get('user');
+  const user = c.get('user');
 
-    const prefs = await preferencesRepository.getOrCreate(user.id);
+  const prefs = await preferencesRepository.getOrCreate(user.id);
 
-    return c.json({
-      success: true,
-      data: prefs,
-    });
-  } catch (error) {
-    logger.error('Error fetching settings', { error });
-    throw new AppError('Failed to fetch settings', 500);
-  }
+  return c.json({
+    success: true,
+    data: prefs,
+  });
 });
 
 /**
@@ -241,62 +235,54 @@ routes.get('/', async (c) => {
  * Update user settings
  */
 routes.put('/', async (c) => {
-  try {
-    const user = c.get('user');
-    const body = await c.req.json();
-    const updates = updateSettingsSchema.parse(body);
+  const user = c.get('user');
+  const body = await c.req.json();
+  // A ZodError here propagates to the central errorHandler → 400 ValidationError
+  // ('Invalid request data'); the storage/backup validators throw ValidationError
+  // (an AppError subclass) which the handler shapes by its 400 statusCode.
+  const updates = updateSettingsSchema.parse(body);
 
-    // Ensure settings exist first
-    const existingSettings = await preferencesRepository.getOrCreate(user.id);
+  // Ensure settings exist first
+  const existingSettings = await preferencesRepository.getOrCreate(user.id);
 
-    // Merge partial unitPreferences with existing values
-    const {
-      unitPreferences: partialUnitPrefs,
-      storageConfig,
-      backupConfig,
-      ...restUpdates
-    } = updates;
-    const mergedUnitPreferences: UnitPreferences | undefined = partialUnitPrefs
-      ? { ...existingSettings.unitPreferences, ...partialUnitPrefs }
-      : undefined;
+  // Merge partial unitPreferences with existing values
+  const {
+    unitPreferences: partialUnitPrefs,
+    storageConfig,
+    backupConfig,
+    ...restUpdates
+  } = updates;
+  const mergedUnitPreferences: UnitPreferences | undefined = partialUnitPrefs
+    ? { ...existingSettings.unitPreferences, ...partialUnitPrefs }
+    : undefined;
 
-    // Validate storageConfig if provided
-    let mergedStorageConfig: StorageConfig | undefined;
-    if (storageConfig) {
-      mergedStorageConfig = mergeStorageConfig(existingSettings.storageConfig, storageConfig);
-      // Validate the merged result to catch cases where disabling a category
-      // conflicts with it being set as a default
-      await validateStorageConfig(mergedStorageConfig, user.id);
-    }
-
-    // Validate backupConfig ownership if provided
-    if (backupConfig) {
-      await validateBackupConfig(backupConfig, user.id);
-    }
-
-    // Update settings
-    const updatedSettings = await preferencesRepository.update(user.id, {
-      ...restUpdates,
-      ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
-      ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
-      ...(backupConfig && { backupConfig }),
-    });
-
-    return c.json({
-      success: true,
-      data: updatedSettings,
-      message: 'Settings updated successfully',
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new AppError('Invalid settings data', 400);
-    }
-    if (error instanceof AppError) {
-      throw error;
-    }
-    logger.error('Error updating settings', { error });
-    throw new AppError('Failed to update settings', 500);
+  // Validate storageConfig if provided
+  let mergedStorageConfig: StorageConfig | undefined;
+  if (storageConfig) {
+    mergedStorageConfig = mergeStorageConfig(existingSettings.storageConfig, storageConfig);
+    // Validate the merged result to catch cases where disabling a category
+    // conflicts with it being set as a default
+    await validateStorageConfig(mergedStorageConfig, user.id);
   }
+
+  // Validate backupConfig ownership if provided
+  if (backupConfig) {
+    await validateBackupConfig(backupConfig, user.id);
+  }
+
+  // Update settings
+  const updatedSettings = await preferencesRepository.update(user.id, {
+    ...restUpdates,
+    ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
+    ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
+    ...(backupConfig && { backupConfig }),
+  });
+
+  return c.json({
+    success: true,
+    data: updatedSettings,
+    message: 'Settings updated successfully',
+  });
 });
 
 /**
@@ -304,19 +290,14 @@ routes.put('/', async (c) => {
  * Trigger manual backup — updates lastBackupDate in sync_state
  */
 routes.post('/backup', async (c) => {
-  try {
-    const user = c.get('user');
-    await syncStateRepository.updateBackupDate(user.id);
+  const user = c.get('user');
+  await syncStateRepository.updateBackupDate(user.id);
 
-    return c.json({
-      success: true,
-      message: 'Backup completed successfully',
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    logger.error('Error creating backup', { error });
-    throw new AppError('Failed to create backup', 500);
-  }
+  return c.json({
+    success: true,
+    message: 'Backup completed successfully',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 /**
@@ -324,15 +305,10 @@ routes.post('/backup', async (c) => {
  * Restore from backup
  */
 routes.post('/restore', async (c) => {
-  try {
-    return c.json({
-      success: true,
-      message: 'Data restored successfully',
-    });
-  } catch (error) {
-    logger.error('Error restoring backup', { error });
-    throw new AppError('Failed to restore backup', 500);
-  }
+  return c.json({
+    success: true,
+    message: 'Data restored successfully',
+  });
 });
 
 export { routes };

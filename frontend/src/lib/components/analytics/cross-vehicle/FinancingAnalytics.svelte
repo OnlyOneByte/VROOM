@@ -9,7 +9,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { AppBarChart, StatCardGrid } from '$lib/components/charts';
 	import type { FinancingResponse } from '$lib/types';
-	import { formatCurrency } from '$lib/utils/formatters';
+	import { capitalize, formatCurrency } from '$lib/utils/formatters';
 	import { parseMonthToDate } from '$lib/utils/chart-formatters';
 
 	let { financing }: { financing: FinancingResponse } = $props();
@@ -112,10 +112,7 @@
 										{vehicle.vehicleName}
 									</h4>
 									<Badge variant={getFinancingBadgeVariant(vehicle.financingType)}>
-										{vehicle.financingType === 'own'
-											? 'Owned'
-											: vehicle.financingType.charAt(0).toUpperCase() +
-												vehicle.financingType.slice(1)}
+										{vehicle.financingType === 'own' ? 'Owned' : capitalize(vehicle.financingType)}
 									</Badge>
 								</div>
 

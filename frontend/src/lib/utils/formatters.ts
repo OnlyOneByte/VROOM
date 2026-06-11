@@ -46,6 +46,11 @@ export function formatNumber(value: number, decimals = 2): string {
 	}).format(value);
 }
 
+/** Upper-case the first character, leaving the rest unchanged (e.g. 'loan' → 'Loan'). */
+export function capitalize(s: string): string {
+	return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 // Date formatting
 export function formatDate(date: string | Date): string {
 	const d = typeof date === 'string' ? new Date(date) : date;

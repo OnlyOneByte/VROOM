@@ -11,7 +11,7 @@
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
 import type { VehicleFinancing } from '$lib/types';
-import { calculateLeaseMetrics } from '$lib/utils/financing-calculations';
+import { calculateLeaseMetrics, resolveCurrentOdometer } from '$lib/utils/financing-calculations';
 
 // Build a valid lease. Dates are expressed as offsets from a fixed "now" anchor the
 // caller passes, so tests are deterministic regardless of the wall clock: startDate is
@@ -181,5 +181,39 @@ describe('calculateLeaseMetrics — property: every numeric output finite & non-
 			),
 			{ numRuns: 200 }
 		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// resolveCurrentOdometer (C157, bug lease/loan — Angelo-approved C151): lease overage + loan miles-used
+// must derive from the ALL-TIME, all-sources `currentOdometer`, NOT the period-scoped + fuel-only
+// `currentMileage` (which shrinks under a 7d/30d stats window and ignores manual odometer entries). This
+// pins the selection contract both FinanceTab call sites share so a refactor can't silently re-introduce
+// the period-scoped value as the primary input.
+// ---------------------------------------------------------------------------
+describe('resolveCurrentOdometer — prefers all-time currentOdometer over period-scoped currentMileage', () => {
+	test('currentOdometer wins when present, even if currentMileage is lower (the period-scoped bug case)', () => {
+		// The whole point: a 7d window made currentMileage drop to 12,100 while the true odometer is 48,000.
+		expect(resolveCurrentOdometer(48_000, 12_100, 10_000)).toBe(48_000);
+	});
+
+	test('falls back to currentMileage when currentOdometer is null/undefined', () => {
+		expect(resolveCurrentOdometer(null, 30_000, 10_000)).toBe(30_000);
+		expect(resolveCurrentOdometer(undefined, 30_000, 10_000)).toBe(30_000);
+	});
+
+	test('falls back to initialMileage when both odometer readings are absent', () => {
+		expect(resolveCurrentOdometer(null, null, 10_000)).toBe(10_000);
+		expect(resolveCurrentOdometer(undefined, undefined, 10_000)).toBe(10_000);
+	});
+
+	test('returns null when nothing is available', () => {
+		expect(resolveCurrentOdometer(null, null, null)).toBeNull();
+		expect(resolveCurrentOdometer(undefined, undefined, undefined)).toBeNull();
+	});
+
+	test('a zero currentOdometer is honored (??, not ||) — 0 is a real reading, not "missing"', () => {
+		// `0 ?? x` returns 0; a `0 || x` bug would wrongly skip to currentMileage.
+		expect(resolveCurrentOdometer(0, 12_100, 10_000)).toBe(0);
 	});
 });

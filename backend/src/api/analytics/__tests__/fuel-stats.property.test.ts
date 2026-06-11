@@ -347,6 +347,107 @@ describe('total distance is summed per vehicle (cycle 211 multi-vehicle regressi
 });
 
 // ---------------------------------------------------------------------------
+// Regression (C97, bug #18): cross-fleet fillup COUNT must not be inflated by a
+// split fuel expense.
+//
+// A fuel expense split across N vehicles creates N sibling rows, but only the AMOUNT
+// is split — siblings carry volume=null (ExpenseSplitService.createSiblings). The
+// cross-fleet getFuelStats (no vehicleId) sees all siblings, so counting raw rows
+// (fuelRows.length) reported one logical fillup as N. A "fillup" is a fuel PURCHASE
+// with an actual volume, so the count now includes only volume-bearing rows. The
+// volume/cost SUMS were always correct (null volume contributes 0); only the COUNT
+// was wrong. This pins: two real fillups (volume set) + two split siblings (volume
+// null) on different cars => currentYear fillups == 2, not 4; gallons unchanged.
+// ---------------------------------------------------------------------------
+describe('cross-fleet fillup count excludes split siblings (C97 bug #18)', () => {
+  test('a split fuel expense (volume-null siblings) counts as zero fillups, not N', async () => {
+    const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
+    seedUser(testDb.sqlite, user);
+
+    const carA: TestVehicle = {
+      id: 'veh-A',
+      userId: user.id,
+      make: 'Toyota',
+      model: 'Camry',
+      year: 2022,
+    };
+    const carB: TestVehicle = {
+      id: 'veh-B',
+      userId: user.id,
+      make: 'Honda',
+      model: 'Civic',
+      year: 2021,
+    };
+    seedVehicle(testDb.sqlite, carA);
+    seedVehicle(testDb.sqlite, carB);
+
+    // Two genuine fillups (one per car) — each carries a real volume.
+    const realFillups: TestExpense[] = [
+      {
+        id: 'real-A',
+        vehicleId: 'veh-A',
+        category: 'fuel',
+        expenseAmount: 40,
+        date: new Date(2024, 2, 10),
+        mileage: 10000,
+        volume: 10,
+        fuelType: 'Regular',
+        missedFillup: false,
+      },
+      {
+        id: 'real-B',
+        vehicleId: 'veh-B',
+        category: 'fuel',
+        expenseAmount: 38,
+        date: new Date(2024, 2, 12),
+        mileage: 90000,
+        volume: 9,
+        fuelType: 'Regular',
+        missedFillup: false,
+      },
+    ];
+
+    // One fuel expense split across both cars => two sibling rows, AMOUNT split but
+    // volume=null on each (exactly what ExpenseSplitService.createSiblings produces).
+    const splitSiblings: TestExpense[] = [
+      {
+        id: 'split-A',
+        vehicleId: 'veh-A',
+        category: 'fuel',
+        expenseAmount: 12.5,
+        date: new Date(2024, 4, 1),
+        mileage: null,
+        volume: null,
+        fuelType: null,
+        missedFillup: false,
+      },
+      {
+        id: 'split-B',
+        vehicleId: 'veh-B',
+        category: 'fuel',
+        expenseAmount: 12.5,
+        date: new Date(2024, 4, 1),
+        mileage: null,
+        volume: null,
+        fuelType: null,
+        missedFillup: false,
+      },
+    ];
+
+    for (const r of [...realFillups, ...splitSiblings]) seedExpense(testDb.sqlite, r);
+
+    // Cross-fleet view (no vehicleId) — the path where all siblings are visible.
+    const result = await repo.getFuelStats(user.id, yearToRange(2024));
+
+    // Two real fillups; the two volume-null split siblings are NOT fillups.
+    // Pre-fix this was 4 (raw fuelRows.length).
+    expect(result.fillups.currentYear).toBe(2);
+    // The gallons SUM was always correct — null volume contributes nothing.
+    expect(result.volume.currentYear).toBe(19);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Property 18: Gas price always positive
 // **Validates: Requirement 4.7**
 // ---------------------------------------------------------------------------

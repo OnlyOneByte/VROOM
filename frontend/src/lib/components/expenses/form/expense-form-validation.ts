@@ -33,9 +33,15 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 		}
 		case 'date': {
 			if (!value) return 'Date is required';
-			const selectedDate = new Date(value as string);
-			const today = new Date();
-			if (selectedDate > today) return 'Date cannot be in the future';
+			// Compare CALENDAR DAYS, not Date instants. `new Date('YYYY-MM-DD')` parses as UTC
+			// midnight, so for a user at a positive UTC offset it lands on tomorrow-morning-local
+			// and a Date-instant `> new Date()` wrongly rejects TODAY as "in the future" (the
+			// C6/C61 local-vs-UTC class). The date-picker value is already a local 'YYYY-MM-DD';
+			// today's local day uses the same getFullYear/getMonth/getDate parts idiom this file
+			// uses for mileage ordering (lines 96/109). String compare is timezone-safe.
+			const now = new Date();
+			const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+			if ((value as string) > todayStr) return 'Date cannot be in the future';
 			break;
 		}
 		case 'volume': {

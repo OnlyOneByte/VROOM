@@ -130,4 +130,54 @@ describe('findPaginated search', () => {
     const blank = await repo.findPaginated({ userId: USER_A, search: '   ' });
     expect(blank.totalCount).toBe(2);
   });
+
+  // bug #41: LIKE metacharacters in the search term must be treated as LITERALS, not wildcards.
+  describe('LIKE-wildcard escaping (#41)', () => {
+    test('a literal "%" matches only rows containing "%", not every row', async () => {
+      await repo.create(input({ description: '50% synthetic oil' }));
+      await repo.create(input({ description: '1000 mile service' }));
+      await repo.create(input({ description: 'plain gas' }));
+
+      const result = await repo.findPaginated({ userId: USER_A, search: '50%' });
+      // Pre-fix `%50%%` matched "1000 mile service" (contains "50") too → 2. Now only the literal.
+      expect(result.totalCount).toBe(1);
+      expect(result.data[0]?.description).toBe('50% synthetic oil');
+    });
+
+    test('a literal "_" matches only rows containing "_", not any single char', async () => {
+      await repo.create(input({ description: 'oil_change' }));
+      await repo.create(input({ description: 'oilXchange' }));
+
+      const result = await repo.findPaginated({ userId: USER_A, search: 'oil_change' });
+      // Pre-fix `_` was "any one char" → matched "oilXchange" too. Now the underscore is literal.
+      expect(result.totalCount).toBe(1);
+      expect(result.data[0]?.description).toBe('oil_change');
+    });
+
+    test('a bare "%" no longer matches every row', async () => {
+      await repo.create(input({ description: 'alpha' }));
+      await repo.create(input({ description: 'beta' }));
+      await repo.create(input({ description: '100% beef' }));
+
+      const result = await repo.findPaginated({ userId: USER_A, search: '%' });
+      // Pre-fix `%%%` matched all 3. Now only the row with a literal "%".
+      expect(result.totalCount).toBe(1);
+      expect(result.data[0]?.description).toBe('100% beef');
+    });
+
+    test('a backslash in the term is matched literally (escape-char not double-applied)', async () => {
+      await repo.create(input({ description: 'path a\\b' }));
+      await repo.create(input({ description: 'path ab' }));
+
+      const result = await repo.findPaginated({ userId: USER_A, search: 'a\\b' });
+      expect(result.totalCount).toBe(1);
+      expect(result.data[0]?.description).toBe('path a\\b');
+    });
+
+    test('normal (metacharacter-free) search still matches as a substring', async () => {
+      await repo.create(input({ description: 'premium gasoline' }));
+      const result = await repo.findPaginated({ userId: USER_A, search: 'premium' });
+      expect(result.totalCount).toBe(1);
+    });
+  });
 });

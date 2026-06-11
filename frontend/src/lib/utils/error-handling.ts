@@ -1,5 +1,19 @@
 import { appStore } from '$lib/stores/app.svelte';
 
+/**
+ * Extract a human message from an unknown thrown value, falling back to `fallback`
+ * when it isn't an `Error`. This is the `error instanceof Error ? error.message : <fallback>`
+ * idiom that was hand-repeated across the catch blocks in load-state, the auth store, and
+ * the sync manager — one source of truth so the shape can't drift.
+ *
+ * NOTE: this is the "error message WINS, literal is the fallback" ordering. It is deliberately
+ * NOT used by `handleApiError`, whose `fallbackMessage || (...)` gives the caller's message
+ * PRECEDENCE over the error's own — a different contract that must stay as-is.
+ */
+export function extractErrorMessage(error: unknown, fallback: string): string {
+	return error instanceof Error ? error.message : fallback;
+}
+
 interface AppError {
 	message: string;
 	code?: string | undefined;

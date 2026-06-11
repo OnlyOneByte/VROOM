@@ -8,6 +8,7 @@ import type {
 	RestoreResult
 } from '../types/index.js';
 import { settingsApi } from '$lib/services/settings-api';
+import { extractErrorMessage } from '$lib/utils/error-handling';
 
 const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
 	distanceUnit: 'miles',
@@ -15,9 +16,10 @@ const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
 	chargeUnit: 'kwh'
 };
 
-function handleError(error: unknown): string {
-	return error instanceof Error ? error.message : 'An unexpected error occurred';
-}
+// C166 (arch): the local handleError was a byte-identical reimplementation of the shared
+// extractErrorMessage (C90/C137 — error-wins precedence). Converged onto the shared helper; the fallback
+// string is passed explicitly. (NOT handleApiError, whose fallback-wins precedence is a different contract.)
+const UNEXPECTED_ERROR = 'An unexpected error occurred';
 
 function createSettingsStore() {
 	let settings = $state<UserSettings | null>(null);
@@ -46,7 +48,7 @@ function createSettingsStore() {
 				settings = await settingsApi.getSettings();
 				isLoading = false;
 			} catch (err) {
-				error = handleError(err);
+				error = extractErrorMessage(err, UNEXPECTED_ERROR);
 				isLoading = false;
 			}
 		},
@@ -59,7 +61,7 @@ function createSettingsStore() {
 				isLoading = false;
 				return settings;
 			} catch (err) {
-				error = handleError(err);
+				error = extractErrorMessage(err, UNEXPECTED_ERROR);
 				isLoading = false;
 				throw err;
 			}
@@ -81,7 +83,7 @@ function createSettingsStore() {
 				window.URL.revokeObjectURL(url);
 				document.body.removeChild(a);
 			} catch (err) {
-				error = handleError(err);
+				error = extractErrorMessage(err, UNEXPECTED_ERROR);
 				throw err;
 			}
 		},
@@ -96,7 +98,7 @@ function createSettingsStore() {
 				}
 				return result;
 			} catch (err) {
-				error = handleError(err);
+				error = extractErrorMessage(err, UNEXPECTED_ERROR);
 				throw err;
 			}
 		},
@@ -105,7 +107,7 @@ function createSettingsStore() {
 			try {
 				return await settingsApi.executeSync(syncTypes, force);
 			} catch (err) {
-				error = handleError(err);
+				error = extractErrorMessage(err, UNEXPECTED_ERROR);
 				throw err;
 			}
 		},
@@ -114,7 +116,7 @@ function createSettingsStore() {
 			try {
 				return await settingsApi.listBackupsFromProvider(providerId);
 			} catch (err) {
-				error = handleError(err);
+				error = extractErrorMessage(err, UNEXPECTED_ERROR);
 				throw err;
 			}
 		},
@@ -123,7 +125,7 @@ function createSettingsStore() {
 			try {
 				return await settingsApi.listAllBackups();
 			} catch (err) {
-				error = handleError(err);
+				error = extractErrorMessage(err, UNEXPECTED_ERROR);
 				throw err;
 			}
 		},
@@ -142,7 +144,7 @@ function createSettingsStore() {
 				}
 				return result;
 			} catch (err) {
-				error = handleError(err);
+				error = extractErrorMessage(err, UNEXPECTED_ERROR);
 				throw err;
 			}
 		},
@@ -156,7 +158,7 @@ function createSettingsStore() {
 				restoreProviders = await settingsApi.getRestoreProviders();
 				return restoreProviders;
 			} catch (err) {
-				error = handleError(err);
+				error = extractErrorMessage(err, UNEXPECTED_ERROR);
 				throw err;
 			}
 		},

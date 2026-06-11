@@ -22,7 +22,10 @@ desktop is for review and analytics.
    timezone-correct dates; cross-tenant isolation (a user never sees/writes another's data).
 3. **Four-states + a11y + mobile-first.** Every surface handles loading / empty / error /
    data; passes axe; no mobile horizontal overflow. A green build is the FLOOR, not "done"
-   — UI work needs an eyes-on screenshot.
+   — UI work needs an eyes-on screenshot. A new user-facing capability isn't done until one
+   E2E exercises the real FE→BE→DB→render round trip (integrated bugs hide in that seam, not
+   in isolated unit/HTTP tests); if that E2E is harness-blocked, it stays "code-complete,
+   eyes-on pending" — not done.
 4. **Compose, don't reinvent.** Use the kit (`/dev/gallery`, DesignSystem.md). One way to
    do a thing (e.g. `ConfirmDialog`, `formatCurrency`).
 5. **Regression-proof under autonomous dev.** When a bug class is fixed, leave a

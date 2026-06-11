@@ -12,6 +12,23 @@ const MUTEX_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const MUTEX_MAX_SIZE = 500;
 const backupMutex = new Map<string, number>();
 
+/**
+ * The providers a backup run will fan out to: enabled (ZIP) OR sheetsSyncEnabled. Pure +
+ * exported so the orchestrator and its tests share ONE source of truth — previously the test
+ * re-implemented this filter locally and asserted against the copy, leaving the real branch
+ * uncovered (coverage theater, C181). execute() calls this so the test now pins real code.
+ */
+export function filterEnabledProviders(config: BackupConfig): [string, ProviderBackupSettings][] {
+  return Object.entries(config.providers).filter(
+    ([, s]) => s.enabled || s.sheetsSyncEnabled === true
+  );
+}
+
+/** A ZIP is generated only if at least one selected provider has enabled=true (Sheets-only skips it). */
+export function needsZipGeneration(enabledProviders: [string, ProviderBackupSettings][]): boolean {
+  return enabledProviders.some(([, s]) => s.enabled);
+}
+
 function acquireMutex(userId: string): boolean {
   const now = Date.now();
   const existing = backupMutex.get(userId);
@@ -66,9 +83,7 @@ export class BackupOrchestrator {
         providers: {},
       };
 
-      const enabledProviders: [string, ProviderBackupSettings][] = Object.entries(
-        config.providers
-      ).filter(([, s]) => s.enabled || s.sheetsSyncEnabled === true);
+      const enabledProviders = filterEnabledProviders(config);
 
       // No enabled providers
       if (enabledProviders.length === 0) {
@@ -77,7 +92,7 @@ export class BackupOrchestrator {
       }
 
       // Conditional ZIP generation — only if any provider has enabled=true
-      const needsZip = enabledProviders.some(([, s]) => s.enabled);
+      const needsZip = needsZipGeneration(enabledProviders);
       let zipBuffer: Buffer | null = null;
       if (needsZip) {
         try {
@@ -193,7 +208,13 @@ export class BackupOrchestrator {
       if (anySuccess) {
         await preferencesRepository.update(userId, { backupConfig: updatedConfig });
         const { syncStateRepository } = await import('../settings/repository');
-        await syncStateRepository.updateSyncDate(userId);
+        // Stamp lastSyncDate from the run's START timestamp (the snapshot anchor — taken before the
+        // change-check + ZIP export above), NOT a fresh end-of-run time. A long backup can run for
+        // minutes; a data change made mid-run (after the snapshot) must stay "unsynced" so the NEXT
+        // backup captures it. Stamping end-of-run would mark that change already-synced and silently
+        // drop it from every future backup (C144 #42). Using the start timestamp (slightly before the
+        // actual L85 snapshot) errs safe: at worst a redundant re-backup, never a lost change.
+        await syncStateRepository.updateSyncDate(userId, new Date(timestamp));
         await syncStateRepository.updateBackupDate(userId);
       }
 

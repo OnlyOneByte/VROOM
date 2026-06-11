@@ -5,7 +5,7 @@
  * combining expenses.mileage and odometer_entries.odometer.
  */
 
-import { count, desc, eq, sql } from 'drizzle-orm';
+import { and, count, desc, eq, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
@@ -43,21 +43,25 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
 
   async findByVehicleIdPaginated(
     vehicleId: string,
+    userId: string,
     limit: number,
     offset: number
   ): Promise<{ data: OdometerEntry[]; totalCount: number }> {
+    // userId-scope BOTH legs (#48 — completes the C168 sweep, which scoped getHistory +
+    // getCurrentOdometer but missed THIS method): the route validates vehicle ownership
+    // first, but scoping here means an unvalidated vehicleId can never surface another
+    // user's manual entries (the C109/#52 tenant class). vehicle_id AND user_id together.
+    const where = and(eq(odometerEntries.vehicleId, vehicleId), eq(odometerEntries.userId, userId));
+
     const data = await this.db
       .select()
       .from(odometerEntries)
-      .where(eq(odometerEntries.vehicleId, vehicleId))
+      .where(where)
       .orderBy(desc(odometerEntries.recordedAt))
       .limit(limit)
       .offset(offset);
 
-    const [result] = await this.db
-      .select({ count: count() })
-      .from(odometerEntries)
-      .where(eq(odometerEntries.vehicleId, vehicleId));
+    const [result] = await this.db.select({ count: count() }).from(odometerEntries).where(where);
 
     return { data, totalCount: result?.count ?? 0 };
   }
@@ -72,13 +76,16 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
    */
   async getHistory(
     vehicleId: string,
+    userId: string,
     options?: { limit?: number; offset?: number }
   ): Promise<OdometerHistoryResult> {
     const limit = options?.limit ?? 50;
     const offset = options?.offset ?? 0;
 
     try {
-      // Data query: UNION ALL combining expenses.mileage and odometer_entries
+      // Data query: UNION ALL combining expenses.mileage and odometer_entries. Both legs AND the userId
+      // scope (#48 belt-and-braces): callers validate vehicle ownership first, but scoping here too means
+      // an unvalidated vehicleId can never surface another user's readings (the C109/#52 tenant class).
       const rows = await this.db.all<{
         odometer: number;
         recorded_at: number;
@@ -87,10 +94,10 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         note: string | null;
       }>(sql`
         SELECT mileage AS odometer, date AS recorded_at, 'expense' AS source, id AS source_id, NULL AS note
-        FROM expenses WHERE vehicle_id = ${vehicleId} AND mileage IS NOT NULL
+        FROM expenses WHERE vehicle_id = ${vehicleId} AND user_id = ${userId} AND mileage IS NOT NULL
         UNION ALL
         SELECT odometer, recorded_at, 'manual' AS source, id AS source_id, note
-        FROM odometer_entries WHERE vehicle_id = ${vehicleId}
+        FROM odometer_entries WHERE vehicle_id = ${vehicleId} AND user_id = ${userId}
         ORDER BY recorded_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `);
@@ -98,8 +105,8 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       // Count query for pagination
       const [countResult] = await this.db.all<{ total: number }>(sql`
         SELECT (
-          (SELECT COUNT(*) FROM expenses WHERE vehicle_id = ${vehicleId} AND mileage IS NOT NULL) +
-          (SELECT COUNT(*) FROM odometer_entries WHERE vehicle_id = ${vehicleId})
+          (SELECT COUNT(*) FROM expenses WHERE vehicle_id = ${vehicleId} AND user_id = ${userId} AND mileage IS NOT NULL) +
+          (SELECT COUNT(*) FROM odometer_entries WHERE vehicle_id = ${vehicleId} AND user_id = ${userId})
         ) AS total
       `);
 
@@ -135,14 +142,16 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
    * Returns null when the vehicle has no readings on either source.
    * Distance is stored as-entered in the vehicle's distanceUnit (convert-on-read).
    */
-  async getCurrentOdometer(vehicleId: string): Promise<number | null> {
+  async getCurrentOdometer(vehicleId: string, userId: string): Promise<number | null> {
     try {
+      // Both legs AND the userId scope (#48 belt-and-braces — see getHistory): scoping here means an
+      // unvalidated vehicleId can never poison the mileage trigger with another user's reading.
       const [row] = await this.db.all<{ current: number | null }>(sql`
         SELECT MAX(odometer) AS current FROM (
           SELECT mileage AS odometer FROM expenses
-            WHERE vehicle_id = ${vehicleId} AND mileage IS NOT NULL
+            WHERE vehicle_id = ${vehicleId} AND user_id = ${userId} AND mileage IS NOT NULL
           UNION ALL
-          SELECT odometer FROM odometer_entries WHERE vehicle_id = ${vehicleId}
+          SELECT odometer FROM odometer_entries WHERE vehicle_id = ${vehicleId} AND user_id = ${userId}
         )
       `);
 

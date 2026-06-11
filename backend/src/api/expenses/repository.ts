@@ -7,6 +7,7 @@ import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, photos, vehicles } from '../../db/schema';
 import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import { DatabaseError, NotFoundError } from '../../errors';
+import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import type { PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
@@ -49,6 +50,20 @@ const EXPENSE_SORT_COLUMNS = {
 } as const;
 
 /**
+ * If `d` falls exactly on LOCAL midnight (the date-only `YYYY-MM-DD` DatePicker signature), return
+ * the inclusive end of that local day (23:59:59.999); otherwise return `d` unchanged. Detection +
+ * construction use local Y/M/D parts (not a hardcoded UTC instant), so the behavior is
+ * host-independent — a date-only end bound covers its whole day on any server timezone, and a
+ * deliberate mid-day timestamp is left alone. See the `endDate` note in buildExpenseConditions.
+ */
+function endOfDayIfDateOnly(d: Date): Date {
+  const isLocalMidnight =
+    d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0;
+  if (!isLocalMidnight) return d;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+}
+
+/**
  * Build the shared WHERE conditions for an expense query (everything EXCEPT the
  * userId scope, which the caller ANDs in). Used by BOTH findPaginated and findAll so
  * the list table and the CSV export filter identically — a divergence here is exactly
@@ -69,7 +84,14 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
     conditions.push(gte(expenses.date, filters.startDate));
   }
   if (filters.endDate) {
-    conditions.push(lte(expenses.date, filters.endDate));
+    // `endDate` from the UI is a date-only `YYYY-MM-DD` (the DatePicker), coerced to LOCAL
+    // midnight (00:00:00.000) — the START of that day. A bare `lte(date, midnight)` therefore
+    // drops every same-day expense not stamped at exactly midnight, so a "through Mar 31" filter
+    // silently hides all of Mar 31 (the C6/C61/C103 local-vs-UTC boundary class, here on the
+    // most-used list + the CSV export — both route through this one builder). Treat a midnight
+    // endDate as INCLUSIVE of the whole local day by extending it to 23:59:59.999 local; a
+    // non-midnight endDate (a deliberate full timestamp) is honored as-is.
+    conditions.push(lte(expenses.date, endOfDayIfDateOnly(filters.endDate)));
   }
   // SQL-level tag filtering via json_each (a row must carry EVERY listed tag).
   if (filters.tags?.length) {
@@ -81,11 +103,16 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
   }
   // Free-text search over description + category (case-insensitive). LIKE is
   // case-insensitive for ASCII in SQLite by default; lower() handles mixed case too.
+  // Escape the LIKE metacharacters (`%` `_` and the escape char `\`) in the user's term so a
+  // search for a literal "50%" or "oil_change" matches the TEXT, not a wildcard — without the
+  // ESCAPE clause a `%` means "any chars" (over-matches every row) and `_` means "any one char"
+  // (bug #41). Order matters: escape `\` FIRST so we don't double-escape the ones we just added.
   const search = filters.search?.trim();
   if (search) {
-    const pattern = `%${search.toLowerCase()}%`;
+    const escaped = search.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const pattern = `%${escaped}%`;
     conditions.push(
-      sql`(lower(${expenses.description}) LIKE ${pattern} OR lower(${expenses.category}) LIKE ${pattern})`
+      sql`(lower(${expenses.description}) LIKE ${pattern} ESCAPE '\\' OR lower(${expenses.category}) LIKE ${pattern} ESCAPE '\\')`
     );
   }
 
@@ -143,6 +170,25 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
       .limit(1);
     return result[0] ?? null;
+  }
+
+  /**
+   * All expenses materialized from a source (e.g. a recurring-expense reminder), scoped to a user
+   * and ordered by date. The READ counterpart to clearSource/deleteBySource — backs the recurring-
+   * expenses T6 "this reminder materialized N expenses" view. Returns [] when nothing is linked.
+   */
+  async findBySource(sourceType: string, sourceId: string, userId: string): Promise<Expense[]> {
+    return this.db
+      .select()
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.sourceType, sourceType),
+          eq(expenses.sourceId, sourceId),
+          eq(expenses.userId, userId)
+        )
+      )
+      .orderBy(asc(expenses.date));
   }
 
   /** IDs of all expenses for a vehicle (for photo cascade cleanup on delete). */
@@ -384,24 +430,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       // Build date filter based on period
       const period = filters.period ?? 'all';
       if (period !== 'all') {
-        const now = new Date();
-        let startDate: Date;
-        switch (period) {
-          case '7d':
-            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            break;
-          case '30d':
-            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            break;
-          case '90d':
-            startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-            break;
-          case '1y':
-            startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-            break;
-          default:
-            startDate = new Date(0);
-        }
+        // Shared one-source-of-truth window (see calculations.ts). The `?? new Date(0)` keeps
+        // the prior defensive fallback for a value outside the 5 known periods (unreachable in
+        // practice — period is a fixed enum — but behavior-identical to the old default branch).
+        const startDate = getPeriodStartDate(period) ?? new Date(0);
         periodConditions.push(gte(expenses.date, startDate));
       }
 
@@ -684,8 +716,14 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           .delete(photos)
           .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, siblingIds)));
 
-        // Delete all sibling expense rows
-        await tx.delete(expenses).where(eq(expenses.groupId, groupId));
+        // Delete all sibling expense rows. AND the userId scope (not groupId alone): the read above is
+        // userId-scoped, so the destructive write must match it — keeping ownership and deletion on the
+        // SAME predicate. Behavior-identical today (groupId is a server cuid2, single-owner), but a
+        // defense-in-depth boundary so a future cross-user group can never be cross-deleted (the C109
+        // detectConflicts tenant-scope class).
+        await tx
+          .delete(expenses)
+          .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
       });
     } catch (error) {
       logger.error('Failed to delete split expense', {
@@ -721,7 +759,22 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       if (!firstOld) {
         throw new NotFoundError('Split expense');
       }
-      const totalAmount = data.totalAmount ?? firstOld.groupTotal ?? firstOld.expenseAmount;
+      // For an ABSOLUTE split the total is DEFINITIONALLY the sum of the per-vehicle
+      // allocations, so derive it from them rather than trusting an omitted `totalAmount`
+      // or the stale stored `groupTotal`. updateSplitSchema makes `totalAmount` optional
+      // AND gates its absolute-sum refinement on it being present (validation.ts:64,102),
+      // so an absolute edit that omits `totalAmount` would otherwise fall back to the OLD
+      // groupTotal — stamping every sibling with a header that no longer matches the legs
+      // (edit 30/30→40/40 with no total keeps groupTotal=60 while the legs sum to 80, a
+      // persistent stored inconsistency that violates Property 3: legs sum to groupTotal).
+      // When `totalAmount` IS sent for absolute, validation already forces sum===total, so
+      // this yields the identical value (no behavior change). Even/percentage carry no
+      // absolute amounts in the config → they still need the caller's total to divide.
+      const totalAmount =
+        data.splitConfig.method === 'absolute'
+          ? Math.round(data.splitConfig.allocations.reduce((sum, a) => sum + a.amount, 0) * 100) /
+            100
+          : (data.totalAmount ?? firstOld.groupTotal ?? firstOld.expenseAmount);
       const allocations = expenseSplitService.computeAllocations(data.splitConfig, totalAmount);
       const splitMethod: SplitMethod = data.splitConfig.method;
       const oldSiblingIds = oldSiblings.map((s) => s.id);
@@ -735,8 +788,11 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
         const photoIds = oldPhotos.map((p) => p.id);
 
-        // 2. Delete old siblings
-        await tx.delete(expenses).where(eq(expenses.groupId, groupId));
+        // 2. Delete old siblings (userId-scoped to match the read above — same predicate for the
+        // ownership check and the destructive write; see deleteSplitExpense for the rationale).
+        await tx
+          .delete(expenses)
+          .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
 
         // 3. Insert new siblings with same groupId
         const newSiblings = await expenseSplitService.createSiblings(tx, {

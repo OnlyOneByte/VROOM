@@ -13,7 +13,7 @@
 	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import { formatCurrency, formatDate, dateOnlyToISO } from '$lib/utils/formatters';
+	import { capitalize, formatCurrency, formatDate, dateOnlyToISO } from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import {
 		CLAIM_TYPES,
@@ -82,10 +82,6 @@
 		settled: 'secondary',
 		denied: 'destructive'
 	};
-
-	function titleCase(s: string): string {
-		return s.charAt(0).toUpperCase() + s.slice(1);
-	}
 
 	onMount(loadClaims);
 
@@ -235,7 +231,7 @@
 						<div class="flex items-start justify-between gap-3">
 							<div class="min-w-0 flex-1">
 								<div class="flex flex-wrap items-center gap-2">
-									<span class="text-sm font-medium text-foreground">{titleCase(claim.claimType)}</span>
+									<span class="text-sm font-medium text-foreground">{capitalize(claim.claimType)}</span>
 									<Badge variant={STATUS_VARIANT[claim.status]} class="text-xs">
 										{STATUS_LABELS[claim.status]}
 									</Badge>
@@ -328,10 +324,10 @@
 					<div class="space-y-1">
 						<Label for="claim-type">Type</Label>
 						<Select.Root type="single" value={claimType} onValueChange={v => (claimType = v as ClaimType)}>
-							<Select.Trigger id="claim-type" class="w-full">{titleCase(claimType)}</Select.Trigger>
+							<Select.Trigger id="claim-type" class="w-full">{capitalize(claimType)}</Select.Trigger>
 							<Select.Content>
 								{#each CLAIM_TYPES as t (t)}
-									<Select.Item value={t} label={titleCase(t)}>{titleCase(t)}</Select.Item>
+									<Select.Item value={t} label={capitalize(t)}>{capitalize(t)}</Select.Item>
 								{/each}
 							</Select.Content>
 						</Select.Root>

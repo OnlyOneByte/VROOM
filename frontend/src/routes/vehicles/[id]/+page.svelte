@@ -4,7 +4,7 @@
 	import { routes, paramRoutes } from '$lib/routes';
 	import { parseMonthToDate } from '$lib/utils/chart-formatters';
 	import { onMount, type Component } from 'svelte';
-	import { Plus, FileText, Download } from '@lucide/svelte';
+	import { Plus, FileText, Download, CircleAlert } from '@lucide/svelte';
 	import FloatingActionButton from '$lib/components/common/floating-action-button.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
@@ -69,6 +69,9 @@
 	// Server-provided summary and fuel efficiency data
 	let summary = $state<ExpenseSummary | null>(null);
 	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
+	// A summary load FAILURE must not fall through to the "no expenses yet" empty state —
+	// a returning user would think their data vanished (four-states: error ≠ empty).
+	let summaryLoadError = $state<string | null>(null);
 
 	// Paginated expenses state (for Expenses tab)
 	let expenses = $state<Expense[]>([]);
@@ -77,6 +80,8 @@
 	let totalCount = $state(0);
 	let isLoadingPage = $state(false);
 	let hasLoadedExpensesTab = $state(false);
+	// Same class for the Expenses tab: a fetch failure must show error+retry, not an empty table.
+	let expensesLoadError = $state<string | null>(null);
 	// Server-side sort for the Expenses tab (default date desc).
 	let expenseSortBy = $state<'date' | 'amount'>('date');
 	let expenseSortDir = $state<'asc' | 'desc'>('desc');
@@ -204,6 +209,7 @@
 
 	async function loadSummary() {
 		isLoadingStats = true;
+		summaryLoadError = null;
 		try {
 			summary = await expenseApi.getExpenseSummary({
 				vehicleId,
@@ -211,6 +217,7 @@
 			});
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load expense summary');
+			summaryLoadError = error instanceof Error ? error.message : 'Failed to load expense summary';
 		} finally {
 			isLoadingStats = false;
 		}
@@ -227,6 +234,7 @@
 
 	async function fetchExpensesPage(offset: number) {
 		isLoadingPage = true;
+		expensesLoadError = null;
 		try {
 			const result = await expenseApi.getExpensesByVehicle(vehicleId, {
 				limit: pageSize,
@@ -239,6 +247,7 @@
 			currentOffset = offset;
 		} catch (error) {
 			handleErrorWithNotification(error, 'Failed to load expenses');
+			expensesLoadError = error instanceof Error ? error.message : 'Failed to load expenses';
 		} finally {
 			isLoadingPage = false;
 		}
@@ -398,7 +407,19 @@
 					<InsuranceTab {vehicleId} />
 				{/if}
 
-				{#if !hasExpenseData}
+				{#if summaryLoadError && !isLoadingStats}
+					<!-- Error state takes precedence over the empty state: a summary load
+					     failure must NOT render "No expenses yet" (a returning user would think
+					     their data vanished). Mirrors the dashboard/analytics error+retry idiom. -->
+					<div class="rounded-lg border bg-card p-6">
+						<div class="mb-4 flex items-center gap-3 text-destructive">
+							<CircleAlert class="h-5 w-5" />
+							<p class="font-medium">Failed to load expense summary</p>
+						</div>
+						<p class="mb-4 text-sm text-muted-foreground">{summaryLoadError}</p>
+						<Button onclick={loadSummary}>Retry</Button>
+					</div>
+				{:else if !hasExpenseData}
 					<!-- No Expenses Empty State -->
 					<EmptyState>
 						{#snippet icon()}
@@ -487,39 +508,47 @@
 					<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
 						<CardFull.Title>All Expenses ({totalCount})</CardFull.Title>
 						{#if totalCount > 0}
-							<Button
-								variant="outline"
-								size="sm"
-								onclick={handleExportCsv}
-								disabled={isExporting}
-							>
+							<Button variant="outline" size="sm" onclick={handleExportCsv} disabled={isExporting}>
 								<Download class="mr-2 h-4 w-4" />
 								{isExporting ? 'Exporting…' : 'Export CSV'}
 							</Button>
 						{/if}
 					</CardFull.Header>
 					<CardFull.Content>
-						<ExpensesTable
-							expenses={filteredExpenses}
-							showVehicleColumn={false}
-							returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}
-							onDelete={handleDeleteExpense}
-							emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
-							emptyDescription="Start tracking expenses for this vehicle"
-							emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
-							emptyActionHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
-							scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
-							onClearFilters={clearFilters}
-							{hasActiveFilters}
-							{totalCount}
-							{currentOffset}
-							{pageSize}
-							{isLoadingPage}
-							onPageChange={handlePageChange}
-							activeSortBy={expenseSortBy}
-							activeSortDir={expenseSortDir}
-							onSortChange={handleExpenseSortChange}
-						/>
+						{#if expensesLoadError && !isLoadingPage}
+							<!-- Load failure must show error+retry, not the table's "No expenses" empty
+							     state (which would falsely imply this vehicle has zero expenses). -->
+							<div class="flex flex-col items-center gap-3 py-8 text-center">
+								<CircleAlert class="h-8 w-8 text-destructive" />
+								<p class="font-medium">Failed to load expenses</p>
+								<p class="text-sm text-muted-foreground">{expensesLoadError}</p>
+								<Button variant="outline" onclick={() => fetchExpensesPage(currentOffset)}>
+									Retry
+								</Button>
+							</div>
+						{:else}
+							<ExpensesTable
+								expenses={filteredExpenses}
+								showVehicleColumn={false}
+								returnTo={resolve(paramRoutes.vehicle, { id: vehicleId })}
+								onDelete={handleDeleteExpense}
+								emptyTitle={COMMON_MESSAGES.NO_EXPENSES}
+								emptyDescription="Start tracking expenses for this vehicle"
+								emptyActionLabel={COMMON_MESSAGES.ADD_EXPENSE}
+								emptyActionHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
+								scrollHeight={SCROLL_HEIGHTS.TABLE_DEFAULT}
+								onClearFilters={clearFilters}
+								{hasActiveFilters}
+								{totalCount}
+								{currentOffset}
+								{pageSize}
+								{isLoadingPage}
+								onPageChange={handlePageChange}
+								activeSortBy={expenseSortBy}
+								activeSortDir={expenseSortDir}
+								onSortChange={handleExpenseSortChange}
+							/>
+						{/if}
 					</CardFull.Content>
 				</CardFull.Root>
 			</TabsContent>

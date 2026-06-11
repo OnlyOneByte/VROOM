@@ -1,4 +1,6 @@
 import type {
+	Expense,
+	RecurringCostSummary,
 	Reminder,
 	ReminderNotification,
 	ReminderWithVehicles,
@@ -62,6 +64,24 @@ export const reminderApi = {
 	 */
 	async markServiced(id: string): Promise<Reminder> {
 		return apiClient.post<Reminder>(`/api/v1/reminders/${id}/mark-serviced`);
+	},
+
+	/**
+	 * The expense rows this reminder has materialized (recurring-expenses T6 — the "this reminder
+	 * created N expenses" view). Backend: GET /:id/expenses → expenseRepository.findBySource
+	 * (ownership-checked, user-scoped), ordered oldest-first.
+	 */
+	async getMaterializedExpenses(id: string): Promise<Expense[]> {
+		return apiClient.get<Expense[]>(`/api/v1/reminders/${id}/expenses`);
+	},
+
+	/**
+	 * The monthly recurring run-rate across the user's active expense reminders (recurring-expenses
+	 * T7). Backend: GET /recurring-cost → recurringCostSummary (a read-only derivation, no new table).
+	 * The dashboard "recurring costs" widget renders this.
+	 */
+	async getRecurringCost(): Promise<RecurringCostSummary> {
+		return apiClient.get<RecurringCostSummary>('/api/v1/reminders/recurring-cost');
 	},
 
 	async getNotifications(unreadOnly?: boolean): Promise<ReminderNotification[]> {

@@ -8,10 +8,11 @@ import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../types';
-import { commonSchemas } from '../../utils/validation';
+import { getPeriodStartDate } from '../../utils/calculations';
+import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
-import { financingRepository } from '../financing/repository';
+import { financingRepository, isEligibleForPayoff } from '../financing/repository';
 import { odometerRepository } from '../odometer/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { preferencesRepository } from '../settings/repository';
@@ -92,7 +93,12 @@ const createVehicleSchema = baseVehicleSchema
     unitPreferences: unitPreferencesSchema.optional(),
   });
 
-const updateVehicleSchema = baseVehicleSchema
+// Exported so the C41 `.partial()`+`.default()` no-clobber net can assert against it directly
+// (partial-update-no-default-injection.test.ts) — it's a createInsertSchema(...).partial() over a
+// table with four .default() columns (vehicleType/trackFuel/trackCharging/unitPreferences), the exact
+// shape that class targets. Safe today (drizzle-zod doesn't surface DB defaults as Zod defaults), but
+// the highest-risk uncovered instance, so it belongs under the standing guard.
+export const updateVehicleSchema = baseVehicleSchema
   .omit({
     id: true,
     userId: true,
@@ -145,7 +151,7 @@ routes.get('/', async (c) => {
         financing: {
           ...v.financing,
           computedBalance,
-          eligibleForPayoff: computedBalance <= 0.01,
+          eligibleForPayoff: isEligibleForPayoff(computedBalance),
         },
       };
     }
@@ -221,7 +227,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
       financing: {
         ...vehicle.financing,
         computedBalance,
-        eligibleForPayoff: computedBalance <= 0.01,
+        eligibleForPayoff: isEligibleForPayoff(computedBalance),
       },
     };
   }
@@ -283,10 +289,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const { id } = c.req.valid('param');
 
   // Check if vehicle exists and belongs to user
-  const existingVehicle = await vehicleRepository.findByUserIdAndId(user.id, id);
-  if (!existingVehicle) {
-    throw new NotFoundError('Vehicle');
-  }
+  await validateVehicleOwnership(id, user.id);
 
   // Cascade delete all photos (provider files + DB) BEFORE removing the vehicle.
   // The photos table links to entities by (entity_type, entity_id) strings with
@@ -326,10 +329,7 @@ routes.get(
     const { period } = c.req.valid('query');
 
     // Verify vehicle exists and belongs to user
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, id);
-    if (!vehicle) {
-      throw new NotFoundError('Vehicle');
-    }
+    const vehicle = await validateVehicleOwnership(id, user.id);
 
     // Get all fuel expenses for this vehicle
     const fuelExpenses = await expenseRepository.findAll({
@@ -338,27 +338,8 @@ routes.get(
       category: 'fuel',
     });
 
-    // Filter by time period
-    const now = new Date();
-    let startDate: Date | null = null;
-
-    switch (period) {
-      case '7d':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case '30d':
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      case '90d':
-        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-        break;
-      case '1y':
-        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        startDate = null;
-        break;
-    }
+    // Filter by time period (null for 'all' = no lower bound). Shared one-source-of-truth window.
+    const startDate = getPeriodStartDate(period);
 
     const filteredFuelExpenses = startDate
       ? fuelExpenses.filter((e) => new Date(e.date) >= (startDate as Date))
@@ -377,11 +358,20 @@ routes.get(
       vehicle.trackCharging
     );
 
+    // `stats.currentMileage` is period-filtered + fuel-only (MAX over the filtered fuel
+    // expenses), so it can drop/disappear under a 7d/30d window and never sees manual
+    // odometer entries. `currentOdometer` is the canonical ALL-TIME, ALL-SOURCES reading
+    // (the D2 helper the mileage trigger uses) — period-independent by design, so a
+    // consumer that needs the vehicle's true odometer (lease overage, loan miles-used)
+    // can use it instead of the period-scoped stat. Additive: currentMileage is unchanged.
+    const currentOdometer = await odometerRepository.getCurrentOdometer(id, user.id);
+
     return c.json({
       success: true,
       data: {
         period,
         ...stats,
+        currentOdometer,
       },
     });
   }

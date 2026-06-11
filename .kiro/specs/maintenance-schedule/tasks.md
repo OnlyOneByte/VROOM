@@ -53,8 +53,16 @@
             deferred (needs ratified re-arm semantics). FOLDED IN bug #12 (`fastForwardPastNow` now
             honors endDate). Pinned: `trigger-mileage.test.ts` (5) + `trigger-fastforward-enddate.test.ts`
             (1). tsc 0 · musl-biome · 918 pass · build OK. Engine dormant until T4 wires validation.
-      - [ ] **T3 part 3** the deferred T2 reconcile — decide `vehicle-stats.currentMileage` period
-            semantics and route it (or a new all-time field) through `getCurrentOdometer`.
+      - [x] **T3 part 3 (cycle 52)** the deferred T2 reconcile — chose the ADDITIVE path (new all-time
+            field, not a breaking `currentMileage` semantics change): added `currentOdometer` to GET
+            /vehicles/:id/stats via `getCurrentOdometer(id)` (all-sources MAX, period-INDEPENDENT);
+            `currentMileage` (period-filtered + fuel-only) left untouched → zero behavior change.
+            Pinned by `vehicle-stats-current-odometer.test.ts` (4 HTTP cases: period-independence +
+            cross-source MAX incl. manual entries). Frontend `VehicleStats` type gained the field.
+            FLAGGED TO ANGELO (not in scope here, both deferred): (a) lease/loan miles-used consume the
+            period-scoped `currentMileage` and should switch to `currentOdometer` (a bug — understates
+            overage under a non-'all' window, user-visible $ change); (b) whether the "Current Mileage"
+            stat CARD should stay period-scoped or show the true odometer (display direction call).
 - [~] **T4 Routes + validation** (in progress):
       - [x] **part 1 (cycle 31) — mileage reminders API-creatable.** validation.ts: `triggerMode`/
             `intervalMileage`/`lastServiceOdometer` on reminderBaseSchema + `refineMileageTrigger`

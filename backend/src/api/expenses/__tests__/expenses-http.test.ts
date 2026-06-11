@@ -131,3 +131,69 @@ describe('expenses HTTP search/pagination', () => {
     }
   });
 });
+
+/**
+ * PUT /:id vehicle-reassignment ownership (#61, C189): the CREATE path validates the target vehicle
+ * is the user's (validateVehicleOwnership), but the UPDATE path did NOT — so a PUT could point the
+ * (owned) expense at a vehicleId the user doesn't own, corrupting their analytics attribution. The
+ * create path's own guard is the model; this pins the symmetric update guard. Raw-seed a FOREIGN
+ * user+vehicle that coexists in the shared DB (a second createTestApp would reset it).
+ */
+describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership (#61)', () => {
+  test('reassigning the expense to a FOREIGN vehicle is rejected 404 (ownership guard)', async () => {
+    const vehicleId = await seedVehicle();
+    const expenseId = await createExpense(
+      vehicleId,
+      'misc',
+      12,
+      'reassign me',
+      '2026-03-01T12:00:00.000Z'
+    );
+
+    // A vehicle owned by ANOTHER user, seeded directly so it coexists with ours.
+    ctx.sqlite.run(
+      `INSERT INTO users (id, email, display_name) VALUES ('u-foreign-61', 'f61@test.com', 'Foreign')`
+    );
+    ctx.sqlite.run(
+      `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-foreign-61', 'u-foreign-61', 'Mazda', '3', 2020)`
+    );
+
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${expenseId}`, {
+      vehicleId: 'veh-foreign-61',
+    });
+    expect(res.status).toBe(404); // validateVehicleOwnership → NotFoundError (not-owned ≡ not-found)
+
+    // The expense still points at the ORIGINAL (owned) vehicle — the bad write never landed.
+    const getRes = await ctx.authed('GET', `/api/v1/expenses/${expenseId}`);
+    const body = await json<DataEnvelope<{ vehicleId: string }>>(getRes);
+    expect(body.data.vehicleId).toBe(vehicleId);
+  });
+
+  test('reassigning to the user’s OWN second vehicle still works (200) — guard isn’t over-broad', async () => {
+    const v1 = await seedVehicle();
+    const v2 = await seedVehicle();
+    const expenseId = await createExpense(v1, 'misc', 9, 'move to v2', '2026-03-02T12:00:00.000Z');
+
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${expenseId}`, { vehicleId: v2 });
+    expect(res.status).toBe(200);
+    const body = await json<DataEnvelope<{ vehicleId: string }>>(res);
+    expect(body.data.vehicleId).toBe(v2);
+  });
+
+  test('a PUT that does NOT touch vehicleId still updates normally (no regression)', async () => {
+    const vehicleId = await seedVehicle();
+    const expenseId = await createExpense(
+      vehicleId,
+      'misc',
+      5,
+      'before',
+      '2026-03-03T12:00:00.000Z'
+    );
+
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${expenseId}`, { description: 'after' });
+    expect(res.status).toBe(200);
+    const body = await json<DataEnvelope<{ description: string; vehicleId: string }>>(res);
+    expect(body.data.description).toBe('after');
+    expect(body.data.vehicleId).toBe(vehicleId);
+  });
+});

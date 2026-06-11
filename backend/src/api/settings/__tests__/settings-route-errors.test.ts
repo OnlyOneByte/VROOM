@@ -44,17 +44,17 @@ describe('settings route error behavior (characterization — pins today before 
   });
 
   test('PUT /settings with an out-of-range syncInactivityMinutes → 400 (ZodError path)', async () => {
-    // maxSyncInactivityMinutes is 30 (config); 9999 fails the schema → ZodError. TODAY the handler
-    // catches it and rethrows AppError('Invalid settings data', 400).
+    // maxSyncInactivityMinutes is 30 (config); 9999 fails the schema → ZodError.
     const res = await ctx.authed('PUT', '/api/v1/settings', { syncInactivityMinutes: 9999 });
     expect(res.status).toBe(400);
     const body = (await json<ErrorBody>(res)) as ErrorBody;
     expect(body.success).toBe(false);
-    // ⚠️ part 2c-drop WILL CHANGE the code/message: with the try/catch gone, the ZodError reaches the
-    // central errorHandler → 400 ValidationError ('Invalid request data'). Status stays 400; the
-    // envelope code/message change. Update this assertion in the same commit that drops the catch.
-    expect(body.error.message, "TODAY: handler's transformed message").toBe(
-      'Invalid settings data'
+    // POST-DROP (C50): the hand-rolled try/catch is gone, so the ZodError reaches the central
+    // errorHandler → 400 ValidationError ('Invalid request data'), the standard envelope. Status is
+    // unchanged (still 400); only the transformed 'Invalid settings data' message went away. This is
+    // the authorized, reviewed behavior change the C43 characterization flagged.
+    expect(body.error.message, 'post-drop: central errorHandler ZodError message').toBe(
+      'Invalid request data'
     );
   });
 

@@ -2,6 +2,8 @@ import type {
 	Expense,
 	ExpenseCategory,
 	ExpenseSummary,
+	ImportColumnMapping,
+	ImportMappingPreset,
 	PaginatedResponse,
 	Photo,
 	SplitConfig,
@@ -33,6 +35,10 @@ export interface ExpenseImportResult {
 	errorCount: number;
 	totalRows: number;
 	rows: ExpenseImportRow[];
+	/** Foreign-tracker import only: rows skipped as already-present on a commit (idempotent re-import). */
+	duplicates?: number;
+	/** Foreign-tracker import only: distinct foreign category words that fell through to `misc` (D2). */
+	unmappedCategories?: string[];
 }
 
 /** Parameters accepted by paginated expense list methods. */
@@ -163,13 +169,36 @@ export const expenseApi = {
 	},
 
 	/**
-	 * Import expenses from a "VROOM CSV" (the round-trip target of the export). Sends
-	 * the CSV TEXT; the server validates every row and resolves each vehicle by NAME
-	 * within the user's own fleet. With `dryRun: true` the server validates + reports
-	 * only (preview) and writes nothing; `dryRun: false` commits the valid rows.
+	 * Import expenses from a CSV. Sends the CSV TEXT; the server validates every row and resolves
+	 * each vehicle by NAME within the user's own fleet. With `dryRun: true` the server validates +
+	 * reports only (preview) and writes nothing; `dryRun: false` commits the valid rows.
+	 *
+	 * For a foreign-tracker file (import-trackers T4/T5), pass `mapping` — the server translates the
+	 * file to native shape (rename + unit-convert + category-map + date-parse) FIRST, then runs the
+	 * exact same validate/commit flow, so the result adds `unmappedCategories` (and `duplicates` on a
+	 * commit). Omit `mapping` for a native "VROOM CSV" (the round-trip target of the export) — the
+	 * request is then byte-identical to before (backward-compatible).
 	 */
-	async importExpensesCsv(csv: string, dryRun = false): Promise<ExpenseImportResult> {
-		return apiClient.post<ExpenseImportResult>('/api/v1/expenses/import', { csv, dryRun });
+	async importExpensesCsv(
+		csv: string,
+		dryRun = false,
+		mapping?: ImportColumnMapping
+	): Promise<ExpenseImportResult> {
+		return apiClient.post<ExpenseImportResult>('/api/v1/expenses/import', {
+			csv,
+			dryRun,
+			// Only include mapping when provided so the native path's request is unchanged.
+			...(mapping ? { mapping } : {})
+		});
+	},
+
+	/**
+	 * Identify a known tracker (Fuelly/Fuelio/Drivvo) from the uploaded file's HEADER names, so the
+	 * mapping dialog can pre-fill (import-trackers T4). Sends only the header strings (never the data).
+	 * Returns the matched preset (its label + default mapping) or null → the user maps manually.
+	 */
+	async detectImportSource(headers: string[]): Promise<ImportMappingPreset | null> {
+		return apiClient.post<ImportMappingPreset | null>('/api/v1/expenses/import/detect', { headers });
 	},
 
 	async getExpenseSummary(params?: ExpenseSummaryParams): Promise<ExpenseSummary> {

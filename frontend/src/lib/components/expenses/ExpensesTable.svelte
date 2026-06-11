@@ -17,7 +17,13 @@
 	import { expenseApi } from '$lib/services/expense-api';
 	import type { Expense, Vehicle, ExpenseCategory } from '$lib/types';
 	import { formatCurrency, formatDate } from '$lib/utils/formatters';
-	import { categoryLabels, getCategoryIcon, getCategoryColor } from '$lib/utils/expense-helpers';
+	import {
+		categoryLabels,
+		getCategoryIcon,
+		getCategoryColor,
+		compareExpenseRows,
+		type SortableRow
+	} from '$lib/utils/expense-helpers';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
@@ -191,20 +197,9 @@
 
 		if (controlled) return filtered;
 
-		filtered.sort((a, b) => {
-			let comparison = 0;
-
-			switch (sortBy) {
-				case 'date':
-					comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
-					break;
-				case 'amount':
-					comparison = a.amount - b.amount;
-					break;
-			}
-
-			return sortOrder === 'asc' ? comparison : -comparison;
-		});
+		// Sort via the shared comparator, which carries a stable id tiebreaker in the
+		// server's direction (bug #4) so equal date/amount rows don't reshuffle.
+		filtered.sort((a, b) => compareExpenseRows(a, b, sortBy, sortOrder));
 
 		return filtered;
 	});
@@ -261,22 +256,24 @@
 
 		// Re-order the combined rows by the ACTIVE sort field (not always date — the
 		// old hardcoded date sort here is what made the Amount header a no-op). Group
-		// rows use their representative value: total amount, or the group's date. This
-		// runs in both modes so a collapsed split group sits in the right place among
-		// standalone rows; in controlled mode it re-imposes the server's chosen order
-		// onto the grouped view (consistent, since both use the same field+direction).
+		// rows use their representative value: total amount, or the group's date, and
+		// the first child's id as their stable key. This runs in both modes so a
+		// collapsed split group sits in the right place among standalone rows; in
+		// controlled mode it re-imposes the server's chosen order onto the grouped view
+		// (consistent, since both use the same field+direction). Via compareExpenseRows
+		// so equal date/amount rows break ties by id in the server's direction (bug #4)
+		// — grouping concatenates standalone-then-group, which would otherwise reshuffle
+		// same-key rows out of the server's order.
 		rows.sort((a, b) => {
-			let comparison: number;
-			if (sortBy === 'amount') {
-				const amtA = a.type === 'standalone' ? a.expense.amount : a.totalAmount;
-				const amtB = b.type === 'standalone' ? b.expense.amount : b.totalAmount;
-				comparison = amtA - amtB;
-			} else {
-				const dateA = a.type === 'standalone' ? a.expense.date : a.date;
-				const dateB = b.type === 'standalone' ? b.expense.date : b.date;
-				comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
-			}
-			return sortOrder === 'asc' ? comparison : -comparison;
+			const rowA: SortableRow =
+				a.type === 'standalone'
+					? a.expense
+					: { id: a.children[0]?.id ?? a.groupId, date: a.date, amount: a.totalAmount };
+			const rowB: SortableRow =
+				b.type === 'standalone'
+					? b.expense
+					: { id: b.children[0]?.id ?? b.groupId, date: b.date, amount: b.totalAmount };
+			return compareExpenseRows(rowA, rowB, sortBy, sortOrder);
 		});
 
 		return rows;
@@ -654,7 +651,12 @@
 {:else}
 	<!-- Desktop: full table -->
 	<div class="rounded-md border bg-card overflow-hidden">
-		<ScrollArea class="h-[{scrollHeight}] w-full">
+		<!-- height MUST be an inline style, not `h-[{scrollHeight}]`: Tailwind only generates
+		     arbitrary-value classes it can see as STATIC literals at build time, so a runtime-
+		     interpolated `h-[600px]` produces no CSS rule (confirmed C14 via DOM probe) — the cap
+		     + internal scroll never engage and a many-row vehicle grows unbounded. Inline style is
+		     the ChartCard idiom for a dynamic height. -->
+		<ScrollArea class="w-full" style="height: {scrollHeight}">
 			<Table>
 				<TableHeader>
 					<TableRow>

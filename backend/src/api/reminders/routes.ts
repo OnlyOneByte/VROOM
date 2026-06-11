@@ -2,13 +2,17 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { CONFIG } from '../../config';
 import type { NewReminder } from '../../db/schema';
-import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
-import { commonSchemas } from '../../utils/validation';
+import {
+  commonSchemas,
+  validateReminderOwnership,
+  validateVehicleIdsOwned,
+} from '../../utils/validation';
+import { expenseRepository } from '../expenses/repository';
 import { odometerRepository } from '../odometer/repository';
-import { vehicleRepository } from '../vehicles/repository';
+import { recurringCostSummary } from './reminder-cost';
 import { reminderRepository } from './repository';
-import { computeNextDueDate, reminderTriggerService } from './trigger-service';
+import { advanceReminderDueDate, reminderTriggerService } from './trigger-service';
 import { createReminderSchema, updateReminderSchema } from './validation';
 
 const routes = new Hono();
@@ -26,7 +30,8 @@ async function resolveMileageFields(
     intervalMileage?: number | null;
     lastServiceOdometer?: number | null;
   },
-  vehicleIds: string[]
+  vehicleIds: string[],
+  userId: string
 ): Promise<{
   intervalMileage: number | null;
   lastServiceOdometer: number | null;
@@ -37,7 +42,9 @@ async function resolveMileageFields(
   }
   const intervalMileage = data.intervalMileage ?? 0;
   const lastServiceOdometer =
-    data.lastServiceOdometer ?? (await odometerRepository.getCurrentOdometer(vehicleIds[0])) ?? 0;
+    data.lastServiceOdometer ??
+    (await odometerRepository.getCurrentOdometer(vehicleIds[0], userId)) ??
+    0;
   return {
     intervalMileage,
     lastServiceOdometer,
@@ -62,6 +69,16 @@ routes.post('/trigger', triggerRateLimiter, async (c) => {
   return c.json({ success: true, data: result });
 });
 
+// GET /recurring-cost — the monthly recurring run-rate across the user's active expense reminders
+// (recurring-expenses T7 backend, R5/D4). A read-only derivation over existing rows (NO new table):
+// the dashboard "recurring costs" widget (T7 eyes-on) fetches this. Static suffix → before /:id.
+routes.get('/recurring-cost', async (c) => {
+  const user = c.get('user');
+  const expenseReminders = await reminderRepository.findByUserId(user.id, { type: 'expense' });
+  const summary = recurringCostSummary(expenseReminders.map((r) => r.reminder));
+  return c.json({ success: true, data: summary });
+});
+
 // POST /:id/mark-serviced — re-arm a reminder after a service (D3). A static suffix segment, so it
 // doesn't collide with GET/PUT /:id. Rate-limited like /trigger (it reads the odometer + writes).
 routes.post(
@@ -72,21 +89,19 @@ routes.post(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const existing = await reminderRepository.findByIdAndUserId(id, user.id);
-    if (!existing) {
-      throw new NotFoundError('Reminder');
-    }
-    const { reminder, vehicleIds } = existing;
+    const { reminder, vehicleIds } = await validateReminderOwnership(id, user.id);
 
     // Compute the re-arm per axis (D3). The route owns the math (it has the odometer repo +
-    // computeNextDueDate) to keep the repository free of a trigger-service import cycle.
+    // advanceReminderDueDate) to keep the repository free of a trigger-service import cycle.
     const fields: { lastServiceOdometer?: number; nextDueOdometer?: number; nextDueDate?: Date } =
       {};
 
     // Mileage axis: anchor to the CURRENT odometer, recompute the milestone cache.
     if (reminder.triggerMode === 'mileage' || reminder.triggerMode === 'both') {
       const vehicleId = vehicleIds[0];
-      const current = vehicleId ? await odometerRepository.getCurrentOdometer(vehicleId) : null;
+      const current = vehicleId
+        ? await odometerRepository.getCurrentOdometer(vehicleId, user.id)
+        : null;
       const lastServiceOdometer = current ?? reminder.lastServiceOdometer ?? 0;
       fields.lastServiceOdometer = lastServiceOdometer;
       fields.nextDueOdometer = lastServiceOdometer + (reminder.intervalMileage ?? 0);
@@ -97,13 +112,7 @@ routes.post(
       (reminder.triggerMode === 'time' || reminder.triggerMode === 'both') &&
       reminder.nextDueDate
     ) {
-      fields.nextDueDate = computeNextDueDate(
-        reminder.nextDueDate,
-        reminder.frequency,
-        reminder.intervalValue,
-        reminder.intervalUnit,
-        reminder.startDate.getDate()
-      );
+      fields.nextDueDate = advanceReminderDueDate(reminder, reminder.nextDueDate);
     }
 
     const updated = await reminderRepository.markServiced(id, user.id, fields);
@@ -133,15 +142,10 @@ routes.post('/', zValidator('json', createReminderSchema), async (c) => {
   const data = c.req.valid('json');
 
   // Verify vehicle ownership — all vehicleIds must belong to the user
-  const userVehicles = await vehicleRepository.findByUserId(user.id);
-  const ownedVehicleIds = new Set(userVehicles.map((v) => v.id));
-  const invalidIds = data.vehicleIds.filter((id: string) => !ownedVehicleIds.has(id));
-  if (invalidIds.length > 0) {
-    throw new ValidationError(`Vehicles not found or not owned: ${invalidIds.join(', ')}`);
-  }
+  await validateVehicleIdsOwned(data.vehicleIds, user.id);
 
   const { vehicleIds, ...reminderData } = data;
-  const mileage = await resolveMileageFields(reminderData, vehicleIds);
+  const mileage = await resolveMileageFields(reminderData, vehicleIds, user.id);
   const result = await reminderRepository.createWithVehicles(
     {
       ...reminderData,
@@ -178,12 +182,21 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const result = await reminderRepository.findByIdAndUserId(id, user.id);
-  if (!result) {
-    throw new NotFoundError('Reminder');
-  }
+  const result = await validateReminderOwnership(id, user.id);
 
   return c.json({ success: true, data: result });
+});
+
+// GET /:id/expenses — the expense rows this reminder has materialized (recurring-expenses T6 backend:
+// the "this reminder created N expenses" view). Ownership-checked, then read by source link.
+routes.get('/:id/expenses', zValidator('param', commonSchemas.idParam), async (c) => {
+  const user = c.get('user');
+  const { id } = c.req.valid('param');
+
+  await validateReminderOwnership(id, user.id);
+
+  const materialized = await expenseRepository.findBySource('reminder', id, user.id);
+  return c.json({ success: true, data: materialized });
 });
 
 // PUT /:id — update reminder
@@ -197,21 +210,11 @@ routes.put(
     const partialUpdate = c.req.valid('json');
 
     // Fetch existing reminder (scoped to user)
-    const existing = await reminderRepository.findByIdAndUserId(id, user.id);
-    if (!existing) {
-      throw new NotFoundError('Reminder');
-    }
+    const existing = await validateReminderOwnership(id, user.id);
 
     // If vehicleIds are being updated, verify ownership
     if (partialUpdate.vehicleIds) {
-      const userVehicles = await vehicleRepository.findByUserId(user.id);
-      const ownedVehicleIds = new Set(userVehicles.map((v) => v.id));
-      const invalidIds = partialUpdate.vehicleIds.filter(
-        (vid: string) => !ownedVehicleIds.has(vid)
-      );
-      if (invalidIds.length > 0) {
-        throw new ValidationError(`Vehicles not found or not owned: ${invalidIds.join(', ')}`);
-      }
+      await validateVehicleIdsOwned(partialUpdate.vehicleIds, user.id);
     }
 
     // Merge partial update with existing to re-validate the full object
@@ -236,7 +239,7 @@ routes.put(
       reminderFields.intervalMileage !== undefined ||
       reminderFields.lastServiceOdometer !== undefined;
     if (touchesMileage) {
-      const mileage = await resolveMileageFields(merged, merged.vehicleIds);
+      const mileage = await resolveMileageFields(merged, merged.vehicleIds, user.id);
       updateFields.intervalMileage = mileage.intervalMileage;
       updateFields.lastServiceOdometer = mileage.lastServiceOdometer;
       updateFields.nextDueOdometer = mileage.nextDueOdometer;
@@ -264,9 +267,18 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const existing = await reminderRepository.findByIdAndUserId(id, user.id);
-  if (!existing) {
-    throw new NotFoundError('Reminder');
+  await validateReminderOwnership(id, user.id);
+
+  // T3/D2 (recurring-expenses): a 'expense'-type reminder auto-materializes real expense rows
+  // (sourceType:'reminder', sourceId:reminder.id). Those are HISTORY — deleting the reminder must
+  // NOT delete them (NORTH_STAR #1, no silent loss). Sever the link (keep the rows) via clearSource,
+  // mirroring the C85 onFinancingDeactivated idiom. Best-effort: a clearSource hiccup must not block
+  // the delete the user asked for (the rows simply keep a now-dangling sourceId, harmless). Scoped to
+  // the user. No-op for non-expense reminders (they materialize nothing, so 0 rows match).
+  try {
+    await expenseRepository.clearSource('reminder', id, user.id);
+  } catch {
+    // swallow — the reminder delete below is the user's actual intent
   }
 
   await reminderRepository.delete(id);

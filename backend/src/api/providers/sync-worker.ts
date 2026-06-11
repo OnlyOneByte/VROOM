@@ -13,6 +13,7 @@
 
 import { CONFIG } from '../../config';
 import type { PhotoRef } from '../../db/schema';
+import { extractErrorMessage } from '../../utils/error-handling';
 import { logger } from '../../utils/logger';
 import { photoRefRepository } from '../photos/photo-ref-repository';
 import { photoRepository } from '../photos/photo-repository';
@@ -258,7 +259,7 @@ async function processSingleRef(
     });
   } catch (error) {
     // On failure: increment retry_count, set errorMessage, update syncedAt for backoff tracking
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = extractErrorMessage(error);
 
     await deps.photoRefRepository.updateStatus(ref.id, {
       status: 'failed',

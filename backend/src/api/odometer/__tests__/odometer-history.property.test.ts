@@ -124,7 +124,7 @@ describe('Property 8: Odometer UNION query completeness and source labeling', ()
           const expectedTotal = expenseMileages.length + manualEntries.length;
 
           // Fetch full history (large limit to get all)
-          const result = await repo.getHistory(VEHICLE_ID, { limit: 100, offset: 0 });
+          const result = await repo.getHistory(VEHICLE_ID, USER_ID, { limit: 100, offset: 0 });
 
           // Total count matches
           expect(result.totalCount).toBe(expectedTotal);
@@ -168,17 +168,17 @@ describe('Property 8: Odometer UNION query completeness and source labeling', ()
     }
 
     // Page 1: limit 2, offset 0
-    const page1 = await repo.getHistory(VEHICLE_ID, { limit: 2, offset: 0 });
+    const page1 = await repo.getHistory(VEHICLE_ID, USER_ID, { limit: 2, offset: 0 });
     expect(page1.totalCount).toBe(5);
     expect(page1.data.length).toBe(2);
 
     // Page 2: limit 2, offset 2
-    const page2 = await repo.getHistory(VEHICLE_ID, { limit: 2, offset: 2 });
+    const page2 = await repo.getHistory(VEHICLE_ID, USER_ID, { limit: 2, offset: 2 });
     expect(page2.totalCount).toBe(5);
     expect(page2.data.length).toBe(2);
 
     // Page 3: limit 2, offset 4
-    const page3 = await repo.getHistory(VEHICLE_ID, { limit: 2, offset: 4 });
+    const page3 = await repo.getHistory(VEHICLE_ID, USER_ID, { limit: 2, offset: 4 });
     expect(page3.totalCount).toBe(5);
     expect(page3.data.length).toBe(1);
 
@@ -188,7 +188,7 @@ describe('Property 8: Odometer UNION query completeness and source labeling', ()
   });
 
   test('empty history returns zero count and empty array', async () => {
-    const result = await repo.getHistory(VEHICLE_ID);
+    const result = await repo.getHistory(VEHICLE_ID, USER_ID);
     expect(result.totalCount).toBe(0);
     expect(result.data.length).toBe(0);
   });

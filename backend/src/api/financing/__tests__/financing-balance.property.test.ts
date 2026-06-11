@@ -13,7 +13,7 @@ import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
-import { FinancingRepository } from '../repository';
+import { FinancingRepository, isEligibleForPayoff, PAYOFF_BALANCE_THRESHOLD } from '../repository';
 
 let sqliteDb: Database;
 let db: AppDatabase;
@@ -189,12 +189,14 @@ describe('Property 6: Financing payoff eligibility flag', () => {
           }
 
           const computedBalance = await repo.computeBalance(financingId);
-          const eligibleForPayoff = computedBalance <= 0.01;
+          // C182: call the REAL exported rule (was a local `<= 0.01` copy — the C181 theater
+          // pattern). isEligibleForPayoff is now the one source of truth the 3 route sites use.
+          const eligibleForPayoff = isEligibleForPayoff(computedBalance);
 
           const totalPayments = payments.reduce((sum, p) => sum + p, 0);
           const expectedBalance = Math.max(0, originalAmount - totalPayments);
 
-          if (expectedBalance <= 0.01) {
+          if (expectedBalance <= PAYOFF_BALANCE_THRESHOLD) {
             expect(eligibleForPayoff).toBe(true);
           } else {
             expect(eligibleForPayoff).toBe(false);
@@ -214,7 +216,7 @@ describe('Property 6: Financing payoff eligibility flag', () => {
 
     const balance = await repo.computeBalance(financingId);
     expect(balance).toBe(0);
-    expect(balance <= 0.01).toBe(true);
+    expect(isEligibleForPayoff(balance)).toBe(true);
   });
 
   test('financing with remaining balance is not eligible', async () => {
@@ -222,8 +224,17 @@ describe('Property 6: Financing payoff eligibility flag', () => {
     createFinancingPayment(100, financingId);
 
     const balance = await repo.computeBalance(financingId);
-    expect(balance).toBeGreaterThan(0.01);
-    expect(balance <= 0.01).toBe(false);
+    expect(balance).toBeGreaterThan(PAYOFF_BALANCE_THRESHOLD);
+    expect(isEligibleForPayoff(balance)).toBe(false);
+  });
+
+  // C182: pin the extracted predicate's BOUNDARY directly (the 3 route sites + the property
+  // test above all route through it now). Exactly-at-threshold is eligible; a cent above is not.
+  test('isEligibleForPayoff boundary: exactly the threshold is eligible, just above is not', () => {
+    expect(isEligibleForPayoff(PAYOFF_BALANCE_THRESHOLD)).toBe(true); // 0.01 → paid off
+    expect(isEligibleForPayoff(0)).toBe(true);
+    expect(isEligibleForPayoff(PAYOFF_BALANCE_THRESHOLD + 0.0001)).toBe(false); // 0.0101 → still owed
+    expect(isEligibleForPayoff(100)).toBe(false);
   });
 });
 
