@@ -358,6 +358,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > sheetsSyncEnabled; Sheets-only-no-ZIP; ZIP+Sheets-needs-ZIP]. execute()'s body stays getDb-singleton-bound [the deep-review #3 DI
 > limit] → honestly documented, not falsely claimed. **WATCH FOR THIS PATTERN: a green test that re-implements logic locally is NOT
 > coverage** — grep a 0%-covered module's test for local copies of its functions.)
+> `vehicles/photo-routes.ts` 0%→covered (provider-free slice) (C228 — the vehicle-photo sub-router's LIST (GET /) + SET-COVER
+> (PUT /:photoId/cover) handlers were 0%-covered; upload+thumbnail need a real storage provider [property-test territory], so +6 HTTP tests via
+> createTestApp with RAW-seeded photo rows [C215/C220 pattern]: list ownership-gate/pagination/401, set-cover single-cover invariant + the
+> entityType/entityId match-check [foreign photoId via my vehicle URL → 404] + foreign-vehicle 404. The C227 dedup confirmed the parent router
+> supplies requireAuth+changeTracker; this pins the sub-router's own handlers.)
 > NEXT high-value low spots
 > **(C152 re-measure — be 82.02% line / fe 70.09% line; FE STILL the bigger gap but closing — broke 70%):**
 > backend — ~~`body-limit.ts`~~ DONE C156; ~~`backup-orchestrator.ts` 0%~~ now 50% func C181 (execute() body still DI-blocked);

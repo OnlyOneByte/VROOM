@@ -3981,3 +3981,18 @@ Current cycle: **227**
   that wiring reverted. (Process: gate first red on the test's long-line FORMAT → check:musl:fix reflowed it; pre-existing noNonNullAssertion are
   warnings, untouched.) green→green: backend validate:local EXIT 0 — 1310 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean, build bundled.
   cov: be 84.25%+ (carry; +1 BE) / fe 80.33% (carry). #77 (vehicle-photo serve missing nosniff) CLOSED as a side effect.
+- **C228 (guard): cover the vehicle-photo sub-router's provider-free HTTP paths (list + set-cover) — the 0%-covered `vehicles/photo-routes.ts`** —
+  BALANCE: `feature` most-starved (cyc 170, starved-for 58, blocked 53rd) but blocked → fell through; nothing else strictly OVER budget →
+  highest-leverage; `guard` was the most-starved actionable (cyc 223, starved-for 5 = 5 → 6 at this cycle, due — the C227 forecast). RESUME NOTE:
+  this cycle's test file was authored in a prior session that was cut before validate/commit/ledger (HEAD was still C227, the file untracked) —
+  resumed by verifying + landing it. STEERED to the file's CLEAN slice (the C163/C223 mock-trap lesson): the C227 dedup confirmed
+  vehicles/photo-routes.ts inherits requireAuth + changeTracker from the parent vehicles router, but its own LIST (GET /) + SET-COVER
+  (PUT /:photoId/cover) handlers were 0%-covered (upload + thumbnail need a real storage provider — not in-harness-testable, modeled by the
+  property tests). +6 HTTP tests via createTestApp over the FULL route stack with RAW-seeded photo rows (the C215/C220 provider-free pattern):
+  LIST is ownership-gated (foreign vehicle → 404, no cross-tenant leak) + paginated + 401-on-anon; SET-COVER flips the target + clears the prior
+  cover (the single-cover invariant, asserted on the raw is_cover flags) + enforces the entityType/entityId match (another entity's photoId via
+  my vehicle URL → 404, foreign flag untouched) + foreign-vehicle → 404. VERIFY-FIRSTHAND: ran in isolation FIRST — 6 green, 16 expect()s; the
+  ownership + single-cover mechanics confirmed against the real handlers. (Process: gate first red on the test's long-line FORMAT →
+  check:musl:fix reflowed 1 file; the 10 pre-existing noNonNullAssertion stay warnings, untouched — the recurring C220/C221/C227 note.)
+  green→green: backend validate:local EXIT 0 — 1316 pass / 1 skip / 0 fail (+6), tsc 0, musl-biome clean, build bundled. cov: be 84.25%+
+  (carry; +6 BE) / fe 80.33% (carry).
