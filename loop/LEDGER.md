@@ -4126,3 +4126,18 @@ Current cycle: **227**
   backend validate:local EXIT 0 — 1328 pass / 1 skip / 0 fail (+6), tsc 0, musl-biome clean (3 import-order autofixed), build bundled. cov: be
   84.25%+ (carry; +6 BE) / fe 80.33% (carry). This is a real reliability fix (an analytics crash for the most-engaged users), surfaced by a
   deep-review and fixed in-cycle since the whole class was a mechanical, behavior-preserving swap.
+- **C236 (infra): #5 branch-hygiene sweep + coverage re-measure (last measured C224, last #5 sweep C224 — ~12 cycles / overdue)** — BALANCE: TWO
+  at budget — `infra` (cyc 230, starved-for 6 = 6) + `bug` (cyc 233, starved-for 3 = 3); `infra` waited LONGER (touched C230 vs C233) → infra
+  wins. The coverage-re-measure increment was TOOL-BLOCKED last cycle (C235, `bun test --coverage` refused) — retried this cycle and it RAN. (1)
+  STRAY-TEST CHECK CLEAN: zero untracked non-e2e `.test.ts` in the tree. (2) GREEN BASELINE + RE-MEASURE: backend `bun test --coverage` EXIT 0
+  (1328 pass / 1 skip) — **be 85.18% line / 84.74% func** (up from C224's 84.25/84.60 — the C229 setCoverPhoto + C233 vehicles + C235 maxOf/minOf
+  BE additions); frontend `vitest --coverage` EXIT 0 (592 pass) — **fe 80.64% line / 80.51% func / 74.97% branch** (up from C224's 80.33 — the C231
+  characterization + C234 category-maps FE additions). BE↔FE gap ~4.5pts (85 vs 81). (3) LOWEST substantive spots (for steering future guard/bug
+  cycles, all KNOWN-hard): `auth/routes.ts` 18% (OAuth flow — needs a real provider, the mock-trap), `photo-service.ts` 30% func + `google-photos-
+  service.ts` 25% func + `backup-orchestrator.ts` 29% func (all storage-provider/DI-bound — the documented deep-review #3 + C181 gaps),
+  `settings/routes.ts` 56%, `providers/routes.ts` 58%, `sync/routes.ts` 59% + `analytics/routes.ts` 59% (HTTP-harness-reachable but largely
+  worked — partial). The clean pure/util layer is ~fully covered both sides (calculations 98.9%, the C235 maxOf/minOf now pinned). NO clean
+  high-value low spot remains that isn't provider/DI/OAuth-bound — confirms the "guard cycles thin both sides" note; next guard should expect a
+  characterization-of-a-known-hard-seam or an eyes-on-acknowledged punt. DOCS/MEASUREMENT-ONLY (no source touched) → no build gate beyond the two
+  coverage runs that WERE the verification. Next #5 sweep ~C246; next CLAUDE.md refresh ~C240. cov: be 85.18% line / 84.74% func / fe 80.64% line /
+  80.51% func / 74.97% branch (FRESH C236 reading).

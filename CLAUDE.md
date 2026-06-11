@@ -156,9 +156,9 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C224, not an estimate): **backend 84.25% line / 84.60% func · frontend 80.33% line / 79.87%
-  func / 74.45% branch** (frontend CROSSED 80% line at C224) — backend ~84% (the C178–C222 BE bug-fix + route-coverage arc);
-  frontend climbed 65.3→80.3 since C138 under a sustained
+  (re-measured C236, not an estimate): **backend 85.18% line / 84.74% func · frontend 80.64% line / 80.51%
+  func / 74.97% branch** (both suites > 80% line) — backend ~85% (the C178–C235 BE bug-fix + route-coverage arc, incl. C229 setCoverPhoto / C233 vehicles / C235 maxOf-minOf);
+  frontend climbed 65.3→80.6 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
   C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts, C201
   expense-form-validation, C207 payoff-date clamp, C212 analytics-api, C217 auth.ts, C223 sync-manager conflict-classification).
@@ -174,7 +174,7 @@ Highlights:
   (see C163) — defer until a DI seam exists. **The clean BE route/util low spots are now largely worked through —
   next guard cycles are thin both sides; prefer a fresh deep-review-surfaced fix.**
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1320 backend tests / ~585 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1328 backend tests / ~592 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
