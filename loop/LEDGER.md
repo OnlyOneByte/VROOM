@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 197 |
+| deep-review | 5 | 199 |
 | guard | 6 | 195 |
 | bug | 3 | 198 |
 | arch | 5 | 194 |
 | infra | 6 | 196 |
 
-Current cycle: **198**
+Current cycle: **199**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3534,3 +3534,18 @@ Current cycle: **198**
   first draft over-drove the fixture → caught + corrected the projection arithmetic). green→green: FE validate:local **EXIT 0 — 516
   pass (+6)**, tsc 0, build OK; + CI-only eslint + prettier clean on both touched files. #64 CLOSED. cov: fe 73.89%+ (carry; +6 FE) /
   be 84.08% (carry).
+- **C199 (deep-review): audit the FE financing DATE-math vein (continuing the C198 #64 thread) — CERTIFIED CLEAN; 1 guard-pickup filed**
+  — BALANCE: TWO past budget — `feature` (cyc 170, starved-for 29, blocked 24th) + `deep-review` (cyc 197, starved-for 6 > 5). Feature
+  blocked → `deep-review` forced (most-starved past, 6 > arch's at-budget 5). Inline (6/3 spawn cap). Continued the PROVEN-fruitful FE
+  money vein (C198 #64 was here): the date-math functions in financing-calculations.ts (the #39/#53/C103 TZ/off-by-one class). **CERTIFIED
+  CLEAN (firsthand):** (1) `calculateNextPaymentDate` (:158) — bounded iteration (maxIterations 1000 → no infinite loop), guarded base
+  date, advances by frequency; the monthly setMonth(+1) day-rollover is cosmetic (next-payment display, not displayed-$). (2)
+  `calculateDaysUntil` (:465) — getTime() deltas → TZ-independent; ceil is right for "days until." (3) `derivePaymentEntries` (:502) —
+  remainingBalance = max(0, original − Σpayments) consistent with the C101-certified backend computeBalance; principal/interest from
+  the schedule by index; no div/date hazard. (4) `calculateMinimumPayment` (:475) — standard amortization formula, div-guarded
+  (apr>0, term>0, original>0 all checked). (5) `calculatePayoffDateFromStart` (:545) — the month-overflow clamp VERIFIED correct
+  firsthand: Jan-31 + 1mo → new Date(y,1,31) rolls to Mar 3, the guard `payoff.getDate() !== start.getDate()` fires (only on genuine
+  overflow — a non-overflow preserves the day exactly), `setDate(0)` → Feb 28; handles month>12 via Date normalization. **GUARD-PICKUP
+  FILED: `calculatePayoffDateFromStart` is correct but UNPINNED** (no test — the C196 :540-547 uncovered range; the C54/C77
+  traced-clean-but-uncovered class) — a subtle date clamp a refactor could silently break → primed for the next FE guard cycle.
+  NO code change (clean cert; deep-review = find-not-fix). cov: fe 73.89% / be 84.08% (carry, read-only audit).

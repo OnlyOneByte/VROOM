@@ -364,7 +364,9 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > `restore.ts:160-246` (restoreFromSheets) is uncovered but needs a process-global Sheets-service mock — NO sync test uses mock.module
 > (the C38/C91 cross-suite-flake trap), so it's NOT a clean guard pick; defer until a DI seam exists or accept the gap. **The clean BE
 > route/util low spots are now largely worked through (analytics/sync routes C185/C188, backup-orchestrator C181, activity-tracker pure
-> slice C195) — next guard cycles steer FRONTEND. **FE low spots (FRESH C196 measure): a ~15% form-validation module
+> slice C195) — next guard cycles steer FRONTEND. **PRIMED FE guard pick (C199 deep-review): `calculatePayoffDateFromStart`
+> (financing-calculations.ts:545) — VERIFIED correct firsthand but has NO test (the C196 :540-547 uncovered range); a subtle
+> month-overflow clamp (Jan-31 + 1mo → Feb-28 via setDate(0)) a refactor could silently break → pin it. FE low spots (FRESH C196 measure): a ~15% form-validation module
 > (`vehicle-form-validation.ts` or `expense-form-validation.ts` — pure logic, the CLEANEST next FE guard pick; confirm which when
 > picked, the C103/C125 cycles covered only parts), `analytics-api.ts` ~36% func, `sync-manager.ts` ~56% (timer/network-bound — less
 > clean), `auth.ts` ~56%; `settings.svelte.ts` ~11% is the filed handleError arch pick (deferred). The components/routes deficit is
