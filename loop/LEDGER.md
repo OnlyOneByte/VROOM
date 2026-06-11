@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 209 |
 | guard | 6 | 207 |
-| bug | 3 | 206 |
+| bug | 3 | 210 |
 | arch | 5 | 205 |
 | infra | 6 | 208 |
 
-Current cycle: **209**
+Current cycle: **210**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3708,3 +3708,24 @@ Current cycle: **209**
   green. NON-VACUOUS: confirmed the INTEGER regressions FAIL RED with the fix reverted (12,345→12) then GREEN restored. DE-RISKS the money-cents
   migration (the C146-named parseInt crux). green→green: backend validate:local EXIT 0 — 1279 pass / 1 skip / 0 fail (+5), tsc 0, musl-biome
   clean, build bundled. cov: be 84.06%+ (carry; +5 BE) / fe 77.79% (carry).
+- **C210 (bug → #70 fixed; #69 escalated): insurance /expiring-soon `days` param unguarded → NaN → Invalid Date → silently empty** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 40, blocked 35th) but blocked → fell through; `bug` FORCED (cyc 206, starved-for 4 > 3 — over
+  budget; arch was AT-budget 5=5, not strictly over, so bug's tighter budget tipped it first). Fresh hunt. FIRST pursued the #68 parseInt/parseFloat
+  CLASS-SWEEP (the C41/#48 pattern) — swept all BE parseInt/parseFloat sites: the query-param + import-time-parse sites are guarded/bounded
+  (import-mapping `||0` + buildLocalDate echo-check; body-limit; pagination) → NO comma-truncation class repeat (C21/C77 — did not force it). PIVOTED
+  to the insurance write/route surface. FOUND TWO: (a) #69 (SEMANTICS, escalated — see below); (b) #70 (CLEAN, decision-free — the forced-bug fix).
+  #70 VERIFIED firsthand end-to-end: GET /insurance/expiring-soon read `days` via `Number.parseInt(c.req.query('days')||'30',10)` with NO
+  finite-guard — UNLIKE its SIBLING `limit` two lines down (guarded `Number.isFinite(x) ? clamp : 100`). So `?days=<non-numeric>` → NaN →
+  `endDate = new Date(now + NaN*86400000)` = Invalid Date → findExpiringTerms' `between(endDate, now, InvalidDate)` matched NOTHING → the
+  "expiring soon" nag SILENTLY returned ZERO expiring policies → a user misses an insurance-renewal reminder (NORTH_STAR #2). The asymmetry
+  (limit guarded, days not, right beside each other) is the tell — the C189 create/update-asymmetry class applied to sibling params. FIX
+  (decision-free, mirrors the sibling): `Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays,1),366) : 30`. +4 HTTP tests in a new
+  expiring-soon-http.test.ts (default finds a ~20-day term; the `?days=abc` REGRESSION falls back to 30 + still finds it; `?days=45` honored;
+  `?days=99999` clamps to 366). NON-VACUOUS: confirmed the regression FAILS RED with the guard reverted (daysAhead NaN, term vanished) then GREEN
+  restored. green→green: backend validate:local EXIT 0 — 1283 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean, build bundled.
+  **#69 (consistency, ESCALATED C210 — NOT auto-fixed, it's a semantics call) — a monthly-only insurance term (monthlyCost set, totalCost null)
+  shows in the analytics insurance card (effectiveMonthlyPremium honors monthlyCost) but materializes NO expense row (createTermExpenses guards
+  `totalCost > 0`) → ABSENT from vehicle TCO/$-per-month → same cost, two headline numbers.** Verified firsthand (schema both nullable :137-138;
+  analytics-charts effectiveMonthlyPremium:176 returns monthlyCost directly; routes :84/:176 gate materialization on totalCost>0). send_message
+  options: materialize monthlyCost×term-months as one lump (TCO==analytics) / N monthly rows / leave analytics-only + document. Awaiting Angelo;
+  did NOT block. cov: be 84.06%+ (carry; +4 BE) / fe 77.79% (carry).

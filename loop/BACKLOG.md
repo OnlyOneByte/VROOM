@@ -754,6 +754,23 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   Sheets "12345.0" lands whole). Did NOT unilaterally switch the Sheets read to UNFORMATTED_VALUE (deeper, separate) — the coercion-layer fix
   is complete + covers CSV too. +5 tests; NON-VACUOUS (confirmed RED with the fix reverted). DE-RISKS the money-cents migration (the C146-named
   parseInt crux). green→green backend validate:local EXIT 0, 1279 pass (+5).*
+- ~~**#70 (MED, data-correctness — found C210 via the insurance route surface) — GET /insurance/expiring-soon `days` param unguarded → NaN →
+  Invalid Date → silently zero expiring policies.**~~ — *DONE C210: `days` was `Number.parseInt(c.req.query('days')||'30',10)` with NO
+  finite-guard, UNLIKE its sibling `limit` two lines down (guarded). `?days=<non-numeric>` → NaN → `endDate = new Date(now + NaN)` = Invalid
+  Date → findExpiringTerms' `between(endDate, now, InvalidDate)` matched NOTHING → the renewal nag silently showed ZERO expiring policies
+  (NORTH_STAR #2 — the C189 create/update-asymmetry class applied to sibling params). VERIFIED firsthand. FIX (mirrors the sibling):
+  `Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays,1),366) : 30`. +4 HTTP tests (new expiring-soon-http.test.ts: default finds
+  a ~20-day term; the `?days=abc` regression falls back to 30 + still finds it; `?days=45` honored; `?days=99999` clamps to 366); NON-VACUOUS
+  (RED with the guard reverted). green→green backend validate:local EXIT 0, 1283 pass (+4).*
+- **#69 (MED, consistency — found + ESCALATED C210, NOT auto-fixed; it's a semantics call) — a monthly-only insurance term shows in analytics
+  but is ABSENT from TCO.** A term can carry its premium as `totalCost` (lump) OR `monthlyCost` (recurring). Analytics counts both (via
+  `effectiveMonthlyPremium`, analytics-charts.ts:176 returns monthlyCost directly when totalCost is null), but the expense-materialization hook
+  `createTermExpenses` (insurance/hooks.ts:28) + both call sites (routes.ts:84/:176) gate on `totalCost > 0` → a monthlyCost-only term
+  materializes NO expense row → its premium is ABSENT from vehicle TCO/$-per-month while showing in the analytics insurance card (same cost, two
+  headline numbers). VERIFIED firsthand (schema both nullable :137-138; both cost shapes reachable). ESCALATED C210 (send_message) — semantics
+  call: materialize monthlyCost×term-months as one lump (TCO==analytics) / N monthly rows across the term / leave analytics-only + document.
+  Awaiting Angelo; not loop-decidable (the C167 audit certified the totalCost-path materialization clean but never considered the monthlyCost-only
+  shape).*
 
 > [stray prior-edit run-on — the C155 deep-review block header, preserved for the audit trail:] (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent (delayed event, triaged post-C155): its Finding 1 → **#54 (HIGH, VERIFIED firsthand)** filed below; its div-guard/split-sibling checks matched my C155 pre-read (isFillup volume>0, fillupDetails length-guards, per-vehicle distance — clean).**
 - ~~**#52 (MED, security defense-in-depth) — split delete/regenerate keyed the destructive write on groupId alone.**~~ — *DONE

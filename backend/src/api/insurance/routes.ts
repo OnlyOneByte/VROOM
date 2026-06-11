@@ -50,7 +50,12 @@ routes.get('/', async (c) => {
 // GET /api/v1/insurance/expiring-soon — expiring policies
 routes.get('/expiring-soon', async (c) => {
   const user = c.get('user');
-  const daysAhead = Number.parseInt(c.req.query('days') || '30', 10);
+  // Guard `days` like `limit` below: a non-numeric `?days=` made Number.parseInt → NaN →
+  // `endDate = new Date(now + NaN)` = Invalid Date → the BETWEEN range query silently matched
+  // NOTHING, so "expiring soon" falsely showed ZERO expiring policies and the user missed a
+  // renewal nag (#70). Fall back to the 30-day default + clamp to a sane 1..366 window.
+  const requestedDays = Number.parseInt(c.req.query('days') || '30', 10);
+  const daysAhead = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), 366) : 30;
   // Bound the result set so a user with many terms can't trigger an unbounded scan.
   const requestedLimit = Number.parseInt(c.req.query('limit') || '100', 10);
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 200) : 100;
