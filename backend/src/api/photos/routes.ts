@@ -2,7 +2,7 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { AppError, NotFoundError } from '../../errors';
-import { requireAuth } from '../../middleware';
+import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas } from '../../utils/validation';
 import {
@@ -20,6 +20,12 @@ import {
 const routes = new Hono();
 
 routes.use('*', requireAuth);
+// Stamp lastDataChangeDate on a 2xx photo mutation (upload/delete) so the change re-triggers the
+// next auto-backup (#74): photos + photo_refs ARE in the backup payload (backup.ts), and the
+// orchestrator skips when !hasChangesSinceLastSync — without this, a photo-only change between
+// backups was silently excluded until some OTHER tracked mutation bumped the timestamp (the #42
+// silent-backup-gap class). This was the lone mutating route module missing changeTracker.
+routes.use('*', changeTracker);
 
 // GET /photos?entityType=vehicle — Batch-list the user's photos of one entity
 // type, grouped by entityId. Lets the dashboard fetch all vehicle photos in a

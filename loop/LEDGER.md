@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 215 |
+| deep-review | 5 | 220 |
 | guard | 6 | 217 |
 | bug | 3 | 218 |
 | arch | 5 | 216 |
 | infra | 6 | 219 |
 
-Current cycle: **219**
+Current cycle: **220**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3860,3 +3860,20 @@ Current cycle: **219**
   userId-scope) + #73 (C218 split-config-only update), range C155–C206 → C155–C218; + added #69 (insurance monthly-only TCO, escalated C210) to
   the Angelo-pending list. Doc-only, no code → no build gate (the C93/C131/C145/C193/C208 precedent). Next CLAUDE.md refresh ~C232; next #5
   branch-hygiene sweep ~C223 (last C213). cov: be 84.14% / fe 79.22% (carry, C213 reading).
+- **C220 (deep-review → #74): photos route was the LONE mutating module missing changeTracker → a photo-only change didn't re-trigger the
+  auto-backup** — BALANCE: `feature` most-starved (cyc 170, starved-for 50, blocked 45th — milestone) but blocked → fell through; `deep-review`
+  AT budget (cyc 215, starved-for 5 = 5, due — the C219 forecast). Inline review (spawn cap/flake). SURFACE: the `changeTracker` middleware
+  wiring (the #42 silent-backup-gap class, never audited for COMPLETENESS across route modules). CERTIFIED `changeTracker` itself CLEAN
+  firsthand: mutating-method filter (:50), runs after handler (:54), stamps lastDataChangeDate only on 2xx (:56 — a failed write correctly
+  doesn't mark changed). THE finding → #74: of 12 route modules, changeTracker is on 8; the 4 without it are analytics (read-only ✓), auth
+  (sessions ✓), sync (the backup itself — circular ✓) — and PHOTOS, which has POST upload + DELETE. VERIFIED end-to-end: photos + photo_refs ARE
+  in the backup payload (backup.ts:368/414), and the orchestrator SKIPS when !hasChangesSinceLastSync (backup-orchestrator.ts:70-76) — so a
+  photo-only change between backups never bumped lastDataChangeDate → silently excluded from the next auto-backup until some OTHER tracked
+  mutation bumped it (NORTH_STAR #1). FIX: added `routes.use('*', changeTracker)` to photos/routes.ts (mirrors the 8 siblings; fire-and-forget
+  after 2xx, no response-behavior change — the photos-http suite stayed green). GUARD: photo-change-tracker.test.ts (+3 source-scan, the C133
+  photo-serve-headers precedent — a full upload/delete needs a real storage provider, not in-harness-testable, so pin the WIRING: import +
+  `routes.use('*', changeTracker)` + the mutating endpoints still exist). NON-VACUOUS: confirmed the "registered" assertion FAILS RED with the
+  routes.use line removed. NOTE: the gate first went red on my new test's FORMAT (long regex line) — check:musl:fix reflowed it; the 10
+  pre-existing noNonNullAssertion are WARNINGS (exit 0), not errors (verified firsthand — did NOT touch the 4 unrelated files). green→green:
+  backend validate:local EXIT 0 — 1303 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. cov: be 84.14%+ (carry; +3 BE) /
+  fe 79.22% (carry).

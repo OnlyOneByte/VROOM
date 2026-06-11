@@ -497,6 +497,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   object. The percentage/absolute SUM checks (vehicleIds-independent) stay unconditional. +4 tests (the #73 regression accepted; sum-check still
   fires without vehicleIds; both-sent mismatch still fails; both-sent match accepted); NON-VACUOUS (RED with the guard reverted). green→green
   backend validate:local EXIT 0, 1300 pass (+4).*
+- ~~**#74 (MED, data-safety / NORTH_STAR #1 — found C220 via a deep-review of changeTracker wiring completeness) — the photos route was the LONE
+  mutating module missing `changeTracker`, so a photo-only change didn't re-trigger the next auto-backup.**~~ — *DONE C220: of 12 route modules,
+  changeTracker is on 8; the 4 without are analytics (read-only ✓), auth (sessions ✓), sync (the backup itself, circular ✓) — and PHOTOS, which
+  has POST upload + DELETE. VERIFIED end-to-end: photos + photo_refs ARE in the backup payload (backup.ts:368/414), and the orchestrator SKIPS
+  when !hasChangesSinceLastSync (backup-orchestrator.ts:70-76) → a photo-only change between backups never bumped lastDataChangeDate → silently
+  excluded from the next auto-backup until some OTHER tracked mutation bumped it (the #42 silent-backup-gap class). FIX: added `routes.use('*',
+  changeTracker)` to photos/routes.ts (mirrors the 8 siblings; fire-and-forget after 2xx → no response-behavior change, photos-http suite green).
+  GUARD: +3 source-scan (photo-change-tracker.test.ts — the C133 photo-serve-headers precedent, since a full upload/delete needs a real storage
+  provider; pins import + routes.use + the mutating endpoints); NON-VACUOUS (RED with the routes.use removed). green→green backend validate:local
+  EXIT 0, 1303 pass (+3). changeTracker itself CERTIFIED CLEAN (2xx-gate, mutating-method filter).*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:
