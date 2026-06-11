@@ -1250,6 +1250,11 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     mimeType)` to photos/helpers.ts with nosniff baked in + wired both → vehicle GAINS nosniff (security fix), generic unchanged, future drift
     prevented. UPDATED the C133 source-scan to follow the literal to the builder + pin both routes call it; NON-VACUOUS (RED with vehicle wiring
     reverted). green→green 1310 pass (+1). **#77 (vehicle-photo serve missing nosniff) CLOSED.*** **ARCH QUEUE thin — next arch cycle prefers a rule-7 fan-out over forcing a micro-dedup.**
+  - **C232 (arch): trigger-service 3× `reason:'error'` skip-push → one `pushReminderSkipError` helper.** DONE — collapsed the byte-identical
+    skip-push at the time/mileage/recheck catch sites into one source of truth (the skip shape can't drift between axes; the recheck axis was
+    added later, C214). Test-anchored green→green (trigger-bad-interval-unit asserts skip.message contains the real error text). Confirmed AGAIN:
+    the `error instanceof Error ? .message : ...` idiom across 16 files is EXCLUDED by design (C147/C211 — logger structured-shape + fixed-fallback
+    stay inline); do NOT re-file it.
   - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
     pending-migration constraints rule out most FE/money candidates). The BE logging-idiom convergence stays EXCLUDED by design (C147/C211); do
     NOT re-file it. Genuinely thin now — prefer a fan-out to surface a fresh candidate over forcing a micro-dedup.

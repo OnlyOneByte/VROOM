@@ -24,6 +24,22 @@ export interface TriggerResult {
 // Helpers
 // ============================================================================
 
+/**
+ * Push a `reason:'error'` skip for a reminder whose per-reminder processing threw. The three
+ * trigger catch sites (time axis, mileage axis, recheck-on-write per-reminder) built this exact
+ * `{ reminderId, reason:'error', message }` entry byte-for-byte — collapse them to one source of
+ * truth so the skip shape can't drift between the axes. The `'Unknown error'` fallback is kept
+ * inline here (NOT routed through extractErrorMessage, whose contract is String(error)) — the
+ * deliberate fixed-fallback idiom the C147 helper doc carves out.
+ */
+function pushReminderSkipError(result: TriggerResult, reminderId: string, error: unknown): void {
+  result.skipped.push({
+    reminderId,
+    reason: 'error',
+    message: error instanceof Error ? error.message : 'Unknown error',
+  });
+}
+
 /** Apply anchor-day clamping after advancing month/year on a Date. */
 function clampToAnchorDay(next: Date, anchorDay: number): void {
   const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
@@ -293,11 +309,7 @@ class ReminderTriggerService {
       try {
         await this.processReminder(reminder, vehicleIds, now, result);
       } catch (error) {
-        result.skipped.push({
-          reminderId: reminder.id,
-          reason: 'error',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
+        pushReminderSkipError(result, reminder.id, error);
       }
     }
 
@@ -310,11 +322,7 @@ class ReminderTriggerService {
       try {
         await this.processMileageReminder(reminder, vehicleIds, result);
       } catch (error) {
-        result.skipped.push({
-          reminderId: reminder.id,
-          reason: 'error',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
+        pushReminderSkipError(result, reminder.id, error);
       }
     }
 
@@ -353,11 +361,7 @@ class ReminderTriggerService {
       try {
         await this.processMileageReminder(reminder, vehicleIds, result);
       } catch (error) {
-        result.skipped.push({
-          reminderId: reminder.id,
-          reason: 'error',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
+        pushReminderSkipError(result, reminder.id, error);
       }
     }
     return result;

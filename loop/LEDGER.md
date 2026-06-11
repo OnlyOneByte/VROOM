@@ -4050,3 +4050,20 @@ Current cycle: **227**
   asserted only "not POSTed", never what happens to the entry after) so a fix can't change it unnoticed — +1, drives the REAL syncOfflineExpenses
   over the stateful localStorage mock (two syncs → entry persists unsynced, never POSTed). green→green: frontend validate:local EXIT 0 — 586 pass
   (+1), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. cov: fe 80.33%+ (carry; +1 FE) / be 84.25% (carry).
+- **C232 (arch): collapse trigger-service's 3 byte-identical `reason:'error'` skip-push blocks into one `pushReminderSkipError` helper** —
+  BALANCE: TWO at budget — `bug` (cyc 229, starved-for 3 = 3) + `arch` (cyc 227, starved-for 5 = 5); `arch` waited LONGER (touched C227 vs C229)
+  → arch wins the tiebreak. Inline scout. REJECTED the obvious target first (C21/C77 — didn't force churn): the `error instanceof Error ?
+  .message : String(error)` idiom is hand-rolled in 16 files, but `extractErrorMessage` (C147) ALREADY exists for the VALUE form and its doc +
+  test EXPLICITLY carve out the 16 logger `{error: <idiom>}` structured-shape sites + the `'Unknown error'` fixed-fallback as deliberately-inline
+  — so a sweep would reverse a documented decision (arch rule 5). The genuine, contained dedup: trigger-service.ts built
+  `result.skipped.push({ reminderId, reason:'error', message: error instanceof Error ? error.message : 'Unknown error' })` BYTE-IDENTICALLY at 3
+  catch sites (time axis :312, mileage axis :329, recheck-on-write per-reminder :372). Extracted a module-level `pushReminderSkipError(result,
+  reminderId, error)` (beside clampToAnchorDay/advanceCustom) + routed all 3 → one call each. PAYOFF: one source of truth for the per-reminder
+  error-skip shape so it can't drift between the axes (a real risk — the recheck axis was added later, C214). DELIBERATELY LEFT inline: the
+  `recheck_query_failed` site (:360 — different reason + reminderId:'all', single occurrence) + the pre-math `no_vehicles`/`mileage_requires_
+  single_vehicle`/`catch_up_limit_reached` skips (no message, distinct reasons). Kept the `'Unknown error'` fallback inside the helper (NOT routed
+  through extractErrorMessage, whose contract is String(error)) — honors the C147 carve-out. Test-anchored (rule 3, green→green): the
+  reason:'error' path is pinned by trigger-bad-interval-unit.test.ts (asserts skip.message CONTAINS 'intervalUnit') +
+  trigger-nonprogress-frequency + recheck-on-write — all passed UNCHANGED through the substitution (proves the helper preserves the real
+  error-message extraction). green→green: backend validate:local EXIT 0 — 1319 pass / 1 skip / 0 fail (UNCHANGED — behavior-preserving), tsc 0,
+  musl-biome clean (no reflow needed), build bundled. cov: be 84.25% / fe 80.33% (carry — no test count change, pure refactor).
