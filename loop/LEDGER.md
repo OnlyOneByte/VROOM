@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 207 |
 | bug | 3 | 206 |
 | arch | 5 | 205 |
-| infra | 6 | 203 |
+| infra | 6 | 208 |
 
-Current cycle: **207**
+Current cycle: **208**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3679,3 +3679,14 @@ Current cycle: **207**
   ran in isolation FIRST — all 12 green, my reasoned clamp values (Feb 28/29, Sep 30, Dec31+2→Feb28-2025) confirmed correct. green→green:
   FE validate:local EXIT 0 — 557 pass (+12), tsc 0, build OK; prettier + eslint clean on the new file. Test-only, no production change.
   cov: fe 77.79%+ (carry; +12 FE) / be 84.06% (carry). Next FE guard pick (no primed): analytics-api.ts ~36% func or auth.ts ~56%.
+- **C208 (infra): CLAUDE.md orientation refresh (post-C193 drift, C194–C207)** — BALANCE: `feature` most-starved (cyc 170, starved-for 38,
+  blocked 33rd) but blocked → fell through; nothing else strictly OVER budget → highest-leverage pick. `infra` was the most-starved actionable
+  (cyc 203, starved-for 5) AND the CLAUDE.md refresh was concretely due (last C193, ~15 cycles of real drift — a fresh agent reading stale
+  figures re-plans done work). Fixed 3 actively-misleading drifts, each VERIFIED vs source/LEDGER (the C93/C145/C193 doc-refresh discipline —
+  fix what misleads, don't churn): (1) COVERAGE — the C186 reading (be 83.41/83.74, fe 73.89/73.61/66.08) → the FRESH C203 re-measure (be
+  84.06% line / 84.43% func · fe 77.79% line / 75.57% func / 72.96% branch); added C201/C207 to the FE-ratchet list + re-pointed the next FE
+  low spots (analytics-api ~36%, auth ~56%, sync-manager ~56% — form-validation/payoff now done). (2) SUITE SIZE ~1263 BE / ~513 FE → 1274 BE /
+  557 FE. (3) CLOSED-BUG list ended at #63 → appended #64 (lease excess-mileage annual×term, C198) + #65 (offline legacy-clientId fresh-per-read
+  dup hole, C202) + #66 (offline electric charge dropped on sync, C204) + #67 (re-finance → inactive record, C206); range C155–C192 → C155–C206.
+  Doc-only, no code → no build gate (the C93/C131/C145/C193 precedent). Next CLAUDE.md refresh ~C220; next #5 branch-hygiene sweep ~C213 (last
+  C203). cov: be 84.06% / fe 77.79% (carry, C203 reading).

@@ -156,14 +156,16 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C186, not an estimate): **backend 83.41% line / 83.74% func · frontend 73.89% line / 73.61%
-  func / 66.08% branch** — backend creeping up to ~83% (the C178–C192 BE bug-fix + route-coverage arc);
-  frontend climbed 65.3→73.9 since C138 under a sustained
+  (re-measured C203, not an estimate): **backend 84.06% line / 84.43% func · frontend 77.79% line / 75.57%
+  func / 72.96% branch** — backend ~84% (the C178–C206 BE bug-fix + route-coverage arc);
+  frontend climbed 65.3→77.8 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
-  C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts). **The FE
+  C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts, C201
+  expense-form-validation, C207 payoff-date clamp). **The FE
   SERVICE layer is now 100% module-covered** (api-client + expense-api + reminder-api + settings-api + error-
   handling); the remaining FE gap is the **components/routes deficit** (largely eyes-on; prefer the few
-  thin pure-`.ts`/`.svelte.ts`/store/util modules — e.g. sync-manager.ts ~58%). Backend
+  thin pure-`.ts`/`.svelte.ts`/store/util modules — e.g. analytics-api.ts ~36% func, auth.ts ~56%,
+  sync-manager.ts ~56%). Backend
   middleware trio all covered (idempotency C105, rate-limit C112, body-limit C156); `backup-orchestrator.ts`
   0→50% func (C181 — its old test was COVERAGE THEATER, re-implementing the logic locally instead of importing
   it; watch for that pattern), `analytics/routes.ts` 15→59% (C185), `sync/routes.ts` 32→59% (C188) — all via
@@ -171,7 +173,7 @@ Highlights:
   less clean). NOTE: `restore.ts` restoreFromSheets needs a process-global Sheets mock the sync suite avoids
   (see C163) — defer until a DI seam exists.
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1263 backend tests / ~513 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1274 backend tests / ~557 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
@@ -191,13 +193,16 @@ Highlights:
   efficiency trend paired rows across vehicles in the fleet view) fixed C158 (per-vehicle pairing via
   `forEachVehiclePair`); **#57** (deleting an insurance policy orphaned its auto-materialized premium
   expenses — still summed into TCO forever, no FK) fixed C167 (deleteBySource per term before delete).
-  Plus the MED/LOW fixes #52/#55/#56/#48/#59/#25/#26c/#61/#62/#63 (split-delete tenant-scope, amortization
-  neg-guard, perFillup split inflation, odometer userId-scope [sweep COMPLETED C180 — the 3rd read method
-  `findByVehicleIdPaginated` was the leg C168 missed], native-CSV out-of-range date echo-check, insurance
+  Plus the MED/LOW fixes #52/#55/#56/#48/#59/#25/#26c/#61/#62/#63/#64/#65/#66/#67 (split-delete tenant-scope,
+  amortization neg-guard, perFillup split inflation, odometer userId-scope [sweep COMPLETED C180 — the 3rd read
+  method `findByVehicleIdPaginated` was the leg C168 missed], native-CSV out-of-range date echo-check, insurance
   latest-term attribution, findExpiringTerms excludes cancelled policies, expense-PUT vehicle-reassignment
-  ownership, manual-expense sourceType restricted to `financing`, provider PUT/DELETE tenant-scoped writes)
-  all landed C155–C192. Recurring lesson the loop keeps re-finding (C181/C182/C185): a green test that
-  RE-IMPLEMENTS or RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module.
+  ownership, manual-expense sourceType restricted to `financing`, provider PUT/DELETE tenant-scoped writes,
+  lease excess-mileage scales the ANNUAL limit by term [C198], offline legacy-clientId minted fresh per read →
+  dup-expense idempotency hole [C202], offline ELECTRIC charge dropped on sync because fuelType wasn't carried
+  in the outbox [C204], re-financing a paid-off vehicle produced an INACTIVE record [C206]) all landed C155–C206.
+  Recurring lesson the loop keeps re-finding (C181/C182/C185): a green test that RE-IMPLEMENTS or RECONSTRUCTS a
+  module's logic locally is NOT real coverage — drive the real module.
 - Pending an Angelo decision (filed, NOT auto-fixed — each changes a displayed $/HTTP behavior or is a
   product call). TWO HIGHs, both in the Google Sheets backup path: **#36** (writes `USER_ENTERED` →
   formula injection + silent round-trip corruption; ARCC-consult before fixing), **#37** (non-atomic
