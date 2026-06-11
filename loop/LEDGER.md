@@ -4176,3 +4176,17 @@ Current cycle: **227**
   backend validate:local EXIT 0 — 1338 pass / 1 skip / 0 fail (+7), tsc 0, musl-biome clean (import-order autofixed), build bundled. cov: be 85.18%+
   (carry; +7 BE) / fe 80.64% (carry). NOTE: the C237 mergeBackupConfig + mergeStorageConfig stay in settings/routes.ts (config-specific, single-site
   — not over-extracted; arch rule 5 no churn-for-churn).
+- **C239 (guard): cover the 4 `validateStorageConfig` consistency branches (settings/routes.ts, was ~56%)** — BALANCE: nothing OVER budget; `guard`
+  most-starved (cyc 234, starved-for 5) → highest-leverage. Per the C236 steering note (clean coverage low spots exhausted → characterize a
+  known-hard seam via the HTTP harness), picked validateStorageConfig: it gates a user from saving a BROKEN or CROSS-TENANT storage-routing config
+  (a regression would let photos route to a non-owned/disabled provider — data-routing + tenant), and it's HTTP-harness-reachable via PUT /settings
+  with raw-seeded providers (the C237 pattern); the validator runs on the MERGED config so it also exercises mergeStorageConfig. The C237
+  settings-route-errors test covered GET + the ZodError path + a path-traversal backupConfig + a valid partial — but NONE of the 4 storageConfig
+  consistency branches. +4 HTTP tests (storage-config-validation.test.ts, raw-seeded owned providers): (1) fully-consistent config → 200 (positive
+  control); (2) a default referencing a NON-OWNED provider → 400 'does not belong to this user' (the cross-tenant routing guard); (3) a default
+  whose provider has NO providerCategories entry → 400 'no category settings'; (4) a default whose category is present but NOT enabled → 400
+  'Cannot disable'. PROCESS: first draft sent partial providerCategories maps → all 400'd as ZodError ('Invalid request data') BEFORE reaching the
+  validator — the inner `z.record(photoCategoryEnum, …)` is EXHAUSTIVE in Zod v4 (the C70 trap), so added a categoryMap() helper building all 4
+  category keys; the assertions then hit the real validator branches (confirmed via the distinct 400 messages, not the schema 400). green→green:
+  backend validate:local EXIT 0 — 1341 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production
+  change. cov: be 85.18%+ (carry; +4 BE, settings/routes.ts validateStorageConfig now branch-covered) / fe 80.64% (carry).

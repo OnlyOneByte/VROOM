@@ -391,7 +391,10 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > loading-poll paths via fake timers; the existing test covered only route-classification + handleRouteProtection);
 > `settings.svelte.ts` ~11% is the filed handleError arch pick (deferred). `expense-helpers.ts` category-display maps DONE C234 (+6:
 > categoryLabels/getCategoryIcon/getCategoryColor exhaustiveness — every ExpenseCategory maps to a label/icon/color, no extra/missing key, +
-> the unknown-category fallback; so a new category without a map entry fails CI instead of rendering blank). **NEXT FE guard pick (no primed): the FE pure/service modules are now
+> the unknown-category fallback; so a new category without a map entry fails CI instead of rendering blank).
+> `settings/routes.ts validateStorageConfig` 4 branches DONE C239 (+4 HTTP via raw-seeded providers: non-owned-provider → 400 cross-tenant-routing
+> guard, no-category-settings → 400, default-category-disabled → 400, consistent → 200; the C70 Zod-v4-exhaustive-record trap needed an all-4-category
+> map helper). **NEXT FE guard pick (no primed): the FE pure/service modules are now
 > essentially all covered — remaining FE gap is the components/routes deficit (largely eyes-on) + the network/timer-bound tails (mock-trap, low-value). vehicle-helpers.ts is the lone untested FE util but it's a single trivial display-name fn (theater — skip).** The components/routes deficit is
 > the bulk + largely eyes-on.** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
 > the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
