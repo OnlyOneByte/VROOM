@@ -56,3 +56,49 @@ describe('createReminderSchema isActive', () => {
     expect(parsed.isActive).toBe(false);
   });
 });
+
+// #73 (C218): refineSplitConfig's split-vs-vehicleIds MATCH check is a cross-field invariant. On a
+// PARTIAL update that changes only the split config and OMITS vehicleIds, the old unconditional check
+// compared the split's IDs against an undefined vehicleIds (∅) and 400'd every legitimate
+// split-config-only edit. The match check must be guarded on vehicleIds presence; the route's merged
+// re-parse still catches a genuine mismatch against the full object. The sum checks stay unconditional.
+describe('updateReminderSchema split-config partial (#73)', () => {
+  test('a split-config-only update WITHOUT vehicleIds is ACCEPTED (the regression)', () => {
+    const parsed = updateReminderSchema.parse({
+      expenseSplitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
+    });
+    expect(parsed.expenseSplitConfig).toBeDefined();
+  });
+
+  test('a percentage split-config-only update still validates the 100-sum (vehicleIds-independent)', () => {
+    // No vehicleIds, but the sum check must still fire — proves the fix didn't disable it.
+    expect(() =>
+      updateReminderSchema.parse({
+        expenseSplitConfig: {
+          method: 'percentage',
+          allocations: [
+            { vehicleId: 'v1', percentage: 70 },
+            { vehicleId: 'v2', percentage: 20 }, // sums to 90 ≠ 100
+          ],
+        },
+      })
+    ).toThrow();
+  });
+
+  test('when BOTH vehicleIds + split are sent, a genuine mismatch STILL fails (invariant intact)', () => {
+    expect(() =>
+      updateReminderSchema.parse({
+        vehicleIds: ['v1'],
+        expenseSplitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
+      })
+    ).toThrow();
+  });
+
+  test('when BOTH are sent and they MATCH, it is accepted', () => {
+    const parsed = updateReminderSchema.parse({
+      vehicleIds: ['v1', 'v2'],
+      expenseSplitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
+    });
+    expect(parsed.expenseSplitConfig).toBeDefined();
+  });
+});

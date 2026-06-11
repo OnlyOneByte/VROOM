@@ -487,6 +487,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   +2 tests (the cross-tenant case — two users' photos on the SAME entityType+entityId, raw-seeded, foreign excluded from count & data; + an
   owner over-filter control); NON-VACUOUS (RED with the scope reverted). green→green backend validate:local EXIT 0, 1293 pass (+2). The rest of
   the photos list/serve/delete path CERTIFIED CLEAN (ownership gated, batch userId-scoped, nosniff/CORP headers correct).*
+- ~~**#73 (MED, UX-breaking — found C218 via a fresh hunt of the reminders WRITE-path validation) — a split-config-only reminder UPDATE
+  (omitting vehicleIds) falsely 400'd.**~~ — *DONE C218: `refineSplitConfig` (validation.ts:133) compares the split's vehicle IDs against
+  `data.vehicleIds`, but `updateReminderSchema` is `.partial()` + FE `reminderApi.update` takes vehicleIds OPTIONAL — so a PUT changing ONLY
+  the split config (omitting vehicleIds) → `data.vehicleIds` undefined → `new Set(undefined)`=∅ → the match check (0 vs N) ALWAYS failed →
+  `zValidator(updateReminderSchema)` (runs BEFORE the handler's merged re-parse) 400'd every legitimate split-config-only edit. VERIFIED
+  firsthand. FIX (mirror the other refiners' presence-guards): wrap the MATCH check in `if (data.vehicleIds)` — a cross-field invariant
+  meaningful only when both present; the route's merged `createReminderSchema.parse(merged)` still catches a genuine mismatch against the full
+  object. The percentage/absolute SUM checks (vehicleIds-independent) stay unconditional. +4 tests (the #73 regression accepted; sum-check still
+  fires without vehicleIds; both-sent mismatch still fails; both-sent match accepted); NON-VACUOUS (RED with the guard reverted). green→green
+  backend validate:local EXIT 0, 1300 pass (+4).*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:

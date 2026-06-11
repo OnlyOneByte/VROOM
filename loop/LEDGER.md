@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 215 |
 | guard | 6 | 217 |
-| bug | 3 | 214 |
+| bug | 3 | 218 |
 | arch | 5 | 216 |
 | infra | 6 | 213 |
 
-Current cycle: **217**
+Current cycle: **218**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3831,3 +3831,20 @@ Current cycle: **217**
   green→green: FE validate:local EXIT 0 — 580 pass (+4), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. auth.ts
   ~56%→well-covered. cov: fe 79.22%+ (carry; +4 FE) / be 84.14% (carry). Next FE guard low spot: sync-manager.ts ~56% (timer/network-bound — less
   clean) — the FE pure/service modules are now essentially all covered; the rest is the components/routes deficit (eyes-on).
+- **C218 (bug → #73): a split-config-only reminder UPDATE (omitting vehicleIds) falsely 400'd** — BALANCE: `feature` most-starved (cyc 170,
+  starved-for 48, blocked 43rd) but blocked → fell through; `bug` FORCED (cyc 214, starved-for 4 > 3 — the C217 forecast). Hunted a FRESH surface
+  (the reminders create/update WRITE-path validation — the C189 create/update-asymmetry class; C150/C153/C197 had covered the trigger
+  date-advance + mark-serviced, NOT the Zod write schema). REJECTED firsthand a vehicleIds-reassign mileage-anchor edge as a SEMANTICS edge
+  (lastServiceOdometer is a stored historical anchor; whether it should auto-follow a vehicle swap is ambiguous — C21/C77, did not force). THE
+  real one — #73, VERIFIED firsthand end-to-end: `refineSplitConfig` (validation.ts:133) compares the split's vehicle IDs against
+  `data.vehicleIds`, but `updateReminderSchema` is `.partial()` + the FE `reminderApi.update` takes vehicleIds OPTIONAL — so a PUT changing ONLY
+  the split config (omitting vehicleIds) → `data.vehicleIds` undefined → `new Set(undefined)` = ∅ → the match check (0 vs N) ALWAYS failed →
+  `zValidator('json', updateReminderSchema)` (routes.ts:206, runs BEFORE the handler's merged re-parse) 400'd every legitimate split-config-only
+  edit with "Split config vehicle IDs must match vehicleIds". FIX (mirror the other refiners' presence-guards — refineCustomFrequency/
+  refineMileageTrigger already guard on their fields): wrap the MATCH check in `if (data.vehicleIds)` — it's a cross-field invariant meaningful
+  only when both are present; the route's merged `createReminderSchema.parse(merged)` (routes.ts:228) still catches a genuine mismatch against
+  the full object. The percentage/absolute SUM checks (vehicleIds-independent) stay UNCONDITIONAL. +4 tests in update-validation.test.ts (the
+  #73 regression: split-only-no-vehicleIds ACCEPTED; the percentage-sum still fires without vehicleIds; both-sent genuine-mismatch still fails;
+  both-sent-match accepted). NON-VACUOUS: confirmed the regression FAILS RED with the guard reverted (split-only still rejected) + the other 3
+  stayed green (invariant intact). green→green: backend validate:local EXIT 0 — 1300 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean, build
+  bundled. cov: be 84.14%+ (carry; +4 BE) / fe 79.22% (carry).
