@@ -149,8 +149,18 @@ routes.post(
     const existingFinancing = await financingRepository.findByVehicleId(vehicleId);
 
     if (existingFinancing) {
+      // This endpoint is "the vehicle's financing is now THIS" — a create-or-replace. If the prior
+      // financing was paid off / completed (isActive=false, via PUT /payoff or DELETE), re-financing
+      // the same vehicle reuses that row, and `isActive` is .optional() in the create schema (it's a
+      // .notNull().default(true) column, so drizzle-zod omits it) → the client never sends it → the
+      // update would LEAVE isActive=false, silently dropping the new active financing from
+      // findActiveFinancing + loanBreakdown/analytics + the FE's isActive gate (#67). Re-activate
+      // explicitly, mirroring how create() defaults isActive=true. A still-active record stays active
+      // (idempotent). endDate is likewise cleared so a stale payoff/lease-end date can't linger.
       const updatedFinancing = await financingRepository.update(existingFinancing.id, {
         ...financingData,
+        isActive: true,
+        endDate: null,
       });
       return c.json({
         success: true,

@@ -725,6 +725,21 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   control; offline-storage: outbox persists fuelType). green→green FE validate:local EXIT 0, 542 pass (+5); prettier + eslint clean.
   CAVEAT: root-cause fixed + unit-pinned; the offline→sync→render E2E for an electric charge is Playwright-eyes-on-BLOCKED here → lands
   code-complete/eyes-on-pending per the feature-DoD rule.*
+- ~~**#67 (MED-HIGH, data-correctness — found C206 via a fresh hunt of the financing WRITE path) — re-financing a paid-off vehicle
+  silently produced an INACTIVE financing record.**~~ — *DONE C206: `POST /vehicles/:id/financing` is a create-or-REPLACE keyed on
+  vehicleId; when a prior row exists it reuses it via `update(existing.id, {...financingData})`. `isActive` is .optional() in the create
+  schema (a .notNull().default(true) col → drizzle-zod omits it) AND the VehicleForm financing payload (VehicleForm.svelte:420-449) never
+  sends it → re-financing a vehicle whose prior financing was paid off (isActive=false via PUT /payoff or DELETE) reused that row and LEFT
+  isActive=false → the new ACTIVE loan/lease was silently dropped from findActiveFinancing + loanBreakdown/analytics (:863 filters
+  f.isActive) + the FE's `vehicle.financing?.isActive` gate → the user's real financing vanished from TCO/analytics. VERIFIED firsthand
+  end-to-end. FIX (root-cause, behavior-preserving for the normal edit): on the upsert update branch set `isActive: true` + `endDate: null`
+  (mirrors create()'s default; a still-active record stays active = idempotent; clears a stale payoff/lease-end date). +2 HTTP tests
+  (financing-get-contract.test.ts: the #67 regression payoff→re-finance→active + an already-active idempotent control); NON-VACUOUS —
+  confirmed it fails RED with the fix reverted then green restored. green→green backend validate:local EXIT 0, 1274 pass (+2).
+  NOTE (latent, NOT fixed — C21/C77, filed for a future cycle): the same loan↔lease upsert leaves STALE type-specific columns (e.g. `apr`
+  on a record switched loan→lease, since the .optional() field is absent from the payload → drizzle .set() skips it). Latent only — every
+  read gates on `financingType` (analytics :806/:864, FE lease-metrics), so no displayed-value bug today; a defensive null-the-other-type's
+  fields on switch would close it if desired.*
 
 > [stray prior-edit run-on — the C155 deep-review block header, preserved for the audit trail:] (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent (delayed event, triaged post-C155): its Finding 1 → **#54 (HIGH, VERIFIED firsthand)** filed below; its div-guard/split-sibling checks matched my C155 pre-read (isFillup volume>0, fillupDetails length-guards, per-vehicle distance — clean).**
 - ~~**#52 (MED, security defense-in-depth) — split delete/regenerate keyed the destructive write on groupId alone.**~~ — *DONE

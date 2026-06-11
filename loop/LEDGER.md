@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 204 |
 | guard | 6 | 201 |
-| bug | 3 | 202 |
+| bug | 3 | 206 |
 | arch | 5 | 205 |
 | infra | 6 | 203 |
 
-Current cycle: **205**
+Current cycle: **206**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3645,3 +3645,23 @@ Current cycle: **205**
   fake transform) — a net IMPROVEMENT (the test now exercises the genuine transform). green→green: FE validate:local EXIT 0 — 545 pass (+3),
   tsc 0, build OK; prettier (auto-fixed the helper-signature reflow) + eslint clean on all touched files. cov: fe 77.79%+ (carry; +3 FE) /
   be 84.06% (carry).
+- **C206 (bug → #67): re-financing a paid-off vehicle silently produced an INACTIVE record (upsert never re-activates)** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 36, blocked 31st) but blocked → fell through; `bug` FORCED (cyc 202, starved-for 4 > 3 —
+  most-starved over-budget actionable, the C205 forecast). Filed bug queue all decision/approach-gated → hunted a FRESH bug per the
+  C189/C198/C202/C204 precedent. The offline/sync vein is now deduped + twice-audited, so I PIVOTED to a fresh surface: the financing
+  WRITE path (un-hunted for the C189 create/update-asymmetry class). FE pure-utils (chart-formatters/formatters) read CLEAN; rejected two
+  LATENT-but-guarded boundaries firsthand (C21/C77 discipline — did NOT inflate into a forced bug): (a) financingRepository.findByVehicleId
+  is NOT userId-scoped, but vehicleFinancing has NO userId column [ownership is transitive via vehicleId→vehicles FK, by design] + every
+  caller validates vehicle ownership first → no live leak; (b) the loan↔lease upsert leaves stale type-specific cols [apr on a now-lease],
+  but every read gates on financingType → latent, not a live displayed-value bug [noted for a future cycle]. THE LIVE ONE — #67, VERIFIED
+  firsthand end-to-end: POST /vehicles/:id/financing is a create-or-REPLACE keyed on vehicleId; when a prior row exists it reuses it via
+  `update(existing.id, {...financingData})`. `isActive` is .optional() in the create schema (a .notNull().default(true) col → drizzle-zod
+  omits it) AND the VehicleForm financing payload (VehicleForm.svelte:420-449) NEVER sends it → so re-financing a vehicle whose prior
+  financing was paid off (isActive=false via PUT /payoff or DELETE) reused that row and LEFT isActive=false → the new ACTIVE loan/lease was
+  silently dropped from findActiveFinancing + loanBreakdown/analytics (:863 filters f.isActive) + the FE's `vehicle.financing?.isActive`
+  gate → the user's real financing vanished from TCO/analytics. FIX (root-cause, behavior-preserving for the normal edit): on the upsert
+  update branch, set `isActive: true` + `endDate: null` (mirrors how create() defaults isActive=true; a still-active record stays active =
+  idempotent; clears a stale payoff/lease-end date). +2 HTTP tests in financing-get-contract.test.ts (the #67 regression: payoff → re-finance
+  → isActive true; + an already-active-update idempotent control). NON-VACUOUS: confirmed the regression FAILS RED with the fix reverted
+  (isActive stayed false) then GREEN restored (the C77 anti-vacuity check). green→green: backend validate:local EXIT 0 — 1274 pass / 1 skip
+  / 0 fail (+2), tsc 0, musl-biome clean, build bundled. cov: be 84.06%+ (carry; +2 BE) / fe 77.79% (carry).
