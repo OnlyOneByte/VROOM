@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 209 |
-| guard | 6 | 207 |
+| guard | 6 | 212 |
 | bug | 3 | 210 |
 | arch | 5 | 211 |
 | infra | 6 | 208 |
 
-Current cycle: **211**
+Current cycle: **212**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3745,3 +3745,15 @@ Current cycle: **211**
   (behavior-preserving proof) + 6 new unit tests (valid/in-range; undefined→fallback; non-numeric→fallback [the #70 guard]; above-max + below-min
   clamp; the parseInt trailing-unit-vs-leading-non-digit semantics documented). green→green: backend validate:local EXIT 0 — 1289 pass / 1 skip /
   0 fail (+6), tsc 0, musl-biome clean, build bundled. cov: be 84.06%+ (carry; +6 BE) / fe 77.79% (carry). ARCH QUEUE empty.
+- **C212 (guard): cover analytics-api.ts (the ~36%-func FE low spot — 13 method wirings + getDefaultDateRange + buildQuery)** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 42, blocked 37th) but blocked → fell through; nothing else strictly OVER budget → highest-leverage
+  pick; `guard` was the most-starved actionable (cyc 207, starved-for 5 — the C211 forecast). Took the primed FE low spot: analytics-api.ts ~36%
+  func — the ONE FE service the C137/C143/C149/C163/C169 "service layer 100%" arc left behind. IDENTIFIED firsthand: the existing test covered
+  ONLY getSummary() (its 404/network fallback control flow — well-pinned); the 12 other method→endpoint wrappers + the pure exported
+  getDefaultDateRange + buildQuery's inclusion-rule edges were entirely uncovered (= the gap). +19 cases: getDefaultDateRange (unix-SECONDS not ms;
+  start exactly 1yr before end same month/day; end at-not-after now), the 13 method wirings (exact path + query, mirroring the C149 expense-api
+  pattern — incl. the no-query bare-path methods financing/insurance + the optional-param buildQuery edges: getFuelStats omits undefined
+  vehicleId / getVehicleTCO + getYearEnd omit absent year, none emit a stray "?"), + a verbatim-return check. VERIFY-FIRSTHAND: ran in isolation
+  FIRST — 24 green (was 5, +19), my getDefaultDateRange seconds/one-year assumptions confirmed empirically. green→green: FE validate:local EXIT 0
+  — 576 pass (+19), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. analytics-api ~36%→well-covered. cov: fe 77.79%+
+  (carry; +19 FE) / be 84.06% (carry). Next FE guard low spot: auth.ts ~56% / sync-manager.ts ~56% (timer/network-bound — less clean).

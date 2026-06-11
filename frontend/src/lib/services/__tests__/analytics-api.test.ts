@@ -16,7 +16,7 @@ vi.mock('../api-client', () => ({
 
 // Import after mock setup
 const { apiClient } = await import('../api-client');
-const { analyticsApi } = await import('../analytics-api');
+const { analyticsApi, getDefaultDateRange } = await import('../analytics-api');
 
 const mockGet = vi.mocked(apiClient.get);
 
@@ -185,5 +185,144 @@ describe('analyticsApi.getSummary()', () => {
 		expect(fallbackResult.quickStats).toBeDefined();
 		expect(fallbackResult.fuelStats).toBeDefined();
 		expect(fallbackResult.fuelAdvanced).toBeDefined();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// getDefaultDateRange — the last-12-months window every analytics page seeds with (C212).
+// Pure, exported, previously untested; a regression in the offset would skew every analytics query.
+// ---------------------------------------------------------------------------
+describe('getDefaultDateRange', () => {
+	it('returns unix-SECONDS (not ms) — both bounds are ~10-digit, not ~13', () => {
+		const { startDate, endDate } = getDefaultDateRange();
+		// seconds since epoch are ~1.7e9 (10 digits); ms would be ~1.7e12 (13). Guards the /1000.
+		expect(endDate).toBeLessThan(1e12);
+		expect(startDate).toBeLessThan(1e12);
+		expect(Number.isInteger(startDate)).toBe(true);
+		expect(Number.isInteger(endDate)).toBe(true);
+	});
+
+	it('start is exactly one year before end (same month/day)', () => {
+		const { startDate, endDate } = getDefaultDateRange();
+		const start = new Date(startDate * 1000);
+		const end = new Date(endDate * 1000);
+		expect(end.getFullYear() - start.getFullYear()).toBe(1);
+		expect(start.getMonth()).toBe(end.getMonth());
+		expect(start.getDate()).toBe(end.getDate());
+	});
+
+	it('end is at/just-before now (window ends at the present, not the future)', () => {
+		const nowSec = Math.floor(Date.now() / 1000);
+		const { endDate } = getDefaultDateRange();
+		expect(endDate).toBeLessThanOrEqual(nowSec + 2); // tiny clock slop
+		expect(endDate).toBeGreaterThan(nowSec - 5);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Method→endpoint wiring + buildQuery (C212). The 12 thin wrappers the getSummary-only suite left
+// uncovered (the ~36% func gap). Mock apiClient, assert the EXACT path + query, and that the wrapper
+// returns the apiClient result verbatim (apiClient.get already unwraps the {success,data} envelope).
+// ---------------------------------------------------------------------------
+describe('analyticsApi — method→endpoint wiring', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockGet.mockResolvedValue({} as never);
+	});
+
+	/** The single URL string a wrapper passed to apiClient.get. */
+	function calledUrl(): string {
+		return mockGet.mock.calls[0]?.[0] as string;
+	}
+
+	it('getFuelEfficiency: no vehicleId → bare path (buildQuery emits no "?")', async () => {
+		await analyticsApi.getFuelEfficiency();
+		expect(calledUrl()).toBe('/api/v1/analytics/fuel-efficiency');
+	});
+
+	it('getFuelEfficiency: a vehicleId is appended as a query param', async () => {
+		await analyticsApi.getFuelEfficiency({ vehicleId: 'veh-1' });
+		expect(calledUrl()).toBe('/api/v1/analytics/fuel-efficiency?vehicleId=veh-1');
+	});
+
+	it('getQuickStats: serializes startDate + endDate', async () => {
+		await analyticsApi.getQuickStats(dateParams);
+		const url = calledUrl();
+		expect(url).toContain('/api/v1/analytics/quick-stats?');
+		expect(url).toContain('startDate=1700000000');
+		expect(url).toContain('endDate=1710000000');
+	});
+
+	it('getFuelStats: omits an undefined vehicleId but keeps the dates', async () => {
+		await analyticsApi.getFuelStats(dateParams);
+		const url = calledUrl();
+		expect(url).toContain('/api/v1/analytics/fuel-stats?');
+		expect(url).not.toContain('vehicleId');
+	});
+
+	it('getFuelStats: includes a provided vehicleId', async () => {
+		await analyticsApi.getFuelStats({ ...dateParams, vehicleId: 'veh-9' });
+		expect(calledUrl()).toContain('vehicleId=veh-9');
+	});
+
+	it('getFuelAdvanced: hits the fuel-advanced endpoint', async () => {
+		await analyticsApi.getFuelAdvanced(dateParams);
+		expect(calledUrl()).toContain('/api/v1/analytics/fuel-advanced?');
+	});
+
+	it('getCrossVehicle: hits the cross-vehicle endpoint', async () => {
+		await analyticsApi.getCrossVehicle(dateParams);
+		expect(calledUrl()).toContain('/api/v1/analytics/cross-vehicle?');
+	});
+
+	it('getFinancing: bare path, no query', async () => {
+		await analyticsApi.getFinancing();
+		expect(calledUrl()).toBe('/api/v1/analytics/financing');
+	});
+
+	it('getInsurance: bare path, no query', async () => {
+		await analyticsApi.getInsurance();
+		expect(calledUrl()).toBe('/api/v1/analytics/insurance');
+	});
+
+	it('getVehicleHealth: appends the vehicleId', async () => {
+		await analyticsApi.getVehicleHealth('veh-2');
+		expect(calledUrl()).toBe('/api/v1/analytics/vehicle-health?vehicleId=veh-2');
+	});
+
+	it('getVehicleTCO: vehicleId only when no year', async () => {
+		await analyticsApi.getVehicleTCO('veh-3');
+		const url = calledUrl();
+		expect(url).toContain('/api/v1/analytics/vehicle-tco?vehicleId=veh-3');
+		expect(url).not.toContain('year');
+	});
+
+	it('getVehicleTCO: includes year when provided', async () => {
+		await analyticsApi.getVehicleTCO('veh-3', { year: 2024 });
+		expect(calledUrl()).toContain('year=2024');
+	});
+
+	it('getVehicleExpenses: serializes vehicleId + date range', async () => {
+		await analyticsApi.getVehicleExpenses('veh-4', dateParams);
+		const url = calledUrl();
+		expect(url).toContain('/api/v1/analytics/vehicle-expenses?');
+		expect(url).toContain('vehicleId=veh-4');
+		expect(url).toContain('startDate=1700000000');
+	});
+
+	it('getYearEnd: no year → bare path (no "?")', async () => {
+		await analyticsApi.getYearEnd();
+		expect(calledUrl()).toBe('/api/v1/analytics/year-end');
+	});
+
+	it('getYearEnd: includes a provided year', async () => {
+		await analyticsApi.getYearEnd({ year: 2023 });
+		expect(calledUrl()).toBe('/api/v1/analytics/year-end?year=2023');
+	});
+
+	it('a wrapper returns the apiClient result verbatim (envelope already unwrapped)', async () => {
+		mockGet.mockResolvedValueOnce(mockQuickStats as never);
+		const result = await analyticsApi.getQuickStats(dateParams);
+		expect(result).toBe(mockQuickStats);
 	});
 });
