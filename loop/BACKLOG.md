@@ -854,11 +854,17 @@ positives, debunked in LEDGER C21; these two are the real ones)*
     markServiced comment was ALREADY accurate ("ownership-scoped"); the route had NO claim; the false
     "optimistic-locked transaction" lived ONLY in design.md:83. Rewrote it to describe the real
     ownership-scoped single-statement update + why no CAS is needed. Doc-only.*
-16. **mark-serviced advances nextDueDate one period even from an overdue date** — `routes.ts:100`
-    computeNextDueDate from the CURRENT (possibly past) nextDueDate advances by ONE period, so marking
+16. **mark-serviced advances nextDueDate one period even from an overdue date** — `routes.ts:115`
+    advanceReminderDueDate from the CURRENT (possibly past) nextDueDate advances by ONE period, so marking
     an overdue reminder serviced without first running /trigger can leave it still in the past
     ("bounces" through past periods, re-firing). Matches the trigger's one-period model + assumes a
     trigger ran first. SEMANTICS CALL: catch-up to >= now, or assert/leave-as-is. (needs decision)
+    **RE-CONFIRMED present C197** (the mark-serviced/mileage-re-arm deep-review); still decision-gated.
+    *(C197 also CERTIFIED CLEAN the rest of that vein: the mark-serviced MILEAGE axis's `vehicleIds[0]`
+    single-vehicle assumption is SAFE — the "must be exactly one vehicle" D4 rule is enforced at validation
+    create+update [refineMileageTrigger], so a mileage reminder provably has 1 vehicle; the apparent
+    asymmetry vs the trigger's length-check was a FALSE POSITIVE. mark-serviced anchoring is consistent with
+    resolveMileageFields create-seed + self-corrects via recheck.)*
 17. **recheck-on-write is CREATE-only** — recheckMileageReminders is wired into expense/odometer
     CREATE, not their UPDATE (PUT). Editing a reading upward across a milestone won't fire until the
     next /trigger. Matches D5's "after a create" wording — a documented scope choice. Expand to UPDATE

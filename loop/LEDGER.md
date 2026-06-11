@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 191 |
+| deep-review | 5 | 197 |
 | guard | 6 | 195 |
 | bug | 3 | 192 |
 | arch | 5 | 194 |
 | infra | 6 | 196 |
 
-Current cycle: **196**
+Current cycle: **197**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3502,3 +3502,18 @@ Current cycle: **196**
   the 6 commits C190–C195), appended **§26 (C190–C195: #62/#63 bugs, the providers credential audit, toDate dedup, activity-tracker
   guard, CLAUDE.md refresh)**, status 1245→1269 BE + fresh cov. Doc/measurement-only — NO code change. Next #5 sweep ~C206; CLAUDE.md
   refresh next ~C203. cov: be 84.08% line / fe 73.89% line (RE-MEASURED).
+- **C197 (deep-review): audit the reminders mark-serviced / mileage-re-arm vein — CERTIFIED CLEAN (1 false positive debunked)** —
+  BALANCE: THREE past budget — `feature` (cyc 170, starved-for 27, blocked 22nd) + `bug` (cyc 192, starved-for 5) + `deep-review`
+  (cyc 191, starved-for 6). Feature blocked; bug still honestly blocked (C196 — clean fixes exhausted, #22 escalated) → most-starved
+  actionable = `deep-review` (6 > 5). Inline (6/3 spawn cap). Vein: reminders/routes.ts mark-serviced re-arm + trigger-service mileage
+  processing (data-integrity — drives WHEN reminders fire; prior findings #16/#47). **CERTIFIED CLEAN (firsthand):** (1) the
+  mark-serviced MILEAGE axis (:101) uses `vehicleIds[0]` WITHOUT a length-check — looked like an asymmetry vs the trigger's
+  D4 length===1 skip (:380), but VERIFIED it's a FALSE POSITIVE (C150): the single-vehicle invariant is ENFORCED at validation
+  (refineMileageTrigger :113-119, "A mileage reminder must be linked to exactly one vehicle", on BOTH create :181 + update :188), so a
+  mileage reminder PROVABLY has exactly 1 vehicle by the time mark-serviced runs — `[0]` is safe, the trigger's check is
+  belt-and-braces. (2) mark-serviced anchoring (`current ?? lastServiceOdometer ?? 0` → `nextDueOdometer = anchor + interval`) is
+  CONSISTENT with resolveMileageFields create-seed (:43-51); the `?? 0` floor is a harmless brand-new-reminder default that
+  self-corrects on the first real reading via recheckMileageReminders. **#16 RE-CONFIRMED present** (time-axis advances one period from
+  the possibly-past nextDueDate :115 → an overdue mark-serviced can land still-past) — but it's the documented SEMANTICS call
+  (catch-up-to-≥now vs one-period), decision-gated, stays filed. NO code change (clean cert + a debunk; #16 not loop-decidable).
+  cov: be 84.08% / fe 73.89% (carry, read-only audit).
