@@ -7,8 +7,12 @@ import { vehicles as vehiclesTable } from '../../db/schema';
 import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
-import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../types';
 import { getPeriodStartDate } from '../../utils/calculations';
+import {
+  mergeUnitPreferences,
+  partialUnitPreferencesSchema,
+  unitPreferencesSchema,
+} from '../../utils/unit-preferences-schema';
 import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
@@ -21,21 +25,8 @@ import { vehicleRepository } from './repository';
 
 const routes = new Hono();
 
-// Zod schema for unitPreferences enum validation
-const unitPreferencesSchema = z.object({
-  distanceUnit: z.enum(DistanceUnit, {
-    message: "Invalid distanceUnit: must be 'miles' or 'kilometers'",
-  }),
-  volumeUnit: z.enum(VolumeUnit, {
-    message: "Invalid volumeUnit: must be 'gallons_us', 'gallons_uk', or 'liters'",
-  }),
-  chargeUnit: z.enum(ChargeUnit, {
-    message: "Invalid chargeUnit: must be 'kwh'",
-  }),
-});
-
-// Partial version for update (each field optional)
-const partialUnitPreferencesSchema = unitPreferencesSchema.partial();
+// unitPreferencesSchema + partialUnitPreferencesSchema now live in utils/unit-preferences-schema.ts
+// (shared with settings/routes.ts — the C238 dedup).
 
 // Validation schemas derived from db schema
 const baseVehicleSchema = createInsertSchema(vehiclesTable, {
@@ -271,11 +262,12 @@ routes.put(
       }
     }
 
-    // Merge partial unitPreferences with existing values
+    // Merge partial unitPreferences with existing values (shared helper — the C238 dedup).
     const { unitPreferences: partialUnitPrefs, ...restUpdateData } = updateData;
-    const mergedUnitPreferences: UnitPreferences | undefined = partialUnitPrefs
-      ? { ...existingVehicle.unitPreferences, ...partialUnitPrefs }
-      : undefined;
+    const mergedUnitPreferences = mergeUnitPreferences(
+      existingVehicle.unitPreferences,
+      partialUnitPrefs
+    );
 
     const updatedVehicle = await vehicleRepository.update(id, {
       ...restUpdateData,

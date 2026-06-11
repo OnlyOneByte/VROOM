@@ -4159,3 +4159,20 @@ Current cycle: **227**
   wholesale (sheetsSyncEnabled dropped on re-PUT without it). NON-VACUOUS: the preserve assertion fails RED pre-fix (wholesale write → drive-a
   absent). green→green: backend validate:local EXIT 0 — 1330 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean (1 import-order + test reflow
   autofixed), build bundled. cov: be 85.18%+ (carry; +2 BE) / fe 80.64% (carry).
+- **C238 (arch): extract the byte-identical `unitPreferencesSchema` + partial + merge idiom (vehicles + settings routes) to one shared module** —
+  BALANCE: `arch` OVER budget (cyc 232, starved-for 6 > 5, FORCED — the C237 forecast). Inline scout. FOUND a clean 2-file dedup: vehicles/routes.ts
+  (24-38) and settings/routes.ts (156-170) each declared a BYTE-IDENTICAL `unitPreferencesSchema = z.object({ distanceUnit/volumeUnit/chargeUnit
+  enums + identical error-message strings })` + `partialUnitPreferencesSchema = .partial()`, AND both PUT handlers repeated the same
+  `partialUnitPrefs ? { ...existing.unitPreferences, ...partialUnitPrefs } : undefined` merge — two sources of truth for one validation contract (a
+  future enum/message change would have to land in both or silently drift). FIX: new pure module `utils/unit-preferences-schema.ts` (depends only on
+  zod + the type enums, NOT the repo-heavy validation.ts) exporting `unitPreferencesSchema`, `partialUnitPreferencesSchema`, and
+  `mergeUnitPreferences(existing, partial)` (returns undefined when nothing to merge so the caller leaves the column untouched; null/undefined
+  existing spread safely — preserving the vehicle-path edge where existing may be null). Wired both routes to import the shared symbols + call the
+  helper; dropped the now-unused unit-enum + UnitPreferences imports from both files. Behavior-IDENTICAL (the helper reproduces the exact spread the
+  two inline sites did). Test-anchored (rule 3, green→green): every existing vehicles + settings route test (incl. the C237 backup-config-merge + the
+  vehicle clear-optional-field + unit-defaults suites) passed UNCHANGED through the swap; +7 direct tests (unit-preferences-schema.test.ts — full vs
+  partial schema validity, enum rejection, and the merge contracts incl. the undefined-when-no-partial + null-existing edges). tsc caught a real
+  test-type issue (the helper's `UnitPreferences` return needs an `as` cast on the partial-expected values — the prior inline behavior). green→green:
+  backend validate:local EXIT 0 — 1338 pass / 1 skip / 0 fail (+7), tsc 0, musl-biome clean (import-order autofixed), build bundled. cov: be 85.18%+
+  (carry; +7 BE) / fe 80.64% (carry). NOTE: the C237 mergeBackupConfig + mergeStorageConfig stay in settings/routes.ts (config-specific, single-site
+  — not over-extracted; arch rule 5 no churn-for-churn).

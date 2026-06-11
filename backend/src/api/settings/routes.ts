@@ -7,14 +7,12 @@ import { getDb } from '../../db/connection';
 import { userPreferences, userProviders } from '../../db/schema';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import type { BackupConfig, StorageConfig } from '../../types';
 import {
-  type BackupConfig,
-  ChargeUnit,
-  DistanceUnit,
-  type StorageConfig,
-  type UnitPreferences,
-  VolumeUnit,
-} from '../../types';
+  mergeUnitPreferences,
+  partialUnitPreferencesSchema,
+  unitPreferencesSchema,
+} from '../../utils/unit-preferences-schema';
 import { preferencesRepository, syncStateRepository } from './repository';
 
 /**
@@ -153,21 +151,8 @@ const routes = new Hono();
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-// Zod schema for unitPreferences enum validation
-const unitPreferencesSchema = z.object({
-  distanceUnit: z.enum(DistanceUnit, {
-    message: "Invalid distanceUnit: must be 'miles' or 'kilometers'",
-  }),
-  volumeUnit: z.enum(VolumeUnit, {
-    message: "Invalid volumeUnit: must be 'gallons_us', 'gallons_uk', or 'liters'",
-  }),
-  chargeUnit: z.enum(ChargeUnit, {
-    message: "Invalid chargeUnit: must be 'kwh'",
-  }),
-});
-
-// Partial version for update (each field optional)
-const partialUnitPreferencesSchema = unitPreferencesSchema.partial();
+// unitPreferencesSchema + partialUnitPreferencesSchema now live in utils/unit-preferences-schema.ts
+// (shared with vehicles/routes.ts — the C238 dedup).
 
 // Zod schema for storageConfig validation
 const categorySettingSchema = z.object({
@@ -276,9 +261,10 @@ routes.put('/', async (c) => {
     backupConfig,
     ...restUpdates
   } = updates;
-  const mergedUnitPreferences: UnitPreferences | undefined = partialUnitPrefs
-    ? { ...existingSettings.unitPreferences, ...partialUnitPrefs }
-    : undefined;
+  const mergedUnitPreferences = mergeUnitPreferences(
+    existingSettings.unitPreferences,
+    partialUnitPrefs
+  );
 
   // Validate storageConfig if provided
   let mergedStorageConfig: StorageConfig | undefined;

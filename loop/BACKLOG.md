@@ -1283,6 +1283,11 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     added later, C214). Test-anchored green→green (trigger-bad-interval-unit asserts skip.message contains the real error text). Confirmed AGAIN:
     the `error instanceof Error ? .message : ...` idiom across 16 files is EXCLUDED by design (C147/C211 — logger structured-shape + fixed-fallback
     stay inline); do NOT re-file it.
+  - **C238 (arch): byte-identical `unitPreferencesSchema` + partial + `{ ...existing, ...partial }` merge (vehicles + settings routes) → one shared
+    `utils/unit-preferences-schema.ts`.** DONE — two sources of truth for one validation contract (a future enum/message change would drift)
+    collapsed to a pure module (zod + type enums only, NOT the repo-heavy validation.ts); `mergeUnitPreferences` handles the null-existing vehicle
+    edge. +7 direct tests; every existing vehicles/settings route test passed UNCHANGED. The C237 mergeBackup/StorageConfig stay single-site in
+    settings (config-specific — not over-extracted, rule 5).
   - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
     pending-migration constraints rule out most FE/money candidates). The BE logging-idiom convergence stays EXCLUDED by design (C147/C211); do
     NOT re-file it. Genuinely thin now — prefer a fan-out to surface a fresh candidate over forcing a micro-dedup.
