@@ -364,12 +364,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > `restore.ts:160-246` (restoreFromSheets) is uncovered but needs a process-global Sheets-service mock — NO sync test uses mock.module
 > (the C38/C91 cross-suite-flake trap), so it's NOT a clean guard pick; defer until a DI seam exists or accept the gap. **The clean BE
 > route/util low spots are now largely worked through (analytics/sync routes C185/C188, backup-orchestrator C181, activity-tracker pure
-> slice C195) — next guard cycles steer FRONTEND. **PRIMED FE guard pick (C199 deep-review): `calculatePayoffDateFromStart`
-> (financing-calculations.ts:545) — VERIFIED correct firsthand but has NO test (the C196 :540-547 uncovered range); a subtle
-> month-overflow clamp (Jan-31 + 1mo → Feb-28 via setDate(0)) a refactor could silently break → pin it. FE low spots (FRESH C196 measure):
+> slice C195) — next guard cycles steer FRONTEND. ~~**PRIMED FE guard pick (C199 deep-review): `calculatePayoffDateFromStart`
+> (financing-calculations.ts:545)**~~ — DONE C207 (+12: the month-overflow clamp [Jan31+1→Feb28, leap→Feb29, Aug31+1→Sep30], no-clamp paths,
+> year-rollover incl. Dec31+2→Feb28-2025, + the real date-only-string path with tz-robust assertions; verified-in-isolation first, my reasoned
+> clamp values confirmed). FE low spots (FRESH C196 measure):
 > ~~the ~15% form-validation module~~ DONE C201 (it was `expense-form-validation.ts` 127-line — +19 covering amount/volume/charge bounds,
 > the electric-vs-liquid unit gating, + validateMileage monotonicity); `analytics-api.ts` ~36% func, `sync-manager.ts` ~56% (timer/network-bound — less
-> clean), `auth.ts` ~56%; `settings.svelte.ts` ~11% is the filed handleError arch pick (deferred). The components/routes deficit is
+> clean), `auth.ts` ~56%; `settings.svelte.ts` ~11% is the filed handleError arch pick (deferred). **NEXT FE guard pick (no primed): analytics-api.ts
+> ~36% func or auth.ts ~56% — both pure-ish service/util slices.** The components/routes deficit is
 > the bulk + largely eyes-on.** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
 > the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
 > `.svelte.ts`/store/util modules still thin, e.g. settings.svelte.ts 10% [but that's the filed handleError arch pick] /

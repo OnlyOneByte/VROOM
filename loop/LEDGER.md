@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 204 |
-| guard | 6 | 201 |
+| guard | 6 | 207 |
 | bug | 3 | 206 |
 | arch | 5 | 205 |
 | infra | 6 | 203 |
 
-Current cycle: **206**
+Current cycle: **207**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3665,3 +3665,17 @@ Current cycle: **206**
   → isActive true; + an already-active-update idempotent control). NON-VACUOUS: confirmed the regression FAILS RED with the fix reverted
   (isActive stayed false) then GREEN restored (the C77 anti-vacuity check). green→green: backend validate:local EXIT 0 — 1274 pass / 1 skip
   / 0 fail (+2), tsc 0, musl-biome clean, build bundled. cov: be 84.06%+ (carry; +2 BE) / fe 77.79% (carry).
+- **C207 (guard): cover calculatePayoffDateFromStart — the vehicle-form payoff-date month-overflow clamp** — BALANCE: `feature`
+  most-starved (cyc 170, starved-for 37, blocked 32nd) but blocked → fell through; `guard` AT budget (cyc 201, starved-for 6 = 6, due) →
+  the most-starved actionable (the C206 forecast). Took the C199-PRIMED pick — `calculatePayoffDateFromStart` (financing-calculations.ts:545,
+  the VehicleForm amortization-preview payoff date), VERIFIED-correct firsthand at C199 but with ZERO test coverage (confirmed: only the source
+  + the VehicleForm caller reference it). The load-bearing logic is a subtle month-overflow CLAMP: `new Date(y, startMonth+n, startDay)` rolls
+  a day past the target month's length INTO the next month (Jan 31 + 1mo → Mar 3, Feb has no 31st), so it detects the rolled day
+  (`getDate() !== start.getDate()`) + `setDate(0)`s back to the intended month's last day — exactly the date arithmetic a refactor silently
+  breaks. Created payoff-date-from-start.test.ts (+12): the clamp (Jan31+1→Feb28; leap→Feb29; Aug31+1→Sep30; May31+1→Jun30), no-clamp paths
+  (mid-month exact day; 0 payments; the 28th never overflows), year-rollover (Mar15+12→next-year; Oct15+6 crosses; Dec31+2 rolls year AND
+  clamps → Feb28 2025), + the real date-only-STRING call path with timezone-ROBUST relative assertions (payoff > start, year lands; the C103/C77
+  UTC-parse trap — Date-OBJECT inputs for the exact-field cases so getMonth/getDate read the same frame the fn constructs). VERIFY-FIRSTHAND:
+  ran in isolation FIRST — all 12 green, my reasoned clamp values (Feb 28/29, Sep 30, Dec31+2→Feb28-2025) confirmed correct. green→green:
+  FE validate:local EXIT 0 — 557 pass (+12), tsc 0, build OK; prettier + eslint clean on the new file. Test-only, no production change.
+  cov: fe 77.79%+ (carry; +12 FE) / be 84.06% (carry). Next FE guard pick (no primed): analytics-api.ts ~36% func or auth.ts ~56%.
