@@ -4017,3 +4017,16 @@ Current cycle: **227**
   AND an interim unset-then-throw (coverFlag('p1')===0) — green only once validation precedes the unset (live evidence this session). green→green:
   backend validate:local EXIT 0 — 1319 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (1 unused-import + reflow fixed), build bundled.
   cov: be 84.25%+ (carry; +3 BE, setCoverPhoto now really covered) / fe 80.33% (carry).
+- **C230 (infra): CLAUDE.md orientation refresh — stale coverage reading + suite size + closed-bug list (drifted C219→C229)** — BALANCE: TWO
+  at-budget — `infra` (cyc 224, starved-for 6 = 6) + `deep-review` (cyc 225, starved-for 5 = 5); `infra` waited LONGER (touched C224 vs C225) →
+  infra wins the tiebreak. The #5 branch-hygiene sweep just ran C224 (only ~6 cycles / a few commits ago — not due), so the actionable infra
+  increment is the CLAUDE.md refresh: it last refreshed ~C219 and three things had drifted materially. (1) The coverage paragraph cited the
+  SUPERSEDED C213 reading (be 84.14/84.49, fe 79.22/78.89) — replaced with the C224 #5-sweep measure (be 84.25% line / 84.60% func, fe 80.33%
+  line / 79.87% func / 74.45% branch; FE crossed 80%), and folded C223 sync-manager into the FE-ratchet list. (2) "Next BE low spot:
+  activity-tracker.ts ~44%" was stale — its pure slice (cleanupInactiveUsers) was covered C195 + the rest is timer/orchestrator-bound; updated to
+  "clean BE route/util low spots largely worked through; next guard cycles thin both sides." (3) Suite size "~1300 BE / ~580 FE" → "~1320 BE /
+  ~585 FE" (actual 1319/585) and the closed-bug list ended at #73/C218 → extended with #74 (C220 photos changeTracker), #75 (C222 mpg ordering),
+  #76 (C226 category-switch fuel fields), #77 (C227 vehicle-photo nosniff), #78 (C229 setCoverPhoto); also threaded C229 into the recurring
+  coverage-theater lesson (the property tests never drove the real setCoverPhoto). DOCS-ONLY (CLAUDE.md only — verified `git diff --name-only`
+  shows just CLAUDE.md), no source touched → no build gate (the C195/C213/C224 doc-refresh precedent). Next CLAUDE.md refresh ~C240; next #5
+  sweep ~C234. cov: be 84.25% / fe 80.33% (carry — no code, no re-measure this cycle).

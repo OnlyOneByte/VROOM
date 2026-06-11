@@ -156,23 +156,25 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C213, not an estimate): **backend 84.14% line / 84.49% func · frontend 79.22% line / 78.89%
-  func / 73.52% branch** — backend ~84% (the C178–C211 BE bug-fix + route-coverage arc);
-  frontend climbed 65.3→79.2 since C138 under a sustained
+  (re-measured C224, not an estimate): **backend 84.25% line / 84.60% func · frontend 80.33% line / 79.87%
+  func / 74.45% branch** (frontend CROSSED 80% line at C224) — backend ~84% (the C178–C222 BE bug-fix + route-coverage arc);
+  frontend climbed 65.3→80.3 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
   C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts, C201
-  expense-form-validation, C207 payoff-date clamp, C212 analytics-api, C217 auth.ts). **The FE
-  SERVICE + pure-util layers are now essentially fully covered** (api-client + expense-api + reminder-api +
-  settings-api + error-handling + analytics-api + auth); the remaining FE gap is the **components/routes deficit**
-  (largely eyes-on) + a couple timer/network-bound modules (e.g. sync-manager.ts ~56%, the least-clean pick). Backend
+  expense-form-validation, C207 payoff-date clamp, C212 analytics-api, C217 auth.ts, C223 sync-manager conflict-classification).
+  **The FE SERVICE + pure-util layers are now essentially fully covered** (api-client + expense-api + reminder-api +
+  settings-api + error-handling + analytics-api + auth + sync-manager's clean slice); the remaining FE gap is the **components/routes deficit**
+  (largely eyes-on) + the network/timer-bound retry tails (the C163 mock-trap, low-value) — so the next FE guard cycles are thin; prefer BE low spots. Backend
   middleware trio all covered (idempotency C105, rate-limit C112, body-limit C156); `backup-orchestrator.ts`
   0→50% func (C181 — its old test was COVERAGE THEATER, re-implementing the logic locally instead of importing
   it; watch for that pattern), `analytics/routes.ts` 15→59% (C185), `sync/routes.ts` 32→59% (C188) — all via
-  the createTestApp HTTP harness. Next BE low spot: `activity-tracker.ts` (~44%, but timer/setInterval-bound —
-  less clean). NOTE: `restore.ts` restoreFromSheets needs a process-global Sheets mock the sync suite avoids
-  (see C163) — defer until a DI seam exists.
+  the createTestApp HTTP harness. `activity-tracker.ts`'s pure slice (`cleanupInactiveUsers` ageout) covered C195; its
+  rest (handleInactivity/performAutoSync/performAutoBackup) is setTimeout + orchestrator-bound — left documented, not a
+  clean unit pick. NOTE: `restore.ts` restoreFromSheets needs a process-global Sheets mock the sync suite avoids
+  (see C163) — defer until a DI seam exists. **The clean BE route/util low spots are now largely worked through —
+  next guard cycles are thin both sides; prefer a fresh deep-review-surfaced fix.**
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1300 backend tests / ~580 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1320 backend tests / ~585 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
@@ -202,9 +204,14 @@ Highlights:
   in the outbox [C204], re-financing a paid-off vehicle produced an INACTIVE record [C206], restore coerceRow
   truncated a thousands-separated number via parseInt [C209], /insurance/expiring-soon `days` NaN → Invalid Date →
   silently zero results [C210], mileage-reminder recheck was CREATE-only so an EDIT crossing a milestone didn't fire
-  [C214], photos findByEntityPaginated userId-scoped [C215], a split-config-only reminder update falsely 400'd [C218])
-  all landed C155–C218. Recurring lesson the loop keeps re-finding (C181/C182/C185): a green test that RE-IMPLEMENTS or
-  RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module.
+  [C214], photos findByEntityPaginated userId-scoped [C215], a split-config-only reminder update falsely 400'd [C218],
+  photos route missing changeTracker → photo-only change excluded from the next auto-backup [#74, C220], calculateAverageMpg
+  caller-ordering dependence [#75, C222], expense category-switch leaves stale fuel fields [#76, C226], vehicle-photo serve
+  missing nosniff [#77, C227 — closed as an arch-dedup side effect], setCoverPhoto id-alone write + getDb-singleton bind +
+  validate-before-unset [#78, C229]) all landed C155–C229. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
+  a green test that RE-IMPLEMENTS or RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module
+  (C229: the two photo "property" tests only drove a reference model, never the real setCoverPhoto, which was also
+  getDb-singleton-bound and thus untestable via a constructed repo until switched to this.db.transaction).
 - Pending an Angelo decision (filed, NOT auto-fixed — each changes a displayed $/HTTP behavior or is a
   product call). TWO HIGHs, both in the Google Sheets backup path: **#36** (writes `USER_ENTERED` →
   formula injection + silent round-trip corruption; ARCC-consult before fixing), **#37** (non-atomic
