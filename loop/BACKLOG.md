@@ -1219,7 +1219,14 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     (each → `const file = await parseUploadedPhoto(c)`) + dropped the now-unused AppError import from both. PAYOFF: one source of truth for the
     upload-input contract + the seam for the #34 follow-on (size/type/magic-byte validation lands once). +3 direct tests (File→returned;
     missing→400; non-File→400, via a minimal Hono app + FormData); existing upload suites green through. green→green 1306 pass (+3). ALSO
-    verified firsthand a #74 sibling-gap is NOT real: vehicles/photo-routes.ts inherits changeTracker from its parent (use('*') before .route()).* **ARCH QUEUE thin — next arch cycle prefers a rule-7 fan-out over forcing a micro-dedup.**
+    verified firsthand a #74 sibling-gap is NOT real: vehicles/photo-routes.ts inherits changeTracker from its parent (use('*') before .route()).*
+  - ~~**`photoThumbnailResponse` — the photo byte-serve Response, 2 sites → 1 (C227 inline scout; ALSO closed security gap #77)**~~ — *DONE C227:
+    the thumbnail serve `new Response(buffer, {headers})` existed at photos/routes.ts:85 + vehicles/photo-routes.ts:59 with the SAME headers
+    EXCEPT the generic route carried `X-Content-Type-Options: nosniff` (C133/#35) and the VEHICLE route did NOT (#77) — so the vehicle path (the
+    PRIMARY photo surface) was MIME-sniff-exploitable (client-asserted never-sniffed mimeType). Extracted `photoThumbnailResponse(buffer,
+    mimeType)` to photos/helpers.ts with nosniff baked in + wired both → vehicle GAINS nosniff (security fix), generic unchanged, future drift
+    prevented. UPDATED the C133 source-scan to follow the literal to the builder + pin both routes call it; NON-VACUOUS (RED with vehicle wiring
+    reverted). green→green 1310 pass (+1). **#77 (vehicle-photo serve missing nosniff) CLOSED.*** **ARCH QUEUE thin — next arch cycle prefers a rule-7 fan-out over forcing a micro-dedup.**
   - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
     pending-migration constraints rule out most FE/money candidates). The BE logging-idiom convergence stays EXCLUDED by design (C147/C211); do
     NOT re-file it. Genuinely thin now — prefer a fan-out to surface a fresh candidate over forcing a micro-dedup.

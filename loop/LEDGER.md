@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 225 |
 | guard | 6 | 223 |
 | bug | 3 | 226 |
-| arch | 5 | 221 |
+| arch | 5 | 227 |
 | infra | 6 | 224 |
 
-Current cycle: **226**
+Current cycle: **227**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3967,3 +3967,17 @@ Current cycle: **226**
   feature-DoD rule. (Process: my first guard draft used bun:test/import.meta.dir [the BACKEND source-scan idiom] → vitest rejected it; fixed to
   vitest + fileURLToPath, the FE sibling convention.) green→green: FE validate:local EXIT 0 — 585 pass (+1), tsc 0, build OK; prettier + eslint
   clean. cov: fe 80.33%+ (carry; +1 FE) / be 84.25% (carry).
+- **C227 (arch → also closed #77 security gap): extract photoThumbnailResponse — the photo byte-serve Response, 2 sites → 1** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 57, blocked 52nd) but blocked → fell through; `arch` FORCED (cyc 221, starved-for 6 > 5 — the
+  C226 forecast). Inline scout. FOUND a dedup that ALSO closes a real security divergence (the C205/C211 "dedup-collapses-the-bug" pattern, here
+  on a SECURITY header): the photo-thumbnail byte-serve `new Response(buffer, {headers})` existed at 2 sites — generic photos/routes.ts (:85) +
+  vehicles/photo-routes.ts (:59) — with the SAME headers EXCEPT the generic route carried `X-Content-Type-Options: nosniff` (the C133/#35 fix)
+  and the VEHICLE route did NOT (#77, VERIFIED firsthand). Since the serve uses the client-asserted never-sniffed mimeType, the vehicle path —
+  the PRIMARY photo surface — was MIME-sniff-exploitable (a declared-image/actually-HTML file could execute). Extracted
+  `photoThumbnailResponse(buffer, mimeType)` to photos/helpers.ts (beside parseUploadedPhoto) with nosniff baked in + wired BOTH sites → the
+  vehicle path GAINS nosniff (security fix) + the generic path is behavior-identical + future header drift between the two is structurally
+  prevented. Test-anchored: UPDATED the C133 photo-serve-headers.test.ts source-scan to follow the literal to its new home (helpers.ts builder)
+  + EXTENDED it to pin BOTH routes call the shared builder (the #77 assertion). NON-VACUOUS: confirmed the vehicle-route assertion FAILS RED with
+  that wiring reverted. (Process: gate first red on the test's long-line FORMAT → check:musl:fix reflowed it; pre-existing noNonNullAssertion are
+  warnings, untouched.) green→green: backend validate:local EXIT 0 — 1310 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean, build bundled.
+  cov: be 84.25%+ (carry; +1 BE) / fe 80.33% (carry). #77 (vehicle-photo serve missing nosniff) CLOSED as a side effect.

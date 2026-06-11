@@ -96,3 +96,24 @@ export async function parseUploadedPhoto(c: Context): Promise<File> {
   }
   return file;
 }
+
+/**
+ * Build the byte-serving Response for a photo thumbnail — ONE source of truth for the serve headers
+ * (C227 dedup). Both the generic photos route and the vehicle-photo sub-router served user-uploaded
+ * bytes with the same header set EXCEPT one: the generic route carried `X-Content-Type-Options: nosniff`
+ * (the C133/#35 fix) and the vehicle route did NOT — a real security divergence (#77), since the serve
+ * uses the CLIENT-asserted, never-sniffed `mimeType`, so without nosniff a file whose bytes are
+ * HTML/script but declared image/png could be MIME-sniffed + executed by the browser (a stored-content
+ * vector) on the PRIMARY photo surface. Routing both through this builder closes the gap + prevents
+ * future drift. nosniff is MANDATORY here (ARCC Secure-HTTP-Headers / Secure-File-Uploads).
+ */
+export function photoThumbnailResponse(buffer: Buffer, mimeType: string): Response {
+  return new Response(buffer, {
+    headers: {
+      'Content-Type': mimeType,
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'private, max-age=3600',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    },
+  });
+}

@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { NotFoundError } from '../../errors';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas } from '../../utils/validation';
-import { parseUploadedPhoto } from '../photos/helpers';
+import { parseUploadedPhoto, photoThumbnailResponse } from '../photos/helpers';
 import {
   deletePhotoForEntity,
   getPhotoThumbnailForEntity,
@@ -56,13 +56,7 @@ photoRoutes.get('/:photoId/thumbnail', async (c) => {
     user.id
   );
 
-  return new Response(buffer, {
-    headers: {
-      'Content-Type': mimeType,
-      'Cache-Control': 'private, max-age=3600',
-      'Cross-Origin-Resource-Policy': 'cross-origin',
-    },
-  });
+  return photoThumbnailResponse(buffer, mimeType);
 });
 
 // PUT /:photoId/cover — Set cover photo
