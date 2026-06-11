@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 197 |
 | guard | 6 | 195 |
-| bug | 3 | 192 |
+| bug | 3 | 198 |
 | arch | 5 | 194 |
 | infra | 6 | 196 |
 
-Current cycle: **197**
+Current cycle: **198**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3517,3 +3517,20 @@ Current cycle: **197**
   the possibly-past nextDueDate :115 → an overdue mark-serviced can land still-past) — but it's the documented SEMANTICS call
   (catch-up-to-≥now vs one-period), decision-gated, stays filed. NO code change (clean cert + a debunk; #16 not loop-decidable).
   cov: be 84.08% / fe 73.89% (carry, read-only audit).
+- **C198 (bug → #64): lease excess-mileage projection treated the ANNUAL limit as the whole-lease allowance** — BALANCE: TWO past
+  budget — `feature` (cyc 170, starved-for 28, blocked 23rd) + `bug` (cyc 192, starved-for 6). Feature blocked → `bug` forced. The
+  FILED queue is still all gated (#22/#51 escalated, no Angelo answer; rest decision/approach-gated), so per the C189 precedent I
+  HUNTED A FRESH bug on an un-scanned surface — FE money math (the #55/#56 displayed-$ class). Inline (6/3 spawn cap). **FOUND #64
+  (MED-HIGH, displayed-$, VERIFIED firsthand):** `calculateLeaseMetrics` (frontend financing-calculations.ts:369) compares the
+  lifetime `mileageUsed` + `projectedFinalMileage` against `financing.mileageLimit` DIRECTLY — but that field is the ANNUAL limit
+  (CONFIRMED: the form labels it "Annual Mileage Limit" FinancingFormSection.svelte:261 + schema.ts:84 comment). So a 36-mo lease at
+  12,000 mi/yr (36,000 total allowed) driven a normal 30,000 mi showed ~18,000 PHANTOM excess miles × the per-mile fee = thousands of
+  $ of fake excess-mileage fees on the FinanceTab/LeaseMetricsCard. Backend analytics doesn't touch these fields → FE-only, contained.
+  FIX: `totalMileageAllowance = mileageLimit × (termMonths/12)` (termMonths .notNull; falls back to the annual value if 0), used in all
+  3 comparisons (projected-excess, remaining, init). VERIFY-FIRSTHAND PAID OFF TWICE: (1) confirmed the annual semantics at the
+  form+schema before acting (not a false positive); (2) the existing lease-metrics.test.ts had BAKED IN the bug (its 36000 fixture
+  treated annual-as-total; even its header said "no product bug found") → reconciled its 5 affected assertions to a realistic 12000/yr
+  fixture (→ 36000 term-scaled total, preserving their intent) + added a #64 describe (3 cases pinning annual×years scaling; my own
+  first draft over-drove the fixture → caught + corrected the projection arithmetic). green→green: FE validate:local **EXIT 0 — 516
+  pass (+6)**, tsc 0, build OK; + CI-only eslint + prettier clean on both touched files. #64 CLOSED. cov: fe 73.89%+ (carry; +6 FE) /
+  be 84.08% (carry).

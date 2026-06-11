@@ -687,7 +687,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   one layer up (not exploitable), but the C109/#52 tenant-scope-at-the-write class. FIX: ANDed `eq(userProviders.userId, user.id)` into
   BOTH write predicates (behavior-identical today — the guard proves ownership; mirrors C155 split + C168/C180 odometer). +3 tests via
   a raw-seeded COEXISTING foreign provider (foreign DELETE→404 + row SURVIVES; foreign PUT→404 + displayName UNCHANGED; own delete→204)
-  — pins the WRITE PREDICATE itself, not just the guard. green→green 1263 pass (+3).* (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent (delayed event, triaged post-C155): its Finding 1 → **#54 (HIGH, VERIFIED firsthand)** filed below; its div-guard/split-sibling checks matched my C155 pre-read (isFillup volume>0, fillupDetails length-guards, per-vehicle distance — clean).**
+  — pins the WRITE PREDICATE itself, not just the guard. green→green 1263 pass (+3).*
+- ~~**#64 (MED-HIGH, displayed-$ — found C198 via a fresh FE-money hunt) — lease excess-mileage projection treated the ANNUAL
+  mileageLimit as the whole-lease allowance.**~~ — *DONE C198: `calculateLeaseMetrics` (frontend financing-calculations.ts:369)
+  compared the lifetime mileageUsed + projectedFinalMileage against `financing.mileageLimit` directly, but that field is the ANNUAL
+  limit (form labels it "Annual Mileage Limit" + schema comment agrees). A 36-mo lease at 12k/yr (36k total) driven a normal 30k showed
+  ~18k PHANTOM excess miles × per-mile fee = thousands of $ fake excess fees on FinanceTab/LeaseMetricsCard. Backend doesn't touch
+  these fields → FE-only. FIX: totalMileageAllowance = mileageLimit × (termMonths/12), used in all 3 comparisons. VERIFIED the annual
+  semantics firsthand before acting + reconciled the existing lease-metrics.test.ts (which had BAKED IN the bug — its 36000 fixture
+  treated annual-as-total) to a realistic 12000/yr fixture + a #64 describe (annual×years scaling). green→green FE 516 pass (+6).*
+
+> [stray prior-edit run-on — the C155 deep-review block header, preserved for the audit trail:] (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent (delayed event, triaged post-C155): its Finding 1 → **#54 (HIGH, VERIFIED firsthand)** filed below; its div-guard/split-sibling checks matched my C155 pre-read (isFillup volume>0, fillupDetails length-guards, per-vehicle distance — clean).**
 - ~~**#52 (MED, security defense-in-depth) — split delete/regenerate keyed the destructive write on groupId alone.**~~ — *DONE
   C155: `deleteSplitExpense` (repository.ts:720) + `updateSplitExpense` step 2 (:771) ran `delete(expenses).where(eq(groupId))`
   while their guarding SELECTs (:704/:743) were userId-scoped — ownership check + destructive write on DIFFERENT predicates. NOT

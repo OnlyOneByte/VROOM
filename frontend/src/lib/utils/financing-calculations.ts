@@ -409,8 +409,17 @@ export function calculateLeaseMetrics(
 		const daysRemaining = Math.max(0, totalDays - daysElapsed);
 		const monthsRemaining = Math.max(0, Math.ceil(daysRemaining / 30));
 
+		// `mileageLimit` is the ANNUAL allowance (the form labels it "Annual Mileage Limit" + the schema
+		// comment agrees), so the WHOLE-LEASE allowance the excess-fee projection compares against is
+		// annual × (term / 12) — e.g. 12,000/yr on a 36-mo lease = 36,000 total. Comparing the lifetime
+		// mileageUsed / projectedFinalMileage against the bare annual number (the prior bug, #64)
+		// over-reported excess ~Nx for an N-year lease (a normal 30k-mi 3yr lease showed ~18k phantom
+		// excess miles + fees). termMonths is `.notNull()`; fall back to the annual limit (term≈12mo) if 0.
+		const leaseYears = financing.termMonths > 0 ? financing.termMonths / 12 : 1;
+		const totalMileageAllowance = (financing.mileageLimit || 0) * leaseYears;
+
 		let mileageUsed = 0;
-		let mileageRemaining = financing.mileageLimit || 0;
+		let mileageRemaining = totalMileageAllowance;
 		let projectedFinalMileage = currentMileage || 0;
 		let projectedExcessMiles = 0;
 		let projectedExcessFee = 0;
@@ -420,10 +429,10 @@ export function calculateLeaseMetrics(
 			mileageUsed = Math.max(0, currentMileage - initialMileage);
 			const milesPerDay = daysElapsed > 0 ? mileageUsed / daysElapsed : 0;
 			projectedFinalMileage = currentMileage + milesPerDay * daysRemaining;
-			projectedExcessMiles = Math.max(0, projectedFinalMileage - financing.mileageLimit);
+			projectedExcessMiles = Math.max(0, projectedFinalMileage - totalMileageAllowance);
 			projectedExcessFee = projectedExcessMiles * (financing.excessMileageFee || 0);
 			isOverMileage = projectedExcessMiles > 0;
-			mileageRemaining = Math.max(0, financing.mileageLimit - mileageUsed);
+			mileageRemaining = Math.max(0, totalMileageAllowance - mileageUsed);
 		}
 
 		return {
