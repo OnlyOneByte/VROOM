@@ -1,4 +1,5 @@
 import { isElectricFuelType } from '../db/types';
+import { maxOf, minOf } from './calculations';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -403,8 +404,8 @@ export function computeFuelConsumptionMetrics(efficiencyValues: number[]): {
     return { avgEfficiency: null, bestEfficiency: null, worstEfficiency: null };
   return {
     avgEfficiency: efficiencyValues.reduce((a, b) => a + b, 0) / efficiencyValues.length,
-    bestEfficiency: Math.max(...efficiencyValues),
-    worstEfficiency: Math.min(...efficiencyValues),
+    bestEfficiency: maxOf(efficiencyValues),
+    worstEfficiency: minOf(efficiencyValues),
   };
 }
 
@@ -440,8 +441,8 @@ export function computeAverageCosts(
   const totalSpending = withCost.reduce((s, r) => s + r.expenseAmount, 0);
   return {
     perFillup,
-    bestCostPerDistance: costPerMileValues.length > 0 ? Math.min(...costPerMileValues) : null,
-    worstCostPerDistance: costPerMileValues.length > 0 ? Math.max(...costPerMileValues) : null,
+    bestCostPerDistance: costPerMileValues.length > 0 ? minOf(costPerMileValues) : null,
+    worstCostPerDistance: costPerMileValues.length > 0 ? maxOf(costPerMileValues) : null,
     avgCostPerDay: withCost.length > 0 ? totalSpending / daysSoFar : null,
   };
 }
@@ -760,34 +761,24 @@ export function buildVehicleRadar(
       vehicleName: vehicleNameMap.get(vId) ?? 'Unknown',
       fuelEfficiency: normalizeScore(
         m.fuelEfficiency,
-        Math.min(...fuelEffVals),
-        Math.max(...fuelEffVals),
+        minOf(fuelEffVals),
+        maxOf(fuelEffVals),
         false
       ),
       maintenanceCost: normalizeScore(
         m.maintenanceCost,
-        Math.min(...maintCostVals),
-        Math.max(...maintCostVals),
+        minOf(maintCostVals),
+        maxOf(maintCostVals),
         true
       ),
       reliability: normalizeScore(
         m.maintenanceCount,
-        Math.min(...reliabilityVals),
-        Math.max(...reliabilityVals),
+        minOf(reliabilityVals),
+        maxOf(reliabilityVals),
         true
       ),
-      annualCost: normalizeScore(
-        m.annualCost,
-        Math.min(...annualCostVals),
-        Math.max(...annualCostVals),
-        true
-      ),
-      mileage: normalizeScore(
-        m.totalMileage,
-        Math.min(...mileageVals),
-        Math.max(...mileageVals),
-        false
-      ),
+      annualCost: normalizeScore(m.annualCost, minOf(annualCostVals), maxOf(annualCostVals), true),
+      mileage: normalizeScore(m.totalMileage, minOf(mileageVals), maxOf(mileageVals), false),
     };
   });
 }

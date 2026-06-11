@@ -568,6 +568,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   CREATE composite `(user_id, license_plate)` partial unique; journal idx 5 + schema.ts updated (was absent there — fixed drift too). +3 HTTP tests
   (cross-tenant CREATE→201, same-user dup→409, cross-tenant UPDATE→200); NON-VACUOUS (both cross-tenant cases RED pre-fix: 409 then 500). green→green
   1322 pass (+3).*
+- ~~**#81 (MED, reliability / NORTH_STAR #1-adjacent — found C235 deep-review of the analytics read-path) — `Math.max(...arr)` argument-spread
+  crash-class.**~~ — *DONE C235: `Math.max(...mileages)` / `Math.min(...arr)` spreads each element as a function arg → a heavy logger's UNBOUNDED
+  analytics arrays (queryFuelExpenses/queryAllExpenses have no LIMIT; the all-time 'all' period no range filter) overflow the engine argument cap
+  → `RangeError: Maximum call stack size exceeded` crashes the analytics request. 18 sites: analytics/repository.ts (4, incl. cross-fleet total
+  distance on every summary), analytics-charts.ts (12, radar + best/worst), vehicle-stats.ts (1, per-vehicle latestMileage). FIX: spread-safe
+  `maxOf`/`minOf` (O(n) reduce) in calculations.ts + swept all 18 → behavior-IDENTICAL (return ±Infinity on [] exactly like Math.max/min, so the
+  existing length-guards are unchanged). +6 tests (array-min-max.test.ts: correctness + Math.max/min identity + 50-trial parity + a 500k-element
+  no-spread regression). green→green 1328 pass (+6), every existing analytics/vehicle-stats test passed UNCHANGED through the swap.*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:

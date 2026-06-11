@@ -4104,3 +4104,25 @@ Current cycle: **227**
   validate:local EXIT 0 — 592 pass (+6), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. cov: fe 80.33%+ (carry; +6 FE)
   / be 84.25% (carry). (vehicle-helpers.ts — the one truly untested FE util — was REJECTED as a pick: a single trivial display-name helper,
   pinning it would be borderline coverage-theater.)
+- **C235 (deep-review → bug-class fix): `Math.max(...arr)` argument-spread crash-class across the analytics read-path — 18 sites swept to
+  spread-safe `maxOf`/`minOf` reduce helpers** — BALANCE: `infra` was most-starved (cyc 230, starved-for 5) BUT its only real increment (the #5
+  sweep's coverage re-measure via `bun test --coverage`) is BLOCKED by refused heavy tooling this session → per don't-force-a-blocked-pick, took
+  the next most-starved ACTIONABLE = `deep-review` (cyc 231, starved-for 4, inline-doable; the C231/C179 spawn-400 precedent). Audited the analytics
+  aggregation read-path firsthand. FOUND a systemic latent crash-class (VERIFIED, NORTH_STAR #1-adjacent): `Math.max(...mileages)` /
+  `Math.min(...arr)` spreads every element as a function argument, so a large array overflows the engine's argument-count cap and throws
+  `RangeError: Maximum call stack size exceeded`, crashing the analytics REQUEST. CONFIRMED the arrays are UNBOUNDED: queryFuelExpenses /
+  queryAllExpenses have NO LIMIT (the all-time 'all' period has no range filter either), so the mileages/volumes arrays scale 1:1 with a heavy
+  logger's fillup count — thousands-to-tens-of-thousands of rows reaches the cap (V8 ~65k, stack-depth-dependent). 18 spread sites across 3 files:
+  analytics/repository.ts (4 — incl. line 503 cross-fleet total distance, hit on EVERY /analytics summary), utils/analytics-charts.ts (12 — radar
+  + best/worst efficiency/cost), utils/vehicle-stats.ts (1 — per-vehicle latestMileage, also fillup-scaled). FIX (one coherent class-closing
+  increment): added spread-safe `maxOf`/`minOf` (O(n) reduce, no spread) to utils/calculations.ts + swept ALL 18 sites to them. Behavior-IDENTICAL:
+  the helpers return -Infinity/+Infinity on [] exactly like Math.max()/Math.min(), so every call site (incl. the `length > 0 ? : null` and
+  `length >= 2` guards already present) is unchanged. GUARD: +6 tests (array-min-max.test.ts) — correctness (incl. negatives/floats/single),
+  behavior-IDENTITY with Math.max/min incl. the empty→±Infinity contract + a 50-trial randomized parity vs the spread form, and the REGRESSION:
+  maxOf/minOf compute correctly on a 500k array (the no-spread path well beyond the argument cap). NOTE: my first draft asserted
+  `Math.max(...big)` THROWS at 500k — but Bun/JSC tolerates a far larger spread than V8, so I removed that environment-specific assertion (the
+  C77 vacuity discipline — don't assert an engine-specific premise); the test pins the helper's correctness at scale, not the engine's throw
+  threshold. Test-anchored green→green: every existing analytics + vehicle-stats test passed UNCHANGED through the 18-site swap. green→green:
+  backend validate:local EXIT 0 — 1328 pass / 1 skip / 0 fail (+6), tsc 0, musl-biome clean (3 import-order autofixed), build bundled. cov: be
+  84.25%+ (carry; +6 BE) / fe 80.33% (carry). This is a real reliability fix (an analytics crash for the most-engaged users), surfaced by a
+  deep-review and fixed in-cycle since the whole class was a mechanical, behavior-preserving swap.

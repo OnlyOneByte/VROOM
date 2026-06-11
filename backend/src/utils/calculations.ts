@@ -179,3 +179,34 @@ export function parseClampedInt(
   const parsed = Number.parseInt(raw ?? '', 10);
   return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
 }
+
+// ============================================================================
+// ARRAY MIN/MAX (spread-safe)
+// ============================================================================
+
+/**
+ * Max / min of a numeric array WITHOUT the `Math.max(...arr)` argument spread.
+ *
+ * `Math.max(...arr)` / `Math.min(...arr)` pass each element as a separate function argument, so a
+ * large array (a heavy logger's thousands of fuel/mileage rows over the all-time window — these
+ * analytics queries have NO LIMIT) overflows the engine's argument-count cap and throws
+ * `RangeError: Maximum call stack size exceeded`, crashing the whole analytics request (NORTH_STAR
+ * #1 — the feature breaks for the most-engaged users). Reduce avoids the spread entirely and is
+ * O(n) with constant stack. Caller MUST guard emptiness (these return -Infinity/+Infinity on []
+ * exactly like Math.max/min, so behavior is identical at every existing call site).
+ */
+export function maxOf(values: number[]): number {
+  let max = Number.NEGATIVE_INFINITY;
+  for (const v of values) {
+    if (v > max) max = v;
+  }
+  return max;
+}
+
+export function minOf(values: number[]): number {
+  let min = Number.POSITIVE_INFINITY;
+  for (const v of values) {
+    if (v < min) min = v;
+  }
+  return min;
+}

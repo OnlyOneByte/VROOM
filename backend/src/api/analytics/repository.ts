@@ -50,6 +50,7 @@ import {
   sortByVehicleThenDate,
   toMonthKey,
 } from '../../utils/analytics-charts';
+import { maxOf, minOf } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { convertDistance, convertEfficiency } from '../../utils/unit-conversions';
 
@@ -500,7 +501,7 @@ export class AnalyticsRepository {
     let total = 0;
     for (const [vId, mileages] of vehicleMileages) {
       if (mileages.length < 2) continue;
-      let distance = Math.max(...mileages) - Math.min(...mileages);
+      let distance = maxOf(mileages) - minOf(mileages);
       if (!skipConversion && distance > 0) {
         const vUnits = vehicleUnitsMap.get(vId) ?? { ...DEFAULT_UNIT_PREFERENCES };
         distance = convertDistance(distance, vUnits.distanceUnit, targetUnits.distanceUnit);
@@ -1362,8 +1363,8 @@ export class AnalyticsRepository {
       .map((r) => r.volume as number);
     const fillupDetails = {
       avgVolume: volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : null,
-      minVolume: volumes.length > 0 ? Math.min(...volumes) : null,
-      maxVolume: volumes.length > 0 ? Math.max(...volumes) : null,
+      minVolume: volumes.length > 0 ? minOf(volumes) : null,
+      maxVolume: volumes.length > 0 ? maxOf(volumes) : null,
     };
 
     const averageCost = computeAverageCosts(
@@ -1387,7 +1388,7 @@ export class AnalyticsRepository {
     }
     let totalDistance = 0;
     for (const mileages of mileagesByVehicle.values()) {
-      if (mileages.length >= 2) totalDistance += Math.max(...mileages) - Math.min(...mileages);
+      if (mileages.length >= 2) totalDistance += maxOf(mileages) - minOf(mileages);
     }
     const daysSoFar = Math.max(
       1,
@@ -1888,8 +1889,7 @@ export class AnalyticsRepository {
       const mileages = detailedExpenses
         .filter((r) => r.mileage != null)
         .map((r) => r.mileage as number);
-      const totalDistance =
-        mileages.length >= 2 ? Math.max(...mileages) - Math.min(...mileages) : 0;
+      const totalDistance = mileages.length >= 2 ? maxOf(mileages) - minOf(mileages) : 0;
 
       return {
         vehicleId,

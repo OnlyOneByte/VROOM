@@ -6,7 +6,7 @@
  */
 
 import { isElectricFuelType } from '../db/types';
-import { calculateAverageMilesPerKwh } from './calculations';
+import { calculateAverageMilesPerKwh, maxOf } from './calculations';
 
 // Helper types for vehicle stats calculations
 export interface FuelExpense {
@@ -133,7 +133,7 @@ function calculateMileageStats(
   totalCost: number
 ): void {
   const mileages = expensesWithMileage.map((e) => e.mileage as number);
-  const latestMileage = Math.max(...mileages);
+  const latestMileage = maxOf(mileages);
   stats.currentMileage = latestMileage;
   // Distance driven can never be negative. A backdated/mistyped reading BELOW initialMileage (or the
   // only in-window reading being lower than the purchase odometer) would otherwise surface a negative
