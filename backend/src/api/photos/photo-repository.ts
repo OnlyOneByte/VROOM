@@ -99,10 +99,20 @@ export class PhotoRepository {
   async findByEntityPaginated(
     entityType: string,
     entityId: string,
+    userId: string,
     limit: number,
     offset: number
   ): Promise<PaginatedResult<Photo>> {
-    const whereClause = and(eq(photos.entityType, entityType), eq(photos.entityId, entityId));
+    // userId-scope the WHERE (the C168/#48 + C180 + C192 tenant-scope-at-the-read class): this was the
+    // lone photo read-method not scoped by user_id, even though photos carries that column and every
+    // sibling (findByUser/countByUser/findIdsByUser) filters on it. Behavior-identical today — the route's
+    // validateEntityOwnership proves ownership before this runs — but it closes the boundary at the query
+    // so a future caller that forgets the guard can't page another tenant's photos (#72).
+    const whereClause = and(
+      eq(photos.entityType, entityType),
+      eq(photos.entityId, entityId),
+      eq(photos.userId, userId)
+    );
 
     const [countResult, data] = await Promise.all([
       this.db.select({ count: sql<number>`count(*)` }).from(photos).where(whereClause),

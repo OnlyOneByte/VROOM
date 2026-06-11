@@ -476,6 +476,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   (also handles a vehicle-reassign edit); odometer PUT → unconditional recheck. +2 HTTP tests (edit odometer/expense mileage up across a
   milestone fires); NON-VACUOUS (RED with the fix reverted, the 5 create-path tests stayed green). green→green backend validate:local EXIT 0,
   1291 pass (+2). (The 5 hunted mileage defect classes — double-fire, boundary, cross-vehicle, stale, throw — were CERTIFIED CLEAN at C108.)*
+- ~~**#72 (LOW, defense-in-depth — found C215 via a deep-review of the photos list/pagination path) — `findByEntityPaginated` was the lone
+  photo read-method NOT userId-scoped.**~~ — *DONE C215: it filtered `(entityType, entityId)` ALONE on both count + data legs, even though
+  photos carries user_id + every sibling (findByUser/countByUser/findIdsByUser) scopes it (the C168/#48 + C180 + C192 tenant-scope-at-the-read
+  class). NOT a live leak (the route's validateEntityOwnership — an exhaustive switch with a throwing default — proves ownership before the
+  query), but a latent boundary; directly fixable here (photos HAS a userId column, unlike financing's no-column case at C206). FIX: threaded a
+  userId param + ANDed `eq(photos.userId, userId)` into the shared whereClause + threaded userId through the one caller (listPhotosForEntity).
+  +2 tests (the cross-tenant case — two users' photos on the SAME entityType+entityId, raw-seeded, foreign excluded from count & data; + an
+  owner over-filter control); NON-VACUOUS (RED with the scope reverted). green→green backend validate:local EXIT 0, 1293 pass (+2). The rest of
+  the photos list/serve/delete path CERTIFIED CLEAN (ownership gated, batch userId-scoped, nosniff/CORP headers correct).*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:

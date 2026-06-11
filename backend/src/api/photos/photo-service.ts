@@ -128,6 +128,7 @@ export async function listPhotosForEntity(
   return photoRepository.findByEntityPaginated(
     entityType,
     entityId,
+    userId,
     pagination.limit,
     pagination.offset
   );

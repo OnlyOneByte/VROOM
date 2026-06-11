@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 209 |
+| deep-review | 5 | 215 |
 | guard | 6 | 212 |
 | bug | 3 | 214 |
 | arch | 5 | 211 |
 | infra | 6 | 213 |
 
-Current cycle: **214**
+Current cycle: **215**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3786,3 +3786,20 @@ Current cycle: **214**
   34000→35500 fires) — NON-VACUOUS: confirmed both FAIL RED with the fixes reverted (edit didn't fire) + the 5 create-path tests stayed green
   (fix is additive). green→green: backend validate:local EXIT 0 — 1291 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean, build bundled.
   cov: be 84.14%+ (carry; +2 BE) / fe 79.22% (carry).
+- **C215 (deep-review → #72): photos list/pagination certified CLEAN; closed the lone non-userId-scoped read method** — BALANCE: `feature`
+  most-starved (cyc 170, starved-for 45, blocked 40th — milestone) but blocked → fell through; `deep-review` FORCED (cyc 209, starved-for 6 > 5
+  — the C214 forecast). Inline focused review (spawn cap/flake — C179/C204/C209 precedent). SURFACE: the photos list/pagination path (C132/C167
+  covered cross-tenant delete/serve + nosniff, NOT the list/paginate queries). CERTIFIED CLEAN firsthand: validateEntityOwnership gates every
+  list/serve/delete via an EXHAUSTIVE switch (vehicle/insurance_policy/insurance_claim/expense/odometer_entry each ownership-checked) + a
+  `default` that THROWS ValidationError — so an arbitrary entityType string (the route's `min(1).max(64)` is just a length bound) can't slip past;
+  the batch endpoint listPhotosByEntityType is userId-scoped (findByUser); nosniff + CORP + private-cache headers correct (C133/#35). ONE finding
+  → #72 (defense-in-depth, the C168/#48 + C180 + C192 tenant-scope-at-the-read class): `findByEntityPaginated` (backs GET /:entityType/:entityId)
+  filtered (entityType, entityId) ALONE on BOTH legs — the LONE photo read-method not userId-scoped, even though photos carries user_id + every
+  sibling (findByUser/countByUser/findIdsByUser) filters on it. NOT a live leak (the route's validateEntityOwnership proves ownership before the
+  query) but a latent boundary — and directly fixable here (unlike financing's no-userId-column case at C206 which I correctly DECLINED). FIX:
+  threaded userId param + ANDed `eq(photos.userId, userId)` into the shared whereClause (covers both count + data legs) + threaded userId through
+  the one caller (listPhotosForEntity). +2 tests in photo-user-scoped.property.test.ts — the load-bearing cross-tenant case (two users' photos on
+  the SAME entityType+entityId, raw-seeded — only constructible by direct seed; foreign photo excluded from BOTH count & data) + an owner-still-
+  sees-theirs over-filter control. NON-VACUOUS: confirmed the cross-tenant test FAILS RED with the scope reverted (count 3 not 2) then GREEN
+  restored. green→green: backend validate:local EXIT 0 — 1293 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean, build bundled. cov: be
+  84.14%+ (carry; +2 BE) / fe 79.22% (carry).
