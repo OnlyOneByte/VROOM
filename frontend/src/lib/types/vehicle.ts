@@ -71,7 +71,10 @@ export interface VehicleFinancing {
 export interface VehicleStats {
 	period: '7d' | '30d' | '90d' | '1y' | 'all';
 	totalMileage: number;
+	/** Period-filtered + fuel-only MAX (can drop under a short window; ignores manual odometer entries). */
 	currentMileage: number | null;
+	/** Canonical all-time, all-sources odometer (expenses + manual entries); period-independent. */
+	currentOdometer: number | null;
 	totalFuelConsumed: number;
 	totalChargeConsumed: number;
 	averageMpg: number | null;

@@ -135,7 +135,11 @@ function calculateMileageStats(
   const mileages = expensesWithMileage.map((e) => e.mileage as number);
   const latestMileage = Math.max(...mileages);
   stats.currentMileage = latestMileage;
-  stats.totalMileage = latestMileage - initialMileage;
+  // Distance driven can never be negative. A backdated/mistyped reading BELOW initialMileage (or the
+  // only in-window reading being lower than the purchase odometer) would otherwise surface a negative
+  // totalMileage verbatim (#46). Clamp at 0 — correct under ANY stats-period windowing (the separate
+  // #45 decision), since a driven distance is non-negative regardless of the window's numerator scope.
+  stats.totalMileage = Math.max(0, latestMileage - initialMileage);
 
   if (stats.totalMileage > 0) {
     stats.costPerMile = totalCost / stats.totalMileage;

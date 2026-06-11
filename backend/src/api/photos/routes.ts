@@ -83,6 +83,11 @@ routes.get('/:entityType/:entityId/:photoId/thumbnail', async (c) => {
   return new Response(buffer, {
     headers: {
       'Content-Type': mimeType,
+      // The stored mimeType is the CLIENT-asserted upload type (never sniffed), so a file whose bytes
+      // are HTML/script but declared image/png would otherwise be MIME-sniffed + executed by the
+      // browser. nosniff forces the declared Content-Type (C133/#35; ARCC Secure-HTTP-Headers makes
+      // this a MANDATORY header + Secure-File-Uploads "do not trust Content-Type / mitigate MIME sniff").
+      'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'private, max-age=3600',
       'Cross-Origin-Resource-Policy': 'cross-origin',
     },

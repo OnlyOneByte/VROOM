@@ -401,6 +401,85 @@ describe('Property 14: TCO total equals sum of components', () => {
 });
 
 // ---------------------------------------------------------------------------
+// #27 (C154, Angelo-approved option c): TCO must not double-count a financed vehicle's principal.
+// The `financingInterest` bucket sums WHOLE financing-sourced expense rows (full loan payments =
+// principal + interest), so counting both purchasePrice AND those payments counts the principal twice.
+// Decided model: when purchasePrice is counted, EXCLUDE the financing-payment rows from the total (they
+// retire the already-counted price). seedExpense can't set source_type, so we insert the financing row
+// directly. Pre-fix this asserted ~price+payments (double); post-fix it asserts price only.
+// ---------------------------------------------------------------------------
+describe('#27: financed vehicle TCO does not double-count principal', () => {
+  /** Insert a financing-sourced expense row (category 'financial' + source_type 'financing'). */
+  function seedFinancingPayment(vehicleId: string, id: string, amount: number, date: Date): void {
+    testDb.sqlite.run(
+      'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        id,
+        vehicleId,
+        'user-1',
+        'financial',
+        amount,
+        Math.floor(date.getTime() / 1000),
+        'financing',
+        0,
+      ]
+    );
+  }
+
+  test('purchasePrice counted → financing-payment rows are EXCLUDED from the total (no double-count)', async () => {
+    const { userId, vehicle } = setupUserAndVehicle({
+      purchasePrice: 30000,
+      purchaseDate: new Date(2020, 0, 1),
+    });
+    // Three loan payments of $500 (full payments retiring principal), plus one real fuel cost.
+    seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(2024, 0, 15));
+    seedFinancingPayment(vehicle.id, 'fin-2', 500, new Date(2024, 1, 15));
+    seedFinancingPayment(vehicle.id, 'fin-3', 500, new Date(2024, 2, 15));
+    seedExpense(testDb.sqlite, {
+      id: 'fuel-1',
+      vehicleId: vehicle.id,
+      category: 'fuel',
+      expenseAmount: 60,
+      date: new Date(2024, 0, 20),
+      mileage: null,
+      volume: 10,
+      fuelType: 'gasoline',
+      missedFillup: false,
+    } as TestExpense);
+
+    const result = await repo.getVehicleTCO(userId, vehicle.id);
+
+    // Total = purchasePrice + fuel ONLY — the $1500 of payments are excluded (they retire the price).
+    expect(result.totalCost).toBe(30060);
+    // The reported financing bucket is 0 (the counted value), so the breakdown still sums.
+    expect(result.financingInterest).toBe(0);
+    const componentSum =
+      (result.purchasePrice ?? 0) +
+      result.financingInterest +
+      result.insuranceCost +
+      result.fuelCost +
+      result.maintenanceCost +
+      result.otherCosts;
+    expect(Math.abs(result.totalCost - componentSum)).toBeLessThan(0.01);
+  });
+
+  test('NO purchasePrice → financing payments ARE counted (they are the only acquisition signal)', async () => {
+    const { userId, vehicle } = setupUserAndVehicle({
+      purchasePrice: null,
+      purchaseDate: new Date(2020, 0, 1),
+    });
+    seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(2024, 0, 15));
+    seedFinancingPayment(vehicle.id, 'fin-2', 500, new Date(2024, 1, 15));
+
+    const result = await repo.getVehicleTCO(userId, vehicle.id);
+
+    // Without a recorded price, the financing outflow IS the cost signal — keep it.
+    expect(result.totalCost).toBe(1000);
+    expect(result.financingInterest).toBe(1000);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Property 15: Cost per month formula
 // **Validates: Requirement 10.4**
 // ---------------------------------------------------------------------------
@@ -433,5 +512,43 @@ describe('Property 15: Cost per month formula', () => {
       ),
       { numRuns: 100 }
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FE↔BE response contract-drift guard for getVehicleHealth — the FINAL hand-assembled surface
+// in loop-improvement #2 (C55 /stats, C62 /vehicles list, C68 single-financing, C74
+// /analytics/insurance, C78 /analytics/year-end). getVehicleHealth hand-assembles a 6-field
+// literal (repository.ts:1713) with NO type binding to the frontend VehicleHealthResponse
+// (types/analytics.ts:199). Property 10 above pins the SCORE MATH but NOT the key shape, so a
+// dropped/renamed field would silently break the health card. Exact top-level key equality.
+// ---------------------------------------------------------------------------
+const VEHICLE_HEALTH_KEYS = [
+  'vehicleId',
+  'vehicleName',
+  'overallScore',
+  'maintenanceRegularity',
+  'mileageIntervalAdherence',
+  'insuranceCoverage',
+].sort();
+
+describe('getVehicleHealth — FE↔BE response contract shape (drift guard)', () => {
+  test('the response has exactly the frontend VehicleHealthResponse top-level keys', async () => {
+    const { userId, vehicle } = setupUserAndVehicle({});
+    const result = await repo.getVehicleHealth(userId, vehicle.id);
+    expect(Object.keys(result).sort()).toEqual(VEHICLE_HEALTH_KEYS);
+  });
+
+  test('every score field is a finite number (no NaN escape on a no-data vehicle)', async () => {
+    const { userId, vehicle } = setupUserAndVehicle({});
+    const result = await repo.getVehicleHealth(userId, vehicle.id);
+    for (const k of [
+      'overallScore',
+      'maintenanceRegularity',
+      'mileageIntervalAdherence',
+      'insuranceCoverage',
+    ] as const) {
+      expect(Number.isFinite(result[k]), k).toBe(true);
+    }
   });
 });

@@ -110,4 +110,23 @@ describe('odometer PUT /:id (update contract)', () => {
     expect(row.odometer, 'odometer untouched by a note-only edit').toBe(42_000);
     expect(row.note).toBe('corrected note');
   });
+
+  // C172 (arch): the 3 inline `findById + entry.userId !== user.id → NotFoundError` guards (GET /entry/:id,
+  // PUT, DELETE) converged onto the shared validateOdometerOwnership helper. These pin the helper's
+  // not-found 404 path at all 3 sites (the anchoring test the C160 audit flagged as missing — odometer
+  // routes had no 404 coverage; the cross-tenant IDOR suite covers the cross-user leg).
+  test('GET /entry/:id returns 404 for a non-existent id', async () => {
+    const res = await ctx.authed('GET', '/api/v1/odometer/entry/does-not-exist');
+    expect(res.status).toBe(404);
+  });
+
+  test('PUT /:id returns 404 for a non-existent id', async () => {
+    const res = await ctx.authed('PUT', '/api/v1/odometer/does-not-exist', { odometer: 1000 });
+    expect(res.status).toBe(404);
+  });
+
+  test('DELETE /:id returns 404 for a non-existent id', async () => {
+    const res = await ctx.authed('DELETE', '/api/v1/odometer/does-not-exist');
+    expect(res.status).toBe(404);
+  });
 });

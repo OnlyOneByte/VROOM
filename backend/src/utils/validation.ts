@@ -72,8 +72,16 @@ export const commonSchemas = {
 import { expenseRepository } from '../api/expenses/repository';
 import { financingRepository } from '../api/financing/repository';
 import { insurancePolicyRepository } from '../api/insurance/repository';
+import { odometerRepository } from '../api/odometer/repository';
+import { type ReminderWithVehicles, reminderRepository } from '../api/reminders/repository';
 import { vehicleRepository } from '../api/vehicles/repository';
-import type { Expense, InsurancePolicy, Vehicle, VehicleFinancing } from '../db/schema';
+import type {
+  Expense,
+  InsurancePolicy,
+  OdometerEntry,
+  Vehicle,
+  VehicleFinancing,
+} from '../db/schema';
 import { NotFoundError } from '../errors';
 
 /**
@@ -89,6 +97,25 @@ export async function validateVehicleOwnership(
     throw new NotFoundError('Vehicle');
   }
   return vehicle;
+}
+
+/**
+ * Validate that EVERY vehicleId in a set belongs to the user (the plural, ValidationError-listing
+ * counterpart to the single `validateVehicleOwnership`). Fetches the user's fleet once, then reports
+ * all non-owned ids together. Used where a request attaches a list of vehicles (e.g. a reminder's
+ * vehicleIds on create/update).
+ * @throws ValidationError listing every id not found or not owned.
+ */
+export async function validateVehicleIdsOwned(
+  vehicleIds: readonly string[],
+  userId: string
+): Promise<void> {
+  const userVehicles = await vehicleRepository.findByUserId(userId);
+  const ownedVehicleIds = new Set(userVehicles.map((v) => v.id));
+  const invalidIds = vehicleIds.filter((id) => !ownedVehicleIds.has(id));
+  if (invalidIds.length > 0) {
+    throw new ValidationError(`Vehicles not found or not owned: ${invalidIds.join(', ')}`);
+  }
 }
 
 /**
@@ -146,6 +173,40 @@ export async function validateInsuranceOwnership(
   }
 
   return insurance;
+}
+
+/**
+ * Validate that a reminder belongs to the user, returning it (with its vehicleIds). The userId-scoped
+ * counterpart to the inline `findByIdAndUserId` guard the reminder routes repeated 5×; mirrors the
+ * validateExpenseOwnership shape (findByIdAndUserId → NotFoundError → return entity).
+ * @throws NotFoundError if the reminder is not found or doesn't belong to the user
+ */
+export async function validateReminderOwnership(
+  reminderId: string,
+  userId: string
+): Promise<ReminderWithVehicles> {
+  const reminder = await reminderRepository.findByIdAndUserId(reminderId, userId);
+  if (!reminder) {
+    throw new NotFoundError('Reminder');
+  }
+  return reminder;
+}
+
+/**
+ * Validate that an odometer entry belongs to the user, returning it. The userId-scoped counterpart to
+ * the inline `findById` + `entry.userId !== userId` guard the odometer routes repeated 3×; mirrors the
+ * validateInsuranceOwnership shape (findById has no userId arg, so re-check the column post-fetch).
+ * @throws NotFoundError if the entry is not found or doesn't belong to the user
+ */
+export async function validateOdometerOwnership(
+  entryId: string,
+  userId: string
+): Promise<OdometerEntry> {
+  const entry = await odometerRepository.findById(entryId);
+  if (!entry || entry.userId !== userId) {
+    throw new NotFoundError('Odometer entry');
+  }
+  return entry;
 }
 
 /**

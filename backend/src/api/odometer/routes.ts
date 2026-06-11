@@ -2,10 +2,13 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse } from '../../utils/pagination';
-import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
+import {
+  commonSchemas,
+  validateOdometerOwnership,
+  validateVehicleOwnership,
+} from '../../utils/validation';
 import { deleteAllPhotosForEntity } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { odometerRepository } from './repository';
@@ -56,6 +59,7 @@ routes.get(
 
     const { data, totalCount } = await odometerRepository.findByVehicleIdPaginated(
       vehicleId,
+      user.id,
       limit,
       offset
     );
@@ -82,7 +86,7 @@ routes.get(
     );
     const offset = query.offset ?? 0;
 
-    const { data, totalCount } = await odometerRepository.getHistory(vehicleId, {
+    const { data, totalCount } = await odometerRepository.getHistory(vehicleId, user.id, {
       limit,
       offset,
     });
@@ -96,10 +100,7 @@ routes.get('/entry/:id', zValidator('param', commonSchemas.idParam), async (c) =
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const entry = await odometerRepository.findById(id);
-  if (!entry || entry.userId !== user.id) {
-    throw new NotFoundError('Odometer entry');
-  }
+  const entry = await validateOdometerOwnership(id, user.id);
 
   return c.json({ success: true, data: entry });
 });
@@ -143,10 +144,7 @@ routes.put(
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
 
-    const entry = await odometerRepository.findById(id);
-    if (!entry || entry.userId !== user.id) {
-      throw new NotFoundError('Odometer entry');
-    }
+    await validateOdometerOwnership(id, user.id);
 
     const updated = await odometerRepository.update(id, {
       ...data,
@@ -162,10 +160,7 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
   const user = c.get('user');
   const { id } = c.req.valid('param');
 
-  const entry = await odometerRepository.findById(id);
-  if (!entry || entry.userId !== user.id) {
-    throw new NotFoundError('Odometer entry');
-  }
+  await validateOdometerOwnership(id, user.id);
 
   await deleteAllPhotosForEntity('odometer_entry', id, user.id);
   await odometerRepository.delete(id);

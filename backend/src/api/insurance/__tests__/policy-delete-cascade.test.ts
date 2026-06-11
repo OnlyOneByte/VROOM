@@ -40,6 +40,14 @@ function photoCount(entityType: string, entityId: string): number {
   return row.n;
 }
 
+/** Count the auto-materialized premium expense rows linked to ANY insurance term (sourceType). */
+function insuranceExpenseCount(): number {
+  const row = ctx.sqlite
+    .query(`SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'insurance_term'`)
+    .get() as { n: number };
+  return row.n;
+}
+
 async function seedVehicle(): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/vehicles', {
     make: 'Toyota',
@@ -112,6 +120,41 @@ describe('insurance policy deletion cascades photo cleanup to itself + claims', 
     expect(
       photoCount('insurance_claim', claimId),
       'claim photo rows should be cleaned up on direct claim delete'
+    ).toBe(0);
+  });
+
+  // #57 (C167 deep-review): a costed term auto-materializes a premium expense (hooks.createTermExpenses,
+  // sourceType:'insurance_term'). Expenses link to terms by plain text columns, NOT an FK, so the term
+  // cascade-delete leaves the expense ORPHANED (still summed into TCO insurance cost forever) unless the
+  // DELETE-policy route deletes it explicitly — which DELETE-term/UPDATE-term did but policy-delete didn't.
+  test("deleting a policy removes its terms' auto-materialized premium expenses (no orphan)", async () => {
+    const vehicleId = await seedVehicle();
+    // A term WITH a totalCost → createTermExpenses fires (the seedPolicyWithClaim term has none).
+    const pol = await ctx.authed('POST', '/api/v1/insurance', {
+      company: 'Acme Mutual',
+      terms: [
+        {
+          startDate: '2024-01-01T00:00:00.000Z',
+          endDate: '2025-01-01T00:00:00.000Z',
+          totalCost: 1200,
+          vehicleCoverage: { vehicleIds: [vehicleId] },
+        },
+      ],
+    });
+    const polBody = await json<DataEnvelope<{ id: string }>>(pol);
+    expect(pol.status, JSON.stringify(polBody)).toBe(201);
+    const policyId = polBody.data.id;
+
+    // Sanity: the premium expense materialized.
+    expect(insuranceExpenseCount(), 'a costed term should auto-create a premium expense').toBe(1);
+
+    const del = await ctx.authed('DELETE', `/api/v1/insurance/${policyId}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    // Pre-fix: the expense row survived with a dangling sourceId (orphan in TCO). Post-fix: cleaned up.
+    expect(
+      insuranceExpenseCount(),
+      'premium expense rows should be cleaned up on policy delete (no orphan in TCO)'
     ).toBe(0);
   });
 });

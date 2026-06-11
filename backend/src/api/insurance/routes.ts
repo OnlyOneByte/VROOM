@@ -144,6 +144,18 @@ routes.delete('/:id', zValidator('param', idParamSchema), async (c) => {
   await deleteAllPhotosForEntity('insurance_policy', id, user.id);
   await deletePhotosForEntities('insurance_claim', claimIds, user.id);
 
+  // Clean the auto-materialized premium expenses too (#57). Each costed term spawned a split expense
+  // (hooks.ts createTermExpenses, sourceType:'insurance_term', sourceId:termId), but expenses link to
+  // terms by plain text columns, NOT an FK — so the term cascade-delete below leaves those expense rows
+  // ORPHANED, still summed into TCO insurance cost forever (analytics categorizes any financial +
+  // sourceType:'insurance_term' row, with no term-exists check) and leaking their own expense photos.
+  // DELETE-term + UPDATE-term already deleteBySource these; the parent-policy delete was the one gap.
+  // Enumerate the policy's terms while they still exist, mirroring the claim-photo cleanup above.
+  const policyToDelete = await insurancePolicyRepository.findById(id);
+  for (const term of policyToDelete?.terms ?? []) {
+    await expenseRepository.deleteBySource('insurance_term', term.id, user.id);
+  }
+
   await insurancePolicyRepository.delete(id, user.id);
   return c.json({ success: true, message: 'Insurance policy deleted successfully' });
 });

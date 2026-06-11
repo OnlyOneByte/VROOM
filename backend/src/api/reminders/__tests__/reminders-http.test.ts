@@ -114,6 +114,21 @@ describe('reminders HTTP routes', () => {
     expect(res.status).toBeLessThan(500);
   });
 
+  test('PUT updating vehicleIds to a vehicle the user does not own is rejected', async () => {
+    // Pins the UPDATE-path ownership gate — the second site converged onto the shared
+    // validateVehicleIdsOwned helper (C141). A valid reminder, then a PUT that swaps in a
+    // foreign vehicleId must be rejected by the same validator, not silently accepted.
+    const vehicleId = await seedVehicle();
+    const created = await createNotificationReminder(vehicleId);
+    const id = (await json<DataEnvelope<ReminderWithJoins>>(created)).data.reminder.id;
+
+    const res = await ctx.authed('PUT', `/api/v1/reminders/${id}`, {
+      vehicleIds: ['someone-elses-vehicle'],
+    });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+  });
+
   test('anonymous access is unauthorized', async () => {
     const res = await ctx.anon('GET', '/api/v1/reminders');
     expect(res.status).toBe(401);

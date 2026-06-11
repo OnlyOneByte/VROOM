@@ -11,7 +11,27 @@
 
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { computeNextDueDate } from '../trigger-service';
+import type { Reminder } from '../../../db/schema';
+import { advanceReminderDueDate, computeNextDueDate } from '../trigger-service';
+
+/**
+ * Minimal Reminder stub exposing only the fields advanceReminderDueDate reads — frequency,
+ * intervalValue, intervalUnit, and startDate (the anchor-day source). Cast to Reminder for the
+ * delegation tests (the helper touches nothing else).
+ */
+function stubReminder(fields: {
+  frequency: string;
+  intervalValue?: number | null;
+  intervalUnit?: string | null;
+  startDate: Date;
+}): Reminder {
+  return {
+    frequency: fields.frequency,
+    intervalValue: fields.intervalValue ?? null,
+    intervalUnit: fields.intervalUnit ?? null,
+    startDate: fields.startDate,
+  } as Reminder;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -245,5 +265,63 @@ describe('Property 20: Anchor day prevents month-end drift', () => {
       ),
       { numRuns: 200 }
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// advanceReminderDueDate — the C153 wrapper that binds the four reminder.* fields + the stable
+// anchor day, so the catch-up / notification / fast-forward / mark-serviced re-arm paths all advance
+// a reminder identically (it replaced four byte-identical computeNextDueDate(...) call blocks).
+// ---------------------------------------------------------------------------
+describe('advanceReminderDueDate delegates to computeNextDueDate with the reminder config', () => {
+  test('matches an explicit computeNextDueDate call for monthly/weekly/yearly/custom', () => {
+    const from = new Date(2025, 0, 15); // Jan 15 2025
+    const start = new Date(2024, 5, 15); // anchor day = 15
+    const cases: Array<{ frequency: string; intervalValue?: number; intervalUnit?: string }> = [
+      { frequency: 'weekly' },
+      { frequency: 'monthly' },
+      { frequency: 'yearly' },
+      { frequency: 'custom', intervalValue: 3, intervalUnit: 'month' },
+    ];
+    for (const c of cases) {
+      const reminder = stubReminder({ ...c, startDate: start });
+      const expected = computeNextDueDate(
+        from,
+        c.frequency,
+        c.intervalValue ?? null,
+        c.intervalUnit ?? null,
+        start.getDate()
+      );
+      expect(advanceReminderDueDate(reminder, from).getTime()).toBe(expected.getTime());
+    }
+  });
+
+  test('uses startDate day-of-month as the anchor (Jan-31 monthly clamps to Feb but re-anchors)', () => {
+    // startDate day 31 is the STABLE anchor — advancing from a clamped Feb-28 must return to 31 in March.
+    const reminder = stubReminder({ frequency: 'monthly', startDate: new Date(2025, 0, 31) });
+    const feb = advanceReminderDueDate(reminder, new Date(2025, 0, 31)); // Jan 31 -> Feb (clamped 28)
+    expect(feb.getMonth()).toBe(1);
+    expect(feb.getDate()).toBe(28);
+    const mar = advanceReminderDueDate(reminder, feb); // Feb 28 -> March, re-anchored to 31
+    expect(mar.getMonth()).toBe(2);
+    expect(mar.getDate()).toBe(31);
+  });
+
+  test('propagates the bug-#13 throws (corrupt frequency / non-positive interval)', () => {
+    const start = new Date(2025, 0, 10);
+    expect(() =>
+      advanceReminderDueDate(stubReminder({ frequency: 'monthy', startDate: start }), start)
+    ).toThrow(/frequency/);
+    expect(() =>
+      advanceReminderDueDate(
+        stubReminder({
+          frequency: 'custom',
+          intervalValue: 0,
+          intervalUnit: 'day',
+          startDate: start,
+        }),
+        start
+      )
+    ).toThrow(/intervalValue/);
   });
 });

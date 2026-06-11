@@ -36,9 +36,13 @@ async function seedVehicle(nickname: string): Promise<string> {
   return body.data.id;
 }
 
-async function listExpenses(): Promise<Array<{ category: string; expenseAmount: number }>> {
+async function listExpenses(): Promise<
+  Array<{ category: string; expenseAmount: number; date: string }>
+> {
   const res = await ctx.authed('GET', '/api/v1/expenses?limit=100');
-  const body = await json<{ data: Array<{ category: string; expenseAmount: number }> }>(res);
+  const body = await json<{
+    data: Array<{ category: string; expenseAmount: number; date: string }>;
+  }>(res);
   return body.data;
 }
 
@@ -80,6 +84,89 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(rows.length).toBe(2);
     expect(rows.find((r) => r.category === 'fuel')?.expenseAmount).toBe(52.4);
     expect(rows.find((r) => r.category === 'maintenance')?.expenseAmount).toBe(120);
+  });
+
+  test('imports a BOM-prefixed CSV (Excel/Sheets/Numbers re-save); first column still resolves', async () => {
+    await seedVehicle('Daily Driver');
+    // Excel / Google Sheets / Numbers prepend a UTF-8 BOM (﻿) when they re-save a
+    // CSV as UTF-8. WITHOUT bom:true on the parser the BOM sticks to the FIRST header
+    // name, so the `date` column key becomes "﻿date" → record.date is undefined and
+    // EVERY row fails with a misleading "Invalid date" (cycle 51). bom:true strips it
+    // pre-parse, so a VROOM export survives a spreadsheet round-trip. (Pre-fix this test
+    // would see imported:0 / errorCount:1 with an "Invalid date" message.)
+    const csv = `﻿${[
+      'date,vehicle,category,amount',
+      '2024-06-01T00:00:00.000Z,Daily Driver,misc,12.50',
+    ].join('\n')}`;
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(1);
+    expect(body.data.readyCount).toBe(1);
+    expect(body.data.errorCount).toBe(0);
+    expect(body.data.rows.every((r) => r.status === 'ready')).toBe(true);
+    expect((await listExpenses()).length).toBe(1);
+  });
+
+  test('a DATE-ONLY cell keeps its calendar day in local time (no UTC-midnight day-shift)', async () => {
+    await seedVehicle('Daily Driver');
+    // A hand-edited or foreign CSV commonly uses bare YYYY-MM-DD (no time). `new Date('2024-03-15')`
+    // parses as UTC midnight, so a user west of UTC would see the expense land on Mar 14 (cycle-6/11).
+    // parseDate now builds a date-only value from parts in LOCAL time. We assert the timezone-independent
+    // invariant: the stored instant's LOCAL calendar day equals the imported day — true in any CI zone.
+    // (Pre-fix, in a negative-offset zone, getDate() would be 14, not 15.)
+    const csv = ['date,vehicle,category,amount', '2024-03-15,Daily Driver,misc,20.00'].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(1);
+
+    const [row] = await listExpenses();
+    const stored = new Date(row.date);
+    expect(stored.getFullYear()).toBe(2024);
+    expect(stored.getMonth() + 1).toBe(3);
+    expect(stored.getDate()).toBe(15);
+  });
+
+  test('an OUT-OF-RANGE date-only cell is REJECTED, not silently rolled forward (#59)', async () => {
+    await seedVehicle('Daily Driver');
+    // `new Date(2024, 12, 45)` ("2024-13-45") never NaNs — it rolls to 2025-02-14. The native parseDate
+    // now echo-checks the constructed Y/M/D (the buildLocalDate guard the mapping path had), so an
+    // impossible date-only value is rejected with a per-row error instead of importing a wrong date.
+    const csv = [
+      'date,vehicle,category,amount',
+      '2024-13-45,Daily Driver,fuel,40.00', // month 13 + day 45 → would roll to 2025-02-14 pre-fix
+      '2024-02-30,Daily Driver,misc,10.00', // Feb 30 → would roll to Mar 1 pre-fix
+    ].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    // Both rows rejected; nothing imported (pre-fix both would import at rolled-forward dates).
+    expect(body.data.imported).toBe(0);
+    expect(body.data.errorCount).toBe(2);
+    expect(
+      body.data.rows.every((r) => (r.message ?? '').toLowerCase().includes('invalid date'))
+    ).toBe(true);
+    expect(await listExpenses()).toHaveLength(0);
+  });
+
+  test('a full-ISO timestamp keeps its absolute instant (date-only fix does not regress it)', async () => {
+    await seedVehicle('Daily Driver');
+    // The date-only branch must NOT capture full ISO values — those name an absolute instant and
+    // must round-trip unchanged (our own export writes this form). Asserts the instant is preserved.
+    const iso = '2024-06-01T13:30:00.000Z';
+    const csv = ['date,vehicle,category,amount', `${iso},Daily Driver,misc,12.50`].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(1);
+
+    const [row] = await listExpenses();
+    expect(new Date(row.date).getTime()).toBe(new Date(iso).getTime());
   });
 
   test('re-importing the same file is idempotent (no duplicate rows; cycle 211)', async () => {

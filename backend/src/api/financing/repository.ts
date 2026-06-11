@@ -15,6 +15,19 @@ import { DatabaseError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 
+/**
+ * A computed balance at or below this (in the user's currency) counts as paid off — the small
+ * epsilon absorbs float drift so a fully-paid loan reads as eligible, not "$0.003 remaining".
+ * One source of truth for the payoff rule: the threshold was hand-inlined as `<= 0.01` at three
+ * enrichment sites (vehicles list + single GET, financing GET) — C182 collapsed them onto this.
+ */
+export const PAYOFF_BALANCE_THRESHOLD = 0.01;
+
+/** Whether a computed financing balance is small enough to count as paid off (see threshold above). */
+export function isEligibleForPayoff(computedBalance: number): boolean {
+  return computedBalance <= PAYOFF_BALANCE_THRESHOLD;
+}
+
 export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVehicleFinancing> {
   constructor(db: AppDatabase) {
     super(db, vehicleFinancing);

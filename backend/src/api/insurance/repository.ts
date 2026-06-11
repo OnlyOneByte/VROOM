@@ -698,7 +698,12 @@ export class InsurancePolicyRepository {
   }
 
   /**
-   * Find terms expiring within a date range.
+   * Find terms expiring within a date range, for ACTIVE policies only.
+   *
+   * The `insurancePolicies.isActive` filter (#26c) excludes terms of CANCELLED policies: this
+   * backs GET /expiring-soon (upcoming-renewal nags), and a policy the user has cancelled must
+   * not resurface there as "expiring" — they're not renewing it. Mirrors the active-only filter
+   * the per-vehicle coverage query already uses below.
    */
   async findExpiringTerms(
     startDate: Date,
@@ -714,7 +719,8 @@ export class InsurancePolicyRepository {
         .where(
           and(
             between(insuranceTerms.endDate, startDate, endDate),
-            eq(insurancePolicies.userId, userId)
+            eq(insurancePolicies.userId, userId),
+            eq(insurancePolicies.isActive, true)
           )
         )
         .orderBy(insuranceTerms.endDate)

@@ -43,6 +43,7 @@ import {
   type FuelExpenseRow,
   type FuelRow,
   findBiggestExpense,
+  forEachVehiclePair,
   type GeneralExpenseRow,
   groupByVehicle,
   monthKeysInRange,
@@ -52,6 +53,21 @@ import { logger } from '../../utils/logger';
 import { convertDistance, convertEfficiency } from '../../utils/unit-conversions';
 
 export type { FuelEfficiencyPoint } from '../../utils/analytics-charts';
+
+/**
+ * How many calendar months of `year` the vehicle was owned, bounded by [ownershipStart, now]
+ * (C121/#28). Used to divide a YEAR-scoped TCO total by a matching span instead of full-ownership
+ * months. Inclusive of both endpoint months: a vehicle owned all of `year` → 12; bought in July of
+ * `year` → 6 (Jul–Dec); a FUTURE year (start after year-end) or one entirely before ownership → 0.
+ * Pure (no Date.now() inside — `now` is injected by the caller), so it's host-independent + testable.
+ */
+export function monthsOwnedInYear(ownershipStart: Date, now: Date, year: number): number {
+  const yearStartMonth = ownershipStart.getFullYear() < year ? 0 : ownershipStart.getMonth();
+  const yearEndMonth = now.getFullYear() > year ? 11 : now.getMonth();
+  // The vehicle wasn't owned during `year` at all (bought after it, or `now` precedes it).
+  if (ownershipStart.getFullYear() > year || now.getFullYear() < year) return 0;
+  return Math.max(0, yearEndMonth - yearStartMonth + 1);
+}
 
 // ---------------------------------------------------------------------------
 // Data interfaces for each analytics endpoint
@@ -316,6 +332,19 @@ export class AnalyticsRepository {
     this.vehicleNameCache.set(cacheKey, { data, timestamp: now });
   }
 
+  /**
+   * Resolve a single fetched row's stored unit preferences to a usable value, falling back to the
+   * defaults when the row is absent OR its stored prefs don't parse (C129 dedup of the byte-identical
+   * tail shared by getUserUnits + getVehicleUnits). NOTE: this is the FALLBACK-on-bad-prefs semantics;
+   * getAllVehicleUnits deliberately does NOT use it — it THROWS on invalid prefs, so folding it in here
+   * would silently swallow a real data error (the C90 inverted-semantics exclusion).
+   */
+  private resolveUnitsOrDefault(row: { unitPreferences: unknown } | undefined): UnitPreferences {
+    if (!row) return { ...DEFAULT_UNIT_PREFERENCES };
+    const parsed = parseUnitPreferences(row.unitPreferences);
+    return parsed ?? { ...DEFAULT_UNIT_PREFERENCES };
+  }
+
   /** Read the user's global unit preferences from user_preferences. */
   async getUserUnits(userId: string): Promise<UnitPreferences> {
     try {
@@ -325,11 +354,7 @@ export class AnalyticsRepository {
         .where(eq(userPreferences.userId, userId))
         .limit(1);
 
-      const row = rows[0];
-      if (!row) return { ...DEFAULT_UNIT_PREFERENCES };
-
-      const parsed = parseUnitPreferences(row.unitPreferences);
-      return parsed ?? { ...DEFAULT_UNIT_PREFERENCES };
+      return this.resolveUnitsOrDefault(rows[0]);
     } catch (error) {
       throw new DatabaseError('Failed to read user unit preferences', error);
     }
@@ -344,11 +369,7 @@ export class AnalyticsRepository {
         .where(eq(vehicles.id, vehicleId))
         .limit(1);
 
-      const row = rows[0];
-      if (!row) return { ...DEFAULT_UNIT_PREFERENCES };
-
-      const parsed = parseUnitPreferences(row.unitPreferences);
-      return parsed ?? { ...DEFAULT_UNIT_PREFERENCES };
+      return this.resolveUnitsOrDefault(rows[0]);
     } catch (error) {
       throw new DatabaseError('Failed to read vehicle unit preferences', error);
     }
@@ -640,9 +661,13 @@ export class AnalyticsRepository {
       lt(expenses.date, new Date(range.end * 1000)),
     ];
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
+    // COUNT only volume-bearing rows so the previous-year fillup count matches the
+    // in-memory isFillup predicate in buildFuelStatsFromData (a split fuel sibling has
+    // volume=null and is not a fillup — bug #18). The gallons SUM is unaffected (null
+    // volume contributes nothing) but is kept explicit for symmetry.
     const result = await this.db
       .select({
-        count: sql<number>`COUNT(*)`,
+        count: sql<number>`COUNT(CASE WHEN ${expenses.volume} > 0 THEN 1 END)`,
         totalGallons: sql<number>`COALESCE(SUM(${expenses.volume}), 0)`,
       })
       .from(expenses)
@@ -880,9 +905,17 @@ export class AnalyticsRepository {
       // Get the latest term for this policy
       const policyTerms = termRows.filter((t) => t.policyId === policy.id);
       const latestTerm = policyTerms.sort((a, b) => {
+        // Latest term = newest endDate (descending). insuranceTerms.endDate is NOT NULL (schema), so
+        // the instanceof guard is purely defensive — a null can't occur in practice (treated as epoch).
         const aEnd = a.endDate instanceof Date ? a.endDate.getTime() : 0;
         const bEnd = b.endDate instanceof Date ? b.endDate.getTime() : 0;
-        return bEnd - aEnd;
+        if (bEnd !== aEnd) return bEnd - aEnd;
+        // Deterministic tiebreak when two terms share an endDate (e.g. a mid-term correction): the
+        // later-STARTING term is the more current one (#50 — without this the pick was DB-row-order
+        // dependent / nondeterministic, since the term query has no ORDER BY).
+        const aStart = a.startDate instanceof Date ? a.startDate.getTime() : 0;
+        const bStart = b.startDate instanceof Date ? b.startDate.getTime() : 0;
+        return bStart - aStart;
       })[0];
       if (!latestTerm) continue;
 
@@ -890,12 +923,14 @@ export class AnalyticsRepository {
       // across the term span (bug #8 — `monthlyCost ?? 0` zeroed every totalCost-only term).
       const monthlyPremium = effectiveMonthlyPremium(latestTerm);
       const annualPremium = monthlyPremium * 12;
+      // Scope the covered vehicles to the LATEST term's junctions — the same term the premium is
+      // computed from (#25). Spanning EVERY term's junctions mis-distributes when coverage changed
+      // across terms: if an old term covered {A,B,C} and the latest covers {A}, dividing the latest
+      // premium by 3 understates A and invents a phantom premium for the dropped B,C (and inflates
+      // costByCarrier.vehicleCount). Aggregate totals are unaffected (added once per policy); this
+      // only fixes the per-vehicle + per-carrier DISTRIBUTION.
       const coveredVehicleIds = [
-        ...new Set(
-          junctionRows
-            .filter((j) => policyTerms.some((t) => t.id === j.termId))
-            .map((j) => j.vehicleId)
-        ),
+        ...new Set(junctionRows.filter((j) => j.termId === latestTerm.id).map((j) => j.vehicleId)),
       ];
 
       totalMonthlyPremiums += monthlyPremium;
@@ -1010,6 +1045,45 @@ export class AnalyticsRepository {
     return { financingInterest, insuranceCost, fuelCost, maintenanceCost, otherCosts };
   }
 
+  /**
+   * Assemble the TCO total from the categorized buckets, applying two accounting rules:
+   *
+   * - #28 (C121): purchasePrice is a one-time ACQUISITION cost — include it only in the all-time
+   *   (no-`year`) total, never in a year-scoped window (whose expenses are already date-filtered).
+   * - #27 (C154, Angelo-approved option c): the `financingInterest` bucket sums WHOLE financing-sourced
+   *   expense rows — full loan/lease payments (principal + interest), not interest alone (computeBalance
+   *   proves payments retire principal: financing/repository.ts:68). Counting both purchasePrice AND those
+   *   payments double-counts the principal (a $30k car with ~$33k of payments → TCO ≈ $63k). So when
+   *   purchasePrice is counted, EXCLUDE the financing-payment rows (they retire the already-counted price,
+   *   a balance-transfer, not new spend). When purchasePrice is NOT counted (no price, or a year window),
+   *   the financing outflow IS the cost signal for that window, so keep it.
+   *
+   * Returns `countedFinancingInterest` — the financing value actually included (0 when excluded) — so the
+   * caller can report a bucket that matches the total (keeps the breakdown summing: Property 14 / Req 10.2).
+   */
+  private computeTCOTotal(
+    costs: {
+      financingInterest: number;
+      insuranceCost: number;
+      fuelCost: number;
+      maintenanceCost: number;
+      otherCosts: number;
+    },
+    purchasePrice: number | null,
+    year?: number
+  ): { totalCost: number; countedFinancingInterest: number } {
+    const purchaseInTotal = year ? 0 : (purchasePrice ?? 0);
+    const countedFinancingInterest = purchaseInTotal > 0 ? 0 : costs.financingInterest;
+    const totalCost =
+      purchaseInTotal +
+      countedFinancingInterest +
+      costs.insuranceCost +
+      costs.fuelCost +
+      costs.maintenanceCost +
+      costs.otherCosts;
+    return { totalCost, countedFinancingInterest };
+  }
+
   // ---- Public API methods -------------------------------------------------
 
   /** Compute fuel efficiency trend from sequential fuel expenses. */
@@ -1024,6 +1098,11 @@ export class AnalyticsRepository {
       if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
       const rows = await this.db
         .select({
+          // vehicleId is REQUIRED for the fleet view (no vehicleId arg): without grouping, the
+          // date-ordered multi-vehicle list would pair two DIFFERENT cars' consecutive rows and
+          // subtract their odometers → a phantom efficiency point (#54). forEachVehiclePair groups
+          // by vehicle first, mirroring the MPG/cost charts (computeMpgAndCostPerMile).
+          vehicleId: expenses.vehicleId,
           date: expenses.date,
           mileage: expenses.mileage,
           volume: expenses.volume,
@@ -1033,16 +1112,13 @@ export class AnalyticsRepository {
         .from(expenses)
         .innerJoin(vehicles, eq(expenses.vehicleId, vehicles.id))
         .where(and(...conditions))
-        .orderBy(asc(expenses.date));
+        .orderBy(asc(expenses.vehicleId), asc(expenses.date));
       if (rows.length < 2) return [];
       const points: FuelEfficiencyPoint[] = [];
-      for (let i = 1; i < rows.length; i++) {
-        const current = rows[i];
-        const previous = rows[i - 1];
-        if (!current || !previous) continue;
+      forEachVehiclePair(rows, (current, previous) => {
         const point = computeEfficiencyPoint(current as FuelRow, previous as FuelRow);
         if (point) points.push(point);
-      }
+      });
       return points;
     } catch (error) {
       logger.error('Failed to compute fuel efficiency trend', {
@@ -1235,13 +1311,23 @@ export class AnalyticsRepository {
 
     const toDate = (r: FuelExpenseRow) =>
       r.date instanceof Date ? r.date : new Date(r.date as unknown as number);
-    const currentYearFillups = fuelRows.length;
+    // A "fillup" is a fuel PURCHASE — it carries an actual volume. A split fuel expense
+    // creates one sibling row per vehicle, but only the amount is split: siblings have
+    // volume=null (see ExpenseSplitService.createSiblings). Counting raw rows would inflate
+    // the fillup count by (#vehicles − 1) per split fillup in the cross-fleet view (bug #18).
+    // Count only volume-bearing rows — the same predicate fillupDetails already uses — so a
+    // split fillup counts once and a volume-less row never counts as a fillup. The volume/
+    // cost SUMS were always correct (null volume contributes 0); only the COUNTS were wrong.
+    const isFillup = (r: FuelExpenseRow) => r.volume != null && r.volume > 0;
+    const currentYearFillups = fuelRows.filter(isFillup).length;
     const previousYearFillups = prevYearAgg.count;
     const currentMonthFillups = fuelRows.filter(
-      (r) => toDate(r).getMonth() === currentMonth
+      (r) => isFillup(r) && toDate(r).getMonth() === currentMonth
     ).length;
     const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const prevMonthFillups = fuelRows.filter((r) => toDate(r).getMonth() === prevMonth).length;
+    const prevMonthFillups = fuelRows.filter(
+      (r) => isFillup(r) && toDate(r).getMonth() === prevMonth
+    ).length;
 
     const sumGallons = (rows: FuelExpenseRow[]) => rows.reduce((s, r) => s + (r.volume ?? 0), 0);
     const currentYearGallons = sumGallons(fuelRows);
@@ -1765,13 +1851,11 @@ export class AnalyticsRepository {
         .orderBy(asc(expenses.date));
 
       const costs = this.categorizeTCOExpenses(detailedExpenses);
-      const totalCost =
-        (purchasePrice ?? 0) +
-        costs.financingInterest +
-        costs.insuranceCost +
-        costs.fuelCost +
-        costs.maintenanceCost +
-        costs.otherCosts;
+      const { totalCost, countedFinancingInterest } = this.computeTCOTotal(
+        costs,
+        purchasePrice,
+        year
+      );
 
       const now = new Date();
       const ownershipStart =
@@ -1780,11 +1864,16 @@ export class AnalyticsRepository {
           : purchaseDate
             ? new Date(purchaseDate as unknown as number)
             : now;
-      const ownershipMonths = Math.max(
-        1,
-        (now.getFullYear() - ownershipStart.getFullYear()) * 12 +
-          (now.getMonth() - ownershipStart.getMonth())
-      );
+      // costPerMonth must divide the (windowed) total by a matching span. All-time → purchase→now.
+      // Year-scoped → the months of THAT year the vehicle was owned (≤12), so a year-filtered
+      // numerator isn't divided by a full-ownership denominator (#28). Both clamp to ≥1.
+      const ownershipMonths = year
+        ? Math.max(1, monthsOwnedInYear(ownershipStart, now, year))
+        : Math.max(
+            1,
+            (now.getFullYear() - ownershipStart.getFullYear()) * 12 +
+              (now.getMonth() - ownershipStart.getMonth())
+          );
       const mileages = detailedExpenses
         .filter((r) => r.mileage != null)
         .map((r) => r.mileage as number);
@@ -1796,6 +1885,9 @@ export class AnalyticsRepository {
         vehicleName,
         purchasePrice,
         ...costs,
+        // Override the raw bucket with the COUNTED value (0 when excluded under #27 option c) so the
+        // returned financingInterest matches what the total includes — keeps the breakdown summing.
+        financingInterest: countedFinancingInterest,
         totalCost,
         ownershipMonths,
         totalDistance,

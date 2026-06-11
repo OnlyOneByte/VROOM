@@ -235,3 +235,75 @@ function assertFinancedAreNotOwn(
     expect(detail?.financingType).not.toBe('own');
   }
 }
+
+// ---------------------------------------------------------------------------
+// #54 (C158): getFuelEfficiencyTrend must NOT pair fuel rows ACROSS vehicles in the fleet view.
+// Pre-fix the query ordered by date only and paired consecutive rows globally, so two different cars'
+// odometers got subtracted → a phantom efficiency point. The fix orders by (vehicleId, date) and pairs
+// only WITHIN each vehicle (forEachVehiclePair). These pin the boundary.
+// ---------------------------------------------------------------------------
+/** Seed one fuel fillup for a vehicle (real volume + mileage; not a missed fillup). */
+function seedFuel(
+  vehicleId: string,
+  id: string,
+  date: Date,
+  mileage: number,
+  volume: number
+): void {
+  seedExpense(testDb.sqlite, {
+    id,
+    vehicleId,
+    category: 'fuel',
+    expenseAmount: 50,
+    date,
+    mileage,
+    volume,
+    fuelType: 'gasoline',
+    missedFillup: false,
+  } as TestExpense);
+}
+
+describe('#54: fleet fuel-efficiency trend never pairs across vehicles', () => {
+  test('two cars with CLOSE odometers + interleaved dates produce NO cross-vehicle phantom point', async () => {
+    const { userId } = setupUserAndVehicles(2);
+    const [v0, v1] = ['vehicle-user-1-0', 'vehicle-user-1-1'];
+    // Each car has exactly ONE fuel row → zero same-vehicle pairs → the trend must be empty.
+    // Odometers are CLOSE (12,000 vs 12,100) and dates INTERLEAVED so a cross-vehicle pair would yield
+    // a plausible 100mi/10gal = 10 MPG point that survives the [5,100] realistic-bounds filter.
+    seedFuel(v0, 'f-v0', new Date(2024, 0, 1), 12_000, 10);
+    seedFuel(v1, 'f-v1', new Date(2024, 0, 8), 12_100, 10);
+
+    const trend = await repo.getFuelEfficiencyTrend(userId);
+    // Pre-fix: 1 phantom point (12,100 − 12,000)/10 = 10 MPG. Post-fix: empty (no same-vehicle pair).
+    expect(trend).toEqual([]);
+  });
+
+  test('each vehicle still gets its OWN valid trend points (per-vehicle pairing preserved)', async () => {
+    const { userId } = setupUserAndVehicles(2);
+    const [v0, v1] = ['vehicle-user-1-0', 'vehicle-user-1-1'];
+    // v0: two rows 300mi/10gal = 30 MPG. v1: two rows 250mi/10gal = 25 MPG. Interleave all four by date.
+    seedFuel(v0, 'f-v0-a', new Date(2024, 0, 1), 10_000, 10);
+    seedFuel(v1, 'f-v1-a', new Date(2024, 0, 3), 50_000, 10);
+    seedFuel(v0, 'f-v0-b', new Date(2024, 0, 5), 10_300, 10); // +300 within v0
+    seedFuel(v1, 'f-v1-b', new Date(2024, 0, 7), 50_250, 10); // +250 within v1
+
+    const trend = await repo.getFuelEfficiencyTrend(userId);
+    // Exactly TWO points (one valid pair per vehicle); none cross-vehicle (a v0→v1 jump would be
+    // 40,000mi → filtered, but the ordering guarantees we never even attempt it).
+    expect(trend.length).toBe(2);
+    const effs = trend.map((p) => p.efficiency).sort((a, b) => a - b);
+    expect(effs[0]).toBeCloseTo(25, 5);
+    expect(effs[1]).toBeCloseTo(30, 5);
+  });
+
+  test('scoping to a single vehicleId is unaffected (per-vehicle path unchanged)', async () => {
+    const { userId } = setupUserAndVehicles(2);
+    const v0 = 'vehicle-user-1-0';
+    seedFuel(v0, 'f-v0-a', new Date(2024, 0, 1), 10_000, 10);
+    seedFuel(v0, 'f-v0-b', new Date(2024, 0, 5), 10_300, 10);
+
+    const trend = await repo.getFuelEfficiencyTrend(userId, v0);
+    expect(trend.length).toBe(1);
+    expect(trend[0]?.efficiency).toBeCloseTo(30, 5);
+  });
+});

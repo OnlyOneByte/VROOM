@@ -89,6 +89,19 @@ function calculateAmortizationScheduleImpl(
 		for (let i = 1; i <= totalPayments; i++) {
 			const interestAmount = remainingBalance * monthlyRate;
 			const principalAmount = Math.min(financing.paymentAmount - interestAmount, remainingBalance);
+
+			// Negative-amortization guard (C161): if the payment doesn't cover the period's interest,
+			// principalAmount is negative and `remainingBalance - principalAmount` would GROW the balance
+			// every period — emitting rows with negative principal + a climbing balance into the displayed
+			// amortization table (and into derivePaymentEntries' totalPrincipalPaid/totalInterestPaid).
+			// Stop the schedule, mirroring the sibling guards in calculatePayoffDate (:238) and
+			// calculateExtraPaymentImpact (:311). The loan never amortizes under this payment, so there's
+			// no meaningful further schedule to project.
+			if (principalAmount <= 0) {
+				if (DEV) console.warn('calculateAmortizationSchedule: payment does not cover interest');
+				break;
+			}
+
 			remainingBalance = Math.max(0, remainingBalance - principalAmount);
 			const paymentDate = calculatePaymentDate(startDate, i, financing.paymentFrequency);
 
@@ -336,6 +349,22 @@ function calculateExtraPaymentImpactImpl(
 }
 
 export const calculateExtraPaymentImpact = memoizeMulti(calculateExtraPaymentImpactImpl);
+
+/**
+ * Resolve the odometer reading to use for lease overage / loan miles-used (C157, bug #lease-loan,
+ * Angelo-approved C151). Miles-used is inherently ALL-TIME, so it must prefer the canonical all-sources,
+ * period-independent `currentOdometer` (GET /stats, C52) over the period-scoped + fuel-only
+ * `currentMileage` (which shrinks under a 7d/30d stats window and ignores manual odometer entries).
+ * Falls back currentOdometer → currentMileage → initialMileage → null. Pure + host-independent so both
+ * FinanceTab call sites (PaymentMetricsGrid mileageUsed, LeaseMetricsCard) derive miles identically.
+ */
+export function resolveCurrentOdometer(
+	currentOdometer: number | null | undefined,
+	currentMileage: number | null | undefined,
+	initialMileage: number | null | undefined
+): number | null {
+	return currentOdometer ?? currentMileage ?? initialMileage ?? null;
+}
 
 export function calculateLeaseMetrics(
 	financing: VehicleFinancing,

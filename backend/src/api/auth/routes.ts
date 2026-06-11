@@ -20,6 +20,30 @@ import { validateAndRefreshSession } from './utils';
 const routes = new Hono();
 
 /**
+ * The session-user shape returned by GET /me and POST /refresh — id/email/displayName plus
+ * ISO-or-null timestamps. Extracted (C187) so the two handlers share ONE serializer instead of
+ * the byte-identical 5-field block they each inlined; structurally typed so it accepts both the
+ * `c.get('user')` row and validateAndRefreshSession's `result.user`. NOTE: deliberately NOT used
+ * by PATCH /me (emits only id/email/displayName — no timestamps) or GET /accounts (a different
+ * created-at fallback) — those are different shapes, folding them in would change a response.
+ */
+function serializeSessionUser(u: {
+  id: string;
+  email: string;
+  displayName: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}) {
+  return {
+    id: u.id,
+    email: u.email,
+    displayName: u.displayName,
+    createdAt: u.createdAt?.toISOString() ?? null,
+    updatedAt: u.updatedAt?.toISOString() ?? null,
+  };
+}
+
+/**
  * OAuth State Storage
  *
  * IMPORTANT: This is an in-memory store and will be lost on server restart.
@@ -443,19 +467,24 @@ routes.get('/me', async (c) => {
   const { session, user } = await lucia.validateSession(sessionId);
 
   if (!session) {
+    // Clear the now-invalid session cookie so the dead token doesn't linger in the browser
+    // (C127/#32a — align with requireAuth + the logout handler; OWASP session-mgmt hygiene per ARCC
+    // secure-cookie-handling). The session is already invalid server-side, so this is hygiene, not a
+    // replay fix — but it stops the client from re-sending a known-dead cookie on every request.
+    deleteCookie(c, lucia.sessionCookieName, {
+      path: '/',
+      secure: CONFIG.env === 'production',
+      httpOnly: true,
+      maxAge: CONFIG.auth.cookieMaxAge,
+      sameSite: 'Lax',
+    });
     throw new HTTPException(401, { message: 'Invalid session' });
   }
 
   return c.json({
     success: true,
     data: {
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        createdAt: user.createdAt?.toISOString() ?? null,
-        updatedAt: user.updatedAt?.toISOString() ?? null,
-      },
+      user: serializeSessionUser(user),
       session: {
         id: session.id,
         expiresAt: session.expiresAt,
@@ -534,19 +563,21 @@ routes.post('/refresh', async (c) => {
   const result = await validateAndRefreshSession(sessionId, lucia, c);
 
   if (!result) {
+    // Clear the now-invalid session cookie (C127/#32a — mirror /me + requireAuth + logout).
+    deleteCookie(c, lucia.sessionCookieName, {
+      path: '/',
+      secure: CONFIG.env === 'production',
+      httpOnly: true,
+      maxAge: CONFIG.auth.cookieMaxAge,
+      sameSite: 'Lax',
+    });
     throw new HTTPException(401, { message: 'Invalid session' });
   }
 
   return c.json({
     success: true,
     data: {
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        displayName: result.user.displayName,
-        createdAt: result.user.createdAt?.toISOString() ?? null,
-        updatedAt: result.user.updatedAt?.toISOString() ?? null,
-      },
+      user: serializeSessionUser(result.user),
       session: {
         id: result.session.id,
         expiresAt: result.session.expiresAt,

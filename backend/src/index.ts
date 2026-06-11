@@ -10,6 +10,7 @@ import { app } from './app';
 import './api/sync/init';
 import { CONFIG } from './config';
 import { checkpointWAL, forceCheckpointWAL, runMigrations } from './db/connection';
+import { extractErrorMessage } from './utils/error-handling';
 import { logger } from './utils/logger';
 
 logger.startup(`VROOM Backend starting on port ${CONFIG.server.port}`);
@@ -20,7 +21,7 @@ try {
   await runMigrations();
 } catch (error) {
   // Log the full error for debugging but don't crash if tables already exist
-  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorMessage = extractErrorMessage(error);
   if (errorMessage.includes('already exists')) {
     logger.info('Database tables already exist, skipping migrations');
   } else {

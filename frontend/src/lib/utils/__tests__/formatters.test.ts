@@ -14,9 +14,13 @@
 
 import { describe, expect, test } from 'vitest';
 import {
+	capitalize,
+	dateOnlyToISO,
+	formatCompactRelativeTime,
 	formatCurrency,
 	formatDate,
-	dateOnlyToISO,
+	formatNumber,
+	formatRelativeTime,
 	getCurrencySymbol
 } from '$lib/utils/formatters';
 
@@ -107,5 +111,91 @@ describe('dateOnlyToISO', () => {
 		// Empty string / undefined → a valid ISO timestamp (no throw, no NaN).
 		expect(() => new Date(dateOnlyToISO('')).toISOString()).not.toThrow();
 		expect(Number.isNaN(new Date(dateOnlyToISO(undefined)).getTime())).toBe(false);
+	});
+});
+
+describe('capitalize (C119 — extracted from 5 hand-rolled sites)', () => {
+	test('upper-cases the first character, leaving the rest unchanged', () => {
+		expect(capitalize('loan')).toBe('Loan');
+		expect(capitalize('monthly')).toBe('Monthly');
+		expect(capitalize('lease')).toBe('Lease');
+	});
+
+	test('is a no-op on an empty string and leaves an already-capitalized word', () => {
+		expect(capitalize('')).toBe('');
+		expect(capitalize('Owned')).toBe('Owned');
+	});
+
+	test('only touches the first character (does not lower-case the rest)', () => {
+		expect(capitalize('mDY')).toBe('MDY');
+	});
+});
+
+describe('formatNumber (C130 — coverage ratchet)', () => {
+	test('formats with the default 2 decimals', () => {
+		expect(formatNumber(1234.5)).toBe('1,234.50');
+	});
+
+	test('honors a custom decimal count (0 → integer, 3 → fuel-price style)', () => {
+		expect(formatNumber(1234.567, 0)).toBe('1,235');
+		expect(formatNumber(3.4, 3)).toBe('3.400');
+	});
+});
+
+describe('formatDate (C130)', () => {
+	test('renders a Date as "Mon D, YYYY" (en-US short month)', () => {
+		// Construct at noon local so the calendar day is offset-stable for the assertion.
+		expect(formatDate(new Date(2024, 2, 15, 12))).toBe('Mar 15, 2024');
+	});
+
+	test('accepts an ISO string carrying an explicit instant', () => {
+		// A timezone-qualified instant formats to its local calendar day; assert the parts are present.
+		const out = formatDate('2024-03-15T18:00:00.000Z');
+		expect(out).toMatch(/Mar 1[45], 2024/); // 14th or 15th depending on host offset — both valid
+	});
+});
+
+describe('formatRelativeTime (C130 — branches driven relative to now, host-independent)', () => {
+	const DAY = 1000 * 60 * 60 * 24;
+	const daysAgo = (n: number) => new Date(Date.now() - n * DAY);
+
+	test('null → "Never"', () => {
+		expect(formatRelativeTime(null)).toBe('Never');
+	});
+
+	test('the day/week/month/year buckets', () => {
+		expect(formatRelativeTime(daysAgo(0))).toBe('Today');
+		expect(formatRelativeTime(daysAgo(1))).toBe('Yesterday');
+		expect(formatRelativeTime(daysAgo(3))).toBe('3 days ago');
+		expect(formatRelativeTime(daysAgo(14))).toBe('2 weeks ago');
+		expect(formatRelativeTime(daysAgo(60))).toBe('2 months ago');
+		expect(formatRelativeTime(daysAgo(400))).toBe('1 years ago');
+	});
+
+	test('a future date clamps to "Today" (the Math.max(0, …) guard, not a negative bucket)', () => {
+		expect(formatRelativeTime(new Date(Date.now() + 5 * DAY))).toBe('Today');
+	});
+
+	test('accepts an ISO string as well as a Date', () => {
+		expect(formatRelativeTime(daysAgo(1).toISOString())).toBe('Yesterday');
+	});
+});
+
+describe('formatCompactRelativeTime (C130)', () => {
+	const MIN = 60000;
+
+	test('null → "Never"', () => {
+		expect(formatCompactRelativeTime(null)).toBe('Never');
+	});
+
+	test('the minute/hour/day buckets', () => {
+		expect(formatCompactRelativeTime(new Date(Date.now() - 30 * 1000))).toBe('Just now'); // <1 min
+		expect(formatCompactRelativeTime(new Date(Date.now() - 5 * MIN))).toBe('5m ago');
+		expect(formatCompactRelativeTime(new Date(Date.now() - 3 * 60 * MIN))).toBe('3h ago');
+		expect(formatCompactRelativeTime(new Date(Date.now() - 2 * 24 * 60 * MIN))).toBe('2d ago');
+	});
+
+	test('a future date clamps to "Just now" (the Math.max(0, …) guard)', () => {
+		expect(formatCompactRelativeTime(new Date(Date.now() + 10 * MIN))).toBe('Just now');
 	});
 });

@@ -1,9 +1,8 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { NotFoundError } from '../../errors';
 import { requireAuth } from '../../middleware';
-import { vehicleRepository } from '../vehicles/repository';
+import { validateVehicleOwnership } from '../../utils/validation';
 import { analyticsRepository } from './repository';
 
 const routes = new Hono();
@@ -67,8 +66,7 @@ routes.get('/fuel-stats', zValidator('query', dateRangeVehicleQuerySchema), asyn
   const { startDate, endDate, vehicleId } = c.req.valid('query');
 
   if (vehicleId) {
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-    if (!vehicle) throw new NotFoundError('Vehicle');
+    await validateVehicleOwnership(vehicleId, user.id);
   }
 
   const data = await analyticsRepository.getFuelStats(
@@ -110,8 +108,7 @@ routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), a
   const { startDate, endDate, vehicleId } = c.req.valid('query');
 
   if (vehicleId) {
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-    if (!vehicle) throw new NotFoundError('Vehicle');
+    await validateVehicleOwnership(vehicleId, user.id);
   }
 
   const data = await analyticsRepository.getFuelAdvanced(
@@ -126,8 +123,7 @@ routes.get('/fuel-advanced', zValidator('query', dateRangeVehicleQuerySchema), a
 routes.get('/vehicle-health', zValidator('query', vehicleIdQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId } = c.req.valid('query');
-  const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-  if (!vehicle) throw new NotFoundError('Vehicle');
+  await validateVehicleOwnership(vehicleId, user.id);
   const data = await analyticsRepository.getVehicleHealth(user.id, vehicleId);
   return c.json({ success: true, data });
 });
@@ -136,8 +132,7 @@ routes.get('/vehicle-health', zValidator('query', vehicleIdQuerySchema), async (
 routes.get('/vehicle-tco', zValidator('query', yearVehicleQuerySchema), async (c) => {
   const user = c.get('user');
   const { vehicleId, year } = c.req.valid('query');
-  const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-  if (!vehicle) throw new NotFoundError('Vehicle');
+  await validateVehicleOwnership(vehicleId, user.id);
   const data = await analyticsRepository.getVehicleTCO(user.id, vehicleId, year);
   return c.json({ success: true, data });
 });
@@ -149,8 +144,7 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { vehicleId, startDate, endDate } = c.req.valid('query');
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-    if (!vehicle) throw new NotFoundError('Vehicle');
+    await validateVehicleOwnership(vehicleId, user.id);
     const data = await analyticsRepository.getVehicleExpenses(user.id, vehicleId, {
       start: startDate,
       end: endDate,
@@ -175,10 +169,7 @@ routes.get('/fuel-efficiency', zValidator('query', fuelEfficiencyQuerySchema), a
 
   // If vehicleId provided, verify user owns the vehicle
   if (vehicleId) {
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-    if (!vehicle) {
-      throw new NotFoundError('Vehicle');
-    }
+    await validateVehicleOwnership(vehicleId, user.id);
   }
 
   const fuelEfficiencyTrend = await analyticsRepository.getFuelEfficiencyTrend(user.id, vehicleId);
