@@ -31,7 +31,7 @@
 > branch (UP SHARPLY +3.7 line / +6.7 func / +3.2 branch from C164 — the C166 settings-store + C169 settings-api + C175 pwa.ts FE
 > ratchets delivered; FE still the bigger gap but closing fast).** **RE-MEASURED AGAIN C186 (the #5-sweep re-measure): be 83.41% line /
 > 83.74% func (up from C176's 82.74/82.49 — the C178/#25 + C180/#48 + C181/orchestrator + C184/#26c + C185/analytics-routes BE
-> additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C176 — every C178–C185 cycle was backend, so FE didn't move).** **RE-MEASURED AGAIN C196 (the #5-sweep re-measure): be 84.08% line / 84.44% func (up from C186's 83.41/83.74 — the C188 sync-routes + C190/#62 + C192/#63 + C195 activity-tracker additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C186 — C188–C195 all backend). FRESH FE LOW SPOTS to steer the next FE guard cycle: a ~15% form-validation module (pure logic — cleanest pick), analytics-api.ts ~36% func, sync-manager.ts ~56% (timer/network-bound), auth.ts ~56%; settings.svelte.ts ~11% is the filed handleError arch pick.** **RE-MEASURED AGAIN C203 (the #5-sweep re-measure): be 84.06% line / 84.43% func (FLAT vs C196's 84.08/84.44 — C198/C201/C202 all FE, only C200 touched BE +3); fe 77.79% line / 75.57% func / 72.96% branch (UP SHARPLY +3.9 line / +2.0 func / +6.9 branch vs C196 — the C198 lease-metrics + C201 form-validation [+19] + C202 offline-storage [+2] FE ratchet delivered; the BE↔FE gap is narrowing to ~6pts). REMAINING FE LOW SPOTS (form-validation now DONE C201): analytics-api.ts ~36% func, sync-manager.ts ~56% (timer/network-bound), auth.ts ~56%; the C199-primed `calculatePayoffDateFromStart` is the next clean FE guard pick.** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C176 — every C178–C185 cycle was backend, so FE didn't move).** **RE-MEASURED AGAIN C196 (the #5-sweep re-measure): be 84.08% line / 84.44% func (up from C186's 83.41/83.74 — the C188 sync-routes + C190/#62 + C192/#63 + C195 activity-tracker additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C186 — C188–C195 all backend). FRESH FE LOW SPOTS to steer the next FE guard cycle: a ~15% form-validation module (pure logic — cleanest pick), analytics-api.ts ~36% func, sync-manager.ts ~56% (timer/network-bound), auth.ts ~56%; settings.svelte.ts ~11% is the filed handleError arch pick.** **RE-MEASURED AGAIN C203 (the #5-sweep re-measure): be 84.06% line / 84.43% func (FLAT vs C196's 84.08/84.44 — C198/C201/C202 all FE, only C200 touched BE +3); fe 77.79% line / 75.57% func / 72.96% branch (UP SHARPLY +3.9 line / +2.0 func / +6.9 branch vs C196 — the C198 lease-metrics + C201 form-validation [+19] + C202 offline-storage [+2] FE ratchet delivered; the BE↔FE gap is narrowing to ~6pts). REMAINING FE LOW SPOTS (form-validation now DONE C201): analytics-api.ts ~36% func, sync-manager.ts ~56% (timer/network-bound), auth.ts ~56%; the C199-primed `calculatePayoffDateFromStart` is the next clean FE guard pick.** **RE-MEASURED AGAIN C213 (the #5-sweep re-measure): be 84.14% line / 84.49% func (up slightly from C203's 84.06/84.43 — the C206 #67 + C209 #68 + C210 #70 + C211 parseClampedInt BE additions); fe 79.22% line / 78.89% func / 73.52% branch (UP +1.4 line / +3.3 func vs C203 — the C207 payoff-date [+12] + C212 analytics-api [+19] FE guard ratchet; the FE SERVICE layer is now FULLY covered, analytics-api was the last gap [C212]). BE↔FE gap NEARLY CLOSED — 84 vs 79. REMAINING FE LOW SPOTS: auth.ts ~56% (next clean guard pick), sync-manager.ts ~56% (timer/network-bound — less clean); the rest is the components/routes deficit (largely eyes-on).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 212 |
 | bug | 3 | 210 |
 | arch | 5 | 211 |
-| infra | 6 | 208 |
+| infra | 6 | 213 |
 
-Current cycle: **212**
+Current cycle: **213**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3757,3 +3757,16 @@ Current cycle: **212**
   FIRST — 24 green (was 5, +19), my getDefaultDateRange seconds/one-year assumptions confirmed empirically. green→green: FE validate:local EXIT 0
   — 576 pass (+19), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. analytics-api ~36%→well-covered. cov: fe 77.79%+
   (carry; +19 FE) / be 84.06% (carry). Next FE guard low spot: auth.ts ~56% / sync-manager.ts ~56% (timer/network-bound — less clean).
+- **C213 (infra): #5 branch-hygiene sweep + coverage re-measure (last sweep C203, branch 23 commits deep)** — BALANCE: `feature` most-starved
+  (cyc 170, starved-for 43, blocked 38th) but blocked → fell through; nothing else strictly OVER budget → highest-leverage pick. `infra` was
+  the most-starved actionable (cyc 208, starved-for 5) AND the #5 sweep was concretely due (last C203, ~10 cycles / 23 commits — the C212
+  forecast). (1) STRAY-TEST CHECK CLEAN: zero untracked unit/spec `.test.ts` — all untracked are the by-design `*.meshclaw.e2e.ts` set +
+  e2e screenshots/snapshots/results + playwright config + `.meshclaw-tools/` + `mise.local.toml` + the pre-loop `.kiro/specs/offline-entries/`
+  doc (unchanged since C203). (2) GREEN BASELINE + RE-MEASURE: backend `bun test --coverage` EXIT 0 (1289 pass / 1 skip) — be 84.14% line /
+  84.49% func (up slightly from C203's 84.06/84.43 — the C206/C209/C210/C211 BE additions); frontend `vitest --coverage` EXIT 0 (576 pass) —
+  fe 79.22% line / 78.89% func / 73.52% branch (UP +1.4 line / +3.3 func vs C203 — the C207 payoff-date + C212 analytics-api FE ratchet; the
+  BE↔FE gap is NEARLY CLOSED, 84 vs 79). (3) BRANCH_REVIEW.md REFRESH (gitignored): header scope 13→23 commits (C190–C212), status block to
+  1289 BE / 576 FE + the C213 coverage, appended §28 (C203–C212: the balanced arc — #66 offline-electric-charge + #68 restore-comma-truncation
+  [2 HIGH data-safety], #67/#70 + the C205/C211 dedups-that-collapsed-the-bug-they-just-fixed, the C207/C212 guard ratchet that closed the FE
+  service layer, #69 escalated), fixed the stale "13 commits" → "23 commits (C190–C212)" in Suggested-merge. Doc/measurement-only, no product
+  code. Next sweep ~C223; next CLAUDE.md refresh ~C220 (last C208). cov: be 84.14% / fe 79.22% (FRESH C213 reading).
