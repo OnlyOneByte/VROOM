@@ -4190,3 +4190,21 @@ Current cycle: **227**
   category keys; the assertions then hit the real validator branches (confirmed via the distinct 400 messages, not the schema 400). green→green:
   backend validate:local EXIT 0 — 1341 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production
   change. cov: be 85.18%+ (carry; +4 BE, settings/routes.ts validateStorageConfig now branch-covered) / fe 80.64% (carry).
+- **C240 (deep-review): financing write+balance+hook path — CERTIFIED CLEAN; pinned the refinance-after-payoff balance-reset invariant** —
+  BALANCE: TWO at budget — `deep-review` (cyc 235, starved-for 5 = 5) + `bug` (cyc 237, starved-for 3 = 3); deep-review waited LONGER (touched C235
+  vs C237) → deep-review wins. spawn_run 400 → inline (the C231/C235 precedent). Audited the financing write-path firsthand, CERTIFIED CLEAN: (1)
+  computeBalance/computeBalances are payment-history-based (originalAmount − SUM(financing-payment expenses), clamped ≥0), C101-consistent; the
+  SUM isn't userId-scoped but `sourceType='financing'` expenses require validated ownership to create (#62) so no cross-tenant injection. (2) Every
+  route entry-point is ownership-gated: POST create-or-replace validates the VEHICLE (findByUserIdAndId) then findByVehicleId; PATCH
+  payment-amount / PUT payoff / DELETE all call validateFinancingOwnership (financing→its vehicle→owned, throws NotFound on either miss, no info
+  leak). (3) onFinancingDeactivated → clearSource('financing', id, userId) nulls BOTH sourceType+sourceId, userId-scoped, best-effort. (4) The
+  #67/C206 re-finance reactivation (isActive→true, endDate→null) is correct. THE one subtle invariant with NO dedicated test: re-financing REUSES
+  the same row (#67), so the new loan's balance is correct ONLY because payoff/DELETE first clearSource the old payment links — else computeBalance
+  (filtered by source_id) would subtract the OLD loan's payments from the NEW originalAmount (a wrong headline $, NORTH_STAR #1/#2). The
+  financing-balance property test covers the math but not this multi-step chain. GUARD (record-only cert + a merge-surviving net where coverage was
+  thin — the C108/C179 precedent): +2 DB-integration tests (refinance-balance-reset.test.ts, real FinancingRepository + ExpenseRepository over an
+  in-memory DB): pay-down→clearSource→reuse-row→FRESH full balance ($20k−$8k paid, cleared, re-fin $30k → $30k); + a proves-the-dependency case
+  (SKIP the clear → the reused row wrongly shows $22k, documenting WHY payoff must clearSource so a dropped-hook regression resurfaces). NON-VACUOUS
+  by construction (the two cases differ ONLY by the clearSource call → 30000 vs 22000). green→green: backend validate:local EXIT 0 — 1344 pass /
+  1 skip / 0 fail (+2), tsc 0, musl-biome clean (1 unused-import + a long-line reflow autofixed), build bundled. NO production change (clean cert).
+  cov: be 85.18%+ (carry; +2 BE) / fe 80.64% (carry).

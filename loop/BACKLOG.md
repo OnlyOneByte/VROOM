@@ -181,6 +181,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Financing write+balance+hook vein audit (C240)**~~ — *DONE C240: inline audit (spawn_run 400). CERTIFIED CLEAN: computeBalance/Balances
+  payment-history-based + C101-consistent; every route entry ownership-gated (POST validates the vehicle, PATCH/PUT/DELETE validateFinancingOwnership
+  — financing→vehicle→owned, no info leak); onFinancingDeactivated clearSource nulls sourceType+sourceId userId-scoped; the #67/C206 re-finance
+  reactivation correct. The one un-pinned subtle invariant: re-financing REUSES the row, so the new balance is right ONLY because payoff/DELETE first
+  clearSource the old payment links (else computeBalance subtracts the OLD loan's payments from the NEW originalAmount). +2 DB-integration tests
+  (refinance-balance-reset.test.ts): clear→reuse→fresh-full-balance, + a proves-the-dependency case (skip clear → wrong $22k). NON-VACUOUS by
+  construction (cases differ only by the clearSource call). NO production change (record-only cert, the C179/C225 precedent). green→green 1344 pass (+2).*
 - ~~**Auth session-refresh + OAuth callback vein audit (C225)**~~ — *DONE C225: inline audit of the auth surface C56/C126 certified for
   session/email but NOT the OAuth-callback + refresh paths. CERTIFIED CLEAN firsthand: (1) validateAndRefreshSession create-before-invalidate
   ordering correct; both callers pass `c` so no live cookie-loss; C32(b) orphan edge = documented sprawl note. (2) requireAuth deletes cookie +
