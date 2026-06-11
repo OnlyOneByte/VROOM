@@ -8,6 +8,7 @@ import { userPreferences, userProviders } from '../../db/schema';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import {
+  type BackupConfig,
   ChargeUnit,
   DistanceUnit,
   type StorageConfig,
@@ -120,6 +121,29 @@ function mergeStorageConfig(
       ...existingConfig.providerCategories,
       ...incoming.providerCategories,
     },
+  };
+}
+
+/**
+ * Merge incoming backupConfig with existing, producing a full BackupConfig.
+ *
+ * MIRRORS mergeStorageConfig — the PUT used to write backupConfig WHOLESALE while storageConfig was
+ * merged, an asymmetry that was a silent data-loss trap (NORTH_STAR #1): a client PUT-ing
+ * `backupConfig` with only the provider it's editing would WIPE every other provider's backup
+ * settings (retentionCount / sheetsSyncEnabled / folderPath). The frontend mitigated by always
+ * reconstructing the full providers map (ProviderForm.svelte spreads ...backupConfig.providers), but
+ * that made the backend contract fragile — a partial sender (a future client, a direct API caller, or
+ * a stale-load race) lost data. Merge per-provider here so the backend is correct regardless of caller.
+ * A provider entry IS replaced wholesale (its settings are a small fixed shape always sent complete by
+ * the editor), but providers NOT in the incoming map are preserved.
+ */
+function mergeBackupConfig(
+  existing: BackupConfig | null | undefined,
+  incoming: z.infer<typeof backupConfigSchema>
+): BackupConfig {
+  const existingProviders = existing?.providers ?? {};
+  return {
+    providers: { ...existingProviders, ...incoming.providers },
   };
 }
 
@@ -265,9 +289,12 @@ routes.put('/', async (c) => {
     await validateStorageConfig(mergedStorageConfig, user.id);
   }
 
-  // Validate backupConfig ownership if provided
+  // Validate + merge backupConfig if provided. Merge (not wholesale-replace) so a partial PUT that
+  // names only one provider can't silently wipe the others' backup settings — mirrors storageConfig.
+  let mergedBackupConfig: BackupConfig | undefined;
   if (backupConfig) {
     await validateBackupConfig(backupConfig, user.id);
+    mergedBackupConfig = mergeBackupConfig(existingSettings.backupConfig, backupConfig);
   }
 
   // Update settings
@@ -275,7 +302,7 @@ routes.put('/', async (c) => {
     ...restUpdates,
     ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
     ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
-    ...(backupConfig && { backupConfig }),
+    ...(mergedBackupConfig && { backupConfig: mergedBackupConfig }),
   });
 
   return c.json({

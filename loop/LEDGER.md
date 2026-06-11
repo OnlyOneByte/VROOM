@@ -4141,3 +4141,21 @@ Current cycle: **227**
   characterization-of-a-known-hard-seam or an eyes-on-acknowledged punt. DOCS/MEASUREMENT-ONLY (no source touched) → no build gate beyond the two
   coverage runs that WERE the verification. Next #5 sweep ~C246; next CLAUDE.md refresh ~C240. cov: be 85.18% line / 84.74% func / fe 80.64% line /
   80.51% func / 74.97% branch (FRESH C236 reading).
+- **C237 (bug → #82): PUT /settings wrote `backupConfig` WHOLESALE while storageConfig was merged — a partial PUT silently wiped other providers'
+  backup settings; merge per-provider server-side** — BALANCE: `bug` OVER budget (cyc 233, starved-for 4 > 3, FORCED — the C236 forecast). Per the
+  bug-cycle pattern (fresh verified defect over a gated one), hunted un-audited write-paths. CERTIFIED CLEAN firsthand: the insurance term
+  write-path — addTerm (repository.ts:407) + updateTerm (:541) BOTH validateVehicleOwnership on the term↔vehicle junction (no #61 cross-tenant
+  link gap). THE live defect in PUT /settings: storageConfig is MERGED with existing (mergeStorageConfig, :262) but backupConfig was written
+  WHOLESALE (`...(backupConfig && { backupConfig })`, :278). backupConfig = { providers: Record<providerId, settings> }, and backupConfigSchema
+  REQUIRES the full providers map → a client PUT-ing backupConfig with only the provider it's editing WIPES every other provider's backup settings
+  (retentionCount / sheetsSyncEnabled / folderPath) — silent data loss (NORTH_STAR #1). VERIFIED the frontend currently MITIGATES (ProviderForm.svelte:356
+  spreads ...backupConfig.providers, sending the full map), but that makes the backend contract FRAGILE: a partial sender (future client, direct
+  API caller, or a stale-load race) loses data — and storageConfig already defends server-side, so the asymmetry IS the bug. FIX (mirror
+  mergeStorageConfig): `mergeBackupConfig(existing, incoming)` merges per-provider — a named entry is replaced wholesale (its settings are a small
+  fixed shape the editor always sends complete) but un-named providers are PRESERVED; wired into the PUT. validateBackupConfig still gates the
+  INCOMING providers (ownership), and the merged-in existing ones were validated when first written, so no validation bypass. Behavior-preserving
+  for today's full-map caller; protective for partial callers. GUARD: +2 HTTP tests (backup-config-merge.test.ts, 2 raw-seeded owned providers):
+  a partial PUT naming only drive-b PRESERVES drive-a's settings (the #82 regression — pre-fix drive-a was wiped); a named entry IS replaced
+  wholesale (sheetsSyncEnabled dropped on re-PUT without it). NON-VACUOUS: the preserve assertion fails RED pre-fix (wholesale write → drive-a
+  absent). green→green: backend validate:local EXIT 0 — 1330 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean (1 import-order + test reflow
+  autofixed), build bundled. cov: be 85.18%+ (carry; +2 BE) / fe 80.64% (carry).

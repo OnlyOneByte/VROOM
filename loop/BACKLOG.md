@@ -576,6 +576,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   `maxOf`/`minOf` (O(n) reduce) in calculations.ts + swept all 18 → behavior-IDENTICAL (return ±Infinity on [] exactly like Math.max/min, so the
   existing length-guards are unchanged). +6 tests (array-min-max.test.ts: correctness + Math.max/min identity + 50-trial parity + a 500k-element
   no-spread regression). green→green 1328 pass (+6), every existing analytics/vehicle-stats test passed UNCHANGED through the swap.*
+- ~~**#82 (MED, data-safety / NORTH_STAR #1 — found C237 hunting the settings write-path) — PUT /settings wrote `backupConfig` WHOLESALE while
+  storageConfig was merged.**~~ — *DONE C237: backupConfig = { providers: Record<id, settings> }; the schema requires the full map + the handler
+  wrote it wholesale (`...(backupConfig && { backupConfig })`) → a client PUT-ing only the provider it's editing WIPED every other provider's
+  backup settings (retentionCount/sheetsSyncEnabled/folderPath). The frontend MITIGATES (ProviderForm spreads the full map) but the backend
+  contract was fragile — a partial sender (future client / direct API / stale-load race) lost data, and storageConfig already merges server-side
+  (the asymmetry was the bug). FIX: `mergeBackupConfig` (mirrors mergeStorageConfig) merges per-provider — a named entry is replaced wholesale
+  (fixed-shape, editor sends complete) but un-named providers preserved; validateBackupConfig still gates incoming ownership. +2 HTTP tests
+  (partial PUT preserves the un-named provider [the regression]; named entry replaced wholesale); NON-VACUOUS (preserve fails RED pre-fix).
+  green→green 1330 pass (+2).*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:
