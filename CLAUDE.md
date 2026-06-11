@@ -156,8 +156,9 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C176, not an estimate): **backend 82.74% line / 82.49% func · frontend 73.89% line / 73.61%
-  func / 66.08% branch** — backend steady ~82%; frontend climbed 65.3→73.9 since C138 under a sustained
+  (re-measured C186, not an estimate): **backend 83.41% line / 83.74% func · frontend 73.89% line / 73.61%
+  func / 66.08% branch** — backend creeping up to ~83% (the C178–C192 BE bug-fix + route-coverage arc);
+  frontend climbed 65.3→73.9 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
   C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts). **The FE
   SERVICE layer is now 100% module-covered** (api-client + expense-api + reminder-api + settings-api + error-
@@ -165,11 +166,12 @@ Highlights:
   thin pure-`.ts`/`.svelte.ts`/store/util modules — e.g. sync-manager.ts ~58%). Backend
   middleware trio all covered (idempotency C105, rate-limit C112, body-limit C156); `backup-orchestrator.ts`
   0→50% func (C181 — its old test was COVERAGE THEATER, re-implementing the logic locally instead of importing
-  it; watch for that pattern). Next BE low spots (C181 re-measure): **`analytics/routes.ts` 15% func** (the
-  GET-handler response assembly — highest-value, HTTP-harness-tractable), then `sync/routes.ts` (~32%; NOTE:
-  `restore.ts` restoreFromSheets needs a process-global Sheets mock the sync suite avoids — see C163).
+  it; watch for that pattern), `analytics/routes.ts` 15→59% (C185), `sync/routes.ts` 32→59% (C188) — all via
+  the createTestApp HTTP harness. Next BE low spot: `activity-tracker.ts` (~44%, but timer/setInterval-bound —
+  less clean). NOTE: `restore.ts` restoreFromSheets needs a process-global Sheets mock the sync suite avoids
+  (see C163) — defer until a DI seam exists.
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1236 backend tests / ~513 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1263 backend tests / ~513 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
@@ -189,10 +191,13 @@ Highlights:
   efficiency trend paired rows across vehicles in the fleet view) fixed C158 (per-vehicle pairing via
   `forEachVehiclePair`); **#57** (deleting an insurance policy orphaned its auto-materialized premium
   expenses — still summed into TCO forever, no FK) fixed C167 (deleteBySource per term before delete).
-  Plus the MED fixes #52/#55/#56/#48/#59/#25 (split-delete tenant-scope, amortization neg-guard, perFillup
-  split inflation, odometer userId-scope [sweep COMPLETED C180 — the 3rd read method `findByVehicleIdPaginated`
-  was the leg C168 missed], native-CSV out-of-range date echo-check, insurance latest-term attribution) all
-  landed C155–C180.
+  Plus the MED/LOW fixes #52/#55/#56/#48/#59/#25/#26c/#61/#62/#63 (split-delete tenant-scope, amortization
+  neg-guard, perFillup split inflation, odometer userId-scope [sweep COMPLETED C180 — the 3rd read method
+  `findByVehicleIdPaginated` was the leg C168 missed], native-CSV out-of-range date echo-check, insurance
+  latest-term attribution, findExpiringTerms excludes cancelled policies, expense-PUT vehicle-reassignment
+  ownership, manual-expense sourceType restricted to `financing`, provider PUT/DELETE tenant-scoped writes)
+  all landed C155–C192. Recurring lesson the loop keeps re-finding (C181/C182/C185): a green test that
+  RE-IMPLEMENTS or RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module.
 - Pending an Angelo decision (filed, NOT auto-fixed — each changes a displayed $/HTTP behavior or is a
   product call). TWO HIGHs, both in the Google Sheets backup path: **#36** (writes `USER_ENTERED` →
   formula injection + silent round-trip corruption; ARCC-consult before fixing), **#37** (non-atomic

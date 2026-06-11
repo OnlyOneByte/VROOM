@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 188 |
 | bug | 3 | 192 |
 | arch | 5 | 187 |
-| infra | 6 | 186 |
+| infra | 6 | 193 |
 
-Current cycle: **192**
+Current cycle: **193**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3444,3 +3444,14 @@ Current cycle: **192**
   delete→204 (not over-broad). These pin the WRITE PREDICATE itself, not just the guard. One biome reflow autofixed. green→green:
   backend validate:local **EXIT 0 — 1263 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean, build bundled. #63 CLOSED — the C191
   providers-audit finding now landed. cov: be 83.41%+ (carry; +3 BE) / fe 73.89% (carry).
+- **C193 (infra): CLAUDE.md orientation refresh (post-C183 drift, C184–C192) — first cycle after the squash→rebase**
+  — BALANCE: THREE past budget — `feature` (cyc 170, starved-for 23, blocked 18th cycle) + `arch` (cyc 187, starved-for 6) + `infra`
+  (cyc 186, starved-for 7). Feature blocked → among the over-budget actionable, most-starved wins → `infra` (7 > arch 6). The CLAUDE.md
+  refresh was DUE (last C183, ~10 cycles) + had real drift to fix after the eventful window (the C190.5 squash→main→rebase + 4 closed
+  bugs + a coverage re-measure). Doc-only — no build gate (standing convention; every figure verified vs the C186 measure + the
+  C184–C192 ledger). FIXED 4 drifts: (1) coverage C176→C186 (be 82.74→83.41 line / 82.49→83.74 func; fe flat 73.89 — backend-only
+  window); (2) suite size ~1236→~1263 BE; (3) BE low-spots — analytics/routes 15→59% (C185) + sync/routes 32→59% (C188) now DONE,
+  next = activity-tracker ~44% (timer-bound); (4) closed-bugs line += #26c/#61/#62/#63 + the recurring coverage-theater lesson
+  (C181/C182/C185: a green test that re-implements/reconstructs a module locally is NOT real coverage). Left the loop-steering +
+  branch hard-rules untouched (accurate + timeless — the squash→rebase IS the documented human-merge workflow, not a drift). NO code
+  touched. Next CLAUDE.md refresh ~C203; #5 sweep next ~C196. cov: be 83.41% line / fe 73.89% line (carry, doc-only).
