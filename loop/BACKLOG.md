@@ -1156,10 +1156,17 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     to utils/calculations.ts + wired both sites. PAYOFF (the C205 "dup caused the bug → dedup it" logic): the guard can't be on one param +
     forgotten on its sibling. Anchored by the C210 expiring-soon-http.test.ts (green through) + 6 unit tests. green→green 1289 pass (+6).
     SCOUTED + REJECTED as churn (C75/C99): the FE query-builders (divergent inclusion rules — C69 trap), the ~57 logging-idiom sites (C147
-    doc comment EXPLICITLY excludes them — structured-log shape, not value extraction), clampPagination (pre-parsed, no NaN-guard).* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or an inline scout.**
+    doc comment EXPLICITLY excludes them — structured-log shape, not value extraction), clampPagination (pre-parsed, no NaN-guard).*
+  - ~~**`calendarYearRange` — the [Jan1, nextJan1) year-boundary Date pair, 3 sites → 1 (C216 inline scout)**~~ — *DONE C216: the
+    `new Date(year, 0, 1)` / `new Date(year + 1, 0, 1)` pair was hand-repeated at 3 analytics/repository.ts sites (queryTotalSpending :654,
+    year-scoped vehicle-expenses :1835, getYearEnd :1937) — sites 1+2 feed `gte(start)+lt(end)`, site 3 `Math.floor(.getTime()/1000)`s the pair
+    into a DateRange. Extracted exported `calendarYearRange(year): {start, end}` beside monthsOwnedInYear/toDate (the file's own year-date-helper
+    cluster) + wired all 3 via destructuring. PAYOFF: one source of truth for the year-boundary pair (a future leap/half-open-edge fix lands
+    once). Behavior-identical (each site consumes the 2 Dates as before; local-time preserved); anchored by the existing analytics suites (green
+    through) + 3 helper tests (boundaries; the 366-day leap half-open window; 365-day non-leap). green→green 1296 pass (+3).* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or an inline scout.**
   - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
     pending-migration constraints rule out most FE/money candidates). The BE logging-idiom convergence stays EXCLUDED by design (C147/C211); do
-    NOT re-file it. Genuinely thin now — prefer a fan-out to surface a fresh candidate over forcing a 2-site micro-dedup.
+    NOT re-file it. Genuinely thin now — prefer a fan-out to surface a fresh candidate over forcing a micro-dedup.
 
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,

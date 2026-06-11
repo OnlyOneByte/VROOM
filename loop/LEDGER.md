@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 215 |
 | guard | 6 | 212 |
 | bug | 3 | 214 |
-| arch | 5 | 211 |
+| arch | 5 | 216 |
 | infra | 6 | 213 |
 
-Current cycle: **215**
+Current cycle: **216**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3803,3 +3803,18 @@ Current cycle: **215**
   sees-theirs over-filter control. NON-VACUOUS: confirmed the cross-tenant test FAILS RED with the scope reverted (count 3 not 2) then GREEN
   restored. green→green: backend validate:local EXIT 0 — 1293 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean, build bundled. cov: be
   84.14%+ (carry; +2 BE) / fe 79.22% (carry).
+- **C216 (arch): extract calendarYearRange — the [Jan1, nextJan1) year-boundary Date pair, 3 sites → 1** — BALANCE: `feature` most-starved
+  (cyc 170, starved-for 46, blocked 41st) but blocked → fell through; nothing else strictly OVER budget → highest-leverage; `arch` was the
+  most-starved actionable (cyc 211, starved-for 5 = 5, due). Inline scout (queue thin). FOUND a clean one: the `new Date(year, 0, 1)` /
+  `new Date(year + 1, 0, 1)` calendar-year-boundary pair was hand-repeated at 3 analytics/repository.ts sites — queryTotalSpending (:654),
+  the year-scoped vehicle-expenses filter (:1835), getYearEnd (:1937). VERIFIED firsthand the consumption: sites 1+2 feed `gte(start)+lt(end)`
+  (the half-open year filter), site 3 `Math.floor(.getTime()/1000)`s the same pair into a DateRange (seconds) — so the SHARED thing is the
+  boundary PAIR, not how each consumes it (the safe extraction boundary; not the C69 divergence trap since I extract only the pair). Extracted
+  exported `calendarYearRange(year): {start, end}` BESIDE monthsOwnedInYear/toDate (the file's own exported year-date-helper cluster — kept it
+  local to its only consumer, matching the established pattern rather than importing from calculations) + wired all 3 via destructuring
+  (`const {start: yearStart, end: yearEnd} = calendarYearRange(year)`). Behavior-identical (each site consumes the two Dates exactly as before;
+  local-time preserved). Test-anchored (rule 3): the EXISTING analytics year-end + total-spending + vehicle-expenses suites green THROUGH the
+  substitution + 3 new helper tests in tco-months-owned.test.ts (Jan1/nextJan1 boundaries; the half-open 366-day leap window with Dec-31-23:59
+  inside + end excluded; the 365-day non-leap). VERIFY-FIRSTHAND: ran in isolation FIRST — 12 green, the leap-year/half-open assumptions
+  confirmed. green→green: backend validate:local EXIT 0 — 1296 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. cov: be
+  84.14%+ (carry; +3 BE) / fe 79.22% (carry). ARCH QUEUE thin — next arch cycle prefers a fan-out over forcing a micro-dedup.

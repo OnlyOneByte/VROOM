@@ -81,6 +81,19 @@ export function toDate(value: Date | number | string): Date {
   return value instanceof Date ? value : new Date(value);
 }
 
+/**
+ * The half-open `[Jan 1 of `year`, Jan 1 of `year`+1)` local-time Date boundaries (C216 dedup). The
+ * `new Date(year, 0, 1)` / `new Date(year + 1, 0, 1)` pair was hand-repeated at 3 sites
+ * (queryTotalSpending, the year-scoped vehicle-expenses filter, getYearEnd) — each then either feeds
+ * `gte(start) + lt(end)` (the half-open year filter) or `Math.floor(.getTime()/1000)` (the DateRange
+ * seconds form). One source of truth for the boundary pair; behavior-identical (callers consume the
+ * two Dates exactly as before). Local-time, matching the existing sites + the rest of the analytics
+ * date math.
+ */
+export function calendarYearRange(year: number): { start: Date; end: Date } {
+  return { start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) };
+}
+
 // ---------------------------------------------------------------------------
 // Data interfaces for each analytics endpoint
 // ---------------------------------------------------------------------------
@@ -651,8 +664,7 @@ export class AnalyticsRepository {
   }
 
   private async queryTotalSpending(userId: string, year: number): Promise<number> {
-    const yearStart = new Date(year, 0, 1);
-    const yearEnd = new Date(year + 1, 0, 1);
+    const { start: yearStart, end: yearEnd } = calendarYearRange(year);
     const result = await this.db
       .select({ total: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)` })
       .from(expenses)
@@ -1832,8 +1844,7 @@ export class AnalyticsRepository {
 
       const conditions = [eq(expenses.vehicleId, vehicleId), eq(vehicles.userId, userId)];
       if (year) {
-        const yearStart = new Date(year, 0, 1);
-        const yearEnd = new Date(year + 1, 0, 1);
+        const { start: yearStart, end: yearEnd } = calendarYearRange(year);
         conditions.push(gte(expenses.date, yearStart));
         conditions.push(lt(expenses.date, yearEnd));
       }
@@ -1934,8 +1945,7 @@ export class AnalyticsRepository {
   /** Compute year-end summary: totals, trends, biggest expense, YoY comparison. */
   async getYearEnd(userId: string, year: number): Promise<YearEndData> {
     try {
-      const yearStart = new Date(year, 0, 1);
-      const yearEnd = new Date(year + 1, 0, 1);
+      const { start: yearStart, end: yearEnd } = calendarYearRange(year);
       const yearRange: DateRange = {
         start: Math.floor(yearStart.getTime() / 1000),
         end: Math.floor(yearEnd.getTime() / 1000),
