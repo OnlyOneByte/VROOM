@@ -1185,7 +1185,14 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     into a DateRange. Extracted exported `calendarYearRange(year): {start, end}` beside monthsOwnedInYear/toDate (the file's own year-date-helper
     cluster) + wired all 3 via destructuring. PAYOFF: one source of truth for the year-boundary pair (a future leap/half-open-edge fix lands
     once). Behavior-identical (each site consumes the 2 Dates as before; local-time preserved); anchored by the existing analytics suites (green
-    through) + 3 helper tests (boundaries; the 366-day leap half-open window; 365-day non-leap). green→green 1296 pass (+3).* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or an inline scout.**
+    through) + 3 helper tests (boundaries; the 366-day leap half-open window; 365-day non-leap). green→green 1296 pass (+3).*
+  - ~~**`parseUploadedPhoto` — the multipart upload parse+File-validate block, 2 sites → 1 (C221 inline scout)**~~ — *DONE C221: the
+    `parseBody() → body.photo → instanceof File → AppError('No photo file provided', 400)` block was byte-identical at both upload routes
+    (photos/routes.ts:63 + vehicles/photo-routes.ts:27). Extracted `parseUploadedPhoto(c): Promise<File>` to photos/helpers.ts + wired both
+    (each → `const file = await parseUploadedPhoto(c)`) + dropped the now-unused AppError import from both. PAYOFF: one source of truth for the
+    upload-input contract + the seam for the #34 follow-on (size/type/magic-byte validation lands once). +3 direct tests (File→returned;
+    missing→400; non-File→400, via a minimal Hono app + FormData); existing upload suites green through. green→green 1306 pass (+3). ALSO
+    verified firsthand a #74 sibling-gap is NOT real: vehicles/photo-routes.ts inherits changeTracker from its parent (use('*') before .route()).* **ARCH QUEUE thin — next arch cycle prefers a rule-7 fan-out over forcing a micro-dedup.**
   - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
     pending-migration constraints rule out most FE/money candidates). The BE logging-idiom convergence stays EXCLUDED by design (C147/C211); do
     NOT re-file it. Genuinely thin now — prefer a fan-out to surface a fresh candidate over forcing a micro-dedup.

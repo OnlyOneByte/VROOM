@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 220 |
 | guard | 6 | 217 |
 | bug | 3 | 218 |
-| arch | 5 | 216 |
+| arch | 5 | 221 |
 | infra | 6 | 219 |
 
-Current cycle: **220**
+Current cycle: **221**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3877,3 +3877,19 @@ Current cycle: **220**
   pre-existing noNonNullAssertion are WARNINGS (exit 0), not errors (verified firsthand — did NOT touch the 4 unrelated files). green→green:
   backend validate:local EXIT 0 — 1303 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. cov: be 84.14%+ (carry; +3 BE) /
   fe 79.22% (carry).
+- **C221 (arch): extract parseUploadedPhoto — the multipart upload parse+File-validate block, 2 sites → 1** — BALANCE: `feature` most-starved
+  (cyc 170, starved-for 51, blocked 46th) but blocked → fell through; nothing else strictly OVER budget → highest-leverage; `arch` was the
+  most-starved actionable (cyc 216, starved-for 5 = 5, due — vs bug also at 3=3 but arch waited longer). Inline scout. WHILE scouting, VERIFIED
+  firsthand a potential #74 SIBLING-gap is NOT real: vehicles/photo-routes.ts (the vehicle-photo sub-router, also mutating) inherits
+  changeTracker from its parent vehicles/routes.ts (routes.use('*', changeTracker) at :128, BEFORE .route('/:vehicleId/photos') at :131 — Hono
+  parent use('*') covers mounted sub-routes) → correctly covered, confirming C220's fix targeted the genuinely-standalone photos/routes.ts. THE
+  dedup: the `parseBody() → body.photo → instanceof File → AppError('No photo file provided', 400)` block was byte-identical at both upload
+  routes (photos/routes.ts:63 + vehicles/photo-routes.ts:27). Extracted `parseUploadedPhoto(c): Promise<File>` to photos/helpers.ts (beside
+  validateEntityOwnership) + wired both sites (each collapses to `const file = await parseUploadedPhoto(c)`) + dropped the now-unused AppError
+  import from BOTH route files. PAYOFF: one source of truth for the upload-input contract + the natural seam for the filed #34 follow-on
+  (size/type/magic-byte upload validation lands once, not twice). Test-anchored (rule 3): the existing photos + vehicle-photo upload suites green
+  THROUGH the substitution + 3 new direct tests (parse-uploaded-photo.test.ts — File present→returned; missing→400; non-File text field→400; via
+  a minimal Hono app + real FormData, no storage provider needed). NOTE: gate first red on helpers.ts import-order (organizeImports, the
+  Context-type import) → check:musl:fix reflowed it (the C33 whole-tree lesson; pre-existing noNonNullAssertion are warnings, untouched).
+  green→green: backend validate:local EXIT 0 — 1306 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. cov: be 84.14%+ (carry;
+  +3 BE) / fe 79.22% (carry). ARCH QUEUE thin — next arch cycle prefers a fan-out.

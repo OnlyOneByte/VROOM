@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm';
+import type { Context } from 'hono';
 import { getDb } from '../../db/connection';
 import { odometerEntries, photos } from '../../db/schema';
-import { NotFoundError, ValidationError } from '../../errors';
+import { AppError, NotFoundError, ValidationError } from '../../errors';
 import {
   validateExpenseOwnership,
   validateInsuranceOwnership,
@@ -78,4 +79,20 @@ export async function validateEntityOwnership(
     default:
       throw new ValidationError(`Unknown entity type: ${entityType}`);
   }
+}
+
+/**
+ * Parse the multipart upload body and return the validated `photo` File, or throw a 400 (C221 dedup).
+ * The `parseBody()` → `body.photo` → `instanceof File` → AppError('No photo file provided', 400) block
+ * was byte-identical at both upload routes (photos/routes.ts + vehicles/photo-routes.ts). One source of
+ * truth for the upload-input contract — and the natural seam for future upload validation (size/type/
+ * magic-byte sniffing, the filed #34 follow-on) so it lands in one place, not two.
+ */
+export async function parseUploadedPhoto(c: Context): Promise<File> {
+  const body = await c.req.parseBody();
+  const file = body.photo;
+  if (!file || !(file instanceof File)) {
+    throw new AppError('No photo file provided', 400);
+  }
+  return file;
 }

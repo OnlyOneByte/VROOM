@@ -1,10 +1,11 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { AppError, NotFoundError } from '../../errors';
+import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas } from '../../utils/validation';
+import { parseUploadedPhoto } from './helpers';
 import {
   deletePhotoForEntity,
   getPhotoThumbnailForEntity,
@@ -60,12 +61,7 @@ routes.post('/:entityType/:entityId', async (c) => {
   if (!entityType || !entityId) throw new NotFoundError('Entity');
 
   const user = c.get('user');
-  const body = await c.req.parseBody();
-  const file = body.photo;
-
-  if (!file || !(file instanceof File)) {
-    throw new AppError('No photo file provided', 400);
-  }
+  const file = await parseUploadedPhoto(c);
 
   const photo = await uploadPhotoForEntity(entityType, entityId, user.id, file);
   return c.json({ success: true, data: photo }, 201);
