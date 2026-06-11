@@ -77,3 +77,56 @@ describe('vehicle update HTTP route — clear-optional-field semantics', () => {
     expect(clearedBody.data.purchasePrice).toBeNull();
   });
 });
+
+describe('vehicle license-plate uniqueness is per-user, not global (C233 tenant-scope)', () => {
+  // Raw-seed a DIFFERENT user who already owns a vehicle with plate SHARED-9. The plate-uniqueness
+  // check that backs create/update must be scoped to the requesting user — a global lookup wrongly
+  // 409'd this user AND leaked plate existence across tenants (the C168/#52 class). Two users may
+  // legitimately share a plate string (reissued plates, sold-then-rebought cars).
+  function seedForeignVehicleWithPlate(plate: string): void {
+    ctx.sqlite.run(
+      `INSERT INTO users (id, email, display_name) VALUES ('other-user', 'other@test.com', 'Other')`
+    );
+    ctx.sqlite.run(
+      `INSERT INTO vehicles (id, user_id, make, model, year, license_plate)
+       VALUES ('foreign-veh', 'other-user', 'Honda', 'Civic', 2020, ?)`,
+      [plate]
+    );
+  }
+
+  test('CREATE with a plate another tenant already owns succeeds (no cross-tenant 409)', async () => {
+    seedForeignVehicleWithPlate('SHARED-9');
+
+    const res = await ctx.authed('POST', '/api/v1/vehicles', {
+      make: 'Toyota',
+      model: 'Corolla',
+      year: 2023,
+      licensePlate: 'SHARED-9',
+    });
+    const body = await json<DataEnvelope<VehicleRow>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    expect(body.data.licensePlate).toBe('SHARED-9');
+  });
+
+  test('CREATE still 409s on a plate the SAME user already owns (per-user constraint intact)', async () => {
+    await seedFullVehicle(); // owns 'ABC-123'
+
+    const res = await ctx.authed('POST', '/api/v1/vehicles', {
+      make: 'Mazda',
+      model: 'CX-5',
+      year: 2024,
+      licensePlate: 'ABC-123',
+    });
+    expect(res.status).toBe(409);
+  });
+
+  test('UPDATE to a plate another tenant owns succeeds (no cross-tenant 409)', async () => {
+    seedForeignVehicleWithPlate('SHARED-9');
+    const id = await seedFullVehicle(); // owns 'ABC-123'
+
+    const res = await ctx.authed('PUT', `/api/v1/vehicles/${id}`, { licensePlate: 'SHARED-9' });
+    const body = await json<DataEnvelope<VehicleRow>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.licensePlate).toBe('SHARED-9');
+  });
+});

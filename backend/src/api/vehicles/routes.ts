@@ -172,9 +172,13 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
   const user = c.get('user');
   const vehicleData = c.req.valid('json');
 
-  // Check if license plate already exists (if provided)
+  // Check if license plate already exists in THIS user's fleet (scoped — plate uniqueness is
+  // per-user, not global; see findByLicensePlate).
   if (vehicleData.licensePlate) {
-    const existingVehicle = await vehicleRepository.findByLicensePlate(vehicleData.licensePlate);
+    const existingVehicle = await vehicleRepository.findByLicensePlate(
+      vehicleData.licensePlate,
+      user.id
+    );
     if (existingVehicle) {
       throw new ConflictError('A vehicle with this license plate already exists');
     }
@@ -256,9 +260,12 @@ routes.put(
       throw new NotFoundError('Vehicle');
     }
 
-    // Check if license plate already exists (if being updated)
+    // Check if license plate already exists in THIS user's fleet (scoped — see findByLicensePlate).
     if (updateData.licensePlate && updateData.licensePlate !== existingVehicle.licensePlate) {
-      const vehicleWithPlate = await vehicleRepository.findByLicensePlate(updateData.licensePlate);
+      const vehicleWithPlate = await vehicleRepository.findByLicensePlate(
+        updateData.licensePlate,
+        user.id
+      );
       if (vehicleWithPlate && vehicleWithPlate.id !== id) {
         throw new ConflictError('A vehicle with this license plate already exists');
       }

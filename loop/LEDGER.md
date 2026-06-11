@@ -4067,3 +4067,24 @@ Current cycle: **227**
   trigger-nonprogress-frequency + recheck-on-write — all passed UNCHANGED through the substitution (proves the helper preserves the real
   error-message extraction). green→green: backend validate:local EXIT 0 — 1319 pass / 1 skip / 0 fail (UNCHANGED — behavior-preserving), tsc 0,
   musl-biome clean (no reflow needed), build bundled. cov: be 84.25% / fe 80.33% (carry — no test count change, pure refactor).
+- **C233 (bug → #80): license-plate uniqueness was GLOBAL across all tenants (cross-tenant false-409 + plate-existence enumeration oracle) —
+  scoped per-user at BOTH the route check AND the DB unique index** — BALANCE: `bug` OVER budget (cyc 229, starved-for 4 > 3, FORCED — the C232
+  forecast). The filed queue's unblocked items are all weak/gated (#79 escalated; #29/#40/#47 product calls), so per the bug-cycle pattern
+  (C189/C218/C222/C226 — find a FRESH verified defect over forcing a gated one) I hunted the vehicles write-path. FOUND #80 (MED, tenant-isolation
+  + info-leak): `vehicleRepository.findByLicensePlate(plate)` queried `WHERE license_plate = ?` GLOBALLY (no userId), and it backs the
+  plate-uniqueness check on BOTH create (routes.ts:177) + update (:261) → a user adding a plate that ANOTHER tenant already owns got a 409 "A
+  vehicle with this license plate already exists" (a cross-tenant FALSE conflict — two users may legitimately share a plate string: reissued
+  plates across states, sold-then-rebought cars) AND the 409 is an ENUMERATION ORACLE (probe whether any plate exists system-wide). VERIFIED
+  firsthand + via a RED test. KEY DISCOVERY mid-fix: the route check is only HALF — migration 0000's `vehicles_license_plate_idx` is a GLOBAL
+  UNIQUE partial index, so scoping the route alone turned the cross-tenant collision from a 409 into a SQLITE_CONSTRAINT_UNIQUE 500. The complete
+  fix is TWO layers: (1) route + repo — added a `userId` param to findByLicensePlate, ANDed `eq(vehicles.userId, userId)`, threaded user.id
+  through both sites; (2) migration 0005 (the low-risk 0003-class index swap — NO data rebuild, and the existing globally-unique data trivially
+  satisfies the more-permissive composite constraint so it can't fail on existing rows): DROP the global index, CREATE UNIQUE
+  `vehicles_user_license_plate_idx ON (user_id, license_plate) WHERE license_plate IS NOT NULL`; registered in _journal.json (idx 5) + added the
+  composite index to schema.ts (it was ABSENT there — fixing pre-existing schema↔migration drift too, since the global one lived only in 0000).
+  GUARD: +3 HTTP tests (vehicles-http.test.ts, raw-seeded foreign user — the C215/C220 pattern): cross-tenant CREATE with a foreign-owned plate →
+  201; same-user duplicate plate → 409 (per-user constraint intact); cross-tenant UPDATE → 200. NON-VACUOUS: the 2 cross-tenant cases were RED
+  pre-fix (409 on the route, then 500 on the DB index before 0005). Migration applied cleanly across the WHOLE suite via the harness's
+  runMigrations() — no other test relied on the global plate constraint. green→green: backend validate:local EXIT 0 — 1322 pass / 1 skip / 0 fail
+  (+3), tsc 0, musl-biome clean, build bundled. cov: be 84.25%+ (carry; +3 BE) / fe 80.33% (carry). NOTE: this is a real tenant-isolation fix
+  (not just defense-in-depth) — the false-409 was user-observable.

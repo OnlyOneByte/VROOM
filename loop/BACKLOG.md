@@ -557,6 +557,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   Angelo): (a) drop it + toast "couldn't sync N entries", (b) move to a surfaced "failed/needs-attention" bucket, or (c) leave-as-is IF the
   ExpenseForm already blocks queuing an invalid fuel entry offline (worth confirming). Not loop-decidable — awaiting Angelo. (Both audited surfaces
   this cycle — split-service allocation math + offline-outbox idempotency — were CERTIFIED CLEAN.)
+- ~~**#80 (MED, tenant-isolation + info-leak — found C233 hunting the vehicles write-path) — license-plate uniqueness was enforced GLOBALLY across
+  all tenants.**~~ — *DONE C233: `findByLicensePlate(plate)` queried `WHERE license_plate = ?` with NO userId, backing the plate-uniqueness check on
+  BOTH create + update → a user adding a plate ANOTHER tenant owns got a cross-tenant FALSE 409 (two users may legitimately share a plate:
+  reissued/sold-then-rebought) AND the 409 was an enumeration oracle (probe any plate system-wide). KEY: a TWO-LAYER defect — migration 0000's
+  `vehicles_license_plate_idx` is also a GLOBAL unique index, so the route fix alone turned the collision from a 409 into a 500. FIX: (1) userId
+  param on findByLicensePlate + threaded through both routes; (2) migration 0005 (low-risk index swap, no data rebuild) DROP the global index +
+  CREATE composite `(user_id, license_plate)` partial unique; journal idx 5 + schema.ts updated (was absent there — fixed drift too). +3 HTTP tests
+  (cross-tenant CREATE→201, same-user dup→409, cross-tenant UPDATE→200); NON-VACUOUS (both cross-tenant cases RED pre-fix: 409 then 500). green→green
+  1322 pass (+3).*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:
