@@ -58,6 +58,59 @@ describe('Offline Storage', () => {
 			const expenses = loadOfflineExpenses();
 			expect(expenses).toEqual([]);
 		});
+
+		it('backfills a legacy clientId DETERMINISTICALLY — stable across repeated reads (idempotency-key bug)', () => {
+			// A pre-v3 entry has no clientId. The migration must mint a STABLE key, because
+			// loadOfflineExpenses runs on every read of a not-yet-persisted legacy entry — a random
+			// UUID fallback would produce a DIFFERENT clientId each read, so a retried sync POST
+			// (after a lost response) carries a fresh key the server can't dedup → a duplicate
+			// expense row (NORTH_STAR #1, offline data safety). The clientId is the offline POST's
+			// idempotency key (offline-storage.ts:160 / sync-manager.ts:222).
+			const legacy: OfflineExpense[] = [
+				{
+					id: 'legacy-entry-1',
+					vehicleId: 'vehicle-1',
+					tags: ['fuel'],
+					category: 'fuel',
+					amount: 42.0,
+					date: '2024-01-01',
+					timestamp: Date.now(),
+					synced: false
+					// no version, no clientId → pre-v3
+				}
+			];
+			localStorageMock.getItem.mockReturnValue(JSON.stringify(legacy));
+
+			const first = loadOfflineExpenses()[0];
+			const second = loadOfflineExpenses()[0];
+
+			expect(first?.clientId).toBeTruthy();
+			// The load-bearing invariant: the SAME stored entry yields the SAME clientId every read.
+			expect(second?.clientId).toBe(first?.clientId);
+			expect(second?.version).toBe('3.0');
+		});
+
+		it('preserves an existing clientId on migration (never re-mints over a real key)', () => {
+			const withKey: OfflineExpense[] = [
+				{
+					id: 'legacy-entry-2',
+					clientId: 'already-assigned-key',
+					vehicleId: 'vehicle-1',
+					tags: ['maintenance'],
+					category: 'maintenance',
+					amount: 99.0,
+					date: '2024-02-01',
+					timestamp: Date.now(),
+					synced: false
+					// version absent → still triggers the migration branch
+				}
+			];
+			localStorageMock.getItem.mockReturnValue(JSON.stringify(withKey));
+
+			const migrated = loadOfflineExpenses()[0];
+			expect(migrated?.clientId).toBe('already-assigned-key');
+			expect(migrated?.version).toBe('3.0');
+		});
 	});
 
 	describe('saveOfflineExpenses', () => {

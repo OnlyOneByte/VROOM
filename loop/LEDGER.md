@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 199 |
 | guard | 6 | 201 |
-| bug | 3 | 198 |
+| bug | 3 | 202 |
 | arch | 5 | 200 |
 | infra | 6 | 196 |
 
-Current cycle: **201**
+Current cycle: **202**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3576,3 +3576,19 @@ Current cycle: **201**
   ~15%→well-covered. green→green: FE validate:local **EXIT 0 — 535 pass (+19)**, tsc 0, build OK; + prettier (auto-fixed tabs) + eslint
   clean on the new file. cov: fe 73.89%+ (carry; +19 FE) / be 84.08% (carry). The C199-primed calculatePayoffDateFromStart remains the
   NEXT FE guard pick.
+- **C202 (bug #65): offline-storage legacy-clientId backfill minted a FRESH UUID on every read → duplicate-expense idempotency hole**
+  — BALANCE: `feature` most-starved (cyc 170, starved-for 32, blocked 27th) but blocked → fell through; `bug` forced (cyc 198,
+  starved-for 4 > 3 — most-starved over-budget actionable). Filed bug queue is all decision/approach-gated (#22/#24/#29/#30/#33/#34/
+  #40/#43/#44/#45/#47/#51/#58) → hunted a FRESH bug per the C189/C198 precedent. Inline (6/3 spawn cap). HUNTED the FE offline/sync
+  data-safety vein (NORTH_STAR #1, never deeply scanned). FOUND + VERIFIED firsthand: `loadOfflineExpenses` (offline-storage.ts:48-58)
+  backfills a pre-v3 entry's missing clientId with `expense.clientId ?? crypto.randomUUID()` BUT returns the migrated array WITHOUT
+  persisting — and the migration re-runs on every read of a not-yet-persisted legacy entry, so it mints a DIFFERENT UUID each call.
+  clientId IS the offline-POST idempotency key (offline-storage.ts:160 / sync-manager.ts:222), so a legacy entry whose first sync POST
+  commits server-side but loses its response gets re-read with a fresh key on the next run → the server's clientId-dedup can't match →
+  DUPLICATE expense row + double-counted TCO. The doc comment (lines 11-12) explicitly promises a STABLE key — the code broke its own
+  contract. FIX (deterministic, minimal, behavior-preserving for v3, NO write-on-read side-effect — safe since +layout.svelte:67 reads
+  it once in onMount, not a $derived/$effect): backfill from the entry's own stable+unique `id` (`expense.clientId ?? expense.id`) — same
+  key every read → server dedups correctly. VERIFIED the existing sync-manager/sync-offline-expenses tests' setItem-call-index assertions
+  tolerate it (no write-on-read added) before editing. Guard: +2 in offline-storage.test.ts — (1) the load-bearing read-twice→SAME-clientId
+  stability invariant (the #65 regression), (2) an existing-clientId-never-re-minted control. green→green: FE validate:local **EXIT 0 —
+  537 pass (+2)**, tsc 0, build OK; + prettier + eslint clean on both touched files. cov: fe 73.89%+ (carry; +2 FE) / be 84.08% (carry).

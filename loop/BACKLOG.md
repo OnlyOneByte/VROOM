@@ -698,6 +698,19 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   these fields → FE-only. FIX: totalMileageAllowance = mileageLimit × (termMonths/12), used in all 3 comparisons. VERIFIED the annual
   semantics firsthand before acting + reconciled the existing lease-metrics.test.ts (which had BAKED IN the bug — its 36000 fixture
   treated annual-as-total) to a realistic 12000/yr fixture + a #64 describe (annual×years scaling). green→green FE 516 pass (+6).*
+- ~~**#65 (MED-HIGH, offline data-safety / NORTH_STAR #1 — found C202 via a fresh FE offline/sync hunt) — legacy-entry clientId backfill
+  minted a FRESH random UUID on every read → defeated offline-POST idempotency → duplicate expense rows.**~~ — *DONE C202:
+  `loadOfflineExpenses` (offline-storage.ts:48-58) backfilled a pre-v3 entry's missing clientId with `expense.clientId ?? crypto.randomUUID()`
+  but RETURNED the migrated array WITHOUT persisting it, and the migration re-runs on every read of a not-yet-persisted legacy entry — so a
+  DIFFERENT UUID was minted each call. clientId IS the offline-create idempotency key (offline-storage.ts:160 / sync-manager.ts:222), so a
+  legacy entry whose first sync POST committed server-side but lost its response got re-read with a fresh key on the next run → the server's
+  clientId-dedup couldn't match → a DUPLICATE expense row + double-counted TCO (the doc comment lines 11-12 explicitly promise a STABLE key —
+  the code broke its own contract). VERIFIED firsthand vs source (both consumer paths read pending → POST clientId). FIX (deterministic,
+  minimal, behavior-preserving for v3, NO write-on-read side-effect — the entry's own `id` is already stable+unique per entry):
+  `clientId: expense.clientId ?? expense.id`. Same key every read → server dedups correctly. Confirmed the existing sync-manager/
+  sync-offline-expenses tests tolerate it (no write-on-read added). +2 guards in offline-storage.test.ts (the load-bearing read-twice→
+  SAME-clientId stability invariant + an existing-key-never-re-minted control). green→green FE validate:local EXIT 0, 537 pass (+2);
+  prettier + eslint clean.*
 
 > [stray prior-edit run-on — the C155 deep-review block header, preserved for the audit trail:] (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent (delayed event, triaged post-C155): its Finding 1 → **#54 (HIGH, VERIFIED firsthand)** filed below; its div-guard/split-sibling checks matched my C155 pre-read (isFillup volume>0, fillupDetails length-guards, per-vehicle distance — clean).**
 - ~~**#52 (MED, security defense-in-depth) — split delete/regenerate keyed the destructive write on groupId alone.**~~ — *DONE

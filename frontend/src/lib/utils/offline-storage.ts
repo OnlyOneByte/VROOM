@@ -48,9 +48,15 @@ export function loadOfflineExpenses(): OfflineExpense[] {
 		return expenses.map(expense => {
 			if (!expense.version || expense.version !== OFFLINE_STORAGE_VERSION) {
 				// Backfill a clientId for pre-v3 entries so they sync idempotently.
+				// MUST be DETERMINISTIC across reads: this migration runs on every read of a
+				// not-yet-persisted legacy entry, so a `crypto.randomUUID()` fallback minted a
+				// DIFFERENT key each time — defeating the very idempotency it backfills (a retried
+				// POST after a lost response would carry a fresh clientId, the server couldn't dedup,
+				// and the offline entry would duplicate). The entry's own `id` is already stable and
+				// unique per entry, so it is the correct deterministic idempotency key.
 				return {
 					...expense,
-					clientId: expense.clientId ?? crypto.randomUUID(),
+					clientId: expense.clientId ?? expense.id,
 					version: OFFLINE_STORAGE_VERSION
 				};
 			}
