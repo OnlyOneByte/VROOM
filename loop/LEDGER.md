@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 199 |
 | guard | 6 | 195 |
 | bug | 3 | 198 |
-| arch | 5 | 194 |
+| arch | 5 | 200 |
 | infra | 6 | 196 |
 
-Current cycle: **199**
+Current cycle: **200**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3549,3 +3549,17 @@ Current cycle: **199**
   FILED: `calculatePayoffDateFromStart` is correct but UNPINNED** (no test — the C196 :540-547 uncovered range; the C54/C77
   traced-clean-but-uncovered class) — a subtle date clamp a refactor could silently break → primed for the next FE guard cycle.
   NO code change (clean cert; deep-review = find-not-fix). cov: fe 73.89% / be 84.08% (carry, read-only audit).
+- **C200 (arch): extract `sortByVehicleThenDate` — the (vehicleId, date) fuel-row sort, 3 sites → 1** — BALANCE: TWO past budget —
+  `feature` (cyc 170, starved-for 30, blocked 25th — milestone cycle) + `arch` (cyc 194, starved-for 6 > 5). Feature blocked → `arch`
+  forced (most-starved past, 6 > guard's 5). Inline scout (6/3 spawn cap). FOUND: the ENTIRE `[...fuelRows].sort((a,b) => { vehicleId
+  localeCompare; then date getTime })` comparator block was hand-duplicated BYTE-FOR-BYTE at 3 analytics/repository.ts sites
+  (:1283/:1436/:2048 — the per-vehicle MPG/cost/odometer-progression pre-sorts). EXCLUDED the `:923-930` latest-term sort (different
+  `: 0` fallback + a startDate tiebreak — the C194/C182-#2 trap). Extracted `sortByVehicleThenDate<T extends {vehicleId; date:
+  Date|number|null}>(rows): T[]` to analytics-charts.ts beside forEachVehiclePair/groupByVehicle (the per-vehicle pairing family it
+  feeds). Behavior-preserving (arch rule 2): VERIFIED the date-key `instanceof Date ? getTime() : Number(x)` is kept VERBATIM (not
+  swapped to toDate().getTime() — confirmed firsthand FuelExpenseRow.date is `Date|number|null`, never a string, so number=epoch-ms +
+  Number(null)=0 are unchanged; toDate would have changed the null path). Returns a COPY (matches `[...rows]`). Test-anchored by the
+  EXISTING analytics property/fuel-stats/cross-vehicle suites (green THROUGH the 3 substitutions) + 3 new cases in
+  analytics-charts-unpinned.test.ts (group+date-order; no-mutation; numeric/null date handling). One biome import-sort autofixed.
+  green→green: backend validate:local **EXIT 0 — 1272 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean, build bundled. ARCH QUEUE
+  empty again — next arch cycle = a fresh rule-7 scout. cov: be 84.08%+ (carry) / fe 73.89% (carry).

@@ -268,6 +268,25 @@ export function forEachVehiclePair<T extends { vehicleId: string }>(
   }
 }
 
+/**
+ * Return a COPY of `rows` sorted by (vehicleId, then date ascending) — the canonical pre-sort the
+ * per-vehicle MPG / cost-per-distance / odometer-progression builders need before pairing consecutive
+ * rows (so forEachVehiclePair never straddles two cars or goes out of date order). The whole comparator
+ * was hand-duplicated byte-for-byte at 3 sites in analytics/repository.ts (C200 dedup). The date-key
+ * preserves the original `instanceof Date ? getTime() : Number(date)` exactly: `date` is `Date | number
+ * | null` (never a string), so a number is already epoch-ms and `Number(null)` → 0, both unchanged.
+ */
+export function sortByVehicleThenDate<T extends { vehicleId: string; date: Date | number | null }>(
+  rows: T[]
+): T[] {
+  return [...rows].sort((a, b) => {
+    if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
+    const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
+    const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
+    return aTime - bTime;
+  });
+}
+
 /** Compute MPG and cost-per-mile values from consecutive fuel expense pairs. */
 export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
   mpgValues: number[];

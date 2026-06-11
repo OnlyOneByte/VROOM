@@ -1046,7 +1046,14 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     monthsOwnedInYear + wired all 4. tsc surfaced that the financing site's `Date | null` local type was masking a null→epoch path
     (the old `as unknown as number` cast hid it) → preserved exactly with `?? 0` (startDate is `.notNull()` so null is unreachable
     anyway). Anchored by the existing fuel-stats/insurance-details/financing tests (green through) + 3 new toDate cases. green→green
-    1266 pass (+3).* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or an inline scout.**
+    1266 pass (+3).*
+  - ~~**`sortByVehicleThenDate` — the (vehicleId, date) fuel-row sort comparator, 3 sites → 1 (C200 inline scout)**~~ — *DONE C200:
+    the ENTIRE `[...fuelRows].sort((a,b) => { vehicleId localeCompare; then date getTime })` block was hand-duplicated byte-for-byte at
+    3 analytics/repository.ts sites (:1283/:1436/:2048 — the per-vehicle MPG/cost/odometer pre-sorts; the `: Number(x)` variant C194
+    had noted-but-excluded, now its own clean dedup). EXCLUDED the :923 latest-term sort (different `: 0` fallback + startDate tiebreak
+    — still the C182-#2 trap). Extracted `sortByVehicleThenDate` to analytics-charts.ts beside forEachVehiclePair; date-key kept VERBATIM
+    (FuelExpenseRow.date is Date|number|null, never string → number=epoch-ms + Number(null)=0 unchanged). +3 tests; existing analytics
+    suites green through. green→green 1272 pass (+3).* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or an inline scout.**
   - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
     pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the ~57 logging sites
     is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.

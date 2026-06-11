@@ -24,6 +24,7 @@ import {
   computeRegularityScore,
   type FuelExpenseRow,
   type GeneralExpenseRow,
+  sortByVehicleThenDate,
 } from '../analytics-charts';
 
 // Local-time date for a given Y/M/D so the bucketing assertions are timezone-independent
@@ -239,5 +240,47 @@ describe('computeAverageCosts.perFillup — split fuel siblings do not inflate t
     ];
     const { perFillup } = computeAverageCosts(rows, [], YEAR_START, YEAR_END, NOW);
     expect(perFillup).toBeNull();
+  });
+});
+
+// sortByVehicleThenDate (C200 dedup): the canonical (vehicleId, then date asc) pre-sort the per-vehicle
+// pairing builders need, hand-duplicated byte-for-byte at 3 analytics/repository.ts sites. Pins the
+// comparator: groups by vehicle, orders within a vehicle by date, doesn't mutate the input, and the date
+// key handles the `Date | number | null` shape (number = epoch-ms, null → 0) exactly as the inline form did.
+describe('sortByVehicleThenDate', () => {
+  test('groups by vehicleId, then orders within a vehicle by date ascending', () => {
+    const rows: FuelExpenseRow[] = [
+      fuelRow({ vehicleId: 'v2', date: d(2024, 3, 1) }),
+      fuelRow({ vehicleId: 'v1', date: d(2024, 6, 1) }),
+      fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1) }),
+      fuelRow({ vehicleId: 'v2', date: d(2024, 2, 1) }),
+    ];
+    const sorted = sortByVehicleThenDate(rows);
+    // v1 rows first (localeCompare), date-ascending within each vehicle group.
+    expect(sorted.map((r) => r.vehicleId)).toEqual(['v1', 'v1', 'v2', 'v2']);
+    expect((sorted[0].date as Date).getTime()).toBeLessThan((sorted[1].date as Date).getTime());
+    expect((sorted[2].date as Date).getTime()).toBeLessThan((sorted[3].date as Date).getTime());
+  });
+
+  test('does NOT mutate the input array (returns a copy)', () => {
+    const rows: FuelExpenseRow[] = [
+      fuelRow({ vehicleId: 'v2', date: d(2024, 3, 1) }),
+      fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1) }),
+    ];
+    const firstBefore = rows[0];
+    const sorted = sortByVehicleThenDate(rows);
+    expect(rows[0]).toBe(firstBefore); // original order untouched
+    expect(sorted).not.toBe(rows); // a new array
+  });
+
+  test('handles a numeric (epoch-ms) date the same as a Date, and a null date sorts as 0', () => {
+    const ms = d(2024, 5, 1).getTime();
+    const rows: FuelExpenseRow[] = [
+      fuelRow({ vehicleId: 'v1', date: ms }), // number form
+      fuelRow({ vehicleId: 'v1', date: null }), // null → 0 (earliest)
+    ];
+    const sorted = sortByVehicleThenDate(rows);
+    expect(sorted[0].date).toBeNull(); // 0 sorts before the 2024 epoch-ms
+    expect(sorted[1].date).toBe(ms);
   });
 });

@@ -47,6 +47,7 @@ import {
   type GeneralExpenseRow,
   groupByVehicle,
   monthKeysInRange,
+  sortByVehicleThenDate,
   toMonthKey,
 } from '../../utils/analytics-charts';
 import { logger } from '../../utils/logger';
@@ -1280,12 +1281,7 @@ export class AnalyticsRepository {
       ]);
 
       // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
-      const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
-        if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
-        const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
-        const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
-        return aTime - bTime;
-      });
+      const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
 
       return this.buildFuelStatsFromData(
         fuelRows,
@@ -1433,12 +1429,7 @@ export class AnalyticsRepository {
       ]);
 
       // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
-      const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
-        if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
-        const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
-        const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
-        return aTime - bTime;
-      });
+      const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
 
       return this.buildFuelAdvancedFromData(
         fuelRows,
@@ -2045,12 +2036,7 @@ export class AnalyticsRepository {
         this.getAllVehicleUnits(userId),
       ]);
 
-      const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
-        if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
-        const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
-        const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
-        return aTime - bTime;
-      });
+      const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
 
       // Build quickStats with per-vehicle unit conversion
       const skipConversion = this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits);
