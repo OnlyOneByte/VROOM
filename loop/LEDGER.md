@@ -4088,3 +4088,19 @@ Current cycle: **227**
   runMigrations() — no other test relied on the global plate constraint. green→green: backend validate:local EXIT 0 — 1322 pass / 1 skip / 0 fail
   (+3), tsc 0, musl-biome clean, build bundled. cov: be 84.25%+ (carry; +3 BE) / fe 80.33% (carry). NOTE: this is a real tenant-isolation fix
   (not just defense-in-depth) — the false-409 was user-observable.
+- **C234 (guard): pin the expense-category display maps' EXHAUSTIVENESS (categoryLabels / getCategoryIcon / getCategoryColor) — the uncovered
+  exports of expense-helpers.ts** — BALANCE: `guard` AT budget (cyc 228, starved-for 6 = 6, FORCED — the C233 forecast). SCOUTED for a grounded,
+  non-theater pick: the backend utils are genuinely worked through — VERIFIED firsthand that csv-safety.ts (both directions + round-trip +
+  idempotence) and unit-conversions.ts (correctness/identity/round-trip for all 3 fns via property tests) are FULLY covered, NOT gaps; the named
+  BE low spots (activity-tracker timer-bound, restore.ts mock-trap) stay non-clean. Pivoted FE per the standing angle: expense-helpers.ts had only
+  compareExpenseRows pinned (compare-expense-rows.test.ts) — its 3 category-display exports (categoryLabels, getCategoryIcon, getCategoryColor)
+  were UNCOVERED. Picked the EXHAUSTIVENESS invariant (real value, not theater): every ExpenseCategory in the union must map to a label/icon/color
+  — a missing key is a SILENT UI bug (categoryLabels[newcat]=undefined renders blank; the icon/color maps fall through to DollarSign/muted). +6
+  tests (expense-category-maps.test.ts, drives the REAL exports): ALL_CATEGORIES (a literal mirror of the union) has exactly 6 / no dupes; every
+  category has a truthy string label + Object.keys(categoryLabels) EXACTLY equals the union (catches a stale/extra key too); a defined icon
+  component + a `text-`-containing color class for each; representative known values (fuel→'Fuel & Charging', the chart-1 color); and the unknown-
+  category FALLBACK (icon→DollarSign, color→muted, no throw — the `|| fallback` guards, reachable via a legacy/garbage row cast through unknown).
+  PAYOFF: adding a 7th ExpenseCategory without updating these maps now FAILS CI instead of shipping a blank label. green→green: frontend
+  validate:local EXIT 0 — 592 pass (+6), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. cov: fe 80.33%+ (carry; +6 FE)
+  / be 84.25% (carry). (vehicle-helpers.ts — the one truly untested FE util — was REJECTED as a pick: a single trivial display-name helper,
+  pinning it would be borderline coverage-theater.)
