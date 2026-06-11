@@ -440,3 +440,37 @@ describe('totalMileage non-negative clamp (#46)', () => {
     expect(stats.costPerMile).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression (#75, C222): averageMpg must be ORDER-INDEPENDENT. The MPG pairs CONSECUTIVE fillups
+// (current − previous), so unordered input mis-pairs segments. calculateAverageMpg now sorts by date
+// internally — the production caller already sorts, but this makes the pure helper correct for any
+// future consumer. These assert shuffled input yields the SAME averageMpg as the chronological order.
+// ---------------------------------------------------------------------------
+describe('averageMpg is order-independent (#75)', () => {
+  // 3 chronological fillups (index = day): 10000 → 10300 (300mi/10gal=30) → 10620 (320mi/10gal=32).
+  // Expected avg MPG = (30 + 32) / 2 = 31, regardless of input order.
+  const inOrder: FuelExpense[] = [
+    makeFuelExpense({ mileage: 10000, volume: 10, missedFillup: false, index: 0 }),
+    makeFuelExpense({ mileage: 10300, volume: 10, missedFillup: false, index: 1 }),
+    makeFuelExpense({ mileage: 10620, volume: 10, missedFillup: false, index: 2 }),
+  ];
+
+  test('chronological input computes the expected average (baseline)', () => {
+    const stats = calculateVehicleStats(inOrder, 10000, true, false);
+    expect(stats.averageMpg).toBeCloseTo(31, 5);
+  });
+
+  test('SHUFFLED input yields the SAME averageMpg (the regression — was mis-paired pre-fix)', () => {
+    // Reverse + interleave so consecutive array slots are NOT chronological.
+    const shuffled = [inOrder[2], inOrder[0], inOrder[1]];
+    const stats = calculateVehicleStats(shuffled, 10000, true, false);
+    expect(stats.averageMpg).toBeCloseTo(31, 5);
+  });
+
+  test('a fully-reversed input still matches', () => {
+    const reversed = [...inOrder].reverse();
+    const stats = calculateVehicleStats(reversed, 10000, true, false);
+    expect(stats.averageMpg).toBeCloseTo(31, 5);
+  });
+});

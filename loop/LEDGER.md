@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 220 |
 | guard | 6 | 217 |
-| bug | 3 | 218 |
+| bug | 3 | 222 |
 | arch | 5 | 221 |
 | infra | 6 | 219 |
 
-Current cycle: **221**
+Current cycle: **222**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3893,3 +3893,17 @@ Current cycle: **221**
   Context-type import) → check:musl:fix reflowed it (the C33 whole-tree lesson; pre-existing noNonNullAssertion are warnings, untouched).
   green→green: backend validate:local EXIT 0 — 1306 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. cov: be 84.14%+ (carry;
   +3 BE) / fe 79.22% (carry). ARCH QUEUE thin — next arch cycle prefers a fan-out.
+- **C222 (bug → #75): calculateAverageMpg silently depended on caller date-ordering (an unordered future caller → mis-paired/wrong MPG)** —
+  BALANCE: `feature` most-starved (cyc 170, starved-for 52, blocked 47th) but blocked → fell through; `bug` FORCED (cyc 218, starved-for 4 > 3
+  — the C221 forecast). Hunted FRESH surfaces + REJECTED several as not-a-live-bug (C21/C77 — did NOT manufacture): vehicle-stats core (the one
+  caller sorts; the fencepost is the C214 uniform convention), split-service (C173-certified), the offline.svelte store (trivial get/set),
+  FE settings store (no backup-config logic). THE genuine defect-class found in calculateVehicleStats: `calculateAverageMpg` pairs CONSECUTIVE
+  fillups (current − previous) for the per-segment distance, so it's correct ONLY on chronologically-ordered input — but it neither sorted nor
+  documented that, silently trusting the caller (the C168/#48 "helper trusts the caller" class, applied to MATH). The sole production caller
+  (vehicles/routes.ts:348) DOES sort, so no LIVE bug today — but any future consumer reusing this pure util would get silently-WRONG MPG
+  (out-of-order segments mis-paired; negatives dropped by the mpg>0 filter but valid segments scrambled). FIX (behavior-preserving for the
+  current caller — sorting an already-sorted copy is idempotent; closes the class): sort `[...unorderedExpenses]` by date inside
+  calculateAverageMpg. (calculateMileageStats uses Math.max — order-independent, no fix needed.) +3 tests (chronological baseline avg=31;
+  SHUFFLED + fully-reversed inputs yield the SAME 31). NON-VACUOUS: confirmed the shuffled + reversed tests FAIL RED with the sort reverted
+  (mis-paired MPG) while the baseline stayed green. green→green: backend validate:local EXIT 0 — 1309 pass / 1 skip / 0 fail (+3), tsc 0,
+  musl-biome clean, build bundled. cov: be 84.14%+ (carry; +3 BE) / fe 79.22% (carry).

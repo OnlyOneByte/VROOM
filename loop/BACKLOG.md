@@ -507,6 +507,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   GUARD: +3 source-scan (photo-change-tracker.test.ts — the C133 photo-serve-headers precedent, since a full upload/delete needs a real storage
   provider; pins import + routes.use + the mutating endpoints); NON-VACUOUS (RED with the routes.use removed). green→green backend validate:local
   EXIT 0, 1303 pass (+3). changeTracker itself CERTIFIED CLEAN (2xx-gate, mutating-method filter).*
+- ~~**#75 (LOW, defensive-correctness — found C222 hunting the vehicle-stats math) — `calculateAverageMpg` silently depended on caller
+  date-ordering.**~~ — *DONE C222: it pairs CONSECUTIVE fillups (current − previous) for per-segment distance, correct ONLY on chronological
+  input, but neither sorted nor documented that (the C168/#48 "helper trusts the caller" class, applied to math). The sole production caller
+  (vehicles/routes.ts:348) DOES sort → no LIVE bug today, but a future consumer of this pure util would get silently-WRONG MPG (out-of-order
+  segments mis-paired). FIX (behavior-preserving — sorting an already-sorted copy is idempotent; closes the class): sort `[...unorderedExpenses]`
+  by date inside calculateAverageMpg. +3 tests (chronological avg=31; SHUFFLED + reversed yield the SAME 31); NON-VACUOUS (RED with the sort
+  reverted). green→green 1309 pass (+3). (calculateMileageStats uses Math.max — order-independent, untouched.)*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:
