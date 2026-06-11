@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 217 |
 | bug | 3 | 218 |
 | arch | 5 | 216 |
-| infra | 6 | 213 |
+| infra | 6 | 219 |
 
-Current cycle: **218**
+Current cycle: **219**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3848,3 +3848,15 @@ Current cycle: **218**
   both-sent-match accepted). NON-VACUOUS: confirmed the regression FAILS RED with the guard reverted (split-only still rejected) + the other 3
   stayed green (invariant intact). green→green: backend validate:local EXIT 0 — 1300 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean, build
   bundled. cov: be 84.14%+ (carry; +4 BE) / fe 79.22% (carry).
+- **C219 (infra): CLAUDE.md orientation refresh (post-C208 drift, C209–C218)** — BALANCE: `feature` most-starved (cyc 170, starved-for 49,
+  blocked 44th) but blocked → fell through; nothing else strictly OVER budget → highest-leverage; `infra` was the most-starved actionable
+  (cyc 213, starved-for 6 = 6, due) AND the CLAUDE.md refresh was concretely due (last C208, ~11 cycles of drift; the #5 sweep isn't due til
+  ~C223). Fixed 5 actively-misleading drifts, each VERIFIED vs source/LEDGER (the C93/C145/C193/C208 doc-refresh discipline — fix what misleads,
+  don't churn): (1) COVERAGE — the C203 reading (84.06/77.79) → the FRESH C213 re-measure (be 84.14% line / 84.49% func · fe 79.22% line /
+  78.89% func / 73.52% branch); (2) FE-ratchet list — added C212 analytics-api + C217 auth.ts; (3) "FE service layer 100%" → "FE service +
+  pure-util layers essentially fully covered" (analytics-api/auth were the last gaps) + re-pointed the next low spot to sync-manager (the
+  components/routes deficit is the bulk); (4) SUITE SIZE ~1274 BE / ~557 FE → 1300 BE / 580 FE; (5) CLOSED-BUG list ended at #67/C206 →
+  appended #68 (C209 restore comma-truncation) + #70 (C210 expiring-soon NaN) + #71 (C214 mileage-recheck-on-edit) + #72 (C215 photos
+  userId-scope) + #73 (C218 split-config-only update), range C155–C206 → C155–C218; + added #69 (insurance monthly-only TCO, escalated C210) to
+  the Angelo-pending list. Doc-only, no code → no build gate (the C93/C131/C145/C193/C208 precedent). Next CLAUDE.md refresh ~C232; next #5
+  branch-hygiene sweep ~C223 (last C213). cov: be 84.14% / fe 79.22% (carry, C213 reading).
