@@ -31,7 +31,7 @@
 > branch (UP SHARPLY +3.7 line / +6.7 func / +3.2 branch from C164 — the C166 settings-store + C169 settings-api + C175 pwa.ts FE
 > ratchets delivered; FE still the bigger gap but closing fast).** **RE-MEASURED AGAIN C186 (the #5-sweep re-measure): be 83.41% line /
 > 83.74% func (up from C176's 82.74/82.49 — the C178/#25 + C180/#48 + C181/orchestrator + C184/#26c + C185/analytics-routes BE
-> additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C176 — every C178–C185 cycle was backend, so FE didn't move).** **RE-MEASURED AGAIN C196 (the #5-sweep re-measure): be 84.08% line / 84.44% func (up from C186's 83.41/83.74 — the C188 sync-routes + C190/#62 + C192/#63 + C195 activity-tracker additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C186 — C188–C195 all backend). FRESH FE LOW SPOTS to steer the next FE guard cycle: a ~15% form-validation module (pure logic — cleanest pick), analytics-api.ts ~36% func, sync-manager.ts ~56% (timer/network-bound), auth.ts ~56%; settings.svelte.ts ~11% is the filed handleError arch pick.** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C176 — every C178–C185 cycle was backend, so FE didn't move).** **RE-MEASURED AGAIN C196 (the #5-sweep re-measure): be 84.08% line / 84.44% func (up from C186's 83.41/83.74 — the C188 sync-routes + C190/#62 + C192/#63 + C195 activity-tracker additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C186 — C188–C195 all backend). FRESH FE LOW SPOTS to steer the next FE guard cycle: a ~15% form-validation module (pure logic — cleanest pick), analytics-api.ts ~36% func, sync-manager.ts ~56% (timer/network-bound), auth.ts ~56%; settings.svelte.ts ~11% is the filed handleError arch pick.** **RE-MEASURED AGAIN C203 (the #5-sweep re-measure): be 84.06% line / 84.43% func (FLAT vs C196's 84.08/84.44 — C198/C201/C202 all FE, only C200 touched BE +3); fe 77.79% line / 75.57% func / 72.96% branch (UP SHARPLY +3.9 line / +2.0 func / +6.9 branch vs C196 — the C198 lease-metrics + C201 form-validation [+19] + C202 offline-storage [+2] FE ratchet delivered; the BE↔FE gap is narrowing to ~6pts). REMAINING FE LOW SPOTS (form-validation now DONE C201): analytics-api.ts ~36% func, sync-manager.ts ~56% (timer/network-bound), auth.ts ~56%; the C199-primed `calculatePayoffDateFromStart` is the next clean FE guard pick.** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 201 |
 | bug | 3 | 202 |
 | arch | 5 | 200 |
-| infra | 6 | 196 |
+| infra | 6 | 203 |
 
-Current cycle: **202**
+Current cycle: **203**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3592,3 +3592,18 @@ Current cycle: **202**
   tolerate it (no write-on-read added) before editing. Guard: +2 in offline-storage.test.ts — (1) the load-bearing read-twice→SAME-clientId
   stability invariant (the #65 regression), (2) an existing-clientId-never-re-minted control. green→green: FE validate:local **EXIT 0 —
   537 pass (+2)**, tsc 0, build OK; + prettier + eslint clean on both touched files. cov: fe 73.89%+ (carry; +2 FE) / be 84.08% (carry).
+- **C203 (infra): #5 branch-hygiene sweep + coverage re-measure (last sweep C196, branch 13 commits deep)** — BALANCE: `feature`
+  most-starved (cyc 170, starved-for 33, blocked 28th) but blocked → fell through; `infra` FORCED (cyc 196, starved-for 7 > 6 — the only
+  other over-budget category, exactly the C202 forecast). The standing #5 cadence sweep. (1) STRAY-TEST CHECK CLEAN: zero untracked
+  unit/spec `.test.ts` — all untracked are the by-design `*.meshclaw.e2e.ts` set + e2e screenshots/snapshots/results + playwright config +
+  `.meshclaw-tools/` harness + `mise.local.toml`. ONE observation logged (not acted on): `.kiro/specs/offline-entries/` is the only
+  untracked spec dir (every other `.kiro/specs/*` is committed) — a pre-loop doc dated Jun 5, untouched since, NOT a test (doesn't drop
+  coverage on merge), not loop-authored → left as-is, noted in BRANCH_REVIEW. (2) GREEN BASELINE + RE-MEASURE: backend `bun test
+  --coverage` EXIT 0 (1272 pass / 1 skip / 0 fail) — be 84.06% line / 84.43% func (FLAT vs C196's 84.08/84.44; C198/C201/C202 all FE, only
+  C200 touched BE); frontend `vitest --coverage` EXIT 0 (537 pass) — fe 77.79% line / 75.57% func / 72.96% branch (UP SHARPLY +3.9 line /
+  +2.0 func / +6.9 branch vs C196 — the C198 lease-metrics + C201 form-validation [+19] + C202 offline-storage [+2] FE ratchet DELIVERED;
+  the BE↔FE gap narrowed to ~6pts). (3) BRANCH_REVIEW.md REFRESH (gitignored): header scope 6→13 commits (C190–C202), status block to
+  1272 BE / 537 FE + the C203 coverage, appended §27 (C196–C202: the FE-weighted arc — #64 lease-$ + #65 offline-idempotency bugs, the
+  C201 form-validation guard, C200 sortByVehicleThenDate dedup, C197/C199 deep-review certs), fixed the stale "116 themed commits" →
+  "13 commits (C190–C202)" in Suggested-merge + refreshed the arc paragraph. Doc/measurement-only, no product code. Next sweep ~C213;
+  next CLAUDE.md refresh ~C203-onward (last C193). cov: be 84.06% / fe 77.79% (FRESH C203 reading).
