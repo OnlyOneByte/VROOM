@@ -742,6 +742,18 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   on a record switched loan→lease, since the .optional() field is absent from the payload → drizzle .set() skips it). Latent only — every
   read gates on `financingType` (analytics :806/:864, FE lease-metrics), so no displayed-value bug today; a defensive null-the-other-type's
   fields on switch would close it if desired.*
+- ~~**#68 (HIGH, data-safety / NORTH_STAR #1 — found C209 via a deep-review of the restore coercion surface) — restore coerceRow truncated a
+  thousands-separated number (parseInt stops at the comma).**~~ — *DONE C209: `coerceRow` (backup.ts:70), the per-field type coercion EVERY
+  restored row flows through, used `Number.parseInt(strVal, 10)` on INTEGER columns — which STOPS at the first non-digit. The Google Sheets
+  restore reads cells via `values.get` with NO valueRenderOption → defaults to FORMATTED_VALUE (google-sheets-service.ts:622), so a
+  thousands-separated odometer/mileage comes back as "12,345" → parseInt → 12 (a 1000x SILENT corruption; 12 is not NaN so it passed through;
+  mileage/odometer/initialMileage all confirmed `integer`). REAL branch had the same hazard (parseFloat("1,234.56")→1). The CSV path writes
+  raw integers with NO separators (convertToCSV:451) so a VROOM-own round-trip never hit it — but the Sheets path does. VERIFIED firsthand
+  end-to-end. FIX (minimal, complete, behavior-preserving for valid input): strip grouping commas + a STRICT whole-string parse
+  (`Number(strVal.replace(/,/g,''))` — rejects a "12abc" tail to NaN→null, matching the garbage→null contract; Math.round on INTEGER so a
+  Sheets "12345.0" lands whole). Did NOT unilaterally switch the Sheets read to UNFORMATTED_VALUE (deeper, separate) — the coercion-layer fix
+  is complete + covers CSV too. +5 tests; NON-VACUOUS (confirmed RED with the fix reverted). DE-RISKS the money-cents migration (the C146-named
+  parseInt crux). green→green backend validate:local EXIT 0, 1279 pass (+5).*
 
 > [stray prior-edit run-on — the C155 deep-review block header, preserved for the audit trail:] (expenses-repository query/filter/search/pagination/aggregation + fuel-stats/efficiency math). KEY: agent A CERTIFIED the entire filter/sort/pagination/aggregation core CLEAN (the search OR is pre-parenthesized + AND-joined with the userId scope → can't widen past tenant; count==rows WHERE; allowlisted sort with id tiebreaker; split SUM not double-counted since siblings carry per-share expenseAmount; every read userId-scoped). #52 (real, security) FIXED in-cycle; #53 filed. Fuel-stats agent (delayed event, triaged post-C155): its Finding 1 → **#54 (HIGH, VERIFIED firsthand)** filed below; its div-guard/split-sibling checks matched my C155 pre-read (isFillup volume>0, fillupDetails length-guards, per-vehicle distance — clean).**
 - ~~**#52 (MED, security defense-in-depth) — split delete/regenerate keyed the destructive write on groupId alone.**~~ — *DONE

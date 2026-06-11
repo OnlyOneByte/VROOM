@@ -108,10 +108,19 @@ export function coerceRow(row: Record<string, unknown>, table: Table): Record<st
         coerced[columnName] = null;
       }
     } else if (INTEGER_TYPES.has(col.columnType)) {
-      const num = Number.parseInt(strVal, 10);
-      coerced[columnName] = Number.isNaN(num) ? null : num;
+      // STRICT numeric parse, not Number.parseInt: parseInt stops at the first non-digit, so a
+      // thousands-separated value the Google Sheets restore returns (default valueRenderOption is
+      // FORMATTED_VALUE → a 12,345-mile odometer comes back as the string "12,345") would truncate
+      // to 12 — silently, since 12 is not NaN — corrupting the reading 1000x (#68, NORTH_STAR #1).
+      // Strip grouping commas, then require the WHOLE string to be numeric (Number(), unlike parseInt,
+      // rejects a "12abc" tail to NaN → null, matching the existing garbage→null contract). Round so a
+      // Sheets "12345.0" / a stray decimal lands on a whole number rather than truncating.
+      const num = Number(strVal.replace(/,/g, ''));
+      coerced[columnName] = Number.isNaN(num) ? null : Math.round(num);
     } else if (REAL_TYPES.has(col.columnType)) {
-      const num = Number.parseFloat(strVal);
+      // Same thousands-separator hazard: parseFloat("1,234.56") stops at the comma → 1. Strip grouping
+      // commas + a strict whole-string parse (Number() → NaN on a garbage tail → null).
+      const num = Number(strVal.replace(/,/g, ''));
       coerced[columnName] = Number.isNaN(num) ? null : num;
     } else if (TEXT_TYPES.has(col.columnType)) {
       // Google Sheets may return numeric-looking text values (e.g., license plates) as numbers

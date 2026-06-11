@@ -217,6 +217,42 @@ describe('coerceRow: Numeric columns', () => {
     const result = coerceRow(row, expenses);
     expect(result.mileage).toBeNull();
   });
+
+  // #68 (data-safety, C209): the Google Sheets restore reads cells as FORMATTED_VALUE (default
+  // valueRenderOption), so a thousands-separated odometer/mileage comes back as a string like
+  // "12,345". The old Number.parseInt(strVal, 10) stopped at the comma → 12 (a 1000x silent
+  // corruption, NORTH_STAR #1). These pin the comma-aware strict parse.
+  test('#68 INTEGER: a thousands-separated mileage keeps its full value (not parseInt-truncated)', () => {
+    const row = buildMinimalStringRow(expenses, { mileage: '12,345' });
+    const result = coerceRow(row, expenses);
+    expect(result.mileage).toBe(12345); // was 12 under parseInt — the bug
+  });
+
+  test('#68 INTEGER: a "12345.0"-style Sheets numeric string rounds to the whole number', () => {
+    const row = buildMinimalStringRow(expenses, { mileage: '45000.0' });
+    const result = coerceRow(row, expenses);
+    expect(result.mileage).toBe(45000);
+  });
+
+  test('#68 INTEGER: a genuine garbage tail still rejects to null (strict, not truncated)', () => {
+    // Number('12abc') is NaN (unlike parseInt('12abc')=12) → null, matching the garbage→null contract.
+    const row = buildMinimalStringRow(expenses, { mileage: '12abc' });
+    const result = coerceRow(row, expenses);
+    expect(result.mileage).toBeNull();
+  });
+
+  test('#68 REAL: a thousands-separated amount keeps its full value (not parseFloat-truncated)', () => {
+    const row = buildMinimalStringRow(expenses, { expenseAmount: '1,234.56' });
+    const result = coerceRow(row, expenses);
+    expect(result.expenseAmount).toBe(1234.56); // was 1 under parseFloat — the bug
+  });
+
+  test('#68 REAL: a plain integer-valued amount (CSV round-trip) is unchanged', () => {
+    // The CSV path writes a raw number with no separators — confirm the fix didn't regress it.
+    const row = buildMinimalStringRow(expenses, { expenseAmount: '50' });
+    const result = coerceRow(row, expenses);
+    expect(result.expenseAmount).toBe(50);
+  });
 });
 
 // ---------------------------------------------------------------------------

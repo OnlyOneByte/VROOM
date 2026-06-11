@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 204 |
+| deep-review | 5 | 209 |
 | guard | 6 | 207 |
 | bug | 3 | 206 |
 | arch | 5 | 205 |
 | infra | 6 | 208 |
 
-Current cycle: **208**
+Current cycle: **209**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3690,3 +3690,21 @@ Current cycle: **208**
   dup hole, C202) + #66 (offline electric charge dropped on sync, C204) + #67 (re-finance → inactive record, C206); range C155–C192 → C155–C206.
   Doc-only, no code → no build gate (the C93/C131/C145/C193 precedent). Next CLAUDE.md refresh ~C220; next #5 branch-hygiene sweep ~C213 (last
   C203). cov: be 84.06% / fe 77.79% (carry, C203 reading).
+- **C209 (deep-review → #68): restore coerceRow truncated a thousands-separated number (parseInt stops at the comma)** — BALANCE: `feature`
+  most-starved (cyc 170, starved-for 39, blocked 34th) but blocked → fell through; `deep-review` AT budget (cyc 204, starved-for 5 = 5, due) →
+  the most-starved actionable (the C208 forecast). Inline focused review (spawn cap/flake — C179/C204 precedent). SURFACE: the restore-path
+  per-field coercion `coerceRow` (backup.ts:70) — THE data-safety surface (NORTH_STAR #1), flagged in the C146 money-cents spec as a latent
+  crux + never directly audited (C108/C136/C144 covered cross-tenant + empty-replace + mid-run-change, not the coercion). FOUND + VERIFIED
+  firsthand end-to-end: the INTEGER branch did `Number.parseInt(strVal, 10)`, which STOPS at the first non-digit. The Google Sheets restore
+  reads cells via `values.get` with NO valueRenderOption → defaults to FORMATTED_VALUE (google-sheets-service.ts:622), so a thousands-separated
+  odometer/mileage comes back as the string "12,345" → parseInt → 12 (a 1000x SILENT corruption — 12 is not NaN, so it passed straight
+  through; mileage/odometer/initialMileage all confirmed `integer` columns). The REAL branch had the same hazard (parseFloat("1,234.56")→1).
+  CONFIRMED the CSV path writes raw integers with NO separators (convertToCSV:451), so a VROOM-own-export round-trip never hit it — but the
+  Sheets path does. FIX (minimal, complete, behavior-preserving for valid input): strip grouping commas + a STRICT whole-string parse
+  (`Number(strVal.replace(/,/g,''))`, which unlike parseInt rejects a "12abc" tail to NaN→null, matching the existing garbage→null contract;
+  Math.round on INTEGER so a Sheets "12345.0" lands whole). Did NOT unilaterally switch the Sheets read to UNFORMATTED_VALUE (deeper, separate)
+  — the coercion-layer fix is complete + covers CSV too. +5 tests in backup.test.ts (INTEGER "12,345"→12345 [the regression]; "45000.0"→45000;
+  "12abc"→null [strict]; REAL "1,234.56"→1234.56; plain "50" CSV-round-trip unchanged); the existing per-table Zod re-validation block still
+  green. NON-VACUOUS: confirmed the INTEGER regressions FAIL RED with the fix reverted (12,345→12) then GREEN restored. DE-RISKS the money-cents
+  migration (the C146-named parseInt crux). green→green: backend validate:local EXIT 0 — 1279 pass / 1 skip / 0 fail (+5), tsc 0, musl-biome
+  clean, build bundled. cov: be 84.06%+ (carry; +5 BE) / fe 77.79% (carry).
