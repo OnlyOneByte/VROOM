@@ -366,9 +366,9 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > route/util low spots are now largely worked through (analytics/sync routes C185/C188, backup-orchestrator C181, activity-tracker pure
 > slice C195) — next guard cycles steer FRONTEND. **PRIMED FE guard pick (C199 deep-review): `calculatePayoffDateFromStart`
 > (financing-calculations.ts:545) — VERIFIED correct firsthand but has NO test (the C196 :540-547 uncovered range); a subtle
-> month-overflow clamp (Jan-31 + 1mo → Feb-28 via setDate(0)) a refactor could silently break → pin it. FE low spots (FRESH C196 measure): a ~15% form-validation module
-> (`vehicle-form-validation.ts` or `expense-form-validation.ts` — pure logic, the CLEANEST next FE guard pick; confirm which when
-> picked, the C103/C125 cycles covered only parts), `analytics-api.ts` ~36% func, `sync-manager.ts` ~56% (timer/network-bound — less
+> month-overflow clamp (Jan-31 + 1mo → Feb-28 via setDate(0)) a refactor could silently break → pin it. FE low spots (FRESH C196 measure):
+> ~~the ~15% form-validation module~~ DONE C201 (it was `expense-form-validation.ts` 127-line — +19 covering amount/volume/charge bounds,
+> the electric-vs-liquid unit gating, + validateMileage monotonicity); `analytics-api.ts` ~36% func, `sync-manager.ts` ~56% (timer/network-bound — less
 > clean), `auth.ts` ~56%; `settings.svelte.ts` ~11% is the filed handleError arch pick (deferred). The components/routes deficit is
 > the bulk + largely eyes-on.** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
 > the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`

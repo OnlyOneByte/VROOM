@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 199 |
-| guard | 6 | 195 |
+| guard | 6 | 201 |
 | bug | 3 | 198 |
 | arch | 5 | 200 |
 | infra | 6 | 196 |
 
-Current cycle: **200**
+Current cycle: **201**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3563,3 +3563,16 @@ Current cycle: **200**
   analytics-charts-unpinned.test.ts (group+date-order; no-mutation; numeric/null date handling). One biome import-sort autofixed.
   green→green: backend validate:local **EXIT 0 — 1272 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean, build bundled. ARCH QUEUE
   empty again — next arch cycle = a fresh rule-7 scout. cov: be 84.08%+ (carry) / fe 73.89% (carry).
+- **C201 (guard): cover expense-form-validation.ts (the ~15% FE low spot — amount/volume/charge/mileage branches)** — BALANCE: only
+  `feature` strictly PAST budget (cyc 170, starved-for 31, blocked 26th) but blocked → fell through; `guard` + `bug` both AT budget
+  (6=6 / 3=3, due). Took `guard` via the PRIMED C196 pick (the ~15% form-validation module) — higher-confidence than a fresh hunt.
+  Inline (6/3 spawn cap). IDENTIFIED it firsthand as `expense-form-validation.ts` (127 lines; the C196 :42/48-126 uncovered range; C103
+  covered only the date slice). +19 cases in a new expense-form-validation-fields.test.ts (PURE — ValidationContext in, error-or-null
+  out): required vehicleId/category, amount bounds (>0, ≤999999), the fuel-vs-charging UNIT GATING (electric fuelType → charge branch,
+  liquid → volume branch), fuelType length, and — the load-bearing one — `validateMileage`'s MONOTONICITY check (a fuel entry's odometer
+  must sit strictly between the nearest earlier/later-dated entries; + the edit-self-exclusion). VERIFY-FIRSTHAND PAID OFF: my first
+  draft used `fuelType:'electric'` but isElectricFuelType matches the EXACT case-sensitive ELECTRIC_FUEL_TYPES members ('Electric',
+  'Level 2 (AC)', …) — caught the 2 failures in isolation + fixed to 'Electric' (the C150 assume-nothing class). expense-form-validation
+  ~15%→well-covered. green→green: FE validate:local **EXIT 0 — 535 pass (+19)**, tsc 0, build OK; + prettier (auto-fixed tabs) + eslint
+  clean on the new file. cov: fe 73.89%+ (carry; +19 FE) / be 84.08% (carry). The C199-primed calculatePayoffDateFromStart remains the
+  NEXT FE guard pick.
