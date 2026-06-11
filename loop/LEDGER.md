@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 191 |
 | guard | 6 | 188 |
 | bug | 3 | 192 |
-| arch | 5 | 187 |
+| arch | 5 | 194 |
 | infra | 6 | 193 |
 
-Current cycle: **193**
+Current cycle: **194**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3455,3 +3455,18 @@ Current cycle: **193**
   (C181/C182/C185: a green test that re-implements/reconstructs a module locally is NOT real coverage). Left the loop-steering +
   branch hard-rules untouched (accurate + timeless — the squash→rebase IS the documented human-merge workflow, not a drift). NO code
   touched. Next CLAUDE.md refresh ~C203; #5 sweep next ~C196. cov: be 83.41% line / fe 73.89% line (carry, doc-only).
+- **C194 (arch): extract `toDate` — the `instanceof Date ? x : new Date(x)` normalization, 4 sites → 1** — BALANCE: THREE past budget
+  — `feature` (cyc 170, starved-for 24, blocked 19th cycle) + `arch` (cyc 187, starved-for 7) + `infra` AT budget. Feature blocked →
+  most-starved past-budget actionable = `arch` (7). Inline scout (6/3 spawn cap — no fan-out). FOUND: analytics/repository.ts
+  hand-repeated `value instanceof Date ? value : new Date(value as unknown as number)` at 4 sites — fuel-monthly (:689), financing
+  startDate (:796), term start + end (:1003/:1007). EXCLUDED the `? x.getTime() : 0` / `: Number(x)` sort-comparator variants
+  (different fallbacks — the C182-#2 trap). Extracted exported `toDate(value: Date|number|string): Date` (beside the sibling
+  monthsOwnedInYear), wired all 4. **tsc EARNED ITS KEEP:** the financing site's local type is `startDate: Date | null`, so toDate's
+  non-null param rejected it — surfacing that the original `as unknown as number` cast was masking a null→`new Date(null)`=epoch path.
+  Preserved EXACTLY with `toDate(fin.startDate ?? 0)` (startDate is `.notNull()` in schema → null is impossible at runtime anyway; the
+  `?? 0` matches the old epoch-on-null behavior). The other 3 sites narrow via their preceding truthy-guards (no cast needed).
+  Behavior-preserving (arch rule 2 — identity passthrough for a Date, `new Date` otherwise, exactly as before); anchored by the
+  EXISTING fuel-stats + insurance-details + financing analytics tests (green THROUGH the change) + 3 new toDate cases
+  (identity-passthrough, epoch-millis, ISO-string) in tco-months-owned.test.ts. green→green: backend validate:local **EXIT 0 — 1266
+  pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean, build bundled. ARCH QUEUE empty again — next arch cycle = a fresh rule-7
+  scout. cov: be 83.41%+ (carry) / fe 73.89% (carry).

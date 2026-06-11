@@ -1009,8 +1009,15 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     byte-identical at auth/routes.ts GET /me (:463, src `user`) + POST /refresh (:562, src `result.user`); the PATCH /me + /accounts
     near-misses correctly stay EXCLUDED (different shapes). Extracted `serializeSessionUser` (structurally typed → accepts both sources)
     + wired both. CLOSED the caveat's gap: /refresh's success body was UNANCHORED → added a POST /refresh success-body shape test to
-    me-http.test.ts. Behavior-preserving, green→green 1246 pass (+1).* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out
-    (spawn cap permitting) or an inline scout.**
+    me-http.test.ts. Behavior-preserving, green→green 1246 pass (+1).*
+  - ~~**`toDate` — the `instanceof Date ? x : new Date(x)` normalization, 4 sites → 1 (C194 inline scout)**~~ — *DONE C194:
+    analytics/repository.ts hand-repeated `value instanceof Date ? value : new Date(value as unknown as number)` at 4 sites
+    (fuel-monthly :689, financing startDate :796, term start+end :1003/:1007). EXCLUDED the `? x.getTime() : 0`/`: Number(x)`
+    sort-comparator variants (different fallbacks — the C182-#2 trap). Extracted exported `toDate(value: Date|number|string)` beside
+    monthsOwnedInYear + wired all 4. tsc surfaced that the financing site's `Date | null` local type was masking a null→epoch path
+    (the old `as unknown as number` cast hid it) → preserved exactly with `?? 0` (startDate is `.notNull()` so null is unreachable
+    anyway). Anchored by the existing fuel-stats/insurance-details/financing tests (green through) + 3 new toDate cases. green→green
+    1266 pass (+3).* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or an inline scout.**
   - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
     pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the ~57 logging sites
     is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.

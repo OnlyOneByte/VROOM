@@ -69,6 +69,17 @@ export function monthsOwnedInYear(ownershipStart: Date, now: Date, year: number)
   return Math.max(0, yearEndMonth - yearStartMonth + 1);
 }
 
+/**
+ * Normalize a date-or-raw-timestamp into a Date (C194 dedup). Drizzle timestamp columns surface as
+ * Date, but some rows reach these builders via paths typed loosely (a raw number/string), so the
+ * analytics builders defensively coerced with `x instanceof Date ? x : new Date(x)` — hand-repeated at
+ * 4 sites (fuel monthly, financing startDate, term start+end). One source of truth; behavior-identical
+ * (an already-Date passes through; anything else goes through `new Date`, exactly as before).
+ */
+export function toDate(value: Date | number | string): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
 // ---------------------------------------------------------------------------
 // Data interfaces for each analytics endpoint
 // ---------------------------------------------------------------------------
@@ -686,7 +697,7 @@ export class AnalyticsRepository {
     const map = new Map<string, { mileage: number }>();
     for (const row of fuelRows) {
       if (row.mileage == null || !row.date) continue;
-      const d = row.date instanceof Date ? row.date : new Date(row.date);
+      const d = toDate(row.date);
       const key = `${toMonthKey(d)}|${row.vehicleId}`;
       const existing = map.get(key);
       if (!existing || row.mileage > existing.mileage) {
@@ -792,8 +803,10 @@ export class AnalyticsRepository {
   ): FinancingData['vehicleDetails'][number] {
     const monthlyInterestEstimate =
       fin.financingType === 'loan' && fin.apr ? (computedBalance * (fin.apr / 100)) / 12 : 0;
-    const startDate =
-      fin.startDate instanceof Date ? fin.startDate : new Date(fin.startDate as unknown as number);
+    // startDate is `Date | null` in this builder's local type but `.notNull()` in the schema, so it's
+    // never actually null at runtime. The `?? 0` preserves the prior `new Date(<null-cast>)`=epoch
+    // behavior on the impossible-null path EXACTLY, while satisfying toDate's non-null param.
+    const startDate = toDate(fin.startDate ?? 0);
     const now = new Date();
     const monthsElapsed = Math.max(
       0,
@@ -999,12 +1012,8 @@ export class AnalyticsRepository {
     monthlyPremium: number
   ): void {
     if (!term.startDate || !term.endDate) return;
-    const start =
-      term.startDate instanceof Date
-        ? term.startDate
-        : new Date(term.startDate as unknown as number);
-    const end =
-      term.endDate instanceof Date ? term.endDate : new Date(term.endDate as unknown as number);
+    const start = toDate(term.startDate);
+    const end = toDate(term.endDate);
     // monthKeysInRange anchors to day-1 per month, so a term starting on day 29-31 no longer
     // skips a short month (the setMonth-overshoot bug — cycle 14).
     for (const key of monthKeysInRange(start, end)) {

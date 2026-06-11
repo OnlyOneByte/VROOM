@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { monthsOwnedInYear } from '../repository';
+import { monthsOwnedInYear, toDate } from '../repository';
 
 describe('monthsOwnedInYear — year-scoped ownership span (C121 #28)', () => {
   test('a vehicle owned for the WHOLE year counts 12 months', () => {
@@ -38,5 +38,24 @@ describe('monthsOwnedInYear — year-scoped ownership span (C121 #28)', () => {
   test('bought and queried within the same single month counts 1 (the divisor never collapses below the calling Math.max(1,…))', () => {
     // Jun 2024 → Jun 2024: month index 5 to 5 inclusive = 1.
     expect(monthsOwnedInYear(new Date(2024, 5, 5), new Date(2024, 5, 20), 2024)).toBe(1);
+  });
+});
+
+// toDate (C194 dedup): the `x instanceof Date ? x : new Date(x)` normalization the analytics builders
+// hand-repeated at 4 sites (fuel monthly, financing startDate, term start+end), now one helper.
+describe('toDate — normalize a Date-or-raw-timestamp into a Date', () => {
+  test('passes an existing Date through by IDENTITY (no reconstruction)', () => {
+    const d = new Date(2024, 5, 15, 10, 30);
+    expect(toDate(d)).toBe(d); // same reference — the `instanceof Date` short-circuit
+  });
+
+  test('constructs a Date from an epoch-millis number', () => {
+    const ms = Date.UTC(2024, 0, 2, 3, 4, 5);
+    expect(toDate(ms).getTime()).toBe(ms);
+  });
+
+  test('constructs a Date from an ISO string', () => {
+    const iso = '2024-03-15T12:00:00.000Z';
+    expect(toDate(iso).getTime()).toBe(new Date(iso).getTime());
   });
 });
