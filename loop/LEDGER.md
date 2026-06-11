@@ -3996,3 +3996,24 @@ Current cycle: **227**
   check:musl:fix reflowed 1 file; the 10 pre-existing noNonNullAssertion stay warnings, untouched — the recurring C220/C221/C227 note.)
   green→green: backend validate:local EXIT 0 — 1316 pass / 1 skip / 0 fail (+6), tsc 0, musl-biome clean, build bundled. cov: be 84.25%+
   (carry; +6 BE) / fe 80.33% (carry).
+- **C229 (bug): `PhotoRepository.setCoverPhoto` second UPDATE keyed on `id` ALONE + bound the getDb() singleton (untestable) —
+  scoped to (id,entityType,entityId), validated BEFORE the unset, switched to `this.db.transaction`** — BALANCE: `feature` most-starved
+  (cyc 170, starved-for 59, blocked 54th) but blocked → fell through; `bug` FORCED (cyc 226, starved-for 3 = 3, due — the C228 forecast).
+  Scouted the photo write-paths firsthand (the queued #34 upload-atomicity is storage-provider-blocked in-harness — deferred, not forced).
+  Found a THREE-PART defect in setCoverPhoto, the same method: (1) the second (set-cover) UPDATE keyed on `photoId` ALONE while the first
+  (unset) was (entityType,entityId)-scoped → the C63/#192 + C72/#215 "write keyed on id alone, match proven a layer up" class: a photoId from a
+  DIFFERENT entity would clear the named entity's cover AND flag the foreign photo (entity left cover-less). (2) it used the MODULE-level
+  `transaction()` helper, which binds the `getDb()` singleton + IGNORES the injected `this.db` (the lone repo method that did — every sibling in
+  expenses/insurance uses `this.db.transaction`), so it was UNTESTABLE via a constructed repo → the two photo "property" tests only drive an
+  in-memory REFERENCE model, never the real method (the C181 coverage-theater pattern); it also wrapped the internal NotFoundError into a 500
+  DatabaseError. (3) discovered while testing: even an entity-scoped second UPDATE + a throw does NOT undo the unset — the C151 bun:sqlite
+  ASYNC-transaction footgun (a throw escaping the async callback AFTER a sync write does not roll it back). FIX (all three, one coherent
+  setCoverPhoto change): VALIDATE the target's (id,entityType,entityId) match BEFORE any write (so a bad/foreign id mutates nothing regardless
+  of rollback semantics — strictly safer than both the old flag-foreign and an unset-then-throw), switch to `this.db.transaction` (DI-consistent
+  with siblings + 404 propagates cleanly; production has this.db===getDb() so behavior-preserving). GUARD: set-cover-entity-scope.test.ts (+3)
+  drives the REAL repo over a migrated in-memory SQLite DB (the batch-by-entity-type pattern — closes the coverage-theater gap): happy-path
+  flip+single-cover; a foreign-entity photoId → NotFoundError + VEH_1 keeps its cover + foreign flag untouched (the #-class regression); an
+  unknown id → NotFoundError, cover intact. NON-VACUOUS: the foreign-entity + unknown-id cases went RED under both the original id-alone code
+  AND an interim unset-then-throw (coverFlag('p1')===0) — green only once validation precedes the unset (live evidence this session). green→green:
+  backend validate:local EXIT 0 — 1319 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (1 unused-import + reflow fixed), build bundled.
+  cov: be 84.25%+ (carry; +3 BE, setCoverPhoto now really covered) / fe 80.33% (carry).

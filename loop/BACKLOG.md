@@ -539,6 +539,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   mount; pins the clear-block); NON-VACUOUS (RED with the block reverted). green→green FE 585 pass (+1). CAVEAT: the full
   select→clear→submit round-trip is eyes-on/Playwright-blocked → code-complete/source-pinned/eyes-on-pending. ALSO certified clean this cycle:
   the insurance-CLAIM write path (ownership-gated, writes id+policyId-scoped [C155 clean], findOwnerUserId is the correct owner-resolver).*
+- ~~**#78 (MED, write-scope + DI + atomicity — found C229 scouting the photo write-paths) — `PhotoRepository.setCoverPhoto`: id-alone second UPDATE,
+  getDb()-singleton-bound (untestable), and an unset-then-throw that couldn't roll back.**~~ — *DONE C229: the method's first UPDATE unset covers
+  scoped by (entityType,entityId) but the second (set-cover) UPDATE keyed on `photoId` ALONE (the C63/#192 + C72/#215 class — a foreign-entity id
+  would clear the named entity's cover AND flag the foreign photo, entity left cover-less). It ALSO used the module-level `transaction()` helper
+  (binds the getDb() singleton, ignores `this.db` — the lone repo method that did) so it was untestable via a constructed repo → the 2 photo
+  "property" tests only drive a reference model, never the real method (the C181 coverage-theater pattern). FIX (one coherent change): VALIDATE the
+  (id,entityType,entityId) match BEFORE any write (the C151 bun:sqlite async-txn footgun means a throw after the unset wouldn't roll it back, so
+  validate-first is what actually guarantees no-mutation on a bad id), switch to `this.db.transaction` (DI-consistent with expenses/insurance;
+  404 propagates instead of a wrapped 500; production this.db===getDb() so behavior-preserving). +3 direct-repo tests over a migrated in-memory DB
+  (set-cover-entity-scope.test.ts — closes the coverage-theater gap). NON-VACUOUS (foreign-entity + unknown-id RED pre-fix). green→green 1319 pass (+3).*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:

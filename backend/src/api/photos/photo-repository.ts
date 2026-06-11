@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb, transaction } from '../../db/connection';
+import { getDb } from '../../db/connection';
 import { type NewPhoto, type Photo, photos } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import type { PaginatedResult } from '../../utils/pagination';
@@ -155,23 +155,46 @@ export class PhotoRepository {
   }
 
   async setCoverPhoto(entityType: string, entityId: string, photoId: string): Promise<Photo> {
-    return transaction(async (tx) => {
-      // Unset all covers for this entity
+    // Use this.db.transaction (the sibling-repo convention — expenses/insurance all do) rather than
+    // the module-level transaction() helper, which binds the getDb() singleton and ignored the
+    // injected this.db (production has this.db === getDb(), so behavior-preserving — but it makes the
+    // method respect a test-injected DB AND lets the internal NotFoundError propagate as a 404 instead
+    // of being wrapped into a 500 DatabaseError).
+    return this.db.transaction(async (tx) => {
+      // Validate the target photo belongs to THIS entity BEFORE any write. Two reasons:
+      // (1) the C63/#192 + C72/#215 "write keyed on id alone, match proven a layer up" class — a
+      //     photoId from a DIFFERENT entity must never be flagged as this entity's cover; and
+      // (2) the bun:sqlite ASYNC-transaction footgun (the C151 lesson): a throw escaping this async
+      //     callback AFTER a sync write does NOT roll the write back, so validating BEFORE the unset
+      //     is what actually guarantees we never leave the entity cover-less on a bad id (an
+      //     unset-then-throw would persist the unset).
+      const target = await tx
+        .select({ id: photos.id })
+        .from(photos)
+        .where(
+          and(
+            eq(photos.id, photoId),
+            eq(photos.entityType, entityType),
+            eq(photos.entityId, entityId)
+          )
+        )
+        .limit(1);
+
+      if (target.length === 0) {
+        throw new NotFoundError('Photo');
+      }
+
+      // Unset all covers for this entity (only reached once the target is proven valid)
       await tx
         .update(photos)
         .set({ isCover: false })
         .where(and(eq(photos.entityType, entityType), eq(photos.entityId, entityId)));
 
-      // Set the target photo as cover
       const result = await tx
         .update(photos)
         .set({ isCover: true })
         .where(eq(photos.id, photoId))
         .returning();
-
-      if (result.length === 0) {
-        throw new NotFoundError('Photo');
-      }
 
       return result[0];
     });
