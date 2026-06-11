@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 220 |
-| guard | 6 | 217 |
+| guard | 6 | 223 |
 | bug | 3 | 222 |
 | arch | 5 | 221 |
 | infra | 6 | 219 |
 
-Current cycle: **222**
+Current cycle: **223**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3907,3 +3907,15 @@ Current cycle: **222**
   SHUFFLED + fully-reversed inputs yield the SAME 31). NON-VACUOUS: confirmed the shuffled + reversed tests FAIL RED with the sort reverted
   (mis-paired MPG) while the baseline stayed green. green→green: backend validate:local EXIT 0 — 1309 pass / 1 skip / 0 fail (+3), tsc 0,
   musl-biome clean, build bundled. cov: be 84.14%+ (carry; +3 BE) / fe 79.22% (carry).
+- **C223 (guard): cover sync-manager conflict classification (determineConflictType — the duplicate-vs-modified data-safety distinction)** —
+  BALANCE: `feature` most-starved (cyc 170, starved-for 53, blocked 48th) but blocked → fell through; nothing else strictly OVER budget →
+  highest-leverage; `guard` was the most-starved actionable (cyc 217, starved-for 6 = 6, due — vs infra at 4, the #5 sweep is next). Took the
+  primed FE low spot sync-manager.ts ~56%, but STEERED to its CLEANEST, highest-stakes slice (the C163 lesson — avoid the network/timer mock-trap
+  paths): `determineConflictType`, which decides whether an offline-vs-server sync collision is 'duplicate' (silently DROPPED) vs 'modified'
+  (surfaced to the user) — a regression mislabeling a real edit as 'duplicate' DISCARDS the user's offline change (data-safety). It was only
+  indirectly hit (one 'duplicate' assertion at :180); the 'modified' branch + each match-component were uncovered. +4 cases driven through the
+  PUBLIC syncAll conflict path (the existing-test convention, NOT private access): amount+tags+date all-match → 'duplicate'; a differing amount
+  (tag still matches so checkForExistingExpense FINDS it) → 'modified'; a differing date → 'modified'; the <0.01 amount epsilon still matches →
+  'duplicate'. VERIFY-FIRSTHAND: ran in isolation FIRST — 13 green (was 9, +4), the conflict-path mechanics + the epsilon confirmed. green→green:
+  FE validate:local EXIT 0 — 584 pass (+4), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. cov: fe 79.22%+ (carry;
+  +4 FE) / be 84.14% (carry). sync-manager's remaining gap = the network/setTimeout-retry paths (the C163 mock-trap territory — left).

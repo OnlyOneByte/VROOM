@@ -294,3 +294,79 @@ describe('Sync Manager', () => {
 		});
 	});
 });
+
+// determineConflictType (C223 guard) — when an offline expense collides with a server row that
+// shares a tag (so checkForExistingExpense FINDS it), the conflict is classified 'duplicate' ONLY
+// when amount + tags + date ALL match; ANY difference → 'modified'. This is the load-bearing
+// data-safety distinction: a 'duplicate' is silently dropped, while 'modified' surfaces the
+// collision to the user. Mislabeling a real edit as 'duplicate' would discard the user's offline
+// change. Driven through the public syncAll conflict path (the existing-test convention), not via
+// private access.
+describe('Sync Manager — conflict classification (determineConflictType)', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		onlineStatus.current = true;
+		syncState.current = 'idle';
+		syncConfig.current = {
+			maxRetries: 3,
+			retryDelay: 100,
+			batchSize: 10,
+			conflictResolution: 'ask_user'
+		};
+	});
+
+	/** Seed one local offline expense + the server row the conflict-check GET returns; run syncAll. */
+	async function classifyAgainst(
+		local: Partial<OfflineExpense>,
+		server: { amount: number; tags: string[]; date: string }
+	): Promise<SyncConflict | undefined> {
+		const localExpense: OfflineExpense = {
+			id: 'local-1',
+			vehicleId: 'vehicle-1',
+			tags: ['fuel'],
+			category: 'fuel',
+			amount: 50.0,
+			date: '2024-01-01',
+			timestamp: Date.now(),
+			synced: false,
+			...local
+		};
+		vi.mocked(loadOfflineExpenses).mockReturnValue([localExpense]);
+		mockFetch.mockResolvedValueOnce(apiOk([server])); // checkForExistingExpense GET
+		const result = await syncManager.syncAll();
+		return result.conflicts[0];
+	}
+
+	it("amount+tags+date all match → 'duplicate'", async () => {
+		const c = await classifyAgainst(
+			{ amount: 50, date: '2024-01-01', tags: ['fuel'] },
+			{ amount: 50, date: '2024-01-01', tags: ['fuel'] }
+		);
+		expect(c?.conflictType).toBe('duplicate');
+	});
+
+	it("a DIFFERENT amount (tag still matches so it's found) → 'modified', not a silent duplicate", async () => {
+		const c = await classifyAgainst(
+			{ amount: 50, date: '2024-01-01', tags: ['fuel'] },
+			{ amount: 75, date: '2024-01-01', tags: ['fuel'] } // amount differs
+		);
+		expect(c?.conflictType).toBe('modified');
+	});
+
+	it("a DIFFERENT date → 'modified'", async () => {
+		const c = await classifyAgainst(
+			{ amount: 50, date: '2024-01-01', tags: ['fuel'] },
+			{ amount: 50, date: '2024-02-01', tags: ['fuel'] } // date differs
+		);
+		expect(c?.conflictType).toBe('modified');
+	});
+
+	it("an amount within the <0.01 epsilon still counts as matching → 'duplicate'", async () => {
+		// 50.00 vs 50.009 → |Δ| < 0.01 → amountMatch true (float-drift tolerance).
+		const c = await classifyAgainst(
+			{ amount: 50.0, date: '2024-01-01', tags: ['fuel'] },
+			{ amount: 50.009, date: '2024-01-01', tags: ['fuel'] }
+		);
+		expect(c?.conflictType).toBe('duplicate');
+	});
+});
