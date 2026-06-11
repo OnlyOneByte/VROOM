@@ -4224,3 +4224,13 @@ Current cycle: **227**
   to the unbounded fastForwardPastNow pattern), then compared the `mode:'timestamp'` next_due_date (unix SECONDS) against Date.now() (ms) → fixed
   to now-in-seconds. green→green: backend validate:local EXIT 0 — 1344 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean (no reflow), build
   bundled. cov: be 85.18%+ (carry; +1 BE) / fe 80.64% (carry).
+- **C242 (infra): CLAUDE.md orientation refresh — suite size + closed-bug list (#78→#83) + the known-hard-seam guard note (drift C236→C241)** —
+  BALANCE: `infra` AT budget (cyc 236, starved-for 6 = 6, FORCED — the C241 forecast). The #5 sweep ran recently (C236) so it's not due; the
+  actionable infra increment is the CLAUDE.md refresh (forecast ~C240, last content-refreshed C230 + coverage-line C236). Three drifts fixed: (1)
+  suite size ~1328 BE → ~1344 (FE 592 still accurate); (2) the closed-bug list ended at #78/C229 → extended with #80 (C233 per-user license-plate +
+  migration 0005), #81 (C235 Math.max-spread crash-class, 18 sites), #82 (C237 backupConfig per-provider merge), #83 (C241 mark-serviced to-future
+  re-arm), range bumped C155–C229 → C155–C241; (3) added a note that recent guard/deep-review cycles now characterize KNOWN-HARD seams via the
+  HTTP harness + raw-seeded providers (C239 validateStorageConfig's 4 branches; C240 the financing refinance-balance DB-integration net) — so a
+  future guard cycle knows that vein is being actively worked, not just "thin." DOCS-ONLY (CLAUDE.md only — verified `git diff --name-only` shows
+  just CLAUDE.md), no source touched → no build gate (the C230/C236 doc-refresh precedent). Next CLAUDE.md refresh ~C252; next #5 sweep ~C246. cov:
+  be 85.18% / fe 80.64% (carry — no code, no re-measure this cycle).

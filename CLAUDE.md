@@ -172,9 +172,11 @@ Highlights:
   rest (handleInactivity/performAutoSync/performAutoBackup) is setTimeout + orchestrator-bound — left documented, not a
   clean unit pick. NOTE: `restore.ts` restoreFromSheets needs a process-global Sheets mock the sync suite avoids
   (see C163) — defer until a DI seam exists. **The clean BE route/util low spots are now largely worked through —
-  next guard cycles are thin both sides; prefer a fresh deep-review-surfaced fix.**
+  next guard cycles are thin both sides; prefer a fresh deep-review-surfaced fix.** Recent guard/deep-review cycles now
+  characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
+  branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1328 backend tests / ~592 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1344 backend tests / ~592 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
@@ -208,7 +210,11 @@ Highlights:
   photos route missing changeTracker → photo-only change excluded from the next auto-backup [#74, C220], calculateAverageMpg
   caller-ordering dependence [#75, C222], expense category-switch leaves stale fuel fields [#76, C226], vehicle-photo serve
   missing nosniff [#77, C227 — closed as an arch-dedup side effect], setCoverPhoto id-alone write + getDb-singleton bind +
-  validate-before-unset [#78, C229]) all landed C155–C229. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
+  validate-before-unset [#78, C229], license-plate uniqueness scoped per-user (route + DB index migration 0005) was global →
+  cross-tenant false-409 + enumeration oracle [#80, C233], `Math.max(...arr)` argument-spread crash-class swept to spread-safe maxOf/minOf across
+  18 analytics sites [#81, C235], PUT /settings backupConfig merged per-provider (was wholesale → partial PUT wiped other providers) [#82, C237],
+  mark-serviced time re-arm advances to the first FUTURE occurrence (was one period → a multi-period-overdue reminder stayed overdue) [#83, C241])
+  all landed C155–C241. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
   a green test that RE-IMPLEMENTS or RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module
   (C229: the two photo "property" tests only drove a reference model, never the real setCoverPhoto, which was also
   getDb-singleton-bound and thus untestable via a constructed repo until switched to this.db.transaction).
