@@ -140,3 +140,53 @@ describe('mileage re-check on write (D5)', () => {
     expect(mileageNotifCount('rw5')).toBe(0);
   });
 });
+
+/**
+ * #71 (C214): the recheck hook was wired on CREATE but NOT on the PUT/update paths, so EDITING a
+ * reading upward across a milestone (a common correction) silently did NOT fire until the next
+ * /trigger — breaking the D5 "fires the moment crossed" guarantee for edits. These pin the recheck on
+ * both update routes (odometer PUT + mileaged-expense PUT).
+ */
+describe('mileage re-check on UPDATE (D5, #71)', () => {
+  test('editing an odometer reading UP across the milestone fires immediately (no /trigger)', async () => {
+    const vehicleId = await seedVehicle();
+    seedMileageReminder('ru1', vehicleId, 35000);
+
+    // Create a reading BELOW the milestone — fires nothing yet.
+    const created = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
+      odometer: 34000,
+      recordedAt: '2024-06-01T00:00:00.000Z',
+    });
+    const body = await json<DataEnvelope<{ id: string }>>(created);
+    expect(created.status, JSON.stringify(body)).toBe(201);
+    expect(mileageNotifCount('ru1')).toBe(0);
+
+    // EDIT it up across the milestone — the recheck hook must fire it now.
+    const put = await ctx.authed('PUT', `/api/v1/odometer/${body.data.id}`, { odometer: 35200 });
+    expect(put.status, await put.text()).toBe(200);
+    expect(mileageNotifCount('ru1')).toBe(1);
+  });
+
+  test('editing a mileaged expense UP across the milestone fires immediately', async () => {
+    const vehicleId = await seedVehicle();
+    seedMileageReminder('ru2', vehicleId, 35000);
+
+    // A fuel expense BELOW the milestone — fires nothing yet.
+    const created = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'fuel',
+      date: '2024-06-15T00:00:00.000Z',
+      expenseAmount: 50,
+      mileage: 34000,
+      volume: 12,
+    });
+    const body = await json<DataEnvelope<{ id: string }>>(created);
+    expect(created.status, JSON.stringify(body)).toBeLessThan(300);
+    expect(mileageNotifCount('ru2')).toBe(0);
+
+    // Correct the mileage up across the milestone — recheck must fire it.
+    const put = await ctx.authed('PUT', `/api/v1/expenses/${body.data.id}`, { mileage: 35500 });
+    expect(put.status, await put.text()).toBe(200);
+    expect(mileageNotifCount('ru2')).toBe(1);
+  });
+});

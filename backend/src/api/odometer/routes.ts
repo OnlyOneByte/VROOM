@@ -151,6 +151,12 @@ routes.put(
       updatedAt: new Date(),
     });
 
+    // D5 (#71): editing a reading can cross a mileage milestone (e.g. correcting an odometer upward
+    // past a reminder's due value). The create path rechecks (:131) but the update path did not, so
+    // an edit-crossed reminder only fired on the next /trigger. Mirror the create-path best-effort
+    // recheck (never throws, idempotent via the dedup) on the updated entry's vehicle.
+    await reminderTriggerService.recheckMileageReminders(user.id, updated.vehicleId);
+
     return c.json({ success: true, data: updated, message: 'Odometer reading updated' });
   }
 );

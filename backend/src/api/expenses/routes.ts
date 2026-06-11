@@ -656,6 +656,16 @@ routes.put(
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
     const updatedExpense = await expenseRepository.update(id, updateData);
+
+    // D5 (#71): an EDIT can also cross a mileage milestone — e.g. correcting a reading upward past a
+    // reminder's due odometer. The create path rechecks (:573) but the update path did not, so an
+    // edit-crossed reminder only fired on the next /trigger or login, silently breaking the
+    // "fires the moment crossed" guarantee. Mirror the create-path best-effort recheck (never throws,
+    // idempotent via the dedup). Use the UPDATED vehicleId so a reassign rechecks the right vehicle.
+    if (updatedExpense.mileage != null) {
+      await reminderTriggerService.recheckMileageReminders(user.id, updatedExpense.vehicleId);
+    }
+
     return c.json({
       success: true,
       data: updatedExpense,

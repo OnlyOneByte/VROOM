@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 209 |
 | guard | 6 | 212 |
-| bug | 3 | 210 |
+| bug | 3 | 214 |
 | arch | 5 | 211 |
 | infra | 6 | 213 |
 
-Current cycle: **213**
+Current cycle: **214**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3770,3 +3770,19 @@ Current cycle: **213**
   [2 HIGH data-safety], #67/#70 + the C205/C211 dedups-that-collapsed-the-bug-they-just-fixed, the C207/C212 guard ratchet that closed the FE
   service layer, #69 escalated), fixed the stale "13 commits" → "23 commits (C190–C212)" in Suggested-merge. Doc/measurement-only, no product
   code. Next sweep ~C223; next CLAUDE.md refresh ~C220 (last C208). cov: be 84.14% / fe 79.22% (FRESH C213 reading).
+- **C214 (bug → #71): mileage-reminder recheck was CREATE-only — an EDIT crossing a milestone didn't fire until the next /trigger** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 44, blocked 39th) but blocked → fell through; `bug` FORCED (cyc 210, starved-for 4 > 3 — the C213
+  forecast). Hunted a FRESH surface (offline/sync + restore-coercion + insurance-route veins each already mined+deduped). SCOUTED SIX surfaces
+  firsthand + REJECTED each as not-a-clean-live-bug (C21/C77 — did NOT manufacture one): CSV export (neutralizeCsvRow guards the human-facing
+  path; backup convertToCSV unguarded is the DOCUMENTED round-trip exemption, not a bug); year-end costPerDistance (windowed max−min distance is
+  the ratified approximation, the #45 family — gated); getQuickStats ytdSpending (C161-clean); the cost-per-mile fencepost (current.expenseAmount
+  ÷ miles-since-previous is applied UNIFORMLY across both paths → a defensible convention, not a divergence; flipping it is a semantics call).
+  THE clean one — #71, the filed "Mileage Finding A/B" (VERIFIED C108, deferred for ORDERING not gating — a decision-free fix): VERIFIED firsthand
+  that recheckMileageReminders is wired on odometer CREATE (:131) + expense CREATE (:573) but NOT on either PUT (expense :658, odometer :149), so
+  editing a reading UP across a reminder's milestone silently did NOT fire until the next /trigger/login — the D5 "fires the moment crossed"
+  guarantee held for creates but not EDITS. FIX (mirror the create-path best-effort recheck, never-throws/idempotent): expense PUT → recheck on
+  the UPDATED vehicleId when mileage != null (handles a vehicle-reassign edit too); odometer PUT → unconditional recheck (every entry is a
+  reading). +2 HTTP tests in recheck-on-write.test.ts (edit odometer 34000→35200 across a 35000 milestone fires; edit expense mileage
+  34000→35500 fires) — NON-VACUOUS: confirmed both FAIL RED with the fixes reverted (edit didn't fire) + the 5 create-path tests stayed green
+  (fix is additive). green→green: backend validate:local EXIT 0 — 1291 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean, build bundled.
+  cov: be 84.14%+ (carry; +2 BE) / fe 79.22% (carry).

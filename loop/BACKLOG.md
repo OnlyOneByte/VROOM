@@ -468,13 +468,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   (2) streaming/bounded-inflation lib (real protection, bigger), or (3) add the compressed bodyLimit to the download path + treat as
   won't-fix. Also unresolved without AdmZip-internals spelunking: whether it already cross-checks header.size vs the inflated length
   (which would partly defeat the attack). Awaiting Angelo's approach pick; not loop-decidable.
-- **Mileage Findings A/B (MED → delayed-fire only, NOT lost) — no IMMEDIATE recheck on PUT-update.** Editing an expense's
-  mileage (expenses/routes.ts PUT /:id) or a manual odometer entry (odometer/routes.ts PUT /:id) to push a vehicle past a
-  milestone does NOT call `recheckMileageReminders` (recheck is wired only on CREATE). The crossed reminder fires on the
-  next periodic /trigger or login pass — eventually-consistent, nothing permanently lost, so the D5 "fires the moment
-  crossed" guarantee silently doesn't hold for edits. FIX: add the same best-effort recheck after both update paths.
-  VERIFIED against source C108. (The 5 hunted mileage defect classes — double-fire, boundary, cross-vehicle, stale, throw —
-  were all CERTIFIED CLEAN.)
+- ~~**Mileage Findings A/B (→ #71, MED → delayed-fire only, NOT lost) — no IMMEDIATE recheck on PUT-update.**~~ — *DONE C214: editing an
+  expense's mileage (expenses/routes.ts PUT /:id) or a manual odometer entry (odometer/routes.ts PUT /:id) to push a vehicle past a milestone
+  did NOT call `recheckMileageReminders` (recheck was wired only on CREATE) → the crossed reminder fired only on the next /trigger/login, so the
+  D5 "fires the moment crossed" guarantee silently didn't hold for EDITS. VERIFIED firsthand (create :573/:131 recheck; both PUTs did not). FIX
+  (mirror the create-path best-effort recheck, never-throws/idempotent): expense PUT → recheck on the UPDATED vehicleId when mileage != null
+  (also handles a vehicle-reassign edit); odometer PUT → unconditional recheck. +2 HTTP tests (edit odometer/expense mileage up across a
+  milestone fires); NON-VACUOUS (RED with the fix reverted, the 5 create-path tests stayed green). green→green backend validate:local EXIT 0,
+  1291 pass (+2). (The 5 hunted mileage defect classes — double-fire, boundary, cross-vehicle, stale, throw — were CERTIFIED CLEAN at C108.)*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:
