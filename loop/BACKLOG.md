@@ -364,8 +364,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > `restore.ts:160-246` (restoreFromSheets) is uncovered but needs a process-global Sheets-service mock — NO sync test uses mock.module
 > (the C38/C91 cross-suite-flake trap), so it's NOT a clean guard pick; defer until a DI seam exists or accept the gap. **The clean BE
 > route/util low spots are now largely worked through (analytics/sync routes C185/C188, backup-orchestrator C181, activity-tracker pure
-> slice C195) — next guard cycles likely steer FRONTEND (needs a fresh fe coverage measure; the components/routes deficit is the bulk,
-> largely eyes-on, so prefer a thin pure FE store/util).** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
+> slice C195) — next guard cycles steer FRONTEND. **FE low spots (FRESH C196 measure): a ~15% form-validation module
+> (`vehicle-form-validation.ts` or `expense-form-validation.ts` — pure logic, the CLEANEST next FE guard pick; confirm which when
+> picked, the C103/C125 cycles covered only parts), `analytics-api.ts` ~36% func, `sync-manager.ts` ~56% (timer/network-bound — less
+> clean), `auth.ts` ~56%; `settings.svelte.ts` ~11% is the filed handleError arch pick (deferred). The components/routes deficit is
+> the bulk + largely eyes-on.** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
 > the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
 > `.svelte.ts`/store/util modules still thin, e.g. settings.svelte.ts 10% [but that's the filed handleError arch pick] /
 > sync-manager.ts 58%). ~~pwa.ts 56%~~ DONE C175 — getPlatformInfo() (the file's only pure branching logic) 0%→covered + the
@@ -450,12 +453,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   1164 pass (+4).* **STILL FILED (the product-decision half): the partial-SHRINK guard** — reject a replace whose payload is
   implausibly SMALLER than current (e.g. 3 rows replacing 3000), not just empty. Needs Angelo's call on how aggressive a shrink
   to block (a legit large delete is a valid replace). The empty case is now closed; the shrink case is a separate threshold.
-- **#22 (MED, hardening) — zip-bomb guard trusts the attacker-declared `header.size`.** `backup.ts:469` sums
-  `e.header?.size` from the ZIP central directory (attacker-controlled in an uploaded archive) and checks it before
-  `getData()`. A forged archive can declare a small size while the deflate stream inflates large. The 50MB COMPRESSED
-  bodyLimit (routes.ts:209) is the real backstop on the UPLOAD path — but the provider DOWNLOAD path (downloadBackup) has
-  no such cap, relying solely on this spoofable check. FIX: enforce a hard running byte-cap DURING inflation, not from the
-  declared size. VERIFIED against source C108.
+- **#22 (MED, hardening — ESCALATED to Angelo C196, approach-gated) — zip-bomb guard trusts the attacker-declared `header.size`.**
+  `backup.ts:469` sums `e.header?.size` from the ZIP central directory (attacker-controlled) and checks it before `getData()`. A
+  forged archive can declare a small size while the deflate stream inflates large. The 50MB COMPRESSED bodyLimit (routes.ts:209) is
+  the real backstop on the UPLOAD path — but the provider DOWNLOAD path has no such cap. VERIFIED C108 + re-assessed firsthand C196:
+  AdmZip `getData()` inflates the whole entry in-memory synchronously, so a post-inflation length check is TOO LATE (the OOM already
+  happened) → NOT a clean single-cycle fix. ESCALATED C196 — direction call: (1) compression-ratio cap pre-inflation (cheap, no dep),
+  (2) streaming/bounded-inflation lib (real protection, bigger), or (3) add the compressed bodyLimit to the download path + treat as
+  won't-fix. Also unresolved without AdmZip-internals spelunking: whether it already cross-checks header.size vs the inflated length
+  (which would partly defeat the attack). Awaiting Angelo's approach pick; not loop-decidable.
 - **Mileage Findings A/B (MED → delayed-fire only, NOT lost) — no IMMEDIATE recheck on PUT-update.** Editing an expense's
   mileage (expenses/routes.ts PUT /:id) or a manual odometer entry (odometer/routes.ts PUT /:id) to push a vehicle past a
   milestone does NOT call `recheckMileageReminders` (recheck is wired only on CREATE). The crossed reminder fires on the

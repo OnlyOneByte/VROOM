@@ -31,7 +31,7 @@
 > branch (UP SHARPLY +3.7 line / +6.7 func / +3.2 branch from C164 — the C166 settings-store + C169 settings-api + C175 pwa.ts FE
 > ratchets delivered; FE still the bigger gap but closing fast).** **RE-MEASURED AGAIN C186 (the #5-sweep re-measure): be 83.41% line /
 > 83.74% func (up from C176's 82.74/82.49 — the C178/#25 + C180/#48 + C181/orchestrator + C184/#26c + C185/analytics-routes BE
-> additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C176 — every C178–C185 cycle was backend, so FE didn't move).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C176 — every C178–C185 cycle was backend, so FE didn't move).** **RE-MEASURED AGAIN C196 (the #5-sweep re-measure): be 84.08% line / 84.44% func (up from C186's 83.41/83.74 — the C188 sync-routes + C190/#62 + C192/#63 + C195 activity-tracker additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C186 — C188–C195 all backend). FRESH FE LOW SPOTS to steer the next FE guard cycle: a ~15% form-validation module (pure logic — cleanest pick), analytics-api.ts ~36% func, sync-manager.ts ~56% (timer/network-bound), auth.ts ~56%; settings.svelte.ts ~11% is the filed handleError arch pick.** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 195 |
 | bug | 3 | 192 |
 | arch | 5 | 194 |
-| infra | 6 | 193 |
+| infra | 6 | 196 |
 
-Current cycle: **195**
+Current cycle: **196**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3484,3 +3484,21 @@ Current cycle: **195**
   production change. green→green: backend validate:local **EXIT 0 — 1269 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean,
   build bundled. NEXT guard low spot: the FE components/routes deficit (needs a fresh FE coverage measure) or a thin FE store/util.
   cov: be 83.41%+ (carry) / fe 73.89% (carry).
+- **C196 (bug→ESCALATED #22, then pivoted to the #5 branch-hygiene sweep + coverage re-measure)** — BALANCE: TWO past budget —
+  `feature` (cyc 170, starved-for 26, blocked 21st cycle) + `bug` (cyc 192, starved-for 4 > 3). Feature blocked → `bug` forced. But the
+  bug queue's clean mechanical fixes are EXHAUSTED — remaining items are decision-gated (#24/#29/#40/#43/#44/#45/#47/#51), approach-gated
+  (#33/#34/#58), or scope-gated (#30). The one tempting unblocked item, #22 (zip-bomb guard trusts attacker-declared header.size),
+  I investigated firsthand + concluded it's NOT a clean single-cycle fix: AdmZip getData() inflates the whole entry in-memory
+  synchronously, so a post-inflation length check is too late (OOM already happened) — a robust fix needs an APPROACH call
+  (compression-ratio cap / streaming lib / accept-the-compressed-cap), and exploitability hinges on AdmZip internals I'd be guessing at.
+  Per "don't-force-a-blocked-pick" → ESCALATED #22 to Angelo (send_message, 3 approach options + the #51 reminder), then PIVOTED (step
+  7) to the cadence-due **#5 sweep** (last C186; balance forced bug over the soft-cadence infra, but the sweep is the highest-leverage
+  ACTIONABLE once bug is honestly blocked). THE 3-PART SWEEP: **(1) STRAY SCAN** — no new strays (offline-entries already Angelo-flagged;
+  + the expected gitignored harness/config/test-results/mise); branch now a 6-commit post-squash stack (C190–C195), not 138. **(2)
+  GREEN + RE-MEASURE** — backend 1269 pass / 0 fail, **be 84.08% line / 84.44% func** (up from C186's 83.41/83.74); frontend 513 pass,
+  **fe 73.89% line** (flat — C188–C195 all backend). Captured FRESH FE low spots (a ~15% form-validation module = next clean FE guard
+  pick; analytics-api ~36%; sync-manager ~56%) into the coverage-trend header + BACKLOG guard note. **(3) BRANCH_REVIEW.md REFRESH**
+  (gitignored) — REFRAMED for the post-squash reality (§1–§25 + C51–C189 are now IN origin/main via "#108"; the reviewable delta is
+  the 6 commits C190–C195), appended **§26 (C190–C195: #62/#63 bugs, the providers credential audit, toDate dedup, activity-tracker
+  guard, CLAUDE.md refresh)**, status 1245→1269 BE + fresh cov. Doc/measurement-only — NO code change. Next #5 sweep ~C206; CLAUDE.md
+  refresh next ~C203. cov: be 84.08% line / fe 73.89% line (RE-MEASURED).
