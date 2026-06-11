@@ -2,6 +2,7 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { CONFIG } from '../../config';
 import type { NewReminder } from '../../db/schema';
+import { ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
 import {
   commonSchemas,
@@ -107,12 +108,30 @@ routes.post(
       fields.nextDueOdometer = lastServiceOdometer + (reminder.intervalMileage ?? 0);
     }
 
-    // Time axis: advance nextDueDate one period from its current value (reuse the trigger math).
+    // Time axis: advance nextDueDate to the FIRST FUTURE occurrence (reuse the trigger math). A single
+    // one-period advance is wrong when the reminder is MULTIPLE periods overdue at service time (e.g. a
+    // monthly reminder serviced 5 months late): advancing once from the stale nextDueDate lands it still
+    // <= now, so the just-serviced reminder stays overdue and immediately re-fires. Mirror
+    // fastForwardPastNow (NOT the capped catch-up loop — maxCatchUpOccurrences is a materialization
+    // budget; mark-serviced creates nothing, so it must reach the future regardless of how lapsed it is).
+    // The loop is bounded by the date advancing past `now`; the strict-advance backstop bails on a
+    // non-progressing cadence (the bug #13 guard — advanceReminderDueDate also throws on a bad interval).
     if (
       (reminder.triggerMode === 'time' || reminder.triggerMode === 'both') &&
       reminder.nextDueDate
     ) {
-      fields.nextDueDate = advanceReminderDueDate(reminder, reminder.nextDueDate);
+      const now = new Date();
+      let nextDue = advanceReminderDueDate(reminder, reminder.nextDueDate);
+      while (nextDue <= now) {
+        const advanced = advanceReminderDueDate(reminder, nextDue);
+        if (advanced <= nextDue) {
+          throw new ValidationError(
+            `Reminder ${reminder.id} did not advance (frequency "${reminder.frequency}") — aborting re-arm`
+          );
+        }
+        nextDue = advanced;
+      }
+      fields.nextDueDate = nextDue;
     }
 
     const updated = await reminderRepository.markServiced(id, user.id, fields);

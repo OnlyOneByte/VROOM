@@ -595,6 +595,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   (fixed-shape, editor sends complete) but un-named providers preserved; validateBackupConfig still gates incoming ownership. +2 HTTP tests
   (partial PUT preserves the un-named provider [the regression]; named entry replaced wholesale); NON-VACUOUS (preserve fails RED pre-fix).
   green→green 1330 pass (+2).*
+- ~~**#83 (MED, UX/correctness — found C241 hunting the reminders mark-serviced path) — time-axis re-arm advanced nextDueDate only ONE period.**~~ —
+  *DONE C241: POST /:id/mark-serviced time axis did a SINGLE `advanceReminderDueDate(reminder, reminder.nextDueDate)` → a reminder serviced when
+  MULTIPLE periods overdue (monthly serviced 5 months late, or any long-lapsed startDate-anchored due date) advanced to a date STILL <= now → stayed
+  overdue + re-fired on the next trigger (user serviced it, app keeps nagging). The trigger path already advances to-future (catch-up +
+  fastForwardPastNow); mark-serviced didn't. FIX (mirror fastForwardPastNow, NOT the maxCatchUp-capped loop — that's a materialization budget;
+  mark-serviced creates nothing): `while (nextDue <= now)` advance + strict-advance backstop (throw on non-progress, the bug #13 guard). +1 HTTP test
+  (2020 monthly reminder serviced now → next_due_date strictly future); NON-VACUOUS (old single-advance → 2020-02 ≪ now → RED). green→green 1344 pass (+1).*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:

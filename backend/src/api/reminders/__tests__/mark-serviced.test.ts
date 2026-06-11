@@ -152,6 +152,34 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
     expect((after as number) > (before as number), 'nextDueDate advanced forward').toBe(true);
   });
 
+  test('time: a MULTI-period-overdue reminder advances to a FUTURE due date (not still overdue)', async () => {
+    const vehicleId = await seedVehicle();
+    // A monthly reminder whose startDate is YEARS in the past → nextDueDate starts many periods
+    // overdue. A single one-period advance would leave it still <= now (re-fires immediately); the
+    // catch-up loop must land it strictly in the future.
+    const created = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Monthly check',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2020-01-15T00:00:00.000Z',
+      vehicleIds: [vehicleId],
+    });
+    const body = await json<DataEnvelope<{ reminder: { id: string } }>>(created);
+    expect(created.status, JSON.stringify(body)).toBe(201);
+    const id = body.data.reminder.id;
+
+    const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
+    expect(res.status).toBe(200);
+
+    const after = reminderRow(id).next_due_date;
+    expect(after).not.toBeNull();
+    // The re-armed due date must be in the FUTURE — the user serviced it, so it must not still be due.
+    // next_due_date is a drizzle `mode:'timestamp'` column → stored as unix SECONDS, so compare against
+    // now-in-seconds (NOT Date.now() ms).
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    expect((after as number) > nowSeconds, 'serviced reminder is no longer overdue').toBe(true);
+  });
+
   test('both: moves the mileage milestone AND advances the date', async () => {
     const vehicleId = await seedVehicle();
     const id = await createMileageReminder(vehicleId, {

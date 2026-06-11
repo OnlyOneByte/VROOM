@@ -4208,3 +4208,19 @@ Current cycle: **227**
   by construction (the two cases differ ONLY by the clearSource call → 30000 vs 22000). green→green: backend validate:local EXIT 0 — 1344 pass /
   1 skip / 0 fail (+2), tsc 0, musl-biome clean (1 unused-import + a long-line reflow autofixed), build bundled. NO production change (clean cert).
   cov: be 85.18%+ (carry; +2 BE) / fe 80.64% (carry).
+- **C241 (bug → #83): mark-serviced time-axis re-arm advanced nextDueDate only ONE period — a multi-period-overdue reminder stayed overdue +
+  immediately re-fired** — BALANCE: `bug` OVER budget (cyc 237, starved-for 4 > 3, FORCED — the C240 forecast). Hunted the reminders mark-serviced
+  path (markServiced repo is userId-scoped clean; the re-arm MATH lives in the route). FOUND #83 (MED, UX/correctness): POST /:id/mark-serviced
+  time axis did `fields.nextDueDate = advanceReminderDueDate(reminder, reminder.nextDueDate)` — a SINGLE one-period advance. For a reminder serviced
+  when it's MULTIPLE periods overdue (e.g. a monthly reminder serviced 5 months late, or any reminder whose startDate-anchored nextDueDate lapsed
+  long ago), one advance lands the new date STILL <= now → the just-serviced reminder remains overdue and re-fires on the next trigger pass (the
+  user serviced it but the app keeps nagging). VERIFIED firsthand. The trigger path already advances to-future (the `while (nextDue <= now)` catch-up
+  + fastForwardPastNow); mark-serviced did not. FIX (mirror fastForwardPastNow, NOT the capped catch-up — maxCatchUpOccurrences=12 is a
+  MATERIALIZATION budget; mark-serviced creates nothing so it must reach the future regardless of how lapsed it is): loop
+  `while (nextDue <= now)` advancing via advanceReminderDueDate, with the strict-advance backstop (throw ValidationError if the date doesn't move —
+  the bug #13 non-progress guard; advanceReminderDueDate also throws on a bad interval). GUARD: +1 HTTP test (mark-serviced.test.ts: a 2020-01
+  monthly reminder serviced now → next_due_date strictly in the FUTURE). NON-VACUOUS by construction (old single-advance → 2020-02, still ≪ now →
+  RED). PROCESS: two self-caught test bugs — first capped the loop at maxCatchUp=12 (only reached ~2021 for a 2020 reminder → still past; switched
+  to the unbounded fastForwardPastNow pattern), then compared the `mode:'timestamp'` next_due_date (unix SECONDS) against Date.now() (ms) → fixed
+  to now-in-seconds. green→green: backend validate:local EXIT 0 — 1344 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean (no reflow), build
+  bundled. cov: be 85.18%+ (carry; +1 BE) / fe 80.64% (carry).
