@@ -6,7 +6,11 @@
 
 import { describe, expect, test } from 'bun:test';
 import type { Expense } from '../../db/schema';
-import { calculateAverageMilesPerKwh, calculateMilesPerKwh } from '../calculations';
+import {
+  calculateAverageMilesPerKwh,
+  calculateMilesPerKwh,
+  parseClampedInt,
+} from '../calculations';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -151,5 +155,39 @@ describe('calculateAverageMilesPerKwh', () => {
     // After sorting: index 0 (mileage 1000) then index 2 (mileage 1100)
     // 100 miles / 30 kWh = 3.333
     expect(result).toBeCloseTo(100 / 30, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseClampedInt (C211 — the insurance /expiring-soon days/limit dedup; the #70 guard)
+// ---------------------------------------------------------------------------
+
+describe('parseClampedInt', () => {
+  test('a valid in-range value parses through unchanged', () => {
+    expect(parseClampedInt('45', 30, 1, 366)).toBe(45);
+  });
+
+  test('undefined (missing param) → fallback', () => {
+    expect(parseClampedInt(undefined, 30, 1, 366)).toBe(30);
+  });
+
+  test('a non-numeric value → fallback (the #70 guard: never NaN)', () => {
+    expect(parseClampedInt('abc', 30, 1, 366)).toBe(30);
+    expect(parseClampedInt('', 30, 1, 366)).toBe(30);
+  });
+
+  test('above max clamps to the ceiling', () => {
+    expect(parseClampedInt('99999', 100, 1, 200)).toBe(200);
+  });
+
+  test('below min clamps to the floor', () => {
+    expect(parseClampedInt('-5', 100, 1, 200)).toBe(1);
+  });
+
+  test('parseInt tolerates a trailing unit but not a leading non-digit', () => {
+    // parseInt('45px') = 45 (then clamped); parseInt('px45') = NaN → fallback. Documents the
+    // parse semantics so a future change to a stricter parser is a conscious one.
+    expect(parseClampedInt('45px', 30, 1, 366)).toBe(45);
+    expect(parseClampedInt('px45', 30, 1, 366)).toBe(30);
   });
 });

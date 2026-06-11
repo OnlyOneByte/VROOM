@@ -2,6 +2,7 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { changeTracker, requireAuth } from '../../middleware';
+import { parseClampedInt } from '../../utils/calculations';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
@@ -50,15 +51,11 @@ routes.get('/', async (c) => {
 // GET /api/v1/insurance/expiring-soon — expiring policies
 routes.get('/expiring-soon', async (c) => {
   const user = c.get('user');
-  // Guard `days` like `limit` below: a non-numeric `?days=` made Number.parseInt → NaN →
-  // `endDate = new Date(now + NaN)` = Invalid Date → the BETWEEN range query silently matched
-  // NOTHING, so "expiring soon" falsely showed ZERO expiring policies and the user missed a
-  // renewal nag (#70). Fall back to the 30-day default + clamp to a sane 1..366 window.
-  const requestedDays = Number.parseInt(c.req.query('days') || '30', 10);
-  const daysAhead = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), 366) : 30;
-  // Bound the result set so a user with many terms can't trigger an unbounded scan.
-  const requestedLimit = Number.parseInt(c.req.query('limit') || '100', 10);
-  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 200) : 100;
+  // Both params go through parseClampedInt (C211 dedup): a non-numeric value → the fallback, never
+  // a NaN that would make `endDate = new Date(now + NaN)` an Invalid Date and silently empty the
+  // result (#70). `days` → 30-day default, clamped 1..366; `limit` → 100, clamped 1..200.
+  const daysAhead = parseClampedInt(c.req.query('days'), 30, 1, 366);
+  const limit = parseClampedInt(c.req.query('limit'), 100, 1, 200);
   const now = new Date();
   const endDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
   const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate, user.id, limit);

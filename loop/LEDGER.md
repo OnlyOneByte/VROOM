@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 209 |
 | guard | 6 | 207 |
 | bug | 3 | 210 |
-| arch | 5 | 205 |
+| arch | 5 | 211 |
 | infra | 6 | 208 |
 
-Current cycle: **210**
+Current cycle: **211**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3729,3 +3729,19 @@ Current cycle: **210**
   analytics-charts effectiveMonthlyPremium:176 returns monthlyCost directly; routes :84/:176 gate materialization on totalCost>0). send_message
   options: materialize monthlyCost×term-months as one lump (TCO==analytics) / N monthly rows / leave analytics-only + document. Awaiting Angelo;
   did NOT block. cov: be 84.06%+ (carry; +4 BE) / fe 77.79% (carry).
+- **C211 (arch): extract parseClampedInt — the insurance /expiring-soon days/limit parse-clamp, 2 sites → 1 (the #70 divergence)** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 41, blocked 36th) but blocked → fell through; `arch` FORCED (cyc 205, starved-for 6 > 5 — the
+  C210 forecast). Inline scout (queue empty; spawn cap/flake). SCOUTED THOROUGHLY + REJECTED several as churn (the C75/C99 discipline — arch
+  rule 5): the FE query-string builders (analytics buildQuery / reminder-api / expense-api / api-client) have GENUINELY DIVERGENT inclusion
+  rules (`value != null` vs truthy-`if` vs field-specific — the C69 "looks identical, diverges" trap, esp. empty-string/falsy edges); the
+  ~57 `logger.error({error: instanceof…})` sites are EXPLICITLY excluded by the C147 error-handling.ts doc comment ("the structured-log shape,
+  NOT a value extraction — converging is a separate larger call") → re-deciding that without new cause is churn; clampPagination operates on
+  pre-parsed numbers (no NaN-guard) — a different concern. THE clean pick: parseClampedInt — the `Number.parseInt(raw) + Number.isFinite ?
+  clamp : fallback` idiom was hand-rolled at the 2 insurance /expiring-soon sites (days + limit), and that copy-paste is EXACTLY how #70
+  happened (limit carried the finite-guard, days was written without it). CONCRETE PAYOFF (arch rule 5 + the C205 "the dup caused the bug →
+  dedup it" logic): one tested helper so the guard can't be present on one param and forgotten on its sibling. Extracted
+  `parseClampedInt(raw, fallback, min, max)` to utils/calculations.ts (beside getPeriodStartDate, the shared-route-helper home) + wired both
+  sites (days→30/1..366, limit→100/1..200). Test-anchored (rule 3): the C210 expiring-soon-http.test.ts stayed GREEN through the substitution
+  (behavior-preserving proof) + 6 new unit tests (valid/in-range; undefined→fallback; non-numeric→fallback [the #70 guard]; above-max + below-min
+  clamp; the parseInt trailing-unit-vs-leading-non-digit semantics documented). green→green: backend validate:local EXIT 0 — 1289 pass / 1 skip /
+  0 fail (+6), tsc 0, musl-biome clean, build bundled. cov: be 84.06%+ (carry; +6 BE) / fe 77.79% (carry). ARCH QUEUE empty.

@@ -155,3 +155,27 @@ export function getPeriodStartDate(period: StatsPeriod, now: Date = new Date()):
   if (period === 'all') return null;
   return new Date(now.getTime() - PERIOD_DAYS[period] * 24 * 60 * 60 * 1000);
 }
+
+// ============================================================================
+// QUERY-PARAM PARSING
+// ============================================================================
+
+/**
+ * Parse a raw query-string value to a bounded integer, falling back when it isn't finite.
+ *
+ * The `Number.parseInt(raw ?? String(fallback), 10)` + `Number.isFinite(x) ? clamp : fallback`
+ * idiom was hand-rolled twice in the SAME handler (insurance /expiring-soon `days` and `limit`) —
+ * and that copy-paste is exactly how #70 happened: `limit` carried the finite-guard, `days` was
+ * written without it, so a non-numeric `?days=` became NaN → an Invalid Date → a silently-empty
+ * result. One source of truth so the guard can't be present on one param and forgotten on its
+ * sibling. NaN/missing/non-numeric → `fallback`; otherwise clamped to `[min, max]`.
+ */
+export function parseClampedInt(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = Number.parseInt(raw ?? '', 10);
+  return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
+}

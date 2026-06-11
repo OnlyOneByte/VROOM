@@ -1137,10 +1137,17 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     future field can't be carried in one copy and forgotten in another (NORTH_STAR #6 + regression-prevention). +3 direct helper tests (core
     mapping; the electric-charge #66 invariant at the dedup boundary; liquid control); existing sync suites green through. Caught + fixed a
     test-mock gap (sync-manager.test.ts vi.mock stubbed only 4 fns → importActual keeps the REAL pure mapper, a net improvement). green→green
-    FE 545 pass (+3), tsc 0, build OK; prettier + eslint clean.* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or an inline scout.**
+    FE 545 pass (+3), tsc 0, build OK; prettier + eslint clean.*
+  - ~~**`parseClampedInt` — the insurance /expiring-soon days/limit parse-clamp, 2 sites → 1 (C211 inline scout)**~~ — *DONE C211: the
+    `Number.parseInt(raw) + Number.isFinite ? clamp : fallback` idiom was hand-rolled at the 2 /expiring-soon sites (days + limit), and that
+    copy-paste is EXACTLY how #70 happened (limit carried the finite-guard, days didn't). Extracted `parseClampedInt(raw, fallback, min, max)`
+    to utils/calculations.ts + wired both sites. PAYOFF (the C205 "dup caused the bug → dedup it" logic): the guard can't be on one param +
+    forgotten on its sibling. Anchored by the C210 expiring-soon-http.test.ts (green through) + 6 unit tests. green→green 1289 pass (+6).
+    SCOUTED + REJECTED as churn (C75/C99): the FE query-builders (divergent inclusion rules — C69 trap), the ~57 logging-idiom sites (C147
+    doc comment EXPLICITLY excludes them — structured-log shape, not value extraction), clampPagination (pre-parsed, no NaN-guard).* **ARCH QUEUE empty — next arch cycle runs a rule-7 fan-out (spawn cap permitting) or an inline scout.**
   - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
-    pending-migration constraints rule out most FE/money candidates). The BE `extractErrorMessage` convergence of the ~57 logging sites
-    is available but is multi-cycle/borderline-churn (a distinct logging idiom) — only if nothing cleaner.
+    pending-migration constraints rule out most FE/money candidates). The BE logging-idiom convergence stays EXCLUDED by design (C147/C211); do
+    NOT re-file it. Genuinely thin now — prefer a fan-out to surface a fresh candidate over forcing a 2-site micro-dedup.
 
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,
