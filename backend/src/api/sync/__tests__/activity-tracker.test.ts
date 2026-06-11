@@ -61,4 +61,40 @@ describe('Activity tracker', () => {
     tracker.stopTracking(userId);
     expect(tracker.getSyncStatus(userId).lastActivity).toBeUndefined();
   });
+
+  // cleanupInactiveUsers (C195 guard ratchet — the pure ageout was 0%-covered; it's the
+  // synchronous, timer-free slice of this otherwise setInterval/orchestrator-bound module).
+  // recordActivity always uses a long delay (999 min) so no inactivity timer fires mid-test.
+  describe('cleanupInactiveUsers — ages out stale users only', () => {
+    test('a user idle past the cutoff is removed (and its timer cleared via stopTracking)', () => {
+      const tracker = UserActivityTracker.getInstance();
+      const userId = `cleanup-stale-${Date.now()}`;
+      tracker.recordActivity(userId, 999);
+      expect(tracker.getSyncStatus(userId).lastActivity).toBeDefined();
+
+      // A NEGATIVE window puts the cutoff in the future, so lastActivity (now) is always < cutoff
+      // → the just-recorded user counts as "inactive" and is aged out. Timing-independent (no
+      // sleep / fake clock needed) — it deterministically exercises the ageout branch.
+      tracker.cleanupInactiveUsers(-1);
+      expect(tracker.getSyncStatus(userId).lastActivity).toBeUndefined();
+    });
+
+    test('a user active within the window SURVIVES cleanup (the guard is not over-broad)', () => {
+      const tracker = UserActivityTracker.getInstance();
+      const userId = `cleanup-fresh-${Date.now()}`;
+      tracker.recordActivity(userId, 999);
+
+      // A large positive window → cutoff far in the past → a just-active user is NOT stale.
+      tracker.cleanupInactiveUsers(24);
+      expect(tracker.getSyncStatus(userId).lastActivity).toBeDefined();
+
+      tracker.stopTracking(userId); // cleanup
+    });
+
+    test('cleanup over an empty tracker is a no-op (no throw)', () => {
+      const tracker = UserActivityTracker.getInstance();
+      // Should not throw even when there is nothing (or nothing stale) to remove.
+      expect(() => tracker.cleanupInactiveUsers(24)).not.toThrow();
+    });
+  });
 });

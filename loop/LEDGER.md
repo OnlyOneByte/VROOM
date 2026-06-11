@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 191 |
-| guard | 6 | 188 |
+| guard | 6 | 195 |
 | bug | 3 | 192 |
 | arch | 5 | 194 |
 | infra | 6 | 193 |
 
-Current cycle: **194**
+Current cycle: **195**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3470,3 +3470,17 @@ Current cycle: **194**
   (identity-passthrough, epoch-millis, ISO-string) in tco-months-owned.test.ts. green→green: backend validate:local **EXIT 0 — 1266
   pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean, build bundled. ARCH QUEUE empty again — next arch cycle = a fresh rule-7
   scout. cov: be 83.41%+ (carry) / fe 73.89% (carry).
+- **C195 (guard): cover activity-tracker's pure `cleanupInactiveUsers` ageout (the 44%-line low spot)** — BALANCE: `feature` PAST
+  (cyc 170, starved-for 25, blocked 20th cycle) but blocked → fell through; `guard` most-starved past-budget actionable (cyc 188,
+  starved-for 7 > 6 > bug's at-budget 3). Inline (6/3 spawn cap). Steered the ratchet to the named BE low spot `activity-tracker.ts`
+  (53.85% func / 44.76% line). Read it firsthand to pick the TRACTABLE slice: `cleanupInactiveUsers` (:126-133) is the only PURE,
+  synchronous, timer-free method (the rest — handleInactivity/performAutoSync/performAutoBackup :64-106 — is setTimeout +
+  orchestrator-bound, the genuinely-less-clean territory the C186 note flagged + the DB-passthrough catch branches :132-147 need a DB
+  seam). The existing C144-era test covered recordActivity/getSyncStatus/stopTracking but NOT the ageout. ADDED 3 cases (via the
+  singleton + unique-id + stopTracking-cleanup pattern the file already uses): a NEGATIVE-window cutoff ages out a just-recorded user
+  (timing-independent — no fake clock); a large positive window SURVIVES (guard not over-broad); empty-tracker no-op. RESULT:
+  cleanupInactiveUsers 0%→covered (uncovered range :126-131 dropped out). HONESTLY left the timer/orchestrator-bound methods +
+  DB-catch branches documented as the remaining gap (NOT a clean unit pick — consistent with the C186 caveat). Test-only, no
+  production change. green→green: backend validate:local **EXIT 0 — 1269 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean,
+  build bundled. NEXT guard low spot: the FE components/routes deficit (needs a fresh FE coverage measure) or a thin FE store/util.
+  cov: be 83.41%+ (carry) / fe 73.89% (carry).

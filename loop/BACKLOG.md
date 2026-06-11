@@ -358,9 +358,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > 59% line C188 (sync-route-success.test.ts +7 — the success/derivation handlers the C30/C36 error tests didn't reach: GET /status flag
 > derivation, GET /restore/providers sourceTypes zip/sheets logic + skip branches, POST / no-provider success; the byte/provider-bound
 > paths [download, restore-from-provider/backup] deliberately left — C163 mock-trap territory). REMAINING named BE low spot:
-> `activity-tracker.ts` (53%/44%, but timer/setInterval-bound — less clean). NOTE (C163): `restore.ts:160-246` (restoreFromSheets) is
-> uncovered but needs a process-global Sheets-service mock — NO sync test uses mock.module (the C38/C91 cross-suite-flake trap), so it's
-> NOT a clean guard pick; defer until a DI seam exists or accept the gap. FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
+> ~~`activity-tracker.ts` (53%/44%)~~ its PURE slice now covered C195 (cleanupInactiveUsers ageout 0%→covered, +3 — negative-window
+> deterministic ageout / survives-control / empty no-op); the REST (handleInactivity/performAutoSync/performAutoBackup :64-106) is
+> setTimeout + orchestrator-bound + the DB-catch branches :132-147 need a DB seam — left documented, NOT a clean unit pick. NOTE (C163):
+> `restore.ts:160-246` (restoreFromSheets) is uncovered but needs a process-global Sheets-service mock — NO sync test uses mock.module
+> (the C38/C91 cross-suite-flake trap), so it's NOT a clean guard pick; defer until a DI seam exists or accept the gap. **The clean BE
+> route/util low spots are now largely worked through (analytics/sync routes C185/C188, backup-orchestrator C181, activity-tracker pure
+> slice C195) — next guard cycles likely steer FRONTEND (needs a fresh fe coverage measure; the components/routes deficit is the bulk,
+> largely eyes-on, so prefer a thin pure FE store/util).** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
 > the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
 > `.svelte.ts`/store/util modules still thin, e.g. settings.svelte.ts 10% [but that's the filed handleError arch pick] /
 > sync-manager.ts 58%). ~~pwa.ts 56%~~ DONE C175 — getPlatformInfo() (the file's only pure branching logic) 0%→covered + the
