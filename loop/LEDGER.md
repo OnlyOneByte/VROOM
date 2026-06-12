@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 291 |
 | guard | 6 | 290 |
-| bug | 3 | 288 |
+| bug | 3 | 293 |
 | arch | 5 | 289 |
 | infra | 6 | 292 |
 
-Current cycle: **292**
+Current cycle: **293**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4834,3 +4834,17 @@ Current cycle: **292**
   pending-Angelo block beside #79/#85; (2) suite size ~1392→~1414 BE / ~604 FE. CHECKED the closed-bug list is still ACCURATE (last fix was #87/C268; C272–C291
   were guards/dedups/a-filed-#88, not new fixes). DOCS-ONLY — verified `git diff --name-only` = CLAUDE.md alone before the loop-file edits; no source/test/
   build touched (the C291 gate is the last code state). Keeps the next cycle's product-call backlog accurate.
+- **C293 (bug): create-or-replace financing leaves STALE cross-type fields when a vehicle's financing type changes (the sibling to C240)** —
+  BALANCE: feature most-starved (170, starved-for 123) but every feature tail is Playwright/Angelo-gated (standing escalation, not loop-actionable);
+  bug next-actionable over budget (288, starved-for 5 > 3) → forced pick. Bug vein dormant → fresh-surface scout of the FINANCING module (less recently
+  scoured). repository.ts/hooks.ts certified clean; the defect is in routes.ts POST. THE finding: `POST /vehicles/:id/financing` is a create-OR-REPLACE
+  that REUSES the existing row via `update(...financingData, isActive:true, endDate:null)` (its own comment: "the vehicle's financing is now THIS"). But
+  `update()` SKIPS `undefined` keys, and the cross-type fields are all `.optional()` in the create schema — loan-only `apr`, lease-only `residualValue`/
+  `mileageLimit`/`excessMileageFee`, schedule `paymentDayOfMonth`/`paymentDayOfWeek`. So converting a vehicle's financing TYPE (lease↔loan) without
+  re-sending the prior type's fields LEAVES them stale → a `financingType:'loan'` row carrying a lease `mileageLimit`, consumed by FE lease-metrics
+  (financing-calculations.ts:419-433) + the Google-Sheets export (all three lease columns) → a self-contradictory row (NORTH_STAR #2). C240 pinned the
+  BALANCE reset on this same reuse path but never the FIELD reset. FIX: coalesce every optional cross-type/schedule field to `null` in the replace path so
+  the reused row mirrors a fresh `create()` (where absent nullable columns default to NULL). GUARD: new refinance-cross-type-field-reset.test.ts drives the
+  REAL POST over createTestApp in BOTH directions (lease→loan clears the 3 lease fields + keeps apr; loan→lease clears apr + keeps the lease fields) —
+  RED before the fix (residualValue 18000 / apr 6.5 lingered), GREEN after. green→green: backend validate:local EXIT 0 — 1415 pass (+2) / 1 skip / 0 fail,
+  tsc 0, musl-biome clean, build bundled. cov: be 85.74%+ (carry; the replace path now field-reset-covered) / fe 81.41% (carry).

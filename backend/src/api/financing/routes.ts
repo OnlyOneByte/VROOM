@@ -153,8 +153,22 @@ routes.post(
       // findActiveFinancing + loanBreakdown/analytics + the FE's isActive gate (#67). Re-activate
       // explicitly, mirroring how create() defaults isActive=true. A still-active record stays active
       // (idempotent). endDate is likewise cleared so a stale payoff/lease-end date can't linger.
+      //
+      // The cross-type optional fields must ALSO be reset, not merged (C293, the sibling defect to the
+      // #67 reset). `update()` skips `undefined` keys, but these are all `.optional()` in the create
+      // schema — so switching a vehicle's financing TYPE (lease↔loan) without re-sending the prior
+      // type's fields would LEAVE them stale (a `loan` row carrying a lease `mileageLimit`, consumed by
+      // FE lease-metrics + the Sheets export — NORTH_STAR #2). A fresh create() defaults each absent
+      // nullable column to NULL; the create-or-REPLACE path must produce the same clean row. Coalesce
+      // every optional cross-type/schedule field to null so the reused row mirrors a fresh insert.
       const updatedFinancing = await financingRepository.update(existingFinancing.id, {
         ...financingData,
+        apr: financingData.apr ?? null,
+        paymentDayOfMonth: financingData.paymentDayOfMonth ?? null,
+        paymentDayOfWeek: financingData.paymentDayOfWeek ?? null,
+        residualValue: financingData.residualValue ?? null,
+        mileageLimit: financingData.mileageLimit ?? null,
+        excessMileageFee: financingData.excessMileageFee ?? null,
         isActive: true,
         endDate: null,
       });

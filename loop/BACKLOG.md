@@ -508,6 +508,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#90 (MED, correctness / NORTH_STAR #2 — found+fixed C293 scouting the financing module on a forced bug cycle; the sibling to
+> C240) — create-or-replace financing leaves STALE cross-type fields when a vehicle's financing TYPE changes.**~~ — *DONE C293:
+> `POST /vehicles/:id/financing` REUSES the existing row via `update(...financingData, isActive:true, endDate:null)` (routes.ts:156,
+> "the vehicle's financing is now THIS"), but `update()` SKIPS `undefined` keys and the cross-type fields are all `.optional()` —
+> loan-only `apr`, lease-only `residualValue`/`mileageLimit`/`excessMileageFee`, schedule `paymentDayOfMonth`/`paymentDayOfWeek`. So
+> switching lease↔loan without re-sending the prior type's fields left them stale → a `financingType:'loan'` row carrying a lease
+> `mileageLimit`, consumed by FE lease-metrics (financing-calculations.ts:419-433) + the Sheets export (all 3 lease columns) →
+> self-contradictory data. FIX: coalesce every optional cross-type/schedule field to `null` in the replace path so the reused row
+> mirrors a fresh `create()` (absent nullable columns → NULL). GUARD: refinance-cross-type-field-reset.test.ts drives the REAL POST
+> over createTestApp in both directions; RED before (18000/6.5 lingered), GREEN after. validate:local EXIT 0, 1415 pass (+2).*
+
 > ~~**Lease/loan miles-used consume the period-scoped `currentMileage`** (traced C54, APPROVED Angelo C151)~~ — *DONE C157
 > (CODE-COMPLETE, EYES-ON-PENDING for the FinanceTab visual). `FinanceTab.svelte` fed `vehicleStatsData?.currentMileage`
 > (period-scoped + fuel-only — shrinks under a 7d/30d stats selection, ignores manual odometer entries) into both
