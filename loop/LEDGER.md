@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 270 |
+| deep-review | 5 | 275 |
 | guard | 6 | 271 |
 | bug | 3 | 272 |
 | arch | 5 | 273 |
 | infra | 6 | 274 |
 
-Current cycle: **274**
+Current cycle: **275**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4642,3 +4642,16 @@ Current cycle: **274**
   those are a separate tracked-or-deliberate-untracked decision). Untracked dropped 329 → 122 (the remaining 122 = the deliberate set: e2e specs,
   snapshot baselines, .meshclaw-tools/, .kiro specs, mise.local.toml). DOCS/CONFIG-ONLY (only frontend/.gitignore tracked-diff; no code → no build gate
   needed, gitignore doesn't affect compilation). De-noises every future hygiene sweep + protects the eventual PR from artifact pollution.
+- **C275 (deep-review): vehicle-stats computation path — CERTIFIED CLEAN; extended #30 with a SECOND unit-unaware-filter site** — BALANCE: `deep-review`
+  most-starved actionable (cyc 270, starved-for 5 = budget, due); feature more-starved (105) but human-gated. Picked the per-vehicle headline-stats path
+  (calculateVehicleStats: avg MPG, cost/mile, fuel/charge totals — never deep-reviewed). spawn_run still 400s → firsthand. CERTIFIED CLEAN: the function
+  is COMPREHENSIVELY property-pinned already — fuelType partition (totalFuel+totalCharge = Σvolume; electric-only vs liquid-only splits), tracking-flag
+  gating (averageMpg null unless trackFuel; mi/kWh null unless trackCharging), the #46 negative-distance clamp (Math.max(0, latest−initial)), the #75
+  order-independence (calculateAverageMpg sorts a copy before pairing), missed-fillup pair exclusion, costPerMile div-guard. THE finding (record-only, NOT
+  loop-actionable): `vehicle-stats.ts:179` calculateAverageMpg's inline `mpg > 0 && mpg < 150` outlier bound is a SECOND INSTANCE of the #30 unit-unaware-filter
+  class (the C126-filed, product-scope-gated finding that named ONLY analytics-charts.ts's MIN/MAX_VALID_MPG) — a metric km/L vehicle's realistic efficiency
+  is mis-shaped against the 150 imperial ceiling. Same scope-gate (store-native-vs-canonical units + shared FE/BE invariant) → NOT a clean unilateral fix.
+  Extended the #30 BACKLOG entry to record this site so the eventual scope-call fix doesn't miss it (a fix touching only analytics-charts would leave the
+  per-vehicle averageMpg cull mis-calibrated). RECORD-ONLY (the C259/C246 clean-cert precedent — surface clean + already comprehensively pinned; the one
+  finding is a known product-gated class, not a fresh defect). No code, no test, no gate run (no source touched — the C274 state is unchanged). cov:
+  be 85.65% (carry) / fe 80.72% (carry).
