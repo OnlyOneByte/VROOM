@@ -741,6 +741,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   The core fleetHealthScore is UNAFFECTED (that path uses neutral-50 defaults, not this radar). This is a relative-comparison
   RADAR DISPLAY semantics call (how to render "no data" — exclude the vehicle / grey it / neutral-midpoint), not a mechanical
   correctness fix → needs a product decision before any change. Secondary analytics surface.
+- **#85 (MED, needs a product decision — found C252 deep-review of getSummary/getFuelStats; ESCALATED to Angelo C252) — fuel-stats "This/Last Year"
+  is range-relative, not calendar-year.** buildFuelStatsFromData (repository.ts:1340-1341): `currentYearFillups` = ALL fillups in the client-supplied
+  range (no year filter); `previousYearFillups` = the immediately-preceding equal-length window. But FuelStatsTab.svelte:170/174 labels them
+  "This Year"/"Last Year" — while the sibling "This/Last Month" numbers ARE true calendar months (getMonth()). The analytics range is whatever the
+  dashboard requests (default all / 7d / 30d / 90d / 1y), almost never a calendar year → e.g. a 30d view shows "This Year" = last 30 days + "Last
+  Year" = the prior 30 days. The #9 interestPaidYtd-rename class; same family as #45 (period-scoped stats). DECISION (not loop-decidable — changes a
+  headline figure + the FE↔BE contract): (a) make it true calendar-YTD vs prior calendar year (like getYearEnd), (b) relabel "This/Last Period", or
+  (c) only show the year row when the range is ~1yr. VERIFIED C252; rest of the getSummary path CERTIFIED CLEAN.
 - ~~**#41 (LOW) — expense search doesn't escape LIKE wildcards `%`/`_`.**~~ — *DONE C142: scope-checked first — the ONLY
   user-input LIKE in product source is this one expenses search site (the 2 other LIKEs are test files with literal patterns),
   so it's a single-site fix not a class. `buildExpenseConditions` built `%${search}%` with no ESCAPE → "50%" matched every row

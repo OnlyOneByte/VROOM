@@ -4356,3 +4356,16 @@ Current cycle: **227**
   branch is PR-ready; the 3 eyes-on feature tails; the filed product/accounting calls #36/#37/#43/#44/#79/#45/#19/#24/#51/#69) is all human-gated.
   Loop continues on marginal guard/arch/coverage increments. NO build gate (no code touched — record-only, the C225/C246 clean-cert precedent). cov:
   be 85.91% / fe 80.64% (carry).
+- **C252 (deep-review): analytics getSummary/getFuelStats path — CERTIFIED CLEAN except FILED #85 (fuel-stats "This/Last Year" mislabel,
+  product-gated)** — BALANCE: `deep-review` AT budget (cyc 246, starved-for 5 = 5, FORCED — the C251 forecast). spawn_run 400 → inline. Audited the
+  getSummary dashboard aggregation + getFuelStats firsthand. CERTIFIED CLEAN: ytdSpending = sum of all expense rows (split siblings sum to the group
+  total, no double-count); fleetHealthScore uses neutral-50 defaults (C139); avgEfficiency per-vehicle unit-converted; isFillup volume-bearing
+  predicate (bug #18 fix) consistent. THE finding → #85 (MED, ESCALATED, product-gated): buildFuelStatsFromData computes `currentYearFillups` = ALL
+  fillups in the client-supplied range (NO year filter, :1340) and `previousYearFillups` = prevYearAgg.count over the immediately-PRECEDING
+  equal-length window (:1341), but the FuelStatsTab labels them "This Year" / "Last Year" (FuelStatsTab.svelte:170/174) — while the sibling
+  "This/Last Month" numbers ARE true calendar months (getMonth(), :1343/1347). The analytics range is whatever the dashboard requests (default all,
+  or 7d/30d/90d/1y), almost never a calendar year → for a 30d view "This Year" = last 30 days + "Last Year" = the prior 30 days, both labeled as
+  years (the #9 interestPaidYtd-rename class; same family as the filed #45 period-scoped-stats call). FIX is a SEMANTICS decision (calendar-YTD vs
+  relabel "This/Last Period" vs hide-on-non-year-range) → NOT loop-decidable (changes a headline figure + the FE↔BE contract). send_message'd
+  Angelo + filed #85. NO code change (the rest of the path is clean + the finding is gated — record-only, the C225/C246/C251 precedent). cov: be
+  85.91% / fe 80.64% (carry).
