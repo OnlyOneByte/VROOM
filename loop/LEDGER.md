@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 271 |
 | bug | 3 | 272 |
 | arch | 5 | 273 |
-| infra | 6 | 269 |
+| infra | 6 | 274 |
 
-Current cycle: **273**
+Current cycle: **274**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4631,3 +4631,14 @@ Current cycle: **273**
   dedup downstream). +3 unit tests (vehicle-ids-for-term.test.ts: filter+project in order, empty/unknown term → [], no cross-term leak); anchored ALSO by
   the existing premium-expense-hook + the C272 term-ownership HTTP tests passing UNCHANGED through the extraction. green→green: backend validate:local
   EXIT 0 — 1388 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (import-order auto-fixed), build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C274 (infra): gitignore Playwright transient artifacts — branch-hygiene sweep found test-results/ unignored (~155 churning files)** — BALANCE: nothing
+  OVER budget → highest-leverage; infra most-starved (cyc 269, starved-for 5, breaches next), and the #5 branch-hygiene cadence is high-value at ~84
+  commits deep pre-PR. SWEEP (firsthand): NO untracked SOURCE files (src/ or loop/) + NO modified-uncommitted tracked files — the branch is clean of real
+  gaps. But the working tree carried 329 untracked files, ~232 of them under `frontend/test-results/` (Playwright's per-run artifacts: traces, .network
+  logs, transient PNGs/JPEGs, error-context) + a stray `playwright.meshclaw.config.ts` — NONE gitignored, so every hygiene sweep drowns in churn and a
+  pre-PR `git add .` would commit megabytes of regenerated junk. FIX (config-only, the standard Playwright convention): added a Playwright section to
+  frontend/.gitignore — `test-results/`, `playwright-report/`, `blob-report/`, `.playwright-artifacts-*/`. VERIFIED scope precisely via `git check-ignore`:
+  test-results/ + playwright-report/ now IGNORED; the e2e `*.meshclaw.e2e.ts` specs + the committed `*-snapshots/` baselines stay VISIBLE (untouched —
+  those are a separate tracked-or-deliberate-untracked decision). Untracked dropped 329 → 122 (the remaining 122 = the deliberate set: e2e specs,
+  snapshot baselines, .meshclaw-tools/, .kiro specs, mise.local.toml). DOCS/CONFIG-ONLY (only frontend/.gitignore tracked-diff; no code → no build gate
+  needed, gitignore doesn't affect compilation). De-noises every future hygiene sweep + protects the eventual PR from artifact pollution.
