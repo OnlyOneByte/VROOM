@@ -4429,3 +4429,15 @@ Current cycle: **227**
   the route reads (the C163 same-instance discipline); ran clean in the full 182-file suite (no cross-suite Map-pollution flake). green→green:
   backend validate:local EXIT 0 — 1370 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production
   change. cov: be 85.91%+ (carry; +4 BE, providers/routes.ts /pending slice now covered) / fe 80.64% (carry).
+- **C258 (infra): #5 branch-hygiene sweep + coverage re-measure (last C248) — + the 90%-goal-plateau observation** — BALANCE: `infra` most-starved
+  (cyc 253, starved-for 5) AND the #5 sweep was due (last C248, ~10 cycles). (1) STRAY-TEST CHECK CLEAN: zero untracked non-e2e `.test.ts`. (2)
+  GREEN BASELINE + RE-MEASURE: backend `bun test --coverage` EXIT 0 (1370 pass / 1 skip) — **be 85.95% line / 85.64% func** (up a hair from C248's
+  85.91/85.31 — the C254 registry + C257 pending-route additions); frontend `vitest --coverage` EXIT 0 (592 pass) — **fe 80.64% line / 80.51% func
+  / 74.87% branch** — FLAT vs C248 (C249–C257 all backend). Refreshed CLAUDE.md's coverage line to C258. (3) STRUCTURAL OBSERVATION (worth
+  recording at the 30-cycle mark): the coverage curve has PLATEAUED — be ~86% (+0.04 since C248), fe 80.64% (UNMOVED across C248→C258). The 90%
+  goal is now structurally UNREACHABLE by the loop alone: the BE pure/route/util layer is essentially saturated (remaining gaps are the
+  DI/orchestrator-bound tails — backup-orchestrator execute() body, activity-tracker timers, restore.ts Sheets mock-trap — that need a DI seam, not
+  a test), and the FE remaining gap is the components/routes deficit that needs the eyes-on Playwright harness (sandbox-blocked in the loop). So
+  90% requires either an Angelo-unblocked harness or a DI-refactor sign-off — NOT loop-grindable. DOCS/MEASUREMENT-ONLY (CLAUDE.md + ledger, no
+  source) → the two coverage runs + stray-test check WERE the verification. Next #5 sweep ~C268; next CLAUDE.md content-refresh ~C263. cov: be
+  85.95% line / 85.64% func / fe 80.64% line / 80.51% func / 74.87% branch (FRESH C258 reading).

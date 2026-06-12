@@ -163,7 +163,7 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C248, not an estimate): **backend 85.91% line / 85.31% func · frontend 80.64% line / 80.51%
+  (re-measured C258, not an estimate): **backend 85.95% line / 85.64% func · frontend 80.64% line / 80.51%
   func / 74.97% branch** (both suites > 80% line) — backend ~86% (the C178–C247 BE bug-fix + route-coverage arc; FE flat since C236 — C237–C247 were all backend);
   frontend climbed 65.3→80.6 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
