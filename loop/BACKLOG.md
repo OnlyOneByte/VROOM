@@ -471,6 +471,9 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > `auth-provider-repository.ts updateProfile` cross-tenant write defense DONE C282 (+1; the OAuth-identity store, thinnest auth module). Its property-test
 > covered 6 methods + delete's cross-tenant guard, but updateProfile had only the happy path → +1: attacker rewriting another user's google profile via
 > updateProfile(id, wrongUserId) is a no-op (victim's displayName/email unchanged) — the (id,userId,domain='auth') predicate. NON-VACUOUS.
+> `split-service.ts computeAllocations` percentage penny-residue + over-100% clamp DONE C287 (+3; thinnest service module, money math). Property tests pin
+> sum/fairness/count but not the deterministic percentage edges: the LAST vehicle absorbs the rounding residue (33/33/34 → [33,33,34]); the Math.max(0,…)
+> clamp (a non-last-overshoot config like 60/60/10 → last leg clamps to 0 not −20, since computeAllocations doesn't re-validate). NON-VACUOUS.
 > **NEXT FE guard pick (no primed): the FE pure/service modules are now
 > essentially all covered — remaining FE gap is the components/routes deficit (largely eyes-on) + the network/timer-bound tails (mock-trap, low-value). vehicle-helpers.ts is the lone untested FE util but it's a single trivial display-name fn (theater — skip).** The components/routes deficit is
 > the bulk + largely eyes-on.** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);

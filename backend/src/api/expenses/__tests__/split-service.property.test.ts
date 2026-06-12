@@ -220,6 +220,74 @@ describe('Property 4: Absolute split passthrough', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// C287: deterministic percentage-split edge cases the property gens don't reach.
+// The percentage path floors the first N-1 vehicles and assigns the EXACT remainder
+// to the last (so the sum is precise), with a Math.max(0, ...) clamp guarding a
+// negative remainder. The property tests pin the SUM; these pin the penny placement
+// + the clamp branch (a >100% config reaching the pure fn — computeAllocations does
+// NOT re-validate; only the route's Zod refinement gates the sum-to-100 invariant).
+// ---------------------------------------------------------------------------
+describe('C287: percentage split penny-residue + over-100% clamp', () => {
+  test('the LAST vehicle absorbs the rounding residue (33/33/34 of $100, exact sum)', () => {
+    const result = service.computeAllocations(
+      {
+        method: 'percentage',
+        allocations: [
+          { vehicleId: 'v-1', percentage: 33 },
+          { vehicleId: 'v-2', percentage: 33 },
+          { vehicleId: 'v-3', percentage: 34 },
+        ],
+      },
+      100
+    );
+    // First two are floor(33% of 100) = 33.00 each; the last carries the remainder = 34.00.
+    expect(result.map((a) => a.amount)).toEqual([33, 33, 34]);
+    expect(result.reduce((s, a) => s + a.amount, 0)).toBeCloseTo(100, 6);
+  });
+
+  test('thirds of a non-divisible total: floor the firsts, last absorbs the cents (sum exact)', () => {
+    const result = service.computeAllocations(
+      {
+        method: 'percentage',
+        allocations: [
+          { vehicleId: 'v-1', percentage: 33.33 },
+          { vehicleId: 'v-2', percentage: 33.33 },
+          { vehicleId: 'v-3', percentage: 33.34 },
+        ],
+      },
+      100
+    );
+    // floor(33.33) = 33.33, floor(33.33) = 33.33, last = 100 - 66.66 = 33.34.
+    expect(result[0].amount).toBeCloseTo(33.33, 6);
+    expect(result[1].amount).toBeCloseTo(33.33, 6);
+    expect(result[2].amount).toBeCloseTo(33.34, 6);
+    expect(result.reduce((s, a) => s + a.amount, 0)).toBeCloseTo(100, 6);
+  });
+
+  test('a config whose NON-LAST percentages exceed 100 clamps the last vehicle to 0 (no negative amount)', () => {
+    // 60% + 60% + 10% of $100. The pure fn does NOT re-validate (the route's Zod sum=100 refinement
+    // does), so the first two floored legs already run the total to 120 BEFORE the last leg — its
+    // remainder (100-120=-20) must clamp to 0, never a negative allocation. (The clamp only triggers
+    // when the non-last legs alone overshoot the total, since only the last leg takes the remainder.)
+    const result = service.computeAllocations(
+      {
+        method: 'percentage',
+        allocations: [
+          { vehicleId: 'v-1', percentage: 60 },
+          { vehicleId: 'v-2', percentage: 60 },
+          { vehicleId: 'v-3', percentage: 10 },
+        ],
+      },
+      100
+    );
+    expect(result[0].amount).toBeCloseTo(60, 6);
+    expect(result[1].amount).toBeCloseTo(60, 6);
+    expect(result[2].amount).toBe(0); // clamped, not -20
+    expect(result.every((a) => a.amount >= 0)).toBe(true);
+  });
+});
+
 // ===========================================================================
 // DB-backed property tests for createSiblings
 // ===========================================================================

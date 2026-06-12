@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 286 |
-| guard | 6 | 282 |
+| guard | 6 | 287 |
 | bug | 3 | 284 |
 | arch | 5 | 283 |
 | infra | 6 | 285 |
 
-Current cycle: **286**
+Current cycle: **287**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4770,3 +4770,13 @@ Current cycle: **286**
   non-midnight-verbatim) + search-paginated.test (#41) + repository.property.test (tag-every). NO defect, NO warranted new test (more would be coverage-theater,
   the C225/C259/C275 rule). RECORD-ONLY (the C259/C275 clean-cert precedent — both targets clean AND already comprehensively pinned). No code, no test, no gate
   run (the C284 state is the last code change; C285 was docs). cov: be 85.74% (carry) / fe 81.41% (carry).
+- **C287 (guard): pin the percentage-split penny-residue placement + the over-100% clamp branch** — BALANCE: nothing OVER budget → highest-leverage; guard
+  most-starved (cyc 282, starved-for 5); feature more-starved (117) but human-gated. SCOUT: split-service.ts was the thinnest service module (1 referencing
+  test) — the money-allocation math (NORTH_STAR #2 currency-correctness). computeAllocations is property-tested for SUM-invariant + even-split fairness +
+  count + absolute-passthrough, but two deterministic percentage edges the gens don't reach were UNPINNED: (1) the LAST vehicle absorbs the rounding residue
+  (floor the first N-1, exact remainder to last → precise sum: 33/33/34 of $100 = [33,33,34]; 33.33/33.33/33.34 → last carries the cents); (2) the
+  Math.max(0,…) clamp (computeAllocations does NOT re-validate — only the route's Zod sum=100 refinement does — so a config whose NON-LAST legs overshoot
+  100, e.g. 60/60/10, drives the last remainder negative → must clamp to 0, never −20). +3 deterministic tests. NON-VACUOUS (the clamp test asserts 0 not
+  −20; the first attempt RED-validated my algorithm reading — the clamp only triggers when non-last legs overshoot, since only the last leg takes the
+  remainder). green→green: backend validate:local EXIT 0 — 1404 pass (+3) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Test-only. cov:
+  be 85.74%+ (carry) / fe 81.41% (carry).
