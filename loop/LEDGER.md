@@ -4264,3 +4264,15 @@ Current cycle: **227**
   genuine fuel expense KEEPS its fields (no over-clear). NON-VACUOUS by construction (pre-fix the verbatim write stored the stray values).
   green→green: backend validate:local EXIT 0 — 1350 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (1 test reflow autofixed), build bundled.
   cov: be 85.18%+ (carry; +3 BE) / fe 80.64% (carry).
+- **C245 (guard): cover DELETE /providers/:id storage+backup config cleanup side effects (providers/routes.ts, ~58% func)** — BALANCE: TWO at
+  budget — `guard` (cyc 239, starved-for 6 = 6) + `deep-review` (cyc 240, starved-for 5 = 5); guard waited LONGER (touched C239 vs C240) → guard
+  wins. Per the C236/C239 steering (clean low spots exhausted → characterize a known-hard seam via the HTTP harness), picked the providers DELETE
+  cleanup: deleting a STORAGE provider must scrub it from the user's settings (cleanupStorageConfig nulls any storageConfig.defaults pointer at it +
+  removes its providerCategories entry; cleanupBackupConfig removes its backupConfig.providers entry, routes.ts:418-454) — a regression leaves a
+  dangling default (photo uploads route to a deleted provider) or a stale backup entry. The existing providers-routes-http DELETE tests cover only
+  the 204 + tenant-scoping (#63); the cleanup HELPERS had no end-to-end coverage. +2 HTTP tests (delete-provider-config-cleanup.test.ts, the C91
+  s3-seam — no OAuth/env-gate): (1) create s3 → PUT settings pointing a category default + a providerCategories entry + a backupConfig entry at it →
+  DELETE → GET settings asserts the default is NULLED + both entries GONE; (2) a 2-provider case proving the OTHER provider's config references stay
+  intact (the scrub is targeted, not over-broad). Used the all-4-category exhaustive map (the C70 Zod-v4-record trap) + all-null defaults helper (the
+  C239 pattern). green→green: backend validate:local EXIT 0 — 1352 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean (no reflow), build bundled.
+  Test-only, no production change. cov: be 85.18%+ (carry; +2 BE, providers/routes.ts DELETE-cleanup now covered) / fe 80.64% (carry).
