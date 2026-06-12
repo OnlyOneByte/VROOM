@@ -193,11 +193,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
   /** IDs of all expenses for a vehicle (for photo cascade cleanup on delete). */
   async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
-    const rows = await this.db
-      .select({ id: expenses.id })
-      .from(expenses)
-      .where(eq(expenses.vehicleId, vehicleId));
-    return rows.map((r) => r.id);
+    return this.findIdsByColumn(expenses.vehicleId, vehicleId);
   }
 
   /** IDs of all sibling expenses in a split group, scoped to a user. */

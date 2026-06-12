@@ -4317,3 +4317,16 @@ Current cycle: **227**
   C248 reading. DOCS/MEASUREMENT-ONLY (CLAUDE.md + ledger; no source touched) → the two coverage runs + stray-test check WERE the verification.
   Next #5 sweep ~C258; next CLAUDE.md content-refresh ~C252. cov: be 85.91% line / 85.31% func / fe 80.64% line / 80.51% func / 74.97% branch
   (FRESH C248 reading).
+- **C249 (arch): hoist the duplicated `findIdsByVehicleId` query body into a shared `BaseRepository.findIdsByColumn`** — BALANCE: `arch` OVER budget
+  (cyc 243, starved-for 6 > 5, FORCED — the C248 forecast). Scouted honestly (the vein is thin, noted C221/C227): REJECTED the photo-cleanup-on-
+  delete blocks (4 route files, but each enumerates DIFFERENT child entity-types via different repos → a shared abstraction would be MORE complex,
+  the C75 churn trap) and the claim/term/expense FK-validators (different parent-scopes). FOUND a genuine contained dup: ExpenseRepository.
+  findIdsByVehicleId (:195) + OdometerRepository.findIdsByVehicleId (:36) had BYTE-IDENTICAL bodies (select id-and-map where vehicleId=?) differing
+  only by the table — both back the C-tested vehicle-delete photo-cascade cleanup. Both extend BaseRepository, so hoisted a protected generic
+  `findIdsByColumn(column, value)` into the base; each repo's named method collapses to a one-line delegate (keeping the public typed contract the
+  vehicle-delete relies on). PROCESS: two self-caught tsc fights — `select({ id: this.table.id })` rejects the loose generic `Column` type (the
+  projection slot wants the concrete SQLiteColumn), and casting via `Parameters<typeof eq>` still mismatched; resolved by selecting the FULL row
+  (like the base's findById, type-clean, zero casts) + mapping `.id` — immaterial row-width for these small bounded per-vehicle child sets. Test-
+  anchored (rule 3, green→green): the vehicle-delete-cascade test exercises BOTH findIdsByVehicleId paths + passed UNCHANGED. green→green: backend
+  validate:local EXIT 0 — 1357 pass / 1 skip / 0 fail (UNCHANGED, behavior-preserving), tsc 0, musl-biome clean, build bundled. cov: be 85.91% / fe
+  80.64% (carry — pure refactor, no test-count change).

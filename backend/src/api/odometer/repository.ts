@@ -34,11 +34,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
 
   /** IDs of all manual odometer entries for a vehicle (for cascade cleanup). */
   async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
-    const rows = await this.db
-      .select({ id: odometerEntries.id })
-      .from(odometerEntries)
-      .where(eq(odometerEntries.vehicleId, vehicleId));
-    return rows.map((r) => r.id);
+    return this.findIdsByColumn(odometerEntries.vehicleId, vehicleId);
   }
 
   async findByVehicleIdPaginated(

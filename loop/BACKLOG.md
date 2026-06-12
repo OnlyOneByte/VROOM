@@ -1329,6 +1329,11 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     one pure `withComputedBalance` helper** (beside isEligibleForPayoff). DONE — takes the already-computed balance so it serves both the batch-Map
     and per-record paths; the SAME trio C182 collapsed the threshold across, so this finishes the derived-field-set dedup. +3 direct tests; every
     existing vehicles/financing route test passed UNCHANGED (incl. the list-financing-contract key-shape pin). green→green 1347 pass (+3).
+  - **C249 (arch): duplicated `findIdsByVehicleId` body (ExpenseRepository + OdometerRepository, byte-identical select-id-and-map) → shared
+    `BaseRepository.findIdsByColumn`.** DONE — protected generic in the base; each repo's named method delegates (keeps the public typed contract
+    the vehicle-delete cascade relies on). Rejected the photo-cleanup-on-delete blocks (4 files, different child entity-types/repos → C75 churn
+    trap) + the claim/term/expense FK-validators (different parent-scopes) as not-clean. Test-anchored green→green (vehicle-delete-cascade exercises
+    both paths, passed UNCHANGED). green→green 1357 pass (unchanged).
   - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
     pending-migration constraints rule out most FE/money candidates). The BE logging-idiom convergence stays EXCLUDED by design (C147/C211); do
     NOT re-file it. Genuinely thin now — prefer a fan-out to surface a fresh candidate over forcing a micro-dedup.
