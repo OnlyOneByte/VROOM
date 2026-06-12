@@ -345,6 +345,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C296 — translation-invariance property guarding the C295/#91 coordinate-space bug class.**~~ — *DONE C296: C295 fixed the
+> lease-overage absolute-odometer-vs-driven-miles mix with a single example test, but the pre-existing lease-metrics property test
+> asserts only finiteness/non-negativity (would NOT catch #91 — the over-reported fee was still finite & ≥0). Added a fast-check
+> property (200 runs): shifting BOTH initialMileage and currentMileage by the same constant moves only the absolute odometer baseline,
+> so every driven-miles output (mileageUsed/mileageRemaining/projectedExcessMiles/projectedExcessFee/isOverMileage) must be INVARIANT
+> while projectedFinalMileage moves by exactly the shift. NON-VACUOUS: reverting the fix turned it RED. lease-metrics 22/22, fe
+> validate:local EXIT 0, 606 pass.*
+
 > **NEW STANDING ANGLE (C83): coverage-ratchet on the C81-named low spots.** With loop-improvement #2
 > closed and the audit veins thin, a grounded non-churn guard pick is to steer at a low-covered, high-risk
 > module (per the revived #4 rule). PRIORITIZE high-RISK pure logic over trivial passthroughs (e.g. SKIP

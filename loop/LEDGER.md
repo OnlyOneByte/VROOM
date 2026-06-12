@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 295 |
-| guard | 6 | 290 |
+| guard | 6 | 296 |
 | bug | 3 | 293 |
 | arch | 5 | 294 |
 | infra | 6 | 292 |
 
-Current cycle: **295**
+Current cycle: **296**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4877,3 +4877,16 @@ Current cycle: **295**
   GUARD: +1 lease-metrics test — a 40k-initial / 52k-current on-pace lease projects EXACTLY $0 excess (pre-fix: 76k−36k = 40k phantom miles →
   $10k fee, so non-vacuous). green→green: frontend validate:local EXIT 0 — type-check 0, build, 605 pass (+1), lease-metrics 21/21. cov: be
   85.74% (carry) / fe 81.41%+ (carry; the lease projection now correctly-anchored).
+- **C296 (guard): translation-invariance property pins the C295/#91 coordinate-space bug CLASS (not just one example)** — BALANCE:
+  guard forced (last 290, starved-for 6 = budget, most-starved actionable; feature gated). Per the LEDGER steering note, steered the
+  guard to the freshest high-risk surface — the C295 lease-overage fix. THE GAP: C295 left a single example test (40k-initial on-pace →
+  $0), and the pre-existing lease-metrics property test asserts only finiteness + non-negativity — which would NOT have caught #91 (the
+  over-reported fee was still finite & non-negative). The bug was a coordinate-space mix (absolute odometer vs driven-miles budget), and
+  the merge-surviving guard for that CLASS is a translation-invariance property: adding the SAME constant to both initialMileage and
+  currentMileage shifts only the odometer baseline (the car was leased with more miles on it), NOT how far it's driven — so every
+  DRIVEN-miles output (mileageUsed, mileageRemaining, projectedExcessMiles, projectedExcessFee, isOverMileage) must be INVARIANT, and only
+  projectedFinalMileage (absolute) moves by exactly the shift. +1 fast-check property (200 runs) asserting exactly that. NON-VACUOUS,
+  PROVEN: temporarily reverted the #91 fix line → BOTH the C295 example AND this new property went RED (projectedExcessMiles leaked the
+  shift: "expected 1 to be close to 0"); restored the fix → green. green→green: frontend validate:local EXIT 0 — type-check 0, build, 606
+  pass (+1), lease-metrics 22/22. Guard-only (pure test addition, no source touched) → no UI moved, no screenshot. cov: be 85.74% (carry)
+  / fe 81.41%+ (carry).

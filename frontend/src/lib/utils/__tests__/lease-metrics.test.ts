@@ -249,6 +249,51 @@ describe('calculateLeaseMetrics — property: every numeric output finite & non-
 			{ numRuns: 200 }
 		);
 	});
+
+	// THE #91 GUARD (C296): the merge-surviving property for the coordinate-space bug class. Lease overage
+	// is about miles DRIVEN, not the absolute odometer — so adding the SAME constant to both initialMileage
+	// and currentMileage shifts only the odometer baseline (the car was simply leased with more miles on it),
+	// NOT how far it's driven or projected to drive. Every DRIVEN-miles output must be invariant under that
+	// shift; only projectedFinalMileage (an absolute reading) moves by the constant. The #91 bug compared the
+	// absolute projectedFinalMileage against the driven-miles budget, so a baseline shift leaked straight into
+	// projectedExcessMiles/Fee — this property would have caught it where the finiteness property above could
+	// not (the over-reported fee was still finite & non-negative). A single example pins one point; this pins
+	// the whole class so the absolute-vs-driven mix can't silently return.
+	test('#91: driven-miles outputs are INVARIANT under an equal shift of initial+current (only the absolute odometer moves)', () => {
+		fc.assert(
+			fc.property(
+				fc.integer({ min: 0, max: 100000 }), // base initialMileage
+				fc.integer({ min: 0, max: 100000 }), // delta driven (current − initial)
+				fc.integer({ min: 1, max: 150000 }), // baseline shift (extra miles already on the car at signing)
+				fc.integer({ min: 1, max: 100000 }), // mileageLimit (>0)
+				fc.integer({ min: -700, max: 700 }), // start offset days
+				fc.integer({ min: 12, max: 60 }), // termMonths
+				fc.float({ min: 0, max: 2, noNaN: true }), // excessMileageFee
+				(initial, driven, shift, limit, startOffset, termMonths, fee) => {
+					const lease = makeLease({
+						mileageLimit: limit,
+						excessMileageFee: fee,
+						termMonths,
+						startDate: isoDaysFromNow(startOffset),
+						endDate: isoDaysFromNow(startOffset + termMonths * 30)
+					});
+					const base = calculateLeaseMetrics(lease, initial + driven, initial);
+					const shifted = calculateLeaseMetrics(lease, initial + driven + shift, initial + shift);
+					if (base === null || shifted === null) return; // both guard identically (same dates)
+
+					// Driven-miles space: identical regardless of the odometer baseline.
+					expect(shifted.mileageUsed).toBeCloseTo(base.mileageUsed, 6);
+					expect(shifted.mileageRemaining).toBeCloseTo(base.mileageRemaining, 6);
+					expect(shifted.projectedExcessMiles).toBeCloseTo(base.projectedExcessMiles, 6);
+					expect(shifted.projectedExcessFee).toBeCloseTo(base.projectedExcessFee, 6);
+					expect(shifted.isOverMileage).toBe(base.isOverMileage);
+					// Absolute-odometer space: this one DOES move by exactly the shift.
+					expect(shifted.projectedFinalMileage).toBeCloseTo(base.projectedFinalMileage + shift, 6);
+				}
+			),
+			{ numRuns: 200 }
+		);
+	});
 });
 
 // ---------------------------------------------------------------------------
