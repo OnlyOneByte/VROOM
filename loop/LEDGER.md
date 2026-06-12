@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 277 |
 | bug | 3 | 276 |
 | arch | 5 | 278 |
-| infra | 6 | 274 |
+| infra | 6 | 279 |
 
-Current cycle: **278**
+Current cycle: **279**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4687,3 +4687,10 @@ Current cycle: **278**
   download filename is set) via jsdom stubs on window.URL + an HTMLAnchorElement.click spy. green→green: frontend validate:local EXIT 0 — type-check 0,
   build OK, 604 tests pass (+2), every existing expense-api + settings-store test UNCHANGED through the rewire (behavior-preserving proof; tsc caught a
   vi.fn-vs-spyOn typing nit, fixed). cov: fe 80.72%+ (carry) / be 85.65% (carry).
+- **C279 (infra): CLAUDE.md suite-size refresh — ~1376→~1392 BE / ~592→~604 FE** — BALANCE: nothing OVER budget → highest-leverage; infra most-starved
+  (cyc 274, starved-for 5); feature more-starved (109) but human-gated. The C253/C263 docs-accuracy cadence: the suite-size line was last set C263 (~1376/
+  ~592) and the C264/C270/C272/C276/C277/C278 test adds have moved it to 1392 BE / 604 FE — a fresh reading keeps the "don't regress the floor" guidance
+  honest. CHECKED the closed-bug list is still ACCURATE at #87/C268 (the "all landed C155–C271" span is correct — C272/C276/C277 added merge-surviving
+  GUARDS on certified-clean surfaces + C278 a dedup, NOT new bug fixes; bumping the span would falsely imply a fix landed later). DOCS-ONLY: only the
+  CLAUDE.md suite-size line changed (verified `git diff --name-only` = CLAUDE.md before the loop-file edits); no source/test/build touched (the C278 gate
+  is the last code state). Minimal, correct refresh.
