@@ -1629,6 +1629,11 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     and read back via config.email/config.avatarUrl → writers must stay in lockstep (FE↔BE drift class). Extracted a pure helper + wired all 3.
     Behavior-preserving (identical literal); anchored by the existing config-shape property tests + auth-routes green→green, +2 helper tests. 1400 pass (+2).
     REJECTED this scout: new Date(x*1000) (trivial), store try/catch HOF (taste/risk), createLoadState (filed direction call C79).*
+  - ~~**`assertLicensePlateAvailable(plate, userId, excludeId?)` — the per-user plate-uniqueness check, 2 vehicle-route sites → 1 (C289)**~~ — *DONE C289:
+    findByLicensePlate → ConflictError was hand-rolled at vehicles/routes POST + PUT (the latter adding the self-exclusion). Extracted a route helper; the
+    excludeId param folds in the PUT self-exclusion (POST omits, PUT passes current id). Behavior-preserving (verified both branches); anchored by the
+    existing #80/#233 plate tests green→green, +2 new tests for the excludeId branches (no-self-409 on unchanged-plate re-save; same-user dup on a DIFFERENT
+    vehicle still 409s — excludeId not over-broad). 1407 pass (+2).*
 
 Seed audit angles for the rule-7 fan-out (once the above are done, or to go broader):
 - **Backend layering** — route handlers doing repository/business logic inline; missing or

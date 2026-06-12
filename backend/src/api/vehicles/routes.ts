@@ -121,6 +121,25 @@ routes.use('*', changeTracker);
 // Mount photo sub-router
 routes.route('/:vehicleId/photos', photoRoutes);
 
+/**
+ * Assert a license plate is free within THIS user's fleet (plate uniqueness is per-user, not global —
+ * see findByLicensePlate + migration 0005, the #80 fix). One source of truth for the create + update
+ * checks (C289 dedup): the conflict message + the per-user-scoped lookup lived in two hand-rolled
+ * copies. `excludeId` lets the update path ignore the vehicle being edited (so re-saving without
+ * changing the plate, or hitting its own row, never false-409s itself).
+ * @throws ConflictError if another of the user's vehicles already carries the plate.
+ */
+async function assertLicensePlateAvailable(
+  licensePlate: string,
+  userId: string,
+  excludeId?: string
+): Promise<void> {
+  const existing = await vehicleRepository.findByLicensePlate(licensePlate, userId);
+  if (existing && existing.id !== excludeId) {
+    throw new ConflictError('A vehicle with this license plate already exists');
+  }
+}
+
 // GET /api/vehicles - List user's vehicles (including shared)
 routes.get('/', async (c) => {
   const user = c.get('user');
@@ -156,16 +175,9 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
   const user = c.get('user');
   const vehicleData = c.req.valid('json');
 
-  // Check if license plate already exists in THIS user's fleet (scoped — plate uniqueness is
-  // per-user, not global; see findByLicensePlate).
+  // Plate uniqueness is per-user (see assertLicensePlateAvailable / migration 0005, #80).
   if (vehicleData.licensePlate) {
-    const existingVehicle = await vehicleRepository.findByLicensePlate(
-      vehicleData.licensePlate,
-      user.id
-    );
-    if (existingVehicle) {
-      throw new ConflictError('A vehicle with this license plate already exists');
-    }
+    await assertLicensePlateAvailable(vehicleData.licensePlate, user.id);
   }
 
   // Default unitPreferences from user's settings if not provided
@@ -240,15 +252,9 @@ routes.put(
       throw new NotFoundError('Vehicle');
     }
 
-    // Check if license plate already exists in THIS user's fleet (scoped — see findByLicensePlate).
+    // Plate uniqueness is per-user; skip when unchanged, and exclude THIS vehicle from the check.
     if (updateData.licensePlate && updateData.licensePlate !== existingVehicle.licensePlate) {
-      const vehicleWithPlate = await vehicleRepository.findByLicensePlate(
-        updateData.licensePlate,
-        user.id
-      );
-      if (vehicleWithPlate && vehicleWithPlate.id !== id) {
-        throw new ConflictError('A vehicle with this license plate already exists');
-      }
+      await assertLicensePlateAvailable(updateData.licensePlate, user.id, id);
     }
 
     // Merge partial unitPreferences with existing values (shared helper — the C238 dedup).

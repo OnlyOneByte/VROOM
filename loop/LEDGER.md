@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 286 |
 | guard | 6 | 287 |
 | bug | 3 | 288 |
-| arch | 5 | 283 |
+| arch | 5 | 289 |
 | infra | 6 | 285 |
 
-Current cycle: **288**
+Current cycle: **289**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4793,3 +4793,14 @@ Current cycle: **288**
   DELETE v2; trigger → deleted v2 never gets a leg + reminder in `skipped` + the independent v3 reminder STILL fires (containment) + run 200. NON-VACUOUS
   (a fix, or an uncaught-throw regression breaking the whole run, both change these). green→green: backend validate:local EXIT 0 — 1405 pass (+1) / 1 skip /
   0 fail, tsc 0, musl-biome clean, build bundled. cov: be 85.74%+ (carry) / fe 81.41% (carry).
+- **C289 (arch): extract `assertLicensePlateAvailable` — the per-user plate-uniqueness check, 2 vehicle-route sites → 1** — BALANCE: `arch` the only
+  ACTIONABLE over-budget category (cyc 283, starved-for 6 > 5); feature more-starved (119) but human-gated. FAN-OUT scout (spawn_run still 400s → inline):
+  rejected the already-shared (withComputedBalance C243, parseClampedInt C211, getPaginated is the apiClient method). PICKED a real one: the license-plate
+  uniqueness check (findByLicensePlate(plate, userId) → ConflictError('A vehicle with this license plate already exists')) was hand-rolled at 2 sites in
+  vehicles/routes.ts — POST (162) + PUT (245), the latter adding the self-exclusion (!== id). Extracted async `assertLicensePlateAvailable(plate, userId,
+  excludeId?)` (the excludeId param folds in the PUT self-exclusion: POST omits it, PUT passes the current id). PAYOFF (rule 5): the #80/#233 per-user
+  plate-uniqueness rule + its message live in ONE place. BEHAVIOR-PRESERVING (POST: existing.id !== undefined is always true when a row exists → throws,
+  identical; PUT: excludeId=id self-excluded, identical). Anchored by the existing #80/#233 HTTP tests passing UNCHANGED, +2 NEW tests for the excludeId
+  branches the dedup centralizes (re-save-without-plate-change → no self-409; same-user dup on a DIFFERENT vehicle → still 409, proving excludeId isn't
+  over-broad). green→green: backend validate:local EXIT 0 — 1407 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean (format auto-fixed), build bundled.
+  cov: be 85.74%+ (carry) / fe 81.41% (carry).

@@ -129,4 +129,36 @@ describe('vehicle license-plate uniqueness is per-user, not global (C233 tenant-
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.licensePlate).toBe('SHARED-9');
   });
+
+  // C289: the assertLicensePlateAvailable dedup centralized the excludeId self-exclusion — pin both
+  // of its branches so the helper can't over- or under-exclude.
+  test('UPDATE re-saving a vehicle WITHOUT changing its plate does not 409 against itself', async () => {
+    const id = await seedFullVehicle(); // owns 'ABC-123'
+
+    // Re-send the same plate alongside another edit — must NOT collide with its own row.
+    const res = await ctx.authed('PUT', `/api/v1/vehicles/${id}`, {
+      licensePlate: 'ABC-123',
+      nickname: 'Renamed',
+    });
+    const body = await json<DataEnvelope<VehicleRow>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.licensePlate).toBe('ABC-123');
+  });
+
+  test('UPDATE to a plate the SAME user already owns on a DIFFERENT vehicle still 409s (excludeId is not over-broad)', async () => {
+    await seedFullVehicle(); // veh A owns 'ABC-123'
+    const idB = await ctx
+      .authed('POST', '/api/v1/vehicles', {
+        make: 'Kia',
+        model: 'Niro',
+        year: 2023,
+        licensePlate: 'XYZ-789',
+      })
+      .then((r) => json<DataEnvelope<VehicleRow>>(r))
+      .then((b) => b.data.id); // veh B owns 'XYZ-789'
+
+    // Try to give veh B the plate veh A already owns — a genuine same-user dup → 409.
+    const res = await ctx.authed('PUT', `/api/v1/vehicles/${idB}`, { licensePlate: 'ABC-123' });
+    expect(res.status).toBe(409);
+  });
 });
