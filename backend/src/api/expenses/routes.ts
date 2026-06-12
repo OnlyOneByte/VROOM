@@ -129,6 +129,32 @@ const updateExpenseSchema = createExpenseSchemaBase
       .optional(),
   });
 
+/**
+ * Null the fuel-only columns on a NON-fuel expense write (the server-side mirror of the C226/#76 FE
+ * fix). `validateFuelExpenseData` only enforces the forward direction (a `fuel` expense MUST have
+ * volume+mileage) — it never strips fuel fields from a non-fuel write, so a direct API caller (or a
+ * future client) could persist a `maintenance`/`misc` row carrying volume/fuelType/missedFillup, and
+ * crucially a stray `mileage`, which getCurrentOdometer reads CROSS-CATEGORY (odometer/repository.ts:
+ * the UNION has no category filter) → a typo'd mileage on a non-fuel row poisons the reminder/lease
+ * odometer axis (#76's verified reachability). For a non-fuel category these four columns are
+ * meaningless, so null them. Only acts when `category` is explicitly present + non-fuel (a PUT that
+ * omits category leaves the row's existing category — and its fields — untouched). Returns a shallow
+ * copy; never mutates the input. The `charge` field is FE-only (mapped to volume at the API boundary),
+ * so it isn't a backend column.
+ */
+function clearFuelFieldsIfNotFuel<
+  T extends {
+    category?: string;
+    volume?: number | null;
+    fuelType?: string | null;
+    mileage?: number | null;
+    missedFillup?: boolean;
+  },
+>(data: T): T {
+  if (data.category === undefined || data.category === 'fuel') return data;
+  return { ...data, volume: null, fuelType: null, mileage: null, missedFillup: false };
+}
+
 // Exported so the query-contract (search/limit/tags coercion) can be unit-tested
 // at the route boundary without standing up a server.
 export const expenseQuerySchema = z.object({
@@ -535,7 +561,9 @@ routes.post('/import/detect', zValidator('json', detectSourceSchema), (c) => {
 // POST /api/expenses - Create a new expense
 routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   const user = c.get('user');
-  const expenseData = c.req.valid('json');
+  // Strip fuel-only fields from a non-fuel create (#76 server-side): a stray mileage would otherwise
+  // poison getCurrentOdometer (cross-category UNION). For a fuel expense this is a no-op.
+  const expenseData = clearFuelFieldsIfNotFuel(c.req.valid('json'));
 
   // Verify vehicle exists and belongs to user
   await validateVehicleOwnership(expenseData.vehicleId, user.id);
@@ -655,7 +683,13 @@ routes.put(
 
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
-    const updatedExpense = await expenseRepository.update(id, updateData);
+    // If this edit switches the expense to a non-fuel category, null its fuel-only columns in the same
+    // write (#76 server-side) — otherwise a fuel→maintenance switch that omits volume/fuelType/mileage
+    // leaves them stale on the row (and a stray mileage keeps poisoning getCurrentOdometer). Keyed on
+    // updateData.category, so it only fires on an explicit non-fuel switch; a non-category edit is a no-op.
+    const normalizedUpdate = clearFuelFieldsIfNotFuel(updateData);
+
+    const updatedExpense = await expenseRepository.update(id, normalizedUpdate);
 
     // D5 (#71): an EDIT can also cross a mileage milestone — e.g. correcting a reading upward past a
     // reminder's due odometer. The create path rechecks (:573) but the update path did not, so an

@@ -551,6 +551,10 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   mount; pins the clear-block); NON-VACUOUS (RED with the block reverted). green→green FE 585 pass (+1). CAVEAT: the full
   select→clear→submit round-trip is eyes-on/Playwright-blocked → code-complete/source-pinned/eyes-on-pending. ALSO certified clean this cycle:
   the insurance-CLAIM write path (ownership-gated, writes id+policyId-scoped [C155 clean], findOwnerUserId is the correct owner-resolver).*
+  **BACKEND HALF DONE C244:** the FE clear was client-side only — the backend wrote POST/PUT verbatim, so a direct API caller (or stale client)
+  could persist a non-fuel row with stray volume/fuelType/missedFillup + a `mileage` that poisons getCurrentOdometer cross-category. Added pure
+  `clearFuelFieldsIfNotFuel` (nulls the 4 backend fuel columns when category is non-fuel) on both POST + PUT; +3 HTTP tests (read-back via
+  ctx.sqlite), NON-VACUOUS. Server-side enforcement now mirrors the FE C226 semantics. green→green 1350 pass (+3).
 - ~~**#78 (MED, write-scope + DI + atomicity — found C229 scouting the photo write-paths) — `PhotoRepository.setCoverPhoto`: id-alone second UPDATE,
   getDb()-singleton-bound (untestable), and an unset-then-throw that couldn't roll back.**~~ — *DONE C229: the method's first UPDATE unset covers
   scoped by (entityType,entityId) but the second (set-cover) UPDATE keyed on `photoId` ALONE (the C63/#192 + C72/#215 class — a foreign-entity id

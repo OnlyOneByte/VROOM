@@ -4247,3 +4247,20 @@ Current cycle: **227**
   UNCHANGED through the substitution (incl. vehicles-list-financing-contract.test.ts which pins the enriched key-shape) + 3 new direct unit tests
   (with-computed-balance.test.ts: enrichment shape, payoff-threshold boundary, no-mutation). green→green: backend validate:local EXIT 0 — 1347 pass
   / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (1 test reflow autofixed), build bundled. cov: be 85.18%+ (carry; +3 BE) / fe 80.64% (carry).
+- **C244 (bug → #76 BACKEND): a non-fuel expense write persisted fuel-only fields (volume/fuelType/mileage/missedFillup) — server-side clear added** —
+  BALANCE: `bug` AT budget (cyc 241, starved-for 3 = 3, FORCED — the C243 forecast). Hunted fresh write-paths: odometer create/PUT CERTIFIED CLEAN
+  firsthand (both ownership-gated + recheck-wired C214; updateSchema=createSchema.partial() so the future-date .refine + odometer.min(0) survive,
+  C180 class). THE live gap — the BACKEND analog of #76 (the C226 FE fix): `validateFuelExpenseData` only enforces the FORWARD direction (a `fuel`
+  expense MUST have volume+mileage) — it never strips fuel fields from a NON-fuel write, and both POST `/` (createIdempotent({...expenseData})) +
+  PUT `/:id` (update(id, updateData)) wrote verbatim. So a direct API caller (or a future/stale client — the FE clears client-side, C226) could
+  persist a maintenance/misc row carrying volume/fuelType/missedFillup AND a stray `mileage` — which getCurrentOdometer reads CROSS-CATEGORY
+  (odometer/repository.ts UNION has NO category filter, VERIFIED) → a typo'd mileage on a non-fuel row POISONS the reminder/lease odometer axis
+  (#76's documented reachability, now reachable server-side). FIX: a pure `clearFuelFieldsIfNotFuel(data)` that nulls the 4 backend fuel columns
+  (volume/fuelType/mileage/missedFillup; `charge` is FE-only, mapped to volume at the boundary) when `category` is explicitly present + non-fuel —
+  mirrors the FE C226 clear-set (lines 369-374). Applied on POST (normalize before validate+write) + PUT (normalize updateData before update; keyed
+  on updateData.category so a fuel→maintenance switch that OMITS the fuel fields still clears them, and a non-category edit is a no-op). Decision-
+  free (a non-fuel expense definitionally has none of these). GUARD: +3 HTTP tests (non-fuel-clears-fuel-fields.test.ts, read row back via
+  ctx.sqlite): POST misc w/ stray volume/fuelType/mileage/missedFillup → all nulled; PUT fuel→maintenance (category-only) → fuel fields nulled; a
+  genuine fuel expense KEEPS its fields (no over-clear). NON-VACUOUS by construction (pre-fix the verbatim write stored the stray values).
+  green→green: backend validate:local EXIT 0 — 1350 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (1 test reflow autofixed), build bundled.
+  cov: be 85.18%+ (carry; +3 BE) / fe 80.64% (carry).
