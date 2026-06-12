@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 264 |
 | guard | 6 | 265 |
-| bug | 3 | 262 |
+| bug | 3 | 266 |
 | arch | 5 | 261 |
 | infra | 6 | 263 |
 
-Current cycle: **265**
+Current cycle: **266**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4530,3 +4530,16 @@ Current cycle: **265**
   trusted-proxy list + the connInfoThrows toggle — no new harness). NON-VACUOUS (each asserts the resolved key is the socket/leftmost IP, not '' or
   'unknown'). green→green: backend validate:local EXIT 0 — 1381 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. Test-only, no
   production change. cov: be 85.95%+ (carry; client-ip.ts trusted-proxy + fallback branches now covered) / fe 80.64% (carry).
+- **C266 (bug — DORMANT-vein sweep, record-only): 3 fresh surfaces scouted, all CLEAN + already well-pinned; no live defect, no warranted test** —
+  BALANCE: `bug` the only ACTIONABLE over-budget category (cyc 262, starved-for 4 > 3); feature is more-starved (96) but human-gated. Bug has been
+  DORMANT since C251/C255 (re-confirmed C262 found the last live one, #86) → the protocol is scout-a-fresh-surface → fix if real, else record + pivot.
+  SCOUTED THREE surfaces the recent sweeps hadn't deeply hit, all CERTIFIED CLEAN firsthand: (1) `OdometerRepository.getCurrentOdometer` — cross-source
+  MAX(expenses.mileage ∪ odometer_entries.odometer) BY VALUE, userId-scoped on BOTH legs (#48/#168), null-vs-zero distinct; its dedicated test already
+  pins all of it incl. the cross-TENANT leg (a foreign user's higher reading returns null) + NULL-mileage skip + per-vehicle scope — comprehensive. (2)
+  reminder due-date math (computeNextDueDate/advanceCustom/clampToAnchorDay in trigger-service.ts) — month/year advance sets day=1 BEFORE the month bump
+  (the Jan-31→Feb overflow guard), anchor-day clamp to min(anchorDay,lastDay), non-positive-interval throws (#13); pinned by compute-next-due-date.property
+  + trigger-nonprogress-frequency + the C153/C241 work. (3) csv-safety neutralize/denormalize — FORMULA_TRIGGERS leading-token guard (=/+/-/@/TAB/CR,
+  CWE-1236) is symmetric + covered. ALSO a quick arch scout (arch at-budget 5/5): NO clean byte-identical dedup — the `new Date(x*1000)` 8-site idiom is
+  trivial/divergent (churn, rule 5), `c.get('user')` (105 sites) is the standard Hono pattern, not a dedup target. RECORD-ONLY (the C255/C259 precedent —
+  the scout IS the bug touch; forcing a test on an already-comprehensively-pinned surface is coverage-theater, the C225 rule). No code, no test, no gate
+  run (no source touched — the C265 gate is the last code state). The bug vein remains EXHAUSTED; next forced bug cycle, scout a not-yet-hit surface again.
