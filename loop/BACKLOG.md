@@ -181,6 +181,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**buildAmortizationSchedule audit (C281)**~~ — *DONE C281: inline (spawn_run 400). CERTIFIED CLEAN — balance-clamped principal (final payment ≤
+  balance), paid-off loans skip, interest non-neg-clamped, no caller-mutation. Comprehensively pinned (interest-declines/principal-rises #10, payoff-clamp,
+  multi-loan aggregation, no-mutation, empty). THE finding → guard: the NEGATIVE-AMORTIZATION edge (payment < monthly interest → principal 0, balance
+  frozen, never pays off) was uncovered (all prior tests used payment > interest). +1 test ($10k @ 24%, $150/mo < $200 interest → principal 0, constant
+  $200 interest every month). NON-VACUOUS. green→green 1397 pass (+1). C67 covered 6 OTHER analytics builders; this one hadn't been re-reviewed since C38.*
 - ~~**Offline-sync outbox + conflict-resolution write path audit (C270)**~~ — *DONE C270: inline (spawn_run 400). CERTIFIED CLEAN: offline-storage.ts is
   comprehensively pinned (deterministic clientId backfill, #66 charge survival, corrupted-LS fallback, every CRUD primitive, syncOfflineExpenses
   happy/partial-failure/malformed-skip + the #79 stuck-queue characterization); sync-manager determineConflictType is C223-pinned. THE finding → guard:

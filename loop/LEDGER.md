@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 275 |
+| deep-review | 5 | 281 |
 | guard | 6 | 277 |
 | bug | 3 | 280 |
 | arch | 5 | 278 |
 | infra | 6 | 279 |
 
-Current cycle: **280**
+Current cycle: **281**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4708,3 +4708,14 @@ Current cycle: **280**
   (body-isolation asserts catch + provider.delete + throw all present). green→green: backend validate:local EXIT 0 — 1395 pass / 1 skip / 0 fail (+3),
   tsc 0, musl-biome clean, build bundled. #34 CLOSED. (#33 — the delete-side external-byte orphan reconcile-queue — remains the larger filed follow-on.)
   cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C281 (deep-review): buildAmortizationSchedule CERTIFIED CLEAN; pinned the negative-amortization edge** — BALANCE: `deep-review` the only category
+  strictly OVER budget (cyc 275, starved-for 6 > 5); feature more-starved (111) but human-gated. Picked buildAmortizationSchedule (the loan principal/
+  interest projection a user relies on for payoff planning; bug #10 lived here; not re-reviewed since C38) — the C67 analytics-builder cert covered 6
+  OTHER builders, not this one. CERTIFIED CLEAN firsthand: balance-clamped principal (final payment can't exceed balance), paid-off loans skip, interest
+  non-negative-clamped, no caller-mutation (local balances copy). Comprehensively pinned already: interest-declines/principal-rises (#10), payoff-clamp
+  (no negative/phantom), multi-loan aggregation, no-mutation, empty-input. THE finding → guard: the NEGATIVE-AMORTIZATION edge (payment < monthly interest
+  → principal = Math.max(0, payment−interest) clamps to 0 → balance frozen, loan never pays off) was UNCOVERED (every prior test used payment > interest).
+  +1 test: $10k @ 24% APR, $150/mo payment (< $200 interest) → principal 0 every month, interest a constant $200 (frozen balance), identical across rows —
+  pins the under-water-loan behavior (correct, not a bug, but unpinned). NON-VACUOUS (a regression allowing negative principal or un-clamped balance breaks
+  the frozen-balance signature). green→green: backend validate:local EXIT 0 — 1397 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean (format
+  auto-fixed), build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).
