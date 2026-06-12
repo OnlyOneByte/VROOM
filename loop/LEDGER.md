@@ -4292,3 +4292,17 @@ Current cycle: **227**
   wipe — validation runs before the replace txn). NON-VACUOUS (the control restores cleanly). Fixed a self-caught path bug: financing mounts at
   /api/v1/financing/vehicles/:id/financing (not /api/v1/vehicles/...). green→green: backend validate:local EXIT 0 — 1353 pass / 1 skip / 0 fail
   (+1), tsc 0, musl-biome clean (no reflow), build bundled. NO production change (clean cert). cov: be 85.18%+ (carry; +1 BE) / fe 80.64% (carry).
+- **C247 (bug → #84): insurance claim create/update wrote vehicleId/termId VERBATIM — no ownership/policy validation (cross-tenant FK + integrity)** —
+  BALANCE: `bug` AT budget (cyc 244, starved-for 3 = 3, FORCED — the C246 forecast). Hunted the insurance CLAIM write-path (noted "certified clean
+  in passing" C226 but never focus-hunted). FOUND #84 (MED, within-tenant integrity + cross-tenant FK): createClaimSchema/updateClaimSchema accept
+  OPTIONAL `vehicleId` + `termId` ("links to a specific term/vehicle"), and both POST `/:id/claims` + PUT `/:id/claims/:claimId` validated ONLY
+  policy ownership then passed the data to claims-repository create/update which write termId/vehicleId VERBATIM (claims-repository.ts:103-104/
+  133-134). So a user could file/edit a claim referencing a vehicle they DON'T own (a cross-tenant FK — the claim row is theirs but points at a
+  foreign vehicle) or a termId from a DIFFERENT policy (even another tenant's) → corrupted claim attribution + a planted cross-tenant reference (the
+  #61/#62/C240 class). VERIFIED firsthand. FIX: a `validateClaimRefs(data, policyId, userId)` helper — if `vehicleId` present → validateVehicle-
+  Ownership (the existing C240 validator, already imported); if `termId` present → findById(policyId) [returns the policy WITH terms] + assert the
+  termId is among policy.terms, else ValidationError. Wired into both POST (create) + PUT (re-validate a changed link). Only checks present fields (a
+  null-clear on update is a no-op). GUARD: +4 HTTP tests (claims-http.test.ts): foreign vehicleId → 404; termId-not-on-policy → 400 (cites 'term');
+  own-vehicle+real-term → 201 control (no over-block); PUT re-point to unowned vehicle → 404. NON-VACUOUS (pre-fix the verbatim write stored the
+  foreign ids → 201). green→green: backend validate:local EXIT 0 — 1357 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean (no reflow), build
+  bundled. cov: be 85.18%+ (carry; +4 BE) / fe 80.64% (carry).

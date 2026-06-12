@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { parseClampedInt } from '../../utils/calculations';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
@@ -32,6 +33,32 @@ const claimParamsSchema = z.object({
   id: z.string().min(1, 'Insurance policy ID is required'),
   claimId: z.string().min(1, 'Claim ID is required'),
 });
+
+/**
+ * Validate a claim's OPTIONAL vehicleId/termId links before a create/update write. The route already
+ * proves policy ownership, but the claim schema accepts a free-form `vehicleId` (a cross-tenant FK —
+ * the #61/#62 within-tenant-integrity class) and `termId` (which must belong to THIS policy, not another
+ * — including another tenant's). The repository wrote both VERBATIM, so without this a user could attach
+ * a claim to a vehicle they don't own or a term from a different policy, corrupting claim attribution
+ * and planting a cross-tenant reference. Only checks fields that are present (a `null` clear on update is
+ * a no-op here). Mirrors the term-vehicle ownership guard (addTerm/updateTerm validateVehicleOwnership).
+ */
+async function validateClaimRefs(
+  data: { vehicleId?: string | null; termId?: string | null },
+  policyId: string,
+  userId: string
+): Promise<void> {
+  if (data.vehicleId) {
+    await validateVehicleOwnership(data.vehicleId, userId);
+  }
+  if (data.termId) {
+    const policy = await insurancePolicyRepository.findById(policyId);
+    const onThisPolicy = policy?.terms.some((t) => t.id === data.termId);
+    if (!onThisPolicy) {
+      throw new ValidationError('Claim termId does not belong to this policy');
+    }
+  }
+}
 
 const vehiclePoliciesParamSchema = z.object({
   vehicleId: z.string().min(1, 'Vehicle ID is required'),
@@ -259,6 +286,9 @@ routes.post(
     const { id } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const data = c.req.valid('json');
+    // Validate the optional vehicleId/termId links (owned vehicle; term on THIS policy) — the route
+    // only proved policy ownership, and the repo writes these FKs verbatim.
+    await validateClaimRefs(data, id, user.id);
     const claim = await insuranceClaimRepository.create(id, data);
     return c.json({ success: true, data: claim, message: 'Claim filed successfully' }, 201);
   }
@@ -274,6 +304,8 @@ routes.put(
     const { id, claimId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const updates = c.req.valid('json');
+    // Re-validate a CHANGED vehicleId/termId link (mirror the create-path guard).
+    await validateClaimRefs(updates, id, user.id);
     const claim = await insuranceClaimRepository.update(id, claimId, updates);
     return c.json({ success: true, data: claim, message: 'Claim updated successfully' });
   }

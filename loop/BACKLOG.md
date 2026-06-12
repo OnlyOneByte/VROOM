@@ -616,6 +616,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   fastForwardPastNow); mark-serviced didn't. FIX (mirror fastForwardPastNow, NOT the maxCatchUp-capped loop — that's a materialization budget;
   mark-serviced creates nothing): `while (nextDue <= now)` advance + strict-advance backstop (throw on non-progress, the bug #13 guard). +1 HTTP test
   (2020 monthly reminder serviced now → next_due_date strictly future); NON-VACUOUS (old single-advance → 2020-02 ≪ now → RED). green→green 1344 pass (+1).*
+- ~~**#84 (MED, within-tenant integrity + cross-tenant FK — found C247 hunting the insurance CLAIM write-path) — claim create/update wrote
+  vehicleId/termId verbatim, unvalidated.**~~ — *DONE C247: createClaimSchema/updateClaimSchema accept optional `vehicleId`+`termId` links, but POST
+  `/:id/claims` + PUT validated ONLY policy ownership then passed the data to the repo which writes them verbatim → a user could attach a claim to a
+  vehicle they don't own (cross-tenant FK) or a term from a DIFFERENT policy (even another tenant's). FIX: `validateClaimRefs(data, policyId, userId)`
+  — vehicleId → validateVehicleOwnership; termId → findById(policyId).terms membership (else 400). Wired into create + update (present-fields only).
+  +4 HTTP tests (foreign vehicle→404, foreign term→400, own-vehicle+term→201 control, PUT-repoint→404); NON-VACUOUS. green→green 1357 pass (+4).*
 
 **NEW — surfaced + verified-against-source by the C114 deep-review fan-out (CSV-import + insurance-cost paths). All MED/LOW, none HIGH; the strong parts of both paths were CERTIFIED CLEAN (CSV: cross-tenant vehicle resolution, userId double-stamp, txn atomicity, idempotency, injection-on-export, C61 local-day; insurance: div-by-zero guarded, no monthly-vs-total double-count, aggregate totals correct). Unblocked — ranked for a future bug cycle:**
 - ~~**#23 (MED) — CSV import: an out-of-range month/day silently ROLLS OVER instead of erroring.**~~ — *DONE C115:
