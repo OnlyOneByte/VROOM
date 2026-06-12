@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 275 |
 | guard | 6 | 277 |
-| bug | 3 | 276 |
+| bug | 3 | 280 |
 | arch | 5 | 278 |
 | infra | 6 | 279 |
 
-Current cycle: **279**
+Current cycle: **280**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4694,3 +4694,17 @@ Current cycle: **279**
   GUARDS on certified-clean surfaces + C278 a dedup, NOT new bug fixes; bumping the span would falsely imply a fix landed later). DOCS-ONLY: only the
   CLAUDE.md suite-size line changed (verified `git diff --name-only` = CLAUDE.md before the loop-file edits); no source/test/build touched (the C278 gate
   is the last code state). Minimal, correct refresh.
+- **C280 (bug — FIXED #34, a real defect from a fresh scout): photo upload was non-atomic → orphaned provider bytes on a post-upload DB failure** —
+  BALANCE: `bug` the only category strictly OVER budget (cyc 276, starved-for 4 > 3); feature more-starved (110) but human-gated. Bug DORMANT → scout-fresh
+  → and this one HIT a real, filed-but-unfixed defect. FOUND (firsthand, photo-service.ts uploadPhotoForEntity): provider.upload (external bytes) →
+  photoRepository.create (photo row) → photoRefRepository.create (active ref) ran with NO transaction + NO compensating delete. A DB error/constraint after
+  the bytes land ORPHANS the external object — no DB row references it, so it's never reconcilable or deletable through the app (#34, NORTH_STAR #1 no
+  silent loss). FIX (loop-sized, no new DI seam — `provider` already in scope): extracted `persistUploadedPhotoOrCleanup(provider, providerId, storageRef,
+  meta)` that wraps the two inserts in try/catch and best-effort `provider.delete(storageRef.externalId)`s the just-uploaded object before re-throwing; a
+  failed cleanup is logger.warn'd (reconcilable) but never masks the original error. The extraction ALSO cleared the Biome complexity ceiling
+  (uploadPhotoForEntity went 16→17 with the inline try/catch; the helper drops it back under 15). GUARD: source-scan upload-compensating-delete.test.ts
+  (+3, the C133/C220 precedent — a real upload needs a live provider's bytes, not in-harness-drivable without the mock.module leak trap): pins the helper
+  exists + is invoked, the catch best-effort-deletes externalId:storageRef.externalId + re-throws, and the orphan-cleanup-failure is logged. NON-VACUOUS
+  (body-isolation asserts catch + provider.delete + throw all present). green→green: backend validate:local EXIT 0 — 1395 pass / 1 skip / 0 fail (+3),
+  tsc 0, musl-biome clean, build bundled. #34 CLOSED. (#33 — the delete-side external-byte orphan reconcile-queue — remains the larger filed follow-on.)
+  cov: be 85.65%+ (carry) / fe 80.72% (carry).

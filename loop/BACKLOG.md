@@ -763,10 +763,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   `deleteRefsFromProviders`. ALSO: DELETE /providers/:id (routes.ts:467-487) drops the provider + photoRefs but never the
   external bytes NOR the `photos` rows → dangling photo rows that 422 forever. VERIFIED C132. FIX: a reconcile/retry queue
   for failed external deletes, + cascade the photos rows on provider delete.
-- **#34 (MED) — photo upload is not atomic.** `uploadPhotoForEntity` (photo-service.ts:62-91) does bytes→photo row→ref with
-  no txn + no compensating delete: a DB failure after `provider.upload` orphans the external bytes; a ref-insert failure
-  after the photo row leaves a 422 dangling row. FIX: wrap the 2 inserts in a txn + best-effort `provider.delete` the
-  just-uploaded object on failure. VERIFIED C132.
+- ~~**#34 (MED) — photo upload is not atomic.**~~ — *DONE C280: `uploadPhotoForEntity` did bytes→photo row→ref with no compensating
+  delete, so a DB failure after `provider.upload` orphaned the external bytes (no DB row → never reconcilable/deletable through the app).
+  FIX: extracted `persistUploadedPhotoOrCleanup` wrapping the 2 inserts in try/catch + best-effort `provider.delete(storageRef.externalId)`
+  before re-throwing (failed cleanup logged, never masks the original error); no new DI seam (provider already in scope). +3 source-scan
+  guard (upload-compensating-delete.test.ts — the C133/C220 precedent; a real upload needs live provider bytes). green→green 1395 pass (+3).
+  (#33, the DELETE-side external-byte orphan reconcile/retry queue, remains the larger filed follow-on.)*
 - **#38 (LOW, latent) — Sheets write range hard-capped at `A:Z` (26 cols)** (google-sheets-service.ts:594 + the :604
   `String.fromCharCode(64 + headers.length)`); the widest table (reminders) is at 25 cols — a 27th column produces an
   invalid A1 ref (charCode 91 = `[`) and silently truncates the clear/write range. Not a bug today; guard before the next
