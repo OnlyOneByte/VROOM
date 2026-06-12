@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 295 |
 | guard | 6 | 296 |
-| bug | 3 | 293 |
+| bug | 3 | 297 |
 | arch | 5 | 294 |
 | infra | 6 | 292 |
 
-Current cycle: **296**
+Current cycle: **297**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4890,3 +4890,19 @@ Current cycle: **296**
   shift: "expected 1 to be close to 0"); restored the fix → green. green→green: frontend validate:local EXIT 0 — type-check 0, build, 606
   pass (+1), lease-metrics 22/22. Guard-only (pure test addition, no source touched) → no UI moved, no screenshot. cov: be 85.74% (carry)
   / fe 81.41%+ (carry).
+- **C297 (bug): calculateExtraPaymentImpact treated EVERY 0%-APR loan as inert → "0 mos saved" for an interest-free loan an extra
+  payment clearly shortens (#92)** — BALANCE: bug over budget (last 293, starved-for 4 > 3, most-starved actionable; feature gated) →
+  forced pick. Pivoted OFF financing (3 cycles deep) to scout odometer/split-service/import-mapping (all CERTIFIED CLEAN — odometer
+  repo #48-hardened both legs + getCurrentOdometer MAX-by-value; split-service cents-based remainder-to-last; import-mapping
+  decimal-comma + local-date + unit-convert all sound), then back to the FE financing payment-planner. THE FINDING
+  (frontend/src/lib/utils/financing-calculations.ts calculateExtraPaymentImpact): the early guard `financingType !== 'loan' ||
+  !financing.apr || financing.apr <= 0` lumped every 0%-APR (or no-APR-entered) loan in with leases/own and returned a FLAT
+  {monthsSaved:0, interestSaved:0}. But a 0% loan is interest-free, NOT inert — extra payments retire principal faster and genuinely
+  shorten the term. PaymentPlannerDialog.svelte:153 renders impact.monthsSaved ("{n} mos"), so an interest-free loan (common: 0%
+  dealer financing) wrongly showed "0 mos" for an extra payment that obviously shortens payoff. NORTH_STAR #2. FIX: the amortization
+  loop already handles 0% correctly (monthlyRate 0 → full payment to principal), so bail early ONLY for non-loans and let 0%-APR loans
+  run the loop with rate 0 (`apr && apr>0 ? apr/100/12 : 0`). GUARD: new extra-payment-zero-apr.test.ts (+4): a $12k @ 0% / $500-a-mo
+  loan + $500 extra saves exactly 12 months (24→12) with $0 interestSaved; monotonic; positive-APR path unaffected (both savings >0);
+  lease still inert. NON-VACUOUS, PROVEN: restoring the old guard turned the two 0%-APR tests RED ("expected +0 to be 12"). The fixed
+  $ figure is shown in the planner dialog (markup unchanged → no pixel moved; eyes-on screenshot Playwright-gated, logic fully pinned).
+  green→green: frontend validate:local EXIT 0 — type-check 0, build, 610 pass (+4). cov: be 85.74% (carry) / fe 81.41%+ (carry).

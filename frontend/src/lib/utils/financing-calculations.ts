@@ -284,7 +284,15 @@ function calculateExtraPaymentImpactImpl(
 			return defaultResult;
 		}
 
-		if (financing.financingType !== 'loan' || !financing.apr || financing.apr <= 0) {
+		// Only NON-loans (lease/own) have no amortization to accelerate. A 0%-APR (or no-APR-entered)
+		// loan is interest-free but NOT inert: extra payments still retire the principal faster, so they
+		// genuinely shorten the term (monthsSaved > 0) even though interestSaved is $0. The old guard
+		// `!financing.apr || financing.apr <= 0` lumped every 0%-APR loan in with leases and returned a
+		// flat monthsSaved:0, so the PaymentPlannerDialog showed "0 mos" for an interest-free loan where
+		// an extra payment clearly shortens the payoff (#92). The amortization loop below already handles
+		// 0% correctly — monthlyRate 0 → interest 0 → the full payment goes to principal each month — so
+		// the fix is simply to let 0%-APR loans through and compute the rate as 0.
+		if (financing.financingType !== 'loan') {
 			return { ...defaultResult, newPayoffDate: calculatePayoffDate(financing) };
 		}
 
@@ -292,7 +300,7 @@ function calculateExtraPaymentImpactImpl(
 			return { ...defaultResult, newPayoffDate: calculatePayoffDate(financing) };
 		}
 
-		const monthlyRate = financing.apr / 100 / 12;
+		const monthlyRate = financing.apr && financing.apr > 0 ? financing.apr / 100 / 12 : 0;
 		const newPaymentAmount = financing.paymentAmount + extraPaymentAmount;
 
 		let originalBalance = financing.computedBalance ?? 0;

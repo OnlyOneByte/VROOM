@@ -516,6 +516,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#92 (MED, correctness / NORTH_STAR #2 — found+fixed C297 on a forced bug cycle) — calculateExtraPaymentImpact treated every
+> 0%-APR loan as inert → "0 mos saved" in the payment planner for an interest-free loan an extra payment clearly shortens.**~~ — *DONE
+> C297: the early guard `financingType !== 'loan' || !financing.apr || financing.apr <= 0` (financing-calculations.ts) lumped every
+> 0%-APR (or no-APR-entered) loan in with leases/own and returned a flat {monthsSaved:0, interestSaved:0}. A 0% loan is interest-free
+> but NOT inert — extra payments retire principal faster, shortening the term. PaymentPlannerDialog.svelte:153 renders monthsSaved
+> ("{n} mos"), so a common 0% dealer-financing loan wrongly showed "0 mos". FIX: bail early only for NON-loans; let 0%-APR loans run
+> the amortization loop (which already handles rate 0 → full payment to principal) with monthlyRate 0. GUARD: extra-payment-zero-apr.test.ts
+> (+4) — $12k @ 0% / $500/mo + $500 extra → exactly 12 months saved, $0 interestSaved; monotonic; positive-APR unaffected; lease inert.
+> NON-VACUOUS (old guard → RED). frontend validate:local EXIT 0, 610 pass (+4).*
+
 > ~~**#91 (MED, correctness / NORTH_STAR #2 — found+fixed C295 on a financing/analytics money-math deep-review; sibling to #64) —
 > lease-overage projection compared an ABSOLUTE odometer against a DRIVEN-miles budget → phantom excess fee on any used-car lease.**~~
 > — *DONE C295: in `calculateLeaseMetrics` (financing-calculations.ts), `totalMileageAllowance`/`mileageUsed`/`mileageRemaining` all
