@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 270 |
 | guard | 6 | 271 |
-| bug | 3 | 268 |
+| bug | 3 | 272 |
 | arch | 5 | 267 |
 | infra | 6 | 269 |
 
-Current cycle: **271**
+Current cycle: **272**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4609,3 +4609,13 @@ Current cycle: **271**
   no toISOString) never matches. NON-VACUOUS (it found the residual RED before the fix; the live-scan precondition asserts >50 sources). green→green:
   frontend validate:local EXIT 0 — type-check 0, build OK, 602 tests pass (+2 guard; the edit-page fix is product-only), every existing test UNCHANGED.
   cov: fe 80.72%+ (carry) / be 85.65% (carry).
+- **C272 (bug-cycle scout → guard): insurance TERM write paths CERTIFIED CLEAN for the #84-class; pinned the cross-tenant vehicle-ownership guard via HTTP** —
+  BALANCE: `bug` the only actionable OVER-budget category (cyc 268, starved-for 4 > 3); feature more-starved (102) but human-gated. Bug DORMANT → scout-fresh
+  → fix-or-record. SCOUTED two never-recently-hit write paths, BOTH clean: (1) insurance term/coverage writes — the repo's PRIVATE validateVehicleOwnership
+  gates create()/addTerm()/updateTerm() before junction insert (repository.ts:175/407/541), so a term's vehicleCoverage.vehicleIds can't reference a
+  foreign vehicle (#84/#61 cross-tenant FK class); (2) financing PATCH/payoff/refinance — already C240-certified (reactivation + clearSource ordering). NO
+  live defect. THE finding → guard: create()'s guard is property-tested, but the addTerm/updateTerm HTTP paths (the live request surface) were UNPINNED
+  (terms-http.test only covered clear-optional-field). +4 HTTP tests (terms-http.test.ts): POST /insurance, POST /:id/terms, and PUT /:id/terms/:termId
+  with a RAW-SEEDED foreign vehicleId all → 404 with ZERO junction rows planted (read via ctx.sqlite); PUT also asserts the original owned coverage is
+  intact; + an owned-vehicle control proving the guard isn't over-broad. NON-VACUOUS (the 404s + junction-count=0 fail if the guard regresses). green→green:
+  backend validate:local EXIT 0 — 1385 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean, build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).

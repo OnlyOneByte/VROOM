@@ -805,6 +805,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   components (getFullYear/getMonth+1/getDate, zero-padded) — the forward partner to dateOnlyToISO; noon ± any real offset never crosses local midnight, so
   the round-trip is now exact in every tz. Tests rewritten UTC→LOCAL + host-tz-independent + a round-trip-in-every-tz case (NON-VACUOUS — fails under the
   old UTC version for a positive-offset host). green→green fe 596 pass; all 9 C267 call sites benefit from the one chokepoint.*
+- ~~**Insurance TERM write-path #84-class scout (C272)**~~ — *DONE C272 (bug-cycle scout, CERTIFIED CLEAN + guard): the term/coverage write paths
+  (create/addTerm/updateTerm) are PROTECTED — the repo's private validateVehicleOwnership gates all three before junction insert (repository.ts:175/407/541),
+  so a term's vehicleCoverage.vehicleIds can't reference a foreign vehicle (#84/#61 cross-tenant FK). create()'s guard was property-tested but the
+  addTerm/updateTerm HTTP paths were unpinned → +4 HTTP tests (terms-http.test.ts): POST /insurance + POST /:id/terms + PUT /:id/terms/:termId with a
+  foreign vehicleId → 404, zero junction rows planted (PUT keeps original coverage); + owned-vehicle control. NON-VACUOUS. green→green 1385 pass (+4). Also
+  re-confirmed financing PATCH/payoff/refinance clean (C240). NO live defect — bug vein still exhausted.*
 - ~~**#41 (LOW) — expense search doesn't escape LIKE wildcards `%`/`_`.**~~ — *DONE C142: scope-checked first — the ONLY
   user-input LIKE in product source is this one expenses search site (the 2 other LIKEs are test files with literal patterns),
   so it's a single-site fix not a class. `buildExpenseConditions` built `%${search}%` with no ESCAPE → "50%" matched every row

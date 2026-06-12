@@ -137,3 +137,93 @@ describe('insurance term update HTTP route — clear-optional-field semantics', 
     expect(clearedBody.data.notes).toBeNull();
   });
 });
+
+/**
+ * C272 (bug-cycle scout → guard): the #84-class cross-tenant FK defense on the TERM write paths. A
+ * term's vehicleCoverage.vehicleIds is the attacker-controllable FK; the repository's private
+ * validateVehicleOwnership gates create()/addTerm()/updateTerm() before inserting junction rows
+ * (repository.ts:175/407/541) — so a user can't attach a vehicle they don't own to an insurance term
+ * (which would plant a cross-tenant reference + corrupt per-vehicle premium attribution). create()'s
+ * guard is property-tested, but the addTerm/updateTerm HTTP paths (the live request surface) were
+ * unpinned. These pin all three via the real route, seeding a FOREIGN vehicle owned by another user.
+ * A failure here = NotFoundError('Vehicle') → 404. The foreign row is raw-seeded so it coexists in the
+ * shared DB (a second createTestApp would reset it).
+ */
+describe('#84-class — insurance term writes reject a foreign (non-owned) vehicleId', () => {
+  /** Seed a vehicle owned by ANOTHER user directly; returns its id. */
+  function seedForeignVehicle(id: string): void {
+    ctx.sqlite.run(
+      `INSERT INTO users (id, email, display_name) VALUES ('u-foreign-84', 'f84@test.com', 'Foreign 84')`
+    );
+    ctx.sqlite.run(
+      `INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, 'u-foreign-84', 'Mazda', '3', 2020)`,
+      [id]
+    );
+  }
+
+  /** Count junction rows pointing at a given vehicleId (proves nothing was written). */
+  function junctionCountFor(vehicleId: string): number {
+    const rows = ctx.sqlite
+      .query('SELECT COUNT(*) AS n FROM insurance_term_vehicles WHERE vehicle_id = ?')
+      .all(vehicleId) as { n: number }[];
+    return rows[0]?.n ?? 0;
+  }
+
+  test('POST /insurance with a foreign vehicleId → 404, no junction row planted', async () => {
+    seedForeignVehicle('veh-foreign-create');
+    const res = await ctx.authed('POST', '/api/v1/insurance', {
+      company: 'Acme Mutual',
+      terms: [
+        {
+          startDate: '2024-01-01T00:00:00.000Z',
+          endDate: '2025-01-01T00:00:00.000Z',
+          vehicleCoverage: { vehicleIds: ['veh-foreign-create'] },
+        },
+      ],
+    });
+    expect(res.status).toBe(404);
+    expect(junctionCountFor('veh-foreign-create')).toBe(0);
+  });
+
+  test('POST /insurance/:id/terms with a foreign vehicleId → 404, no junction row planted', async () => {
+    const ownVehicle = await seedVehicle();
+    const { policyId } = await seedPolicyWithTerm(ownVehicle);
+    seedForeignVehicle('veh-foreign-addterm');
+
+    const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/terms`, {
+      startDate: '2025-01-01T00:00:00.000Z',
+      endDate: '2026-01-01T00:00:00.000Z',
+      vehicleCoverage: { vehicleIds: ['veh-foreign-addterm'] },
+    });
+    expect(res.status).toBe(404);
+    expect(junctionCountFor('veh-foreign-addterm')).toBe(0);
+  });
+
+  test('PUT /insurance/:id/terms/:termId re-pointing coverage to a foreign vehicleId → 404, original coverage intact', async () => {
+    const ownVehicle = await seedVehicle();
+    const { policyId, termId } = await seedPolicyWithTerm(ownVehicle);
+    seedForeignVehicle('veh-foreign-updateterm');
+
+    const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
+      vehicleCoverage: { vehicleIds: ['veh-foreign-updateterm'] },
+    });
+    expect(res.status).toBe(404);
+    // The foreign vehicle never got a junction row, and the term keeps its original owned coverage.
+    expect(junctionCountFor('veh-foreign-updateterm')).toBe(0);
+    expect(junctionCountFor(ownVehicle)).toBe(1);
+  });
+
+  test('control: a term write with an OWNED vehicleId still succeeds (guard is not over-broad)', async () => {
+    const ownVehicle = await seedVehicle();
+    const { policyId } = await seedPolicyWithTerm(ownVehicle);
+    const second = await seedVehicle();
+
+    const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/terms`, {
+      startDate: '2025-01-01T00:00:00.000Z',
+      endDate: '2026-01-01T00:00:00.000Z',
+      vehicleCoverage: { vehicleIds: [second] },
+    });
+    expect(res.status).toBe(201);
+    expect(junctionCountFor(second)).toBe(1);
+  });
+});
