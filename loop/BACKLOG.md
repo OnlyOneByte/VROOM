@@ -1315,6 +1315,17 @@ against current source before acting, then knock out the top one. Once these are
 go broader), run the AUDIT fan-out per rule 7 to repopulate. Obey the `arch` rules above —
 behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
 
+- ~~**Financing routes adopt the shared `validateVehicleOwnership` (filed+done C294).**~~ — *DONE C294: financing/routes.ts
+  was the LONE route module hand-rolling the vehicle-ownership guard inline (`vehicleRepository.findByUserIdAndId` + a manual
+  `throw new HTTPException(404, {message:'Vehicle not found'})`) at 2 sites (GET + POST), while every sibling
+  (expenses/insurance/odometer/analytics/vehicles) uses the shared `validateVehicleOwnership`. Neither site used the returned
+  vehicle → clean dedup. Behavior-preserving: validateVehicleOwnership throws `NotFoundError('Vehicle')` → global handler renders
+  the same 404 + "Vehicle not found"; only the raw `code` shifts 'HTTPException'→'NotFoundError' (CONVERGING financing onto the
+  code every other route emits; FE never branches on either — both absent from ERROR_CODE_MESSAGES). Side win: POST 404 now logs
+  as a client warn, not "Server error". -8 LOC, dead vehicleRepository import dropped. GUARD: new
+  financing-vehicle-ownership-404.test.ts pins the 404+message on both routes, GREEN before AND after. validate:local EXIT 0,
+  1418 pass (+2).*
+
 - ~~**Converge providers/routes.ts ownership lookups on a helper (filed C119).**~~ — *DONE C123: the 7-line
   `select().from(userProviders).where(and(eq id, eq userId)).limit(1); if (!existing[0]) throw NotFoundError('Provider')`
   block (5 sites: PATCH/DELETE/health/backfill/sync) → `findOwnedProviderOrThrow(db, id, userId): Promise<UserProvider>`

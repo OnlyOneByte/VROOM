@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 291 |
 | guard | 6 | 290 |
 | bug | 3 | 293 |
-| arch | 5 | 289 |
+| arch | 5 | 294 |
 | infra | 6 | 292 |
 
-Current cycle: **293**
+Current cycle: **294**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4848,3 +4848,18 @@ Current cycle: **293**
   REAL POST over createTestApp in BOTH directions (lease→loan clears the 3 lease fields + keeps apr; loan→lease clears apr + keeps the lease fields) —
   RED before the fix (residualValue 18000 / apr 6.5 lingered), GREEN after. green→green: backend validate:local EXIT 0 — 1415 pass (+2) / 1 skip / 0 fail,
   tsc 0, musl-biome clean, build bundled. cov: be 85.74%+ (carry; the replace path now field-reset-covered) / fe 81.41% (carry).
+- **C294 (arch): financing routes adopt the shared `validateVehicleOwnership` — kill the lone hand-rolled vehicle-ownership guard** —
+  BALANCE: feature most-starved (170) but Playwright/Angelo-gated (not loop-actionable); arch DUE (last 289, starved-for 5 = budget) → forced
+  pick. Arch is "reliably dry" — rule-7 inline scout (spawn_run reliably 400s). THE finding: financing/routes.ts was the SOLE route module
+  hand-rolling the vehicle-ownership guard inline (`vehicleRepository.findByUserIdAndId` + a manual `throw new HTTPException(404, {message:
+  'Vehicle not found'})`) at 2 sites (GET + POST), while EVERY sibling (expenses/insurance/odometer/analytics/vehicles, ~20 call sites) uses the
+  shared `validateVehicleOwnership(vehicleId, userId)` from utils/validation. Neither financing site used the returned vehicle (pure guard-then-
+  throw) → a clean dedup. BEHAVIOR-PRESERVING verified (rule 2): `validateVehicleOwnership` throws `NotFoundError('Vehicle')` → the global
+  error-handler renders it 404 + message "Vehicle not found" — byte-identical status+message to the inline HTTPException. The only raw-envelope
+  delta is the `code` field ('HTTPException'→'NotFoundError'), which CONVERGES financing onto the code every other route already emits for this
+  exact case; the FE never branches on either (both absent from ERROR_CODE_MESSAGES → falls back to error.message, unchanged). Side win: the POST
+  404 now logs as a client `warn` (NotFoundError IS an AppError, statusCode<500) instead of "Server error" (HTTPException isn't). PAYOFF: -8 LOC
+  net, one source of truth for the guard, dead `vehicleRepository` import dropped from the module. GUARD (rule 3, test-anchored both ways): new
+  financing-vehicle-ownership-404.test.ts pins the observable 404+message on GET & POST over the REAL routes via createTestApp — GREEN before the
+  refactor (against the inline guard) AND after (against validateVehicleOwnership). green→green: backend validate:local EXIT 0 — 1418 pass (+2) /
+  1 skip / 0 fail, tsc 0, musl-biome clean (test reflow auto-fixed), build bundled. cov: be 85.74%+ (carry) / fe 81.41% (carry).

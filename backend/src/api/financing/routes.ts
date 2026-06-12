@@ -10,8 +10,8 @@ import {
   commonSchemas,
   validateFinancingOwnership,
   validateLoanTerms,
+  validateVehicleOwnership,
 } from '../../utils/validation';
-import { vehicleRepository } from '../vehicles/repository';
 import { onFinancingDeactivated } from './hooks';
 import { financingRepository, withComputedBalance } from './repository';
 
@@ -93,10 +93,7 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-    if (!vehicle) {
-      throw new HTTPException(404, { message: 'Vehicle not found' });
-    }
+    await validateVehicleOwnership(vehicleId, user.id);
 
     const financingData = await financingRepository.findByVehicleId(vehicleId);
     if (!financingData) {
@@ -122,10 +119,7 @@ routes.post(
     const { vehicleId } = c.req.valid('param');
     const financingData = c.req.valid('json');
 
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-    if (!vehicle) {
-      throw new HTTPException(404, { message: 'Vehicle not found' });
-    }
+    await validateVehicleOwnership(vehicleId, user.id);
 
     if (financingData.financingType === 'loan' && financingData.apr !== undefined) {
       const validationErrors = validateLoanTerms({
