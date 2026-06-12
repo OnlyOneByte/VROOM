@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 300 |
 | guard | 6 | 296 |
-| bug | 3 | 297 |
+| bug | 3 | 301 |
 | arch | 5 | 299 |
 | infra | 6 | 298 |
 
-Current cycle: **300**
+Current cycle: **301**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4946,3 +4946,18 @@ Current cycle: **300**
   still collides, merge) — RED before the fix (the raw UNIQUE throw), GREEN after (a clean conflict). green→green: backend
   validate:local EXIT 0 — 1418 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be
   85.74%+ (carry; detectConflicts now covers prefs/syncState) / fe 81.41% (carry).
+- **C301 (bug → file+escalate + guard): fleet-wide fuel-stats pools per-vehicle distance/cost WITHOUT unit conversion — mixed-unit
+  fleets get garbage on the main analytics view (#94)** — BALANCE: bug over budget (last 297, starved-for 4 > 3; feature gated) → forced
+  pick. Scouted fresh surfaces (financing-deep already): reminders trigger-service (#12/#13/#42/#71/C151-hardened — CLEAN), reminder-cost
+  (occurrences/yr — CLEAN), offline-storage syncOfflineExpenses (the batch-abort-on-first-error is INTENTIONAL + test-pinned, the
+  failing entry's fate is the product-gated #79 — NOT a clean bug), insurance repo, analytics divisions (all `>0?` guarded). THE FINDING:
+  GET /analytics/fuel-stats with NO vehicleId (the DEFAULT analytics-summary path, confirmed in analytics-api.ts:146) aggregates across
+  ALL vehicles; buildFuelStatsFromData sums each vehicle's (max−min) odometer span into distance.totalDistance + takes min/max of per-pair
+  cost/distance into averageCost.best/worstCostPerDistance — both WITHOUT unit conversion. Vehicles carry PER-VEHICLE unitPreferences
+  (vehicles.unit_preferences), so a mi+km fleet pools miles+km into one distance + blends $/mi with $/km on the headline view (NORTH_STAR
+  #2). The per-vehicle CHARTS (computeConvertedTotalDistance) already convert; only the summary SCALARS don't. DISTINCT from #45 (period-
+  scoping). A SEMANTICS decision (convert-to-user-global / per-vehicle-only / require vehicleId) → FILED #94 + send_message'd Angelo, NOT
+  self-fixed. SHIPPABLE increment (bug-cycle floor): a characterization guard (new fuel-stats-fleet-distance-pooling.test.ts, +2) pinning
+  the CURRENT raw-pooled behavior (totalDistance = per-vehicle spans summed 800+200=1000 NOT the 40_200 cross-vehicle pool; best/worst =
+  $0.05/$0.20 raw min/max) so the eventual fix has a red→green anchor + the bug can't silently worsen. green→green: backend validate:local
+  EXIT 0 — 1420 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 85.74% (carry) / fe 81.41% (carry).

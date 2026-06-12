@@ -715,6 +715,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   reported skipped, independent reminders still fire, run 200). DECISION (send_message'd Angelo): on vehicle-delete (a) drop it from the config +
   re-normalize the remaining percentages, (b) convert to single-vehicle if one remains, (c) deactivate the reminder + notify, or (d) other. Not
   loop-decidable — awaiting Angelo.
+- **#94 (MED, correctness / NORTH_STAR #2 — found C301 bug scout; ESCALATED to Angelo C301, semantics-gated) — fleet-wide fuel-stats pools
+  per-vehicle distance + cost WITHOUT unit conversion.** `GET /analytics/fuel-stats` with no vehicleId (the DEFAULT analytics-summary path,
+  analytics-api.ts:146) aggregates across ALL vehicles; `buildFuelStatsFromData` sums each vehicle's (max−min) odometer span into
+  `distance.totalDistance` + takes min/max of per-pair cost/distance into `averageCost.best/worstCostPerDistance` — both WITHOUT unit
+  conversion. Vehicles carry PER-VEHICLE `unitPreferences` (vehicles.unit_preferences), so a mi+km fleet pools miles+km into one distance +
+  blends $/mi with $/km on the headline view. The per-vehicle CHARTS (computeConvertedTotalDistance) already convert; only the summary
+  SCALARS don't. Distinct from #45 (period-scoping). VERIFIED + pinned by a characterization test (C301, fuel-stats-fleet-distance-pooling.test.ts:
+  totalDistance = per-vehicle spans summed, best/worst = raw cross-vehicle min/max). DECISION (send_message'd Angelo): (a) convert each
+  vehicle to the user-global unit before pooling (mirror the per-vehicle chart path), (b) emit fleet scalars only when all vehicles share a
+  unit, else per-vehicle, or (c) require vehicleId for distance scalars. Not loop-decidable — awaiting Angelo.
 - ~~**#80 (MED, tenant-isolation + info-leak — found C233 hunting the vehicles write-path) — license-plate uniqueness was enforced GLOBALLY across
   all tenants.**~~ — *DONE C233: `findByLicensePlate(plate)` queried `WHERE license_plate = ?` with NO userId, backing the plate-uniqueness check on
   BOTH create + update → a user adding a plate ANOTHER tenant owns got a cross-tenant FALSE 409 (two users may legitimately share a plate:
