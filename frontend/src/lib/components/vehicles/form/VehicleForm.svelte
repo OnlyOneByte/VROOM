@@ -44,7 +44,7 @@
 	import FinancingFormSection from './FinancingFormSection.svelte';
 	import { vehicleApi } from '$lib/services/vehicle-api';
 	import { getLongFormLabel } from '$lib/utils/units';
-	import { dateOnlyToISO } from '$lib/utils/formatters';
+	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 	import type {
 		Vehicle,
 		VehicleFinancing,
@@ -213,9 +213,7 @@
 			vin: vehicle.vin || '',
 			initialMileage: vehicle.initialMileage,
 			purchasePrice: vehicle.purchasePrice,
-			purchaseDate: vehicle.purchaseDate
-				? new Date(vehicle.purchaseDate).toISOString().split('T')[0]
-				: ''
+			purchaseDate: vehicle.purchaseDate ? toDateInputValue(vehicle.purchaseDate) : ''
 		};
 
 		// Set tracking flags from vehicle data
@@ -247,7 +245,7 @@
 				originalAmount: vehicle.financing.originalAmount,
 				apr: vehicle.financing.apr || 0,
 				termMonths: vehicle.financing.termMonths,
-				startDate: new Date(vehicle.financing.startDate).toISOString().split('T')[0]!,
+				startDate: toDateInputValue(vehicle.financing.startDate),
 				paymentAmount: vehicle.financing.paymentAmount,
 				frequency: vehicle.financing.paymentFrequency,
 				dayOfMonth: vehicle.financing.paymentDayOfMonth || 1,

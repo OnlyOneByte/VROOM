@@ -1,4 +1,5 @@
 import { getVolumeUnitLabel, getChargeUnitLabel, isElectricFuelType } from '$lib/utils/units';
+import { toDateInputValue } from '$lib/utils/formatters';
 import type { Vehicle, VolumeUnit, ChargeUnit } from '$lib/types';
 
 interface ValidationContext {
@@ -92,7 +93,7 @@ function validateMileage(value: string, ctx: ValidationContext): string | null {
 	}
 
 	const currentDateStr: string =
-		(ctx.formData['date'] as string) || new Date().toISOString().split('T')[0] || '';
+		(ctx.formData['date'] as string) || toDateInputValue(new Date());
 	const otherExpenses = ctx.allVehicleExpenses.filter(
 		exp => exp.id !== ctx.expenseId && exp.mileage != null
 	);

@@ -12,7 +12,7 @@
 	import { LoaderCircle } from '@lucide/svelte';
 	import { reminderApi } from '$lib/services/reminder-api';
 	import { appStore } from '$lib/stores/app.svelte';
-	import { capitalize, dateOnlyToISO } from '$lib/utils/formatters';
+	import { capitalize, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
@@ -63,7 +63,7 @@
 	let frequency = $state<Frequency>('monthly');
 	let intervalValue = $state('');
 	let intervalUnit = $state<IntervalUnit>('month');
-	let startDate = $state(new Date().toISOString().slice(0, 10));
+	let startDate = $state(toDateInputValue(new Date()));
 	let endDate = $state('');
 	let selectedVehicleIds = $state<string[]>([]);
 
@@ -131,7 +131,7 @@
 			frequency = 'monthly';
 			intervalValue = '';
 			intervalUnit = 'month';
-			startDate = new Date().toISOString().slice(0, 10);
+			startDate = toDateInputValue(new Date());
 			endDate = '';
 			// Default to the only vehicle when the user owns exactly one.
 			selectedVehicleIds = vehicles.length === 1 && vehicles[0] ? [vehicles[0].id] : [];

@@ -78,6 +78,25 @@ export function dateOnlyToISO(dateOnly: string | undefined | null): string {
 	return new Date(year, month - 1, day, 12, 0, 0).toISOString();
 }
 
+/**
+ * Format a date as the `YYYY-MM-DD` string an `<input type="date">` binds to.
+ *
+ * Collapses the `new Date(x).toISOString().split('T')[0]` / `.slice(0, 10)` idiom that was
+ * hand-repeated across the date-input forms (expense / reminder / vehicle / odometer) + the CSV
+ * download filename. `.split('T')[0]` and `.slice(0, 10)` are identical for an ISO string; this is
+ * the single spelling.
+ *
+ * BEHAVIOR NOTE (preserved deliberately): this uses the UTC calendar date (toISOString), matching
+ * every prior call site exactly — so for a negative-offset (Americas) user late in the day the input
+ * can show TOMORROW's date. That is the same latent off-by-one `dateOnlyToISO` guards on the reverse
+ * (parse) direction; converging the writers here means a future local-date fix is one edit, not nine.
+ * No default — an explicit argument is always passed (callers default to `new Date()` themselves).
+ */
+export function toDateInputValue(date: Date | string): string {
+	const d = typeof date === 'string' ? new Date(date) : date;
+	return d.toISOString().slice(0, 10);
+}
+
 // Relative time formatting
 export function formatRelativeTime(date: Date | string | null): string {
 	if (!date) return 'Never';

@@ -40,7 +40,7 @@
 	import { validateExpenseField } from './expense-form-validation';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { formatCurrency, dateOnlyToISO } from '$lib/utils/formatters';
+	import { formatCurrency, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 	import { categoryLabels } from '$lib/utils/expense-helpers';
 	import { extractUniqueTags } from '$lib/utils/expense-filters';
 	import { COMMON_EXPENSE_TAGS } from '$lib/types';
@@ -85,7 +85,7 @@
 		tags: [] as string[],
 		category: '',
 		amount: '',
-		date: new Date().toISOString().split('T')[0],
+		date: toDateInputValue(new Date()),
 		mileage: '',
 		volume: '',
 		charge: '',

@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 264 |
 | guard | 6 | 265 |
 | bug | 3 | 266 |
-| arch | 5 | 261 |
+| arch | 5 | 267 |
 | infra | 6 | 263 |
 
-Current cycle: **266**
+Current cycle: **267**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4543,3 +4543,18 @@ Current cycle: **266**
   trivial/divergent (churn, rule 5), `c.get('user')` (105 sites) is the standard Hono pattern, not a dedup target. RECORD-ONLY (the C255/C259 precedent —
   the scout IS the bug touch; forcing a test on an already-comprehensively-pinned surface is coverage-theater, the C225 rule). No code, no test, no gate
   run (no source touched — the C265 gate is the last code state). The bug vein remains EXHAUSTED; next forced bug cycle, scout a not-yet-hit surface again.
+- **C267 (arch): extract `toDateInputValue` — the date→YYYY-MM-DD input idiom, 9 sites → 1 (FE fan-out found it)** — BALANCE: `arch` the only ACTIONABLE
+  over-budget category (cyc 261, starved-for 6 > 5); feature more-starved (97) but human-gated. arch was twice-cert-dry on the BACKEND (C254/C261) +
+  C266's quick backend scout — so per rule 7 ran a fresh FE fan-out (spawn_run still 400s → inline). FOUND: `new Date(x).toISOString().split('T')[0]` /
+  `.slice(0,10)` (identical output for an ISO string) hand-repeated 9× across 6 files — ExpenseForm + expense-form-validation, ReminderForm (×2),
+  VehicleForm (×2: purchaseDate + financing.startDate), the odometer-new route, and the CSV-download filename in expense-api. CONCRETE PAYOFF (rule 5):
+  it's ALSO the UTC-based off-by-one tz class the NORTH_STAR flags + `dateOnlyToISO` already guards on the REVERSE direction — converging the writers to
+  one chokepoint makes that future local-date fix ONE edit not nine. NOT previously filed/rejected (grep'd the loop docs). Added `toDateInputValue(date:
+  Date | string)` to formatters.ts (beside dateOnlyToISO/formatDate — the right home, NORTH_STAR #4; pure `.ts`, fully testable). BEHAVIOR-PRESERVING
+  (rule 2): replicates the CURRENT UTC `.slice(0,10)` output EXACTLY — NOT the local-date fix (that stays a future `bug` cycle changing displayed
+  values). The C135/C166 precedent: a pure value-helper swap returning the IDENTICAL string can't change rendered output, so it's anchored by the
+  helper's tests + the green FE suite, not a screenshot (no eyes-on needed for a provably-identical value substitution). Wired all 9 (mixed Date and
+  string inputs — the helper takes both) + the 4 needed imports; removed the now-redundant `|| ''` fallbacks where the helper always returns a string.
+  +3 unit tests (formatters.test.ts: Date input, ISO-string input, parity-with-the-legacy-idiom split-vs-slice). green→green: frontend validate:local
+  EXIT 0 — type-check 0, build OK, 595 tests pass (+3), every existing form/service test passed UNCHANGED through the 9 swaps (behavior-preserving
+  proof). cov: fe 80.64%+ (carry; +3 FE) / be 85.95% (carry).

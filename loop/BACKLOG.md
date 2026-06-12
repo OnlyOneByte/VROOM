@@ -1542,6 +1542,15 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
   guard), removed the now-unused NotFoundError + vehicleRepository imports. Byte-identical to the helper (verified vs source);
   green→green (1109 pass unchanged). Rejected the frontend MS_PER_DAY consolidation as churn (arch rule 5). validate:local
   EXIT 0.*
+  - ~~**`toDateInputValue(date)` — the date→YYYY-MM-DD input idiom, 9 FE sites → 1 (C267, FE fan-out)**~~ — *DONE C267: with the
+    backend twice-cert-dry (C254/C261/C266), a fresh FE fan-out found `new Date(x).toISOString().split('T')[0]` / `.slice(0,10)`
+    (identical for an ISO string) hand-repeated 9× across 6 files — ExpenseForm + expense-form-validation, ReminderForm (×2), VehicleForm
+    (×2), the odometer-new route, the CSV-filename in expense-api. PAYOFF (rule 5): it's the UTC off-by-one tz class the NORTH_STAR flags +
+    `dateOnlyToISO` already guards on the reverse direction → one chokepoint makes the future local-date fix ONE edit not nine. Added
+    `toDateInputValue(date: Date | string)` to formatters.ts (beside dateOnlyToISO, NORTH_STAR #4); BEHAVIOR-PRESERVING — replicates the
+    current UTC `.slice(0,10)` EXACTLY (the local-date fix stays a future `bug` cycle). Wired all 9 (mixed Date+string) + 4 imports; the
+    C135/C166 precedent (a value-identical swap can't move a pixel → no eyes-on needed). +3 unit tests. green→green fe 595 pass (+3),
+    every form/service test UNCHANGED.*
 
 Seed audit angles for the rule-7 fan-out (once the above are done, or to go broader):
 - **Backend layering** — route handlers doing repository/business logic inline; missing or

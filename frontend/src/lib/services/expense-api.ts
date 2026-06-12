@@ -15,6 +15,7 @@ import {
 	type BackendExpenseResponse
 } from './api-transformer';
 import { apiClient, getApiBaseUrl, withPagination } from './api-client';
+import { toDateInputValue } from '$lib/utils/formatters';
 
 /** Convenience alias for a paginated response of transformed frontend Expenses. */
 type PaginatedExpenseResponse = PaginatedResponse<Expense>;
@@ -161,7 +162,7 @@ export const expenseApi = {
 		const url = window.URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `vroom-expenses-${new Date().toISOString().slice(0, 10)}.csv`;
+		a.download = `vroom-expenses-${toDateInputValue(new Date())}.csv`;
 		document.body.appendChild(a);
 		a.click();
 		window.URL.revokeObjectURL(url);

@@ -21,7 +21,8 @@ import {
 	formatDate,
 	formatNumber,
 	formatRelativeTime,
-	getCurrencySymbol
+	getCurrencySymbol,
+	toDateInputValue
 } from '$lib/utils/formatters';
 
 describe('formatCurrency', () => {
@@ -111,6 +112,31 @@ describe('dateOnlyToISO', () => {
 		// Empty string / undefined → a valid ISO timestamp (no throw, no NaN).
 		expect(() => new Date(dateOnlyToISO('')).toISOString()).not.toThrow();
 		expect(Number.isNaN(new Date(dateOnlyToISO(undefined)).getTime())).toBe(false);
+	});
+});
+
+/**
+ * toDateInputValue (C267 — extracted from 9 hand-rolled `new Date(x).toISOString().split('T')[0]` /
+ * `.slice(0,10)` sites across the date-input forms + the CSV download filename). Behavior-preserving:
+ * pins the UTC-calendar-date output the prior call sites all produced (NOT the local-date fix — that
+ * stays a future bug cycle). Both string and Date inputs are exercised since the call sites mixed them.
+ */
+describe('toDateInputValue (C267 — date → YYYY-MM-DD input value)', () => {
+	test('formats a Date to the YYYY-MM-DD (UTC calendar date) an input binds to', () => {
+		// A fixed UTC instant — the date part is unambiguous regardless of the host timezone.
+		expect(toDateInputValue(new Date('2024-03-15T08:30:00.000Z'))).toBe('2024-03-15');
+	});
+
+	test('accepts an ISO string (the stored-date call sites pass strings)', () => {
+		expect(toDateInputValue('2024-12-31T00:00:00.000Z')).toBe('2024-12-31');
+		expect(toDateInputValue('2024-01-01T23:59:59.000Z')).toBe('2024-01-01');
+	});
+
+	test('matches the legacy idiom it replaced (split vs slice are identical for ISO)', () => {
+		const d = new Date('2023-07-04T12:00:00.000Z');
+		const legacy = d.toISOString().split('T')[0];
+		expect(toDateInputValue(d)).toBe(legacy);
+		expect(toDateInputValue(d)).toBe(d.toISOString().slice(0, 10));
 	});
 });
 
