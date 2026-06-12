@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 300 |
-| guard | 6 | 296 |
+| guard | 6 | 302 |
 | bug | 3 | 301 |
 | arch | 5 | 299 |
 | infra | 6 | 298 |
 
-Current cycle: **301**
+Current cycle: **302**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4961,3 +4961,15 @@ Current cycle: **301**
   the CURRENT raw-pooled behavior (totalDistance = per-vehicle spans summed 800+200=1000 NOT the 40_200 cross-vehicle pool; best/worst =
   $0.05/$0.20 raw min/max) so the eventual fix has a red→green anchor + the bug can't silently worsen. green→green: backend validate:local
   EXIT 0 — 1420 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 85.74% (carry) / fe 81.41% (carry).
+- **C302 (guard): drift-proof the #93 conflict-probe symmetry — every inserted table is conflict-probed OR a documented child of a probed
+  parent** — BALANCE: guard forced (last 296, starved-for 6 = budget; feature gated). Steered to the freshest high-risk surface — the C300
+  #93 restore fix, which was AD-HOC: it added userPreferences + syncState to detectConflicts because those are the always-present singleton
+  collisions, but the broader symmetry (insertBackupData inserts 15 tables, detectConflicts probes 8) stayed UNDEFENDED — a future
+  parent-less table added to inserts without a probe would silently reintroduce the #93 raw-PK-throw class. THE GUARD (new 3rd test in
+  restore-table-coverage.test.ts, the existing source-scan idiom — no DB): every `.insert(<table>)` in restore.ts must be either (a)
+  conflict-probed (`name: '<db_table>'` in detectConflicts) or (b) on an explicit CHILD_OF_PROBED_PARENT allowlist (the 7 children whose
+  insert is UNREACHABLE on a colliding merge because a probed ANCESTOR collides first → detectConflicts returns before the tx runs:
+  insuranceTerms/TermVehicles/Claims, odometerEntries, reminders/Vehicles/Notifications). A new parent-less unprobed table fails loudly with
+  a fix-it message. NON-VACUOUS, PROVEN: re-ran the guard logic with the C300 probes stripped → it flagged EXACTLY userPreferences +
+  syncState (the #93 gap), confirming it discriminates. green→green: backend validate:local EXIT 0 — 1421 pass (+1) / 1 skip / 0 fail, tsc 0,
+  musl-biome clean, build bundled. Guard-only (one test added, no source) → no UI. cov: be 85.74% (carry) / fe 81.41% (carry).

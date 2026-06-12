@@ -345,6 +345,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C302 — drift-proof the #93 restore conflict-probe symmetry.**~~ — *DONE C302: the C300 #93 fix added userPreferences + syncState
+> to detectConflicts ad-hoc (the always-present singleton collisions), but insertBackupData inserts 15 tables while detectConflicts probes
+> only 8 — a future PARENT-LESS table added to inserts without a probe would silently reintroduce the #93 raw-PK-throw on a colliding
+> merge. Added a 3rd source-scan test to restore-table-coverage.test.ts: every `.insert(<table>)` must be either conflict-probed or on an
+> explicit CHILD_OF_PROBED_PARENT allowlist (the 7 children whose insert is unreachable on a colliding merge because a probed ancestor
+> collides first). NON-VACUOUS: stripping the C300 probes flags exactly userPreferences + syncState. validate:local EXIT 0, 1421 pass (+1).*
+
 > ~~**C296 — translation-invariance property guarding the C295/#91 coordinate-space bug class.**~~ — *DONE C296: C295 fixed the
 > lease-overage absolute-odometer-vs-driven-miles mix with a single example test, but the pre-existing lease-metrics property test
 > asserts only finiteness/non-negativity (would NOT catch #91 — the over-reported fee was still finite & ≥0). Added a fast-check
