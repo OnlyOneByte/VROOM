@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 286 |
 | guard | 6 | 287 |
-| bug | 3 | 284 |
+| bug | 3 | 288 |
 | arch | 5 | 283 |
 | infra | 6 | 285 |
 
-Current cycle: **287**
+Current cycle: **288**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4780,3 +4780,16 @@ Current cycle: **287**
   −20; the first attempt RED-validated my algorithm reading — the clamp only triggers when non-last legs overshoot, since only the last leg takes the
   remainder). green→green: backend validate:local EXIT 0 — 1404 pass (+3) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Test-only. cov:
   be 85.74%+ (carry) / fe 81.41% (carry).
+- **C288 (bug scout → FILED+ESCALATED #88, pinned current behavior): split reminder naming a DELETED vehicle leaves a partial group** — BALANCE: `bug` the
+  only category strictly OVER budget (cyc 284, starved-for 4 > 3); feature more-starved (118) but human-gated. Bug DORMANT → scout-fresh → this scout FOUND
+  a real defect, but the FIX is a product call (not loop-decidable) → file + escalate + pin current behavior + don't block. FOUND (firsthand): a SPLIT
+  recurring-expense reminder's expenseSplitConfig is a JSON blob (NOT a FK); the reminder_vehicles junction IS FK-cascade-cleaned on a vehicle delete, but
+  the config isn't → a deleted vehicle's id persists in it. On the next trigger, createExpenseFromReminder → createSiblings inserts siblings one-by-one; the
+  deleted vehicle's leg FK-violates expenses.vehicle_id (onDelete:cascade ref). SHARPER than expected: a throw escaping the async tx callback after the prior
+  sync insert does NOT roll back (the C151 better-sqlite3 footgun) → the SURVIVING vehicle's leg can PERSIST as a partial/inconsistent group (groupTotal=$100,
+  one $50 leg) while the deleted leg never lands — repeating every trigger, NO user signal (NORTH_STAR #1). The per-reminder try/catch contains it (recorded
+  `skipped`, run stays 200). ESCALATED #88 to Angelo (+ a correction msg once I saw the partial-group nuance); resolution is a product call (drop+renormalize
+  config on vehicle-delete / deactivate / single-vehicle fallback). CHARACTERIZATION GUARD (+1, trigger-expense.test.ts): split[v1,v2] + independent[v3];
+  DELETE v2; trigger → deleted v2 never gets a leg + reminder in `skipped` + the independent v3 reminder STILL fires (containment) + run 200. NON-VACUOUS
+  (a fix, or an uncaught-throw regression breaking the whole run, both change these). green→green: backend validate:local EXIT 0 — 1405 pass (+1) / 1 skip /
+  0 fail, tsc 0, musl-biome clean, build bundled. cov: be 85.74%+ (carry) / fe 81.41% (carry).

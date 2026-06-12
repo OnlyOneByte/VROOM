@@ -272,3 +272,51 @@ describe('expense-reminder trigger — split materialization (recurring-expenses
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// #88 (C288, ESCALATED — product call): a SPLIT reminder whose expenseSplitConfig names a vehicle
+// that was later DELETED can never materialize a COMPLETE split. The reminder_vehicles junction is
+// FK-cascade-cleaned on a vehicle delete, but expenseSplitConfig is a JSON blob (NOT a FK), so the
+// deleted vehicle's id persists in it. On the next trigger, createSiblings inserts an expense whose
+// vehicle_id points at the now-gone vehicle → SQLITE FK violation → the per-reminder try/catch records
+// a "skipped" (surfaced in the result, NOT the UI) → the recurring cost is broken with no user signal
+// (NORTH_STAR #1). SHARPER than first thought: createSiblings inserts siblings one-by-one, and a throw
+// escaping the async tx callback after a prior sync insert does NOT roll it back (the C151 better-sqlite3
+// footgun) — so the deleted vehicle NEVER gets a sibling, but a leg for a still-existing vehicle can
+// PERSIST as a partial/inconsistent group (groupTotal says $100 while only one $50 leg landed).
+// This CHARACTERIZES that current behavior (anchor for the real fix — drop+renormalize / deactivate /
+// etc., per Angelo) + pins the load-bearing CONTAINMENT guarantee: the failure does not throw uncaught
+// and break the whole trigger run / other reminders.
+// ---------------------------------------------------------------------------
+describe('#88: split reminder naming a DELETED vehicle is contained, not a trigger-wide failure (C288 characterization)', () => {
+  test('the deleted vehicle never gets a sibling + the reminder is reported skipped; an independent reminder still fires; run returns 200', async () => {
+    const [v1, v2] = await seedTwoVehicles();
+    const v3 = await seedVehicle();
+
+    // A split reminder over v1+v2, and an independent single-vehicle reminder on v3 (the control).
+    const splitReminderId = await createOverdueExpenseReminder(v1, {
+      vehicleIds: [v1, v2],
+      expenseAmount: 100,
+      expenseSplitConfig: { method: 'even', vehicleIds: [v1, v2] },
+    });
+    const okReminderId = await createOverdueExpenseReminder(v3, { expenseAmount: 40 });
+
+    // Delete v2 — the junction row is FK-cascade-cleaned, but expenseSplitConfig still names v2.
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${v2}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
+    // The run does NOT 500 — the per-reminder catch contains the FK violation.
+    expect(res.status).toBe(200);
+    const body = await json<DataEnvelope<TriggerResultShape>>(res);
+
+    // The DELETED vehicle never receives a sibling (its FK-violating insert can never persist) — so the
+    // split is permanently incomplete; and the reminder is reported in `skipped`.
+    const rows = splitRowsForReminder(splitReminderId);
+    expect(rows.some((r) => r.vehicle_id === v2)).toBe(false);
+    expect(body.data.skipped.some((s) => s.reminderId === splitReminderId)).toBe(true);
+
+    // The CONTAINMENT guarantee: the independent reminder still fired despite the bad one.
+    expect(expensesForReminder(okReminderId).length).toBeGreaterThanOrEqual(1);
+  });
+});

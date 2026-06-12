@@ -646,6 +646,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   Angelo): (a) drop it + toast "couldn't sync N entries", (b) move to a surfaced "failed/needs-attention" bucket, or (c) leave-as-is IF the
   ExpenseForm already blocks queuing an invalid fuel entry offline (worth confirming). Not loop-decidable — awaiting Angelo. (Both audited surfaces
   this cycle — split-service allocation math + offline-outbox idempotency — were CERTIFIED CLEAN.)
+- **#88 (MED, data-integrity / NORTH_STAR #1 — found C288 bug scout; ESCALATED to Angelo C288, product-gated) — a SPLIT recurring-expense reminder
+  naming a DELETED vehicle leaves a partial/inconsistent group every trigger.** `reminder.expenseSplitConfig` is a JSON blob (NOT a FK); the
+  `reminder_vehicles` junction IS FK-cascade-cleaned on a vehicle delete, but the config isn't → the deleted vehicle's id persists in it. On the next
+  trigger, `createSiblings` inserts siblings one-by-one; the deleted vehicle's leg FK-violates `expenses.vehicle_id`. SHARPER: a throw escaping the async
+  tx callback after the prior sync insert does NOT roll back (the C151 better-sqlite3 footgun) → the surviving vehicle's leg PERSISTS as a partial group
+  (groupTotal=$100, one $50 leg) while the deleted leg never lands — repeating every trigger, no user signal. Per-reminder try/catch contains it (recorded
+  `skipped`, run stays 200). VERIFIED + pinned by a characterization test (C288, trigger-expense.test.ts: deleted vehicle never gets a leg, reminder
+  reported skipped, independent reminders still fire, run 200). DECISION (send_message'd Angelo): on vehicle-delete (a) drop it from the config +
+  re-normalize the remaining percentages, (b) convert to single-vehicle if one remains, (c) deactivate the reminder + notify, or (d) other. Not
+  loop-decidable — awaiting Angelo.
 - ~~**#80 (MED, tenant-isolation + info-leak — found C233 hunting the vehicles write-path) — license-plate uniqueness was enforced GLOBALLY across
   all tenants.**~~ — *DONE C233: `findByLicensePlate(plate)` queried `WHERE license_plate = ?` with NO userId, backing the plate-uniqueness check on
   BOTH create + update → a user adding a plate ANOTHER tenant owns got a cross-tenant FALSE 409 (two users may legitimately share a plate:
