@@ -4418,3 +4418,14 @@ Current cycle: **227**
   40500 → 2 notifs at [35000, 40200]. NON-VACUOUS (a reminderId-only dedup would leave it at 1). green→green: backend validate:local EXIT 0 — 1366
   pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean (1 reflow autofixed), build bundled. NO production change (clean cert). cov: be 85.91%+
   (carry; +1 BE) / fe 80.64% (carry).
+- **C257 (guard): cover GET /providers/pending/:nonce — the OAuth-pending-email route + its userId:nonce cross-user isolation** — BALANCE: nothing
+  OVER budget; `infra` nominally most-starved (cyc 253, 4/6) but its increments are recent+not-due (#5 sweep forecast ~C258; CLAUDE.md fresh C253),
+  so per don't-force-a-blocked-pick the next-actionable is `guard` (cyc 254, 3/6). GROUNDED pick (C248 measure: providers/routes.ts 58% line):
+  GET /pending/:nonce reads the in-memory pending-OAuth-credentials store via getPendingEmail(user.id, nonce) — the store's UNIT logic is covered
+  (pending-credentials.test) but the ROUTE slice (auth + found/not-found branch + the userId:nonce KEY-SCOPING) was uncovered. +4 HTTP tests:
+  own-nonce → 200 + email; unknown → 404; a nonce stored under ANOTHER userId → 404 (cross-user isolation — the key is `${userId}:${nonce}`, so
+  user B can't read user A's pending OAuth email); anon → 401. SEAM NOTE: pending-credentials is a process-global Map (no DB), but createTestApp
+  dynamic-imports the app AFTER rewriting env — so the test dynamic-imports storePending INSIDE the test (post-harness) to seed the SAME instance
+  the route reads (the C163 same-instance discipline); ran clean in the full 182-file suite (no cross-suite Map-pollution flake). green→green:
+  backend validate:local EXIT 0 — 1370 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production
+  change. cov: be 85.91%+ (carry; +4 BE, providers/routes.ts /pending slice now covered) / fe 80.64% (carry).
