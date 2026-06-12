@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 265 |
 | bug | 3 | 268 |
 | arch | 5 | 267 |
-| infra | 6 | 263 |
+| infra | 6 | 269 |
 
-Current cycle: **268**
+Current cycle: **269**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4572,3 +4572,12 @@ Current cycle: **268**
   test FAILS under the old UTC `.slice(0,10)` for a positive-offset host). green→green: frontend validate:local EXIT 0 — type-check 0, build OK, 596
   tests pass (net +1: consolidated 3 C267 tests → 4), every form/service test UNCHANGED (the call sites bind correctly to the local output). Single FE
   chokepoint, all 9 call sites benefit. cov: fe 80.64%+ (carry) / be 85.95% (carry).
+- **C269 (infra): coverage RE-MEASURE — 11 cycles stale (last C258); ground the post-C260/C265/C262/C268 reading** — BALANCE: nothing OVER budget →
+  most-starved of the due pair (infra 6 = budget, deep-review 5 = budget); feature most-starved (99) but human-gated. Picked infra — the C236/C248/C258
+  cadence: a fresh MEASURED reading (not an estimate) grounds future guard/coverage picks, and the C260/C265 guard adds + C262/C268 fixes had moved it.
+  RAN both suites with `--coverage`: **backend 85.65% line / 85.95% func** (was 85.64/85.95 at C258 — line +0.01; the C260/C265 guard adds were
+  already-covered-adjacent, so no jump — expected, those pinned uncovered BRANCHES of already-line-covered files). **frontend 80.72% line / 80.58% func /
+  75.00% branch** (was 80.64/80.51/74.97 — crept up on the C267/C268 formatters tests). Both suites hold > 80% line. The 90% goal remains the C258
+  STRUCTURAL PLATEAU: backend is saturated except DI/orchestrator-bound tails; the FE gap is the eyes-on components/routes deficit (Playwright-gated) —
+  NOT loop-closable without an eyes-on harness or a human glance. DOCS-ONLY: updated the CLAUDE.md coverage line (C258→C269 figures) + this entry; no
+  source/test/build touched (the C268 gate is the last code state). Recorded the measure honestly; no churn-test forced to chase a structurally-gated number.
