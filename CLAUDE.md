@@ -163,8 +163,8 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C285, not an estimate): **backend 85.74% line / 86.04% func · frontend 81.41% line / 80.64%
-  func / 75.20% branch** (both suites > 80% line) — backend ~86% (the C178–C284 BE bug-fix + route/guard-coverage arc; FE crept 80.72→81.41 on the C271/C278 guard + download-util tests);
+  (re-measured C303, not an estimate): **backend 86.07% line / 86.21% func · frontend 81.76% line / 80.70%
+  func / 75.70% branch** (both suites > 80% line) — backend ~86% (the C178–C302 BE bug-fix + route/guard-coverage arc; FE crept 81.41→81.76 on the C295/C296/C297 lease-overage + invariance + 0%-APR planner tests);
   frontend climbed 65.3→80.6 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
   C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts, C201
@@ -183,7 +183,7 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1418 backend tests / ~610 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1421 backend tests / ~610 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
