@@ -812,6 +812,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   addTerm/updateTerm HTTP paths were unpinned → +4 HTTP tests (terms-http.test.ts): POST /insurance + POST /:id/terms + PUT /:id/terms/:termId with a
   foreign vehicleId → 404, zero junction rows planted (PUT keeps original coverage); + owned-vehicle control. NON-VACUOUS. green→green 1385 pass (+4). Also
   re-confirmed financing PATCH/payoff/refinance clean (C240). NO live defect — bug vein still exhausted.*
+- ~~**Reminder mark-serviced re-arm scout (C276)**~~ — *DONE C276 (bug-cycle scout, CERTIFIED CLEAN + guard): the two-axis re-arm (POST /:id/mark-serviced)
+  is sound by domain semantics — TIME axis schedule-anchored (advance from nextDueDate; #83 overdue fast-forward correct+tested), MILEAGE axis usage-anchored
+  (reset to current odometer + interval); axis difference INTENTIONAL. Comprehensively pinned (mileage anchor, no-longer-due-at-trigger, #83 overdue catch-up,
+  both-axis, cross-tenant 404) EXCEPT the EARLY-service branch — every time test seeds a PAST startDate (overdue loop runs), so servicing when nextDueDate is
+  already FUTURE (loop skips, single advance) was uncovered. +1 HTTP test: yearly reminder anchored 2099 (host-independent) serviced early advances exactly
+  one year forward (Δ 364–367 days), stays future. NON-VACUOUS. green→green 1389 pass (+1). NO live defect.*
 - ~~**#41 (LOW) — expense search doesn't escape LIKE wildcards `%`/`_`.**~~ — *DONE C142: scope-checked first — the ONLY
   user-input LIKE in product source is this one expenses search site (the 2 other LIKEs are test files with literal patterns),
   so it's a single-site fix not a class. `buildExpenseConditions` built `%${search}%` with no ESCAPE → "50%" matched every row

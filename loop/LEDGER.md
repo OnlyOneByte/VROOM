@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 275 |
 | guard | 6 | 271 |
-| bug | 3 | 272 |
+| bug | 3 | 276 |
 | arch | 5 | 273 |
 | infra | 6 | 274 |
 
-Current cycle: **275**
+Current cycle: **276**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4655,3 +4655,15 @@ Current cycle: **275**
   per-vehicle averageMpg cull mis-calibrated). RECORD-ONLY (the C259/C246 clean-cert precedent — surface clean + already comprehensively pinned; the one
   finding is a known product-gated class, not a fresh defect). No code, no test, no gate run (no source touched — the C274 state is unchanged). cov:
   be 85.65% (carry) / fe 80.72% (carry).
+- **C276 (bug-cycle scout → guard): mark-serviced re-arm CERTIFIED CLEAN; pinned the uncovered EARLY-service time-axis branch** — BALANCE: `bug` the only
+  category strictly OVER budget (cyc 272, starved-for 4 > 3); feature more-starved (106) but human-gated. Bug DORMANT → scout-fresh → fix-or-record.
+  SCOUTED the reminder mark-serviced re-arm path (POST /:id/mark-serviced) firsthand. CERTIFIED CLEAN: the two-axis re-arm is sound by domain semantics —
+  TIME axis is SCHEDULE-anchored (advance from nextDueDate; the #83 multi-period-overdue fast-forward loop is correct + tested), MILEAGE axis is
+  USAGE-anchored (reset to current odometer + intervalMileage); the axis difference is INTENTIONAL, not a bug. Comprehensively pinned already: mileage
+  anchor+recompute, re-armed-no-longer-due-at-trigger, time one-period advance, the #83 overdue catch-up, `both`-axis, cross-tenant 404. THE finding → guard:
+  every existing time-axis test seeds a PAST startDate (overdue → the `while (nextDue <= now)` loop runs), so the EARLY-service branch (servicing when
+  nextDueDate is already in the FUTURE → loop skips, single unconditional advance) was UNCOVERED. +1 HTTP test: a yearly reminder anchored 2099 (always
+  future, host-independent) serviced early advances EXACTLY one year forward (Δ 364–367 days) and stays future — pins the schedule-anchored early-service
+  semantics (NOT "reset relative to now"). NON-VACUOUS (the Δ bound fails if the advance is skipped or collapsed toward now). green→green: backend
+  validate:local EXIT 0 — 1389 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean, build bundled. NO live defect — bug vein still exhausted. cov:
+  be 85.65%+ (carry) / fe 80.72% (carry).

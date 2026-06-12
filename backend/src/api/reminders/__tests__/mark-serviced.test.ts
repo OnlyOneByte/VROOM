@@ -180,6 +180,39 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
     expect((after as number) > nowSeconds, 'serviced reminder is no longer overdue').toBe(true);
   });
 
+  test('time: an EARLY service (nextDueDate already in the FUTURE) advances exactly one period, stays future', async () => {
+    const vehicleId = await seedVehicle();
+    // A yearly reminder anchored FAR in the future → nextDueDate is already > now, so the catch-up
+    // `while (nextDue <= now)` loop never runs. This is the early-service path (servicing before due,
+    // e.g. registering in May for a July-due reminder): schedule-anchored, so it advances ONE period
+    // forward from the scheduled date — not "reset relative to now". This branch was uncovered (all
+    // other time tests seed PAST startDates that exercise the overdue loop).
+    const created = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Future registration',
+      type: 'notification',
+      frequency: 'yearly',
+      startDate: '2099-06-15T00:00:00.000Z',
+      vehicleIds: [vehicleId],
+    });
+    const body = await json<DataEnvelope<{ reminder: { id: string } }>>(created);
+    expect(created.status, JSON.stringify(body)).toBe(201);
+    const id = body.data.reminder.id;
+    const before = reminderRow(id).next_due_date;
+    expect(before).not.toBeNull();
+
+    const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
+    expect(res.status).toBe(200);
+    const after = reminderRow(id).next_due_date;
+    expect(after).not.toBeNull();
+    // Advanced exactly one year forward from the already-future scheduled date (≈365-366 days),
+    // NOT collapsed back toward now. Bounds the delta to one yearly period (in unix SECONDS).
+    const deltaDays = ((after as number) - (before as number)) / 86_400;
+    expect(deltaDays).toBeGreaterThanOrEqual(364);
+    expect(deltaDays).toBeLessThanOrEqual(367);
+    // Still strictly in the future (it was future before, advanced forward → trivially future).
+    expect((after as number) > Math.floor(Date.now() / 1000)).toBe(true);
+  });
+
   test('both: moves the mileage milestone AND advances the date', async () => {
     const vehicleId = await seedVehicle();
     const id = await createMileageReminder(vehicleId, {
