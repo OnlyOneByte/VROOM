@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 264 |
-| guard | 6 | 261 |
+| guard | 6 | 265 |
 | bug | 3 | 262 |
 | arch | 5 | 261 |
 | infra | 6 | 263 |
 
-Current cycle: **264**
+Current cycle: **265**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4519,3 +4519,14 @@ Current cycle: **264**
   mangle/truncate/double-stringify would fail the post-restore toEqual). green→green: backend validate:local EXIT 0 — 1378 pass / 1 skip / 0 fail (+2),
   tsc 0, musl-biome clean (one format reflow auto-fixed via check:musl:fix; the pre-existing unitPreferencesSchema unused-import is a WARNING, exit 0),
   build bundled. Test-only, no production change. cov: be 85.95%+ (carry) / fe 80.64% (carry).
+- **C265 (guard): cover the 3 uncovered trusted-proxy / fallback branches of getClientIp (the rate-limit-key spoof defense)** — BALANCE: nothing OVER
+  budget → highest-leverage. feature most-starved (starved-for 95) but human-gated; guard & arch both furthest (4), arch twice-certified dry (C254/C261)
+  → grounded guard coverage slice. PICK (scout: utils/client-ip.ts had only 1 referencing test, security-critical — it derives the rate-limit key, and
+  keying on a spoofable X-Forwarded-For lets an attacker get a fresh bucket per request, bypassing the auth brute-force limiter). The existing test
+  covered the 4 headline trust rules but left 3 security-meaningful branches uncovered: (1) trusted proxy but NO XFF (the `xff ? : undefined` false leg +
+  `if (forwarded)` false → must fall through to the socket IP, not crash/'unknown'); (2) trusted proxy with EMPTY/whitespace XFF (`first || undefined` →
+  undefined → fall through, NOT key on '' which would pool every empty-XFF request); (3) the no-socket in-process fallback (:62) with a MULTI-hop XFF
+  (takes leftmost+trim, mirroring the trusted parse — was only single-value-tested). +3 unit tests (extend client-ip.test.ts via the injected
+  trusted-proxy list + the connInfoThrows toggle — no new harness). NON-VACUOUS (each asserts the resolved key is the socket/leftmost IP, not '' or
+  'unknown'). green→green: backend validate:local EXIT 0 — 1381 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. Test-only, no
+  production change. cov: be 85.95%+ (carry; client-ip.ts trusted-proxy + fallback branches now covered) / fe 80.64% (carry).
