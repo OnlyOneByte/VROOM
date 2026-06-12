@@ -14,7 +14,7 @@ import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
-import { AuthProviderRepository } from '../auth-provider-repository';
+import { AuthProviderRepository, buildAuthProviderConfig } from '../auth-provider-repository';
 
 // ---------------------------------------------------------------------------
 // Test infrastructure
@@ -391,5 +391,25 @@ describe('Domain isolation', () => {
 
     const found = await repo.findByProviderIdentity('google', 'some-id');
     expect(found).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildAuthProviderConfig (C283 dedup — one source for the auth `config` shape)
+// ---------------------------------------------------------------------------
+
+describe('buildAuthProviderConfig', () => {
+  test('builds the { email, avatarUrl } config shape', () => {
+    expect(buildAuthProviderConfig('a@test.com', 'https://x/avatar.png')).toEqual({
+      email: 'a@test.com',
+      avatarUrl: 'https://x/avatar.png',
+    });
+  });
+
+  test('avatarUrl is optional (undefined when omitted)', () => {
+    expect(buildAuthProviderConfig('a@test.com')).toEqual({
+      email: 'a@test.com',
+      avatarUrl: undefined,
+    });
   });
 });

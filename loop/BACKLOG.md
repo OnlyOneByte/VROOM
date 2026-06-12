@@ -1602,6 +1602,11 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     anchor → click → revoke → remove dance was byte-identical at expense-api (CSV export) + settings-store (backup download), differing only in blob +
     filename. Extracted a pure helper to new utils/download.ts + wired both → one-liners. Behavior-preserving (same ordering; callers guard browser/ok
     upstream). +2 unit tests (jsdom URL stubs + click spy: url created+revoked, anchor clicked, no DOM leak, filename set). green→green fe 604 pass (+2).*
+  - ~~**`buildAuthProviderConfig(email, avatarUrl?)` — the auth-provider config:{email,avatarUrl} shape, 3 BE sites → 1 (C283)**~~ — *DONE C283: the
+    OAuth-identity config blob was hand-assembled byte-identically at auth-provider-repository create + updateProfile + auth/routes.ts new-user insert,
+    and read back via config.email/config.avatarUrl → writers must stay in lockstep (FE↔BE drift class). Extracted a pure helper + wired all 3.
+    Behavior-preserving (identical literal); anchored by the existing config-shape property tests + auth-routes green→green, +2 helper tests. 1400 pass (+2).
+    REJECTED this scout: new Date(x*1000) (trivial), store try/catch HOF (taste/risk), createLoadState (filed direction call C79).*
 
 Seed audit angles for the rule-7 fan-out (once the above are done, or to go broader):
 - **Backend layering** — route handlers doing repository/business logic inline; missing or

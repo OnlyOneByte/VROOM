@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 281 |
 | guard | 6 | 282 |
 | bug | 3 | 280 |
-| arch | 5 | 278 |
+| arch | 5 | 283 |
 | infra | 6 | 279 |
 
-Current cycle: **282**
+Current cycle: **283**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4728,3 +4728,14 @@ Current cycle: **282**
   google profile via updateProfile(row.id, USER_ID, {hijacked}) → the victim's row is UNCHANGED (displayName 'Victim', email 'victim@test.com' intact).
   NON-VACUOUS (a regression dropping the userId predicate lets the attacker's values land → fails). green→green: backend validate:local EXIT 0 — 1398 pass
   (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Test-only. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C283 (arch): extract `buildAuthProviderConfig` — the auth-provider `config:{email,avatarUrl}` shape, 3 sites → 1** — BALANCE: `arch` most-starved
+  actionable (cyc 278, starved-for 5 = budget, due); feature more-starved (113) but human-gated. FAN-OUT scout (spawn_run still 400s → inline): rejected
+  the trivial/divergent candidates per the C99/C273 churn rule — `new Date(x*1000)` (8 trivial analytics sites), the FE store try/catch wrappers (11 sites
+  but the catch is the only common part; a HOF wrapper is refactor-for-taste with error-timing risk), createLoadState (already a filed direction call,
+  C79). PICKED a real one-source-of-truth dedup: the OAuth-identity `config: { email, avatarUrl }` blob was hand-assembled BYTE-IDENTICALLY at 3 write
+  sites — auth-provider-repository create:55 + updateProfile:90 + auth/routes.ts new-user insert:246 — and it's READ BACK via `config.email`/`config.avatarUrl`,
+  so the writers must stay in lockstep (the FE↔BE-contract-drift class; rule-5 "collapse N sources into one"). Extracted `buildAuthProviderConfig(email,
+  avatarUrl?)` to auth-provider-repository.ts + wired all 3 (+ the routes.ts import). PAYOFF: a future config field (e.g. locale) is added in one place,
+  not three. BEHAVIOR-PRESERVING (returns the identical literal). Anchored by the existing create/updateProfile config-shape property assertions + the
+  auth-routes tests passing UNCHANGED, +2 direct helper tests (full shape; avatarUrl optional). green→green: backend validate:local EXIT 0 — 1400 pass
+  (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean (format auto-fixed), build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).

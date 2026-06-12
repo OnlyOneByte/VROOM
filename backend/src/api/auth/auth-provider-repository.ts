@@ -5,6 +5,20 @@ import { getDb } from '../../db/connection';
 import type { UserProvider } from '../../db/schema';
 import { userProviders } from '../../db/schema';
 
+/**
+ * The shape of an auth-domain provider's `config` blob (the OAuth identity profile). One source of
+ * truth for the `{ email, avatarUrl }` object that was hand-assembled at 3 write sites (C283 dedup):
+ * create + updateProfile here, and the new-user insert in auth/routes.ts. It's read back via
+ * `config.email` / `config.avatarUrl`, so the write sites must stay in lockstep — a future field
+ * (e.g. locale) is then added in one place, not three.
+ */
+export function buildAuthProviderConfig(
+  email: string,
+  avatarUrl?: string
+): { email: string; avatarUrl?: string } {
+  return { email, avatarUrl };
+}
+
 export class AuthProviderRepository {
   constructor(private db: AppDatabase) {}
 
@@ -52,7 +66,7 @@ export class AuthProviderRepository {
         providerAccountId: params.providerAccountId,
         displayName: params.displayName ?? params.email,
         credentials: '',
-        config: { email: params.email, avatarUrl: params.avatarUrl },
+        config: buildAuthProviderConfig(params.email, params.avatarUrl),
         status: 'active',
       })
       .returning();
@@ -87,7 +101,7 @@ export class AuthProviderRepository {
     await this.db
       .update(userProviders)
       .set({
-        config: { email: profile.email, avatarUrl: profile.avatarUrl },
+        config: buildAuthProviderConfig(profile.email, profile.avatarUrl),
         displayName: profile.displayName ?? profile.email,
         updatedAt: new Date(),
       })
