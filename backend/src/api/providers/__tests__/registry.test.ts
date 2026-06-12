@@ -300,5 +300,73 @@ describe('StorageProviderRegistry', () => {
         'Invalid Google Drive credentials: missing refreshToken'
       );
     });
+
+    // C254: the google-photos + s3 builder validation throws (registry.ts buildGooglePhotosProvider /
+    // buildS3Provider) were the uncovered createProviderInstance branches — credential/config integrity
+    // gates. createProviderInstance only CONSTRUCTS (no network), so these are pure-input tests.
+    test('creates GooglePhotosProvider for google-photos type (reuses cached albumId from config)', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      const row = {
+        ...baseProvider,
+        providerType: 'google-photos',
+        credentials: 'encrypted:{"refreshToken":"tok-gp"}',
+        config: { albumId: 'album-xyz' },
+      };
+      expect(registry.createProviderInstance(row).type).toBe('google-photos');
+    });
+
+    test('throws when google-photos credentials lack refreshToken', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      const row = {
+        ...baseProvider,
+        providerType: 'google-photos',
+        credentials: 'encrypted:{"noToken":true}',
+      };
+      expect(() => registry.createProviderInstance(row)).toThrow(
+        'Invalid Google Photos credentials: missing refreshToken'
+      );
+    });
+
+    test('creates S3CompatProvider for s3 type with valid credentials + config', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      const row = {
+        ...baseProvider,
+        providerType: 's3',
+        credentials: 'encrypted:{"accessKeyId":"AK","secretAccessKey":"SK"}',
+        config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
+      };
+      expect(registry.createProviderInstance(row).type).toBe('s3');
+    });
+
+    test('throws when s3 credentials lack accessKeyId/secretAccessKey', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      const row = {
+        ...baseProvider,
+        providerType: 's3',
+        credentials: 'encrypted:{"accessKeyId":"AK"}', // missing secretAccessKey
+        config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
+      };
+      expect(() => registry.createProviderInstance(row)).toThrow(
+        'Invalid S3 credentials: missing accessKeyId or secretAccessKey'
+      );
+    });
+
+    test('throws when s3 config is missing endpoint/bucket/region', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      const row = {
+        ...baseProvider,
+        providerType: 's3',
+        credentials: 'encrypted:{"accessKeyId":"AK","secretAccessKey":"SK"}',
+        config: { bucket: 'b' }, // missing endpoint + region
+      };
+      expect(() => registry.createProviderInstance(row)).toThrow(
+        'Invalid S3 config: missing endpoint, bucket, or region'
+      );
+    });
   });
 });

@@ -414,7 +414,10 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > 2-provider case proves the scrub is targeted, not over-broad).
 > `sync/routes.ts` backups download+list slices DONE C250 (+3 HTTP: GET /backups/download → real ZIP w/ attachment headers + matching
 > Content-Length [own-data export, no provider] + anon 401; GET /backups/providers no-providers → 200 []. The byte/provider-bound restore paths
-> stay the C163 mock-trap territory). **NEXT FE guard pick (no primed): the FE pure/service modules are now
+> stay the C163 mock-trap territory).
+> `providers/.../registry.ts` createProviderInstance google-photos/s3 validation branches DONE C254 (+5: GP happy [cached albumId] + missing-
+> refreshToken throw; S3 happy + missing-creds throw + missing-config throw — the credential/config integrity gates; pure-construct, no DB/network).
+> **NEXT FE guard pick (no primed): the FE pure/service modules are now
 > essentially all covered — remaining FE gap is the components/routes deficit (largely eyes-on) + the network/timer-bound tails (mock-trap, low-value). vehicle-helpers.ts is the lone untested FE util but it's a single trivial display-name fn (theater — skip).** The components/routes deficit is
 > the bulk + largely eyes-on.** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
 > the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
@@ -1345,9 +1348,11 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     the vehicle-delete cascade relies on). Rejected the photo-cleanup-on-delete blocks (4 files, different child entity-types/repos → C75 churn
     trap) + the claim/term/expense FK-validators (different parent-scopes) as not-clean. Test-anchored green→green (vehicle-delete-cascade exercises
     both paths, passed UNCHANGED). green→green 1357 pass (unchanged).
-  - **Next arch pick (no primed pick):** a rule-7 fan-out scoped to **pure-`.ts`, cents-migration-INDEPENDENT** duplication (the eyes-on +
-    pending-migration constraints rule out most FE/money candidates). The BE logging-idiom convergence stays EXCLUDED by design (C147/C211); do
-    NOT re-file it. Genuinely thin now — prefer a fan-out to surface a fresh candidate over forcing a micro-dedup.
+  - **ARCH VEIN NOW RELIABLY DRY (confirmed C254).** Rejected-as-churn this cycle: analytics-api `buildQuery` vs expense-api `buildExpenseQuery`
+    (different shapes — generic/`?`-prefixed/.set-only vs bare/`tags`-array/.trim/exported-tested-contract; converging forces the tested one to
+    regress, the C75 outlier rule). With C249's 3 BE rejections + these 2, no clean dedup remains. STANDING GUIDANCE: an arch cycle should EXPECT to
+    pivot to the next-actionable category (don't-force-a-blocked-pick) UNLESS feature work introduces a NEW genuine duplication. The BE logging-idiom
+    convergence stays EXCLUDED by design (C147/C211); do NOT re-file it.
 
 1. **Converge route error handling on the central error middleware.** `sync` (7 try/catch),
    `auth` (7), and `settings` (5) route handlers hand-roll try/catch→error-response blocks,

@@ -4377,3 +4377,17 @@ Current cycle: **227**
   C231) + #85 (fuel-stats This/Last Year range-relative mislabel, escalated C252). DOCS-ONLY (CLAUDE.md only — verified `git diff --name-only`
   shows just CLAUDE.md), no source touched → no build gate (the C230/C242/C248 doc-refresh precedent). Next CLAUDE.md content-refresh ~C263; next #5
   sweep ~C258. cov: be 85.91% / fe 80.64% (carry — no code, no re-measure this cycle).
+- **C254 (arch→guard pivot): arch vein dry (2 more candidates rejected as churn) → covered the registry createProviderInstance google-photos/s3
+  validation branches** — BALANCE: `arch` AT budget (cyc 249, starved-for 5 = 5, FORCED). SCOUTED a rule-7 FE candidate per the BACKLOG note +
+  REJECTED two as churn (arch rule 5 / the C75 outlier lesson): the analytics-api buildQuery (generic, `?`-prefixed, .set-only) vs expense-api
+  buildExpenseQuery (bare string, `tags` .append array + .trim + no-default-sort, EXPORTED+tested as the search-correctness contract) are DIFFERENT
+  shapes — converging them would force the tested one to lose its array handling or thread a special case. With C249's 3 BE rejections, the arch
+  vein is genuinely exhausted of clean dedups → per don't-force-a-blocked-pick, pivoted to the next-actionable `guard` (cyc 250, starved-for 4).
+  GROUNDED guard pick (C248 measure: providers/domains/storage/registry.ts 66% func): registry.test.ts already covers getDefaultProvider (3
+  throws + happy + no-settings), getBackupProviders, getProvider, createProviderInstance (google-drive + unsupported-type + GD-missing-refreshToken)
+  — the UNCOVERED branches were the google-photos + s3 builder validation gates (registry.ts:41-64, credential/config integrity throws). +5 tests
+  (createProviderInstance is pure-construct, no network/DB): google-photos happy [reuses cached albumId] + missing-refreshToken throw; s3 happy +
+  missing-accessKeyId/secretAccessKey throw + missing-endpoint/bucket/region throw. green→green: backend validate:local EXIT 0 — 1365 pass / 1 skip
+  / 0 fail (+5), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production change. cov: be 85.91%+ (carry; +5 BE, registry
+  createProviderInstance now fully branch-covered) / fe 80.64% (carry). NOTE: the arch category is now reliably dry — future arch picks should
+  expect to pivot unless a NEW dup is introduced by feature work.
