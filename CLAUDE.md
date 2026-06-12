@@ -224,8 +224,8 @@ Highlights:
   non-fuel expense write now nulls fuel-only fields server-side (a stray mileage on a misc row poisoned getCurrentOdometer cross-category) [#76-backend, C244],
   insurance claim create/update validates the optional vehicleId/termId links (owned vehicle; term on THIS policy — they were written verbatim) [#84, C247],
   fuel-stats "This/Last Month" now year-scoped (was getMonth()-only → a prior-year same-month fillup folded into "This Month" under a multi-year range) [#86, C262],
-  toDateInputValue reads the LOCAL calendar date (was UTC .slice(0,10) → date-input off-by-one for negative offsets + broke the noon-local stored-date round-trip for positive offsets) [#87, C268])
-  all landed C155–C268. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
+  toDateInputValue reads the LOCAL calendar date (was UTC .slice(0,10) → date-input off-by-one for negative offsets + broke the noon-local stored-date round-trip for positive offsets) [#87, C268; residual on the odometer-edit page swept + a committed no-utc-date-input source-scan guard added C271])
+  all landed C155–C271. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
   a green test that RE-IMPLEMENTS or RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module
   (C229: the two photo "property" tests only drove a reference model, never the real setCoverPhoto, which was also
   getDb-singleton-bound and thus untestable via a constructed repo until switched to this.db.transaction).

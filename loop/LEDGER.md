@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 270 |
-| guard | 6 | 265 |
+| guard | 6 | 271 |
 | bug | 3 | 268 |
 | arch | 5 | 267 |
 | infra | 6 | 269 |
 
-Current cycle: **270**
+Current cycle: **271**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4596,3 +4596,16 @@ Current cycle: **270**
   fn), so the assertions pin the observable boolean + fetch behavior, not the mocked module spy (a wrong-target assertion I caught + removed via the gate).
   green→green: frontend validate:local EXIT 0 — type-check 0, build OK, 600 tests pass (+4), every existing sync test UNCHANGED. cov: fe 80.72%+ (carry;
   resolveConflict branches now covered) / be 85.65% (carry).
+- **C271 (guard): committed source-scan guard for the #87 UTC date-input class + caught & fixed a RESIDUAL (odometer-edit page)** — BALANCE: guard
+  most-starved actionable (cyc 265, starved-for 6 = budget, due); feature more-starved (101) but human-gated. Scouted BE+FE pure-logic for a clean
+  coverage pick — all genuinely saturated (client-ip C265, unit-conversions property-tested, mergeUnitPreferences directly tested, payment-planner has a
+  7-property suite; the truly-thin FE files are display-name/DOM-observer theater) → the C258/C269 plateau. PIVOTED to the higher-leverage guard the C268
+  fix earned: a MERGE-SURVIVING source-scan pinning the #87 class (the UTC date-input idiom can't re-creep into forms), mirroring the no-utc-month-parse /
+  no-hardcoded-currency precedent. The new guard IMMEDIATELY EARNED ITS KEEP — it caught a RESIDUAL the C267 sweep missed: `odometer/[entryId]/edit/+page.svelte:69`
+  still did `new Date(entry.recordedAt).toISOString().split('T')[0]` → a stored noon-local recordedAt reloads ONE DAY EARLIER in the edit form for
+  positive-offset users (the exact #87 bug, on the EDIT page C267 didn't touch). FIXED: routed it through `toDateInputValue` (the C268 local-date
+  chokepoint) + added the import. GUARD: `no-utc-date-input.test.ts` (+2) — scans every product .svelte/.ts (comments stripped, line-preserving;
+  __tests__ dirs excluded since a test may assert on the idiom) for `.toISOString().split('T')[0]` / `.slice(0,10)`; toDateInputValue (local components,
+  no toISOString) never matches. NON-VACUOUS (it found the residual RED before the fix; the live-scan precondition asserts >50 sources). green→green:
+  frontend validate:local EXIT 0 — type-check 0, build OK, 602 tests pass (+2 guard; the edit-page fix is product-only), every existing test UNCHANGED.
+  cov: fe 80.72%+ (carry) / be 85.65% (carry).
