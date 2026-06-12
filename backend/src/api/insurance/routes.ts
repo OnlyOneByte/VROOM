@@ -9,7 +9,7 @@ import { expenseRepository } from '../expenses/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { insuranceClaimRepository } from './claims-repository';
 import { createClaimSchema, updateClaimSchema } from './claims-validation';
-import { createTermExpenses, updateTermExpenses } from './hooks';
+import { createTermExpenses, updateTermExpenses, vehicleIdsForTerm } from './hooks';
 import { insurancePolicyRepository } from './repository';
 import {
   addTermSchema,
@@ -111,9 +111,7 @@ routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   // Auto-create split expenses for each term that has a totalCost
   for (const term of policy.terms) {
     if (term.totalCost && term.totalCost > 0) {
-      const termVehicleIds = policy.termVehicleCoverage
-        .filter((tc) => tc.termId === term.id)
-        .map((tc) => tc.vehicleId);
+      const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, term.id);
       await createTermExpenses({
         termId: term.id,
         vehicleIds: termVehicleIds,
@@ -203,9 +201,7 @@ routes.post(
 
     // Auto-create split expenses if the new term has a totalCost
     if (termData.totalCost && termData.totalCost > 0) {
-      const termVehicleIds = policy.termVehicleCoverage
-        .filter((tc) => tc.termId === policy.newTermId)
-        .map((tc) => tc.vehicleId);
+      const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, policy.newTermId);
       await createTermExpenses({
         termId: policy.newTermId,
         vehicleIds: termVehicleIds,
@@ -235,9 +231,7 @@ routes.put(
     // Sync auto-created expenses with updated term data
     const updatedTerm = policy.terms.find((t) => t.id === termId);
     if (updatedTerm) {
-      const termVehicleIds = policy.termVehicleCoverage
-        .filter((tc) => tc.termId === termId)
-        .map((tc) => tc.vehicleId);
+      const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, termId);
       await updateTermExpenses({
         termId,
         vehicleIds: termVehicleIds,

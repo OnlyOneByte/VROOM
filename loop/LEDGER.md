@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 270 |
 | guard | 6 | 271 |
 | bug | 3 | 272 |
-| arch | 5 | 267 |
+| arch | 5 | 273 |
 | infra | 6 | 269 |
 
-Current cycle: **272**
+Current cycle: **273**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4619,3 +4619,15 @@ Current cycle: **272**
   with a RAW-SEEDED foreign vehicleId all → 404 with ZERO junction rows planted (read via ctx.sqlite); PUT also asserts the original owned coverage is
   intact; + an owned-vehicle control proving the guard isn't over-broad. NON-VACUOUS (the 404s + junction-count=0 fail if the guard regresses). green→green:
   backend validate:local EXIT 0 — 1385 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean, build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C273 (arch): extract `vehicleIdsForTerm` — the term junction→vehicleIds derivation, 3 sites → 1** — BALANCE: `arch` the only ACTIONABLE over-budget
+  category (cyc 267, starved-for 6 > 5); feature more-starved (103) but human-gated. FAN-OUT scout (spawn_run still 400s → inline): FE candidates all
+  rejected — MS_PER_DAY is the C99-rejected churn (divergent month-approx vs day-divisor spellings, re-confirmed), roundToCents is cents-migration-deferred
+  (C147), the `n>1`-vs-`n!==1` pluralization idiom (20+ sites) carries an n=0 behavior trap + violates rule-1-small, raw toFixed(2) is only 2 non-currency
+  sites. Backend re-scan FOUND a clean one: the `policy.termVehicleCoverage.filter(tc => tc.termId === X).map(tc => tc.vehicleId)` derivation was
+  byte-identical at 3 sites in insurance/routes.ts (create-policy loop :114, addTerm :206, updateTerm :238 — only the termId source + surrounding args
+  differ), each feeding createTermExpenses/updateTermExpenses. Extracted pure `vehicleIdsForTerm(termVehicleCoverage, termId): string[]` to insurance/hooks.ts
+  (beside its consumers; typed `readonly TermCoverageRow[]` so it's decoupled from the full policy) + wired all 3 → one-liners. PAYOFF (rule 5): one source
+  for the junction→vehicleIds shape — a future coverage-shape change touches one place. BEHAVIOR-PRESERVING (faithful 1:1 map, no dedup — the consumers
+  dedup downstream). +3 unit tests (vehicle-ids-for-term.test.ts: filter+project in order, empty/unknown term → [], no cross-term leak); anchored ALSO by
+  the existing premium-expense-hook + the C272 term-ownership HTTP tests passing UNCHANGED through the extraction. green→green: backend validate:local
+  EXIT 0 — 1388 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (import-order auto-fixed), build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).

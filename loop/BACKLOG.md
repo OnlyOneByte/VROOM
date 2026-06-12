@@ -1573,6 +1573,11 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     current UTC `.slice(0,10)` EXACTLY (the local-date fix stays a future `bug` cycle). Wired all 9 (mixed Date+string) + 4 imports; the
     C135/C166 precedent (a value-identical swap can't move a pixel → no eyes-on needed). +3 unit tests. green→green fe 595 pass (+3),
     every form/service test UNCHANGED.*
+  - ~~**`vehicleIdsForTerm(termVehicleCoverage, termId)` — the insurance term junction→vehicleIds derivation, 3 sites → 1 (C273)**~~ — *DONE C273: the
+    `policy.termVehicleCoverage.filter(tc => tc.termId === X).map(tc => tc.vehicleId)` block was byte-identical at 3 sites in insurance/routes.ts
+    (create-policy loop, addTerm, updateTerm), each feeding createTermExpenses/updateTermExpenses. Extracted a pure `vehicleIdsForTerm` to insurance/hooks.ts
+    (typed `readonly TermCoverageRow[]`, decoupled from the full policy) + wired all 3 → one-liners. Behavior-preserving (faithful 1:1 map). +3 unit tests
+    (filter+project order, empty/unknown→[], no cross-term leak); anchored by the existing premium-expense-hook + C272 ownership tests green→green. 1388 pass (+3).*
 
 Seed audit angles for the rule-7 fan-out (once the above are done, or to go broader):
 - **Backend layering** — route handlers doing repository/business logic inline; missing or
