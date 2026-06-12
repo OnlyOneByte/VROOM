@@ -187,6 +187,39 @@ describe('PUT /api/v1/providers/:id — update', () => {
     });
     expect(res.status).toBe(404);
   });
+
+  // C260: the credentials-re-encrypt branch (routes.ts:397-399) was uncovered — the security-sensitive
+  // one. A PUT carrying new credentials must RE-ENCRYPT them into the column (never store plaintext)
+  // and still never echo them in the response.
+  test('PUT with new credentials re-encrypts the stored blob (never plaintext, never echoed)', async () => {
+    const created = await createProvider();
+    const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, {
+      credentials: { secretAccessKey: 'rotated-secret-9999', bucket: 'b', region: 'us-east-1' },
+    });
+    expect(res.status).toBe(200);
+    const data = (await json<DataEnvelope<ProviderResponse>>(res)).data;
+    // Never echoed in the response.
+    expect(JSON.stringify(data)).not.toContain('rotated-secret-9999');
+    expect('credentials' in data).toBe(false);
+
+    // Stored column was updated and the plaintext secret is NOT in it (encrypted at rest).
+    const row = ctx.sqlite
+      .query('SELECT credentials FROM user_providers WHERE id = ?')
+      .get(created.id) as { credentials: string };
+    expect(row.credentials, 'credentials column present').toBeTruthy();
+    expect(row.credentials).not.toContain('rotated-secret-9999');
+  });
+
+  test('PUT against an AUTH-domain provider → 400 (managed via /auth only)', async () => {
+    // Raw-seed an auth-domain provider owned by the user (the create route rejects domain:'auth').
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
+       VALUES ('auth-prov', ?, 'auth', 'google', 'My Login', '', 'active')`,
+      [ctx.user.id]
+    );
+    const res = await ctx.authed('PUT', '/api/v1/providers/auth-prov', { displayName: 'hijack' });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('DELETE /api/v1/providers/:id', () => {

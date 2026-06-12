@@ -4452,3 +4452,12 @@ Current cycle: **227**
   (category %s sum to 100), Property 5 (costPerDistance formula + null-on-zero edge), #54 (per-vehicle pairing); the only skip is Property 23
   (financing-DI, the deep-review #3 gap, not loop-fixable). Adding a test would be coverage-theater. NO code change (record-only, the
   C225/C246/C251/C256 precedent — certified clean AND already pinned). cov: be 85.95% / fe 80.64% (carry).
+- **C260 (guard): cover the providers PUT credentials-re-encrypt + auth-domain-guard branches (providers/routes.ts, the 58% low spot)** — BALANCE:
+  nothing OVER budget; `guard` most-starved (cyc 257, starved-for 3) → highest-leverage. GROUNDED pick (C258 measure: providers/routes.ts 58%
+  line): the C91 net covered PUT displayName+config + the no-credentials-echo, but TWO PUT branches were uncovered: (1) the
+  CREDENTIALS-RE-ENCRYPT branch (:397-399, the security-sensitive one) and (2) the auth-domain → 400 guard via the LIVE HTTP path (domain-guard.test
+  covers it only by source-scan). +2 HTTP tests: PUT with new credentials → 200, the response NEVER echoes the new secret + `credentials` absent,
+  AND the stored DB column (read via ctx.sqlite) was updated + does NOT contain the plaintext secret (encrypted-at-rest invariant); PUT against a
+  raw-seeded auth-domain provider → 400 ('Auth providers cannot be modified through this endpoint'). green→green: backend validate:local EXIT 0 —
+  1372 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production change. cov: be 85.95%+ (carry;
+  +2 BE, providers/routes.ts PUT credentials/auth-guard now covered) / fe 80.64% (carry).

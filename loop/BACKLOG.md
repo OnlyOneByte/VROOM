@@ -431,6 +431,8 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > refreshToken throw; S3 happy + missing-creds throw + missing-config throw — the credential/config integrity gates; pure-construct, no DB/network).
 > `providers/routes.ts` GET /pending/:nonce DONE C257 (+4 HTTP: own-nonce → 200+email, unknown → 404, ANOTHER-user's-nonce → 404 [the userId:nonce
 > cross-user isolation], anon → 401; seeded via a post-harness dynamic-import of storePending for the same-instance Map, ran clean in the full suite).
+> `providers/routes.ts` PUT credentials-re-encrypt + auth-domain-guard DONE C260 (+2 HTTP: PUT new credentials → 200, response never echoes the
+> secret + the stored DB blob doesn't contain the plaintext [encrypted-at-rest]; PUT an auth-domain provider → 400 via the live route).
 > **NEXT FE guard pick (no primed): the FE pure/service modules are now
 > essentially all covered — remaining FE gap is the components/routes deficit (largely eyes-on) + the network/timer-bound tails (mock-trap, low-value). vehicle-helpers.ts is the lone untested FE util but it's a single trivial display-name fn (theater — skip).** The components/routes deficit is
 > the bulk + largely eyes-on.** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
