@@ -181,6 +181,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Cross-vehicle analytics vein audit (C259)**~~ — *DONE C259: inline (spawn_run 400). CERTIFIED CLEAN: getCrossVehicle costPerDistance is the
+  documented #45-family period-scoped semantics (not a new bug; maxMileage/minMileage guard requires ≥1 reading, single-reading→null handled);
+  buildMonthlyExpenseTrends sort-then-slice(-24) [C11 guard], buildExpenseByCategory unknown→misc + div-by-zero guarded, #54 per-vehicle pairing.
+  NO guard gap — cross-vehicle.property.test ALREADY pins it (Property 4 category-%s-sum-100, Property 5 costPerDistance+null-edge, #54); only skip
+  is Property 23 (financing-DI, deep-review #3). NO code (record-only, certified clean + already pinned — the C246/C256 precedent).*
 - ~~**Mileage-reminder trigger vein audit (C256)**~~ — *DONE C256: inline (spawn_run 400). CERTIFIED CLEAN: processMileageReminder guards
   null-milestone/single-vehicle/due-check; idempotency is belt-and-braces (app mileageNotificationExists + the partial unique rn_reminder_odo_idx
   on (reminderId,dueOdometer) + createMileageNotification UNIQUE-catch→null under races); time/mileage axes cleanly separated via NULL-distinct +

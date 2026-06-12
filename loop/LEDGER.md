@@ -4441,3 +4441,14 @@ Current cycle: **227**
   90% requires either an Angelo-unblocked harness or a DI-refactor sign-off — NOT loop-grindable. DOCS/MEASUREMENT-ONLY (CLAUDE.md + ledger, no
   source) → the two coverage runs + stray-test check WERE the verification. Next #5 sweep ~C268; next CLAUDE.md content-refresh ~C263. cov: be
   85.95% line / 85.64% func / fe 80.64% line / 80.51% func / 74.87% branch (FRESH C258 reading).
+- **C259 (deep-review): analytics getCrossVehicle + its builders — CERTIFIED CLEAN, already well-tested (pure record-only cert)** — BALANCE:
+  `deep-review` most-starved (cyc 256, starved-for 3) → highest-leverage. spawn_run 400 → inline. Audited getCrossVehicle (the fleet-comparison
+  tab: vehicleCostComparison + fuelEfficiencyComparison + monthlyExpenseTrends + expenseByCategory) firsthand. CERTIFIED CLEAN: (1) per-vehicle
+  costPerDistance = totalCost / (maxMileage−minMileage over in-range mileaged expenses) — the period-scoped distance pairs correctly with the
+  period cost; the maxMileage>0 && minMileage<Infinity guard requires ≥1 reading; single-reading → distance 0 → null (handled). This is the
+  documented #45-family period-scoped semantics (already escalated), NOT a new bug. (2) buildMonthlyExpenseTrends sorts-then-slice(-24) [newest,
+  the C11 oldest-slice guard satisfied]; buildExpenseByCategory unknown-cat→misc bucket + div-by-zero guarded (total===0→[]); per-vehicle unit
+  conversion correct (#54 per-vehicle pairing). NO guard gap to fill: cross-vehicle.property.test ALREADY drives getCrossVehicle — Property 4
+  (category %s sum to 100), Property 5 (costPerDistance formula + null-on-zero edge), #54 (per-vehicle pairing); the only skip is Property 23
+  (financing-DI, the deep-review #3 gap, not loop-fixable). Adding a test would be coverage-theater. NO code change (record-only, the
+  C225/C246/C251/C256 precedent — certified clean AND already pinned). cov: be 85.95% / fe 80.64% (carry).
