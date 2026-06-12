@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 281 |
 | guard | 6 | 282 |
-| bug | 3 | 280 |
+| bug | 3 | 284 |
 | arch | 5 | 283 |
 | infra | 6 | 279 |
 
-Current cycle: **283**
+Current cycle: **284**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4739,3 +4739,14 @@ Current cycle: **283**
   not three. BEHAVIOR-PRESERVING (returns the identical literal). Anchored by the existing create/updateProfile config-shape property assertions + the
   auth-routes tests passing UNCHANGED, +2 direct helper tests (full shape; avatarUrl optional). green→green: backend validate:local EXIT 0 — 1400 pass
   (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean (format auto-fixed), build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C284 (bug-cycle scout → guard): odometer write paths CERTIFIED CLEAN; pinned the DELETE-no-recheck (downward-change-safe) invariant** — BALANCE: `bug`
+  the only category strictly OVER budget (cyc 280, starved-for 4 > 3); feature more-starved (114) but human-gated. Bug DORMANT → scout-fresh → fix-or-record.
+  SCOUTED two surfaces, BOTH clean: (1) odometer routes — DELETE /:id does NOT call recheckMileageReminders (POST :131 + PUT :158 do), which I initially
+  flagged as a possible gap, but VERIFIED it's CORRECT: processMileageReminder only fires on a FORWARD crossing (currentOdometer >= nextDueOdometer) +
+  dedups, never un-fires, so a DELETE (which can only LOWER the odometer) has nothing to re-evaluate; (2) expenses repository source/clientId queries
+  (findBySource/findIdsByGroupId/findByClientId) — all userId-scoped, idempotency CAS race-recovery clean. NO live defect. THE finding → guard: the
+  downward-odometer-is-safe invariant was subtle + unpinned (recheck-on-write.test covered CREATE+UPDATE firing but not the DELETE/un-fire case). +1 HTTP
+  test (recheck-on-write.test.ts): a reading crosses 35000 → fires; DELETE that highest reading (odometer drops below the milestone) → the notification
+  SURVIVES (durable history, no un-fire) AND a later /trigger does NOT re-fire (dedup holds, no reading ≥ milestone). NON-VACUOUS (a future "recheck on
+  delete" un-fire or a dedup regression breaks it). green→green: backend validate:local EXIT 0 — 1401 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean,
+  build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).

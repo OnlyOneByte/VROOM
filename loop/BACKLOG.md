@@ -825,6 +825,10 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   addTerm/updateTerm HTTP paths were unpinned → +4 HTTP tests (terms-http.test.ts): POST /insurance + POST /:id/terms + PUT /:id/terms/:termId with a
   foreign vehicleId → 404, zero junction rows planted (PUT keeps original coverage); + owned-vehicle control. NON-VACUOUS. green→green 1385 pass (+4). Also
   re-confirmed financing PATCH/payoff/refinance clean (C240). NO live defect — bug vein still exhausted.*
+- ~~**Odometer write-path scout (C284)**~~ — *DONE C284 (bug-cycle scout, CERTIFIED CLEAN + guard): odometer DELETE does NOT recheckMileageReminders
+  (POST/PUT do) — VERIFIED CORRECT (processMileageReminder fires only on a forward crossing + dedups, never un-fires; a DELETE can only LOWER the odometer →
+  nothing to re-evaluate). expenses source/clientId queries all userId-scoped, idempotency CAS clean. THE finding → guard: the downward-safe invariant was
+  unpinned → +1 HTTP test (cross 35000 fires; DELETE the highest reading → notification SURVIVES, /trigger does NOT re-fire). NON-VACUOUS. 1401 pass (+1). NO live defect.*
 - ~~**Reminder mark-serviced re-arm scout (C276)**~~ — *DONE C276 (bug-cycle scout, CERTIFIED CLEAN + guard): the two-axis re-arm (POST /:id/mark-serviced)
   is sound by domain semantics — TIME axis schedule-anchored (advance from nextDueDate; #83 overdue fast-forward correct+tested), MILEAGE axis usage-anchored
   (reset to current odometer + interval); axis difference INTENTIONAL. Comprehensively pinned (mileage anchor, no-longer-due-at-trigger, #83 overdue catch-up,
