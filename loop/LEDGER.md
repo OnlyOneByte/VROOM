@@ -4306,3 +4306,14 @@ Current cycle: **227**
   own-vehicle+real-term → 201 control (no over-block); PUT re-point to unowned vehicle → 404. NON-VACUOUS (pre-fix the verbatim write stored the
   foreign ids → 201). green→green: backend validate:local EXIT 0 — 1357 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean (no reflow), build
   bundled. cov: be 85.18%+ (carry; +4 BE) / fe 80.64% (carry).
+- **C248 (infra): #5 branch-hygiene sweep + coverage re-measure (last sweep C236, ~12 cycles / overdue)** — BALANCE: TWO at budget — `infra` (cyc
+  242, starved-for 6 = 6) + `arch` (cyc 243, starved-for 5 = 5); infra waited LONGER (touched C242 vs C243) → infra wins. The #5 sweep was due
+  (last C236, forecast ~C246); CLAUDE.md was refreshed recently (C242) so the doc-refresh wasn't the pick. (1) STRAY-TEST CHECK CLEAN: zero
+  untracked non-e2e `.test.ts` in the tree. (2) GREEN BASELINE + RE-MEASURE: backend `bun test --coverage` EXIT 0 (1357 pass / 1 skip) — **be
+  85.91% line / 85.31% func** (up from C236's 85.18/84.74 — the C237 backupConfig + C239 validateStorageConfig + C244 fuel-clear + C245
+  delete-cleanup + C247 claim-refs BE additions); frontend `vitest --coverage` EXIT 0 (592 pass) — **fe 80.64% line / 80.51% func / 74.97%
+  branch** — FLAT vs C236 (every C237–C247 cycle was backend, so FE didn't move). BE↔FE gap ~5pts (86 vs 81). The BE bug/guard arc keeps lifting
+  backend; FE is steady at ~80.6 (its pure/service layer is saturated, the rest is eyes-on components). Refreshed CLAUDE.md's coverage line to the
+  C248 reading. DOCS/MEASUREMENT-ONLY (CLAUDE.md + ledger; no source touched) → the two coverage runs + stray-test check WERE the verification.
+  Next #5 sweep ~C258; next CLAUDE.md content-refresh ~C252. cov: be 85.91% line / 85.31% func / fe 80.64% line / 80.51% func / 74.97% branch
+  (FRESH C248 reading).
