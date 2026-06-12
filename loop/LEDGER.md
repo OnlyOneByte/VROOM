@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 290 |
 | bug | 3 | 288 |
 | arch | 5 | 289 |
-| infra | 6 | 285 |
+| infra | 6 | 292 |
 
-Current cycle: **291**
+Current cycle: **292**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4827,3 +4827,10 @@ Current cycle: **291**
   NON-VACUOUS (skipped=true vs undefined distinguishes the change-gate path from the no-providers path; migrations ran + the real module imported, proving
   it's the genuine execute(), not a sim). green→green: backend validate:local EXIT 0 — 1414 pass (+3) / 1 skip / 0 fail, tsc 0, musl-biome clean (format
   auto-fixed), build bundled. cov: be 85.74%+ (carry; execute() skip paths now REAL-covered) / fe 81.41% (carry).
+- **C292 (infra): CLAUDE.md refresh — add #88 to the pending-Angelo block + suite size ~1392→~1414 BE** — BALANCE: TWO over budget (infra 7 > 6, bug 4 > 3);
+  infra most-starved → picked it (the C253/C279 docs-accuracy cadence). #88 was filed+escalated C288 but the CLAUDE.md pending-Angelo list ended at #85, and
+  the suite-size line (C279, ~1392) drifted as C287/C288/C289/C290/C291 added ~22 BE tests → now 1414. FIXED (CLAUDE.md only): (1) appended #88 (split
+  reminder + deleted vehicle → partial-group, the C151 async-tx footgun; drop+renormalize / deactivate / single-vehicle — product-gated) to the
+  pending-Angelo block beside #79/#85; (2) suite size ~1392→~1414 BE / ~604 FE. CHECKED the closed-bug list is still ACCURATE (last fix was #87/C268; C272–C291
+  were guards/dedups/a-filed-#88, not new fixes). DOCS-ONLY — verified `git diff --name-only` = CLAUDE.md alone before the loop-file edits; no source/test/
+  build touched (the C291 gate is the last code state). Keeps the next cycle's product-call backlog accurate.

@@ -183,7 +183,7 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1392 backend tests / ~604 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1414 backend tests / ~604 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
@@ -240,5 +240,6 @@ Highlights:
   inclusivity server-TZ-conditional, UTC-mitigated), **#69** (a monthly-only insurance term shows in analytics
   but is absent from TCO — escalated C210: materialize monthlyCost×term-months / N monthly rows / analytics-only),
   **#79** (a malformed fuel offline entry is stuck in the outbox forever, silently re-skipped — drop+toast / failed-bucket / confirm-the-form-blocks-it),
-  **#85** (fuel-stats "This/Last Year" is range-relative not calendar-year — the sibling month fields are now true calendar months after #86/C262, so this is purely the YEAR row: calendar-YTD / relabel "This/Last Period" / hide-on-non-year-range; #9-rename class).
+  **#85** (fuel-stats "This/Last Year" is range-relative not calendar-year — the sibling month fields are now true calendar months after #86/C262, so this is purely the YEAR row: calendar-YTD / relabel "This/Last Period" / hide-on-non-year-range; #9-rename class),
+  **#88** (a SPLIT recurring-expense reminder naming a DELETED vehicle leaves a partial/inconsistent group every trigger — expenseSplitConfig is a JSON blob, NOT FK-cascade-cleaned like the junction, so the deleted vehicle's leg FK-violates [the C151 async-tx rollback footgun leaves the surviving leg]; found+escalated C288 — drop+renormalize on vehicle-delete / deactivate / single-vehicle fallback).
   See `loop/BACKLOG.md` bug queue for the full list + grounding.
