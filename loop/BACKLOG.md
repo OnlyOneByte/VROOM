@@ -181,6 +181,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**backup-orchestrator execute() audit (C291)**~~ — *DONE C291 (deep-review → guard): CERTIFIED CLEAN — mutex (idempotent-delete, double-release
+  harmless), force-bypass + change-skip, no-providers early return, ZIP-fail→Sheets-only, per-provider decrypt-fail skip, Promise.allSettled containment,
+  #42 snapshot-start-timestamp persist-on-success. THE finding: backup-orchestrator.test's mutex/skip/no-providers cases were LOCAL SIMS (C181 theater, its
+  header claimed execute() "not reachable in-harness" — OVER-CAUTIOUS: createTestApp rewrites DATABASE_URL before the dynamically-imported orchestrator's
+  getDb() resolves, and the early-return skip paths predate any provider work → drivable). +3 real-execute() tests (new backup-orchestrator-execute.test.ts:
+  no-changes→skipped; has-changes+no-providers→empty; force+no-providers→empty). NON-VACUOUS. green→green 1414 pass (+3).*
 - ~~**Split-expense edit/delete cascade + expense-filter builder audit (C286)**~~ — *DONE C286: inline (spawn_run 400), record-only. BOTH CERTIFIED CLEAN +
   already comprehensively pinned: updateSplitExpense/deleteSplitExpense (userId-scoped destructive writes #52/C109; absolute-edit derives groupTotal from
   legs #60; source-link preserved across edit C101; photo migration) — all in expense-repository.property.test; buildExpenseConditions (endDate-inclusive

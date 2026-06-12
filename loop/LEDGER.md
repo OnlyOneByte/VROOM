@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 286 |
+| deep-review | 5 | 291 |
 | guard | 6 | 290 |
 | bug | 3 | 288 |
 | arch | 5 | 289 |
 | infra | 6 | 285 |
 
-Current cycle: **290**
+Current cycle: **291**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4814,3 +4814,16 @@ Current cycle: **290**
   startDate+endDate (dateRangeVehicleQuerySchema) — omitting them 400s at zValidator BEFORE the guard; supplying a valid 2024 unix-seconds range reaches
   the guard branch. NON-VACUOUS (foreign-id asserts 404 not 200/400; no-id asserts the 200 envelope). green→green: backend validate:local EXIT 0 — 1411
   pass (+4) / 1 skip / 0 fail, tsc 0, musl-biome clean (format auto-fixed), build bundled. Test-only. cov: be 85.74%+ (carry) / fe 81.41% (carry).
+- **C291 (deep-review → guard): backup-orchestrator execute() CERTIFIED CLEAN; converted the C181 skip-path SIMS to real-execute() coverage** — BALANCE:
+  infra + deep-review both due (cyc 285/286, starved-for 6/5); infra has no pressing work (cov C285, hygiene C274, docs C279 — manufactured if forced) →
+  picked deep-review. Audited BackupOrchestrator.execute() firsthand. CERTIFIED CLEAN: mutex (idempotent delete → the inline-release-at-early-returns +
+  finally double-release is HARMLESS, not a bug), force-bypass + change-detection skip, no-providers early return, ZIP-fail→Sheets-only resilience,
+  per-provider decrypt-fail skip, Promise.allSettled containment (one provider's failure can't sink the others), the #42 snapshot-START-timestamp
+  persist-only-on-success (C144). THE finding: backup-orchestrator.test.ts's mutex/change-skip/no-providers cases are LOCAL SIMS (the C181 coverage-theater
+  pattern its own header flags as "execute() not reachable in-harness") — but that note was OVER-CAUTIOUS: createTestApp rewrites DATABASE_URL to in-memory
+  BEFORE the (dynamically-imported-here) orchestrator + its getDb() resolve, so the REAL execute() runs against the harness DB, and the EARLY-RETURN skip
+  paths return before any storage-provider work → genuinely drivable. +3 real-execute() tests (new backup-orchestrator-execute.test.ts): force=false+no-changes
+  → {skipped:true}; has-changes(seeded vehicle bumps lastDataChangeDate)+no-providers → not-skipped+empty results; force=true+no-providers → not-skipped+empty.
+  NON-VACUOUS (skipped=true vs undefined distinguishes the change-gate path from the no-providers path; migrations ran + the real module imported, proving
+  it's the genuine execute(), not a sim). green→green: backend validate:local EXIT 0 — 1414 pass (+3) / 1 skip / 0 fail, tsc 0, musl-biome clean (format
+  auto-fixed), build bundled. cov: be 85.74%+ (carry; execute() skip paths now REAL-covered) / fe 81.41% (carry).
