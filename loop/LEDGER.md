@@ -4391,3 +4391,16 @@ Current cycle: **227**
   / 0 fail (+5), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production change. cov: be 85.91%+ (carry; +5 BE, registry
   createProviderInstance now fully branch-covered) / fe 80.64% (carry). NOTE: the arch category is now reliably dry — future arch picks should
   expect to pivot unless a NEW dup is introduced by feature work.
+- **C255 (bug): second clean sweep — 4 more surfaces hunted, all clean + already test-covered; bug category now effectively DORMANT** — BALANCE:
+  `bug` AT budget (cyc 251, starved-for 3 = 3, FORCED). Per the C251 finding (integrity vein exhausted) + don't-manufacture (C21/C77), hunted FOUR
+  surfaces NOT covered in C251's sweep, all CERTIFIED CLEAN against source: (1) expense CSV export — neutralizeCsvRow guards every string cell
+  (CWE-1236, one-way, the #36-class closed here); (2) odometer getHistory UNION ALL — keeps an expense-mileage reading + a manual reading as
+  DISTINCT events by design (no double-count; count query sums both legs consistently; ORDER BY recorded_at DESC + LIMIT/OFFSET correct); (3)
+  buildExpenseConditions filter combination — vehicleId/category/date(×2)/each-tag-as-EXISTS (AND semantics ✓) / search as a parenthesized
+  (desc LIKE OR category LIKE) sub-clause that can't break the outer AND; date inclusive (#39), LIKE-escaped (#41); (4) re-confirmed the high-risk
+  paths are ALREADY test-covered (odometer-history.property.test, the registry suite C254, the restore suite C246). NO defect → NO code (the honest
+  C21/C77 outcome). CONCLUSION: across C251+C255 (10+ surfaces) the bug vein is confirmed DRY and the high-risk paths are pinned. STANDING
+  GUIDANCE: treat `bug` as effectively DORMANT — a forced bug cycle should do ONE quick fresh-surface scout, and if clean (the expected outcome),
+  record a one-line sweep + pivot to the next-actionable category rather than burn tokens re-hunting covered ground. Re-arms only when feature work
+  or an Angelo-unblocked product call lands new code. (Already escalated C251 — no re-escalation.) NO build gate (no code touched). cov: be 85.91%
+  / fe 80.64% (carry).
