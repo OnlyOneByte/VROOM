@@ -181,6 +181,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Sync RESTORE path vein audit (C246)**~~ — *DONE C246: inline audit (spawn_run 400). CERTIFIED CLEAN: both ZIP + Sheets restore call
+  assertReplaceNotEmpty symmetrically (#21 wipe-guard, no path-asymmetry); stampUserId force-stamps every userId-column table + the unstamped
+  children (financing/terms/claims/junctions) own indirectly via FK, and validateReferentialIntegrity constrains EVERY FK-child to in-backup id
+  sets — so a crafted backup can't smuggle foreign-owned data; detectConflicts tenant-scoped (C109). GUARD: restore-junction-refs covered the
+  junction ref-check but NOT financing (the highest-stakes unstamped child — no userId column, owns purely via vehicleId FK); +1 HTTP test (tamper
+  vehicle_financing.csv → out-of-backup vehicleId → restore rejected, data intact). NO production change (record-only cert, the C179/C240
+  precedent). green→green 1353 pass (+1).*
 - ~~**Financing write+balance+hook vein audit (C240)**~~ — *DONE C240: inline audit (spawn_run 400). CERTIFIED CLEAN: computeBalance/Balances
   payment-history-based + C101-consistent; every route entry ownership-gated (POST validates the vehicle, PATCH/PUT/DELETE validateFinancingOwnership
   — financing→vehicle→owned, no info leak); onFinancingDeactivated clearSource nulls sourceType+sourceId userId-scoped; the #67/C206 re-finance

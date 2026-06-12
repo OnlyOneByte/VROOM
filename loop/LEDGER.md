@@ -4276,3 +4276,19 @@ Current cycle: **227**
   intact (the scrub is targeted, not over-broad). Used the all-4-category exhaustive map (the C70 Zod-v4-record trap) + all-null defaults helper (the
   C239 pattern). green→green: backend validate:local EXIT 0 — 1352 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean (no reflow), build bundled.
   Test-only, no production change. cov: be 85.18%+ (carry; +2 BE, providers/routes.ts DELETE-cleanup now covered) / fe 80.64% (carry).
+- **C246 (deep-review): sync RESTORE path (ZIP + Sheets, insert/stamp/ref-integrity) — CERTIFIED CLEAN; pinned the financing-ref ownership
+  invariant** — BALANCE: `deep-review` OVER budget (cyc 240, starved-for 6 > 5, FORCED — the C245 forecast). spawn_run 400 → inline (C231/C235/C240
+  precedent). Audited the restore path firsthand, CERTIFIED CLEAN: (1) BOTH restoreFromBackup (ZIP) + restoreFromSheets call assertReplaceNotEmpty
+  (the #21 empty-replace TOTAL-wipe guard) symmetrically (lines 123/238) — no path-asymmetry. (2) stampUserId force-stamps the importer on every
+  userId-COLUMN table (vehicles/insurance/reminders/reminderNotifications/expenses/odometer/userPreferences/syncState — C145); the un-stamped
+  children (financing/insuranceTerms/insuranceClaims/junctions) own INDIRECTLY via an FK to a stamped parent. (3) The model is SOUND because
+  validateReferentialIntegrity (backup.ts:574) constrains EVERY FK-child to the backup's OWN in-backup id sets (expenses/financing/terms/term-veh
+  junctions/claims/odometer/photos/photoRefs/reminders/reminder-veh junctions/notifications) — so a child can't reference a parent outside the
+  (importer-stamped) backup, and metadata.userId is validated against the importer. A crafted backup can't smuggle foreign-owned data. (4)
+  detectConflicts is tenant-scoped (C109). THE merge-surviving guard left where coverage was thin (the C108/C179/C240 record-only-cert precedent):
+  restore-junction-refs.test.ts covered the JUNCTION ref-check (reminder_vehicles → bogus vehicle) but NOT financing — the highest-stakes UNSTAMPED
+  child (no userId column; its ENTIRE ownership safety rests on validateFinancingRefs constraining it to in-backup vehicleIds). +1 HTTP test: create
+  financing → tamper vehicle_financing.csv to point at an out-of-backup vehicleId → restore REJECTED (cites 'vehicle'), original data intact (no
+  wipe — validation runs before the replace txn). NON-VACUOUS (the control restores cleanly). Fixed a self-caught path bug: financing mounts at
+  /api/v1/financing/vehicles/:id/financing (not /api/v1/vehicles/...). green→green: backend validate:local EXIT 0 — 1353 pass / 1 skip / 0 fail
+  (+1), tsc 0, musl-biome clean (no reflow), build bundled. NO production change (clean cert). cov: be 85.18%+ (carry; +1 BE) / fe 80.64% (carry).

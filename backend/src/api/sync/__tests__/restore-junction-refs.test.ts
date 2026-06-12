@@ -96,6 +96,62 @@ describe('restore rejects junction rows that reference out-of-backup ids', () =>
     expect(rows.some((r) => r.id === 'not-in-backup-vehicle')).toBe(false);
   });
 
+  // C246: financing is the highest-stakes UN-stamped child — it carries NO userId column (it owns
+  // purely via its vehicleId FK), so its ENTIRE ownership safety rests on validateFinancingRefs
+  // constraining it to in-backup vehicleIds. If that ref-check regressed, a crafted backup could
+  // attach a financing record to a vehicle outside the (importer-stamped) backup. Pins it the same
+  // way as the junction case (the deep-review C246 certified the indirect-ownership model; this is
+  // the merge-surviving net on its load-bearing assumption).
+  test('a vehicle_financing row pointing at a bogus vehicle id is rejected', async () => {
+    const vehicleId = await seedVehicle();
+
+    // Create financing on the vehicle → a vehicle_financing row referencing it.
+    const fin = await ctx.authed('POST', `/api/v1/financing/vehicles/${vehicleId}/financing`, {
+      financingType: 'loan',
+      provider: 'TestBank',
+      originalAmount: 20000,
+      termMonths: 60,
+      startDate: '2024-01-01T00:00:00.000Z',
+      paymentAmount: 400,
+      apr: 5,
+    });
+    expect(fin.status, await fin.text()).toBeLessThan(300);
+
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const AdmZip = (await import('adm-zip')).default;
+
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    const archive = new AdmZip(zip);
+    const finCsv = archive.getEntry('vehicle_financing.csv')?.getData().toString('utf-8');
+    expect(finCsv, 'export contains vehicle_financing.csv').toBeTruthy();
+    expect(finCsv as string, 'financing references the real vehicle').toContain(vehicleId);
+
+    // Tamper: repoint the financing row at a vehicle id NOT in the backup.
+    const tampered = (finCsv as string).split(vehicleId).join('not-in-backup-vehicle');
+    archive.updateFile('vehicle_financing.csv', Buffer.from(tampered, 'utf-8'));
+    const tamperedZip = archive.toBuffer();
+
+    let thrown: unknown;
+    try {
+      await restoreService.restoreFromBackup(ctx.user.id, tamperedZip, 'replace');
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown, 'tampered financing restore must throw').toBeDefined();
+    const errText = JSON.stringify(
+      thrown instanceof Error
+        ? { message: thrown.message, ...(thrown as unknown as Record<string, unknown>) }
+        : thrown
+    ).toLowerCase();
+    expect(errText, 'rejection cites the financing/vehicle ref').toContain('vehicle');
+
+    // Validation runs before the replace transaction → nothing mutated, no wipe.
+    const rows = ctx.sqlite.query('SELECT id FROM vehicles').all() as { id: string }[];
+    expect(rows, 'rejected restore left the original data intact').toHaveLength(1);
+    expect(rows[0].id).toBe(vehicleId);
+  });
+
   test('the untampered backup restores cleanly (control)', async () => {
     const vehicleId = await seedVehicle();
     const created = await ctx.authed('POST', '/api/v1/reminders', {
