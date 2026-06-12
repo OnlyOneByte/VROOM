@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 281 |
+| deep-review | 5 | 286 |
 | guard | 6 | 282 |
 | bug | 3 | 284 |
 | arch | 5 | 283 |
 | infra | 6 | 285 |
 
-Current cycle: **285**
+Current cycle: **286**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4759,3 +4759,14 @@ Current cycle: **285**
   DI/orchestrator-bound tails; FE gap is eyes-on components/routes, Playwright-gated) — not loop-closable without an eyes-on harness or DI sign-off.
   DOCS-ONLY: updated the CLAUDE.md coverage line (C269→C285 figures); no source/test/build touched (the C284 gate is the last code state). Recorded the
   measure honestly; no churn-test forced to chase a structurally-gated number.
+- **C286 (deep-review): split-expense edit/delete cascade + expense-filter builder — BOTH CERTIFIED CLEAN, already comprehensively pinned (record-only)** —
+  BALANCE: `deep-review` most-starved actionable (cyc 281, starved-for 5 = budget, due); feature more-starved (116) but human-gated. spawn_run still 400s →
+  firsthand. SCOUTED two surfaces, both CLEAN + thoroughly covered: (1) `updateSplitExpense`/`deleteSplitExpense` (repository.ts) — userId-scoped destructive
+  writes (the #52/C109 cross-tenant class), absolute-edit derives groupTotal from the new legs (NOT the stale stored header — the #60 Property-3 fix),
+  source-link (sourceType/sourceId) preserved across an edit (C101), photos migrated to the first new sibling; ALL pinned by expense-repository.property.test
+  (groupId preservation, photo migration, source survival, #52 cross-tenant delete+update, #60 absolute-no-total + matching-total-no-op). (2)
+  `buildExpenseConditions` (the single source for list + CSV-export filtering) — endDate-inclusive-of-local-day (#39/C6/C61/C103 boundary class), tag AND-semantics
+  via json_each, LIKE-metachar escape (#41 `50%`-literal); ALL pinned by date-range-boundary.test (5 cases incl. the findAll/CSV-export-shares-boundary +
+  non-midnight-verbatim) + search-paginated.test (#41) + repository.property.test (tag-every). NO defect, NO warranted new test (more would be coverage-theater,
+  the C225/C259/C275 rule). RECORD-ONLY (the C259/C275 clean-cert precedent — both targets clean AND already comprehensively pinned). No code, no test, no gate
+  run (the C284 state is the last code change; C285 was docs). cov: be 85.74% (carry) / fe 81.41% (carry).

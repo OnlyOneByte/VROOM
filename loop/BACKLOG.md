@@ -181,6 +181,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Split-expense edit/delete cascade + expense-filter builder audit (C286)**~~ — *DONE C286: inline (spawn_run 400), record-only. BOTH CERTIFIED CLEAN +
+  already comprehensively pinned: updateSplitExpense/deleteSplitExpense (userId-scoped destructive writes #52/C109; absolute-edit derives groupTotal from
+  legs #60; source-link preserved across edit C101; photo migration) — all in expense-repository.property.test; buildExpenseConditions (endDate-inclusive
+  #39, tag-AND json_each, LIKE-escape #41) — all in date-range-boundary + search-paginated + repository.property tests. NO defect, NO warranted test
+  (coverage-theater per C225/C259/C275). The C259/C275 clean-cert precedent.*
 - ~~**buildAmortizationSchedule audit (C281)**~~ — *DONE C281: inline (spawn_run 400). CERTIFIED CLEAN — balance-clamped principal (final payment ≤
   balance), paid-off loans skip, interest non-neg-clamped, no caller-mutation. Comprehensively pinned (interest-declines/principal-rises #10, payoff-clamp,
   multi-loan aggregation, no-mutation, empty). THE finding → guard: the NEGATIVE-AMORTIZATION edge (payment < monthly interest → principal 0, balance
