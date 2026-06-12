@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 264 |
 | guard | 6 | 265 |
-| bug | 3 | 266 |
+| bug | 3 | 268 |
 | arch | 5 | 267 |
 | infra | 6 | 263 |
 
-Current cycle: **267**
+Current cycle: **268**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4558,3 +4558,17 @@ Current cycle: **267**
   +3 unit tests (formatters.test.ts: Date input, ISO-string input, parity-with-the-legacy-idiom split-vs-slice). green→green: frontend validate:local
   EXIT 0 — type-check 0, build OK, 595 tests pass (+3), every existing form/service test passed UNCHANGED through the 9 swaps (behavior-preserving
   proof). cov: fe 80.64%+ (carry; +3 FE) / be 85.95% (carry).
+- **C268 (bug — #87, the leverage payoff C267 set up): `toDateInputValue` read the UTC date → off-by-one + broken stored-date round-trip** — BALANCE:
+  nothing OVER budget → highest-leverage. The standout: C267 had just CENTRALIZED the date→input idiom into one chokepoint, explicitly so this latent
+  tz defect (NORTH_STAR #2 correct-for-everyone) becomes a one-line fix — unambiguous (not a product call) + deterministically unit-testable, the highest
+  leverage available. FOUND/FIXED: `toDateInputValue` used `new Date(x).toISOString().slice(0,10)` = the UTC calendar date. Two harms: (a) a
+  negative-offset (Americas) user editing late in the day saw TOMORROW pre-filled; (b) — the worse one — it BROKE THE STORED-DATE ROUND-TRIP:
+  `dateOnlyToISO` persists date-only values anchored at NOON LOCAL, and noon-local in a positive offset (e.g. +14) is the PREVIOUS day in UTC, so a
+  vehicle's saved purchaseDate / financing.startDate reloaded ONE DAY EARLIER in the edit form. FIX: read the LOCAL components
+  (getFullYear/getMonth+1/getDate, zero-padded) — the forward partner to dateOnlyToISO's reverse direction. Noon ± any real offset (±14h) never crosses
+  LOCAL midnight, so a dateOnlyToISO→toDateInputValue round-trip is now EXACT in every timezone (the property the UTC version violated). Updated the C267
+  tests UTC→LOCAL + made them host-tz-INDEPENDENT by construction (build the Date from local components `new Date(y,m,d,…)`, assert the same y/m/d back)
+  + added a round-trip-in-every-tz test (dateOnlyToISO→toDateInputValue identity over 4 dates incl. leap-day) + zero-pad. NON-VACUOUS (the round-trip
+  test FAILS under the old UTC `.slice(0,10)` for a positive-offset host). green→green: frontend validate:local EXIT 0 — type-check 0, build OK, 596
+  tests pass (net +1: consolidated 3 C267 tests → 4), every form/service test UNCHANGED (the call sites bind correctly to the local output). Single FE
+  chokepoint, all 9 call sites benefit. cov: fe 80.64%+ (carry) / be 85.95% (carry).

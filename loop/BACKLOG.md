@@ -789,6 +789,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   (Jan→prev-year rollover) + inCurrentMonth/inPrevMonth predicates matching BOTH month AND year; applied to all 4 month figures. +2 deterministic
   regression tests (dates relative to now → host-independent): prior-year same-month excluded from This Month; Last Month rolls to prev-year in January.
   NON-VACUOUS. green→green 1376 pass (+2); existing single-year fuel-stats property tests UNCHANGED.*
+- ~~**#87 (MED, correctness / NORTH_STAR #2 — surfaced by the C267 arch extract, fixed C268) — `toDateInputValue` read the UTC calendar date → date-input
+  off-by-one + broken stored-date round-trip.**~~ — *DONE C268: the helper used `new Date(x).toISOString().slice(0,10)` (UTC). Harms: (a) a negative-offset
+  user editing late in the day saw TOMORROW pre-filled; (b) the worse one — `dateOnlyToISO` persists date-only values at NOON LOCAL, and noon-local in a
+  positive offset is the PREVIOUS day in UTC, so a saved purchaseDate/financing.startDate reloaded one day EARLIER in the edit form. FIX: read LOCAL
+  components (getFullYear/getMonth+1/getDate, zero-padded) — the forward partner to dateOnlyToISO; noon ± any real offset never crosses local midnight, so
+  the round-trip is now exact in every tz. Tests rewritten UTC→LOCAL + host-tz-independent + a round-trip-in-every-tz case (NON-VACUOUS — fails under the
+  old UTC version for a positive-offset host). green→green fe 596 pass; all 9 C267 call sites benefit from the one chokepoint.*
 - ~~**#41 (LOW) — expense search doesn't escape LIKE wildcards `%`/`_`.**~~ — *DONE C142: scope-checked first — the ONLY
   user-input LIKE in product source is this one expenses search site (the 2 other LIKEs are test files with literal patterns),
   so it's a single-site fix not a class. `buildExpenseConditions` built `%${search}%` with no ESCAPE → "50%" matched every row

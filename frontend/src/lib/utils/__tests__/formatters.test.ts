@@ -116,27 +116,35 @@ describe('dateOnlyToISO', () => {
 });
 
 /**
- * toDateInputValue (C267 — extracted from 9 hand-rolled `new Date(x).toISOString().split('T')[0]` /
- * `.slice(0,10)` sites across the date-input forms + the CSV download filename). Behavior-preserving:
- * pins the UTC-calendar-date output the prior call sites all produced (NOT the local-date fix — that
- * stays a future bug cycle). Both string and Date inputs are exercised since the call sites mixed them.
+ * toDateInputValue (C267 extract; #87/C268 — now LOCAL-calendar, the forward partner to dateOnlyToISO).
+ * Host-tz-independent by construction: build the input Date from LOCAL components (new Date(y,m,d,...))
+ * and assert the same local y/m/d come back, so the test passes in any timezone the CI runs in.
  */
-describe('toDateInputValue (C267 — date → YYYY-MM-DD input value)', () => {
-	test('formats a Date to the YYYY-MM-DD (UTC calendar date) an input binds to', () => {
-		// A fixed UTC instant — the date part is unambiguous regardless of the host timezone.
-		expect(toDateInputValue(new Date('2024-03-15T08:30:00.000Z'))).toBe('2024-03-15');
+describe('toDateInputValue (#87 — LOCAL date → YYYY-MM-DD input value)', () => {
+	test('formats a Date to its LOCAL calendar date (zero-padded)', () => {
+		// Local components in → the same local date out, regardless of host offset.
+		expect(toDateInputValue(new Date(2024, 2, 5, 8, 30))).toBe('2024-03-05'); // March = month index 2
+		expect(toDateInputValue(new Date(2024, 0, 1, 0, 0))).toBe('2024-01-01');
+		expect(toDateInputValue(new Date(2024, 11, 31, 23, 59))).toBe('2024-12-31');
 	});
 
-	test('accepts an ISO string (the stored-date call sites pass strings)', () => {
-		expect(toDateInputValue('2024-12-31T00:00:00.000Z')).toBe('2024-12-31');
-		expect(toDateInputValue('2024-01-01T23:59:59.000Z')).toBe('2024-01-01');
+	test('zero-pads single-digit month and day', () => {
+		expect(toDateInputValue(new Date(2025, 6, 9, 12))).toBe('2025-07-09');
 	});
 
-	test('matches the legacy idiom it replaced (split vs slice are identical for ISO)', () => {
-		const d = new Date('2023-07-04T12:00:00.000Z');
-		const legacy = d.toISOString().split('T')[0];
-		expect(toDateInputValue(d)).toBe(legacy);
-		expect(toDateInputValue(d)).toBe(d.toISOString().slice(0, 10));
+	test('round-trips with dateOnlyToISO in EVERY timezone (the #87 fix — noon-local anchor)', () => {
+		// dateOnlyToISO writes a date-only string at NOON LOCAL; reading it back with LOCAL components
+		// must return the SAME calendar date — the round-trip the old UTC .slice(0,10) broke for
+		// positive-offset users (noon-local is the previous day in UTC there).
+		for (const dateOnly of ['2024-03-15', '2024-01-01', '2024-12-31', '2024-02-29']) {
+			expect(toDateInputValue(dateOnlyToISO(dateOnly))).toBe(dateOnly);
+		}
+	});
+
+	test('accepts an ISO string input (the stored-date call sites pass strings)', () => {
+		// A noon-anchored stored date (how dateOnlyToISO persists it) reads back to that local date.
+		const stored = new Date(2024, 5, 15, 12, 0, 0).toISOString();
+		expect(toDateInputValue(stored)).toBe('2024-06-15');
 	});
 });
 

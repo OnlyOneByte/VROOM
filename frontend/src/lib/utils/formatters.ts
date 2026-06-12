@@ -79,22 +79,27 @@ export function dateOnlyToISO(dateOnly: string | undefined | null): string {
 }
 
 /**
- * Format a date as the `YYYY-MM-DD` string an `<input type="date">` binds to.
+ * Format a date as the `YYYY-MM-DD` string an `<input type="date">` binds to, using the LOCAL
+ * calendar date (not UTC) — the forward partner to `dateOnlyToISO`'s reverse (parse) direction.
  *
  * Collapses the `new Date(x).toISOString().split('T')[0]` / `.slice(0, 10)` idiom that was
  * hand-repeated across the date-input forms (expense / reminder / vehicle / odometer) + the CSV
- * download filename. `.split('T')[0]` and `.slice(0, 10)` are identical for an ISO string; this is
- * the single spelling.
+ * download filename (C267 extraction).
  *
- * BEHAVIOR NOTE (preserved deliberately): this uses the UTC calendar date (toISOString), matching
- * every prior call site exactly — so for a negative-offset (Americas) user late in the day the input
- * can show TOMORROW's date. That is the same latent off-by-one `dateOnlyToISO` guards on the reverse
- * (parse) direction; converging the writers here means a future local-date fix is one edit, not nine.
- * No default — an explicit argument is always passed (callers default to `new Date()` themselves).
+ * WHY LOCAL, NOT UTC (#87, the NORTH_STAR #2 fix): the old `.toISOString().slice(0,10)` read the UTC
+ * calendar date, so it (a) showed TOMORROW for a negative-offset (Americas) user editing late in the
+ * day, and (b) BROKE THE ROUND-TRIP for stored dates — `dateOnlyToISO` writes them anchored at NOON
+ * LOCAL, and noon-local in a positive offset (e.g. +14) is the PREVIOUS day in UTC, so a vehicle's
+ * stored purchaseDate would reload one day earlier in the form. Reading the LOCAL components fixes
+ * both: noon ± any real offset (±14h) never crosses LOCAL midnight, so a dateOnlyToISO→toDateInputValue
+ * round-trip is exact in every timezone. No default — callers pass an explicit argument.
  */
 export function toDateInputValue(date: Date | string): string {
 	const d = typeof date === 'string' ? new Date(date) : date;
-	return d.toISOString().slice(0, 10);
+	const year = d.getFullYear();
+	const month = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
 }
 
 // Relative time formatting
