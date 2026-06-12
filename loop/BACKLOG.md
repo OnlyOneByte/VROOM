@@ -516,6 +516,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#93 (MED, data-safety / NORTH_STAR #1 — found+fixed C300 on a sync/restore deep-review) — merge-mode restore threw a raw PK
+> violation on the always-present userPreferences/syncState collision instead of a clean conflict.**~~ — *DONE C300: detectConflicts
+> (restore.ts) probed only 6 tables but insertBackupData inserts 15 — incl. userPreferences + syncState (PK = userId). The importer
+> ALWAYS has a prefs row (getOrCreate) and a backup ALWAYS carries one, so a merge whose 6 probed tables didn't collide slipped past
+> detection into insert(userPreferences) against the existing PK → `UNIQUE constraint failed: user_preferences.user_id`, an unhandled
+> throw rolling back the whole restore. The existing tenant-scope test masked it (its merge backups also self-collided on a vehicle,
+> short-circuiting first). FIX: probe userPreferences + syncState like any owned table (scope eq(userId); conflict id = userId);
+> generalized the probe loop with per-entry idColumn/idField. GUARD: restore-merge-prefs-collision.test.ts isolates the case (export
+> → delete vehicle → only prefs collides → merge); RED before (raw UNIQUE throw), GREEN after (clean conflict). validate:local EXIT 0,
+> 1418 pass (+1).*
+
 > ~~**#92 (MED, correctness / NORTH_STAR #2 — found+fixed C297 on a forced bug cycle) — calculateExtraPaymentImpact treated every
 > 0%-APR loan as inert → "0 mos saved" in the payment planner for an interest-free loan an extra payment clearly shortens.**~~ — *DONE
 > C297: the early guard `financingType !== 'loan' || !financing.apr || financing.apr <= 0` (financing-calculations.ts) lumped every

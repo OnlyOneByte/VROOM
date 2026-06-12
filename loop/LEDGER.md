@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 295 |
+| deep-review | 5 | 300 |
 | guard | 6 | 296 |
 | bug | 3 | 297 |
 | arch | 5 | 299 |
 | infra | 6 | 298 |
 
-Current cycle: **299**
+Current cycle: **300**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4929,3 +4929,20 @@ Current cycle: **299**
   extra-payment-zero-apr + financing-calculations.property + amortization-negative-guard + payment-planner.property suites (46 tests)
   pass UNCHANGED before & after. green→green: frontend validate:local EXIT 0 — type-check 0, build, 610 pass (unchanged — pure
   refactor). Pure util, no UI moved, no screenshot. cov: be 85.74% (carry) / fe 81.41% (carry).
+- **C300 (deep-review → bug): merge-mode restore threw a raw PK-violation on the (always-present) userPreferences/syncState collision
+  instead of reporting a clean conflict (#93)** — BALANCE: deep-review DUE (last 295, starved-for 5 = budget; feature gated) → forced
+  pick. Pivoted off financing to the sync/RESTORE path (NORTH_STAR #1 data-safety hotspot). Inline-audited restore.ts firsthand:
+  stampUserId chokepoint, tenant-scoped conflict probes (C109), empty-replace guard, FK-ordered inserts — all SOUND. THE FINDING:
+  detectConflicts probes only 6 tables (vehicles/expenses/financing/insurance/photos/photoRefs) but insertBackupData inserts 15 —
+  including userPreferences + syncState, whose PRIMARY KEY is userId. The importer ALWAYS has a prefs row (getOrCreate / first-use) and
+  a backup ALWAYS carries the creator's prefs row, so a MERGE restore whose 6 probed tables DON'T collide (e.g. importing fresh data
+  into an account with only default prefs) slipped past conflict detection straight into insert(userPreferences) against the existing
+  PK → `UNIQUE constraint failed: user_preferences.user_id`, an unhandled SQLite throw that rolled back the WHOLE restore. Merge was
+  effectively broken for the no-other-collision case (NORTH_STAR #1 — restore must be predictable, not a raw DB error). The existing
+  tenant-scope test MASKED it: its merge backups always also self-collided on a vehicle, which short-circuited before the prefs insert.
+  FIX: detectConflicts now probes userPreferences + syncState like any owned table (scope eq(userId); the conflict id IS the userId);
+  generalized the probe loop with per-entry idColumn/idField so the userId-PK'd tables match + report on userId, not a missing `id`
+  column. GUARD: new restore-merge-prefs-collision.test.ts ISOLATES the case (export a ZIP, DELETE the vehicle so ONLY the prefs row
+  still collides, merge) — RED before the fix (the raw UNIQUE throw), GREEN after (a clean conflict). green→green: backend
+  validate:local EXIT 0 — 1418 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be
+  85.74%+ (carry; detectConflicts now covers prefs/syncState) / fe 81.41% (carry).
