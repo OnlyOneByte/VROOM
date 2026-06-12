@@ -28,6 +28,22 @@ export function isEligibleForPayoff(computedBalance: number): boolean {
   return computedBalance <= PAYOFF_BALANCE_THRESHOLD;
 }
 
+/**
+ * Enrich a financing record with the two derived API fields — `computedBalance` (passed in, since the
+ * caller decides whether to use the per-record computeBalance or the batch computeBalances) and
+ * `eligibleForPayoff`. The `{ ...financing, computedBalance, eligibleForPayoff: isEligibleForPayoff(...) }`
+ * shape was hand-rolled at 3 sites (vehicles list + single GET, financing GET — the same trio C182
+ * collapsed the threshold across); one source of truth so the derived-field set can't drift between
+ * them. Generic over the financing shape so it serves both the full VehicleFinancing and the
+ * vehicle-joined financing object. Pure — no DB.
+ */
+export function withComputedBalance<T>(
+  financing: T,
+  computedBalance: number
+): T & { computedBalance: number; eligibleForPayoff: boolean } {
+  return { ...financing, computedBalance, eligibleForPayoff: isEligibleForPayoff(computedBalance) };
+}
+
 export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVehicleFinancing> {
   constructor(db: AppDatabase) {
     super(db, vehicleFinancing);

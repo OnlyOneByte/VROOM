@@ -16,7 +16,7 @@ import {
 import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
-import { financingRepository, isEligibleForPayoff } from '../financing/repository';
+import { financingRepository, withComputedBalance } from '../financing/repository';
 import { odometerRepository } from '../odometer/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { preferencesRepository } from '../settings/repository';
@@ -137,14 +137,7 @@ routes.get('/', async (c) => {
   const enrichedVehicles = userVehicles.map((v) => {
     if (v.financing) {
       const computedBalance = balances.get(v.financing.id) ?? 0;
-      return {
-        ...v,
-        financing: {
-          ...v.financing,
-          computedBalance,
-          eligibleForPayoff: isEligibleForPayoff(computedBalance),
-        },
-      };
+      return { ...v, financing: withComputedBalance(v.financing, computedBalance) };
     }
     return v;
   });
@@ -219,11 +212,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     const computedBalance = await financingRepository.computeBalance(vehicle.financing.id);
     responseData = {
       ...vehicle,
-      financing: {
-        ...vehicle.financing,
-        computedBalance,
-        eligibleForPayoff: isEligibleForPayoff(computedBalance),
-      },
+      financing: withComputedBalance(vehicle.financing, computedBalance),
     };
   }
 

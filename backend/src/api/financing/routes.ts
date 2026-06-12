@@ -13,7 +13,7 @@ import {
 } from '../../utils/validation';
 import { vehicleRepository } from '../vehicles/repository';
 import { onFinancingDeactivated } from './hooks';
-import { financingRepository, isEligibleForPayoff } from './repository';
+import { financingRepository, withComputedBalance } from './repository';
 
 const routes = new Hono();
 
@@ -83,11 +83,7 @@ async function enrichWithBalance(
   financing: NonNullable<Awaited<ReturnType<typeof financingRepository.findByVehicleId>>>
 ) {
   const computedBalance = await financingRepository.computeBalance(financing.id);
-  return {
-    ...financing,
-    computedBalance,
-    eligibleForPayoff: isEligibleForPayoff(computedBalance),
-  };
+  return withComputedBalance(financing, computedBalance);
 }
 
 // GET /api/vehicles/:vehicleId/financing - Get financing details for a vehicle

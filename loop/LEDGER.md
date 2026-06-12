@@ -4234,3 +4234,16 @@ Current cycle: **227**
   future guard cycle knows that vein is being actively worked, not just "thin." DOCS-ONLY (CLAUDE.md only — verified `git diff --name-only` shows
   just CLAUDE.md), no source touched → no build gate (the C230/C236 doc-refresh precedent). Next CLAUDE.md refresh ~C252; next #5 sweep ~C246. cov:
   be 85.18% / fe 80.64% (carry — no code, no re-measure this cycle).
+- **C243 (arch): extract `withComputedBalance` — the financing `{...financing, computedBalance, eligibleForPayoff}` enrichment, 3 sites → 1** —
+  BALANCE: `arch` AT budget (cyc 238, starved-for 5 = 5, FORCED — the C242 forecast). The arch vein is thin (noted C221/C227), so scouted a
+  contained dedup with a concrete payoff (rule 5, no churn). FOUND: the `{ ...financing, computedBalance, eligibleForPayoff: isEligibleForPayoff(
+  computedBalance) }` shape was hand-rolled at 3 sites — vehicles/routes.ts list (batch computeBalances Map path) + single GET, and
+  financing/routes.ts (a local enrichWithBalance helper) — the SAME trio C182 collapsed the `<= 0.01` threshold across. Extracted a pure
+  `withComputedBalance<T>(financing, computedBalance)` beside isEligibleForPayoff in financing/repository.ts (takes the ALREADY-computed balance, so
+  it serves both the per-record computeBalance and the batch-Map paths without coupling to how the balance was fetched; generic over the financing
+  shape so it covers both the full VehicleFinancing and the vehicle-joined object). Wired all 3 sites + dropped the now-unused isEligibleForPayoff
+  import from both route files. PAYOFF: one source of truth for the derived-field SET (not just the threshold) — a future enrichment field can't be
+  added to one site and forgotten in the others. Test-anchored (rule 3, green→green): every existing vehicles + financing route test passed
+  UNCHANGED through the substitution (incl. vehicles-list-financing-contract.test.ts which pins the enriched key-shape) + 3 new direct unit tests
+  (with-computed-balance.test.ts: enrichment shape, payoff-threshold boundary, no-mutation). green→green: backend validate:local EXIT 0 — 1347 pass
+  / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (1 test reflow autofixed), build bundled. cov: be 85.18%+ (carry; +3 BE) / fe 80.64% (carry).
