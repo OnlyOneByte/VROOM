@@ -1324,6 +1324,7 @@ export class AnalyticsRepository {
   ): FuelStatsData {
     const now = new Date();
     const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
     const rangeStartDate = new Date(range.start * 1000);
     const rangeEndDate = new Date(range.end * 1000);
 
@@ -1339,21 +1340,29 @@ export class AnalyticsRepository {
     const isFillup = (r: FuelExpenseRow) => r.volume != null && r.volume > 0;
     const currentYearFillups = fuelRows.filter(isFillup).length;
     const previousYearFillups = prevYearAgg.count;
-    const currentMonthFillups = fuelRows.filter(
-      (r) => isFillup(r) && toDate(r).getMonth() === currentMonth
-    ).length;
+    // "This/Last Month" are CALENDAR months (the FE labels them so) — match BOTH month AND year.
+    // fuelRows spans the whole requested range (default 'all' = multi-year), so a year-less
+    // getMonth() match folded every prior year's same-month fillups into "This Month" (#86,
+    // NORTH_STAR #2 correct-for-everyone). "Last Month" is the calendar month before now, which
+    // rolls into the previous YEAR when now is January.
     const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const prevMonthFillups = fuelRows.filter(
-      (r) => isFillup(r) && toDate(r).getMonth() === prevMonth
-    ).length;
+    const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const inCurrentMonth = (r: FuelExpenseRow) => {
+      const d = toDate(r);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    };
+    const inPrevMonth = (r: FuelExpenseRow) => {
+      const d = toDate(r);
+      return d.getMonth() === prevMonth && d.getFullYear() === prevMonthYear;
+    };
+    const currentMonthFillups = fuelRows.filter((r) => isFillup(r) && inCurrentMonth(r)).length;
+    const prevMonthFillups = fuelRows.filter((r) => isFillup(r) && inPrevMonth(r)).length;
 
     const sumGallons = (rows: FuelExpenseRow[]) => rows.reduce((s, r) => s + (r.volume ?? 0), 0);
     const currentYearGallons = sumGallons(fuelRows);
     const previousYearGallons = prevYearAgg.totalGallons;
-    const currentMonthGallons = sumGallons(
-      fuelRows.filter((r) => toDate(r).getMonth() === currentMonth)
-    );
-    const prevMonthGallons = sumGallons(fuelRows.filter((r) => toDate(r).getMonth() === prevMonth));
+    const currentMonthGallons = sumGallons(fuelRows.filter(inCurrentMonth));
+    const prevMonthGallons = sumGallons(fuelRows.filter(inPrevMonth));
 
     const { mpgValues, costPerMileValues } = computeMpgAndCostPerMile(fuelRowsByVehicle);
     const fuelConsumption = computeFuelConsumptionMetrics(mpgValues);

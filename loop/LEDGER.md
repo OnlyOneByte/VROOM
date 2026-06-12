@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 259 |
 | guard | 6 | 261 |
-| bug | 3 | 255 |
+| bug | 3 | 262 |
 | arch | 5 | 261 |
 | infra | 6 | 258 |
 
-Current cycle: **261**
+Current cycle: **262**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4477,3 +4477,19 @@ Current cycle: **261**
   + ACTIVE. NON-VACUOUS (each asserts the upload happened AND the ref didn't strand). green→green: backend validate:local EXIT 0 — 1374 pass / 1 skip /
   0 fail (+2), tsc 0, musl-biome clean, build bundled. Test-only, no production change. cov: be 85.95%+ (carry; sync-worker path-resolution branches
   now covered) / fe 80.64% (carry).
+- **C262 (bug — found+fixed a LIVE defect, NOT the dormant-sweep outcome): #86 fuel-stats "This/Last Month" counted cross-year** — BALANCE: feature
+  most-starved (starved-for 92) but human-gated; next actionable over-budget = `bug` (cyc 255, starved-for 7 > 3). Bug was declared DORMANT (C251/C255),
+  so the protocol is scout-a-fresh-surface → record → pivot — but this scout HIT a real defect on a surface the recent sweeps hadn't touched
+  (analytics fuel-stats month aggregation), so it's a genuine bug cycle, not a sweep. FOUND (firsthand, repository.ts:1342-1356):
+  buildFuelStatsFromData filtered currentMonth/prevMonth fillups + gallons on `toDate(r).getMonth() === currentMonth` with NO year check. fuelRows
+  spans the WHOLE requested range (default 'all' = multi-year), so a fillup from the SAME calendar month in a PRIOR year was folded into "This Month"
+  — three years of January data → the "This Month" figure triple-counted. The FE (FuelStatsTab.svelte:184/188/227/231) labels these "This Month"/"Last
+  Month" = true calendar months, consistent with the `now`-derived currentMonth → the contamination is unambiguously wrong (NORTH_STAR #2). DISTINCT
+  from the product-gated #85 (which is ONLY the year-ROW's range-relative labeling — none of its 3 options touch the month rows). FIX: derive
+  `currentYear = now.getFullYear()` + `prevMonthYear` (Jan → previous year rollover) + `inCurrentMonth`/`inPrevMonth` predicates matching BOTH month
+  AND year; applied to all 4 month figures (fillups + gallons, current + prev). +2 deterministic regression tests (fuel-stats-calendar-month.test.ts,
+  dates RELATIVE to now → host/run-date independent): a prior-year same-month fillup does NOT contaminate This Month (currentMonth=1 not 3,
+  volume=10 not ~208; currentYear range-figure still sees all 3); "Last Month" rolls into the previous YEAR when now is January (wrong-year same-month
+  excluded). NON-VACUOUS (the prior-year rows carry volume 99 → pre-fix currentMonth would be 3). green→green: backend validate:local EXIT 0 — 1376
+  pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean, build bundled; the existing single-year fuel-stats property tests passed UNCHANGED
+  (behavior-preserving for them). cov: be 85.95%+ (carry) / fe 80.64% (carry).

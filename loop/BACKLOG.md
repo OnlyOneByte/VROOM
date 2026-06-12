@@ -771,6 +771,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   Year" = the prior 30 days. The #9 interestPaidYtd-rename class; same family as #45 (period-scoped stats). DECISION (not loop-decidable — changes a
   headline figure + the FE↔BE contract): (a) make it true calendar-YTD vs prior calendar year (like getYearEnd), (b) relabel "This/Last Period", or
   (c) only show the year row when the range is ~1yr. VERIFIED C252; rest of the getSummary path CERTIFIED CLEAN.
+- ~~**#86 (MED, correctness / NORTH_STAR #2 — found+fixed C262 scouting fuel-stats during a forced bug cycle) — fuel-stats "This/Last Month" counted
+  cross-year.**~~ — *DONE C262: buildFuelStatsFromData (repository.ts:1342-1356) filtered currentMonth/prevMonth fillups + gallons on `getMonth() ===
+  currentMonth` with NO year check; fuelRows spans the whole requested range (default 'all' = multi-year) → a prior-year same-month fillup folded into
+  "This Month" (3 years of Jan data → triple-counted). The FE labels these true calendar "This/Last Month" alongside the now-derived currentMonth → the
+  contamination is unambiguous (DISTINCT from the product-gated #85, which only concerns the year ROW's labeling). FIX: derive currentYear + prevMonthYear
+  (Jan→prev-year rollover) + inCurrentMonth/inPrevMonth predicates matching BOTH month AND year; applied to all 4 month figures. +2 deterministic
+  regression tests (dates relative to now → host-independent): prior-year same-month excluded from This Month; Last Month rolls to prev-year in January.
+  NON-VACUOUS. green→green 1376 pass (+2); existing single-year fuel-stats property tests UNCHANGED.*
 - ~~**#41 (LOW) — expense search doesn't escape LIKE wildcards `%`/`_`.**~~ — *DONE C142: scope-checked first — the ONLY
   user-input LIKE in product source is this one expenses search site (the 2 other LIKEs are test files with literal patterns),
   so it's a single-site fix not a class. `buildExpenseConditions` built `%${search}%` with no ESCAPE → "50%" matched every row
