@@ -181,6 +181,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Offline-sync outbox + conflict-resolution write path audit (C270)**~~ — *DONE C270: inline (spawn_run 400). CERTIFIED CLEAN: offline-storage.ts is
+  comprehensively pinned (deterministic clientId backfill, #66 charge survival, corrupted-LS fallback, every CRUD primitive, syncOfflineExpenses
+  happy/partial-failure/malformed-skip + the #79 stuck-queue characterization); sync-manager determineConflictType is C223-pinned. THE finding → guard:
+  `resolveConflict` (keep_local/keep_server/merge — the conflict-resolution WRITE path) had only 2 boolean happy-path tests; +4 pinning the load-bearing
+  outcomes (keep_local forceOverwrite+clientId; FAILED overwrite → false [edit survives, not dropped]; keep_server no-POST; merge→keep_local delegation).
+  NON-VACUOUS. green→green fe 600 pass (+4). Note: resolveConflict uses the class-private this.markExpenseAsSynced, so assertions pin the boolean + fetch.*
 - ~~**Backup EXPORT path audit (C264)**~~ — *DONE C264: inline (spawn_run 400). CERTIFIED CLEAN: the export/restore TABLE-SET symmetry is AIRTIGHT —
   five hand-maintained lists (createBackup's 15 data keys, TABLE_SCHEMA_MAP, TABLE_FILENAME_MAP, restore insertBackupData inserts, ImportSummary fields)
   all pinned equal by the C208/C209 drift guards, incl. the `if (table && filename)` silent-skip + every-table-backed-up-or-EXCLUDED_BY_DESIGN. THE

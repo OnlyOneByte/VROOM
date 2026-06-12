@@ -229,6 +229,71 @@ describe('Sync Manager', () => {
 			const result = await syncManager.resolveConflict(conflict, 'keep_server');
 			expect(result).toBe(true);
 		});
+
+		// C270 deep-review: the existing two tests only assert the boolean — not the load-bearing
+		// SIDE EFFECTS of each resolution (the data-safety contract: a user's conflict choice must be
+		// honored exactly). These pin the three uncovered outcomes.
+		function modifiedConflict(): SyncConflict {
+			return {
+				id: 'c-1',
+				localExpense: {
+					id: 'c-1',
+					clientId: 'cid-c-1',
+					vehicleId: 'vehicle-1',
+					tags: ['fuel'],
+					category: 'fuel',
+					amount: 50.0,
+					date: '2024-01-01',
+					mileage: 50000,
+					volume: 10.5,
+					timestamp: Date.now(),
+					synced: false
+				},
+				serverExpense: { tags: ['fuel'], amount: 45.0, date: '2024-01-01' },
+				conflictType: 'modified'
+			};
+		}
+
+		it('keep_local: POSTs forceOverwrite + the idempotency clientId, returns true', async () => {
+			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-1' }));
+
+			const result = await syncManager.resolveConflict(modifiedConflict(), 'keep_local');
+
+			expect(result).toBe(true);
+			// The overwrite carries forceOverwrite (server row replaced) + the idempotency clientId.
+			const body = JSON.parse((mockFetch.mock.calls[0]![1] as { body: string }).body);
+			expect(body.forceOverwrite).toBe(true);
+			expect(body.clientId).toBe('cid-c-1');
+		});
+
+		it('keep_local: a FAILED overwrite returns false (the edit survives to retry, not silently lost)', async () => {
+			// The POST rejects — resolveConflict must report failure (the catch→break→return false path)
+			// so the user's local edit stays unresolved rather than being dropped (NORTH_STAR #1).
+			mockFetch.mockRejectedValueOnce(new Error('network down'));
+
+			const result = await syncManager.resolveConflict(modifiedConflict(), 'keep_local');
+
+			expect(result).toBe(false);
+		});
+
+		it('keep_server: returns true WITHOUT any POST (server version wins, no overwrite sent)', async () => {
+			const result = await syncManager.resolveConflict(modifiedConflict(), 'keep_server');
+
+			expect(result).toBe(true);
+			// No network call — choosing the server version just retires the local entry locally.
+			expect(mockFetch).not.toHaveBeenCalled();
+		});
+
+		it('merge: delegates to keep_local (documented behavior — local wins via a forceOverwrite POST)', async () => {
+			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-1' }));
+
+			const result = await syncManager.resolveConflict(modifiedConflict(), 'merge');
+
+			expect(result).toBe(true);
+			// Same forceOverwrite path as keep_local — proves merge isn't a silent no-op.
+			const body = JSON.parse((mockFetch.mock.calls[0]![1] as { body: string }).body);
+			expect(body.forceOverwrite).toBe(true);
+		});
 	});
 
 	describe('retry mechanism', () => {

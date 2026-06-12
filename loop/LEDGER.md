@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 264 |
+| deep-review | 5 | 270 |
 | guard | 6 | 265 |
 | bug | 3 | 268 |
 | arch | 5 | 267 |
 | infra | 6 | 269 |
 
-Current cycle: **269**
+Current cycle: **270**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4581,3 +4581,18 @@ Current cycle: **269**
   STRUCTURAL PLATEAU: backend is saturated except DI/orchestrator-bound tails; the FE gap is the eyes-on components/routes deficit (Playwright-gated) —
   NOT loop-closable without an eyes-on harness or a human glance. DOCS-ONLY: updated the CLAUDE.md coverage line (C258→C269 figures) + this entry; no
   source/test/build touched (the C268 gate is the last code state). Recorded the measure honestly; no churn-test forced to chase a structurally-gated number.
+- **C270 (deep-review): offline-sync outbox + conflict-resolution write path — CERTIFIED CLEAN; pinned the 3 uncovered resolveConflict outcomes** —
+  BALANCE: `deep-review` the ONLY actionable OVER-budget category (cyc 264, starved-for 6 > 5); feature more-starved (100) but human-gated. Picked the
+  offline-first data-safety surface (NORTH_STAR #1 — offline writes never drop), never fully deep-reviewed. spawn_run still 400s → firsthand. CERTIFIED
+  CLEAN: (1) `offline-storage.ts` is COMPREHENSIVELY pinned already — the deterministic clientId backfill (idempotency-key-stability bug guard), #66
+  electric-charge survival through the shared offlineExpenseToBackend mapper, corrupted-localStorage graceful fallback, every CRUD primitive, and the
+  syncOfflineExpenses happy-path + mid-batch-partial-failure (no data loss) + malformed-fuel-skip + the #79 stuck-queue characterization. (2)
+  `sync-manager.ts` determineConflictType (duplicate-vs-modified) is C223-pinned. THE finding (the one genuinely uncovered high-value branch):
+  `resolveConflict` (the keep_local/keep_server/merge WRITE path — the data-safety decision point where a user's choice between their offline edit and
+  the server row is honored) had only the two BOOLEAN happy-path tests; the load-bearing OUTCOMES were unpinned. +4 tests: keep_local POSTs
+  forceOverwrite+clientId; keep_local FAILED overwrite → returns FALSE (the catch→break→return-false path — the edit survives to retry, NOT silently
+  dropped); keep_server returns true with NO POST (server wins, local retired); merge delegates to keep_local (proves it's not a silent no-op). NON-VACUOUS
+  (the failure case asserts false; keep_server asserts zero fetch). NOTE: resolveConflict calls the class-PRIVATE this.markExpenseAsSynced (not the module
+  fn), so the assertions pin the observable boolean + fetch behavior, not the mocked module spy (a wrong-target assertion I caught + removed via the gate).
+  green→green: frontend validate:local EXIT 0 — type-check 0, build OK, 600 tests pass (+4), every existing sync test UNCHANGED. cov: fe 80.72%+ (carry;
+  resolveConflict branches now covered) / be 85.65% (carry).
