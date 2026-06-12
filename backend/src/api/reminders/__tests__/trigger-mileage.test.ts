@@ -168,4 +168,38 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
 
     expect(mileageNotifs('rm5')).toHaveLength(1);
   });
+
+  // C256: the mileage dedup is per-MILESTONE (the rn_reminder_odo_idx partial unique is on
+  // (reminderId, dueOdometer)), NOT per-reminder. After mark-serviced re-arms to a NEW milestone,
+  // crossing THAT must fire a fresh notification — a regression making the index reminderId-only
+  // would silently block every future milestone. This pins the distinct-milestone invariant the
+  // existing idempotent-re-trigger test (same milestone → still 1) doesn't cover.
+  test('a DISTINCT milestone after mark-serviced fires a NEW notification (per-milestone dedup)', async () => {
+    const vehicleId = await seedVehicle();
+    await addOdometerReading(vehicleId, 35200); // past the first 35000 milestone
+    seedMileageReminder('rm6', vehicleId, 35000);
+
+    await trigger();
+    const first = mileageNotifs('rm6');
+    expect(first).toHaveLength(1);
+    expect(first[0]?.due_odometer).toBe(35000);
+
+    // Mark serviced now: re-anchors lastServiceOdometer to the current odometer (35200) and
+    // recomputes nextDueOdometer = 35200 + intervalMileage(5000) = 40200.
+    const serviced = await ctx.authed('POST', '/api/v1/reminders/rm6/mark-serviced');
+    expect(serviced.status).toBe(200);
+
+    // Still at 35200 → below the NEW 40200 milestone → no new notification yet.
+    await trigger();
+    expect(mileageNotifs('rm6')).toHaveLength(1);
+
+    // Drive past the new milestone → a SECOND notification at the new dueOdometer.
+    await addOdometerReading(vehicleId, 40500);
+    await trigger();
+    const after = mileageNotifs('rm6').sort(
+      (a, b) => (a.due_odometer ?? 0) - (b.due_odometer ?? 0)
+    );
+    expect(after).toHaveLength(2);
+    expect(after.map((n) => n.due_odometer)).toEqual([35000, 40200]);
+  });
 });

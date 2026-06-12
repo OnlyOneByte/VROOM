@@ -181,6 +181,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Mileage-reminder trigger vein audit (C256)**~~ — *DONE C256: inline (spawn_run 400). CERTIFIED CLEAN: processMileageReminder guards
+  null-milestone/single-vehicle/due-check; idempotency is belt-and-braces (app mileageNotificationExists + the partial unique rn_reminder_odo_idx
+  on (reminderId,dueOdometer) + createMileageNotification UNIQUE-catch→null under races); time/mileage axes cleanly separated via NULL-distinct +
+  partial index; no auto-re-arm (mark-serviced is explicit, C25). GUARD: trigger-mileage.test covered firing+idempotent-same-milestone but NOT the
+  DISTINCT-milestone invariant (after mark-serviced re-arms, crossing the NEW milestone must fire a fresh notif — per-milestone dedup, not
+  per-reminder). +1 HTTP test (35000→1; re-arm→40200; below→still 1; 40500→2 at [35000,40200]); NON-VACUOUS. NO production change (record-only cert,
+  the C246 precedent). green→green 1366 pass (+1).*
 - ~~**Sync RESTORE path vein audit (C246)**~~ — *DONE C246: inline audit (spawn_run 400). CERTIFIED CLEAN: both ZIP + Sheets restore call
   assertReplaceNotEmpty symmetrically (#21 wipe-guard, no path-asymmetry); stampUserId force-stamps every userId-column table + the unstamped
   children (financing/terms/claims/junctions) own indirectly via FK, and validateReferentialIntegrity constrains EVERY FK-child to in-backup id

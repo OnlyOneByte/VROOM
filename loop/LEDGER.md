@@ -4404,3 +4404,17 @@ Current cycle: **227**
   record a one-line sweep + pivot to the next-actionable category rather than burn tokens re-hunting covered ground. Re-arms only when feature work
   or an Angelo-unblocked product call lands new code. (Already escalated C251 — no re-escalation.) NO build gate (no code touched). cov: be 85.91%
   / fe 80.64% (carry).
+- **C256 (deep-review): mileage-reminder trigger path — CERTIFIED CLEAN; pinned the per-MILESTONE dedup invariant** — BALANCE: `deep-review`
+  most-starved (cyc 252, starved-for 4) → highest-leverage. spawn_run 400 → inline. Audited processMileageReminder + the notification dedup
+  firsthand. CERTIFIED CLEAN: guards null-milestone + single-vehicle (D4) + currentOdometer≥milestone (the due check, getCurrentOdometer is the
+  MAX-across-sources C168-scoped); idempotency is BELT-AND-BRACES — app-level mileageNotificationExists check + the PARTIAL unique index
+  rn_reminder_odo_idx on (reminderId, dueOdometer) WHERE dueOdometer IS NOT NULL as the race backstop + createMileageNotification catches the
+  UNIQUE violation → null (no double-fire under concurrent triggers); the time-axis (reminderDueIdx on (reminderId,dueDate)) + mileage-axis are
+  cleanly separated via the NULL-distinct trick + the partial index; no auto-re-arm (mark-serviced is the explicit path, C25 design). THE guard
+  gap (the C108/C246 record-only-cert precedent): trigger-mileage.test covered at/over/below-milestone + idempotent-re-trigger (SAME milestone →
+  still 1) + no-vehicle + MAX-across-sources — but NOT the DISTINCT-milestone invariant: after mark-serviced re-arms to a new milestone, crossing
+  THAT must fire a fresh notification (the dedup is per-milestone via the composite index, not per-reminder; a regression to a reminderId-only
+  index would silently block every future milestone). +1 HTTP test: cross 35000 → 1 notif; mark-serviced re-arms to 40200; below → still 1; cross
+  40500 → 2 notifs at [35000, 40200]. NON-VACUOUS (a reminderId-only dedup would leave it at 1). green→green: backend validate:local EXIT 0 — 1366
+  pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean (1 reflow autofixed), build bundled. NO production change (clean cert). cov: be 85.91%+
+  (carry; +1 BE) / fe 80.64% (carry).
