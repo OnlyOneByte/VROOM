@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 291 |
+| deep-review | 5 | 295 |
 | guard | 6 | 290 |
 | bug | 3 | 293 |
 | arch | 5 | 294 |
 | infra | 6 | 292 |
 
-Current cycle: **294**
+Current cycle: **295**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4863,3 +4863,17 @@ Current cycle: **294**
   financing-vehicle-ownership-404.test.ts pins the observable 404+message on GET & POST over the REAL routes via createTestApp — GREEN before the
   refactor (against the inline guard) AND after (against validateVehicleOwnership). green→green: backend validate:local EXIT 0 — 1418 pass (+2) /
   1 skip / 0 fail, tsc 0, musl-biome clean (test reflow auto-fixed), build bundled. cov: be 85.74%+ (carry) / fe 81.41% (carry).
+- **C295 (deep-review → bug): lease-overage projection compared an ABSOLUTE odometer against a DRIVEN-miles budget — phantom excess fee on
+  any used-car lease (#91)** — BALANCE: nothing over budget except gated feature; deep-review highest non-gated budget-pressure (last 291,
+  starved-for 4) + pairs with the C293/C294 financing focus → picked it. Inline-scouted the financing/analytics MONEY math (spawn_run 400s).
+  CERTIFIED CLEAN: buildAmortizationSchedule (bug #10 fix — walks balance down, clamps at 0), effectiveMonthlyPremium (bug #8 — totalCost
+  amortized across the term span), buildSingleFinancingDetail (monthlyInterestEstimate guarded on loan+apr, monthsElapsed clamped). THE FINDING
+  (frontend/src/lib/utils/financing-calculations.ts calculateLeaseMetrics): `totalMileageAllowance`/`mileageUsed`/`mileageRemaining` all live in
+  DRIVEN-miles space (current − initial), but `projectedFinalMileage` is an ABSOLUTE odometer reading (currentMileage + milesPerDay·daysRemaining),
+  and the excess compared the absolute reading DIRECTLY against the driven budget → over-reported projectedExcessMiles + the $ projectedExcessFee
+  by EXACTLY initialMileage. A 40k-mi car leased + driven on-pace showed a ~$10k phantom fee at $0.25/mi. Sibling to #64 (C198 fixed the allowance
+  SCALING but left this coordinate-space mismatch). NORTH_STAR #2. FIX: project DRIVEN miles (projectedFinalMileage − initialMileage) before
+  comparing to the budget. Fields aren't rendered yet (latent in the LeaseMetrics contract) → no UI moved, pure-logic util, no screenshot needed.
+  GUARD: +1 lease-metrics test — a 40k-initial / 52k-current on-pace lease projects EXACTLY $0 excess (pre-fix: 76k−36k = 40k phantom miles →
+  $10k fee, so non-vacuous). green→green: frontend validate:local EXIT 0 — type-check 0, build, 605 pass (+1), lease-metrics 21/21. cov: be
+  85.74% (carry) / fe 81.41%+ (carry; the lease projection now correctly-anchored).

@@ -508,6 +508,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#91 (MED, correctness / NORTH_STAR #2 — found+fixed C295 on a financing/analytics money-math deep-review; sibling to #64) —
+> lease-overage projection compared an ABSOLUTE odometer against a DRIVEN-miles budget → phantom excess fee on any used-car lease.**~~
+> — *DONE C295: in `calculateLeaseMetrics` (financing-calculations.ts), `totalMileageAllowance`/`mileageUsed`/`mileageRemaining` all
+> live in driven-miles space (current − initial), but `projectedFinalMileage` is an ABSOLUTE odometer reading; the excess compared
+> the absolute reading DIRECTLY against the driven budget → over-reported projectedExcessMiles + the $ fee by exactly `initialMileage`.
+> A 40k-mi car leased + driven on-pace showed a ~$10k phantom fee at $0.25/mi. #64 (C198) fixed the allowance SCALING but left this
+> coordinate-space mismatch. FIX: project DRIVEN miles (projectedFinalMileage − initialMileage) before comparing to the budget. GUARD:
+> +1 lease-metrics test (40k-initial / 52k-current on-pace → exactly $0 excess; pre-fix $10k → non-vacuous). Fields not rendered yet
+> (latent contract) → pure-logic util, no UI moved. frontend validate:local EXIT 0, 605 pass (+1).*
+
 > ~~**#90 (MED, correctness / NORTH_STAR #2 — found+fixed C293 scouting the financing module on a forced bug cycle; the sibling to
 > C240) — create-or-replace financing leaves STALE cross-type fields when a vehicle's financing TYPE changes.**~~ — *DONE C293:
 > `POST /vehicles/:id/financing` REUSES the existing row via `update(...financingData, isActive:true, endDate:null)` (routes.ts:156,

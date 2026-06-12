@@ -118,6 +118,24 @@ describe('calculateLeaseMetrics — excess-mileage projection (the dollar figure
 		expect(m?.isOverMileage).toBe(false);
 	});
 
+	test('high INITIAL mileage (used-car lease) driven on-pace projects NO excess (driven-miles, not absolute odometer)', () => {
+		// THE BUG: projectedFinalMileage is an ABSOLUTE odometer reading, but totalMileageAllowance +
+		// mileageUsed are DRIVEN miles (current − initial). Comparing the absolute reading against the
+		// driven budget over-reported excess by exactly `initialMileage`. Here: a car with 40,000 mi at
+		// signing, one year into a 12000/yr × 3yr = 36000-total lease, driven 12,000 (exactly on pace) →
+		// current 52,000, projects 76,000 absolute = 36,000 DRIVEN → exactly at the allowance, $0 excess.
+		// Pre-fix: 76,000 − 36,000 = 40,000 phantom excess miles → a $10,000 phantom fee at $0.25/mi.
+		const m = calculateLeaseMetrics(
+			makeLease({ mileageLimit: 12000, excessMileageFee: 0.25 }),
+			52000, // current odometer
+			40000 // initial odometer at signing → driven 12000 one year in (on pace)
+		);
+		expect(m?.mileageUsed).toBe(12000); // 52000 − 40000
+		expect(m?.projectedExcessMiles).toBe(0); // projects 36000 DRIVEN = the allowance, not 76000 absolute
+		expect(m?.projectedExcessFee).toBe(0);
+		expect(m?.isOverMileage).toBe(false);
+	});
+
 	test('missing excessMileageFee → excess miles can be >0 but fee is 0 (no NaN)', () => {
 		const m = calculateLeaseMetrics(
 			makeLease({ mileageLimit: 12000, excessMileageFee: undefined as unknown as number }),

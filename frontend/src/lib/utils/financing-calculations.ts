@@ -429,7 +429,15 @@ export function calculateLeaseMetrics(
 			mileageUsed = Math.max(0, currentMileage - initialMileage);
 			const milesPerDay = daysElapsed > 0 ? mileageUsed / daysElapsed : 0;
 			projectedFinalMileage = currentMileage + milesPerDay * daysRemaining;
-			projectedExcessMiles = Math.max(0, projectedFinalMileage - totalMileageAllowance);
+			// `totalMileageAllowance` is a DRIVEN-miles budget (annual × years) and `mileageUsed` is driven
+			// miles (current − initial), but `projectedFinalMileage` is an ABSOLUTE odometer reading. The
+			// excess must compare like with like: project DRIVEN miles forward, not the odometer. Comparing
+			// the absolute reading against the driven budget over-reported excess (and the $ fee) by exactly
+			// `initialMileage` for any lease signed on a car with miles on it (a used-car lease, or the
+			// odometer not reset) — e.g. a 40k-mile car leased and driven on-pace showed a large phantom
+			// excess fee. (Sibling to #64, which fixed the allowance scaling but left this space mismatch.)
+			const projectedDrivenMiles = Math.max(0, projectedFinalMileage - initialMileage);
+			projectedExcessMiles = Math.max(0, projectedDrivenMiles - totalMileageAllowance);
 			projectedExcessFee = projectedExcessMiles * (financing.excessMileageFee || 0);
 			isOverMileage = projectedExcessMiles > 0;
 			mileageRemaining = Math.max(0, totalMileageAllowance - mileageUsed);
