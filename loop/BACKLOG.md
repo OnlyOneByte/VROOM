@@ -1588,6 +1588,10 @@ behavior-preserving, test-anchored, ONE small reviewable refactor per cycle.)*
     (create-policy loop, addTerm, updateTerm), each feeding createTermExpenses/updateTermExpenses. Extracted a pure `vehicleIdsForTerm` to insurance/hooks.ts
     (typed `readonly TermCoverageRow[]`, decoupled from the full policy) + wired all 3 → one-liners. Behavior-preserving (faithful 1:1 map). +3 unit tests
     (filter+project order, empty/unknown→[], no cross-term leak); anchored by the existing premium-expense-hook + C272 ownership tests green→green. 1388 pass (+3).*
+  - ~~**`triggerBlobDownload(blob, filename)` — the browser save-as Blob-download idiom, 2 FE sites → 1 (C278)**~~ — *DONE C278: the 7-line object-URL →
+    anchor → click → revoke → remove dance was byte-identical at expense-api (CSV export) + settings-store (backup download), differing only in blob +
+    filename. Extracted a pure helper to new utils/download.ts + wired both → one-liners. Behavior-preserving (same ordering; callers guard browser/ok
+    upstream). +2 unit tests (jsdom URL stubs + click spy: url created+revoked, anchor clicked, no DOM leak, filename set). green→green fe 604 pass (+2).*
 
 Seed audit angles for the rule-7 fan-out (once the above are done, or to go broader):
 - **Backend layering** — route handlers doing repository/business logic inline; missing or

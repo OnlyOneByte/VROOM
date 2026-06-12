@@ -16,6 +16,7 @@ import {
 } from './api-transformer';
 import { apiClient, getApiBaseUrl, withPagination } from './api-client';
 import { toDateInputValue } from '$lib/utils/formatters';
+import { triggerBlobDownload } from '$lib/utils/download';
 
 /** Convenience alias for a paginated response of transformed frontend Expenses. */
 type PaginatedExpenseResponse = PaginatedResponse<Expense>;
@@ -159,14 +160,7 @@ export const expenseApi = {
 		if (!res.ok) throw new Error(`Export failed with status ${res.status}`);
 
 		const blob = await res.blob();
-		const url = window.URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `vroom-expenses-${toDateInputValue(new Date())}.csv`;
-		document.body.appendChild(a);
-		a.click();
-		window.URL.revokeObjectURL(url);
-		document.body.removeChild(a);
+		triggerBlobDownload(blob, `vroom-expenses-${toDateInputValue(new Date())}.csv`);
 	},
 
 	/**

@@ -8,6 +8,7 @@ import type {
 	RestoreResult
 } from '../types/index.js';
 import { settingsApi } from '$lib/services/settings-api';
+import { triggerBlobDownload } from '$lib/utils/download';
 import { extractErrorMessage } from '$lib/utils/error-handling';
 
 const DEFAULT_UNIT_PREFERENCES: UnitPreferences = {
@@ -74,14 +75,7 @@ function createSettingsStore() {
 				if (!response.ok) throw new Error('Failed to download backup');
 
 				const blob = await response.blob();
-				const url = window.URL.createObjectURL(blob);
-				const a = document.createElement('a');
-				a.href = url;
-				a.download = `vroom-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`;
-				document.body.appendChild(a);
-				a.click();
-				window.URL.revokeObjectURL(url);
-				document.body.removeChild(a);
+				triggerBlobDownload(blob, `vroom-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`);
 			} catch (err) {
 				error = extractErrorMessage(err, UNEXPECTED_ERROR);
 				throw err;

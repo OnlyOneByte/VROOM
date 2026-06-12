@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 275 |
 | guard | 6 | 277 |
 | bug | 3 | 276 |
-| arch | 5 | 273 |
+| arch | 5 | 278 |
 | infra | 6 | 274 |
 
-Current cycle: **277**
+Current cycle: **278**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4676,3 +4676,14 @@ Current cycle: **277**
   BOTH require auth (anon → 401, pinning the routes.use('*', requireAuth) chain). NON-VACUOUS (the null→timestamp assertion fails if updateBackupDate
   regresses; the 401s fail if the auth chain drops). green→green: backend validate:local EXIT 0 — 1392 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome
   clean, build bundled. Test-only. cov: be 85.65%+ (carry; settings POST /backup+/restore now covered) / fe 80.72% (carry).
+- **C278 (arch): extract `triggerBlobDownload` — the browser save-as Blob-download idiom, 2 sites → 1** — BALANCE: `arch` most-starved actionable (cyc 273,
+  starved-for 5 = budget, due); feature more-starved (108) but human-gated. FAN-OUT scout (spawn_run still 400s → inline): backend dry (groupByVehicle/
+  parseClampedInt already shared; deleteBySource one-liners; envelope is the standard Hono pattern — no clean dedup). FE FOUND one: the 7-line object-URL →
+  anchor → href → download → appendChild → click → revokeObjectURL → removeChild "save a Blob as a file" dance was BYTE-IDENTICAL at 2 sites (expense-api
+  CSV export :162-169 + settings-store backup download :77-84), differing only in blob + filename. Extracted pure `triggerBlobDownload(blob, filename)` to
+  new `utils/download.ts` (no existing DOM/download util — NORTH_STAR #4 checked) + wired both → one-liners (+ 2 imports). PAYOFF (rule 5): one source for
+  the download mechanics — a future fix (revoke ordering / Safari workaround) is one edit. BEHAVIOR-PRESERVING (same append→click→revoke→remove ordering as
+  both copies; callers still guard browser/ok upstream). +2 unit tests (download.test.ts: object-URL created+revoked + anchor clicked + no DOM leak; the
+  download filename is set) via jsdom stubs on window.URL + an HTMLAnchorElement.click spy. green→green: frontend validate:local EXIT 0 — type-check 0,
+  build OK, 604 tests pass (+2), every existing expense-api + settings-store test UNCHANGED through the rewire (behavior-preserving proof; tsc caught a
+  vi.fn-vs-spyOn typing nit, fixed). cov: fe 80.72%+ (carry) / be 85.65% (carry).
