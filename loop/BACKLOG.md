@@ -181,6 +181,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > but a *manual* mapping of a US-thousands file would corrupt amounts — consider a `decimalSeparator`
 > hint on `ColumnMapping` if manual mapping ships before presets cover it.
 
+- ~~**Backup EXPORT path audit (C264)**~~ — *DONE C264: inline (spawn_run 400). CERTIFIED CLEAN: the export/restore TABLE-SET symmetry is AIRTIGHT —
+  five hand-maintained lists (createBackup's 15 data keys, TABLE_SCHEMA_MAP, TABLE_FILENAME_MAP, restore insertBackupData inserts, ImportSummary fields)
+  all pinned equal by the C208/C209 drift guards, incl. the `if (table && filename)` silent-skip + every-table-backed-up-or-EXCLUDED_BY_DESIGN. THE
+  finding → guard: the per-column VALUE round-trip through convertToCSV JSON.stringify → csv-stringify → csv-parse → coerceRow JSON.parse was pinned only
+  in ISOLATION for the parse half on flat columns (unitPreferences, tags[]); no test round-tripped a NESTED-object JSON column (the CSV-hostile case).
+  +2 HTTP round-trip tests (reminder-split-config-roundtrip.test.ts) for expenseSplitConfig (the deepest nested JSON: ABSOLUTE allocations[] + EVEN
+  vehicleIds[]) via real export→wipe→restore; NON-VACUOUS. green→green 1378 pass (+2).*
 - ~~**Cross-vehicle analytics vein audit (C259)**~~ — *DONE C259: inline (spawn_run 400). CERTIFIED CLEAN: getCrossVehicle costPerDistance is the
   documented #45-family period-scoped semantics (not a new bug; maxMileage/minMileage guard requires ≥1 reading, single-reading→null handled);
   buildMonthlyExpenseTrends sort-then-slice(-24) [C11 guard], buildExpenseByCategory unknown→misc + div-by-zero guarded, #54 per-vehicle pairing.

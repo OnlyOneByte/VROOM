@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 259 |
+| deep-review | 5 | 264 |
 | guard | 6 | 261 |
 | bug | 3 | 262 |
 | arch | 5 | 261 |
 | infra | 6 | 263 |
 
-Current cycle: **263**
+Current cycle: **264**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4502,3 +4502,20 @@ Current cycle: **263**
   months after #86/C262, so this is purely the YEAR row." DOCS-ONLY — verified `git diff --name-only` = CLAUDE.md alone; no code/test/build touched
   (no validate run needed — the prior C262 gate is the last code state, unchanged). The pending-Angelo HIGH list (#36/#37/#43/#44) + the eyes-on
   feature tails are unchanged from C253; not re-escalated (already standing).
+- **C264 (deep-review): backup EXPORT path — table-set symmetry CERTIFIED CLEAN; pinned the one uncovered VALUE-round-trip vector** — BALANCE:
+  feature most-starved (starved-for 94) but human-gated + escalated; `deep-review` at budget (cyc 259, starved-for 5 = 5, due) → the most-starved
+  actionable. Picked the backup EXPORT path (the symmetric partner to the restore path C246 certified; never deep-reviewed). FAN-OUT: spawn_run still
+  400s → did it firsthand. CERTIFIED CLEAN: the export/restore TABLE-SET symmetry is AIRTIGHT — FIVE hand-maintained lists (createBackup's 15 data
+  keys, TABLE_SCHEMA_MAP, TABLE_FILENAME_MAP, restore insertBackupData's tx.insert() calls, ImportSummary count fields) are ALL pinned equal by the
+  C208/C209 drift guards, INCLUDING the exact `if (table && filename)` silent-skip in exportAsZip:434 (backup-table-coverage.test "registry and
+  filename map cover exactly the same keys") + every-schema-table-backed-up-or-EXCLUDED_BY_DESIGN. THE finding (the one vector those KEY guards don't
+  reach): the per-column VALUE round-trip through convertToCSV's `JSON.stringify(value)` (backup.ts:458) → real csv-stringify (quoted:true) → csv-parse
+  → coerceRow's `JSON.parse` — existing coerceRow tests pin the PARSE direction in ISOLATION on hand-built rows (flat unitPreferences, string[] tags),
+  but NOTHING round-tripped a NESTED-object JSON column through the full serialize→parse pipe (the CSV-hostile case: commas between allocations + quotes
+  around every key, which the CSV layer double-quotes and the parser must unwrap losslessly). expenseSplitConfig (ReminderSplitConfig: { method,
+  allocations:[{vehicleId,amount}] }) is the deepest such column. GUARD: reminder-split-config-roundtrip.test.ts (+2 HTTP, the claims-roundtrip
+  precedent — seed a multi-vehicle ABSOLUTE split + an EVEN split via the real route, exportAsZip → wipe → restoreFromBackup('replace'), assert the
+  nested config is structurally `.toEqual` intact). NON-VACUOUS (asserts the config persisted pre-export as a real object AND survived round-trip — a
+  mangle/truncate/double-stringify would fail the post-restore toEqual). green→green: backend validate:local EXIT 0 — 1378 pass / 1 skip / 0 fail (+2),
+  tsc 0, musl-biome clean (one format reflow auto-fixed via check:musl:fix; the pre-existing unitPreferencesSchema unused-import is a WARNING, exit 0),
+  build bundled. Test-only, no production change. cov: be 85.95%+ (carry) / fe 80.64% (carry).
