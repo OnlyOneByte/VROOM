@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 275 |
-| guard | 6 | 271 |
+| guard | 6 | 277 |
 | bug | 3 | 276 |
 | arch | 5 | 273 |
 | infra | 6 | 274 |
 
-Current cycle: **276**
+Current cycle: **277**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4667,3 +4667,12 @@ Current cycle: **276**
   semantics (NOT "reset relative to now"). NON-VACUOUS (the Δ bound fails if the advance is skipped or collapsed toward now). green→green: backend
   validate:local EXIT 0 — 1389 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean, build bundled. NO live defect — bug vein still exhausted. cov:
   be 85.65%+ (carry) / fe 80.72% (carry).
+- **C277 (guard): cover the two zero-coverage settings POST endpoints — /backup (side effect) + /restore + auth-gating** — BALANCE: `guard` most-starved
+  actionable (cyc 271, starved-for 6 = budget, due); feature more-starved (107) but human-gated. SCOUT: settings/routes.ts was the thinnest route module
+  (4 referencing test files); the GET + PUT branches are well-pinned (C237/C238/C239), but `POST /settings/backup` and `POST /settings/restore` had ZERO
+  HTTP coverage. /backup has a REAL observable side effect — syncStateRepository.updateBackupDate writes sync_state.last_backup_date (read by a
+  backup-status UI) — worth pinning end-to-end. +3 HTTP tests (settings-route-errors.test.ts): POST /backup → 200 + the DB row's last_backup_date goes
+  from null → a real timestamp (read via ctx.sqlite, bounded ≤ now+5s — proves the write LANDED, not just a 200); POST /restore → 200 success envelope;
+  BOTH require auth (anon → 401, pinning the routes.use('*', requireAuth) chain). NON-VACUOUS (the null→timestamp assertion fails if updateBackupDate
+  regresses; the 401s fail if the auth chain drops). green→green: backend validate:local EXIT 0 — 1392 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome
+  clean, build bundled. Test-only. cov: be 85.65%+ (carry; settings POST /backup+/restore now covered) / fe 80.72% (carry).

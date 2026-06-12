@@ -455,6 +455,9 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > `no-utc-date-input.test.ts` committed source-scan guard for the #87 UTC date-input class DONE C271 (+2; scans product .svelte/.ts for
 > `.toISOString().split('T')[0]`/`.slice(0,10)` — toDateInputValue never matches). CAUGHT A RESIDUAL: odometer-edit page :69 still used the UTC idiom
 > (the EDIT page C267's sweep missed) → reloaded a stored noon-local date one day earlier for +offset users; FIXED via toDateInputValue. NON-VACUOUS (RED on the residual pre-fix).
+> `settings/routes.ts` POST /backup + /restore endpoints DONE C277 (+3 HTTP; the two zero-coverage settings endpoints — settings was the thinnest route
+> module): POST /backup → 200 + sync_state.last_backup_date null→timestamp via ctx.sqlite (proves updateBackupDate landed, a backup-status UI reads it);
+> POST /restore → 200; both anon → 401 (auth-chain pin). NON-VACUOUS.
 > **NEXT FE guard pick (no primed): the FE pure/service modules are now
 > essentially all covered — remaining FE gap is the components/routes deficit (largely eyes-on) + the network/timer-bound tails (mock-trap, low-value). vehicle-helpers.ts is the lone untested FE util but it's a single trivial display-name fn (theater — skip).** The components/routes deficit is
 > the bulk + largely eyes-on.** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
