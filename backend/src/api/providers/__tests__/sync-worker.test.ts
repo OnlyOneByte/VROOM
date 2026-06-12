@@ -297,6 +297,75 @@ describe('processBatch', () => {
     });
   });
 
+  // C261: the folder-path resolution is wrapped in its OWN try/catch (sync-worker.ts:228-234) so a
+  // storage_config glitch can't strand a photo in `failed` forever (NORTH_STAR #1 — no silent loss).
+  // Every other test resolves the path cleanly, leaving this resilience branch unpinned: a throwing
+  // resolveProviderFolderPath must be swallowed and the upload must still proceed with an empty pathHint.
+  test('path-resolution failure is swallowed — the sync still completes with an empty pathHint', async () => {
+    const pendingRef = makePhotoRef({ status: 'pending' });
+    const activeRef = makeActiveRef();
+    const photo = makePhoto(); // entityType 'vehicle' → IS in ENTITY_TO_CATEGORY, so resolve IS attempted
+
+    mockFindPendingOrFailed.mockResolvedValue([pendingRef]);
+    mockFindActiveByPhoto.mockResolvedValue(activeRef);
+    mockFindById.mockResolvedValue(photo);
+    mockDownload.mockResolvedValue(Buffer.from('photo-data'));
+    mockResolveFolderPath.mockRejectedValue(new Error('storage_config unreadable'));
+    mockUpload.mockResolvedValue({
+      providerType: 'google-drive',
+      externalId: 'new-file-id',
+      externalUrl: 'https://example.com/new',
+    });
+    mockGetProvider.mockResolvedValue(makeMockProvider('s3'));
+
+    await processBatch(makeDeps());
+
+    // The resolve was attempted (vehicle maps to a category) and threw...
+    expect(mockResolveFolderPath).toHaveBeenCalled();
+    // ...but the upload still happened, with the empty-string pathHint fallback.
+    expect(mockUpload).toHaveBeenCalledWith(expect.objectContaining({ pathHint: '' }));
+    // ...and the ref ends up ACTIVE, not failed — the photo is not stranded.
+    expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
+      status: 'active',
+      storageRef: 'new-file-id',
+      externalUrl: 'https://example.com/new',
+      syncedAt: expect.any(Date),
+    });
+  });
+
+  // C261: an entityType absent from ENTITY_TO_CATEGORY yields an undefined category, so path
+  // resolution is SKIPPED entirely (the `if (category)` guard at sync-worker.ts:228) — the sync must
+  // still upload with the empty pathHint rather than crash on a missing map entry.
+  test('unknown entityType skips path resolution and still uploads (empty pathHint)', async () => {
+    const pendingRef = makePhotoRef({ status: 'pending' });
+    const activeRef = makeActiveRef();
+    const photo = makePhoto({ entityType: 'not_a_known_entity' }); // NOT in ENTITY_TO_CATEGORY
+
+    mockFindPendingOrFailed.mockResolvedValue([pendingRef]);
+    mockFindActiveByPhoto.mockResolvedValue(activeRef);
+    mockFindById.mockResolvedValue(photo);
+    mockDownload.mockResolvedValue(Buffer.from('photo-data'));
+    mockUpload.mockResolvedValue({
+      providerType: 'google-drive',
+      externalId: 'new-file-id',
+      externalUrl: 'https://example.com/new',
+    });
+    mockGetProvider.mockResolvedValue(makeMockProvider('s3'));
+
+    await processBatch(makeDeps());
+
+    // category undefined → the resolve branch is never entered.
+    expect(mockResolveFolderPath).not.toHaveBeenCalled();
+    // Upload still proceeds with the empty pathHint default.
+    expect(mockUpload).toHaveBeenCalledWith(expect.objectContaining({ pathHint: '' }));
+    expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
+      status: 'active',
+      storageRef: 'new-file-id',
+      externalUrl: 'https://example.com/new',
+      syncedAt: expect.any(Date),
+    });
+  });
+
   test('marks ref as failed with incremented retryCount on upload error', async () => {
     const pendingRef = makePhotoRef({ status: 'pending', retryCount: 0 });
     const activeRef = makeActiveRef();

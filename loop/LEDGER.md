@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 225 |
-| guard | 6 | 223 |
-| bug | 3 | 226 |
-| arch | 5 | 227 |
-| infra | 6 | 224 |
+| deep-review | 5 | 259 |
+| guard | 6 | 261 |
+| bug | 3 | 255 |
+| arch | 5 | 261 |
+| infra | 6 | 258 |
 
-Current cycle: **227**
+Current cycle: **261**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4461,3 +4461,19 @@ Current cycle: **227**
   raw-seeded auth-domain provider → 400 ('Auth providers cannot be modified through this endpoint'). green→green: backend validate:local EXIT 0 —
   1372 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production change. cov: be 85.95%+ (carry;
   +2 BE, providers/routes.ts PUT credentials/auth-guard now covered) / fe 80.64% (carry).
+- **C261 (arch dry re-cert → guard pivot): pin the sync-worker's path-resolution resilience branches** — BALANCE: feature most-starved (cyc 170,
+  starved-for 91) but structurally human-gated (escalated; 3 eyes-on tails + product calls await Angelo) → next actionable over-budget = `arch`
+  (cyc 254, starved-for 7 > 5). ARCH SWEEP (2 inline scouts, spawn_run still 400s): production frontend CLEAN (Intl/toLocaleString only in tests;
+  chart-formatters already converged C-prior); backend dry — the 7 validateXOwnership validators are deliberately individual (documented shape
+  differences: NotFoundError-name + findById-vs-findByIdAndUserId vary; collapsing = churn, rule 5), the recent dedups (C243 withComputedBalance /
+  C249 findIdsByColumn / C254 registry) cleared the clean picks, `groupByVehicle`/`buildPaginatedResponse` are ALREADY shared, the 66 structured
+  `logger.error({error})` sites are the distinct idiom C147 correctly left (converging risks changing log serialization — NOT behavior-preserving),
+  and the `new Set(map(v=>v.id))` pair isn't byte-identical. → arch RE-CERTIFIED DRY (the C254 precedent; recording no-churn-warranted IS the arch
+  job) and PIVOTED the increment to a grounded guard slice. PICK (high-value, genuinely uncovered): `processSingleRef` (sync-worker.ts:228-234) has
+  TWO unpinned resilience branches every existing test skipped — (1) `resolveProviderFolderPath` THROWS → caught, upload still proceeds with empty
+  pathHint (a storage_config glitch must NOT strand a photo in `failed` forever, NORTH_STAR #1 no-silent-loss); (2) an entityType NOT in
+  ENTITY_TO_CATEGORY → category undefined → resolve SKIPPED via the `if (category)` guard, upload still proceeds. +2 unit tests (sync-worker.test.ts):
+  throwing resolve → resolve-attempted + upload(pathHint:'') + ref ends ACTIVE-not-failed; unknown-entityType → resolve-NOT-called + upload(pathHint:'')
+  + ACTIVE. NON-VACUOUS (each asserts the upload happened AND the ref didn't strand). green→green: backend validate:local EXIT 0 — 1374 pass / 1 skip /
+  0 fail (+2), tsc 0, musl-biome clean, build bundled. Test-only, no production change. cov: be 85.95%+ (carry; sync-worker path-resolution branches
+  now covered) / fe 80.64% (carry).
