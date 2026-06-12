@@ -474,6 +474,9 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > `split-service.ts computeAllocations` percentage penny-residue + over-100% clamp DONE C287 (+3; thinnest service module, money math). Property tests pin
 > sum/fairness/count but not the deterministic percentage edges: the LAST vehicle absorbs the rounding residue (33/33/34 → [33,33,34]); the Math.max(0,…)
 > clamp (a non-last-overshoot config like 60/60/10 → last leg clamps to 0 not −20, since computeAllocations doesn't re-validate). NON-VACUOUS.
+> analytics `/fuel-stats` + `/fuel-advanced` cross-tenant ownership guard DONE C290 (+4; the 2 uncovered optional-vehicleId endpoints — C185 pinned
+> fuel-efficiency + the required-vehicleId ones, not these): each → omitted-vehicleId 200 all-fleet + FOREIGN-vehicleId 404 (no cross-tenant leak). These
+> REQUIRE startDate+endDate (zValidator 400s before the guard otherwise) — supply a unix-seconds range to reach the guard branch. NON-VACUOUS.
 > **NEXT FE guard pick (no primed): the FE pure/service modules are now
 > essentially all covered — remaining FE gap is the components/routes deficit (largely eyes-on) + the network/timer-bound tails (mock-trap, low-value). vehicle-helpers.ts is the lone untested FE util but it's a single trivial display-name fn (theater — skip).** The components/routes deficit is
 > the bulk + largely eyes-on.** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);

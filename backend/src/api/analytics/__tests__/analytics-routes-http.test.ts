@@ -111,4 +111,43 @@ describe('analytics routes (real HTTP stack)', () => {
     const res = await ctx.authed('GET', '/api/v1/analytics/fuel-efficiency?vehicleId=nope');
     expect(res.status).toBe(404);
   });
+
+  // C290: /fuel-stats + /fuel-advanced carry the IDENTICAL `if (vehicleId) validateVehicleOwnership`
+  // optional-guard as fuel-efficiency, but their cross-tenant branch was uncovered (the C185 net pinned
+  // fuel-efficiency + the required-vehicleId endpoints, not these two). Pin both branches on each:
+  // omitted vehicleId → 200 all-fleet (no validation), foreign vehicleId → 404 (no cross-tenant leak).
+  // NOTE: unlike fuel-efficiency, these two REQUIRE startDate+endDate (unix seconds) — omit them and
+  // zValidator 400s BEFORE the ownership guard, so supply a valid range to reach the guard branch.
+  const RANGE = 'startDate=1704067200&endDate=1735689600'; // 2024 calendar year (unix seconds)
+
+  test('fuel-stats with NO vehicleId returns the all-fleet envelope (optional-guard branch)', async () => {
+    const res = await ctx.authed('GET', `/api/v1/analytics/fuel-stats?${RANGE}`);
+    const body = await json<{ success: boolean; data: unknown }>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+  });
+
+  test('fuel-stats with a FOREIGN vehicleId is 404 (cross-tenant ownership guard)', async () => {
+    await seedVehicle('Daily Driver');
+    const res = await ctx.authed('GET', `/api/v1/analytics/fuel-stats?${RANGE}&vehicleId=not-mine`);
+    expect(res.status).toBe(404);
+  });
+
+  test('fuel-advanced with NO vehicleId returns the all-fleet envelope (optional-guard branch)', async () => {
+    const res = await ctx.authed('GET', `/api/v1/analytics/fuel-advanced?${RANGE}`);
+    const body = await json<{ success: boolean; data: unknown }>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+  });
+
+  test('fuel-advanced with a FOREIGN vehicleId is 404 (cross-tenant ownership guard)', async () => {
+    await seedVehicle('Daily Driver');
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/analytics/fuel-advanced?${RANGE}&vehicleId=not-mine`
+    );
+    expect(res.status).toBe(404);
+  });
 });

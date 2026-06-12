@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 286 |
-| guard | 6 | 287 |
+| guard | 6 | 290 |
 | bug | 3 | 288 |
 | arch | 5 | 289 |
 | infra | 6 | 285 |
 
-Current cycle: **289**
+Current cycle: **290**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4804,3 +4804,13 @@ Current cycle: **289**
   branches the dedup centralizes (re-save-without-plate-change → no self-409; same-user dup on a DIFFERENT vehicle → still 409, proving excludeId isn't
   over-broad). green→green: backend validate:local EXIT 0 — 1407 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean (format auto-fixed), build bundled.
   cov: be 85.74%+ (carry) / fe 81.41% (carry).
+- **C290 (guard): pin the cross-tenant ownership guard on /fuel-stats + /fuel-advanced (the 2 uncovered optional-vehicleId analytics endpoints)** —
+  BALANCE: nothing OVER budget → highest-leverage; guard most-starved (cyc 287, starved-for 3); infra most-starved (5) but has no pressing work (cov
+  re-measured C285, hygiene C274, docs C279 — forcing it would be manufactured); feature more-starved (120) but human-gated. SCOUT: 12 analytics GET
+  endpoints, only 7 with HTTP coverage. The C185 net pinned the required-vehicleId guards (vehicle-tco/health) + the optional-vehicleId pair on
+  fuel-efficiency, but /fuel-stats + /fuel-advanced carry the IDENTICAL `if (vehicleId) validateVehicleOwnership` optional-guard with its cross-tenant
+  branch UNCOVERED. +4 HTTP tests (analytics-routes-http.test.ts): each endpoint — omitted vehicleId → 200 all-fleet envelope (no validation); FOREIGN
+  vehicleId → 404 (no cross-tenant analytics leak, the C109/#52 class). DISCOVERY (the RED first run): unlike fuel-efficiency, these two REQUIRE
+  startDate+endDate (dateRangeVehicleQuerySchema) — omitting them 400s at zValidator BEFORE the guard; supplying a valid 2024 unix-seconds range reaches
+  the guard branch. NON-VACUOUS (foreign-id asserts 404 not 200/400; no-id asserts the 200 envelope). green→green: backend validate:local EXIT 0 — 1411
+  pass (+4) / 1 skip / 0 fail, tsc 0, musl-biome clean (format auto-fixed), build bundled. Test-only. cov: be 85.74%+ (carry) / fe 81.41% (carry).
