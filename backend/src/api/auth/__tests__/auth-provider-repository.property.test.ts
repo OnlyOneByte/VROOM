@@ -318,6 +318,31 @@ describe('updateProfile', () => {
     expect(config.email).toBe('new@test.com');
     expect(config.avatarUrl).toBe('https://example.com/avatar');
   });
+
+  // C282: the cross-tenant WRITE defense — updateProfile is scoped on (id, userId) just like delete
+  // (which has its own "does not delete other users' rows" guard), so updating another user's auth
+  // profile with the wrong userId must be a no-op (account-profile tampering defense). Was unpinned —
+  // delete had the parallel guard but updateProfile only had the happy path.
+  test('does not update rows belonging to other users (cross-tenant write defense)', async () => {
+    const row = await repo.create({
+      userId: USER_ID_2,
+      authProvider: 'google',
+      providerAccountId: 'other-user-profile',
+      email: 'victim@test.com',
+      displayName: 'Victim',
+    });
+
+    // Attacker (USER_ID) tries to rewrite USER_ID_2's auth profile.
+    await repo.updateProfile(row.id, USER_ID, {
+      email: 'attacker@test.com',
+      displayName: 'Hijacked',
+    });
+
+    // The victim's row is untouched — the userId predicate excluded it.
+    const found = await repo.findByProviderIdentity('google', 'other-user-profile');
+    expect(found?.displayName).toBe('Victim');
+    expect((found?.config as Record<string, unknown>).email).toBe('victim@test.com');
+  });
 });
 
 // ---------------------------------------------------------------------------

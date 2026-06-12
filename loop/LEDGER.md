@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 281 |
-| guard | 6 | 277 |
+| guard | 6 | 282 |
 | bug | 3 | 280 |
 | arch | 5 | 278 |
 | infra | 6 | 279 |
 
-Current cycle: **281**
+Current cycle: **282**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4719,3 +4719,12 @@ Current cycle: **281**
   pins the under-water-loan behavior (correct, not a bug, but unpinned). NON-VACUOUS (a regression allowing negative principal or un-clamped balance breaks
   the frozen-balance signature). green→green: backend validate:local EXIT 0 — 1397 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean (format
   auto-fixed), build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C282 (guard): pin the cross-tenant WRITE defense on AuthProviderRepository.updateProfile** — BALANCE: nothing OVER budget → highest-leverage; guard
+  most-starved (cyc 277, starved-for 5); feature more-starved (112) but human-gated. SCOUT: auth-provider-repository.ts was the thinnest auth module (1
+  referencing test) — the OAuth-identity store (links Google/etc accounts to users), constructor-DI'd so directly testable over in-memory SQLite (no
+  harness leak trap). Its property-test ALREADY covers 6 methods + domain isolation + delete's cross-tenant guard ("does not delete other users' rows"),
+  but `updateProfile` had ONLY the happy path — its parallel cross-tenant WRITE defense (scoped on (id, userId, domain='auth'), so updating another user's
+  auth profile with the wrong userId is a no-op — account-profile-tampering defense) was UNPINNED. +1 test: attacker(USER_ID) tries to rewrite USER_ID_2's
+  google profile via updateProfile(row.id, USER_ID, {hijacked}) → the victim's row is UNCHANGED (displayName 'Victim', email 'victim@test.com' intact).
+  NON-VACUOUS (a regression dropping the userId predicate lets the attacker's values land → fails). green→green: backend validate:local EXIT 0 — 1398 pass
+  (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Test-only. cov: be 85.65%+ (carry) / fe 80.72% (carry).
