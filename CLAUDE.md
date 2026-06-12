@@ -183,7 +183,7 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1344 backend tests / ~592 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1360 backend tests / ~592 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
@@ -220,8 +220,10 @@ Highlights:
   validate-before-unset [#78, C229], license-plate uniqueness scoped per-user (route + DB index migration 0005) was global →
   cross-tenant false-409 + enumeration oracle [#80, C233], `Math.max(...arr)` argument-spread crash-class swept to spread-safe maxOf/minOf across
   18 analytics sites [#81, C235], PUT /settings backupConfig merged per-provider (was wholesale → partial PUT wiped other providers) [#82, C237],
-  mark-serviced time re-arm advances to the first FUTURE occurrence (was one period → a multi-period-overdue reminder stayed overdue) [#83, C241])
-  all landed C155–C241. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
+  mark-serviced time re-arm advances to the first FUTURE occurrence (was one period → a multi-period-overdue reminder stayed overdue) [#83, C241],
+  non-fuel expense write now nulls fuel-only fields server-side (a stray mileage on a misc row poisoned getCurrentOdometer cross-category) [#76-backend, C244],
+  insurance claim create/update validates the optional vehicleId/termId links (owned vehicle; term on THIS policy — they were written verbatim) [#84, C247])
+  all landed C155–C247. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
   a green test that RE-IMPLEMENTS or RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module
   (C229: the two photo "property" tests only drove a reference model, never the real setCoverPhoto, which was also
   getDb-singleton-bound and thus untestable via a constructed repo until switched to this.db.transaction).
@@ -234,5 +236,7 @@ Highlights:
   **#45** (period-scoped totalMileage/costPerMile) + the "Current Mileage card" semantics call; #19 (TCO
   trend scope), #24 (CSV decimal separator), #21-shrink, #51 (term-less active policy count), #53 (endDate
   inclusivity server-TZ-conditional, UTC-mitigated), **#69** (a monthly-only insurance term shows in analytics
-  but is absent from TCO — escalated C210: materialize monthlyCost×term-months / N monthly rows / analytics-only).
+  but is absent from TCO — escalated C210: materialize monthlyCost×term-months / N monthly rows / analytics-only),
+  **#79** (a malformed fuel offline entry is stuck in the outbox forever, silently re-skipped — drop+toast / failed-bucket / confirm-the-form-blocks-it),
+  **#85** (fuel-stats "This/Last Year" is range-relative not calendar-year, while the sibling month fields are true calendar months — calendar-YTD / relabel "This/Last Period" / hide-on-non-year-range; #9-rename class).
   See `loop/BACKLOG.md` bug queue for the full list + grounding.

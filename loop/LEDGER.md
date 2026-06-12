@@ -4369,3 +4369,11 @@ Current cycle: **227**
   relabel "This/Last Period" vs hide-on-non-year-range) → NOT loop-decidable (changes a headline figure + the FE↔BE contract). send_message'd
   Angelo + filed #85. NO code change (the rest of the path is clean + the finding is gated — record-only, the C225/C246/C251 precedent). cov: be
   85.91% / fe 80.64% (carry).
+- **C253 (infra): CLAUDE.md content refresh — suite size, closed-bug list (#83→#84 incl. #76-backend), pending-Angelo list (+#79/#85)** — BALANCE:
+  nothing OVER budget; `infra` most-starved (cyc 248, starved-for 5) → highest-leverage. The #5 sweep + coverage line were done recently (C248), so
+  the actionable infra increment is the CLAUDE.md content-refresh (forecast ~C252). Three drifts fixed: (1) suite size ~1344 BE → ~1360 (FE 592
+  accurate); (2) closed-bug list ended at #83/C241 → extended with #76-backend (C244 non-fuel-write fuel-field clear) + #84 (C247 claim vehicleId/
+  termId validation), range bumped C155–C241 → C155–C247; (3) pending-Angelo product-call list += #79 (stuck malformed offline entry, escalated
+  C231) + #85 (fuel-stats This/Last Year range-relative mislabel, escalated C252). DOCS-ONLY (CLAUDE.md only — verified `git diff --name-only`
+  shows just CLAUDE.md), no source touched → no build gate (the C230/C242/C248 doc-refresh precedent). Next CLAUDE.md content-refresh ~C263; next #5
+  sweep ~C258. cov: be 85.91% / fe 80.64% (carry — no code, no re-measure this cycle).
