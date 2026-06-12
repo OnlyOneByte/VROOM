@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 296 |
 | bug | 3 | 297 |
 | arch | 5 | 294 |
-| infra | 6 | 292 |
+| infra | 6 | 298 |
 
-Current cycle: **297**
+Current cycle: **298**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4906,3 +4906,12 @@ Current cycle: **297**
   lease still inert. NON-VACUOUS, PROVEN: restoring the old guard turned the two 0%-APR tests RED ("expected +0 to be 12"). The fixed
   $ figure is shown in the planner dialog (markup unchanged → no pixel moved; eyes-on screenshot Playwright-gated, logic fully pinned).
   green→green: frontend validate:local EXIT 0 — type-check 0, build, 610 pass (+4). cov: be 85.74% (carry) / fe 81.41%+ (carry).
+- **C298 (infra): CLAUDE.md docs-accuracy refresh — record #90/#91/#92 in the closed-bug list + suite size ~1418 BE / ~610 FE** —
+  BALANCE: infra forced (last 292, starved-for 6 = budget, most-starved actionable; feature gated). The C253/C279/C292 docs-accuracy
+  cadence: three bugs closed since the last refresh (#90 C293, #91 C295, #92 C297) but the CLAUDE.md closed-bug list ended at #87/C268
+  and even SKIPPED #90 entirely; suites drifted (BE 1414→1418 via C294's +2 ownership-404 tests; FE 604→610 via C295/C296/C297's +1/+1/+4).
+  FIXED (CLAUDE.md only): (1) appended #90 (create-or-replace stale cross-type fields), #91 (lease overage absolute-vs-driven), #92
+  (0%-APR planner inert) to the closed-bug list + bumped the arc range C155–C271 → C155–C297; (2) suite size ~1414→~1418 BE / ~604→~610
+  FE. DOCS-ONLY — verified `git status --short` = CLAUDE.md alone (the ?? items are the pre-existing untracked-by-design e2e/tooling
+  scaffold); no source/test/build touched (the C297 gate is the last code state). Keeps the next cycle's closed-bug + suite-floor refs
+  accurate. cov: be 85.74% (carry) / fe 81.41% (carry).

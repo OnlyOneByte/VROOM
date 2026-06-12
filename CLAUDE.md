@@ -183,7 +183,7 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1414 backend tests / ~604 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1418 backend tests / ~610 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
@@ -224,8 +224,11 @@ Highlights:
   non-fuel expense write now nulls fuel-only fields server-side (a stray mileage on a misc row poisoned getCurrentOdometer cross-category) [#76-backend, C244],
   insurance claim create/update validates the optional vehicleId/termId links (owned vehicle; term on THIS policy — they were written verbatim) [#84, C247],
   fuel-stats "This/Last Month" now year-scoped (was getMonth()-only → a prior-year same-month fillup folded into "This Month" under a multi-year range) [#86, C262],
-  toDateInputValue reads the LOCAL calendar date (was UTC .slice(0,10) → date-input off-by-one for negative offsets + broke the noon-local stored-date round-trip for positive offsets) [#87, C268; residual on the odometer-edit page swept + a committed no-utc-date-input source-scan guard added C271])
-  all landed C155–C271. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
+  toDateInputValue reads the LOCAL calendar date (was UTC .slice(0,10) → date-input off-by-one for negative offsets + broke the noon-local stored-date round-trip for positive offsets) [#87, C268; residual on the odometer-edit page swept + a committed no-utc-date-input source-scan guard added C271],
+  create-or-replace financing left STALE cross-type fields when a vehicle's financing TYPE changed (lease↔loan) — update() skips undefined keys, so a loan row kept the prior lease's mileageLimit etc.; coalesce optional cross-type fields to null so the reused row mirrors a fresh create (sibling to the #67/C206/C240 reset) [#90, C293],
+  lease-overage projection compared an ABSOLUTE odometer against a DRIVEN-miles budget → phantom excess fee by exactly initialMileage on any used-car lease (sibling to #64; +a translation-invariance property guarding the coordinate-space class C296) [#91, C295],
+  extra-payment planner treated every 0%-APR loan as inert → "0 mos saved" for an interest-free loan an extra payment clearly shortens (bail early only for non-loans; 0%-APR loans run the amortization loop with rate 0) [#92, C297])
+  all landed C155–C297. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
   a green test that RE-IMPLEMENTS or RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module
   (C229: the two photo "property" tests only drove a reference model, never the real setCoverPhoto, which was also
   getDb-singleton-bound and thus untestable via a constructed repo until switched to this.db.transaction).
