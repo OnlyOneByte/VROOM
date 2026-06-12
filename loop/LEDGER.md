@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 295 |
 | guard | 6 | 296 |
 | bug | 3 | 297 |
-| arch | 5 | 294 |
+| arch | 5 | 299 |
 | infra | 6 | 298 |
 
-Current cycle: **298**
+Current cycle: **299**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4915,3 +4915,17 @@ Current cycle: **298**
   FE. DOCS-ONLY — verified `git status --short` = CLAUDE.md alone (the ?? items are the pre-existing untracked-by-design e2e/tooling
   scaffold); no source/test/build touched (the C297 gate is the last code state). Keeps the next cycle's closed-bug + suite-floor refs
   accurate. cov: be 85.74% (carry) / fe 81.41% (carry).
+- **C299 (arch): extract `simulateAmortization` — collapse the two byte-identical balance-walk loops in calculateExtraPaymentImpact
+  into one pure helper** — BALANCE: arch DUE (last 294, starved-for 5 = budget; feature gated) → forced pick. Arch is reliably-dry —
+  rule-7 inline scout. THE FINDING (frontend/src/lib/utils/financing-calculations.ts): calculateExtraPaymentImpact ran the SAME
+  amortization balance-walk loop TWICE — once for the original payment, once for payment+extra — byte-identical but for the payment
+  amount + local var names (originalBalance/originalMonths/originalTotalInterest vs new*). C161's note records that a hand-copied
+  variant of exactly this loop once LOST its negative-amortization guard → concrete proof these copies are a live bug vector (rule-5
+  payoff: one source of truth for the guarded walk). FIX: extracted `simulateAmortization(balance, monthlyRate, paymentAmount,
+  maxMonths) → {months, totalInterest}` (pure; the `principal ≤ 0` break = the C161 guard; monthlyRate 0 ⇒ 0%-APR path #92), called
+  twice; savings are the deltas. (Left calculatePayoffDate's loop ALONE — it `return`s today on the under-funded path rather than
+  break-ing, so it's NOT byte-identical; rule-2 forbids changing that observable behavior.) The only dropped code was two DEV-only
+  console.warn lines (not observable, no test asserts them). −28 LOC. BEHAVIOR-PRESERVING + test-anchored both ways (rule 3): the
+  extra-payment-zero-apr + financing-calculations.property + amortization-negative-guard + payment-planner.property suites (46 tests)
+  pass UNCHANGED before & after. green→green: frontend validate:local EXIT 0 — type-check 0, build, 610 pass (unchanged — pure
+  refactor). Pure util, no UI moved, no screenshot. cov: be 85.74% (carry) / fe 81.41% (carry).

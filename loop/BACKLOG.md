@@ -1338,6 +1338,14 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract simulateAmortization — dedup the twin balance-walk loops in calculateExtraPaymentImpact (filed+done C299).**~~ — *DONE
+  C299: calculateExtraPaymentImpact (financing-calculations.ts) ran the SAME guarded amortization balance-walk TWICE (original payment
+  vs payment+extra), byte-identical but for the payment amount. C161 recorded a hand-copied variant of this loop once LOSING its
+  negative-amortization guard → these copies are a live bug vector. Extracted pure `simulateAmortization(balance, monthlyRate,
+  paymentAmount, maxMonths) → {months, totalInterest}` (the `principal ≤ 0` break = the C161 guard; rate 0 ⇒ 0%-APR path #92), called
+  twice; savings = the deltas. Left calculatePayoffDate's loop alone (it RETURNS on the under-funded path, not byte-identical — rule 2).
+  −28 LOC, one source of truth. Test-anchored both ways: 46 financing tests pass unchanged. fe validate:local EXIT 0, 610 pass.*
+
 *(NEW category. Three concrete items seeded below from a quick grounding scan — verify each
 against current source before acting, then knock out the top one. Once these are done (or to
 go broader), run the AUDIT fan-out per rule 7 to repopulate. Obey the `arch` rules above —

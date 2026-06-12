@@ -266,6 +266,34 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 
 export const calculateAmortizationSchedule = memoizeMulti(calculateAmortizationScheduleImpl);
 
+/**
+ * Walk a loan balance down month-by-month at a fixed payment, returning the number of months to
+ * pay it off and the total interest paid. Stops at `maxMonths` (the runaway guard) or when a
+ * payment no longer covers the period's interest (the negative-amortization guard — principal ≤ 0,
+ * the same break the displayed schedule uses; C161 records that a hand-copied loop once LOST this
+ * guard, which is exactly why this is now ONE function). Pure; `monthlyRate` 0 ⇒ interest 0 ⇒ the
+ * full payment retires principal (the 0%-APR path, #92). Extracted C299 — `calculateExtraPaymentImpact`
+ * ran this identical loop twice (original vs. extra payment), the only difference being the payment.
+ */
+function simulateAmortization(
+	balance: number,
+	monthlyRate: number,
+	paymentAmount: number,
+	maxMonths: number
+): { months: number; totalInterest: number } {
+	let months = 0;
+	let totalInterest = 0;
+	while (balance > 0 && months < maxMonths) {
+		const interestAmount = balance * monthlyRate;
+		const principalAmount = Math.min(paymentAmount - interestAmount, balance);
+		if (principalAmount <= 0) break;
+		balance -= principalAmount;
+		totalInterest += interestAmount;
+		months++;
+	}
+	return { months, totalInterest };
+}
+
 function calculateExtraPaymentImpactImpl(
 	financing: VehicleFinancing,
 	extraPaymentAmount: number
@@ -302,46 +330,21 @@ function calculateExtraPaymentImpactImpl(
 
 		const monthlyRate = financing.apr && financing.apr > 0 ? financing.apr / 100 / 12 : 0;
 		const newPaymentAmount = financing.paymentAmount + extraPaymentAmount;
+		const balance = financing.computedBalance ?? 0;
+		const maxMonths = financing.termMonths * 2;
 
-		let originalBalance = financing.computedBalance ?? 0;
-		let originalMonths = 0;
-		let originalTotalInterest = 0;
+		// Same amortization walk at two payment levels (the only difference): original schedule vs. the
+		// accelerated one with the extra payment. The savings are the deltas. See simulateAmortization.
+		const original = simulateAmortization(balance, monthlyRate, financing.paymentAmount, maxMonths);
+		const accelerated = simulateAmortization(balance, monthlyRate, newPaymentAmount, maxMonths);
 
-		while (originalBalance > 0 && originalMonths < financing.termMonths * 2) {
-			const interestAmount = originalBalance * monthlyRate;
-			const principalAmount = Math.min(financing.paymentAmount - interestAmount, originalBalance);
-
-			if (principalAmount <= 0) {
-				if (DEV) console.warn('calculateExtraPaymentImpact: payment does not cover interest');
-				break;
-			}
-
-			originalBalance -= principalAmount;
-			originalTotalInterest += interestAmount;
-			originalMonths++;
-		}
-
-		let newBalance = financing.computedBalance ?? 0;
-		let newMonths = 0;
-		let newTotalInterest = 0;
-
-		while (newBalance > 0 && newMonths < financing.termMonths * 2) {
-			const interestAmount = newBalance * monthlyRate;
-			const principalAmount = Math.min(newPaymentAmount - interestAmount, newBalance);
-
-			if (principalAmount <= 0) {
-				if (DEV) console.warn('calculateExtraPaymentImpact: new payment does not cover interest');
-				break;
-			}
-
-			newBalance -= principalAmount;
-			newTotalInterest += interestAmount;
-			newMonths++;
-		}
-
-		const monthsSaved = Math.max(0, originalMonths - newMonths);
-		const interestSaved = Math.max(0, originalTotalInterest - newTotalInterest);
-		const newPayoffDate = calculatePaymentDate(new Date(), newMonths, financing.paymentFrequency);
+		const monthsSaved = Math.max(0, original.months - accelerated.months);
+		const interestSaved = Math.max(0, original.totalInterest - accelerated.totalInterest);
+		const newPayoffDate = calculatePaymentDate(
+			new Date(),
+			accelerated.months,
+			financing.paymentFrequency
+		);
 
 		return {
 			extraPaymentAmount,
