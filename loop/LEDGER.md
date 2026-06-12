@@ -4330,3 +4330,15 @@ Current cycle: **227**
   anchored (rule 3, green→green): the vehicle-delete-cascade test exercises BOTH findIdsByVehicleId paths + passed UNCHANGED. green→green: backend
   validate:local EXIT 0 — 1357 pass / 1 skip / 0 fail (UNCHANGED, behavior-preserving), tsc 0, musl-biome clean, build bundled. cov: be 85.91% / fe
   80.64% (carry — pure refactor, no test-count change).
+- **C250 (guard): cover the provider-free sync-backup route slices — GET /backups/download + /backups/providers (sync/routes.ts, was 72%/59%)** —
+  BALANCE: nothing OVER budget; `guard` most-starved (cyc 245, starved-for 5) → highest-leverage. Per the C236/C239 steering (characterize a
+  known-hard seam via the HTTP harness), the C248 measure flagged sync/routes.ts as the genuine BE low spot (72% func / 59% line). C188 covered the
+  status/restore-providers/POST handlers; the byte/provider-bound paths were left as C163 mock-trap territory — but TWO slices are PROVIDER-FREE and
+  were uncovered: (1) GET /backups/download (:139-154) — exportAsZip reads the user's OWN db data, no provider; (2) GET /backups/providers with no
+  providerId (:135) — listAllBackups iterates enabledProviders, which is EMPTY for a user with no backup providers → returns [] with no provider
+  call. +3 HTTP tests (sync-route-success.test.ts): download → 200 with a REAL ZIP (PK signature, Content-Type application/zip, attachment
+  Content-Disposition w/ vroom-backup- filename, matching Content-Length) after seeding a vehicle; anon download → 401; empty-provider list → 200
+  []. The download route is the user's "download my backup" button — its header-shaping + auth wrapper had no route-level coverage (existing tests
+  use exportAsZip at the SERVICE level only). green→green: backend validate:local EXIT 0 — 1360 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean
+  (no reflow), build bundled. Test-only, no production change. cov: be 85.91%+ (carry; +3 BE, sync/routes.ts download+list slices now covered) / fe
+  80.64% (carry).

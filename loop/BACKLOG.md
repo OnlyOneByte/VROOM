@@ -411,7 +411,10 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > map helper).
 > `providers/routes.ts` DELETE-cleanup side effects DONE C245 (+2 HTTP via the s3 seam: deleting a storage provider NULLS its storageConfig.defaults
 > pointer + removes its providerCategories & backupConfig.providers entries [cleanupStorageConfig/cleanupBackupConfig, was 0 e2e coverage]; a
-> 2-provider case proves the scrub is targeted, not over-broad). **NEXT FE guard pick (no primed): the FE pure/service modules are now
+> 2-provider case proves the scrub is targeted, not over-broad).
+> `sync/routes.ts` backups download+list slices DONE C250 (+3 HTTP: GET /backups/download → real ZIP w/ attachment headers + matching
+> Content-Length [own-data export, no provider] + anon 401; GET /backups/providers no-providers → 200 []. The byte/provider-bound restore paths
+> stay the C163 mock-trap territory). **NEXT FE guard pick (no primed): the FE pure/service modules are now
 > essentially all covered — remaining FE gap is the components/routes deficit (largely eyes-on) + the network/timer-bound tails (mock-trap, low-value). vehicle-helpers.ts is the lone untested FE util but it's a single trivial display-name fn (theater — skip).** The components/routes deficit is
 > the bulk + largely eyes-on.** FRONTEND — the FE SERVICE layer is now FULLY covered (C137/C143/C149/C163);
 > the remaining FE gap is the **components/routes deficit** (largely eyes-on — prefer the few pure-`.ts`
