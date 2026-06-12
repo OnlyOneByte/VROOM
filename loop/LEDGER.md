@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 261 |
 | bug | 3 | 262 |
 | arch | 5 | 261 |
-| infra | 6 | 258 |
+| infra | 6 | 263 |
 
-Current cycle: **262**
+Current cycle: **263**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4493,3 +4493,12 @@ Current cycle: **262**
   excluded). NON-VACUOUS (the prior-year rows carry volume 99 → pre-fix currentMonth would be 3). green→green: backend validate:local EXIT 0 — 1376
   pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean, build bundled; the existing single-year fuel-stats property tests passed UNCHANGED
   (behavior-preserving for them). cov: be 85.95%+ (carry) / fe 80.64% (carry).
+- **C263 (infra): CLAUDE.md content refresh — suite size, closed-bug list (+#86/C262), the #85 parenthetical (now post-#86)** — BALANCE: feature
+  most-starved (starved-for 93) but human-gated + already-escalated (re-escalating each cycle is spam, step-7); next actionable = `infra` (cyc 258,
+  starved-for 5, breaches next cycle) → the C253/C258 docs-accuracy cadence so future cycles ground correctly, and #86 just closed → 3 stale spots.
+  FIXED (CLAUDE.md only): (1) suite size ~1360→~1376 BE; (2) the closed-bug list ended at #84/C247 → appended #86/C262 (fuel-stats "This/Last Month"
+  year-scoped) + bumped the arc span C155–C247→C155–C262 and the coverage-arc span C178–C247→C178–C262 / C237–C247→C237–C262 (all backend); (3) the
+  #85 pending-Angelo parenthetical said "the sibling month fields ARE true calendar months" — that WAS the #86 bug; now reads "are now true calendar
+  months after #86/C262, so this is purely the YEAR row." DOCS-ONLY — verified `git diff --name-only` = CLAUDE.md alone; no code/test/build touched
+  (no validate run needed — the prior C262 gate is the last code state, unchanged). The pending-Angelo HIGH list (#36/#37/#43/#44) + the eyes-on
+  feature tails are unchanged from C253; not re-escalated (already standing).

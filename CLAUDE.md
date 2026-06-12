@@ -164,7 +164,7 @@ Highlights:
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
   (re-measured C258, not an estimate): **backend 85.95% line / 85.64% func · frontend 80.64% line / 80.51%
-  func / 74.97% branch** (both suites > 80% line) — backend ~86% (the C178–C247 BE bug-fix + route-coverage arc; FE flat since C236 — C237–C247 were all backend);
+  func / 74.97% branch** (both suites > 80% line) — backend ~86% (the C178–C262 BE bug-fix + route-coverage arc; FE flat since C236 — C237–C262 were all backend);
   frontend climbed 65.3→80.6 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
   C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts, C201
@@ -183,7 +183,7 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1360 backend tests / ~592 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1376 backend tests / ~592 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
@@ -222,8 +222,9 @@ Highlights:
   18 analytics sites [#81, C235], PUT /settings backupConfig merged per-provider (was wholesale → partial PUT wiped other providers) [#82, C237],
   mark-serviced time re-arm advances to the first FUTURE occurrence (was one period → a multi-period-overdue reminder stayed overdue) [#83, C241],
   non-fuel expense write now nulls fuel-only fields server-side (a stray mileage on a misc row poisoned getCurrentOdometer cross-category) [#76-backend, C244],
-  insurance claim create/update validates the optional vehicleId/termId links (owned vehicle; term on THIS policy — they were written verbatim) [#84, C247])
-  all landed C155–C247. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
+  insurance claim create/update validates the optional vehicleId/termId links (owned vehicle; term on THIS policy — they were written verbatim) [#84, C247],
+  fuel-stats "This/Last Month" now year-scoped (was getMonth()-only → a prior-year same-month fillup folded into "This Month" under a multi-year range) [#86, C262])
+  all landed C155–C262. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
   a green test that RE-IMPLEMENTS or RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module
   (C229: the two photo "property" tests only drove a reference model, never the real setCoverPhoto, which was also
   getDb-singleton-bound and thus untestable via a constructed repo until switched to this.db.transaction).
@@ -238,5 +239,5 @@ Highlights:
   inclusivity server-TZ-conditional, UTC-mitigated), **#69** (a monthly-only insurance term shows in analytics
   but is absent from TCO — escalated C210: materialize monthlyCost×term-months / N monthly rows / analytics-only),
   **#79** (a malformed fuel offline entry is stuck in the outbox forever, silently re-skipped — drop+toast / failed-bucket / confirm-the-form-blocks-it),
-  **#85** (fuel-stats "This/Last Year" is range-relative not calendar-year, while the sibling month fields are true calendar months — calendar-YTD / relabel "This/Last Period" / hide-on-non-year-range; #9-rename class).
+  **#85** (fuel-stats "This/Last Year" is range-relative not calendar-year — the sibling month fields are now true calendar months after #86/C262, so this is purely the YEAR row: calendar-YTD / relabel "This/Last Period" / hide-on-non-year-range; #9-rename class).
   See `loop/BACKLOG.md` bug queue for the full list + grounding.
