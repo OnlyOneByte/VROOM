@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 282 |
 | bug | 3 | 284 |
 | arch | 5 | 283 |
-| infra | 6 | 279 |
+| infra | 6 | 285 |
 
-Current cycle: **284**
+Current cycle: **285**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4750,3 +4750,12 @@ Current cycle: **284**
   SURVIVES (durable history, no un-fire) AND a later /trigger does NOT re-fire (dedup holds, no reading ≥ milestone). NON-VACUOUS (a future "recheck on
   delete" un-fire or a dedup regression breaks it). green→green: backend validate:local EXIT 0 — 1401 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean,
   build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C285 (infra): coverage RE-MEASURE — 16 cycles stale (last C269); ground the post-C270–C284 reading** — BALANCE: nothing OVER budget → infra
+  most-starved actionable (cyc 279, starved-for 6 = budget, due); feature more-starved (115) but human-gated. The C236/C248/C258/C269 cadence (~every
+  10–11 cycles): a fresh MEASURED reading (not an estimate) grounds future guard/coverage picks, and the C270/C272/C276/C277/C280/C281/C282/C284 BE test
+  adds + C271/C278 FE adds moved it. RAN both suites with `--coverage`: **backend 85.74% line / 86.04% func** (was 85.65/85.95 at C269 — +0.09/+0.09; the
+  guard adds nudged it). **frontend 81.41% line / 80.64% func / 75.20% branch** (was 80.72/80.58/75.00 — +0.69 line on the C271 no-utc-date-input guard +
+  C278 download.ts util tests). Both suites hold > 80% line; FE broke 81%. The 90% goal remains the C258 STRUCTURAL PLATEAU (BE saturated except
+  DI/orchestrator-bound tails; FE gap is eyes-on components/routes, Playwright-gated) — not loop-closable without an eyes-on harness or DI sign-off.
+  DOCS-ONLY: updated the CLAUDE.md coverage line (C269→C285 figures); no source/test/build touched (the C284 gate is the last code state). Recorded the
+  measure honestly; no churn-test forced to chase a structurally-gated number.
