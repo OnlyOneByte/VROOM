@@ -4342,3 +4342,17 @@ Current cycle: **227**
   use exportAsZip at the SERVICE level only). green→green: backend validate:local EXIT 0 — 1360 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean
   (no reflow), build bundled. Test-only, no production change. cov: be 85.91%+ (carry; +3 BE, sync/routes.ts download+list slices now covered) / fe
   80.64% (carry).
+- **C251 (bug → clean sweep + escalation): hunted 6 fresh write/compute surfaces, NO live defect — the cross-tenant/integrity vein is exhausted** —
+  BALANCE: `bug` AT budget (cyc 247, starved-for 3 = 3, FORCED — the C250 forecast). Per the bug-cycle pattern + the C21/C77 don't-manufacture rule,
+  hunted SIX surfaces firsthand, ALL CERTIFIED CLEAN against source: (1) insurance POLICY create (validates nested term vehicleCoverage via
+  repo.create C240) + PUT (updatePolicySchema is scalar-only — company/notes/isActive, no FK to validate); (2) insurance TERM + CLAIM writes
+  (guarded C240/C247); (3) CSV import-mapping units — resolveTargetUnits passes the target vehicle's units (the C60 risk was already closed); (4)
+  expense SPLIT create/update — both validateVehicleOwnership on the splitConfig (C101/C240); (5) getQuickStats ytdSpending (sum of all expense
+  rows — split siblings sum to the group total, financing/reminder rows are real outflows → no double-count); (6) analytics getYearEnd (totalSpent
+  vs prevTotalSpent are calendar-year-bounded identically at second-granularity → previousYearComparison compares like-for-like; well-covered by
+  year-end.property.test). markNotificationRead is userId-scoped. NO defect found → NO code change (the don't-manufacture rule; this is the honest
+  C21/C77 outcome, not a punt). CONCLUSION: the cross-tenant/integrity vein that produced #80/#82/#83/#84/#76-backend over C233–C247 is genuinely
+  worked through. send_message'd Angelo: the autonomous bug vein is past its high-leverage frontier — the HIGH-value remaining work (the ~30-commit
+  branch is PR-ready; the 3 eyes-on feature tails; the filed product/accounting calls #36/#37/#43/#44/#79/#45/#19/#24/#51/#69) is all human-gated.
+  Loop continues on marginal guard/arch/coverage increments. NO build gate (no code touched — record-only, the C225/C246 clean-cert precedent). cov:
+  be 85.91% / fe 80.64% (carry).
