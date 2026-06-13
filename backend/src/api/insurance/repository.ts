@@ -12,6 +12,7 @@ import {
 import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
+import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
 
 // ============================================================================
 // Types
@@ -98,24 +99,16 @@ export class InsurancePolicyRepository {
   // --------------------------------------------------------------------------
 
   /**
-   * Validate that all vehicleIds belong to the given userId.
+   * Validate that all vehicleIds belong to the given userId. Delegates to the shared
+   * assertVehiclesOwned (C376) — ONE source of truth for the cross-tenant ownership query shared with
+   * the expense split path; the insurance term writes run inside a tx, hence the dbOrTx handle.
    */
   private async validateVehicleOwnership(
     dbOrTx: AppDatabase | DrizzleTransaction,
     vehicleIds: string[],
     userId: string
   ): Promise<void> {
-    if (vehicleIds.length === 0) return;
-
-    const uniqueIds = [...new Set(vehicleIds)];
-    const ownedVehicles = await dbOrTx
-      .select({ id: vehicles.id })
-      .from(vehicles)
-      .where(and(inArray(vehicles.id, uniqueIds), eq(vehicles.userId, userId)));
-
-    if (ownedVehicles.length !== uniqueIds.length) {
-      throw new NotFoundError('Vehicle');
-    }
+    await assertVehiclesOwned(dbOrTx, vehicleIds, userId);
   }
 
   /**

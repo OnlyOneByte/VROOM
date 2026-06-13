@@ -10,6 +10,7 @@ import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
+import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
 import { expenseSplitService } from './split-service';
 import type { SplitConfig } from './validation';
 export interface ExpenseFilters {
@@ -614,17 +615,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         ? splitConfig.vehicleIds
         : splitConfig.allocations.map((a) => a.vehicleId);
 
-    const ownedVehicles = await this.db
-      .select({ id: vehicles.id })
-      .from(vehicles)
-      .where(and(eq(vehicles.userId, userId), inArray(vehicles.id, vehicleIds)));
-
-    const ownedIds = new Set(ownedVehicles.map((v) => v.id));
-    for (const vid of vehicleIds) {
-      if (!ownedIds.has(vid)) {
-        throw new NotFoundError('Vehicle');
-      }
-    }
+    // Delegate the cross-tenant ownership query to the shared assertVehiclesOwned (C376) — ONE source
+    // of truth shared with the insurance term path. This wrapper keeps the split-config field
+    // extraction; the helper owns the `userId AND id IN (ids)` predicate + the NotFoundError throw.
+    await assertVehiclesOwned(this.db, vehicleIds, userId);
   }
 
   /**

@@ -57,10 +57,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 372 |
 | guard | 6 | 375 |
 | bug | 3 | 374 |
-| arch | 5 | 370 |
+| arch | 5 | 376 |
 | infra | 6 | 373 |
 
-Current cycle: **375**
+Current cycle: **376**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5885,4 +5885,17 @@ Current cycle: **375**
   startDate'. NON-VACUOUS (a `<` would pass it). Rejected the other picks: FE getCategoryColor bogus-fallback already pinned (expense-category-maps.test.ts,
   confirmed C370/C234); FE getLatestTerm/sortTermsByEndDateDesc tiebreak a low-stakes determinism nit; BE photo-ref retryCount===3 the by-design cap (C367, +
   needs a mock); reminder is the cleanest pure-schema reachable boundary. green→green: be validate:local EXIT 0, 1465 pass (+1) / 0 fail. cov: be 86.68%
+  (carry) / fe 84.45% (carry).
+- **C376 (arch): extract assertVehiclesOwned — ONE source of truth for the cross-tenant vehicle-ownership query (2 repos → 1)** — BALANCE: arch OVER budget
+  (last 370, starved-for 376−370=6 > budget 5) → forced pick. rule-7 fan-out (2 agents). PICK (CONFIRMED firsthand, C21/C60): the expense split repo
+  (repository.ts:611) and the insurance repo (repository.ts:103) each ran a private validateVehicleOwnership doing the BYTE-IDENTICAL core `select id from
+  vehicles where userId AND id IN (ids)` → throw NotFoundError if any unowned. Verified behavior-equivalent (empty→no-op both; dupes: Set-membership ==
+  dedup+length; missing: both throw). Differences were only the splitConfig-extraction (expenses) + the dbOrTx tx-handle (insurance term writes run in a tx).
+  This is the C109 cross-tenant auth boundary — a divergent copy dropping the userId leg = another user's vehicle into a split allocation or insurance term
+  (a money/coverage cross-tenant write). Extracted `assertVehiclesOwned(handle, vehicleIds, userId)` into a NEW dependency-free utils/vehicle-ownership.ts
+  (zero repo imports → no cycle); both privates delegate (expenses keeps its config-extraction + passes this.db; insurance keeps its dbOrTx signature).
+  Deliberately did NOT route through the existing validateVehicleIdsOwned — it throws ValidationError, NOT NotFoundError, so reusing it would CHANGE the
+  observable error (arch rule 2 violation). Behavior-preserving (NotFoundError + empty/dupe/missing semantics identical). Test-anchored: the split + insurance
+  ownership property/HTTP suites drive both call sites — GREEN before AND after. validate:local EXIT 0, 1465 pass (unchanged). Rejected the FE dead
+  calculateDaysUntil delete (twice-deferred — deleting a tested export is lower-value than collapsing a live cross-tenant-boundary duplicate). cov: be 86.68%
   (carry) / fe 84.45% (carry).

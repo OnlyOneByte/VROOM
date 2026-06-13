@@ -1788,6 +1788,15 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract assertVehiclesOwned — ONE source of truth for the cross-tenant vehicle-ownership query (2 repos → 1, rule-7 fan-out, done C376).**~~ —
+  *DONE C376: the expense split repo (repository.ts:611) + insurance repo (repository.ts:103) each ran a private validateVehicleOwnership with a BYTE-IDENTICAL
+  core `select id from vehicles where userId AND id IN (ids)` → throw NotFoundError if any unowned (behavior-equivalent: empty→no-op, dupes via Set, missing→throw).
+  Differences only the splitConfig-extraction + the dbOrTx tx-handle. The C109 cross-tenant auth boundary — a divergent copy dropping userId = a cross-tenant
+  vehicle write into a split/term. Extracted assertVehiclesOwned(handle, vehicleIds, userId) into a NEW dependency-free utils/vehicle-ownership.ts (no cycle);
+  both privates delegate. Deliberately NOT routed through validateVehicleIdsOwned (throws ValidationError not NotFoundError → would change the observable error,
+  arch rule 2). Behavior-preserving. Test-anchored: split + insurance ownership suites GREEN before AND after. validate:local EXIT 0, 1465 pass. Rejected the FE
+  dead calculateDaysUntil delete (twice-deferred — deleting a tested export < collapsing a live cross-tenant-boundary duplicate).*
+
 - ~~**Route expense-form-validation's 3 hand-built local-date strings onto the canonical toDateInputValue (3 sites → 1, rule-7 fan-out, done C370).**~~ —
   *DONE C370: expense-form-validation.ts built a local YYYY-MM-DD string BYTE-IDENTICAL at 3 sites (future-date check :44, mileage entriesBefore :103,
   entriesAfter :116) while ALREADY importing + using toDateInputValue (:2/:96). toDateInputValue (formatters.ts:97) is byte-equivalent AND the #87 timezone-fix
