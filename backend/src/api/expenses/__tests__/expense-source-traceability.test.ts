@@ -255,3 +255,77 @@ describe('#109 — PUT rejects an asymmetric sourceType/sourceId (both-or-neithe
     expect(res.status).toBe(200);
   });
 });
+
+// #125 (C422): the create path VERIFIES a financing source link points at the vehicle's ACTIVE financing
+// (computeBalance sums `source_type='financing' AND source_id=id`, so a forged/mismatched link mis-attributes
+// the expense as a loan payment → understates the displayed balance). The PUT path SKIPPED this — it ran the
+// both-or-neither refine (#109) + the enum restriction but never the financing-existence/id-match check — so
+// a SYMMETRIC `{sourceType:'financing', sourceId:<forged>}` PUT persisted. Now both paths share
+// assertFinancingSourceValid. These are the symmetric cases the #62/#109 tests above don't cover.
+describe('#125 — PUT verifies a financing source link (not just the asymmetry/enum)', () => {
+  async function seedPlainExpense(vehicleId: string): Promise<string> {
+    const createRes = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'financial',
+      expenseAmount: 20,
+      date: '2024-05-01T00:00:00.000Z',
+    });
+    const created = await json<DataEnvelope<ExpenseResponse>>(createRes);
+    expect(createRes.status, JSON.stringify(created)).toBe(201);
+    return created.data.id;
+  }
+
+  test('PUT {sourceType:financing, sourceId:forged} on a vehicle with NO financing → 400 (was 200 pre-fix)', async () => {
+    const vehicleId = await seedVehicle();
+    const id = await seedPlainExpense(vehicleId);
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      sourceType: 'financing',
+      sourceId: 'forged-financing-id',
+    });
+    expect(res.status).toBe(400); // "Vehicle has no active financing"
+  });
+
+  test('PUT linking to the vehicle ACTUAL active financing succeeds (the check is not over-broad)', async () => {
+    const vehicleId = await seedVehicle();
+    const id = await seedPlainExpense(vehicleId);
+    // Create real active financing on the vehicle.
+    const finRes = await ctx.authed('POST', `/api/v1/financing/vehicles/${vehicleId}/financing`, {
+      financingType: 'loan',
+      provider: 'TestBank',
+      originalAmount: 20000,
+      termMonths: 60,
+      startDate: '2024-01-01T00:00:00.000Z',
+      paymentAmount: 400,
+      apr: 5,
+    });
+    const fin = await json<DataEnvelope<{ id: string }>>(finRes);
+    expect(finRes.status, JSON.stringify(fin)).toBeLessThan(300);
+
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      sourceType: 'financing',
+      sourceId: fin.data.id,
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+  });
+
+  test('PUT linking to a sourceId that does NOT match the vehicle active financing → 400', async () => {
+    const vehicleId = await seedVehicle();
+    const id = await seedPlainExpense(vehicleId);
+    const finRes = await ctx.authed('POST', `/api/v1/financing/vehicles/${vehicleId}/financing`, {
+      financingType: 'loan',
+      provider: 'TestBank',
+      originalAmount: 10000,
+      termMonths: 36,
+      startDate: '2024-01-01T00:00:00.000Z',
+      paymentAmount: 300,
+      apr: 4,
+    });
+    expect(finRes.status, await finRes.clone().text()).toBeLessThan(300);
+
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      sourceType: 'financing',
+      sourceId: 'a-different-id-not-the-active-one',
+    });
+    expect(res.status).toBe(400); // "Source ID does not match the active financing record"
+  });
+});

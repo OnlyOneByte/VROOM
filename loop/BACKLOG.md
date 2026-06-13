@@ -829,6 +829,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#125 (MED, money/data-safety / NORTH_STAR #1 — found+fixed C422 on an expense-validation deep-review) — PUT /expenses/:id skipped the financing-source
+> verification POST enforces, letting a forged source_id='financing' link corrupt the displayed loan balance.**~~ — *DONE C422: the POST handler verifies a
+> `sourceType:'financing'` link points at the vehicle's ACTIVE financing (exists + isActive + sourceId===financing.id), but PUT wrote `{sourceType:'financing',
+> sourceId:<arbitrary>}` verbatim (it had the #61 vehicle re-check + #76 fuel-clear + #109 both-or-neither, but NOT this). computeBalance sums EXACTLY
+> `source_type='financing' AND source_id=id` (originalAmount − SUM), so a forged/mismatched link mis-attributes the expense as a loan payment → understates the balance +
+> wires the row into the financing cascade-cleanup (#62 class). DISTINCT from #109 (asymmetric) + the enum restriction. FIX (atomic + arch-clean): extracted
+> assertFinancingSourceValid(sourceType, sourceId, vehicleId), shared by POST + PUT (keyed on sourceType, final vehicleId). +3 guards (forged→400 [200 pre-fix], valid→200,
+> mismatched-id→400). NON-VACUOUS. be validate:local EXIT 0, 1521 pass (+3). Vehicle write-path CERTIFIED CLEAN the same cycle (C338/C366 corroborated).*
+
 > ~~**#124 (MED, money/correctness / NORTH_STAR #1 — found+fixed C417 on an import-mapping bug scout) — normalizeDecimal corrupted a US-format number with BOTH
 > separators (1,234.56 → 1.23456, a ~1000x money under-count).**~~ — *DONE C417: normalizeDecimal (import-mapping.ts:145) on `hasDot && hasComma` hard-assumed EUROPEAN
 > (strip dots, comma→decimal), but the dot-AFTER-comma ordering of US `1,234.56` is UNAMBIGUOUSLY US → it stripped the dots → 1.23456. Applied unconditionally to `amount`

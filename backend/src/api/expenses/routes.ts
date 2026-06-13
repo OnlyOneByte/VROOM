@@ -165,6 +165,31 @@ function clearFuelFieldsIfNotFuel<
   return { ...data, volume: null, fuelType: null, mileage: null, missedFillup: false };
 }
 
+/**
+ * When an expense write SETS a financing source link, verify it points at the vehicle's ACTIVE financing
+ * record. ONE source of truth (C422) for the check the create path enforced inline — the PUT path skipped
+ * it, so a `{sourceType:'financing', sourceId:<arbitrary or mismatched id>}` edit persisted verbatim. That
+ * link is the exact predicate FinancingRepository.computeBalance sums (originalAmount − SUM(expenseAmount)
+ * WHERE source_type='financing' AND source_id=id), so a forged/mismatched link MIS-ATTRIBUTES an expense as
+ * a loan payment → understates the displayed balance (NORTH_STAR #1 money figure) + wires the row into the
+ * financing cascade-cleanup (the #62 integrity class). Pass `undefined` sourceType (a non-financing or
+ * source-less write) → no-op. The both-or-neither refine guarantees sourceId is present when sourceType is.
+ */
+async function assertFinancingSourceValid(
+  sourceType: string | undefined,
+  sourceId: string | undefined,
+  vehicleId: string
+): Promise<void> {
+  if (sourceType !== 'financing') return;
+  const financing = await financingRepository.findByVehicleId(vehicleId);
+  if (!financing?.isActive) {
+    throw new ValidationError('Vehicle has no active financing');
+  }
+  if (sourceId !== financing.id) {
+    throw new ValidationError('Source ID does not match the active financing record');
+  }
+}
+
 // Exported so the query-contract (search/limit/tags coercion) can be unit-tested
 // at the route boundary without standing up a server.
 export const expenseQuerySchema = z.object({
@@ -578,16 +603,12 @@ routes.post('/', zValidator('json', createExpenseSchema), async (c) => {
   // Verify vehicle exists and belongs to user
   await validateVehicleOwnership(expenseData.vehicleId, user.id);
 
-  // Validate: if sourceType is provided, verify the referenced entity exists
-  if (expenseData.sourceType === 'financing') {
-    const financing = await financingRepository.findByVehicleId(expenseData.vehicleId);
-    if (!financing?.isActive) {
-      throw new ValidationError('Vehicle has no active financing');
-    }
-    if (expenseData.sourceId !== financing.id) {
-      throw new ValidationError('Source ID does not match the active financing record');
-    }
-  }
+  // Validate: a financing source link must point at the vehicle's active financing (shared with PUT, C422).
+  await assertFinancingSourceValid(
+    expenseData.sourceType,
+    expenseData.sourceId,
+    expenseData.vehicleId
+  );
 
   // Validate fuel expense requirements
   validateFuelExpenseData(
@@ -677,6 +698,16 @@ routes.put(
     if (updateData.vehicleId && updateData.vehicleId !== existingExpense.vehicleId) {
       await validateVehicleOwnership(updateData.vehicleId, user.id);
     }
+
+    // A PUT that SETS a financing source link must verify it like the create path does (C422) — else a
+    // forged/mismatched sourceId persists + corrupts the displayed loan balance (computeBalance sums this
+    // exact link). Keyed on updateData.sourceType so a normal edit (no source fields) is a no-op; validated
+    // against the FINAL vehicleId so a simultaneous reassignment checks the right vehicle's financing.
+    await assertFinancingSourceValid(
+      updateData.sourceType,
+      updateData.sourceId,
+      updateData.vehicleId ?? existingExpense.vehicleId
+    );
 
     const finalCategory =
       updateData.category !== undefined ? updateData.category : existingExpense.category;

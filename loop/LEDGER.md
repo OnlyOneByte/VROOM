@@ -69,13 +69,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 416 |
+| deep-review | 5 | 422 |
 | guard | 6 | 419 |
 | bug | 3 | 420 |
 | arch | 5 | 421 |
 | infra | 6 | 418 |
 
-Current cycle: **421**
+Current cycle: **422**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6406,3 +6406,14 @@ Current cycle: **421**
   Extracted `sortExpensesByDate<T extends {date: Date|string}>` (copy, never mutates) into calculations.ts (where 2 of 3 live + the shared util home); routed all 3. Rule-2
   behavior-preserving (identical sort). Rule-3 green→green: the #75/C222 order-independence guard + calculations sort tests drive calculateAverageMPG/MilesPerKwh — GREEN
   before AND after. +4 helper tests (ascending; no-mutation; Date+string mix; empty/single). be validate:local EXIT 0, 1518 pass (+4). cov: be 86.92% (carry, +4) / fe 84.46% (carry).
+- **C422 (deep-review → #125: PUT /expenses/:id skipped the financing-source verification POST enforces — a forged source_id='financing' link corrupts the loan balance)** —
+  BALANCE: deep-review OVER budget (last 416, starved-for 422−416=6 > 5) → forced pick. 2-agent fan-out (expense validation/fuel-fields + vehicle CRUD/cover-photo); vehicle
+  write-path CERTIFIED CLEAN (C338/C366 corroborated — clear-field .nullish(), plate per-tenant, cover-photo validate-before-unset, delete cascade). The expense scout
+  surfaced #125, VERIFIED FIRSTHAND (C21/C60): the POST handler (routes.ts:582) verifies a `sourceType:'financing'` link points at the vehicle's ACTIVE financing
+  (existence + isActive + sourceId===financing.id), but the PUT handler had NO equivalent — it ran the #61 vehicle re-check + #76 fuel-clear + the #109 both-or-neither
+  refine, then wrote `{sourceType:'financing', sourceId:<arbitrary>}` verbatim. computeBalance sums EXACTLY `source_type='financing' AND source_id=id`
+  (originalAmount − SUM), so a forged/mismatched link mis-attributes the expense as a loan payment → UNDERSTATES the displayed balance (NORTH_STAR #1 money figure) + wires
+  the row into the financing cascade-cleanup (#62 class). DISTINCT from #109 (asymmetric one-of-pair) + the enum restriction (reminder/insurance_term) — neither re-added
+  the financing existence/id-match check on PUT. FIX (atomic + arch-clean, ONE source of truth): extracted `assertFinancingSourceValid(sourceType, sourceId, vehicleId)`
+  from the POST inline block; called from BOTH POST and the PUT handler (keyed on updateData.sourceType, validated against the FINAL vehicleId). GUARD: +3 (forged on a
+  no-financing vehicle → 400 [200 pre-fix, RED]; valid link → 200; mismatched id on a financed vehicle → 400). NON-VACUOUS. be validate:local EXIT 0, 1521 pass (+3). cov: be 86.92% (carry, +3 guards) / fe 84.46% (carry).
