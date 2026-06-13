@@ -154,6 +154,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Insurance premium-allocation analytics audit + #5 coverage re-measure (C323).**~~ — *DONE C323 (CERTIFIED CLEAN, no defect).
+> buildInsuranceDetails latest-term scoping (#25), #50 tiebreak, #8 totalCost amortization, cycle-14 monthKeysInRange all sound; the
+> per-vehicle premium division is a DISPLAY distribution (headline total computed independently, so float-split values carry no
+> inconsistency — not stored money). Paired the overdue #5 re-measure (last C303): be 86.53% line / 86.21% func; fe 84.39% line / 83.97%
+> func / 76.43% branch (UP +2.6 line / +3.3 func — the C308/C314/C319 FE arc; settings.svelte.ts ~12%→covered). BE↔FE gap ~2pts. Next sweep ~C333.*
+
 > ~~**Odometer→reminder D5 mileage-trigger seam audit (C317).**~~ — *DONE C317 (CERTIFIED CLEAN, +1 coexistence guard). findMileageTracking
 > + the check-then-insert + race-safe createMileageNotification (catches the UNIQUE violation) + the TWO partial unique indexes
 > (rn_reminder_due_idx on dueDate, rn_reminder_odo_idx partial-on-dueOdometer) — a disjoint-domain whichever-comes-first design. Pinned the
