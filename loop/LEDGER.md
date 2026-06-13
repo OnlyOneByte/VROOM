@@ -71,11 +71,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 399 |
 | guard | 6 | 401 |
-| bug | 3 | 398 |
+| bug | 3 | 402 |
 | arch | 5 | 397 |
 | infra | 6 | 400 |
 
-Current cycle: **401**
+Current cycle: **402**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6184,3 +6184,18 @@ Current cycle: **401**
   labeled NOT an endorsement — flips to a true round-trip assertion when the call lands); (3) ESCALATED to Angelo via send_message with options (a) VROOM-own-export
   faithfulness / (b) foreign-import faithfulness / (c) discuss. No production behavior changed (doc + tests only). green→green: be validate:local EXIT 0, 1490 pass (+5)
   / 0 fail (format reflow → check:musl:fix double-quoted the escaped-`'` describe/test names, then re-validated clean). cov: be 86.92% (carry, tests-only) / fe 84.45% (carry).
+- **C402 (bug): vehicle-stats/odometer aggregation + insurance claims/term/premium-materialization CERTIFIED CLEAN (dormant-vein scout, no defect; docs-only)** —
+  BALANCE: bug OVER budget (last 398, starved-for 402−398=4 > 3) → forced pick (arch was AT budget 5=5, less starved). 2-agent fan-out on two under-recently-audited
+  within-tenant surfaces. (A) vehicle-stats + odometer (vehicle-stats.ts, odometer/repository.ts, vehicles/routes.ts /stats): CERTIFIED CLEAN — every division div-by-0
+  guarded (costPerMile behind totalMileage>0, averageMpg behind volume truthiness, mi/kWh behind kwh>0); the #46 negative-distance clamp (Math.max(0,...)) keeps
+  costPerMile NULL not Infinity; split-fuel siblings (volume/mileage=null) correctly excluded from sumVolume + mpg pairing + expensesWithMileage (the residual
+  fuelExpenseCount inclusion is the CERTIFIED-CLEAN #56/#328 class); all 6 odometer raw-SQL legs tenant-scoped via vehicleScope; period enum fully covered by PERIOD_DAYS
+  (no NaN date). The live deltas are filed/escalated (#45 period span; Current-Mileage card semantics). (B) insurance claims/term/premium (insurance routes/repository/
+  hooks/claims): CERTIFIED CLEAN — premium largest-remainder split sums exact (100/3→3333/3333/3334, C382-pinned), re-materialize-on-edit = deleteBySource+recreate (no
+  dup/orphan), #57 orphan-cleanup complete, #84 claim link validation on create+update, findExpiringTerms excludes cancelled (#26c). Candidates DEBUNKED firsthand
+  (C21/C60): photo-loss on term edit is UI-UNREACHABLE (FE hard-locks insurance-managed expenses — raw-API only); non-atomic re-materialize is the documented
+  swallow-on-failure design; getCurrentTermDates/getActiveInsurancePolicyId missing-startDate-tiebreak is TEST-ONLY (no production consumer); lump-sum totalCost
+  regardless of premiumFrequency is the escalated #69. NO reachable atomic defect, NO genuinely-unpinned reachable invariant (the #46 clamp + costPerMile-null + #75
+  order-independence + #66 isolation + C378 costPerMile-consistency are ALL already pinned in vehicle-stats.property.test.ts; the premium split + re-materialize in
+  premium-expense-hook/terms-http) → CERTIFICATION only (C306/C345/C355/C388 precedent; a manufactured test = the C181/C229 coverage-theater trap). Docs-only, no
+  source/test touched. cov: be 86.92% (carry) / fe 84.45% (carry).
