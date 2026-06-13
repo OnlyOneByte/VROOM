@@ -62,13 +62,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 388 |
+| deep-review | 5 | 393 |
 | guard | 6 | 391 |
 | bug | 3 | 390 |
 | arch | 5 | 392 |
 | infra | 6 | 389 |
 
-Current cycle: **392**
+Current cycle: **393**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6069,3 +6069,15 @@ Current cycle: **392**
   DEFAULT_UNIT_PREFERENCES, true) (the unit args are ignored under skipConversion). Behavior-preserving (identical math). RULE-3 GREEN→GREEN:
   fuel-stats-fleet-distance-pooling.test.ts (totalDistance = SUM of per-vehicle max-min) + year-end.property.test.ts drive both sites — GREEN before AND after.
   validate:local EXIT 0, 1474 pass (unchanged). cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C393 (deep-review): middleware (idempotency/rate-limit/body-limit) + split-tx-integrity audit → BOTH CERTIFIED CLEAN; idempotency in-memory-race hardening
+  FILED** — BALANCE: deep-review AT budget (last 388, starved-for 393−388=5 = budget) + bug also at budget; picked deep-review (broader, surfaces next bug).
+  2-agent fan-out. (B) split create/update tx integrity CLEAN — the C151 async-tx footgun is NOT exposed: all validation (ownership, computeAllocations, firstOld)
+  is pre-hoisted OUT of the async tx callback (mirrors the trigger-service pattern), createSiblings is throw-free inserts, the delete→insert→photo-migrate
+  sequence rolls back atomically; groupTotal==sum-of-legs penny-exact by construction (property-pinned). (A) middleware: idempotency is COMPREHENSIVELY pinned —
+  user-scoped no-collision, non-2xx-not-cached, non-JSON-2xx-no-500 (#96/C315), TTL-drop, method-gating (idempotency.test.ts, verified firsthand); rate-limit
+  per-user, body-limit strict-`>`. The agent's "check-then-cache RACE (get at :71, set at :88, await next() yield between → both handlers run)" — VERIFIED real
+  in-principle BUT honestly low-sev: (1) the DURABLE dedup is the DB-level clientId (createIdempotent, C8) which prevents a duplicate expense regardless of this
+  in-memory replay cache racing; (2) the sync worker POSTs SEQUENTIALLY (not parallel same-key), so it's theoretically-reachable-not-in-app-traffic. The agent
+  itself rated it "UNLIKELY". A per-key lock/promise is a concurrency-ARCHITECTURE change (and the DB layer arguably makes it unnecessary) → FILED, not self-fixed;
+  no flaky timing test manufactured (the singleton-store-across-tests constraint makes one fragile). NO genuinely-unpinned invariant on either surface → docs-only
+  certification. No source/test/build touched → no build gate. cov: be 86.78% (carry) / fe 84.39% (carry).

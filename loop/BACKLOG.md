@@ -154,6 +154,18 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Middleware (idempotency/rate-limit/body-limit) + split-tx-integrity audit (C393).**~~ — *DONE C393 (BOTH CERTIFIED CLEAN; idempotency in-memory-race
+> hardening FILED). 2-agent fan-out. (B) split create/update tx CLEAN — C151 async-tx footgun NOT exposed (all validation pre-hoisted out of the async callback;
+> createSiblings throw-free; delete→insert→photo-migrate rolls back atomically; groupTotal==sum penny-exact, property-pinned). (A) middleware: idempotency
+> comprehensively pinned (user-scoped, non-2xx-not-cached, non-JSON-2xx-no-500 #96/C315, TTL-drop — verified firsthand), rate-limit per-user, body-limit strict>.
+> The agent's check-then-cache RACE is real in-principle but low-sev (see note); NO genuinely-unpinned invariant → docs-only certification, no manufactured test.*
+> NOTE (filed C393, concurrency-hardening — low priority): the idempotency middleware (idempotency.ts) is check-then-cache (get :71, set :88, with an
+> `await next()` yield between), so two requests with the SAME Idempotency-Key interleaving in the event loop would BOTH run the handler (idempotency replay
+> defeated for that pair). Low-sev because (1) the DURABLE dedup is the DB-level clientId (createIdempotent/C8) — a duplicate EXPENSE can't persist regardless of
+> this in-memory replay cache racing; (2) the sync worker POSTs sequentially (not parallel same-key), so it's not in the app's actual traffic. A hardening cycle
+> could add a per-key in-flight promise (check-if-pending-else-execute) to serialize duplicates — a concurrency-architecture change; deferred (the DB clientId
+> layer arguably makes it unnecessary). No flaky timing test added (the singleton-store-across-tests constraint makes one fragile).
+
 > ~~**Dashboard quick-stats + expense-list pagination/filter audit (C388).**~~ — *DONE C388 (BOTH CERTIFIED CLEAN; docs-only, no manufactured test). 2-agent
 > fan-out. (A) dashboard quick-stats/getSummary CLEAN — known issues FILED (#94, #85) or FIXED (#86/C262); div/NaN/precision guards present + property-tested;
 > summary↔per-method equivalence pinned. (B) expense-list pagination+filter CLEAN (verified firsthand): id-tiebreaker → deterministic sort (no drop/dup,
