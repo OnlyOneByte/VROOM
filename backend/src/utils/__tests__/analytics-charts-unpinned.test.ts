@@ -20,6 +20,7 @@ import {
   buildMonthlyCostHeatmap,
   buildSeasonalEfficiency,
   computeAverageCosts,
+  computeEfficiencyPoint,
   computeFuelConsumptionMetrics,
   computeMileageScore,
   computeMpgAndCostPerMile,
@@ -544,5 +545,42 @@ describe('an EV-only vehicle yields an EMPTY gas-MPG series but a real cost-per-
     expect(march?.efficiency).toBe(0);
     // The volume (kWh) still aggregates — that's a real charge total, not an efficiency.
     expect(march?.volume).toBeCloseTo(120, 5);
+  });
+});
+
+// C419 (guard): pin computeEfficiencyPoint's realistic-band boundaries against the REAL function. The
+// only existing band coverage (fuel-efficiency.property.test.ts) RE-IMPLEMENTS isRealisticEfficiency as a
+// local reference and tests THAT — the C229 coverage-theater trap — so a regression changing
+// MAX_VALID_MPG (5–100 gas) or MAX_VALID_MI_KWH (1–10 electric) would leave it green while production
+// shifted. These drive the exported computeEfficiencyPoint directly so the band can't drift unnoticed.
+// (Note: the per-vehicle stats path [calculations.ts / vehicle-stats.ts] uses a DIFFERENT inline band
+// `mpg > 0 && mpg < 150` — that divergence is a behavior/direction call, escalated C419, not pinned here.)
+describe('computeEfficiencyPoint — realistic-band boundaries (gas 5–100, electric 1–10) on the REAL fn', () => {
+  // efficiency = (current.mileage − previous.mileage) / current.volume; control volume=1 so efficiency
+  // equals the mileage delta. fuelType 'regular' = gas band [5,100]; 'Level 2 (AC)' = electric [1,10].
+  const prev = (mileage: number, fuelType = 'regular') => fuelRow({ mileage, volume: 1, fuelType });
+  const cur = (mileage: number, fuelType = 'regular') => fuelRow({ mileage, volume: 1, fuelType });
+
+  test('a gas pair at exactly 100 MPG is KEPT (upper boundary inclusive)', () => {
+    expect(computeEfficiencyPoint(cur(10100), prev(10000))?.efficiency).toBe(100);
+  });
+  test('a gas pair at 101 MPG is REJECTED (above the 100 cap → null)', () => {
+    expect(computeEfficiencyPoint(cur(10101), prev(10000))).toBeNull();
+  });
+  test('a gas pair at exactly 5 MPG is KEPT (lower boundary inclusive)', () => {
+    expect(computeEfficiencyPoint(cur(10005), prev(10000))?.efficiency).toBe(5);
+  });
+  test('a gas pair at 4 MPG is REJECTED (below the 5 floor → null)', () => {
+    expect(computeEfficiencyPoint(cur(10004), prev(10000))).toBeNull();
+  });
+  test('an electric pair at exactly 10 mi/kWh is KEPT (upper boundary inclusive)', () => {
+    expect(
+      computeEfficiencyPoint(cur(10010, 'Level 2 (AC)'), prev(10000, 'Level 2 (AC)'))?.efficiency
+    ).toBe(10);
+  });
+  test('an electric pair at 11 mi/kWh is REJECTED (above the 10 cap → null)', () => {
+    expect(
+      computeEfficiencyPoint(cur(10011, 'Level 2 (AC)'), prev(10000, 'Level 2 (AC)'))
+    ).toBeNull();
   });
 });

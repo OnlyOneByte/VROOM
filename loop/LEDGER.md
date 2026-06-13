@@ -70,12 +70,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 416 |
-| guard | 6 | 414 |
+| guard | 6 | 419 |
 | bug | 3 | 417 |
 | arch | 5 | 415 |
 | infra | 6 | 418 |
 
-Current cycle: **418**
+Current cycle: **419**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6378,3 +6378,12 @@ Current cycle: **418**
   #124 import-decimal-US-format) + bumped "all landed C155→C417". Doc-only, no code touched → no build gate (CLAUDE.md is not compiled; verified the edits read coherently +
   preserved the structure the loop depends on). The pending-Angelo block is unchanged (PR-readiness C368 + CSV-apostrophe C401 remain the open escalations; #121 + the
   MAX_VALID_MPG band divergence are loop-actionable BACKLOG items, not Angelo-gated). cov: be 86.92% (carry) / fe 84.46% (carry). Next CLAUDE.md refresh ~C428; next #5 sweep ~C422.
+- **C419 (guard): pin computeEfficiencyPoint's realistic-band boundaries against the REAL function + ESCALATE the MPG-band divergence (direction call)** — BALANCE: nothing
+  over budget; guard MOST-STARVED actionable (last 414, starved-for 419−414=5, budget 6) → highest-leverage. Investigating the C415-filed MAX_VALID_MPG divergence
+  firsthand (C21/C60): the "realistic MPG" filter is [5,100] gas / [1,10] electric in analytics-charts.ts isRealisticEfficiency (the documented band, min+max) but an inline
+  `mpg > 0 && mpg < 150` (no min, looser max, no electric band) in calculations.ts:62 + vehicle-stats.ts:179 — so the SAME car's outlier pair (4 or 120 MPG) counts on the
+  per-vehicle stats card but is filtered from the Analytics Fuel Stats card → two different averages. Unifying CHANGES a displayed number AND is a judgment call (which band)
+  → ESCALATED to Angelo (options: adopt [5,100] everywhere [my lean — documented + matches charts] / adopt (0,150) / discuss). NOT self-unified. GUARD INCREMENT (the
+  genuinely-unpinned invariant): the ONLY prior band coverage (fuel-efficiency.property.test.ts) RE-IMPLEMENTS isRealisticEfficiency as a local reference + tests THAT (the
+  C229 theater trap) — so a real MAX_VALID_MPG drift would leave it green. +6 guards (analytics-charts-unpinned.test.ts) driving the EXPORTED computeEfficiencyPoint: gas
+  100→kept / 101→null / 5→kept / 4→null; electric 10→kept / 11→null. NON-VACUOUS (a band-constant change → RED). be validate:local EXIT 0, 1514 pass (+6). cov: be 86.92% (carry, +6 guards) / fe 84.46% (carry).
