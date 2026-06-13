@@ -829,6 +829,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#124 (MED, money/correctness / NORTH_STAR #1 — found+fixed C417 on an import-mapping bug scout) — normalizeDecimal corrupted a US-format number with BOTH
+> separators (1,234.56 → 1.23456, a ~1000x money under-count).**~~ — *DONE C417: normalizeDecimal (import-mapping.ts:145) on `hasDot && hasComma` hard-assumed EUROPEAN
+> (strip dots, comma→decimal), but the dot-AFTER-comma ordering of US `1,234.56` is UNAMBIGUOUSLY US → it stripped the dots → 1.23456. Applied unconditionally to `amount`
+> (:295) on every import incl. the US Fuelly preset (mdy/miles/US-gallons, NO decimal flag) → a $1,234.56 expense imported as $1.23. DISTINCT from the product-gated #24
+> (lone-comma IS ambiguous; both-separators is NOT — provably wrong regardless of locale). FIX: the decimal separator is whichever appears LAST (lastIndexOf); strip the
+> other as thousands — handles BOTH 1.234,56 (EU) AND 1,234.56 (US). +2 guards (US + multi-group); the existing EU test stays green. NON-VACUOUS. be validate:local EXIT 0,
+> 1508 pass (+2). Also CORRECTED a stale grounding note: there is NO "per-mapping decimalComma flag" — normalizeDecimal runs unconditionally. (TCO/depreciation CERTIFIED
+> CLEAN the same cycle, C361 corroborated.)*
+
 > ~~**#123 (LOW-MED, reliability/data-safety / NORTH_STAR #1 — found+fixed C416 on a storage-provider deep-review; the #103/C349 sibling on the UPDATE path) — PUT
 > /providers/:id bypassed the S3-config fail-fast CREATE has, persisting a bricked provider.**~~ — *DONE C416: PUT /providers/:id (routes.ts:406-408) wrote body.config
 > verbatim with NO provider-type validation, while CREATE fail-fasts an incomplete S3 config (resolveProviderCredentials, the C349 fix). Editing an S3 provider (the edit

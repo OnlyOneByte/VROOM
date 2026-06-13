@@ -71,11 +71,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 416 |
 | guard | 6 | 414 |
-| bug | 3 | 413 |
+| bug | 3 | 417 |
 | arch | 5 | 415 |
 | infra | 6 | 412 |
 
-Current cycle: **416**
+Current cycle: **417**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6359,3 +6359,14 @@ Current cycle: **416**
   updated, against the existing provider's type). GUARD: the existing PUT test codified the BUG (PUT {config:{changed:true}} on an s3 default → asserted 200) — flipped it
   to send a complete config for the happy path + added a NEW 400 guard (incomplete-config PUT rejected, original config survives — no partial persist). NON-VACUOUS
   (pre-fix 200). be validate:local EXIT 0, 1506 pass (+1 net). cov: be 86.92% (carry) / fe 84.46% (carry).
+- **C417 (bug → #124: import normalizeDecimal corrupted a US-format number with BOTH separators — "1,234.56" → 1.23456, a ~1000x money under-count via the Fuelly preset)** —
+  BALANCE: bug OVER budget (last 413, starved-for 417−413=4 > 3) → forced pick. 2-agent fan-out (import-mapping + TCO/depreciation); TCO CERTIFIED CLEAN (C361 corroborated:
+  #27 exclusion correct, all cost-per-X div-guarded, percentages sum ~100). The import scout surfaced #124 AND corrected my filed grounding (there is NO "per-mapping
+  decimalComma flag" — normalizeDecimal runs UNCONDITIONALLY; that note was wrong). VERIFIED FIRSTHAND (C21/C60): normalizeDecimal (import-mapping.ts:145) on `hasDot &&
+  hasComma` did `s.replace(/\./g,'').replace(',','.')` — hard-assuming EUROPEAN (dot=thousands, comma=decimal). But the dot-AFTER-comma ordering of US `1,234.56` is
+  UNAMBIGUOUSLY US (no locale puts a decimal dot after a thousands comma), so it stripped the dots → `1,23456` → `1.23456` = a $1,234.56 expense imported as $1.23. Applied
+  unconditionally to `amount` (:295) on EVERY import incl. the US Fuelly preset (mdy/miles/US-gallons, NO decimal flag) → reachable money under-count, NORTH_STAR #1.
+  DISTINCT from the product-gated #24 (a LONE-comma `1,234` IS ambiguous US-thousands-vs-EU-decimal; the BOTH-separators case is NOT — provably wrong regardless of locale).
+  FIX (atomic): in the both-separators branch, the decimal separator is whichever appears LAST (`lastIndexOf`); strip the other as thousands. Handles BOTH `1.234,56` (EU,
+  comma last → 1234.56) AND `1,234.56` (US, dot last → 1234.56). GUARD: +2 (US 1,234.56→1234.56 [RED pre-fix: 1.23456]; multi-group 1,234,567.89→1234567.89); the existing
+  EU `1.234,56` test stays green (comma last). NON-VACUOUS. be validate:local EXIT 0, 1508 pass (+2). cov: be 86.92% (carry, +2 guards) / fe 84.46% (carry).

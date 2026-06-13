@@ -127,6 +127,25 @@ describe('applyMapping — European decimal-comma (D1)', () => {
     expect(row.amount).toBe('1234.56'); // dot thousands stripped, comma → dot
     expect(Number(row.volume)).toBeCloseTo(45.7, 3); // lone comma → decimal dot
   });
+
+  // #124 (C417): a US-format value with BOTH separators (comma thousands + dot decimal) is reachable via
+  // the US Fuelly preset (mdy/miles/US-gallons). The old code hard-assumed comma-decimal → stripped the
+  // dots → "1,234.56" became 1.23456 (~1000x money under-count). The fix keys on the LAST separator as
+  // the decimal, so BOTH conventions normalize correctly. Pre-fix this asserted ~1.23 (RED).
+  test('US-format dot-decimal + comma-thousands also normalizes correctly (1,234.56 → 1234.56)', () => {
+    const csv = ['amt', '"1,234.56"'].join('\n');
+    const mapping: ColumnMapping = { columns: { amount: 'amt' }, dateFormat: 'iso' };
+    const [row] = parseNative(applyMapping(csv, mapping).csv);
+    expect(row.amount).toBe('1234.56'); // comma thousands stripped, dot stays decimal — NOT 1.23456
+    expect(Number(row.amount)).toBeCloseTo(1234.56, 2);
+  });
+
+  test('a multi-group US number with both separators (1,234,567.89) normalizes', () => {
+    const csv = ['amt', '"1,234,567.89"'].join('\n');
+    const mapping: ColumnMapping = { columns: { amount: 'amt' }, dateFormat: 'iso' };
+    const [row] = parseNative(applyMapping(csv, mapping).csv);
+    expect(Number(row.amount)).toBeCloseTo(1234567.89, 2);
+  });
 });
 
 describe('applyMapping — category map + unmapped→misc (D2)', () => {
