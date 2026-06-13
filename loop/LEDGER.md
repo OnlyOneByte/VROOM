@@ -73,9 +73,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 401 |
 | bug | 3 | 405 |
 | arch | 5 | 403 |
-| infra | 6 | 400 |
+| infra | 6 | 406 |
 
-Current cycle: **405**
+Current cycle: **406**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6238,3 +6238,11 @@ Current cycle: **405**
   branches through it. apr>0 paths (minimum>0) byte-unchanged. GUARD: +5 (payment-planner.property.test.ts): 0%-APR minimum null; $500-vs-$400 → monthsSaved=6 (was 0,
   RED pre-fix) + interest $0; more-extra→strictly-more-months (monotonic, never stuck at 0); apr>0 baseline unchanged. NON-VACUOUS. fe validate:local EXIT 0, 690 pass
   (+5; one self-corrected assertion — I'd mislabeled the with-delta state 'normal', fixed). cov: be 86.92% (carry) / fe 84.45%+ (carry, +5 guards).
+- **C406 (infra): CLAUDE.md full orientation refresh (the overdue ~C405 cadence; last full C395)** — BALANCE: nothing over budget (deep-review 2, guard 5, bug 1,
+  arch 3, infra 6/6, feature parked); infra MOST-STARVED AT budget (last 400, starved-for 406−400=6=budget) AND the CLAUDE.md refresh cadence was due → highest-leverage
+  pick. REFRESHED the drift-prone "Current state & gaps" section so a fresh-agent entry point reflects reality: (1) coverage reading C389→C400 fresh measure (be
+  86.78→86.92 line / 86.39→86.54 func; fe 84.39→84.45 line / 84.3→84.4 func / 76.63→76.87 branch — both creeping UP); (2) suite size ~1475/~675 → ~1491/~690; (3)
+  appended the C395–C405 closed-bug arc to the fix list (#115 lease-overage annual-vs-total, #116 reminder catch-up-natural-exit endDate [the bug-#12 family's THIRD
+  path], #C404 claim-photo backup-roundtrip crown-jewel, #117 0%-APR planner) + bumped "all landed C155→C405"; (4) added the C401 CSV-apostrophe DATA-CONTRACT direction
+  call to the pending-Angelo block. Doc-only, no code touched → no build gate (CLAUDE.md is not compiled; verified the edits read coherently + preserved the structure
+  the loop depends on). cov: be 86.92% (carry) / fe 84.45% (carry). Next CLAUDE.md refresh ~C416; next #5 sweep ~C410.
