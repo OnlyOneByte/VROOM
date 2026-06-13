@@ -1366,6 +1366,14 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract fetchTermsAndCoverage — dedup the 5× term+coverage query-assembly in InsurancePolicyRepository (filed+done C304).**~~ — *DONE
+  C304: the "select terms by policyId (endDate desc) → select term→vehicle junction rows → dedupe vehicleIds" block was byte-identical at 5
+  sites (attachTermsAndCoverage + update-policy / add-term / update-term / delete-term txns), differing only in the db handle (this.db vs tx)
+  + spread target. Extracted private `fetchTermsAndCoverage(handle: AppDatabase | DrizzleTransaction, policyId) → {terms, termVehicleCoverage,
+  vehicleIds}`; callers spread it + add their own policy row / newTermId. Left the CREATE path alone (builds coverage IN-MEMORY from the
+  just-inserted terms, not a re-query — converting = redundant round-trip + behavior change, rule 2). ~75 LOC → 1 helper. Behavior-preserving:
+  all 56 insurance tests pass unchanged. validate:local EXIT 0, 1421 pass.*
+
 - ~~**Extract simulateAmortization — dedup the twin balance-walk loops in calculateExtraPaymentImpact (filed+done C299).**~~ — *DONE
   C299: calculateExtraPaymentImpact (financing-calculations.ts) ran the SAME guarded amortization balance-walk TWICE (original payment
   vs payment+extra), byte-identical but for the payment amount. C161 recorded a hand-copied variant of this loop once LOSING its

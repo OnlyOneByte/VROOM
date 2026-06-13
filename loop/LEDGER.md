@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 300 |
 | guard | 6 | 302 |
 | bug | 3 | 301 |
-| arch | 5 | 299 |
+| arch | 5 | 304 |
 | infra | 6 | 303 |
 
-Current cycle: **303**
+Current cycle: **304**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -4984,3 +4984,19 @@ Current cycle: **303**
   ~1418→~1421 BE). The 90%-line goal stays structurally gated (BE tail DI/singleton + OAuth-network; FE gap the eyes-on components/routes
   deficit, Playwright-blocked). DOCS/MEASUREMENT-ONLY — no source/test/build touched (the C302 gate is the last code state). Next #5 sweep
   ~C313. cov: be 86.07% / fe 81.76%.
+- **C304 (arch): extract `fetchTermsAndCoverage` — collapse the 5× term+coverage query-assembly in InsurancePolicyRepository into one
+  helper** — BALANCE: arch DUE (last 299, starved-for 5 = budget, most-starved actionable; bug also at 3 but arch waited longer) → forced
+  pick. Arch reliably-dry — rule-7 inline scout. Rejected the analytics-api buildQuery wrappers (already factored — each method is a thin
+  typed wrapper over divergent param sets, collapsing = churn over divergent shapes, rule 5). THE FINDING (insurance/repository.ts): the
+  byte-identical "select terms by policyId ordered by endDate desc → select the term→vehicle junction rows for those termIds → dedupe
+  vehicleIds" block was hand-repeated at 5 sites — attachTermsAndCoverage + the update-policy / add-term / update-term / delete-term
+  transactions — differing ONLY in the db handle (this.db vs the tx) + the spread target (some add newTermId). PAYOFF (rule 5): 5 sources of
+  truth for the response's coverage shape → 1; a junction-schema change can't drift across them. FIX: extracted private
+  `fetchTermsAndCoverage(handle: AppDatabase | DrizzleTransaction, policyId) → {terms, termVehicleCoverage, vehicleIds}` (the existing
+  dbOrTx pattern from validateVehicleOwnership, so the in-tx callers still read their own uncommitted writes); callers spread its result +
+  add their own policy row / newTermId. DELIBERATELY left the CREATE path (line 253) alone — it builds termCoverage IN-MEMORY from the
+  just-inserted terms (accumulated in the insert loop), NOT a re-query; converting would add a redundant round-trip + change behavior (rule
+  2). ~75 LOC → 1 helper + 5 thin calls. BEHAVIOR-PRESERVING + test-anchored both ways (rule 3): all 56 insurance tests
+  (terms-http/repository.property/policy-delete-cascade/etc.) pass UNCHANGED. green→green: backend validate:local EXIT 0 — 1421 pass
+  (unchanged — pure refactor) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07% (carry) / fe
+  81.76% (carry).
