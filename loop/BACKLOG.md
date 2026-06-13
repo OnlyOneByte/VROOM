@@ -464,6 +464,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C380 — pin the buildSummary singular/plural month rendering (the formatMonths `=== 1` boundary, via the public API).**~~ — *DONE C380: guard closest to
+> budget (5/6). buildSummary (payment-planner.ts) renders monthsSaved via the private formatMonths, which pluralizes on `months === 1`. Property 6 pinned the
+> summary STRUCTURE but never the singular/plural rendering — a regression dropping the `=== 1` branch silently emits "saves 1 months" (visible grammar bug).
+> +2 tests via the PUBLIC buildSummary (helper isn't exported): monthsSaved=1 → '1 month' AND not '1 months' (the load-bearing not-contains); =2 → '2 months'.
+> NON-VACUOUS. fe validate:local EXIT 0, 675 pass (+2). Debunked: FE isElectricFuelType (already the ORACLE in api-transformer.property.test.ts, load-bearing-
+> tested); BE analytics date-range startDate>endDate (thin characterization, would need a behavior change not a guard).*
+
 > ~~**C375 — pin the reminder refineDateRange `endDate === startDate` equality boundary (the `<=`-not-`<` load-bearing case).**~~ — *DONE C375: guard at
 > budget (6/6). refineDateRange (reminders/validation.ts:124) rejects `endDate <= startDate`, but reminder-refinements.test.ts only covered strictly-after (ok)
 > + strictly-before (fail), NOT equality — exactly what the `<=` (vs `<`) is load-bearing for (a regression to `<` would silently ACCEPT a zero-duration

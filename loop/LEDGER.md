@@ -59,12 +59,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 377 |
-| guard | 6 | 375 |
+| guard | 6 | 380 |
 | bug | 3 | 378 |
 | arch | 5 | 376 |
 | infra | 6 | 379 |
 
-Current cycle: **379**
+Current cycle: **380**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5934,3 +5934,12 @@ Current cycle: **379**
   GREEN, flat-to-up, gap stable ~2.4pts; 90% goal still structurally gated (BE DI/singleton + OAuth; FE eyes-on components/routes). Build floor GREEN both sides.
   PR-readiness was escalated C368 (standing, open) — NOT re-spammed (no new decision needed; the loop keeps improving the reachable remainder). Docs-only cycle
   (no source/test touched → no build gate beyond the coverage runs, both EXIT 0). cov: be 86.79% / fe 84.39%. Next #5 sweep ~C384; CLAUDE.md refresh ~C383.
+- **C380 (guard): pin the buildSummary singular/plural month rendering (the formatMonths `=== 1` boundary, via the public API)** — BALANCE: nothing over budget;
+  guard closest (last 375, starved-for 380−375=5, budget 6) → highest-leverage. 2-agent fan-out. DEBUNKED 2 picks firsthand (C21/C60): FE isElectricFuelType is
+  NOT untested — it's used as the ORACLE in api-transformer.property.test.ts (:160, the test calls it to decide the expected branch), so it's load-bearing-tested,
+  not unpinned; the BE analytics date-range startDate>endDate case is thin characterization (would need a behavior CHANGE to 400, not a guard). PICK (verified
+  firsthand): buildSummary (payment-planner.ts:113) renders monthsSaved via the private formatMonths, which pluralizes on `months === 1` ("1 month" vs "N
+  months"). Property 6 pins the summary STRUCTURE (contains "vs minimum" etc.) but NEVER the singular/plural rendering — a regression dropping the `=== 1`
+  branch silently emits "saves 1 months" (a visible grammar bug on the planner card). +2 tests via the PUBLIC buildSummary (the helper isn't exported):
+  monthsSaved=1 → contains '1 month' AND not '1 months' (the load-bearing boundary — '1 month' is a substring of '1 months', so the not-contains distinguishes
+  them); monthsSaved=2 → '2 months'. NON-VACUOUS. green→green: fe validate:local EXIT 0, 675 pass (+2) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).

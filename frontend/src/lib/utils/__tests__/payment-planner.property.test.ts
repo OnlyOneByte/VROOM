@@ -697,6 +697,37 @@ describe('Property 6: Summary Sentence Consistency', () => {
 		);
 	});
 
+	// C380: buildSummary renders monthsSaved via the (private) formatMonths, which pluralizes on the
+	// `=== 1` boundary — "1 month" vs "N months". The structure tests above never assert the singular/
+	// plural rendering, so a regression dropping the `=== 1` branch would silently emit "saves 1 months"
+	// (a visible grammar bug on the planner card). Pin both sides through the PUBLIC buildSummary (the
+	// helper isn't exported). Input strictly above minimum + a null delta → the normal-state sentence.
+	test('monthsSaved=1 renders the SINGULAR "1 month" (not "1 months") in the summary', () => {
+		const impact = {
+			extraPaymentAmount: 50,
+			monthsSaved: 1,
+			interestSaved: 123.45,
+			totalSavings: 173.45,
+			newPayoffDate: new Date(2030, 0, 1)
+		};
+		// input (150) strictly > minimum (100) + 0.01 → not the at-minimum branch; null delta → normal.
+		const result = buildSummary(150, 150, 100, impact, null);
+		expect(result).toContain('1 month');
+		expect(result).not.toContain('1 months'); // the load-bearing singular boundary
+	});
+
+	test('monthsSaved=2 renders the PLURAL "2 months" (boundary other side)', () => {
+		const impact = {
+			extraPaymentAmount: 50,
+			monthsSaved: 2,
+			interestSaved: 200,
+			totalSavings: 250,
+			newPayoffDate: new Date(2030, 0, 1)
+		};
+		const result = buildSummary(150, 150, 100, impact, null);
+		expect(result).toContain('2 months');
+	});
+
 	test('normal state (no delta): summary contains "Your current payment" and "vs the minimum"', () => {
 		fc.assert(
 			fc.property(arbMinCents, arbAboveGapCents, (minCents, aboveGapCents) => {
