@@ -62,13 +62,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 393 |
+| deep-review | 5 | 399 |
 | guard | 6 | 396 |
 | bug | 3 | 398 |
 | arch | 5 | 397 |
 | infra | 6 | 395 |
 
-Current cycle: **398**
+Current cycle: **399**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6137,3 +6137,19 @@ Current cycle: **398**
   consecutive-fillup PAIRING adjacency → dropped efficiency points, ~10 pairing sites) is REAL + reachable but a multi-site arch change, NOT a clean one-cycle bug fix
   → NOTED for a future arch cycle (route all pairing sites through forEachVehiclePair + a volume pre-filter), not self-fixed this cycle. green→green: fe validate:local
   EXIT 0, 686 pass (+12) / 0 fail, svelte-check + build clean. cov: be 86.78% (carry) / fe 84.39%+ (the +12 lease-overage guards nudge it up; not re-measured this cycle).
+- **C399 (deep-review → #116: the reminder catch-up loop's NATURAL exit left a bounded reminder active past its endDate — the #107/#114 bug-#12 endDate family on a
+  THIRD, unfixed path)** — BALANCE: deep-review OVER budget (last 393, starved-for 399−393=6 > 5) → forced pick (feature parked on eyes-on/Playwright-blocked tails).
+  2-agent fan-out on under-recently-audited surfaces (reminder trigger/recurring-materialization engine + CSV import↔export round-trip integrity). VERIFIED FIRSTHAND
+  (C21/C60): trigger-service.ts processReminder's catch-up `while` (:443) has an in-loop endDate guard (:445) that only inspects nextDue <= now (the while condition);
+  the FINAL advance steps nextDue PAST now and exits the loop UNDER the 12-occurrence cap, so that last value is never tested against endDate — and the post-loop block
+  (:464) only runs at the cap. A bounded reminder whose endDate falls between its last in-window occurrence and that final advance was left is_active=1 with a future
+  nextDueDate → inflates GET /reminders/recurring-cost (monthlyRunRate gates ONLY on isActive, reminder-cost.ts:66) + stays in the active list until a LATER trigger
+  lazily closes it (NO duplicate expense — the in-loop guard runs before materialization — purely a wrong active-state / wrong run-rate defect). The EXACT #107(C362,
+  fastForwardPastNow exit)/#114(C394, mark-serviced) bug-#12 family on a THIRD path neither fix touched (this path stays well under the cap → fastForward never reached).
+  FIX (atomic, consolidates to ONE deactivation site): the in-loop guard now just `break`s, and a single post-loop guard deactivates+returns — covering BOTH the
+  in-loop-break case AND the natural-exit boundary with no duplication; mirrors fastForwardPastNow:303. GUARD: +1 HTTP (trigger-expense.test.ts): a weekly reminder
+  with 4 weeks of history (« the 12 cap) + endDate≈now → is_active=0 after trigger + no re-fire on a second trigger. NON-VACUOUS (pre-fix: catchUpCount=4<12 skips
+  fast-forward → left active). The existing "endDate bounds to 3 then deactivates" test still passes (break → post-loop guard deactivates). The paired CSV finding
+  (a free-text value literally beginning with `'`+a formula-trigger char round-trips lossy: neutralizeCsvCell only escapes a LEADING trigger, but denormalizeCsvCell
+  strips a leading `'` whenever char-2 is a trigger → asymmetric; csv-safety.ts:22/35/64) is REAL + reachable but NARROW (only `'`+`=/+/-/@/TAB/CR`-led values) → NOTED
+  below for a guard cycle, not bundled into this deep-review. green→green: be validate:local EXIT 0, 1484 pass (+1) / 0 fail. cov: be 86.78%+ (carry, +1 guard) / fe 84.39% (carry).

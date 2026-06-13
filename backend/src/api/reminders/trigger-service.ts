@@ -441,9 +441,10 @@ class ReminderTriggerService {
     let catchUpCount = 0;
 
     while (nextDue <= now && catchUpCount < maxCatchUp) {
-      // EndDate check inside the loop — process periods up to endDate before deactivating
+      // EndDate check inside the loop — process periods up to endDate, then stop catching up.
+      // Deactivation is handled ONCE after the loop (see the #116 guard below) so the natural
+      // exit boundary is covered by the same code — one deactivation site, no duplication.
       if (reminder.endDate && nextDue > reminder.endDate) {
-        await reminderRepository.deactivate(reminder.id);
         break;
       }
 
@@ -458,6 +459,20 @@ class ReminderTriggerService {
       }
 
       catchUpCount++;
+    }
+
+    // Bug #116 (C399 audit): honor endDate at the loop's NATURAL exit too (the #107/#114 bug-#12
+    // family on a third path). The in-loop guard above only inspects nextDue <= now (the while
+    // condition); the FINAL advance steps nextDue PAST now and exits the loop under the catch-up cap,
+    // so that last value was never tested against endDate. A bounded reminder whose endDate fell
+    // between its last in-window occurrence and that final advance was left is_active=1 with a future
+    // nextDueDate — it then inflates GET /reminders/recurring-cost's run-rate + count and stays in the
+    // active list until a LATER trigger lazily closes it (no duplicate expense — the in-loop guard
+    // runs before materialization — purely a wrong active-state / wrong run-rate defect). This single
+    // guard also covers the in-loop break case above. Mirrors fastForwardPastNow's exit guard (:303).
+    if (reminder.endDate && nextDue > reminder.endDate) {
+      await reminderRepository.deactivate(reminder.id);
+      return;
     }
 
     // Fast-forward past now when catch-up limit reached

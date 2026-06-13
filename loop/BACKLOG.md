@@ -154,6 +154,25 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Reminder trigger/recurring-materialization engine + CSV import↔export round-trip audit (C399) → found+fixed bug #116.**~~ — *DONE C399 (deep-review OVER
+> budget 6>5 → forced). 2-agent fan-out. (A) reminder engine surfaced #116: trigger-service.ts processReminder's catch-up `while` (:443) — the in-loop endDate guard
+> (:445) only inspects nextDue <= now (the while condition); the FINAL advance steps nextDue PAST now and exits the loop UNDER the 12-occurrence cap, never tested
+> against endDate (the post-loop block at :464 only runs AT the cap). A bounded reminder whose endDate falls between its last in-window occurrence and that final advance
+> was left is_active=1 with a future nextDueDate → inflates GET /reminders/recurring-cost (monthlyRunRate gates only on isActive) + stays active until a LATER trigger
+> lazily closes it (NO dup expense — in-loop guard precedes materialization — purely wrong active-state/run-rate). The EXACT #107(C362)/#114(C394) bug-#12 family on a
+> THIRD path neither fix touched. FIX (atomic, ONE deactivation site): in-loop guard now `break`s, single post-loop guard deactivates+returns (covers both the break
+> case + the natural-exit boundary); mirrors fastForwardPastNow:303. +1 HTTP guard (weekly, 4wk history « 12 cap, endDate≈now → is_active=0 + no re-fire). NON-VACUOUS.
+> be validate:local EXIT 0, 1484 pass (+1). The materialization path itself CERTIFIED CLEAN (split sums + source-links every sibling; per-period advance-before-insert
+> sound; #88/#97 already filed). (B) CSV round-trip mostly CLEAN (numbers, dates, RFC-4180 quoting, multi-tag, BOM, formula-injection `=…` round-trip all survive) —
+> surfaced one NARROW asymmetry, noted below.*
+> NOTE (filed C399, data-safety guard — NARROW round-trip corruption): a user free-text value (description / tag / vehicle nickname) literally beginning with `'` +
+> a formula-trigger char (`=`/`+`/`-`/`@`/TAB/CR) round-trips LOSSY. neutralizeCsvCell (csv-safety.ts:35) only escapes a value whose FIRST char is a trigger, so `'=mc2`
+> exports UNCHANGED; but denormalizeCsvCell (:64) strips a leading `'` whenever char-2 is a trigger → re-imports as `=mc2` (the apostrophe is silently gone). For a
+> vehicle nickname it's worse: the stripped name no longer matches the registered key → the whole row fails to import. Reachable (people lead with `'` to force text)
+> but NARROW (only `'`+trigger-led values). FIX (atomic, write-boundary): in neutralizeCsvCell also prefix the ambiguous `value[0]==="'" && trigger(value[1])` case so
+> denormalize's single-`'`-strip is its exact inverse (`'=mc2`→`''=mc2`→`'=mc2`); leaves all passing cases untouched. A clean guard-cycle pick (csv-safety.test.ts has
+> the harness; the existing pin only covers `'`+digit, not `'`+trigger). NORTH_STAR #1 (round-trips every field, no silent loss).
+>
 > ~~**Middleware (idempotency/rate-limit/body-limit) + split-tx-integrity audit (C393).**~~ — *DONE C393 (BOTH CERTIFIED CLEAN; idempotency in-memory-race
 > hardening FILED). 2-agent fan-out. (B) split create/update tx CLEAN — C151 async-tx footgun NOT exposed (all validation pre-hoisted out of the async callback;
 > createSiblings throw-free; delete→insert→photo-migrate rolls back atomically; groupTotal==sum penny-exact, property-pinned). (A) middleware: idempotency

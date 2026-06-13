@@ -137,6 +137,45 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
     expect(countAfterSecond).toBe(countAfterFirst);
   });
 
+  // Bug #116 (C399 audit): the #107/#114 bug-#12 endDate family on a THIRD, previously-unfixed path —
+  // the catch-up loop's NATURAL exit (under the 12-occurrence cap). The in-loop endDate guard only sees
+  // nextDue <= now (the while condition); the FINAL advance steps nextDue PAST now and exits, so that
+  // last value was never tested against endDate. A bounded reminder whose endDate falls between its last
+  // in-window occurrence and that final advance was left is_active=1 with a future nextDueDate — it then
+  // inflates GET /reminders/recurring-cost (which gates only on isActive) and stays in the active list
+  // until a LATER trigger lazily closes it. (#107/C362 fixed fastForwardPastNow's exit; #114/C394 fixed
+  // mark-serviced; neither touched this natural-exit path — it stays well under the cap, so fastForward
+  // is never reached.) Construction: weekly, a handful of weeks of history, endDate ≈ now (so it lands
+  // in the straddling period after the last <=now step) — only a few catch-up iterations, well under 12.
+  test('a bounded reminder whose endDate lands at the natural loop exit (under the catch-up cap) is deactivated, not left active (#116)', async () => {
+    const vehicleId = await seedVehicle();
+
+    // Dates relative to the server clock so the test is wall-clock-independent. Weekly from 24 days
+    // ago → occurrences at -24/-17/-10/-3 days (all <= now, 4 iterations « 12 cap), then the final
+    // advance lands +4 days (> now). endDate one second ago sits between the -3d step and that +4d
+    // advance → the in-loop guard never fires (every processed step is < endDate), only the post-loop
+    // guard does. Pre-fix: catchUpCount=4 < 12 so fast-forward is skipped → left active with a future
+    // nextDueDate past its endDate. The fix deactivates at the natural exit.
+    const DAY = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const reminderId = await createOverdueExpenseReminder(vehicleId, {
+      frequency: 'weekly',
+      startDate: new Date(now - 24 * DAY).toISOString(),
+      endDate: new Date(now - 1000).toISOString(),
+    });
+
+    const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
+    expect(res.status).toBe(200);
+
+    const after = reminderRow(reminderId);
+    // Past its endDate and fully lapsed → deactivated, NOT left active with a future nextDueDate.
+    expect(after.is_active).toBe(0);
+    // And triggering again creates no further expenses (it's inactive / findOverdue won't return it).
+    const countAfter = expensesForReminder(reminderId).length;
+    await ctx.authed('POST', '/api/v1/reminders/trigger');
+    expect(expensesForReminder(reminderId).length).toBe(countAfter);
+  });
+
   test('endDate bounds catch-up to the in-window occurrences, then deactivates', async () => {
     const vehicleId = await seedVehicle();
     // Monthly, anchored on the 15th, window [Jan 15, Apr 1] 2024 (all in the past
