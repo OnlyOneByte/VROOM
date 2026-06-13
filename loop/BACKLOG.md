@@ -829,6 +829,22 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#120 (LOW-MED, UX-correctness / NORTH_STAR #2-3 — found+fixed C410 on a route-load/display deep-review) — OfflineExpenseCards rendered a RAW ISO date string
+> instead of a formatted date.**~~ — *DONE C410: OfflineExpenseCards.svelte rendered `{expense.date}` raw at :58 (pending) + :108 (synced); the offline-first save
+> stores `date` as a full ISO timestamp (dateOnlyToISO → noon-local), so /expenses showed `2024-03-15T17:00:00.000Z` next to a clean formatCurrency amount, while every
+> other date in the app uses formatDate → "Mar 15, 2024". FIX: import formatDate + `{formatDate(expense.date)}` at both sites (handles the ISO-timestamp + date-only
+> forms). formatDate contract already pinned (formatters.test.ts:96/187) → wiring fix to a tested helper. EYES-ON offline-state-blocked (the cards need a client-side
+> IndexedDB queue the screenshot harness can't seed). fe validate:local EXIT 0, 690 pass / svelte-check + build clean.*
+
+> **#121 (LOW, data-safety / NORTH_STAR #1 — found C410 on an offline-sync deep-review; TIMING-RACE-gated, FILED not fixed) — retrySingleExpense silently drops a
+> conflict result.** sync-manager.ts retrySingleExpense (~:257-273) acts only on `result.success` — when syncSingleExpense returns `{success:false, conflict}` it is NOT
+> pushed to syncConflicts.current (the main syncExpenses loop DOES push it → SyncConflictResolver opens). So a conflict detected ON A RETRY (the realistic trigger: first
+> POST committed server-side but its response was lost → expense left pending + retry scheduled → on retry checkForExistingExpense finds the committed row → conflict) is
+> silently dropped: no dialog, expense stuck pending, retryCount never cleared. FIX (atomic): mirror the main loop — on `result.conflict` in the retry handler, append to
+> syncConflicts.current + retryCount.delete(expense.id). REACHABILITY caveat: network-race-gated (conflict-must-appear-on-retry-but-not-first-attempt), the C163 timer/
+> network-bound mock-trap class — the LOGIC bug is real + unit-testable in isolation (mock syncSingleExpense → conflict) but the trigger isn't a clean deterministic user
+> path, so it's LOW. The durable dedup (DB clientId) means no DOUBLE-apply regardless; this is a stuck-pending + no-signal defect, sibling to the filed #79.
+
 > ~~**#118 (MED, data-safety / NORTH_STAR #1 — found+fixed C408 on a split/tag bug scout; the #104/C352 CSV round-trip class, on the boundary that fix missed) — the
 > split-expense create schema's tags bypassed the separator-rejection, re-opening the silent tag-split-on-round-trip.**~~ — *DONE C408: createSplitExpenseSchema
 > (validation.ts:80) had `tags: z.array(z.string()).optional()` — a bare array bypassing the tagElementSchema separator-refine (#104/C352) the regular create/update

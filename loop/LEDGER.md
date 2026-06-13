@@ -69,13 +69,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 404 |
+| deep-review | 5 | 410 |
 | guard | 6 | 407 |
 | bug | 3 | 408 |
 | arch | 5 | 409 |
 | infra | 6 | 406 |
 
-Current cycle: **409**
+Current cycle: **410**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6283,3 +6283,15 @@ Current cycle: **409**
   existing getAnchorDay helper); callers keep their own ACTION (break vs deactivate+return — the 4 sites diverge there by design), only the boundary TEST is shared.
   Rule-2 behavior-preserving (`endDate != null && nextDue > endDate` ≡ the old truthy check for a Date|null). Rule-3 green→green: trigger-fastforward-enddate +
   trigger-expense (#116) + the other endDate tests drive all 4 sites — GREEN before AND after, no test touched. be validate:local EXIT 0, 1496 pass (unchanged). cov: be 86.92% (carry) / fe 84.45% (carry).
+- **C410 (deep-review → #120: OfflineExpenseCards rendered a RAW ISO date string instead of a formatted date)** — BALANCE: deep-review OVER budget (last 404, starved-for
+  410−404=6 > 5) → forced pick. 2-agent fan-out (offline-sync outbox + route-load/dashboard display). VERIFIED FIRSTHAND (C21/C60): OfflineExpenseCards.svelte rendered
+  `{expense.date}` raw at TWO sites (:58 pending, :108 synced) — the offline-first save stores `date` as a full ISO timestamp (dateOnlyToISO → noon-local), so the
+  "Pending Sync"/"Recently Synced" cards on /expenses literally showed `2024-03-15T17:00:00.000Z` next to a clean formatCurrency amount, while EVERY other date in the app
+  (ExpensesTable, RecentActivityCard, reminders) goes through formatDate → "Mar 15, 2024". FIX (atomic, mirrors the app-wide pattern): import formatDate +
+  `{formatDate(expense.date)}` at both sites (formatDate accepts string|Date, handles both the ISO-timestamp offline-first form AND the date-only error-fallback form).
+  The formatDate contract is ALREADY pinned (formatters.test.ts:96/187 cover both offline date shapes incl. the #87 negative-offset round-trip), so this is a wiring fix to
+  a tested helper — the merge-surviving net is that existing coverage. EYES-ON: offline-state-BLOCKED — OfflineExpenseCards only renders with a client-side IndexedDB
+  offline queue the screenshot harness can't seed (a /expenses shot needs auth + a queued offline expense; the harness auth-state was also stale → login screen), the
+  same documented eyes-on-blocked class as the maintenance-T7/import-trackers tails. fe validate:local EXIT 0, 690 pass / svelte-check + build clean. The paired offline
+  finding (retrySingleExpense silently drops a conflict result — no syncConflicts.current push, unlike the main loop) is REAL but TIMING-RACE-gated (conflict-on-retry-
+  only, the C163 mock-trap class) → FILED below, not this cycle's pick. cov: be 86.92% (carry) / fe 84.45% (carry, wiring-only).
