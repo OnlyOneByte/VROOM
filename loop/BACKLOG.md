@@ -1603,6 +1603,13 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract deactivateFinancing — ONE source of truth for the financing deactivation write + side-effect (rule-7 fan-out, done C343).**~~ — *DONE
+  C343: the payoff (PUT /:id/payoff) + delete (DELETE /:id) routes ran a BYTE-IDENTICAL `update({isActive:false, endDate}) + onFinancingDeactivated` pair,
+  differing only in the response message + whether the updated row is echoed — a money/lifecycle drift risk (a future deactivation-cleanup change lands
+  twice). Extracted `deactivateFinancing(financingId, userId) → VehicleFinancing` into hooks.ts (composes the repo write + the existing hook); routed both
+  sites through it. No import cycle (repo doesn't import hooks). −10 LOC. Test-anchored: financing-deactivate-hook.test.ts drives BOTH routes — GREEN before
+  AND after. validate:local EXIT 0, 1442 pass. Rejected the FE settings-store try/catch wrapper (the PERMANENTLY-rejected skeleton — bodies differ, churn).*
+
 - ~~**Extract buildQueryString — collapse the 2 service-layer query-string builders onto one shared helper (rule-7 fan-out, done C337).**~~ — *DONE
   C337: analytics-api `buildQuery` was already the generic URLSearchParams + `value != null` + `qs ? '?'+qs : ''` form; reminder-api `buildReminderQuery`
   repeated that convention by hand. Extracted `buildQueryString` to new services/api-utils.ts + routed both through it. KEY behavior-preservation

@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 339 |
 | guard | 6 | 342 |
 | bug | 3 | 341 |
-| arch | 5 | 337 |
+| arch | 5 | 343 |
 | infra | 6 | 340 |
 
-Current cycle: **342**
+Current cycle: **343**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5505,3 +5505,15 @@ Current cycle: **342**
   update/remove predicate or a default duration → RED). svelte-check strict caught noUncheckedIndexedAccess + index-signature bracket-access (fixed with `!`
   + `['key']`). green→green: frontend validate:local EXIT 0 — 658 pass (+11) / 0 fail, tsc 0 errors, build OK. cov: be 86.53% (carry) / fe 84.39%+ (carry,
   app.svelte.ts 0%→covered).
+- **C343 (arch): extract deactivateFinancing — ONE source of truth for the financing deactivation write + side-effect** — BALANCE: arch OVER budget
+  (last 337, starved-for 343−337=6 > budget 5) → FORCED. Rule-7 fan-out (2 Explore agents). FE pick (the settings-store try/catch wrapper) REJECTED — it's
+  the same skeleton a prior fan-out PERMANENTLY rejected (bodies differ: some assign state, some don't; closure-over-error churn). BE pick was clean: the
+  payoff (PUT /:id/payoff) + delete (DELETE /:id) routes ran a BYTE-IDENTICAL `financingRepository.update({isActive:false, endDate:new Date()})` +
+  `onFinancingDeactivated(financingId, user.id)` pair (routes.ts:221-226 / :241-246), differing only in the response message + whether the updated row is
+  echoed. A money/lifecycle drift risk: a future change to what deactivation entails (extra cleanup, the #67/C206 re-finance reset) would have to land twice.
+  FIX: extracted `deactivateFinancing(financingId, userId) → VehicleFinancing` into hooks.ts (the natural home — it already owns onFinancingDeactivated;
+  composes the repo write + the hook), routed both sites through it (payoff echoes the return, delete ignores it). Swapped the route's import
+  onFinancingDeactivated → deactivateFinancing (no longer called directly). VERIFIED no import cycle (repository doesn't import hooks). −10 LOC. Test-anchored
+  both ways (rule 3): financing-deactivate-hook.test.ts drives BOTH routes end-to-end (PUT payoff + DELETE sever the source link, best-effort no-op, unrelated
+  expense untouched) — all GREEN before AND after. green→green: backend validate:local EXIT 0 — 1442 pass (unchanged) / 1 skip / 0 fail, tsc 0, musl-biome
+  clean, build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).

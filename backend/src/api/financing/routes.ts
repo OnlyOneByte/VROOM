@@ -12,7 +12,7 @@ import {
   validateLoanTerms,
   validateVehicleOwnership,
 } from '../../utils/validation';
-import { onFinancingDeactivated } from './hooks';
+import { deactivateFinancing } from './hooks';
 import { financingRepository, withComputedBalance } from './repository';
 
 const routes = new Hono();
@@ -218,12 +218,7 @@ routes.put('/:financingId/payoff', zValidator('param', financingParamsSchema), a
   const { financingId } = c.req.valid('param');
   await validateFinancingOwnership(financingId, user.id);
 
-  const updated = await financingRepository.update(financingId, {
-    isActive: false,
-    endDate: new Date(),
-  });
-
-  await onFinancingDeactivated(financingId, user.id);
+  const updated = await deactivateFinancing(financingId, user.id);
 
   return c.json({
     success: true,
@@ -238,12 +233,7 @@ routes.delete('/:financingId', zValidator('param', financingParamsSchema), async
   const { financingId } = c.req.valid('param');
   await validateFinancingOwnership(financingId, user.id);
 
-  await financingRepository.update(financingId, {
-    isActive: false,
-    endDate: new Date(),
-  });
-
-  await onFinancingDeactivated(financingId, user.id);
+  await deactivateFinancing(financingId, user.id);
 
   return c.json({ success: true, message: 'Financing marked as completed successfully' });
 });
