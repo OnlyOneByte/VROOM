@@ -1632,6 +1632,14 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract findOwnedProvider — ONE source of truth for the tenant-scoped provider lookup in the storage registry (rule-7 fan-out, done C348).**~~ —
+  *DONE C348: getDefaultProvider/getBackupProviders/getProvider ran a BYTE-IDENTICAL `this.db.select().from(userProviders).where(and(eq(id), eq(userId)))
+  .limit(1) → row[0]` (3 sites), differing only in caller null/status handling. Extracted private findOwnedProvider(providerId, userId) → UserProvider|null;
+  callers keep their own throw/skip. Left getProviderInternal alone (id-ALONE no-auth variant, deliberately not routed). A divergent copy dropping the userId
+  predicate = a cross-tenant read, so one source keeps the ownership scope in lockstep. −18 LOC. registry.test.ts (23 tests) GREEN before AND after.
+  validate:local EXIT 0, 1444 pass. Rejected: the FE photo-upload-FormData ×4 (3-liner churn) + the cross-file backup.ts/registry.ts dedup (different
+  db-access → would need two helpers, not a real collapse).*
+
 - ~~**Extract deactivateFinancing — ONE source of truth for the financing deactivation write + side-effect (rule-7 fan-out, done C343).**~~ — *DONE
   C343: the payoff (PUT /:id/payoff) + delete (DELETE /:id) routes ran a BYTE-IDENTICAL `update({isActive:false, endDate}) + onFinancingDeactivated` pair,
   differing only in the response message + whether the updated row is echoed — a money/lifecycle drift risk (a future deactivation-cleanup change lands

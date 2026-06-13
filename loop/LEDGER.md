@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 344 |
 | guard | 6 | 347 |
 | bug | 3 | 345 |
-| arch | 5 | 343 |
+| arch | 5 | 348 |
 | infra | 6 | 346 |
 
-Current cycle: **347**
+Current cycle: **348**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5563,3 +5563,14 @@ Current cycle: **347**
   (offline-storage.test.ts): a fully-populated OfflineExpense → assert vehicleId/tags/category/amount/date/mileage/volume/fuelType/missedFillup/description ALL
   round-trip. NON-VACUOUS (a future field added to OfflineExpense + the form but forgotten in the mapper — the exact #66/#101 shape — leaves its assertion
   unmet → RED). green→green: frontend validate:local EXIT 0 — 659 pass (+1) / 0 fail, tsc 0, build OK. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C348 (arch): extract findOwnedProvider — ONE source of truth for the tenant-scoped provider lookup in the storage registry** — BALANCE: arch at budget
+  (last 343, starved-for 348−343=5 = budget, most-starved) → pick. Rule-7 fan-out (2 Explore agents). FE: NO clean win (the only byte-identical block,
+  photo-upload FormData ×4, is genuine 3-liner churn — agent agreed). BE: the agent's cross-file findUserProviderById (backup.ts + registry.ts) was weak —
+  the two files use DIFFERENT db-access (getDb()+dynamic-import+.get() vs this.db+.limit(1)) → it proposed TWO helpers (not a real dedup). But the
+  registry.ts SAME-SCOPE subset is clean: getDefaultProvider/getBackupProviders/getProvider ran a BYTE-IDENTICAL tenant-scoped query
+  `this.db.select().from(userProviders).where(and(eq(id), eq(userId))).limit(1) → row[0]` (3 sites), differing only in caller null/status handling (throw vs
+  skip). VERIFIED firsthand (C21/C60). FIX: extracted private `findOwnedProvider(providerId, userId) → UserProvider | null` (returns the row/null, callers
+  keep their own handling). Left getProviderInternal alone (queries by id ALONE, no userId — the deliberate no-auth variant, NOT routed here). A divergent
+  copy dropping the userId predicate would be a CROSS-TENANT read, so one source of truth keeps the ownership scope in lockstep. −~18 LOC. Test-anchored
+  (rule 3): registry.test.ts (23 tests) drives all 3 methods — GREEN before AND after. green→green: backend validate:local EXIT 0 — 1444 pass (unchanged) /
+  1 skip / 0 fail, tsc 0, musl-biome clean (one format reflow auto-fixed), build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
