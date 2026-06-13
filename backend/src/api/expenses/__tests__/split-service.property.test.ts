@@ -555,3 +555,49 @@ describe('Property 3 (Design): Split amounts sum to groupTotal', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Property 4 (Design): a split sibling is COST-ONLY — never carries fuel metrics (C311 deep-review).
+// createSiblings hardcodes missedFillup:false and never sets volume/mileage/fuelType (the create-split
+// schema has NO input path for them — splitting a SHARED cost across vehicles can't attribute a physical
+// volume/odometer to each leg). So even a category:'fuel' split is a pure cost row: volume/mileage/fuelType
+// stay null + missedFillup stays false. This matters because computeEfficiencyPoint / the fuel-stats fillup
+// count key off volume — a regression that started stamping a volume on split siblings would silently
+// pollute MPG attribution + double-count fillups. Pin the contract so that change can't land unnoticed.
+// ---------------------------------------------------------------------------
+describe('Property 4 (Design): split siblings are cost-only (no fuel metrics, even for category:fuel)', () => {
+  test('every sibling has null volume/mileage/fuelType + missedFillup=false across all categories', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        dbConfigAndTotalArb,
+        categoryArb,
+        async ({ config, totalAmount }, category) => {
+          const allocations = service.computeAllocations(config, totalAmount);
+          const groupId = createId();
+
+          await db.transaction(async (tx) => {
+            return service.createSiblings(tx, {
+              groupId,
+              userId: USER_ID,
+              splitMethod: config.method,
+              groupTotal: totalAmount,
+              allocations,
+              category, // includes 'fuel' from categoryArb — must STILL be cost-only
+              date: new Date(2024, 5, 15),
+            });
+          });
+
+          const dbSiblings = await db.select().from(expenses).where(eq(expenses.groupId, groupId));
+          expect(dbSiblings.length).toBeGreaterThan(0);
+          for (const row of dbSiblings) {
+            expect(row.volume).toBeNull();
+            expect(row.mileage).toBeNull();
+            expect(row.fuelType).toBeNull();
+            expect(row.missedFillup).toBe(false);
+          }
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+});

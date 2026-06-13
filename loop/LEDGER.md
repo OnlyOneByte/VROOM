@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 306 |
+| deep-review | 5 | 311 |
 | guard | 6 | 307 |
 | bug | 3 | 308 |
 | arch | 5 | 310 |
 | infra | 6 | 309 |
 
-Current cycle: **310**
+Current cycle: **311**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5078,3 +5078,17 @@ Current cycle: **310**
   intended callers; dropped a now-dead `CONFIG` import from expenses/repository.ts (tsc-confirmed). BEHAVIOR-PRESERVING + test-anchored both
   ways (rule 3): 221 odometer+expenses+pagination tests pass UNCHANGED. green→green: backend validate:local EXIT 0 — 1424 pass (unchanged —
   pure refactor) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C311 (deep-review): expenses split create/update/delete + group-integrity CERTIFIED CLEAN; pinned the split-is-cost-only contract** —
+  BALANCE: deep-review at budget (last 306, starved-for 5 = budget, most-starved; bug also at 3 but deep-review waited longer) → forced.
+  Audited the split money/integrity surface firsthand. CERTIFIED CLEAN: (1) updateSplitExpense — absolute total DERIVED from the legs (the
+  Property-3 fix: never trusts a stale groupTotal on an absolute edit), userId-scoped delete matching the read, photo migration to
+  newSiblings[0] (reasonable — re-split has no 1:1 vehicle mapping); (2) deleteSplitExpense — userId-scoped, photo_refs auto-cascade via the
+  FK onDelete:'cascade', and the ROUTE layer cleans provider files + refs BEFORE the row delete (deletePhotosForEntities, documented at
+  routes.ts:276-282 — provider cleanup is at the right layer, not a gap); (3) createSiblings — cents-based remainder-to-last (C84), and a
+  split is COST-ONLY by design: the create-split schema has NO volume/mileage/fuelType/missedFillup input path (splitting a SHARED cost
+  across vehicles can't attribute a physical volume/odometer per leg), so a category:'fuel' split is a pure cost row. THE worthwhile guard:
+  that cost-only contract was UNPINNED — a future change stamping a volume on split siblings would silently pollute MPG attribution + the
+  fuel-stats fillup count. +1 design property (Property 4, split-service.property.test.ts): every persisted sibling has null
+  volume/mileage/fuelType + missedFillup=false ACROSS ALL categories (incl. 'fuel' from the arb). NO defect, no source change. green→green:
+  backend validate:local EXIT 0 — 1425 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.07%+ (carry) / fe
+  81.76% (carry).

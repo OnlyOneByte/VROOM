@@ -154,6 +154,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Expenses split create/update/delete + group-integrity audit (C311).**~~ — *DONE C311 (CERTIFIED CLEAN, +1 contract-pin guard).
+> updateSplitExpense derives the absolute total from the legs (Property-3 fix), userId-scoped delete; deleteSplitExpense cascades photo_refs
+> via FK + the ROUTE cleans provider files first (documented, not a gap); createSiblings is cents-based + COST-ONLY (the create-split schema
+> has no volume/mileage/fuelType input path — a shared cost can't attribute a physical volume per leg). Pinned the cost-only contract
+> (Property 4: every sibling null volume/mileage/fuelType + missedFillup=false across all categories incl. 'fuel') so a future change can't
+> silently pollute MPG attribution. No defect. validate:local EXIT 0, 1425 pass (+1).*
+
 > ~~**Provider/storage CREDENTIAL layer audit (ARCC-grounded, C306).**~~ — *DONE C306 (CERTIFIED CLEAN, no defect — the C291
 > certification precedent). VROOM's most security-sensitive surface. ARCC-consulted first (SAX-01/SAX-08: encrypt at rest, key outside the
 > data store). Firsthand: encryption.ts AES-256-GCM + random IV + auth tag + env key (not in DB); routes.ts encrypt-on-write +
