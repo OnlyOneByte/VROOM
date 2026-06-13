@@ -73,9 +73,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 419 |
 | bug | 3 | 420 |
 | arch | 5 | 421 |
-| infra | 6 | 418 |
+| infra | 6 | 423 |
 
-Current cycle: **422**
+Current cycle: **423**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6417,3 +6417,11 @@ Current cycle: **422**
   the financing existence/id-match check on PUT. FIX (atomic + arch-clean, ONE source of truth): extracted `assertFinancingSourceValid(sourceType, sourceId, vehicleId)`
   from the POST inline block; called from BOTH POST and the PUT handler (keyed on updateData.sourceType, validated against the FINAL vehicleId). GUARD: +3 (forged on a
   no-financing vehicle → 400 [200 pre-fix, RED]; valid link → 200; mismatched id on a financed vehicle → 400). NON-VACUOUS. be validate:local EXIT 0, 1521 pass (+3). cov: be 86.92% (carry, +3 guards) / fe 84.46% (carry).
+- **C423 (infra): #5 branch-hygiene sweep + coverage re-measure (the ~C422 cadence; last actual C412)** — BALANCE: nothing over budget (deep-review 1, guard 4, bug 3=budget,
+  arch 2, infra 5/6, feature parked); infra MOST-STARVED actionable (last 418, starved-for 423−418=5, budget 6) AND the #5 sweep was due → highest-leverage pick. SWEEP:
+  re-measured both suites — be 86.93% line / 86.57% func (line +0.01 vs C412's 86.92, func +0.03 — the C413–C422 fix+guard arc held as product code grew); fe 84.51% line /
+  84.54% func / 77.06% branch (line +0.05 / func +0.14 / branch +0.14 vs C412's 84.46/84.4/76.92 — the C415 resetSplitAllocations + C419 band + C421 sort + C422 financing
+  guards delivered). Both creeping UP, gap stable ~2.4pts. HYGIENE: working tree CLEAN of tracked changes; NO stray untracked tracked-class file (the C400/C412
+  offline-entries spec + .config.kiro catches stayed fixed); all untracked confirmed by-design (*.meshclaw.e2e.ts, .meshclaw-tools/, screenshots, playwright config,
+  mise.local.toml). Branch 233 commits ahead of origin/main, build floor GREEN both sides → PR-ready (standing escalation since C368). No product code touched → coverage
+  runs were the gate (both EXIT 0). cov: be 86.93% / fe 84.51%. Next #5 sweep ~C433; next CLAUDE.md refresh ~C428.
