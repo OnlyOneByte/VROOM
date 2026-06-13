@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 342 |
 | bug | 3 | 345 |
 | arch | 5 | 343 |
-| infra | 6 | 340 |
+| infra | 6 | 346 |
 
-Current cycle: **345**
+Current cycle: **346**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5545,3 +5545,10 @@ Current cycle: **345**
   (sync-worker.test.ts:227 asserts updateStatus NOT called on the no-source path; :238 the no-photo path). NO reachable atomic defect, NO unpinned invariant
   → certification only (the C306/C327/C334/C341 precedent — a manufactured test here = coverage-theater). DOCS-ONLY (LEDGER + BACKLOG); no source/test/build
   touched (the C344 gate is the last code state). cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C346 (infra): CLAUDE.md suite-size refresh (post-C335 drift)** — BALANCE: nothing OVER budget; infra most-starved AT budget (last 340, starved-for
+  346−340=6 = budget) → pick. The two big infra cadences aren't due (#5 sweep ~C350, full CLAUDE.md refresh ~C348) + the closed-bug list is kept current
+  inline each bug cycle (accurate through #102/C344), so this is a TARGETED single-drift fix, not a full refresh: the suite-size line cited **~1440 BE /
+  ~641 FE** (stale since C335) → corrected to **~1444 BE / ~658 FE** (VERIFIED by running bun test + vitest — not guessed) + named the C336–C344 test arc
+  (themeStore + appStore zero-coverage-store sweep, the buildMonthlyConsumption if-entry invariant, the #102 ambiguous-import guards). Resisted manufacturing
+  a fuller refresh — the doc is otherwise current. Docs-only; no source/test/build touched → no build gate (the C309/C316/C322/C335 refresh pattern). Next
+  CLAUDE.md refresh ~C348; next #5 sweep ~C350. cov: be 86.53% (carry) / fe 84.39% (carry).
