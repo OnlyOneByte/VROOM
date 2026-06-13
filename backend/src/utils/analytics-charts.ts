@@ -312,7 +312,17 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
     const point = computeEfficiencyPoint(current, previous);
     if (!point) return;
 
-    mpgValues.push(point.efficiency);
+    // mpgValues feeds the FuelStats "Fuel Consumption" card, labeled mi/gal (getFuelEfficiencyLabel).
+    // A charge session stores kWh in `volume`, so computeEfficiencyPoint emits its ~3 mi/kWh under the
+    // electric realistic-band — a DIFFERENT physical quantity. Pushing it into the SAME mpgValues array
+    // as ~40 mi/gal gas points drags the average down + shows a charge's mi/kWh as "mi/gal" (#119, the
+    // C353 gas/charge isolation that vehicle-stats.ts already does, missed on this analytics path). So
+    // only volume-from-GAS rows count toward MPG. costPerMileValues is INTENTIONALLY unfiltered: cost
+    // per mile is total energy spend over total miles (fuel + charge), a consistent $/mi (C378) — a
+    // dollar spent charging is a real cost per real mile, so electric rows MUST stay in that array.
+    if (!isElectricFuelType(current.fuelType)) {
+      mpgValues.push(point.efficiency);
+    }
     const milesDriven = (current.mileage ?? 0) - (previous.mileage ?? 0);
     if (milesDriven > 0 && current.expenseAmount > 0) {
       costPerMileValues.push(current.expenseAmount / milesDriven);

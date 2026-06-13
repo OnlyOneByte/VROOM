@@ -854,17 +854,22 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > through it, re-imported into routes.ts (regular boundaries unchanged). +4 guards (split-create rejects ';'/','/empty tag; control passes). NON-VACUOUS. be
 > validate:local EXIT 0, 1496 pass (+4). The split-UPDATE path was already safe (reuses firstOld.tags).*
 
-> **#119 (MED, correctness/units / NORTH_STAR #1 — found C408 on an EV/unit bug scout; FILED, not yet fixed) — a plug-in hybrid's CHARGE sessions contaminate the
-> analytics Fuel Stats "MPG" card.** The analytics FuelStats path (analytics/repository.ts computeMpgAndCostPerMile → computeFuelConsumptionMetrics, via
-> computeEfficiencyPoint in analytics-charts.ts:~122) has NO gas/charge partition — queryFuelExpenses returns all category='fuel' rows (gas gal + charge kWh) with no
-> fuelType filter, and computeEfficiencyPoint accepts an electric row (gated only by the per-row realistic-efficiency band), so a charge session's ~3 mi/kWh point lands
-> in the SAME mpgValues array as a ~40 mi/gal gas point. FuelStatsTab renders avg/best/worst under an "mi/gal" label → worstEfficiency shows ~3 "mi/gal", the avg is
-> dragged down, all mislabeled. DISTINCT from C353 (which isolated MPG/mi-kWh ONLY in vehicle-stats.ts — the analytics path has zero electric awareness) and from #94
-> (cross-VEHICLE pooling; this is within ONE vehicle mixing two different quantities). Reachable: any PHEV with both gas fillups + charge sessions, Analytics→Fuel Stats.
-> FIX: exclude electric rows from the MPG pairing in computeMpgAndCostPerMile (`if (isElectricFuelType(current.fuelType)) return;` — isElectricFuelType already imported
-> at analytics-charts.ts:1), mirroring vehicle-stats.ts's partition. NOTE the sibling builders (buildMonthlyConsumption/buildSeasonalEfficiency/buildDayOfWeekPatterns)
-> share computeEfficiencyPoint and warrant the same guard — so this is a small coherent multi-site fix, best as its own cycle (a bug if scoped to the headline
-> computeMpgAndCostPerMile card, or arch if consolidating the partition across all pairing sites). NORTH_STAR #1 money/efficiency-facing.
+> ~~**#119 (MED, correctness/units / NORTH_STAR #1 — found C408 on an EV/unit bug scout) — a plug-in hybrid's CHARGE sessions contaminated the analytics Fuel Stats
+> "MPG" card.**~~ — *DONE C411: computeMpgAndCostPerMile (analytics-charts.ts:311) pushed every computeEfficiencyPoint into mpgValues, and computeEfficiencyPoint accepts
+> electric rows (electric-aware band), so a charge session's ~3 mi/kWh (kWh in `volume`) landed in the SAME array as ~40 mi/gal gas points → fuelConsumption (the
+> FuelStats card, labeled mi/gal) blended them. FIX (SURGICAL — NOT the scouted blanket `if(electric)return`, which would have wrongly dropped charge from COST too):
+> gate the mpgValues.push on `!isElectricFuelType(current.fuelType)` ONLY; costPerMileValues stays unfiltered (cost/mile = total energy spend / total miles, the
+> C378-certified invariant — dropping charge cost would UNDER-report spend). +3 guards (mpgValues gas-only [len 1, RED pre-fix]; costPerMileValues keeps the charge $/mi;
+> gas-only control). NON-VACUOUS. be validate:local EXIT 0, 1499 pass (+3).*
+
+> **#122 (MED, correctness/units / NORTH_STAR #1 — found C411, the #119 sibling-builder sweep; FILED, not yet fixed) — buildMonthlyConsumption / buildSeasonalEfficiency
+> / buildDayOfWeekPatterns mix a PHEV's charge mi/kWh into their gas-MPG efficiency average.** Same root as #119: all three sum `computeEfficiencyPoint(current,
+> previous).efficiency` into an `effSum`/`effCount` average (buildMonthlyConsumption:357, addSeasonalEfficiencyData:645, the day-of-week pairing) with NO gas/charge
+> partition, so for a plug-in hybrid a ~3 mi/kWh charge point dilutes the gas-MPG average each chart shows. #119 fixed the headline computeMpgAndCostPerMile card (C411);
+> these three sibling efficiency builders share the same `point.efficiency` accumulation and need the same `!isElectricFuelType(current.fuelType)` gate before the
+> effSum add. A coherent multi-site sweep (the C367→C390→C391 per-builder-then-sweep precedent) — could go as a bug (3 inline gates) or, better, arch: route all the
+> MPG-aggregating sites through ONE gas-only-efficiency-point helper so the partition can't drift (sibling to the C403 isFillup / C409 hasReminderEndedBy extractions).
+> NORTH_STAR #1 money/efficiency-facing; reachable by any PHEV with gas + charge, Analytics tabs.
 
 > ~~**#117 (MED, money/correctness / NORTH_STAR #1 — found C404 on a financing-planner deep-review scout; the #92 symptom re-manifested at the planner layer) — a
 > 0%-APR loan in the Payment Planner always shows "0 mos / $0 saved" no matter the extra payment.**~~ — *DONE C405: baseline = `minimumPayment > 0 ? minimumPayment :

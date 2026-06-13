@@ -20,6 +20,7 @@ import {
   buildSeasonalEfficiency,
   computeAverageCosts,
   computeMileageScore,
+  computeMpgAndCostPerMile,
   computePreviousYearComparison,
   computeRegularityScore,
   type FuelExpenseRow,
@@ -356,5 +357,78 @@ describe('sortByVehicleThenDate', () => {
     const sorted = sortByVehicleThenDate(rows);
     expect(sorted[0].date).toBeNull(); // 0 sorts before the 2024 epoch-ms
     expect(sorted[1].date).toBe(ms);
+  });
+});
+
+// #119 (C411): the FuelStats "Fuel Consumption" card (mpgValues → computeFuelConsumptionMetrics, labeled
+// mi/gal) must NOT include a plug-in-hybrid's CHARGE sessions — a charge stores kWh in `volume`, so
+// computeEfficiencyPoint emits its ~mi/kWh (a different quantity), which dragged the avg down + showed a
+// charge's mi/kWh as "mi/gal". The fix excludes electric rows from mpgValues ONLY; costPerMileValues stays
+// unfiltered because cost-per-mile is total energy spend over total miles (fuel + charge), a consistent
+// $/mi (C378). Pre-fix mpgValues had length 2 (the gas point AND the charge point) — RED.
+describe('computeMpgAndCostPerMile — charge rows excluded from MPG, kept in cost-per-mile (#119)', () => {
+  // One gas vehicle: 10000 → 10300 mi on 10 gal = 30 MPG. One charge interval on the SAME vehicle right
+  // after: 10300 → 10360 on 15 kWh = 4 mi/kWh (within the electric realistic band). Distinct mileages so
+  // the cost-per-mile deltas are positive and real.
+  const rows: FuelExpenseRow[] = [
+    fuelRow({
+      vehicleId: 'v1',
+      date: d(2024, 1, 1),
+      mileage: 10000,
+      volume: 10,
+      expenseAmount: 40,
+      fuelType: 'regular',
+    }),
+    fuelRow({
+      vehicleId: 'v1',
+      date: d(2024, 1, 8),
+      mileage: 10300,
+      volume: 10,
+      expenseAmount: 40,
+      fuelType: 'regular',
+    }),
+    fuelRow({
+      vehicleId: 'v1',
+      date: d(2024, 1, 15),
+      mileage: 10360,
+      volume: 15,
+      expenseAmount: 9,
+      fuelType: 'Level 2 (AC)',
+    }),
+  ];
+
+  test('mpgValues contains ONLY the gas-pair MPG (~30), not the charge-pair mi/kWh (~4)', () => {
+    const { mpgValues } = computeMpgAndCostPerMile(rows);
+    // Gas pair (10000→10300/10gal) = 30. The charge pair (10300→10360/15kWh) = 4 must NOT appear.
+    expect(mpgValues).toHaveLength(1); // was 2 pre-fix (gas + charge both pushed)
+    expect(mpgValues[0]).toBeCloseTo(30, 5);
+    expect(mpgValues.some((v) => v < 10)).toBe(false); // no mi/kWh-magnitude value leaked in
+  });
+
+  test('costPerMileValues still includes the charge interval (cost spans all energy, C378)', () => {
+    const { costPerMileValues } = computeMpgAndCostPerMile(rows);
+    // Both consecutive intervals contribute a cost/mile: gas 40/300 and charge 9/60 = 0.15.
+    expect(costPerMileValues).toHaveLength(2);
+    expect(costPerMileValues.some((v) => Math.abs(v - 9 / 60) < 1e-9)).toBe(true); // the charge $/mi survived
+  });
+
+  test('a gas-only vehicle is unaffected (control)', () => {
+    const gasOnly: FuelExpenseRow[] = [
+      fuelRow({
+        vehicleId: 'v2',
+        date: d(2024, 2, 1),
+        mileage: 20000,
+        volume: 10,
+        fuelType: 'regular',
+      }),
+      fuelRow({
+        vehicleId: 'v2',
+        date: d(2024, 2, 8),
+        mileage: 20300,
+        volume: 10,
+        fuelType: 'regular',
+      }),
+    ];
+    expect(computeMpgAndCostPerMile(gasOnly).mpgValues).toHaveLength(1);
   });
 });

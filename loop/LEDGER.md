@@ -71,11 +71,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 410 |
 | guard | 6 | 407 |
-| bug | 3 | 408 |
+| bug | 3 | 411 |
 | arch | 5 | 409 |
 | infra | 6 | 406 |
 
-Current cycle: **410**
+Current cycle: **411**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6295,3 +6295,16 @@ Current cycle: **410**
   same documented eyes-on-blocked class as the maintenance-T7/import-trackers tails. fe validate:local EXIT 0, 690 pass / svelte-check + build clean. The paired offline
   finding (retrySingleExpense silently drops a conflict result — no syncConflicts.current push, unlike the main loop) is REAL but TIMING-RACE-gated (conflict-on-retry-
   only, the C163 mock-trap class) → FILED below, not this cycle's pick. cov: be 86.92% (carry) / fe 84.45% (carry, wiring-only).
+- **C411 (bug → #119: a plug-in hybrid's CHARGE sessions contaminated the analytics FuelStats "MPG" card)** — BALANCE: nothing over budget (deep-review 1, guard 4, arch
+  2, infra 5/6); bug AT budget (last 408, starved-for 411−408=3=budget, the tightest "never-sits") + a ready clean money/efficiency-facing fix → highest-leverage (beats
+  the routine #5 sweep, which infra forces next anyway). The C408-filed #119, VERIFIED FIRSTHAND (C21/C60): computeMpgAndCostPerMile (analytics-charts.ts:311) pushed
+  EVERY computeEfficiencyPoint into mpgValues — and computeEfficiencyPoint accepts electric rows (electric-aware realistic band), so a charge session (kWh in `volume`)
+  emitted its ~3 mi/kWh into the SAME array as ~40 mi/gal gas points → fuelConsumption (the FuelStats Average/Best/Worst card, labeled mi/gal) blended them: worst showed
+  ~3 "mi/gal", the avg dragged down. The C353 gas/charge isolation vehicle-stats.ts does, missed on this analytics path. FIX (SURGICAL, not the agent's blanket
+  `if(electric)return` which would have wrongly dropped charge from cost too): gate the `mpgValues.push` on `!isElectricFuelType(current.fuelType)` ONLY — costPerMileValues
+  stays UNFILTERED because cost-per-mile is total energy spend over total miles (fuel+charge), a consistent $/mi (the C378-certified invariant; dropping charge cost would
+  UNDER-report spend). GUARD: +3 (analytics-charts-unpinned.test.ts): a gas+charge vehicle → mpgValues has ONLY the ~30 gas point (len 1, was 2 RED pre-fix), no
+  mi/kWh-magnitude leak; costPerMileValues KEEPS the charge $/mi (len 2, C378 preserved); gas-only control unaffected. NON-VACUOUS. be validate:local EXIT 0, 1499 pass
+  (+3) (a format reflow → check:musl:fix, re-validated clean). The sibling builders (buildMonthlyConsumption/buildSeasonalEfficiency/buildDayOfWeekPatterns) share
+  computeEfficiencyPoint + have the SAME contamination → FILED as #122 (a coherent multi-site sweep, the C367→C390→C391 per-builder-then-sweep precedent), not scattered
+  into this bug cycle. cov: be 86.92% (carry, +3 guards) / fe 84.45% (carry).
