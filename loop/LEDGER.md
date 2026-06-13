@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 353 |
 | bug | 3 | 355 |
 | arch | 5 | 354 |
-| infra | 6 | 351 |
+| infra | 6 | 357 |
 
-Current cycle: **356**
+Current cycle: **357**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5668,3 +5668,11 @@ Current cycle: **356**
   bypasses it, so exercising the real 401 path needs a global-fetch mock the suite deliberately avoids (the C163 mock-trap) → documented, not manufactured
   (coverage-theater avoidance). green→green: backend validate:local EXIT 0 — 1454 pass (unchanged; the fix is in the un-faked real client) / 1 skip / 0 fail,
   tsc 0, musl-biome clean, build bundled. cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C357 (infra): CLAUDE.md FULL orientation refresh (the overdue ~C348 refresh)** — BALANCE: nothing OVER budget; infra most-starved AT budget (last 351,
+  starved-for 357−351=6 = budget) + the full CLAUDE.md refresh was overdue (flagged ~C348; only targeted suite-size spot-fixes since C335). Read the
+  drift-prone sections vs source/LEDGER (no churn — the C5/C47/C72 discipline). FIXED the two material drifts: (1) the coverage line cited the C323 reading
+  (86.53/84.39) → updated to the C351 re-measure (be 86.25/86.67, fe 84.17/83.9/76.32) + the "coverage has PLATEAUED, reachable remainder held flat as
+  product grows" honest framing + extended the FE-ratchet narrative past C223 (the C336/C342 store sweep + C347/C353 pins); (2) suite size ~1444/658 →
+  ~1454/659 + the C345–C356 test arc (the #103/#104 guards, C350 fleet-health, C353 hybrid-isolation). The closed-bug list (through #105/C356) +
+  pending-Angelo block (#88/#94/#97/#98/#100) are kept current inline each cycle — verified accurate, no change. Docs-only; no source/test/build touched →
+  no build gate (the C309/C316/C322/C335 refresh pattern). Next CLAUDE.md refresh ~C370; next #5 sweep ~C361. cov: be 86.25% / fe 84.17%.

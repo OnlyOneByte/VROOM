@@ -163,14 +163,14 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C323, not an estimate): **backend 86.53% line / 86.21% func · frontend 84.39% line / 83.97%
-  func / 76.43% branch** (both suites > 84% line) — backend ~86.5% (the C178–C321 BE bug-fix + route/guard-coverage arc; FE climbed 81.76→84.39 on the C308 settings-error + C314 api-client-dedup + C319 settings-state-contract arc, settings.svelte.ts ~12%→covered — BE↔FE gap now ~2pts);
-  frontend climbed 65.3→80.6 since C138 under a sustained
+  (re-measured C351, not an estimate): **backend 86.25% line / 86.67% func · frontend 84.17% line / 83.9%
+  func / 76.32% branch** (both suites > 84% line; ~FLAT vs the C323 reading 86.53/86.21 · 84.39/83.97/76.43 — coverage has PLATEAUED, the reachable remainder is worked through and held flat as product code grows). BE↔FE gap ~2pts (stable, the tightest era).
+  Frontend climbed 65.3→84 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
   C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts, C201
-  expense-form-validation, C207 payoff-date clamp, C212 analytics-api, C217 auth.ts, C223 sync-manager conflict-classification).
-  **The FE SERVICE + pure-util layers are now essentially fully covered** (api-client + expense-api + reminder-api +
-  settings-api + error-handling + analytics-api + auth + sync-manager's clean slice); the remaining FE gap is the **components/routes deficit**
+  expense-form-validation, C207 payoff-date clamp, C212 analytics-api, C217 auth.ts, C223 sync-manager, then the C336/C342 zero-coverage STORE sweep [themeStore + appStore] + C347 offline-dropout-class pin + C353 hybrid MPG/mi-kWh isolation).
+  **The FE SERVICE + pure-util + STORE layers are now fully covered** (api-client + expense-api + reminder-api +
+  settings-api + error-handling + analytics-api + auth + sync-manager's clean slice + app/theme stores); the remaining FE gap is the **components/routes deficit**
   (largely eyes-on) + the network/timer-bound retry tails (the C163 mock-trap, low-value) — so the next FE guard cycles are thin; prefer BE low spots. Backend
   middleware trio all covered (idempotency C105, rate-limit C112, body-limit C156); `backup-orchestrator.ts`
   0→50% func (C181 — its old test was COVERAGE THEATER, re-implementing the logic locally instead of importing
@@ -183,10 +183,10 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1444 backend tests / ~658 frontend** (a floor — grows most cycles; C336–C344 added
-  themeStore + appStore (the zero-coverage FE store sweep), the buildMonthlyConsumption if-entry invariant,
-  the #102 ambiguous-vehicle-import guards — on top of the C322–C334 #94/#99/getSyncStatusInfo/year-scoped-TCO
-  pins). Don't regress coverage; name why if a cycle drops it.
+  Suite size today: **~1454 backend tests / ~659 frontend** (a floor — grows most cycles; C345–C356 added
+  the #103/#104 fix guards (provider-config + CSV-tag-delimiter), the C350 fleet-health no-data-vehicle pin,
+  the C353 hybrid MPG/mi-kWh isolation, the year-scoped-TCO + buildMonthlyConsumption invariants — on top of the
+  C336–C344 store sweep / #102 import guards). Don't regress coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
   in-memory SQLite DB with a seeded user + a real Lucia session cookie (`ctx.authed/anon`); it's
