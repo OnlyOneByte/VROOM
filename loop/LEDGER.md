@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 323 |
 | guard | 6 | 319 |
-| bug | 3 | 321 |
+| bug | 3 | 324 |
 | arch | 5 | 320 |
 | infra | 6 | 322 |
 
-Current cycle: **323**
+Current cycle: **324**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5236,3 +5236,19 @@ Current cycle: **323**
   C308/C314/C319 FE arc; settings.svelte.ts ~12%→covered). BE↔FE gap ~2pts, the tightest ever. Appended the C323 reading to the LEDGER
   COVERAGE TREND header. green→green: both suites pass (BE 1434 / 1 skip via cov run; FE via cov run). DOCS/MEASUREMENT + cert only (LEDGER),
   no source/test/build touched (the C321 gate is the last code state). Next #5 sweep ~C333. cov: be 86.53% / fe 84.39%.
+- **C324 (bug → file+escalate + characterization guard): sync-manager keep_local "overwrite" is a silent no-op on a real clientId collision
+  (#98)** — BALANCE: bug at budget (last 321, starved-for 3 = budget, tightest; guard at 5 but bug's limit is the hard one) → pick. Bug vein
+  dormant → scouted the FE sync/offline layer. sync-manager fuzzy conflict-detection is ALREADY-pinned design (C223 determineConflictType), so
+  not a fresh bug there; pwa.ts clean (95% line). THE FINDING (resolveConflict keep_local / merge): it POSTs the local expense to the CREATE
+  endpoint with `{ ...backendExpense, clientId, forceOverwrite: true }` — but the backend NEVER handles forceOverwrite (Zod strips unknown
+  keys) and createIdempotent dedups on (userId, clientId). So on a GENUINE clientId collision (a true re-sync), the create returns the existing
+  row UNCHANGED → the user's "keep my local edit" is SILENTLY NOT APPLIED, yet the FE markExpenseAsSynced + returns true (a NORTH_STAR #1
+  offline-edit loss). It only "works" because the fuzzy pre-check flags DISTINCT rows whose clientId is new → a clean insert. The FE code +
+  comment ("server row replaced") + the existing test (asserts forceOverwrite===true) all imply an overwrite that doesn't exist — a
+  maintainer-misleading dead field over a real data-loss path. The FIX is product/arch-gated (real upsert / PUT-on-collision, or drop the
+  fuzzy conflict flow + trust clientId, or surface the no-op) and TANGLED with the C223-pinned conflict-detection design → FILED #98 +
+  send_message'd Angelo, NOT self-fixed. SHIPPABLE increment (bug-cycle floor): (1) a warning COMMENT on resolveConflict keep_local marking
+  forceOverwrite a known backend no-op pending #98 (behavior-preserving); (2) +1 characterization test pinning the FE reality — keep_local
+  POSTs to /api/v1/expenses (create) carrying the local clientId (idempotency governs the outcome), NOT a dedicated overwrite/PUT route — so
+  when #98 lands, the endpoint/shape change is visible. green→green: frontend validate:local EXIT 0 — type-check 0, build, 620 pass (+1).
+  Comment + test only, no logic change → no UI. cov: be 86.53% (carry) / fe 84.39% (carry).

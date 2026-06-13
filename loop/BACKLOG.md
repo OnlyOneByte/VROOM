@@ -803,6 +803,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   reported skipped, independent reminders still fire, run 200). DECISION (send_message'd Angelo): on vehicle-delete (a) drop it from the config +
   re-normalize the remaining percentages, (b) convert to single-vehicle if one remains, (c) deactivate the reminder + notify, or (d) other. Not
   loop-decidable — awaiting Angelo.
+- **#98 (MED, data-safety / NORTH_STAR #1 — found C324 bug scout; ESCALATED to Angelo C324, product/arch-gated) — sync-manager keep_local
+  "overwrite" is a silent no-op on a genuine clientId collision, dropping the user's local edit.** resolveConflict's keep_local (and
+  merge→keep_local) POSTs the local expense to the CREATE endpoint with `{ ...backendExpense, clientId, forceOverwrite: true }`. The backend
+  NEVER handles forceOverwrite (Zod strips unknown keys) + createIdempotent dedups on (userId, clientId). On a real clientId collision the
+  create returns the existing row UNCHANGED → the local edit is NOT applied, yet the FE markExpenseAsSynced + returns true (silent loss). Works
+  by accident only when the fuzzy pre-check (checkForExistingExpense) flags DISTINCT rows whose clientId is new. The FE code/comment/test all
+  imply an overwrite that doesn't exist. Tangled with the C223-pinned fuzzy conflict-detection design. VERIFIED + characterization-pinned
+  (C324, sync-manager.test.ts: keep_local POSTs to /api/v1/expenses (create) with the local clientId, not a dedicated overwrite/PUT) + a
+  warning comment on resolveConflict. DECISION (send_message'd Angelo): (a) real upsert / PUT-on-collision server path, (b) drop the fuzzy
+  pre-check + conflict UI, trust clientId idempotency (keep_local = plain idempotent POST), or (c) at minimum detect the no-op + surface it
+  instead of falsely reporting success. Not loop-decidable — awaiting Angelo.
 - **#97 (LOW-MED, data-hygiene / NORTH_STAR #1-adjacent — found C318 bug scout; ESCALATED to Angelo C318, product-gated; same family as #88) —
   a reminder linked to ONLY the deleted vehicle is left vehicle-less but still active, silently never firing.** `reminder_vehicles.vehicleId`
   is onDelete:'cascade', so deleting a vehicle drops its junction row. A single-vehicle reminder then has ZERO vehicles: the row survives +

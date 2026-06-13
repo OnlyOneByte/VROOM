@@ -294,6 +294,25 @@ describe('Sync Manager', () => {
 			const body = JSON.parse((mockFetch.mock.calls[0]![1] as { body: string }).body);
 			expect(body.forceOverwrite).toBe(true);
 		});
+
+		// CHARACTERIZATION of #98 (escalated C324): keep_local routes through the CREATE endpoint, whose
+		// backend idempotency keys on (userId, clientId). `forceOverwrite` is sent but NOT honored
+		// server-side (Zod strips unknown keys) — so this is a plain idempotent CREATE, not a true
+		// overwrite. Pin the FE reality: the POST goes to /api/v1/expenses (create) carrying the local
+		// row's clientId — NOT a dedicated overwrite/PUT route. When #98 lands (real upsert, or dropping
+		// the fuzzy conflict flow), THIS endpoint/shape is what changes, so a regression here is visible.
+		it('#98: keep_local POSTs to the CREATE endpoint with the local clientId (idempotency, not a real overwrite)', async () => {
+			mockFetch.mockResolvedValueOnce(apiOk({ id: 'server-1' }));
+
+			await syncManager.resolveConflict(modifiedConflict(), 'keep_local');
+
+			const [url, init] = mockFetch.mock.calls[0] as [string, { method: string; body: string }];
+			expect(String(url)).toContain('/api/v1/expenses'); // the create route, not an /overwrite or PUT
+			expect(init.method).toBe('POST');
+			const body = JSON.parse(init.body);
+			// The local row's clientId is what governs the outcome (create-idempotency), not forceOverwrite.
+			expect(body.clientId).toBe('cid-c-1');
+		});
 	});
 
 	describe('retry mechanism', () => {
