@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 323 |
 | guard | 6 | 325 |
-| bug | 3 | 324 |
+| bug | 3 | 327 |
 | arch | 5 | 326 |
 | infra | 6 | 322 |
 
-Current cycle: **326**
+Current cycle: **327**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5274,3 +5274,17 @@ Current cycle: **326**
   sites. BEHAVIOR-PRESERVING + test-anchored both ways (rule 3): all 115 reminder tests (create/update/trigger/refinements) pass UNCHANGED.
   green→green: backend validate:local EXIT 0 — 1434 pass (unchanged — pure refactor) / 1 skip / 0 fail, tsc 0, musl-biome clean, build
   bundled. Backend-only, no UI. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C327 (bug → dormant-vein clean scout, certification): photos upload/serve/delete + provider sync-worker CERTIFIED CLEAN** — BALANCE: bug
+  at budget (last 324, starved-for 3 = budget, tightest; infra at 5 but bug's limit is the hard one) → pick. Bug vein dormant → audited two
+  NORTH_STAR #1 surfaces firsthand. CERTIFIED CLEAN: (1) photo UPLOAD (uploadPhotoForEntity) — ownership-gated, ALLOWED_MIME_TYPES allowlist +
+  MAX_FILE_SIZE + category-mapping + provider-capability gate (D2a), the #34 upload-atomicity compensation (persistUploadedPhotoOrCleanup
+  best-effort deletes the just-uploaded object on a DB-write failure → no orphaned bytes); (2) photo SERVE (getPhotoThumbnailForEntity) —
+  ownership + entityType/entityId match (no cross-entity serve), default-provider-first w/ active-ref fallback, client-asserted mimeType served
+  WITH X-Content-Type-Options:nosniff (the C133/#77 fix — the browser can't sniff/execute a mislabeled file); (3) DELETE + provider sync-worker
+  — shouldSkipDueToBackoff (failed-only, syncedAt??createdAt fallback, 30*2^retryCount seconds → ms, elapsed<backoff), processSingleRef
+  failure → status:'failed' + retryCount++ (the unbounded-retry self-throttles via the exponential backoff — a perma-failed ref queries ~once
+  a year, not a storm; surfacing it is a #79-class product call, not a defect). COVERAGE already comprehensive: sync-worker.test.ts (backoff
+  boundaries 30/60/120s, success→active, failure→failed+retryCount++ for both upload + download errors, all skip cases) + photo-serve-headers
+  + ownership-uses-shared-validators. NO defect, NO unpinned invariant — adding a test here would be coverage-theater (the C306/C323
+  certification precedent). DOCS-ONLY (LEDGER + BACKLOG); no source/test/build touched (the C326 gate is the last code state). cov: be 86.53%
+  (carry) / fe 84.39% (carry).

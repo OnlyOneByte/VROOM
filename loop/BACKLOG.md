@@ -595,6 +595,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**C327 — photos upload/serve/delete + provider sync-worker CERTIFIED CLEAN (bug-cycle dormant-vein scout, no defect).**~~ — *DONE C327:
+> audited two NORTH_STAR #1 surfaces firsthand. Upload: ownership + mime-allowlist + size + capability gate + #34 atomicity compensation.
+> Serve: ownership + entityType/entityId match + nosniff (C133/#77). Sync-worker: shouldSkipDueToBackoff (30*2^retryCount) + failure→failed+
+> retryCount++ (self-throttles via backoff; surfacing a perma-failed ref is a #79-class product call). Coverage already comprehensive
+> (sync-worker backoff boundaries + success/failure status, photo-serve-headers). No defect, no unpinned invariant — certification only
+> (C306/C323 precedent). No code change.*
+
 > ~~**#96 (LOW, robustness — found+fixed C315 on a forced bug-cycle middleware scout) — idempotency middleware would turn a non-JSON 2xx
 > response into a 500.**~~ — *DONE C315: after next(), idempotency.ts did `await c.res.clone().json()` UNCONDITIONALLY to cache the body —
 > a 2xx NON-JSON body (CSV/binary/204) makes .json() throw, escaping the middleware → errorHandler → 500 on a successful response. Latent
