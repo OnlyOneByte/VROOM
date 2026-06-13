@@ -1415,6 +1415,13 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract fetchOrThrow — dedup the byte-identical fetch-setup + error-parsing in api-client request/requestFull (filed+done C314).**~~ —
+  *DONE C314: request + requestFull shared a byte-identical 37-line block (URL resolve + JSON Content-Type + credentials fetch + the
+  !response.ok error-envelope parse → throw ApiError), differing only in the success path (request unwraps .data + handles 204; requestFull
+  returns raw JSON). Extracted fetchOrThrow(url, options) → Promise<Response> (setup + error-check); each wrapper does its own body handling.
+  ~74 LOC → 1 core + 2 thin wrappers; one source of truth for the drift-prone error parsing. Behavior-preserving: api-client.test.ts + the
+  expense/analytics/reminder service suites (75 tests) pass unchanged. fe validate:local EXIT 0, 613 pass.*
+
 - ~~**Converge the 4 inline pagination-clamp sites onto the existing clampPagination helper (filed+done C310).**~~ — *DONE C310: the
   `limit = Math.min(query.limit ?? defaultPageSize, maxPageSize); offset = query.offset ?? 0` block was hand-repeated at 4 sites
   (odometer/routes ×2, expenses/routes ×1, expenses/repository.findPaginated ×1) while utils/pagination.ts already exported clampPagination

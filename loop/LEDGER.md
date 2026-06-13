@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 311 |
 | guard | 6 | 313 |
 | bug | 3 | 312 |
-| arch | 5 | 310 |
+| arch | 5 | 314 |
 | infra | 6 | 309 |
 
-Current cycle: **313**
+Current cycle: **314**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5119,3 +5119,16 @@ Current cycle: **313**
   non-vacuous (swap create/invalidate → RED; fail-closed → RED). green→green: backend validate:local EXIT 0 — 1430 pass (+4) / 1 skip / 0 fail,
   tsc 0, musl-biome clean, build bundled. Guard-only (no source) → no UI. cov: be 86.07%+ (carry; auth/utils.ts line coverage up from ~40%) /
   fe 81.76% (carry). Next #5 sweep ~C323.
+- **C314 (arch): extract `fetchOrThrow` — dedup the byte-identical fetch-setup + error-parsing across api-client's request/requestFull** —
+  BALANCE: nothing over budget except gated feature; arch (4/5) + infra (5/6) both forced NEXT cycle → took arch now (higher-leverage; infra's
+  docs C309 + sweep C313 are fresh = manufactured). Arch reliably-dry — rule-7 inline scout. Rejected the c.json success-message responses
+  (divergent per-site strings → trivial-wrapper churn, rule 5). THE FINDING (frontend/src/lib/services/api-client.ts): `request` and
+  `requestFull` shared a BYTE-IDENTICAL 37-line block — URL resolve + JSON Content-Type (FormData-skip) + credentials fetch + the
+  `!response.ok` backend-error-envelope parse → throw ApiError — differing ONLY in the success path (request unwraps `.data` + handles
+  non-JSON/204; requestFull returns raw JSON). PAYOFF (rule 5): the error-shape parsing is load-bearing + drift-prone (an ApiError fix could
+  land in one copy, be forgotten in the other). FIX: extracted `fetchOrThrow(url, options) → Promise<Response>` (setup + error-check, returns
+  the ok Response); each wrapper does its OWN success-body handling. ~74 LOC → 1 shared core + 2 thin wrappers. BEHAVIOR-PRESERVING +
+  test-anchored both ways (rule 3): the dedicated api-client.test.ts (envelope unwrap / no-over-unwrap / falsy-data / 204 non-JSON / method+
+  header / error message+code+status+array-details) + the expense/analytics/reminder service suites (75 tests) pass UNCHANGED. green→green:
+  frontend validate:local EXIT 0 — type-check 0, build, 613 pass (unchanged — pure refactor). Pure service util, no UI. cov: be 86.07%
+  (carry) / fe 81.76% (carry).
