@@ -71,4 +71,39 @@ describe('fastForwardPastNow honors endDate (bug #12)', () => {
     // The reminder is bounded and fully lapsed → it must be deactivated, not active-and-dormant.
     expect(reminderRow(reminderId).is_active).toBe(0);
   });
+
+  // Bug #107 (C362 audit): the in-loop endDate check only inspects values <= now (the while guard).
+  // The FINAL advance steps nextDue PAST now and exits the loop, so that last value is never tested
+  // against endDate. A bounded reminder whose endDate falls in the period STRADDLING now (after the
+  // last <=now step, before the first >now step) was written forward of its endDate yet left active
+  // → it would fire again next trigger. Construction: endDate ≈ now lands by definition inside that
+  // straddling period AND is >= the last <=now step, so the in-loop guard never catches it — only
+  // the after-loop guard does. Monthly from far past → blows past the 12-occurrence cap into
+  // fastForwardPastNow. Pre-fix this stays active (is_active=1); the fix deactivates it.
+  test('a bounded reminder whose endDate lands in the period straddling now is deactivated, not advanced past it', async () => {
+    const vehicleId = await seedVehicle();
+
+    // endDate one second before the server's `now`: it sits inside the final monthly period (which
+    // contains now) and at/after the last <=now monthly step (a monthly grid won't land in the last
+    // second), so the in-loop `nextDue > endDate` check never fires — exercising ONLY the exit guard.
+    const endDate = new Date(Date.now() - 1000).toISOString();
+
+    const createRes = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Bounded monthly checkup ending ~now',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2024-01-01T00:00:00.000Z',
+      endDate,
+      vehicleIds: [vehicleId],
+    });
+    const created = await json<DataEnvelope<{ reminder: { id: string } }>>(createRes);
+    expect(createRes.status, JSON.stringify(created)).toBe(201);
+    const reminderId = created.data.reminder.id;
+
+    const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
+    expect(res.status).toBe(200);
+
+    // Past its endDate and fully lapsed → must be deactivated, not left active with a future nextDue.
+    expect(reminderRow(reminderId).is_active).toBe(0);
+  });
 });

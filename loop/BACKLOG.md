@@ -704,6 +704,21 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#107 (MED, correctness/data-safety / NORTH_STAR #1 — found+fixed C362 on a reminder-trigger bug scout; the bug #12 family on fast-forward's EXIT
+> boundary) — fastForwardPastNow left a bounded reminder ACTIVE when its endDate fell in the period straddling now.**~~ — *DONE C362: the in-loop
+> `nextDue > endDate` check (trigger-service.ts:281) runs only at the top of `while (nextDue <= now)`, so the FINAL advance that steps nextDue PAST now and
+> exits is never tested against endDate. A bounded reminder lapsed past maxCatchUp (=12) into fastForwardPastNow, whose endDate lands in the straddling period
+> (lastStep ≤ endDate < final nextDue), was written FORWARD of its endDate yet left is_active=1 → fires again next trigger. VERIFIED firsthand (C21/C60):
+> traced the maxCatchUp→fastForward handoff (:454) + the reachable window. FIX: mirror the in-loop guard once AFTER the loop, before the write — deactivate
+> instead of advancing past endDate. +1 HTTP guard (monthly reminder, endDate≈now → exercises ONLY the exit guard; is_active=0 after trigger). NON-VACUOUS
+> (RED pre-fix). be validate:local EXIT 0, 1455 pass (+1). Debunked the paired (A) split fan-out: "duplicate vehicleId not rejected → metrics inflated 100%"
+> is FALSE (two self-consistent legs sum to the entered total; no double-count) — a validation nicety, not a money bug.*
+> NOTE (filed C362, test-quality — low priority): insurance-repository.property.test.ts "Property 1: Current term derivation returns latest term" is FLAKY —
+> a non-fixed fast-check seed can generate two terms sharing the same endDate to the second (a 1s tiebreak ambiguity between the test's reference loop and the
+> impl) AND the test has a tight 5s timeout; one full-suite run at C362 hit it, but isolation + a re-run were both GREEN. A future guard/infra cycle should pin
+> the latest-term tiebreak deterministically (constrain the arbitrary so endDates differ, or assert on the impl's documented tiebreak) + raise the timeout. Not
+> a product defect (test-only non-determinism).
+
 > ~~**#106 (MED, correctness / NORTH_STAR #2 — found+fixed C358 on a date/timezone-util deep-review; the #87/#39 off-by-one family) — the expense-list
 > date-range filter EXCLUDED an expense logged on the chosen END day.**~~ — *DONE C358: filterExpenses did `new Date(expense.date) <= new Date(endDate)`,
 > but the DateRangePicker binds a date-only 'YYYY-MM-DD' → `new Date('2024-06-15')`=midnight UTC, so an expense stored that day (noon-local) was excluded

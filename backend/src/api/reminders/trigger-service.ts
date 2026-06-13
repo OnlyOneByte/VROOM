@@ -294,6 +294,16 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
     }
     nextDue = advanced;
   }
+  // Bug #107 (C362 audit): the in-loop endDate check above only inspects values <= now (the while
+  // guard). The FINAL advance steps `nextDue` PAST now and exits the loop, so that last value is
+  // never tested against endDate. A bounded reminder whose endDate falls in the period straddling
+  // now (lastStep <= endDate < this final nextDue) would otherwise be written FORWARD of its endDate
+  // yet left active — firing again next trigger (the bug #12 family, here on fast-forward's exit
+  // boundary). Deactivate instead of advancing past the end date. Mirrors the in-loop guard at :281.
+  if (reminder.endDate && nextDue > reminder.endDate) {
+    await reminderRepository.deactivate(reminder.id);
+    return;
+  }
   await reminderRepository.advanceNextDueDate(reminder.id, previousDue, nextDue);
 }
 

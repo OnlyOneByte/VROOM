@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 361 |
 | guard | 6 | 359 |
-| bug | 3 | 358 |
+| bug | 3 | 362 |
 | arch | 5 | 360 |
 | infra | 6 | 357 |
 
-Current cycle: **361**
+Current cycle: **362**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5727,3 +5727,18 @@ Current cycle: **361**
   a 1000@12%/6mo loan overpaid with 8×200 payments → schedule shorter than the payment count, every beyond entry all-principal/zero-interest/balance-floored-0.
   NON-VACUOUS (asserts schedule.length<entries.length AND beyond.length>0, so the case actually triggers). green→green: fe validate:local EXIT 0, 664 pass
   (+1). cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C362 (bug → #107: fastForwardPastNow left a bounded reminder ACTIVE when its endDate fell in the period straddling now)** — BALANCE: bug OVER budget
+  (last 358, starved-for 362−358=4 > budget 3) → forced pick. Vein dormant → 2-agent fan-out: (A) expense-split allocation/rounding, (B) reminder
+  trigger/materialization. (A) the agent's "duplicate vehicleId in a split not rejected → metrics inflated 100%" was DEBUNKED FIRSTHAND (C21/C60): a
+  v-1:$50 + v-1:$50 config on a $100 total stores two self-consistent legs; v-1's attributed total is $100 = exactly what the user split — NO double-count
+  beyond what was entered. A validation nicety, not a money-correctness defect → NOT fixed. (B) surfaced a CLEAN ATOMIC live defect → #107: fastForwardPastNow
+  (trigger-service.ts:273) checks `nextDue > endDate` only at the TOP of its `while (nextDue <= now)` loop — so the FINAL advance that steps nextDue PAST now
+  and exits is NEVER tested against endDate. A bounded reminder, lapsed past maxCatchUp (=12) into fast-forward, whose endDate lands in the period straddling
+  now (lastStep ≤ endDate < final nextDue) is written FORWARD of its endDate yet left is_active=1 → it fires AGAIN next trigger (the bug #12 family, on
+  fast-forward's exit boundary; the C25 in-loop fix didn't cover the exit). VERIFIED end-to-end firsthand: traced the maxCatchUp→fastForward handoff (:454)
+  + the reachable endDate window. FIX: mirror the in-loop guard ONCE after the loop, before the write — deactivate instead of advancing past endDate (+7 lines).
+  GUARD: +1 HTTP test (trigger-fastforward-enddate.test.ts) — a monthly bounded reminder with endDate≈now (lands in the straddling period, ≥ the last ≤now
+  step so the IN-loop guard never fires — exercises ONLY the exit guard) → is_active=0 after trigger. NON-VACUOUS (RED pre-fix: stays active). NOTE filed: the
+  insurance Property-1 test is FLAKY (non-fixed fast-check seed + a same-second endDate tiebreak + a tight 5s timeout — one full-suite run hit it, isolation
+  + re-run both GREEN); a future guard/infra cycle should pin the tiebreak deterministically + raise the timeout. green→green: be validate:local EXIT 0, 1455
+  pass (+1) / 0 fail (re-run clean). cov: be 86.25% (carry) / fe 84.17% (carry).
