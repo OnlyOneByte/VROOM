@@ -154,6 +154,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Provider/storage CREDENTIAL layer audit (ARCC-grounded, C306).**~~ — *DONE C306 (CERTIFIED CLEAN, no defect — the C291
+> certification precedent). VROOM's most security-sensitive surface. ARCC-consulted first (SAX-01/SAX-08: encrypt at rest, key outside the
+> data store). Firsthand: encryption.ts AES-256-GCM + random IV + auth tag + env key (not in DB); routes.ts encrypt-on-write +
+> whitelist-response (credentials structurally can't leak); S3 clean config/secret split; registry decrypt-on-read contained per-provider
+> (Promise.allSettled); fake provider double-gated; no log leakage. Coverage already comprehensive (encryption.test.ts tamper/wrong-key/
+> round-trip + providers-routes-http.test.ts credentials-never-echoed incl. the C260 re-encrypt-at-rest column check). No code change
+> warranted.*
+
 1. **Eyes-on sweep: vehicle Overview tab + ExpensesTable populated states** (mobile +
    desktop) — code-reviewed C3 (findings below); still wants a real eyes-on screenshot pass.
 2. **Analytics route eyes-on** (per-vehicle + cross-vehicle + year-end), states + a11y. *(C185: the BACKEND HTTP layer is now

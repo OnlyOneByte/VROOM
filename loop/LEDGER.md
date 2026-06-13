@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 300 |
+| deep-review | 5 | 306 |
 | guard | 6 | 302 |
 | bug | 3 | 305 |
 | arch | 5 | 304 |
 | infra | 6 | 303 |
 
-Current cycle: **305**
+Current cycle: **306**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5014,3 +5014,19 @@ Current cycle: **305**
   STILL surfaces flagged isActive:false (same reused row id) — so the FE isActive gate stays the documented source of truth + any future
   join-filter change is a conscious, test-visible decision. green→green: backend validate:local EXIT 0 — 1422 pass (+1) / 1 skip / 0 fail,
   tsc 0, musl-biome clean (test reflow auto-fixed), build bundled. cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C306 (deep-review): provider/storage CREDENTIAL layer CERTIFIED CLEAN — VROOM's most security-sensitive surface (ARCC-grounded)** —
+  BALANCE: deep-review over budget (last 300, starved-for 6 > 5, most-starved actionable; feature gated) → forced. Per ARCC governance
+  (credentials domain), consulted search_arcc FIRST (SAX-01 Outcome 2 + SAX-08 Outcome 1: encrypt content at rest, key managed outside the
+  data store, unreadable without the key) before reading code. AUDITED FIRSTHAND + CERTIFIED CLEAN: (1) utils/encryption.ts — AES-256-GCM,
+  random 96-bit IV per call, 128-bit auth tag (authenticated → tamper-detecting), 256-bit key from PROVIDER_ENCRYPTION_KEY env (NOT in the DB
+  — ARCC key-mgmt aligned), correct [IV|tag|ciphertext] layout; (2) providers/routes.ts — encrypt-on-write (create + update), the
+  formatProviderResponse is a WHITELIST of 8 non-secret fields (credentials structurally CANNOT leak — robust vs a blacklist); (3)
+  s3-compat-provider — clean split: secretAccessKey/accessKeyId = the encrypted credentials blob, endpoint/bucket/region = non-secret config
+  (the verbatim-returned config carries no secret); (4) registry.createProviderInstance decrypt-on-read throws on corrupt/wrong-key →
+  contained per-provider by the C291 orchestrator's Promise.allSettled; fake provider double-gated (non-prod + opt-in); (5) NO credential
+  leakage in any logger.* call. COVERAGE already comprehensive: encryption.test.ts (round-trip incl. empty/unicode/long, random-IV
+  uniqueness, wrong-key/tamper/truncated/invalid-base64 throws, missing/wrong-length key) + providers-routes-http.test.ts
+  (credentials-never-echoed across create/list/update, the C260 re-encrypt-at-rest branch verifying plaintext is NOT in the stored column,
+  domain-guard, ownership-scope). NO defect, NO code change warranted — adding a test would be coverage-theater against an already-pinned
+  invariant (the C291 certification precedent). DOCS-ONLY (LEDGER + BACKLOG); no source/test/build touched (C305 gate is the last code state).
+  cov: be 86.07% (carry) / fe 81.76% (carry).
