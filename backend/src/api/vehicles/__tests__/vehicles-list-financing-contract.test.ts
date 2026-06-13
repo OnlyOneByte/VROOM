@@ -40,6 +40,7 @@ interface FinancingShape {
   financingType: string;
   provider: string;
   originalAmount: number;
+  isActive?: boolean;
   computedBalance?: number;
   eligibleForPayoff?: boolean;
 }
@@ -129,5 +130,32 @@ describe('GET /vehicles list — enriched financing contract (FE↔BE drift guar
     const v = (await listVehicles()).find((x) => x.id === id);
     expect(v).toBeDefined();
     expect(v?.financing).toBeUndefined();
+  });
+
+  test('a PAID-OFF (inactive) financing row STILL surfaces on the list, flagged isActive:false (C305 contract pin)', async () => {
+    // findByUserId leftJoins vehicleFinancing with NO isActive filter, so a paid-off loan (isActive=false,
+    // its row REUSED by the create-or-replace path per #67/C293, never deleted) still rides along on the
+    // list — carrying isActive:false. This is BENIGN today: every FE financing consumer (FinanceTab,
+    // VehicleForm, lease/payment math) gates on `financing?.isActive`, so a paid-off row is correctly
+    // ignored. This pins that contract so the gate stays the source of truth — if a future BE change
+    // started filtering inactive financing out of the join (or a consumer read vehicle.financing WITHOUT
+    // the isActive gate), that's now a conscious, test-visible decision, not a silent drift. Asserts both:
+    // (1) the row is still present, and (2) it's unambiguously marked isActive:false.
+    const id = await seedVehicle('PaidOff');
+    await seedLoan(id);
+
+    // Pay it off via the financing payoff route → isActive=false on the SAME reused row.
+    const beforeFin = (await listVehicles()).find((x) => x.id === id)?.financing;
+    if (!beforeFin) throw new Error('expected financing on the seeded vehicle');
+    const payoff = await ctx.authed('PUT', `/api/v1/financing/${beforeFin.id}/payoff`);
+    expect(payoff.status, 'payoff should succeed').toBeLessThan(300);
+
+    const after = (await listVehicles()).find((x) => x.id === id)?.financing;
+    expect(
+      after,
+      'a paid-off financing row STILL rides along on the list (no isActive filter on the join)'
+    ).toBeDefined();
+    expect(after?.isActive).toBe(false);
+    expect(after?.id).toBe(beforeFin.id); // the same reused row, now inactive
   });
 });

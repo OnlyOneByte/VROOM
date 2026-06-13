@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 300 |
 | guard | 6 | 302 |
-| bug | 3 | 301 |
+| bug | 3 | 305 |
 | arch | 5 | 304 |
 | infra | 6 | 303 |
 
-Current cycle: **304**
+Current cycle: **305**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5000,3 +5000,17 @@ Current cycle: **304**
   (terms-http/repository.property/policy-delete-cascade/etc.) pass UNCHANGED. green→green: backend validate:local EXIT 0 — 1421 pass
   (unchanged — pure refactor) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07% (carry) / fe
   81.76% (carry).
+- **C305 (bug → dormant-vein clean scout + contract-pin guard): seven mature surfaces certified clean; pinned the paid-off-financing
+  list contract** — BALANCE: bug over budget (last 301, starved-for 4 > 3, most-starved actionable; deep-review also due at 5 but bug is
+  over) → forced pick. Bug vein DORMANT → fresh-surface scout. CERTIFIED CLEAN (firsthand): vehicles repo (findByUserId/findByIdWithAccess/
+  findByLicensePlate — tenant-scoped, #48/#52-hardened), photos service+repo (deletePhoto refs-then-row ordering safe-by-design;
+  setCoverPhoto validate-before-unset in a tx, C151/C63/C72 baked in; cover reassignment deterministic via sortOrder/createdAt), expenses
+  filtering (LIKE-escaping correct #41, json_each tag match, endDate-inclusive), auth/OAuth-state (size-capped + expiry-swept + PKCE +
+  IP-keyed limiter) + session (dead-cookie clear), Sheets-header coverage (already bidirectionally guarded by sheets-header-coverage.test.ts).
+  THE ONE OBSERVED unguarded edge: vehicleRepository.findByUserId leftJoins vehicleFinancing with NO isActive filter, so a PAID-OFF
+  (isActive=false) financing row — its row reused-not-deleted per #67/C293 — still rides along on the GET /vehicles list. BENIGN today (every
+  FE consumer gates on financing?.isActive), but UNPINNED: a future BE consumer reading vehicle.financing without the gate would resurface a
+  paid-off loan. SHIPPABLE increment (bug-cycle floor): +1 contract-pin in vehicles-list-financing-contract.test.ts asserting a paid-off row
+  STILL surfaces flagged isActive:false (same reused row id) — so the FE isActive gate stays the documented source of truth + any future
+  join-filter change is a conscious, test-visible decision. green→green: backend validate:local EXIT 0 — 1422 pass (+1) / 1 skip / 0 fail,
+  tsc 0, musl-biome clean (test reflow auto-fixed), build bundled. cov: be 86.07% (carry) / fe 81.76% (carry).

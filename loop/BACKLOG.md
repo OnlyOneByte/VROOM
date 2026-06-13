@@ -345,6 +345,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C305 — pin the paid-off-financing GET /vehicles list contract (bug-cycle dormant-vein scout outcome).**~~ — *DONE C305: a forced bug
+> cycle scouted SEVEN mature surfaces clean (vehicles repo, photos service/repo, expenses filtering, auth/OAuth-state + session, Sheets-header
+> coverage). The one unguarded edge: vehicleRepository.findByUserId leftJoins vehicleFinancing with NO isActive filter → a paid-off
+> (isActive=false) row still rides the list. Benign today (every FE consumer gates on financing?.isActive) but unpinned. Added a contract-pin
+> to vehicles-list-financing-contract.test.ts: a paid-off row STILL surfaces flagged isActive:false (same reused row id), so the FE gate stays
+> the documented source of truth + any future join-filter change is test-visible. validate:local EXIT 0, 1422 pass (+1).*
+
 > ~~**C302 — drift-proof the #93 restore conflict-probe symmetry.**~~ — *DONE C302: the C300 #93 fix added userPreferences + syncState
 > to detectConflicts ad-hoc (the always-present singleton collisions), but insertBackupData inserts 15 tables while detectConflicts probes
 > only 8 — a future PARENT-LESS table added to inserts without a probe would silently reintroduce the #93 raw-PK-throw on a colliding
