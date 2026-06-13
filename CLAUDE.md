@@ -183,7 +183,7 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1424 backend tests / ~613 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1431 backend tests / ~613 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
@@ -229,8 +229,9 @@ Highlights:
   lease-overage projection compared an ABSOLUTE odometer against a DRIVEN-miles budget → phantom excess fee by exactly initialMileage on any used-car lease (sibling to #64; +a translation-invariance property guarding the coordinate-space class C296) [#91, C295],
   extra-payment planner treated every 0%-APR loan as inert → "0 mos saved" for an interest-free loan an extra payment clearly shortens (bail early only for non-loans; 0%-APR loans run the amortization loop with rate 0) [#92, C297],
   merge-mode restore threw a raw UNIQUE-PK error on the always-present userPreferences/syncState collision instead of a clean conflict — detectConflicts probed 6 of the 15 inserted tables; added prefs/syncState probes + a drift-guard for the symmetry (C302) [#93, C300],
-  settings store cleared a stale `error` on only 2 of 9 async ops → a succeeded retry kept showing a phantom error (masked today by the `&& !settings` UI gate); `error = null` on entry to all seven [#95, C308])
-  all landed C155–C308. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
+  settings store cleared a stale `error` on only 2 of 9 async ops → a succeeded retry kept showing a phantom error (masked today by the `&& !settings` UI gate); `error = null` on entry to all seven [#95, C308],
+  idempotency middleware did `await c.res.clone().json()` UNCONDITIONALLY before caching → a 2xx NON-JSON body (CSV/binary/204) made .json() throw + escape → a SUCCESSFUL response became a 500; gate 2xx first + try/catch the parse, leaving a non-JSON 2xx uncached [#96, C315])
+  all landed C155–C315. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
   a green test that RE-IMPLEMENTS or RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module
   (C229: the two photo "property" tests only drove a reference model, never the real setCoverPhoto, which was also
   getDb-singleton-bound and thus untestable via a constructed repo until switched to this.db.transaction).

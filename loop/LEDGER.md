@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 313 |
 | bug | 3 | 315 |
 | arch | 5 | 314 |
-| infra | 6 | 309 |
+| infra | 6 | 316 |
 
-Current cycle: **315**
+Current cycle: **316**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5145,3 +5145,10 @@ Current cycle: **315**
   200 not 500, not cached → dup re-runs); NON-VACUOUS (pre-fix the unconditional json() throws → 500). green→green: backend validate:local
   EXIT 0 — 1431 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07%+ (carry) / fe
   81.76% (carry).
+- **C316 (infra): CLAUDE.md docs-accuracy refresh — record #96 closed + suite ~1424→~1431 BE** — BALANCE: infra OVER budget (last 309,
+  starved-for 7 > 6, most-starved actionable; deep-review at 5 but infra waited longer + over) → forced. The C253/.../C309 docs-accuracy
+  cadence: the closed-bug list ended at #95/C308 (missing #96 C315), and the suite drifted (BE ~1424→~1431 via C310's pagination dedup test
+  delta + C311 +1 / C312 +1 / C313 +4 / C315 +1). FIXED (CLAUDE.md only): (1) appended #96 (idempotency non-JSON-2xx → 500 defensive fix) to
+  the closed-bug list + bumped the arc range C155–C308 → C155–C315; (2) suite size ~1424→~1431 BE (FE unchanged ~613). DOCS-ONLY — verified
+  `git status` = CLAUDE.md alone (the ?? items are the by-design untracked e2e/tooling scaffold); no source/test/build touched (the C315 gate
+  is the last code state). Keeps the next cycle's closed-bug + suite-floor refs accurate. cov: be 86.07% (carry) / fe 81.76% (carry).
