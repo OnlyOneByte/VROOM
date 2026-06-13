@@ -564,6 +564,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#96 (LOW, robustness — found+fixed C315 on a forced bug-cycle middleware scout) — idempotency middleware would turn a non-JSON 2xx
+> response into a 500.**~~ — *DONE C315: after next(), idempotency.ts did `await c.res.clone().json()` UNCONDITIONALLY to cache the body —
+> a 2xx NON-JSON body (CSV/binary/204) makes .json() throw, escaping the middleware → errorHandler → 500 on a successful response. Latent
+> today (all 3 idempotency-mounted sync routes return c.json) but a footgun for any future non-JSON idempotent route. FIX: gate on 2xx FIRST,
+> then try/catch the parse — a non-JSON 2xx is left uncached (dup safely re-runs). GUARD: +1 test (2xx CSV → 200 not 500, not cached);
+> non-vacuous (pre-fix throws → 500). validate:local EXIT 0, 1431 pass (+1).*
+
 > ~~**#95 (LOW, UX-correctness — found+fixed C308 on a forced bug-cycle FE scout) — settings store cleared a stale `error` on only 2 of
 > 9 async ops → a succeeded retry kept showing a phantom error.**~~ — *DONE C308: load()/update() reset error on entry, but the other 7
 > async ops (downloadBackup/uploadBackup/executeSync/listBackupsFromProvider/listAllBackups/restoreFromProvider/loadRestoreProviders) did

@@ -37,7 +37,9 @@ interface ErrorBody {
  * `getCount()` reveals how many times the handler body executed; a cache replay leaves it unchanged.
  * `failStatus`, when set, makes the handler return that status (to exercise the only-cache-2xx branch).
  */
-function makeApp(opts: { required?: boolean; userId?: string; failStatus?: number } = {}) {
+function makeApp(
+  opts: { required?: boolean; userId?: string; failStatus?: number; nonJsonBody?: boolean } = {}
+) {
   const app = new Hono();
   app.onError(errorHandler);
   let count = 0;
@@ -58,6 +60,10 @@ function makeApp(opts: { required?: boolean; userId?: string; failStatus?: numbe
         { success: false, error: { code: 'BOOM', message: 'fail' } },
         opts.failStatus as never
       );
+    }
+    if (opts.nonJsonBody) {
+      // A 2xx NON-JSON body (e.g. a CSV export) — response.json() would throw on this.
+      return c.body('id,amount\nx,1', 200, { 'content-type': 'text/csv' });
     }
     return c.json({ count });
   };
@@ -139,6 +145,27 @@ describe('idempotency middleware — caching contract', () => {
     // Second request must re-run (the 500 was not cached), giving the operation another chance.
     const second = await app.request('/op', { method: 'POST', headers });
     expect(second.status).toBe(500);
+    expect(getCount()).toBe(2);
+  });
+
+  test('a non-JSON 2xx body does NOT 500 and is NOT cached — the dup safely re-runs (C315)', async () => {
+    // The middleware clones + JSON-parses the body to cache it. A 2xx NON-JSON response (CSV/binary/
+    // 204) would make response.json() THROW, turning a SUCCESSFUL response into a 500 — and a cached
+    // non-JSON body couldn't round-trip through the replay c.json() anyway. The guard parses
+    // defensively: a non-JSON 2xx is left UNCACHED (so the dup just re-runs — safe degradation), and
+    // the original response passes through untouched. No idempotency route returns non-JSON today;
+    // this pins the contract so adding one can't regress into a 500.
+    const { app, getCount } = makeApp({ nonJsonBody: true });
+    const headers = { 'Idempotency-Key': 'k-nonjson' };
+
+    const first = await app.request('/op', { method: 'POST', headers });
+    expect(first.status, 'a non-JSON 2xx must NOT be turned into a 500').toBe(200);
+    expect(await first.text()).toContain('id,amount');
+    expect(getCount()).toBe(1);
+
+    // Not cached (couldn't be JSON-parsed) → the duplicate re-runs the handler rather than replaying.
+    const second = await app.request('/op', { method: 'POST', headers });
+    expect(second.status).toBe(200);
     expect(getCount()).toBe(2);
   });
 

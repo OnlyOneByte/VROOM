@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 311 |
 | guard | 6 | 313 |
-| bug | 3 | 312 |
+| bug | 3 | 315 |
 | arch | 5 | 314 |
 | infra | 6 | 309 |
 
-Current cycle: **314**
+Current cycle: **315**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5132,3 +5132,16 @@ Current cycle: **314**
   header / error message+code+status+array-details) + the expense/analytics/reminder service suites (75 tests) pass UNCHANGED. green→green:
   frontend validate:local EXIT 0 — type-check 0, build, 613 pass (unchanged — pure refactor). Pure service util, no UI. cov: be 86.07%
   (carry) / fe 81.76% (carry).
+- **C315 (bug): idempotency middleware would 500 on a non-JSON 2xx body — defensive parse + guard (#96)** — BALANCE: bug at budget (last
+  312, starved-for 3 = budget, tightest; infra also at 6 but its docs/sweep/cov are all fresh → manufactured, so took bug). Bug vein dormant
+  → scouted the full MIDDLEWARE layer (activity/change-tracker, idempotency, body-limit, rate-limit). CERTIFIED CLEAN: change-tracker
+  (2xx-only mark, fire-and-forget contained), rate-limiter (window-reset, limit-before-increment, full 429 headers), body-limit
+  (Content-Length 413 — the chunked-no-CL bypass is a documented header-limiter limitation, not a clean fix). THE FINDING (idempotency.ts):
+  after next(), it did `await c.res.clone().json()` UNCONDITIONALLY before caching — a 2xx NON-JSON body (CSV export / binary / 204) would
+  make .json() THROW, and the throw escapes the middleware → errorHandler → turns a SUCCESSFUL response into a 500. LATENT today (all 3
+  idempotency-mounted sync routes return c.json), but a footgun: adding a non-JSON idempotent route would regress into a 500. FIX: gate on
+  status 2xx FIRST (moved the check before the parse), then try/catch the json() — a non-JSON 2xx is left UNCACHED (the dup safely re-runs;
+  a non-JSON body couldn't round-trip the replay c.json anyway). Behavior-preserving on all-JSON paths. GUARD: +1 test (a 2xx CSV body →
+  200 not 500, not cached → dup re-runs); NON-VACUOUS (pre-fix the unconditional json() throws → 500). green→green: backend validate:local
+  EXIT 0 — 1431 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07%+ (carry) / fe
+  81.76% (carry).
