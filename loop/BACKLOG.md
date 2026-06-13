@@ -660,6 +660,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#103 (LOW-MED, reliability / NORTH_STAR #1-adjacent — found+fixed C349 on a provider-credential-CRUD deep-review) — an S3 provider created with an
+> incomplete config persisted a broken 201 row that threw on EVERY use.**~~ — *DONE C349: createProviderSchema's `config: z.record(...)` is shape-open, so an
+> S3 create missing endpoint/bucket/region (or no config) persisted + auto-populated storageConfig, then every test/sync threw at buildS3Provider:62 — a
+> fail-late footgun. FIX: fail-fast in resolveProviderCredentials (reject the incomplete S3 config before encrypt/persist, mirroring the google-drive nonce
+> gate + the use-time check; google-photos needs only credentials.refreshToken). +2 HTTP guards (incomplete→400+nothing-persisted, no-config→400) + fixed 2
+> existing S3-create test helpers to send valid config. NON-VACUOUS. validate:local EXIT 0, 1446 pass (+2). The paired claims-fan-out finding
+> (claim vehicleId not in its termId's coverage junction) is PRODUCT-SEMANTICS-GATED — #84/C247 validated the security props, coverage-consistency is loose
+> by design (real insurance is messy) — NOT self-fixed.*
+
 > ~~**C345 — expense read-path (filter/search/pagination) + odometer + sync-worker CERTIFIED CLEAN (bug-cycle dormant-vein scout, no defect).**~~ — *DONE
 > C345: bug OVER budget (4>3) → forced. 2-agent fan-out. (A) expense LIST/FILTER/SEARCH/PAGINATION — CERTIFIED CLEAN (cross-tenant scoped, LIKE-escaped #41,
 > pagination/hasMore/stable-tiebreak correct, sortBy enum-allowlisted; redundant-clamp + empty-CSV-tag both by-design-safe). (B) both agent "REAL DEFECTs"

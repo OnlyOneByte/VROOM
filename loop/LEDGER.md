@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 344 |
 | guard | 6 | 347 |
-| bug | 3 | 345 |
+| bug | 3 | 349 |
 | arch | 5 | 348 |
 | infra | 6 | 346 |
 
-Current cycle: **348**
+Current cycle: **349**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5574,3 +5574,16 @@ Current cycle: **348**
   copy dropping the userId predicate would be a CROSS-TENANT read, so one source of truth keeps the ownership scope in lockstep. −~18 LOC. Test-anchored
   (rule 3): registry.test.ts (23 tests) drives all 3 methods — GREEN before AND after. green→green: backend validate:local EXIT 0 — 1444 pass (unchanged) /
   1 skip / 0 fail, tsc 0, musl-biome clean (one format reflow auto-fixed), build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C349 (bug → #103: S3 provider create accepts an incomplete config → a broken row that throws on EVERY use)** — BALANCE: bug OVER budget (last 345,
+  starved-for 349−345=4 > budget 3, tightest) → FORCED. Vein dormant → 2-agent fan-out on surfaces not audited this session: (A) insurance CLAIMS sub-path,
+  (B) provider credential CRUD. RESULTS: (A) the claims "term doesn't cover the vehicle" finding is PRODUCT-SEMANTICS-GATED, not a clean defect (#84/C247
+  deliberately validated the SECURITY props — ownership + policy-membership — while leaving coverage-consistency loose, same family as the by-design
+  claimDate-before-start + payout>coverage; real insurance is messy) → not self-fixed. (B) the credential layer is leak-clean/tenant-clean/nonce-clean
+  (C306/C260/C257 hold), but surfaced a CLEAN ATOMIC fail-late defect → #103: createProviderSchema's `config: z.record(...)` is shape-open, so an S3 create
+  with NO endpoint/bucket/region (or no config at all) persists a 201 row + auto-populates storageConfig, then EVERY later use (test/sync) throws at
+  buildS3Provider:62 — a broken-row footgun (NORTH_STAR #1-adjacent reliability). VERIFIED firsthand (C21/C60). FIX: fail-fast at CREATE in
+  resolveProviderCredentials — reject an S3 config missing endpoint/bucket/region BEFORE encrypt/persist, mirroring the google-drive nonce gate in the same
+  function + the buildS3Provider use-time check (google-photos needs only credentials.refreshToken → no required-config gate). GUARD: +2 HTTP tests
+  (incomplete config → 400 + nothing persisted; no-config → 400) + updated 2 existing S3-create helpers (providers-routes-http + delete-provider-config-cleanup)
+  to send a valid endpoint/bucket/region config (they'd relied on the no-validation behavior). NON-VACUOUS. green→green: backend validate:local EXIT 0 —
+  1446 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean (one reflow auto-fixed), build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).

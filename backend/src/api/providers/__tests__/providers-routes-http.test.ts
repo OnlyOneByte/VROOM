@@ -66,8 +66,10 @@ async function createProvider(
     domain: over.domain ?? 'storage',
     providerType: 's3',
     displayName: over.displayName ?? 'Test S3 Storage',
-    credentials: { secretAccessKey: 'super-secret-value', bucket: 'b', region: 'us-east-1' },
-    config: { some: 'setting' },
+    credentials: { accessKeyId: 'AKIA-test', secretAccessKey: 'super-secret-value' },
+    // S3 config must carry endpoint/bucket/region (C349: create-time validation rejects an
+    // incomplete S3 config rather than persisting a row that throws on first use).
+    config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
   });
   expect(res.status).toBe(201);
   return (await json<DataEnvelope<ProviderResponse>>(res)).data;
@@ -82,7 +84,38 @@ describe('POST /api/v1/providers — create', () => {
     expect(data.domain).toBe('storage');
     expect(data.displayName).toBe('Test S3 Storage');
     expect(data.status).toBe('active');
-    expect(data.config).toEqual({ some: 'setting' });
+    expect(data.config).toEqual({
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      region: 'us-east-1',
+    });
+  });
+
+  test('C349: rejects an S3 create whose config is missing endpoint/bucket/region (400, not a broken 201)', async () => {
+    // The Zod schema's `config: z.record(...)` is shape-open, so without the create-time guard an S3
+    // row with no usable config would persist + auto-populate storageConfig, then throw on EVERY use
+    // (test/sync) — a fail-late footgun. Fail-fast at create instead (mirrors buildS3Provider:62).
+    const res = await ctx.authed('POST', '/api/v1/providers', {
+      domain: 'storage',
+      providerType: 's3',
+      displayName: 'Incomplete S3',
+      credentials: { accessKeyId: 'k', secretAccessKey: 's' },
+      config: { bucket: 'b' }, // missing endpoint + region
+    });
+    expect(res.status).toBe(400);
+    // And nothing was persisted: the list stays empty.
+    const list = await ctx.authed('GET', '/api/v1/providers');
+    expect((await json<DataEnvelope<ProviderResponse[]>>(list)).data).toHaveLength(0);
+  });
+
+  test('C349: rejects an S3 create with NO config at all (400)', async () => {
+    const res = await ctx.authed('POST', '/api/v1/providers', {
+      domain: 'storage',
+      providerType: 's3',
+      displayName: 'No-config S3',
+      credentials: { accessKeyId: 'k', secretAccessKey: 's' },
+    });
+    expect(res.status).toBe(400);
   });
 
   test('NEVER echoes credentials back in the response (security invariant)', async () => {

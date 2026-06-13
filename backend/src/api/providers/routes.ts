@@ -256,6 +256,18 @@ function resolveProviderCredentials(
       resolvedConfig: { ...(config ?? {}), accountEmail: pending.email },
     };
   }
+  // Fail-fast at CREATE time on a config that the provider can never instantiate with: an S3 row
+  // needs endpoint/bucket/region (buildS3Provider:62 enforces the same at use). Without this, the
+  // Zod schema's open `config: z.record(...)` lets a configless S3 row persist + auto-populate
+  // storageConfig, then EVERY later use (test/sync) throws — a broken-row footgun. Mirror the
+  // google-drive nonce gate above: reject before encrypting/persisting. (google-photos needs only
+  // credentials.refreshToken + an optional config.albumId, so it has no required-config gate here.)
+  if (providerType === 's3') {
+    const c = config ?? {};
+    if (!c.endpoint || !c.bucket || !c.region) {
+      throw new ValidationError('S3 config must include endpoint, bucket, and region');
+    }
+  }
   return {
     encryptedCredentials: encrypt(JSON.stringify(credentials)),
     resolvedConfig: config,

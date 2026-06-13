@@ -31,7 +31,9 @@ async function createS3Provider(displayName: string): Promise<string> {
     domain: 'storage',
     providerType: 's3',
     displayName,
-    credentials: { secretAccessKey: 'secret', bucket: 'b', region: 'us-east-1' },
+    credentials: { accessKeyId: 'k', secretAccessKey: 'secret' },
+    // S3 config must carry endpoint/bucket/region (C349 create-time validation).
+    config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
   });
   const body = await json<DataEnvelope<{ id: string }>>(res);
   expect(res.status, JSON.stringify(body)).toBe(201);
