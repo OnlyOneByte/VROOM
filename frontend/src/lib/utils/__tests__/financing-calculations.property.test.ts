@@ -370,6 +370,45 @@ describe('Property 10: Principal and Interest Derivation', () => {
 			{ numRuns: 100 }
 		);
 	});
+
+	// C361 deep-review (CERTIFIED CLEAN — pins the beyond-schedule fallback the property test
+	// above SKIPS via `if (entry && scheduleEntry)`). The amortization schedule is the CONTRACTUAL
+	// projection: it stops at termMonths, or earlier when the balance reaches 0 (paid off) or the
+	// C161 negative-amortization guard fires. derivePaymentEntries maps logged payments POSITIONALLY
+	// onto that schedule, so a payment logged BEYOND the schedule's length has no scheduleEntry and
+	// falls back to `principal = expense.amount, interest = 0`. This is CORRECT, not a bug: those
+	// payments land after the loan has no remaining balance to amortize, so there is genuinely no
+	// interest to attribute — and remainingBalance stays floored at 0 (never negative). A future
+	// refactor that "amortizes" these phantom payments (inventing interest on a zero balance) or
+	// drops the Math.max(0, …) floor would turn this RED.
+	test('a payment logged BEYOND the amortization schedule is all-principal, zero-interest, balance floored at 0', () => {
+		// A loan that pays off inside its term: 1,000 @ 12% APR, 6-month term, paying 200/mo.
+		// The schedule reaches a 0 balance well before payment 8, so payments 6-8 are off-schedule.
+		const financing = makeFinancing({
+			originalAmount: 1000,
+			apr: 12,
+			termMonths: 6,
+			paymentAmount: 200,
+			financingType: 'loan'
+		});
+		// 8 logged payments of 200 → 1,600 paid against a 1,000 loan (overpaid past payoff).
+		const expenses = Array.from({ length: 8 }, (_, i) => makeExpense(200, i + 1));
+
+		const entries = derivePaymentEntries(expenses, financing);
+		const schedule = calculateAmortizationSchedule(financing, expenses.length);
+
+		// The loan amortizes to 0 before all 8 payments → schedule is shorter than the payment count.
+		expect(schedule.length).toBeLessThan(entries.length);
+
+		// Every entry beyond the schedule: all-principal, zero-interest (no balance left to amortize).
+		const beyond = entries.slice(schedule.length);
+		expect(beyond.length).toBeGreaterThan(0); // the case actually triggers (non-vacuous)
+		for (const entry of beyond) {
+			expect(entry.interestAmount).toBe(0);
+			expect(entry.principalAmount).toBe(entry.expense.amount); // == 200
+			expect(entry.remainingBalance).toBe(0); // floored, never negative on overpayment
+		}
+	});
 });
 
 // ---------------------------------------------------------------------------

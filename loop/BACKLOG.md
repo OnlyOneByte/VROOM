@@ -154,6 +154,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Financing-amortization + depreciation/cost-per-period money audit (C361).**~~ — *DONE C361 (CERTIFIED CLEAN; +1 beyond-schedule guard). 2-agent
+> fan-out on under-audited money surfaces. (B) depreciation + cost/mile + cost/month + value-over-time: CLEAN — all div-guarded (Math.max(1, ownershipMonths)
+> + >0 checks), anchored by the expectAllFinite(tco) property test, #27/#28 year-vs-all-time honored. (A) the agent flagged derivePaymentEntries' beyond-
+> schedule fallback as a money bug — DEBUNKED FIRSTHAND (C21/C60): the amortization schedule is the CONTRACTUAL projection (stops at termMonths / payoff /
+> the C161 negative-am guard); a payment logged beyond it gets principal=expense.amount, interest=0, which is CORRECT (balance is already 0, no interest to
+> attribute; remainingBalance stays Math.max(0,…)-floored). Not a defect. THE unpinned invariant → guard: the Property-10 test SKIPS it via `if (entry &&
+> scheduleEntry)`. +1 deterministic guard (financing-calculations.property.test.ts): a 1000@12%/6mo loan overpaid 8×200 → every beyond-schedule entry
+> all-principal/zero-interest/balance-floored-0. NON-VACUOUS (asserts the case triggers). fe validate:local EXIT 0, 664 pass (+1).*
+
 > ~~**Google provider service wrappers + backup-orchestrator/restore audit (C356).**~~ — *DONE C356 (found+fixed bug #105). 2-agent fan-out, both
 > over-reported. (B) orchestrator/restore: the "per-provider status not recorded" findings are the FILED #43/#44 fail-open family; ZIP-omission/restore-
 > atomicity/coercion all GUARDED. (A) provider services: #36/#37 filed, listAlbums->50-pagination + Sheets-sparse-row are lower-priority hardening; the CLEAN

@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 356 |
+| deep-review | 5 | 361 |
 | guard | 6 | 359 |
 | bug | 3 | 358 |
 | arch | 5 | 360 |
 | infra | 6 | 357 |
 
-Current cycle: **360**
+Current cycle: **361**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5714,3 +5714,16 @@ Current cycle: **360**
   not by comment. Behavior-preserving (the SQL is identical). Test-anchored: delete-split-child + split-service.property drive every routed path — GREEN
   before AND after. Biome reflowed 2 now-short `.delete().where()` chains (check:musl:fix). validate:local EXIT 0, 1454 pass (unchanged). cov: be 86.25%
   (carry) / fe 84.17% (carry).
+- **C361 (deep-review): financing-amortization + depreciation/cost-per-period audit → CERTIFIED CLEAN; +1 beyond-schedule guard** — BALANCE: deep-review
+  AT budget (last 356, starved-for 361−356=5 = budget) + bug also at budget; picked deep-review (broader value, surfaces the next bug; feature over-budget
+  but T9 e2e-blocked / rest Angelo-gated, not loop-actionable). 2-agent fan-out on under-audited money surfaces: (A) financing amortization/payoff/min-payment,
+  (B) depreciation + cost-per-period rollups. (B) CLEAN — every cost/mile, cost/month, value-over-time path is div-guarded (Math.max(1, ownershipMonths) +
+  >0 checks) and anchored by the `expectAllFinite(tco)` property test; no NaN/Infinity escapes; #27/#28 year-vs-all-time honored. (A) the agent flagged
+  derivePaymentEntries' beyond-schedule fallback as a "money bug" — DEBUNKED FIRSTHAND (C21/C60): calculateAmortizationSchedule's 2nd arg only sets isPaid;
+  the schedule is the CONTRACTUAL projection (stops at termMonths, or earlier on payoff / the C161 negative-am guard). A payment logged BEYOND it gets
+  principal=expense.amount, interest=0 — CORRECT, because those payments land after the balance is already 0 (no interest to attribute) and remainingBalance
+  stays Math.max(0,…)-floored. No money lost/invented → NOT a defect, the "should amortize" is a preference with no balance to amortize. THE genuinely-unpinned
+  invariant → guard: the Property-10 test SKIPS this case via `if (entry && scheduleEntry)`. +1 deterministic guard (financing-calculations.property.test.ts):
+  a 1000@12%/6mo loan overpaid with 8×200 payments → schedule shorter than the payment count, every beyond entry all-principal/zero-interest/balance-floored-0.
+  NON-VACUOUS (asserts schedule.length<entries.length AND beyond.length>0, so the case actually triggers). green→green: fe validate:local EXIT 0, 664 pass
+  (+1). cov: be 86.25% (carry) / fe 84.17% (carry).
