@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 317 |
 | guard | 6 | 319 |
-| bug | 3 | 318 |
+| bug | 3 | 321 |
 | arch | 5 | 320 |
 | infra | 6 | 316 |
 
-Current cycle: **320**
+Current cycle: **321**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5202,3 +5202,16 @@ Current cycle: **320**
   test-anchored (rule 3): the analytics-routes-http + summary/cross-vehicle/fuel-stats property suites pass UNCHANGED (the 4 surfaces emit the
   identical units object). green→green: backend validate:local EXIT 0 — 1433 pass (unchanged — pure refactor) / 1 skip / 0 fail, tsc 0,
   musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C321 (bug → dormant-vein clean scout + round-trip-fidelity guard): import-csv parse/commit/round-trip CERTIFIED CLEAN; pinned the
+  missedFillup truthy round-trip** — BALANCE: bug at budget (last 318, starved-for 3 = budget, tightest; arch fresh at 1) → pick. Bug vein
+  dormant → audited the import-csv parse → validate → dedup → atomic-commit → round-trip surface firsthand. CERTIFIED CLEAN: the per-field
+  parsers (date-only local-build #23/#59, amount/mileage/volume bounds mirroring the create schema), the deterministic occurrence-keyed
+  clientId (two identical rows get distinct keys → both import; re-import → same keys → all dedup), importExpenses (single transaction →
+  atomic; per-row (clientId,userId) check-then-insert → idempotent; error → rollback), and the export↔import round-trip incl. the cycle-192
+  formula-injection denormalization symmetry. NO defect (the concurrent-double-import 500 is a narrow edge with a SAFE rollback failure mode,
+  not a clean fix). THE worthwhile guard: the missedFillup TRUTHY parse path was UNPINNED — the export writes 'true'/'false' (routes.ts:432),
+  import parses /^(true|1|yes)$/i, but the round-trip test only used missedFillup=false; a regression narrowing that regex would silently
+  import every missed-fillup row as false, corrupting MPG pairing (a missed fillup spans two tanks → must be excluded from efficiency,
+  NORTH_STAR #2). +1 guard (import-csv.test.ts): a 'true' row → stored missed_fillup=1, a 'false' row → 0, read straight off sqlite.
+  NON-VACUOUS (narrowing the regex → the 'true'→1 assertion RED). green→green: backend validate:local EXIT 0 — 1434 pass (+1) / 1 skip / 0
+  fail, tsc 0, musl-biome clean (test reflow auto-fixed), build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).

@@ -86,6 +86,32 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(rows.find((r) => r.category === 'maintenance')?.expenseAmount).toBe(120);
   });
 
+  test('missedFillup round-trips faithfully: the export `true`/`false` strings import to the stored boolean (C321)', async () => {
+    // The export writes missedFillup as the literal 'true'/'false' (routes.ts:432); import parses it with
+    // /^(true|1|yes)$/i. A regression narrowing that regex (e.g. to only '1') would silently import EVERY
+    // missed-fillup row as false — corrupting MPG pairing (a missed fillup means the next interval spans two
+    // tanks and must be EXCLUDED from efficiency). The export↔import round-trip test above only used
+    // missedFillup=false, so the truthy-parse path was unpinned. Pin both: 'true' → stored 1, 'false' → 0.
+    await seedVehicle('Daily Driver');
+    const csv = [
+      'date,vehicle,category,amount,currency,mileage,volume,fuelType,description,tags,missedFillup,createdAt',
+      '2024-06-01T00:00:00.000Z,Daily Driver,fuel,40,USD,30000,10,regular,Missed one,,true,',
+      '2024-06-05T00:00:00.000Z,Daily Driver,fuel,42,USD,30300,10,regular,Normal,,false,',
+    ].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(2);
+
+    // Read the stored missed_fillup flags straight off sqlite (the list endpoint omits the column).
+    const flags = ctx.sqlite
+      .query('SELECT description, missed_fillup AS m FROM expenses WHERE user_id = ? ORDER BY date')
+      .all(ctx.user.id) as Array<{ description: string; m: number }>;
+    expect(flags.find((f) => f.description === 'Missed one')?.m).toBe(1); // 'true' → stored true
+    expect(flags.find((f) => f.description === 'Normal')?.m).toBe(0); // 'false' → stored false
+  });
+
   test('imports a BOM-prefixed CSV (Excel/Sheets/Numbers re-save); first column still resolves', async () => {
     await seedVehicle('Daily Driver');
     // Excel / Google Sheets / Numbers prepend a UTF-8 BOM (﻿) when they re-save a

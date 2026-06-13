@@ -367,6 +367,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C321 — pin the missedFillup truthy round-trip on CSV import (bug-cycle dormant-vein scout outcome).**~~ — *DONE C321: a forced bug cycle
+> certified the import-csv parse/commit/round-trip surface clean (parsers, occurrence-keyed clientId dedup, atomic+idempotent importExpenses,
+> formula-injection round-trip symmetry). No defect. The unpinned invariant: the export writes missedFillup 'true'/'false', import parses
+> /^(true|1|yes)$/i, but the round-trip test only used false — a regression narrowing the regex would silently import missed fillups as false,
+> corrupting MPG pairing. +1 guard in import-csv.test.ts ('true'→stored 1, 'false'→0); non-vacuous. validate:local EXIT 0, 1434 pass (+1).*
+
 > ~~**C319 — pin the settings store's state-management contracts (~12%-covered settings.svelte.ts).**~~ — *DONE C319: stores/settings.svelte.ts
 > was ~12% covered (C308 pinned only error-clearing on 2 methods). +6 guards (settings-state-contract.test.ts, mocked fetch): update() replaces
 > state + returns it; update() re-throws on failure; a non-preview restoreFromProvider refreshes state via this.load() (2 fetches) while a
