@@ -474,3 +474,65 @@ describe('averageMpg is order-independent (#75)', () => {
     expect(stats.averageMpg).toBeCloseTo(31, 5);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Property 6: a MIXED plug-in-hybrid vehicle keeps MPG and mi/kWh ISOLATED
+// (C353 guard, deep-review→guard from the C352 EV fan-out). calculateVehicleStats partitions on
+// isElectricFuelType: gas rows feed averageMpg, charge rows feed averageMilesPerKwh. Property 4 pins
+// the VOLUME/COST partition; this pins the EFFICIENCY isolation — a gas fill-up must NEVER enter the
+// mi/kWh denominator and a charge must NEVER enter the MPG pairing (the #66 cross-contamination class).
+// Deterministic round numbers so a leak shifts a metric to a detectably-wrong value.
+// ---------------------------------------------------------------------------
+describe('Property 6: a mixed fuel+charge vehicle keeps MPG and mi/kWh isolated', () => {
+  // Gas: 10000→10300 mi on 10 gal each = 300/10 = 30 MPG. Electric: 20000→20060 mi on 15 kWh = 60/15 =
+  // 4 mi/kWh. INTERLEAVED by index (date) so only the fuelType partition — not array order — separates
+  // them. Mileage ranges are disjoint (10k vs 20k) so a cross-paired interval would be absurd, not 30/4.
+  const mixed: FuelExpense[] = [
+    makeFuelExpense({
+      index: 0,
+      mileage: 10000,
+      volume: 10,
+      missedFillup: false,
+      fuelType: '87 (Regular)',
+    }),
+    makeFuelExpense({
+      index: 1,
+      mileage: 20000,
+      volume: 15,
+      missedFillup: false,
+      fuelType: 'Level 2 (AC)',
+    }),
+    makeFuelExpense({
+      index: 2,
+      mileage: 10300,
+      volume: 10,
+      missedFillup: false,
+      fuelType: '87 (Regular)',
+    }),
+    makeFuelExpense({
+      index: 3,
+      mileage: 20060,
+      volume: 15,
+      missedFillup: false,
+      fuelType: 'Level 2 (AC)',
+    }),
+  ];
+
+  test('averageMpg reflects ONLY the gas-row interval (30 MPG), uncontaminated by charges', () => {
+    const stats = calculateVehicleStats(mixed, 0, true, true);
+    expect(stats.averageMpg).toBeCloseTo(30, 5);
+  });
+
+  test('averageMilesPerKwh reflects ONLY the charge-row interval (4 mi/kWh), uncontaminated by gas', () => {
+    const stats = calculateVehicleStats(mixed, 0, true, true);
+    expect(stats.averageMilesPerKwh).toBeCloseTo(4, 5);
+  });
+
+  test('the volume + cost totals stay partitioned (gas 20 gal / electric 30 kWh)', () => {
+    const stats = calculateVehicleStats(mixed, 0, true, true);
+    expect(stats.totalFuelConsumed).toBeCloseTo(20, 5); // 10 + 10 gal
+    expect(stats.totalChargeConsumed).toBeCloseTo(30, 5); // 15 + 15 kWh
+    expect(stats.fuelExpenseCount).toBe(2);
+    expect(stats.chargeExpenseCount).toBe(2);
+  });
+});

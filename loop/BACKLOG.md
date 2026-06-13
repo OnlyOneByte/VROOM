@@ -417,6 +417,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C353 — pin the mixed plug-in-hybrid MPG/mi-kWh isolation invariant (Property 6).**~~ — *DONE C353: the C352 EV fan-out flagged that a MIXED hybrid
+> (gas fill-ups + electric charges on one vehicle) leans entirely on calculateVehicleStats's isElectricFuelType partition to keep MPG/mi-kWh separate — and
+> the efficiency isolation was unpinned (Property 4 pins volume/cost partition, P5 the gating; neither asserts a gas row stays OUT of the mi/kWh denominator).
+> +3 deterministic guards (Property 6): a 4-row interleaved mixed vehicle → averageMpg=30 (gas only), averageMilesPerKwh=4 (charge only), totals partitioned.
+> NON-VACUOUS (a cross-paired gas+charge interval would be ~10000mi absurd, not 30/4). validate:local EXIT 0, 1454 pass (+3).*
+
 > ~~**C347 — class-level completeness pin for the offline-field-dropout family (#66/#101) on offlineExpenseToBackend.**~~ — *DONE C347: the FE
 > store/util veins are worked through (the 3 stores done C331/C336/C342; the rest — visibility-watch/use-google-oauth/is-mobile — are observer/OAuth/$effect-
 > bound integration territory, the C163 mock-trap) + BE security-pure modules (csv-safety, encryption) comprehensive. So pinned a CLASS invariant re-found

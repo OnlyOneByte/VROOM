@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 350 |
-| guard | 6 | 347 |
+| guard | 6 | 353 |
 | bug | 3 | 352 |
 | arch | 5 | 348 |
 | infra | 6 | 351 |
 
-Current cycle: **352**
+Current cycle: **353**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5623,3 +5623,13 @@ Current cycle: **352**
   refine TOO — a bonus dedup that put the rule in ONE place so a future schema can't miss it). GUARD: +4 HTTP tests (create-with-; → 400 + nothing
   persisted; create-with-, → 400; update-introducing-delimiter → 400 + stored tags survive; a normal tag still creates — control). NON-VACUOUS. green→green:
   backend validate:local EXIT 0 — 1451 pass (+4) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C353 (guard): pin the mixed plug-in-hybrid MPG/mi-kWh ISOLATION invariant (Property 6) — the C352 EV-fan-out follow-through** — BALANCE: guard AND arch
+  both at budget (guard 353−347=6=budget; arch 353−348=5=budget); guard MORE starved → pick. The C352 EV fan-out flagged that a MIXED plug-in-hybrid (a
+  vehicle logging BOTH gas fill-ups AND electric charges) leans entirely on calculateVehicleStats's isElectricFuelType partition to keep MPG and mi/kWh
+  separate — and that partition's EFFICIENCY isolation was UNPINNED (Property 4 pins the volume/cost partition; Property 5 the trackFuel/trackCharging
+  gating; neither asserts a gas row stays OUT of the mi/kWh denominator + a charge OUT of the MPG pairing — the #66 cross-contamination class). VERIFIED
+  firsthand the partition is correct (vehicle-stats.ts:70-76 → fuelGroup→averageMpg, chargeGroup→averageMilesPerKwh). +3 deterministic guards (Property 6,
+  vehicle-stats.property.test.ts): a 4-row INTERLEAVED mixed vehicle (gas 10000→10300mi/10gal=30 MPG; electric 20000→20060mi/15kWh=4 mi/kWh, disjoint
+  mileage ranges) → averageMpg=30 (only gas), averageMilesPerKwh=4 (only charge), totals partitioned (20gal/30kWh, counts 2/2). NON-VACUOUS: a leak that
+  cross-paired a gas+charge row would give a ~10000-mile absurd interval, NOT 30/4. green→green: backend validate:local EXIT 0 — 1454 pass (+3) / 1 skip /
+  0 fail, tsc 0, musl-biome clean (one reflow auto-fixed), build bundled. cov: be 86.25% (carry) / fe 84.17% (carry).
