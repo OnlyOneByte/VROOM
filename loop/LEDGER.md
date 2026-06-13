@@ -56,11 +56,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 366 |
 | guard | 6 | 369 |
-| bug | 3 | 367 |
+| bug | 3 | 371 |
 | arch | 5 | 370 |
 | infra | 6 | 368 |
 
-Current cycle: **370**
+Current cycle: **371**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5835,3 +5835,13 @@ Current cycle: **370**
   before AND after. Rejected: the BE analytics `new Date(range.start*1000)` ×3 (a 2-line mechanical pair, thinner payoff); the FE dead calculateDaysUntil delete
   (deferred — deleting a tested export is lower-value than collapsing a live triplicate onto the canonical, #87-critical helper). fe validate:local EXIT 0, 669
   pass (unchanged). cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C371 (bug → NO new defect; CERTIFIED CLEAN + pinned the unpinned multi-tag import round-trip)** — BALANCE: bug OVER budget (last 367, starved-for
+  371−367=4 > budget 3) → forced pick. Vein dormant → 2-agent fan-out: (A) cross-vehicle/fleet analytics, (B) CSV-import value parsing. BOTH agent "bugs"
+  DEBUNKED firsthand (C21/C60): (A) "buildMonthlyConsumption pools volume without per-vehicle unit conversion" IS the already-filed #94 class (the SUMMARY/
+  fuel-stats builders pool distance/volume/efficiency unconverted — escalated C328; getCrossVehicle's convertDistance-per-vehicle is the correct contrast). NOT
+  new. (B) "parseTags should REJECT a tag containing ;/," is BY-DESIGN-WRONG: the exporter JOINS tags with '; ' and import SPLITS on /[;,]/ — a delimiter in a
+  cell is ALWAYS a separator (and #104/C352 already bars a tag from CONTAINING ;/, at the write boundary), so the proposed "reject" would BREAK normal multi-tag
+  import. NOT a bug. THE genuinely-unpinned reachable invariant → pin (dormant-vein protocol, no manufacture): the round-trip test imported a `road; trip` cell
+  but only asserted AMOUNTS — the tags ARRAY parseTags produces was never verified (listExpenses doesn't even return tags). +1 HTTP guard (import-csv.test.ts):
+  `road; trip; toll` → ['road','trip','toll'] (semicolon split+trim); quoted `"errand,grocery"` → ['errand','grocery'] (comma split). Reads tags off sqlite.
+  NON-VACUOUS (a narrowed split merges two tags). green→green: be validate:local EXIT 0, 1461 pass (+1) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).

@@ -728,6 +728,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**C371 — bug cycle CERTIFIED CLEAN (no new defect); pinned the unpinned multi-tag CSV-import round-trip.**~~ — *DONE C371: bug forced (4>3). 2-agent
+> fan-out, BOTH "bugs" debunked firsthand (C21/C60): (A) buildMonthlyConsumption volume-pooling-without-conversion IS the already-filed #94 class (escalated
+> C328); (B) "parseTags should reject a tag containing ;/," is by-design-WRONG — the exporter joins tags with '; ' and import splits on /[;,]/, so a delimiter
+> is always a separator (and #104/C352 bars a tag from containing ;/, at the write boundary); the proposed reject would break normal multi-tag import. THE
+> unpinned reachable invariant → pinned (dormant-vein protocol, no manufacture): the round-trip test imported a `road; trip` cell but only asserted amounts, never
+> the tags ARRAY. +1 HTTP guard (import-csv.test.ts): semicolon + quoted-comma multi-tag cells → the correct trimmed arrays. NON-VACUOUS. be validate:local
+> EXIT 0, 1461 pass (+1).*
+
 > ~~**#108 (MED, correctness/units / NORTH_STAR #1 — found+fixed C367 on an analytics chart-assembly bug scout; the #56/#18/C97 split-sibling overcount
 > class) — buildSeasonalEfficiency inflated a season's fillupCount by N for a single split fuel fillup.**~~ — *DONE C367: buildSeasonalEfficiency
 > (analytics-charts.ts:641) did `entry.fillupCount++` UNCONDITIONALLY per row. queryFuelExpenses selects ALL category='fuel' rows with NO volume filter, and a

@@ -86,6 +86,38 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(rows.find((r) => r.category === 'maintenance')?.expenseAmount).toBe(120);
   });
 
+  test('a multi-tag cell splits on ; OR , into a real tags array (the export "; "-join → import round-trip, #104 by-design)', async () => {
+    // The round-trip test above imports a `road; trip` cell but only asserts amounts — the tags
+    // ARRAY it produces was never verified, leaving the multi-tag split (parseTags' `split(/[;,]/)`)
+    // unpinned. This is the intended export↔import contract: the exporter joins a tags array with
+    // "; " (routes.ts), and import splits on ; OR , back into the array. #104 (C352) guarantees no
+    // single tag can CONTAIN ; or , (rejected at the write boundary), so a delimiter in a cell is
+    // ALWAYS a separator, never literal data — splitting is correct, not data loss. Pin both
+    // delimiters + the trim, so a regression narrowing the split silently merges two tags into one.
+    await seedVehicle('Daily Driver');
+    const csv = [
+      'date,vehicle,category,amount,currency,mileage,volume,fuelType,description,tags,missedFillup,createdAt',
+      '2024-06-01T00:00:00.000Z,Daily Driver,misc,12,USD,,,,Semis,road; trip; toll,false,',
+      '2024-06-02T00:00:00.000Z,Daily Driver,misc,13,USD,,,,Commas,"errand,grocery",false,',
+    ].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(2);
+
+    // Read the stored tags (JSON column) straight off sqlite — the list endpoint shape above omits it.
+    const rows = ctx.sqlite
+      .query('SELECT description, tags FROM expenses WHERE user_id = ? ORDER BY date')
+      .all(ctx.user.id) as Array<{ description: string; tags: string }>;
+    const tagsOf = (desc: string) =>
+      JSON.parse(rows.find((r) => r.description === desc)?.tags ?? '[]');
+    // "road; trip; toll" → three trimmed tags (semicolon split + trim).
+    expect(tagsOf('Semis')).toEqual(['road', 'trip', 'toll']);
+    // "errand,grocery" (QUOTED so the CSV parser keeps it as one cell) → two tags (comma split + trim).
+    expect(tagsOf('Commas')).toEqual(['errand', 'grocery']);
+  });
+
   test('missedFillup round-trips faithfully: the export `true`/`false` strings import to the stored boolean (C321)', async () => {
     // The export writes missedFillup as the literal 'true'/'false' (routes.ts:432); import parses it with
     // /^(true|1|yes)$/i. A regression narrowing that regex (e.g. to only '1') would silently import EVERY
