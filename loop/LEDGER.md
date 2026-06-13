@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 333 |
 | guard | 6 | 336 |
-| bug | 3 | 334 |
+| bug | 3 | 338 |
 | arch | 5 | 337 |
 | infra | 6 | 335 |
 
-Current cycle: **337**
+Current cycle: **338**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5438,3 +5438,19 @@ Current cycle: **337**
   Test-anchored both ways (rule 3): reminder-api.test.ts pins the load-bearing edges (`isActive=false MUST survive`, empty/no-filter → '', vehicleId+type
   appended) — all GREEN before AND after. −9 LOC net. green→green: frontend validate:local EXIT 0 — 646 pass (unchanged) / 0 fail, tsc 0, build OK.
   cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C338 (bug → vehicle write-path CERTIFIED CLEAN; settings lost-update race FILED+ESCALATED #100, architecture-gated)** — BALANCE: bug OVER budget
+  (last 334, starved-for 338−334=4 > budget 3, tightest) → FORCED. Vein dormant → 2-agent fan-out on surfaces not recently audited: (A) vehicle write-path
+  (routes/repo/photo-routes), (B) settings + sync-state. RESULTS: (A) NO defect — clear-field null-vs-undefined correct (.nullish()), cross-tenant scoped,
+  plate-uniqueness per-tenant (#80 follow-through), cover-photo entityId-gated; the one agent flag (photo ops check entityId not photo.userId) is a
+  defense-in-depth gap MASKED by the entityId/entityType check (guarded, not exploitable — cuid2 ids), and unitPreferences-retroactivity is the filed #85
+  class. (B) found a REAL but ARCHITECTURE-GATED defect → #100: userPreferences writes are an un-serialized read-modify-write — PUT /settings
+  (routes.ts:255-292) does getOrCreate → JS-spread merge (mergeUnit/Storage/BackupConfig) → update with NO transaction/lock/version, and the SAME pattern
+  repeats at 5+ sites (provider create :340/:524, cleanupStorageConfig:419, cleanupBackupConfig:448). VERIFIED firsthand (C21/C60) it's genuinely
+  un-serialized → a lost-update race clobbers a sibling config under concurrent edits (a provider-DELETE racing a settings PUT; two settings PUTs naming
+  different providers). The #82/C237 per-provider merge fixed the within-request wholesale-wipe but can't help across two interleaved requests. Severity
+  tempered by deployment (self-host single-user/household PWA → narrow same-user concurrent window) but a genuine NORTH_STAR #1 silent-loss class. NOT a
+  clean one-cycle fix (optimistic-version+migration / transactional-merge vs the C151 async-tx footgun [the merge awaits validate*Config DB reads] /
+  per-user serial queue — all bigger-than-atomic + cross-cutting) → FILED #100 + ESCALATED to Angelo (send_message) + recorded in BACKLOG/CLAUDE.md. NO
+  characterization test — a timing-dependent concurrency test would be FLAKY (worse than none); the #82 backup-config-merge test already pins the
+  sequential within-request merge. Docs-only cycle (file+escalate+cert, the C306/C327 escalation-gated precedent); no source/test/build touched → no build
+  gate (the C337 gate is the last code state). cov: be 86.53% (carry) / fe 84.39% (carry).

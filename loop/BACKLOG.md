@@ -626,6 +626,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**C338 — vehicle write-path CERTIFIED CLEAN; settings lost-update race FILED+ESCALATED (#100, architecture-gated).**~~ — *DONE C338: bug OVER
+> budget (4>3) → forced. 2-agent fan-out (vehicle write-path + settings/sync-state). (A) vehicle routes/repo/photo-routes — NO defect: clear-field
+> null-vs-undefined correct (.nullish()), cross-tenant scoped, plate-uniqueness per-tenant (#80 follow-through correct), cover-photo entityId-gated;
+> the one flag (photo ops check entityId not userId) is a defense-in-depth gap MASKED by the entityId check (guarded), and unitPreferences-retroactivity
+> is the filed #85 class. (B) settings — found a REAL but ARCHITECTURE-GATED defect: userPreferences writes are un-serialized read-modify-write (PUT
+> /settings + 5 sites) → lost-update race under concurrent edits (#100). VERIFIED firsthand. NOT a clean one-cycle fix (needs optimistic-version+migration
+> / transactional-merge vs the C151 async-tx footgun / serial queue) → FILED + ESCALATED, no manufactured test (a timing test would be flaky; #82 pins the
+> sequential merge). Docs-only cycle (file+escalate+cert), no source touched — the C337 gate is the last code state.*
+
 > ~~**C334 — insurance write path + unit-conversion/import-mapping CERTIFIED CLEAN (bug-cycle dormant-vein scout, no defect; +2 guard).**~~ — *DONE
 > C334: bug OVER budget (4 > 3) → forced. 2-agent fan-out on un-recently-audited surfaces. (A) insurance routes/repo/validation/hooks/claims — every
 > agent "finding" a FALSE ALARM (term-update replaces the WHOLE split group; empty-coverage Zod-rejected; cross-policy termId guarded C247; premium
@@ -889,6 +898,21 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   is_active=1, trigger skips no_vehicles). DECISION (send_message'd Angelo): on vehicle-delete, for any reminder left with zero vehicles —
   (a) deactivate it (+ notify), (b) delete it outright (can never fire), (c) surface it in a "needs attention / no vehicle" UI bucket, or
   (d) block deleting a vehicle that's the sole target of an active reminder. Not loop-decidable — awaiting Angelo.
+- **#100 (MED→arch-gated, data-safety / NORTH_STAR #1 — found C338 bug scout; ESCALATED to Angelo C338, architecture-gated) — userPreferences
+  writes are un-serialized read-modify-write → a lost-update race can silently drop a sibling config under concurrent edits.** `PUT /settings`
+  (settings/routes.ts:255-292) does getOrCreate → JS-spread merge (mergeUnitPreferences / mergeStorageConfig / mergeBackupConfig) → update, with NO
+  transaction / lock / optimistic version. The same read-merge-write on userPreferences repeats at 5+ sites (provider create routes.ts:340/:524,
+  cleanupStorageConfig:419, cleanupBackupConfig:448). So two near-simultaneous writes that each read the same base row clobber each other on write
+  (last-writer-wins): e.g. a provider-DELETE (cleanupBackupConfig) racing a settings PUT, or two settings PUTs naming different backup providers →
+  one provider's settings silently lost. The #82/C237 per-provider MERGE fixed the wholesale-wipe WITHIN one request, but can't help across two
+  interleaved requests. VERIFIED firsthand (C21/C60): the read-modify-write is genuinely un-serialized. SEVERITY tempered by deployment: VROOM is a
+  self-host single-user/household PWA, so the concurrent-same-user window is narrow (double-submit across two devices) — but it IS a NORTH_STAR #1
+  silent-loss class. NOT a clean one-cycle fix: the remedies are all bigger than an atomic edit + cross-cutting — (a) optimistic-version column +
+  migration + stale-write reject, (b) wrap each read-merge-write in a transaction with BEGIN IMMEDIATE semantics (Drizzle/bun:sqlite doesn't cleanly
+  expose this + the C151 async-tx footgun bites: the merge awaits validateStorageConfig/validateBackupConfig DB reads), or (c) a per-user serial
+  queue. NO characterization test added — a timing-dependent concurrency test would be flaky (worse than none); the #82 sequential-merge test already
+  pins the within-request merge. DECISION (send_message'd Angelo): which concurrency model — optimistic-version / transactional-merge / accept-the-risk
+  (document as a single-user-deployment non-issue). Not loop-decidable — awaiting Angelo.
 - **#94 (MED, correctness / NORTH_STAR #2 — found C301 bug scout; BROADENED to a CLASS C328 deep-review; ESCALATED to Angelo C301+C328,
   semantics-gated) — the fleet-wide analytics SUMMARY + fuel-advanced paths pool UNIT-BEARING quantities across vehicles WITHOUT per-vehicle
   conversion.** `GET /analytics/fuel-stats` (no vehicleId, the DEFAULT summary path, analytics-api.ts:146), `GET /analytics/summary`, and
