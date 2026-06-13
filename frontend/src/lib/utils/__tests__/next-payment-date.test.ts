@@ -84,20 +84,23 @@ describe('calculateNextPaymentDate — core contract', () => {
 	});
 });
 
-describe('calculateNextPaymentDate — month-end rollover (the JS setMonth trap)', () => {
-	// setMonth(getMonth()+1) on Jan 31 yields Mar 2/3 (Feb has no 31st). This is a
-	// known JS Date behavior; we CHARACTERIZE it rather than assert a "fixed" 31st so
-	// the test documents reality and a future change to date math is caught. The
-	// user-facing impact is benign (the due date drifts to early next month for
-	// 31st-start loans in short months), but pinning it makes any change deliberate.
-	test('a 31st-of-month start still produces a valid future date (no Invalid Date)', () => {
+describe('calculateNextPaymentDate — month-end CLAMP (C330: the JS setMonth-overflow fix)', () => {
+	// Until C330 this advanced via setMonth(getMonth()+1), so a 31st-of-month start in a
+	// short month ROLLED FORWARD (Jan 31 → Mar 2/3, since Feb has no 31st) — the due date
+	// drifted into the WRONG month. C330 routes the monthly advance through addMonthsClamped,
+	// which anchors on baseDate and clamps a day-of-month overflow to the target month's LAST
+	// day (sibling of the #90/#91/#92 financing-math fixes). So a 31st-start now always lands
+	// on a real day of the INTENDED month: the 31st in long months, the 28th/29th/30th in
+	// short ones — NEVER the 1st-3rd of the following month.
+	test('a 31st-of-month start lands on a valid day of the intended month, never rolled forward', () => {
 		const next = calculateNextPaymentDate(makeFinancing({ startDate: '2024-01-31' }));
 		expect(Number.isNaN(next.getTime())).toBe(false);
 		expect(next.getTime()).toBeGreaterThan(Date.now());
-		// Day is either the 31st (long months) or rolled into the 1st-3rd of the next
-		// month (short months) — never a wild value.
 		const d = next.getDate();
-		expect(d === 31 || d <= 3).toBe(true);
+		// The clamp guarantees a real month-end day (28..31), and specifically NOT the
+		// rolled-forward 1st-3rd the pre-C330 setMonth produced.
+		expect(d).toBeGreaterThanOrEqual(28);
+		expect(d).toBeLessThanOrEqual(31);
 	});
 });
 

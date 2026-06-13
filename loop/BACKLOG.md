@@ -604,6 +604,18 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#99 (MED, correctness / NORTH_STAR #2 — found+fixed C330 on a forced bug-cycle financing-math scout; sibling of #90/#91/#92) — financing
+> date projections shifted a payment/payoff/lease-end date into the WRONG month for any 29th–31st contract.**~~ — *DONE C330: THREE sites in
+> financing-calculations.ts advanced months via bare `Date.setMonth(getMonth()+n)`, which rolls a day-of-month overflow into the FOLLOWING month
+> (Aug 31 + 1mo → Oct 1 not Sep 30; May 31 + termMonths → the month after the intended lease end): calculatePaymentDate (amortization-schedule +
+> extra-payment payoff dates), calculateNextPaymentDate (the NextPaymentCard "due" date), calculatePayoffDate (lease end = start + termMonths). The
+> correct clamp already lived inline in calculatePayoffDateFromStart (detect the rolled day → setDate(0) to the target month's last day) but wasn't
+> shared. FIX (atomic + arch-clean): extracted ONE `addMonthsClamped(date, months)` helper (single source of truth) + routed all three through it; the
+> iterative next-payment loop anchors on baseDate + re-derives (base + N months) each step so the day can't "stick" lower after a short month. GUARD:
+> rewrote next-payment-date.test.ts's month-end block (it had CHARACTERIZED the buggy rollover → now asserts the clamp) + new
+> financing-month-overflow-clamp.test.ts (+5, the lease-end clamp had ZERO prior coverage). NON-VACUOUS. frontend validate:local EXIT 0, 627 pass (+5
+> net). Pure-util fix; the .svelte consumers render the corrected dates (visual eyes-on, the VALUE pinned).*
+
 > ~~**C327 — photos upload/serve/delete + provider sync-worker CERTIFIED CLEAN (bug-cycle dormant-vein scout, no defect).**~~ — *DONE C327:
 > audited two NORTH_STAR #1 surfaces firsthand. Upload: ownership + mime-allowlist + size + capability gate + #34 atomicity compensation.
 > Serve: ownership + entityType/entityId match + nosniff (C133/#77). Sync-worker: shouldSkipDueToBackoff (30*2^retryCount) + failure→failed+

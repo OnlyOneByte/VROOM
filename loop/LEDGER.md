@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 328 |
 | guard | 6 | 325 |
-| bug | 3 | 327 |
+| bug | 3 | 330 |
 | arch | 5 | 326 |
 | infra | 6 | 329 |
 
-Current cycle: **329**
+Current cycle: **330**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5326,3 +5326,21 @@ Current cycle: **329**
   "no migration" checklist line (0005 landed C233). Refreshed the Reviewer-checklist pending-Angelo set (+#43/#44, +#88/#94/#97/#98, +the lower-sev
   #45/#51/#69/#79/#85) + the Suggested-merge footer (34→139). Doc/measurement-only; only loop/LEDGER.md commits (BRANCH_REVIEW.md is gitignored).
   Next sweep ~C339; next CLAUDE.md refresh ~C332 (last C322). cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C330 (bug → #99: financing date projections shifted a payment/payoff/lease-end date into the WRONG month for any 29th–31st contract; +arch dedup +guard)** —
+  BALANCE: bug at budget (last 327, starved-for 330−327=3 = budget, tightest "never sits") → pick. Bug vein dormant → 2-agent adversarial fan-out on the
+  money-bearing surfaces that bred this session's #90/#91/#92 cluster: (a) financing-calculations.ts loan/projection math, (b) the expense split write-path.
+  FINDINGS: the expense-split hits were product-semantics-gated (split-create sourceType not restricted to 'financing' like the singular path — a debatable
+  design choice, not an atomic defect; the money-conservation Property 3/4 are already pinned) → NOT self-fixed. The financing-calculations hit IS a clean
+  atomic sibling of #90/#91/#92: THREE sites advance months via bare `Date.setMonth(getMonth()+n)`, which rolls a day-of-month overflow into the FOLLOWING
+  month (Aug 31 + 1mo → Oct 1 not Sep 30; May 31 + term → the month after the intended lease end) — VERIFIED firsthand (C21/C60): calculatePaymentDate:139/148
+  (amortization-schedule + extra-payment payoff dates), calculateNextPaymentDate:202/211 (the NextPaymentCard due date), calculatePayoffDate:230 (lease end =
+  start + termMonths). The CORRECT clamp already lived inline in calculatePayoffDateFromStart:572 (detect rolled day → setDate(0) to the target month's last
+  day) but wasn't shared. FIX (#99, atomic + arch-clean): extracted ONE `addMonthsClamped(date, months)` helper (the single source of truth for the clamp) +
+  routed all three sites through it. KEY subtlety on the ITERATIVE next-payment loop: a step-by-step clamp would let the day "stick" lower after the first short
+  month (a 31st payment passing through Feb → 28th forever, losing the contractual day) → anchored that path on baseDate and re-derive (base + N months) each step,
+  so only a genuinely-short TARGET month clamps. GUARD: rewrote next-payment-date.test.ts's month-end block (it had CHARACTERIZED the buggy rollover `d===31||d<=3`
+  → now asserts the clamp 28..31, never rolled forward) + new financing-month-overflow-clamp.test.ts (+5) pinning the lease-end clamp (the C330 site with ZERO
+  prior coverage: May31+36mo→May31'27, +1mo→Jun30 not Jul1, Jan31+1mo→Feb29 leap, Aug31+13mo→Sep30'25 year-rollover, mid-month unaffected). NON-VACUOUS (revert a
+  site to bare setMonth → 31st-start dates land a month late → RED). green→green: frontend validate:local EXIT 0 — 627 pass (+5 net) / 0 fail, tsc 0, build OK.
+  Pure-util fix (the calc fns are unit-pure; the .svelte consumers — NextPaymentCard, AmortizationSchedule, FinanceTab payoff/lease — render the corrected dates,
+  visual is eyes-on but the date VALUE is now pinned). cov: be 86.53% (carry) / fe 84.39%+ (carry, FE suite +5).

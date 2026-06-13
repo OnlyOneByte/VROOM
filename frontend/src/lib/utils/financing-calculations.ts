@@ -41,6 +41,26 @@ export interface ExtraPaymentImpact {
 
 const DEV = import.meta.env.DEV;
 
+/**
+ * Add `months` to `date`, clamping a day-of-month overflow back to the last day of the TARGET month.
+ * Plain `Date.setMonth(getMonth() + n)` rolls a day past the target month's length into the FOLLOWING
+ * month (Aug 31 + 1mo → Oct 1, since Sept has no 31st; Jan 31 + 1mo → Mar 3), silently shifting a
+ * payment/payoff/lease-end date into the wrong month. This mirrors the clamp `calculatePayoffDateFromStart`
+ * already used inline (detect the rolled day → `setDate(0)` to the intended month's last day) and is the
+ * ONE source of truth for it across this file (the #90/#91/#92 financing-math defect family). Returns a
+ * fresh Date; does not mutate the input.
+ */
+function addMonthsClamped(date: Date, months: number): Date {
+	const result = new Date(date);
+	const targetDay = result.getDate();
+	result.setMonth(result.getMonth() + months);
+	// If the day changed, the target month was shorter → it rolled forward; clamp to that month's end.
+	if (result.getDate() !== targetDay) {
+		result.setDate(0);
+	}
+	return result;
+}
+
 function calculateAmortizationScheduleImpl(
 	financing: VehicleFinancing,
 	paidPaymentCount = 0
@@ -136,8 +156,7 @@ function calculatePaymentDate(startDate: Date, paymentNumber: number, frequency:
 
 		switch (frequency) {
 			case 'monthly':
-				date.setMonth(date.getMonth() + paymentNumber);
-				break;
+				return addMonthsClamped(date, paymentNumber);
 			case 'bi-weekly':
 				date.setDate(date.getDate() + paymentNumber * 14);
 				break;
@@ -145,7 +164,7 @@ function calculatePaymentDate(startDate: Date, paymentNumber: number, frequency:
 				date.setDate(date.getDate() + paymentNumber * 7);
 				break;
 			default:
-				date.setMonth(date.getMonth() + paymentNumber);
+				return addMonthsClamped(date, paymentNumber);
 		}
 
 		return date;
@@ -167,7 +186,7 @@ export function calculateNextPaymentDate(
 
 		const baseDate = lastPaymentDate || new Date(financing.startDate);
 		const today = new Date();
-		const nextDate = new Date(baseDate);
+		let nextDate = new Date(baseDate);
 
 		if (isNaN(nextDate.getTime())) {
 			if (DEV) console.warn('calculateNextPaymentDate: invalid base date');
@@ -176,12 +195,16 @@ export function calculateNextPaymentDate(
 
 		let iterations = 0;
 		const maxIterations = 1000;
+		// For the monthly path, ANCHOR on baseDate and re-derive (base + N months) each step rather
+		// than clamping incrementally: a step-by-step clamp would let the day-of-month "stick" lower
+		// after the first short month (e.g. a 31st payment passing through Feb → 28th forever),
+		// permanently losing the contractual payment day. addMonthsClamped(base, n) re-derives from the
+		// anchor, so only a genuinely-short target month clamps. (paymentFrequency is fixed per
+		// financing, so monthsAdded only advances on the monthly/default branch.)
+		let monthsAdded = 0;
 
 		while (nextDate <= today && iterations < maxIterations) {
 			switch (financing.paymentFrequency) {
-				case 'monthly':
-					nextDate.setMonth(nextDate.getMonth() + 1);
-					break;
 				case 'bi-weekly':
 					nextDate.setDate(nextDate.getDate() + 14);
 					break;
@@ -189,7 +212,9 @@ export function calculateNextPaymentDate(
 					nextDate.setDate(nextDate.getDate() + 7);
 					break;
 				default:
-					nextDate.setMonth(nextDate.getMonth() + 1);
+					// 'monthly' + any unknown frequency (documented fallback)
+					monthsAdded++;
+					nextDate = addMonthsClamped(baseDate, monthsAdded);
 			}
 			iterations++;
 		}
@@ -226,9 +251,7 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 			// Leases have a fixed end date based on start + term
 			const startDate = new Date(financing.startDate);
 			if (!isNaN(startDate.getTime())) {
-				const endDate = new Date(startDate);
-				endDate.setMonth(endDate.getMonth() + financing.termMonths);
-				return endDate;
+				return addMonthsClamped(startDate, financing.termMonths);
 			}
 			return new Date();
 		}
