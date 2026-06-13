@@ -59,12 +59,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 382 |
-| guard | 6 | 380 |
+| guard | 6 | 385 |
 | bug | 3 | 383 |
 | arch | 5 | 381 |
 | infra | 6 | 384 |
 
-Current cycle: **384**
+Current cycle: **385**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5982,3 +5982,14 @@ Current cycle: **384**
   guards). Also ADDED #112 (the C383 chart-palette-collision, DESIGN-gated) to the pending-Angelo escalation list. The closed-bug list correctly ends at #111/C377
   (#112 is escalated, NOT closed — verified, left as-is); testing-infra/open-gaps sections current. Docs-only; no source/test/build touched → no build gate (the
   C309/C357/C373 refresh pattern). Next CLAUDE.md refresh ~C394; next #5 sweep ~C384-ish (just did C379, so ~C390). cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C385 (guard): pin buildLocalDate's out-of-range-hour rejection (the foreign-import time-parse path) + document the same-day-wrap partial coverage** —
+  BALANCE: nothing over budget; guard closest (last 380, starved-for 385−380=5, budget 6) → highest-leverage. 2-agent fan-out. DEBUNKED the FE pick firsthand
+  (C21/C60): buildQueryString is NOT untested — reminder-api.test.ts:176 pins "isActive=false MUST survive" asserting `?isActive=false` end-to-end through the
+  wrapper, exercising the `!= null`-not-truthiness distinction (the agent only grepped for an *api-utils* test FILE + missed the wrapper coverage). PICK (verified
+  firsthand): buildLocalDate (local-date.ts) echo-checks Y/M/D but NOT hh/mm/ss; normalizeForeignDate (import-mapping.ts:192) parses a foreign CSV time segment
+  with a bare `parseInt || 0` (no range clamp), so a malformed cell "2024-03-15 25:00:00" feeds hh=25 here. The EXISTING date echo-check INCIDENTALLY rejects an
+  hour that rolls the DAY forward (hh≥24 → getDate() mismatch → null) — a reachable, correct, UNPINNED invariant. +2 guards (hh=25, hh=48 → null). Also pinned
+  the KNOWN partial coverage honestly: a same-day time wrap (mm=90 → 13:30 same date) is ACCEPTED — by design, since expense analytics bucket by day/month not
+  hour, so a wrapped minute can't corrupt a chart; +1 test documents the current behavior (date intact) so the gap is explicit + a future change is conscious,
+  not coverage-theater. NON-VACUOUS (a Y/M-only echo-check loosening would import day-shifted foreign rows → RED). green→green: be validate:local EXIT 0, 1470
+  pass (+3) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).

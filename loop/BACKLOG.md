@@ -472,6 +472,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C385 — pin buildLocalDate's out-of-range-hour rejection (foreign-import time-parse path) + document the same-day-wrap partial coverage.**~~ — *DONE C385:
+> guard closest to budget (5/6). buildLocalDate echo-checks Y/M/D but not hh/mm/ss; normalizeForeignDate (import-mapping.ts:192) parses a foreign time segment
+> with a bare parseInt||0 (no clamp), so a malformed "2024-03-15 25:00:00" feeds hh=25. The existing date echo-check INCIDENTALLY rejects an hour that rolls the
+> DAY forward (hh≥24 → getDate() mismatch → null) — reachable + correct + unpinned. +2 guards (hh=25/48 → null) + 1 documenting the by-design partial coverage
+> (same-day wrap mm=90 → accepted, date intact; time-of-day is analytically immaterial). NON-VACUOUS. be validate:local EXIT 0, 1470 pass (+3). Debunked the FE
+> buildQueryString pick (already covered through reminder-api.test.ts:176 isActive=false-survives).*
+
 > ~~**C380 — pin the buildSummary singular/plural month rendering (the formatMonths `=== 1` boundary, via the public API).**~~ — *DONE C380: guard closest to
 > budget (5/6). buildSummary (payment-planner.ts) renders monthsSaved via the private formatMonths, which pluralizes on `months === 1`. Property 6 pinned the
 > summary STRUCTURE but never the singular/plural rendering — a regression dropping the `=== 1` branch silently emits "saves 1 months" (visible grammar bug).
