@@ -382,6 +382,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C331 — pin getSyncStatusInfo, the user-facing sync-indicator precedence cascade (zero-coverage pure module).**~~ — *DONE C331: a grep of every
+> non-type/non-UI-reexport src/lib/*.ts against the suite surfaced sync/sync-status.ts (58 lines) at ZERO test references. getSyncStatusInfo backs BOTH
+> SyncStatusIndicator + SyncStatusInline; its branch order is a load-bearing PRIORITY CASCADE (offline > conflicts > syncing > error > success > pending >
+> up-to-date), so a reorder would silently show the WRONG status ("Synced" while offline / hide a conflict behind the sync spinner). +14 (sync-status.test.ts,
+> new sync/__tests__/): all 8 branches' {color,icon,text} in isolation + singular/plural conflict copy + 6 PRECEDENCE cases the per-branch test misses.
+> NON-VACUOUS (reorder a pair → RED). fe validate:local EXIT 0, 641 pass (+14).*
+
 > ~~**C325 — pin sync-manager's retry exponential-backoff + hard cap (real branching, loose coverage).**~~ — *DONE C325: the existing tests
 > checked only the retryCount counter (the "max retries" bound `<= firstCount+1` too weak to pin the cap); the backoff delay (retryDelay *
 > 2^retries) + the scheduling-stops-at-cap behavior were unpinned. +2 guards (setTimeout spy): a failed sync schedules at exactly 100ms

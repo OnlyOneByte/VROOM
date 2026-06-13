@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 328 |
-| guard | 6 | 325 |
+| guard | 6 | 331 |
 | bug | 3 | 330 |
 | arch | 5 | 326 |
 | infra | 6 | 329 |
 
-Current cycle: **330**
+Current cycle: **331**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5344,3 +5344,15 @@ Current cycle: **330**
   site to bare setMonth → 31st-start dates land a month late → RED). green→green: frontend validate:local EXIT 0 — 627 pass (+5 net) / 0 fail, tsc 0, build OK.
   Pure-util fix (the calc fns are unit-pure; the .svelte consumers — NextPaymentCard, AmortizationSchedule, FinanceTab payoff/lease — render the corrected dates,
   visual is eyes-on but the date VALUE is now pinned). cov: be 86.53% (carry) / fe 84.39%+ (carry, FE suite +5).
+- **C331 (guard): pin getSyncStatusInfo, the user-facing sync-indicator precedence cascade (zero-coverage pure module)** — BALANCE: guard AND arch
+  both at budget this cycle (guard 331−325=6=budget; arch 331−326=5=budget); guard MORE starved (6 vs 5) → pick. Guard veins are thin per the cadence note
+  (FE pure/service layers essentially all covered, BE route/util low spots worked through), so scanned for a genuinely-untested logic-bearing module: a grep
+  of every non-type/non-UI-reexport src/lib/*.ts against the test suite surfaced sync/sync-status.ts (58 lines) at ZERO test references. getSyncStatusInfo
+  is the centralized derivation behind BOTH SyncStatusIndicator + SyncStatusInline (the persistent sync badge); its branch ORDER is load-bearing — a
+  PRIORITY CASCADE (offline > conflicts > syncing > error > success > pending > up-to-date), not independent flags — so a refactor reordering the `if`s
+  would silently show the WRONG status (e.g. "Synced" while offline, or hide an unresolved conflict behind the "Syncing…" spinner). +14 guards
+  (sync-status.test.ts, the new sync/__tests__/ dir): all 8 branches' {color, icon, text} in isolation (+ the singular/plural conflict copy via the `> 1`
+  guard) + 6 PRECEDENCE cases pinning the cross-branch ordering a naive per-branch test misses (offline beats all; conflicts beat syncing/success; syncing/
+  error/success each beat pending). NON-VACUOUS (reorder any pair, or drop the `>1` plural guard → RED). Pure-logic, host-independent (asserts the exact
+  Lucide icon identity + token color). green→green: frontend validate:local EXIT 0 — 641 pass (+14) / 0 fail, tsc 0, build OK. cov: be 86.53% (carry) /
+  fe 84.39%+ (carry, sync-status.ts 0%→covered).
