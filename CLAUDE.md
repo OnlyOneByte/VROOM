@@ -163,8 +163,8 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C400, not an estimate): **backend 86.92% line / 86.54% func · frontend 84.45% line / 84.4%
-  func / 76.87% branch** (both suites > 84% line; creeping UP vs the C389 reading 86.78/86.39 · 84.39/84.3/76.63 — the C390–C405 arc [#113/#114/#115/#116/#117 fixes + the C396 expense-source-ref, C398 lease-overage, C404 claim-photo-roundtrip guards, C403 isFillup extract] held/nudged the line as product code grew). BE↔FE gap ~2.5pts (stable, the tightest era). The 90% goal stays structurally gated: BE tail is DI/singleton-bound + OAuth-network; FE gap is the eyes-on components/routes deficit (Playwright-blocked).
+  (re-measured C412, not an estimate): **backend 86.92% line / 86.56% func · frontend 84.46% line / 84.4%
+  func / 76.92% branch** (both suites > 84% line; flat-to-UP vs the C400 reading 86.92/86.54 · 84.45/84.4/76.87 — the C403–C417 fix+guard arc [the #C404 claim-photo, #117 0%-APR-planner, #118 split-tag, #119/#122 PHEV-MPG-partition, #120 offline-date, #123 provider-PUT, #124 import-decimal fixes + the isFillup/hasReminderEndedBy/gasEfficiencyPoint/resetSplitAllocations extracts + the C407/C414 backup/EV-partition guards] held/nudged the line as product code grew). BE↔FE gap ~2.5pts (stable, the tightest era). The 90% goal stays structurally gated: BE tail is DI/singleton-bound + OAuth-network; FE gap is the eyes-on components/routes deficit (Playwright-blocked).
   Frontend climbed 65.3→84 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
   C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts, C201
@@ -183,10 +183,10 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1491 backend tests / ~690 frontend** (a floor — grows most cycles; the C395–C405 arc added
-  the #115 lease-overage + #116 reminder-endDate-natural-exit + #117 0%-APR-planner fixes, the C404 claim-photo
-  backup-roundtrip guard, the C401 CSV-apostrophe characterization, on top of the C384–C394 arc [#113/#114,
-  C391 split-sibling sweep, C392/C394 arch-extracts]). Don't regress coverage; name why if a cycle drops it.
+  Suite size today: **~1508 backend tests / ~696 frontend** (a floor — grows most cycles; the C406–C417 arc added
+  the #C404 claim-photo-roundtrip + C407 5-type drift guard, the #118 split-tag + #119/#122 PHEV-MPG-partition
+  (gasEfficiencyPoint) + #123 provider-PUT-config + #124 import-decimal-US-format fixes, the C414 EV-only-partition
+  + C415 resetSplitAllocations guards, on top of the C395–C405 arc [#115/#116/#117]). Don't regress coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
   in-memory SQLite DB with a seeded user + a real Lucia session cookie (`ctx.authed/anon`); it's
@@ -250,8 +250,13 @@ Highlights:
   PaymentMetricsGrid's "Mileage Overage" card compared LIFETIME driven miles against the bare ANNUAL mileageLimit while the sibling LeaseMetricsCard scales by the term — two contradicting figures on one screen, the grid inflated ~Nx; extracted leaseTotalMileageAllowance (annual × termMonths/12) + a pure calculateLeaseOverage, routed both cards through it [#115, C398, the #64/#110 annual-vs-total class on the overage card],
   the reminder catch-up loop's NATURAL exit (under the 12-occurrence cap) left a bounded reminder active past endDate — the in-loop guard only inspects nextDue ≤ now, but the FINAL advance steps past now and exits untested, so a bounded reminder whose endDate falls between its last in-window occurrence and that final advance stayed is_active=1 (inflates recurring-cost run-rate); consolidated to ONE post-loop deactivation guard covering both the in-loop break and the natural exit [#116, C399, the #107/#114 bug-#12 endDate family on a THIRD path],
   a CLAIM photo broke backup/restore — validateReferentialIntegrity's photo entity-type map omitted insurance_claim (a real photo-upload target), so a backup carrying a claim photo failed validation → valid:false → the WHOLE restore aborted (the user couldn't recover ANY data from their own valid backup); add insurance_claim→claimIds to the map [#C404, C404, NORTH_STAR #1 crown-jewel hard round-trip failure the C366 15-table cert predated],
-  a 0%-APR loan in the Payment Planner showed "0 mos / $0 saved" — computePlannerState fed minimumPayment (=0 for a 0%-APR loan, calculateMinimumPayment returns null) as the baseline paymentAmount, so the baseline amortization tripped the negative-am guard → 0 months → monthsSaved 0; baseline = minimumPayment>0 ? minimumPayment : financing.paymentAmount [#117, C405, the #92 0%-APR symptom re-manifested at the planner layer])
-  all landed C155–C405. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
+  a 0%-APR loan in the Payment Planner showed "0 mos / $0 saved" — computePlannerState fed minimumPayment (=0 for a 0%-APR loan, calculateMinimumPayment returns null) as the baseline paymentAmount, so the baseline amortization tripped the negative-am guard → 0 months → monthsSaved 0; baseline = minimumPayment>0 ? minimumPayment : financing.paymentAmount [#117, C405, the #92 0%-APR symptom re-manifested at the planner layer],
+  the split-expense CREATE schema's tags bypassed the #104 separator-rejection (a bare z.array(z.string()) vs the regular boundaries' tagElementSchema) — a split tag `road; trip` round-tripped into two tags via CSV export/import; lifted tagElementSchema into validation.ts as ONE source of truth, routed the split schema through it [#118, C408, the #104/C352 class on the boundary that fix missed],
+  a plug-in hybrid's CHARGE sessions (kWh in volume → ~mi/kWh) contaminated the gas-MPG analytics — computeEfficiencyPoint accepts electric rows, so they polluted mpgValues (mislabeled mi/gal) across 5 aggregators; extracted gasEfficiencyPoint (null for an electric current row), routed all 5 through it, cost-per-mile stays all-energy (C378) [#119/#122, C411/C413, the C353 gas/charge isolation missed on the analytics path],
+  OfflineExpenseCards rendered a RAW ISO date string ({expense.date}) instead of formatDate — the offline-first save stores a full ISO timestamp, so the pending/synced cards showed `2024-03-15T17:00:00.000Z`; wrap both sites in formatDate [#120, C410, eyes-on offline-state-blocked],
+  PUT /providers/:id wrote body.config verbatim with NO provider-type validation while CREATE fail-fasts an incomplete S3 config — editing an S3 provider to a config missing endpoint/bucket/region persisted a bricked row that threw on every later use; extracted validateStorageProviderConfig, shared by CREATE + PUT [#123, C416, the #103/C349 footgun on the UPDATE path],
+  normalizeDecimal corrupted a US-format number with BOTH separators (1,234.56 → stripped dots → 1.23456, a ~1000x money under-count via the US Fuelly preset) — it hard-assumed comma-decimal; the decimal separator is whichever appears LAST (handles EU 1.234,56 + US 1,234.56) [#124, C417, money-facing, distinct from the product-gated #24])
+  all landed C155–C417. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
   a green test that RE-IMPLEMENTS or RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module
   (C229: the two photo "property" tests only drove a reference model, never the real setCoverPhoto, which was also
   getDb-singleton-bound and thus untestable via a constructed repo until switched to this.db.transaction).

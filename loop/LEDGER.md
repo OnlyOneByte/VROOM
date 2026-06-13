@@ -73,9 +73,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 414 |
 | bug | 3 | 417 |
 | arch | 5 | 415 |
-| infra | 6 | 412 |
+| infra | 6 | 418 |
 
-Current cycle: **417**
+Current cycle: **418**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6370,3 +6370,11 @@ Current cycle: **417**
   FIX (atomic): in the both-separators branch, the decimal separator is whichever appears LAST (`lastIndexOf`); strip the other as thousands. Handles BOTH `1.234,56` (EU,
   comma last → 1234.56) AND `1,234.56` (US, dot last → 1234.56). GUARD: +2 (US 1,234.56→1234.56 [RED pre-fix: 1.23456]; multi-group 1,234,567.89→1234567.89); the existing
   EU `1.234,56` test stays green (comma last). NON-VACUOUS. be validate:local EXIT 0, 1508 pass (+2). cov: be 86.92% (carry, +2 guards) / fe 84.46% (carry).
+- **C418 (infra): CLAUDE.md full orientation refresh (the overdue ~C416 cadence; last full C406)** — BALANCE: nothing over budget (deep-review 2, guard 4, bug 1, arch 3,
+  infra 6/6, feature parked); infra MOST-STARVED AT budget (last 412, starved-for 418−412=6=budget) AND the CLAUDE.md refresh cadence was overdue → highest-leverage pick.
+  REFRESHED the drift-prone "Current state & gaps" section so a fresh-agent entry point reflects reality: (1) coverage reading C400→C412 fresh measure (be 86.92 line /
+  86.54→86.56 func; fe 84.45→84.46 line / 76.87→76.92 branch — flat-to-up, the C403–C417 fix+guard arc held); (2) suite size ~1491/~690 → ~1508/~696; (3) appended the
+  C406–C417 closed-bug arc to the fix list (#C404 claim-photo, #118 split-tag, #119/#122 PHEV-MPG gasEfficiencyPoint partition, #120 offline-date, #123 provider-PUT,
+  #124 import-decimal-US-format) + bumped "all landed C155→C417". Doc-only, no code touched → no build gate (CLAUDE.md is not compiled; verified the edits read coherently +
+  preserved the structure the loop depends on). The pending-Angelo block is unchanged (PR-readiness C368 + CSV-apostrophe C401 remain the open escalations; #121 + the
+  MAX_VALID_MPG band divergence are loop-actionable BACKLOG items, not Angelo-gated). cov: be 86.92% (carry) / fe 84.46% (carry). Next CLAUDE.md refresh ~C428; next #5 sweep ~C422.
