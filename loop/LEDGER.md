@@ -61,10 +61,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 382 |
 | guard | 6 | 385 |
 | bug | 3 | 383 |
-| arch | 5 | 381 |
+| arch | 5 | 386 |
 | infra | 6 | 384 |
 
-Current cycle: **385**
+Current cycle: **386**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5993,3 +5993,13 @@ Current cycle: **385**
   hour, so a wrapped minute can't corrupt a chart; +1 test documents the current behavior (date intact) so the gap is explicit + a future change is conscious,
   not coverage-theater. NON-VACUOUS (a Y/M-only echo-check loosening would import day-shifted foreign rows → RED). green→green: be validate:local EXIT 0, 1470
   pass (+3) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C386 (arch): extract monthsBetween — ONE source of truth for the calendar-month-diff in two analytics money denominators (2 sites → 1)** — BALANCE: arch
+  AT budget (last 381, starved-for 386−381=5 = budget) → most-starved actionable pick. rule-7 fan-out. PICK (CONFIRMED firsthand, C21/C60): the month-diff
+  expression `(now.getFullYear()−X.getFullYear())*12 + (now.getMonth()−X.getMonth())` was BYTE-IDENTICAL at 2 analytics money-paths — the financing monthsElapsed
+  (repository.ts:836, → monthsRemaining) and the all-time TCO ownershipMonths (:1891, → costPerMonth = total/months). The two wrap it in DIFFERENT clamps
+  (Math.max(0,…) vs Math.max(1,…)), so the shared part is the unclamped month-diff. A divergent copy (a dropped `*12`, a flipped subtraction) would skew one
+  money denominator against the other. Extracted `monthsBetween(from, to)` as a sibling to the existing monthsOwnedInYear/toDate (C121/C194) pure date-math
+  helpers; callers keep their own clamp. Behavior-preserving (identical computation). RULE-3 GREEN→GREEN: per-vehicle.property.test.ts (monthsRemaining +
+  costPerMonth) + vehicle-tco-zero-state.test.ts (the ≥1 clamp) drive both sites — GREEN before AND after. validate:local EXIT 0, 1470 pass (unchanged). Rejected
+  the FE dead calculateDaysUntil delete (4×-deferred — deleting a TESTED export is net-negative coverage vs collapsing a live money-denominator dup). cov: be
+  86.79% (carry) / fe 84.39% (carry).

@@ -1842,6 +1842,14 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract monthsBetween — ONE source of truth for the calendar-month-diff in two analytics money denominators (2 sites → 1, rule-7 fan-out, done C386).**~~ —
+  *DONE C386: the month-diff `(now.getFullYear()−X.getFullYear())*12 + (now.getMonth()−X.getMonth())` was BYTE-IDENTICAL at the financing monthsElapsed
+  (repository.ts:836 → monthsRemaining) + the all-time TCO ownershipMonths (:1891 → costPerMonth=total/months). Different clamps (max(0,…) vs max(1,…)), so the
+  shared part is the unclamped diff. A divergent copy (dropped *12 / flipped subtraction) would skew one money denominator vs the other. Extracted
+  monthsBetween(from, to) as a sibling to monthsOwnedInYear/toDate; callers keep their own clamp. Behavior-preserving. Rule-3 green→green:
+  per-vehicle.property.test.ts (monthsRemaining + costPerMonth) + vehicle-tco-zero-state.test.ts (≥1 clamp) drive both sites — GREEN before AND after.
+  validate:local EXIT 0, 1470 pass. Rejected the FE dead calculateDaysUntil delete (4×-deferred — deleting a TESTED export is net-negative coverage).*
+
 - ~~**Extract ExpenseRepository.sourceScope — ONE source of truth for the source-linked-expense tenant predicate (4 sites → 1, rule-7 fan-out, done C381).**~~ —
   *DONE C381: the triple-predicate `and(eq(sourceType), eq(sourceId), eq(userId))` was BYTE-IDENTICAL at 4 sites in expenses/repository.ts — findBySource,
   deleteBySource's read + its destructive delete-write, clearSource's update. These act on AUTO-MATERIALIZED expenses (reminder/insurance/financing cascade

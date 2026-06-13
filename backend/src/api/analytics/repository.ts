@@ -72,6 +72,18 @@ export function monthsOwnedInYear(ownershipStart: Date, now: Date, year: number)
 }
 
 /**
+ * Whole CALENDAR months elapsed from `from` to `to` (signed; can be negative if `to` precedes `from`).
+ * The year×12 + month-delta expression was hand-repeated at the financing months-elapsed + the all-time
+ * TCO ownership-months sites — two money-facing denominators (monthsRemaining; costPerMonth = total /
+ * months). ONE source of truth so a divergent copy (a dropped `* 12`, a flipped subtraction) can't skew
+ * one path's months against the other. Callers apply their OWN clamp (financing Math.max(0,…),
+ * cost-per-month Math.max(1,…)) — this returns the raw count, exactly as both inline expressions did.
+ */
+export function monthsBetween(from: Date, to: Date): number {
+  return (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+}
+
+/**
  * Normalize a date-or-raw-timestamp into a Date (C194 dedup). Drizzle timestamp columns surface as
  * Date, but some rows reach these builders via paths typed loosely (a raw number/string), so the
  * analytics builders defensively coerced with `x instanceof Date ? x : new Date(x)` — hand-repeated at
@@ -833,10 +845,7 @@ export class AnalyticsRepository {
     // behavior on the impossible-null path EXACTLY, while satisfying toDate's non-null param.
     const startDate = toDate(fin.startDate ?? 0);
     const now = new Date();
-    const monthsElapsed = Math.max(
-      0,
-      (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth())
-    );
+    const monthsElapsed = Math.max(0, monthsBetween(startDate, now));
     return {
       vehicleId: fin.vehicleId,
       vehicleName: vehicleNameMap.get(fin.vehicleId) ?? 'Unknown',
@@ -1890,11 +1899,7 @@ export class AnalyticsRepository {
       // numerator isn't divided by a full-ownership denominator (#28). Both clamp to ≥1.
       const ownershipMonths = year
         ? Math.max(1, monthsOwnedInYear(ownershipStart, now, year))
-        : Math.max(
-            1,
-            (now.getFullYear() - ownershipStart.getFullYear()) * 12 +
-              (now.getMonth() - ownershipStart.getMonth())
-          );
+        : Math.max(1, monthsBetween(ownershipStart, now));
       const mileages = detailedExpenses
         .filter((r) => r.mileage != null)
         .map((r) => r.mileage as number);
