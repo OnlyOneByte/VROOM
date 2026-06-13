@@ -1734,6 +1734,15 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract odometerRepository.vehicleScope — ONE source of truth for the odometer tenant+vehicle predicate (6 sites → 1, rule-7 fan-out, done C365).**~~ —
+  *DONE C365: odometer/repository.ts repeated the raw-SQL tenant scope `vehicle_id = ${vehicleId} AND user_id = ${userId}` at SIX sites — getHistory's data
+  query (2 UNION legs) + count query (2 subqueries) + getCurrentOdometer's MAX-UNION (2 legs). The #48/#52/C109 comments manually plead "scope BOTH legs" — a
+  divergent copy dropping user_id on any leg = a cross-tenant history leak OR a poisoned maintenance mileage trigger (D2). Extracted `private vehicleScope(
+  vehicleId, userId): ReturnType<typeof sql>`, routed all 6 (expense legs keep their `AND mileage IS NOT NULL` suffix). Rule-3 green→green verified FIRST:
+  get-current-odometer.test.ts (both-source MAX, NULL-mileage exclusion, per-vehicle + #48 userId cross-tenant @:129) + odometer-history.property.test.ts pass
+  UNCHANGED before AND after. Behavior-preserving (identical SQL). validate:local EXIT 0, 1456 pass. Rejected the FE calculateDaysUntil↔getDaysRemaining
+  collapse (crosses 2 modules into a new file + differing input type/name → thinner collapse, more churn; deferred).*
+
 - ~~**Extract groupOwnedBy — ONE source of truth for the split-expense tenant-scope predicate (6 sites → 1, rule-7 fan-out, done C360).**~~ — *DONE C360:
   the split-group ownership predicate `and(eq(expenses.groupId, groupId), eq(expenses.userId, userId))` was copied BYTE-IDENTICAL at SIX sites in
   expenses/repository.ts — four reads (findIdsByGroupId, getSplitExpense, delete-read, update-read) AND TWO destructive delete-writes (deleteSplitExpense,

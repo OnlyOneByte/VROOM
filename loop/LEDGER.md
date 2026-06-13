@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 361 |
 | guard | 6 | 364 |
 | bug | 3 | 362 |
-| arch | 5 | 360 |
+| arch | 5 | 365 |
 | infra | 6 | 363 |
 
-Current cycle: **364**
+Current cycle: **365**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5764,3 +5764,14 @@ Current cycle: **364**
   +1 test file (vehicle-helpers.test.ts, 5 tests driving the REAL export): nickname-wins, year/make/model fallback, empty-nickname-falls-through, null +
   undefined → 'Unknown Vehicle'. NON-VACUOUS. green→green: fe validate:local EXIT 0, 669 pass (+5) / 0 fail, tsc 0, build OK. cov: be 86.25% (carry) / fe
   84.17%+ (carry).
+- **C365 (arch): extract odometerRepository.vehicleScope — ONE source of truth for the odometer tenant+vehicle predicate (6 sites → 1)** — BALANCE: arch AT
+  budget (last 360, starved-for 365−360=5 = budget) → most-starved actionable pick (feature over-budget but not loop-actionable). rule-7 fan-out (2 agents).
+  PICK (CONFIRMED firsthand, C21/C60): odometer/repository.ts repeated the raw-SQL tenant scope `vehicle_id = ${vehicleId} AND user_id = ${userId}` at SIX
+  sites — getHistory's data query (2 UNION legs) + its count query (2 subqueries) + getCurrentOdometer's MAX-UNION (2 legs). The #48/#52/C109 belt-and-braces
+  comments (46-49/82-84/143-144) manually plead "scope BOTH legs" — a divergent copy dropping user_id on ANY one leg = a cross-tenant history leak OR a
+  poisoned maintenance mileage trigger (design D2). Extracted `private vehicleScope(vehicleId, userId): ReturnType<typeof sql>` returning the scoped fragment,
+  routed all 6 (the expense legs keep their `AND mileage IS NOT NULL` suffix appended after the fragment). RULE-3 GREEN→GREEN VERIFIED FIRST: getCurrentOdometer
+  is comprehensively anchored (get-current-odometer.test.ts — both-source MAX, NULL-mileage exclusion, per-vehicle scope, AND the #48 userId cross-tenant test
+  at :129) + getHistory by odometer-history.property.test.ts — all pass UNCHANGED before AND after. Behavior-preserving (identical emitted SQL). Rejected the FE
+  calculateDaysUntil↔getDaysRemaining collapse (real but crosses 2 modules into a NEW file + the two differ in input type/name — thinner collapse, more churn;
+  deferred). validate:local EXIT 0, 1456 pass (unchanged). cov: be 86.25% (carry) / fe 84.17% (carry).
