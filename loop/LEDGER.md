@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 333 |
+| deep-review | 5 | 339 |
 | guard | 6 | 336 |
 | bug | 3 | 338 |
 | arch | 5 | 337 |
 | infra | 6 | 335 |
 
-Current cycle: **338**
+Current cycle: **339**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5454,3 +5454,19 @@ Current cycle: **338**
   characterization test — a timing-dependent concurrency test would be FLAKY (worse than none); the #82 backup-config-merge test already pins the
   sequential within-request merge. Docs-only cycle (file+escalate+cert, the C306/C327 escalation-gated precedent); no source/test/build touched → no build
   gate (the C337 gate is the last code state). cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C339 (deep-review → bug #101: offline missedFillup silently dropped on sync; backup-validation gaps filed)** — BALANCE: deep-review OVER budget
+  (last 333, starved-for 339−333=6 > budget 5) → FORCED. 2-agent fan-out on the NORTH_STAR #1 crown jewels not recently audited: (A) backup/restore
+  round-trip, (B) offline-sync write path. (B) surfaced a CLEAN ATOMIC live defect → #101 (the C204/C209 deep-review→bug pattern): the offline outbox drops
+  `missedFillup` on sync. VERIFIED FIRSTHAND (C21/C60): OfflineExpense had no missedFillup field, offlineExpenseToBackend didn't map it, and BOTH
+  ExpenseForm addOfflineExpense call sites (:579/:621) omitted it — while the form DOES collect it (formData.missedFillup, :1230) and the ONLINE path sends
+  it (:517). So a fuel fill-up logged OFFLINE with "missed previous fill-up" checked loses the flag on sync → calculateAverageMpg pairs it as a normal
+  consecutive fill-up across the unlogged gap → inflated/garbage MPG (NORTH_STAR #1 silent-loss + #2, the exact #66 offline-field-dropout family). FIX
+  (clean, 4 edits): added missedFillup? to OfflineExpense (+doc), mapped it in offlineExpenseToBackend (the C205 single-source boundary), carried it at
+  both form sites (the 2nd expenseData needed the field too). GUARD: +1 round-trip test in offline-storage.test.ts pinning true AND false survive (the #66
+  test's sibling). NON-VACUOUS (drop the map → undefined → backend default false → the true case RED). (A) backup/restore: the agent flagged
+  validateBackupData doesn't cross-check expense sourceType:'financing' sourceId or reminder expenseSplitConfig vehicleIds against the in-backup sets —
+  but these are DEFENSE-IN-DEPTH on the user's OWN self-created backup (no FK on sourceId by design; a tampered backup is the only trigger), LOWER priority
+  than a live-flow bug; FILED as a note in BACKLOG (not escalated — it's a hardening nicety, the C246 referential-integrity already constrains the
+  FK-children). Insert-order + table-coverage + JSON/date/bool round-trip all RE-CONFIRMED clean. green→green: frontend validate:local EXIT 0 — 647 pass
+  (+1 net) / 0 fail, tsc 0, build OK. Pure FE; the offline→sync→DB path now carries the flag (the .svelte form render unchanged). cov: be 86.53% (carry) /
+  fe 84.39%+ (carry).

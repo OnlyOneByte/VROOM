@@ -409,4 +409,15 @@ describe('offlineExpenseToBackend — shared offline→backend mapping', () => {
 		expect(out.volume).toBe(40);
 		expect(out.fuelType).toBe('Diesel');
 	});
+
+	it('carries missedFillup through (the #101 invariant — same dropout class as #66)', () => {
+		// calculateAverageMpg pairs CONSECUTIVE fill-ups and EXCLUDES a missedFillup row from pairing;
+		// if the outbox drops the flag, an offline missed fill-up syncs as a normal one → the next
+		// pair spans the unlogged gap → inflated/garbage MPG (NORTH_STAR #1/#2). Pin true AND false so
+		// a regression that drops the field (undefined→backend default false) turns the true case RED.
+		const trueOut = offlineExpenseToBackend({ ...base, volume: 40, fuelType: 'Diesel', missedFillup: true });
+		expect(trueOut.missedFillup).toBe(true);
+		const falseOut = offlineExpenseToBackend({ ...base, volume: 40, fuelType: 'Diesel', missedFillup: false });
+		expect(falseOut.missedFillup).toBe(false);
+	});
 });

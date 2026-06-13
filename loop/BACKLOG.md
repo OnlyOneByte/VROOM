@@ -154,6 +154,19 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Backup/restore round-trip + offline-sync write-path audit (C339).**~~ — *DONE C339 (found+fixed bug #101; backup-validation hardening filed).
+> 2-agent fan-out on the NORTH_STAR #1 crown jewels. (B) offline-sync surfaced a CLEAN ATOMIC live defect → #101: the outbox dropped `missedFillup` on sync
+> (OfflineExpense lacked the field, offlineExpenseToBackend didn't map it, both ExpenseForm call sites omitted it — while the form collects it + the online
+> path sends it). A missed offline fill-up synced as normal → calculateAverageMpg pairs across the gap → garbage MPG (the #66 family). FIXED inline (4 edits)
+> + a true/false round-trip guard. (A) backup/restore RE-CONFIRMED clean (insert-order, table-coverage, JSON/date/bool round-trip); filed a defense-in-depth
+> note (validateBackupData doesn't cross-check expense financing-sourceId / reminder splitConfig vehicleIds vs the in-backup sets — only a tampered
+> self-backup triggers it; lower priority than a live bug). validate:local EXIT 0, 647 pass.*
+> NOTE (filed C339, low priority — backup-validation hardening): `validateBackupData` (backup.ts) cross-checks expense `sourceType:'reminder'` sourceIds
+> against the in-backup reminders but NOT `sourceType:'financing'` sourceIds against financing, nor reminder `expenseSplitConfig` vehicleIds against
+> vehicles. Both are defense-in-depth on the user's OWN backup (sourceId has no FK by design; restore's validateReferentialIntegrity already constrains the
+> real FK-children C246) — only a hand-tampered backup smuggles a dangling ref. A future hardening cycle could extend the source-ref validator; not a live
+> data-safety defect (no escalation).
+
 > ~~**TCO money-aggregation + reminder-materialization/CSV-round-trip audit (C333).**~~ — *DONE C333 (CERTIFIED CLEAN; +3 year-scoped guards).
 > 2-agent fan-out. (B) reminder-materialization CAS-idempotent (no double-materialize), backend reminder advance uses clampToAnchorDay (NO C330 setMonth
 > bug — FE-only), CSV value round-trip guarded (thousands-sep/bool/nested-JSON/null); lone hit #88 already filed. (A) an agent flagged a "year-scoped +
@@ -626,6 +639,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#101 (MED, data-safety / NORTH_STAR #1+#2 — found+fixed C339 on a deep-review of the offline-sync path; same family as #66) — an offline fuel
+> fill-up logged with "missed previous fill-up" checked silently DROPS the flag on sync.**~~ — *DONE C339: OfflineExpense had no `missedFillup` field,
+> offlineExpenseToBackend didn't map it, and both ExpenseForm addOfflineExpense call sites (:579/:621) omitted it — while the form collects it (:1230) and
+> the ONLINE create path sends it (:517). So a missed offline fill-up synced as a NORMAL one → calculateAverageMpg pairs it across the unlogged gap →
+> inflated/garbage MPG. FIX (4 edits): added missedFillup? to OfflineExpense + mapped it in offlineExpenseToBackend (the C205 single-source boundary) +
+> carried it at both form sites. GUARD: +1 round-trip test (true AND false survive) in offline-storage.test.ts, the #66 sibling. NON-VACUOUS. frontend
+> validate:local EXIT 0, 647 pass.*
+
 > ~~**C338 — vehicle write-path CERTIFIED CLEAN; settings lost-update race FILED+ESCALATED (#100, architecture-gated).**~~ — *DONE C338: bug OVER
 > budget (4>3) → forced. 2-agent fan-out (vehicle write-path + settings/sync-state). (A) vehicle routes/repo/photo-routes — NO defect: clear-field
 > null-vs-undefined correct (.nullish()), cross-tenant scoped, plate-uniqueness per-tenant (#80 follow-through correct), cover-photo entityId-gated;

@@ -36,6 +36,14 @@ export interface OfflineExpense {
 	 * and every synced expense loses its fuelType label (#66, NORTH_STAR #1/#2 data safety).
 	 */
 	fuelType?: string;
+	/**
+	 * Whether this fill-up follows a MISSED one (the user didn't log the previous fill-up). MUST be
+	 * carried in the outbox: calculateAverageMpg pairs CONSECUTIVE fill-ups, and a missedFillup row is
+	 * excluded from pairing — so dropping the flag on sync makes the next pair span a gap it shouldn't,
+	 * computing an inflated/garbage MPG (#101, same offline field-dropout class as #66's fuelType,
+	 * NORTH_STAR #1/#2). The online create path sends it; the offline path must too.
+	 */
+	missedFillup?: boolean;
 	description?: string;
 	timestamp: number;
 	synced: boolean;
@@ -67,6 +75,7 @@ export function offlineExpenseToBackend(
 		volume: expense.volume,
 		charge: expense.charge,
 		fuelType: expense.fuelType,
+		missedFillup: expense.missedFillup,
 		description: expense.description
 	});
 }

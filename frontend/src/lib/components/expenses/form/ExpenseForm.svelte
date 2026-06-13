@@ -587,7 +587,9 @@
 						...(expenseData.volume !== undefined && { volume: expenseData.volume }),
 						...(expenseData.charge !== undefined && { charge: expenseData.charge }),
 						// Carry fuelType: the sync transform needs it to keep an electric charge (#66).
-						...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType })
+						...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
+						// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing (#101).
+						...(expenseData.missedFillup !== undefined && { missedFillup: expenseData.missedFillup })
 					});
 
 					requestBackgroundSync('expense-sync');
@@ -615,7 +617,8 @@
 					volume: formData.volume ? parseFloat(formData.volume) : undefined,
 					charge: formData.charge ? parseFloat(formData.charge) : undefined,
 					fuelType: formData.fuelType || undefined,
-					description: formData.description || undefined
+					description: formData.description || undefined,
+					missedFillup: formData.missedFillup
 				};
 
 				addOfflineExpense({
