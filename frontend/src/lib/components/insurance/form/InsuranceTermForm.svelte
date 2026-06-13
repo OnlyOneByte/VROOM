@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { gotoDynamic } from '$lib/utils/navigation';
+	import { resetSplitAllocations } from '$lib/utils/expense-helpers';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { ArrowLeft, Check, LoaderCircle, X, FileText } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -164,17 +165,9 @@
 	}
 
 	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		if (method === 'even') {
-			splitAllocations = [];
-		} else if (method === 'absolute') {
-			splitAllocations = selectedVehicleIds.map(id => ({ vehicleId: id, amount: 0 }));
-		} else {
-			const pct = selectedVehicleIds.length > 0 ? 100 / selectedVehicleIds.length : 0;
-			splitAllocations = selectedVehicleIds.map(id => ({
-				vehicleId: id,
-				percentage: Math.round(pct * 10) / 10
-			}));
-		}
+		// resetSplitAllocations is the shared source of truth (C415) — the expense form runs the identical
+		// reset, so the 100/N rounded-to-1-decimal percentage seed can't drift between them.
+		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}
 
 	function handleAllocationsChange(

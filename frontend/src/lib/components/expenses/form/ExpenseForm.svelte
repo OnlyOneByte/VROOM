@@ -41,7 +41,7 @@
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { formatCurrency, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import { categoryLabels, resetSplitAllocations } from '$lib/utils/expense-helpers';
 	import { extractUniqueTags } from '$lib/utils/expense-filters';
 	import { COMMON_EXPENSE_TAGS } from '$lib/types';
 	import type {
@@ -765,17 +765,9 @@
 	}
 
 	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		if (method === 'even') {
-			splitAllocations = [];
-		} else if (method === 'absolute') {
-			splitAllocations = selectedVehicleIds.map(id => ({ vehicleId: id, amount: 0 }));
-		} else {
-			const pct = selectedVehicleIds.length > 0 ? 100 / selectedVehicleIds.length : 0;
-			splitAllocations = selectedVehicleIds.map(id => ({
-				vehicleId: id,
-				percentage: Math.round(pct * 10) / 10
-			}));
-		}
+		// resetSplitAllocations is the shared source of truth (C415) — the insurance-term form runs the
+		// identical reset, so the 100/N rounded-to-1-decimal percentage seed can't drift between them.
+		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}
 
 	function handleAllocationsChange(

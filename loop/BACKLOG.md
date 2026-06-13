@@ -2017,6 +2017,14 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract resetSplitAllocations — ONE source of truth for the split-method allocation reset (2 byte-identical form copies → 1, rule-7 fan-out, done C415).**~~ —
+  *DONE C415: the ENTIRE resetAllocationsForMethod (even→[], absolute→{amount:0}, percentage→{percentage: round(100/N,1dp)}) was BYTE-IDENTICAL in ExpenseForm (:767) +
+  InsuranceTermForm (:166). The 100/N rounded-to-1-decimal seed is load-bearing — a divergent copy (2-decimal round) → the same multi-vehicle split with different
+  per-vehicle percentages by form. Extracted pure resetSplitAllocations(method, vehicleIds) into expense-helpers.ts (tested pure-util home both import); routed both to a
+  one-line call. Rule-2 behavior-preserving; rule-3: forms are eyes-on-blocked so the net is the helper + its OWN test (+6, reset-split-allocations.test.ts incl. the
+  100/3→33.3 1-decimal pin); svelte-check verified the wiring. fe validate:local EXIT 0, 696 pass (+6). BE scout found no clean byte-identical dup (well-deduped); the
+  MAX_VALID_MPG 100-vs-150 band divergence it flagged is a behavior-change → NOT arch (noted for a possible bug/direction cycle).*
+
 - ~~**Extract hasReminderEndedBy — ONE source of truth for the endDate-boundary predicate (4 inline trigger-service.ts sites → 1, rule-7 fan-out, done C409).**~~ —
   *DONE C409: the predicate `reminder.endDate && nextDue > reminder.endDate` was hand-inlined BYTE-IDENTICAL at 4 sites — fastForwardPastNow in-loop (:281) + post-loop
   (:303), processReminder in-loop break (:447) + natural-exit (:473). THE bug-#12 family the loop kept re-finding (#107/C362, #114/C394, #116/C399) — a divergent copy

@@ -72,10 +72,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 410 |
 | guard | 6 | 414 |
 | bug | 3 | 413 |
-| arch | 5 | 409 |
+| arch | 5 | 415 |
 | infra | 6 | 412 |
 
-Current cycle: **414**
+Current cycle: **415**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6337,3 +6337,13 @@ Current cycle: **414**
   1 [the ~4 mi/kWh] → RED) but costPerMileValues len 1 = $9/240mi; computeFuelConsumptionMetrics all-null (no NaN); buildMonthlyConsumption efficiency 0 not ~4, volume
   still aggregates the real kWh. NON-VACUOUS. This is a NORTH_STAR #5 merge-surviving tripwire on the C411/C413 partition — distinctly catches an EV-only regression a
   mixed test (still has a gas point) would miss. No source touched (test-only). be validate:local EXIT 0, 1505 pass (+3). cov: be 86.92% (carry, +3 guards) / fe 84.46% (carry).
+- **C415 (arch): extract resetSplitAllocations — ONE source of truth for the split-method allocation reset (2 byte-identical form copies → 1)** — BALANCE: arch OVER budget
+  (last 409, starved-for 415−409=6 > 5) → forced pick. rule-7 2-agent fan-out; the BE scout found NO clean byte-identical dup (well-deduped) — it flagged a MAX_VALID_MPG
+  100-vs-150 band DIVERGENCE, but unifying that CHANGES behavior → bug/direction-call, NOT arch (rejected for this cycle). The FE candidate was clean: VERIFIED FIRSTHAND
+  (C21/C60) the ENTIRE resetAllocationsForMethod (all 3 branches: even→[], absolute→{amount:0}, percentage→{percentage: round(100/N,1dp)}) was BYTE-IDENTICAL in ExpenseForm
+  (:767) + InsuranceTermForm (:166). The 100/N rounded-to-1-decimal seed is load-bearing — a divergent copy (2-decimal round, or different N math) would materialize the SAME
+  multi-vehicle split with DIFFERENT per-vehicle percentages depending on which form created it (rule-5 concrete payoff). FIX: extracted pure `resetSplitAllocations(method,
+  vehicleIds): SplitAllocationDraft[]` into expense-helpers.ts (already a tested pure-util home both forms can import; no cycle); routed both forms to a one-line call.
+  Rule-2 behavior-preserving (identical output). Rule-3: the forms are eyes-on/Playwright-blocked, so the increment is the helper + ITS OWN test net (+6, reset-split-
+  allocations.test.ts: even→[], absolute→amount:0, percentage 100/N, the 100/3→33.3 1-decimal load-bearing rounding, empty-list→[] no-NaN, single→100); svelte-check
+  verified the wiring green→green. fe validate:local EXIT 0, 696 pass (+6). No eyes-on needed — pure-logic extraction moves no pixel. cov: be 86.92% (carry) / fe 84.46% (carry, +6).
