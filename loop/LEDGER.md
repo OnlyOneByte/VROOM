@@ -58,13 +58,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 382 |
+| deep-review | 5 | 388 |
 | guard | 6 | 385 |
 | bug | 3 | 387 |
 | arch | 5 | 386 |
 | infra | 6 | 384 |
 
-Current cycle: **387**
+Current cycle: **388**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6003,6 +6003,16 @@ Current cycle: **387**
   costPerMonth) + vehicle-tco-zero-state.test.ts (the ≥1 clamp) drive both sites — GREEN before AND after. validate:local EXIT 0, 1470 pass (unchanged). Rejected
   the FE dead calculateDaysUntil delete (4×-deferred — deleting a TESTED export is net-negative coverage vs collapsing a live money-denominator dup). cov: be
   86.79% (carry) / fe 84.39% (carry).
+- **C388 (deep-review): dashboard quick-stats + expense-list pagination/filter audit → BOTH CERTIFIED CLEAN (docs-only, no manufactured test)** — BALANCE:
+  deep-review OVER budget (last 382, starved-for 388−382=6 > budget 5) → forced pick. 2-agent fan-out on two heavily-used-but-this-cycle-unaudited surfaces.
+  (A) dashboard quick-stats/getSummary CLEAN — every known issue already FILED (#94 fleet unit-pooling, #85 This/Last-Year range) or FIXED (#86 This/Last-Month
+  year-scope C262); div-by-zero/NaN/precision guards present + property-tested; summary↔per-method equivalence pinned. (B) expense-list pagination+filter CLEAN
+  — VERIFIED firsthand: the id-tiebreaker makes the sort fully deterministic (no drop/dup across pages, sort-paginated.test.ts:122 = 30 tied rows → 30 unique),
+  hasMore = `offset + data.length < totalCount` (pagination.ts:53, strict < — correct at the exact boundary, spot-checked firsthand), list↔CSV-export share
+  buildExpenseConditions (date-range-boundary.test.ts pins list==export), tag-AND via json_each, LIKE-metachar escape (#41), endOfDayIfDateOnly endDate-inclusive,
+  EXPENSE_SORT_COLUMNS allowlist (no injection) — all already pinned. NO reachable defect, NO genuinely-unpinned invariant on either surface (both comprehensively
+  guarded — the named tests cover every edge). Per the dormant-vein protocol, recorded a CERTIFICATION (docs-only) rather than manufacture a redundant test
+  (coverage-theater) — the vein is genuinely dry on these two surfaces. No source/test/build touched → no build gate. cov: be 86.79% (carry) / fe 84.39% (carry).
 - **C387 (bug): reminder mark-serviced CERTIFIED CLEAN; provider cross-tenant claim DEBUNKED firsthand (ARCC-consulted); pinned the backup-provider tenant-
   isolation invariant** — BALANCE: bug OVER budget (last 383, starved-for 387−383=4 > budget 3) → forced pick. 2-agent fan-out: (A) reminder mark-serviced
   re-arm, (B) provider credential resolution. (A) CERTIFIED CLEAN — both axes re-arm correctly (mileage anchors to getCurrentOdometer, time advances via the

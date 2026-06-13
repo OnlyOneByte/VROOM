@@ -154,6 +154,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Dashboard quick-stats + expense-list pagination/filter audit (C388).**~~ — *DONE C388 (BOTH CERTIFIED CLEAN; docs-only, no manufactured test). 2-agent
+> fan-out. (A) dashboard quick-stats/getSummary CLEAN — known issues FILED (#94, #85) or FIXED (#86/C262); div/NaN/precision guards present + property-tested;
+> summary↔per-method equivalence pinned. (B) expense-list pagination+filter CLEAN (verified firsthand): id-tiebreaker → deterministic sort (no drop/dup,
+> sort-paginated.test.ts:122), hasMore strict-< correct at boundary (pagination.ts:53, spot-checked), list↔export share buildExpenseConditions, tag-AND,
+> LIKE-escape (#41), endDate-inclusive, sort allowlist — all pinned. NO reachable defect, NO genuinely-unpinned invariant (both comprehensively guarded). Per the
+> dormant-vein protocol, recorded a CERTIFICATION not a redundant test (coverage-theater avoided) — the vein is dry on these surfaces. No source/test touched.*
+
 > ~~**Insurance premium-materialization + financing lifecycle audit (C382).**~~ — *DONE C382 (BOTH CERTIFIED CLEAN; +1 non-even-split materialization guard).
 > 2-agent fan-out. (B) financing create-or-replace/refinance/payoff CLEAN — type-change field reset (#90/C293), refinance-reactivation (#67/C206),
 > balance=max(0,original−SUM) clamped + single computeBalances (C332), deactivateFinancing single-call-site (C343), inactive excluded from analytics — verified +
