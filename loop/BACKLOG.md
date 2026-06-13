@@ -403,6 +403,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C342 — pin appStore, the global vehicle-list + notification (toast) store (zero-coverage store).**~~ — *DONE C342: continuing the C331/C336
+> zero-coverage-store sweep. Of the 3 untested FE stores, offline.svelte.ts is trivial get/set (theater to pin), so picked app.svelte.ts — the app-wide
+> vehicle list + toast system. +11 (app-store.test.ts): updateVehicle ID-match (+ unknown-id no-op) + removeVehicle filter; addNotification id/timestamp/
+> default-5000 + explicit override + remove/clear; the FOUR show* helpers' DISTINCT default lifetimes (success 5000 / error 8000 / warning 6000 / info 5000 —
+> the user-facing toast timings); loading + reset. NON-VACUOUS. svelte-check strict needed `!`/`['key']` (noUncheckedIndexedAccess). fe validate:local EXIT 0,
+> 658 pass (+11).*
+
 > ~~**C336 — pin themeStore, the user-facing light/dark/system theme controller (zero-coverage store).**~~ — *DONE C336: scanned every BE pure-logic
 > util against the suite — all covered (the cadence note holds; data-migration is a no-op stub, checkpoint a CLI script). Pivoted FE: the 3 stores
 > (app/offline/theme.svelte.ts) had NO direct test. theme.svelte.ts (68 lines) is the single source of truth for dark mode (setPreference persists +

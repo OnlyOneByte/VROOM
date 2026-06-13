@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 339 |
-| guard | 6 | 336 |
+| guard | 6 | 342 |
 | bug | 3 | 341 |
 | arch | 5 | 337 |
 | infra | 6 | 340 |
 
-Current cycle: **341**
+Current cycle: **342**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5494,3 +5494,14 @@ Current cycle: **341**
   a cross-month pair → both volume months exist + efficiency lands on the LATER fill-up's month (Jan eff 0, Feb 30mpg); emitted month set == distinct
   volume-row months (same-month pair → ONE month, volume pooled). NON-VACUOUS (drop `if (entry)` → phantom NaN-NaN month → RED). green→green: backend
   validate:local EXIT 0 — 1442 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C342 (guard): pin appStore — the global vehicle-list + notification (toast) store (zero-coverage store)** — BALANCE: guard AND arch both at budget
+  (guard 342−336=6=budget; arch 342−337=5=budget); guard MORE starved → pick. Continuing the C331/C336 zero-coverage-store sweep: of the 3 untested FE stores,
+  offline.svelte.ts is trivial get/set accessors (pinning bare setters = theater, the C332-rejected createStateAccessor class), so picked app.svelte.ts (89
+  lines) — the app-wide vehicle list (every vehicle CRUD surface reads it) + the toast notification system. Load-bearing logic: updateVehicle's ID-MATCH map
+  (only the matched vehicle changes, unknown id = no-op), removeVehicle's ID filter, addNotification's id+timestamp+default-5000-duration, and the FOUR show*
+  helpers' DISTINCT default toast lifetimes (success 5000 / error 8000 / warning 6000 / info 5000 — the user-facing dismiss timings; a flattening regression
+  makes errors vanish too fast). +11 guards (app-store.test.ts, new stores/__tests__/): vehicle CRUD incl. the update-only-matches + unknown-id-no-op +
+  filter-remove; notification id/timestamp/default + explicit-override + remove-by-id + clear; the 4 distinct durations; loading + reset. NON-VACUOUS (flip an
+  update/remove predicate or a default duration → RED). svelte-check strict caught noUncheckedIndexedAccess + index-signature bracket-access (fixed with `!`
+  + `['key']`). green→green: frontend validate:local EXIT 0 — 658 pass (+11) / 0 fail, tsc 0 errors, build OK. cov: be 86.53% (carry) / fe 84.39%+ (carry,
+  app.svelte.ts 0%→covered).
