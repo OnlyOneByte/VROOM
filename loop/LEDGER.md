@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 325 |
 | bug | 3 | 327 |
 | arch | 5 | 326 |
-| infra | 6 | 322 |
+| infra | 6 | 329 |
 
-Current cycle: **328**
+Current cycle: **329**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5311,3 +5311,18 @@ Current cycle: **328**
   seedVehicle has no unit_preferences path; the point of record is the un-normalized pool). NON-VACUOUS (the assertions pin the current pooled
   values; the fix will turn them red→update). green→green: backend validate:local EXIT 0 — 1435 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome
   clean, build bundled. Backend test-only, no UI. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C329 (infra): #5 branch-hygiene sweep + BRANCH_REVIEW.md refresh** — BALANCE: infra OVER budget (last 322, starved-for 329−322=7 > budget 6)
+  → FORCED most-starved pick (the queue is empty; the standing #5 cadence is the infra increment). Last full sweep C303 (theme write last C224 —
+  the §-digest lapsed C224→C328 even as the per-delta status header refreshed C303). (1) STRAY-TEST CHECK (the load-bearing half — bun discovers
+  tests by filesystem, so an untracked .test.ts counts locally but VANISHES on merge, silently dropping coverage): `git status` shows ZERO stray
+  untracked unit/spec tests; every untracked entry is the by-design set (*.meshclaw.e2e.ts specs + snapshots, .meshclaw-tools/ harness,
+  playwright.meshclaw.config.ts, mise.local.toml, the squash-merged .kiro/specs/offline-entries/ doc). (2) GREEN BASELINE: backend 1435 pass /
+  1 skip / 0 fail carried from C328 (validate:local EXIT 0, unchanged — this cycle is docs-only, no source touched, the C303/C100 measurement-
+  only pattern → no build gate needed). (3) BRANCH_REVIEW.md refresh (gitignored): the digest was BADLY stale — claimed 34 commits (C190–C223)
+  but the branch is 139 ahead of origin/main (C190–C328, no squash since C190.5). Bumped scope 34→139, status 1309→1435 BE / 584→~622 FE +
+  the C323 coverage re-measure (be 86.53/86.21, fe 84.39/83.97/76.43 — BE↔FE gap closed ~4→~2pts), appended §30 (the C224–C328 arc by category:
+  ~16 shipped within-tenant bug fixes incl. the lone migration 0005/#80, 4 escalated bugs #88/#94/#97/#98, ~11 arch dedups, ~7 guard ratchets,
+  ~15 deep-review certs). ALSO corrected two stale claims: the "Playwright sandbox-blocked" note (a MISDIAGNOSIS resolved 2026-06-11) + the
+  "no migration" checklist line (0005 landed C233). Refreshed the Reviewer-checklist pending-Angelo set (+#43/#44, +#88/#94/#97/#98, +the lower-sev
+  #45/#51/#69/#79/#85) + the Suggested-merge footer (34→139). Doc/measurement-only; only loop/LEDGER.md commits (BRANCH_REVIEW.md is gitignored).
+  Next sweep ~C339; next CLAUDE.md refresh ~C332 (last C322). cov: be 86.53% (carry) / fe 84.39% (carry).
