@@ -750,6 +750,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**C378 — bug cycle CERTIFIED CLEAN (no new defect); pinned the costPerMile cost/miles-consistency invariant.**~~ — *DONE C378: bug forced (4>3). 2-agent
+> fan-out, BOTH "bugs" debunked firsthand (C21/C60): (A) "costPerMile includes untracked charge cost" is BY-DESIGN-CORRECT — numerator+denominator are
+> consistent (both span all mileage rows); trackCharging gates the EFFICIENCY display, not cost; the agent's drop-cost-keep-miles "fix" would UNDER-report
+> spend. (B) sync-manager "tagsMatch partial-overlap → silent drop" is NOT data loss — a 'duplicate' classification is surfaced to the USER via
+> SyncConflictResolver for keep_local/keep_server/merge; conflictType only changes the label, the local is preserved → cosmetic. THE unpinned invariant →
+> pinned: vehicle-stats.property.test.ts pins totals/flag-gating/isolation but NOT that costPerMile is the consistent total-energy/total-miles ratio INDEPENDENT
+> of the flags (what the agent's "fix" would break). +1 (Property 7): costPerMile == (fuelCost+chargeCost)/20060, IDENTICAL across all 4 flag combos.
+> NON-VACUOUS. be validate:local EXIT 0, 1466 pass (+1).*
+
 > ~~**#110 (MED, money/correctness / NORTH_STAR #1 — found+fixed C374 on a lease-metrics bug scout) — calculateLeaseMetrics over-reported the projected
 > excess-mileage fee for a lease stored with NO endDate.**~~ — *DONE C374: calculateLeaseMetrics (financing-calculations.ts:430) derived a missing endDate as
 > `startDate + termMonths × 30 days`. endDate is NULLABLE (schema.ts:95; FE type endDate?), so a no-end lease hits this — and ×30 runs ~0.4 days short per month

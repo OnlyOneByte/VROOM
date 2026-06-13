@@ -56,11 +56,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 377 |
 | guard | 6 | 375 |
-| bug | 3 | 374 |
+| bug | 3 | 378 |
 | arch | 5 | 376 |
 | infra | 6 | 373 |
 
-Current cycle: **377**
+Current cycle: **378**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5898,6 +5898,17 @@ Current cycle: **377**
   +1 SOURCE-SCAN (offline-save-carries-fuel-fields.test.ts, 3 tests): extract every addOfflineExpense({...}) body, assert BOTH sites carry missedFillup AND
   fuelType (+ the scan-is-live count). Merge-surviving, pins the whole #66/#101/#111 dropout class at the call-site layer. NON-VACUOUS (pre-fix the
   missedFillup test RED). green→green: fe validate:local EXIT 0, 673 pass (+3) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C378 (bug → NO new defect; CERTIFIED CLEAN + pinned the costPerMile cost/miles-consistency invariant)** — BALANCE: bug OVER budget (last 374, starved-for
+  378−374=4 > budget 3) → forced pick. Vein dormant → 2-agent fan-out: (A) vehicle-stats cost-per-period rollup, (B) sync-manager conflict classification. BOTH
+  "bugs" DEBUNKED firsthand (C21/C60): (A) "costPerMile includes untracked charge cost" is BY-DESIGN-CORRECT — costPerMile = (fuelCost+chargeCost)/totalMileage
+  has a CONSISTENT numerator+denominator (both span all mileage rows); trackCharging gates the EFFICIENCY display (mi/kWh), NOT cost. The agent's "fix" (drop
+  charge cost, keep charge miles) would UNDER-report real spend — a worse bug. (B) "tagsMatch partial-overlap → silent drop" is NOT data loss: a 'duplicate'
+  classification is surfaced via syncConflicts→SyncConflictResolver.svelte for the USER to resolve (keep_local/keep_server/merge); conflictType only changes
+  the displayed LABEL, the local is preserved either way → cosmetic imprecision, not a defect. THE genuinely-unpinned reachable invariant → pinned (dormant-vein
+  protocol, no manufacture): vehicle-stats.property.test.ts pins totals partition (P4), flag gating (P5), MPG/mi-kWh isolation (P6) — but NOT that costPerMile is
+  the consistent total-energy/total-miles ratio INDEPENDENT of the flags (the exact invariant the agent's "fix" would break). +1 (Property 7 in the C353 mixed
+  block): costPerMile == (fuelCost+chargeCost)/20060, IDENTICAL across all 4 trackFuel/trackCharging combos. NON-VACUOUS (flag-gating the cost would fail the
+  cross-combo equality). green→green: be validate:local EXIT 0, 1466 pass (+1) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).
 - **C376 (arch): extract assertVehiclesOwned — ONE source of truth for the cross-tenant vehicle-ownership query (2 repos → 1)** — BALANCE: arch OVER budget
   (last 370, starved-for 376−370=6 > budget 5) → forced pick. rule-7 fan-out (2 agents). PICK (CONFIRMED firsthand, C21/C60): the expense split repo
   (repository.ts:611) and the insurance repo (repository.ts:103) each ran a private validateVehicleOwnership doing the BYTE-IDENTICAL core `select id from

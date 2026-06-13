@@ -535,4 +535,28 @@ describe('Property 6: a mixed fuel+charge vehicle keeps MPG and mi/kWh isolated'
     expect(stats.fuelExpenseCount).toBe(2);
     expect(stats.chargeExpenseCount).toBe(2);
   });
+
+  // C378: costPerMile is the TOTAL energy spend (fuel + charge) over TOTAL distance driven — a
+  // CONSISTENT numerator/denominator (both span every mileage row). The trackFuel/trackCharging flags
+  // gate only the EFFICIENCY display (MPG / mi-kWh), NOT cost accounting: a dollar spent on either
+  // energy is a real cost per real mile. A tempting "fix" that dropped charge COST when
+  // trackCharging=false while keeping the charge MILES in the denominator would UNDER-report real
+  // spend (a worse bug). Pin both: costPerMile == (fuelCost+chargeCost)/totalMileage, and it is
+  // IDENTICAL across all four flag combinations.
+  test('costPerMile is total-energy-cost / total-miles, IDENTICAL across tracking-flag combinations', () => {
+    const both = calculateVehicleStats(mixed, 0, true, true);
+    const totalMileage = 20060; // max(20060) − initial 0; consistent denominator across flags
+    const expected = (both.totalFuelCost + both.totalChargeCost) / totalMileage;
+    expect(both.costPerMile).toBeCloseTo(expected, 5);
+
+    // The cost ratio must not move when a tracking flag flips — only MPG/mi-kWh are gated.
+    for (const [tf, tc] of [
+      [true, false],
+      [false, true],
+      [false, false],
+    ] as const) {
+      const s = calculateVehicleStats(mixed, 0, tf, tc);
+      expect(s.costPerMile).toBeCloseTo(expected, 5);
+    }
+  });
 });
