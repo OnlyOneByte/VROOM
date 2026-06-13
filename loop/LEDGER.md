@@ -62,9 +62,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 380 |
 | bug | 3 | 383 |
 | arch | 5 | 381 |
-| infra | 6 | 379 |
+| infra | 6 | 384 |
 
-Current cycle: **383**
+Current cycle: **384**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5975,3 +5975,10 @@ Current cycle: **383**
   (import-csv.test.ts): a fully-populated fuel expense create→export→WIPE→import → all 10 fields intact (incl. vehicleId-resolved-by-name, tags array,
   missedFillup=1, calendar day). NON-VACUOUS (any field's export-serialize OR import-parse regression turns it RED). green→green: be validate:local EXIT 0, 1468
   pass (+1) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C384 (infra): CLAUDE.md full orientation refresh (the overdue ~C383 cadence; last full C373)** — BALANCE: nothing over budget; infra closest (last 379,
+  starved-for 384−379=5, budget 6) + the CLAUDE.md refresh was the overdue cadence → pick. Read the drift-prone sections vs source/LEDGER (no churn — C5/C47/C72
+  discipline). FIXED the two MATERIAL drifts: (1) the coverage line cited the C368 reading → updated to the C379 re-measure (be 86.79/86.39 · fe 84.39/84.3/76.53)
+  + the C353–C382 arc framing + ~2.4pt gap; (2) suite size ~1464/669 + the C358–C372 arc → ~1468/675 + the C373–C383 arc (the #110 fix + C375/C380/C382/C383
+  guards). Also ADDED #112 (the C383 chart-palette-collision, DESIGN-gated) to the pending-Angelo escalation list. The closed-bug list correctly ends at #111/C377
+  (#112 is escalated, NOT closed — verified, left as-is); testing-infra/open-gaps sections current. Docs-only; no source/test/build touched → no build gate (the
+  C309/C357/C373 refresh pattern). Next CLAUDE.md refresh ~C394; next #5 sweep ~C384-ish (just did C379, so ~C390). cov: be 86.79% (carry) / fe 84.39% (carry).

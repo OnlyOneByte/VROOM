@@ -163,8 +163,8 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C368, not an estimate): **backend 86.68% line / 86.26% func · frontend 84.45% line / 84.3%
-  func / 76.43% branch** (both suites > 84% line; creeping UP vs the C351 reading 86.25/86.67 · 84.17/83.9/76.32 — the C353–C372 dedup-anchor + #107/#108/#109 fix + claim-survival/tie-tolerant/cross-policy guards held/nudged the line as product code grew). BE↔FE gap ~2pts (stable, the tightest era). The 90% goal stays structurally gated: BE tail is DI/singleton-bound + OAuth-network; FE gap is the eyes-on components/routes deficit (Playwright-blocked).
+  (re-measured C379, not an estimate): **backend 86.79% line / 86.39% func · frontend 84.39% line / 84.3%
+  func / 76.53% branch** (both suites > 84% line; creeping UP vs the C351 reading 86.25/86.67 · 84.17/83.9/76.32 — the C353–C382 dedup-anchor + #107–#111 fix + claim-survival/tie-tolerant/cross-policy/round-trip guards held/nudged the line as product code grew). BE↔FE gap ~2.4pts (stable, the tightest era). The 90% goal stays structurally gated: BE tail is DI/singleton-bound + OAuth-network; FE gap is the eyes-on components/routes deficit (Playwright-blocked).
   Frontend climbed 65.3→84 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
   C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts, C201
@@ -183,11 +183,10 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1464 backend tests / ~669 frontend** (a floor — grows most cycles; the C358–C372 arc added
-  the #106 date-filter + #107 reminder-fast-forward + #108 seasonal-fillup + #109 source-link fix guards, the
-  C363 insurance-tie flake kill, the C364 getVehicleDisplayName coverage-theater fix, the C366 claim-survival
-  pin, the C369 PUT-claim termId cross-policy guard, the C371 multi-tag import round-trip — on top of the
-  C345–C356 #103/#104/#105 fix guards + C353 hybrid isolation). Don't regress coverage; name why if a cycle drops it.
+  Suite size today: **~1468 backend tests / ~675 frontend** (a floor — grows most cycles; the C373–C383 arc added
+  the #110 lease-endDate fix + C375 reminder-equality + C380 month-plural + C382 non-even-split + C383 full
+  export→import round-trip guards, on top of the C358–C372 arc [#106–#109 fixes, C363 flake-kill, C364
+  coverage-theater fix, C366 claim-survival, C369 cross-policy, C371 multi-tag]). Don't regress coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
   in-memory SQLite DB with a seeded user + a real Lucia session cookie (`ctx.authed/anon`); it's
@@ -266,4 +265,5 @@ Highlights:
   **#94** (BROADENED to a CLASS C328: the fleet-wide analytics SUMMARY + fuel-advanced builders pool UNIT-BEARING quantities across vehicles WITHOUT per-vehicle conversion — distance + cost/distance [the original, C301], volume gal+L + fillupDetails [C328], and efficiency mi/gal+km/L via buildMonthlyConsumption/buildSeasonalEfficiency/buildVehicleRadar/buildDayOfWeekPatterns; 6 members verified firsthand C328 vs getCrossVehicle's correct convert-before-pool contrast. So a mixed mi+km/gal+L fleet shows garbage pooled scalars on the headline view; per-vehicle charts + getCrossVehicle convert, the summary builders don't; found+escalated C301, broadened+re-escalated C328, characterization-pinned distance C301 + volume C328 — the fix is one coherent thread-units-into-builders change: convert-to-user-global / per-vehicle-only / require-vehicleId. The C328 fan-out also certified per-vehicle calculateVehicleStats CLEAN).
   **#97** (a reminder linked to ONLY the deleted vehicle is left vehicle-less but still active — reminder_vehicles.vehicleId is onDelete:cascade, so the junction row drops but the reminder row survives is_active with zero vehicles, skipped 'no_vehicles' every trigger forever, no user signal; same family as #88 but the junction-cascade mechanism; found+escalated C318, characterization-pinned — deactivate / delete / surface-in-needs-attention / block-delete-of-sole-target).
   **#100** (userPreferences writes are an un-serialized read-modify-write — PUT /settings getOrCreate→JS-merge→update + the same at 5 sites incl. the two provider-cleanup helpers — so concurrent edits lost-update-clobber a sibling config; the #82 per-provider merge fixed the within-request wipe but not the across-request interleave; found+escalated C338, architecture-gated [optimistic-version+migration / transactional-merge vs the C151 async-tx footgun / serial-queue / accept-as-single-user-deployment-non-issue]; NO test added — a timing test would be flaky, the #82 sequential merge is pinned).
+  **#112** (DESIGN-gated, LOW — CrossVehicleTab colors series via `CHART_COLORS[i % 5]` but only 5 `--chart-N` design tokens exist, so a fleet of ≥6 vehicles reuses --chart-1 → two chart lines share a color; found+escalated C383; reachable [VROOM is multi-vehicle; #94 fleet=6] but the fix is a palette/design call: extend the palette with a11y-safe tokens / generate HSL hues for N>5 / accept-as-limitation — NOT self-invented).
   See `loop/BACKLOG.md` bug queue for the full list + grounding.
