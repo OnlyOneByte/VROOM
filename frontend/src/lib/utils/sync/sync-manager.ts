@@ -266,6 +266,23 @@ class SyncManager {
 				offlineExpenseQueue.current = currentExpenses.map(e =>
 					e.id === expense.id ? { ...e, synced: true } : e
 				);
+			} else if (result.conflict) {
+				// #121 (C424): a conflict detected ON A RETRY must be SURFACED for resolution, just like the
+				// main syncExpenses loop does (which pushes to result.conflicts → syncConflicts.current). The
+				// realistic trigger: the first POST committed server-side but its response was lost → the
+				// expense stayed pending + a retry was scheduled → on retry checkForExistingExpense now finds
+				// the committed row → conflict. Without this branch the conflict was silently dropped: no
+				// SyncConflictResolver dialog, the expense stuck pending, retryCount never cleared. Append
+				// (don't replace) since the retry runs async AFTER syncAll returned — other conflicts may
+				// already be displayed; dedup by expense id so a re-retry can't double-list it.
+				this.retryCount.delete(expense.id);
+				const already = syncConflicts.current.some(
+					c => c.localExpense.id === result.conflict?.localExpense.id
+				);
+				if (!already) {
+					syncConflicts.current = [...syncConflicts.current, result.conflict];
+					syncState.current = 'error';
+				}
 			}
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Retry failed for expense:', expense.id, error);

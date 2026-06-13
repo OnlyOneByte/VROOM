@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { syncManager, syncConfig, type SyncConflict } from '../sync/sync-manager';
+import { syncManager, syncConfig, syncConflicts, type SyncConflict } from '../sync/sync-manager';
 import { onlineStatus, syncState } from '../../stores/offline.svelte';
 import type { OfflineExpense } from '../offline-storage';
 
@@ -445,6 +445,39 @@ describe('Sync Manager', () => {
 				setTimeoutSpy.mockRestore();
 			} finally {
 				vi.useRealTimers();
+			}
+		});
+
+		// #121 (C424): a conflict detected ON A RETRY must SURFACE (push to syncConflicts.current + clear
+		// retryCount), mirroring the main loop. Pre-fix retrySingleExpense acted only on result.success, so
+		// a retry-conflict was silently dropped — no resolver dialog, expense stuck pending. Realistic
+		// trigger: first POST committed but its response was lost → retry's conflict-check now finds the row.
+		it('surfaces a conflict detected during a scheduled RETRY (was silently dropped) — #121', async () => {
+			syncConfig.update(config => ({ ...config, maxRetries: 3, retryDelay: 100 }));
+			vi.mocked(loadOfflineExpenses).mockReturnValue([failingExpense('retry-conf-1')]);
+			syncConflicts.current = [];
+
+			vi.useFakeTimers();
+			try {
+				// Attempt 1 (main loop): conflict-check ok (empty) → create FAILS (500) → schedules a retry.
+				mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiError(500, 'boom'));
+				await syncManager.syncAll();
+				expect(syncManager.getRetryCount('retry-conf-1')).toBe(1);
+				expect(syncConflicts.current).toHaveLength(0); // no conflict yet
+
+				// The RETRY's conflict-check now finds the committed row → a duplicate conflict.
+				mockFetch.mockResolvedValueOnce(
+					apiOk([{ id: 'server-x', tags: ['fuel'], category: 'fuel', amount: 50.0, date: '2024-01-01' }])
+				);
+				await vi.advanceTimersByTimeAsync(200); // fire the scheduled retry (100 * 2^0)
+
+				// Pre-fix: still 0 (dropped). Post-fix: the retry-conflict is surfaced + retryCount cleared.
+				expect(syncConflicts.current).toHaveLength(1);
+				expect(syncConflicts.current[0]?.localExpense.id).toBe('retry-conf-1');
+				expect(syncManager.getRetryCount('retry-conf-1')).toBe(0);
+			} finally {
+				vi.useRealTimers();
+				syncConflicts.current = [];
 			}
 		});
 	});

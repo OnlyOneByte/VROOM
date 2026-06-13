@@ -71,11 +71,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 422 |
 | guard | 6 | 419 |
-| bug | 3 | 420 |
+| bug | 3 | 424 |
 | arch | 5 | 421 |
 | infra | 6 | 423 |
 
-Current cycle: **423**
+Current cycle: **424**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6425,3 +6425,13 @@ Current cycle: **423**
   offline-entries spec + .config.kiro catches stayed fixed); all untracked confirmed by-design (*.meshclaw.e2e.ts, .meshclaw-tools/, screenshots, playwright config,
   mise.local.toml). Branch 233 commits ahead of origin/main, build floor GREEN both sides → PR-ready (standing escalation since C368). No product code touched → coverage
   runs were the gate (both EXIT 0). cov: be 86.93% / fe 84.51%. Next #5 sweep ~C433; next CLAUDE.md refresh ~C428.
+- **C424 (bug → #121: sync-manager retrySingleExpense silently DROPPED a conflict detected during a retry)** — BALANCE: bug OVER budget (last 420, starved-for 424−420=4 >
+  3) → forced pick. Re-examined the C410-filed #121 firsthand (C21/C60) — and it turned out a CLEAN atomic fix, not the flaky timing test the scout's caveat implied:
+  retrySingleExpense (sync-manager.ts:261) acted ONLY on result.success — when syncSingleExpense returned {success:false, conflict} on a retry, the conflict was NOT pushed
+  to syncConflicts.current (the main syncExpenses loop DOES, :154) → no SyncConflictResolver dialog, expense stuck pending, retryCount never cleared. The realistic trigger
+  (first POST committed but its response lost → retry's checkForExistingExpense finds the row) is race-GATED, but the LOGIC is deterministically testable. FIX (mirror the
+  main loop): on result.conflict in the retry handler, APPEND to syncConflicts.current (not replace — the retry runs async AFTER syncAll returned, other conflicts may be
+  displayed; dedup by expense id) + clear retryCount + set syncState 'error'. GUARD: +1 (sync-manager.test.ts) driving the REAL retry path with FAKE TIMERS (not a wall-clock
+  race): attempt-1 create fails → schedules retry → retry's conflict-check returns an existing row → advanceTimersByTimeAsync fires it → syncConflicts.current has the
+  conflict + retryCount cleared. NON-VACUOUS (pre-fix stayed []). fe validate:local EXIT 0, 697 pass (+1). The durable DB clientId dedup means no DOUBLE-apply regardless;
+  this closes the stuck-pending + no-signal half. cov: be 86.93% (carry) / fe 84.51% (carry, +1).

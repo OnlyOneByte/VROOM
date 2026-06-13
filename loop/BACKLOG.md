@@ -863,14 +863,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > forms). formatDate contract already pinned (formatters.test.ts:96/187) → wiring fix to a tested helper. EYES-ON offline-state-blocked (the cards need a client-side
 > IndexedDB queue the screenshot harness can't seed). fe validate:local EXIT 0, 690 pass / svelte-check + build clean.*
 
-> **#121 (LOW, data-safety / NORTH_STAR #1 — found C410 on an offline-sync deep-review; TIMING-RACE-gated, FILED not fixed) — retrySingleExpense silently drops a
-> conflict result.** sync-manager.ts retrySingleExpense (~:257-273) acts only on `result.success` — when syncSingleExpense returns `{success:false, conflict}` it is NOT
-> pushed to syncConflicts.current (the main syncExpenses loop DOES push it → SyncConflictResolver opens). So a conflict detected ON A RETRY (the realistic trigger: first
-> POST committed server-side but its response was lost → expense left pending + retry scheduled → on retry checkForExistingExpense finds the committed row → conflict) is
-> silently dropped: no dialog, expense stuck pending, retryCount never cleared. FIX (atomic): mirror the main loop — on `result.conflict` in the retry handler, append to
-> syncConflicts.current + retryCount.delete(expense.id). REACHABILITY caveat: network-race-gated (conflict-must-appear-on-retry-but-not-first-attempt), the C163 timer/
-> network-bound mock-trap class — the LOGIC bug is real + unit-testable in isolation (mock syncSingleExpense → conflict) but the trigger isn't a clean deterministic user
-> path, so it's LOW. The durable dedup (DB clientId) means no DOUBLE-apply regardless; this is a stuck-pending + no-signal defect, sibling to the filed #79.
+> ~~**#121 (LOW, data-safety / NORTH_STAR #1 — found C410 on an offline-sync deep-review) — retrySingleExpense silently dropped a conflict result.**~~ — *DONE C424:
+> retrySingleExpense (sync-manager.ts:261) acted ONLY on result.success — a {success:false, conflict} on a retry was NOT pushed to syncConflicts.current (the main loop
+> does, :154) → no SyncConflictResolver dialog, expense stuck pending, retryCount never cleared. FIX (mirror the main loop): on result.conflict, APPEND to
+> syncConflicts.current (not replace — the retry runs async after syncAll returned; dedup by expense id) + clear retryCount + set syncState 'error'. The timing-race caveat
+> was about the TRIGGER, not the fix — the LOGIC is deterministically testable: +1 guard driving the REAL retry path with FAKE TIMERS (attempt-1 create fails → schedules
+> retry → retry conflict-check returns an existing row → advanceTimersByTimeAsync fires it → syncConflicts.current has it + retryCount cleared). NON-VACUOUS (pre-fix []).
+> fe validate:local EXIT 0, 697 pass (+1). The durable DB clientId dedup means no DOUBLE-apply regardless; this closed the stuck-pending + no-signal half.*
 
 > ~~**#118 (MED, data-safety / NORTH_STAR #1 — found+fixed C408 on a split/tag bug scout; the #104/C352 CSV round-trip class, on the boundary that fix missed) — the
 > split-expense create schema's tags bypassed the separator-rejection, re-opening the silent tag-split-on-round-trip.**~~ — *DONE C408: createSplitExpenseSchema
