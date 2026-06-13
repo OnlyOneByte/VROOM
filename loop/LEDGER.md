@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 311 |
-| guard | 6 | 307 |
+| guard | 6 | 313 |
 | bug | 3 | 312 |
 | arch | 5 | 310 |
 | infra | 6 | 309 |
 
-Current cycle: **312**
+Current cycle: **313**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5105,3 +5105,17 @@ Current cycle: **312**
   1800 → still exactly 2 siblings summing to 1800 (no stale lingering, no missing). Drives the REAL PUT route + reads the persisted expenses;
   non-vacuous (skip the delete → count 4/total 3000; skip the recreate → count 0). green→green: backend validate:local EXIT 0 — 1426 pass
   (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).
+- **C313 (guard): pin validateAndRefreshSession — the untested security-critical session-rotation core** — BALANCE: guard forced (last 307,
+  starved-for 6 = budget, most-starved; feature gated). Confirmed the obvious guard targets are already covered (sourceType-rejection #62/C190;
+  the backend UTC-date scan found only a cosmetic CSV-filename stamp; the SECONDS-vs-MS footgun has no live instance — Drizzle reads
+  mode:'timestamp' as Dates). Also ran the standing #5 stray-untracked-test sweep: CLEAN (all untracked tests = the by-design *.meshclaw.e2e.ts
+  set; branch 123 commits ahead of origin/main; BRANCH_REVIEW.md gitignored at §27). Per the LEDGER steering note, steered to the
+  lowest-LINE-covered PURE-logic module: auth/utils.ts validateAndRefreshSession (100% func / 40% line — the refresh + failure branches
+  untested; used by BOTH requireAuth + POST /auth/refresh, ZERO direct tests). +4 unit guards (new validate-and-refresh-session.test.ts,
+  mockable Lucia, no DB): (1) invalid session → null, no refresh attempted; (2) FRESH session → returned as-is refreshed:false, NO
+  create/invalidate (the no-churn invariant — else every request rotates); (3) NEAR-EXPIRY → rotates with call order ['validate','create',
+  'invalidate'] (create-before-invalidate: never lose the session if create fails — the source's stated ordering); (4) createSession THROWS →
+  FAILS OPEN to the existing session, old NOT invalidated (a transient hiccup must not log the user out). Real call-order assertions →
+  non-vacuous (swap create/invalidate → RED; fail-closed → RED). green→green: backend validate:local EXIT 0 — 1430 pass (+4) / 1 skip / 0 fail,
+  tsc 0, musl-biome clean, build bundled. Guard-only (no source) → no UI. cov: be 86.07%+ (carry; auth/utils.ts line coverage up from ~40%) /
+  fe 81.76% (carry). Next #5 sweep ~C323.

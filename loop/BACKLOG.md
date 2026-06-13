@@ -360,6 +360,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C313 — pin validateAndRefreshSession, the untested security-critical session-rotation core.**~~ — *DONE C313: auth/utils.ts
+> validateAndRefreshSession (used by requireAuth + POST /auth/refresh) sat at 100% func / 40% line with ZERO direct tests. +4 unit guards
+> (mockable Lucia, no DB): invalid → null; FRESH → as-is, no create/invalidate (no-churn); NEAR-EXPIRY → rotate with call order
+> ['validate','create','invalidate'] (create-before-invalidate); createSession throws → FAILS OPEN to the existing session (not logged out).
+> Real call-order assertions, non-vacuous. Also ran the #5 stray-test sweep: clean (branch 123 ahead). validate:local EXIT 0, 1430 pass (+4).*
+
 > ~~**C312 — pin the insurance term-cost-UPDATE premium-expense replacement (bug-cycle dormant-vein scout outcome).**~~ — *DONE C312: a
 > forced bug cycle scouted 4 surfaces clean (claims-repository, insurance hooks, deleteBySource, financing-timeline). No defect. The unguarded
 > invariant: a costed term auto-materializes a split premium expense (sourceType:'insurance_term'); on a term UPDATE, updateTermExpenses must
