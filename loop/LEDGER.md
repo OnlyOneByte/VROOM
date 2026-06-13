@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 350 |
 | guard | 6 | 353 |
 | bug | 3 | 352 |
-| arch | 5 | 348 |
+| arch | 5 | 354 |
 | infra | 6 | 351 |
 
-Current cycle: **353**
+Current cycle: **354**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5633,3 +5633,13 @@ Current cycle: **353**
   mileage ranges) → averageMpg=30 (only gas), averageMilesPerKwh=4 (only charge), totals partitioned (20gal/30kWh, counts 2/2). NON-VACUOUS: a leak that
   cross-paired a gas+charge row would give a ~10000-mile absurd interval, NOT 30/4. green→green: backend validate:local EXIT 0 — 1454 pass (+3) / 1 skip /
   0 fail, tsc 0, musl-biome clean (one reflow auto-fixed), build bundled. cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C354 (arch): extract computeAverageEfficiency — ONE source of truth for the analytics efficiency-average + empty→null guard** — BALANCE: arch OVER
+  budget (last 348, starved-for 354−348=6 > budget 5) → FORCED. Rule-7 fan-out (2 Explore agents). FE candidate (a shared photoApi over the
+  insurance-api/expense-api per-entity photo methods, 2 services) was the higher-surface pick (different naming conventions across modules, overlaps the
+  already-rejected photo-upload-FormData). Picked the cleaner BE one: getQuickStats/getYearEnd/getSummary computed `avgEfficiency` as a BYTE-IDENTICAL
+  4-liner (convertedEfficiencyValues.length > 0 ? reduce(sum)/len : null) at 3 sites (repository.ts:1183/1980/2056), all consuming the same
+  computeConvertedEfficiencyValues() → number[]. VERIFIED firsthand (C21/C60). FIX: extracted private computeAverageEfficiency(values) → number|null
+  (sibling to computeConvertedEfficiencyValues), routed all 3 through it. The empty→null guard (a div-by-zero vector) now lives in ONE place. −9 LOC.
+  Test-anchored both ways (rule 3): the analytics property/HTTP suites (quick-stats, year-end, summary) drive all 3 readers — GREEN before AND after.
+  green→green: backend validate:local EXIT 0 — 1454 pass (unchanged) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.25% (carry) /
+  fe 84.17% (carry).

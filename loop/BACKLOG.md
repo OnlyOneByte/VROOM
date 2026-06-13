@@ -1662,6 +1662,12 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract computeAverageEfficiency — ONE source of truth for the analytics efficiency-average + empty→null guard (rule-7 fan-out, done C354).**~~ —
+  *DONE C354: getQuickStats/getYearEnd/getSummary computed avgEfficiency as a BYTE-IDENTICAL 4-liner (values.length>0 ? reduce(sum)/len : null) at 3 sites,
+  all off the same computeConvertedEfficiencyValues()→number[]. Extracted private computeAverageEfficiency(values)→number|null (sibling helper), routed all 3
+  through it — the empty→null div-by-zero guard now lives once. −9 LOC. Analytics property/HTTP suites GREEN before AND after. validate:local EXIT 0, 1454
+  pass. Rejected: the FE shared-photoApi (2 services, different naming, overlaps the rejected photo-FormData dedup).*
+
 - ~~**Extract findOwnedProvider — ONE source of truth for the tenant-scoped provider lookup in the storage registry (rule-7 fan-out, done C348).**~~ —
   *DONE C348: getDefaultProvider/getBackupProviders/getProvider ran a BYTE-IDENTICAL `this.db.select().from(userProviders).where(and(eq(id), eq(userId)))
   .limit(1) → row[0]` (3 sites), differing only in caller null/status handling. Extracted private findOwnedProvider(providerId, userId) → UserProvider|null;

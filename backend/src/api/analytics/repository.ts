@@ -482,6 +482,17 @@ export class AnalyticsRepository {
   }
 
   /**
+   * Mean of the (already unit-converted) per-pair efficiency values, or null when there are none.
+   * The ONE source of truth for the `values.length > 0 ? sum/len : null` averaging the three analytics
+   * readers (getQuickStats / getYearEnd / getSummary) computed byte-identically off
+   * computeConvertedEfficiencyValues — so a future change to the averaging (outlier trim, weighting)
+   * lands once, and the empty→null guard (a common div-by-zero vector) lives in one place.
+   */
+  private computeAverageEfficiency(values: number[]): number | null {
+    return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null;
+  }
+
+  /**
    * Compute per-vehicle total distance, converting each to the target unit system.
    * Groups mileage readings by vehicle, computes max-min range, and converts.
    */
@@ -1180,10 +1191,7 @@ export class AnalyticsRepository {
         userUnits,
         skipConversion
       );
-      const avgEfficiency =
-        convertedEfficiencyValues.length > 0
-          ? convertedEfficiencyValues.reduce((a, b) => a + b, 0) / convertedEfficiencyValues.length
-          : null;
+      const avgEfficiency = this.computeAverageEfficiency(convertedEfficiencyValues);
 
       const fleetHealthScore =
         vehicleCount > 0 ? await this.computeFleetHealthScore(vehicleRows, userId) : 0;
@@ -1977,10 +1985,7 @@ export class AnalyticsRepository {
         userUnits,
         skipConversion
       );
-      const avgEfficiency =
-        convertedEfficiencyValues.length > 0
-          ? convertedEfficiencyValues.reduce((a, b) => a + b, 0) / convertedEfficiencyValues.length
-          : null;
+      const avgEfficiency = this.computeAverageEfficiency(convertedEfficiencyValues);
 
       const efficiencyTrend = this.buildConvertedEfficiencyTrend(
         fuelRows,
@@ -2053,10 +2058,7 @@ export class AnalyticsRepository {
         userUnits,
         skipConversion
       );
-      const avgEfficiency =
-        convertedEfficiencyValues.length > 0
-          ? convertedEfficiencyValues.reduce((a, b) => a + b, 0) / convertedEfficiencyValues.length
-          : null;
+      const avgEfficiency = this.computeAverageEfficiency(convertedEfficiencyValues);
       const ytdSpending = allExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
       const fleetHealthScore =
         vehicleRows.length > 0 ? await this.computeFleetHealthScore(vehicleRows, userId) : 0;
