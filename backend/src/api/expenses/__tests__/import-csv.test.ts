@@ -46,6 +46,28 @@ async function listExpenses(): Promise<
   return body.data;
 }
 
+/** Raw expense rows straight off sqlite — exposes columns (fuel_type, missed_fillup, tags JSON, the
+ *  integer `date` timestamp) the list endpoint omits or reshapes, for full round-trip assertions. */
+interface RawExpenseRow {
+  category: string;
+  expense_amount: number;
+  vehicle_id: string;
+  mileage: number | null;
+  volume: number | null;
+  fuel_type: string | null;
+  description: string | null;
+  tags: string | null;
+  missed_fillup: number;
+  date_ms: number;
+}
+function listExpensesRaw(): RawExpenseRow[] {
+  return ctx.sqlite
+    .query(
+      'SELECT category, expense_amount, vehicle_id, mileage, volume, fuel_type, description, tags, missed_fillup, date AS date_ms FROM expenses WHERE user_id = ? ORDER BY date'
+    )
+    .all(ctx.user.id) as RawExpenseRow[];
+}
+
 interface ImportResponse {
   data: {
     dryRun: boolean;
@@ -84,6 +106,61 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(rows.length).toBe(2);
     expect(rows.find((r) => r.category === 'fuel')?.expenseAmount).toBe(52.4);
     expect(rows.find((r) => r.category === 'maintenance')?.expenseAmount).toBe(120);
+  });
+
+  // C383: the FULL export→import round-trip on a populated fuel row. export-csv.test.ts pins the export
+  // SHAPE (filters, formula-injection, currency, numeric-quoting) and import-csv pins individual import
+  // fields, but NOTHING drove a create→EXPORT→import→re-read asserting EVERY field survives together — the
+  // NORTH_STAR #1 crown jewel ("export → re-import round-trips losslessly"). A regression in either the
+  // export serialization OR the import parse of any one field would silently corrupt that field on a real
+  // user's backup/restore-via-CSV. Create a fully-populated fuel expense, export it, WIPE the table (avoids
+  // the idempotency/duplicate-detection collision), import the exact exported CSV, and read the row back.
+  test('a populated fuel expense survives a full create→export→import round-trip with every field intact', async () => {
+    const vehicleId = await seedVehicle('Daily Driver');
+    const createRes = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'fuel',
+      expenseAmount: 52.4,
+      date: '2024-06-15T00:00:00.000Z',
+      mileage: 31234,
+      volume: 11.5,
+      fuelType: 'regular',
+      description: 'Shell premium top-up',
+      tags: ['road', 'trip'],
+      missedFillup: true,
+    });
+    const created = await json<DataEnvelope<{ id: string }>>(createRes);
+    expect(createRes.status, JSON.stringify(created)).toBeLessThan(300);
+
+    // Export the current state to CSV (the exact bytes a user would download).
+    const exportRes = await ctx.authed('GET', '/api/v1/expenses/export');
+    expect(exportRes.status).toBe(200);
+    const csv = await exportRes.text();
+
+    // Wipe expenses so the re-import recreates from the CSV alone (no duplicate-detection interference).
+    ctx.sqlite.run('DELETE FROM expenses WHERE user_id = ?', [ctx.user.id]);
+    expect(listExpensesRaw().length).toBe(0);
+
+    const importRes = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const importBody = await json<ImportResponse>(importRes);
+    expect(importRes.status, JSON.stringify(importBody)).toBe(200);
+    expect(importBody.data.imported).toBe(1);
+
+    // Read the recreated row straight off sqlite and assert EVERY round-tripped field.
+    const [row] = listExpensesRaw();
+    expect(row, 'the round-tripped expense exists').toBeDefined();
+    expect(row?.category).toBe('fuel');
+    expect(row?.expense_amount).toBeCloseTo(52.4, 2);
+    expect(row?.vehicle_id).toBe(vehicleId); // resolved back by vehicle NAME
+    expect(row?.mileage).toBe(31234);
+    expect(row?.volume).toBeCloseTo(11.5, 2);
+    expect(row?.fuel_type).toBe('regular');
+    expect(row?.description).toBe('Shell premium top-up');
+    expect(JSON.parse(row?.tags ?? '[]')).toEqual(['road', 'trip']);
+    expect(row?.missed_fillup).toBe(1); // boolean true survived as the stored 1
+    // The calendar day is preserved (ISO export → import; the stored instant's local day is 2024-06-15).
+    const storedDay = new Date(Number(row?.date_ms) * 1000);
+    expect(storedDay.getUTCFullYear()).toBe(2024);
   });
 
   test('a multi-tag cell splits on ; OR , into a real tags array (the export "; "-join → import round-trip, #104 by-design)', async () => {

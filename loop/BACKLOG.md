@@ -765,6 +765,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**C383 — CSV export CERTIFIED CLEAN; #112 found but DESIGN-GATED (escalated); pinned the full export→import round-trip.**~~ — *DONE C383: bug forced (5>3).
+> 2-agent fan-out. (A) CSV export→import CERTIFIED CLEAN — every field round-trips (verified firsthand). (B) surfaced #112: CrossVehicleTab colors series via
+> `CHART_COLORS[i % 5]` but only 5 --chart-N tokens exist → a 6th vehicle reuses --chart-1 (chart misleading). Reachable (multi-vehicle; #94 fleet=6) but the
+> fix is a DESIGN call (extend palette / generate hues / accept) → ESCALATED to Angelo, not self-invented. THE unpinned invariant → pinned: NOTHING drove a
+> create→EXPORT→import→re-read asserting EVERY field survives together (NORTH_STAR #1 crown jewel). +1 HTTP guard (import-csv.test.ts): a populated fuel expense
+> create→export→WIPE→import → all 10 fields intact. NON-VACUOUS. be validate:local EXIT 0, 1468 pass (+1).*
+
 > ~~**C378 — bug cycle CERTIFIED CLEAN (no new defect); pinned the costPerMile cost/miles-consistency invariant.**~~ — *DONE C378: bug forced (4>3). 2-agent
 > fan-out, BOTH "bugs" debunked firsthand (C21/C60): (A) "costPerMile includes untracked charge cost" is BY-DESIGN-CORRECT — numerator+denominator are
 > consistent (both span all mileage rows); trackCharging gates the EFFICIENCY display, not cost; the agent's drop-cost-keep-miles "fix" would UNDER-report
@@ -1111,6 +1118,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   validate-first is what actually guarantees no-mutation on a bad id), switch to `this.db.transaction` (DI-consistent with expenses/insurance;
   404 propagates instead of a wrapped 500; production this.db===getDb() so behavior-preserving). +3 direct-repo tests over a migrated in-memory DB
   (set-cover-entity-scope.test.ts — closes the coverage-theater gap). NON-VACUOUS (foreign-entity + unknown-id RED pre-fix). green→green 1319 pass (+3).*
+- **#112 (LOW, UI-legibility / NORTH_STAR #2-adjacent — found C383 bug scout; ESCALATED to Angelo C383, DESIGN-gated) — cross-vehicle analytics charts
+  reuse a color on a fleet of ≥6 vehicles.** CrossVehicleTab (fuel-efficiency comparison) assigns each series a color via `CHART_COLORS[i % CHART_COLORS.length]`,
+  but the design system defines exactly 5 `--chart-N` tokens (app.css) → a 6th vehicle reuses `--chart-1`, identical to vehicle 1, so two lines share a color and
+  the chart can't distinguish them. VERIFIED firsthand: reachable (VROOM is explicitly multi-vehicle/household; #94's fleet has 6 members). The modulo IS the
+  correct way to cycle a BOUNDED palette — the real fix is a DESIGN call, so escalated rather than self-inventing hues. DECISION (send_message'd Angelo): (a)
+  extend the palette with designer-chosen a11y-contrast-safe `--chart-6/7/8…` tokens, (b) generate distinct hues programmatically (HSL rotation) for N>5 series,
+  or (c) accept as a known limitation (most households ≤5 vehicles). Not loop-decidable — awaiting Angelo. Lower priority than the standing escalations.
 - **#79 (LOW, data-hygiene / NORTH_STAR #1-adjacent — found C231 deep-review; ESCALATED to Angelo C231, product-gated) — a malformed fuel offline
   entry is stuck in the outbox FOREVER.** `syncOfflineExpenses` (offline-storage.ts:177-187) `continue`-skips a fuel entry missing volume/charge or
   mileage → it's never `markExpenseAsSynced`'d → the trailing `clearSyncedExpenses()` (drops only synced===true) leaves it PENDING, silently

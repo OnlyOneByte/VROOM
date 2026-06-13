@@ -60,11 +60,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 382 |
 | guard | 6 | 380 |
-| bug | 3 | 378 |
+| bug | 3 | 383 |
 | arch | 5 | 381 |
 | infra | 6 | 379 |
 
-Current cycle: **382**
+Current cycle: **383**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5963,3 +5963,15 @@ Current cycle: **382**
   MUST sum exactly to the total) was unpinned at the HTTP/materialization layer (the pure algorithm is property-tested, but not the insurance term→expense
   round-trip). +1 HTTP guard (premium-expense-hook.test.ts): a $100/3 premium → 3 legs summing to EXACTLY 10000 cents, distributed [3333,3333,3334]. NON-VACUOUS
   (a lost/invented cent fails the exact-cents sum). green→green: be validate:local EXIT 0, 1467 pass (+1) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C383 (bug): CSV export CERTIFIED CLEAN; #112 found but DESIGN-GATED (escalated); pinned the full export→import round-trip crown jewel** — BALANCE: bug OVER
+  budget (last 378, starved-for 383−378=5 > budget 3) → forced pick. 2-agent fan-out: (A) CSV export, (B) FE chart-data assembly. (A) export→import CERTIFIED
+  CLEAN — every field round-trips (date ISO, vehicle-by-name, category case-insensitive, amount unquoted-number, mileage/volume null↔'', fuelType/description
+  formula-injection-guarded, tags '; '-join↔/[;,]/-split, missedFillup true/false, currency+createdAt export-only). (B) surfaced #112: CrossVehicleTab assigns
+  series colors via `CHART_COLORS[i % 5]` but the design system defines only 5 --chart-N tokens → a 6th vehicle reuses --chart-1 (two lines same color, chart
+  misleading). VERIFIED firsthand (C21/C60): reachable (VROOM is multi-vehicle; #94's fleet has 6). But the modulo is the CORRECT way to cycle a bounded palette
+  — the fix is a DESIGN call (extend palette / generate hues / accept), so ESCALATED to Angelo, NOT self-invented colors (the #36/#37/#88/#94 product-gated
+  pattern). THE genuinely-unpinned invariant → pinned (no clean self-fixable defect this cycle): export-csv pins the export SHAPE + import-csv pins individual
+  fields, but NOTHING drove a create→EXPORT→import→re-read asserting EVERY field survives together — the NORTH_STAR #1 crown jewel. +1 HTTP guard
+  (import-csv.test.ts): a fully-populated fuel expense create→export→WIPE→import → all 10 fields intact (incl. vehicleId-resolved-by-name, tags array,
+  missedFillup=1, calendar day). NON-VACUOUS (any field's export-serialize OR import-parse regression turns it RED). green→green: be validate:local EXIT 0, 1468
+  pass (+1) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).
