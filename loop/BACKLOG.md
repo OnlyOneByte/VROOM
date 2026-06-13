@@ -735,6 +735,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#110 (MED, money/correctness / NORTH_STAR #1 — found+fixed C374 on a lease-metrics bug scout) — calculateLeaseMetrics over-reported the projected
+> excess-mileage fee for a lease stored with NO endDate.**~~ — *DONE C374: calculateLeaseMetrics (financing-calculations.ts:430) derived a missing endDate as
+> `startDate + termMonths × 30 days`. endDate is NULLABLE (schema.ts:95; FE type endDate?), so a no-end lease hits this — and ×30 runs ~0.4 days short per month
+> (36-mo lease ended ~16 days early) → understated daysRemaining → inflated the milesPerDay burn rate → OVER-reported the excess FEE. FIX: addMonthsClamped(
+> startDate, termMonths) — calendar months, the helper calculatePayoffDate (:254) already uses. +1 guard (no-endDate 36-mo lease: daysRemaining matches the
+> calendar end ±1 AND > 36×30). NON-VACUOUS. fe validate:local EXIT 0, 670 pass (+1). Debunked the paired (B) backupConfig "orphan persists" → the filed #100
+> race (not new); noted storageConfig validates the MERGED result while backupConfig validates only INCOMING (hardening inconsistency, not a live bug).*
+
 > ~~**C371 — bug cycle CERTIFIED CLEAN (no new defect); pinned the unpinned multi-tag CSV-import round-trip.**~~ — *DONE C371: bug forced (4>3). 2-agent
 > fan-out, BOTH "bugs" debunked firsthand (C21/C60): (A) buildMonthlyConsumption volume-pooling-without-conversion IS the already-filed #94 class (escalated
 > C328); (B) "parseTags should reject a tag containing ;/," is by-design-WRONG — the exporter joins tags with '; ' and import splits on /[;,]/, so a delimiter

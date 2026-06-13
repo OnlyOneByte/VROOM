@@ -56,11 +56,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 372 |
 | guard | 6 | 369 |
-| bug | 3 | 371 |
+| bug | 3 | 374 |
 | arch | 5 | 370 |
 | infra | 6 | 373 |
 
-Current cycle: **373**
+Current cycle: **374**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5865,3 +5865,15 @@ Current cycle: **373**
   multi-tag). The closed-bug list (through #109/C372) + the pending-Angelo block (#88/#94/#97/#98/#100) + testing-infra/open-gaps were VERIFIED accurate inline
   — no change. Docs-only; no source/test/build touched → no build gate (the C309/C316/C322/C357 refresh pattern). Next CLAUDE.md refresh ~C383; next #5 sweep
   ~C378. cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C374 (bug → #110: calculateLeaseMetrics no-endDate fallback used termMonths×30 days, not calendar months → over-reported the excess fee)** — BALANCE: bug
+  AT budget (last 371, starved-for 374−371=3 = budget, tightest) → pick. Vein dormant → 2-agent fan-out: (A) lease-metrics/financing projection, (B)
+  settings/preferences merge. (B) the agent's "orphaned unowned provider persists after backupConfig merge" was DEBUNKED firsthand (C21/C60): a provider can't
+  become unowned without a delete (which runs cleanupBackupConfig), so the orphan needs a delete-vs-PUT race on stale prefs — that's the filed #100
+  un-serialized read-modify-write family, NOT new (real but: storageConfig validates the MERGED result while backupConfig validates only INCOMING — a hardening
+  inconsistency, noted not fixed). (A) surfaced a CLEAN ATOMIC live defect → #110: calculateLeaseMetrics (financing-calculations.ts:430) derived a missing
+  endDate as `startDate + termMonths × 30 × dayMs`. endDate is NULLABLE (schema.ts:95 no notNull; FE type endDate?), so a lease stored without an explicit end
+  hits this — and ×30 runs ~0.4 days short PER month (a 36-mo lease ended ~16 days / half a month early), understating daysRemaining → inflating the milesPerDay
+  burn rate → OVER-reporting the projected excess-mileage FEE (money-facing, NORTH_STAR #1). FIX: derive via addMonthsClamped(startDate, termMonths) — real
+  CALENDAR months, the same helper calculatePayoffDate (:254) already uses, so a no-endDate lease + an explicit payoff agree. GUARD: +1 (lease-metrics.test.ts)
+  — a no-endDate 36-mo lease's daysRemaining matches the calendar-month end (±1) AND is strictly > 36×30=1080. NON-VACUOUS (the ×30 fallback fails the >1080
+  assertion). green→green: fe validate:local EXIT 0, 670 pass (+1) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).

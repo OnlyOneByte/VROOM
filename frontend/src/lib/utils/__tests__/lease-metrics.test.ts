@@ -72,6 +72,34 @@ describe('calculateLeaseMetrics — guards & null paths', () => {
 		expect(Number.isFinite(m?.projectedExcessFee ?? NaN)).toBe(true);
 		expect(m?.isOverMileage).toBe(false);
 	});
+
+	// #110 (C374): endDate is nullable; when absent, calculateLeaseMetrics derives the lease end from
+	// the term. The old fallback used termMonths × 30 DAYS — ~0.4 days short per month — so a 36-mo
+	// lease ended ~16 days early, understating daysRemaining and inflating the excess-fee projection.
+	// The fix uses addMonthsClamped (real CALENDAR months). This pins that a no-endDate lease's
+	// daysRemaining matches the calendar-month end, and is STRICTLY MORE than the old ×30 fallback.
+	test('a lease with NO endDate derives the end from CALENDAR months, not termMonths×30 (#110)', () => {
+		// Start exactly today so daysElapsed ≈ 0 and daysRemaining ≈ the full lease span.
+		const start = new Date();
+		const startIso = start.toISOString().slice(0, 10);
+		const m = calculateLeaseMetrics(
+			makeLease({ startDate: startIso, endDate: undefined, termMonths: 36 }),
+			null,
+			0
+		);
+		expect(m).not.toBeNull();
+
+		// Expected end via real calendar-month addition (clamped), the same helper the fix uses.
+		const expectedEnd = new Date(start.getFullYear(), start.getMonth() + 36, start.getDate());
+		const MS_DAY = 1000 * 60 * 60 * 24;
+		const expectedTotalDays = Math.floor((expectedEnd.getTime() - start.getTime()) / MS_DAY);
+		// daysRemaining ≈ expectedTotalDays (allow ±1 for the floor + same-day elapsed boundary).
+		expect(Math.abs((m?.daysRemaining ?? 0) - expectedTotalDays)).toBeLessThanOrEqual(1);
+
+		// The OLD ×30 fallback would give 36×30 = 1080 days; a real 36 calendar months is ~1096 →
+		// strictly MORE. This is the load-bearing assertion: the fix can't silently revert to ×30.
+		expect(m?.daysRemaining ?? 0).toBeGreaterThan(36 * 30);
+	});
 });
 
 describe('calculateLeaseMetrics — mileage usage & remaining', () => {

@@ -427,9 +427,15 @@ export function calculateLeaseMetrics(
 			return null;
 		}
 
+		// endDate is nullable (schema: a lease may store no explicit end). When absent, derive it from
+		// the term via addMonthsClamped — CALENDAR months, not termMonths×30 days. The old ×30 fallback
+		// ran ~0.4 days short PER month (a 36-mo lease landed ~16 days / half a month early), which
+		// understated daysRemaining → inflated the milesPerDay burn rate → OVER-reported the projected
+		// excess-mileage fee (#110, money-facing per NORTH_STAR #1). addMonthsClamped is the same helper
+		// calculatePayoffDate (:254) already uses, so the no-endDate lease and an explicit payoff agree.
 		const endDate = financing.endDate
 			? new Date(financing.endDate)
-			: new Date(startDate.getTime() + financing.termMonths * 30 * 24 * 60 * 60 * 1000);
+			: addMonthsClamped(startDate, financing.termMonths);
 
 		if (isNaN(endDate.getTime())) {
 			if (DEV) console.warn('calculateLeaseMetrics: invalid endDate');
