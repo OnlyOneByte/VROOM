@@ -154,6 +154,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Insurance premium-materialization + financing lifecycle audit (C382).**~~ — *DONE C382 (BOTH CERTIFIED CLEAN; +1 non-even-split materialization guard).
+> 2-agent fan-out. (B) financing create-or-replace/refinance/payoff CLEAN — type-change field reset (#90/C293), refinance-reactivation (#67/C206),
+> balance=max(0,original−SUM) clamped + single computeBalances (C332), deactivateFinancing single-call-site (C343), inactive excluded from analytics — verified +
+> guarded. (A) insurance materialization CLEAN — totalCost split via integer-cents largest-remainder (exact to the cent), re-materialize-on-edit deletes+recreates,
+> #57 orphan-cleanup fixed, edge cases handled. THE unpinned invariant → guard: the existing premium test uses 1200/2=600 (EVEN), so the remainder-distribution
+> path was unpinned at the HTTP/materialization layer. +1 HTTP guard (premium-expense-hook.test.ts): a $100/3 premium → 3 legs summing to EXACTLY 10000 cents
+> [3333,3333,3334]. NON-VACUOUS. be validate:local EXIT 0, 1467 pass (+1).*
+
 > ~~**Offline outbox sync write-path + photo upload/serve audit (C377).**~~ — *DONE C377 (photo CERTIFIED CLEAN; found+fixed bug #111). 2-agent fan-out.
 > (B) photo upload/serve CLEAN — every route ownership-scoped (validateEntityOwnership) + nosniff'd + mime/size-gated; #74/#77/#78 confirmed fixed+guarded.
 > (A) surfaced #111: ExpenseForm saves offline from TWO sites — the offline-first path (:579, carries fuelType+missedFillup) AND the error-fallback path (:624,

@@ -58,13 +58,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 377 |
+| deep-review | 5 | 382 |
 | guard | 6 | 380 |
 | bug | 3 | 378 |
 | arch | 5 | 381 |
 | infra | 6 | 379 |
 
-Current cycle: **381**
+Current cycle: **382**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5953,3 +5953,13 @@ Current cycle: **381**
   premium-expense-hook + financing-deactivate-hook + refinance-balance-reset drive deleteBySource/clearSource/findBySource across all three source paths —
   GREEN before AND after. validate:local EXIT 0, 1466 pass (unchanged). Rejected the FE dead calculateDaysUntil delete (thrice-deferred — deleting a tested
   export < collapsing a live 4-site cross-tenant-boundary duplicate, 2 destructive). cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C382 (deep-review): insurance premium-materialization + financing lifecycle audit → BOTH CERTIFIED CLEAN; +1 non-even-split materialization guard** —
+  BALANCE: deep-review AT budget (last 377, starved-for 382−377=5 = budget) + bug over budget; picked deep-review (broader, and bug stays forced next cycle
+  regardless). 2-agent fan-out. (B) financing create-or-replace / refinance / payoff CERTIFIED CLEAN — type-change field reset (#90/C293), refinance-reactivation
+  (#67/C206), balance=max(0, original−SUM) clamped + single computeBalances source (C332), deactivateFinancing single-call-site (C343), inactive excluded from
+  analytics — all verified firsthand + guarded. (A) insurance premium materialization CERTIFIED CLEAN — totalCost split via the integer-cents largest-remainder
+  algorithm (exact to the cent), re-materialize-on-edit deletes+recreates (no double-count), #57 orphan-cleanup FIXED, zero-vehicle/zero-cost/empty-update
+  handled. THE genuinely-unpinned invariant → guard: the existing premium test uses 1200/2=600 (EVEN), so the REMAINDER-distribution path (legs not all equal but
+  MUST sum exactly to the total) was unpinned at the HTTP/materialization layer (the pure algorithm is property-tested, but not the insurance term→expense
+  round-trip). +1 HTTP guard (premium-expense-hook.test.ts): a $100/3 premium → 3 legs summing to EXACTLY 10000 cents, distributed [3333,3333,3334]. NON-VACUOUS
+  (a lost/invented cent fails the exact-cents sum). green→green: be validate:local EXIT 0, 1467 pass (+1) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).
