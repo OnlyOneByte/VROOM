@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 319 |
 | bug | 3 | 321 |
 | arch | 5 | 320 |
-| infra | 6 | 316 |
+| infra | 6 | 322 |
 
-Current cycle: **321**
+Current cycle: **322**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5215,3 +5215,11 @@ Current cycle: **321**
   NORTH_STAR #2). +1 guard (import-csv.test.ts): a 'true' row → stored missed_fillup=1, a 'false' row → 0, read straight off sqlite.
   NON-VACUOUS (narrowing the regex → the 'true'→1 assertion RED). green→green: backend validate:local EXIT 0 — 1434 pass (+1) / 1 skip / 0
   fail, tsc 0, musl-biome clean (test reflow auto-fixed), build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).
+- **C322 (infra): CLAUDE.md docs-accuracy refresh — add #97 to pending-Angelo + suite ~1434 BE / ~619 FE** — BALANCE: infra at budget (last
+  316, starved-for 6 = budget, most-starved; deep-review also at 5 but infra waited longer) → forced. The C253/.../C316 docs-accuracy
+  cadence: #97 was escalated C318 but the CLAUDE.md pending-Angelo block ended at #94, and the suites drifted (BE ~1431→~1434 via C317 +1 /
+  C318 +1 / C321 +1; FE ~613→~619 via C319 +6). FIXED (CLAUDE.md only): (1) appended #97 (reminder orphaned vehicle-less on last-vehicle
+  delete — junction-cascade mechanism, same family as #88) to the pending-Angelo block beside #94; (2) suite size ~1431→~1434 BE / ~613→~619
+  FE. DOCS-ONLY — verified `git status` = CLAUDE.md alone (the ?? items are the by-design untracked e2e/tooling scaffold); no source/test/
+  build touched (the C321 gate is the last code state). Keeps the next cycle's pending-Angelo + suite-floor refs accurate. cov: be 86.07%
+  (carry) / fe 81.76% (carry).
