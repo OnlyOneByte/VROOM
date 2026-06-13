@@ -7,7 +7,7 @@ import { vehicles as vehiclesTable } from '../../db/schema';
 import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
-import { getPeriodStartDate } from '../../utils/calculations';
+import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
@@ -339,10 +339,8 @@ routes.get(
       ? fuelExpenses.filter((e) => new Date(e.date) >= (startDate as Date))
       : fuelExpenses;
 
-    // Sort by date ascending for calculations
-    const sortedExpenses = [...filteredFuelExpenses].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    // Sort by date ascending for calculations (sortExpensesByDate — the shared pairwise-order invariant)
+    const sortedExpenses = sortExpensesByDate(filteredFuelExpenses);
 
     // Calculate statistics
     const stats = calculateVehicleStats(

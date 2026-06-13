@@ -72,10 +72,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 416 |
 | guard | 6 | 419 |
 | bug | 3 | 420 |
-| arch | 5 | 415 |
+| arch | 5 | 421 |
 | infra | 6 | 418 |
 
-Current cycle: **420**
+Current cycle: **421**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6398,3 +6398,11 @@ Current cycle: **420**
   double-count), largest-remainder split penny-exact (C382), validation rejects endDate<=startDate (no zero-length term). Known shape-mismatches (#19 trend-dates-totalCost-
   on-startDate-month, #69 monthly-only-term-absent-from-TCO) already filed/escalated, NOT re-reported. NO reachable atomic defect, NO genuinely-unpinned reachable invariant
   → CERTIFICATION only (C306/C345/C402 precedent; a manufactured test = the C181/C229 coverage-theater trap). Docs-only, no source/test touched. cov: be 86.92% (carry) / fe 84.46% (carry).
+- **C421 (arch): extract sortExpensesByDate — ONE source of truth for the chronological pairwise-order sort (3 byte-identical sites → 1)** — BALANCE: arch OVER budget
+  (last 415, starved-for 421−415=6 > 5) → forced pick. rule-7 2-agent fan-out (FE certified well-factored — only trivial 1-liners). VERIFIED FIRSTHAND (C21/C60): the
+  date-ascending comparator `[...x].sort((a,b) => new Date(a.date).getTime() − new Date(b.date).getTime())` was BYTE-IDENTICAL at 3 sites — calculateAverageMPG
+  (calculations.ts:42), calculateAverageMilesPerKwh (:93), and the /stats handler (vehicles/routes.ts:343). All 3 feed PAIRWISE consecutive-row calcs (current − previous),
+  so an unsorted/wrong-direction/in-place-mutating copy silently mis-pairs into garbage MPG/mi-kWh with no error (the #75/C222 class — a real latent bug, the rule-5 payoff).
+  Extracted `sortExpensesByDate<T extends {date: Date|string}>` (copy, never mutates) into calculations.ts (where 2 of 3 live + the shared util home); routed all 3. Rule-2
+  behavior-preserving (identical sort). Rule-3 green→green: the #75/C222 order-independence guard + calculations sort tests drive calculateAverageMPG/MilesPerKwh — GREEN
+  before AND after. +4 helper tests (ascending; no-mutation; Date+string mix; empty/single). be validate:local EXIT 0, 1518 pass (+4). cov: be 86.92% (carry, +4) / fe 84.46% (carry).

@@ -2036,6 +2036,13 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract sortExpensesByDate — ONE source of truth for the chronological pairwise-order sort (3 byte-identical sites → 1, rule-7 fan-out, done C421).**~~ —
+  *DONE C421: the date-ascending comparator `[...x].sort((a,b) => new Date(a.date).getTime() − new Date(b.date).getTime())` was BYTE-IDENTICAL at calculateAverageMPG
+  (calculations.ts:42), calculateAverageMilesPerKwh (:93), the /stats handler (vehicles/routes.ts:343) — all feed PAIRWISE consecutive-row calcs, so an unsorted/
+  wrong-direction/in-place copy silently mis-pairs into garbage (the #75/C222 class). Extracted sortExpensesByDate<T extends {date: Date|string}> (copy, never mutates) into
+  calculations.ts; routed all 3. Rule-2 behavior-preserving; rule-3 green→green (the #75/C222 + calculations sort tests drive 2 of the 3 callers). +4 helper tests. be
+  validate:local EXIT 0, 1518 pass (+4). FE fan-out: certified well-factored (only trivial 1-liners).*
+
 - ~~**Extract resetSplitAllocations — ONE source of truth for the split-method allocation reset (2 byte-identical form copies → 1, rule-7 fan-out, done C415).**~~ —
   *DONE C415: the ENTIRE resetAllocationsForMethod (even→[], absolute→{amount:0}, percentage→{percentage: round(100/N,1dp)}) was BYTE-IDENTICAL in ExpenseForm (:767) +
   InsuranceTermForm (:166). The 100/N rounded-to-1-decimal seed is load-bearing — a divergent copy (2-decimal round) → the same multi-vehicle split with different

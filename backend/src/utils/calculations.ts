@@ -18,6 +18,18 @@ interface EfficiencyExpense {
   date: Date | string;
 }
 
+/**
+ * Sort rows ASCENDING by date, on a COPY (never mutates the input). ONE source of truth (C421) for the
+ * chronological order every PAIRWISE efficiency calc requires — calculateAverageMPG, calculateAverageMilesPerKwh,
+ * and the /stats handler each pair CONSECUTIVE rows (current − previous), so an unsorted or wrong-direction
+ * input silently mis-pairs into garbage with no error (the #75/C222 class). A divergent inline copy (flipped
+ * subtraction, or sorting in place and corrupting the caller's array) reintroduces exactly that. `date` is
+ * `Date | string`; new Date() normalizes both.
+ */
+export function sortExpensesByDate<T extends { date: Date | string }>(expenses: T[]): T[] {
+  return [...expenses].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
 // ============================================================================
 // FUEL EFFICIENCY CALCULATIONS
 // ============================================================================
@@ -38,10 +50,8 @@ export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
     return null;
   }
 
-  // Sort by date to ensure chronological order
-  const sortedExpenses = [...fuelExpenses].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  // Sort by date to ensure chronological order (sortExpensesByDate — the shared pairwise-order invariant)
+  const sortedExpenses = sortExpensesByDate(fuelExpenses);
 
   const mpgValues: number[] = [];
 
@@ -89,10 +99,8 @@ export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[])
     return null;
   }
 
-  // Sort by date to ensure chronological order
-  const sortedExpenses = [...chargeExpenses].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  // Sort by date to ensure chronological order (sortExpensesByDate — the shared pairwise-order invariant)
+  const sortedExpenses = sortExpensesByDate(chargeExpenses);
 
   // Need at least 2 expenses with mileage data
   const withMileage = sortedExpenses.filter((e) => e.mileage != null);

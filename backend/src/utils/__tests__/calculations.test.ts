@@ -10,6 +10,7 @@ import {
   calculateAverageMilesPerKwh,
   calculateMilesPerKwh,
   parseClampedInt,
+  sortExpensesByDate,
 } from '../calculations';
 
 // ---------------------------------------------------------------------------
@@ -189,5 +190,45 @@ describe('parseClampedInt', () => {
     // parse semantics so a future change to a stricter parser is a conscious one.
     expect(parseClampedInt('45px', 30, 1, 366)).toBe(45);
     expect(parseClampedInt('px45', 30, 1, 366)).toBe(30);
+  });
+});
+
+// C421: sortExpensesByDate is the ONE source of truth for the chronological-order invariant the pairwise
+// efficiency calcs require (calculateAverageMPG / calculateAverageMilesPerKwh / the /stats handler all
+// pair consecutive rows; unsorted input silently mis-pairs — the #75/C222 class). Pins ascending order,
+// no input mutation, and Date+string date handling.
+describe('sortExpensesByDate', () => {
+  test('sorts ASCENDING by date', () => {
+    const rows = [
+      { date: '2024-03-10', id: 'b' },
+      { date: '2024-01-05', id: 'a' },
+      { date: '2024-06-20', id: 'c' },
+    ];
+    expect(sortExpensesByDate(rows).map((r) => r.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('does NOT mutate the input array (sorts a copy)', () => {
+    const rows = [
+      { date: '2024-03-10', id: 'b' },
+      { date: '2024-01-05', id: 'a' },
+    ];
+    const sorted = sortExpensesByDate(rows);
+    expect(rows.map((r) => r.id)).toEqual(['b', 'a']); // original order untouched
+    expect(sorted.map((r) => r.id)).toEqual(['a', 'b']);
+    expect(sorted).not.toBe(rows);
+  });
+
+  test('handles a mix of Date and string dates', () => {
+    const rows = [
+      { date: new Date('2024-05-01'), id: 'mid' },
+      { date: '2024-02-01', id: 'early' },
+      { date: new Date('2024-09-01'), id: 'late' },
+    ];
+    expect(sortExpensesByDate(rows).map((r) => r.id)).toEqual(['early', 'mid', 'late']);
+  });
+
+  test('empty + single-element inputs are returned as-is (sorted copy)', () => {
+    expect(sortExpensesByDate([])).toEqual([]);
+    expect(sortExpensesByDate([{ date: '2024-01-01', id: 'x' }]).map((r) => r.id)).toEqual(['x']);
   });
 });
