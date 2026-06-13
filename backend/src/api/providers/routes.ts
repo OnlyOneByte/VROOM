@@ -236,6 +236,27 @@ routes.get('/', async (c) => {
  * For google-drive: consumes pending OAuth credentials via nonce.
  * For other types: encrypts the provided credentials directly.
  */
+/**
+ * Reject a storage-provider config that the provider can NEVER instantiate with — an S3 row needs
+ * endpoint/bucket/region (buildS3Provider enforces the same at use). ONE source of truth (C416) for that
+ * required-field gate, shared by the CREATE path (resolveProviderCredentials) AND the PUT /:id handler:
+ * C349 closed this footgun on CREATE, but PUT wrote body.config verbatim, so editing an S3 provider to a
+ * config missing a field persisted a 200 + a bricked row that threw on every later test/upload/sync (#123,
+ * the #103/C349 sibling on the update path). google-drive resolves its config server-side from the OAuth
+ * nonce + google-photos needs only credentials, so neither has a required-config gate here.
+ */
+function validateStorageProviderConfig(
+  providerType: string,
+  config: Record<string, unknown> | null
+): void {
+  if (providerType === 's3') {
+    const c = config ?? {};
+    if (!c.endpoint || !c.bucket || !c.region) {
+      throw new ValidationError('S3 config must include endpoint, bucket, and region');
+    }
+  }
+}
+
 function resolveProviderCredentials(
   userId: string,
   providerType: string,
@@ -256,18 +277,10 @@ function resolveProviderCredentials(
       resolvedConfig: { ...(config ?? {}), accountEmail: pending.email },
     };
   }
-  // Fail-fast at CREATE time on a config that the provider can never instantiate with: an S3 row
-  // needs endpoint/bucket/region (buildS3Provider:62 enforces the same at use). Without this, the
-  // Zod schema's open `config: z.record(...)` lets a configless S3 row persist + auto-populate
-  // storageConfig, then EVERY later use (test/sync) throws — a broken-row footgun. Mirror the
-  // google-drive nonce gate above: reject before encrypting/persisting. (google-photos needs only
-  // credentials.refreshToken + an optional config.albumId, so it has no required-config gate here.)
-  if (providerType === 's3') {
-    const c = config ?? {};
-    if (!c.endpoint || !c.bucket || !c.region) {
-      throw new ValidationError('S3 config must include endpoint, bucket, and region');
-    }
-  }
+  // Fail-fast at CREATE time on a config the provider can never instantiate with (the shared gate,
+  // C349/C416) — without it the Zod schema's open `config: z.record(...)` lets a broken S3 row persist
+  // + auto-populate storageConfig, then EVERY later use throws.
+  validateStorageProviderConfig(providerType, config);
   return {
     encryptedCredentials: encrypt(JSON.stringify(credentials)),
     resolvedConfig: config,
@@ -404,6 +417,10 @@ routes.put(
       updates.displayName = body.displayName;
     }
     if (body.config !== undefined) {
+      // Same fail-fast gate CREATE uses (C416, the #103/C349 sibling): a PUT that swaps an S3 provider's
+      // config to one missing endpoint/bucket/region would otherwise persist a 200 + a bricked row that
+      // throws on every later test/upload/sync. Validate against the EXISTING provider's type.
+      validateStorageProviderConfig(existing[0].providerType, body.config);
       updates.config = body.config;
     }
     if (body.credentials !== undefined) {

@@ -829,6 +829,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#123 (LOW-MED, reliability/data-safety / NORTH_STAR #1 — found+fixed C416 on a storage-provider deep-review; the #103/C349 sibling on the UPDATE path) — PUT
+> /providers/:id bypassed the S3-config fail-fast CREATE has, persisting a bricked provider.**~~ — *DONE C416: PUT /providers/:id (routes.ts:406-408) wrote body.config
+> verbatim with NO provider-type validation, while CREATE fail-fasts an incomplete S3 config (resolveProviderCredentials, the C349 fix). Editing an S3 provider (the edit
+> form's canSave doesn't require region) to a config missing endpoint/bucket/region persisted a 200 + a row that throws at buildS3Provider on every later test/upload/sync
+> — the #103/C349 footgun C349 only closed on CREATE. FIX (atomic + arch-clean, ONE source of truth): extracted validateStorageProviderConfig(providerType, config) from
+> resolveProviderCredentials's inline S3 block; called from BOTH CREATE + the PUT handler (against the existing provider's type). GUARD: flipped the existing PUT test
+> (which codified the bug — {config:{changed:true}}→200) to a complete config + a NEW 400 guard (incomplete PUT rejected, original config survives). NON-VACUOUS. be
+> validate:local EXIT 0, 1506 pass (+1 net). Auth/session/OAuth CERTIFIED CLEAN the same cycle (3rd confirmation, C341/C372/C416).*
+
 > ~~**#120 (LOW-MED, UX-correctness / NORTH_STAR #2-3 — found+fixed C410 on a route-load/display deep-review) — OfflineExpenseCards rendered a RAW ISO date string
 > instead of a formatted date.**~~ — *DONE C410: OfflineExpenseCards.svelte rendered `{expense.date}` raw at :58 (pending) + :108 (synced); the offline-first save
 > stores `date` as a full ISO timestamp (dateOnlyToISO → noon-local), so /expenses showed `2024-03-15T17:00:00.000Z` next to a clean formatCurrency amount, while every

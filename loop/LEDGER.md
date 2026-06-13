@@ -69,13 +69,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 410 |
+| deep-review | 5 | 416 |
 | guard | 6 | 414 |
 | bug | 3 | 413 |
 | arch | 5 | 415 |
 | infra | 6 | 412 |
 
-Current cycle: **415**
+Current cycle: **416**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6347,3 +6347,15 @@ Current cycle: **415**
   Rule-2 behavior-preserving (identical output). Rule-3: the forms are eyes-on/Playwright-blocked, so the increment is the helper + ITS OWN test net (+6, reset-split-
   allocations.test.ts: even→[], absolute→amount:0, percentage 100/N, the 100/3→33.3 1-decimal load-bearing rounding, empty-list→[] no-NaN, single→100); svelte-check
   verified the wiring green→green. fe validate:local EXIT 0, 696 pass (+6). No eyes-on needed — pure-logic extraction moves no pixel. cov: be 86.92% (carry) / fe 84.46% (carry, +6).
+- **C416 (deep-review → #123: the provider PUT path bypassed the C349 S3-config validation CREATE has — the #103/C349 footgun re-manifested on UPDATE)** — BALANCE:
+  deep-review OVER budget (last 410, starved-for 416−410=6 > 5) → forced pick (CLAUDE.md refresh ~C416 waits). 2-agent fan-out (auth/session/OAuth + storage-providers/
+  sync-worker). (A) auth/session/OAuth + cross-tenant ownership CERTIFIED CLEAN — third independent confirmation (C341/C372/C416): every route requireAuth + userId-scoped,
+  session refresh creates-before-invalidates, cookies httpOnly/secure/sameSite, OAuth 3-flow state single-use + flowType-gated + session-bound, the id-only repo writes are
+  all defense-in-depth behind a userId ownership guard. (B) storage scout surfaced #123, VERIFIED FIRSTHAND (C21/C60): PUT /providers/:id (routes.ts:406-408) wrote
+  body.config VERBATIM with NO provider-type validation — while CREATE fail-fasts an incomplete S3 config (resolveProviderCredentials, the C349 fix). So editing an S3
+  provider (the edit form's canSave doesn't even require region) to a config missing endpoint/bucket/region persisted a 200 + a bricked row that throws at buildS3Provider
+  on EVERY later test/upload/sync — silent backup loss, the exact #103/C349 footgun C349 only closed on CREATE. FIX (atomic + arch-clean, ONE source of truth): extracted
+  validateStorageProviderConfig(providerType, config) from resolveProviderCredentials's inline S3 block; called from BOTH CREATE and the PUT handler (when body.config is
+  updated, against the existing provider's type). GUARD: the existing PUT test codified the BUG (PUT {config:{changed:true}} on an s3 default → asserted 200) — flipped it
+  to send a complete config for the happy path + added a NEW 400 guard (incomplete-config PUT rejected, original config survives — no partial persist). NON-VACUOUS
+  (pre-fix 200). be validate:local EXIT 0, 1506 pass (+1 net). cov: be 86.92% (carry) / fe 84.46% (carry).

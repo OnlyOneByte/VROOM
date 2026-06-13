@@ -191,16 +191,41 @@ describe('GET /api/v1/providers — list', () => {
 describe('PUT /api/v1/providers/:id — update', () => {
   test('updates displayName + config, returns the exact response key shape (no credentials)', async () => {
     const created = await createProvider({ displayName: 'Before' });
+    // A complete S3 config (the default provider is s3): the C416 gate requires endpoint/bucket/region
+    // on a config update too, so the happy path must send a full config (not a partial like {changed:true}).
+    const newConfig = { endpoint: 'https://s3.example.com', bucket: 'b2', region: 'us-west-2' };
     const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, {
       displayName: 'After',
-      config: { changed: true },
+      config: newConfig,
     });
     expect(res.status).toBe(200);
     const data = (await json<DataEnvelope<ProviderResponse>>(res)).data;
     expect(Object.keys(data).sort()).toEqual(PROVIDER_RESPONSE_KEYS);
     expect(data.displayName).toBe('After');
-    expect(data.config).toEqual({ changed: true });
+    expect(data.config).toEqual(newConfig);
     expect(JSON.stringify(data)).not.toContain('credentials');
+  });
+
+  // #123 (C416, the #103/C349 sibling on the UPDATE path): C349 fail-fasts an incomplete S3 config on
+  // CREATE, but PUT wrote body.config verbatim — so editing an S3 provider to a config missing
+  // endpoint/bucket/region persisted a 200 + a bricked row that threw on every later test/upload/sync.
+  // The fix shares the CREATE gate (validateStorageProviderConfig) on PUT. NON-VACUOUS: pre-fix this was 200.
+  test('rejects a PUT that swaps an S3 provider to an INCOMPLETE config (400, the #103/C349 sibling)', async () => {
+    const created = await createProvider();
+    const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, {
+      config: { bucket: 'b' }, // missing endpoint + region
+    });
+    expect(res.status).toBe(400);
+    // The original complete config must survive the rejected update (no partial persist).
+    const list = (
+      await json<DataEnvelope<ProviderResponse[]>>(await ctx.authed('GET', '/api/v1/providers'))
+    ).data;
+    const after = list.find((p) => p.id === created.id);
+    expect(after?.config).toEqual({
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      region: 'us-east-1',
+    });
   });
 
   test("404s another user's provider (ownership-scoped, no existence leak)", async () => {
