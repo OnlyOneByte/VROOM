@@ -1963,6 +1963,15 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract isFillup — ONE source of truth for the volume-bearing-fillup predicate (3 inline analytics-charts sites + 1 local repository def → 1, rule-7 fan-out, done C403).**~~ —
+  *DONE C403: the split-sibling guard `r.volume != null && r.volume > 0` was hand-inlined BYTE-IDENTICAL at computeAverageCosts (:434), buildSeasonalEfficiency (:644),
+  buildDayOfWeekPatterns (:807) + re-defined locally in analytics/repository.ts buildFuelStatsFromData (:1353). It guards the #56/#18/#108/#113 SPLIT-SIBLING OVERCOUNT
+  class (a split fuel expense creates one volume=null sibling per vehicle; counting raw rows overcounts one split fillup as N) → a divergent copy silently reintroduces
+  the overcount on one surface (real latent bug). Exported `isFillup` from analytics-charts.ts (typed Pick<FuelExpenseRow,'volume'>, where the type already lives +
+  repository.ts already imports — no cycle); routed all 4. Rule-2 behavior-preserving; rule-3 green→green: analytics-charts-unpinned.test.ts (#108/#113/#56 guards) +
+  fuel-stats-fleet-distance-pooling.test.ts (#18 COUNT) drive all 4 — GREEN before AND after, no test touched. be validate:local EXIT 0, 1490 pass (unchanged). FE
+  fan-out returned only a contrived test-only MS_PER_DAY dup → REJECTED (churn-for-churn, rule 5).*
+
 - ~~**Extract chunk() + SQLITE_BATCH_SIZE — ONE source of truth for the batched-IN-clause loop (4 photo/photoRef sites → 1, rule-7 fan-out, done C397).**~~ —
   *DONE C397: the batched-IN loop `for (i += 500) { ids.slice(i, i+500); inArray(col, batch) }` + the magic 500 was hand-rolled BYTE-IDENTICAL at 4 sites
   (photo-repository findByEntities/deleteByEntities, photo-ref-repository findAllByPhotos/deleteByPhotos — cascade-delete fan-outs; 2 destructive). A divergent

@@ -74,6 +74,18 @@ export interface FuelExpenseRow {
   vehicleId: string;
 }
 
+/**
+ * A row counts as a real FILLUP only if it carries a positive volume. queryFuelExpenses returns ALL
+ * category='fuel' rows with no volume filter, and a SPLIT fuel expense creates one sibling PER VEHICLE
+ * with volume=null (createSiblings never sets it) — so any fillup-COUNT or per-fillup-average that
+ * counts raw rows overcounts a single split fillup as N (the #56/#18/#108/#113 split-sibling overcount
+ * class). This is the ONE source of truth for that predicate (was hand-inlined at computeAverageCosts,
+ * buildSeasonalEfficiency, buildDayOfWeekPatterns + re-defined locally in analytics/repository's
+ * buildFuelStatsFromData); a divergent copy silently reintroduces the overcount on one surface.
+ */
+export const isFillup = (r: Pick<FuelExpenseRow, 'volume'>): boolean =>
+  r.volume != null && r.volume > 0;
+
 export interface GeneralExpenseRow {
   id: string;
   vehicleId: string;
@@ -431,7 +443,7 @@ export function computeAverageCosts(
   // the fuel-stats COUNT already uses (C97): a null-volume split sibling counts as 0 fillups there, so
   // its share must drop out of perFillup too (else cost-in-numerator / count-not-in-denominator inflates
   // it). For an unsplit fillup volume>0 && cost>0 both hold, so this equals the old value on the common path.
-  const fillups = fuelRows.filter((r) => r.volume != null && r.volume > 0);
+  const fillups = fuelRows.filter(isFillup);
   const perFillup =
     fillups.length > 0 ? fillups.reduce((s, r) => s + r.expenseAmount, 0) / fillups.length : null;
   const daysSoFar = Math.max(
@@ -640,8 +652,8 @@ export function buildSeasonalEfficiency(
     // expense creates one sibling PER VEHICLE, each carrying its cost share but volume=null
     // (createSiblings never sets volume), so an unconditional row count would overcount a single
     // split fillup as N in the season's fillupCount. A real fillup has a volume — mirror the
-    // isFillup predicate computeAverageCosts (:434) and the fuel-stats COUNT (C97) already use.
-    if (row.volume == null || row.volume <= 0) continue;
+    // isFillup predicate computeAverageCosts and the fuel-stats COUNT (C97) already use.
+    if (!isFillup(row)) continue;
     const season = SEASON_MAP[d.getMonth()] ?? 'Winter';
     const entry = seasonData.get(season) ?? { effSum: 0, effCount: 0, fillupCount: 0 };
     entry.fillupCount++;
@@ -803,8 +815,8 @@ export function buildDayOfWeekPatterns(
     // sibling PER VEHICLE, each with its cost share but volume=null (createSiblings never sets volume),
     // and queryFuelExpenses has no volume filter — so an unconditional count would overcount one split
     // fillup as N AND skew avgVolume (totalGallons/N) + avgCost (per-row not per-fillup). A real fillup
-    // has a volume; mirror computeAverageCosts (:434).
-    if (row.volume == null || row.volume <= 0) continue;
+    // has a volume; mirror computeAverageCosts.
+    if (!isFillup(row)) continue;
     const dayName = DAY_NAMES[d.getDay()] ?? 'Sunday';
     const entry = dayData.get(dayName) ?? { count: 0, totalCost: 0, totalGallons: 0 };
     entry.count++;

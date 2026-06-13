@@ -46,6 +46,7 @@ import {
   forEachVehiclePair,
   type GeneralExpenseRow,
   groupByVehicle,
+  isFillup,
   monthKeysInRange,
   sortByVehicleThenDate,
   toMonthKey,
@@ -1350,7 +1351,7 @@ export class AnalyticsRepository {
     // Count only volume-bearing rows — the same predicate fillupDetails already uses — so a
     // split fillup counts once and a volume-less row never counts as a fillup. The volume/
     // cost SUMS were always correct (null volume contributes 0); only the COUNTS were wrong.
-    const isFillup = (r: FuelExpenseRow) => r.volume != null && r.volume > 0;
+    // isFillup is the shared predicate (analytics-charts.ts, C403) — one source of truth.
     const currentYearFillups = fuelRows.filter(isFillup).length;
     const previousYearFillups = prevYearAgg.count;
     // "This/Last Month" are CALENDAR months (the FE labels them so) — match BOTH month AND year.

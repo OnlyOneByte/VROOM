@@ -72,10 +72,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 399 |
 | guard | 6 | 401 |
 | bug | 3 | 402 |
-| arch | 5 | 397 |
+| arch | 5 | 403 |
 | infra | 6 | 400 |
 
-Current cycle: **402**
+Current cycle: **403**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6199,3 +6199,14 @@ Current cycle: **402**
   order-independence + #66 isolation + C378 costPerMile-consistency are ALL already pinned in vehicle-stats.property.test.ts; the premium split + re-materialize in
   premium-expense-hook/terms-http) → CERTIFICATION only (C306/C345/C355/C388 precedent; a manufactured test = the C181/C229 coverage-theater trap). Docs-only, no
   source/test touched. cov: be 86.92% (carry) / fe 84.45% (carry).
+- **C403 (arch): extract isFillup — ONE source of truth for the volume-bearing-fillup predicate (3 inline analytics-charts sites + 1 local repository def → 1)** —
+  BALANCE: arch OVER budget (last 397, starved-for 403−397=6 > 5) → forced pick. rule-7 2-agent fan-out (FE returned only a contrived test-only MS_PER_DAY dup —
+  REJECTED as churn-for-churn per rule 5: a ms/day constant is fixed 86400000, the "DST divergence" risk is fiction). PICK (verified firsthand, C21/C60): the
+  split-sibling guard predicate `r.volume != null && r.volume > 0` was hand-inlined BYTE-IDENTICAL at 3 analytics-charts.ts sites — computeAverageCosts (:434 filter),
+  buildSeasonalEfficiency (:644 negated loop-guard), buildDayOfWeekPatterns (:807 negated loop-guard) — PLUS re-defined locally in analytics/repository.ts
+  buildFuelStatsFromData (:1353 `const isFillup = (r: FuelExpenseRow) => ...`). This predicate guards the #56/#18/#108/#113 SPLIT-SIBLING OVERCOUNT class (a split fuel
+  expense creates one volume=null sibling per vehicle; counting raw rows overcounts one split fillup as N) — so a divergent copy silently REINTRODUCES the overcount on
+  one surface (a real latent bug, not cosmetic). Clean single home: exported `isFillup` from analytics-charts.ts (typed `Pick<FuelExpenseRow,'volume'>`), where
+  FuelExpenseRow already lives + which repository.ts already imports (no cycle). Routed all 4 (3 inline → isFillup(row)/filter(isFillup); deleted the local def). Rule-2
+  behavior-preserving (identical boolean). Rule-3 green→green: analytics-charts-unpinned.test.ts (the #108/#113/#56 split-sibling guards) + fuel-stats-fleet-distance-
+  pooling.test.ts (the #18 COUNT) drive all 4 sites — GREEN before AND after, no test touched. be validate:local EXIT 0, 1490 pass (unchanged). cov: be 86.92% (carry) / fe 84.45% (carry).
