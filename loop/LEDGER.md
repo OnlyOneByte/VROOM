@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 350 |
+| deep-review | 5 | 356 |
 | guard | 6 | 353 |
 | bug | 3 | 355 |
 | arch | 5 | 354 |
 | infra | 6 | 351 |
 
-Current cycle: **355**
+Current cycle: **356**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5655,3 +5655,16 @@ Current cycle: **355**
   call), and totalMileage clamp / costPerMile div-guard / single-expense / refund / boundary all CERTIFIED CLEAN + pinned. NO reachable atomic defect, NO
   unpinned reachable invariant (mark-serviced is comprehensively covered) → certification only (the C306/C345/C350 precedent — a manufactured test = theater).
   DOCS-ONLY (LEDGER + the #100 note); no source/test/build touched (the C354 gate is the last code state). cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C356 (deep-review → bug #105: Google Photos uploadBytes misclassified a 401 auth-expiry as a retryable NETWORK_ERROR)** — BALANCE: deep-review OVER
+  budget (last 350, starved-for 356−350=6 > budget 5) → FORCED. 2-agent fan-out: (A) Google provider service wrappers, (B) backup-orchestrator + restore.
+  Both agents over-reported; triaged firsthand: (B) the orchestrator "per-provider status not recorded" findings are the FILED #43/#44 fail-open-honesty
+  family; ZIP-omission/restore-atomicity/coercion all GUARDED (the agent talked itself out of 7/9). (A) #36/#37 filed; listAlbums->50-album pagination
+  (rare) + Sheets-sparse-row (manual-edit) are lower-priority hardening. The CLEAN ATOMIC defect → #105: createRealPhotosClient.uploadBytes (the ONE Photos
+  call that bypasses authedFetch — it needs raw-octet upload headers) threw a flat NETWORK_ERROR on !res.ok, so a 401/403 (expired/revoked token) was
+  classified as a retryable network flake → the sync backoff retries it as a transient glitch (a 401 storm) instead of surfacing AUTH_INVALID for the user to
+  re-connect. VERIFIED firsthand (C21/C60): authedFetch (:150) AND the sibling batchCreate/download/list paths already map 401/403→AUTH_INVALID; only
+  uploadBytes was inconsistent. FIX: mirror authedFetch's status→code mapping in uploadBytes (401/403→AUTH_INVALID, else NETWORK_ERROR). Correct regardless
+  of testability. NO guard added — the fix lives in createRealPhotosClient (the REAL HTTP client); the service test suite injects a FAKE PhotosClient that
+  bypasses it, so exercising the real 401 path needs a global-fetch mock the suite deliberately avoids (the C163 mock-trap) → documented, not manufactured
+  (coverage-theater avoidance). green→green: backend validate:local EXIT 0 — 1454 pass (unchanged; the fix is in the un-faked real client) / 1 skip / 0 fail,
+  tsc 0, musl-biome clean, build bundled. cov: be 86.25% (carry) / fe 84.17% (carry).

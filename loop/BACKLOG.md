@@ -154,6 +154,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Google provider service wrappers + backup-orchestrator/restore audit (C356).**~~ — *DONE C356 (found+fixed bug #105). 2-agent fan-out, both
+> over-reported. (B) orchestrator/restore: the "per-provider status not recorded" findings are the FILED #43/#44 fail-open family; ZIP-omission/restore-
+> atomicity/coercion all GUARDED. (A) provider services: #36/#37 filed, listAlbums->50-pagination + Sheets-sparse-row are lower-priority hardening; the CLEAN
+> atomic defect → #105: createRealPhotosClient.uploadBytes (the one Photos call bypassing authedFetch — raw-octet headers) threw a flat NETWORK_ERROR on a
+> 401, so an expired token was retried as a transient flake instead of surfacing AUTH_INVALID. FIXED (mirror authedFetch's status mapping). No guard — the
+> fix is in the real HTTP client; the suite injects a fake that bypasses it, so a real-401 test needs a global-fetch mock the suite avoids (C163 mock-trap,
+> documented). validate:local EXIT 0, 1454 pass.*
+
 > ~~**Health-score (getVehicleHealth / computeFleetHealthScore) surface audit (C350).**~~ — *DONE C350 (CERTIFIED CLEAN; +1 fleet-aggregation guard).
 > Firsthand audit. Every agent "REAL DEFECT" debunked: the "active policy with expired term counts" IS the filed #14 (different surface, not new); the
 > "negative mileage/time interval mis-score" findings are UNREACHABLE (maintenance rows are .orderBy(asc(date)) — the #75 caller-sorts class; backward-gap-
@@ -180,6 +188,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > vehicles. Both are defense-in-depth on the user's OWN backup (sourceId has no FK by design; restore's validateReferentialIntegrity already constrains the
 > real FK-children C246) — only a hand-tampered backup smuggles a dangling ref. A future hardening cycle could extend the source-ref validator; not a live
 > data-safety defect (no escalation).
+> NOTE (filed C356, low priority — Photos/Sheets hardening, surfaced by the C356 fan-out, not live-reachable): (a) google-photos-service listAlbums uses a
+> hardcoded pageSize=50 with NO nextPageToken loop — a user with >50 app-created albums could fail to find the VROOM album → a duplicate album + fragmented
+> photo backup. (b) google-sheets-service parseSheetData reads a SHORT row (fewer cells than the header) as trailing nulls — only triggerable by a manual
+> Sheets edit, and restore's per-row schema validation catches a NOT-NULL violation. Both need a real Google-API harness path (not the injected fake) to test
+> — fold into a future Sheets/Photos pass with #36/#37 (the Sheets HIGHs already FILED).
 
 > ~~**TCO money-aggregation + reminder-materialization/CSV-round-trip audit (C333).**~~ — *DONE C333 (CERTIFIED CLEAN; +3 year-scoped guards).
 > 2-agent fan-out. (B) reminder-materialization CAS-idempotent (no double-materialize), backend reminder advance uses clampToAnchorDay (NO C330 setMonth
