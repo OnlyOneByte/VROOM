@@ -7,6 +7,7 @@ import type {
 	TriggerResult
 } from '$lib/types';
 import { apiClient } from './api-client';
+import { buildQueryString } from './api-utils';
 
 interface ReminderListFilters {
 	vehicleId?: string;
@@ -16,12 +17,14 @@ interface ReminderListFilters {
 
 function buildReminderQuery(filters?: ReminderListFilters): string {
 	if (!filters) return '';
-	const query = new URLSearchParams();
-	if (filters.vehicleId) query.set('vehicleId', filters.vehicleId);
-	if (filters.type) query.set('type', filters.type);
-	if (filters.isActive !== undefined) query.set('isActive', String(filters.isActive));
-	const qs = query.toString();
-	return qs ? `?${qs}` : '';
+	// vehicleId/type keep their truthy-drop (an empty string is omitted, not serialized) via
+	// `|| undefined`; isActive must SURVIVE when false, so pass the boolean through as-is (the
+	// shared filter drops only null/undefined). Matches the prior hand-rolled construction exactly.
+	return buildQueryString({
+		vehicleId: filters.vehicleId || undefined,
+		type: filters.type || undefined,
+		isActive: filters.isActive
+	});
 }
 
 /**

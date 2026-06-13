@@ -14,6 +14,7 @@ import type {
 } from '$lib/types';
 import { ApiError } from '$lib/utils/error-handling';
 import { apiClient } from './api-client';
+import { buildQueryString } from './api-utils';
 
 /** Parameters accepted by the fuel efficiency endpoint. */
 interface FuelEfficiencyParams {
@@ -37,12 +38,7 @@ export function getDefaultDateRange(): { startDate: number; endDate: number } {
 
 /** Build a query string from optional params, prepending '?' if non-empty. */
 function buildQuery(params: Record<string, string | number | undefined>): string {
-	const query = new URLSearchParams();
-	for (const [key, value] of Object.entries(params)) {
-		if (value != null) query.set(key, String(value));
-	}
-	const qs = query.toString();
-	return qs ? `?${qs}` : '';
+	return buildQueryString(params);
 }
 
 /**

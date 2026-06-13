@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 333 |
 | guard | 6 | 336 |
 | bug | 3 | 334 |
-| arch | 5 | 332 |
+| arch | 5 | 337 |
 | infra | 6 | 335 |
 
-Current cycle: **336**
+Current cycle: **337**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5427,3 +5427,14 @@ Current cycle: **336**
   localStorage + matchMedia mocks (matchMedia overridden per-case for the system branch). NON-VACUOUS (drop the classList toggle / meta swap / persistence,
   or invert the system resolution → RED). green→green: frontend validate:local EXIT 0 — 646 pass (+5) / 0 fail, tsc 0, build OK. cov: be 86.53% (carry) /
   fe 84.39%+ (carry, theme.svelte.ts 0%→covered).
+- **C337 (arch): extract buildQueryString — collapse the 2 service-layer query-string builders onto one shared helper** — BALANCE: arch at budget
+  (last 332, starved-for 337−332=5 = budget, most-starved) → pick. Rule-7 fan-out (2 Explore agents, BE + FE). BE candidate (recheckMileageReminders
+  wrapper, 4 sites) was thin/borderline-churn (wraps a one-line service call + a guard that legitimately differs expense-vs-odometer). FE pick was cleaner:
+  analytics-api `buildQuery` is ALREADY the generic form (URLSearchParams + `value != null` filter + `qs ? '?'+qs : ''`), and reminder-api
+  `buildReminderQuery` repeats that byte-identical convention by hand. Extracted `buildQueryString` to a new services/api-utils.ts (single source of truth)
+  + routed both through it. KEY behavior-preservation subtlety VERIFIED firsthand (C21/C60): buildReminderQuery used TRUTHY checks for vehicleId/type (empty
+  string DROPPED) but `isActive !== undefined` (false SURVIVES), while the generic `!= null` filter would KEEP an empty-string vehicleId — so mapped
+  `vehicleId: filters.vehicleId || undefined` (+ type) to preserve the exact truthy-drop, and passed `isActive` through as-is so false still serializes.
+  Test-anchored both ways (rule 3): reminder-api.test.ts pins the load-bearing edges (`isActive=false MUST survive`, empty/no-filter → '', vehicleId+type
+  appended) — all GREEN before AND after. −9 LOC net. green→green: frontend validate:local EXIT 0 — 646 pass (unchanged) / 0 fail, tsc 0, build OK.
+  cov: be 86.53% (carry) / fe 84.39% (carry).

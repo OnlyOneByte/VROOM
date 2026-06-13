@@ -1543,6 +1543,14 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract buildQueryString — collapse the 2 service-layer query-string builders onto one shared helper (rule-7 fan-out, done C337).**~~ — *DONE
+  C337: analytics-api `buildQuery` was already the generic URLSearchParams + `value != null` + `qs ? '?'+qs : ''` form; reminder-api `buildReminderQuery`
+  repeated that convention by hand. Extracted `buildQueryString` to new services/api-utils.ts + routed both through it. KEY behavior-preservation
+  (verified firsthand): buildReminderQuery TRUTHY-drops vehicleId/type (empty string omitted) but isActive SURVIVES when false — mapped `vehicleId ||
+  undefined` (+type) so the `!= null` shared filter doesn't start keeping empty strings, isActive passed as-is. Test-anchored: reminder-api.test.ts pins
+  isActive=false-survives + empty-filter → '' — GREEN before AND after. −9 LOC. fe validate:local EXIT 0, 646 pass (unchanged). Rejected the BE
+  recheckMileageReminders wrapper (thin — wraps a 1-line call + a guard that legitimately differs by call site).*
+
 - ~~**Collapse computeBalance onto computeBalances — ONE source of truth for the financing-payment money query (rule-7 fan-out, done C332).**~~ —
   *DONE C332: computeBalance + computeBalances both ran the financing-payment money query (originalAmount lookup + `WHERE sourceType='financing' AND
   sourceId=… COALESCE(SUM(expenseAmount),0)` clamped ≥0) — a RAW-`sql` copy vs a typed-`and/eq/inArray` copy, drift-prone money duplication (a divergent
