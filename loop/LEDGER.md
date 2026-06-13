@@ -55,12 +55,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 366 |
-| guard | 6 | 364 |
+| guard | 6 | 369 |
 | bug | 3 | 367 |
 | arch | 5 | 365 |
 | infra | 6 | 368 |
 
-Current cycle: **368**
+Current cycle: **369**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5815,3 +5815,12 @@ Current cycle: **368**
   ~2pts; 90% goal still structurally gated (BE DI/singleton+OAuth; FE eyes-on components/routes). Build floor GREEN both sides. The branch is genuinely PR-ready
   and hasn't been flagged recently → ESCALATED to Angelo (rule 7). Docs-only cycle (no source/test touched → no build gate beyond the coverage runs, which were
   EXIT 0). cov: be 86.68% / fe 84.45%. Next #5 sweep ~C373; CLAUDE.md refresh ~C370.
+- **C369 (guard): pin the PUT-claim termId cross-policy isolation guard (the unpinned leg of validateClaimRefs/#84)** — BALANCE: nothing over budget; guard
+  closest (last 364, starved-for 369−364=5, budget 6) → highest-leverage. 2-agent fan-out. DEBUNKED the BE agent's top "PUT vehicleId cross-tenant unpinned"
+  (C21/C60): it's ALREADY pinned (claims-http.test.ts:247). Its SIBLING was the real gap: validateClaimRefs (routes.ts:46) gates BOTH vehicleId-ownership AND
+  termId-on-this-policy, on create AND update — but only the CREATE termId leg (:210) + the UPDATE vehicleId leg (:247) were pinned; the UPDATE termId leg was
+  UNGUARDED. A claim re-pointed at a term on ANOTHER policy is a cross-policy referential-integrity violation (a claim belongs to its own policy's coverage).
+  +1 HTTP guard: seed a 2nd policy, PUT this policy's claim at the other policy's (valid-but-foreign) termId → 400 'term...'. NON-VACUOUS (a real foreign term
+  id, not a missing-id 400). Rejected the other picks: the updateClaimSchema empty-`{}` rejection (a no-op-defense nicety, not a correctness/isolation
+  invariant); the FE formatRelativeTime/shouldTriggerRecurring boundary nits (already representatively tested — boundary-only adds were thin). green→green: be
+  validate:local EXIT 0, 1460 pass (+1) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).

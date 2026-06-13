@@ -258,4 +258,36 @@ describe('insurance claim vehicleId/termId link validation (#84)', () => {
     });
     expect(put.status).toBe(404);
   });
+
+  // C369: validateClaimRefs gates termId on BOTH create + update, but only the UPDATE vehicleId leg
+  // (above) and the CREATE termId leg (filing-with-termId test) were pinned — the UPDATE termId leg
+  // was unguarded. A claim must not be re-pointed at a term on ANOTHER policy (a cross-policy link is
+  // a referential-integrity violation: a claim belongs to its own policy's coverage). This pins that
+  // the PUT path re-validates termId-on-this-policy, not just vehicle ownership.
+  test('a PUT re-pointing a claim at a termId NOT on this policy → 400', async () => {
+    const ownVehicle = await seedVehicle();
+    const policyId = await seedPolicy(ownVehicle);
+    // A SECOND policy with its own term — its term id is valid but foreign to the first policy.
+    const otherPolicyId = await seedPolicy(ownVehicle);
+    const otherGet = await ctx.authed('GET', `/api/v1/insurance/${otherPolicyId}`);
+    const otherTermId = (await json<DataEnvelope<{ terms: { id: string }[] }>>(otherGet)).data
+      .terms[0]?.id;
+    expect(otherTermId, 'the other policy has a term').toBeTruthy();
+
+    const filed = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
+      claimDate: '2024-06-15T00:00:00.000Z',
+      claimType: 'collision',
+    });
+    const claimId = (await json<DataEnvelope<ClaimRow>>(filed)).data.id;
+
+    // Re-point THIS policy's claim at the OTHER policy's term → cross-policy link, must be rejected.
+    const put = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/claims/${claimId}`, {
+      termId: otherTermId,
+    });
+    expect(put.status).toBe(400);
+    const body = (await json<{ error: { message: string } }>(put)) as {
+      error: { message: string };
+    };
+    expect(body.error.message.toLowerCase()).toContain('term');
+  });
 });

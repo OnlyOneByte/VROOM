@@ -448,6 +448,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C369 — pin the PUT-claim termId cross-policy isolation guard (the unpinned leg of validateClaimRefs/#84).**~~ — *DONE C369: guard closest to budget (5/6)
+> → highest-leverage. validateClaimRefs (insurance/routes.ts:46) gates BOTH vehicleId-ownership AND termId-on-this-policy, on create AND update — but only the
+> CREATE termId leg (claims-http.test.ts:210) + the UPDATE vehicleId leg (:247) were pinned; the UPDATE termId leg was UNGUARDED. A claim re-pointed at a term
+> on ANOTHER policy is a cross-policy referential-integrity violation. +1 HTTP guard: seed a 2nd policy, PUT this policy's claim at the other's valid-but-foreign
+> termId → 400 'term...'. NON-VACUOUS (real foreign term id, not a missing-id 400). be validate:local EXIT 0, 1460 pass (+1). Debunked the agent's "PUT
+> vehicleId cross-tenant unpinned" (already pinned :247); rejected the empty-{} rejection nicety + the FE boundary-nit adds (already representatively tested).*
+
 > ~~**C364 — pin the REAL getVehicleDisplayName (12-site display helper) — fix a C229 coverage-theater gap.**~~ — *DONE C364: guard closest to budget (5/6)
 > → highest-leverage. getVehicleDisplayName (vehicle-helpers.ts) is used across 8 components + 4 routes, yet its only "coverage" was VehicleManagement.test.ts:275,
 > which RE-IMPLEMENTS the function as a local arrow and tests the COPY — never importing the real export (the C229 anti-pattern). The load-bearing
