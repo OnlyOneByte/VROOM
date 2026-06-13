@@ -1193,11 +1193,7 @@ export class AnalyticsRepository {
         ytdSpending,
         avgEfficiency,
         fleetHealthScore,
-        units: {
-          distanceUnit: userUnits.distanceUnit,
-          volumeUnit: userUnits.volumeUnit,
-          chargeUnit: userUnits.chargeUnit,
-        },
+        units: { ...userUnits },
       };
     } catch (error) {
       if (error instanceof ValidationError) throw error;
@@ -1562,11 +1558,7 @@ export class AnalyticsRepository {
         expenseByCategory: buildExpenseByCategory(allExpenses),
         vehicleCostComparison,
         fuelEfficiencyComparison,
-        units: {
-          distanceUnit: userUnits.distanceUnit,
-          volumeUnit: userUnits.volumeUnit,
-          chargeUnit: userUnits.chargeUnit,
-        },
+        units: { ...userUnits },
       };
     } catch (error) {
       if (error instanceof ValidationError) throw error;
@@ -2008,11 +2000,7 @@ export class AnalyticsRepository {
         totalDistance,
         avgEfficiency,
         costPerDistance: totalDistance > 0 ? totalSpent / totalDistance : null,
-        units: {
-          distanceUnit: userUnits.distanceUnit,
-          volumeUnit: userUnits.volumeUnit,
-          chargeUnit: userUnits.chargeUnit,
-        },
+        units: { ...userUnits },
       };
     } catch (error) {
       if (error instanceof ValidationError) throw error;
@@ -2078,11 +2066,7 @@ export class AnalyticsRepository {
         ytdSpending,
         avgEfficiency,
         fleetHealthScore,
-        units: {
-          distanceUnit: userUnits.distanceUnit,
-          volumeUnit: userUnits.volumeUnit,
-          chargeUnit: userUnits.chargeUnit,
-        },
+        units: { ...userUnits },
       };
 
       const fuelStats = this.buildFuelStatsFromData(

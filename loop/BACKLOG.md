@@ -1444,6 +1444,12 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Collapse the 4× `units` field-by-field projection in analytics into a `{ ...userUnits }` spread (filed+done C320).**~~ — *DONE C320: the
+  `units: { distanceUnit: userUnits.distanceUnit, volumeUnit: ..., chargeUnit: ... }` projection was hand-repeated at 4 analytics response
+  sites; UnitPreferences is exactly that 3-field shape. Replaced with `units: { ...userUnits }` ×4 — so a future 4th unit auto-propagates to
+  all 4 surfaces instead of silently dropping (the clientId-drop / sheets-header class). −12 LOC, tsc-confirmed, behavior-preserving (the
+  analytics-routes-http + summary/cross-vehicle/fuel-stats suites pass unchanged). validate:local EXIT 0, 1433 pass.*
+
 - ~~**Extract fetchOrThrow — dedup the byte-identical fetch-setup + error-parsing in api-client request/requestFull (filed+done C314).**~~ —
   *DONE C314: request + requestFull shared a byte-identical 37-line block (URL resolve + JSON Content-Type + credentials fetch + the
   !response.ok error-envelope parse → throw ApiError), differing only in the success path (request unwraps .data + handles 204; requestFull

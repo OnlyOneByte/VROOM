@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 317 |
 | guard | 6 | 319 |
 | bug | 3 | 318 |
-| arch | 5 | 314 |
+| arch | 5 | 320 |
 | infra | 6 | 316 |
 
-Current cycle: **319**
+Current cycle: **320**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5190,3 +5190,15 @@ Current cycle: **319**
   (dropping the non-preview this.load() → the 2-call + populated-settings assertions RED). green→green: frontend validate:local EXIT 0 —
   type-check 0, build, 619 pass (+6). Guard-only (no source) → no UI. cov: be 86.07% (carry) / fe 81.76%+ (carry; settings.svelte.ts up
   sharply from ~12%).
+- **C320 (arch): collapse the 4× `units` field-by-field projection in analytics into a `{ ...userUnits }` spread** — BALANCE: arch OVER
+  budget (last 314, starved-for 6 > 5, most-starved actionable; feature gated) → forced. Arch reliably-dry — rule-7 inline scout. Rejected
+  the analytics route-handler abstraction (per-route validator/repo/shape differences → HOF-over-handlers churn, rule 5). THE FINDING
+  (analytics/repository.ts): the `units: { distanceUnit: userUnits.distanceUnit, volumeUnit: userUnits.volumeUnit, chargeUnit:
+  userUnits.chargeUnit }` projection was hand-repeated at 4 response sites (getSummary fleet + cross-vehicle + 2 fuel-stats surfaces).
+  UnitPreferences is EXACTLY that 3-field shape, so it's a verbatim re-spread. PAYOFF (rule 5): when a 4th unit is ever added to
+  UnitPreferences (e.g. a pressureUnit for tire tracking), the spread auto-propagates to all 4 response surfaces — the field-by-field literal
+  would SILENTLY DROP it at all 4 (the exact clientId-drop / sheets-header data-loss class). FIX: `units: { ...userUnits }` ×4 (the
+  enum-typed UnitPreferences fields satisfy the string-typed response `units` shape — tsc-confirmed). −12 LOC. BEHAVIOR-PRESERVING +
+  test-anchored (rule 3): the analytics-routes-http + summary/cross-vehicle/fuel-stats property suites pass UNCHANGED (the 4 surfaces emit the
+  identical units object). green→green: backend validate:local EXIT 0 — 1433 pass (unchanged — pure refactor) / 1 skip / 0 fail, tsc 0,
+  musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07% (carry) / fe 81.76% (carry).
