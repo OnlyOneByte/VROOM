@@ -374,6 +374,89 @@ describe('validateBackupData: acceptance', () => {
 });
 
 // ---------------------------------------------------------------------------
+// validateBackupData: cross-row UNIQUE constraints (#127, C428)
+// A corrupt/truncated backup whose rows violate a DB unique index (duplicate non-null clientId /
+// licensePlate) passes per-row schema + referential checks but throws on the 2nd colliding INSERT.
+// Because bun-sqlite's async-tx callback does NOT roll back the wipe (the C151 footgun), a replace-mode
+// restore would leave the account EMPTY. Catching the duplicate at validation = the insert can't fail on
+// it = the destructive wipe never runs. (The general transient-failure atomicity fix is escalated C428.)
+// ---------------------------------------------------------------------------
+describe('validateBackupData: cross-row unique constraints (#127)', () => {
+  function backupWith(over: Partial<ParsedBackupData>): ParsedBackupData {
+    return {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      vehicles: [],
+      expenses: [],
+      financing: [],
+      insurance: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      userPreferences: [],
+      syncState: [],
+      photos: [],
+      odometer: [],
+      photoRefs: [],
+      ...over,
+    };
+  }
+
+  test('two expenses sharing a non-null clientId are rejected (would crash the restore insert)', () => {
+    const v = coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles);
+    const mkExpense = () =>
+      coerceRow(
+        buildMinimalStringRow(expenses, {
+          vehicleId: v.id as string,
+          userId: 'u1',
+          missedFillup: '',
+        }),
+        expenses
+      );
+    const e1 = { ...mkExpense(), id: 'e1', clientId: 'dup-cid' } as Record<string, unknown>;
+    const e2 = { ...mkExpense(), id: 'e2', clientId: 'dup-cid' } as Record<string, unknown>;
+    const result = backupService.validateBackupData(
+      backupWith({ vehicles: [v], expenses: [e1, e2] })
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('clientId'))).toBe(true);
+  });
+
+  test('two vehicles sharing a non-null licensePlate are rejected', () => {
+    const v1 = {
+      ...coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles),
+      id: 'v1',
+      licensePlate: 'ABC123',
+    } as Record<string, unknown>;
+    const v2 = {
+      ...coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles),
+      id: 'v2',
+      licensePlate: 'ABC123',
+    } as Record<string, unknown>;
+    const result = backupService.validateBackupData(backupWith({ vehicles: [v1, v2] }));
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('licensePlate'))).toBe(true);
+  });
+
+  test('NULL licensePlate does NOT collide (the index is partial — many nulls allowed)', () => {
+    // Explicitly NULL the plate on both: the partial unique index is `WHERE license_plate IS NOT NULL`,
+    // so two null-plate vehicles are NOT a duplicate — dupCheck must skip nulls. (buildMinimalStringRow
+    // fills every column with a `test-<name>` default, so without this override BOTH would share
+    // 'test-licensePlate' and legitimately collide — confirming the dupCheck fires; this pins the null skip.)
+    const v1 = {
+      ...coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles),
+      id: 'v1',
+      licensePlate: null,
+    } as Record<string, unknown>;
+    const v2 = {
+      ...coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles),
+      id: 'v2',
+      licensePlate: null,
+    } as Record<string, unknown>;
+    const result = backupService.validateBackupData(backupWith({ vehicles: [v1, v2] }));
+    expect(result.valid).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // validateBackupData: referential integrity
 // ---------------------------------------------------------------------------
 

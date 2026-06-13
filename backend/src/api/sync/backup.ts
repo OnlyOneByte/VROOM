@@ -614,7 +614,42 @@ export class BackupService {
         reminderIds,
         userIds
       ),
+      ...this.validateUniqueConstraints(backup),
     ];
+  }
+
+  /**
+   * Reject a backup whose rows would violate a DB-level UNIQUE index, BEFORE restore's destructive
+   * replace-mode wipe runs (#127, C428). Per-row schema + referential checks don't catch CROSS-ROW
+   * duplicates, so a corrupt/truncated download with two expenses sharing a non-null clientId
+   * (expenses_user_client_idx) or two vehicles sharing a licensePlate (vehicles_user_license_plate_idx)
+   * passes validateBackupData, the wipe commits, then the 2nd colliding INSERT throws — and bun-sqlite's
+   * async-transaction callback does NOT roll back the wipe (the C151 footgun), leaving the account EMPTY.
+   * Catching the duplicate here means the insert can't fail on it, so the wipe never runs. (The general
+   * transient-insert-failure window is a transaction-atomicity fix, escalated C428 — this closes the one
+   * reachable within-tenant data-loss trigger.)
+   */
+  private validateUniqueConstraints(backup: ParsedBackupData): string[] {
+    const errors: string[] = [];
+    const dupCheck = (
+      rows: Record<string, unknown>[] | undefined,
+      field: string,
+      label: string
+    ): void => {
+      const seen = new Set<string>();
+      for (const row of rows ?? []) {
+        const v = row[field];
+        if (v == null) continue; // the unique index is partial (WHERE <field> IS NOT NULL)
+        const key = String(v);
+        if (seen.has(key)) {
+          errors.push(`Duplicate ${label} "${key}" — backup violates a unique constraint`);
+        }
+        seen.add(key);
+      }
+    };
+    dupCheck(backup.expenses, 'clientId', 'expense clientId');
+    dupCheck(backup.vehicles, 'licensePlate', 'vehicle licensePlate');
+    return errors;
   }
 
   private validateExpenseRefs(

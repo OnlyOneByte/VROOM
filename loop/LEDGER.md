@@ -71,11 +71,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 427 |
 | guard | 6 | 425 |
-| bug | 3 | 424 |
+| bug | 3 | 428 |
 | arch | 5 | 426 |
 | infra | 6 | 423 |
 
-Current cycle: **427**
+Current cycle: **428**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6466,3 +6466,17 @@ Current cycle: **427**
   point). NON-VACUOUS. (Self-corrected the test first: an interleaved seed conflated this with the separate #C398 pairing-adjacency issue — grouped each energy type to
   isolate the exclusion concern.) be validate:local EXIT 0, 1523 pass (+2). The C411→C413→C427 arc now covers the gas/charge partition across BOTH the analytics-charts builders
   AND the repository converted/trend paths. cov: be 86.93% (carry, +1 guard) / fe 84.51% (carry).
+- **C428 (bug → #127: replace-mode restore wipe is NON-ATOMIC with the insert — a mid-restore insert failure leaves the account WIPED, total data loss; HIGH, partial mitigation
+  landed + general fix ESCALATED)** — BALANCE: bug OVER budget (last 424, starved-for 428−424=4 > 3) → forced pick (all #117–#126 closed → fresh 2-agent fan-out: odometer CRUD +
+  restore merge/replace). Odometer CERTIFIED CLEAN (C345 corroborated). The restore scout surfaced #127, VERIFIED FIRSTHAND (C21/C60) + cross-checked the C151 LEDGER entry:
+  restore.ts:125 does `db.transaction(async tx => { deleteUserData; insertBackupData })`, but bun-sqlite's ASYNC-callback transaction does NOT roll back on a thrown insert
+  (the exact footgun C151 hit + documented: "runs the INSERT synchronously and does not roll it back when a throw escapes the ASYNC transaction callback"). So a mid-restore
+  insert failure leaves the replace-mode WIPE committed → the user's account is emptied (NORTH_STAR #1 total data loss). Reachable WITHIN-TENANT: a schema-valid +
+  referentially-valid backup whose rows violate a DB UNIQUE index validateBackupData doesn't check (two expenses sharing a non-null clientId, two vehicles sharing a
+  licensePlate — a truncated/corrupt download) → wipe commits, 2nd insert throws, data gone. WHY A DIRECTION CALL: a FULLY-GENERAL fix (atomic wipe+insert not relying on the
+  broken async rollback) is a transaction-semantics change every `async (tx)` in the codebase shares → arch rule-6, ESCALATED to Angelo (options: a synchronous bun:sqlite tx
+  for restore / a codebase-wide async-tx-safety wrapper / discuss). MITIGATION LANDED (safe, fully-verifiable, closes the concrete reachable trigger): validateUniqueConstraints
+  in validateBackupData rejects a backup with duplicate non-null clientId/licensePlate BEFORE any wipe (the insert can't fail on it → the wipe never runs). +3 guards
+  (dup-clientId→reject, dup-licensePlate→reject, null-plate→NOT a dup [partial-index skip]). NON-VACUOUS. (Self-corrected the null-control test: I'd wrongly assumed
+  buildMinimalStringRow leaves the plate null — it fills 'test-<name>', so I explicitly nulled it; the correction reaffirmed the dupCheck genuinely fires.) be validate:local
+  EXIT 0, 1526 pass (+3). The general transient-insert-failure window stays open until the escalated transaction-semantics fix. cov: be 86.93% (carry, +3 guards) / fe 84.51% (carry).

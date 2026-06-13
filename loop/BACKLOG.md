@@ -829,6 +829,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> **#127 (HIGH, data-safety / NORTH_STAR #1 — found C428 on a restore deep-review; MITIGATION landed C428, general fix ESCALATED) — replace-mode restore wipe is
+> NON-ATOMIC with the insert: a mid-restore insert failure leaves the account WIPED (total data loss).** restore.ts:125 `db.transaction(async tx => { deleteUserData;
+> insertBackupData })` — bun-sqlite's ASYNC-callback transaction does NOT roll back on a thrown insert (the C151 footgun, firsthand-confirmed in the ledger). A schema+ref-valid
+> backup violating a DB UNIQUE index validateBackupData misses (dup non-null clientId / licensePlate, a corrupt download) → wipe commits, 2nd insert throws, data gone.
+> Worse: ANY transient insert failure has the same effect. **MITIGATION DONE C428:** validateUniqueConstraints rejects a dup-clientId/licensePlate backup BEFORE the wipe (the
+> insert can't fail on it → wipe never runs), +3 guards, closing the concrete reachable trigger. **GENERAL FIX ESCALATED C428 (arch rule-6 — a transaction-semantics change
+> every `async (tx)` in the codebase shares):** make wipe+insert atomic without the broken async rollback (a synchronous bun:sqlite tx for restore / a codebase-wide
+> async-tx-safety wrapper). The transient-insert-failure window stays open until that lands. NORTH_STAR #1 crown-jewel; awaiting Angelo's fix-approach pick.
+
 > ~~**#126 (MED, correctness/units / NORTH_STAR #1 — found+fixed C427 on a cross-vehicle deep-review; the C413 sweep's missed twin) — the CONVERTED/trend analytics
 > efficiency builders contaminated gas-MPG with PHEV charge mi/kWh.**~~ — *DONE C427: C411/C413 fixed the gas/charge partition (gasEfficiencyPoint) on the analytics-charts
 > builders + computeMpgAndCostPerMile, but the repository.ts CONVERTED/trend builders still used computeEfficiencyPoint (accepts electric) at 4 sites —
