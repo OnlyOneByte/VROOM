@@ -1702,6 +1702,16 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract groupOwnedBy — ONE source of truth for the split-expense tenant-scope predicate (6 sites → 1, rule-7 fan-out, done C360).**~~ — *DONE C360:
+  the split-group ownership predicate `and(eq(expenses.groupId, groupId), eq(expenses.userId, userId))` was copied BYTE-IDENTICAL at SIX sites in
+  expenses/repository.ts — four reads (findIdsByGroupId, getSplitExpense, delete-read, update-read) AND TWO destructive delete-writes (deleteSplitExpense,
+  updateSplitExpense). Two C109 comments manually pleaded "keep ownership + deletion on the SAME predicate" — a divergent copy dropping the userId scope is a
+  cross-tenant read or (worse) cross-tenant DELETE. Extracted `private groupOwnedBy(groupId, userId): SQL | undefined` (and+eq) and routed all 6 → the
+  defense-in-depth boundary is enforced STRUCTURALLY now, not by comment. Behavior-preserving (identical SQL). Test-anchored: delete-split-child +
+  split-service.property drive every routed path — GREEN before AND after. validate:local EXIT 0, 1454 pass. Rejected (firsthand, C21/C60): the FE
+  "dead getCategoryColor/categoryLabels/getCategoryIcon" claim (FALSE — all live across 5 components + 2 routes, the C234 category-map trio); the BE
+  Number(x)||0 coercion (idiomatic, variadic helper = churn); the test-only formatters rework (low leverage).*
+
 - ~~**Extract computeAverageEfficiency — ONE source of truth for the analytics efficiency-average + empty→null guard (rule-7 fan-out, done C354).**~~ —
   *DONE C354: getQuickStats/getYearEnd/getSummary computed avgEfficiency as a BYTE-IDENTICAL 4-liner (values.length>0 ? reduce(sum)/len : null) at 3 sites,
   all off the same computeConvertedEfficiencyValues()→number[]. Extracted private computeAverageEfficiency(values)→number|null (sibling helper), routed all 3

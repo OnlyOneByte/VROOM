@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 356 |
 | guard | 6 | 359 |
 | bug | 3 | 358 |
-| arch | 5 | 354 |
+| arch | 5 | 360 |
 | infra | 6 | 357 |
 
-Current cycle: **359**
+Current cycle: **360**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5701,3 +5701,16 @@ Current cycle: **359**
   next-payment-date.test.ts (the NextPaymentCard display-helper family's home) — (1) each of the 4 schema-valid frequencies maps to its exact label; (2) an
   unknown frequency + '' pass through verbatim (the graceful no-blank fallback). NON-VACUOUS (a wrong label fails). green→green: frontend validate:local
   EXIT 0 — 663 pass (+2) / 0 fail, tsc 0, build OK. cov: be 86.25% (carry) / fe 84.17%+ (carry).
+- **C360 (arch): extract `groupOwnedBy` — ONE source of truth for the split-expense tenant-scope predicate (6 sites → 1)** — BALANCE: arch OVER budget
+  (last 354, starved-for 360−354=6 > budget 5) → MUST pick arch (feature is more-starved at 190 but its only-open T9 is e2e-blocked / the rest Angelo-gated,
+  not loop-actionable). rule-7 fan-out (2 agents). DEBUNKED firsthand (C21/C60): the FE agent's "dead getCategoryColor/categoryLabels/getCategoryIcon" claim
+  was FALSE — all three are live in ExpenseOverviewSection/ExpensesTable/RecentActivityCard/ReminderForm/ExpenseForm + 2 routes (the C234-guarded category-map
+  trio); rejected. Also rejected the BE `Number(x)||0` coercion (idiomatic, a variadic helper is churn not a real collapse) + the test-only formatters rework
+  (low leverage). PICK (CONFIRMED firsthand): the split-group tenant predicate `and(eq(expenses.groupId, groupId), eq(expenses.userId, userId))` was copied
+  BYTE-IDENTICAL at SIX sites — four reads (findIdsByGroupId:203, getSplitExpense:678, deleteSplitExpense-read:695, updateSplitExpense-read:740) AND TWO
+  destructive delete-writes (deleteSplitExpense:717, updateSplitExpense:786). Two C109 comments (710-714, 782-783) manually plead "keep ownership and deletion
+  on the SAME predicate" — a divergent copy dropping the userId scope = a cross-tenant read or (worse) cross-tenant DELETE. Extracted
+  `private groupOwnedBy(groupId, userId): SQL | undefined` (and+eq, the existing import) and routed all 6 → the C109 boundary is now enforced STRUCTURALLY,
+  not by comment. Behavior-preserving (the SQL is identical). Test-anchored: delete-split-child + split-service.property drive every routed path — GREEN
+  before AND after. Biome reflowed 2 now-short `.delete().where()` chains (check:musl:fix). validate:local EXIT 0, 1454 pass (unchanged). cov: be 86.25%
+  (carry) / fe 84.17% (carry).
