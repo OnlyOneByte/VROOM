@@ -806,6 +806,29 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#115 (MED, money/correctness / NORTH_STAR #1 — found+fixed C398 on a forced bug-cycle FE calc scout; the #64/#91/#110 annual-vs-total lease class) —
+> PaymentMetricsGrid's "Mileage Overage" card compared LIFETIME driven miles against the bare ANNUAL mileageLimit, over-reporting the overage + $ fee ~Nx.**~~ —
+> *DONE C398: bug OVER budget (4>3) → forced. PaymentMetricsGrid.svelte:62 did `Math.max(0, mileageUsed − financing.mileageLimit)`, but `mileageUsed` (FinanceTab:157)
+> is LIFETIME driven miles (currentOdometer − initialMileage) while `mileageLimit` is the ANNUAL allowance (schema + form label "Annual Mileage Limit"; the sibling
+> calculateLeaseMetrics:458 correctly scales `× leaseYears`). So a 36-mo/12k-yr lease (36k total) driven 30k showed "18,000 over" + a phantom fee here, while
+> LeaseMetricsCard on the SAME Finance-tab screen showed 0 — two contradicting figures, this one inflated ~Nx. The exact #64/#91/#110/C198/C374 class, Angelo-approved
+> on the sibling card (C157/C198) → a known-correct invariant the loop lands autonomously. FIX (atomic + arch-clean): extracted the `annual × termMonths/12`
+> total-allowance math (inline ONLY at calculateLeaseMetrics:458-459) into shared `leaseTotalMileageAllowance(financing)` + a pure `calculateLeaseOverage(financing,
+> mileageUsed)` in financing-calculations.ts (the audited, UNIT-TESTABLE module); routed BOTH calculateLeaseMetrics AND the .svelte card through it (ONE source of
+> truth). NOTE the card is CURRENT overage, LeaseMetricsCard the PROJECTED end-of-lease excess — different metrics, but both must use the term-scaled total. +12 guards
+> (term-scaling, 0-term fallback, no-limit; under-total→0 [the bug case, RED pre-fix], over→excess×fee, longer-term, agrees-with-metrics, no-fee, non-lease, no-limit).
+> NON-VACUOUS. fe validate:local EXIT 0, 686 pass (+12). The paired BE finding (split null-mileage siblings break the consecutive-fillup PAIRING adjacency → dropped
+> efficiency points) is REAL + reachable but a ~10-site arch change → noted below for a future arch cycle, not self-fixed.*
+> NOTE (filed C398, arch — efficiency-pairing adjacency): a split FUEL expense creates one sibling PER VEHICLE with volume=null AND mileage=null (createSiblings,
+> split-service.ts). queryFuelExpenses returns all category='fuel' rows with no volume filter, and sortByVehicleThenDate interleaves the split sibling chronologically.
+> The consecutive-fillup pairing loop (forEachVehiclePair, analytics-charts.ts:258, + ~9 inlined copies: computeMpgAndCostPerMile, buildMonthlyConsumption,
+> addSeasonalEfficiencyData, computePerVehicleFuelEfficiency, buildFuelEfficiencyComparison, accumulateCostPerMile, repository's computeConvertedEfficiencyValues /
+> buildConvertedEfficiencyTrend / buildConvertedFuelEfficiencyComparison) then pairs the null-mileage sibling with the real fillups around it → those pairs are
+> rejected by computeEfficiencyPoint (null mileage), and the VALID real-fillup→real-fillup window straddling the split is never paired → a legitimate efficiency point
+> is silently dropped (undercount — the OPPOSITE failure mode from the #108/#113 COUNT overcount). The value math is correct (null rows can't produce a point); the bug
+> is purely lost ADJACENCY. Reachable (a household logging joint fill-ups as splits) but the clean fix is to route all pairing sites through forEachVehiclePair + a
+> `volume != null && volume > 0` pre-filter there — a multi-site arch change, not a one-cycle bug fix. NOT a single-line global fix because the pairing is duplicated.
+>
 > ~~**#114 (MED, correctness/data-hygiene / NORTH_STAR #1 — found+fixed C394 on an odometer/reminder bug scout; the #107/bug-#12 endDate family on the
 > mark-serviced path) — mark-serviced re-arm ignored endDate, re-arming a bounded reminder forward + leaving it active past its end.**~~ — *DONE C394: the
 > mark-serviced time-axis re-arm (routes.ts:119) advanced nextDueDate past now + WROTE it but never checked endDate, so a bounded reminder serviced AFTER its end

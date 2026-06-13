@@ -64,11 +64,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 393 |
 | guard | 6 | 396 |
-| bug | 3 | 394 |
+| bug | 3 | 398 |
 | arch | 5 | 397 |
 | infra | 6 | 395 |
 
-Current cycle: **397**
+Current cycle: **398**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6120,3 +6120,20 @@ Current cycle: **397**
   locally-obvious, behavior-preserving rewrite (chunk yields identical batches). +1 test file (chunk.test.ts, 7 tests): empty→[], exact-multiple, remainder, the
   flatten-round-trips-exactly data-loss guard, default-500, size<1 throws. Left the google-sheets-service:500 + backup.ts:373 sibling copies (C163 mock-trap
   territory) — noted for a future cycle. green→green: be validate:local EXIT 0, 1483 pass (+7) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C398 (bug → #115: PaymentMetricsGrid "Mileage Overage" card compared LIFETIME driven miles against the bare ANNUAL mileageLimit — the #64/#110 annual-vs-total
+  class the sibling card already fixed)** — BALANCE: bug OVER budget (last 394, starved-for 398−394=4 > 3) → forced pick (the most-starved autonomously-actionable
+  category; feature is parked on eyes-on/Playwright-blocked tails, escalated). 2-agent fan-out (BE analytics-aggregation + FE calc/state). VERIFIED FIRSTHAND
+  (C21/C60): PaymentMetricsGrid.svelte:62 did `Math.max(0, mileageUsed − financing.mileageLimit)`, but `mileageUsed` (FinanceTab:157) is LIFETIME driven miles
+  (currentOdometer − initialMileage) and `mileageLimit` is the ANNUAL allowance (the schema + form label "Annual Mileage Limit"; the sibling calculateLeaseMetrics:
+  458 correctly scales `× leaseYears`). So a 36-mo/12k-yr lease (36k total) driven 30k showed "18,000 over" + a phantom fee on this card, while LeaseMetricsCard on
+  the SAME Finance-tab screen showed 0 — two contradicting figures, the grid's inflated ~Nx. The exact #64/#91/#110/C198/C374 annual-vs-total class, Angelo-approved
+  on the sibling card (C157/C198) → a KNOWN-CORRECT invariant the loop lands autonomously (not a new direction call). FIX (atomic + arch-clean): extracted the
+  `annual × termMonths/12` total-allowance math (it lived inline ONLY at calculateLeaseMetrics:458-459) into a shared `leaseTotalMileageAllowance(financing)` + a pure
+  `calculateLeaseOverage(financing, mileageUsed)` in financing-calculations.ts (the audited, UNIT-TESTABLE module — the safety net the eyes-on card can't have);
+  routed BOTH calculateLeaseMetrics AND the .svelte card through it (ONE source of truth). NOTE the card shows CURRENT overage, LeaseMetricsCard the PROJECTED
+  end-of-lease excess — genuinely different metrics, but BOTH must use the term-scaled total. GUARD: +12 (leaseTotalMileageAllowance term-scaling/0-term-fallback/
+  no-limit; calculateLeaseOverage under-total→0 [the bug case, RED pre-fix], genuinely-over→excess×fee, longer-term-more-allowance, agrees-with-calculateLeaseMetrics,
+  no-fee→0-cost, non-lease→0, no-limit→0). NON-VACUOUS (reverting the helper to the bare annual → RED). The paired BE finding (split null-mileage siblings break the
+  consecutive-fillup PAIRING adjacency → dropped efficiency points, ~10 pairing sites) is REAL + reachable but a multi-site arch change, NOT a clean one-cycle bug fix
+  → NOTED for a future arch cycle (route all pairing sites through forEachVehiclePair + a volume pre-filter), not self-fixed this cycle. green→green: fe validate:local
+  EXIT 0, 686 pass (+12) / 0 fail, svelte-check + build clean. cov: be 86.78% (carry) / fe 84.39%+ (the +12 lease-overage guards nudge it up; not re-measured this cycle).
