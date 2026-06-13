@@ -544,6 +544,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#95 (LOW, UX-correctness — found+fixed C308 on a forced bug-cycle FE scout) — settings store cleared a stale `error` on only 2 of
+> 9 async ops → a succeeded retry kept showing a phantom error.**~~ — *DONE C308: load()/update() reset error on entry, but the other 7
+> async ops (downloadBackup/uploadBackup/executeSync/listBackupsFromProvider/listAllBackups/restoreFromProvider/loadRestoreProviders) did
+> not, so a failure left a stale error that a later succeeding op never cleared. Masked today (settings/+page.svelte gates loadError on
+> `&& !settings` = initial-load only) but a latent footgun for any future ungated consumer. FIX: `error = null` on entry to all seven.
+> GUARD: settings-error-clearing.test.ts (+3, the store's first test) — succeeded retry clears, failing op still sets; non-vacuous
+> (reverting one → RED). fe validate:local EXIT 0, 613 pass (+3).*
+
 > ~~**#93 (MED, data-safety / NORTH_STAR #1 — found+fixed C300 on a sync/restore deep-review) — merge-mode restore threw a raw PK
 > violation on the always-present userPreferences/syncState collision instead of a clean conflict.**~~ — *DONE C300: detectConflicts
 > (restore.ts) probed only 6 tables but insertBackupData inserts 15 — incl. userPreferences + syncState (PK = userId). The importer

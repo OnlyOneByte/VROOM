@@ -70,6 +70,7 @@ function createSettingsStore() {
 
 		async downloadBackup() {
 			if (!browser) return;
+			error = null;
 			try {
 				const response = await settingsApi.downloadBackup();
 				if (!response.ok) throw new Error('Failed to download backup');
@@ -83,6 +84,7 @@ function createSettingsStore() {
 		},
 
 		async uploadBackup(file: File, mode: 'preview' | 'replace' | 'merge' = 'preview') {
+			error = null;
 			try {
 				const idempotencyKey = `restore-${mode}-${file.name}-${file.size}-${Date.now()}`;
 				const result = await settingsApi.uploadBackup(file, mode, idempotencyKey);
@@ -98,6 +100,7 @@ function createSettingsStore() {
 		},
 
 		async executeSync(syncTypes: 'backup'[], force = false) {
+			error = null;
 			try {
 				return await settingsApi.executeSync(syncTypes, force);
 			} catch (err) {
@@ -107,6 +110,7 @@ function createSettingsStore() {
 		},
 
 		async listBackupsFromProvider(providerId: string): Promise<BackupFileInfo[]> {
+			error = null;
 			try {
 				return await settingsApi.listBackupsFromProvider(providerId);
 			} catch (err) {
@@ -116,6 +120,7 @@ function createSettingsStore() {
 		},
 
 		async listAllBackups(): Promise<ProviderBackupList[]> {
+			error = null;
 			try {
 				return await settingsApi.listAllBackups();
 			} catch (err) {
@@ -131,6 +136,7 @@ function createSettingsStore() {
 			fileRef?: string;
 			idempotencyKey: string;
 		}): Promise<RestoreResult> {
+			error = null;
 			try {
 				const result = await settingsApi.restoreFromProvider(opts);
 				if (opts.mode !== 'preview') {
@@ -148,6 +154,7 @@ function createSettingsStore() {
 		},
 
 		async loadRestoreProviders(): Promise<RestoreProviderInfo[]> {
+			error = null;
 			try {
 				restoreProviders = await settingsApi.getRestoreProviders();
 				return restoreProviders;

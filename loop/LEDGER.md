@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 306 |
 | guard | 6 | 307 |
-| bug | 3 | 305 |
+| bug | 3 | 308 |
 | arch | 5 | 304 |
 | infra | 6 | 303 |
 
-Current cycle: **307**
+Current cycle: **308**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5042,3 +5042,17 @@ Current cycle: **307**
   hiccup silently dropping an expected auto-backup). Both pin real branch behavior (non-vacuous: removing the syncInProgress AND → RED; a
   fail-closed catch → RED). green→green: backend validate:local EXIT 0 — 1424 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build
   bundled. Guard-only (no source touched) → no UI. cov: be 86.07%+ (carry; activity-tracker safety branches now covered) / fe 81.76% (carry).
+- **C308 (bug): settings store cleared a stale `error` on only 2 of 9 async ops → a succeeded retry kept showing a phantom error (#95)** —
+  BALANCE: bug at budget (last 305, starved-for 3 = 3, tightest budget per the rule; infra at 5 but bug's limit is the hard one) → pick.
+  Bug vein dormant → fresh-surface FE scout. CERTIFIED CLEAN: api-client (envelope-unwrap + ApiError shaping sound), api-transformer (#66
+  charge↔volume routing symmetric, null-clear-on-edit guard), formatters (hardcoded en-US is design-consistent — no locale setting exists,
+  so it's not a bug). THE FINDING (stores/settings.svelte.ts): load()/update() reset `error = null` on entry, but the OTHER SEVEN async ops
+  (downloadBackup/uploadBackup/executeSync/listBackupsFromProvider/listAllBackups/restoreFromProvider/loadRestoreProviders) did NOT — so a
+  failure from one left a stale error string on the store that a LATER SUCCEEDING op never cleared. Masked TODAY in the one UI consumer
+  (settings/+page.svelte gates loadError on `&& !settings` = initial-load only), but a latent footgun: any future component rendering
+  settingsStore.error ungated would show a phantom error after a succeeded retry. FIX: add `error = null` on entry to all seven (symmetry
+  with load/update). GUARD: new settings-error-clearing.test.ts (+3, the store's FIRST test) — a failed load() then a SUCCEEDING
+  loadRestoreProviders()/listAllBackups() clears the stale error; + a failing op still SETS its error (the clear-on-entry doesn't swallow
+  real errors). NON-VACUOUS, PROVEN: reverting one method's clear → that test RED ("a succeeding op must clear the stale error"). FE store
+  logic only — error is computed state, no markup moved → no screenshot. green→green: frontend validate:local EXIT 0 — type-check 0, build,
+  613 pass (+3). cov: be 86.07% (carry) / fe 81.76%+ (carry; settings store now has coverage).
