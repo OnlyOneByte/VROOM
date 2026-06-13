@@ -829,6 +829,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> **#117 (MED, money/correctness / NORTH_STAR #1 — found C404 on a financing-planner deep-review scout; the #92 symptom re-manifested at the planner layer; FILED, not
+> yet fixed) — a 0%-APR loan in the Payment Planner always shows "0 mos / $0 saved" no matter the extra payment.** computePlannerState (payment-planner.ts:64-66)
+> builds the baseline as `{ ...financing, paymentAmount: minimumPayment }` + calls calculateExtraPaymentImpact. For a 0%-APR loan calculateMinimumPayment returns null
+> → PaymentPlannerDialog passes `minimumPayment ?? 0 = 0` → the baseline amortization is simulateAmortization(balance, 0, 0) → first iteration principal=0 trips the
+> negative-am guard → original.months=0 → monthsSaved=max(0, 0−accelerated)=0 + interestSaved=0. So a user paying $500 instead of $400 on a $12k 0%-APR loan (genuinely
+> 30→24 months) sees "0 mos / $0 saved". The C297 fix lives one layer DOWN in calculateExtraPaymentImpact (0%-APR runs the loop), but the planner defeats it by feeding
+> minimumPayment=0 as the baseline. Reachable: NextPaymentCard "Change Payment" (no apr guard) + FinanceTab renders PaymentPlannerDialog for ANY loan (apr=0 only adds an
+> "APR Not Set" alert). FIX (atomic): baseline = `minimumPayment > 0 ? minimumPayment : financing.paymentAmount` (the real contractual payment) in computePlannerState +
+> the secondary-delta branch (:70-71); apr>0 paths (minimum>0) byte-unchanged. The 0%-loan-opens-planner path has NO test → add one with the fix. fe-only, money-facing.
+
 > ~~**#115 (MED, money/correctness / NORTH_STAR #1 — found+fixed C398 on a forced bug-cycle FE calc scout; the #64/#91/#110 annual-vs-total lease class) —
 > PaymentMetricsGrid's "Mileage Overage" card compared LIFETIME driven miles against the bare ANNUAL mileageLimit, over-reporting the overage + $ fee ~Nx.**~~ —
 > *DONE C398: bug OVER budget (4>3) → forced. PaymentMetricsGrid.svelte:62 did `Math.max(0, mileageUsed − financing.mileageLimit)`, but `mileageUsed` (FinanceTab:157)

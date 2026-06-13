@@ -117,6 +117,50 @@ describe('backup → restore round-trip preserves insurance claims', () => {
     expect(row.description).toBe('Rear-ended at a light');
   });
 
+  // C404 (bug, NORTH_STAR #1 crown jewel): a photo attached to an insurance CLAIM must survive the
+  // round-trip. insurance_claim is a real photo-upload target (photos/helpers.ts validateEntityOwnership
+  // accepts it; the ClaimsSection UI uploads to it), but validateReferentialIntegrity's photo entity-type
+  // map omitted it — so a backup carrying a claim photo failed validation with "unknown entity type:
+  // insurance_claim" → valid:false → the WHOLE restore aborted (the user couldn't recover ANY data from
+  // their own valid backup). The original 15-table cert (C366) predated claim photos. Pre-fix this test
+  // throws on restore; post-fix the claim photo round-trips. Seed the photos row directly (the upload
+  // route is multipart; the bug is purely in the validator, not the upload path).
+  test('a photo attached to an insurance claim survives the round-trip (does not abort restore) — #C404', async () => {
+    const vehicleId = await seedVehicle();
+    const policyId = await seedPolicy(vehicleId);
+
+    const created = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
+      claimDate: '2024-06-15T00:00:00.000Z',
+      claimType: 'collision',
+    });
+    const createdBody = await json<DataEnvelope<{ id: string }>>(created);
+    expect(created.status, JSON.stringify(createdBody)).toBe(201);
+    const claimId = createdBody.data.id;
+
+    // A photo attached to that claim (entity_type='insurance_claim'), as an upload would create.
+    ctx.sqlite.run(
+      `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
+       VALUES ('photo-claim-1', ?, 'insurance_claim', ?, 'damage.jpg', 'image/jpeg', 2048)`,
+      [ctx.user.id, claimId]
+    );
+
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    // Pre-fix: this throws SyncError(VALIDATION_ERROR) — "unknown entity type: insurance_claim".
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    // The claim photo round-tripped intact, still pointing at its claim.
+    const photoRows = ctx.sqlite
+      .query("SELECT id, entity_type, entity_id FROM photos WHERE entity_type = 'insurance_claim'")
+      .all() as { id: string; entity_type: string; entity_id: string }[];
+    expect(photoRows, 'the claim photo survived restore').toHaveLength(1);
+    expect(photoRows[0].id).toBe('photo-claim-1');
+    expect(photoRows[0].entity_id).toBe(claimId);
+  });
+
   test('multiple claims on a policy all survive the round-trip', async () => {
     const vehicleId = await seedVehicle();
     const policyId = await seedPolicy(vehicleId);

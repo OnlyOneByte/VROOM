@@ -578,6 +578,7 @@ export class BackupService {
     const termIds = new Set((backup.insuranceTerms ?? []).map((t) => String(t.id)));
     const expenseIds = new Set(backup.expenses.map((e) => String(e.id)));
     const odometerIds = new Set((backup.odometer ?? []).map((o) => String(o.id)));
+    const claimIds = new Set((backup.insuranceClaims ?? []).map((c) => String(c.id)));
     const photoIds = new Set((backup.photos ?? []).map((p) => String(p.id)));
     const reminderIds = new Set((backup.reminders ?? []).map((r) => String(r.id)));
 
@@ -598,6 +599,7 @@ export class BackupService {
         vehicleIds,
         expenseIds,
         policyIds,
+        claimIds,
         odometerIds,
       }),
       ...this.validatePhotoRefEntries(backup.photoRefs ?? [], photoIds),
@@ -732,14 +734,21 @@ export class BackupService {
       vehicleIds: Set<string>;
       expenseIds: Set<string>;
       policyIds: Set<string>;
+      claimIds: Set<string>;
       odometerIds: Set<string>;
     }
   ): string[] {
     const errors: string[] = [];
+    // entityType keys MUST match the photo upload allowlist (photos/helpers.ts validateEntityOwnership):
+    // vehicle / insurance_policy / insurance_claim / expense / odometer_entry. A type accepted on upload
+    // but missing here makes restore reject an otherwise-valid backup outright (valid:false aborts the
+    // WHOLE restore, not just the photo) — the crown-jewel NORTH_STAR #1 round-trip failure insurance_claim
+    // hit (C404: claim photos are a real, app-creatable target the original 15-table cert/C366 predated).
     const entityTypeToIds: Record<string, Set<string>> = {
       vehicle: entityIds.vehicleIds,
       expense: entityIds.expenseIds,
       insurance_policy: entityIds.policyIds,
+      insurance_claim: entityIds.claimIds,
       odometer_entry: entityIds.odometerIds,
     };
 

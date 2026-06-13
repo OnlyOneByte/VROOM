@@ -69,13 +69,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 399 |
+| deep-review | 5 | 404 |
 | guard | 6 | 401 |
 | bug | 3 | 402 |
 | arch | 5 | 403 |
 | infra | 6 | 400 |
 
-Current cycle: **403**
+Current cycle: **404**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6210,3 +6210,19 @@ Current cycle: **403**
   FuelExpenseRow already lives + which repository.ts already imports (no cycle). Routed all 4 (3 inline → isFillup(row)/filter(isFillup); deleted the local def). Rule-2
   behavior-preserving (identical boolean). Rule-3 green→green: analytics-charts-unpinned.test.ts (the #108/#113/#56 split-sibling guards) + fuel-stats-fleet-distance-
   pooling.test.ts (the #18 COUNT) drive all 4 sites — GREEN before AND after, no test touched. be validate:local EXIT 0, 1490 pass (unchanged). cov: be 86.92% (carry) / fe 84.45% (carry).
+- **C404 (deep-review → #C404: insurance_claim photos broke backup/restore — a HARD restore failure on a valid backup, NORTH_STAR #1 crown-jewel violation)** —
+  BALANCE: deep-review most-starved actionable AT budget (last 399, starved-for 404−399=5=budget; feature parked) → highest-leverage pick. 2-agent fan-out (backup/
+  restore round-trip + financing planner math). VERIFIED FIRSTHAND (C21/C60): validateReferentialIntegrity's validatePhotoRefs (backup.ts:739) entityTypeToIds map had
+  vehicle/expense/insurance_policy/odometer_entry but OMITTED insurance_claim — yet insurance_claim IS a real photo-upload target (photos/helpers.ts:56
+  validateEntityOwnership accepts it, ownership transitive through the claim's policy; the ClaimsSection UI uploads to it). createBackup serializes ALL user photos
+  (backup.ts:368, entityType-agnostic), so a claim photo lands in the backup; on restore validatePhotoRefs finds no idSet for 'insurance_claim' → pushes "unknown entity
+  type" → validateBackupData returns valid:false → restoreFromBackup THROWS → the ENTIRE restore aborts (not just the photo). A user who attached a photo to ANY
+  insurance claim could not restore ANY of their data from their own valid backup — worse than silent loss, a hard round-trip failure on the data-safety crown jewel.
+  The original 15-table cert (C366) predated claim photos. FIX (atomic, mirrors the existing pattern): build `claimIds` from backup.insuranceClaims (already serialized +
+  parsed), pass it into validatePhotoRefs, add insurance_claim→claimIds to the entity map (+ a comment pinning the map to the upload allowlist). Claims insert before
+  photos (restore.ts:461<:513) so FK order was already safe — only validation blocked it. GUARD: +1 round-trip (claims-roundtrip.test.ts): seed a claim + a
+  entity_type='insurance_claim' photos row → exportAsZip → restoreFromBackup(replace) → success + the photo survives pointing at its claim. NON-VACUOUS (pre-fix the
+  restore throws on the unknown entity type). be validate:local EXIT 0, 1491 pass (+1) (a format reflow → check:musl:fix one-lined the query string, re-validated clean).
+  The paired FE finding (0%-APR loan in the Payment Planner shows "0 mos / $0 saved" because computePlannerState uses minimumPayment=0 as the baseline → defeats the C297
+  fix one layer down — the #92 symptom re-manifested at the planner layer) is REAL + reachable → FILED below for a near-term bug cycle (clean atomic fix: baseline =
+  minimumPayment>0 ? minimumPayment : financing.paymentAmount). cov: be 86.92%+ (carry, +1 guard) / fe 84.45% (carry).
