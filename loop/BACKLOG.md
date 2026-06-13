@@ -829,6 +829,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#126 (MED, correctness/units / NORTH_STAR #1 — found+fixed C427 on a cross-vehicle deep-review; the C413 sweep's missed twin) — the CONVERTED/trend analytics
+> efficiency builders contaminated gas-MPG with PHEV charge mi/kWh.**~~ — *DONE C427: C411/C413 fixed the gas/charge partition (gasEfficiencyPoint) on the analytics-charts
+> builders + computeMpgAndCostPerMile, but the repository.ts CONVERTED/trend builders still used computeEfficiencyPoint (accepts electric) at 4 sites —
+> computeConvertedEfficiencyValues, buildConvertedEfficiencyTrend, getFuelEfficiencyTrend, buildConvertedFuelEfficiencyComparison. A PHEV charge (kWh→~mi/kWh) leaked into
+> the gas-MPG average; WORSE on the converted path, convertEfficiency then converts that mi/kWh AS IF mi/gal → garbage. The comparison case is a BRANCH-PARITY gap (its
+> skipConversion twin already used gasEfficiencyPoint → same chart flips correct↔polluted on a fleet units-mismatch). FIX: routed all 4 through gasEfficiencyPoint
+> (electric excluded BEFORE conversion); dropped the unused computeEfficiencyPoint import. +1 guard (a PHEV trend returns only the gas point). NON-VACUOUS. be validate:local
+> EXIT 0, 1523 pass. The C411→C413→C427 arc now covers the gas/charge partition across BOTH the analytics-charts builders AND the repository converted/trend paths.*
+
 > ~~**#125 (MED, money/data-safety / NORTH_STAR #1 — found+fixed C422 on an expense-validation deep-review) — PUT /expenses/:id skipped the financing-source
 > verification POST enforces, letting a forged source_id='financing' link corrupt the displayed loan balance.**~~ — *DONE C422: the POST handler verifies a
 > `sourceType:'financing'` link points at the vehicle's ACTIVE financing (exists + isActive + sourceId===financing.id), but PUT wrote `{sourceType:'financing',

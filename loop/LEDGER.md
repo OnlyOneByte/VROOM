@@ -69,13 +69,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 422 |
+| deep-review | 5 | 427 |
 | guard | 6 | 425 |
 | bug | 3 | 424 |
 | arch | 5 | 426 |
 | infra | 6 | 423 |
 
-Current cycle: **426**
+Current cycle: **427**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6453,3 +6453,16 @@ Current cycle: **426**
   sync-manager.test.ts (syncAll) drive it — GREEN before AND after. The sync-manager test's offline-storage MOCK omitted getPendingExpenses → had to add a mock mirroring
   the real impl over the MOCKED loadOfflineExpenses (the C163 mock-trap discipline: keep the mock driving the real contract, not a divergent reimpl). fe validate:local
   EXIT 0, 697 pass (unchanged). Chose the FE cross-file dup over the BE toTimeMs candidate (4 identical lines within ONE comparator — more local/cosmetic). cov: be 86.93% (carry) / fe 84.51% (carry).
+- **C427 (deep-review → #126: the CONVERTED/trend analytics efficiency builders used computeEfficiencyPoint, contaminating gas-MPG with PHEV charge mi/kWh — the C413 sweep's
+  missed twin)** — BALANCE: deep-review most-starved actionable AT budget (last 422, starved-for 427−422=5=budget) → highest-leverage. 2-agent fan-out (CSV export + cross-vehicle
+  agg); CSV export CERTIFIED CLEAN (C383 round-trip corroborated, every field traced both directions). The cross-vehicle scout surfaced #126, VERIFIED FIRSTHAND (C21/C60):
+  C411/C413 fixed the gas/charge partition (gasEfficiencyPoint) on the analytics-charts builders + computeMpgAndCostPerMile, but the repository.ts CONVERTED/trend builders
+  still used computeEfficiencyPoint (accepts electric) at 4 sites — computeConvertedEfficiencyValues (:479), buildConvertedEfficiencyTrend (:561), getFuelEfficiencyTrend (:1168),
+  buildConvertedFuelEfficiencyComparison (:1615). For a PHEV a charge session (kWh→~mi/kWh) leaked into the gas-MPG average; WORSE on the converted path, convertEfficiency
+  would then convert that mi/kWh AS IF mi/gal → garbage. The buildConvertedFuelEfficiencyComparison case is a BRANCH-PARITY gap: its skipConversion twin
+  (buildFuelEfficiencyComparison) already uses gasEfficiencyPoint, so the SAME chart flipped correct↔polluted purely on a fleet units-mismatch. FIX: routed all 4 through
+  gasEfficiencyPoint (electric excluded BEFORE conversion); dropped the now-unused computeEfficiencyPoint import. GUARD: +1 (cross-vehicle.property.test.ts + a seedCharge
+  helper): a PHEV with 2 consecutive gas fillups + 2 consecutive charge sessions → getFuelEfficiencyTrend returns ONLY the 30 MPG gas point (pre-fix: + a ~4 mi/kWh charge
+  point). NON-VACUOUS. (Self-corrected the test first: an interleaved seed conflated this with the separate #C398 pairing-adjacency issue — grouped each energy type to
+  isolate the exclusion concern.) be validate:local EXIT 0, 1523 pass (+2). The C411→C413→C427 arc now covers the gas/charge partition across BOTH the analytics-charts builders
+  AND the repository converted/trend paths. cov: be 86.93% (carry, +1 guard) / fe 84.51% (carry).

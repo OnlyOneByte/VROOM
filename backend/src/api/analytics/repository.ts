@@ -32,7 +32,6 @@ import {
   buildVehicleMaintenanceCosts,
   buildVehicleRadar,
   computeAverageCosts,
-  computeEfficiencyPoint,
   computeFuelConsumptionMetrics,
   computeMileageScore,
   computeMpgAndCostPerMile,
@@ -45,6 +44,7 @@ import {
   findBiggestExpense,
   forEachVehiclePair,
   type GeneralExpenseRow,
+  gasEfficiencyPoint,
   groupByVehicle,
   isFillup,
   monthKeysInRange,
@@ -475,7 +475,11 @@ export class AnalyticsRepository {
         const current = rows[i];
         const previous = rows[i - 1];
         if (!current || !previous) continue;
-        const point = computeEfficiencyPoint(current, previous);
+        // gasEfficiencyPoint (not computeEfficiencyPoint): this is a gas-MPG average — a PHEV's charge
+        // session (mi/kWh) must NOT be summed in, and crucially must NOT be fed to convertEfficiency
+        // (which would convert mi/kWh as if it were mi/gal → garbage). The #119/#122 gas/charge
+        // partition (C413) on the converted/summary repository path it missed (#126, C427).
+        const point = gasEfficiencyPoint(current, previous);
         if (!point) continue;
 
         values.push(
@@ -553,7 +557,8 @@ export class AnalyticsRepository {
         const current = rows[i];
         const previous = rows[i - 1];
         if (!current || !previous) continue;
-        const point = computeEfficiencyPoint(current, previous);
+        // gasEfficiencyPoint: gas-MPG trend — exclude a PHEV's charge mi/kWh before pooling/convert (#126/C427).
+        const point = gasEfficiencyPoint(current, previous);
         if (!point) continue;
 
         const converted = skipConversion
@@ -1160,7 +1165,8 @@ export class AnalyticsRepository {
       if (rows.length < 2) return [];
       const points: FuelEfficiencyPoint[] = [];
       forEachVehiclePair(rows, (current, previous) => {
-        const point = computeEfficiencyPoint(current as FuelRow, previous as FuelRow);
+        // gasEfficiencyPoint: the fuel-efficiency TREND is gas MPG — exclude PHEV charge mi/kWh (#126/C427).
+        const point = gasEfficiencyPoint(current as FuelRow, previous as FuelRow);
         if (point) points.push(point);
       });
       return points;
@@ -1607,7 +1613,10 @@ export class AnalyticsRepository {
         const current = rows[i];
         const previous = rows[i - 1];
         if (!current || !previous) continue;
-        const point = computeEfficiencyPoint(current, previous);
+        // gasEfficiencyPoint: this converted comparison is gas MPG — exclude a PHEV's charge mi/kWh BEFORE
+        // convertEfficiency (which would mis-convert mi/kWh as mi/gal). Matches the skipConversion twin
+        // buildFuelEfficiencyComparison's gas gate, restoring branch parity (#126/C427, the #119/#122 class).
+        const point = gasEfficiencyPoint(current, previous);
         if (!point) continue;
 
         const converted = convertEfficiency(
