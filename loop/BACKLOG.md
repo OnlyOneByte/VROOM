@@ -360,6 +360,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C312 — pin the insurance term-cost-UPDATE premium-expense replacement (bug-cycle dormant-vein scout outcome).**~~ — *DONE C312: a
+> forced bug cycle scouted 4 surfaces clean (claims-repository, insurance hooks, deleteBySource, financing-timeline). No defect. The unguarded
+> invariant: a costed term auto-materializes a split premium expense (sourceType:'insurance_term'); on a term UPDATE, updateTermExpenses must
+> delete the stale auto-expenses + re-create at the new cost — but no test pinned the update-REPLACES path (only create+delete). +1 HTTP guard
+> in terms-http.test.ts: a 2-vehicle term @1200 → 2 even-split siblings; PUT totalCost 1800 → still exactly 2 siblings summing to 1800 (no
+> stale, no missing). NORTH_STAR #2 money correctness. validate:local EXIT 0, 1426 pass (+1).*
+
 > ~~**C307 — pin activity-tracker's two unguarded safety invariants (mid-sync eviction shield + fail-open change-check).**~~ — *DONE C307:
 > sync/activity-tracker.ts (71% func / 57% line) had two SAFETY branches unpinned after the C195 ageout ratchet. +2 guards: (1)
 > cleanupInactiveUsers must NOT evict a stale-but-syncInProgress user (line 129 `!syncInProgress` AND) — proven by flipping the in-memory flag

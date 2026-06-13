@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 311 |
 | guard | 6 | 307 |
-| bug | 3 | 308 |
+| bug | 3 | 312 |
 | arch | 5 | 310 |
 | infra | 6 | 309 |
 
-Current cycle: **311**
+Current cycle: **312**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5092,3 +5092,16 @@ Current cycle: **311**
   volume/mileage/fuelType + missedFillup=false ACROSS ALL categories (incl. 'fuel' from the arb). NO defect, no source change. green→green:
   backend validate:local EXIT 0 — 1425 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.07%+ (carry) / fe
   81.76% (carry).
+- **C312 (bug → dormant-vein clean scout + money-correctness guard): four surfaces certified clean; pinned the term-cost-UPDATE premium
+  replacement** — BALANCE: bug over budget (last 308, starved-for 4 > 3, most-starved actionable) → forced. Bug vein dormant → fresh-surface
+  scout. CERTIFIED CLEAN: insurance claims-repository (policy-scoped + defense-in-depth claimId+policyId, null-clear semantics; claim-delete
+  photo cleanup at the route via deleteAllPhotosForEntity), insurance hooks createTermExpenses/updateTermExpenses (best-effort by design —
+  derived projection, not source-of-truth), deleteBySource (catches ALL split siblings via sourceType/sourceId, photo_refs cascade), analytics
+  buildFinancingTimeline (spread-safe Math.max + 0 floor, 24-cap, positive-payment filter). NO defect. THE worthwhile guard: a costed term
+  auto-materializes a split premium expense (sourceType:'insurance_term'); on a term UPDATE, updateTermExpenses must DELETE the stale
+  auto-expenses + RE-CREATE at the new cost — but the existing tests (terms-http clear-field + #84; policy-delete-cascade create+delete) NEVER
+  pinned the update-REPLACES path, so a regression leaving stale/missing premium siblings would silently drift the premium from its term
+  (NORTH_STAR #2). +1 HTTP guard (terms-http.test.ts): a 2-vehicle costed term → 2 even-split siblings summing to 1200; PUT a new totalCost
+  1800 → still exactly 2 siblings summing to 1800 (no stale lingering, no missing). Drives the REAL PUT route + reads the persisted expenses;
+  non-vacuous (skip the delete → count 4/total 3000; skip the recreate → count 0). green→green: backend validate:local EXIT 0 — 1426 pass
+  (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).

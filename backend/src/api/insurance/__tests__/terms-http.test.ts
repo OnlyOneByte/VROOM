@@ -227,3 +227,63 @@ describe('#84-class — insurance term writes reject a foreign (non-owned) vehic
     expect(junctionCountFor(second)).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Term-UPDATE → premium-expense REPLACEMENT (C312 deep-review guard). A costed term
+// auto-materializes a split premium expense (hooks.createTermExpenses, sourceType:'insurance_term',
+// one even-split sibling per covered vehicle). On a term UPDATE, updateTermExpenses must DELETE the
+// stale auto-expenses (deleteBySource) and RE-CREATE them to match the NEW totalCost — else the
+// premium expense drifts from the term it derives from (NORTH_STAR #2 money correctness). The
+// clear-field + #84 tests above don't touch this; policy-delete-cascade pins create+delete but not
+// the update-replaces path. Drives the REAL PUT route + reads the persisted expenses.
+// ---------------------------------------------------------------------------
+describe('#57-class — a term-cost UPDATE replaces its auto-created premium expense (C312)', () => {
+  /** Sum + count of the auto-created premium expenses linked to a term. */
+  function premiumExpenses(termId: string): { count: number; total: number } {
+    const rows = ctx.sqlite
+      .query(
+        "SELECT expense_amount AS amt FROM expenses WHERE source_type = 'insurance_term' AND source_id = ?"
+      )
+      .all(termId) as { amt: number }[];
+    const total = rows.reduce((s, r) => s + (r.amt ?? 0), 0);
+    return { count: rows.length, total: Math.round(total * 100) / 100 };
+  }
+
+  test('changing a term totalCost deletes the old premium siblings and re-creates them at the new cost', async () => {
+    const v1 = await seedVehicle();
+    const v2 = await seedVehicle();
+    // A costed term covering TWO vehicles → an even split: 2 siblings summing to totalCost.
+    const created = await ctx.authed('POST', '/api/v1/insurance', {
+      company: 'Acme Mutual',
+      terms: [
+        {
+          startDate: '2024-01-01T00:00:00.000Z',
+          endDate: '2025-01-01T00:00:00.000Z',
+          totalCost: 1200,
+          vehicleCoverage: { vehicleIds: [v1, v2] },
+        },
+      ],
+    });
+    const body = await json<DataEnvelope<PolicyRow>>(created);
+    expect(created.status, JSON.stringify(body)).toBe(201);
+    const policyId = body.data.id;
+    const termId = body.data.terms[0].id;
+
+    // The premium expense materialized: 2 even-split siblings summing to 1200.
+    const before = premiumExpenses(termId);
+    expect(before.count).toBe(2);
+    expect(before.total).toBe(1200);
+
+    // UPDATE the term's totalCost → the hook must delete the old siblings + re-create at 1800.
+    const upd = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
+      totalCost: 1800,
+      vehicleCoverage: { vehicleIds: [v1, v2] },
+    });
+    expect(upd.status, await upd.text()).toBeLessThan(300);
+
+    // No stale siblings linger; the premium now tracks the NEW cost exactly (still 2 siblings → 1800).
+    const after = premiumExpenses(termId);
+    expect(after.count).toBe(2);
+    expect(after.total).toBe(1800);
+  });
+});
