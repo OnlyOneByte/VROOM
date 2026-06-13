@@ -165,13 +165,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > be validate:local EXIT 0, 1484 pass (+1). The materialization path itself CERTIFIED CLEAN (split sums + source-links every sibling; per-period advance-before-insert
 > sound; #88/#97 already filed). (B) CSV round-trip mostly CLEAN (numbers, dates, RFC-4180 quoting, multi-tag, BOM, formula-injection `=…` round-trip all survive) —
 > surfaced one NARROW asymmetry, noted below.*
-> NOTE (filed C399, data-safety guard — NARROW round-trip corruption): a user free-text value (description / tag / vehicle nickname) literally beginning with `'` +
-> a formula-trigger char (`=`/`+`/`-`/`@`/TAB/CR) round-trips LOSSY. neutralizeCsvCell (csv-safety.ts:35) only escapes a value whose FIRST char is a trigger, so `'=mc2`
-> exports UNCHANGED; but denormalizeCsvCell (:64) strips a leading `'` whenever char-2 is a trigger → re-imports as `=mc2` (the apostrophe is silently gone). For a
-> vehicle nickname it's worse: the stripped name no longer matches the registered key → the whole row fails to import. Reachable (people lead with `'` to force text)
-> but NARROW (only `'`+trigger-led values). FIX (atomic, write-boundary): in neutralizeCsvCell also prefix the ambiguous `value[0]==="'" && trigger(value[1])` case so
-> denormalize's single-`'`-strip is its exact inverse (`'=mc2`→`''=mc2`→`'=mc2`); leaves all passing cases untouched. A clean guard-cycle pick (csv-safety.test.ts has
-> the harness; the existing pin only covers `'`+digit, not `'`+trigger). NORTH_STAR #1 (round-trips every field, no silent loss).
+> NOTE (filed C399, RE-CLASSIFIED C401 to a DIRECTION CALL — ESCALATED to Angelo, NOT a clean guard fix): a user free-text value (description / tag / vehicle
+> nickname) literally beginning with `'` + a formula-trigger char (`=`/`+`/`-`/`@`/TAB/CR) round-trips LOSSY. neutralizeCsvCell (csv-safety.ts:35) only escapes a value
+> whose FIRST char is a trigger, so `'=mc2` exports UNCHANGED; but denormalizeCsvCell (:65, called on every cell via makeCellGetter:88) strips a leading `'` whenever
+> char-2 is a trigger → re-imports as `=mc2` (the apostrophe is silently gone). For a vehicle nickname it's worse: the stripped name no longer matches the registered
+> key → the whole row fails to import. Reachable but NARROW (only `'`+trigger-led values). C401 VERIFIED FIRSTHAND the C399-proposed "clean fix" (escape to `''=mc2`)
+> is WRONG: denormalizeCsvCell strips only when char-2 is a TRIGGER, and `'` isn't one → `''=mc2` returns UNCHANGED (still corrupt), AND it collides with the pinned
+> `''=double`-stays test. A single-`'` sentinel CANNOT disambiguate a user-typed `'=` from an export-escaped `'=`; the ONLY invertible scheme (escape EVERY leading-`'`
+> on write, strip one on read) reinterprets hand-authored leading-`'` FOREIGN CSVs, flipping the deliberate import-csv.test.ts:532 "preserves a genuinely
+> apostrophe-led description" contract → a data-safety TRADEOFF (optimize VROOM-own-export round-trip faithfulness vs foreign-import faithfulness), Angelo's call.
+> C401 increment (safe): corrected the FALSE doc claim ("can never eat real data") + pinned the actual lossy behavior with a labeled characterization test (flips to a
+> true round-trip assertion when the call lands) + escalated. NORTH_STAR #1 (round-trips every field, no silent loss) — but the fix is gated on the direction decision.
 >
 > ~~**Middleware (idempotency/rate-limit/body-limit) + split-tx-integrity audit (C393).**~~ — *DONE C393 (BOTH CERTIFIED CLEAN; idempotency in-memory-race
 > hardening FILED). 2-agent fan-out. (B) split create/update tx CLEAN — C151 async-tx footgun NOT exposed (all validation pre-hoisted out of the async callback;

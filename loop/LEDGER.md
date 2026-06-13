@@ -70,12 +70,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 399 |
-| guard | 6 | 396 |
+| guard | 6 | 401 |
 | bug | 3 | 398 |
 | arch | 5 | 397 |
 | infra | 6 | 400 |
 
-Current cycle: **400**
+Current cycle: **401**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6170,3 +6170,17 @@ Current cycle: **400**
   FIX: committed the 3 spec docs (matching every sibling; .config.kiro stays untracked as siblings do). No product code touched → no build gate beyond the coverage
   runs (both EXIT 0). All other untracked items confirmed by-design (*.meshclaw.e2e.ts specs, .meshclaw-tools/, screenshots, mise.local.toml, playwright config).
   cov: be 86.92% / fe 84.45%. Next #5 sweep ~C410; next CLAUDE.md refresh ~C405.
+- **C401 (guard → the C399-filed CSV-apostrophe round-trip: VERIFIED REAL but the "clean fix" DEBUNKED → reclassified to a DIRECTION CALL + escalated; pinned the
+  actual lossy behavior)** — BALANCE: nothing over budget (deep-review 2, bug 3=budget, arch 4, infra 1, feature parked); guard MOST-STARVED actionable (5/6) →
+  highest-leverage pick, and the freshly-filed CSV-apostrophe guard was the obvious target. VERIFIED FIRSTHAND (C21/C60) — and the verification PAID OFF: the bug is
+  REAL + reachable (makeCellGetter:88 DOES call denormalizeCsvCell on every cell incl. the vehicle name; a user-typed `'=mc2` exports unescaped [neutralizeCsvCell only
+  prefixes when value[0] is itself a trigger] then imports stripped to `=mc2` [denormalize strips `'` when value[1] is a trigger] → lossy; a `'=Daily` nickname then
+  fails to re-match → row drops). BUT the C399-filed "clean atomic fix" (escape to `''=mc2`) is WRONG: denormalizeCsvCell:65 strips only when value[1] is a TRIGGER, and
+  `'` isn't one → `''=mc2` returns UNCHANGED (still corrupt), AND it collides with the pinned `''=double`-stays test. A single-`'` sentinel CANNOT disambiguate a
+  user-typed `'=` from an export-escaped `'=`; the only invertible scheme (escape EVERY leading-`'` on write, strip one on read) reinterprets hand-authored leading-`'`
+  FOREIGN CSVs, flipping the deliberate import-csv.test.ts:532 "preserves a genuinely apostrophe-led description" contract → a data-safety TRADEOFF (optimize
+  VROOM-own-export round-trip vs foreign-import faithfulness), NOT a one-side fix. INCREMENT (safe, behavior-preserving): (1) fixed the FALSE doc claim in csv-safety.ts
+  (denormalizeCsvCell claimed "this can never eat real data" — it can, for `'`+trigger); (2) +5 CHARACTERIZATION tests pinning the actual lossy round-trip (clearly
+  labeled NOT an endorsement — flips to a true round-trip assertion when the call lands); (3) ESCALATED to Angelo via send_message with options (a) VROOM-own-export
+  faithfulness / (b) foreign-import faithfulness / (c) discuss. No production behavior changed (doc + tests only). green→green: be validate:local EXIT 0, 1490 pass (+5)
+  / 0 fail (format reflow → check:musl:fix double-quoted the escaped-`'` describe/test names, then re-validated clean). cov: be 86.92% (carry, tests-only) / fe 84.45% (carry).
