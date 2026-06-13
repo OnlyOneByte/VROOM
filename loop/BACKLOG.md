@@ -1759,6 +1759,14 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Route expense-form-validation's 3 hand-built local-date strings onto the canonical toDateInputValue (3 sites → 1, rule-7 fan-out, done C370).**~~ —
+  *DONE C370: expense-form-validation.ts built a local YYYY-MM-DD string BYTE-IDENTICAL at 3 sites (future-date check :44, mileage entriesBefore :103,
+  entriesAfter :116) while ALREADY importing + using toDateInputValue (:2/:96). toDateInputValue (formatters.ts:97) is byte-equivalent AND the #87 timezone-fix
+  locus (reads LOCAL calendar parts) — a divergent hand-built copy silently re-introduces the UTC-midnight #87/#6/#61 bug on the date-validation surface. Routed
+  all 3 onto it. Behavior-preserving (byte-equivalent). Rule-3 green→green: expense-form-validation-date.test.ts (date-format + mileage ordering) pass UNCHANGED.
+  fe validate:local EXIT 0, 669 pass. Rejected: the BE analytics new Date(range*1000)×3 (thin 2-line pair); the FE dead calculateDaysUntil delete (deleting a
+  tested export < collapsing a live triplicate onto the #87-critical canonical helper).*
+
 - ~~**Extract odometerRepository.vehicleScope — ONE source of truth for the odometer tenant+vehicle predicate (6 sites → 1, rule-7 fan-out, done C365).**~~ —
   *DONE C365: odometer/repository.ts repeated the raw-SQL tenant scope `vehicle_id = ${vehicleId} AND user_id = ${userId}` at SIX sites — getHistory's data
   query (2 UNION legs) + count query (2 subqueries) + getCurrentOdometer's MAX-UNION (2 legs). The #48/#52/C109 comments manually plead "scope BOTH legs" — a

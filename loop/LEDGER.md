@@ -57,10 +57,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 366 |
 | guard | 6 | 369 |
 | bug | 3 | 367 |
-| arch | 5 | 365 |
+| arch | 5 | 370 |
 | infra | 6 | 368 |
 
-Current cycle: **369**
+Current cycle: **370**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5824,3 +5824,14 @@ Current cycle: **369**
   id, not a missing-id 400). Rejected the other picks: the updateClaimSchema empty-`{}` rejection (a no-op-defense nicety, not a correctness/isolation
   invariant); the FE formatRelativeTime/shouldTriggerRecurring boundary nits (already representatively tested — boundary-only adds were thin). green→green: be
   validate:local EXIT 0, 1460 pass (+1) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C370 (arch): route expense-form-validation's 3 hand-built local-date strings onto the canonical toDateInputValue (3 sites → 1)** — BALANCE: arch AT budget
+  (last 365, starved-for 370−365=5 = budget) → most-starved actionable pick. rule-7 fan-out. PICK (CONFIRMED firsthand, C21/C60): expense-form-validation.ts
+  built a local `YYYY-MM-DD` string `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` BYTE-IDENTICAL at 3
+  sites (future-date check :44, mileage-ordering entriesBefore :103, entriesAfter :116) — while the file ALREADY imports toDateInputValue (:2) and ALREADY uses
+  it at :96. toDateInputValue (formatters.ts:97) is BYTE-EQUIVALENT (same parts + padStart) AND is the #87 timezone-fix locus (reads LOCAL calendar parts so a
+  dateOnlyToISO noon-local round-trip is exact in every tz). A divergent hand-built copy silently re-introduces the UTC-midnight #87/#6/#61 bug class on the
+  date-validation surface. Routed all 3 onto toDateInputValue (the 2 mileage sites keep their `new Date(exp.date)` then pass it; the helper takes Date|string).
+  Behavior-preserving (byte-equivalent). RULE-3 GREEN→GREEN: expense-form-validation-date.test.ts pins the date-format + mileage ordering — pass UNCHANGED
+  before AND after. Rejected: the BE analytics `new Date(range.start*1000)` ×3 (a 2-line mechanical pair, thinner payoff); the FE dead calculateDaysUntil delete
+  (deferred — deleting a tested export is lower-value than collapsing a live triplicate onto the canonical, #87-critical helper). fe validate:local EXIT 0, 669
+  pass (unchanged). cov: be 86.68% (carry) / fe 84.45% (carry).
