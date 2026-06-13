@@ -61,10 +61,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 377 |
 | guard | 6 | 380 |
 | bug | 3 | 378 |
-| arch | 5 | 376 |
+| arch | 5 | 381 |
 | infra | 6 | 379 |
 
-Current cycle: **380**
+Current cycle: **381**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5943,3 +5943,13 @@ Current cycle: **380**
   branch silently emits "saves 1 months" (a visible grammar bug on the planner card). +2 tests via the PUBLIC buildSummary (the helper isn't exported):
   monthsSaved=1 → contains '1 month' AND not '1 months' (the load-bearing boundary — '1 month' is a substring of '1 months', so the not-contains distinguishes
   them); monthsSaved=2 → '2 months'. NON-VACUOUS. green→green: fe validate:local EXIT 0, 675 pass (+2) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C381 (arch): extract ExpenseRepository.sourceScope — ONE source of truth for the source-linked-expense tenant predicate (4 sites → 1)** — BALANCE: arch AT
+  budget (last 376, starved-for 381−376=5 = budget) → most-starved actionable pick. rule-7 fan-out. PICK (CONFIRMED firsthand, C21/C60): the triple-predicate
+  `and(eq(sourceType), eq(sourceId), eq(userId))` was BYTE-IDENTICAL at 4 sites in expenses/repository.ts — findBySource (:185), deleteBySource's read (:538)
+  AND its destructive delete-write (:557), clearSource's update (:585). These act on AUTO-MATERIALIZED expenses (reminder/insurance/financing cascade cleanup),
+  so a divergent copy dropping the userId leg = one user's source-entity delete/deactivate wiping or nulling ANOTHER user's expenses (a cross-tenant destructive
+  write, the C109/#57/#62 class; 2 of the 4 sites ARE destructive). Extracted `private sourceScope(sourceType, sourceId, userId): SQL | undefined` (the existing
+  SQL import from groupOwnedBy C360), routed all 4. Behavior-preserving (identical emitted SQL). RULE-3 GREEN→GREEN: delete-reminder-cascade +
+  premium-expense-hook + financing-deactivate-hook + refinance-balance-reset drive deleteBySource/clearSource/findBySource across all three source paths —
+  GREEN before AND after. validate:local EXIT 0, 1466 pass (unchanged). Rejected the FE dead calculateDaysUntil delete (thrice-deferred — deleting a tested
+  export < collapsing a live 4-site cross-tenant-boundary duplicate, 2 destructive). cov: be 86.79% (carry) / fe 84.39% (carry).

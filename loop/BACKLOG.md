@@ -1813,6 +1813,15 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract ExpenseRepository.sourceScope — ONE source of truth for the source-linked-expense tenant predicate (4 sites → 1, rule-7 fan-out, done C381).**~~ —
+  *DONE C381: the triple-predicate `and(eq(sourceType), eq(sourceId), eq(userId))` was BYTE-IDENTICAL at 4 sites in expenses/repository.ts — findBySource,
+  deleteBySource's read + its destructive delete-write, clearSource's update. These act on AUTO-MATERIALIZED expenses (reminder/insurance/financing cascade
+  cleanup), so a divergent copy dropping userId = one user's source delete/deactivate wiping/nulling ANOTHER user's expenses (cross-tenant destructive write,
+  C109/#57/#62; 2 of 4 sites destructive). Extracted `private sourceScope(...): SQL | undefined`, routed all 4. Behavior-preserving (identical SQL). Rule-3
+  green→green: delete-reminder-cascade + premium-expense-hook + financing-deactivate-hook + refinance-balance-reset drive all three source paths — GREEN before
+  AND after. validate:local EXIT 0, 1466 pass. Rejected the FE dead calculateDaysUntil delete (thrice-deferred — deleting a tested export < collapsing a live
+  4-site cross-tenant-boundary duplicate).*
+
 - ~~**Extract assertVehiclesOwned — ONE source of truth for the cross-tenant vehicle-ownership query (2 repos → 1, rule-7 fan-out, done C376).**~~ —
   *DONE C376: the expense split repo (repository.ts:611) + insurance repo (repository.ts:103) each ran a private validateVehicleOwnership with a BYTE-IDENTICAL
   core `select id from vehicles where userId AND id IN (ids)` → throw NotFoundError if any unowned (behavior-equivalent: empty→no-op, dupes via Set, missing→throw).

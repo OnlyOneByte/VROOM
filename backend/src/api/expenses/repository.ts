@@ -177,17 +177,28 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * and ordered by date. The READ counterpart to clearSource/deleteBySource — backs the recurring-
    * expenses T6 "this reminder materialized N expenses" view. Returns [] when nothing is linked.
    */
+  /**
+   * The tenant-scoped predicate for a source-linked expense set: (sourceType, sourceId) AND the
+   * owning userId. EVERY source read AND destructive write (findBySource / deleteBySource read +
+   * delete-write / clearSource update — 4 sites) routes through this single source so the userId
+   * scope can't drift apart. These methods act on AUTO-MATERIALIZED expenses (reminder/insurance/
+   * financing cascade cleanup), so a divergent copy dropping the userId leg would let one user's
+   * source-entity delete/deactivate wipe or null ANOTHER user's expenses (a cross-tenant destructive
+   * write — the C109/#57/#62 class). One predicate keeps the boundary in lockstep structurally.
+   */
+  private sourceScope(sourceType: string, sourceId: string, userId: string): SQL | undefined {
+    return and(
+      eq(expenses.sourceType, sourceType),
+      eq(expenses.sourceId, sourceId),
+      eq(expenses.userId, userId)
+    );
+  }
+
   async findBySource(sourceType: string, sourceId: string, userId: string): Promise<Expense[]> {
     return this.db
       .select()
       .from(expenses)
-      .where(
-        and(
-          eq(expenses.sourceType, sourceType),
-          eq(expenses.sourceId, sourceId),
-          eq(expenses.userId, userId)
-        )
-      )
+      .where(this.sourceScope(sourceType, sourceId, userId))
       .orderBy(asc(expenses.date));
   }
 
@@ -534,13 +545,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const linked = await this.db
         .select({ id: expenses.id })
         .from(expenses)
-        .where(
-          and(
-            eq(expenses.sourceType, sourceType),
-            eq(expenses.sourceId, sourceId),
-            eq(expenses.userId, userId)
-          )
-        );
+        .where(this.sourceScope(sourceType, sourceId, userId));
 
       if (linked.length === 0) return 0;
 
@@ -550,15 +555,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         await tx
           .delete(photos)
           .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, linkedIds)));
-        await tx
-          .delete(expenses)
-          .where(
-            and(
-              eq(expenses.sourceType, sourceType),
-              eq(expenses.sourceId, sourceId),
-              eq(expenses.userId, userId)
-            )
-          );
+        await tx.delete(expenses).where(this.sourceScope(sourceType, sourceId, userId));
       });
 
       return linked.length;
@@ -581,13 +578,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const result = await this.db
         .update(expenses)
         .set({ sourceType: null, sourceId: null })
-        .where(
-          and(
-            eq(expenses.sourceType, sourceType),
-            eq(expenses.sourceId, sourceId),
-            eq(expenses.userId, userId)
-          )
-        )
+        .where(this.sourceScope(sourceType, sourceId, userId))
         .returning();
 
       return result.length;
