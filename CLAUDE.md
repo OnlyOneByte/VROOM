@@ -163,8 +163,8 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C351, not an estimate): **backend 86.25% line / 86.67% func · frontend 84.17% line / 83.9%
-  func / 76.32% branch** (both suites > 84% line; ~FLAT vs the C323 reading 86.53/86.21 · 84.39/83.97/76.43 — coverage has PLATEAUED, the reachable remainder is worked through and held flat as product code grows). BE↔FE gap ~2pts (stable, the tightest era).
+  (re-measured C368, not an estimate): **backend 86.68% line / 86.26% func · frontend 84.45% line / 84.3%
+  func / 76.43% branch** (both suites > 84% line; creeping UP vs the C351 reading 86.25/86.67 · 84.17/83.9/76.32 — the C353–C372 dedup-anchor + #107/#108/#109 fix + claim-survival/tie-tolerant/cross-policy guards held/nudged the line as product code grew). BE↔FE gap ~2pts (stable, the tightest era). The 90% goal stays structurally gated: BE tail is DI/singleton-bound + OAuth-network; FE gap is the eyes-on components/routes deficit (Playwright-blocked).
   Frontend climbed 65.3→84 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
   C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts, C201
@@ -183,10 +183,11 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1454 backend tests / ~659 frontend** (a floor — grows most cycles; C345–C356 added
-  the #103/#104 fix guards (provider-config + CSV-tag-delimiter), the C350 fleet-health no-data-vehicle pin,
-  the C353 hybrid MPG/mi-kWh isolation, the year-scoped-TCO + buildMonthlyConsumption invariants — on top of the
-  C336–C344 store sweep / #102 import guards). Don't regress coverage; name why if a cycle drops it.
+  Suite size today: **~1464 backend tests / ~669 frontend** (a floor — grows most cycles; the C358–C372 arc added
+  the #106 date-filter + #107 reminder-fast-forward + #108 seasonal-fillup + #109 source-link fix guards, the
+  C363 insurance-tie flake kill, the C364 getVehicleDisplayName coverage-theater fix, the C366 claim-survival
+  pin, the C369 PUT-claim termId cross-policy guard, the C371 multi-tag import round-trip — on top of the
+  C345–C356 #103/#104/#105 fix guards + C353 hybrid isolation). Don't regress coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
   in-memory SQLite DB with a seeded user + a real Lucia session cookie (`ctx.authed/anon`); it's

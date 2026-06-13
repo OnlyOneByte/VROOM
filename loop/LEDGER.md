@@ -58,9 +58,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 369 |
 | bug | 3 | 371 |
 | arch | 5 | 370 |
-| infra | 6 | 368 |
+| infra | 6 | 373 |
 
-Current cycle: **372**
+Current cycle: **373**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5857,3 +5857,11 @@ Current cycle: **372**
   cleanup). FIX: re-add the same both-or-neither refine to updateExpenseSchema. GUARD: +3 (expense-source-traceability.test.ts) — PUT only-sourceId → 400,
   PUT only-sourceType → 400, PUT neither (normal edit) → 200 (not over-broad). NON-VACUOUS. green→green: be validate:local EXIT 0, 1464 pass (+3) / 0 fail. cov:
   be 86.68% (carry) / fe 84.45% (carry).
+- **C373 (infra): CLAUDE.md full orientation refresh (the overdue ~C370 cadence; last full C357)** — BALANCE: nothing over budget; infra closest (last 368,
+  starved-for 373−368=5, budget 6) + the CLAUDE.md refresh was the overdue cadence → pick. Read the drift-prone sections vs source/LEDGER (no churn — the
+  C5/C47/C72 discipline). FIXED the two MATERIAL drifts: (1) the coverage line cited the C351 reading (86.25/86.67 · 84.17/83.9/76.32) → updated to the C368
+  re-measure (be 86.68/86.26 · fe 84.45/84.3/76.43) + the "creeping UP, not flat" framing + the structural-gate note; (2) suite size ~1454/659 + the C345–C356
+  arc → ~1464/669 + the C358–C372 arc (the #106–#109 fix guards, C363 flake-kill, C364 coverage-theater fix, C366 claim-survival, C369 cross-policy, C371
+  multi-tag). The closed-bug list (through #109/C372) + the pending-Angelo block (#88/#94/#97/#98/#100) + testing-infra/open-gaps were VERIFIED accurate inline
+  — no change. Docs-only; no source/test/build touched → no build gate (the C309/C316/C322/C357 refresh pattern). Next CLAUDE.md refresh ~C383; next #5 sweep
+  ~C378. cov: be 86.68% (carry) / fe 84.45% (carry).
