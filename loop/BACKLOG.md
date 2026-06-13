@@ -410,6 +410,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C347 — class-level completeness pin for the offline-field-dropout family (#66/#101) on offlineExpenseToBackend.**~~ — *DONE C347: the FE
+> store/util veins are worked through (the 3 stores done C331/C336/C342; the rest — visibility-watch/use-google-oauth/is-mobile — are observer/OAuth/$effect-
+> bound integration territory, the C163 mock-trap) + BE security-pure modules (csv-safety, encryption) comprehensive. So pinned a CLASS invariant re-found
+> twice (#66 fuelType-drop, #101 missedFillup-drop): the offline outbox carries a field but offlineExpenseToBackend forgets it. The per-field tests pin one
+> field each; +1 completeness test asserts EVERY user-settable OfflineExpense field round-trips together. NON-VACUOUS (a future field added to the type+form
+> but forgotten in the mapper → RED). fe validate:local EXIT 0, 659 pass (+1).*
+
 > ~~**C342 — pin appStore, the global vehicle-list + notification (toast) store (zero-coverage store).**~~ — *DONE C342: continuing the C331/C336
 > zero-coverage-store sweep. Of the 3 untested FE stores, offline.svelte.ts is trivial get/set (theater to pin), so picked app.svelte.ts — the app-wide
 > vehicle list + toast system. +11 (app-store.test.ts): updateVehicle ID-match (+ unknown-id no-op) + removeVehicle filter; addNotification id/timestamp/

@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 344 |
-| guard | 6 | 342 |
+| guard | 6 | 347 |
 | bug | 3 | 345 |
 | arch | 5 | 343 |
 | infra | 6 | 346 |
 
-Current cycle: **346**
+Current cycle: **347**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5552,3 +5552,14 @@ Current cycle: **346**
   (themeStore + appStore zero-coverage-store sweep, the buildMonthlyConsumption if-entry invariant, the #102 ambiguous-import guards). Resisted manufacturing
   a fuller refresh — the doc is otherwise current. Docs-only; no source/test/build touched → no build gate (the C309/C316/C322/C335 refresh pattern). Next
   CLAUDE.md refresh ~C348; next #5 sweep ~C350. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C347 (guard): class-level completeness pin for the offline-field-dropout family (#66/#101) on offlineExpenseToBackend** — BALANCE: nothing OVER budget;
+  guard most-starved (347−342=5, budget 6) → highest-leverage pick. SCANNED for a real zero-coverage logic module: the FE store/util veins are genuinely
+  worked through (sync-status C331 / theme C336 / app C342 stores done; the remaining untested FE modules — visibility-watch.svelte.ts, use-google-oauth,
+  is-mobile — are IntersectionObserver/MutationObserver/$effect + OAuth-popup/postMessage bound = integration/eyes-on territory, the C163 mock-trap, pinning
+  the wiring = theater) and the BE security-pure modules (csv-safety, encryption) are comprehensive (neutralize/denormalize/round-trip; round-trip/wrong-key/
+  tamper). So NOT a zero-coverage pick. Instead pinned a CLASS-level invariant the loop has now re-found TWICE (#66 fuelType-drop C204, #101 missedFillup-drop
+  C339): the offline outbox carries a field but offlineExpenseToBackend (the C205 single-source mapper) forgets it → silent sync data-loss. The per-field
+  tests each pin ONE field; the missing guard is that EVERY user-settable OfflineExpense field survives the mapping TOGETHER. +1 completeness test
+  (offline-storage.test.ts): a fully-populated OfflineExpense → assert vehicleId/tags/category/amount/date/mileage/volume/fuelType/missedFillup/description ALL
+  round-trip. NON-VACUOUS (a future field added to OfflineExpense + the form but forgotten in the mapper — the exact #66/#101 shape — leaves its assertion
+  unmet → RED). green→green: frontend validate:local EXIT 0 — 659 pass (+1) / 0 fail, tsc 0, build OK. cov: be 86.53% (carry) / fe 84.39% (carry).

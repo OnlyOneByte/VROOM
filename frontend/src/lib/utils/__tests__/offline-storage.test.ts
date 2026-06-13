@@ -420,4 +420,42 @@ describe('offlineExpenseToBackend — shared offline→backend mapping', () => {
 		const falseOut = offlineExpenseToBackend({ ...base, volume: 40, fuelType: 'Diesel', missedFillup: false });
 		expect(falseOut.missedFillup).toBe(false);
 	});
+
+	// C347 (guard): a CLASS-level completeness pin for the recurring offline-field-dropout family. The
+	// per-field tests above each pin ONE field, but the bug class (#66 fuelType-drop, #101 missedFillup-drop)
+	// is "the outbox carries a field in one place but the MAPPER forgot it" — so the load-bearing guard is
+	// that EVERY user-settable OfflineExpense field survives the mapping TOGETHER, in one populated round-trip.
+	// A future field added to OfflineExpense + the form but forgotten in offlineExpenseToBackend (the exact
+	// #66/#101 shape) leaves its assertion here unmet → RED. NOTE description: an offline expense is create-only
+	// (isEdit defaults false), so an OMITTED description is dropped from the payload — but a PRESENT one must
+	// survive; we pin a present description.
+	it('carries EVERY user-settable field together (the #66/#101 dropout-class completeness pin)', () => {
+		const full: OfflineExpense = {
+			id: 'off-full',
+			clientId: 'cid-full',
+			vehicleId: 'vehicle-9',
+			tags: ['fuel', 'road-trip'],
+			category: 'fuel',
+			amount: 73.21,
+			date: '2024-07-04',
+			mileage: 54321,
+			volume: 12.5,
+			fuelType: 'Diesel',
+			missedFillup: true,
+			description: 'Costco top-up',
+			timestamp: 1700000000000,
+			synced: false
+		};
+		const out = offlineExpenseToBackend(full);
+		expect(out.vehicleId).toBe('vehicle-9');
+		expect(out.tags).toEqual(['fuel', 'road-trip']);
+		expect(out.category).toBe('fuel');
+		expect(out.expenseAmount).toBe(73.21);
+		expect(out.date).toBe('2024-07-04');
+		expect(out.mileage).toBe(54321);
+		expect(out.volume).toBe(12.5); // liquid fuel → volume kept on volume
+		expect(out.fuelType).toBe('Diesel');
+		expect(out.missedFillup).toBe(true);
+		expect(out.description).toBe('Costco top-up');
+	});
 });
