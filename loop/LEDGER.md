@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 336 |
 | bug | 3 | 338 |
 | arch | 5 | 337 |
-| infra | 6 | 335 |
+| infra | 6 | 340 |
 
-Current cycle: **339**
+Current cycle: **340**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5470,3 +5470,12 @@ Current cycle: **339**
   FK-children). Insert-order + table-coverage + JSON/date/bool round-trip all RE-CONFIRMED clean. green→green: frontend validate:local EXIT 0 — 647 pass
   (+1 net) / 0 fail, tsc 0, build OK. Pure FE; the offline→sync→DB path now carries the flag (the .svelte form render unchanged). cov: be 86.53% (carry) /
   fe 84.39%+ (carry).
+- **C340 (infra): #5 branch-hygiene sweep + BRANCH_REVIEW.md refresh (branch 150 commits, last full sweep C329)** — BALANCE: nothing over budget (infra
+  5/6 closest to starving + the #5 sweep due, last full C329) → highest-leverage infra. (1) STRAY-TEST CHECK (the load-bearing half): `git status` shows
+  ZERO stray untracked unit/spec .test.ts — every untracked entry is the by-design set (*.meshclaw.e2e.ts + snapshots, .meshclaw-tools/,
+  playwright.meshclaw.config.ts, mise.local.toml, the squash-merged offline-entries spec). (2) GREEN BASELINE: 1440 BE / 647 FE carried from C338/C339
+  (docs-only cycle, no source touched → the C303/C329 measurement-only pattern, no build gate). (3) BRANCH_REVIEW.md refresh (gitignored): scope 139→150
+  (C190–C328 → C190–C339), status 1435→1440 BE / ~622→647 FE, appended §31 (the C329–C339 delta: #99 + #101 fixed, #100 filed+escalated, the C331/C333/C336
+  guards, the C332/C337 arch dedups, C334/C338 clean-certs), refreshed the pending-Angelo set (+#100) + the Suggested-merge footer (139→150). Coverage
+  carried from the C323 re-measure (no test-adding arc large enough to warrant a re-measure; C330–C339 was coverage-positive). Doc/measurement-only; only
+  loop/LEDGER.md + loop/BACKLOG.md commit. Next sweep ~C350; next CLAUDE.md refresh ~C348. cov: be 86.53% (carry) / fe 84.39% (carry).
