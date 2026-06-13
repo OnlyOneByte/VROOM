@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 350 |
 | guard | 6 | 347 |
-| bug | 3 | 349 |
+| bug | 3 | 352 |
 | arch | 5 | 348 |
 | infra | 6 | 351 |
 
-Current cycle: **351**
+Current cycle: **352**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5611,3 +5611,15 @@ Current cycle: **351**
   re-measure, appended §32 (the C340–C350 arc: #102/#103 fixed, the C341/C345/C350 clean-certs, deactivateFinancing/findOwnedProvider dedups, the C342/C347
   guards), bumped the Suggested-merge footer (150→161). Updated the LEDGER COVERAGE TREND header with the C351 reading. Doc/measurement-only; only
   loop/LEDGER.md + loop/BACKLOG.md commit. Next sweep ~C361; CLAUDE.md full refresh is overdue (~C348) — fold into the next infra cycle. cov: be 86.25% / fe 84.17%.
+- **C352 (bug → #104: a tag containing the CSV delimiter (; or ,) silently round-trip-split on export→re-import)** — BALANCE: bug at budget (last 349,
+  starved-for 352−349=3 = budget, tightest) → pick. Vein dormant → 2-agent fan-out on un-audited surfaces: (A) EV/charge math, (B) CSV EXPORT path. (A) the
+  agent's findings were debunked: "averageMilesPerKwh reads volume" is CORRECT (electric rows store kWh in the volume column by design; the
+  isElectricFuelType partition guards it), and "costPerMile pools fuel+charge for a plug-in hybrid" is PRODUCT-SEMANTICS-GATED (a single blended $/mi is a
+  debatable display choice, not a data bug) → no fix. (B) surfaced a CLEAN ATOMIC defect → #104: the expense CSV export joins tags with '; ' (routes.ts:431)
+  and the import splits on /[;,]/ (import-csv.ts:169), but tags were validated only for length — so a tag CONTAINING a semicolon/comma (e.g. "oil; filter")
+  round-trips into MULTIPLE tags ("oil","filter") → silent data loss on export→re-import (NORTH_STAR #1). VERIFIED firsthand (C21/C60). FIX: reject the two
+  delimiter chars in a tag at the write boundary via a refine — and factored a shared `tagElementSchema` (the create base + the update override both built
+  their own `z.string().min(1).max(tagMaxLength)` tags element; the override drops the base .default([]) for the C34 .partial() clobber, so it needed the
+  refine TOO — a bonus dedup that put the rule in ONE place so a future schema can't miss it). GUARD: +4 HTTP tests (create-with-; → 400 + nothing
+  persisted; create-with-, → 400; update-introducing-delimiter → 400 + stored tags survive; a normal tag still creates — control). NON-VACUOUS. green→green:
+  backend validate:local EXIT 0 — 1451 pass (+4) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.25% (carry) / fe 84.17% (carry).

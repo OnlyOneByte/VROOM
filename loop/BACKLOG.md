@@ -667,6 +667,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#104 (MED, data-safety / NORTH_STAR #1 — found+fixed C352 on a CSV-export deep-review) — a tag containing the CSV delimiter (; or ,) silently
+> round-trip-split on export→re-import.**~~ — *DONE C352: export joins tags with '; ' (routes.ts:431), import splits on /[;,]/ (import-csv.ts:169), but
+> tags were length-validated only — so a tag like "oil; filter" round-tripped into ["oil","filter"] (silent data loss). FIX: reject ';'/',' in a tag at the
+> write boundary via a refine, factored into a shared tagElementSchema (the create base + the update override each had their own tags element — the override
+> drops the base .default([]) for the C34 .partial() clobber, so it needed the refine too; the dedup puts the rule in ONE place). +4 HTTP guards
+> (create-;/create-,/update-delimiter → 400 + nothing persisted/stored-survives; normal tag = control). NON-VACUOUS. validate:local EXIT 0, 1451 pass (+4).
+> The paired EV-math fan-out findings were debunked (averageMilesPerKwh-reads-volume is correct-by-design; costPerMile-pools-hybrid is product-gated) — no fix.*
+
 > ~~**#103 (LOW-MED, reliability / NORTH_STAR #1-adjacent — found+fixed C349 on a provider-credential-CRUD deep-review) — an S3 provider created with an
 > incomplete config persisted a broken 201 row that threw on EVERY use.**~~ — *DONE C349: createProviderSchema's `config: z.record(...)` is shape-open, so an
 > S3 create missing endpoint/bucket/region (or no config) persisted + auto-populated storageConfig, then every test/sync threw at buildS3Provider:62 — a

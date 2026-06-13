@@ -46,17 +46,26 @@ const routes = new Hono();
 // Validation schemas derived from db schema
 const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
 
+// One source of truth for a single tag's rules, reused by the create base + the update override (which
+// drops the base `.default([])` to dodge the .partial() clobber, C34/#tags). Beyond the length cap, a
+// tag may NOT contain ';' or ',': the CSV export joins tags with '; ' and import splits on /[;,]/, so a
+// tag holding a delimiter round-trips into MULTIPLE tags — silent data loss on export→re-import
+// (#104, NORTH_STAR #1). Rejecting at the write boundary keeps the round-trip lossless; separator-free
+// tags are unaffected.
+const tagElementSchema = z
+  .string()
+  .min(1)
+  .max(
+    CONFIG.validation.expense.tagMaxLength,
+    `Tag must be ${CONFIG.validation.expense.tagMaxLength} characters or less`
+  )
+  .refine((t) => !t.includes(';') && !t.includes(','), {
+    message: 'Tag cannot contain a semicolon or comma',
+  });
+
 const baseExpenseSchema = createInsertSchema(expensesTable, {
   tags: z
-    .array(
-      z
-        .string()
-        .min(1)
-        .max(
-          CONFIG.validation.expense.tagMaxLength,
-          `Tag must be ${CONFIG.validation.expense.tagMaxLength} characters or less`
-        )
-    )
+    .array(tagElementSchema)
     .max(
       CONFIG.validation.expense.maxTags,
       `Maximum ${CONFIG.validation.expense.maxTags} tags allowed`
@@ -123,10 +132,7 @@ const updateExpenseSchema = createExpenseSchemaBase
   .omit({ clientId: true })
   .partial()
   .extend({
-    tags: z
-      .array(z.string().min(1).max(CONFIG.validation.expense.tagMaxLength))
-      .max(CONFIG.validation.expense.maxTags)
-      .optional(),
+    tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
   });
 
 /**
