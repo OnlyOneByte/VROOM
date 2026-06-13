@@ -60,11 +60,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 382 |
 | guard | 6 | 385 |
-| bug | 3 | 383 |
+| bug | 3 | 387 |
 | arch | 5 | 386 |
 | infra | 6 | 384 |
 
-Current cycle: **386**
+Current cycle: **387**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6003,3 +6003,17 @@ Current cycle: **386**
   costPerMonth) + vehicle-tco-zero-state.test.ts (the ≥1 clamp) drive both sites — GREEN before AND after. validate:local EXIT 0, 1470 pass (unchanged). Rejected
   the FE dead calculateDaysUntil delete (4×-deferred — deleting a TESTED export is net-negative coverage vs collapsing a live money-denominator dup). cov: be
   86.79% (carry) / fe 84.39% (carry).
+- **C387 (bug): reminder mark-serviced CERTIFIED CLEAN; provider cross-tenant claim DEBUNKED firsthand (ARCC-consulted); pinned the backup-provider tenant-
+  isolation invariant** — BALANCE: bug OVER budget (last 383, starved-for 387−383=4 > budget 3) → forced pick. 2-agent fan-out: (A) reminder mark-serviced
+  re-arm, (B) provider credential resolution. (A) CERTIFIED CLEAN — both axes re-arm correctly (mileage anchors to getCurrentOdometer, time advances via the
+  while-loop to first FUTURE occurrence [#83/C241], both-axes independent + atomic), defensively guarded. (B) the agent's "crafted cross-tenant PhotoRef →
+  getProviderInternal decrypts another user's credentials" — domain = CREDENTIALS + cross-tenant → queried ARCC FIRST (SAX-05 Outcome-2 Data-Processing-
+  Isolation: confirms "missing tenant validation in background jobs" is a real pitfall). Then VERIFIED FIRSTHAND (C21/C60): the premise is FALSE — both real
+  photo_ref creation sites derive providerId from the AUTHENTICATED user's OWN providers (photo-service.ts:144 getBackupProviders(userId,…) routes through
+  findOwnedProvider/C348 userId-scoped + skips non-owned/inactive; routes.ts:562 uses the just-created owned provider). No app path supplies a client-controlled
+  or cross-tenant providerId → every ref is co-owned with its photo by construction → getProviderInternal's id-only lookup (explicitly @internal "where userId is
+  unavailable") is safe. The "attacker inserts a PhotoRef" needs direct DB write = out of threat model. NOT a reachable defect. THE genuinely-unpinned invariant
+  → pinned (the actual safety property): getBackupProviders SKIPS a config-listed provider whose row isn't owned by the user. +1 guard (registry.test.ts):
+  a 'provider-foreign' in storageConfig whose findOwnedProvider → [] yields 0 backup targets. NON-VACUOUS. ARCC-grounded defense-in-depth note filed (a sync-
+  worker co-ownership assertion = an architecture change, not self-fixed). green→green: be validate:local EXIT 0, 1471 pass (+1) / 0 fail. cov: be 86.79%
+  (carry) / fe 84.39% (carry).

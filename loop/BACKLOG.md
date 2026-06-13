@@ -772,6 +772,20 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**C387 — reminder mark-serviced CERTIFIED CLEAN; provider cross-tenant claim DEBUNKED (ARCC-consulted); pinned the backup-provider tenant-isolation invariant.**~~
+> — *DONE C387: bug forced (4>3). 2-agent fan-out. (A) mark-serviced re-arm CLEAN (both axes correct, #83 loop, defensive). (B) the agent's "crafted PhotoRef →
+> getProviderInternal uses another user's credentials" — CREDENTIALS+cross-tenant domain → queried ARCC FIRST (SAX-05 Outcome-2 confirms background-job tenant
+> validation is a real pitfall). Then DEBUNKED firsthand (C21/C60): both real photo_ref creation sites derive providerId from the user's OWN providers
+> (getBackupProviders(userId) routes through findOwnedProvider/C348, skips non-owned; provider-create uses the owned id) → every ref is co-owned by construction
+> → getProviderInternal's id-only lookup (@internal, no-auth-context by design) is safe; the "attacker inserts a PhotoRef" needs direct DB write = out of threat
+> model. NOT a defect. THE unpinned invariant → pinned: getBackupProviders SKIPS a config-listed-but-not-owned provider. +1 guard (registry.test.ts). ARCC-grounded
+> defense-in-depth note filed (a sync-worker co-ownership assertion is an arch change, not self-fixed). be validate:local EXIT 0, 1471 pass (+1).*
+> NOTE (filed C387, defense-in-depth — ARCC SAX-05 Outcome-2): the photo-sync worker resolves storage credentials via getProviderInternal (id-only, no userId
+> scope) because it runs without an auth context. Today this is SAFE — every photo_ref's providerId is co-owned with its photo by construction (refs are only
+> created from getBackupProviders(userId), C348-scoped). But ARCC flags "missing tenant validation in background jobs" as a pitfall: a future ref-creation path
+> that doesn't go through getBackupProviders, OR a direct-DB-write threat model, would break the assumption. A hardening cycle could add a co-ownership assertion
+> in the worker (photo.userId === providerRow.userId before credential use) — needs the worker to load the photo's userId + the provider's userId, an arch change.
+
 > ~~**C383 — CSV export CERTIFIED CLEAN; #112 found but DESIGN-GATED (escalated); pinned the full export→import round-trip.**~~ — *DONE C383: bug forced (5>3).
 > 2-agent fan-out. (A) CSV export→import CERTIFIED CLEAN — every field round-trips (verified firsthand). (B) surfaced #112: CrossVehicleTab colors series via
 > `CHART_COLORS[i % 5]` but only 5 --chart-N tokens exist → a 6th vehicle reuses --chart-1 (chart misleading). Reachable (multi-vehicle; #94 fleet=6) but the
