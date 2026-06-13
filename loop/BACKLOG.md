@@ -639,6 +639,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**C341 — analytics chart-builders + auth/session/OAuth CERTIFIED CLEAN (bug-cycle dormant-vein scout, no defect; +2 invariant guard).**~~ — *DONE
+> C341: bug at budget (3=3) → pick. 2-agent fan-out (analytics-charts last deep C67; auth last C225). Every agent "REAL DEFECT" debunked firsthand:
+> buildMonthlyConsumption NaN-key NOT reachable (date .notNull() + `if(!d)continue` + the `if(entry)` guard); buildGasPriceHistory String(epochMs) is a dead
+> branch (mode:'timestamp'→Date); unsorted-input is the documented caller-sorts convention (#75); the auth findings are all security-POLICY/PRODUCT calls
+> (email_exists/account_conflict enumeration UX, Google email_verified policy — ARCC+Angelo, not a loop fix) or behavior-identical hygiene (maxAge==config).
+> NO reachable atomic defect → certification (C306/C327/C334 precedent). +2 non-theater guard pinning buildMonthlyConsumption's `if(entry)` invariant (the
+> efficiency loop only AUGMENTS volume-created months, never creates a phantom one). NON-VACUOUS. validate:local EXIT 0, 1442 pass (+2).*
+
 > ~~**#101 (MED, data-safety / NORTH_STAR #1+#2 — found+fixed C339 on a deep-review of the offline-sync path; same family as #66) — an offline fuel
 > fill-up logged with "missed previous fill-up" checked silently DROPS the flag on sync.**~~ — *DONE C339: OfflineExpense had no `missedFillup` field,
 > offlineExpenseToBackend didn't map it, and both ExpenseForm addOfflineExpense call sites (:579/:621) omitted it — while the form collects it (:1230) and

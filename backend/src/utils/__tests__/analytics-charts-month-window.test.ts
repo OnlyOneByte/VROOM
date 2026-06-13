@@ -54,3 +54,44 @@ describe('buildMonthlyConsumption — keeps the most recent 12 months', () => {
     expect(out.map((m) => m.month)).toEqual(['2024-01', '2024-02', '2024-03']);
   });
 });
+
+// C341 (deep-review→guard): the efficiency loop attaches MPG to months the VOLUME loop already
+// created — `map.get(key)` then `if (entry)` (analytics-charts.ts:333-334). That guard is load-bearing:
+// the volume loop skips a null/invalid date (`if (!d) continue`), but a degenerate efficiency point
+// returns date='' → toMonthKey(new Date('')) = 'NaN-NaN', and `if (entry)` is what stops that phantom
+// key from becoming an emitted month with efficiency-but-no-volume. (expenses.date is .notNull() so a
+// real row can't trigger it, but a refactor swapping `if (entry)` for an upsert/`?? default` would
+// silently start emitting phantom months — this pins the invariant so that change turns RED.) Also pins
+// that efficiency lands on the LATER fill-up's month (computeEfficiencyPoint uses current.date).
+describe('buildMonthlyConsumption — efficiency only augments volume-created months (the if(entry) invariant)', () => {
+  test('a 2-fillup pair across months: both months exist (volume), efficiency lands on the LATER one', () => {
+    // Jan 1 @ 10000mi, Feb 1 @ 10300mi (300 mi / 10 vol = 30 mpg). Same vehicle, sorted.
+    const rows: FuelExpenseRow[] = [
+      fuelExp({ date: new Date(2024, 0, 1), mileage: 10000, volume: 10 }),
+      fuelExp({ date: new Date(2024, 1, 1), mileage: 10300, volume: 10 }),
+    ];
+    const out = buildMonthlyConsumption(rows);
+    // Exactly the two volume-row months — efficiency never CREATED a third.
+    expect(out.map((m) => m.month)).toEqual(['2024-01', '2024-02']);
+    const jan = out.find((m) => m.month === '2024-01');
+    const feb = out.find((m) => m.month === '2024-02');
+    // The pair's efficiency attaches to Feb (the later fill-up); Jan has volume but no completed pair.
+    expect(jan?.efficiency).toBe(0);
+    expect(feb?.efficiency).toBeCloseTo(30, 5);
+    // Both months still report their own volume regardless of efficiency.
+    expect(jan?.volume).toBe(10);
+    expect(feb?.volume).toBe(10);
+  });
+
+  test('the emitted month set equals the DISTINCT volume-row months (efficiency adds none)', () => {
+    // Two same-month fill-ups (one completed pair) → ONE month, not two; efficiency on that month.
+    const rows: FuelExpenseRow[] = [
+      fuelExp({ date: new Date(2024, 4, 2), mileage: 20000, volume: 8 }),
+      fuelExp({ date: new Date(2024, 4, 20), mileage: 20240, volume: 8 }), // 240/8 = 30 mpg
+    ];
+    const out = buildMonthlyConsumption(rows);
+    expect(out.map((m) => m.month)).toEqual(['2024-05']);
+    expect(out[0]?.volume).toBe(16); // both fill-ups' volume pooled into the one month
+    expect(out[0]?.efficiency).toBeCloseTo(30, 5);
+  });
+});

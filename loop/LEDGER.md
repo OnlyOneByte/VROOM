@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 339 |
 | guard | 6 | 336 |
-| bug | 3 | 338 |
+| bug | 3 | 341 |
 | arch | 5 | 337 |
 | infra | 6 | 340 |
 
-Current cycle: **340**
+Current cycle: **341**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5479,3 +5479,18 @@ Current cycle: **340**
   guards, the C332/C337 arch dedups, C334/C338 clean-certs), refreshed the pending-Angelo set (+#100) + the Suggested-merge footer (139→150). Coverage
   carried from the C323 re-measure (no test-adding arc large enough to warrant a re-measure; C330–C339 was coverage-positive). Doc/measurement-only; only
   loop/LEDGER.md + loop/BACKLOG.md commit. Next sweep ~C350; next CLAUDE.md refresh ~C348. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C341 (bug → dormant-vein clean scout: analytics-charts + auth CERTIFIED CLEAN; +2 buildMonthlyConsumption invariant guard)** — BALANCE: bug at budget
+  (last 338, starved-for 341−338=3 = budget, tightest "never sits") → pick. Vein dormant → 2-agent fan-out on surfaces not recently audited:
+  (A) analytics chart builders (last deep C67), (B) auth/session/OAuth (last C225). RESULTS — every agent "REAL DEFECT" debunked firsthand (C21/C60):
+  (A.1) buildMonthlyConsumption "NaN-NaN month key on null date" — NOT reachable: expenses.date is .notNull() (schema:220), the volume loop guards `if (!d)
+  continue`, AND the efficiency loop's `if (entry)` drops any phantom key (the agent missed that guard). (A.2) buildGasPriceHistory "String(epochMs)" — dead
+  branch: date is mode:'timestamp' so Drizzle returns a Date → the `instanceof Date` arm always wins for real rows. (A.3) unsorted-input → 0 efficiency = the
+  documented caller-sorts convention (#75 class; repository always sortByVehicleThenDate). (A.4) computePreviousYearComparison field-name = a naming nit, not
+  a correctness bug. (B) ALL auth findings are SECURITY-POLICY/PRODUCT calls (email_exists / account_conflict enumeration-vs-UX tradeoff; Google email_verified
+  enforcement = an identity-policy decision — ARCC+Angelo territory, not a clean loop fix) or BEHAVIOR-IDENTICAL hygiene (requireAuth hardcoded maxAge ==
+  CONFIG.auth.cookieMaxAge today). NO reachable atomic defect → certification (the C306/C327/C334 precedent). THE one genuinely-unpinned reachable invariant
+  worth a non-theater guard: buildMonthlyConsumption's `if (entry)` (the efficiency loop only AUGMENTS volume-created months, never CREATES one) was unpinned —
+  a refactor swapping it for an upsert/`?? default` would silently emit phantom efficiency-but-no-volume months. +2 guards (analytics-charts-month-window.test.ts):
+  a cross-month pair → both volume months exist + efficiency lands on the LATER fill-up's month (Jan eff 0, Feb 30mpg); emitted month set == distinct
+  volume-row months (same-month pair → ONE month, volume pooled). NON-VACUOUS (drop `if (entry)` → phantom NaN-NaN month → RED). green→green: backend
+  validate:local EXIT 0 — 1442 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
