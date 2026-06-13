@@ -142,6 +142,26 @@ export function computeEfficiencyPoint(
   };
 }
 
+/**
+ * A GAS-MPG efficiency point: like computeEfficiencyPoint but null for an electric `current` row. ONE
+ * source of truth (C413, #122) for the gas/charge partition every MPG-aggregating builder needs — a
+ * charge session stores kWh in `volume`, so computeEfficiencyPoint emits a ~mi/kWh value that, summed
+ * into a gas-MPG average labeled mi/gal (getFuelEfficiencyLabel is always distance/volume), drags the
+ * average down + mislabels a charge's mi/kWh (#119 fixed the headline FuelStats card C411; this sweeps
+ * the sibling builders — buildMonthlyConsumption, addSeasonalEfficiencyData, computePerVehicleFuelEfficiency,
+ * the per-vehicle monthly comparison). The C353 gas/charge isolation vehicle-stats.ts does, here for the
+ * analytics pairing builders. EV-only efficiency belongs on the mi/kWh surface, not a mi/gal chart, so a
+ * gas-less car correctly contributes no point here. (cost-per-mile is NOT gated — it spans all energy,
+ * the C378 invariant — so computeMpgAndCostPerMile still calls computeEfficiencyPoint directly for cost.)
+ */
+export function gasEfficiencyPoint(
+  current: FuelRow,
+  previous: FuelRow
+): FuelEfficiencyPoint | null {
+  if (isElectricFuelType(current.fuelType)) return null;
+  return computeEfficiencyPoint(current, previous);
+}
+
 /** Convert a date to a YYYY-MM month key. */
 export function toMonthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -312,15 +332,12 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
     const point = computeEfficiencyPoint(current, previous);
     if (!point) return;
 
-    // mpgValues feeds the FuelStats "Fuel Consumption" card, labeled mi/gal (getFuelEfficiencyLabel).
-    // A charge session stores kWh in `volume`, so computeEfficiencyPoint emits its ~3 mi/kWh under the
-    // electric realistic-band — a DIFFERENT physical quantity. Pushing it into the SAME mpgValues array
-    // as ~40 mi/gal gas points drags the average down + shows a charge's mi/kWh as "mi/gal" (#119, the
-    // C353 gas/charge isolation that vehicle-stats.ts already does, missed on this analytics path). So
-    // only volume-from-GAS rows count toward MPG. costPerMileValues is INTENTIONALLY unfiltered: cost
-    // per mile is total energy spend over total miles (fuel + charge), a consistent $/mi (C378) — a
-    // dollar spent charging is a real cost per real mile, so electric rows MUST stay in that array.
-    if (!isElectricFuelType(current.fuelType)) {
+    // mpgValues feeds the FuelStats "Fuel Consumption" card, labeled mi/gal — so a charge session's
+    // ~mi/kWh must NOT count toward it (#119/C411). gasEfficiencyPoint is the ONE source of truth for
+    // that gas/charge partition (C413). costPerMileValues is INTENTIONALLY unfiltered: cost per mile is
+    // total energy spend over total miles (fuel + charge), a consistent $/mi (C378) — so the cost block
+    // below uses `point` (any fuel type), while only a gas point counts toward mpg.
+    if (gasEfficiencyPoint(current, previous)) {
       mpgValues.push(point.efficiency);
     }
     const milesDriven = (current.mileage ?? 0) - (previous.mileage ?? 0);
@@ -347,9 +364,10 @@ export function buildMonthlyConsumption(
     map.set(key, entry);
   }
 
-  // Add efficiency data from consecutive pairs within each vehicle group
+  // Add efficiency data from consecutive pairs within each vehicle group. gasEfficiencyPoint (not
+  // computeEfficiencyPoint) so a PHEV's charge mi/kWh doesn't pollute this gas-MPG average (#122/C413).
   forEachVehiclePair(rows, (current, previous) => {
-    const point = computeEfficiencyPoint(current, previous);
+    const point = gasEfficiencyPoint(current, previous);
     if (!point) return;
     const key = toMonthKey(new Date(point.date));
     const entry = map.get(key);
@@ -636,7 +654,8 @@ function addSeasonalEfficiencyData(
       const current = vehicleRows[i];
       const previous = vehicleRows[i - 1];
       if (!current || !previous) continue;
-      const point = computeEfficiencyPoint(current, previous);
+      // gasEfficiencyPoint: gas-MPG only, no PHEV charge mi/kWh in this seasonal average (#122/C413).
+      const point = gasEfficiencyPoint(current, previous);
       if (!point) continue;
       const d = new Date(point.date);
       const season = SEASON_MAP[d.getMonth()] ?? 'Winter';
@@ -723,7 +742,8 @@ function computePerVehicleFuelEfficiency(
   for (const [vId, rows] of vFuelRows) {
     const mpgValues: number[] = [];
     for (let i = 1; i < rows.length; i++) {
-      const point = computeEfficiencyPoint(rows[i] as FuelRow, rows[i - 1] as FuelRow);
+      // gasEfficiencyPoint: this feeds the radar's fuelEfficiency (gas MPG), no charge mi/kWh (#122/C413).
+      const point = gasEfficiencyPoint(rows[i] as FuelRow, rows[i - 1] as FuelRow);
       if (point) mpgValues.push(point.efficiency);
     }
     const m = metrics.get(vId);
@@ -1171,7 +1191,8 @@ export function buildFuelEfficiencyComparison(
   const monthVehicleEff = new Map<string, Map<string, { sum: number; count: number }>>();
   for (const [vId, rows] of byVehicle) {
     for (let i = 1; i < rows.length; i++) {
-      const point = computeEfficiencyPoint(rows[i] as FuelRow, rows[i - 1] as FuelRow);
+      // gasEfficiencyPoint: per-vehicle gas-MPG comparison, no PHEV charge mi/kWh (#122/C413).
+      const point = gasEfficiencyPoint(rows[i] as FuelRow, rows[i - 1] as FuelRow);
       if (!point) continue;
       const month = toMonthKey(new Date(point.date));
       if (!monthVehicleEff.has(month)) monthVehicleEff.set(month, new Map());

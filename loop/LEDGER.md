@@ -71,11 +71,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 410 |
 | guard | 6 | 407 |
-| bug | 3 | 411 |
+| bug | 3 | 413 |
 | arch | 5 | 409 |
 | infra | 6 | 412 |
 
-Current cycle: **412**
+Current cycle: **413**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6317,3 +6317,14 @@ Current cycle: **412**
   (plain `{specId, workflowType, specType}` metadata, no secrets) — offline-entries was the lone straggler. Committed it → the spec is now fully consistent with every
   sibling, finishing the C400 fix. No product code touched → coverage runs were the gate (both EXIT 0). All other untracked items confirmed by-design (*.meshclaw.e2e.ts,
   .meshclaw-tools/, screenshots, playwright config, mise.local.toml). cov: be 86.92% / fe 84.46%. Next #5 sweep ~C422; next CLAUDE.md refresh ~C416.
+- **C413 (bug → #122: the #119 sibling-builder sweep — extract gasEfficiencyPoint, route ALL gas-MPG aggregators through it so a PHEV's charge mi/kWh stops diluting them)** —
+  BALANCE: nothing over budget (deep-review 3, guard 6=budget, bug 2, arch 4, infra 1); guard not OVER, and the C411-filed #122 was a live money/efficiency bug → highest-leverage.
+  VERIFIED FIRSTHAND (C21/C60), and the verification WIDENED the scope: the filed note named 3 sibling builders, but grep found computeEfficiencyPoint feeding a gas-MPG average
+  at 5 sites — computeMpgAndCostPerMile (#119/C411), buildMonthlyConsumption, addSeasonalEfficiencyData, computePerVehicleFuelEfficiency (→ vehicleRadar), and
+  buildFuelEfficiencyComparison's per-vehicle monthly. ALSO verified the label is ALWAYS gas-derived (getFuelEfficiencyLabel = distance/volume, no adaptive mi/kWh on these
+  charts) → excluding electric is correct (an EV-only car has no gas MPG for a mi/gal chart; its efficiency belongs on the mi/kWh surface), not an EV regression. FIX (arch-clean
+  for a bug — ONE source of truth instead of 5 inline gates, dodging the C403/C409 drift risk): extracted `gasEfficiencyPoint(current, previous)` = computeEfficiencyPoint but
+  null for an electric current row; routed all 5 gas-MPG sites through it (incl. replacing C411's inline `!isElectricFuelType` gate). cost-per-mile STILL calls
+  computeEfficiencyPoint directly (spans all energy, C378). GUARD: +3 (gasEfficiencyPoint gas→point/electric→null; buildMonthlyConsumption + buildSeasonalEfficiency efficiency =
+  the gas 30 MPG, NOT the diluted (30+4)/2=17). NON-VACUOUS. be validate:local EXIT 0, 1502 pass (+3) (an import-sort + format reflow → check:musl:fix, re-validated clean).
+  cov: be 86.92% (carry, +3 guards) / fe 84.46% (carry).

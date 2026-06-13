@@ -16,6 +16,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   buildDayOfWeekPatterns,
   buildFillupIntervals,
+  buildMonthlyConsumption,
   buildMonthlyCostHeatmap,
   buildSeasonalEfficiency,
   computeAverageCosts,
@@ -25,6 +26,7 @@ import {
   computeRegularityScore,
   type FuelExpenseRow,
   type GeneralExpenseRow,
+  gasEfficiencyPoint,
   sortByVehicleThenDate,
 } from '../analytics-charts';
 
@@ -430,5 +432,61 @@ describe('computeMpgAndCostPerMile — charge rows excluded from MPG, kept in co
       }),
     ];
     expect(computeMpgAndCostPerMile(gasOnly).mpgValues).toHaveLength(1);
+  });
+});
+
+// #122 (C413): the #119 sweep across the sibling gas-MPG efficiency builders. They all summed
+// computeEfficiencyPoint().efficiency into a gas-MPG average (labeled mi/gal) with no gas/charge
+// partition, so a PHEV's ~mi/kWh charge point diluted the average. Now routed through gasEfficiencyPoint
+// (the ONE source of truth — null for an electric current row). Pre-fix the charge interval contributed
+// to effSum/effCount; post-fix only gas pairs do.
+describe('gasEfficiencyPoint — gas-MPG partition source of truth (#122)', () => {
+  test('returns a point for a gas pair, null for an electric current row', () => {
+    const gas = fuelRow({ mileage: 10300, volume: 10, fuelType: 'regular' });
+    const prev = fuelRow({ mileage: 10000, volume: 10, fuelType: 'regular' });
+    expect(gasEfficiencyPoint(gas, prev)?.efficiency).toBeCloseTo(30, 5);
+    const charge = fuelRow({ mileage: 10360, volume: 15, fuelType: 'Level 2 (AC)' });
+    expect(gasEfficiencyPoint(charge, gas)).toBeNull(); // electric current → no gas point
+  });
+});
+
+describe('sibling efficiency builders exclude PHEV charge from the gas-MPG average (#122)', () => {
+  // Same vehicle: two gas fillups (10000→10300 on 10 gal = 30 MPG) then a charge session (→10360 on
+  // 15 kWh = 4 mi/kWh). The gas-MPG average must be 30, NOT (30+4)/2 = 17.
+  const rows: FuelExpenseRow[] = [
+    fuelRow({
+      vehicleId: 'v1',
+      date: d(2024, 1, 1),
+      mileage: 10000,
+      volume: 10,
+      fuelType: 'regular',
+    }),
+    fuelRow({
+      vehicleId: 'v1',
+      date: d(2024, 1, 8),
+      mileage: 10300,
+      volume: 10,
+      fuelType: 'regular',
+    }),
+    fuelRow({
+      vehicleId: 'v1',
+      date: d(2024, 1, 15),
+      mileage: 10360,
+      volume: 15,
+      fuelType: 'Level 2 (AC)',
+    }),
+  ];
+
+  test('buildMonthlyConsumption efficiency is the gas MPG (30), not diluted by the charge mi/kWh', () => {
+    const out = buildMonthlyConsumption(rows);
+    const jan = out.find((m) => m.month === '2024-01');
+    expect(jan).toBeDefined();
+    // Pre-fix: (30 + 4)/2 = 17. Post-fix: only the gas pair counts → 30.
+    expect(jan?.efficiency).toBeCloseTo(30, 5);
+  });
+
+  test('buildSeasonalEfficiency avgEfficiency is the gas MPG (30), not diluted', () => {
+    const winter = buildSeasonalEfficiency(rows).find((s) => s.season === 'Winter');
+    expect(winter?.avgEfficiency).toBeCloseTo(30, 5);
   });
 });
