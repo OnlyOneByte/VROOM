@@ -65,10 +65,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 393 |
 | guard | 6 | 396 |
 | bug | 3 | 394 |
-| arch | 5 | 392 |
+| arch | 5 | 397 |
 | infra | 6 | 395 |
 
-Current cycle: **396**
+Current cycle: **397**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6109,3 +6109,14 @@ Current cycle: **396**
   refs" note (the reminder-source direction is now validated AND pinned). Rejected the FE chart-formatters picks (getXTickCount/getTrendLineProps/formatDecimalAxis
   — real but lower-stakes DISPLAY utils vs a data-safety restore guard); the BE pagination-offset-beyond was ~certified C388. green→green: be validate:local
   EXIT 0, 1476 pass (+1) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C397 (arch): extract chunk() + SQLITE_BATCH_SIZE — ONE source of truth for the batched-IN-clause loop (4 photo/photoRef sites → 1)** — BALANCE: arch AT
+  budget (last 392, starved-for 397−392=5 = budget; more starved than bug at 3) → pick. rule-7 fan-out (FE clean "none"). PICK (verified firsthand, C21/C60):
+  the batched-IN-clause loop `for (i += 500) { ids.slice(i, i+500); inArray(col, batch) }` + the magic `500` was hand-rolled BYTE-IDENTICAL at 4 sites — photo-
+  repository findByEntities/deleteByEntities, photo-ref-repository findAllByPhotos/deleteByPhotos (cascade-delete fan-outs that must stay under SQLite's variable
+  limit; 2 are destructive DELETEs). A divergent stride/limit copy silently drops or double-processes a batch on a cascade DELETE (data loss). The bodies differ
+  (select-photos vs select-refs vs delete), so the clean collapse is NOT a batchSelect/batchDelete pair (type churn over drizzle builders) — it's the CHUNKING:
+  a pure `chunk<T>(items, size=SQLITE_BATCH_SIZE)` + the shared constant. RULE-3: the 4 batch methods had NO test net (called via the cascade HTTP path, not unit-
+  tested), so the increment is the pure helper + ITS characterization test (the safety net), then route the 4 sites to `for (const batch of chunk(ids))` — a
+  locally-obvious, behavior-preserving rewrite (chunk yields identical batches). +1 test file (chunk.test.ts, 7 tests): empty→[], exact-multiple, remainder, the
+  flatten-round-trips-exactly data-loss guard, default-500, size<1 throws. Left the google-sheets-service:500 + backup.ts:373 sibling copies (C163 mock-trap
+  territory) — noted for a future cycle. green→green: be validate:local EXIT 0, 1483 pass (+7) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).

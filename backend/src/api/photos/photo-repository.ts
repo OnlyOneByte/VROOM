@@ -3,6 +3,7 @@ import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import { type NewPhoto, type Photo, photos } from '../../db/schema';
 import { NotFoundError } from '../../errors';
+import { chunk } from '../../utils/chunk';
 import type { PaginatedResult } from '../../utils/pagination';
 
 /**
@@ -85,8 +86,7 @@ export class PhotoRepository {
   async findByEntities(entityType: string, entityIds: string[]): Promise<Photo[]> {
     if (entityIds.length === 0) return [];
     const out: Photo[] = [];
-    for (let i = 0; i < entityIds.length; i += 500) {
-      const batch = entityIds.slice(i, i + 500);
+    for (const batch of chunk(entityIds)) {
       const rows = await this.db
         .select()
         .from(photos)
@@ -213,8 +213,7 @@ export class PhotoRepository {
   /** Delete all photo rows for many entities of one type. Batched for SQLite. */
   async deleteByEntities(entityType: string, entityIds: string[]): Promise<void> {
     if (entityIds.length === 0) return;
-    for (let i = 0; i < entityIds.length; i += 500) {
-      const batch = entityIds.slice(i, i + 500);
+    for (const batch of chunk(entityIds)) {
       await this.db
         .delete(photos)
         .where(and(eq(photos.entityType, entityType), inArray(photos.entityId, batch)));

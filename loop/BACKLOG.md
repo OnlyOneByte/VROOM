@@ -1917,6 +1917,15 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract chunk() + SQLITE_BATCH_SIZE — ONE source of truth for the batched-IN-clause loop (4 photo/photoRef sites → 1, rule-7 fan-out, done C397).**~~ —
+  *DONE C397: the batched-IN loop `for (i += 500) { ids.slice(i, i+500); inArray(col, batch) }` + the magic 500 was hand-rolled BYTE-IDENTICAL at 4 sites
+  (photo-repository findByEntities/deleteByEntities, photo-ref-repository findAllByPhotos/deleteByPhotos — cascade-delete fan-outs; 2 destructive). A divergent
+  stride/limit copy drops/double-processes a batch on a cascade DELETE (data loss). Bodies differ (select-photos/select-refs/delete) so the clean collapse is the
+  CHUNKING: a pure chunk<T>(items, size=SQLITE_BATCH_SIZE) + shared constant, NOT a batchSelect/batchDelete pair (type churn). Rule-3: the 4 methods had NO test
+  net → increment = the pure helper + its characterization test (safety net) + route the 4 sites to `for (const batch of chunk(ids))` (behavior-preserving). +1
+  test file (chunk.test.ts, 7 tests incl. the flatten-round-trips data-loss guard). be validate:local EXIT 0, 1483 pass (+7). FUTURE: the google-sheets-service:500
+  + backup.ts:373 sibling copies remain (C163 mock-trap territory) — a later cycle could route them too once their seam is testable.*
+
 - ~~**Route buildFuelStatsFromData's inline per-vehicle distance onto the existing computeConvertedTotalDistance (2 sites → 1, rule-7 fan-out, done C392).**~~ —
   *DONE C392: buildFuelStatsFromData (repository.ts:1404) inlined the per-vehicle mileage group→max−min→sum, BYTE-IDENTICAL to the existing private
   computeConvertedTotalDistance (:511) under skipConversion=true — the inline code's own comment even said "Mirrors the grouped computeConvertedTotalDistance".

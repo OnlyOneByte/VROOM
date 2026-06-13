@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import { type NewPhotoRef, type PhotoRef, photoRefs, photos } from '../../db/schema';
+import { chunk } from '../../utils/chunk';
 
 export interface UpdateStatusOptions {
   status: 'pending' | 'active' | 'failed';
@@ -110,15 +111,11 @@ export class PhotoRefRepository {
     await this.db.delete(photoRefs).where(eq(photoRefs.photoId, photoId));
   }
 
-  /** SQLite variable limit safe batch size */
-  private readonly BATCH_SIZE = 500;
-
   /** Find all refs for multiple photos (batch). Used for cascade deletes. */
   async findAllByPhotos(photoIds: string[]): Promise<PhotoRef[]> {
     if (photoIds.length === 0) return [];
     const results: PhotoRef[] = [];
-    for (let i = 0; i < photoIds.length; i += this.BATCH_SIZE) {
-      const batch = photoIds.slice(i, i + this.BATCH_SIZE);
+    for (const batch of chunk(photoIds)) {
       const rows = await this.db.select().from(photoRefs).where(inArray(photoRefs.photoId, batch));
       results.push(...rows);
     }
@@ -128,8 +125,7 @@ export class PhotoRefRepository {
   /** Delete all refs for multiple photos (batch). */
   async deleteByPhotos(photoIds: string[]): Promise<void> {
     if (photoIds.length === 0) return;
-    for (let i = 0; i < photoIds.length; i += this.BATCH_SIZE) {
-      const batch = photoIds.slice(i, i + this.BATCH_SIZE);
+    for (const batch of chunk(photoIds)) {
       await this.db.delete(photoRefs).where(inArray(photoRefs.photoId, batch));
     }
   }
