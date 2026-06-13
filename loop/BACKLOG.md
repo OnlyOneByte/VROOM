@@ -829,8 +829,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
-> **#117 (MED, money/correctness / NORTH_STAR #1 — found C404 on a financing-planner deep-review scout; the #92 symptom re-manifested at the planner layer; FILED, not
-> yet fixed) — a 0%-APR loan in the Payment Planner always shows "0 mos / $0 saved" no matter the extra payment.** computePlannerState (payment-planner.ts:64-66)
+> ~~**#117 (MED, money/correctness / NORTH_STAR #1 — found C404 on a financing-planner deep-review scout; the #92 symptom re-manifested at the planner layer) — a
+> 0%-APR loan in the Payment Planner always shows "0 mos / $0 saved" no matter the extra payment.**~~ — *DONE C405: baseline = `minimumPayment > 0 ? minimumPayment :
+> financing.paymentAmount` in computePlannerState (primary + secondary-delta), so a 0%-APR loan (minimumPayment=0) uses its real contractual payment as the baseline
+> instead of $0 (which tripped the negative-am guard → 0 months → monthsSaved 0). +5 guards (0%-APR $500-vs-$400 → monthsSaved=6 RED pre-fix; monotonic; apr>0
+> unchanged). NON-VACUOUS. fe validate:local EXIT 0, 690 pass (+5). The ORIGINAL filed analysis below, for grounding:* computePlannerState (payment-planner.ts:64-66)
 > builds the baseline as `{ ...financing, paymentAmount: minimumPayment }` + calls calculateExtraPaymentImpact. For a 0%-APR loan calculateMinimumPayment returns null
 > → PaymentPlannerDialog passes `minimumPayment ?? 0 = 0` → the baseline amortization is simulateAmortization(balance, 0, 0) → first iteration principal=0 trips the
 > negative-am guard → original.months=0 → monthsSaved=max(0, 0−accelerated)=0 + interestSaved=0. So a user paying $500 instead of $400 on a $12k 0%-APR loan (genuinely

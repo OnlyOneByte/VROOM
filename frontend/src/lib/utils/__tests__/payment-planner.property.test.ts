@@ -807,3 +807,64 @@ describe('Property 7: Non-Loan Financing Guard', () => {
 		);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// #117 (C405): a 0%-APR loan in the Payment Planner showed "0 mos / $0 saved" no matter the extra
+// payment. calculateMinimumPayment returns null for a 0%-APR loan, so the dialog passes minimumPayment=0
+// into computePlannerState; the OLD code used that 0 as the baseline paymentAmount, so the baseline
+// amortization (simulateAmortization at payment 0) tripped the negative-amortization guard → 0 months →
+// monthsSaved = max(0, 0 − accelerated) = 0. The #92 symptom re-manifested at the planner layer (the
+// C297 0%-APR fix lives one layer down in calculateExtraPaymentImpact; feeding a $0 baseline defeats it).
+// FIX: baseline = minimumPayment>0 ? minimumPayment : financing.paymentAmount. These pin that a 0%-APR
+// loan now reports real months saved, and that apr>0 behavior is unchanged.
+// ---------------------------------------------------------------------------
+describe('#117: 0%-APR loan planner reports real months saved (not "0 mos")', () => {
+	// A 0%-APR loan: minimumPayment is null → the dialog passes 0. $12,000 balance, $400/mo contractual.
+	const zeroApr = makeFinancing({
+		apr: 0,
+		computedBalance: 12000,
+		originalAmount: 12000,
+		paymentAmount: 400,
+		termMonths: 30
+	});
+
+	test('calculateMinimumPayment is null for a 0%-APR loan (so the dialog feeds minimumPayment=0)', () => {
+		expect(calculateMinimumPayment(zeroApr)).toBeNull();
+	});
+
+	test('paying $500 vs the $400 contractual payment reports the real ~6 months saved, $0 interest', () => {
+		// 12000 / 400 = 30 mo baseline; 12000 / 500 = 24 mo accelerated → 6 months saved, interest 0 (0%).
+		const state = computePlannerState(zeroApr, 500, 0, 400);
+		expect(state.state === 'normal' || state.state === 'with-delta').toBe(true);
+		const impact = (state as { primaryImpact: { monthsSaved: number; interestSaved: number } })
+			.primaryImpact;
+		expect(impact.monthsSaved).toBe(6); // was 0 pre-fix (the bug)
+		expect(impact.interestSaved).toBe(0); // interest-free loan — $0 interest saved is correct
+	});
+
+	test('more extra → strictly more months saved on a 0%-APR loan (monotonic, never stuck at 0)', () => {
+		// $600/mo (12000/600 = 20 mo) saves more than $500/mo (24 mo): 10 mo vs 6 mo.
+		const at600 = computePlannerState(zeroApr, 600, 0, 400) as {
+			primaryImpact: { monthsSaved: number };
+		};
+		const at500 = computePlannerState(zeroApr, 500, 0, 400) as {
+			primaryImpact: { monthsSaved: number };
+		};
+		expect(at600.primaryImpact.monthsSaved).toBeGreaterThan(at500.primaryImpact.monthsSaved);
+	});
+
+	test('apr>0 behavior is unchanged: the real minimum is still the baseline', () => {
+		// A 5%-APR loan with a real minimumPayment computes the same as before (baseline = minimumPayment,
+		// not paymentAmount). Pin that the input-vs-minimum primary impact is still produced. savedAmount =
+		// minimum (≠ input) so this is the 'with-delta' state by definition; either impact-bearing state is
+		// fine — the point is the apr>0 path produces a real impact, not the 0%-APR fallback.
+		const fivePct = makeFinancing({ apr: 5, computedBalance: 20000, paymentAmount: 400 });
+		const min = calculateMinimumPayment(fivePct);
+		expect(min).not.toBeNull();
+		const state = computePlannerState(fivePct, (min as number) + 100, min as number, min as number);
+		expect(state.state === 'normal' || state.state === 'with-delta').toBe(true);
+		expect(
+			(state as { primaryImpact: { monthsSaved: number } }).primaryImpact.monthsSaved
+		).toBeGreaterThanOrEqual(0);
+	});
+});

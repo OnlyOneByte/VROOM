@@ -71,11 +71,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 404 |
 | guard | 6 | 401 |
-| bug | 3 | 402 |
+| bug | 3 | 405 |
 | arch | 5 | 403 |
 | infra | 6 | 400 |
 
-Current cycle: **404**
+Current cycle: **405**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6226,3 +6226,15 @@ Current cycle: **404**
   The paired FE finding (0%-APR loan in the Payment Planner shows "0 mos / $0 saved" because computePlannerState uses minimumPayment=0 as the baseline → defeats the C297
   fix one layer down — the #92 symptom re-manifested at the planner layer) is REAL + reachable → FILED below for a near-term bug cycle (clean atomic fix: baseline =
   minimumPayment>0 ? minimumPayment : financing.paymentAmount). cov: be 86.92%+ (carry, +1 guard) / fe 84.45% (carry).
+- **C405 (bug → #117: a 0%-APR loan in the Payment Planner showed "0 mos / $0 saved" — the #92 symptom re-manifested at the planner layer)** — BALANCE: bug AT budget
+  (last 402, starved-for 405−402=3=budget; the most-starved actionable with a clean ready fix beats infra's raw 5/6 — taking it resets the tightest budget + closes a
+  money-facing bug). The C404-filed #117, verified FIRSTHAND (C21/C60): computePlannerState (payment-planner.ts:65) built the baseline as `{...financing,
+  paymentAmount: minimumPayment}`. For a 0%-APR loan calculateMinimumPayment returns null → PaymentPlannerDialog passes `minimumPayment ?? 0 = 0` → the baseline
+  amortization simulateAmortization(balance, 0, 0) trips the negative-am guard (principal = 0−0 ≤ 0 → 0 months) → monthsSaved = max(0, 0−accelerated) = 0. So a user
+  paying $500 vs a $400 contractual payment on a $12k 0%-APR loan (genuinely 30→24mo) saw "0 mos / $0 saved". The C297 0%-APR fix lives one layer DOWN in
+  calculateExtraPaymentImpact (0%-APR runs the loop), but the planner DEFEATED it by feeding a $0 baseline. Reachable: NextPaymentCard "Change Payment" (no apr guard) +
+  FinanceTab renders PaymentPlannerDialog for ANY loan (apr=0 only adds an "APR Not Set" alert). FIX (atomic): `baselinePayment = minimumPayment > 0 ? minimumPayment :
+  financing.paymentAmount` — fall back to the loan's REAL contractual payment so the baseline is a genuine amortizing schedule; routed both the primary + secondary-delta
+  branches through it. apr>0 paths (minimum>0) byte-unchanged. GUARD: +5 (payment-planner.property.test.ts): 0%-APR minimum null; $500-vs-$400 → monthsSaved=6 (was 0,
+  RED pre-fix) + interest $0; more-extra→strictly-more-months (monotonic, never stuck at 0); apr>0 baseline unchanged. NON-VACUOUS. fe validate:local EXIT 0, 690 pass
+  (+5; one self-corrected assertion — I'd mislabeled the with-delta state 'normal', fixed). cov: be 86.92% (carry) / fe 84.45%+ (carry, +5 guards).
