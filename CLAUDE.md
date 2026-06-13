@@ -163,8 +163,8 @@ Highlights:
     app-init/focus hook (calls the gate → `POST /reminders/trigger`); the T6 "Recurring" badge + view; the
     T7 dashboard widget; T8 round-trip e2e.
 - Standing goal (TODO.md → Misc): raise test coverage to **90%** both sides. Latest MEASURED reading
-  (re-measured C379, not an estimate): **backend 86.79% line / 86.39% func · frontend 84.39% line / 84.3%
-  func / 76.53% branch** (both suites > 84% line; creeping UP vs the C351 reading 86.25/86.67 · 84.17/83.9/76.32 — the C353–C382 dedup-anchor + #107–#111 fix + claim-survival/tie-tolerant/cross-policy/round-trip guards held/nudged the line as product code grew). BE↔FE gap ~2.4pts (stable, the tightest era). The 90% goal stays structurally gated: BE tail is DI/singleton-bound + OAuth-network; FE gap is the eyes-on components/routes deficit (Playwright-blocked).
+  (re-measured C389, not an estimate): **backend 86.78% line / 86.39% func · frontend 84.39% line / 84.3%
+  func / 76.63% branch** (both suites > 84% line; holding flat-to-up vs the C351 reading 86.25/86.67 · 84.17/83.9/76.32 — the C353–C394 dedup-anchor + #107–#114 fix + claim-survival/tie-tolerant/cross-policy/round-trip/split-sibling guards held the line as product code grew). BE↔FE gap ~2.4pts (stable, the tightest era). The 90% goal stays structurally gated: BE tail is DI/singleton-bound + OAuth-network; FE gap is the eyes-on components/routes deficit (Playwright-blocked).
   Frontend climbed 65.3→84 since C138 under a sustained
   FE-guard ratchet (C118 memoize, C125 vehicle-form-validation, C130 formatters, C137 error-handling.ts,
   C143 api-client.ts, C149 expense-api.ts, C163 reminder-api.ts, C169 settings-api.ts, C175 pwa.ts, C201
@@ -183,10 +183,10 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1468 backend tests / ~675 frontend** (a floor — grows most cycles; the C373–C383 arc added
-  the #110 lease-endDate fix + C375 reminder-equality + C380 month-plural + C382 non-even-split + C383 full
-  export→import round-trip guards, on top of the C358–C372 arc [#106–#109 fixes, C363 flake-kill, C364
-  coverage-theater fix, C366 claim-survival, C369 cross-policy, C371 multi-tag]). Don't regress coverage; name why if a cycle drops it.
+  Suite size today: **~1475 backend tests / ~675 frontend** (a floor — grows most cycles; the C384–C394 arc added
+  the #113 day-of-week split-fillup + #114 mark-serviced-endDate fixes, C385 buildLocalDate-hour, C391 the
+  #108/#113 split-sibling family sweep (buildFillupIntervals same-date), C392/C394 arch-extracts, on top of the
+  C373–C383 arc [#110–#112, C375/C380/C382/C383 guards]). Don't regress coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
   in-memory SQLite DB with a seeded user + a real Lucia session cookie (`ctx.authed/anon`); it's

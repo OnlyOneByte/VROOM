@@ -66,9 +66,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 391 |
 | bug | 3 | 394 |
 | arch | 5 | 392 |
-| infra | 6 | 389 |
+| infra | 6 | 395 |
 
-Current cycle: **394**
+Current cycle: **395**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6092,3 +6092,10 @@ Current cycle: **394**
   complexity cap (17>15) → extracted advanceToFirstFutureDue (the loop + bug-#13 strict-advance backstop) as a module helper (bonus arch-clean, dropped it
   under 15). GUARD: +1 (mark-serviced.test.ts): a monthly start+end-in-past reminder serviced now → is_active=0 + response isActive:false. NON-VACUOUS. green→green:
   be validate:local EXIT 0, 1475 pass (+1) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C395 (infra): CLAUDE.md full orientation refresh (the overdue ~C394 cadence; last full C384)** — BALANCE: infra most-starved AT budget (last 389,
+  starved-for 395−389=6 = budget) + the CLAUDE.md refresh was overdue → pick. Read the drift-prone sections vs source/LEDGER (no churn — C5/C47/C72 discipline).
+  FIXED the two MATERIAL drifts: (1) the coverage line cited the C379 reading → updated to the C389 re-measure (be 86.78/86.39 · fe 84.39/84.3/76.63) + the
+  C353–C394 arc framing + #107–#114; (2) suite size ~1468/675 + the C373–C383 arc → ~1475/675 + the C384–C394 arc (the #113/#114 fixes, C385 buildLocalDate-hour,
+  C391 the split-sibling family sweep, C392/C394 arch-extracts). The closed-bug list (through #114/C394) + pending-Angelo block + testing-infra/open-gaps were
+  VERIFIED accurate inline — no change. Docs-only; no source/test/build touched → no build gate (the C309/C357/C373/C384 refresh pattern). Next CLAUDE.md refresh
+  ~C405; next #5 sweep ~C399. cov: be 86.78% (carry) / fe 84.39% (carry).
