@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 350 |
 | guard | 6 | 353 |
-| bug | 3 | 352 |
+| bug | 3 | 355 |
 | arch | 5 | 354 |
 | infra | 6 | 351 |
 
-Current cycle: **354**
+Current cycle: **355**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5643,3 +5643,15 @@ Current cycle: **354**
   Test-anchored both ways (rule 3): the analytics property/HTTP suites (quick-stats, year-end, summary) drive all 3 readers — GREEN before AND after.
   green→green: backend validate:local EXIT 0 — 1454 pass (unchanged) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.25% (carry) /
   fe 84.17% (carry).
+- **C355 (bug → dormant-vein clean scout: reminder mark-serviced + vehicle-stats period/cost CERTIFIED CLEAN, no new defect)** — BALANCE: bug at budget
+  (last 352, starved-for 355−352=3 = budget, tightest) AND deep-review at budget (5); bug tighter → pick. Vein dormant → 2-agent fan-out: (A) reminder
+  mark-serviced/re-arm, (B) vehicle-stats cost/period math. RESULTS — every finding debunked firsthand (C21/C60): (A) mark-serviced re-arm CERTIFIED CLEAN
+  (both axes re-arm, anchor-to-CURRENT-odometer, future-advance for multi-period-overdue, ownership-scoped — ALL comprehensively pinned in mark-serviced.test.ts:
+  mileage-anchor/re-armed-not-due/time-one-period/multi-period→future/early-service/both-axis/cross-tenant-404). The agent's "mark-serviced↔trigger
+  double-advance race" is the #100 architecture-gated family (un-serialized read-modify-write; narrow same-user concurrent window on a single-user PWA, not a
+  clean atomic fix) → NOTED under #100, not separately filed. The "stale unread notification after mark-serviced" is PRODUCT-GATED (the notification is a
+  historical record — "was due on Jan 1" WAS true; auto-clear-on-service vs keep-as-history-until-dismissed is a UX call, user can markNotificationRead). (B)
+  vehicle-stats: NO new defect — the period-cost-over-all-time-span mixing is the already-FILED #45 (semantics-gated, grouped with the currentMileage card
+  call), and totalMileage clamp / costPerMile div-guard / single-expense / refund / boundary all CERTIFIED CLEAN + pinned. NO reachable atomic defect, NO
+  unpinned reachable invariant (mark-serviced is comprehensively covered) → certification only (the C306/C345/C350 precedent — a manufactured test = theater).
+  DOCS-ONLY (LEDGER + the #100 note); no source/test/build touched (the C354 gate is the last code state). cov: be 86.25% (carry) / fe 84.17% (carry).

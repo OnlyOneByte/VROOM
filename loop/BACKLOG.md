@@ -673,6 +673,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**C355 — reminder mark-serviced/re-arm + vehicle-stats cost/period CERTIFIED CLEAN (bug-cycle dormant-vein scout, no defect).**~~ — *DONE C355: bug at
+> budget (3=3) → forced. 2-agent fan-out. (A) mark-serviced re-arm CERTIFIED CLEAN (both axes, anchor-to-current-odometer, multi-period-overdue→future,
+> ownership-scoped — all comprehensively pinned in mark-serviced.test.ts). The "mark-serviced↔trigger double-advance race" is the #100 un-serialized-write
+> architecture family (noted under #100, not separately filed); the "stale unread notification" is product-gated (notification is history). (B) vehicle-stats
+> NO new defect — the period-cost-over-all-time-span mixing is the filed #45; clamp/div-guard/single/refund/boundary all clean+pinned. NO reachable atomic
+> defect, NO unpinned reachable invariant → certification only (C306/C345/C350 precedent). Docs-only.*
+
 > ~~**#104 (MED, data-safety / NORTH_STAR #1 — found+fixed C352 on a CSV-export deep-review) — a tag containing the CSV delimiter (; or ,) silently
 > round-trip-split on export→re-import.**~~ — *DONE C352: export joins tags with '; ' (routes.ts:431), import splits on /[;,]/ (import-csv.ts:169), but
 > tags were length-validated only — so a tag like "oil; filter" round-tripped into ["oil","filter"] (silent data loss). FIX: reject ';'/',' in a tag at the
@@ -1007,7 +1014,10 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   expose this + the C151 async-tx footgun bites: the merge awaits validateStorageConfig/validateBackupConfig DB reads), or (c) a per-user serial
   queue. NO characterization test added — a timing-dependent concurrency test would be flaky (worse than none); the #82 sequential-merge test already
   pins the within-request merge. DECISION (send_message'd Angelo): which concurrency model — optimistic-version / transactional-merge / accept-the-risk
-  (document as a single-user-deployment non-issue). Not loop-decidable — awaiting Angelo.
+  (document as a single-user-deployment non-issue). Not loop-decidable — awaiting Angelo. **C355 ADDENDUM (same family):** reminder mark-serviced
+  (reminders/routes.ts markServiced) is ALSO an un-serialized read-modify-write — its UPDATE is scoped (id, userId) with NO CAS, while the auto-trigger
+  advance uses advanceNextDueDateTx with a CAS on nextDueDate. A mark-serviced racing an in-flight trigger advance could double-advance / clobber a re-arm.
+  Same architecture-gated remedy as #100 (whichever concurrency model is chosen should cover both); folded in here, not separately filed.
 - **#94 (MED, correctness / NORTH_STAR #2 — found C301 bug scout; BROADENED to a CLASS C328 deep-review; ESCALATED to Angelo C301+C328,
   semantics-gated) — the fleet-wide analytics SUMMARY + fuel-advanced paths pool UNIT-BEARING quantities across vehicles WITHOUT per-vehicle
   conversion.** `GET /analytics/fuel-stats` (no vehicleId, the DEFAULT summary path, analytics-api.ts:146), `GET /analytics/summary`, and
