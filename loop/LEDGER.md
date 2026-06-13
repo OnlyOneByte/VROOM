@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 328 |
 | guard | 6 | 331 |
 | bug | 3 | 330 |
-| arch | 5 | 326 |
+| arch | 5 | 332 |
 | infra | 6 | 329 |
 
-Current cycle: **331**
+Current cycle: **332**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5356,3 +5356,18 @@ Current cycle: **331**
   error/success each beat pending). NON-VACUOUS (reorder any pair, or drop the `>1` plural guard → RED). Pure-logic, host-independent (asserts the exact
   Lucide icon identity + token color). green→green: frontend validate:local EXIT 0 — 641 pass (+14) / 0 fail, tsc 0, build OK. cov: be 86.53% (carry) /
   fe 84.39%+ (carry, sync-status.ts 0%→covered).
+- **C332 (arch): collapse computeBalance onto computeBalances — ONE source of truth for the financing-payment money query** — BALANCE: arch OVER budget
+  (last 326, starved-for 332−326=6 > budget 5) → FORCED most-starved pick. The seeded arch queue is a done-trail, so ran the rule-7 fan-out (2 Explore
+  agents, BE + FE duplication). FE top pick (a createStateAccessor factory over sync-state.svelte.ts's 8 $state accessors) REJECTED — rewiring Svelte 5
+  $state plumbing with NO test net is exactly the silent-reactivity-regression / churn the arch rules 3/5 warn against (a broken accessor breaks the sync
+  UI invisibly), + the conditional `update` method breaks clean typing. Also REJECTED converging calculatePayoffDateFromStart onto the C330 addMonthsClamped
+  (it constructs at local-midnight via `new Date(y,m,d)`, dropping time-of-day — converging risks the C103/C77 tz-shift its own test docstring warns about;
+  rule 2). PICKED the BE financing-balance dedup: computeBalance + computeBalances both ran the financing-payment money query (originalAmount lookup +
+  `WHERE sourceType='financing' AND sourceId=… COALESCE(SUM(expenseAmount),0)` clamped to ≥0) — a RAW-`sql` copy vs a typed-`and/eq/inArray` copy, the
+  drift-prone money duplication that silently miscounts a balance (+ TCO downstream) if one copy diverges. FIX: computeBalance(id) now delegates →
+  `(await computeBalances([id])).get(id) ?? 0` (the `?? 0` mirrors the prior explicit `return 0` for a missing record; computeBalances omits unmatched ids).
+  −24 LOC, one money query. Behavior-preserving + INDEPENDENTLY ANCHORED: financing-balance.property.test.ts already has a `computeBalances (batch)
+  equivalence` block asserting batch == per-record, PLUS Property 5/6 drive computeBalance directly (happy/non-financing/clamp/no-payments/non-existent/
+  payoff-boundary) — all pass UNCHANGED. The only deltas are an error-message string + one log line (no test asserts either; grep-confirmed) and query count
+  is 2→2 (no N+1 regression). green→green: backend validate:local EXIT 0 — 1435 pass (unchanged) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled.
+  cov: be 86.53% (carry) / fe 84.39% (carry).

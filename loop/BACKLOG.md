@@ -1518,6 +1518,16 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Collapse computeBalance onto computeBalances — ONE source of truth for the financing-payment money query (rule-7 fan-out, done C332).**~~ —
+  *DONE C332: computeBalance + computeBalances both ran the financing-payment money query (originalAmount lookup + `WHERE sourceType='financing' AND
+  sourceId=… COALESCE(SUM(expenseAmount),0)` clamped ≥0) — a RAW-`sql` copy vs a typed-`and/eq/inArray` copy, drift-prone money duplication (a divergent
+  copy silently miscounts a balance + TCO). computeBalance(id) now delegates → `(await computeBalances([id])).get(id) ?? 0` (the `?? 0` mirrors the prior
+  `return 0` for a missing record). −24 LOC. Behavior-preserving + INDEPENDENTLY ANCHORED: financing-balance.property.test.ts already has a `computeBalances
+  (batch) equivalence` block (batch == per-record) + Property 5/6 drive computeBalance directly — all pass unchanged. Only deltas: an error string + log
+  line (no test asserts either), query count 2→2. Rejected the FE createStateAccessor factory (rewiring $state with no test net = silent-reactivity churn,
+  rules 3/5) + converging calculatePayoffDateFromStart onto addMonthsClamped (local-midnight construction = a tz-difference, rule 2). validate:local EXIT 0,
+  1435 pass.*
+
 - ~~**Extract insertVehicleJunctions — dedup the reminder→vehicle junction-insert loop across create/update (filed+done C326).**~~ — *DONE
   C326: the `for (vehicleId) tx.insert(reminderVehicles)` loop was byte-identical at createWithVehicles + updateWithVehicles (differ only in
   reminder.id vs id); mirrors the insurance repo's insertJunctionRows idiom. Extracted private insertVehicleJunctions(tx, reminderId,
