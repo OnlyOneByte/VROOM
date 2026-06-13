@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 356 |
 | guard | 6 | 353 |
-| bug | 3 | 355 |
+| bug | 3 | 358 |
 | arch | 5 | 354 |
 | infra | 6 | 357 |
 
-Current cycle: **357**
+Current cycle: **358**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5676,3 +5676,15 @@ Current cycle: **357**
   ~1454/659 + the C345–C356 test arc (the #103/#104 guards, C350 fleet-health, C353 hybrid-isolation). The closed-bug list (through #105/C356) +
   pending-Angelo block (#88/#94/#97/#98/#100) are kept current inline each cycle — verified accurate, no change. Docs-only; no source/test/build touched →
   no build gate (the C309/C316/C322/C335 refresh pattern). Next CLAUDE.md refresh ~C370; next #5 sweep ~C361. cov: be 86.25% / fe 84.17%.
+- **C358 (bug → #106: the expense-list date-range filter EXCLUDED an expense on the chosen END day — date-picker off-by-one)** — BALANCE: bug at budget
+  (last 355, starved-for 358−355=3 = budget, tightest) → pick. Vein dormant → 2-agent fan-out: (A) offline outbox queue, (B) date/timezone utils. (A) the
+  agent's findings were the #100 family (concurrent-tab lost-update on localStorage), #79 (stuck queue), or crypto-UUID-negligible; the "#11 currency
+  dropped in offlineExpenseToBackend" is a real #66/#101-class sibling BUT currency is NOT user-settable on the offline form (the form has no currency
+  input — it's the user's single global currency), so it's latent-not-live → NOTED, not fixed. (B) surfaced a CLEAN ATOMIC live defect → #106: filterExpenses
+  (expense-filters.ts:51) did `new Date(expense.date) <= new Date(filters.endDate!)`, but the DateRangePicker binds a date-only 'YYYY-MM-DD'
+  (CalendarDate.toString(), date-range-picker.svelte:56) → `new Date('2024-06-15')` = midnight UTC, so an expense stored that day (noon-local via
+  dateOnlyToISO) was EXCLUDED from a range whose end IS that day (off-by-one, the #87/#39 class on the client-side list filter). VERIFIED end-to-end firsthand
+  (C21/C60): picker→filters.endDate→filterExpenses. FIX: parse both bounds as LOCAL calendar days (localDayStart, reading the date PARTS not new Date(UTC)),
+  end = local-midnight of the day AFTER endDate (exclusive) so the WHOLE end day is included regardless of time-of-day. GUARD: +2 tests (a noon-on-end-day
+  expense is INCLUDED; a YYYY-MM-DD closed range includes both boundary days); the 3 existing full-ISO range tests still pass (CI is UTC). NON-VACUOUS.
+  green→green: frontend validate:local EXIT 0 — 661 pass (+2) / 0 fail, tsc 0, build OK. cov: be 86.25% (carry) / fe 84.17%+ (carry).

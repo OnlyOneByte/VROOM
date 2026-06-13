@@ -686,6 +686,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#106 (MED, correctness / NORTH_STAR #2 — found+fixed C358 on a date/timezone-util deep-review; the #87/#39 off-by-one family) — the expense-list
+> date-range filter EXCLUDED an expense logged on the chosen END day.**~~ — *DONE C358: filterExpenses did `new Date(expense.date) <= new Date(endDate)`,
+> but the DateRangePicker binds a date-only 'YYYY-MM-DD' → `new Date('2024-06-15')`=midnight UTC, so an expense stored that day (noon-local) was excluded
+> from a range whose end IS that day. FIX: parse bounds as LOCAL calendar days (localDayStart), end = local-midnight of the day AFTER endDate (exclusive) so
+> the whole end day is included. +2 guards (noon-on-end-day included; YYYY-MM-DD closed range includes both boundaries); the 3 existing full-ISO tests still
+> pass. NON-VACUOUS. fe validate:local EXIT 0, 661 pass (+2). The paired offline fan-out: #100-family (concurrent-tab) + #79 (stuck queue) re-surfaced (not
+> new); the "currency dropped in offlineExpenseToBackend" is a latent #66/#101 sibling but currency is NOT user-settable offline → NOTED, not fixed.*
+
 > ~~**C355 — reminder mark-serviced/re-arm + vehicle-stats cost/period CERTIFIED CLEAN (bug-cycle dormant-vein scout, no defect).**~~ — *DONE C355: bug at
 > budget (3=3) → forced. 2-agent fan-out. (A) mark-serviced re-arm CERTIFIED CLEAN (both axes, anchor-to-current-odometer, multi-period-overdue→future,
 > ownership-scoped — all comprehensively pinned in mark-serviced.test.ts). The "mark-serviced↔trigger double-advance race" is the #100 un-serialized-write
