@@ -619,6 +619,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**C334 — insurance write path + unit-conversion/import-mapping CERTIFIED CLEAN (bug-cycle dormant-vein scout, no defect; +2 guard).**~~ — *DONE
+> C334: bug OVER budget (4 > 3) → forced. 2-agent fan-out on un-recently-audited surfaces. (A) insurance routes/repo/validation/hooks/claims — every
+> agent "finding" a FALSE ALARM (term-update replaces the WHOLE split group; empty-coverage Zod-rejected; cross-policy termId guarded C247; premium
+> cross-tenant gated in addTerm) or PRODUCT-GATED (claim payout > coverageLimit — legitimately real, a product call). (B) unit conversions sound +
+> property-tested (round-trip invertible, mpg↔L/100km inverse, no div-by-zero); import-mapping clean (date echo-check, non-finite→row-error, unmapped
+> surfaced). applyMapping's `target={}` default VERIFIED NOT a bug (sole caller returns {} or both-units; {} = documented don't-guess pass-through). NO
+> atomic defect → certification (C306/C327 precedent). +2 non-theater guard: mapMileage/mapVolume guard each field's conversion on its OWN `from && to`, so
+> a PARTIAL target would convert one axis + pass the other through in the same row (NORTH_STAR #2) — pinned both partials. NON-VACUOUS. validate:local EXIT
+> 0, 1440 pass (+2).*
+
 > ~~**#99 (MED, correctness / NORTH_STAR #2 — found+fixed C330 on a forced bug-cycle financing-math scout; sibling of #90/#91/#92) — financing
 > date projections shifted a payment/payoff/lease-end date into the WRONG month for any 29th–31st contract.**~~ — *DONE C330: THREE sites in
 > financing-calculations.ts advanced months via bare `Date.setMonth(getMonth()+n)`, which rolls a day-of-month overflow into the FOLLOWING month

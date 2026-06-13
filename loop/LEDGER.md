@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 333 |
 | guard | 6 | 331 |
-| bug | 3 | 330 |
+| bug | 3 | 334 |
 | arch | 5 | 332 |
 | infra | 6 | 329 |
 
-Current cycle: **333**
+Current cycle: **334**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5390,3 +5390,20 @@ Current cycle: **333**
   excludes it) before settling the assertions. NON-VACUOUS (gate the financing on `year` like the agent proposed → the unpriced+financed case drops to 0 →
   RED). green→green: backend validate:local EXIT 0 — 1438 pass (+3) / 1 skip / 0 fail, tsc 0, musl-biome clean (one format reflow auto-fixed via
   check:musl:fix), build bundled. cov: be 86.53%+ (carry, year-scoped TCO path 0→covered) / fe 84.39% (carry).
+- **C334 (bug → dormant-vein clean scout: insurance + units/import CERTIFIED CLEAN; +2 per-field-conversion guard)** — BALANCE: bug OVER budget
+  (last 330, starved-for 334−330=4 > budget 3, tightest) → FORCED. Vein dormant → 2-agent adversarial fan-out on surfaces NOT recently audited:
+  (A) insurance write path (routes/repo/validation/hooks/claims), (B) unit-conversion + the import-mapping pre-pass. RESULTS: (A) NO new defect —
+  every agent "finding" was a FALSE ALARM debunked on second read (term-coverage-reduction replaces the WHOLE split group cleanly; empty-coverage
+  rejected by Zod .min(1); claim cross-policy termId already guarded C247; premium-expense cross-tenant gated by validateVehicleOwnership in addTerm)
+  or PRODUCT-GATED (claim payoutAmount > coverageLimit — real claims legitimately exceed coverage via deductible/depreciation, a product call not a
+  defect). (B) unit conversions mathematically sound + property-tested (round-trip invertible, mpg↔L/100km inverse correct, no div-by-zero); import-mapping
+  pre-pass clean (date echo-check guards rollover, non-finite defers to buildImportPlan, unmapped categories surfaced). VERIFIED FIRSTHAND (C21/C60) the
+  one non-product-gated candidate — applyMapping's `target = {}` default: when a field's target unit is absent mapMileage/mapVolume pass the value through
+  UNCONVERTED. NOT a bug: the sole caller resolveTargetUnits returns {} or BOTH-units-set (never partial), and {} = the documented "no target vehicle → don't
+  guess" pass-through (pinned line 65). So NO atomic defect → certification (the C306/C327 precedent). THE one unpinned by-design invariant worth a
+  non-theater guard: mapMileage/mapVolume guard conversion on each field's OWN `from && to` INDEPENDENTLY — so a future change handing applyMapping a
+  PARTIAL target (one unit resolved, the other not) would convert ONE axis + silently pass the other through in the SAME row (mixed converted/unconverted —
+  NORTH_STAR #2). +2 guards (import-mapping.test.ts): partial target {distanceUnit only} → distance converts (km→mi 100), volume passes through verbatim
+  (37.854, NOT →gal); the mirror {volumeUnit only}. NON-VACUOUS (coupling the two guards, or dropping one, flips a field). Caught my own Math.round(160.9344)=161
+  slip mid-write. green→green: backend validate:local EXIT 0 — 1440 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.53%
+  (carry) / fe 84.39% (carry).
