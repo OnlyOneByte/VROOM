@@ -98,6 +98,30 @@ describe('buildSeasonalEfficiency', () => {
     // A lone fill-up yields no consecutive pair → avgEfficiency stays 0 (not NaN).
     expect(winter?.avgEfficiency).toBe(0);
   });
+
+  // #108 (C367, the #56/#18/C97 class): a split fuel expense creates one sibling PER VEHICLE —
+  // each with its cost share but volume=null (createSiblings never sets volume). The query feeding
+  // this (queryFuelExpenses) selects ALL category='fuel' rows with NO volume filter, so the
+  // null-volume siblings arrive here. Pre-fix, the unconditional row count inflated the season's
+  // fillupCount by N for a single split fillup; the fix counts only volume-bearing rows (a real
+  // fillup has a volume), matching computeAverageCosts (#56) + the fuel-stats COUNT (C97).
+  test('a split fuel fillup (1 volume-bearing row + null-volume siblings) counts as ONE fillup, not N (#108)', () => {
+    const out = buildSeasonalEfficiency([
+      // One split fillup in January: the volume-bearing leg + two null-volume per-vehicle siblings.
+      fuelRow({ date: d(2024, 1, 10), volume: 12 }),
+      fuelRow({ date: d(2024, 1, 10), volume: null }),
+      fuelRow({ date: d(2024, 1, 10), volume: null }),
+    ]);
+    const winter = out.find((s) => s.season === 'Winter');
+    // Pre-fix this was 3 (one per row). A split fillup is ONE fillup.
+    expect(winter?.fillupCount).toBe(1);
+  });
+
+  test('a zero-volume fuel row is not counted as a fillup (#108 — boundary)', () => {
+    const out = buildSeasonalEfficiency([fuelRow({ date: d(2024, 1, 10), volume: 0 })]);
+    const winter = out.find((s) => s.season === 'Winter');
+    expect(winter?.fillupCount).toBe(0);
+  });
 });
 
 describe('buildMonthlyCostHeatmap', () => {

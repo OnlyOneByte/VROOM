@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 366 |
 | guard | 6 | 364 |
-| bug | 3 | 362 |
+| bug | 3 | 367 |
 | arch | 5 | 365 |
 | infra | 6 | 363 |
 
-Current cycle: **366**
+Current cycle: **367**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5789,3 +5789,14 @@ Current cycle: **366**
   vehicle delete. +1 HTTP guard (vehicle-delete-cascade.test.ts): seed policy+claim→vehicleId, DELETE the vehicle, assert the claim SURVIVES with vehicle_id
   NULL + policy_id + payout intact. NON-VACUOUS (cascade would null the whole row). green→green: be validate:local EXIT 0, 1457 pass (+1) / 0 fail. cov: be
   86.25% (carry) / fe 84.17% (carry).
+- **C367 (bug → #108: buildSeasonalEfficiency inflated fillupCount by N for a split fuel fillup — the #56/#18/C97 split-sibling class)** — BALANCE: bug OVER
+  budget (last 362, starved-for 367−362=5 > budget 3) → forced pick. Vein dormant → 2-agent fan-out: (A) analytics chart-assembly, (B) photo/photoRef sync
+  worker. (B) the agent's "retryCount<3 cap → silent data loss" was DEBUNKED (C21/C60): a bounded retry is by-design, and the loss path requires deactivating
+  the PRIMARY provider AFTER the backup ref failed 3× — the #43/#44 fail-open family, already escalated → NOT a clean atomic bug. (A) surfaced a CLEAN ATOMIC
+  live defect → #108: buildSeasonalEfficiency (analytics-charts.ts:641) did `entry.fillupCount++` UNCONDITIONALLY per row. queryFuelExpenses (repository.ts:628)
+  selects ALL category='fuel' rows with NO volume filter, and a split fuel expense creates one sibling PER VEHICLE each with volume=null (createSiblings never
+  sets volume — VERIFIED firsthand: grep volume in split-service.ts = 0 hits). So a single split fillup inflated the season's fillupCount by N — the EXACT
+  #56/#18 row-overcount class, here on the seasonal-efficiency surface (fuel-advanced is a public endpoint). The fix already exists everywhere else:
+  computeAverageCosts (:434) + the fuel-stats COUNT (C97) restrict to `volume != null && volume > 0`. FIX: same isFillup guard before the count (+`continue` on
+  null/≤0 volume). GUARD: +2 (analytics-charts-unpinned.test.ts) — a split fillup (1 volume row + 2 null siblings) counts as 1 not 3; a zero-volume row counts
+  as 0. NON-VACUOUS (pre-fix = 3). green→green: be validate:local EXIT 0, 1459 pass (+2) / 0 fail. cov: be 86.25% (carry) / fe 84.17% (carry).

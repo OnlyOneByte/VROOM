@@ -636,6 +636,12 @@ export function buildSeasonalEfficiency(
   for (const row of fuelRows) {
     const d = normalizeDate(row.date);
     if (!d) continue;
+    // Count only volume-bearing rows as fillups (#108, the #56/#18/C97 class). A split fuel
+    // expense creates one sibling PER VEHICLE, each carrying its cost share but volume=null
+    // (createSiblings never sets volume), so an unconditional row count would overcount a single
+    // split fillup as N in the season's fillupCount. A real fillup has a volume — mirror the
+    // isFillup predicate computeAverageCosts (:434) and the fuel-stats COUNT (C97) already use.
+    if (row.volume == null || row.volume <= 0) continue;
     const season = SEASON_MAP[d.getMonth()] ?? 'Winter';
     const entry = seasonData.get(season) ?? { effSum: 0, effCount: 0, fillupCount: 0 };
     entry.fillupCount++;

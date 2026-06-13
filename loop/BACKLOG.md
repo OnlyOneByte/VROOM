@@ -721,6 +721,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#108 (MED, correctness/units / NORTH_STAR #1 — found+fixed C367 on an analytics chart-assembly bug scout; the #56/#18/C97 split-sibling overcount
+> class) — buildSeasonalEfficiency inflated a season's fillupCount by N for a single split fuel fillup.**~~ — *DONE C367: buildSeasonalEfficiency
+> (analytics-charts.ts:641) did `entry.fillupCount++` UNCONDITIONALLY per row. queryFuelExpenses selects ALL category='fuel' rows with NO volume filter, and a
+> split fuel expense creates one sibling per vehicle each with volume=null (createSiblings never sets volume — verified: 0 volume refs in split-service.ts). So
+> a single split fillup overcounted the season's fillupCount by N — the exact #56/#18 row-overcount on the seasonal surface (fuel-advanced is public). FIX:
+> count only volume-bearing rows (`continue` on volume null/≤0), mirroring computeAverageCosts (#56, :434) + the fuel-stats COUNT (C97). +2 guards (split
+> fillup → 1 not 3; zero-volume → 0). NON-VACUOUS. be validate:local EXIT 0, 1459 pass (+2). Debunked the paired (B) photo-sync "retryCount<3 → silent loss":
+> bounded retry is by-design + the loss path needs deactivating the primary provider post-failure → the #43/#44 fail-open family, already escalated.*
+
 > ~~**#107 (MED, correctness/data-safety / NORTH_STAR #1 — found+fixed C362 on a reminder-trigger bug scout; the bug #12 family on fast-forward's EXIT
 > boundary) — fastForwardPastNow left a bounded reminder ACTIVE when its endDate fell in the period straddling now.**~~ — *DONE C362: the in-loop
 > `nextDue > endDate` check (trigger-service.ts:281) runs only at the top of `while (nextDue <= now)`, so the FINAL advance that steps nextDue PAST now and
