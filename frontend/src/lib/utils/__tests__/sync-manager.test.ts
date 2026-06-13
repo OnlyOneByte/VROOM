@@ -376,6 +376,77 @@ describe('Sync Manager', () => {
 
 			expect(secondCount).toBeLessThanOrEqual(firstCount + 1);
 		});
+
+		// C325 guard: the EXPONENTIAL BACKOFF + the HARD CAP were both unpinned (the existing tests only
+		// check the retryCount counter, never the scheduled delay or that scheduling STOPS at the cap).
+		// A regression to a constant/linear delay (retry-storm risk) or an off-by-one cap (retries past
+		// maxRetries, or none at all) would pass the counter tests. Spy on setTimeout to pin the actual
+		// schedule.
+		function failingExpense(id = 'bo-1'): OfflineExpense {
+			return {
+				id,
+				clientId: `cid-${id}`,
+				vehicleId: 'vehicle-1',
+				tags: ['fuel'],
+				category: 'fuel',
+				amount: 50.0,
+				date: '2024-01-01',
+				mileage: 50000,
+				volume: 10.5,
+				timestamp: Date.now(),
+				synced: false
+			};
+		}
+
+		it('schedules the failed-sync retry with EXPONENTIAL backoff: retryDelay * 2^retries', async () => {
+			syncConfig.update(config => ({ ...config, maxRetries: 3, retryDelay: 100 }));
+			vi.mocked(loadOfflineExpenses).mockReturnValue([failingExpense()]);
+			// conflict-check ok (empty), then the create fails → schedules a retry.
+			mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiError(500, 'boom'));
+
+			const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+			try {
+				await syncManager.syncAll();
+				// FIRST failure → retries was 0 → delay = 100 * 2^0 = 100ms.
+				const scheduled = setTimeoutSpy.mock.calls.find(([, delay]) => delay === 100);
+				expect(scheduled, 'first retry scheduled at retryDelay * 2^0 = 100ms').toBeDefined();
+			} finally {
+				setTimeoutSpy.mockRestore();
+			}
+		});
+
+		it('does NOT schedule a retry once retries have reached maxRetries (the hard cap)', async () => {
+			syncConfig.update(config => ({ ...config, maxRetries: 1, retryDelay: 100 }));
+			vi.mocked(loadOfflineExpenses).mockReturnValue([failingExpense('cap-1')]);
+			mockFetch.mockResolvedValue(apiError(500, 'boom')); // every call fails (conflict-check + create)
+
+			// Fake timers so the FIRST syncAll's scheduled retry can't fire mid-test and pollute the spy
+			// (the prior real-timer version flaked on exactly that leakage). We never advance the clock —
+			// we only inspect what the SECOND syncAll schedules.
+			vi.useFakeTimers();
+			try {
+				// First syncAll: retries 0 < 1 → schedules one retry, bumps count to 1.
+				await syncManager.syncAll();
+				expect(syncManager.getRetryCount('cap-1')).toBe(1);
+
+				// Second syncAll: retries 1 is NOT < maxRetries(1) → NO new retry scheduled.
+				const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+				await syncManager.syncAll();
+				// syncAll ALWAYS schedules a 3000ms idle-reset (sync-manager.ts:116); the RETRY backoff
+				// delays are retryDelay * 2^n = 100, 200, 400, … . Assert none of THOSE were scheduled
+				// (i.e. ignore the 3000ms idle timer — only the retry-family delays signal a cap breach).
+				const RETRY_DELAYS = new Set([100, 200, 400, 800]);
+				const retryScheduled = setTimeoutSpy.mock.calls.some(
+					([, delay]) => typeof delay === 'number' && RETRY_DELAYS.has(delay)
+				);
+				expect(retryScheduled, 'no retry-backoff timer scheduled past the cap').toBe(false);
+				// And the count never climbs past maxRetries.
+				expect(syncManager.getRetryCount('cap-1')).toBe(1);
+				setTimeoutSpy.mockRestore();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
 	});
 });
 

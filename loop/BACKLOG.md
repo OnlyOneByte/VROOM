@@ -373,6 +373,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C325 — pin sync-manager's retry exponential-backoff + hard cap (real branching, loose coverage).**~~ — *DONE C325: the existing tests
+> checked only the retryCount counter (the "max retries" bound `<= firstCount+1` too weak to pin the cap); the backoff delay (retryDelay *
+> 2^retries) + the scheduling-stops-at-cap behavior were unpinned. +2 guards (setTimeout spy): a failed sync schedules at exactly 100ms
+> (retryDelay * 2^0); once retries hit maxRetries no retry-family delay (100/200/400/800) is scheduled (fake timers to avoid leakage; filter
+> out the 3000ms idle timer). NON-VACUOUS (off-by-one cap → 200ms retry → RED). fe validate:local EXIT 0, 622 pass (+2).*
+
 > ~~**C321 — pin the missedFillup truthy round-trip on CSV import (bug-cycle dormant-vein scout outcome).**~~ — *DONE C321: a forced bug cycle
 > certified the import-csv parse/commit/round-trip surface clean (parsers, occurrence-keyed clientId dedup, atomic+idempotent importExpenses,
 > formula-injection round-trip symmetry). No defect. The unpinned invariant: the export writes missedFillup 'true'/'false', import parses

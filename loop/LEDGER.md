@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 323 |
-| guard | 6 | 319 |
+| guard | 6 | 325 |
 | bug | 3 | 324 |
 | arch | 5 | 320 |
 | infra | 6 | 322 |
 
-Current cycle: **324**
+Current cycle: **325**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5252,3 +5252,14 @@ Current cycle: **324**
   POSTs to /api/v1/expenses (create) carrying the local clientId (idempotency governs the outcome), NOT a dedicated overwrite/PUT route — so
   when #98 lands, the endpoint/shape change is visible. green→green: frontend validate:local EXIT 0 — type-check 0, build, 620 pass (+1).
   Comment + test only, no logic change → no UI. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C325 (guard): pin sync-manager's retry EXPONENTIAL BACKOFF + the HARD CAP — both unpinned despite real branching** — BALANCE: guard
+  forced (last 319, starved-for 6 = budget, most-starved; arch also at 5 but guard waited longer). Per the LEDGER steering note → steered to
+  real branching with loose coverage: sync-manager syncExpenses' retry path. The existing tests check only the retryCount COUNTER (and the
+  "max retries" test's `<= firstCount + 1` bound is too weak to pin the cap); the exponential backoff DELAY (retryDelay * 2^retries) and the
+  scheduling-STOPS-at-cap behavior were never asserted. A regression to constant/linear delay (retry-storm risk) or an off-by-one cap (retry
+  past maxRetries, or none) would pass the counter tests. +2 guards (sync-manager.test.ts, setTimeout spy): (1) a failed sync schedules the
+  retry at EXACTLY retryDelay * 2^0 = 100ms (first failure); (2) once retries reach maxRetries, NO retry-family delay (100/200/400/800) is
+  scheduled — using fake timers so the prior call's scheduled retry can't leak into the spy, and filtering OUT syncAll's unrelated 3000ms
+  idle-reset timer (the subtlety that made the first cap-test attempt flake). NON-VACUOUS (an off-by-one cap → a 200ms retry scheduled → RED).
+  green→green: frontend validate:local EXIT 0 — type-check 0, build, 622 pass (+2). Guard-only (no source) → no UI. cov: be 86.53% (carry) /
+  fe 84.39%+ (carry; sync-manager retry branches now pinned).
