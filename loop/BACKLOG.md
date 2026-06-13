@@ -1997,6 +1997,14 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract hasReminderEndedBy — ONE source of truth for the endDate-boundary predicate (4 inline trigger-service.ts sites → 1, rule-7 fan-out, done C409).**~~ —
+  *DONE C409: the predicate `reminder.endDate && nextDue > reminder.endDate` was hand-inlined BYTE-IDENTICAL at 4 sites — fastForwardPastNow in-loop (:281) + post-loop
+  (:303), processReminder in-loop break (:447) + natural-exit (:473). THE bug-#12 family the loop kept re-finding (#107/C362, #114/C394, #116/C399) — a divergent copy
+  (`>=`/`>` slip, or dropping the null-guard) is that exact defect class. Extracted pure `hasReminderEndedBy(reminder, nextDue): boolean` (sibling to getAnchorDay);
+  callers keep their own action (break vs deactivate+return). Rule-2 behavior-preserving; rule-3 green→green: trigger-fastforward-enddate + trigger-expense drive all 4 —
+  GREEN before AND after, no test touched. be validate:local EXIT 0, 1496 pass (unchanged). rule-7 fan-out DEBUNKED both proposed candidates firsthand (FE DAY_MS =
+  churn, rejected C403; BE calculateAverageMPG = NO production caller, "merge" = delete-a-tested-export or couple-to-test-scaffolding) → declined rather than manufacture churn.*
+
 - ~~**Extract isFillup — ONE source of truth for the volume-bearing-fillup predicate (3 inline analytics-charts sites + 1 local repository def → 1, rule-7 fan-out, done C403).**~~ —
   *DONE C403: the split-sibling guard `r.volume != null && r.volume > 0` was hand-inlined BYTE-IDENTICAL at computeAverageCosts (:434), buildSeasonalEfficiency (:644),
   buildDayOfWeekPatterns (:807) + re-defined locally in analytics/repository.ts buildFuelStatsFromData (:1353). It guards the #56/#18/#108/#113 SPLIT-SIBLING OVERCOUNT

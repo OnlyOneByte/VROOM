@@ -72,10 +72,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 404 |
 | guard | 6 | 407 |
 | bug | 3 | 408 |
-| arch | 5 | 403 |
+| arch | 5 | 409 |
 | infra | 6 | 406 |
 
-Current cycle: **408**
+Current cycle: **409**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6271,3 +6271,15 @@ Current cycle: **408**
   them). be validate:local EXIT 0, 1496 pass (+4) (a format reflow → check:musl:fix one-lined a .some(), re-validated clean). The paired EV finding (PHEV charge rows
   contaminate the analytics FuelStats MPG card — computeMpgAndCostPerMile has no gas/charge partition, unlike vehicle-stats.ts/C353; the agent flags it spans the
   sibling builders too) is REAL + reachable → FILED below for a near-term cycle (NOT bundled — broader than one boundary). cov: be 86.92% (carry, +4 guards) / fe 84.45% (carry).
+- **C409 (arch): extract hasReminderEndedBy — ONE source of truth for the endDate-boundary predicate (4 inline sites in trigger-service.ts → 1)** — BALANCE: arch OVER
+  budget (last 403, starved-for 409−403=6 > 5) → forced pick. rule-7 2-agent fan-out, and FIRSTHAND VERIFICATION (C21/C60) DEBUNKED both proposed candidates: the FE
+  DAY_MS constant = churn-for-churn (rejected C403 — ms/day is fixed, divergence is fiction); the BE calculateAverageMPG-vs-vehicle-stats "dup" = the exported
+  calculateAverageMPG has NO production caller (only its own test imports it), so "merging" means either deleting a tested export (net-negative, rejected C381/C386) or
+  coupling vehicle-stats to test-only scaffolding — no real win. Declined both rather than manufacture churn. INSTEAD found the genuine LIVE duplication the recent fixes
+  created: the predicate `reminder.endDate && nextDue > reminder.endDate` ("a bounded reminder's advance has crossed its end") hand-inlined BYTE-IDENTICAL at 4 sites in
+  trigger-service.ts — fastForwardPastNow's in-loop (:281) + post-loop (:303) guards, processReminder's in-loop break (:447) + natural-exit (:473) guards. This is THE
+  bug-#12 family the loop kept re-finding (#107/C362 fast-forward exit, #114/C394 mark-serviced, #116/C399 catch-up natural exit) — a divergent copy (a `>=`/`>` slip, or
+  dropping the `endDate &&` null-guard) is exactly that defect class. Extracted a pure module-level `hasReminderEndedBy(reminder, nextDue): boolean` (sibling to the
+  existing getAnchorDay helper); callers keep their own ACTION (break vs deactivate+return — the 4 sites diverge there by design), only the boundary TEST is shared.
+  Rule-2 behavior-preserving (`endDate != null && nextDue > endDate` ≡ the old truthy check for a Date|null). Rule-3 green→green: trigger-fastforward-enddate +
+  trigger-expense (#116) + the other endDate tests drive all 4 sites — GREEN before AND after, no test touched. be validate:local EXIT 0, 1496 pass (unchanged). cov: be 86.92% (carry) / fe 84.45% (carry).

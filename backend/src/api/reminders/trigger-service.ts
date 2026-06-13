@@ -224,6 +224,21 @@ function getAnchorDay(reminder: Reminder): number {
   return reminder.startDate.getDate();
 }
 
+/**
+ * Has a bounded reminder's next occurrence crossed its endDate? ONE source of truth for the
+ * endDate-boundary predicate (C409) that was hand-inlined at four sites here — fastForwardPastNow's
+ * in-loop + post-loop guards and processReminder's in-loop-break + natural-exit guards. This is THE
+ * bug-#12 family the loop kept re-finding (#107/C362 fast-forward exit, #114/C394 mark-serviced,
+ * #116/C399 catch-up natural exit): each was a path where the advanced nextDue stepped past endDate
+ * but the reminder stayed active. A divergent copy of the predicate (a `>=`/`>` slip, or dropping the
+ * `endDate &&` null-guard so a no-end reminder wrongly deactivates) is exactly that class — so the
+ * comparison lives in one place. Callers keep their own ACTION (break vs deactivate+return), since the
+ * four sites diverge there by design; only the boundary TEST is shared.
+ */
+function hasReminderEndedBy(reminder: Reminder, nextDue: Date): boolean {
+  return reminder.endDate != null && nextDue > reminder.endDate;
+}
+
 async function processExpensePeriod(
   reminder: Reminder,
   vehicleIds: string[],
@@ -278,7 +293,7 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
     // reminder once nextDue crosses endDate, but a reminder lapsed past maxCatchUp reaches this
     // fast-forward instead — without this check it would advance past now and stay "active" but
     // permanently dormant (never fires, never closes). Deactivate the moment we step past endDate.
-    if (reminder.endDate && nextDue > reminder.endDate) {
+    if (hasReminderEndedBy(reminder, nextDue)) {
       await reminderRepository.deactivate(reminder.id);
       return;
     }
@@ -300,7 +315,7 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
   // now (lastStep <= endDate < this final nextDue) would otherwise be written FORWARD of its endDate
   // yet left active — firing again next trigger (the bug #12 family, here on fast-forward's exit
   // boundary). Deactivate instead of advancing past the end date. Mirrors the in-loop guard at :281.
-  if (reminder.endDate && nextDue > reminder.endDate) {
+  if (hasReminderEndedBy(reminder, nextDue)) {
     await reminderRepository.deactivate(reminder.id);
     return;
   }
@@ -444,7 +459,7 @@ class ReminderTriggerService {
       // EndDate check inside the loop — process periods up to endDate, then stop catching up.
       // Deactivation is handled ONCE after the loop (see the #116 guard below) so the natural
       // exit boundary is covered by the same code — one deactivation site, no duplication.
-      if (reminder.endDate && nextDue > reminder.endDate) {
+      if (hasReminderEndedBy(reminder, nextDue)) {
         break;
       }
 
@@ -470,7 +485,7 @@ class ReminderTriggerService {
     // active list until a LATER trigger lazily closes it (no duplicate expense — the in-loop guard
     // runs before materialization — purely a wrong active-state / wrong run-rate defect). This single
     // guard also covers the in-loop break case above. Mirrors fastForwardPastNow's exit guard (:303).
-    if (reminder.endDate && nextDue > reminder.endDate) {
+    if (hasReminderEndedBy(reminder, nextDue)) {
       await reminderRepository.deactivate(reminder.id);
       return;
     }
