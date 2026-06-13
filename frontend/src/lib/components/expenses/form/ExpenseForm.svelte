@@ -632,7 +632,12 @@
 					...(expenseData.volume !== undefined && { volume: expenseData.volume }),
 					...(expenseData.charge !== undefined && { charge: expenseData.charge }),
 					// Carry fuelType: the sync transform needs it to keep an electric charge (#66).
-					...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType })
+					...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
+					// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing (#101).
+					// This error-fallback save mirrors the offline-first save above (#111, C377): the #101
+					// fix landed on that path only, so a fuel fill-up logged with "missed previous" checked
+					// during an online-create FAILURE (timeout/5xx → this catch) silently dropped the flag.
+					...(expenseData.missedFillup !== undefined && { missedFillup: expenseData.missedFillup })
 				});
 				requestBackgroundSync('expense-sync');
 

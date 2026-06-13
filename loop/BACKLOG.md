@@ -154,6 +154,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Offline outbox sync write-path + photo upload/serve audit (C377).**~~ — *DONE C377 (photo CERTIFIED CLEAN; found+fixed bug #111). 2-agent fan-out.
+> (B) photo upload/serve CLEAN — every route ownership-scoped (validateEntityOwnership) + nosniff'd + mime/size-gated; #74/#77/#78 confirmed fixed+guarded.
+> (A) surfaced #111: ExpenseForm saves offline from TWO sites — the offline-first path (:579, carries fuelType+missedFillup) AND the error-fallback path (:624,
+> online-create throws→catch). The error-fallback addOfflineExpense (:635) carried fuelType but OMITTED missedFillup — the #101 fix landed on the offline-first
+> path only. A fuel fill-up logged "missed previous" during an online-create FAILURE dropped the flag → calculateAverageMpg pairs across the gap → garbage MPG.
+> FIX: add the missedFillup spread at :635. GUARD: +1 SOURCE-SCAN (offline-save-carries-fuel-fields.test.ts, 3 tests) — every addOfflineExpense site must carry
+> missedFillup AND fuelType (the mapper-side C347 pin can't catch a field the call site never adds; the catch path is Playwright-gated → C229 trap). fe
+> validate:local EXIT 0, 673 pass (+3).*
+
 > ~~**Auth/session/ownership + expense create/update write-path audit (C372).**~~ — *DONE C372 (auth CERTIFIED CLEAN; found+fixed bug #109). 2-agent fan-out.
 > (A) auth/session/ownership CLEAN — comprehensive firsthand cross-tenant verification: every CRUD route requireAuth-gated + userId-scoped, PUT vehicle-reassign
 > re-validates ownership, 404 (not 200) for not-owned, Lucia lifecycle sound, cross-tenant-idor.test.ts (7) passes. (B) surfaced #109: createExpenseSchema has a

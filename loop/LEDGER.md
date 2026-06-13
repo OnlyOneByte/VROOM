@@ -54,13 +54,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 372 |
+| deep-review | 5 | 377 |
 | guard | 6 | 375 |
 | bug | 3 | 374 |
 | arch | 5 | 376 |
 | infra | 6 | 373 |
 
-Current cycle: **376**
+Current cycle: **377**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5886,6 +5886,18 @@ Current cycle: **376**
   confirmed C370/C234); FE getLatestTerm/sortTermsByEndDateDesc tiebreak a low-stakes determinism nit; BE photo-ref retryCount===3 the by-design cap (C367, +
   needs a mock); reminder is the cleanest pure-schema reachable boundary. green→green: be validate:local EXIT 0, 1465 pass (+1) / 0 fail. cov: be 86.68%
   (carry) / fe 84.45% (carry).
+- **C377 (deep-review → #111: ExpenseForm error-fallback offline-save DROPPED missedFillup — #101 re-occurring at the sibling call site)** — BALANCE:
+  deep-review AT budget (last 372, starved-for 377−372=5 = budget) + bug also at budget; picked deep-review (broader, surfaces the next bug). 2-agent fan-out:
+  (A) offline outbox sync, (B) photo upload/serve. (B) CERTIFIED CLEAN — every photo route ownership-scoped (validateEntityOwnership) + nosniff'd + mime/size-
+  gated; #74/#77/#78 confirmed fixed+guarded. (A) surfaced a CLEAN ATOMIC live defect → #111: ExpenseForm saves offline from TWO sites — the offline-first path
+  (:579, carries fuelType+missedFillup, the #66+#101 fixes) AND the error-fallback path (:624, online-create throws → catch → save offline). The error-fallback
+  addOfflineExpense (:635) carried fuelType but OMITTED missedFillup — the #101 fix landed on the offline-first path ONLY. VERIFIED firsthand (C21/C60):
+  expenseData.missedFillup is built at :621 but never spread into the :624 call. So a fuel fill-up logged with "missed previous" checked during an online-create
+  FAILURE (timeout/5xx) drops the flag → calculateAverageMpg pairs across the gap → garbage MPG (NORTH_STAR #1). FIX: add the missedFillup spread at :635,
+  mirroring :592. GUARD: the mapper side is pinned (C347) but can't catch a field the CALL SITE never adds + the catch path is Playwright-gated (C229 trap) →
+  +1 SOURCE-SCAN (offline-save-carries-fuel-fields.test.ts, 3 tests): extract every addOfflineExpense({...}) body, assert BOTH sites carry missedFillup AND
+  fuelType (+ the scan-is-live count). Merge-surviving, pins the whole #66/#101/#111 dropout class at the call-site layer. NON-VACUOUS (pre-fix the
+  missedFillup test RED). green→green: fe validate:local EXIT 0, 673 pass (+3) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).
 - **C376 (arch): extract assertVehiclesOwned — ONE source of truth for the cross-tenant vehicle-ownership query (2 repos → 1)** — BALANCE: arch OVER budget
   (last 370, starved-for 376−370=6 > budget 5) → forced pick. rule-7 fan-out (2 agents). PICK (CONFIRMED firsthand, C21/C60): the expense split repo
   (repository.ts:611) and the insurance repo (repository.ts:103) each ran a private validateVehicleOwnership doing the BYTE-IDENTICAL core `select id from
