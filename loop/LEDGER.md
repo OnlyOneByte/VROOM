@@ -64,11 +64,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 388 |
 | guard | 6 | 385 |
-| bug | 3 | 387 |
+| bug | 3 | 390 |
 | arch | 5 | 386 |
 | infra | 6 | 389 |
 
-Current cycle: **389**
+Current cycle: **390**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6039,3 +6039,13 @@ Current cycle: **389**
   84.3% func / 76.63% branch (line flat vs C379's 84.39, branch +0.1 — the C380 month-plural guard). Both GREEN, flat-to-up, gap stable ~2.4pts; 90% goal still
   structurally gated. Build floor GREEN both sides. PR-readiness escalated C368 (standing, open) — NOT re-spammed. Docs-only cycle (no source/test touched → no
   build gate beyond the coverage runs, both EXIT 0). cov: be 86.78% / fe 84.39%. Next #5 sweep ~C399; next CLAUDE.md refresh ~C394.
+- **C390 (bug → #113: buildDayOfWeekPatterns overcounted fillupCount + skewed avgCost/avgVolume for a split fuel fillup — the #108 sibling builder)** — BALANCE:
+  bug AT budget (last 387, starved-for 390−387=3 = budget, tightest) → pick. Vein dormant → 2-agent fan-out: (A) restore round-trip, (B) fuel-advanced builders.
+  (B) surfaced a CLEAN ATOMIC live defect → #113: buildDayOfWeekPatterns (analytics-charts.ts:803) did `entry.count++` UNCONDITIONALLY per row + divides
+  avgCost/avgVolume by that count (:814-815). A split fuel expense creates one sibling PER VEHICLE with volume=null (queryFuelExpenses has no volume filter), so a
+  single split fillup inflated the day's fillupCount by N AND skewed avgVolume (totalGallons/N, e.g. 12/3=4 not 12) + avgCost (per-row not per-fillup) — the EXACT
+  #108 class buildSeasonalEfficiency already guards at :644 (the C367 fix), missed on this sibling. FIX: same volume-bearing guard (`continue` on null/≤0). +2
+  guards (split fillup → 1 fillup, real avg; zero-volume → 0). VERIFIED firsthand (C21/C60). (A) the agent's "restore photoRefs cross-tenant provider" is a real
+  defense-in-depth gap (restore.ts:525 validates providerIds without a userId scope) BUT requires a TAMPERED backup ZIP (the app never writes a cross-tenant
+  providerId — same threat class as the C339/C387 notes) → NOTED for a future hardening cycle (ARCC/credentials-adjacent), not the clean within-app defect this
+  cycle. green→green: be validate:local EXIT 0, 1473 pass (+2) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).

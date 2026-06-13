@@ -82,6 +82,32 @@ describe('buildDayOfWeekPatterns', () => {
     expect(monday?.avgCost).toBe(40); // (50+30)/2
     expect(monday?.avgVolume).toBe(8); // (10+6)/2
   });
+
+  // #113 (C390, the #56/#18/C97/#108 split-sibling class — the sibling of the #108 buildSeasonalEfficiency
+  // fix at C367): a split fuel expense creates one sibling PER VEHICLE with volume=null, and
+  // queryFuelExpenses has no volume filter, so an unconditional count overcounts a single split fillup as
+  // N AND skews avgVolume (totalGallons/N) + avgCost (per-row, not per-fillup). The fix counts only
+  // volume-bearing rows. This pins it: a Monday split fillup (1 volume row + 2 null siblings) is ONE
+  // fillup with the REAL avg, not three.
+  test('a split fuel fillup counts as ONE fillup with the real avg, not N (#113)', () => {
+    const out = buildDayOfWeekPatterns([
+      // One split fillup on Monday 2024-01-15: the volume-bearing leg + two null-volume per-vehicle siblings.
+      fuelRow({ date: d(2024, 1, 15), expenseAmount: 30, volume: 12 }),
+      fuelRow({ date: d(2024, 1, 15), expenseAmount: 30, volume: null }),
+      fuelRow({ date: d(2024, 1, 15), expenseAmount: 30, volume: null }),
+    ]);
+    const monday = out.find((r) => r.day === 'Monday');
+    // Pre-fix: fillupCount=3, avgVolume=12/3=4, avgCost=90/3=30. A split fillup is ONE fillup.
+    expect(monday?.fillupCount).toBe(1);
+    expect(monday?.avgVolume).toBe(12); // the real volume, not 12/3
+    expect(monday?.avgCost).toBe(30); // the volume-bearing leg's cost, not skewed by the null siblings
+  });
+
+  test('a zero-volume fuel row is not counted as a fillup (#113 — boundary)', () => {
+    const out = buildDayOfWeekPatterns([fuelRow({ date: d(2024, 1, 15), volume: 0 })]);
+    const monday = out.find((r) => r.day === 'Monday');
+    expect(monday?.fillupCount).toBe(0);
+  });
 });
 
 describe('buildSeasonalEfficiency', () => {

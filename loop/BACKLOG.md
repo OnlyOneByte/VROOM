@@ -779,6 +779,20 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#113 (MED, correctness/units / NORTH_STAR #1 — found+fixed C390 on a fuel-advanced builder bug scout; the #108 sibling) — buildDayOfWeekPatterns
+> overcounted fillupCount + skewed avgCost/avgVolume for a split fuel fillup.**~~ — *DONE C390: buildDayOfWeekPatterns (analytics-charts.ts:803) did `entry.count++`
+> unconditionally + divides avgCost/avgVolume by it. A split fuel expense creates one sibling per vehicle with volume=null (queryFuelExpenses has no volume
+> filter), so one split fillup inflated the day's count by N AND skewed avgVolume (totalGallons/N) + avgCost (per-row). The EXACT #108 class buildSeasonalEfficiency
+> already guards at :644 (C367) — missed on this sibling. FIX: same volume-bearing guard (`continue` on null/≤0). +2 guards (split→1, zero-volume→0). NON-VACUOUS.
+> be validate:local EXIT 0, 1473 pass (+2). The paired (A) restore-round-trip fan-out: photoRefs providerId validated without a userId scope (restore.ts:525) —
+> real defense-in-depth gap but needs a TAMPERED backup ZIP → noted below, not the clean within-app defect.*
+> NOTE (filed C390, defense-in-depth — ARCC/credentials-adjacent, same class as the C339/C387 notes): restore.ts:525 validates a backup's photoRefs.providerId
+> values against userProviders WITHOUT a userId scope (`where(inArray(userProviders.id, providerIds))`), so a hand-tampered backup ZIP whose photoRefs.csv
+> references ANOTHER user's providerId would pass validation → a cross-tenant photo→provider link. The app NEVER writes a cross-tenant providerId (refs are created
+> co-owned via getBackupProviders, C348/C387), so this is only reachable via a tampered self-backup — lower than a live bug. A hardening cycle could add
+> `eq(userProviders.userId, userId)` to that query (one-line, behavior-preserving for honest backups). ARCC SAX-05 Outcome-2 (tenant validation at data-access
+> boundaries) grounds it.
+
 > ~~**C387 — reminder mark-serviced CERTIFIED CLEAN; provider cross-tenant claim DEBUNKED (ARCC-consulted); pinned the backup-provider tenant-isolation invariant.**~~
 > — *DONE C387: bug forced (4>3). 2-agent fan-out. (A) mark-serviced re-arm CLEAN (both axes correct, #83 loop, defensive). (B) the agent's "crafted PhotoRef →
 > getProviderInternal uses another user's credentials" — CREDENTIALS+cross-tenant domain → queried ARCC FIRST (SAX-05 Outcome-2 confirms background-job tenant

@@ -798,6 +798,13 @@ export function buildDayOfWeekPatterns(
   for (const row of fuelRows) {
     const d = normalizeDate(row.date);
     if (!d) continue;
+    // Count only volume-bearing rows as fillups (#113, the #56/#18/C97/#108 split-sibling class — the
+    // sibling buildSeasonalEfficiency already guards this at :644). A split fuel expense creates one
+    // sibling PER VEHICLE, each with its cost share but volume=null (createSiblings never sets volume),
+    // and queryFuelExpenses has no volume filter — so an unconditional count would overcount one split
+    // fillup as N AND skew avgVolume (totalGallons/N) + avgCost (per-row not per-fillup). A real fillup
+    // has a volume; mirror computeAverageCosts (:434).
+    if (row.volume == null || row.volume <= 0) continue;
     const dayName = DAY_NAMES[d.getDay()] ?? 'Sunday';
     const entry = dayData.get(dayName) ?? { count: 0, totalCost: 0, totalGallons: 0 };
     entry.count++;
