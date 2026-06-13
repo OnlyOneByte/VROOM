@@ -70,12 +70,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 404 |
-| guard | 6 | 401 |
+| guard | 6 | 407 |
 | bug | 3 | 405 |
 | arch | 5 | 403 |
 | infra | 6 | 406 |
 
-Current cycle: **406**
+Current cycle: **407**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6246,3 +6246,14 @@ Current cycle: **406**
   path], #C404 claim-photo backup-roundtrip crown-jewel, #117 0%-APR planner) + bumped "all landed C155→C405"; (4) added the C401 CSV-apostrophe DATA-CONTRACT direction
   call to the pending-Angelo block. Doc-only, no code touched → no build gate (CLAUDE.md is not compiled; verified the edits read coherently + preserved the structure
   the loop depends on). cov: be 86.92% (carry) / fe 84.45% (carry). Next CLAUDE.md refresh ~C416; next #5 sweep ~C410.
+- **C407 (guard): DRIFT-GUARD for the #C404 class — a photo on EVERY upload-accepted entity type must survive backup→restore (5 types, not just claim)** — BALANCE:
+  nothing over budget (deep-review 3, bug 2, arch 4, infra 1, feature parked); guard MOST-STARVED actionable AT budget (last 401, starved-for 407−401=6=budget) →
+  highest-leverage pick. The C404 fix added insurance_claim to the restore validator's entityTypeToIds map (backup.ts validatePhotoRefs), but that map and the photo-
+  upload allowlist (photos/helpers.ts validateEntityOwnership) are SEPARATE lists in separate files with NO shared source of truth — exactly the drift that broke restore
+  (#C404). VERIFIED FIRSTHAND (C21/C60): the upload path accepts 5 types (vehicle/insurance_policy/insurance_claim/expense/odometer_entry), the validator map now lists
+  the same 5 — but ONLY insurance_claim had a round-trip test (C404), and a generic "a photo round-trips" test would NOT catch a per-type omission (that's how #C404 slipped
+  past the C366 15-table cert). GUARD: +1 (claims-roundtrip.test.ts) — seed a photo on ALL FIVE upload-accepted types (vehicle/policy/claim/expense/odometer via the real
+  create routes + direct photo-row inserts), exportAsZip → restoreFromBackup(replace) → assert all 5 survive pointing at their entities. NON-VACUOUS: dropping ANY type
+  from the validator map → that photo restores as "unknown entity type" → validateBackupData false → the WHOLE restore aborts → RED. When a 6th photo target is added to
+  the upload path, this fails until the validator map learns it. be validate:local EXIT 0, 1492 pass (+1) (a useConsistentArrayType lint on Array<[...]> → hand-fixed to
+  the T[] shorthand, re-validated clean). cov: be 86.92% (carry, +1 guard) / fe 84.45% (carry).

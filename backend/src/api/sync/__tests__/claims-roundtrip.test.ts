@@ -189,3 +189,88 @@ describe('backup → restore round-trip preserves insurance claims', () => {
     ).toEqual(['collision', 'theft', 'weather']);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C407 (guard, NORTH_STAR #1 + #5): DRIFT-GUARD for the #C404 class. A photo's entity_type must round-trip
+// for EVERY type the upload path accepts. The upload allowlist (photos/helpers.ts validateEntityOwnership:
+// vehicle / insurance_policy / insurance_claim / expense / odometer_entry) and the restore validator's
+// entityTypeToIds map (backup.ts validatePhotoRefs) are SEPARATE lists in separate files with no shared
+// source of truth — exactly why insurance_claim drifted out of the validator and broke restore (#C404,
+// the original 15-table cert predated claim photos). The C404 fix added a per-type round-trip for ONE
+// type; a generic "a photo round-trips" test would NOT catch a per-type omission (that's how #C404 slipped
+// past C366). This pins ALL FIVE: drop any type from the validator map → that photo restores as "unknown
+// entity type" → validateBackupData false → the WHOLE restore aborts → this test goes RED. When a 6th
+// photo target is added to the upload path, this test fails until the validator map (and this list) learn it.
+// ---------------------------------------------------------------------------
+describe('a photo on EVERY upload-accepted entity type survives backup→restore (#C404 drift-guard)', () => {
+  test('vehicle / insurance_policy / insurance_claim / expense / odometer_entry photos all round-trip', async () => {
+    const vehicleId = await seedVehicle();
+    const policyId = await seedPolicy(vehicleId);
+
+    // insurance_claim id
+    const claimRes = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
+      claimDate: '2024-06-15T00:00:00.000Z',
+      claimType: 'collision',
+    });
+    const claimBody = await json<DataEnvelope<{ id: string }>>(claimRes);
+    expect(claimRes.status, JSON.stringify(claimBody)).toBe(201);
+    const claimId = claimBody.data.id;
+
+    // expense id
+    const expRes = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 20,
+      date: '2024-06-01T00:00:00.000Z',
+    });
+    const expBody = await json<DataEnvelope<{ id: string }>>(expRes);
+    expect(expRes.status, JSON.stringify(expBody)).toBe(201);
+    const expenseId = expBody.data.id;
+
+    // odometer_entry id
+    const odoRes = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
+      odometer: 12345,
+      recordedAt: '2024-06-01T00:00:00.000Z',
+    });
+    const odoBody = await json<DataEnvelope<{ id: string }>>(odoRes);
+    expect(odoRes.status, JSON.stringify(odoBody)).toBe(201);
+    const odometerId = odoBody.data.id;
+
+    // One photo per upload-accepted entity type (the bug is in the validator, not the upload path, so
+    // seed the rows directly — same approach as the single-claim case above).
+    const targets: [entityType: string, entityId: string][] = [
+      ['vehicle', vehicleId],
+      ['insurance_policy', policyId],
+      ['insurance_claim', claimId],
+      ['expense', expenseId],
+      ['odometer_entry', odometerId],
+    ];
+    for (const [i, [entityType, entityId]] of targets.entries()) {
+      ctx.sqlite.run(
+        `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
+         VALUES (?, ?, ?, ?, ?, 'image/jpeg', 1024)`,
+        [`photo-${i}`, ctx.user.id, entityType, entityId, `pic-${i}.jpg`]
+      );
+    }
+
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    // RED if any upload-accepted type is missing from the validator's entityTypeToIds map (#C404).
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    // All five photos survived, each still pointing at its entity.
+    const rows = ctx.sqlite
+      .query('SELECT entity_type, entity_id FROM photos ORDER BY id')
+      .all() as { entity_type: string; entity_id: string }[];
+    expect(rows).toHaveLength(5);
+    const byType = new Map(rows.map((r) => [r.entity_type, r.entity_id]));
+    expect(byType.get('vehicle')).toBe(vehicleId);
+    expect(byType.get('insurance_policy')).toBe(policyId);
+    expect(byType.get('insurance_claim')).toBe(claimId);
+    expect(byType.get('expense')).toBe(expenseId);
+    expect(byType.get('odometer_entry')).toBe(odometerId);
+  });
+});
