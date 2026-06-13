@@ -72,10 +72,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 422 |
 | guard | 6 | 425 |
 | bug | 3 | 424 |
-| arch | 5 | 421 |
+| arch | 5 | 426 |
 | infra | 6 | 423 |
 
-Current cycle: **424**
+Current cycle: **426**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6444,3 +6444,12 @@ Current cycle: **424**
   go RED nowhere. GUARD: +2 (expense-source-traceability.test.ts): POST {sourceType:financing, sourceId:forged} on a no-financing vehicle → 400; POST linking the vehicle's
   ACTUAL active financing → 201 (not over-broad). NON-VACUOUS (the POST financing-verification had no direct test before). NORTH_STAR #5 — both call sites of the shared
   helper are now pinned. No source touched (test-only). be validate:local EXIT 0, 1523 pass (+2). cov: be 86.93% (carry, +2 guards) / fe 84.51% (carry).
+- **C426 (arch): collapse the duplicated getPendingExpenses — sync-manager's private copy → the canonical exported one (cross-file dup, 2 sites → 1)** — BALANCE: arch
+  most-starved AT budget (last 421, starved-for 426−421=5=budget) → highest-leverage. rule-7 2-agent fan-out. VERIFIED FIRSTHAND (C21/C60): sync-manager.ts:128-130 had a
+  PRIVATE `getPendingExpenses() { return loadOfflineExpenses().filter(e => !e.synced) }` BYTE-IDENTICAL to the EXPORTED canonical one in offline-storage.ts:156. `!synced`
+  is THE contract for "which offline expenses to sync" — a divergent copy (e.g. one path adding an error/tombstone filter) would desync what sync-manager attempts vs what
+  the store considers pending → silent data loss / phantom sync loops. FIX: deleted the private method, imported the canonical getPendingExpenses, routed both call sites
+  (:104, :350). Rule-2 behavior-preserving (identical filter). Rule-3 green→green: offline-storage.test.ts (getPendingExpenses unsynced-only contract) +
+  sync-manager.test.ts (syncAll) drive it — GREEN before AND after. The sync-manager test's offline-storage MOCK omitted getPendingExpenses → had to add a mock mirroring
+  the real impl over the MOCKED loadOfflineExpenses (the C163 mock-trap discipline: keep the mock driving the real contract, not a divergent reimpl). fe validate:local
+  EXIT 0, 697 pass (unchanged). Chose the FE cross-file dup over the BE toTimeMs candidate (4 identical lines within ONE comparator — more local/cosmetic). cov: be 86.93% (carry) / fe 84.51% (carry).

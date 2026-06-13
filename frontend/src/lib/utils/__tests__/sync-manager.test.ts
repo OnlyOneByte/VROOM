@@ -13,12 +13,20 @@ global.fetch = mockFetch;
 // now route through it (they'd call `undefined`). importActual pulls in the genuine mapper.
 vi.mock('../offline-storage', async () => {
 	const actual = await vi.importActual<typeof import('../offline-storage')>('../offline-storage');
+	const loadOfflineExpenses = vi.fn();
 	return {
 		offlineExpenseToBackend: actual.offlineExpenseToBackend,
-		loadOfflineExpenses: vi.fn(),
+		loadOfflineExpenses,
 		saveOfflineExpenses: vi.fn(),
 		markExpenseAsSynced: vi.fn(),
-		clearSyncedExpenses: vi.fn()
+		clearSyncedExpenses: vi.fn(),
+		// sync-manager now imports getPendingExpenses from here (C426 dedup). Mirror the real impl
+		// (loadOfflineExpenses().filter(!synced)) over the MOCKED loader so the tests' mockReturnValue
+		// still drives it — re-exporting actual.getPendingExpenses would bind the REAL loader, not this mock.
+		getPendingExpenses: () =>
+			(loadOfflineExpenses() as ReturnType<typeof actual.loadOfflineExpenses>).filter(
+				(e) => !e.synced
+			)
 	};
 });
 

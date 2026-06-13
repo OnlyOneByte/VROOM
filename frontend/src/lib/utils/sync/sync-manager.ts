@@ -12,6 +12,7 @@ import {
 	type SyncConfig
 } from './sync-state.svelte';
 import {
+	getPendingExpenses,
 	loadOfflineExpenses,
 	saveOfflineExpenses,
 	offlineExpenseToBackend,
@@ -100,7 +101,7 @@ class SyncManager {
 		syncState.current = 'syncing';
 
 		try {
-			const pendingExpenses = this.getPendingExpenses();
+			const pendingExpenses = getPendingExpenses();
 			const result = await this.syncExpenses(pendingExpenses);
 
 			if (result.success && result.conflicts.length === 0) {
@@ -125,9 +126,6 @@ class SyncManager {
 		}
 	}
 
-	private getPendingExpenses(): OfflineExpense[] {
-		return loadOfflineExpenses().filter(expense => !expense.synced);
-	}
 
 	private async syncExpenses(expenses: OfflineExpense[]): Promise<SyncResult> {
 		const result: SyncResult = {
@@ -349,7 +347,7 @@ class SyncManager {
 			window.addEventListener('online', () => {
 				if (!this.syncInProgress) {
 					fetchLastSyncTime();
-					const pendingExpenses = this.getPendingExpenses();
+					const pendingExpenses = getPendingExpenses();
 					if (pendingExpenses.length > 0) {
 						setTimeout(() => {
 							this.syncAll().catch(error => {

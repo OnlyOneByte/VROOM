@@ -2044,6 +2044,13 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Collapse the duplicated getPendingExpenses — sync-manager's private copy → the canonical exported one (cross-file dup, 2 sites → 1, rule-7 fan-out, done C426).**~~ —
+  *DONE C426: sync-manager.ts:128-130 had a PRIVATE getPendingExpenses byte-identical to the EXPORTED offline-storage.ts:156 (`loadOfflineExpenses().filter(e => !e.synced)`).
+  `!synced` is the contract for "which offline expenses to sync" — a divergent copy desyncs what sync-manager attempts vs what the store considers pending. Deleted the private
+  method, imported the canonical one, routed both call sites. Rule-2 behavior-preserving; rule-3 green→green (offline-storage + sync-manager tests). Had to add the missing
+  getPendingExpenses to the sync-manager test's offline-storage mock, mirroring the real impl over the mocked loader (C163 mock-trap discipline). fe validate:local EXIT 0,
+  697 pass. Chose this FE cross-file dup over the BE toTimeMs candidate (4 identical lines within ONE comparator — local/cosmetic).*
+
 - ~~**Extract sortExpensesByDate — ONE source of truth for the chronological pairwise-order sort (3 byte-identical sites → 1, rule-7 fan-out, done C421).**~~ —
   *DONE C421: the date-ascending comparator `[...x].sort((a,b) => new Date(a.date).getTime() − new Date(b.date).getTime())` was BYTE-IDENTICAL at calculateAverageMPG
   (calculations.ts:42), calculateAverageMilesPerKwh (:93), the /stats handler (vehicles/routes.ts:343) — all feed PAIRWISE consecutive-row calcs, so an unsorted/
