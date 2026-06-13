@@ -653,6 +653,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**C345 — expense read-path (filter/search/pagination) + odometer + sync-worker CERTIFIED CLEAN (bug-cycle dormant-vein scout, no defect).**~~ — *DONE
+> C345: bug OVER budget (4>3) → forced. 2-agent fan-out. (A) expense LIST/FILTER/SEARCH/PAGINATION — CERTIFIED CLEAN (cross-tenant scoped, LIKE-escaped #41,
+> pagination/hasMore/stable-tiebreak correct, sortBy enum-allowlisted; redundant-clamp + empty-CSV-tag both by-design-safe). (B) both agent "REAL DEFECTs"
+> debunked firsthand: backward-odometer-accepted is BY-DESIGN (correction/2nd-vehicle/historical; getCurrentOdometer MAX() can't be corrupted; warn = a
+> product feature), and the sync-worker no-active-source ref `return`-without-burning-a-retry is CORRECT resilient behavior (not a failure — marking it
+> failed would wrongly exhaust retries) AND already pinned (sync-worker.test.ts:227/:238). NO reachable defect, NO unpinned invariant → certification only
+> (C306/C327/C334/C341 precedent; a manufactured test = coverage-theater). Docs-only.*
+
 > ~~**#102 (MED, data-safety / NORTH_STAR #1 — found+fixed C344 on a native-CSV-import deep-review) — an ambiguous "year make model" vehicle name
 > silently misattributed every imported row to the last-seen matching car.**~~ — *DONE C344: buildImportPlan built vehicleByName with `set("year make
 > model", id)`; two vehicles legally sharing that string (distinct nicknames, no unique constraint) → the 2nd overwrote the 1st → a CSV row using that

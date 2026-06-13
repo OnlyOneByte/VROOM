@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 344 |
 | guard | 6 | 342 |
-| bug | 3 | 341 |
+| bug | 3 | 345 |
 | arch | 5 | 343 |
 | infra | 6 | 340 |
 
-Current cycle: **344**
+Current cycle: **345**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5531,3 +5531,17 @@ Current cycle: **344**
   (import-csv.test.ts): two same-model cars → the shared name errors (imported 0, "more than one vehicle"); a UNIQUE nickname still resolves (proves the
   fix is per-name-key targeted, not a blanket reject). NON-VACUOUS. green→green: backend validate:local EXIT 0 — 1444 pass (+2) / 1 skip / 0 fail, tsc 0,
   musl-biome clean (one format reflow auto-fixed), build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C345 (bug → dormant-vein clean scout: expense read-path + odometer + sync-worker CERTIFIED CLEAN, no defect, no manufactured test)** — BALANCE: bug
+  OVER budget (last 341, starved-for 345−341=4 > budget 3, tightest) → FORCED. Vein dormant → 2-agent fan-out on surfaces not audited this session:
+  (A) the expense LIST/FILTER/SEARCH/PAGINATION read path, (B) odometer write/recheck + photo-service. RESULTS — every agent finding debunked firsthand
+  (C21/C60): (A) CERTIFIED CLEAN — cross-tenant scoped (userId always from c.get('user'), vehicleId ownership-validated), LIKE-escaped (#41), pagination
+  totalCount/hasMore correct + stable-id tiebreak, sortBy enum-allowlisted (no orderBy injection), AND/OR precedence sound; the only hits were the
+  redundant-double-clampPagination (harmless, same values) + empty-string-tags-after-CSV-split (returns 0 rows correctly — expenses can't have empty tags),
+  both by-design-safe. (B.A1) "backward odometer reading accepted" → BY-DESIGN, not a bug: a lower reading is a legitimate correction / second-vehicle /
+  out-of-order historical entry, and getCurrentOdometer uses MAX() so it can't corrupt "current" — rejecting it would break real flows (a warn-on-backward
+  would be a product/UX feature, not a defect). (B.B1) "sync-worker multi-ref orphan stuck forever if no active source" → CORRECT resilient behavior, not a
+  bug: processSingleRef with no findActiveByPhoto source `return`s WITHOUT marking failed / burning a retryCount — exactly right (it's "source temporarily
+  unavailable", not a failure; marking it failed would wrongly exhaust retries so it never syncs when a provider is re-added) AND already PINNED
+  (sync-worker.test.ts:227 asserts updateStatus NOT called on the no-source path; :238 the no-photo path). NO reachable atomic defect, NO unpinned invariant
+  → certification only (the C306/C327/C334/C341 precedent — a manufactured test here = coverage-theater). DOCS-ONLY (LEDGER + BACKLOG); no source/test/build
+  touched (the C344 gate is the last code state). cov: be 86.53% (carry) / fe 84.39% (carry).
