@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { changeTracker, requireAuth } from '../../middleware';
-import { buildPaginatedResponse } from '../../utils/pagination';
+import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import {
   commonSchemas,
   validateOdometerOwnership,
@@ -51,11 +51,7 @@ routes.get(
 
     await validateVehicleOwnership(vehicleId, user.id);
 
-    const limit = Math.min(
-      query.limit ?? CONFIG.pagination.defaultPageSize,
-      CONFIG.pagination.maxPageSize
-    );
-    const offset = query.offset ?? 0;
+    const { limit, offset } = clampPagination(query);
 
     const { data, totalCount } = await odometerRepository.findByVehicleIdPaginated(
       vehicleId,
@@ -80,11 +76,7 @@ routes.get(
 
     await validateVehicleOwnership(vehicleId, user.id);
 
-    const limit = Math.min(
-      query.limit ?? CONFIG.pagination.defaultPageSize,
-      CONFIG.pagination.maxPageSize
-    );
-    const offset = query.offset ?? 0;
+    const { limit, offset } = clampPagination(query);
 
     const { data, totalCount } = await odometerRepository.getHistory(vehicleId, user.id, {
       limit,

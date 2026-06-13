@@ -1,6 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
-import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
@@ -9,7 +8,7 @@ import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
-import type { PaginatedResult } from '../../utils/pagination';
+import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { expenseSplitService } from './split-service';
 import type { SplitConfig } from './validation';
@@ -298,11 +297,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    */
   async findPaginated(filters: PaginatedExpenseFilters): Promise<PaginatedResult<Expense>> {
     try {
-      const limit = Math.min(
-        filters.limit ?? CONFIG.pagination.defaultPageSize,
-        CONFIG.pagination.maxPageSize
-      );
-      const offset = filters.offset ?? 0;
+      const { limit, offset } = clampPagination(filters);
 
       const conditions = buildExpenseConditions(filters);
 

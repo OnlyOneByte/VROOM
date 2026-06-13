@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 306 |
 | guard | 6 | 307 |
 | bug | 3 | 308 |
-| arch | 5 | 304 |
+| arch | 5 | 310 |
 | infra | 6 | 309 |
 
-Current cycle: **309**
+Current cycle: **310**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5065,3 +5065,16 @@ Current cycle: **309**
   pooling) to the pending-Angelo block beside #88; (3) suite size ~1421→~1424 BE / ~610→~613 FE. DOCS-ONLY — verified `git status` =
   CLAUDE.md alone (the ?? items are the by-design untracked e2e/tooling scaffold); no source/test/build touched (the C308 gate is the last
   code state). Keeps the next cycle's closed-bug + pending-Angelo + suite-floor refs accurate. cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C310 (arch): converge 4 inline pagination-clamp sites onto the existing (zero-caller) `clampPagination` helper** — BALANCE: arch over
+  budget (last 304, starved-for 6 > 5; it had waited since C304) → forced. Arch reliably-dry — rule-7 inline scout. Rejected the FE
+  query-building dedup (analytics buildQuery skips null; reminder/expense-api use bespoke per-field truthiness that deliberately skips 0/''
+  — converging would change falsy-value behavior, churn trap rule 5/2). THE FINDING: the `limit = Math.min(query.limit ??
+  defaultPageSize, maxPageSize); offset = query.offset ?? 0` block was hand-repeated at 4 sites (odometer/routes ×2, expenses/routes ×1,
+  expenses/repository.findPaginated ×1) — while utils/pagination.ts ALREADY exports `clampPagination` (written beside buildPaginatedResponse)
+  with ZERO callers. The helper is also the MORE CORRECT version: it floors limit at minPageSize + clamps offset ≥0, which the inline `?? 0`
+  did NOT (a negative offset could slip through if a schema ever loosened). BEHAVIOR-PRESERVING verified (rule 2): every site's Zod schema
+  pre-bounds limit `[1,100]`/positive + offset `≥0`, and minPageSize=1, so the helper's clamps are no-ops on the validated inputs — identical
+  observable output today, defensive if a schema loosens tomorrow. PAYOFF (rule 5): 4 inline copies → 1 canonical helper that finally has its
+  intended callers; dropped a now-dead `CONFIG` import from expenses/repository.ts (tsc-confirmed). BEHAVIOR-PRESERVING + test-anchored both
+  ways (rule 3): 221 odometer+expenses+pagination tests pass UNCHANGED. green→green: backend validate:local EXIT 0 — 1424 pass (unchanged —
+  pure refactor) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07% (carry) / fe 81.76% (carry).

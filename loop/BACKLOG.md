@@ -1395,6 +1395,13 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Converge the 4 inline pagination-clamp sites onto the existing clampPagination helper (filed+done C310).**~~ — *DONE C310: the
+  `limit = Math.min(query.limit ?? defaultPageSize, maxPageSize); offset = query.offset ?? 0` block was hand-repeated at 4 sites
+  (odometer/routes ×2, expenses/routes ×1, expenses/repository.findPaginated ×1) while utils/pagination.ts already exported clampPagination
+  with ZERO callers — and the helper is the MORE CORRECT version (floors limit at minPageSize + offset ≥0, which the inline `?? 0` didn't).
+  Behavior-preserving: every site's Zod schema pre-bounds limit/offset into the exact range the helper clamps to (minPageSize=1), so no-op on
+  validated input + defensive if a schema loosens. Dropped a dead CONFIG import (tsc-confirmed). 221 tests unchanged, validate:local EXIT 0.*
+
 - ~~**Extract fetchTermsAndCoverage — dedup the 5× term+coverage query-assembly in InsurancePolicyRepository (filed+done C304).**~~ — *DONE
   C304: the "select terms by policyId (endDate desc) → select term→vehicle junction rows → dedupe vehicleIds" block was byte-identical at 5
   sites (attachTermsAndCoverage + update-policy / add-term / update-term / delete-term txns), differing only in the db handle (this.db vs tx)

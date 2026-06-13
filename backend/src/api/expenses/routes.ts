@@ -13,7 +13,7 @@ import {
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
-import { buildPaginatedResponse } from '../../utils/pagination';
+import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import {
   commonSchemas,
   validateExpenseOwnership,
@@ -635,11 +635,7 @@ routes.get('/', zValidator('query', expenseQuerySchema), async (c) => {
     offset: query.offset,
   });
 
-  const limit = Math.min(
-    query.limit ?? CONFIG.pagination.defaultPageSize,
-    CONFIG.pagination.maxPageSize
-  );
-  const offset = query.offset ?? 0;
+  const { limit, offset } = clampPagination(query);
 
   return c.json(buildPaginatedResponse(data, totalCount, limit, offset));
 });
