@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 359 |
 | bug | 3 | 362 |
 | arch | 5 | 360 |
-| infra | 6 | 357 |
+| infra | 6 | 363 |
 
-Current cycle: **362**
+Current cycle: **363**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5742,3 +5742,14 @@ Current cycle: **362**
   insurance Property-1 test is FLAKY (non-fixed fast-check seed + a same-second endDate tiebreak + a tight 5s timeout — one full-suite run hit it, isolation
   + re-run both GREEN); a future guard/infra cycle should pin the tiebreak deterministically + raise the timeout. green→green: be validate:local EXIT 0, 1455
   pass (+1) / 0 fail (re-run clean). cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C363 (infra): killed the C362-filed FLAKE in insurance Property-1 (non-deterministic green-build floor)** — BALANCE: infra most-starved AT budget (last
+  357, starved-for 363−357=6 = budget) → pick. Of the two infra candidates (#5 branch-hygiene sweep + the C362-filed flaky test), took the flake — a
+  non-deterministic failure in the green-build FLOOR is exactly the harness debt infra exists to kill, and it's fresh. ROOT CAUSE (verified firsthand):
+  getCurrentTermDates is `ORDER BY end_date DESC LIMIT 1` — a SINGLE sort key — but the test's reference loop picked the latest term via strict `>` (keeps the
+  FIRST max). validTermInputArb derives endDate=startMs+gapMs, which can COLLIDE → two terms tie on end_date with different start_dates → SQL's arbitrary
+  tie-break disagrees with the loop on startDate → spurious failure; fast-check then SHRANK the false counterexample 47× against a real in-mem DB, blowing the
+  5s timeout (the "timed out" symptom was the shrink, not a hang). FIX (test-only, no product change): assert the REAL tie-tolerant contract — the returned
+  end_date IS the max, and the returned (start,end) pair belongs to SOME created term at that max (a real round-tripped row, not mangled) — + 20s timeout
+  headroom. Also +1 DETERMINISTIC tie test (two terms, SAME end / DIFFERENT start) that pins the tie-tolerant contract head-on (the exact shape that flaked).
+  STRESS-VERIFIED: insurance file 6× consecutive → 16 pass / 0 fail every run (was the 15-test file). green→green: be validate:local EXIT 0, 1456 pass (+2) /
+  0 fail. cov: be 86.25% (carry) / fe 84.17% (carry). Next infra: #5 branch-hygiene sweep (now most-starved cadence) ~C366; CLAUDE.md refresh ~C370.

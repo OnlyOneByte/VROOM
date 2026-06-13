@@ -713,11 +713,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > instead of advancing past endDate. +1 HTTP guard (monthly reminder, endDate≈now → exercises ONLY the exit guard; is_active=0 after trigger). NON-VACUOUS
 > (RED pre-fix). be validate:local EXIT 0, 1455 pass (+1). Debunked the paired (A) split fan-out: "duplicate vehicleId not rejected → metrics inflated 100%"
 > is FALSE (two self-consistent legs sum to the entered total; no double-count) — a validation nicety, not a money bug.*
-> NOTE (filed C362, test-quality — low priority): insurance-repository.property.test.ts "Property 1: Current term derivation returns latest term" is FLAKY —
-> a non-fixed fast-check seed can generate two terms sharing the same endDate to the second (a 1s tiebreak ambiguity between the test's reference loop and the
-> impl) AND the test has a tight 5s timeout; one full-suite run at C362 hit it, but isolation + a re-run were both GREEN. A future guard/infra cycle should pin
-> the latest-term tiebreak deterministically (constrain the arbitrary so endDates differ, or assert on the impl's documented tiebreak) + raise the timeout. Not
-> a product defect (test-only non-determinism).
+> ~~NOTE (filed C362, test-quality): insurance-repository.property.test.ts "Property 1" FLAKY — same-endDate tiebreak ambiguity + tight 5s timeout.~~ —
+> *RESOLVED C363 (infra): root cause was the test's strict-`>` reference loop disagreeing with the impl's single-key `ORDER BY end_date DESC LIMIT 1` on an
+> end_date tie (validTermInputArb's endDate=startMs+gapMs can collide); the spurious failure then shrank 47× against a real DB, blowing the 5s timeout. Fixed
+> by asserting the tie-tolerant contract (returned end_date IS the max + the pair is a real created term at that max) + 20s headroom + a deterministic
+> same-end/different-start tie test. Stress-verified 6× → 16 pass/0 fail. be validate:local EXIT 0, 1456 pass (+2).*
 
 > ~~**#106 (MED, correctness / NORTH_STAR #2 — found+fixed C358 on a date/timezone-util deep-review; the #87/#39 off-by-one family) — the expense-list
 > date-range filter EXCLUDED an expense logged on the chosen END day.**~~ — *DONE C358: filterExpenses did `new Date(expense.date) <= new Date(endDate)`,

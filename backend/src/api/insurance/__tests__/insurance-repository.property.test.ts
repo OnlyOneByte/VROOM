@@ -101,30 +101,77 @@ describe('Property 1: Current term derivation returns latest term', () => {
 
           // Get current term dates
           const currentDates = await repo.getCurrentTermDates(created.id);
-          expect(currentDates).not.toBeNull();
+          if (!currentDates) throw new Error('expected a current term');
 
-          // Find the term with the latest endDate from the created terms
-          const allTerms = created.terms;
-          let latestTerm = allTerms[0];
-          for (const t of allTerms) {
-            if (t.endDate.getTime() > latestTerm.endDate.getTime()) {
-              latestTerm = t;
-            }
-          }
+          // The contract is "the term with the latest end_date" — getCurrentTermDates is
+          // `ORDER BY end_date DESC LIMIT 1`, a SINGLE sort key. When two generated terms TIE on
+          // end_date (endDate = startMs + gapMs can collide), SQL breaks the tie arbitrarily, so
+          // BOTH tied terms are valid "current" results. Asserting a specific startDate against a
+          // strict-`>` reference loop was therefore NON-DETERMINISTIC — it failed only when a tie's
+          // two terms had different startDates and SQL picked the other one (the C362 flake; the
+          // false failure then cost ~6.6s of fast-check shrinking, tripping the 5s timeout). Pin the
+          // REAL contract deterministically: the returned end_date IS the maximum, and the returned
+          // (startDate, endDate) pair belongs to SOME created term carrying that max end_date (so the
+          // dates are a real round-tripped row, not mangled). Tie-independent, no behavior change.
+          const maxEnd = Math.max(...created.terms.map((t) => t.endDate.getTime()));
+          expect(currentDates.endDate.getTime()).toBe(maxEnd);
 
-          // getCurrentTermDates should match the latest term
-          expect(currentDates?.startDate.getTime()).toBe(latestTerm.startDate.getTime());
-          expect(currentDates?.endDate.getTime()).toBe(latestTerm.endDate.getTime());
+          const matchesACreatedTermAtMaxEnd = created.terms.some(
+            (t) =>
+              t.endDate.getTime() === maxEnd &&
+              t.startDate.getTime() === currentDates.startDate.getTime() &&
+              t.endDate.getTime() === currentDates.endDate.getTime()
+          );
+          expect(matchesACreatedTermAtMaxEnd).toBe(true);
         }
       ),
       { numRuns: 50 }
     );
-  });
+  }, 20_000);
 
   test('getCurrentTermDates returns null for policy with no terms', async () => {
     const created = await repo.create({ company: 'TestCo', terms: [], isActive: true }, USER_ID);
     const result = await repo.getCurrentTermDates(created.id);
     expect(result).toBeNull();
+  });
+
+  // C363 (infra, the C362-filed flake): two terms TIE on end_date with DIFFERENT start_dates — the
+  // exact shape that made the old strict-`>` reference assertion non-deterministic. getCurrentTermDates
+  // is ORDER BY end_date DESC LIMIT 1 (single key), so EITHER tied term is a valid result. This pins
+  // the tie-tolerant contract deterministically: the returned end_date is the (shared) max, and the
+  // returned pair is one of the two real terms at that end_date — never a mismatched/mangled row.
+  test('on an end_date TIE, returns a real term at the max end_date (tie-tolerant, no startDate assumption)', async () => {
+    const sharedEnd = new Date('2027-06-30T00:00:00.000Z');
+    const created = await repo.create(
+      {
+        company: 'TieCo',
+        terms: [
+          {
+            startDate: new Date('2026-07-01T00:00:00.000Z'),
+            endDate: sharedEnd,
+            vehicleCoverage: { vehicleIds: [VEHICLE_IDS[0]] },
+          },
+          {
+            startDate: new Date('2027-01-01T00:00:00.000Z'), // different start, SAME end
+            endDate: sharedEnd,
+            vehicleCoverage: { vehicleIds: [VEHICLE_IDS[0]] },
+          },
+        ],
+        isActive: true,
+      },
+      USER_ID
+    );
+
+    const currentDates = await repo.getCurrentTermDates(created.id);
+    if (!currentDates) throw new Error('expected a current term');
+    expect(currentDates.endDate.getTime()).toBe(sharedEnd.getTime());
+
+    // The returned (start, end) must be one of the two created terms — whichever SQL's tie-break
+    // picked — not a cross-wired pair. Both candidate starts share the max end, so either is correct.
+    const validStarts = created.terms
+      .filter((t) => t.endDate.getTime() === sharedEnd.getTime())
+      .map((t) => t.startDate.getTime());
+    expect(validStarts).toContain(currentDates.startDate.getTime());
   });
 });
 
