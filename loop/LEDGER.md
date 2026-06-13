@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 328 |
+| deep-review | 5 | 333 |
 | guard | 6 | 331 |
 | bug | 3 | 330 |
 | arch | 5 | 332 |
 | infra | 6 | 329 |
 
-Current cycle: **332**
+Current cycle: **333**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5371,3 +5371,22 @@ Current cycle: **332**
   payoff-boundary) — all pass UNCHANGED. The only deltas are an error-message string + one log line (no test asserts either; grep-confirmed) and query count
   is 2→2 (no N+1 regression). green→green: backend validate:local EXIT 0 — 1435 pass (unchanged) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled.
   cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C333 (deep-review → guard): TCO money-aggregation CERTIFIED CLEAN; pinned the unguarded YEAR-SCOPED #28/#27 accounting invariant (+3)** —
+  BALANCE: deep-review AND bug both due (deep-review 333−328=5=budget; bug 333−330=3=budget); deep-review MORE starved (5 vs 3) → pick (bug forces
+  next cycle, nothing sits). 2-agent fan-out: (A) TCO total/breakdown/trend correctness, (B) reminder-materialization idempotency + CSV value round-trip.
+  RESULTS: (B) CERTIFIED CLEAN firsthand — reminder re-trigger is CAS-guarded on nextDueDate (no double-materialize), the BACKEND reminder advance uses
+  clampToAnchorDay (NO C330-class setMonth-overflow — the bug was FE-only), CSV round-trip handles thousands-separators/booleans/nested-JSON/null
+  (C209/C321 + reminder-split-config-roundtrip pin it); the lone hit was #88, already filed. (A) the agent flagged a "year-scoped + unpriced + financed
+  double-count BUG" — VERIFIED FIRSTHAND (C21/C60) it is NOT a bug: computeTCOTotal's doc comment (repository.ts:1081) DOCUMENTS the behavior as the
+  Angelo-approved #28/#27 design — purchasePrice is an all-time-only acquisition cost (EXCLUDED from any year window, whose expenses are already
+  date-filtered), and because the price is NOT counted in a year window the financing-payment rows for that year ARE kept (they're the window's cost signal,
+  not a double-count — the acquisition isn't in the window). The agent's "$1500 is loan principal not new spend" is the OPPOSITE of the decided rationale →
+  a product opinion, not a defect. So TCO math CERTIFIED CLEAN. THE genuine finding → guard: every getVehicleTCO call in the suite OMITTED the optional
+  `year` arg, so the entire year-scoped accounting path (incl. this load-bearing #28/#27 invariant) was UNPINNED — a future "fix" like the agent's would
+  silently break it (the C256/C312/C317 deep-review→guard pattern). +3 guards in per-vehicle.property.test.ts (#28/#27 year-scoped describe): priced+financed
+  year-window (price EXCLUDED, in-year financing KEPT, out-of-year payment date-filtered out); unpriced+financed year-window (financing kept — the exact
+  case mis-flagged); + the year-window breakdown contract (totalCost = windowed buckets, purchasePrice REPORTED but NOT summed in — the #28 divergence).
+  Caught + corrected my own initial mis-assumption that the response zeroes purchasePrice in a year window (it REPORTS the stored price; only totalCost
+  excludes it) before settling the assertions. NON-VACUOUS (gate the financing on `year` like the agent proposed → the unpriced+financed case drops to 0 →
+  RED). green→green: backend validate:local EXIT 0 — 1438 pass (+3) / 1 skip / 0 fail, tsc 0, musl-biome clean (one format reflow auto-fixed via
+  check:musl:fix), build bundled. cov: be 86.53%+ (carry, year-scoped TCO path 0→covered) / fe 84.39% (carry).

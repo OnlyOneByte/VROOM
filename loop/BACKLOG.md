@@ -154,6 +154,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**TCO money-aggregation + reminder-materialization/CSV-round-trip audit (C333).**~~ — *DONE C333 (CERTIFIED CLEAN; +3 year-scoped guards).
+> 2-agent fan-out. (B) reminder-materialization CAS-idempotent (no double-materialize), backend reminder advance uses clampToAnchorDay (NO C330 setMonth
+> bug — FE-only), CSV value round-trip guarded (thousands-sep/bool/nested-JSON/null); lone hit #88 already filed. (A) an agent flagged a "year-scoped +
+> unpriced + financed double-count" — VERIFIED FIRSTHAND it's NOT a bug: computeTCOTotal:1081 DOCUMENTS the Angelo-approved #28/#27 design (purchasePrice
+> all-time-only → excluded from a year window; the window's financing IS the cost signal, not a double-count). TCO math CLEAN. THE finding → guard: every
+> getVehicleTCO call omitted the `year` arg → the year-scoped path was UNPINNED. +3 (per-vehicle.property.test.ts): priced+financed, unpriced+financed,
+> breakdown-contract — pin the #28/#27 year semantics so a future "fix" turns RED. NON-VACUOUS. validate:local EXIT 0, 1438 pass (+3).*
+
 > ~~**#94 isolation check — fleet analytics unit-conversion + per-vehicle stats audit (C328).**~~ — *DONE C328 (#94 BROADENED to a CLASS; +1
 > characterization guard; per-vehicle stats CERTIFIED CLEAN). 2-agent fan-out + firsthand source verify (C21/C60). (a) `calculateVehicleStats`
 > CLEAN: every ratio div-guarded (costPerMile/averageMpg/averageMilesPerKwh), unit-by-design at the route layer, 100-run property-tested — no

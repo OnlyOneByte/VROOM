@@ -480,6 +480,112 @@ describe('#27: financed vehicle TCO does not double-count principal', () => {
 });
 
 // ---------------------------------------------------------------------------
+// #28 + #27, YEAR-SCOPED arm (C333 deep-review → guard). Every getVehicleTCO call in the suite
+// omitted the optional `year` arg, so the year-scoped accounting path was UNPINNED — including the
+// load-bearing rule computeTCOTotal documents (repository.ts:1081): purchasePrice is an all-time-only
+// acquisition cost (#28, EXCLUDED from any year window since the window's expenses are already
+// date-filtered), and because the price is NOT counted in a year window, the financing-payment rows
+// for that year ARE kept (they're the cost signal for the window — NOT a double-count, since the
+// acquisition isn't in the window). A C333 audit flagged the year+unpriced+financed case as a
+// "double-count bug" — it is NOT (the price was a prior-year acquisition, absent from the window);
+// these pin the DECIDED #28/#27 semantics so a future "fix" to that branch is a deliberate, RED-turning
+// change, not a silent regression. seedExpense can't set source_type → insert the financing row raw.
+// ---------------------------------------------------------------------------
+describe('#28/#27 year-scoped: purchasePrice excluded from a year window; that year financing kept', () => {
+  function seedFinancingPayment(vehicleId: string, id: string, amount: number, date: Date): void {
+    testDb.sqlite.run(
+      'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        id,
+        vehicleId,
+        'user-1',
+        'financial',
+        amount,
+        Math.floor(date.getTime() / 1000),
+        'financing',
+        0,
+      ]
+    );
+  }
+
+  test('PRICED + financed, year-scoped: purchasePrice is EXCLUDED, the year financing IS counted', async () => {
+    const { userId, vehicle } = setupUserAndVehicle({
+      purchasePrice: 30000,
+      purchaseDate: new Date(2020, 0, 1), // a prior-year acquisition
+    });
+    // Two financing payments inside the queried year, one in a DIFFERENT year (must be excluded by the window).
+    seedFinancingPayment(vehicle.id, 'fin-in-1', 500, new Date(TEST_YEAR, 0, 15));
+    seedFinancingPayment(vehicle.id, 'fin-in-2', 500, new Date(TEST_YEAR, 5, 15));
+    seedFinancingPayment(vehicle.id, 'fin-out', 999, new Date(TEST_YEAR - 1, 11, 15));
+
+    const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
+
+    // The $30k prior-year purchase is NOT in this window (#28); the two in-year payments ARE the
+    // window's cost signal (not a double-count — the acquisition isn't counted here). Out-of-year
+    // payment excluded by the date filter.
+    expect(result.totalCost).toBe(1000);
+    expect(result.financingInterest).toBe(1000);
+    // The response still REPORTS the vehicle's stored purchasePrice (it's a vehicle attribute), but a
+    // year-scoped totalCost EXCLUDES it (#28) — so in a year window the breakdown fields intentionally
+    // do NOT sum to totalCost by exactly purchasePrice. That divergence is the #28 design, pinned here.
+    expect(result.purchasePrice).toBe(30000);
+    expect(result.totalCost).toBe(
+      result.financingInterest +
+        result.insuranceCost +
+        result.fuelCost +
+        result.maintenanceCost +
+        result.otherCosts
+    ); // year total = the windowed buckets, purchasePrice NOT added
+  });
+
+  test('UNPRICED + financed, year-scoped: the year financing IS counted (the documented #28/#27 branch)', async () => {
+    const { userId, vehicle } = setupUserAndVehicle({
+      purchasePrice: null,
+      purchaseDate: new Date(2020, 0, 1),
+    });
+    seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(TEST_YEAR, 2, 1));
+    seedFinancingPayment(vehicle.id, 'fin-2', 500, new Date(TEST_YEAR, 8, 1));
+
+    const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
+
+    // No price to double-count against → the year's financing outflow is the cost signal. Kept.
+    expect(result.totalCost).toBe(1000);
+    expect(result.financingInterest).toBe(1000);
+  });
+
+  test('year-scoped total = the windowed buckets (financing + fuel), purchasePrice NOT added', async () => {
+    const { userId, vehicle } = setupUserAndVehicle({
+      purchasePrice: 30000,
+      purchaseDate: new Date(2020, 0, 1),
+    });
+    seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(TEST_YEAR, 0, 15));
+    seedExpense(testDb.sqlite, {
+      id: 'fuel-yr',
+      vehicleId: vehicle.id,
+      category: 'fuel',
+      expenseAmount: 60,
+      date: new Date(TEST_YEAR, 0, 20),
+      mileage: null,
+      volume: 10,
+      fuelType: 'gasoline',
+      missedFillup: false,
+    } as TestExpense);
+
+    const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
+
+    // The windowed buckets (everything EXCEPT the all-time-only purchasePrice) sum to totalCost.
+    const windowedBuckets =
+      result.financingInterest +
+      result.insuranceCost +
+      result.fuelCost +
+      result.maintenanceCost +
+      result.otherCosts;
+    expect(Math.abs(result.totalCost - windowedBuckets)).toBeLessThan(0.01);
+    expect(result.totalCost).toBe(560); // 500 financing + 60 fuel, NO purchasePrice (#28)
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Property 15: Cost per month formula
 // **Validates: Requirement 10.4**
 // ---------------------------------------------------------------------------
