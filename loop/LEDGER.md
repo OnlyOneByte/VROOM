@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 317 |
-| guard | 6 | 313 |
+| guard | 6 | 319 |
 | bug | 3 | 318 |
 | arch | 5 | 314 |
 | infra | 6 | 316 |
 
-Current cycle: **318**
+Current cycle: **319**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5179,3 +5179,14 @@ Current cycle: **318**
   pinning the CURRENT behavior — junction count 0, reminder row survives is_active=1, trigger skips it no_vehicles — so the eventual fix has a
   red→green anchor + the bug can't silently worsen. green→green: backend validate:local EXIT 0 — 1433 pass (+1) / 1 skip / 0 fail, tsc 0,
   musl-biome clean, build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).
+- **C319 (guard): pin the settings store's state-management contracts (~12%-covered settings.svelte.ts)** — BALANCE: guard forced (last 313,
+  starved-for 6 = budget, most-starved; arch also at 5 but guard waited longer). Per the LEDGER steering note → steered to the lowest-covered
+  FE logic module: stores/settings.svelte.ts (~12% func/line per the C303 re-measure; C308 pinned only error-clearing on 2 methods). +6 guards
+  (new settings-state-contract.test.ts, mocked fetch): (1) update() REPLACES settings state with the server response + returns it (the
+  unitPreferences/currency render path); (2) update() RE-THROWS on failure + records the error (caller await must reject); (3) a NON-preview
+  restoreFromProvider REFRESHES state via this.load() (2 fetches: restore + reload — a destructive restore changes stored settings, stale
+  in-memory state would mislead, NORTH_STAR #1); (4) a PREVIEW restore does NOT reload (1 fetch, read-only); (5) reset() clears
+  settings/error/loading (logout path); (6) the unitPreferences getter falls back to miles/gallons defaults when settings is null. NON-VACUOUS
+  (dropping the non-preview this.load() → the 2-call + populated-settings assertions RED). green→green: frontend validate:local EXIT 0 —
+  type-check 0, build, 619 pass (+6). Guard-only (no source) → no UI. cov: be 86.07% (carry) / fe 81.76%+ (carry; settings.svelte.ts up
+  sharply from ~12%).

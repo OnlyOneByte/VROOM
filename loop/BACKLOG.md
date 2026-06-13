@@ -367,6 +367,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C319 — pin the settings store's state-management contracts (~12%-covered settings.svelte.ts).**~~ — *DONE C319: stores/settings.svelte.ts
+> was ~12% covered (C308 pinned only error-clearing on 2 methods). +6 guards (settings-state-contract.test.ts, mocked fetch): update() replaces
+> state + returns it; update() re-throws on failure; a non-preview restoreFromProvider refreshes state via this.load() (2 fetches) while a
+> preview does NOT (1 fetch, read-only); reset() clears all state; unitPreferences getter falls back to defaults when null. NON-VACUOUS
+> (dropping the non-preview load → RED). fe validate:local EXIT 0, 619 pass (+6).*
+
 > ~~**C313 — pin validateAndRefreshSession, the untested security-critical session-rotation core.**~~ — *DONE C313: auth/utils.ts
 > validateAndRefreshSession (used by requireAuth + POST /auth/refresh) sat at 100% func / 40% line with ZERO direct tests. +4 unit guards
 > (mockable Lucia, no DB): invalid → null; FRESH → as-is, no create/invalidate (no-churn); NEAR-EXPIRY → rotate with call order
