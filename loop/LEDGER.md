@@ -45,7 +45,14 @@
 > behavior-preserving extract, no product code grew); fe 84.39% line / 84.3% func / 76.63% branch (line FLAT vs C379's 84.39, branch +0.1 — the C380 month-plural
 > guard). BE↔FE gap stable ~2.4pts, both flat-to-up. 90%-line goal still structurally gated (BE DI/singleton + OAuth-network; FE eyes-on components/routes,
 > Playwright-blocked). Branch: 199 commits ahead of origin/main, working tree clean (only by-design untracked *.meshclaw.e2e.ts + tooling), build floor GREEN
-> both sides → PR-ready (standing escalation open since C368, not re-spammed).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> both sides → PR-ready (standing escalation open since C368, not re-spammed).** **RE-MEASURED AGAIN C400 (the #5-sweep re-measure; last C389): be 86.92% line /
+> 86.54% func (line +0.14 / func +0.15 vs C389's 86.78/86.39 — the C396 expense-source-ref guard + the #116/C399 reminder-endDate guard); fe 84.45% line / 84.4%
+> func / 76.87% branch (line +0.06 / func +0.1 / branch +0.24 vs C389's 84.39/84.3/76.63 — the #115/C398 +12 lease-overage guards delivered). BE↔FE gap stable
+> ~2.5pts, BOTH creeping up (the C396–C399 fix+guard arc held the line as product code grew). 90%-line goal still structurally gated (BE DI/singleton + OAuth-network;
+> FE eyes-on components/routes, Playwright-blocked). Branch: 210 commits ahead of origin/main; working tree clean of TRACKED changes, but the #5 sweep CAUGHT an
+> untracked-by-mistake item → .kiro/specs/offline-entries/ (requirements/design/tasks.md) was the ONLY feature spec not committed while ~29 siblings all track their 3
+> .md docs + the offline-entries CODE foundation already shipped → committed it C400 so a fresh clone / the PR keeps the design rationale. Build floor GREEN both sides
+> → PR-ready (standing escalation open since C368, not re-spammed).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -66,9 +73,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 396 |
 | bug | 3 | 398 |
 | arch | 5 | 397 |
-| infra | 6 | 395 |
+| infra | 6 | 400 |
 
-Current cycle: **399**
+Current cycle: **400**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6153,3 +6160,13 @@ Current cycle: **399**
   (a free-text value literally beginning with `'`+a formula-trigger char round-trips lossy: neutralizeCsvCell only escapes a LEADING trigger, but denormalizeCsvCell
   strips a leading `'` whenever char-2 is a trigger → asymmetric; csv-safety.ts:22/35/64) is REAL + reachable but NARROW (only `'`+`=/+/-/@/TAB/CR`-led values) → NOTED
   below for a guard cycle, not bundled into this deep-review. green→green: be validate:local EXIT 0, 1484 pass (+1) / 0 fail. cov: be 86.78%+ (carry, +1 guard) / fe 84.39% (carry).
+- **C400 (infra): #5 branch-hygiene sweep + coverage re-measure (the overdue ~C399 cadence; last actual C389)** — BALANCE: NOTHING over budget (deep-review 1, guard 4,
+  bug 2, arch 3, infra 5/6, feature parked); infra was the MOST-STARVED actionable category (5/6) AND the #5 sweep was overdue → highest-leverage pick (cadences exist
+  so they don't get starved by shinier work; the freshly-filed CSV-apostrophe guard takes the next cycle). SWEEP: re-measured both suites — be 86.92% line / 86.54%
+  func (UP +0.14/+0.15 vs C389's 86.78/86.39 — C396 + #116/C399 guards); fe 84.45% line / 84.4% func / 76.87% branch (UP +0.06/+0.1/+0.24 — the #115/C398 +12
+  lease-overage guards delivered). Both creeping UP, gap stable ~2.5pts. Branch 210 ahead of origin/main. HYGIENE CATCH: the sweep found .kiro/specs/offline-entries/
+  (requirements/design/tasks.md) was the ONLY feature spec left UNTRACKED, while ~29 sibling specs all commit their 3 .md docs AND the offline-entries CODE foundation
+  already shipped (CLAUDE.md confirms client_id idempotency + outbox sync committed) — so a fresh clone / the eventual PR would lose this feature's design rationale.
+  FIX: committed the 3 spec docs (matching every sibling; .config.kiro stays untracked as siblings do). No product code touched → no build gate beyond the coverage
+  runs (both EXIT 0). All other untracked items confirmed by-design (*.meshclaw.e2e.ts specs, .meshclaw-tools/, screenshots, mise.local.toml, playwright config).
+  cov: be 86.92% / fe 84.45%. Next #5 sweep ~C410; next CLAUDE.md refresh ~C405.
