@@ -41,7 +41,11 @@
 > func (+0.11 line vs C368's 86.68 — the C369/C372/C376 BE additions); fe 84.39% line / 84.3% func / 76.53% branch (~FLAT vs C368's 84.45/84.3/76.43 — the
 > C374/C377 FE guards held the line as components grew). BE↔FE gap stable ~2.4pts, both flat-to-up. 90%-line goal still structurally gated (BE DI/singleton +
 > OAuth-network; FE eyes-on components/routes, Playwright-blocked). Branch: 189 commits ahead of origin/main, working tree clean (only by-design untracked
-> *.meshclaw.e2e.ts + tooling), build floor GREEN both sides → PR-ready (standing escalation open since C368, not re-spammed — no new decision needed).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> *.meshclaw.e2e.ts + tooling), build floor GREEN both sides → PR-ready (standing escalation open since C368, not re-spammed — no new decision needed).** **RE-MEASURED AGAIN C389 (the #5-sweep re-measure; last C379): be 86.78% line / 86.39% func (~FLAT vs C379's 86.79/86.39 — C385/C387 added guards, C386 a
+> behavior-preserving extract, no product code grew); fe 84.39% line / 84.3% func / 76.63% branch (line FLAT vs C379's 84.39, branch +0.1 — the C380 month-plural
+> guard). BE↔FE gap stable ~2.4pts, both flat-to-up. 90%-line goal still structurally gated (BE DI/singleton + OAuth-network; FE eyes-on components/routes,
+> Playwright-blocked). Branch: 199 commits ahead of origin/main, working tree clean (only by-design untracked *.meshclaw.e2e.ts + tooling), build floor GREEN
+> both sides → PR-ready (standing escalation open since C368, not re-spammed).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -62,9 +66,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 385 |
 | bug | 3 | 387 |
 | arch | 5 | 386 |
-| infra | 6 | 384 |
+| infra | 6 | 389 |
 
-Current cycle: **388**
+Current cycle: **389**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6027,3 +6031,11 @@ Current cycle: **388**
   a 'provider-foreign' in storageConfig whose findOwnedProvider → [] yields 0 backup targets. NON-VACUOUS. ARCC-grounded defense-in-depth note filed (a sync-
   worker co-ownership assertion = an architecture change, not self-fixed). green→green: be validate:local EXIT 0, 1471 pass (+1) / 0 fail. cov: be 86.79%
   (carry) / fe 84.39% (carry).
+- **C389 (infra): #5 branch-hygiene sweep + coverage re-measure (infra most-starved; the C379 cadence)** — BALANCE: nothing over budget; infra most-starved
+  (last 384, starved-for 389−384=5, budget 6) → pick (the #5 sweep one cycle early, but infra is the most-starved actionable category). SWEEP: working tree
+  CLEAN — only by-design untracked files (the *.meshclaw.e2e.ts runtime specs per quality-bar #5, .meshclaw-tools/, mise.local.toml, .kiro/specs/offline-entries/,
+  e2e snapshots); NO tracked-file drift. Branch 199 commits ahead of origin/main, purely claude-loop-dev off main. COVERAGE RE-MEASURED (last C379): be 86.78%
+  line / 86.39% func (~FLAT vs C379's 86.79/86.39 — C385/C387 added guards, C386 was a behavior-preserving extract, no product code grew); fe 84.39% line /
+  84.3% func / 76.63% branch (line flat vs C379's 84.39, branch +0.1 — the C380 month-plural guard). Both GREEN, flat-to-up, gap stable ~2.4pts; 90% goal still
+  structurally gated. Build floor GREEN both sides. PR-readiness escalated C368 (standing, open) — NOT re-spammed. Docs-only cycle (no source/test touched → no
+  build gate beyond the coverage runs, both EXIT 0). cov: be 86.78% / fe 84.39%. Next #5 sweep ~C399; next CLAUDE.md refresh ~C394.
