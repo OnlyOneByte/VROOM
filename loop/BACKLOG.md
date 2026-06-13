@@ -390,6 +390,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C336 — pin themeStore, the user-facing light/dark/system theme controller (zero-coverage store).**~~ — *DONE C336: scanned every BE pure-logic
+> util against the suite — all covered (the cadence note holds; data-migration is a no-op stub, checkpoint a CLI script). Pivoted FE: the 3 stores
+> (app/offline/theme.svelte.ts) had NO direct test. theme.svelte.ts (68 lines) is the single source of truth for dark mode (setPreference persists +
+> resolves 'system' vs prefers-color-scheme + toggles the <html> dark class + swaps the PWA theme-color meta) — a regression silently breaks dark mode for
+> everyone. +5 (theme-store.test.ts, new stores/__tests__/): explicit dark/light (class + theme-color + persist + current); 'system' resolves vs matchMedia
+> (OS dark/light, stored pref stays 'system'); the same 'system' pref flips with the OS (not frozen). NON-VACUOUS. fe validate:local EXIT 0, 646 pass (+5).*
+
 > ~~**C331 — pin getSyncStatusInfo, the user-facing sync-indicator precedence cascade (zero-coverage pure module).**~~ — *DONE C331: a grep of every
 > non-type/non-UI-reexport src/lib/*.ts against the suite surfaced sync/sync-status.ts (58 lines) at ZERO test references. getSyncStatusInfo backs BOTH
 > SyncStatusIndicator + SyncStatusInline; its branch order is a load-bearing PRIORITY CASCADE (offline > conflicts > syncing > error > success > pending >

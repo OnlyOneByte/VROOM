@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 333 |
-| guard | 6 | 331 |
+| guard | 6 | 336 |
 | bug | 3 | 334 |
 | arch | 5 | 332 |
 | infra | 6 | 335 |
 
-Current cycle: **335**
+Current cycle: **336**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5415,3 +5415,15 @@ Current cycle: **335**
   count by running vitest — 641, not a guess; my first edit said 643 from memory, fixed to the measured 641) + named the C322–C334 additions (the #94-volume
   pin, #99 month-overflow guards, getSyncStatusInfo, year-scoped TCO pins, per-field import-conversion guards). Docs-only; no source/test/build touched (the
   C309/C316/C322 refresh pattern → no build gate). Next CLAUDE.md refresh ~C348; next #5 sweep ~C339. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C336 (guard): pin themeStore, the user-facing light/dark/system theme controller (zero-coverage store)** — BALANCE: nothing over budget (guard 5/6
+  closest to starving, hasn't run since C331) → highest-leverage guard. Scanned for a genuinely-untested logic module (the C331 method): grep'd every BE
+  pure-logic util/helper against the suite — ALL covered (csv-safety/drive-file-utils/reminder-cost/computeNextDueDate directly tested; data-migration is a
+  no-op stub, checkpoint a CLI script — non-targets). Confirmed the cadence note: BE pure-logic veins are genuinely worked through, manufacturing a guard
+  there = theater. Pivoted to FE: the 3 stores (app/offline/theme.svelte.ts) have NO direct test. Picked theme.svelte.ts (68 lines) — the single source of
+  truth for dark mode (setPreference persists to localStorage, resolves 'system' against prefers-color-scheme, toggles the <html> `dark` class, swaps the
+  PWA theme-color meta); a regression silently breaks dark mode for every user. +5 guards (theme-store.test.ts, new stores/__tests__/): explicit dark/light
+  (class + #1a1a2e/#2563eb theme-color + localStorage persist + current); 'system' resolves against matchMedia (OS=dark→dark, OS=light→light, stored pref
+  stays 'system' not the frozen resolved value); + the SAME 'system' pref flips with the OS (not frozen at set-time). Uses test-setup.ts's browser=true +
+  localStorage + matchMedia mocks (matchMedia overridden per-case for the system branch). NON-VACUOUS (drop the classList toggle / meta swap / persistence,
+  or invert the system resolution → RED). green→green: frontend validate:local EXIT 0 — 646 pass (+5) / 0 fail, tsc 0, build OK. cov: be 86.53% (carry) /
+  fe 84.39%+ (carry, theme.svelte.ts 0%→covered).
