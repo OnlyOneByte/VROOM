@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 306 |
-| guard | 6 | 302 |
+| guard | 6 | 307 |
 | bug | 3 | 305 |
 | arch | 5 | 304 |
 | infra | 6 | 303 |
 
-Current cycle: **306**
+Current cycle: **307**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5030,3 +5030,15 @@ Current cycle: **306**
   domain-guard, ownership-scope). NO defect, NO code change warranted — adding a test would be coverage-theater against an already-pinned
   invariant (the C291 certification precedent). DOCS-ONLY (LEDGER + BACKLOG); no source/test/build touched (C305 gate is the last code state).
   cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C307 (guard): pin activity-tracker's two unguarded SAFETY invariants — mid-sync eviction shield + fail-open change-check** — BALANCE:
+  nothing over budget except gated feature; guard highest pressure (last 302, starved-for 5/6, forced next cycle) → highest-leverage pick.
+  Per the LEDGER steering note, steered to a low-covered/high-risk module: sync/activity-tracker.ts (71% func / 57% line — the auto-sync
+  inactivity logic; the C195 ratchet covered cleanupInactiveUsers' ageout but two SAFETY branches stayed unpinned). +2 guards: (1)
+  cleanupInactiveUsers must NOT evict a STALE-but-syncInProgress user (line 129's `!activity.syncInProgress` AND) — evicting mid-sync would
+  clear its timer + drop tracking with the backup still running (orphaned state, flag never reset); the test flips the in-memory flag, proves
+  the stale syncing user SURVIVES, then clears it + proves the same stale user THEN ages out (the guard is exactly the flag, not a blanket
+  exemption). (2) hasChangesSinceLastSync FAILS OPEN — a throwing syncStateRepository returns `true` (back up, don't silently skip), the
+  conservative NORTH_STAR #1 choice; the test stubs the repo to reject + asserts true, so a refactor can't flip it fail-closed (a transient DB
+  hiccup silently dropping an expected auto-backup). Both pin real branch behavior (non-vacuous: removing the syncInProgress AND → RED; a
+  fail-closed catch → RED). green→green: backend validate:local EXIT 0 — 1424 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build
+  bundled. Guard-only (no source touched) → no UI. cov: be 86.07%+ (carry; activity-tracker safety branches now covered) / fe 81.76% (carry).

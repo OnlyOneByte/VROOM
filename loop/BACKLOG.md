@@ -353,6 +353,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C307 — pin activity-tracker's two unguarded safety invariants (mid-sync eviction shield + fail-open change-check).**~~ — *DONE C307:
+> sync/activity-tracker.ts (71% func / 57% line) had two SAFETY branches unpinned after the C195 ageout ratchet. +2 guards: (1)
+> cleanupInactiveUsers must NOT evict a stale-but-syncInProgress user (line 129 `!syncInProgress` AND) — proven by flipping the in-memory flag
+> (survives stale), then clearing it (then ages out); (2) hasChangesSinceLastSync FAILS OPEN — a throwing repo returns true (back up, don't
+> silently skip), the NORTH_STAR #1 choice, so a refactor can't flip it fail-closed. validate:local EXIT 0, 1424 pass (+2).*
+
 > ~~**C305 — pin the paid-off-financing GET /vehicles list contract (bug-cycle dormant-vein scout outcome).**~~ — *DONE C305: a forced bug
 > cycle scouted SEVEN mature surfaces clean (vehicles repo, photos service/repo, expenses filtering, auth/OAuth-state + session, Sheets-header
 > coverage). The one unguarded edge: vehicleRepository.findByUserId leftJoins vehicleFinancing with NO isActive filter → a paid-off
