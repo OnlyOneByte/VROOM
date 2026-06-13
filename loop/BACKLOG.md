@@ -439,6 +439,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C364 — pin the REAL getVehicleDisplayName (12-site display helper) — fix a C229 coverage-theater gap.**~~ — *DONE C364: guard closest to budget (5/6)
+> → highest-leverage. getVehicleDisplayName (vehicle-helpers.ts) is used across 8 components + 4 routes, yet its only "coverage" was VehicleManagement.test.ts:275,
+> which RE-IMPLEMENTS the function as a local arrow and tests the COPY — never importing the real export (the C229 anti-pattern). The load-bearing
+> `!vehicle → 'Unknown Vehicle'` fallback was UNGUARDED and is REACHABLE: a split/reminder/insurance reference can outlive its vehicle (#88/#97 deleted-vehicle
+> family) → every consumer relies on this helper for a safe label, not a null .year deref. +1 test file (vehicle-helpers.test.ts, 5 tests driving the REAL
+> export): nickname-wins, year/make/model fallback, empty-nickname-falls-through, null + undefined → 'Unknown Vehicle'. NON-VACUOUS. fe validate:local EXIT 0,
+> 669 pass (+5). Rejected the BE picks (lower-value): import-csv ambiguity already pinned at the route (#102/C344); pagination hasMore already property-tested.*
+
 > ~~**C359 — pin `formatPaymentFrequency`, the user-visible payment-frequency label rendered in NextPaymentCard.**~~ — *DONE C359: guard at budget
 > (last 353, starved-for 6=budget; feature is over-budget but only-open T9 is e2e-blocked / the rest Angelo-gated → guard is the most-starved actionable).
 > Vein dormant → 2-agent fan-out for a genuinely-unpinned REACHABLE invariant. REJECTED the BE agent's top pick (`normalizeDate`'s seconds-vs-ms threshold

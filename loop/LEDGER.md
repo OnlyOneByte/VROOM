@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 361 |
-| guard | 6 | 359 |
+| guard | 6 | 364 |
 | bug | 3 | 362 |
 | arch | 5 | 360 |
 | infra | 6 | 363 |
 
-Current cycle: **363**
+Current cycle: **364**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5753,3 +5753,14 @@ Current cycle: **363**
   headroom. Also +1 DETERMINISTIC tie test (two terms, SAME end / DIFFERENT start) that pins the tie-tolerant contract head-on (the exact shape that flaked).
   STRESS-VERIFIED: insurance file 6× consecutive → 16 pass / 0 fail every run (was the 15-test file). green→green: be validate:local EXIT 0, 1456 pass (+2) /
   0 fail. cov: be 86.25% (carry) / fe 84.17% (carry). Next infra: #5 branch-hygiene sweep (now most-starved cadence) ~C366; CLAUDE.md refresh ~C370.
+- **C364 (guard): pinned the REAL getVehicleDisplayName — fixed a C229 coverage-theater gap on a 12-site display helper** — BALANCE: nothing actionable over
+  budget; guard closest to budget (last 359, starved-for 364−359=5, budget 6) → highest-leverage pick. 2-agent fan-out for a genuinely-unpinned REACHABLE
+  invariant. The FE pick (verified firsthand, C21/C60): getVehicleDisplayName (vehicle-helpers.ts) is used across 8 components + 4 routes, yet its ONLY
+  "coverage" was VehicleManagement.test.ts:275 which RE-IMPLEMENTS the function as a local arrow and tests the COPY — never importing the real export (the
+  exact C229 coverage-theater anti-pattern CLAUDE.md warns about). So the load-bearing `!vehicle → 'Unknown Vehicle'` fallback was UNGUARDED — and it's
+  REACHABLE: a split expense / reminder / insurance term can outlive the vehicle it references (the #88/#97 deleted-vehicle family), and every consumer leans
+  on this helper to render a safe label instead of dereferencing .year on null. (Rejected the BE picks as lower-value: import-csv buildImportPlan ambiguity is
+  already pinned at the ROUTE level [#102, C344, import-csv.test.ts:332]; pagination hasMore is already property-tested; sync mixed-type is a thin HTTP nicety.)
+  +1 test file (vehicle-helpers.test.ts, 5 tests driving the REAL export): nickname-wins, year/make/model fallback, empty-nickname-falls-through, null +
+  undefined → 'Unknown Vehicle'. NON-VACUOUS. green→green: fe validate:local EXIT 0, 669 pass (+5) / 0 fail, tsc 0, build OK. cov: be 86.25% (carry) / fe
+  84.17%+ (carry).
