@@ -65,10 +65,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 388 |
 | guard | 6 | 391 |
 | bug | 3 | 390 |
-| arch | 5 | 386 |
+| arch | 5 | 392 |
 | infra | 6 | 389 |
 
-Current cycle: **391**
+Current cycle: **392**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6059,3 +6059,13 @@ Current cycle: **391**
   sibling must not phantom a 0-day '1-3 days' interval) was unpinned. +1 guard: a 3-row same-date split fillup + one real later fillup → exactly 1 interval (the
   real gap), no phantom bucket. NON-VACUOUS (loosening days<=0 → RED). green→green: be validate:local EXIT 0, 1474 pass (+1) / 0 fail. cov: be 86.78% (carry) /
   fe 84.39% (carry).
+- **C392 (arch): route buildFuelStatsFromData's inline per-vehicle distance onto the existing computeConvertedTotalDistance (2 sites → 1)** — BALANCE: arch OVER
+  budget (last 386, starved-for 392−386=6 > budget 5) → forced pick. rule-7 fan-out (FE returned a clean "none" — heavily deduped). PICK (CONFIRMED firsthand,
+  C21/C60): buildFuelStatsFromData (repository.ts:1404) inlined the per-vehicle mileage group → max−min → sum, BYTE-IDENTICAL to the existing private
+  computeConvertedTotalDistance (:511) under skipConversion=true — and the inline code's OWN comment already said "Mirrors the grouped
+  computeConvertedTotalDistance; this summary path is single-unit so it doesn't convert". A divergent copy (a null-mileage filter or `< 2` change on one) skews
+  the per-vehicle distance total against the year-end path (both feed cost-per-distance money analytics). The shared method ALREADY has the skipConversion flag,
+  so this is a pure call-the-existing-helper collapse — NO new helper, NO param churn. Routed the inline block → computeConvertedTotalDistance(fuelRows, new Map(),
+  DEFAULT_UNIT_PREFERENCES, true) (the unit args are ignored under skipConversion). Behavior-preserving (identical math). RULE-3 GREEN→GREEN:
+  fuel-stats-fleet-distance-pooling.test.ts (totalDistance = SUM of per-vehicle max-min) + year-end.property.test.ts drive both sites — GREEN before AND after.
+  validate:local EXIT 0, 1474 pass (unchanged). cov: be 86.78% (carry) / fe 84.39% (carry).

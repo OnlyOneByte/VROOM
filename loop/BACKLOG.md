@@ -1885,6 +1885,15 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Route buildFuelStatsFromData's inline per-vehicle distance onto the existing computeConvertedTotalDistance (2 sites → 1, rule-7 fan-out, done C392).**~~ —
+  *DONE C392: buildFuelStatsFromData (repository.ts:1404) inlined the per-vehicle mileage group→max−min→sum, BYTE-IDENTICAL to the existing private
+  computeConvertedTotalDistance (:511) under skipConversion=true — the inline code's own comment even said "Mirrors the grouped computeConvertedTotalDistance".
+  A divergent copy (a null-mileage filter / `< 2` change on one) skews the per-vehicle distance total vs the year-end path (both feed cost-per-distance money
+  analytics). The shared method ALREADY has the skipConversion flag → pure call-the-existing-helper collapse, no new helper/param. Routed →
+  computeConvertedTotalDistance(fuelRows, new Map(), DEFAULT_UNIT_PREFERENCES, true). Behavior-preserving. Rule-3 green→green:
+  fuel-stats-fleet-distance-pooling.test.ts + year-end.property.test.ts drive both — GREEN before AND after. validate:local EXIT 0, 1474 pass. (FE fan-out: clean
+  "none" — heavily deduped.)*
+
 - ~~**Extract monthsBetween — ONE source of truth for the calendar-month-diff in two analytics money denominators (2 sites → 1, rule-7 fan-out, done C386).**~~ —
   *DONE C386: the month-diff `(now.getFullYear()−X.getFullYear())*12 + (now.getMonth()−X.getMonth())` was BYTE-IDENTICAL at the financing monthsElapsed
   (repository.ts:836 → monthsRemaining) + the all-time TCO ownershipMonths (:1891 → costPerMonth=total/months). Different clamps (max(0,…) vs max(1,…)), so the
