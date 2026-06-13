@@ -50,11 +50,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 317 |
 | guard | 6 | 313 |
-| bug | 3 | 315 |
+| bug | 3 | 318 |
 | arch | 5 | 314 |
 | infra | 6 | 316 |
 
-Current cycle: **317**
+Current cycle: **318**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5166,3 +5166,16 @@ Current cycle: **317**
   35000, dueDate null) AND ≥1 time notif (dueDate set, dueOdometer null). NON-VACUOUS (a single-index regression → the dropped-axis assertion
   RED). NO defect, no source change. green→green: backend validate:local EXIT 0 — 1432 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean
   (test reflow auto-fixed), build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).
+- **C318 (bug → file+escalate + characterization guard): reminder orphaned (vehicle-less, still active) when its last vehicle is deleted
+  (#97)** — BALANCE: bug at budget (last 315, starved-for 3 = budget, tightest; guard at 5 but bug's limit is the hard one) → pick. Bug vein
+  dormant → scouted the DELETE-CASCADE surfaces. CERTIFIED CLEAN: vehicle-delete photo cascade (cleans vehicle/expense/odometer_entry — the
+  complete dependent set; insurance policy/claim are user-owned not vehicle-dependent, claim.vehicleId is set-null), financing payoff/DELETE
+  (soft-delete: isActive=false + clearSource, never deletes rows → no photo orphan). THE FINDING: reminder_vehicles.vehicleId is
+  onDelete:'cascade', so deleting a vehicle drops its junction row — a reminder linked to ONLY that vehicle is left with ZERO vehicles: the
+  row SURVIVES + stays is_active, but processReminder skips it forever with reason 'no_vehicles' (a silent never-firing orphan still shown
+  active). Same family as the gated #88 (reminder orphaned on vehicle delete) but distinct mechanism (junction cascade, not the split-config
+  blob). The FIX is a UX decision (deactivate / delete / surface in a needs-attention bucket / block-delete-of-sole-target) → FILED #97 +
+  send_message'd Angelo, NOT self-fixed. SHIPPABLE increment (bug-cycle floor): a characterization guard (vehicle-delete-cascade.test.ts, +1)
+  pinning the CURRENT behavior — junction count 0, reminder row survives is_active=1, trigger skips it no_vehicles — so the eventual fix has a
+  red→green anchor + the bug can't silently worsen. green→green: backend validate:local EXIT 0 — 1433 pass (+1) / 1 skip / 0 fail, tsc 0,
+  musl-biome clean, build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).

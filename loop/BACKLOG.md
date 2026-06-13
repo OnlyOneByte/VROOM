@@ -785,6 +785,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   reported skipped, independent reminders still fire, run 200). DECISION (send_message'd Angelo): on vehicle-delete (a) drop it from the config +
   re-normalize the remaining percentages, (b) convert to single-vehicle if one remains, (c) deactivate the reminder + notify, or (d) other. Not
   loop-decidable — awaiting Angelo.
+- **#97 (LOW-MED, data-hygiene / NORTH_STAR #1-adjacent — found C318 bug scout; ESCALATED to Angelo C318, product-gated; same family as #88) —
+  a reminder linked to ONLY the deleted vehicle is left vehicle-less but still active, silently never firing.** `reminder_vehicles.vehicleId`
+  is onDelete:'cascade', so deleting a vehicle drops its junction row. A single-vehicle reminder then has ZERO vehicles: the row survives +
+  stays is_active, but `processReminder` skips it every trigger with reason 'no_vehicles' — a never-firing orphan still shown active, no user
+  signal. (Multi-vehicle reminders keep their remaining vehicles — unaffected.) Distinct from #88 (split-config blob) but the same "reminder
+  orphaned on vehicle delete" family. VERIFIED + pinned by a characterization test (C318, vehicle-delete-cascade.test.ts: junction 0, reminder
+  is_active=1, trigger skips no_vehicles). DECISION (send_message'd Angelo): on vehicle-delete, for any reminder left with zero vehicles —
+  (a) deactivate it (+ notify), (b) delete it outright (can never fire), (c) surface it in a "needs attention / no vehicle" UI bucket, or
+  (d) block deleting a vehicle that's the sole target of an active reminder. Not loop-decidable — awaiting Angelo.
 - **#94 (MED, correctness / NORTH_STAR #2 — found C301 bug scout; ESCALATED to Angelo C301, semantics-gated) — fleet-wide fuel-stats pools
   per-vehicle distance + cost WITHOUT unit conversion.** `GET /analytics/fuel-stats` with no vehicleId (the DEFAULT analytics-summary path,
   analytics-api.ts:146) aggregates across ALL vehicles; `buildFuelStatsFromData` sums each vehicle's (max−min) odometer span into
