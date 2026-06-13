@@ -231,6 +231,38 @@ describe('POST /:id/mark-serviced — re-arm (D3)', () => {
     expect((after.next_due_date as number) > (before.next_due_date as number)).toBe(true);
   });
 
+  // #114 (C394): mark-serviced must honor endDate on the time-axis re-arm, mirroring the trigger-service
+  // fastForwardPastNow guard (#107/C362). A BOUNDED reminder serviced AFTER its endDate would otherwise be
+  // re-armed to a FUTURE nextDueDate and left is_active=1 — living past its end + firing again. The re-arm
+  // must instead DEACTIVATE the reminder. Pin it: a monthly reminder with start+end both in the past,
+  // serviced now → is_active=0, no future nextDueDate write.
+  test('a bounded reminder serviced past its endDate is DEACTIVATED, not re-armed forward (#114)', async () => {
+    const vehicleId = await seedVehicle();
+    const created = await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Bounded registration',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2024-01-01T00:00:00.000Z',
+      endDate: '2024-06-01T00:00:00.000Z', // well in the past relative to the test clock (2026+)
+      vehicleIds: [vehicleId],
+    });
+    const body = await json<DataEnvelope<{ reminder: { id: string } }>>(created);
+    expect(created.status, JSON.stringify(body)).toBe(201);
+    const id = body.data.reminder.id;
+
+    const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
+    const resBody = await json<DataEnvelope<{ isActive: boolean }>>(res);
+    expect(res.status, JSON.stringify(resBody)).toBe(200);
+
+    // The re-arm crosses endDate → the reminder is done: deactivated, not advanced to a future date.
+    const row = ctx.sqlite.query('SELECT is_active FROM reminders WHERE id = ?').get(id) as {
+      is_active: number;
+    };
+    expect(row.is_active, 'a serviced-past-endDate reminder must be deactivated').toBe(0);
+    // The response echoes the deactivated state.
+    expect(resBody.data.isActive).toBe(false);
+  });
+
   test('a non-existent / cross-tenant id returns 404', async () => {
     const res = await ctx.authed('POST', '/api/v1/reminders/does-not-exist/mark-serviced');
     expect(res.status).toBe(404);

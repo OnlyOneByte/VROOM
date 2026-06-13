@@ -1,7 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { CONFIG } from '../../config';
-import type { NewReminder } from '../../db/schema';
+import type { NewReminder, Reminder } from '../../db/schema';
 import { ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
 import {
@@ -51,6 +51,31 @@ async function resolveMileageFields(
     lastServiceOdometer,
     nextDueOdometer: lastServiceOdometer + intervalMileage,
   };
+}
+
+/**
+ * Advance a time reminder's nextDueDate to the FIRST FUTURE occurrence after `now` (the mark-serviced
+ * D3 re-arm). Mirrors fastForwardPastNow (NOT the capped catch-up loop — maxCatchUpOccurrences is a
+ * materialization budget; mark-serviced creates nothing, so it must reach the future however lapsed).
+ * A single one-period advance is wrong when the reminder is MULTIPLE periods overdue: advancing once
+ * from a stale nextDueDate lands it still <= now, so the just-serviced reminder stays overdue + re-fires.
+ * The loop is bounded by the date advancing past now; the strict-advance backstop bails on a
+ * non-progressing cadence (the bug #13 guard — advanceReminderDueDate also throws on a bad interval).
+ * Extracted from the mark-serviced handler (C394) to keep it under the cognitive-complexity cap.
+ */
+function advanceToFirstFutureDue(reminder: Reminder, from: Date): Date {
+  const now = new Date();
+  let nextDue = advanceReminderDueDate(reminder, from);
+  while (nextDue <= now) {
+    const advanced = advanceReminderDueDate(reminder, nextDue);
+    if (advanced <= nextDue) {
+      throw new ValidationError(
+        `Reminder ${reminder.id} did not advance (frequency "${reminder.frequency}") — aborting re-arm`
+      );
+    }
+    nextDue = advanced;
+  }
+  return nextDue;
 }
 
 // Apply middleware to all routes
@@ -108,28 +133,20 @@ routes.post(
       fields.nextDueOdometer = lastServiceOdometer + (reminder.intervalMileage ?? 0);
     }
 
-    // Time axis: advance nextDueDate to the FIRST FUTURE occurrence (reuse the trigger math). A single
-    // one-period advance is wrong when the reminder is MULTIPLE periods overdue at service time (e.g. a
-    // monthly reminder serviced 5 months late): advancing once from the stale nextDueDate lands it still
-    // <= now, so the just-serviced reminder stays overdue and immediately re-fires. Mirror
-    // fastForwardPastNow (NOT the capped catch-up loop — maxCatchUpOccurrences is a materialization
-    // budget; mark-serviced creates nothing, so it must reach the future regardless of how lapsed it is).
-    // The loop is bounded by the date advancing past `now`; the strict-advance backstop bails on a
-    // non-progressing cadence (the bug #13 guard — advanceReminderDueDate also throws on a bad interval).
+    // Time axis: advance nextDueDate to the FIRST FUTURE occurrence (advanceToFirstFutureDue, above).
     if (
       (reminder.triggerMode === 'time' || reminder.triggerMode === 'both') &&
       reminder.nextDueDate
     ) {
-      const now = new Date();
-      let nextDue = advanceReminderDueDate(reminder, reminder.nextDueDate);
-      while (nextDue <= now) {
-        const advanced = advanceReminderDueDate(reminder, nextDue);
-        if (advanced <= nextDue) {
-          throw new ValidationError(
-            `Reminder ${reminder.id} did not advance (frequency "${reminder.frequency}") — aborting re-arm`
-          );
-        }
-        nextDue = advanced;
+      const nextDue = advanceToFirstFutureDue(reminder, reminder.nextDueDate);
+      // #114 (C394): honor endDate on the re-arm, mirroring the trigger-service fastForwardPastNow guard
+      // (C362/#107). A BOUNDED reminder serviced AFTER its endDate would otherwise be re-armed to a future
+      // nextDueDate and left is_active=1 — living on past its end + firing again. If the advanced date
+      // crosses endDate the reminder is done: deactivate it (the whole reminder, incl. a both-axes one —
+      // endDate bounds the reminder, not just the time axis) and return it inactive, not a forward date.
+      if (reminder.endDate && nextDue > reminder.endDate) {
+        await reminderRepository.deactivate(id);
+        return c.json({ success: true, data: { ...reminder, isActive: false } });
       }
       fields.nextDueDate = nextDue;
     }

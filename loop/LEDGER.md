@@ -64,11 +64,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 393 |
 | guard | 6 | 391 |
-| bug | 3 | 390 |
+| bug | 3 | 394 |
 | arch | 5 | 392 |
 | infra | 6 | 389 |
 
-Current cycle: **393**
+Current cycle: **394**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6081,3 +6081,14 @@ Current cycle: **393**
   itself rated it "UNLIKELY". A per-key lock/promise is a concurrency-ARCHITECTURE change (and the DB layer arguably makes it unnecessary) → FILED, not self-fixed;
   no flaky timing test manufactured (the singleton-store-across-tests constraint makes one fragile). NO genuinely-unpinned invariant on either surface → docs-only
   certification. No source/test/build touched → no build gate. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C394 (bug → #114: mark-serviced re-arm ignored endDate — a bounded reminder serviced past its end was re-armed forward + left active; the #107/bug-#12
+  family on the mark-serviced path)** — BALANCE: bug OVER budget (last 390, starved-for 394−390=4 > budget 3) → forced pick. 2-agent fan-out: (A) FE api-client
+  error/retry, (B) odometer/mileage trigger. (A) surfaced a real-but-lower-sev UX gap (apiClient.raw() bypasses fetchOrThrow → export/backup errors show
+  "status N" not the backend message) — NOTED, not the clean data-correctness pick. (B) surfaced a CLEAN ATOMIC live defect → #114: the mark-serviced time-axis
+  re-arm (routes.ts:119) advanced nextDueDate past now + WROTE it, but NEVER checked endDate — so a BOUNDED reminder (endDate nullable + accepted on create)
+  serviced AFTER its end got re-armed to a future date and left is_active=1 (lives on past its end, fires again). The EXACT bug the trigger-service
+  fastForwardPastNow guards (C362/#107), missed on the mark-serviced path. VERIFIED firsthand (C21/C60). FIX: mirror C362 — after the advance, if endDate &&
+  nextDue > endDate → deactivate the (whole) reminder + return it inactive, not a forward date. My added branch pushed the handler over Biome's cognitive-
+  complexity cap (17>15) → extracted advanceToFirstFutureDue (the loop + bug-#13 strict-advance backstop) as a module helper (bonus arch-clean, dropped it
+  under 15). GUARD: +1 (mark-serviced.test.ts): a monthly start+end-in-past reminder serviced now → is_active=0 + response isActive:false. NON-VACUOUS. green→green:
+  be validate:local EXIT 0, 1475 pass (+1) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).

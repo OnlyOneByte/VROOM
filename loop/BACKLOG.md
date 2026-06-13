@@ -799,6 +799,19 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#114 (MED, correctness/data-hygiene / NORTH_STAR #1 — found+fixed C394 on an odometer/reminder bug scout; the #107/bug-#12 endDate family on the
+> mark-serviced path) — mark-serviced re-arm ignored endDate, re-arming a bounded reminder forward + leaving it active past its end.**~~ — *DONE C394: the
+> mark-serviced time-axis re-arm (routes.ts:119) advanced nextDueDate past now + WROTE it but never checked endDate, so a bounded reminder serviced AFTER its end
+> was re-armed to a future date + left is_active=1 (lives past its end, fires again) — the exact bug trigger-service fastForwardPastNow guards (C362/#107), missed
+> on mark-serviced. FIX: mirror C362 — if endDate && advanced-nextDue > endDate → deactivate the whole reminder + return inactive. The branch pushed the handler
+> over Biome's complexity cap → extracted advanceToFirstFutureDue helper (bonus arch-clean). +1 guard (start+end-in-past reminder serviced → is_active=0).
+> NON-VACUOUS. be validate:local EXIT 0, 1475 pass (+1). The paired (A) api-client fan-out: apiClient.raw() bypasses fetchOrThrow → export/backup errors show
+> "status N" not the backend message — a real UX-transparency gap, noted below (not a data defect).*
+> NOTE (filed C394, UX-transparency — low priority): apiClient.raw() (api-client.ts) returns a naked Response bypassing fetchOrThrow's error-envelope parsing, so
+> its two callers (expense-api.ts export, settings.svelte.ts downloadBackup) `throw new Error("...status N")` on a non-ok — surfacing the HTTP status, NOT the
+> backend's structured error message (e.g. a 403 "permission denied" reason). Not data loss + not all-paths (only the 2 binary/CSV-download callers that need raw
+> Response for the blob); a hardening cycle could parse the error body before throwing (mirror fetchOrThrow). Lower than a live correctness bug.
+
 > ~~**#113 (MED, correctness/units / NORTH_STAR #1 — found+fixed C390 on a fuel-advanced builder bug scout; the #108 sibling) — buildDayOfWeekPatterns
 > overcounted fillupCount + skewed avgCost/avgVolume for a split fuel fillup.**~~ — *DONE C390: buildDayOfWeekPatterns (analytics-charts.ts:803) did `entry.count++`
 > unconditionally + divides avgCost/avgVolume by it. A split fuel expense creates one sibling per vehicle with volume=null (queryFuelExpenses has no volume
