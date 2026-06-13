@@ -73,9 +73,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 407 |
 | bug | 3 | 411 |
 | arch | 5 | 409 |
-| infra | 6 | 406 |
+| infra | 6 | 412 |
 
-Current cycle: **411**
+Current cycle: **412**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6308,3 +6308,12 @@ Current cycle: **411**
   (+3) (a format reflow → check:musl:fix, re-validated clean). The sibling builders (buildMonthlyConsumption/buildSeasonalEfficiency/buildDayOfWeekPatterns) share
   computeEfficiencyPoint + have the SAME contamination → FILED as #122 (a coherent multi-site sweep, the C367→C390→C391 per-builder-then-sweep precedent), not scattered
   into this bug cycle. cov: be 86.92% (carry, +3 guards) / fe 84.45% (carry).
+- **C412 (infra): #5 branch-hygiene sweep + coverage re-measure (the overdue ~C410 cadence; last actual C400)** — BALANCE: nothing over budget (deep-review 2, guard 5,
+  bug 1, arch 3, infra 6/6, feature parked); infra MOST-STARVED AT budget (last 406, starved-for 412−406=6=budget) AND the #5 sweep was overdue → highest-leverage pick.
+  SWEEP: re-measured both suites — be 86.92% line / 86.56% func (line FLAT vs C400's 86.92, func +0.02 — the C403–C411 fix+guard arc held); fe 84.46% line / 84.4% func /
+  76.92% branch (line +0.01 / branch +0.05 vs C400's 84.45/84.4/76.87 — the #117/C405 +5 + #120 wiring). Both flat-to-up, gap stable ~2.5pts. Branch 222 ahead of
+  origin/main, working tree clean of TRACKED changes. HYGIENE CATCH (+ a SELF-CORRECTION): .kiro/specs/offline-entries/.config.kiro was still untracked — C400 committed
+  that spec's 3 .md docs but left .config.kiro out, noting "as siblings do." That note was WRONG (verified firsthand C412): 23 of 24 specs DO track their .config.kiro
+  (plain `{specId, workflowType, specType}` metadata, no secrets) — offline-entries was the lone straggler. Committed it → the spec is now fully consistent with every
+  sibling, finishing the C400 fix. No product code touched → coverage runs were the gate (both EXIT 0). All other untracked items confirmed by-design (*.meshclaw.e2e.ts,
+  .meshclaw-tools/, screenshots, playwright config, mise.local.toml). cov: be 86.92% / fe 84.46%. Next #5 sweep ~C422; next CLAUDE.md refresh ~C416.
