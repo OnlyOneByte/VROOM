@@ -51,10 +51,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 323 |
 | guard | 6 | 325 |
 | bug | 3 | 324 |
-| arch | 5 | 320 |
+| arch | 5 | 326 |
 | infra | 6 | 322 |
 
-Current cycle: **325**
+Current cycle: **326**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5263,3 +5263,14 @@ Current cycle: **325**
   idle-reset timer (the subtlety that made the first cap-test attempt flake). NON-VACUOUS (an off-by-one cap → a 200ms retry scheduled → RED).
   green→green: frontend validate:local EXIT 0 — type-check 0, build, 622 pass (+2). Guard-only (no source) → no UI. cov: be 86.53% (carry) /
   fe 84.39%+ (carry; sync-manager retry branches now pinned).
+- **C326 (arch): extract `insertVehicleJunctions` — dedup the reminder→vehicle junction-insert loop across create/update** — BALANCE: arch
+  OVER budget (last 320, starved-for 6 > 5, most-starved actionable; feature gated) → forced. Arch reliably-dry — rule-7 inline scout.
+  Rejected the reminder-route vehicleIds handling (already factored: shared validateVehicleIdsOwned + resolveMileageFields). THE FINDING
+  (reminders/repository.ts): the `for (const vehicleId of vehicleIds) tx.insert(reminderVehicles).values({reminderId, vehicleId})` loop was
+  byte-identical at 2 sites (createWithVehicles + updateWithVehicles' replace-junctions branch), differing only in reminder.id vs id. It also
+  MIRRORS the insurance repo's established insertJunctionRows helper (C304-adjacent precedent) — so this is consistency with an existing idiom,
+  not a novel abstraction. PAYOFF (rule 5): one source of truth for the junction write — a future change (batch insert / a new junction column)
+  lands once. FIX: extracted private `insertVehicleJunctions(tx, reminderId, vehicleIds)` (the dbOrTx-in-a-transaction pattern), wired both
+  sites. BEHAVIOR-PRESERVING + test-anchored both ways (rule 3): all 115 reminder tests (create/update/trigger/refinements) pass UNCHANGED.
+  green→green: backend validate:local EXIT 0 — 1434 pass (unchanged — pure refactor) / 1 skip / 0 fail, tsc 0, musl-biome clean, build
+  bundled. Backend-only, no UI. cov: be 86.53% (carry) / fe 84.39% (carry).

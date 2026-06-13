@@ -49,6 +49,22 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   /**
+   * Insert the reminder→vehicle junction rows inside the caller's transaction. One source of truth
+   * for the `for (vehicleId) insert(reminderVehicles)` loop the create + update-replace paths repeated
+   * byte-identically (C326 dedup; mirrors insurance/repository.ts insertJunctionRows). A future change
+   * to the junction write (batch insert, a new column) then lands once, not twice.
+   */
+  private async insertVehicleJunctions(
+    tx: DrizzleTransaction,
+    reminderId: string,
+    vehicleIds: string[]
+  ): Promise<void> {
+    for (const vehicleId of vehicleIds) {
+      await tx.insert(reminderVehicles).values({ reminderId, vehicleId });
+    }
+  }
+
+  /**
    * Batch-fetch vehicleIds for multiple reminders. Returns a map of reminderId → vehicleIds.
    */
   private async getVehicleIdsForReminders(reminderIds: string[]): Promise<Map<string, string[]>> {
@@ -284,9 +300,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
         const result = await tx.insert(reminders).values(data).returning();
         const reminder = result[0];
 
-        for (const vehicleId of vehicleIds) {
-          await tx.insert(reminderVehicles).values({ reminderId: reminder.id, vehicleId });
-        }
+        await this.insertVehicleJunctions(tx, reminder.id, vehicleIds);
 
         return { reminder, vehicleIds };
       });
@@ -335,10 +349,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
         // Replace junction rows if vehicleIds provided
         if (vehicleIds) {
           await tx.delete(reminderVehicles).where(eq(reminderVehicles.reminderId, id));
-
-          for (const vehicleId of vehicleIds) {
-            await tx.insert(reminderVehicles).values({ reminderId: id, vehicleId });
-          }
+          await this.insertVehicleJunctions(tx, id, vehicleIds);
         }
 
         // Fetch current vehicleIds for the response

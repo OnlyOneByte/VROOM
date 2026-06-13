@@ -1473,6 +1473,12 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract insertVehicleJunctions — dedup the reminder→vehicle junction-insert loop across create/update (filed+done C326).**~~ — *DONE
+  C326: the `for (vehicleId) tx.insert(reminderVehicles)` loop was byte-identical at createWithVehicles + updateWithVehicles (differ only in
+  reminder.id vs id); mirrors the insurance repo's insertJunctionRows idiom. Extracted private insertVehicleJunctions(tx, reminderId,
+  vehicleIds); one source of truth for the junction write. Behavior-preserving: all 115 reminder tests pass unchanged. validate:local EXIT 0,
+  1434 pass.*
+
 - ~~**Collapse the 4× `units` field-by-field projection in analytics into a `{ ...userUnits }` spread (filed+done C320).**~~ — *DONE C320: the
   `units: { distanceUnit: userUnits.distanceUnit, volumeUnit: ..., chargeUnit: ... }` projection was hand-repeated at 4 analytics response
   sites; UnitPreferences is exactly that 3-field shape. Replaced with `units: { ...userUnits }` ×4 — so a future 4th unit auto-propagates to
