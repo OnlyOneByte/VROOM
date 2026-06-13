@@ -209,3 +209,49 @@ describe('#62 — manual expense route rejects system-only sourceTypes', () => {
     expect(res.status).toBe(201);
   });
 });
+
+// #109 (C372): the create schema enforces both-or-neither for sourceType/sourceId via .refine(), but
+// .refine() does NOT survive the update schema's .partial()/.omit() re-derivation and was never re-added —
+// so a PUT could persist an ASYMMETRIC source link (one of the pair without the other), the #62/#34
+// within-tenant integrity class: it skews source-bucketed analytics and a half-link with a real sourceId
+// would mis-/never-trigger the financing cascade-delete cleanup. The create path forbids this; now the
+// update path does too. (The vehicleId/source seeds use the manual route's only-allowed sourceType,
+// 'financing'; here we only need the asymmetry to trip the refine, so the id can be any string.)
+describe('#109 — PUT rejects an asymmetric sourceType/sourceId (both-or-neither, mirroring create)', () => {
+  async function seedPlainExpense(): Promise<string> {
+    const vehicleId = await seedVehicle();
+    const createRes = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 20,
+      date: '2024-04-01T00:00:00.000Z',
+    });
+    const created = await json<DataEnvelope<ExpenseResponse>>(createRes);
+    expect(createRes.status, JSON.stringify(created)).toBe(201);
+    return created.data.id;
+  }
+
+  test('PUT with sourceId but NO sourceType → 400 (asymmetric, was unguarded on update)', async () => {
+    const id = await seedPlainExpense();
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      sourceId: 'fin-orphan-id',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('PUT with sourceType but NO sourceId → 400 (the mirror asymmetry)', async () => {
+    const id = await seedPlainExpense();
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      sourceType: 'financing',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('PUT with NEITHER (a normal unrelated edit) is accepted — the refine is not over-broad', async () => {
+    const id = await seedPlainExpense();
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      expenseAmount: 25,
+    });
+    expect(res.status).toBe(200);
+  });
+});

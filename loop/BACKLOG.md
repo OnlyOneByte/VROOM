@@ -154,6 +154,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Auth/session/ownership + expense create/update write-path audit (C372).**~~ — *DONE C372 (auth CERTIFIED CLEAN; found+fixed bug #109). 2-agent fan-out.
+> (A) auth/session/ownership CLEAN — comprehensive firsthand cross-tenant verification: every CRUD route requireAuth-gated + userId-scoped, PUT vehicle-reassign
+> re-validates ownership, 404 (not 200) for not-owned, Lucia lifecycle sound, cross-tenant-idor.test.ts (7) passes. (B) surfaced #109: createExpenseSchema has a
+> both-or-neither sourceType/sourceId .refine() but updateExpenseSchema dropped it (.refine() doesn't survive .partial()/.omit()) — a PUT could persist an
+> ASYMMETRIC source link (the #62/#34 within-tenant integrity class: skews source-bucketed analytics + mis-/never-triggers financing cascade-delete). FIX:
+> re-add the refine to update. +3 guards (PUT only-id→400, only-type→400, neither→200). be validate:local EXIT 0, 1464 pass (+3).*
+
 > ~~**Vehicle-delete cascade + backup/restore round-trip audit (C366).**~~ — *DONE C366 (CERTIFIED CLEAN; +1 claim-survival data-safety guard). 2-agent
 > fan-out on NORTH_STAR #1 surfaces. (B) backup/restore CLEAN: all 15 tables round-trip, FK-correct insert order, validateReferentialIntegrity rejects dangling
 > refs, atomic transaction (coverage guards pin symmetry). (A) vehicle-delete cascade CLEAN: every child correctly cascaded or set-null; photos manually cleaned

@@ -54,13 +54,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 366 |
+| deep-review | 5 | 372 |
 | guard | 6 | 369 |
 | bug | 3 | 371 |
 | arch | 5 | 370 |
 | infra | 6 | 368 |
 
-Current cycle: **371**
+Current cycle: **372**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5845,3 +5845,15 @@ Current cycle: **371**
   but only asserted AMOUNTS — the tags ARRAY parseTags produces was never verified (listExpenses doesn't even return tags). +1 HTTP guard (import-csv.test.ts):
   `road; trip; toll` → ['road','trip','toll'] (semicolon split+trim); quoted `"errand,grocery"` → ['errand','grocery'] (comma split). Reads tags off sqlite.
   NON-VACUOUS (a narrowed split merges two tags). green→green: be validate:local EXIT 0, 1461 pass (+1) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C372 (deep-review → #109: updateExpenseSchema dropped the both-or-neither sourceType/sourceId refine — a PUT could persist an asymmetric source link)** —
+  BALANCE: deep-review OVER budget (last 366, starved-for 372−366=6 > budget 5) → forced pick. 2-agent fan-out: (A) auth/session/ownership, (B) expense
+  create/update write-path. (A) CERTIFIED CLEAN — comprehensive firsthand cross-tenant verification: every CRUD route requireAuth-gated + userId-scoped, PUT
+  vehicle-reassign re-validates ownership, 404 (not 200) for not-owned (no enumeration), Lucia session lifecycle sound, cross-tenant-idor.test.ts (7 tests)
+  passes. (B) surfaced a CLEAN ATOMIC live defect → #109: createExpenseSchema has a both-or-neither sourceType/sourceId .refine() (routes.ts:115), but
+  updateExpenseSchema (:131) does NOT — `.refine()` does NOT survive `.partial()`/`.omit()` re-derivation and was never re-added. VERIFIED firsthand (C21/C60):
+  sourceType (z.literal('financing').optional()) + sourceId are client-settable on PUT (only clientId is omitted), and the handler passes the parsed body
+  straight to expenseRepository.update — so `PUT {sourceId:'fin-x'}` (no type) or `PUT {sourceType:'financing'}` (no id) persists an ASYMMETRIC link (the
+  #62/#34 within-tenant integrity class: skews source-bucketed analytics + a half-link with a real sourceId mis-/never-triggers the financing cascade-delete
+  cleanup). FIX: re-add the same both-or-neither refine to updateExpenseSchema. GUARD: +3 (expense-source-traceability.test.ts) — PUT only-sourceId → 400,
+  PUT only-sourceType → 400, PUT neither (normal edit) → 200 (not over-broad). NON-VACUOUS. green→green: be validate:local EXIT 0, 1464 pass (+3) / 0 fail. cov:
+  be 86.68% (carry) / fe 84.45% (carry).

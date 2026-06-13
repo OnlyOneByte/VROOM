@@ -133,7 +133,25 @@ const updateExpenseSchema = createExpenseSchemaBase
   .partial()
   .extend({
     tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
-  });
+  })
+  // #109 (C372): mirror the create-path both-or-neither source refine. `.refine()` does NOT survive
+  // `.partial()`/`.omit()` re-derivation, so without re-adding it a PUT could set ONE of the pair —
+  // `{ sourceId: 'fin-x' }` (no type) or `{ sourceType: 'financing' }` (no id) — persisting an
+  // ASYMMETRIC source link the create path forbids (the #62/#34 within-tenant integrity class): it
+  // skews source-bucketed analytics, and a half-link with a real sourceId would mis-trigger (or
+  // never trigger) the financing cascade-delete cleanup. A PUT supplying NEITHER is fine (a normal
+  // edit leaves the row's existing source untouched); supplying BOTH is the validated create-shape.
+  .refine(
+    (data) => {
+      const hasType = data.sourceType !== undefined;
+      const hasId = data.sourceId !== undefined;
+      return hasType === hasId;
+    },
+    {
+      message: 'sourceType and sourceId must both be provided or both omitted',
+      path: ['sourceType'],
+    }
+  );
 
 /**
  * Null the fuel-only columns on a NON-fuel expense write (the server-side mirror of the C226/#76 FE
