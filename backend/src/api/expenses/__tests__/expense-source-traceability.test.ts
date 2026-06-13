@@ -328,4 +328,48 @@ describe('#125 — PUT verifies a financing source link (not just the asymmetry/
     });
     expect(res.status).toBe(400); // "Source ID does not match the active financing record"
   });
+
+  // C425 (guard): C422 extracted assertFinancingSourceValid as ONE source of truth shared by POST + PUT,
+  // but the C422 tests above all drive the PUT call site. The POST call site's financing-source
+  // verification was previously inline + NEVER directly tested (the #62 POST tests cover only the ENUM
+  // rejection of reminder/insurance_term, not the financing existence/id-match) — so a refactor dropping
+  // the POST call to the shared helper would go RED nowhere. These pin the POST boundary enforces the
+  // contract too, so BOTH call sites of the shared helper are covered (NORTH_STAR #5).
+  test('POST {sourceType:financing, sourceId:forged} on a vehicle with NO financing → 400 (POST call site)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'financial',
+      expenseAmount: 30,
+      date: '2024-06-01T00:00:00.000Z',
+      sourceType: 'financing',
+      sourceId: 'forged-financing-id',
+    });
+    expect(res.status).toBe(400); // "Vehicle has no active financing"
+  });
+
+  test('POST linking to the vehicle ACTUAL active financing succeeds (POST call site not over-broad)', async () => {
+    const vehicleId = await seedVehicle();
+    const finRes = await ctx.authed('POST', `/api/v1/financing/vehicles/${vehicleId}/financing`, {
+      financingType: 'loan',
+      provider: 'TestBank',
+      originalAmount: 18000,
+      termMonths: 48,
+      startDate: '2024-01-01T00:00:00.000Z',
+      paymentAmount: 375,
+      apr: 5,
+    });
+    const fin = await json<DataEnvelope<{ id: string }>>(finRes);
+    expect(finRes.status, JSON.stringify(fin)).toBeLessThan(300);
+
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'financial',
+      expenseAmount: 375,
+      date: '2024-06-01T00:00:00.000Z',
+      sourceType: 'financing',
+      sourceId: fin.data.id,
+    });
+    expect(res.status, await res.clone().text()).toBe(201);
+  });
 });

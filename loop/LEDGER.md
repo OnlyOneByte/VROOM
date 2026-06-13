@@ -70,7 +70,7 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 422 |
-| guard | 6 | 419 |
+| guard | 6 | 425 |
 | bug | 3 | 424 |
 | arch | 5 | 421 |
 | infra | 6 | 423 |
@@ -6435,3 +6435,12 @@ Current cycle: **424**
   race): attempt-1 create fails → schedules retry → retry's conflict-check returns an existing row → advanceTimersByTimeAsync fires it → syncConflicts.current has the
   conflict + retryCount cleared. NON-VACUOUS (pre-fix stayed []). fe validate:local EXIT 0, 697 pass (+1). The durable DB clientId dedup means no DOUBLE-apply regardless;
   this closes the stuck-pending + no-signal half. cov: be 86.93% (carry) / fe 84.51% (carry, +1).
+- **C425 (guard): pin the POST call site of the C422 assertFinancingSourceValid helper (both shared-helper boundaries now covered)** — BALANCE: guard MOST-STARVED actionable
+  AT budget (last 419, starved-for 425−419=6=budget) → highest-leverage. First investigated the computeBalance overpayment→0 clamp (a NORTH_STAR #1 money invariant) — but
+  VERIFIED FIRSTHAND it's ALREADY deterministically pinned (financing-balance.property.test.ts:153 "balance clamped to 0 when payments exceed original" + no-payment +
+  non-existent) → declined to manufacture a redundant test (the C181/C229 trap). The GENUINELY-unpinned invariant: C422 extracted assertFinancingSourceValid as ONE source
+  of truth shared by POST + PUT, but the C422 tests all drive the PUT call site, and the POST financing-source verification (existence/isActive/id-match) was previously
+  inline + NEVER directly tested (the #62 POST tests cover only the ENUM rejection of reminder/insurance_term) — so a refactor dropping the POST call to the helper would
+  go RED nowhere. GUARD: +2 (expense-source-traceability.test.ts): POST {sourceType:financing, sourceId:forged} on a no-financing vehicle → 400; POST linking the vehicle's
+  ACTUAL active financing → 201 (not over-broad). NON-VACUOUS (the POST financing-verification had no direct test before). NORTH_STAR #5 — both call sites of the shared
+  helper are now pinned. No source touched (test-only). be validate:local EXIT 0, 1523 pass (+2). cov: be 86.93% (carry, +2 guards) / fe 84.51% (carry).
