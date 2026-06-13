@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 361 |
+| deep-review | 5 | 366 |
 | guard | 6 | 364 |
 | bug | 3 | 362 |
 | arch | 5 | 365 |
 | infra | 6 | 363 |
 
-Current cycle: **365**
+Current cycle: **366**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5775,3 +5775,17 @@ Current cycle: **365**
   at :129) + getHistory by odometer-history.property.test.ts — all pass UNCHANGED before AND after. Behavior-preserving (identical emitted SQL). Rejected the FE
   calculateDaysUntil↔getDaysRemaining collapse (real but crosses 2 modules into a NEW file + the two differ in input type/name — thinner collapse, more churn;
   deferred). validate:local EXIT 0, 1456 pass (unchanged). cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C366 (deep-review): vehicle-delete cascade + backup/restore round-trip audit → CERTIFIED CLEAN; +1 claim-survival data-safety guard** — BALANCE:
+  deep-review AT budget (last 361, starved-for 366−361=5 = budget) + bug also at budget; picked deep-review (broader value, surfaces the next bug). 2-agent
+  fan-out on under-audited NORTH_STAR #1 surfaces. (B) backup/restore: CERTIFIED CLEAN — all 15 tables round-trip, insert-order is FK-correct (parents before
+  children), validateReferentialIntegrity rejects dangling refs, the whole thing is one atomic transaction; symmetry pinned by backup/restore-table-coverage
+  guards. (A) vehicle-delete cascade: CERTIFIED CLEAN — every child table is correctly cascaded (financing/odometer/expenses/reminderVehicles/termVehicles
+  junctions) or set-null (insuranceClaims); photos manually cleaned pre-cascade (the no-FK string-link). Both known orphan findings (#88 split-reminder, #97
+  vehicle-less reminder) are ALREADY FILED + characterized. The agent's lone un-filed nit (non-transactional delete handler) is the documented best-effort
+  photo-cleanup pattern (photos has no FK → a mid-cleanup throw leaves orphan photo rows, not data loss; lower than a live bug + broader than one increment)
+  → NOTED, not fixed. THE genuinely-unpinned invariant → guard: insurance_claims.vehicleId is onDelete:'set null' (schema.ts:188), deliberately UNLIKE the
+  cascade FKs — a claim is a financial/legal record (payoutAmount/claimDate/status) belonging to its POLICY, so a vehicle delete must PRESERVE it with vehicleId
+  nulled, NOT destroy it (no silent loss). NOTHING pinned this; a regression flipping that FK to 'cascade' would silently wipe claim history on an unrelated
+  vehicle delete. +1 HTTP guard (vehicle-delete-cascade.test.ts): seed policy+claim→vehicleId, DELETE the vehicle, assert the claim SURVIVES with vehicle_id
+  NULL + policy_id + payout intact. NON-VACUOUS (cascade would null the whole row). green→green: be validate:local EXIT 0, 1457 pass (+1) / 0 fail. cov: be
+  86.25% (carry) / fe 84.17% (carry).

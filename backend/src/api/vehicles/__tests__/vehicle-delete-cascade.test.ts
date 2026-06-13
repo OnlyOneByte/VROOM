@@ -185,3 +185,52 @@ describe('#97 — a single-vehicle reminder is orphaned (vehicle-less, still act
     ).toBe(true);
   });
 });
+
+// C366 deep-review (CERTIFIED CLEAN — pins an unguarded data-safety invariant). insurance_claims.vehicleId
+// is onDelete:'set null' (schema.ts:188), deliberately UNLIKE the cascade FKs above: a claim is a financial/
+// legal record (payoutAmount, claimDate, status) that belongs to its POLICY (policyId cascades), NOT to the
+// vehicle — so deleting a vehicle must PRESERVE the claim with vehicleId nulled, never destroy it (NORTH_STAR
+// #1: no silent loss). Nothing pinned this; a regression flipping that FK to 'cascade' (or a manual cleanup
+// that over-deletes) would silently wipe a user's claim history on an unrelated vehicle delete. This anchors
+// survival + the null so such a change turns RED.
+describe('C366 — deleting a vehicle PRESERVES its insurance claims (vehicleId set null, not cascade-deleted)', () => {
+  function claimRow(
+    id: string
+  ): { vehicle_id: string | null; policy_id: string; payout_amount: number } | null {
+    return (
+      (ctx.sqlite
+        .query('SELECT vehicle_id, policy_id, payout_amount FROM insurance_claims WHERE id = ?')
+        .get(id) as {
+        vehicle_id: string | null;
+        policy_id: string;
+        payout_amount: number;
+      } | null) ?? null
+    );
+  }
+
+  test('the claim row SURVIVES with vehicle_id nulled; policy link + payout are intact', async () => {
+    const vehicleId = await seedVehicle();
+
+    // Seed a policy (claims FK→policies is notNull cascade) and a claim referencing the vehicle.
+    ctx.sqlite.run(
+      `INSERT INTO insurance_policies (id, user_id, company, is_active) VALUES ('pol-claim', ?, 'Geico', 1)`,
+      [ctx.user.id]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO insurance_claims (id, policy_id, vehicle_id, claim_date, claim_type, status, payout_amount)
+       VALUES ('clm-1', 'pol-claim', ?, 1700000000, 'collision', 'settled', 2500.0)`,
+      [vehicleId]
+    );
+    expect(claimRow('clm-1')?.vehicle_id).toBe(vehicleId);
+
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    // The financial record must NOT be lost: row survives, vehicle_id is nulled, policy + payout untouched.
+    const after = claimRow('clm-1');
+    expect(after, 'claim must survive vehicle delete (set null, not cascade)').not.toBeNull();
+    expect(after?.vehicle_id).toBeNull();
+    expect(after?.policy_id).toBe('pol-claim');
+    expect(after?.payout_amount).toBe(2500.0);
+  });
+});

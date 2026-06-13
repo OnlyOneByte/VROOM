@@ -154,6 +154,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Vehicle-delete cascade + backup/restore round-trip audit (C366).**~~ — *DONE C366 (CERTIFIED CLEAN; +1 claim-survival data-safety guard). 2-agent
+> fan-out on NORTH_STAR #1 surfaces. (B) backup/restore CLEAN: all 15 tables round-trip, FK-correct insert order, validateReferentialIntegrity rejects dangling
+> refs, atomic transaction (coverage guards pin symmetry). (A) vehicle-delete cascade CLEAN: every child correctly cascaded or set-null; photos manually cleaned
+> pre-cascade; both orphan findings (#88, #97) already filed + characterized; the non-transactional delete handler is the documented best-effort photo-cleanup
+> (orphan photo rows, not data loss) → noted, not fixed. THE unpinned invariant → guard: insurance_claims.vehicleId is onDelete:'set null' (schema.ts:188) —
+> a claim is a financial record belonging to its POLICY, so a vehicle delete must PRESERVE it with vehicleId nulled, NOT destroy it. A regression flipping that
+> FK to 'cascade' would silently wipe claim history. +1 HTTP guard (vehicle-delete-cascade.test.ts): claim SURVIVES vehicle delete, vehicle_id NULL, policy +
+> payout intact. NON-VACUOUS. be validate:local EXIT 0, 1457 pass (+1).*
+
 > ~~**Financing-amortization + depreciation/cost-per-period money audit (C361).**~~ — *DONE C361 (CERTIFIED CLEAN; +1 beyond-schedule guard). 2-agent
 > fan-out on under-audited money surfaces. (B) depreciation + cost/mile + cost/month + value-over-time: CLEAN — all div-guarded (Math.max(1, ownershipMonths)
 > + >0 checks), anchored by the expectAllFinite(tco) property test, #27/#28 year-vs-all-time honored. (A) the agent flagged derivePaymentEntries' beyond-
