@@ -154,6 +154,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Health-score (getVehicleHealth / computeFleetHealthScore) surface audit (C350).**~~ — *DONE C350 (CERTIFIED CLEAN; +1 fleet-aggregation guard).
+> Firsthand audit. Every agent "REAL DEFECT" debunked: the "active policy with expired term counts" IS the filed #14 (different surface, not new); the
+> "negative mileage/time interval mis-score" findings are UNREACHABLE (maintenance rows are .orderBy(asc(date)) — the #75 caller-sorts class; backward-gap-
+> not-good is defensible scoring-semantics); the rounding nit is product-gated. Bounds/div-guards all present. NO new reachable defect → certification. THE
+> unpinned invariant → guard: computeFleetHealthScore INCLUDES a no-data vehicle in the mean at default sub-scores (reg50+mile50+ins0→round(37.5)=38), not
+> excluded/zeroed — +1 deterministic guard (single no-data→38; 2nd→still 38). NON-VACUOUS. validate:local EXIT 0, 1447 pass (+1).*
+
 > ~~**Native CSV import pipeline + year-end/quick-stats analytics audit (C344).**~~ — *DONE C344 (found+fixed bug #102; year-end CERTIFIED CLEAN).
 > 2-agent fan-out. (B) year-end + quick-stats: the agent's 3 "defects" were all schema-shape nits it admitted were math-sound (categoryBreakdown:[] on a
 > zero year is correct; the div "drift" is same-array same-rounding) → CERTIFIED CLEAN (year-boundary/tz, div-guards, empty-shape, no #94-pooling). (A)

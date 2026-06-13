@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 344 |
+| deep-review | 5 | 350 |
 | guard | 6 | 347 |
 | bug | 3 | 349 |
 | arch | 5 | 348 |
 | infra | 6 | 346 |
 
-Current cycle: **349**
+Current cycle: **350**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5587,3 +5587,17 @@ Current cycle: **349**
   (incomplete config → 400 + nothing persisted; no-config → 400) + updated 2 existing S3-create helpers (providers-routes-http + delete-provider-config-cleanup)
   to send a valid endpoint/bucket/region config (they'd relied on the no-validation behavior). NON-VACUOUS. green→green: backend validate:local EXIT 0 —
   1446 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean (one reflow auto-fixed), build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C350 (deep-review → guard): health-score surface CERTIFIED CLEAN; pinned the fleet-aggregation no-data-vehicle invariant (+1)** — BALANCE: deep-review
+  OVER budget (last 344, starved-for 350−344=6 > budget 5) → FORCED. 1-agent firsthand audit (the 2nd agent on the Sheets path didn't return) of
+  getVehicleHealth + computeFleetHealthScore + the score builders. Every agent "REAL DEFECT" debunked: (1) "insurance coverage counts an active policy with
+  an EXPIRED term" IS the already-filed #14 (expired-latest-term-still-counts, characterization-pinned, awaiting Angelo) on a different surface — not new,
+  not self-fixable. (2/3) "negative mileage/time intervals mis-score" are UNREACHABLE in production: the maintenance rows feeding the score builders are
+  .orderBy(asc(expenses.date)) (repository.ts:1225) — the #75 caller-sorts-by-design class; a backward mileage gap scoring as "not a good interval" is
+  defensible scoring-semantics, not an atomic bug. (4) the per-vehicle-vs-fleet rounding is the agent's own product-gated nit. Bounds/div-guards all
+  VERIFIED present (scores in [0,100], no NaN, no-vehicles→0). NO new reachable defect → certification (C306/C327/C345 precedent). THE one
+  genuinely-unpinned reachable invariant worth a non-theater guard (C256/C333 pattern): computeFleetHealthScore INCLUDES a no-data vehicle in the mean at
+  its default sub-scores (reg 50 + mile 50 + ins 0 → round(37.5)=38), NOT excluded, NOT zeroed — the existing tests pin bounds/integer/no-vehicles→0 but not
+  this load-bearing aggregation semantic (a refactor excluding empty vehicles or scoring them 0 would silently shift every multi-vehicle fleet score). +1
+  deterministic guard (quick-stats.property.test.ts): a single no-data vehicle → 38; a 2nd no-data vehicle → still 38 (both counted). NON-VACUOUS (exclude
+  → NaN/0; zero them → 25; the 38 pins reg=mile=50 defaults + inclusion). green→green: backend validate:local EXIT 0 — 1447 pass (+1) / 1 skip / 0 fail,
+  tsc 0, musl-biome clean (one reflow auto-fixed), build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
