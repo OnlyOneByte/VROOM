@@ -491,6 +491,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C396 — pin restore's expense-source dangling-ref rejection (validateExpenseSourceRefs — the expense-level sibling of the junction/financing checks).**~~ —
+> *DONE C396: validateReferentialIntegrity hard-fails a restore if a 'reminder'-sourced expense points at a reminder NOT in the backup (backup.ts:781) — the
+> C246/C339 dangling-ref class. restore-junction-refs.test.ts pinned the JUNCTION + FINANCING ref checks but NOT the expense-SOURCE one. +1 guard: seed a
+> reminder-sourced expense, export, tamper expenses.csv to repoint source at a bogus reminder → restore REJECTS citing 'reminder', mutates nothing. NON-VACUOUS.
+> Partially closes the C339 "validateBackupData doesn't cross-check expense source refs" note (reminder-source direction now validated AND pinned). be
+> validate:local EXIT 0, 1476 pass (+1). Rejected the FE chart-formatters picks (display utils, lower-stakes than a restore data-safety guard).*
+
 > ~~**C391 — complete the #108/#113 split-sibling SWEEP of the fuel-advanced builder family + pin buildFillupIntervals' same-date safety.**~~ — *DONE C391:
 > guard at budget (6/6). Followed up the C390 flag. SWEEP (all 4 builders verified firsthand): buildSeasonalEfficiency guarded (#108/C367); buildDayOfWeekPatterns
 > was the bug (#113/C390); buildFillupIntervals SAFE (accumulateIntervalBuckets `days<=0 → continue` drops a same-date split pair); buildVehicleRadar SAFE (fuel

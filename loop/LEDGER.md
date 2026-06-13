@@ -63,12 +63,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 393 |
-| guard | 6 | 391 |
+| guard | 6 | 396 |
 | bug | 3 | 394 |
 | arch | 5 | 392 |
 | infra | 6 | 395 |
 
-Current cycle: **395**
+Current cycle: **396**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6099,3 +6099,13 @@ Current cycle: **395**
   C391 the split-sibling family sweep, C392/C394 arch-extracts). The closed-bug list (through #114/C394) + pending-Angelo block + testing-infra/open-gaps were
   VERIFIED accurate inline — no change. Docs-only; no source/test/build touched → no build gate (the C309/C357/C373/C384 refresh pattern). Next CLAUDE.md refresh
   ~C405; next #5 sweep ~C399. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C396 (guard): pin restore's expense-source dangling-ref rejection (validateExpenseSourceRefs — the expense-level sibling of the junction/financing ref
+  checks)** — BALANCE: nothing over budget; guard closest (last 391, starved-for 396−391=5, budget 6) → highest-leverage. 2-agent fan-out. PICK (verified
+  firsthand, C21/C60): validateReferentialIntegrity hard-fails a restore if a 'reminder'-sourced expense points at a reminder NOT in the backup
+  (validateExpenseSourceRefs, backup.ts:781) — a real restore-integrity guard (the C246/C339 dangling-ref class). restore-junction-refs.test.ts pins the
+  JUNCTION (reminder_vehicles→vehicle) + FINANCING (vehicle_financing→vehicle) ref checks but NOT the expense-SOURCE one. +1 guard: seed a reminder-sourced
+  expense (source_type='reminder', source_id=<real>), export, tamper expenses.csv to repoint source at a bogus reminder → restore REJECTS citing 'reminder' +
+  mutates nothing (validation runs pre-transaction). NON-VACUOUS. Also partially closes the C339-filed "validateBackupData doesn't cross-check expense source
+  refs" note (the reminder-source direction is now validated AND pinned). Rejected the FE chart-formatters picks (getXTickCount/getTrendLineProps/formatDecimalAxis
+  — real but lower-stakes DISPLAY utils vs a data-safety restore guard); the BE pagination-offset-beyond was ~certified C388. green→green: be validate:local
+  EXIT 0, 1476 pass (+1) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).
