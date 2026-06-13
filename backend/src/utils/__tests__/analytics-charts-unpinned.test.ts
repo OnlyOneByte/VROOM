@@ -247,6 +247,30 @@ describe('buildFillupIntervals — input is not mutated (C67 hygiene fix)', () =
     const bucket = out.find((b) => b.intervalLabel === '22+ days');
     expect(bucket?.count).toBe(1);
   });
+
+  // C391 (the #108/#113 split-sibling sweep): buildFillupIntervals is the SAFE sibling of the
+  // overcounting buildSeasonalEfficiency(#108)/buildDayOfWeekPatterns(#113) — it pairs on DATES via
+  // accumulateIntervalBuckets, whose `days <= 0 → continue` guard (analytics-charts.ts:893) drops a
+  // SAME-DATE pair. A split fuel expense's null-volume siblings share the volume-bearing leg's date, so
+  // they'd form 0-day pairs — which must NOT land in the '1-3 days' bucket as phantom intervals. This
+  // pins that safety: a single split fillup (3 same-date rows) + one real later fillup yields exactly
+  // ONE interval (the real gap), not 1 + the intra-split 0-day pairs. A regression loosening the
+  // `days <= 0` guard (e.g. to `< 0`) would let the split inflate the distribution → RED.
+  test('a same-date split fillup does NOT create phantom 0-day intervals (#108/#113 sibling, the days<=0 guard)', () => {
+    const out = buildFillupIntervals([
+      // One split fillup on Jan 1 (one volume-bearing leg + two null-volume siblings, same date+vehicle).
+      fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1), volume: 12 }),
+      fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1), volume: null }),
+      fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1), volume: null }),
+      // A real later fillup → the ONLY genuine interval (5 days → the '4-7 days' bucket).
+      fuelRow({ vehicleId: 'v1', date: d(2024, 1, 6), volume: 10 }),
+    ]);
+    // Exactly one interval total — the 5-day gap. No 0-day '1-3 days' phantom from the intra-split pairs.
+    const totalCount = out.reduce((s, b) => s + b.count, 0);
+    expect(totalCount).toBe(1);
+    expect(out.find((b) => b.intervalLabel === '4-7 days')?.count).toBe(1);
+    expect(out.find((b) => b.intervalLabel === '1-3 days')).toBeUndefined(); // dropped (filtered count=0)
+  });
 });
 
 // ---------------------------------------------------------------------------

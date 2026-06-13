@@ -479,6 +479,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C391 — complete the #108/#113 split-sibling SWEEP of the fuel-advanced builder family + pin buildFillupIntervals' same-date safety.**~~ — *DONE C391:
+> guard at budget (6/6). Followed up the C390 flag. SWEEP (all 4 builders verified firsthand): buildSeasonalEfficiency guarded (#108/C367); buildDayOfWeekPatterns
+> was the bug (#113/C390); buildFillupIntervals SAFE (accumulateIntervalBuckets `days<=0 → continue` drops a same-date split pair); buildVehicleRadar SAFE (fuel
+> axis via computeEfficiencyPoint null-guards volume+mileage; cost axis sums expenseAmount, correct per-leg like costPerMile/C378). Family FULLY audited — only
+> the 2 count-builders were vulnerable, both fixed. THE unpinned invariant → guard: buildFillupIntervals' split-safety (a same-date sibling must not phantom a
+> 0-day interval) had only the C67 not-mutated test. +1 guard: 3-row same-date split + one real later fillup → exactly 1 interval, no phantom bucket. NON-VACUOUS.
+> be validate:local EXIT 0, 1474 pass (+1).*
+
 > ~~**C385 — pin buildLocalDate's out-of-range-hour rejection (foreign-import time-parse path) + document the same-day-wrap partial coverage.**~~ — *DONE C385:
 > guard closest to budget (5/6). buildLocalDate echo-checks Y/M/D but not hh/mm/ss; normalizeForeignDate (import-mapping.ts:192) parses a foreign time segment
 > with a bare parseInt||0 (no clamp), so a malformed "2024-03-15 25:00:00" feeds hh=25. The existing date echo-check INCIDENTALLY rejects an hour that rolls the

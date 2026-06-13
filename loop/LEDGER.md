@@ -63,12 +63,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 388 |
-| guard | 6 | 385 |
+| guard | 6 | 391 |
 | bug | 3 | 390 |
 | arch | 5 | 386 |
 | infra | 6 | 389 |
 
-Current cycle: **390**
+Current cycle: **391**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6049,3 +6049,13 @@ Current cycle: **390**
   defense-in-depth gap (restore.ts:525 validates providerIds without a userId scope) BUT requires a TAMPERED backup ZIP (the app never writes a cross-tenant
   providerId — same threat class as the C339/C387 notes) → NOTED for a future hardening cycle (ARCC/credentials-adjacent), not the clean within-app defect this
   cycle. green→green: be validate:local EXIT 0, 1473 pass (+2) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C391 (guard): complete the #108/#113 split-sibling SWEEP of the fuel-advanced builder family + pin buildFillupIntervals' same-date safety** — BALANCE: guard
+  AT budget (last 385, starved-for 391−385=6 = budget; arch also at budget but ticks forced next) → pick. Followed up the C390 flag (the remaining siblings may
+  share the overcount). SWEEP (all 4 builders verified firsthand, C21/C60): buildSeasonalEfficiency = guarded (#108/C367); buildDayOfWeekPatterns = was the bug
+  (#113/C390); buildFillupIntervals = SAFE (accumulateIntervalBuckets' `days <= 0 → continue` at :893 drops a same-date split pair); buildVehicleRadar = SAFE (its
+  fuel axis goes through computePerVehicleFuelEfficiency→computeEfficiencyPoint, which null-guards volume :120 + mileage :116, and its cost axis SUMS expenseAmount
+  which is correct per-leg like costPerMile/C378). So the family is FULLY audited — only the 2 count-based builders were vulnerable, both fixed. THE
+  genuinely-unpinned reachable invariant the sweep surfaced → guard: buildFillupIntervals had only the C67 input-not-mutated test; its SPLIT-safety (a same-date
+  sibling must not phantom a 0-day '1-3 days' interval) was unpinned. +1 guard: a 3-row same-date split fillup + one real later fillup → exactly 1 interval (the
+  real gap), no phantom bucket. NON-VACUOUS (loosening days<=0 → RED). green→green: be validate:local EXIT 0, 1474 pass (+1) / 0 fail. cov: be 86.78% (carry) /
+  fe 84.39% (carry).
