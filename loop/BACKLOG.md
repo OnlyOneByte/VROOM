@@ -430,6 +430,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C359 — pin `formatPaymentFrequency`, the user-visible payment-frequency label rendered in NextPaymentCard.**~~ — *DONE C359: guard at budget
+> (last 353, starved-for 6=budget; feature is over-budget but only-open T9 is e2e-blocked / the rest Angelo-gated → guard is the most-starved actionable).
+> Vein dormant → 2-agent fan-out for a genuinely-unpinned REACHABLE invariant. REJECTED the BE agent's top pick (`normalizeDate`'s seconds-vs-ms threshold
+> in analytics-charts.ts) — it self-admits today's DB path always passes a Date object, so the numeric branch is not-live → coverage-theater (C306/C341/C355
+> protocol). The clean reachable pick: `formatPaymentFrequency` (financing-calculations.ts:496) — pure, ZERO test refs, rendered LIVE at NextPaymentCard.svelte:149
+> with `financing.paymentFrequency` (DB column schema.ts:86 admits exactly {monthly|bi-weekly|weekly|custom}). A refactor that renames/drops/mis-cases a label
+> ("Bi-Weekly") silently changes a user-facing label → genuine reachable invariant. +2 tests to next-payment-date.test.ts (the NextPaymentCard display-helper
+> family's home): the 4 schema-valid labels + the unknown/'' graceful-passthrough fallback. NON-VACUOUS. fe validate:local EXIT 0, 663 pass (+2).*
+
 > ~~**C353 — pin the mixed plug-in-hybrid MPG/mi-kWh isolation invariant (Property 6).**~~ — *DONE C353: the C352 EV fan-out flagged that a MIXED hybrid
 > (gas fill-ups + electric charges on one vehicle) leans entirely on calculateVehicleStats's isElectricFuelType partition to keep MPG/mi-kWh separate — and
 > the efficiency isolation was unpinned (Property 4 pins volume/cost partition, P5 the gating; neither asserts a gas row stays OUT of the mi/kWh denominator).

@@ -49,12 +49,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 356 |
-| guard | 6 | 353 |
+| guard | 6 | 359 |
 | bug | 3 | 358 |
 | arch | 5 | 354 |
 | infra | 6 | 357 |
 
-Current cycle: **358**
+Current cycle: **359**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5688,3 +5688,16 @@ Current cycle: **358**
   end = local-midnight of the day AFTER endDate (exclusive) so the WHOLE end day is included regardless of time-of-day. GUARD: +2 tests (a noon-on-end-day
   expense is INCLUDED; a YYYY-MM-DD closed range includes both boundary days); the 3 existing full-ISO range tests still pass (CI is UTC). NON-VACUOUS.
   green→green: frontend validate:local EXIT 0 — 661 pass (+2) / 0 fail, tsc 0, build OK. cov: be 86.25% (carry) / fe 84.17%+ (carry).
+- **C359 (guard): pinned `formatPaymentFrequency` — the user-visible payment-frequency label rendered in NextPaymentCard** — BALANCE: nothing actionable
+  OVER budget (feature 359−170=189 but the only open feature is maintenance T9, e2e-harness-blocked, + the rest is Angelo-gated → not loop-actionable);
+  guard AT budget (last 353, starved-for 359−353=6 = budget) and the most-starved actionable category → pick guard. Vein dormant → 2-agent fan-out for a
+  genuinely-unpinned REACHABLE invariant (pin, don't manufacture coverage-theater): (A) backend pure helpers, (B) frontend pure utils. (A) the agent's top
+  pick was `normalizeDate`'s Unix-seconds-vs-ms threshold in analytics-charts.ts — but it SELF-ADMITS "today's DB path always surfaces a Date object", so
+  the numeric branch is reachable only by hypothetical future callers → REJECTED as not-live coverage-theater (the C306/C327/C341/C355 protocol). (B)
+  surfaced a CLEAN reachable pick: `formatPaymentFrequency` (financing-calculations.ts:496) — pure, ZERO test refs (grep-verified), rendered LIVE at
+  NextPaymentCard.svelte:149 with `financing.paymentFrequency`, whose DB column (schema.ts:86) admits exactly {monthly|bi-weekly|weekly|custom}. A refactor
+  that renames/drops a case or mis-cases a label ("Bi-Weekly") would silently change a real user-facing label → genuinely-unpinned reachable invariant, NOT
+  theater. VERIFIED firsthand (C21/C60): function source + the 4 schema values + the live render site + no existing test. GUARD: +2 tests appended to
+  next-payment-date.test.ts (the NextPaymentCard display-helper family's home) — (1) each of the 4 schema-valid frequencies maps to its exact label; (2) an
+  unknown frequency + '' pass through verbatim (the graceful no-blank fallback). NON-VACUOUS (a wrong label fails). green→green: frontend validate:local
+  EXIT 0 — 663 pass (+2) / 0 fail, tsc 0, build OK. cov: be 86.25% (carry) / fe 84.17%+ (carry).

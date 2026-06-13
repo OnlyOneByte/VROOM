@@ -11,7 +11,11 @@
 
 import { describe, expect, test } from 'vitest';
 import type { VehicleFinancing } from '$lib/types';
-import { calculateNextPaymentDate, calculateDaysUntil } from '$lib/utils/financing-calculations';
+import {
+	calculateNextPaymentDate,
+	calculateDaysUntil,
+	formatPaymentFrequency
+} from '$lib/utils/financing-calculations';
 
 function makeFinancing(overrides: Partial<VehicleFinancing> = {}): VehicleFinancing {
 	return {
@@ -144,5 +148,24 @@ describe('calculateDaysUntil', () => {
 	test('a past target returns a negative number', () => {
 		const target = new Date(Date.now() - 5 * MS_PER_DAY);
 		expect(calculateDaysUntil(target)).toBeLessThan(0);
+	});
+});
+
+describe('formatPaymentFrequency — the user-visible label rendered in NextPaymentCard', () => {
+	// NextPaymentCard.svelte:149 renders formatPaymentFrequency(financing.paymentFrequency).
+	// The DB column (schema.ts:86) admits exactly these four values, so the label for EACH must
+	// be pinned — a refactor that renames/drops a case or mis-cases a label (e.g. "Bi-Weekly")
+	// would silently change what a real user sees. Unknown values pass through verbatim (graceful
+	// fallback), which keeps a future-added frequency legible instead of blanking the field.
+	test('maps each schema-valid frequency to its display label', () => {
+		expect(formatPaymentFrequency('monthly')).toBe('Monthly');
+		expect(formatPaymentFrequency('bi-weekly')).toBe('Bi-weekly');
+		expect(formatPaymentFrequency('weekly')).toBe('Weekly');
+		expect(formatPaymentFrequency('custom')).toBe('Custom');
+	});
+
+	test('an unknown frequency passes through verbatim (graceful fallback, no blank)', () => {
+		expect(formatPaymentFrequency('quarterly')).toBe('quarterly');
+		expect(formatPaymentFrequency('')).toBe('');
 	});
 });
