@@ -55,12 +55,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 372 |
-| guard | 6 | 369 |
+| guard | 6 | 375 |
 | bug | 3 | 374 |
 | arch | 5 | 370 |
 | infra | 6 | 373 |
 
-Current cycle: **374**
+Current cycle: **375**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5877,3 +5877,12 @@ Current cycle: **374**
   CALENDAR months, the same helper calculatePayoffDate (:254) already uses, so a no-endDate lease + an explicit payoff agree. GUARD: +1 (lease-metrics.test.ts)
   — a no-endDate 36-mo lease's daysRemaining matches the calendar-month end (±1) AND is strictly > 36×30=1080. NON-VACUOUS (the ×30 fallback fails the >1080
   assertion). green→green: fe validate:local EXIT 0, 670 pass (+1) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C375 (guard): pin the reminder refineDateRange `endDate === startDate` equality boundary (the `<=`-not-`<` load-bearing case)** — BALANCE: guard AT budget
+  (last 369, starved-for 375−369=6 = budget) → most-starved actionable pick (arch also at budget, ticks to forced next cycle). 2-agent fan-out. PICK (verified
+  firsthand, C21/C60): refineDateRange (reminders/validation.ts:124) rejects a reminder when `endDate <= startDate` — but reminder-refinements.test.ts only
+  covers strictly-after (ok) + strictly-before (fail), NOT the EQUALITY boundary. The `<=` (vs `<`) is load-bearing: a regression to `<` would silently ACCEPT a
+  zero-duration start==end reminder (fires its start period then immediately deactivates). +1 test: endDate EQUAL startDate → fails with 'endDate must be after
+  startDate'. NON-VACUOUS (a `<` would pass it). Rejected the other picks: FE getCategoryColor bogus-fallback already pinned (expense-category-maps.test.ts,
+  confirmed C370/C234); FE getLatestTerm/sortTermsByEndDateDesc tiebreak a low-stakes determinism nit; BE photo-ref retryCount===3 the by-design cap (C367, +
+  needs a mock); reminder is the cleanest pure-schema reachable boundary. green→green: be validate:local EXIT 0, 1465 pass (+1) / 0 fail. cov: be 86.68%
+  (carry) / fe 84.45% (carry).

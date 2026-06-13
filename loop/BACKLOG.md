@@ -455,6 +455,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C375 — pin the reminder refineDateRange `endDate === startDate` equality boundary (the `<=`-not-`<` load-bearing case).**~~ — *DONE C375: guard at
+> budget (6/6). refineDateRange (reminders/validation.ts:124) rejects `endDate <= startDate`, but reminder-refinements.test.ts only covered strictly-after (ok)
+> + strictly-before (fail), NOT equality — exactly what the `<=` (vs `<`) is load-bearing for (a regression to `<` would silently ACCEPT a zero-duration
+> start==end reminder). +1 test: endDate EQUAL startDate → fails 'endDate must be after startDate'. NON-VACUOUS. be validate:local EXIT 0, 1465 pass (+1).
+> Rejected: FE getCategoryColor (already pinned C370/C234), FE getLatestTerm tiebreak (low-stakes nit), BE photo-ref retryCount===3 (by-design cap, needs a mock).*
+
 > ~~**C369 — pin the PUT-claim termId cross-policy isolation guard (the unpinned leg of validateClaimRefs/#84).**~~ — *DONE C369: guard closest to budget (5/6)
 > → highest-leverage. validateClaimRefs (insurance/routes.ts:46) gates BOTH vehicleId-ownership AND termId-on-this-policy, on create AND update — but only the
 > CREATE termId leg (claims-http.test.ts:210) + the UPDATE vehicleId leg (:247) were pinned; the UPDATE termId leg was UNGUARDED. A claim re-pointed at a term
