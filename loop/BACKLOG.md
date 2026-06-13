@@ -154,6 +154,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Odometer→reminder D5 mileage-trigger seam audit (C317).**~~ — *DONE C317 (CERTIFIED CLEAN, +1 coexistence guard). findMileageTracking
+> + the check-then-insert + race-safe createMileageNotification (catches the UNIQUE violation) + the TWO partial unique indexes
+> (rn_reminder_due_idx on dueDate, rn_reminder_odo_idx partial-on-dueOdometer) — a disjoint-domain whichever-comes-first design. Pinned the
+> cross-axis coexistence (a `both` reminder overdue on BOTH axes fires two distinct notifications, one per axis, no collision) — unpinned;
+> a single-index regression would silently drop the mileage notification. +1 guard in trigger-mileage.test.ts, non-vacuous. No defect.
+> validate:local EXIT 0, 1432 pass (+1).*
+
 > ~~**Expenses split create/update/delete + group-integrity audit (C311).**~~ — *DONE C311 (CERTIFIED CLEAN, +1 contract-pin guard).
 > updateSplitExpense derives the absolute total from the legs (Property-3 fix), userId-scoped delete; deleteSplitExpense cascades photo_refs
 > via FK + the ROUTE cleans provider files first (documented, not a gap); createSiblings is cents-based + COST-ONLY (the create-split schema

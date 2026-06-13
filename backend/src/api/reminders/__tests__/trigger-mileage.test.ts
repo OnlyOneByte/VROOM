@@ -202,4 +202,51 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(after).toHaveLength(2);
     expect(after.map((n) => n.due_odometer)).toEqual([35000, 40200]);
   });
+
+  // C317 deep-review: a `both` (whichever-comes-first) reminder that is SIMULTANEOUSLY time-overdue
+  // AND mileage-past-milestone must fire TWO distinct notifications in one trigger — one on the time
+  // axis (dueDate set, dueOdometer null) and one on the mileage axis (dueOdometer set, dueDate null).
+  // This is exactly what the TWO partial unique indexes enable (rn_reminder_due_idx on dueDate +
+  // rn_reminder_odo_idx partial-on-dueOdometer): the two notifications live in disjoint index domains
+  // so neither collides. A regression collapsing them into one (reminderId, dueDate) unique — or a
+  // single (reminderId) unique — would silently drop the mileage notification with no other failing
+  // test (the existing tests cover each axis in ISOLATION, never the coexistence). Pin it.
+  test('a `both` reminder overdue on BOTH axes fires two distinct notifications (time + mileage, no collision)', async () => {
+    const vehicleId = await seedVehicle();
+    await addOdometerReading(vehicleId, 36000); // past the 35000 milestone
+
+    // A `both`-type reminder: past odometer milestone (35000) AND a past next_due_date (time-overdue).
+    // start_date in the past + a monthly cadence so the time axis materializes a period notification.
+    const pastDate = Math.floor(new Date('2024-01-01T00:00:00.000Z').getTime() / 1000);
+    ctx.sqlite.run(
+      `INSERT INTO reminders
+         (id, user_id, name, type, action_mode, frequency, trigger_mode,
+          interval_mileage, last_service_odometer, next_due_odometer,
+          start_date, next_due_date, is_active)
+       VALUES ('rm-both', ?, 'Service', 'notification', 'automatic', 'monthly', 'both',
+          5000, 30000, 35000, ?, ?, 1)`,
+      [ctx.user.id, pastDate, pastDate]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES ('rm-both', ?)`,
+      [vehicleId]
+    );
+
+    await trigger();
+
+    const all = ctx.sqlite
+      .query('SELECT id, due_date, due_odometer FROM reminder_notifications WHERE reminder_id = ?')
+      .all('rm-both') as NotifRow[];
+
+    // Exactly one mileage-axis notification (dueOdometer set, dueDate null)...
+    const mileage = all.filter((n) => n.due_odometer !== null);
+    expect(mileage).toHaveLength(1);
+    expect(mileage[0]?.due_odometer).toBe(35000);
+    expect(mileage[0]?.due_date).toBeNull();
+
+    // ...AND at least one time-axis notification (dueDate set, dueOdometer null) — the two axes coexist.
+    const time = all.filter((n) => n.due_date !== null);
+    expect(time.length).toBeGreaterThanOrEqual(1);
+    expect(time.every((n) => n.due_odometer === null)).toBe(true);
+  });
 });

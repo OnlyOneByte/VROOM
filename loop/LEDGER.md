@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 311 |
+| deep-review | 5 | 317 |
 | guard | 6 | 313 |
 | bug | 3 | 315 |
 | arch | 5 | 314 |
 | infra | 6 | 316 |
 
-Current cycle: **316**
+Current cycle: **317**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5152,3 +5152,17 @@ Current cycle: **316**
   the closed-bug list + bumped the arc range C155–C308 → C155–C315; (2) suite size ~1424→~1431 BE (FE unchanged ~613). DOCS-ONLY — verified
   `git status` = CLAUDE.md alone (the ?? items are the by-design untracked e2e/tooling scaffold); no source/test/build touched (the C315 gate
   is the last code state). Keeps the next cycle's closed-bug + suite-floor refs accurate. cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C317 (deep-review): odometer→reminder D5 mileage-trigger seam CERTIFIED CLEAN; pinned the both-axis notification coexistence** —
+  BALANCE: deep-review OVER budget (last 311, starved-for 6 > 5, most-starved actionable; feature gated) → forced. Audited the
+  odometer→reminder mileage-trigger seam firsthand. CERTIFIED CLEAN: findMileageTracking (filters isNotNull(nextDueOdometer)),
+  mileageNotificationExists (check-then-insert) + createMileageNotification (race-safe: catches the UNIQUE-index violation → null, a
+  belt-and-braces double-fire guard), and the TWO partial unique indexes — rn_reminder_due_idx (reminderId, dueDate) [mileage rows' null
+  dueDate are SQLite-distinct → unconstrained] + rn_reminder_odo_idx (reminderId, dueOdometer) PARTIAL WHERE dueOdometer IS NOT NULL [time
+  rows' null dueOdometer excluded] — a textbook-correct disjoint-domain design for whichever-comes-first. THE worthwhile guard: the
+  cross-axis COEXISTENCE (a `both` reminder simultaneously time-overdue AND mileage-past-milestone fires TWO distinct notifications, one per
+  axis, neither colliding) was UNPINNED — existing tests cover each axis in ISOLATION; a regression collapsing the two indexes into one
+  (reminderId, dueDate) — or a single (reminderId) — would silently DROP the mileage notification with no failing test. +1 guard
+  (trigger-mileage.test.ts): a `both` reminder past both a 35000 milestone AND a past next_due_date → exactly 1 mileage notif (dueOdometer
+  35000, dueDate null) AND ≥1 time notif (dueDate set, dueOdometer null). NON-VACUOUS (a single-index regression → the dropped-axis assertion
+  RED). NO defect, no source change. green→green: backend validate:local EXIT 0 — 1432 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean
+  (test reflow auto-fixed), build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).
