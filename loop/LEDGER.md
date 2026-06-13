@@ -73,9 +73,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 425 |
 | bug | 3 | 428 |
 | arch | 5 | 426 |
-| infra | 6 | 423 |
+| infra | 6 | 429 |
 
-Current cycle: **428**
+Current cycle: **429**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6480,3 +6480,10 @@ Current cycle: **428**
   (dup-clientId→reject, dup-licensePlate→reject, null-plate→NOT a dup [partial-index skip]). NON-VACUOUS. (Self-corrected the null-control test: I'd wrongly assumed
   buildMinimalStringRow leaves the plate null — it fills 'test-<name>', so I explicitly nulled it; the correction reaffirmed the dupCheck genuinely fires.) be validate:local
   EXIT 0, 1526 pass (+3). The general transient-insert-failure window stays open until the escalated transaction-semantics fix. cov: be 86.93% (carry, +3 guards) / fe 84.51% (carry).
+- **C429 (infra): CLAUDE.md full orientation refresh (the overdue ~C428 cadence; last full C418)** — BALANCE: nothing over budget (deep-review 2, guard 4, bug 1, arch 3,
+  infra 6/6, feature parked); infra MOST-STARVED AT budget (last 423, starved-for 429−423=6=budget) AND the CLAUDE.md refresh cadence was overdue → highest-leverage pick.
+  REFRESHED the drift-prone "Current state & gaps" section: (1) coverage reading C412→C423 fresh measure (be 86.92→86.93 line / 86.56→86.57 func; fe 84.46→84.51 line /
+  84.4→84.54 func / 76.92→77.06 branch — flat-to-up, the C413–C428 arc held); (2) suite size ~1508/~696 → ~1526/~697; (3) appended the C418–C428 closed-bug arc to the fix
+  list (#125 financing-source-PUT, #126 converted-path PHEV-MPG, #127 restore-uniqueness) + bumped "all landed C155→C428"; (4) added the TWO new pending-Angelo escalations
+  to that block — #30 MPG-band divergence (C419) + #127 restore-atomicity (C428, HIGH). Doc-only, no code touched → no build gate (CLAUDE.md not compiled; verified the
+  edits read coherently + preserved structure). cov: be 86.93% (carry) / fe 84.51% (carry). Next CLAUDE.md refresh ~C439; next #5 sweep ~C433.
