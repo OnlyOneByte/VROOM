@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 307 |
 | bug | 3 | 308 |
 | arch | 5 | 304 |
-| infra | 6 | 303 |
+| infra | 6 | 309 |
 
-Current cycle: **308**
+Current cycle: **309**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5056,3 +5056,12 @@ Current cycle: **308**
   real errors). NON-VACUOUS, PROVEN: reverting one method's clear → that test RED ("a succeeding op must clear the stale error"). FE store
   logic only — error is computed state, no markup moved → no screenshot. green→green: frontend validate:local EXIT 0 — type-check 0, build,
   613 pass (+3). cov: be 86.07% (carry) / fe 81.76%+ (carry; settings store now has coverage).
+- **C309 (infra): CLAUDE.md docs-accuracy refresh — record #93/#95 closed + #94 in pending-Angelo + suite ~1424 BE / ~613 FE** — BALANCE:
+  both arch (5=5) + infra (6=6) at budget; infra MOST-starved (6 > 5) → forced. The C253/C279/C292/C298 docs-accuracy cadence: the
+  CLAUDE.md closed-bug list ended at #92/C297 (missing #93 C300 + #95 C308; #94 correctly absent there — it's escalated, not closed), the
+  pending-Angelo block ended at #88 (missing #94, escalated C301), and the suites drifted (BE ~1421→~1424 via C302/C307, FE ~610→~613 via
+  C308). FIXED (CLAUDE.md only): (1) appended #93 (merge-restore raw-PK → clean conflict + the C302 symmetry guard) + #95 (settings stale-
+  error clearing) to the closed-bug list + bumped the arc range C155–C297 → C155–C308; (2) added #94 (fleet-wide fuel-stats mixed-unit
+  pooling) to the pending-Angelo block beside #88; (3) suite size ~1421→~1424 BE / ~610→~613 FE. DOCS-ONLY — verified `git status` =
+  CLAUDE.md alone (the ?? items are the by-design untracked e2e/tooling scaffold); no source/test/build touched (the C308 gate is the last
+  code state). Keeps the next cycle's closed-bug + pending-Angelo + suite-floor refs accurate. cov: be 86.07% (carry) / fe 81.76% (carry).

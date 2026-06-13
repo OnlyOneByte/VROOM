@@ -183,7 +183,7 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1421 backend tests / ~610 frontend** (a floor — grows most cycles). Don't regress
+  Suite size today: **~1424 backend tests / ~613 frontend** (a floor — grows most cycles). Don't regress
   coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
@@ -227,8 +227,10 @@ Highlights:
   toDateInputValue reads the LOCAL calendar date (was UTC .slice(0,10) → date-input off-by-one for negative offsets + broke the noon-local stored-date round-trip for positive offsets) [#87, C268; residual on the odometer-edit page swept + a committed no-utc-date-input source-scan guard added C271],
   create-or-replace financing left STALE cross-type fields when a vehicle's financing TYPE changed (lease↔loan) — update() skips undefined keys, so a loan row kept the prior lease's mileageLimit etc.; coalesce optional cross-type fields to null so the reused row mirrors a fresh create (sibling to the #67/C206/C240 reset) [#90, C293],
   lease-overage projection compared an ABSOLUTE odometer against a DRIVEN-miles budget → phantom excess fee by exactly initialMileage on any used-car lease (sibling to #64; +a translation-invariance property guarding the coordinate-space class C296) [#91, C295],
-  extra-payment planner treated every 0%-APR loan as inert → "0 mos saved" for an interest-free loan an extra payment clearly shortens (bail early only for non-loans; 0%-APR loans run the amortization loop with rate 0) [#92, C297])
-  all landed C155–C297. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
+  extra-payment planner treated every 0%-APR loan as inert → "0 mos saved" for an interest-free loan an extra payment clearly shortens (bail early only for non-loans; 0%-APR loans run the amortization loop with rate 0) [#92, C297],
+  merge-mode restore threw a raw UNIQUE-PK error on the always-present userPreferences/syncState collision instead of a clean conflict — detectConflicts probed 6 of the 15 inserted tables; added prefs/syncState probes + a drift-guard for the symmetry (C302) [#93, C300],
+  settings store cleared a stale `error` on only 2 of 9 async ops → a succeeded retry kept showing a phantom error (masked today by the `&& !settings` UI gate); `error = null` on entry to all seven [#95, C308])
+  all landed C155–C308. Recurring lesson the loop keeps re-finding (C181/C182/C185/C229):
   a green test that RE-IMPLEMENTS or RECONSTRUCTS a module's logic locally is NOT real coverage — drive the real module
   (C229: the two photo "property" tests only drove a reference model, never the real setCoverPhoto, which was also
   getDb-singleton-bound and thus untestable via a constructed repo until switched to this.db.transaction).
@@ -244,5 +246,6 @@ Highlights:
   but is absent from TCO — escalated C210: materialize monthlyCost×term-months / N monthly rows / analytics-only),
   **#79** (a malformed fuel offline entry is stuck in the outbox forever, silently re-skipped — drop+toast / failed-bucket / confirm-the-form-blocks-it),
   **#85** (fuel-stats "This/Last Year" is range-relative not calendar-year — the sibling month fields are now true calendar months after #86/C262, so this is purely the YEAR row: calendar-YTD / relabel "This/Last Period" / hide-on-non-year-range; #9-rename class),
-  **#88** (a SPLIT recurring-expense reminder naming a DELETED vehicle leaves a partial/inconsistent group every trigger — expenseSplitConfig is a JSON blob, NOT FK-cascade-cleaned like the junction, so the deleted vehicle's leg FK-violates [the C151 async-tx rollback footgun leaves the surviving leg]; found+escalated C288 — drop+renormalize on vehicle-delete / deactivate / single-vehicle fallback).
+  **#88** (a SPLIT recurring-expense reminder naming a DELETED vehicle leaves a partial/inconsistent group every trigger — expenseSplitConfig is a JSON blob, NOT FK-cascade-cleaned like the junction, so the deleted vehicle's leg FK-violates [the C151 async-tx rollback footgun leaves the surviving leg]; found+escalated C288 — drop+renormalize on vehicle-delete / deactivate / single-vehicle fallback),
+  **#94** (fleet-wide fuel-stats — GET /analytics/fuel-stats with NO vehicleId, the default analytics-summary path — pools per-vehicle distance + averages cost/distance WITHOUT unit conversion, so a mixed mi+km fleet shows a garbage pooled distance + blended $/mi-vs-$/km on the headline view; per-vehicle charts already convert, only the summary scalars don't; found+escalated C301, characterization-pinned — convert-to-user-global / per-vehicle-only / require-vehicleId).
   See `loop/BACKLOG.md` bug queue for the full list + grounding.
