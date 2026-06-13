@@ -154,6 +154,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**#94 isolation check — fleet analytics unit-conversion + per-vehicle stats audit (C328).**~~ — *DONE C328 (#94 BROADENED to a CLASS; +1
+> characterization guard; per-vehicle stats CERTIFIED CLEAN). 2-agent fan-out + firsthand source verify (C21/C60). (a) `calculateVehicleStats`
+> CLEAN: every ratio div-guarded (costPerMile/averageMpg/averageMilesPerKwh), unit-by-design at the route layer, 100-run property-tested — no
+> defect. (b) #94 is NOT one scalar — the fleet SUMMARY + fuel-advanced builders (buildFuelStatsFromData / buildFuelAdvancedFromData) pool
+> distance, VOLUME (gal+L), and EFFICIENCY (mi/gal+km/L) across vehicles with NO unit conversion (6 members, see bug #94). PROOF: getCrossVehicle
+> (repository.ts:1531) is the correct contrast — convertDistance per vehicle BEFORE pooling; the summary builders receive no units. Product-
+> semantics-gated → folded into the #94 escalation (broadened), NOT self-fixed. Pinned the cleanest unfiled member (volume pooling, same file as
+> #94's distance pin) in fuel-stats-fleet-distance-pooling.test.ts; non-vacuous raw-sum proof. green→green 1435 pass (+1).*
+
 > ~~**Insurance premium-allocation analytics audit + #5 coverage re-measure (C323).**~~ — *DONE C323 (CERTIFIED CLEAN, no defect).
 > buildInsuranceDetails latest-term scoping (#25), #50 tiebreak, #8 totalCost amortization, cycle-14 monthKeysInRange all sound; the
 > per-vehicle premium division is a DISPLAY distribution (headline total computed independently, so float-split values carry no
@@ -836,16 +845,26 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   is_active=1, trigger skips no_vehicles). DECISION (send_message'd Angelo): on vehicle-delete, for any reminder left with zero vehicles —
   (a) deactivate it (+ notify), (b) delete it outright (can never fire), (c) surface it in a "needs attention / no vehicle" UI bucket, or
   (d) block deleting a vehicle that's the sole target of an active reminder. Not loop-decidable — awaiting Angelo.
-- **#94 (MED, correctness / NORTH_STAR #2 — found C301 bug scout; ESCALATED to Angelo C301, semantics-gated) — fleet-wide fuel-stats pools
-  per-vehicle distance + cost WITHOUT unit conversion.** `GET /analytics/fuel-stats` with no vehicleId (the DEFAULT analytics-summary path,
-  analytics-api.ts:146) aggregates across ALL vehicles; `buildFuelStatsFromData` sums each vehicle's (max−min) odometer span into
-  `distance.totalDistance` + takes min/max of per-pair cost/distance into `averageCost.best/worstCostPerDistance` — both WITHOUT unit
-  conversion. Vehicles carry PER-VEHICLE `unitPreferences` (vehicles.unit_preferences), so a mi+km fleet pools miles+km into one distance +
-  blends $/mi with $/km on the headline view. The per-vehicle CHARTS (computeConvertedTotalDistance) already convert; only the summary
-  SCALARS don't. Distinct from #45 (period-scoping). VERIFIED + pinned by a characterization test (C301, fuel-stats-fleet-distance-pooling.test.ts:
-  totalDistance = per-vehicle spans summed, best/worst = raw cross-vehicle min/max). DECISION (send_message'd Angelo): (a) convert each
-  vehicle to the user-global unit before pooling (mirror the per-vehicle chart path), (b) emit fleet scalars only when all vehicles share a
-  unit, else per-vehicle, or (c) require vehicleId for distance scalars. Not loop-decidable — awaiting Angelo.
+- **#94 (MED, correctness / NORTH_STAR #2 — found C301 bug scout; BROADENED to a CLASS C328 deep-review; ESCALATED to Angelo C301+C328,
+  semantics-gated) — the fleet-wide analytics SUMMARY + fuel-advanced paths pool UNIT-BEARING quantities across vehicles WITHOUT per-vehicle
+  conversion.** `GET /analytics/fuel-stats` (no vehicleId, the DEFAULT summary path, analytics-api.ts:146), `GET /analytics/summary`, and
+  `GET /analytics/fuel-advanced` aggregate across ALL vehicles. Vehicles carry PER-VEHICLE `unitPreferences` (vehicles.unit_preferences), and
+  distance/volume are STORED in each vehicle's native unit — PROVEN firsthand C328 by the correct contrast `getCrossVehicle` (repository.ts:
+  1500/1531-1532: threads vehicleUnitsMap+userUnits, `skipConversion = allVehiclesMatchUnits`, `convertDistance(...)` per vehicle BEFORE
+  pooling). The summary builders receive NO units. CLASS MEMBERS (all verified firsthand vs source C328, same no-conversion mechanism):
+  (1) `distance.totalDistance` + `averageCost.best/worstCostPerDistance` (buildFuelStatsFromData :1383-1409 / :1375 — the original #94, C301);
+  (2) `volume.currentYear/Month` + `fillupDetails` avg/min/max (gal+L, same fn :1357-1372 — pinned C328); (3) `buildMonthlyConsumption`
+  volume + efficiency (:314-352); (4) `buildSeasonalEfficiency` mi/gal+km/L (:608-655); (5) `buildVehicleRadar` efficiency + distance
+  normalizeScore over mixed units (:709-784); (6) `buildDayOfWeekPatterns` volume (:787-812) — (3)-(6) via getSummary/getFuelAdvanced →
+  buildFuelAdvancedFromData, also units-less. So a mixed mi+km / gal+L fleet shows a garbage pooled distance/volume + blended $/mi-vs-$/km on
+  the headline view. The per-vehicle CHARTS (computeConvertedTotalDistance) + getCrossVehicle already convert; only these summary/advanced
+  builders don't. Distinct from #45 (period-scoping). VERIFIED + pinned by characterization tests (distance C301 + volume C328 in
+  fuel-stats-fleet-distance-pooling.test.ts — raw-sum proof shape). NOTE the C328 fan-out ALSO certified per-vehicle `calculateVehicleStats`
+  CLEAN (every ratio div-guarded, comprehensively property-tested) — the defect is purely cross-vehicle pooling. DECISION (send_message'd
+  Angelo, broadened C328): the fix is now ONE coherent change across all 6 members — (a) thread vehicleUnitsMap+userUnits into the summary +
+  fuel-advanced builders and convert each vehicle to the user-global unit before pooling (mirror getCrossVehicle / the per-vehicle chart path),
+  (b) emit fleet scalars only when all vehicles share a unit else per-vehicle, or (c) require vehicleId for unit-bearing scalars. Not
+  loop-decidable — awaiting Angelo.
 - ~~**#80 (MED, tenant-isolation + info-leak — found C233 hunting the vehicles write-path) — license-plate uniqueness was enforced GLOBALLY across
   all tenants.**~~ — *DONE C233: `findByLicensePlate(plate)` queried `WHERE license_plate = ?` with NO userId, backing the plate-uniqueness check on
   BOTH create + update → a user adding a plate ANOTHER tenant owns got a cross-tenant FALSE 409 (two users may legitimately share a plate:

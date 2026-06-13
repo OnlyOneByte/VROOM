@@ -16,6 +16,15 @@
  * numeric pooling is deterministic; the point of record is that totalDistance is the RAW SUM of the two
  * vehicles' spans (proving no per-vehicle normalization gate exists today). When the fix lands, update
  * this to assert the converted/segmented behavior.
+ *
+ * C328 (deep-review fan-out): #94 is NOT one scalar — it's a CLASS. The same no-conversion pooling spans
+ * the whole fleet-summary + fuel-advanced path: distance (#94, pinned below), VOLUME (volume.currentYear +
+ * fillupDetails, gal+L — pinned below as of C328), and the efficiency/volume pooling in
+ * buildMonthlyConsumption / buildSeasonalEfficiency / buildVehicleRadar / buildDayOfWeekPatterns (mi/gal +
+ * km/L). getCrossVehicle (repository.ts:1500/1531) is the correct contrast — it threads vehicleUnitsMap +
+ * userUnits and converts per vehicle (convertDistance) BEFORE pooling. The summary builders receive no
+ * units. ALL ESCALATED to Angelo as one #94 class — NOT self-fixed (product semantics: convert-to-global /
+ * per-vehicle-only / require vehicleId).
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -97,6 +106,37 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
 
     // CURRENT behavior: per-vehicle spans summed (800 + 200), NOT the cross-vehicle 40_200 pool.
     expect(stats.distance.totalDistance).toBe(1_000);
+  });
+
+  test('volume.currentYear + fillupDetails pool gal/L by RAW summation across the fleet (#94 sibling, C328)', async () => {
+    // The SAME defect mechanism as distance/cost above, on a DIFFERENT scalar: buildFuelStatsFromData
+    // sums every fuel row's `volume` (sumGallons, repository.ts:1357) and derives fillupDetails
+    // (avg/min/max volume) across ALL vehicles with NO per-vehicle unit conversion. Volume is stored in
+    // each vehicle's own volumeUnit (gal OR L), so a mixed-unit fleet pools gallons with litres into one
+    // headline number — the volume limb of the #94 class the C328 deep-review surfaced (alongside
+    // buildMonthlyConsumption / buildSeasonalEfficiency / buildVehicleRadar / buildDayOfWeekPatterns,
+    // all on the fleet-summary + fuel-advanced paths; all ESCALATED to Angelo, NOT self-fixed — same
+    // semantics call as #94). Both vehicles share the default unit here so the pool is deterministic;
+    // the point of record is that volume is the RAW SUM (proving no per-vehicle normalization gate
+    // exists today), the same proof shape the distance pin above uses. Update when the fix lands.
+    seedUser(testDb.sqlite, USER);
+    seedVehicle(testDb.sqlite, VEH_A);
+    seedVehicle(testDb.sqlite, VEH_B);
+
+    // A: two 20-volume fillups (40 total); B: two 5-volume fillups (10 total). Raw fleet pool = 50.
+    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
+    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
+    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
+    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
+
+    const stats = await repo.getFuelStats(USER.id, rangeAll());
+
+    // CURRENT behavior: volume summed across the whole fleet, no per-vehicle gal↔L normalization.
+    expect(stats.volume.currentYear).toBe(50);
+    // fillupDetails are the raw cross-vehicle avg/min/max of the four volumes [20,20,5,5].
+    expect(stats.fillupDetails.avgVolume).toBeCloseTo(12.5, 5);
+    expect(stats.fillupDetails.minVolume).toBe(5);
+    expect(stats.fillupDetails.maxVolume).toBe(20);
   });
 
   test('best/worst cost-per-distance span the per-pair values across the WHOLE fleet (un-normalized scalars)', async () => {

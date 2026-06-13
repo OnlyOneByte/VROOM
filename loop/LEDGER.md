@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 323 |
+| deep-review | 5 | 328 |
 | guard | 6 | 325 |
 | bug | 3 | 327 |
 | arch | 5 | 326 |
 | infra | 6 | 322 |
 
-Current cycle: **327**
+Current cycle: **328**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5288,3 +5288,26 @@ Current cycle: **327**
   + ownership-uses-shared-validators. NO defect, NO unpinned invariant — adding a test here would be coverage-theater (the C306/C323
   certification precedent). DOCS-ONLY (LEDGER + BACKLOG); no source/test/build touched (the C326 gate is the last code state). cov: be 86.53%
   (carry) / fe 84.39% (carry).
+- **C328 (deep-review → #94 is a CLASS, not one scalar; +1 characterization guard, ESCALATED broadened)** — BALANCE: deep-review AND infra both
+  first-come-due this cycle (deep-review 328−323=5=budget; infra 328−322=6=budget); feature 158-over but every item is eyes-on/Playwright- or
+  T0-sign-off-blocked (standing escalation). Picked deep-review (higher leverage — it feeds the dormant bug vein; the infra #5 sweep isn't due
+  till ~C333). Fresh surface: is the just-escalated #94 (fleet fuel-stats summary pools mixed mi+km distance + blends $/mi-vs-$/km without unit
+  conversion) ISOLATED, or a class? Fanned out 2 Explore agents (analytics unit-conversion siblings + calculateVehicleStats correctness).
+  RESULT: (a) per-vehicle calculateVehicleStats CERTIFIED CLEAN — every ratio div-guarded (costPerMile gated on totalMileage>0, averageMpg on
+  length>=2 + mpg>0&&<150 filter, averageMilesPerKwh length+volume gated), unit-by-design at the route layer, comprehensively property-tested
+  (vehicle-stats.property.test.ts 100-run props + currentOdometer contract); no defect. (b) #94 is NOT one scalar — it's a CLASS spanning the
+  whole fleet-SUMMARY + fuel-advanced path. VERIFIED FIRSTHAND against source (C21/C60 rule): getCrossVehicle (repository.ts:1500/1531-1532) is
+  the correct contrast — it threads vehicleUnitsMap+userUnits, computes skipConversion=allVehiclesMatchUnits, and convertDistance(...)s each
+  vehicle to the user's unit BEFORE pooling; buildFuelStatsFromData (called by getFuelStats AND getSummary:2072) receives NO units and its own
+  comment (:1386) wrongly assumes "this summary path is single-unit so it doesn't convert". The convertDistance-per-vehicle in getCrossVehicle is
+  the firsthand PROOF stored distance/volume are in each vehicle's NATIVE unit → raw pooling across a mixed fleet IS garbage. Siblings (all
+  un-filed, all same no-conversion mechanism): volume.currentYear + fillupDetails (gal+L, buildFuelStatsFromData :1357-1372), buildMonthlyConsumption
+  (volume+efficiency :314-352), buildSeasonalEfficiency (mi/gal+km/L :608-655), buildVehicleRadar (efficiency+distance normalizeScore :709-784),
+  buildDayOfWeekPatterns (volume :787-812) — the latter four via getSummary/getFuelAdvanced → buildFuelAdvancedFromData, also units-less. ALL
+  product-semantics-gated (convert-to-user-global / per-vehicle-only / require vehicleId) → NOT a clean atomic loop fix; folded into the #94
+  escalation as one class. INCREMENT: pinned the cleanest unfiled sibling (volume pooling, SAME file+path as #94's distance pin) — +1
+  characterization test in fuel-stats-fleet-distance-pooling.test.ts (volume.currentYear=50 raw gal pool, fillupDetails avg/min/max [20,20,5,5])
+  + broadened the file docblock to record the class. Follows the established raw-sum proof shape (no divergent prefs seeded — the harness
+  seedVehicle has no unit_preferences path; the point of record is the un-normalized pool). NON-VACUOUS (the assertions pin the current pooled
+  values; the fix will turn them red→update). green→green: backend validate:local EXIT 0 — 1435 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome
+  clean, build bundled. Backend test-only, no UI. cov: be 86.53% (carry) / fe 84.39% (carry).
