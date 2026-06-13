@@ -185,17 +185,37 @@ function parseTags(raw: string): { value: string[] } | { error: string } {
  * blank cells the exporter writes for non-fuel rows. Per-field parsing is delegated
  * to the small helpers above to keep this orchestration flat.
  */
+/**
+ * Resolve a CSV row's vehicle NAME to an owned vehicleId. `vehicleByName` maps a lowercased
+ * nickname / "year make model" to the id, or to `null` when that name matches ≥2 vehicles
+ * (ambiguous — see buildImportPlan). Returns the id, or an error: missing, ambiguous (#102: never
+ * silently pick one — that misattributes every row), or not-in-garage.
+ */
+function resolveImportVehicleId(
+  vehicleName: string,
+  vehicleByName: Map<string, string | null>
+): { vehicleId: string } | { error: string } {
+  if (!vehicleName) return { error: 'Missing vehicle' };
+  const match = vehicleByName.get(vehicleName.toLowerCase());
+  if (match === null) {
+    return {
+      error: `"${vehicleName}" matches more than one vehicle in your garage; give them distinct nicknames and use those`,
+    };
+  }
+  if (!match) return { error: `No vehicle named "${vehicleName}" in your garage` };
+  return { vehicleId: match };
+}
+
 function parseRow(
   record: Record<string, string>,
-  vehicleByName: Map<string, string>
+  vehicleByName: Map<string, string | null>
 ): { expense: ImportableExpense } | { error: string } {
   const get = makeCellGetter(record);
 
   // --- vehicle: match by name within the user's OWN fleet (never a file id) ---
-  const vehicleName = get('vehicle');
-  if (!vehicleName) return { error: 'Missing vehicle' };
-  const vehicleId = vehicleByName.get(vehicleName.toLowerCase());
-  if (!vehicleId) return { error: `No vehicle named "${vehicleName}" in your garage` };
+  const vehicleResult = resolveImportVehicleId(get('vehicle'), vehicleByName);
+  if ('error' in vehicleResult) return vehicleResult;
+  const { vehicleId } = vehicleResult;
 
   // Each field is parsed by a small helper that returns {value} or {error}; bail on
   // the first error so the body stays a flat sequence.
@@ -321,10 +341,18 @@ export function buildImportPlan(csv: string, vehicles: ImportVehicle[]): ImportP
 
   // Resolve names case-insensitively. Build BOTH the nickname and the
   // "year make model" forms the exporter emits, so either column value matches.
-  const vehicleByName = new Map<string, string>();
+  // A name that maps to MORE THAN ONE vehicle (two cars sharing a "2021 Honda Civic"
+  // string, or the same nickname) is marked AMBIGUOUS (id=null): two vehicles can
+  // legally share those (no unique constraint), and silently resolving to the last
+  // one would misattribute every imported row with no signal (#102, NORTH_STAR #1).
+  // parseRow rejects an ambiguous name with a clear "use a unique nickname" error.
+  const vehicleByName = new Map<string, string | null>();
+  const register = (key: string, id: string) => {
+    vehicleByName.set(key, vehicleByName.has(key) ? null : id);
+  };
   for (const v of vehicles) {
-    if (v.nickname) vehicleByName.set(v.nickname.toLowerCase(), v.id);
-    vehicleByName.set(`${v.year} ${v.make} ${v.model}`.toLowerCase(), v.id);
+    if (v.nickname) register(v.nickname.toLowerCase(), v.id);
+    register(`${v.year} ${v.make} ${v.model}`.toLowerCase(), v.id);
   }
 
   // Counts how many times each content-key has been seen so far in THIS file, so

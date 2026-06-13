@@ -329,6 +329,40 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(body.data.imported).toBe(1);
   });
 
+  test('#102: an AMBIGUOUS "year make model" name (two cars share it) errors, not silent misattribution', async () => {
+    // Two vehicles share "2021 Honda Civic" (legal — distinct nicknames, no unique constraint).
+    // Pre-C344 the name map resolved to the LAST one (silent misattribution, NORTH_STAR #1). Now
+    // the row must FAIL with a clear "use distinct nicknames" message — nothing imported.
+    await seedVehicle('Work Car'); // 2021 Honda Civic
+    await seedVehicle('Personal Car'); // 2021 Honda Civic (same year/make/model)
+    const csv = [
+      'date,vehicle,category,amount',
+      '2024-06-01T00:00:00.000Z,2021 Honda Civic,misc,50',
+    ].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status).toBe(200); // the import call itself succeeds; the ROW is rejected
+    expect(body.data.imported).toBe(0);
+    expect(body.data.errorCount).toBe(1);
+    expect(body.data.rows[0]?.message).toContain('more than one vehicle');
+  });
+
+  test('#102: a UNIQUE nickname still resolves even when its year/make/model is shared', async () => {
+    // The ambiguity is per-NAME-KEY: the shared "2021 Honda Civic" key is ambiguous, but each
+    // car's distinct nickname is not — so importing by nickname must still work.
+    await seedVehicle('Work Car');
+    await seedVehicle('Personal Car');
+    const csv = ['date,vehicle,category,amount', '2024-06-01T00:00:00.000Z,Work Car,misc,50'].join(
+      '\n'
+    );
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status).toBe(200);
+    expect(body.data.imported).toBe(1);
+  });
+
   test('400 on an empty CSV (header only, no data rows)', async () => {
     await seedVehicle('Daily Driver');
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {

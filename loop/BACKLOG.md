@@ -154,6 +154,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Native CSV import pipeline + year-end/quick-stats analytics audit (C344).**~~ — *DONE C344 (found+fixed bug #102; year-end CERTIFIED CLEAN).
+> 2-agent fan-out. (B) year-end + quick-stats: the agent's 3 "defects" were all schema-shape nits it admitted were math-sound (categoryBreakdown:[] on a
+> zero year is correct; the div "drift" is same-array same-rounding) → CERTIFIED CLEAN (year-boundary/tz, div-guards, empty-shape, no #94-pooling). (A)
+> native CSV import surfaced a CLEAN ATOMIC live defect → #102: buildImportPlan's vehicleByName resolved a "year make model" name shared by two cars to the
+> LAST-seen one (silent misattribution, NORTH_STAR #1). FIXED inline (collision-aware map → ambiguous=null → per-row error) + extracted resolveImportVehicleId
+> (kept parseRow under the complexity cap). +2 HTTP guards. validate:local EXIT 0, 1444 pass.*
+
 > ~~**Backup/restore round-trip + offline-sync write-path audit (C339).**~~ — *DONE C339 (found+fixed bug #101; backup-validation hardening filed).
 > 2-agent fan-out on the NORTH_STAR #1 crown jewels. (B) offline-sync surfaced a CLEAN ATOMIC live defect → #101: the outbox dropped `missedFillup` on sync
 > (OfflineExpense lacked the field, offlineExpenseToBackend didn't map it, both ExpenseForm call sites omitted it — while the form collects it + the online
@@ -646,6 +653,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#102 (MED, data-safety / NORTH_STAR #1 — found+fixed C344 on a native-CSV-import deep-review) — an ambiguous "year make model" vehicle name
+> silently misattributed every imported row to the last-seen matching car.**~~ — *DONE C344: buildImportPlan built vehicleByName with `set("year make
+> model", id)`; two vehicles legally sharing that string (distinct nicknames, no unique constraint) → the 2nd overwrote the 1st → a CSV row using that
+> name form attached to the LAST-seen vehicle with no signal. FIX: collision-aware map (a key seen twice → null = AMBIGUOUS) + resolveImportVehicleId
+> rejects an ambiguous name with a clear "give them distinct nicknames" per-row error; extracted the resolver (kept parseRow under the complexity cap). +2
+> HTTP guards (shared name errors imported:0; a unique nickname still resolves — targeted, not blanket). NON-VACUOUS. validate:local EXIT 0, 1444 pass (+2).*
+
 > ~~**C341 — analytics chart-builders + auth/session/OAuth CERTIFIED CLEAN (bug-cycle dormant-vein scout, no defect; +2 invariant guard).**~~ — *DONE
 > C341: bug at budget (3=3) → pick. 2-agent fan-out (analytics-charts last deep C67; auth last C225). Every agent "REAL DEFECT" debunked firsthand:
 > buildMonthlyConsumption NaN-key NOT reachable (date .notNull() + `if(!d)continue` + the `if(entry)` guard); buildGasPriceHistory String(epochMs) is a dead

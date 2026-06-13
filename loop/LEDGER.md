@@ -48,13 +48,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 339 |
+| deep-review | 5 | 344 |
 | guard | 6 | 342 |
 | bug | 3 | 341 |
 | arch | 5 | 343 |
 | infra | 6 | 340 |
 
-Current cycle: **343**
+Current cycle: **344**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5517,3 +5517,17 @@ Current cycle: **343**
   both ways (rule 3): financing-deactivate-hook.test.ts drives BOTH routes end-to-end (PUT payoff + DELETE sever the source link, best-effort no-op, unrelated
   expense untouched) — all GREEN before AND after. green→green: backend validate:local EXIT 0 — 1442 pass (unchanged) / 1 skip / 0 fail, tsc 0, musl-biome
   clean, build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C344 (deep-review → bug #102: ambiguous-vehicle CSV import silently misattributed every row)** — BALANCE: deep-review AND bug both due (deep-review
+  344−339=5=budget; bug 344−341=3=budget); deep-review MORE starved-for → pick. 2-agent fan-out on surfaces not audited this session: (A) the NATIVE CSV
+  import pipeline (post-mapping, distinct from the C334/C60 mapping layer), (B) year-end + quick-stats analytics. (B) the agent's 3 "defects" were all
+  self-classified schema-shape nits where it admitted "the math is sound" (categoryBreakdown:[] on a zero-total year is CORRECT — FE reads .length; the
+  div-by-zero "drift" is same-array same-rounding) → NO defect, year-end CERTIFIED CLEAN (year-boundary/tz, div-guards, empty-shape, no #94-pooling all
+  sound). (A) surfaced a CLEAN ATOMIC live defect → #102 (the C204/C339 deep-review→bug pattern): buildImportPlan built `vehicleByName` with
+  `set("year make model", id)` — two vehicles legally sharing that string (distinct nicknames, NO unique constraint) → the 2nd OVERWRITES the 1st, so a CSV
+  row using that name form silently attaches to the LAST-seen vehicle, no signal (NORTH_STAR #1). VERIFIED firsthand (C21/C60). FIX: build the map
+  collision-aware (a key seen twice → null = AMBIGUOUS) + resolveImportVehicleId rejects an ambiguous name with a clear "give them distinct nicknames"
+  per-row error instead of last-wins. Extracted the resolution to resolveImportVehicleId (parseRow's added branch tipped it over the Biome
+  noExcessiveCognitiveComplexity cap → the extraction both fixes that AND isolates the logic — a bonus arch-clean). GUARD: +2 HTTP tests
+  (import-csv.test.ts): two same-model cars → the shared name errors (imported 0, "more than one vehicle"); a UNIQUE nickname still resolves (proves the
+  fix is per-name-key targeted, not a blanket reject). NON-VACUOUS. green→green: backend validate:local EXIT 0 — 1444 pass (+2) / 1 skip / 0 fail, tsc 0,
+  musl-biome clean (one format reflow auto-fixed), build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
