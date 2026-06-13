@@ -70,12 +70,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 410 |
-| guard | 6 | 407 |
+| guard | 6 | 414 |
 | bug | 3 | 413 |
 | arch | 5 | 409 |
 | infra | 6 | 412 |
 
-Current cycle: **413**
+Current cycle: **414**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6328,3 +6328,12 @@ Current cycle: **413**
   computeEfficiencyPoint directly (spans all energy, C378). GUARD: +3 (gasEfficiencyPoint gas→point/electric→null; buildMonthlyConsumption + buildSeasonalEfficiency efficiency =
   the gas 30 MPG, NOT the diluted (30+4)/2=17). NON-VACUOUS. be validate:local EXIT 0, 1502 pass (+3) (an import-sort + format reflow → check:musl:fix, re-validated clean).
   cov: be 86.92% (carry, +3 guards) / fe 84.46% (carry).
+- **C414 (guard): pin the LOAD-BEARING edge of the #119/#122 gas/charge partition — an EV-ONLY vehicle yields an EMPTY gas-MPG series but a real cost-per-mile** —
+  BALANCE: guard OVER budget (last 407, starved-for 414−407=7 > 6) → forced pick. The C411/C413 fix rests on TWO sides: (a) charge excluded from the gas-MPG average
+  (pinned by the mixed-PHEV tests), and (b) an EV-ONLY car produces a CLEAN-EMPTY gas-MPG series — null avg / empty mpgValues, NOT a phantom mi/kWh mislabeled mi/gal, NOT
+  NaN — WHILE cost-per-mile still computes from charge spend (cost spans all energy, C378). Side (b) was GENUINELY UNPINNED (the existing tests all carry a gas point).
+  VERIFIED FIRSTHAND (C21/C60): computeFuelConsumptionMetrics([]) returns all-null (clean), buildMonthlyConsumption with no gas pair → effCount 0 → efficiency 0 (documented
+  empty value). GUARD: +3 (analytics-charts-unpinned.test.ts) — an all-charge vehicle: mpgValues EMPTY (a refactor reverting gasEfficiencyPoint→computeEfficiencyPoint → len
+  1 [the ~4 mi/kWh] → RED) but costPerMileValues len 1 = $9/240mi; computeFuelConsumptionMetrics all-null (no NaN); buildMonthlyConsumption efficiency 0 not ~4, volume
+  still aggregates the real kWh. NON-VACUOUS. This is a NORTH_STAR #5 merge-surviving tripwire on the C411/C413 partition — distinctly catches an EV-only regression a
+  mixed test (still has a gas point) would miss. No source touched (test-only). be validate:local EXIT 0, 1505 pass (+3). cov: be 86.92% (carry, +3 guards) / fe 84.46% (carry).

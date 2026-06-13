@@ -20,6 +20,7 @@ import {
   buildMonthlyCostHeatmap,
   buildSeasonalEfficiency,
   computeAverageCosts,
+  computeFuelConsumptionMetrics,
   computeMileageScore,
   computeMpgAndCostPerMile,
   computePreviousYearComparison,
@@ -488,5 +489,60 @@ describe('sibling efficiency builders exclude PHEV charge from the gas-MPG avera
   test('buildSeasonalEfficiency avgEfficiency is the gas MPG (30), not diluted', () => {
     const winter = buildSeasonalEfficiency(rows).find((s) => s.season === 'Winter');
     expect(winter?.avgEfficiency).toBeCloseTo(30, 5);
+  });
+});
+
+// C414 (guard, NORTH_STAR #5): the LOAD-BEARING edge of the #119/#122 gas/charge partition — an EV-ONLY
+// vehicle (all charge rows, no gas). The mixed-PHEV tests above pin that charge is excluded from the
+// gas-MPG average; this pins the OTHER side that the C411/C413 fix rests on: a pure-EV car must produce a
+// CLEAN-EMPTY gas-MPG series (null avg / empty mpgValues — NOT a phantom mi/kWh value mislabeled mi/gal,
+// NOT a NaN/divide-by-zero), WHILE cost-per-mile still computes from the charge spend (cost spans all
+// energy, C378). Without this, a refactor reverting gasEfficiencyPoint → computeEfficiencyPoint would
+// re-mislabel an EV-only car's mi/kWh as mi/gal and only a mixed test (which still has a gas point) might
+// stay green — this catches that distinctly. An EV-only car IS a real VROOM vehicle hitting Analytics.
+describe('an EV-only vehicle yields an EMPTY gas-MPG series but a real cost-per-mile (#119/#122 load-bearing edge)', () => {
+  // Two charge sessions on one all-electric vehicle: 20000 → 20240 mi on 60 kWh = 4 mi/kWh, $9 each.
+  const evRows: FuelExpenseRow[] = [
+    fuelRow({
+      vehicleId: 'ev1',
+      date: d(2024, 3, 1),
+      mileage: 20000,
+      volume: 60,
+      expenseAmount: 9,
+      fuelType: 'DC Fast Charging',
+    }),
+    fuelRow({
+      vehicleId: 'ev1',
+      date: d(2024, 3, 10),
+      mileage: 20240,
+      volume: 60,
+      expenseAmount: 9,
+      fuelType: 'DC Fast Charging',
+    }),
+  ];
+
+  test('mpgValues is EMPTY (no charge mi/kWh leaks into the gas-MPG array)', () => {
+    const { mpgValues, costPerMileValues } = computeMpgAndCostPerMile(evRows);
+    expect(mpgValues).toHaveLength(0); // a refactor dropping the gas gate → length 1 here (the ~4 mi/kWh)
+    // cost-per-mile STILL computes: 240 mi driven, $9 → 0.0375 $/mi.
+    expect(costPerMileValues).toHaveLength(1);
+    expect(costPerMileValues[0]).toBeCloseTo(9 / 240, 9);
+  });
+
+  test('computeFuelConsumptionMetrics on the empty series is all-null (no NaN, not a phantom value)', () => {
+    const { mpgValues } = computeMpgAndCostPerMile(evRows);
+    const fc = computeFuelConsumptionMetrics(mpgValues);
+    expect(fc.avgEfficiency).toBeNull();
+    expect(fc.bestEfficiency).toBeNull();
+    expect(fc.worstEfficiency).toBeNull();
+  });
+
+  test('buildMonthlyConsumption shows a 0 gas efficiency for the EV-only month (no mi/kWh masquerading as mi/gal)', () => {
+    const march = buildMonthlyConsumption(evRows).find((m) => m.month === '2024-03');
+    expect(march).toBeDefined();
+    // No gas pair → effCount 0 → efficiency 0 (the documented empty-series value), NOT the ~4 mi/kWh.
+    expect(march?.efficiency).toBe(0);
+    // The volume (kWh) still aggregates — that's a real charge total, not an efficiency.
+    expect(march?.volume).toBeCloseTo(120, 5);
   });
 });
