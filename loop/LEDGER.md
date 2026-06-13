@@ -52,9 +52,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 331 |
 | bug | 3 | 334 |
 | arch | 5 | 332 |
-| infra | 6 | 329 |
+| infra | 6 | 335 |
 
-Current cycle: **334**
+Current cycle: **335**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -5407,3 +5407,11 @@ Current cycle: **334**
   (37.854, NOT →gal); the mirror {volumeUnit only}. NON-VACUOUS (coupling the two guards, or dropping one, flips a field). Caught my own Math.round(160.9344)=161
   slip mid-write. green→green: backend validate:local EXIT 0 — 1440 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.53%
   (carry) / fe 84.39% (carry).
+- **C335 (infra): CLAUDE.md orientation refresh (post-C322 drift, C323–C334)** — BALANCE: infra at budget (last 329, starved-for 335−329=6 = budget,
+  most-starved) → pick. The #5 branch sweep was just done C329; the due infra increment is the CLAUDE.md refresh (last C322, ~13 cycles drift). Read the
+  drift-prone sections against source/LEDGER (no churn — the C5/C47/C72 discipline). FOUND the doc largely current (the closed-bug list is kept current
+  inline each bug cycle — accurate through #99/C330; the pending-Angelo block accurate incl. #94-broadened-C328/#97/#88; coverage re-measured C323 still
+  recent → carried, NOT re-claimed). The one material drift: suite size cited **~1434 BE / ~619 FE** → corrected to **~1440 BE / ~641 FE** (VERIFIED the FE
+  count by running vitest — 641, not a guess; my first edit said 643 from memory, fixed to the measured 641) + named the C322–C334 additions (the #94-volume
+  pin, #99 month-overflow guards, getSyncStatusInfo, year-scoped TCO pins, per-field import-conversion guards). Docs-only; no source/test/build touched (the
+  C309/C316/C322 refresh pattern → no build gate). Next CLAUDE.md refresh ~C348; next #5 sweep ~C339. cov: be 86.53% (carry) / fe 84.39% (carry).

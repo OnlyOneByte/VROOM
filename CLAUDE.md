@@ -183,8 +183,9 @@ Highlights:
   characterize KNOWN-HARD seams via the HTTP harness + raw-seeded providers: `validateStorageConfig`'s 4 consistency
   branches (C239), and the financing refinance-after-payoff balance-reset invariant (C240, a DB-integration net).
   loop-improvement #4 records a `cov:` tag on every LEDGER cycle entry.
-  Suite size today: **~1434 backend tests / ~619 frontend** (a floor — grows most cycles). Don't regress
-  coverage; name why if a cycle drops it.
+  Suite size today: **~1440 backend tests / ~641 frontend** (a floor — grows most cycles; C322–C334 added
+  the #94-volume-pooling pin, the #99 month-overflow-clamp guards, getSyncStatusInfo, the year-scoped TCO
+  pins, the per-field import-conversion guards). Don't regress coverage; name why if a cycle drops it.
 - Testing infra that DOES exist: an in-process backend HTTP harness —
   `backend/src/test-helpers/http-client.ts` `createTestApp()` drives the REAL app over an
   in-memory SQLite DB with a seeded user + a real Lucia session cookie (`ctx.authed/anon`); it's
