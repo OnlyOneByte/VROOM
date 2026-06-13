@@ -71,11 +71,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 416 |
 | guard | 6 | 419 |
-| bug | 3 | 417 |
+| bug | 3 | 420 |
 | arch | 5 | 415 |
 | infra | 6 | 418 |
 
-Current cycle: **419**
+Current cycle: **420**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6387,3 +6387,14 @@ Current cycle: **419**
   genuinely-unpinned invariant): the ONLY prior band coverage (fuel-efficiency.property.test.ts) RE-IMPLEMENTS isRealisticEfficiency as a local reference + tests THAT (the
   C229 theater trap) — so a real MAX_VALID_MPG drift would leave it green. +6 guards (analytics-charts-unpinned.test.ts) driving the EXPORTED computeEfficiencyPoint: gas
   100→kept / 101→null / 5→kept / 4→null; electric 10→kept / 11→null. NON-VACUOUS (a band-constant change → RED). be validate:local EXIT 0, 1514 pass (+6). cov: be 86.92% (carry, +6 guards) / fe 84.46% (carry).
+- **C420 (bug): reminder date-advance recurrence math + insurance premium-amortization CERTIFIED CLEAN (dormant-vein scout, no defect; docs-only)** — BALANCE: bug AT
+  budget (last 417, starved-for 420−417=3=budget, the tightest "never-sits") tied with arch (5=5) → took bug. 2-agent fan-out on two under-recently-audited money/date
+  surfaces. (A) reminder DATE-ADVANCE arithmetic (trigger-service.ts advanceCustom/clampToAnchorDay/computeNextDueDate): CERTIFIED CLEAN — EVERY setMonth/setFullYear is
+  preceded by `next.setDate(1)`, so the backend does NOT carry the #99 (C330) bare-setMonth day-overflow class; anchor read fresh from startDate each advance (no drift, a
+  Jan-31 monthly clamps to Feb-28 then re-anchors to Mar-31); leap-year Feb-29 yearly correct; strict monotonicity holds (the no-progress backstop can't mis-fire). VERIFIED
+  FIRSTHAND the overflow-clamp is COMPREHENSIVELY pinned (compute-next-due-date.property.test.ts Property 2 + explicit Jan31→Feb28/Feb29 cases) → no unpinned invariant.
+  (B) insurance premium-amortization (effectiveMonthlyPremium/accumulateMonthlyPremiums/monthKeysInRange): CERTIFIED CLEAN — div-by-zero guarded (monthsInTerm===0→0),
+  monthlyCost precedence, totalCost amortized over the SAME monthKeysInRange the trend uses (sums to totalCost exactly), latest-term-only per policy (no cross-term
+  double-count), largest-remainder split penny-exact (C382), validation rejects endDate<=startDate (no zero-length term). Known shape-mismatches (#19 trend-dates-totalCost-
+  on-startDate-month, #69 monthly-only-term-absent-from-TCO) already filed/escalated, NOT re-reported. NO reachable atomic defect, NO genuinely-unpinned reachable invariant
+  → CERTIFICATION only (C306/C345/C402 precedent; a manufactured test = the C181/C229 coverage-theater trap). Docs-only, no source/test touched. cov: be 86.92% (carry) / fe 84.46% (carry).
