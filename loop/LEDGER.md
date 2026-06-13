@@ -71,11 +71,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 404 |
 | guard | 6 | 407 |
-| bug | 3 | 405 |
+| bug | 3 | 408 |
 | arch | 5 | 403 |
 | infra | 6 | 406 |
 
-Current cycle: **407**
+Current cycle: **408**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6257,3 +6257,17 @@ Current cycle: **407**
   from the validator map → that photo restores as "unknown entity type" → validateBackupData false → the WHOLE restore aborts → RED. When a 6th photo target is added to
   the upload path, this fails until the validator map learns it. be validate:local EXIT 0, 1492 pass (+1) (a useConsistentArrayType lint on Array<[...]> → hand-fixed to
   the T[] shorthand, re-validated clean). cov: be 86.92% (carry, +1 guard) / fe 84.45% (carry).
+- **C408 (bug → #118: the split-expense create schema's tags BYPASSED the #104 separator-rejection — re-opening the C352 CSV round-trip data-loss on the one boundary
+  that fix missed)** — BALANCE: bug AT budget (last 405, starved-for 408−405=3=budget, the tightest "never-sits" category) tied with arch (5=5) → took bug. 2-agent
+  fan-out (EV/unit math + split/tag). VERIFIED FIRSTHAND (C21/C60): createSplitExpenseSchema (validation.ts:80) had `tags: z.array(z.string()).optional()` — a bare array
+  that bypassed the tagElementSchema separator-refine the REGULAR create/update boundaries enforce (routes.ts:55-64, the #104/C352 fix). The FE forwards split tags
+  verbatim (expense-api createSplitExpense → POST /expenses/split), createSiblings persists `tags: params.tags ?? null` onto every sibling (split-service.ts:103), the CSV
+  export joins tags with '; ' + import splits on /[;,]/ → a `road; trip` tag round-trips into TWO tags (silent data loss). #104/C352 fixed this "at the write boundary"
+  but landed only on the regular create/update schemas — the SPLIT-create schema is a separate def in validation.ts that the fix missed. The split-UPDATE path is safe
+  (reuses firstOld.tags, accepts no fresh tags). FIX (atomic + arch-clean, ONE source of truth): lifted tagElementSchema from routes.ts INTO validation.ts (its natural
+  home — a validation primitive; routes→validation is the existing import direction, no cycle), exported it, routed createSplitExpenseSchema's tags through
+  `z.array(tagElementSchema).max(maxTags)`, and re-imported it into routes.ts (the 2 regular boundaries unchanged). GUARD: +4 (split-validation-schema.test.ts): split-
+  create rejects a ';'-tag (cites the #104 message) / a ','-tag / an empty tag; separator-free tags pass (control). NON-VACUOUS (RED pre-fix — the bare array accepted
+  them). be validate:local EXIT 0, 1496 pass (+4) (a format reflow → check:musl:fix one-lined a .some(), re-validated clean). The paired EV finding (PHEV charge rows
+  contaminate the analytics FuelStats MPG card — computeMpgAndCostPerMile has no gas/charge partition, unlike vehicle-stats.ts/C353; the agent flags it spans the
+  sibling builders too) is REAL + reachable → FILED below for a near-term cycle (NOT bundled — broader than one boundary). cov: be 86.92% (carry, +4 guards) / fe 84.45% (carry).

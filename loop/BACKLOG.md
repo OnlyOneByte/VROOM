@@ -829,6 +829,27 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
    FUTURE: when a NEW hand-assembled response is added, lock it in the same cycle (now the established pattern).*
 
 ### bug
+> ~~**#118 (MED, data-safety / NORTH_STAR #1 — found+fixed C408 on a split/tag bug scout; the #104/C352 CSV round-trip class, on the boundary that fix missed) — the
+> split-expense create schema's tags bypassed the separator-rejection, re-opening the silent tag-split-on-round-trip.**~~ — *DONE C408: createSplitExpenseSchema
+> (validation.ts:80) had `tags: z.array(z.string()).optional()` — a bare array bypassing the tagElementSchema separator-refine (#104/C352) the regular create/update
+> boundaries enforce. A split tag `road; trip` (FE forwards verbatim → createSiblings persists onto every sibling) round-trips into TWO tags via export ('; '-join) →
+> import (/[;,]/-split). #104/C352 fixed this "at the write boundary" but only on the regular schemas; the split-create schema is a separate def it missed. FIX (atomic +
+> arch-clean): lifted tagElementSchema from routes.ts INTO validation.ts (ONE source of truth; routes→validation import direction, no cycle), routed the split tags
+> through it, re-imported into routes.ts (regular boundaries unchanged). +4 guards (split-create rejects ';'/','/empty tag; control passes). NON-VACUOUS. be
+> validate:local EXIT 0, 1496 pass (+4). The split-UPDATE path was already safe (reuses firstOld.tags).*
+
+> **#119 (MED, correctness/units / NORTH_STAR #1 — found C408 on an EV/unit bug scout; FILED, not yet fixed) — a plug-in hybrid's CHARGE sessions contaminate the
+> analytics Fuel Stats "MPG" card.** The analytics FuelStats path (analytics/repository.ts computeMpgAndCostPerMile → computeFuelConsumptionMetrics, via
+> computeEfficiencyPoint in analytics-charts.ts:~122) has NO gas/charge partition — queryFuelExpenses returns all category='fuel' rows (gas gal + charge kWh) with no
+> fuelType filter, and computeEfficiencyPoint accepts an electric row (gated only by the per-row realistic-efficiency band), so a charge session's ~3 mi/kWh point lands
+> in the SAME mpgValues array as a ~40 mi/gal gas point. FuelStatsTab renders avg/best/worst under an "mi/gal" label → worstEfficiency shows ~3 "mi/gal", the avg is
+> dragged down, all mislabeled. DISTINCT from C353 (which isolated MPG/mi-kWh ONLY in vehicle-stats.ts — the analytics path has zero electric awareness) and from #94
+> (cross-VEHICLE pooling; this is within ONE vehicle mixing two different quantities). Reachable: any PHEV with both gas fillups + charge sessions, Analytics→Fuel Stats.
+> FIX: exclude electric rows from the MPG pairing in computeMpgAndCostPerMile (`if (isElectricFuelType(current.fuelType)) return;` — isElectricFuelType already imported
+> at analytics-charts.ts:1), mirroring vehicle-stats.ts's partition. NOTE the sibling builders (buildMonthlyConsumption/buildSeasonalEfficiency/buildDayOfWeekPatterns)
+> share computeEfficiencyPoint and warrant the same guard — so this is a small coherent multi-site fix, best as its own cycle (a bug if scoped to the headline
+> computeMpgAndCostPerMile card, or arch if consolidating the partition across all pairing sites). NORTH_STAR #1 money/efficiency-facing.
+
 > ~~**#117 (MED, money/correctness / NORTH_STAR #1 — found C404 on a financing-planner deep-review scout; the #92 symptom re-manifested at the planner layer) — a
 > 0%-APR loan in the Payment Planner always shows "0 mos / $0 saved" no matter the extra payment.**~~ — *DONE C405: baseline = `minimumPayment > 0 ? minimumPayment :
 > financing.paymentAmount` in computePlannerState (primary + secondary-delta), so a 0%-APR loan (minimumPayment=0) uses its real contractual payment as the baseline

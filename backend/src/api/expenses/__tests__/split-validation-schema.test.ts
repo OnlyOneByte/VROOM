@@ -156,6 +156,45 @@ describe('createSplitExpenseSchema — source fields are both-or-neither', () =>
   });
 });
 
+// C408 (#104/C352 hole): the split-create schema's tags were a bare z.array(z.string()) that bypassed
+// the tagElementSchema separator-rejection the regular create/update boundaries enforce. A tag containing
+// ';' or ',' persisted onto every sibling, then the CSV export ('; '-join) → re-import (/[;,]/-split)
+// round-tripped it into MULTIPLE tags (silent data loss). Now routed through the shared tagElementSchema.
+// Pre-fix these REJECT-assertions were RED (the bare array accepted the separator tag).
+describe('createSplitExpenseSchema — tags reject the CSV separator (#104, C408)', () => {
+  const splitBase = {
+    ...baseCreate,
+    splitConfig: { method: 'even' as const, vehicleIds: ['v1', 'v2'] },
+  };
+
+  test('a tag containing a semicolon is rejected', () => {
+    const r = createSplitExpenseSchema.safeParse({ ...splitBase, tags: ['road; trip'] });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.message === 'Tag cannot contain a semicolon or comma')
+      ).toBe(true);
+    }
+  });
+
+  test('a tag containing a comma is rejected', () => {
+    const r = createSplitExpenseSchema.safeParse({ ...splitBase, tags: ['errand,grocery'] });
+    expect(r.success).toBe(false);
+  });
+
+  test('an empty tag is rejected (min(1), like the regular boundary)', () => {
+    expect(createSplitExpenseSchema.safeParse({ ...splitBase, tags: [''] }).success).toBe(false);
+  });
+
+  test('separator-free tags still pass (control)', () => {
+    const r = createSplitExpenseSchema.safeParse({
+      ...splitBase,
+      tags: ['road trip', 'business'],
+    });
+    expect(r.success).toBe(true);
+  });
+});
+
 describe('updateSplitSchema — shares the same refinement', () => {
   test('absolute-sum refinement applies; totalAmount optional means the absolute check is skipped when omitted', () => {
     // With totalAmount present, the sum must match.

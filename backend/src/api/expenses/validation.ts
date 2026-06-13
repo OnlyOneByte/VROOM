@@ -1,4 +1,24 @@
 import { z } from 'zod';
+import { CONFIG } from '../../config';
+
+// ---------------------------------------------------------------------------
+// Tag element — ONE source of truth (C408). A tag may not contain ';' or ',' because the CSV export
+// joins tags with '; ' and the importer splits on /[;,]/, so a separator-bearing tag round-trips into
+// MULTIPLE tags (silent data loss, #104/C352). Enforced at EVERY tag write boundary: the regular
+// create/update schemas (routes.ts imports this) AND the split-create schema below — the split boundary
+// was a bare z.array(z.string()) that bypassed the #104 refine, persisting a `road; trip` tag that
+// split on export→re-import (the C352 fix landed on the regular boundaries but missed this one).
+// ---------------------------------------------------------------------------
+export const tagElementSchema = z
+  .string()
+  .min(1)
+  .max(
+    CONFIG.validation.expense.tagMaxLength,
+    `Tag must be ${CONFIG.validation.expense.tagMaxLength} characters or less`
+  )
+  .refine((t) => !t.includes(';') && !t.includes(','), {
+    message: 'Tag cannot contain a semicolon or comma',
+  });
 
 // ---------------------------------------------------------------------------
 // Split Config Schemas (discriminated union on `method`)
@@ -77,7 +97,7 @@ export const createSplitExpenseSchema = z
   .object({
     splitConfig: splitConfigSchema,
     category: z.string().min(1),
-    tags: z.array(z.string()).optional(),
+    tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
     date: z.coerce.date(),
     description: z.string().optional(),
     totalAmount: z.number().positive('Amount must be positive'),

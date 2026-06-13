@@ -39,30 +39,16 @@ import {
 } from './import-mapping';
 import { detectSource } from './import-mapping-presets';
 import { expenseRepository } from './repository';
-import { createSplitExpenseSchema, updateSplitSchema } from './validation';
+import { createSplitExpenseSchema, tagElementSchema, updateSplitSchema } from './validation';
 
 const routes = new Hono();
 
 // Validation schemas derived from db schema
 const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
 
-// One source of truth for a single tag's rules, reused by the create base + the update override (which
-// drops the base `.default([])` to dodge the .partial() clobber, C34/#tags). Beyond the length cap, a
-// tag may NOT contain ';' or ',': the CSV export joins tags with '; ' and import splits on /[;,]/, so a
-// tag holding a delimiter round-trips into MULTIPLE tags — silent data loss on export→re-import
-// (#104, NORTH_STAR #1). Rejecting at the write boundary keeps the round-trip lossless; separator-free
-// tags are unaffected.
-const tagElementSchema = z
-  .string()
-  .min(1)
-  .max(
-    CONFIG.validation.expense.tagMaxLength,
-    `Tag must be ${CONFIG.validation.expense.tagMaxLength} characters or less`
-  )
-  .refine((t) => !t.includes(';') && !t.includes(','), {
-    message: 'Tag cannot contain a semicolon or comma',
-  });
-
+// tagElementSchema (the #104 separator-rejection + length cap) is the ONE source of truth, now in
+// validation.ts so the split-create schema shares it too (C408); reused here by the create base + the
+// update override (which drops the base `.default([])` to dodge the .partial() clobber, C34/#tags).
 const baseExpenseSchema = createInsertSchema(expensesTable, {
   tags: z
     .array(tagElementSchema)
