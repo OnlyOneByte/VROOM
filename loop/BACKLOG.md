@@ -534,6 +534,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C443 — pin updateTermSchema's CONDITIONAL date-order refine (the partial-update both-dates / single-date-skip cells, via the REAL exported schema).**~~ — *DONE C443
+> (guard OVER budget 7>6 → forced). First weighed a class-level source-scan for the #128 fromBackendExpense-skip family (bit twice, C431/C442) but REJECTED it firsthand — no
+> false-positive-free syntactic signal (analytics getVehicleExpenses/getExpenseSummary/getVehicleStats return aggregated/typed data, correctly no mapper), and the class is
+> currently clean. Fanned out instead: updateTermSchema (insurance/validation.ts:73-80) enforces endDate>startDate ONLY when both dates are present + skips for a single-date
+> partial update (the update-vs-create distinction; the repo writes one date with no cross-check → the schema is the only order gate). Reachable via PUT /insurance/:id/terms/:termId.
+> No test drove it (property suite covers only createTermSchema; the partial-update test sends no dates). +3 tests on the REAL schema: both-end>start→accept; inverted AND equal→reject;
+> single-date (start/end/neither)→accept. NON-VACUOUS. be validate:local EXIT 0, 1537 pass (+3).*
+
 > ~~**C436 — pin the 5 zero-test chart-formatters exports (FE LayerChart axis/series callbacks rendered on real charts).**~~ — *DONE C436: guard most-starved
 > (6/6, at budget). 2-agent fan-out — BE scout returned the pure-fn guard surface SATURATED (the only untested export, validateLoanTerms, is DEAD defensive code behind a
 > Zod schema that rejects every error-branch input → a guard would be VACUOUS; correctly rejected). FE confirmed the C430-flagged chart-formatters.ts cluster: formatDecimalAxis

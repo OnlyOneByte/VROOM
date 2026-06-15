@@ -76,12 +76,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 439 |
-| guard | 6 | 436 |
+| guard | 6 | 443 |
 | bug | 3 | 442 |
 | arch | 5 | 438 |
 | infra | 6 | 440 |
 
-Current cycle: **442**
+Current cycle: **443**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6653,3 +6653,14 @@ Current cycle: **442**
   EXIT 0, 707 pass (count unchanged — tests strengthened not added). The #133 SECONDARY note (the date/amount query params are dropped by the backend schema → the fuzzy pre-check scans only page 1) is a multi-file/
   backend-schema change, NOT this fix — left filed in the bug queue. cov: be 86.94% (carry) / fe 85.26% (carry, +the type-lie fix). Two of the three open queued bugs now closed this session (#131 C437, #133 C442); #129
   (product-gated) remains.
+- **C443 (guard): pin updateTermSchema's CONDITIONAL date-order refine (the partial-update both-dates / single-date-skip cells, via the REAL exported schema)** —
+  BALANCE: guard OVER budget (last 436, starved-for 443−436=7 > 6) → FORCED guard. First weighed a class-level source-scan for the #128 fromBackendExpense-skip family (C431/C442 bit twice)
+  but REJECTED it firsthand: a scan can't cleanly distinguish a raw-Expense-row read from an aggregated/typed one (analytics getVehicleExpenses returns pre-aggregated month/category data,
+  correctly no mapper; getExpenseSummary/getVehicleStats/getSplitGroup too) → no false-positive-free syntactic signal, unlike the #87 `.toISOString().slice` antipattern; the class is also
+  currently CLEAN (all genuine Expense-row reads now map). So fanned out for a genuinely-unpinned reachable invariant instead. VERIFIED FIRSTHAND (C21/C60): updateTermSchema (insurance/
+  validation.ts:73-80) has a CONDITIONAL refine — `if (startDate && endDate) return endDate > startDate; return true` — so it enforces order ONLY when both dates are present and DELIBERATELY
+  skips it for a single-date partial update (the update-vs-create distinction; the repo writes whichever single date is sent with independent guards + no cross-check, so the schema is the
+  ONLY order gate). Reachable via PUT /insurance/:id/terms/:termId. NO test drove it: the property suite drives only createTermSchema; the only updateTermSchema test (partial-update-no-default-
+  injection) sends no dates → all three behavioral cells unpinned. +3 tests (insurance-validation.property.test.ts) driving the REAL schema: both-dates end>start→accept; inverted AND equal
+  (the `>` not `>=`)→reject; single-date (start-only / end-only / neither)→accept (the skip branch). NON-VACUOUS (each cell flips under a refine tighten/drop). be validate:local EXIT 0, 1537
+  pass (+3). cov: be 86.94% (carry, +3 guards) / fe 85.26% (carry).
