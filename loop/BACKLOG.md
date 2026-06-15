@@ -514,6 +514,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C430 — close a C181/C229 coverage-theater gap: drive the REAL calculateVehicleStats through the `mpg > 0 && mpg < 150` outlier band (the suite only had a local re-implementation).**~~ —
+> *DONE C430: guard most-starved actionable (last 425, starved-for 5, closest to budget). 2-agent fan-out; BE #1 was a genuine coverage-theater trap. calculateAverageMpg
+> (vehicle-stats.ts:179) drops a pair outside `mpg > 0 && mpg < 150`, reached LIVE via GET /vehicles/:id/stats — but vehicle-stats.property.test.ts "covered" the band only via
+> a LOCAL re-implementation (referenceMpg L43-59 / countUnfilteredPairs L64-76, each carrying their own copy of the filter); Properties 1-3 assert the COPIES, the real-export
+> blocks only feed 8-40 MPG → the boundary was never driven (the C181/C229 anti-pattern). +3 guards driving the REAL export: above-band 175 MPG dropped (→ stays 30, not 102.5);
+> EXACTLY-150 dropped (load-bearing `<150` not `<=150` → not 90); zero-delta dup-odometer dropped (the `mpg>0` edge → not 15). NON-VACUOUS. INTERSECTS #30 (C419) — locks today's
+> (0,150) contract so a regression is detectable WITHOUT pre-deciding the [5,100]/[1,10] unification (noted in the test header). Chose this over the FE chart-formatters picks
+> (getTrendLineProps/getXTickCount/formatDateTick — genuinely unpinned but lower-stakes display utils vs a money-facing metric's coverage-theater hole). One biome line-wrap
+> reflow, then re-validated. be validate:local EXIT 0, 1529 pass (+3).*
+
 > ~~**C396 — pin restore's expense-source dangling-ref rejection (validateExpenseSourceRefs — the expense-level sibling of the junction/financing checks).**~~ —
 > *DONE C396: validateReferentialIntegrity hard-fails a restore if a 'reminder'-sourced expense points at a reminder NOT in the backup (backup.ts:781) — the
 > C246/C339 dangling-ref class. restore-junction-refs.test.ts pinned the JUNCTION + FINANCING ref checks but NOT the expense-SOURCE one. +1 guard: seed a

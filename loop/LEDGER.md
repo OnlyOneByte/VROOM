@@ -70,12 +70,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 427 |
-| guard | 6 | 425 |
+| guard | 6 | 430 |
 | bug | 3 | 428 |
 | arch | 5 | 426 |
 | infra | 6 | 429 |
 
-Current cycle: **429**
+Current cycle: **430**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6487,3 +6487,14 @@ Current cycle: **429**
   list (#125 financing-source-PUT, #126 converted-path PHEV-MPG, #127 restore-uniqueness) + bumped "all landed C155→C428"; (4) added the TWO new pending-Angelo escalations
   to that block — #30 MPG-band divergence (C419) + #127 restore-atomicity (C428, HIGH). Doc-only, no code touched → no build gate (CLAUDE.md not compiled; verified the
   edits read coherently + preserved structure). cov: be 86.93% (carry) / fe 84.51% (carry). Next CLAUDE.md refresh ~C439; next #5 sweep ~C433.
+- **C430 (guard → close a C181/C229 coverage-theater gap: the realistic-MPG outlier band `mpg > 0 && mpg < 150` was "covered" only by a LOCAL re-implementation, never the real export)** —
+  BALANCE: nothing over budget (deep-review 3, guard 5/6, bug 2, arch 4, infra 1, feature parked); guard MOST-STARVED actionable (last 425, starved-for 430−425=5, closest to its 6 budget) → highest-leverage.
+  2-agent fan-out (BE + FE unpinned-invariant scouts). BE #1 was the clear pick: a genuine coverage-theater trap. VERIFIED FIRSTHAND (C21/C60): calculateAverageMpg (vehicle-stats.ts:179) drops a fuel pair whose
+  MPG is outside `mpg > 0 && mpg < 150` as a likely data error; it's reached LIVE via GET /vehicles/:id/stats (routes.ts:346, trackFuel=true) on ordinary DB-valid fuel rows. But vehicle-stats.property.test.ts
+  "covered" the band ONLY through a local re-implementation — referenceMpg (L43-59) + countUnfilteredPairs (L64-76) each carry their OWN copy of `mpg > 0 && mpg < 150`, and Properties 1-3 assert against those COPIES,
+  never importing the real export's filter; the real-export regression blocks (#75 order-indep, Property 6 mixed) only feed realistic 8-40 MPG, so the boundary was never driven (the exact C181/C229 anti-pattern).
+  +3 guards driving the REAL calculateVehicleStats: an above-band pair (175 MPG, 2-gal-after-350mi mistype) dropped → avg stays 30 (regressed `<150` → 102.5); an EXACTLY-150 pair dropped (the load-bearing `<150` not
+  `<=150` → would be 90); a zero-delta/duplicate-odometer pair dropped (the `mpg>0` edge → would be 15). All NON-VACUOUS (the avg-only-the-kept-pair assertion catches each loosening). This also INTERSECTS the escalated #30
+  band-divergence (C419) — pinning today's (0,150) contract LOCKS the behavior so a silent regression is detectable WITHOUT pre-deciding the [5,100]/[1,10] unification (noted in the test header). Chose the BE trap over the
+  FE chart-formatters picks (getTrendLineProps/getXTickCount/formatDateTick — genuinely unpinned but lower-stakes display utils vs a money-facing displayed-metric coverage-theater hole). One biome line-wrap reflow
+  (check:musl:fix) on a long object literal, then re-validated. be validate:local EXIT 0, 1529 pass (+3). cov: be 86.93% (carry, +3 guards) / fe 84.51% (carry).
