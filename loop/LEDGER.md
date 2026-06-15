@@ -89,9 +89,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 463 |
 | bug | 3 | 466 |
 | arch | 5 | 464 |
-| infra | 6 | 460 |
+| infra | 6 | 467 |
 
-Current cycle: **466**
+Current cycle: **467**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6903,3 +6903,11 @@ Current cycle: **466**
   (cross-cutting.property.test.ts only checks tenant-scoping with volume-bearing rows). FIX (the established one-liner mirroring :691/:855): `if (!isFillup(row)) continue;` + updated the isFillup
   docstring's swept-site list. +3 guards (baseline avg; split-sibling NOT counted → $40 not $35; vehicle with only split-legs → no row). PROVEN NON-VACUOUS (deleting the guard line → exactly the 2
   #146 tests fail, 44 pass). be validate:local EXIT 0, 1558 pass (+3). Filed #146 (closed same-cycle). cov: be 87.09% / fe 85.89% (~carry; +3 BE, no re-measure).
+- **C467 (infra → CLAUDE.md full refresh — the overdue ~C464 cadence)** —
+  BALANCE: infra the SOLE over-budget category (7>6; deep-review 2/5, guard 4/6, bug 1/3, arch 3/5, feature parked) → forced. The queued CLAUDE.md refresh (deferred at C464 to keep that cycle to its ONE
+  arch increment; last full refresh C454). Doc-only, no source. Refreshed the drifted snapshot to current: (1) COVERAGE line → the C460 full re-measure (be 87.09% line / 86.60% func · fe 85.89% / 87.15%
+  / 78.35%; BE↔FE gap ~1.2pts — was carrying the C447 86.96/86.55 reading); (2) SUITE SIZE → ~1558 BE / ~715 FE (was ~1543/~714) + re-pointed the recent-guard-arc note to C459–C466; (3) CLOSED-BUG ARC →
+  appended #142 (C459 notification-feed) / #144 (C461 sync-worker terminal-auth) / #145 (C465 split-source-link) / #146 (C466 split-sibling fillup-cost) to the fix list, bumped "all landed C155→C466",
+  noted #143/C462 grammar + C464 Lucia dead-code delete; (4) PENDING-ANGELO/CLOSED block → reset the "CLOSED since last refresh" line to the C447→C466 window, recorded the #62/#109/#125 source-link class
+  closed across ALL 3 write paths + the #56/#108/#113 split-sibling sweep, flagged #140 as the one clean-but-eyes-on item still open. No build gate (docs); verified no stale C453/1543/C447 markers remain.
+  Next infra #5 branch-hygiene sweep ~C470; next CLAUDE.md full refresh ~C477. cov: be 87.09% / fe 85.89% (~carry; doc-only, no re-measure).
