@@ -30,17 +30,19 @@ const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 // .toISOString() in the chain — so it never matches.
 const UTC_DATE_INPUT = /\.toISOString\(\)\s*\.\s*(?:split\(\s*['"`]T['"`]\s*\)\s*\[\s*0\s*\]|slice\(\s*0\s*,\s*10\s*\))/;
 
-// The SECOND form of the same bug (#131, C437): a stored ISO date STRING field read straight to its
-// first 10 chars to feed a date input — `r.startDate.slice(0, 10)` / `x.endDate.slice(0, 10)`. There is
-// no `.toISOString()` in the chain (the value is ALREADY a string), so UTC_DATE_INPUT misses it — exactly
-// how ReminderForm.svelte:116 slipped past this guard for ~340 cycles. Slicing the first 10 chars of a
-// noon-local ISO yields the UTC calendar date, which for a UTC+13/+14 user is the PREVIOUS day → the date
-// shifts back every edit-open. Fix is the same: toDateInputValue(new Date(field)). This matches a
-// date-typed PROPERTY access sliced to [0,10) — narrow enough to SKIP the safe sites (expense-filters'
+// The SECOND form of the same bug (#131, C437; #138, C449): a stored ISO date STRING field read straight
+// to its date part to feed a date input — `r.startDate.slice(0, 10)` (#131) OR `t.startDate.split('T')[0]`
+// (#138, InsuranceTermForm/ClaimsSection). There is no `.toISOString()` in the chain (the value is ALREADY
+// a string), so UTC_DATE_INPUT misses it — exactly how ReminderForm.svelte:116 (the `.slice` form) and the
+// two insurance forms (the `.split('T')[0]` form) each slipped past for hundreds of cycles. Either way the
+// first-10-chars / pre-`T` segment is the UTC calendar date, which for a UTC+13/+14 user is the PREVIOUS
+// day vs the noon-local ISO the save persists → the date shifts back every edit-open. Fix is the same:
+// toDateInputValue(field). This matches a date-typed PROPERTY access taken to its date part by EITHER
+// `.slice(0,10)` OR `.split('T')[0]` — narrow enough to SKIP the safe sites (expense-filters'
 // `dateStr.slice(0,10).split('-')` local-parse on a generic param, and a tags-array `.slice(0, 10)` cap —
 // neither is a date-field property access).
 const ISO_STRING_DATE_SLICE =
-	/\.(?:startDate|endDate|dueDate|nextDueDate|purchaseDate|serviceDate|paymentDate)\s*\.\s*slice\(\s*0\s*,\s*10\s*\)/;
+	/\.(?:startDate|endDate|dueDate|nextDueDate|purchaseDate|serviceDate|paymentDate|claimDate)\s*\.\s*(?:slice\(\s*0\s*,\s*10\s*\)|split\(\s*['"`]T['"`]\s*\)\s*\[\s*0\s*\])/;
 
 function stripComments(source: string): string {
 	// Replace block comments with newline-preserving blanks so line numbers stay aligned with the raw source.

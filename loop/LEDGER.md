@@ -82,11 +82,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 445 |
 | guard | 6 | 443 |
-| bug | 3 | 448 |
+| bug | 3 | 449 |
 | arch | 5 | 444 |
 | infra | 6 | 447 |
 
-Current cycle: **448**
+Current cycle: **449**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6724,3 +6724,14 @@ Current cycle: **448**
   ceiling (parseRow was AT 15→18); the EXTRACTION both fixed that (C280 precedent) AND made it ONE source of truth for the import-side clear. +2 guards (import-csv.test.ts): a maintenance row carrying
   mileage/volume/fuelType → all NULL (NON-VACUOUS: pre-fix 120000 persisted); a genuine fuel row → KEEPS them (no over-clear). be validate:local EXIT 0, 1540 pass (+2). #138 (InsuranceTermForm UTC-date)
   remains queued. cov: be 86.96% (carry, +2 guards) / fe 85.89% (carry).
+- **C449 (bug → #138: InsuranceTermForm (+ ClaimsSection sibling) stored term/claim dates at UTC-midnight → displayed a day early for Americas users — the #87/#131 date class on the lone hold-out forms)** —
+  BALANCE: nothing OVER budget; guard AND arch both at budget (6/6, 5/5) but #138 is a concrete reachable money-document-facing defect (already scouted C446) → a real bug outranks a marginal guard/arch pick, and the
+  fix naturally extends the source-scan guard. VERIFIED FIRSTHAND (C21/C60): InsuranceTermForm save (:247-256) sent raw `startDate`/`endDate` ("2026-07-01") → backend z.coerce.date() → 2026-07-01T00:00:00Z (UTC
+  midnight); PolicyTermCard renders formatDate (LOCAL) → "Jun 30, 2026" for a negative-offset user; reload (:133-138) read via `.split('T')[0]` (UTC). Every other date-only form (Expense/Reminder/Vehicle/odometer)
+  already wraps in dateOnlyToISO+toDateInputValue — InsuranceTermForm was the hold-out. WHILE FIXING, firsthand-found the SIBLING: ClaimsSection.svelte saves claimDate via dateOnlyToISO (:141) but RELOADS via
+  `.split('T')[0]` (:119) — the SAME round-trip bug, so fixed it too. FIX (mirror the #131 sibling-form fixes): route both forms' save through dateOnlyToISO + reload through toDateInputValue. GUARD (forms are
+  eyes-on/Playwright-blocked → source-scan net): GENERALIZED no-utc-date-input.test.ts's ISO_STRING_DATE_SLICE regex to also catch the `.split('T')[0]` form (it only matched `.slice(0,10)`, the exact reason both
+  insurance forms slipped past for hundreds of cycles) + added claimDate to the date-field list; flows into the existing offender scan (no new test). PROVEN non-vacuous + false-positive-free firsthand (matches the
+  pre-fix claimDate/startDate .split('T')[0] lines; SKIPS the safe dateStr.slice(0,10).split('-') local-parse). fe validate:local EXIT 0, 713 pass (svelte-check 0, build clean). The #87/#106/#131/#138 UTC-date
+  family is now closed across ALL date-only forms (Expense/Reminder/Vehicle/odometer/InsuranceTerm/Claims), with the source-scan covering BOTH the `.slice(0,10)` AND `.split('T')[0]` antipattern forms. cov: be
+  86.96% (carry) / fe 85.89% (carry, +source-scan generalized). #129/#135 (gated) are the only remaining queued items.

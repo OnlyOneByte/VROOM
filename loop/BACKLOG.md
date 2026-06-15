@@ -930,12 +930,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > a non-fuel row; fuel passes through), routed parseRow's return through it — the extraction ALSO cleared a Biome cognitive-complexity ceiling parseRow tripped (C280 precedent) +
 > made it ONE source of truth for the import-side clear. +2 guards (non-fuel-with-mileage → NULL [non-vacuous]; genuine fuel → kept). be validate:local EXIT 0, 1540 pass (+2).*
 
-> **#138 (MED, correctness/date — found+filed C446; the #87/#131 UTC-date family on the LONE hold-out form; clean one-edit + guard-extension) — InsuranceTermForm sends bare
-> date-only strings → term dates stored at UTC-midnight → displayed a day early for Americas users.** InsuranceTermForm.svelte:247-248/255-256 send the raw `<input type=date>` value
-> ("2026-07-01") verbatim; backend `z.coerce.date()` → 2026-07-01T00:00:00.000Z (UTC midnight); PolicyTermCard renders formatDate (LOCAL) → "Jun 30, 2026" for a negative-offset user.
-> Every other date-only form (Expense/Reminder/Vehicle/odometer/ClaimsSection) already wraps in dateOnlyToISO (noon-local) on save + toDateInputValue on reload; InsuranceTermForm is the
-> lone hold-out. Also skews endDate>startDate refine + getDaysRemaining/isExpiringSoon by ~a day. Clean one-edit (two dateOnlyToISO wraps + two toDateInputValue reloads, mirroring
-> #131) — and the no-utc-date-input source-scan needs a small extension (this site does `s.split('T')[0]` on an intermediate local var, matching neither existing regex). Queued.
+> ~~**#138 (MED, correctness/date — found C446, FIXED C449; the #87/#131 UTC-date family on the lone hold-out forms) — InsuranceTermForm (+ ClaimsSection sibling) stored term/claim
+> dates at UTC-midnight → displayed a day early for Americas users.**~~ — *DONE C449: InsuranceTermForm save sent raw "YYYY-MM-DD" → z.coerce.date() → UTC midnight → formatDate (local)
+> showed the prior day; reload sliced `.split('T')[0]` (UTC). Firsthand-found the SAME round-trip bug in ClaimsSection (saves via dateOnlyToISO, reloads via `.split('T')[0]`) → fixed
+> both. FIX (mirror #131): save through dateOnlyToISO + reload through toDateInputValue on both forms. GUARD: generalized no-utc-date-input.test.ts ISO_STRING_DATE_SLICE to ALSO match
+> `.split('T')[0]` (it only matched `.slice(0,10)`, the exact reason both forms slipped past) + added claimDate. PROVEN non-vacuous + false-positive-free. fe validate:local EXIT 0, 713
+> pass. The #87/#106/#131/#138 UTC-date family is now closed across ALL date-only forms, the source-scan covering both antipattern forms.*
 
 > **#135 (LOW, hygiene/growth — found+filed C445 on the sync deep-review; NOT fixed, a reaping-lifecycle behavior call) — the SyncManager path never reaps synced rows from
 > localStorage.** syncManager.syncAll + resolveConflict only markExpenseAsSynced (sets synced:true, row STAYS in localStorage); they never removeOfflineExpense/clearSyncedExpenses.
