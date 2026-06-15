@@ -551,6 +551,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C456 — pin buildFuelEfficiencyComparison, the cross-vehicle per-month gas-MPG builder (per-vehicle-pairing + gas-gate, via the REAL export).**~~ — *DONE C456 (guard most-starved
+> 6/6). buildFuelEfficiencyComparison (analytics-charts.ts:1175) is exported + rendered on the cross-vehicle tab (getCrossVehicle skipConversion, the default same-units case) but had ZERO
+> test refs; it re-rolls inline TWO load-bearing invariants the prior pins don't reach: groups byVehicle BEFORE pairing (the #54 cross-vehicle-phantom class, but the #54 pin covered the
+> trend path) + gates on gasEfficiencyPoint (the #122/C413 class, but that swept buildMonthly/buildSeasonal, not this). +2 guards driving the REAL export: interleaved two-car rows →
+> each vehicle's own 30 MPG (no cross phantom); a v1 charge row → excluded from v1's gas MPG. NON-VACUOUS. be validate:local EXIT 0, 1545 pass (+2).*
+
 > ~~**C450 — pin getLatestTerm's equal-endDate tiebreak (the load-bearing `>`-not-`>=`, first-seen-wins, via the REAL export).**~~ — *DONE C450 (guard OVER budget 7>6 → forced;
 > arch also over but guard more-starved). getLatestTerm (insurance.ts:57) uses strict `>` so on two terms sharing an identical endDate the FIRST wins. REACHABLE: insuranceTerms has
 > only a NON-unique (policyId, endDate) index → two co-terminating terms can share an endDate; the backend orders desc(endDate) but SQLite's order among equal endDates is unspecified,

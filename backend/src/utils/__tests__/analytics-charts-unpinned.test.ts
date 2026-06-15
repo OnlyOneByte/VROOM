@@ -16,6 +16,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   buildDayOfWeekPatterns,
   buildFillupIntervals,
+  buildFuelEfficiencyComparison,
   buildMonthlyConsumption,
   buildMonthlyCostHeatmap,
   buildSeasonalEfficiency,
@@ -582,5 +583,62 @@ describe('computeEfficiencyPoint — realistic-band boundaries (gas 5–100, ele
     expect(
       computeEfficiencyPoint(cur(10011, 'Level 2 (AC)'), prev(10000, 'Level 2 (AC)'))
     ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildFuelEfficiencyComparison (C456 guard) — the per-vehicle/per-month gas-MPG comparison rendered on
+// the cross-vehicle analytics tab (getCrossVehicle's skipConversion branch, the DEFAULT same-units fleet
+// case). It was the ONE comparison builder with ZERO test references: the #54 cross-vehicle-pairing pin
+// covered the TREND path's forEachVehiclePair, and the #122/C413 gas-gate sweep covered buildMonthly
+// Consumption/buildSeasonalEfficiency — but this builder re-rolls BOTH inline (groups byVehicle before
+// pairing; gates on gasEfficiencyPoint) and neither pin reaches it. These drive the REAL export.
+// ---------------------------------------------------------------------------
+describe('buildFuelEfficiencyComparison (cross-vehicle per-month gas-MPG)', () => {
+  const names = new Map([
+    ['v1', 'Car One'],
+    ['v2', 'Car Two'],
+  ]);
+
+  test('pairs ONLY within a vehicle — interleaved two-car rows never phantom-pair across vehicles (#54)', () => {
+    // INTERLEAVED by date so a naive flat-list pairing would subtract v2's odometer from v1's:
+    //   v1: 1000 → 1300 mi on 10 gal = 30 MPG;  v2: 5000 → 5240 mi on 8 gal = 30 MPG.
+    // A cross-vehicle pair (e.g. v2@5000 − v1@1000) would be ~thousands of miles / a few gal = absurd.
+    const rows: FuelExpenseRow[] = [
+      fuelRow({ vehicleId: 'v1', date: d(2024, 1, 1), mileage: 1000, volume: 10 }),
+      fuelRow({ vehicleId: 'v2', date: d(2024, 1, 10), mileage: 5000, volume: 8 }),
+      fuelRow({ vehicleId: 'v1', date: d(2024, 1, 20), mileage: 1300, volume: 10 }), // v1 pair → 30
+      fuelRow({ vehicleId: 'v2', date: d(2024, 1, 25), mileage: 5240, volume: 8 }), // v2 pair → 30
+    ];
+    const out = buildFuelEfficiencyComparison(rows, names);
+    // Both pairs land in 2024-01; each vehicle's efficiency is its OWN within-vehicle gas MPG = 30.
+    const jan = out.find((m) => m.month === '2024-01');
+    expect(jan, 'a 2024-01 bucket exists').toBeTruthy();
+    const v1 = jan?.vehicles.find((v) => v.vehicleId === 'v1');
+    const v2 = jan?.vehicles.find((v) => v.vehicleId === 'v2');
+    expect(v1?.efficiency).toBeCloseTo(30, 5);
+    expect(v1?.vehicleName).toBe('Car One');
+    expect(v2?.efficiency).toBeCloseTo(30, 5);
+    // NON-VACUOUS: a cross-vehicle phantom pair would push an efficiency wildly off 30 (or out of band → dropped).
+  });
+
+  test('a PHEV CHARGE row on a vehicle contributes NOTHING to its gas-MPG comparison (#122 gas-gate)', () => {
+    // v1: a clean gas pair (30 MPG) PLUS a charge session — gasEfficiencyPoint excludes the electric row,
+    // so v1's comparison efficiency stays the gas 30, never diluted by a ~mi/kWh value.
+    const rows: FuelExpenseRow[] = [
+      fuelRow({ vehicleId: 'v1', date: d(2024, 2, 1), mileage: 2000, volume: 10 }),
+      fuelRow({ vehicleId: 'v1', date: d(2024, 2, 15), mileage: 2300, volume: 10 }), // gas pair → 30
+      fuelRow({
+        vehicleId: 'v1',
+        date: d(2024, 2, 20),
+        mileage: 2360,
+        volume: 15,
+        fuelType: 'Level 2 (AC)',
+      }), // charge
+    ];
+    const out = buildFuelEfficiencyComparison(rows, names);
+    const feb = out.find((m) => m.month === '2024-02');
+    const v1 = feb?.vehicles.find((v) => v.vehicleId === 'v1');
+    expect(v1?.efficiency, 'gas MPG only, charge excluded').toBeCloseTo(30, 5);
   });
 });

@@ -81,12 +81,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 452 |
-| guard | 6 | 450 |
+| guard | 6 | 456 |
 | bug | 3 | 455 |
 | arch | 5 | 451 |
 | infra | 6 | 454 |
 
-Current cycle: **455**
+Current cycle: **456**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6792,3 +6792,12 @@ Current cycle: **455**
   mechanical re-point. fe validate:local EXIT 0, 714 pass, svelte-check 0, build clean. EYES-ON: the card renders only for a lease WITH a mileageLimit, and the demo seed has none → no meaningful default screenshot
   without seeding a lease vehicle → lands "code-complete, eyes-on pending" per the feature-DoD rule (verifiable by inspection: 3 lines re-pointed to a tested helper, internally consistent). cov: be 86.96% (carry) /
   fe 85.89% (carry). The #64/#110/#115/#140 annual-vs-total lease-mileage class is now closed across BOTH cards (PaymentMetricsGrid C398 + LeaseMetricsCard C455).
+- **C456 (guard): pin buildFuelEfficiencyComparison — the cross-vehicle per-month gas-MPG builder (per-vehicle-pairing + gas-gate, via the REAL export)** —
+  BALANCE: guard AND arch both at budget (6/6, 5/5); guard most-starved (6/6) → pick guard. 1-agent fan-out. VERIFIED FIRSTHAND (C21/C60): buildFuelEfficiencyComparison (analytics-charts.ts:1175) is exported, rendered
+  on the cross-vehicle analytics tab via getCrossVehicle's skipConversion branch (the DEFAULT same-units fleet case), yet had ZERO test references — it re-rolls TWO load-bearing invariants inline that the prior pins
+  DON'T reach: (a) groups byVehicle BEFORE pairing (1183-1204), so it never phantom-pairs two cars' odometers (the #54 class — but the #54 pin covered the TREND path's forEachVehiclePair, not this builder's inline
+  grouping); (b) gates on gasEfficiencyPoint (1195), excluding a PHEV charge from the gas-MPG comparison (the #122/C413 class — but that sweep pinned buildMonthlyConsumption/buildSeasonalEfficiency, explicitly NOT this
+  one). +2 guards (analytics-charts-unpinned.test.ts, its home): (1) two vehicles' fillups INTERLEAVED by date (v1 1000→1300/10gal=30, v2 5000→5240/8gal=30) → each vehicle's monthly efficiency is its OWN 30 MPG, no
+  cross-vehicle phantom (a flat-list pairing would subtract v2's 5000 from v1's 1300 = absurd/out-of-band → dropped); (2) a v1 gas pair + a v1 charge session → v1 efficiency stays the gas 30, charge excluded. NON-VACUOUS
+  (a regression dropping the per-vehicle grouping or swapping gasEfficiencyPoint→computeEfficiencyPoint flips the asserted efficiency). One biome import-reorder autofix. be validate:local EXIT 0, 1545 pass (+2). cov:
+  be 86.96% (carry, +2 guards) / fe 85.89% (carry).
