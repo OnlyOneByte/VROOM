@@ -13,8 +13,7 @@ import {
 } from './sync-state.svelte';
 import {
 	getPendingExpenses,
-	loadOfflineExpenses,
-	saveOfflineExpenses,
+	markExpenseAsSynced,
 	offlineExpenseToBackend,
 	type OfflineExpense
 } from '../offline-storage';
@@ -147,7 +146,7 @@ class SyncManager {
 
 					if (syncResult.success) {
 						result.synced++;
-						this.markExpenseAsSynced(expense.id);
+						markExpenseAsSynced(expense.id);
 						this.retryCount.delete(expense.id);
 					} else if (syncResult.conflict) {
 						result.conflicts.push(syncResult.conflict);
@@ -244,21 +243,13 @@ class SyncManager {
 		return amountMatch && tagsMatch && dateMatch ? 'duplicate' : 'modified';
 	}
 
-	private markExpenseAsSynced(expenseId: string): void {
-		const expenses = loadOfflineExpenses();
-		const updatedExpenses = expenses.map(expense =>
-			expense.id === expenseId ? { ...expense, synced: true } : expense
-		);
-		saveOfflineExpenses(updatedExpenses);
-	}
-
 	private async retrySingleExpense(expense: OfflineExpense): Promise<void> {
 		if (!onlineStatus.current) return;
 
 		try {
 			const result = await this.syncSingleExpense(expense);
 			if (result.success) {
-				this.markExpenseAsSynced(expense.id);
+				markExpenseAsSynced(expense.id);
 				this.retryCount.delete(expense.id);
 				const currentExpenses = offlineExpenseQueue.current;
 				offlineExpenseQueue.current = currentExpenses.map(e =>
@@ -309,14 +300,14 @@ class SyncManager {
 							clientId: conflict.localExpense.clientId,
 							forceOverwrite: true
 						});
-						this.markExpenseAsSynced(conflict.localExpense.id);
+						markExpenseAsSynced(conflict.localExpense.id);
 						return true;
 					} catch {
 						break;
 					}
 				}
 				case 'keep_server':
-					this.markExpenseAsSynced(conflict.localExpense.id);
+					markExpenseAsSynced(conflict.localExpense.id);
 					return true;
 				case 'merge':
 					return await this.resolveConflict(conflict, 'keep_local');
@@ -325,12 +316,6 @@ class SyncManager {
 			if (import.meta.env.DEV) console.error('Failed to resolve conflict:', error);
 		}
 		return false;
-	}
-
-	async clearSyncedExpenses(): Promise<void> {
-		const expenses = loadOfflineExpenses();
-		const pendingExpenses = expenses.filter(expense => !expense.synced);
-		saveOfflineExpenses(pendingExpenses);
 	}
 
 	getRetryCount(expenseId: string): number {

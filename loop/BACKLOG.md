@@ -2087,6 +2087,15 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Collapse SyncManager's private markExpenseAsSynced + dead clearSyncedExpenses → the canonical offline-storage exports (cross-file dup + dead-code delete, rule-7 fan-out, done C432).**~~ —
+  *DONE C432 (arch OVER budget, forced): sync-manager.ts had a PRIVATE markExpenseAsSynced (:247, byte-identical to offline-storage.ts:160) + a PUBLIC async clearSyncedExpenses
+  (:330, near-identical to :169) with ZERO callers (grep-confirmed dead). The SAME offline-storage↔sync-manager divergence channel that produced #66/#101 (and that C426
+  getPendingExpenses + C205 offlineExpenseToBackend already collapsed) — these two queue-mutators were the leftover. Routed the 4 `this.markExpenseAsSynced` callers to the
+  imported canonical fn, deleted the private method + the dead public one, dropped the now-unused loadOfflineExpenses/saveOfflineExpenses imports. rule-2 behavior-preserving;
+  rule-3 green→green (offline-storage.test.ts:259/296 anchor the canonical fns; sync-manager.test.ts:94 drives the routed call over its existing markExpenseAsSynced mock — no
+  test touched). fe validate:local EXIT 0, 697 pass, svelte-check 0, build clean. −16 LOC. BE scout returned a clean "nothing worth doing" (remaining BE dups are
+  untested-path [OAuth2-client ctor, analytics catch/log/rethrow] or churn/false-DRY).*
+
 - ~~**Collapse the duplicated getPendingExpenses — sync-manager's private copy → the canonical exported one (cross-file dup, 2 sites → 1, rule-7 fan-out, done C426).**~~ —
   *DONE C426: sync-manager.ts:128-130 had a PRIVATE getPendingExpenses byte-identical to the EXPORTED offline-storage.ts:156 (`loadOfflineExpenses().filter(e => !e.synced)`).
   `!synced` is the contract for "which offline expenses to sync" — a divergent copy desyncs what sync-manager attempts vs what the store considers pending. Deleted the private

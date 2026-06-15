@@ -72,10 +72,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 427 |
 | guard | 6 | 430 |
 | bug | 3 | 431 |
-| arch | 5 | 426 |
+| arch | 5 | 432 |
 | infra | 6 | 429 |
 
-Current cycle: **431**
+Current cycle: **432**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6512,3 +6512,16 @@ Current cycle: **431**
   bug (fed frontend-shaped {amount} + asserted pass-through) — rewrote it to feed BACKEND-shaped rows (incl. an electric volume=30 row) + assert the transform (amount===49.99,
   no expenseAmount prop, charge===30 & volume undefined). NON-VACUOUS (pre-fix amount was undefined, charge unset). fe validate:local EXIT 0, 697 pass (unchanged count — test
   rewritten not added). cov: be 86.93% (carry) / fe 84.51% (carry, type-lie fix). (Filed the BE google-sheets column-letter ceiling as a latent-hardening candidate.)
+- **C432 (arch → collapse SyncManager's private markExpenseAsSynced/clearSyncedExpenses into the canonical offline-storage exports + delete the dead one)** —
+  BALANCE: arch OVER budget (last 426, starved-for 432−426=6 > 5) → FORCED arch pick. rule-7 2-agent fan-out (BE + FE). BE scout returned a clean "nothing worth doing" (the
+  remaining BE dups are either untested-path [OAuth2-client construction, the analytics catch/log/rethrow block — fail green→green rule 3] or churn-grade single-expression
+  idioms / false-DRY [the per-entity validateXxxOwnership family encodes genuinely different scoping policy]). FE scout's RANK-1 was the pick. VERIFIED FIRSTHAND (C21/C60):
+  sync-manager.ts carried a PRIVATE markExpenseAsSynced (:247, byte-identical to offline-storage.ts:160 — load→map(id?{...e,synced:true}:e)→save) AND a PUBLIC async
+  clearSyncedExpenses (:330, near-identical to offline-storage.ts:169) that has ZERO callers anywhere (grep-confirmed dead). This is the EXACT offline-storage↔sync-manager
+  divergence channel that produced bugs #66 (fuelType drop) + #101 (missedFillup drop) — the same two-file fan-out the C426 getPendingExpenses + C205 offlineExpenseToBackend
+  extracts already collapsed; these two queue-mutators were the leftover. FIX (rule-2 behavior-preserving, one coherent change): added markExpenseAsSynced to the existing
+  offline-storage import, routed the 4 `this.markExpenseAsSynced(...)` callers (:151/:254/:305/:312) to it, DELETED the private method + the dead public clearSyncedExpenses,
+  dropped the now-unused loadOfflineExpenses/saveOfflineExpenses imports. rule-3 green→green: the canonical fns are anchored by offline-storage.test.ts:259/296; the
+  sync-manager success path (sync-manager.test.ts:94) drives the routed call (its offline-storage mock already declared markExpenseAsSynced: vi.fn(), now reused — no test
+  assertion on the marking EFFECT, so green→green holds, no test touched). fe validate:local EXIT 0, 697 pass (unchanged), svelte-check 0 errors, build clean. -16 LOC.
+  (Filed nothing new; the BE OAuth2-client dup is noted as a test-add-then-refactor candidate, not a clean green→green pick.) cov: be 86.93% (carry) / fe 84.51% (carry).
