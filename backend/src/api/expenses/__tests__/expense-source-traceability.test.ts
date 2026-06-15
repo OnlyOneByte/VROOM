@@ -208,6 +208,50 @@ describe('#62 — manual expense route rejects system-only sourceTypes', () => {
     });
     expect(res.status).toBe(201);
   });
+
+  // #145 (C465): the SPLIT route (POST /expenses/split) is the THIRD source-link path #125/C422
+  // missed — its schema was z.string().optional() (any string) and the handler ran NO
+  // assertFinancingSourceValid, so a hand-crafted split could forge an unvalidated reminder/
+  // insurance_term link (cascade-delete data-loss vector) OR a 'financing' link to an arbitrary
+  // sourceId (understates the displayed loan balance). Now: non-financing rejected at the schema;
+  // a financing link is validated per vehicle.
+  test('POST /split with a system-only sourceType "insurance_term" is rejected 400 (#145)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+      category: 'financial',
+      totalAmount: 40,
+      date: '2024-03-13T00:00:00.000Z',
+      sourceType: 'insurance_term',
+      sourceId: 'forged-term-id',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('POST /split with sourceType "financing" but a bogus sourceId is rejected (per-vehicle validation) (#145)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+      category: 'financial',
+      totalAmount: 40,
+      date: '2024-03-13T00:00:00.000Z',
+      sourceType: 'financing',
+      sourceId: 'no-such-financing',
+    });
+    // assertFinancingSourceValid throws ValidationError (no active financing / id mismatch) → 400.
+    expect(res.status).toBe(400);
+  });
+
+  test('POST /split with NO source still creates fine (the restriction is not over-broad) (#145)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+      category: 'misc',
+      totalAmount: 25,
+      date: '2024-03-13T00:00:00.000Z',
+    });
+    expect(res.status).toBe(201);
+  });
 });
 
 // #109 (C372): the create schema enforces both-or-neither for sourceType/sourceId via .refine(), but

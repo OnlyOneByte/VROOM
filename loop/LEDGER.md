@@ -85,13 +85,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 461 |
+| deep-review | 5 | 465 |
 | guard | 6 | 463 |
 | bug | 3 | 462 |
 | arch | 5 | 464 |
 | infra | 6 | 460 |
 
-Current cycle: **464**
+Current cycle: **465**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6881,3 +6881,15 @@ Current cycle: **464**
   A true zero-ref EXPORTED-symbol delete (not the C438 coverage-dropping anti-trap; not a mere unexport). FIX: deleted setTestLucia + the dead `testLucia` let, collapsed getLucia to `return lucia`
   (kept the 12-caller seam as a stable indirection point), documented why. rule-2 behavior-preserving (the override could never fire); rule-3 green→green, NO test touched. −8 LOC. be validate:local
   EXIT 0, 1551 pass (UNCHANGED — confirms dead). NOTE: CLAUDE.md full refresh (~C464 cadence) deferred to the next infra pick — kept this cycle to the ONE arch increment. cov: be 87.09% / fe 85.89% (~carry; arch delete, no re-measure).
+- **C465 (deep-review → #145: the /split expense route is the THIRD source-link path #125/C422 missed — forgeable unvalidated source link (money + cascade-delete data-loss))** —
+  BALANCE: nothing strictly OVER budget at C465 (deep-review 4/5, guard 2/6, bug 3/3=AT, arch 1/5, infra 5/6, feature parked) → highest-leverage = the deep-review engine (it's surfaced every real
+  defect this era). 2-agent fan-out on two stale surfaces. (B) CSV foreign-import mapping CERTIFIED CLEAN (verified firsthand): #124 last-separator-wins holds (lone-comma is the gated #24), unit
+  conversions direction/guards sound, detectSource tie is convenience-only (user confirms units), #102 collision→null + #137 clearImportedFuelFields + #C385 date echo-check all hold, unmapped
+  category → misc + surfaced (no silent drop). (A) EXPENSE write-path found #145: the manual /split route (POST /expenses/split) accepted `sourceType: z.string().optional()` (ANY string,
+  validation.ts:115) + the handler ran NO assertFinancingSourceValid — while the regular POST/PUT restrict to z.literal('financing') + fully validate it (#62/C190 + #125/C422). VERIFIED FIRSTHAND:
+  split-validation-schema.test.ts:130 even ASSERTED sourceType:'reminder' parses success. Two reachable harms from a hand-crafted POST: (1) sourceType:'financing'+arbitrary sourceId → summed by
+  computeBalance per vehicle → understates the displayed loan balance (NORTH_STAR #1 money); (2) sourceType:'insurance_term'+a real term id → deleteBySource cascade-DELETES the manual split when
+  that policy is removed (silent data-loss). FIX (mirror the regular path): tightened the split schema's sourceType to z.literal('financing').optional() + sourceId z.string().min(1) (closes the
+  non-financing forge incl. the insurance_term cascade vector) + added assertFinancingSourceValid per DISTINCT split vehicleId in the POST handler (each sibling on its own vehicle's active financing).
+  The PUT path carries no source fields (re-stamps existing) → no new entry once POST is closed. +4 guards (schema rejects reminder/insurance_term/arbitrary; /split route rejects insurance_term + a
+  bogus financing id, accepts source-less), FLIPPED the schema test that codified the hole. NON-VACUOUS. be validate:local EXIT 0, 1555 pass (+4). Filed #145 (closed same-cycle). cov: be 87.09% / fe 85.89% (~carry; +4 BE, no re-measure).

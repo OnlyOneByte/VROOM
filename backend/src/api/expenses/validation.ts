@@ -112,8 +112,17 @@ export const createSplitExpenseSchema = z
     date: z.coerce.date(),
     description: z.string().optional(),
     totalAmount: centsAmount, // quantized to whole cents so groupTotal == Σsiblings (#141)
-    sourceType: z.string().optional(),
-    sourceId: z.string().optional(),
+    // Manual split create accepts ONLY 'financing' as a source link (mirrors the regular create at
+    // routes.ts:84) — and the /split POST handler fully validates it (assertFinancingSourceValid per
+    // vehicle). 'insurance_term' + 'reminder' splits are created EXCLUSIVELY by system paths that
+    // bypass this route (insurance hooks via createSplitExpense; the reminder trigger via a direct
+    // tx.insert), so a bare z.string() here was pure over-permissiveness: a hand-crafted POST could
+    // forge an UNVALIDATED insurance_term/reminder link on the caller's own siblings (#145 — the #62
+    // within-tenant integrity class on the split path #125/C422 missed: skews source-bucketed
+    // analytics, and a real matching sourceId would cascade-delete the manual split when its parent
+    // insurance term is removed). Restricting to 'financing' closes that with zero system-path impact.
+    sourceType: z.literal('financing').optional(),
+    sourceId: z.string().min(1).optional(),
   })
   .superRefine((data, ctx) => {
     refineSplitConfig(data, ctx);

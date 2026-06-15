@@ -235,6 +235,21 @@ routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) =>
   const user = c.get('user');
   const data = c.req.valid('json');
 
+  // A 'financing'-sourced split must point at the active financing of EACH vehicle it touches —
+  // every sibling lands on a different vehicleId, and computeBalance sums by (sourceType,sourceId)
+  // per vehicle, so validate the link against each (#145, the #125/C422 financing-source check the
+  // split path missed). No-op for a source-less split (assertFinancingSourceValid returns early when
+  // sourceType !== 'financing'). The schema now restricts sourceType to the 'financing' literal.
+  if (data.sourceType === 'financing') {
+    const splitVehicleIds =
+      data.splitConfig.method === 'even'
+        ? data.splitConfig.vehicleIds
+        : data.splitConfig.allocations.map((a) => a.vehicleId);
+    for (const vehicleId of new Set(splitVehicleIds)) {
+      await assertFinancingSourceValid(data.sourceType, data.sourceId, vehicleId);
+    }
+  }
+
   const siblings = await expenseRepository.createSplitExpense(data, user.id);
   const first = siblings[0];
   if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {

@@ -123,12 +123,12 @@ describe('createSplitExpenseSchema — absolute-sum refinement (must equal total
 });
 
 describe('createSplitExpenseSchema — source fields are both-or-neither', () => {
-  test('accepts both source fields present, or both absent', () => {
+  test('accepts both source fields present (financing), or both absent', () => {
     const both = createSplitExpenseSchema.safeParse({
       ...baseCreate,
       splitConfig: { method: 'even', vehicleIds: ['v1'] },
-      sourceType: 'reminder',
-      sourceId: 'rem-1',
+      sourceType: 'financing',
+      sourceId: 'fin-1',
     });
     expect(both.success).toBe(true);
 
@@ -137,6 +137,24 @@ describe('createSplitExpenseSchema — source fields are both-or-neither', () =>
       splitConfig: { method: 'even', vehicleIds: ['v1'] },
     });
     expect(neither.success).toBe(true);
+  });
+
+  // #145 (C465): the manual split route accepts ONLY a 'financing' source link (mirrors the regular
+  // create) — 'insurance_term'/'reminder' splits come EXCLUSIVELY from system paths that bypass this
+  // route. Pre-fix the schema was z.string().optional() → a hand-crafted POST could forge an
+  // UNVALIDATED reminder/insurance_term link on the caller's own siblings (skews source-bucketed
+  // analytics; a real matching insurance_term sourceId cascade-deletes the manual split when the
+  // policy is removed). NON-VACUOUS: pre-fix every line here parsed success:true.
+  test('rejects a non-financing sourceType (reminder / insurance_term / arbitrary string) (#145)', () => {
+    for (const sourceType of ['reminder', 'insurance_term', 'manual', 'anything']) {
+      const r = createSplitExpenseSchema.safeParse({
+        ...baseCreate,
+        splitConfig: { method: 'even', vehicleIds: ['v1'] },
+        sourceType,
+        sourceId: 'x-1',
+      });
+      expect(r.success, `sourceType '${sourceType}' must be rejected`).toBe(false);
+    }
   });
 
   test('rejects exactly one source field (type without id, or id without type)', () => {
