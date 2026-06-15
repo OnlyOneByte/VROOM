@@ -885,8 +885,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > Likely fix is a product/direction nuance (don't sync email on login at all / sync only if unset / surface a "your email changed" notice) → consider a quick Angelo confirm
 > before fixing, OR a minimal guard that pins the collision branch first. Lower priority than a money/data-loss bug; queued.
 
-> **#133 (MED, correctness/UX — found C441 on an FE bug-hunt; loop-fixable, NOT yet fixed; the #128 fromBackendExpense-skip class on the fuzzy-conflict path) — sync-manager
-> checkForExistingExpense returns RAW backend rows, so serverExpense.amount is always undefined.** sync-manager.ts:219-234 does a bare `apiClient.get<{date,amount,tags}[]>` on
+> ~~**#133 (MED, correctness/UX — found C441, FIXED C442; the #128 fromBackendExpense-skip class on the fuzzy-conflict path) — sync-manager checkForExistingExpense returned RAW
+> backend rows, so serverExpense.amount was always undefined.**~~ — *DONE C442: mapped the GET rows through fromBackendExpense (one edit, established pattern → fixes amount +
+> volume→charge + category); the fix EXPOSED + corrected two latent test-masking mocks (conflict test + C223 classifyAgainst both fed frontend-shaped rows). NON-VACUOUS (reverting
+> the source turns 3 duplicate-classification tests RED). fe validate:local EXIT 0, 707 pass. The SECONDARY note below (dropped date/amount query params → fuzzy pre-check scans only
+> page 1) stays OPEN as a multi-file/backend-schema change, NOT a one-edit fix. Original grounding kept for the audit trail:* sync-manager.ts:219-234 does a bare `apiClient.get<{date,amount,tags}[]>` on
 > GET /expenses (which returns the backend shape: `expenseAmount`, not `amount`) and never maps through fromBackendExpense. Downstream: determineConflictType (:241) computes
 > `Math.abs(local.amount - server.amount)` → `local.amount - undefined = NaN` → amountMatch ALWAYS false → a genuine duplicate is mis-classified 'modified'; AND
 > SyncConflictResolver.svelte:174 renders `formatAmount(serverExpense.amount)` = `formatAmount(undefined)` → blank server amount in the resolve dialog (+ an electric row's kWh

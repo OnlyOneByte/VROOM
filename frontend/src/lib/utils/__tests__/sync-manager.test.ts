@@ -167,12 +167,23 @@ describe('Sync Manager', () => {
 				}
 			];
 
+			// The server row carries the BACKEND shape: `expenseAmount` (NOT `amount`), and a fuel row's
+			// volume in `volume`. checkForExistingExpense must map it through fromBackendExpense (#133) —
+			// pre-fix it returned the row raw, so `amount` was undefined and determineConflictType's
+			// `Math.abs(local.amount - server.amount)` was NaN → amountMatch false → mis-classified
+			// 'modified'. This mock now reflects the REAL backend response so the test is non-vacuous.
 			const existingExpense = {
 				id: 'server-1',
+				vehicleId: 'vehicle-1',
+				userId: 'user-1',
 				tags: ['fuel'],
 				category: 'fuel',
-				amount: 50.0,
-				date: '2024-01-01'
+				expenseAmount: 50.0,
+				volume: 10.5,
+				fuelType: '87 (Regular)',
+				date: '2024-01-01',
+				createdAt: '2024-01-01T00:00:00.000Z',
+				updatedAt: '2024-01-01T00:00:00.000Z'
 			};
 
 			vi.mocked(loadOfflineExpenses).mockReturnValue(mockExpenses);
@@ -185,7 +196,10 @@ describe('Sync Manager', () => {
 			expect(result.success).toBe(false);
 			expect(result.synced).toBe(0);
 			expect(result.conflicts).toHaveLength(1);
+			// NON-VACUOUS: only correct if the backend expenseAmount was mapped to amount (matching the
+			// local 50.0). Pre-fix amount was undefined → amountMatch false → 'modified'.
 			expect(result.conflicts[0]?.conflictType).toBe('duplicate');
+			expect(result.conflicts[0]?.serverExpense?.amount).toBe(50.0);
 		});
 	});
 
@@ -511,7 +525,10 @@ describe('Sync Manager — conflict classification (determineConflictType)', () 
 		};
 	});
 
-	/** Seed one local offline expense + the server row the conflict-check GET returns; run syncAll. */
+	/** Seed one local offline expense + the server row the conflict-check GET returns; run syncAll.
+	 *  The GET returns the BACKEND shape (expenseAmount), which checkForExistingExpense maps through
+	 *  fromBackendExpense (#133) — so the `server.amount` arg is emitted as expenseAmount on the wire,
+	 *  mirroring the real response (a frontend-shaped mock would mask the #133 mapping bug). */
 	async function classifyAgainst(
 		local: Partial<OfflineExpense>,
 		server: { amount: number; tags: string[]; date: string }
@@ -528,7 +545,19 @@ describe('Sync Manager — conflict classification (determineConflictType)', () 
 			...local
 		};
 		vi.mocked(loadOfflineExpenses).mockReturnValue([localExpense]);
-		mockFetch.mockResolvedValueOnce(apiOk([server])); // checkForExistingExpense GET
+		// Backend-shaped server row: amount → expenseAmount (the real GET payload).
+		const backendRow = {
+			id: 'server-1',
+			vehicleId: 'vehicle-1',
+			userId: 'user-1',
+			tags: server.tags,
+			category: 'fuel',
+			expenseAmount: server.amount,
+			date: server.date,
+			createdAt: '2024-01-01T00:00:00.000Z',
+			updatedAt: '2024-01-01T00:00:00.000Z'
+		};
+		mockFetch.mockResolvedValueOnce(apiOk([backendRow])); // checkForExistingExpense GET
 		const result = await syncManager.syncAll();
 		return result.conflicts[0];
 	}

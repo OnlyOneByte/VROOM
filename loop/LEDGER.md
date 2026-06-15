@@ -77,11 +77,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 439 |
 | guard | 6 | 436 |
-| bug | 3 | 441 |
+| bug | 3 | 442 |
 | arch | 5 | 438 |
 | infra | 6 | 440 |
 
-Current cycle: **441**
+Current cycle: **442**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6641,3 +6641,15 @@ Current cycle: **441**
   reminders-TYPED conflict only appears when probed — a bare conflicts.length>0 would be VACUOUS since the C300 prefs row also collides, so the assertion keys on the reminders-typed conflict specifically). One biome
   format autofix on the new test. be validate:local EXIT 0, 1534 pass (+1). FE scout's #1 (sync-manager checkForExistingExpense skips fromBackendExpense → blank serverExpense.amount + mis-classified conflict, the #128
   class on the fuzzy-match path) FILED as #133 for a future cycle (MED, bounded by clientId idempotency). cov: be 86.94% (carry, +1 guard) / fe 85.26% (carry).
+- **C442 (bug → #133: sync-manager checkForExistingExpense returned RAW backend rows → serverExpense.amount undefined → duplicate mis-classified 'modified' + blank dialog amount; the #128 class on the fuzzy-conflict path)** —
+  BALANCE: nothing OVER budget; guard most-starved (6/6) but the guard surface is near-saturated (C436), whereas #133 is a concrete reachable already-scouted CLEAN one-edit fix → a real defect outranks a marginal guard
+  (fixing it also lands a fresh genuine coverage add). VERIFIED FIRSTHAND (C21/C60): checkForExistingExpense (sync-manager.ts:219) did a bare apiClient.get typed {date,amount,tags}[] on GET /expenses, which returns the
+  BACKEND shape (expenseAmount, not amount) — never mapped through fromBackendExpense. So existing.amount was undefined → determineConflictType (:241) `Math.abs(local.amount − undefined)` = NaN < 0.01 = false →
+  amountMatch ALWAYS false → a genuine byte-identical duplicate mis-classified 'modified' EVERY time; AND SyncConflictResolver.svelte:174 rendered formatAmount(undefined) → blank server amount in the resolve dialog
+  (+ an electric row's kWh stayed in volume not charge). Reachable on a tag-overlap conflict during syncAll. FIX (one edit, the established pattern, the #128 class): import fromBackendExpense + BackendExpenseResponse,
+  type the GET as BackendExpenseResponse[], map each row through fromBackendExpense (fixes amount + volume→charge + category at once). GUARD: no NEW file — the fix EXPOSED two latent test-masking bugs: the existing
+  'should detect and report conflicts' test (:170) AND the C223 classifyAgainst helper (:531) both fed FRONTEND-shaped server rows (amount:), which is why they passed despite the bug. Corrected both to the REAL backend
+  shape (expenseAmount) + added a serverExpense.amount===50 assertion. PROVEN NON-VACUOUS firsthand: reverting the source fix turns 3 duplicate-classification tests RED ('modified' vs 'duplicate'). fe validate:local
+  EXIT 0, 707 pass (count unchanged — tests strengthened not added). The #133 SECONDARY note (the date/amount query params are dropped by the backend schema → the fuzzy pre-check scans only page 1) is a multi-file/
+  backend-schema change, NOT this fix — left filed in the bug queue. cov: be 86.94% (carry) / fe 85.26% (carry, +the type-lie fix). Two of the three open queued bugs now closed this session (#131 C437, #133 C442); #129
+  (product-gated) remains.

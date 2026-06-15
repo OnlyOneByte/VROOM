@@ -19,6 +19,7 @@ import {
 } from '../offline-storage';
 import { extractErrorMessage } from '$lib/utils/error-handling';
 import { apiClient } from '$lib/services/api-client';
+import { type BackendExpenseResponse, fromBackendExpense } from '$lib/services/api-transformer';
 import { browser } from '$app/environment';
 
 // Re-export types and state for consumers
@@ -220,10 +221,15 @@ class SyncManager {
 		expense: OfflineExpense
 	): Promise<{ date: string; amount: number; tags: string[] } | null> {
 		try {
-			const expenses = await apiClient.get<Array<{ date: string; amount: number; tags: string[] }>>(
+			// GET /expenses returns RAW backend rows (expenseAmount, un-split volume) — map each through
+			// fromBackendExpense like every other expense read (#133, the #128 class). Skipping it left
+			// `existing.amount` undefined, so determineConflictType's `Math.abs(local.amount - server.amount)`
+			// was NaN → amountMatch always false → a genuine duplicate mis-classified 'modified', and the
+			// SyncConflictResolver dialog rendered a blank server amount.
+			const rows = await apiClient.get<BackendExpenseResponse[]>(
 				`/api/v1/expenses?vehicleId=${expense.vehicleId}&date=${expense.date}&amount=${expense.amount}`
 			);
-			const expenseList = Array.isArray(expenses) ? expenses : [];
+			const expenseList = Array.isArray(rows) ? rows.map(fromBackendExpense) : [];
 			return (
 				expenseList.find(existing => expense.tags.some(tag => existing.tags?.includes(tag))) || null
 			);
