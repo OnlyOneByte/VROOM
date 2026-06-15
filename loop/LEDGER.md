@@ -69,13 +69,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 427 |
+| deep-review | 5 | 433 |
 | guard | 6 | 430 |
 | bug | 3 | 431 |
 | arch | 5 | 432 |
 | infra | 6 | 429 |
 
-Current cycle: **432**
+Current cycle: **433**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6525,3 +6525,20 @@ Current cycle: **432**
   sync-manager success path (sync-manager.test.ts:94) drives the routed call (its offline-storage mock already declared markExpenseAsSynced: vi.fn(), now reused — no test
   assertion on the marking EFFECT, so green→green holds, no test touched). fe validate:local EXIT 0, 697 pass (unchanged), svelte-check 0 errors, build clean. -16 LOC.
   (Filed nothing new; the BE OAuth2-client dup is noted as a test-add-then-refactor candidate, not a clean green→green pick.) cov: be 86.93% (carry) / fe 84.51% (carry).
+- **C433 (deep-review → auth/session/OAuth + backup-EXPORT path BOTH CERTIFIED CLEAN; +1 RFC-4180 special-char round-trip guard; +1 MED finding FILED)** —
+  BALANCE: deep-review OVER budget (last 427, starved-for 433−427=6 > 5) → FORCED deep-review. 2-agent fan-out on the two stalest data-safety surfaces (auth lifecycle, last
+  touched only in guard cycles; backup EXPORT, last full cert C264). (A) AUTH/SESSION/OAuth CERTIFIED CLEAN — verified firsthand: session rotation create-before-invalidate +
+  fail-open (C313 holds), logout server-side invalidate, provider-callback CSRF (state.userId===session.user.id), tenant-scoped provider read/mutate/unlink + last-sign-in-method
+  guard, credentials never leaked (formatProviderResponse omits + AES-256-GCM at rest), account-linking blocks cross-account hijack (account_conflict, no implicit email merge).
+  FILED (NOT fixed — for a future bug/deep-review cycle) the one real finding: #129 (MED, data-integrity) — the login callback's updateExistingUserProfile (auth/routes.ts:176)
+  OVERWRITES users.email with the provider's reported email on EVERY login; the UNIQUE-collision branch (keeps old email, updates only displayName) is correct + present BUT
+  UNTESTED, and a within-account email drift on a provider-side email change is silent. Bounded (no cross-user takeover — collision handled). (B) BACKUP EXPORT CERTIFIED CLEAN —
+  completeness guards are REAL (CSV schema-derived via getColumnNames; sheets-header-coverage drives the live getTableColumns, not a hand-copied list — genuinely fails on a
+  dropped column); serialization correct (csv-stringify quoted:true ↔ csv-parse, RFC-4180); the backup path's DELIBERATE non-neutralization of formula-injection is by-design
+  (csv-safety.ts:16 — a round-trip artifact must be verbatim/lossless, not human-export-neutralized); #36/#37/#43/#44 confirmed still in their filed/escalated state, none drifted;
+  the C431 column-letter ceiling re-confirmed (reminders=25 cols, 1 short of the Z ceiling). THE strongest unpinned reachable invariant → guard: the existing round-trip tests
+  (claims/maintenance/reminder-split) drive the REAL exportAsZip→restoreFromBackup but NONE seeds a free-text value with a comma/quote/embedded-newline — so the RFC-4180 quoting
+  contract (what stands between a comma in a description and a column-shifted restore) was unpinned. +1 guard (csv-special-chars-roundtrip.test.ts, +2 tests): a vehicle nickname
+  AND an expense description = `Joe's "Daily", commute\nsecond line` (comma+quote+newline at once) survive export→import BYTE-FOR-BYTE through the real stack; + a leading-`=`
+  description round-trips VERBATIM (not neutralized — pins the by-design lossless contract). NOT coverage-theater (drives the real backup/restore, not a local re-stringifier).
+  One biome import-reorder autofix on the new file, then re-validated. be validate:local EXIT 0, 1531 pass (+2). cov: be 86.93% (carry, +2 guards) / fe 84.51% (carry).

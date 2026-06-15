@@ -154,6 +154,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Auth/session/OAuth lifecycle + backup EXPORT path audit (C433) → BOTH CERTIFIED CLEAN; +1 RFC-4180 round-trip guard; filed #129.**~~ — *DONE C433 (deep-review
+> OVER budget 6>5 → forced). 2-agent fan-out on the two stalest data-safety surfaces. (A) AUTH/SESSION/OAuth CERTIFIED CLEAN: session rotation create-before-invalidate +
+> fail-open (C313 holds), logout server-side invalidate, provider-callback CSRF (state.userId===session.user.id), tenant-scoped provider read/mutate/unlink + last-sign-in
+> guard, credentials never leaked (AES-256-GCM at rest, omitted from responses), account-linking blocks cross-account hijack. FILED #129 (MED, see bug queue) — the one real
+> finding: login callback overwrites users.email with the provider email every login; the UNIQUE-collision branch is correct but UNTESTED + a within-account email drift is
+> silent. (B) BACKUP EXPORT CERTIFIED CLEAN: completeness guards REAL (CSV schema-derived; sheets-header-coverage drives live getTableColumns), serialization correct
+> (csv-stringify quoted ↔ csv-parse RFC-4180), non-neutralization by-design (csv-safety.ts:16 — round-trip must be verbatim), #36/#37/#43/#44 unchanged/escalated, C431
+> column-letter ceiling re-confirmed. THE unpinned invariant → guard: existing round-trip tests drive the real exportAsZip→restoreFromBackup but NONE seeds a comma/quote/
+> newline free-text value. +1 guard (csv-special-chars-roundtrip.test.ts, +2): a nickname AND a description = `Joe's "Daily", commute\nsecond line` survive byte-for-byte; +
+> a leading-`=` value round-trips verbatim (pins the lossless-not-neutralized contract). NON-VACUOUS, drives the real stack. be validate:local EXIT 0, 1531 pass (+2).*
+
 > ~~**Reminder trigger/recurring-materialization engine + CSV import↔export round-trip audit (C399) → found+fixed bug #116.**~~ — *DONE C399 (deep-review OVER
 > budget 6>5 → forced). 2-agent fan-out. (A) reminder engine surfaced #116: trigger-service.ts processReminder's catch-up `while` (:443) — the in-loop endDate guard
 > (:445) only inspects nextDue <= now (the while condition); the FINAL advance steps nextDue PAST now and exits the loop UNDER the 12-occurrence cap, never tested
@@ -847,6 +858,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > insert can't fail on it → wipe never runs), +3 guards, closing the concrete reachable trigger. **GENERAL FIX ESCALATED C428 (arch rule-6 — a transaction-semantics change
 > every `async (tx)` in the codebase shares):** make wipe+insert atomic without the broken async rollback (a synchronous bun:sqlite tx for restore / a codebase-wide
 > async-tx-safety wrapper). The transient-insert-failure window stays open until that lands. NORTH_STAR #1 crown-jewel; awaiting Angelo's fix-approach pick.
+
+> **#129 (MED, data-integrity / account-confusion — found C433 on an auth deep-review; loop-fixable, NOT yet fixed) — the OAuth login callback silently overwrites
+> users.email with the provider's reported email on EVERY login.** updateExistingUserProfile (auth/routes.ts:176, reached from the generic callback :441) sets users.email =
+> userInfo.email on every successful login where the provider identity (providerType+providerAccountId, the STABLE key) already maps to a user. The email is mutable on the
+> provider side, so a user changing their GitHub/Google primary email → next VROOM login silently changes their VROOM login email to a value they never set here. The
+> UNIQUE-constraint catch (:193-209) correctly prevents COLLISION with another user's email (keeps old email, updates only displayName) → NOT a cross-user takeover, bounded to
+> within-account drift. REACHABLE (provider email change → next login). The collision/email-update branch (:193-209) is UNTESTED — no test drives updateExistingUserProfile.
+> Likely fix is a product/direction nuance (don't sync email on login at all / sync only if unset / surface a "your email changed" notice) → consider a quick Angelo confirm
+> before fixing, OR a minimal guard that pins the collision branch first. Lower priority than a money/data-loss bug; queued.
 
 > ~~**#128 (LOW, correctness / FE→BE seam, NORTH_STAR #3 — found+fixed C431 on a 2-agent bug-hunt) — reminderApi.getMaterializedExpenses returned RAW backend-shaped rows
 > typed as Expense[], the one expense read that skips fromBackendExpense.**~~ — *DONE C431: bug+arch both AT budget; bug's only OPEN item (#127) is escalated, so a fresh
