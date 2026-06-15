@@ -2216,6 +2216,13 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Collapse the byte-identical insurance term-create schema — createPolicyTermSchema → createTermSchema (2 sources of truth → 1, done C451).**~~ —
+  *DONE C451 (arch OVER budget 7>5, forced): createTermSchema (validation.ts:40-47) + createPolicyTermSchema (:85-92) were BYTE-IDENTICAL (`z.object({...baseTermFields,
+  vehicleCoverage}).refine(endDate>startDate,{message})`). One is embedded in createPolicySchema.terms (POST /insurance), the other re-exported as addTermSchema (POST /:id/terms) —
+  a policy-create term + add-term term validated by two separately-maintained copies, a divergence-bug vector in a money-facing path. Deleted createPolicyTermSchema, pointed
+  createPolicySchema.terms at createTermSchema (identical schema + message → behavior-preserving). green→green via the policy-create HTTP tests + the add-term path + C443 unit tests
+  (no test touched). be validate:local EXIT 0, 1540 pass.*
+
 - ~~**Extract isIncompleteFuelExpense — ONE source of truth for the byte-identical fuel-completeness sync guard (2 inline sites → 1, rule-7 fan-out, done C444).**~~ —
   *DONE C444 (arch OVER budget, forced): the predicate `category==='fuel' && ((!volume && !charge) || !mileage)` was hand-inlined BYTE-IDENTICAL at syncOfflineExpenses
   (offline-storage.ts, warn+continue) + sync-manager.syncSingleExpense (return error) — the EXACT offline↔sync fan-out whose drift caused #66/#101, the same pair C205/C426/C432

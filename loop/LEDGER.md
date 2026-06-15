@@ -83,10 +83,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 445 |
 | guard | 6 | 450 |
 | bug | 3 | 449 |
-| arch | 5 | 444 |
+| arch | 5 | 451 |
 | infra | 6 | 447 |
 
-Current cycle: **450**
+Current cycle: **451**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6743,3 +6743,12 @@ Current cycle: **450**
   (insurance.test.ts:236) asserts only latest.endDate >= every endDate — `>=`-tolerant, so it does NOT pin the tiebreak; a regression to `>=` (last-seen-wins) would silently flip the chosen term. +1 guard
   (two same-endDate terms, distinct id/policyNumber): [A,B]→A AND [B,A]→B (first-seen regardless of order). NON-VACUOUS (a `>=` flip turns both to last-seen). This pins the CURRENT first-seen contract — making
   the tiebreak deterministic ACROSS reads (a secondary sort key) would be a separate product call, NOT this guard. fe validate:local EXIT 0, 714 pass (+1). cov: be 86.96% (carry) / fe 85.89% (carry, +1 guard).
+- **C451 (arch): collapse the byte-identical insurance term-create schema — createPolicyTermSchema → createTermSchema (2 sources of truth → 1)** —
+  BALANCE: arch OVER budget (last 444, starved-for 451−444=7 > 5) → FORCED arch (deep-review also over at 6 but arch more-starved). The C444 BE scout's #1 candidate (it was ranked under the FE pick that
+  cycle). VERIFIED FIRSTHAND (C21/C60): createTermSchema (validation.ts:40-47) and createPolicyTermSchema (:85-92) were BYTE-IDENTICAL — `z.object({...baseTermFields, vehicleCoverage}).refine(endDate>startDate,
+  {message})` — modulo the name + export. baseTermFields was already shared; the duplicated part was the full object+refine wrapper. createPolicyTermSchema is embedded in createPolicySchema.terms (used by POST
+  /insurance); createTermSchema is re-exported as addTermSchema (POST /insurance/:id/terms). So a policy-create term + an add-term term validated by two separately-maintained copies of one shape+refine — a
+  divergence-bug vector in a money-facing path (a future term-validation tightening would have to land in both; missing one → the same term validates differently by entry route). FIX (rule-2 behavior-preserving,
+  ONE coherent change): deleted createPolicyTermSchema, pointed createPolicySchema.terms at createTermSchema (identical schema + error message → no API/output change). rule-3 green→green: the policy-create path is
+  driven by premium-expense-hook/terms-http/policy-delete-cascade/expiring-soon/claim-photos HTTP tests (POST /insurance with ordered-date terms) + the add-term path + the C443 createTermSchema unit tests — GREEN
+  before AND after, no test touched. be validate:local EXIT 0, 1540 pass (unchanged). cov: be 86.96% (carry) / fe 85.89% (carry).
