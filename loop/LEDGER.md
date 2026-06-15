@@ -85,13 +85,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 458 |
+| deep-review | 5 | 461 |
 | guard | 6 | 456 |
 | bug | 3 | 459 |
 | arch | 5 | 457 |
 | infra | 6 | 460 |
 
-Current cycle: **460**
+Current cycle: **461**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6843,3 +6843,16 @@ Current cycle: **460**
   the COVERAGE TREND header. (3) BRANCH_REVIEW.md (gitignored) refresh — header 257→270 commits, +§35 covering the 13-commit C447–C459 delta (4 bugs incl. the #142 feature-disabling mileage-feed +
   #141 split-cents + #140/#139 closing two annual-vs-total/0%-APR CLASSES; the C452/C458 deep-review certs; the C457 dedup-exhausted cert; the C450/C456 guards). Doc/measurement-only — no source
   touched, both coverage runs green. 90%-line goal still structurally gated. Next #5 sweep ~C470; next CLAUDE.md full refresh ~C464. cov: be 87.09% / fe 85.89% (re-measured C460).
+- **C461 (deep-review → #144: sync-worker retries a TERMINAL auth error as a transient flake — the #105/#43/#44 family at the consumer leg)** —
+  BALANCE: nothing OVER budget at C461 (feature parked-170, deep-review 3/5, guard 5/6, bug 2/3, arch 4/5, infra 1/6) → highest-leverage. 2-agent fan-out on the two stalest data-safety
+  surfaces. (A) restore DATA-APPLICATION path (coerceRow coercion across all 15 tables + FK insert order + replace/merge) CERTIFIED CLEAN (verified firsthand): Number(replace(/,/g))+Math.round
+  pins #209's INTEGER + REAL siblings (backup.test.ts:225-255), boolean NULL-vs-0 + JSON double-stringify + the 15-table no-drop coverage guard + the FK order (photoRefs after all photo-parent
+  types) all sound; the comma-strip is the already-gated #124/#24, out of scope. (B) remote storage WRITE adapters CERTIFIED CLEAN at the adapter layer (#103/#105/#123 hold; no sibling raw-fetch
+  bypasses authedFetch's 401→AUTH_INVALID; Drive multi-step leaves at worst an idempotent empty folder; #37 Sheets non-atomic re-confirmed as the escalated HIGH) — but surfaced #144 ONE layer down
+  at the CONSUMER: processSingleRef's catch (sync-worker.ts:260) treated EVERY error identically (status:failed, retryCount+1, backoff) with NO error.code inspection, so a SyncError(AUTH_INVALID) —
+  the revoked/expired token the adapters deliberately emit (#105 comment: "so the user re-connects") — was retried 3× through findPendingOrFailed (`retryCount < 3`) then stranded `failed` with a
+  transient-looking message, burning backoff + giving no reconnect signal. VERIFIED FIRSTHAND: SyncError/SyncErrorCode.AUTH_INVALID/PERMISSION_DENIED/isSyncError all in errors.ts:57-79; the existing
+  fail test (sync-worker.test.ts:369) pins only a plain Error. FIX (one branch): isSyncError && code∈{AUTH_INVALID,PERMISSION_DENIED} → jump retryCount to a new MAX_RETRY_COUNT=3 const (mirrors the
+  repo's `retryCount < 3`, documented coupling) so the ref drops out of the work set + prefix the message "Reconnect required: …" so the provider-stats failed count means reconnect, not flake.
+  +1 guard (AUTH_INVALID upload reject → retryCount:3 not 1 + prefixed message), NON-VACUOUS (pre-fix → retryCount:1/bare). be validate:local EXIT 0, 1550 pass (+1). Filed #144 (closed same-cycle).
+  cov: be 87.09% / fe 85.89% (~carry; +1 BE guard, no re-measure this cycle).

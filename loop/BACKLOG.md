@@ -154,6 +154,8 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Restore data-application path + remote storage write-adapters audit (C461) → BOTH CERTIFIED CLEAN at their own layers; found+fixed #144 (sync-worker retries a terminal auth error as a transient flake).**~~ — *DONE C461 (nothing over budget → highest-leverage). 2-agent fan-out on the two stalest data-safety surfaces. (A) RESTORE data-application (coerceRow coercion across all 15 tables, FK insert order, replace/merge) CERTIFIED CLEAN, verified firsthand: Number(replace(/,/g))+Math.round pins #209's INTEGER+REAL siblings (backup.test.ts:225-255); boolean NULL-vs-0, JSON double-stringify (expenseSplitConfig comma/quote round-trip), the 15-table no-drop coverage guard, the FK order (photoRefs after ALL photo-parent types incl. expense/odometer_entry/insurance_claim), replace-wipe #127 pre-uniqueness guard — all sound; the comma-strip is the already-gated #124/#24 (out of scope). (B) remote storage WRITE adapters CERTIFIED CLEAN at the adapter layer: #103/#105/#123 hold, no sibling raw-fetch bypasses authedFetch's 401→AUTH_INVALID (the one raw Photos download fetch is an unauthed short-lived media URL — NETWORK_ERROR correct), Drive multi-step leaves at worst an idempotently-reused empty folder (never a half-written file / false success), S3 single-call ops + construct-time config completeness; the #37 Sheets clear-then-update non-atomic in-place rewrite re-confirmed as the escalated HIGH (no change). FOUND #144 ONE layer down at the CONSUMER (see bug queue, fixed same-cycle): processSingleRef's catch ignored error.code → a revoked-token AUTH_INVALID was retried as a transient flake. be validate:local EXIT 0, 1550 pass (+1 guard).*
+
 > ~~**Insurance premium-materialization + expenses-split audit (C458) → insurance CERTIFIED CLEAN; found+fixed #141 (split sub-cent groupTotal drift).**~~ — *DONE C458 (deep-review
 > OVER budget 6>5 → forced). 2-agent fan-out. (A) INSURANCE materialization CERTIFIED CLEAN (verified firsthand): largest-remainder cents split exact (C382), re-materialize deletes-
 > before-recreate, #57/#84/C369 hold, no C151 async-tx footgun. (B) EXPENSES split → #141: createSplitExpenseSchema.totalAmount had NO cent quantization; groupTotal stored the raw
@@ -985,6 +987,16 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > under DESC → a just-due mileage notification renders below year-old time ones, AND past limit(100) the mileage axis is invisible entirely (feature-disabling). FIX: orderBy
 > desc(createdAt) (non-null recency axis spanning both types). +1 guard (a later-created mileage notif sorts first); updated the existing "newest-first" test from dueDate-desc (the
 > buggy contract) to createdAt-desc. NON-VACUOUS. be validate:local EXIT 0, 1549 pass (+1).*
+
+> ~~**#144 (MED, reliability/data-safety / NORTH_STAR #1 — found+fixed C461 on a remote-storage-write deep-review; the #105/#43/#44 fail-open family at the sync-worker CONSUMER leg) — the
+> background photo sync-worker retried a TERMINAL auth error as if it were a transient network flake.**~~ — *DONE C461: processSingleRef's catch (sync-worker.ts:260) marked EVERY upload/download
+> failure identically (status:failed, retryCount+1, schedule backoff) with NO error.code inspection. The provider adapters deliberately map a 401/403 to SyncError(AUTH_INVALID) (#105 comment:
+> "so the user re-connects"), but the sole BACKUP consumer ignored it → a revoked/expired token was retried 3× through findPendingOrFailed (`retryCount < 3`) then stranded `failed` with a
+> transient-looking message — burning backoff cycles + giving the user NO reconnect signal (the primary upload route surfaces the 401 correctly; only the background backup path swallowed it →
+> backup silently stops). VERIFIED FIRSTHAND: SyncError/SyncErrorCode.AUTH_INVALID/PERMISSION_DENIED/isSyncError all in errors.ts:57-79; the existing fail test pinned only a plain Error. FIX (one
+> branch): isSyncError && code∈{AUTH_INVALID,PERMISSION_DENIED} → jump retryCount to a new MAX_RETRY_COUNT=3 const (mirrors the repo's `retryCount < 3` bound, documented coupling) so the ref drops
+> out of the work set, + prefix "Reconnect required: …" so the provider-stats failed count means reconnect not flake. +1 guard (AUTH_INVALID upload reject → retryCount:3/prefixed, not 1/bare),
+> NON-VACUOUS. be validate:local EXIT 0, 1550 pass (+1). NOTE: a future UX cycle could surface "reconnect required" in the provider-stats view (routes.ts:616 failed count) — not done here.*
 
 > **#143 (LOW, cosmetic/grammar — found+filed C459 on an FE bug-hunt; clean one-edit, NOT fixed) — formatRelativeTime renders "1 weeks/months/years ago" at the bucket boundaries.**
 > formatters.ts:115-117: `${Math.floor(days/7)} weeks ago` etc. emit "1 weeks ago" (day 7-13), "1 months ago" (30-59d), "1 years ago" (365-729d) — no singular form. Rendered by

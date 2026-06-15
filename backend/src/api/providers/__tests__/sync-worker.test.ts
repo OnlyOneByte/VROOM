@@ -418,6 +418,44 @@ describe('processBatch', () => {
     });
   });
 
+  // #144: a revoked/expired token (AUTH_INVALID) is TERMINAL — the provider adapters map a 401/403
+  // to it (#105) "so the user re-connects". The worker must NOT retry it: jump retryCount to the cap
+  // (so findPendingOrFailed's `retryCount < 3` stops re-picking it) + prefix the message so the
+  // provider-stats `failed` count means "reconnect required", not a transient flake. Pre-fix this
+  // ref would get retryCount:1 and a bare message + burn 3 backoff cycles. The #105/#43/#44 family.
+  test('parks a ref terminally (no retry) on a TERMINAL auth error (#144)', async () => {
+    const { SyncError, SyncErrorCode } = await import('../../../errors');
+    const pendingRef = makePhotoRef({ status: 'pending', retryCount: 0 });
+    const activeRef = makeActiveRef();
+    const photo = makePhoto();
+
+    mockFindPendingOrFailed.mockResolvedValue([pendingRef]);
+    mockFindActiveByPhoto.mockResolvedValue(activeRef);
+    mockFindById.mockResolvedValue(photo);
+    mockDownload.mockResolvedValue(Buffer.from('photo-data'));
+    mockUpload.mockRejectedValue(
+      new SyncError(SyncErrorCode.AUTH_INVALID, 'Google Photos token revoked')
+    );
+
+    const sourceProvider = makeMockProvider('google-drive');
+    const targetProvider = makeMockProvider('google-photos');
+    mockGetProvider
+      .mockResolvedValueOnce(sourceProvider)
+      .mockResolvedValueOnce(targetProvider)
+      .mockResolvedValueOnce(targetProvider);
+
+    await processBatch(makeDeps());
+
+    // retryCount jumps straight to the cap (3) — NOT 1 — so the ref drops out of the work set,
+    // and the message is reconnect-prefixed.
+    expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
+      status: 'failed',
+      errorMessage: 'Reconnect required: Google Photos token revoked',
+      retryCount: 3,
+      syncedAt: expect.any(Date),
+    });
+  });
+
   test('processes multiple refs in a single batch', async () => {
     const ref1 = makePhotoRef({ id: 'ref-1', photoId: 'photo-1', status: 'pending' });
     const ref2 = makePhotoRef({ id: 'ref-2', photoId: 'photo-2', status: 'pending' });
