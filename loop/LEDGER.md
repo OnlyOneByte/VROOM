@@ -76,12 +76,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 433 |
-| guard | 6 | 430 |
+| guard | 6 | 436 |
 | bug | 3 | 434 |
 | arch | 5 | 432 |
 | infra | 6 | 435 |
 
-Current cycle: **435**
+Current cycle: **436**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6572,3 +6572,15 @@ Current cycle: **435**
   [#C404 closed, #127 mitigated+escalated], ~19 arch dedups, the split/charge-partition + endDate-#12 + #76 families swept, 6 new escalations filed). Doc/measurement-only —
   no source touched, no build gate beyond the two coverage runs (both green). 90%-line goal still structurally gated (BE DI/singleton + OAuth-network; FE eyes-on components/
   routes). Next #5 sweep ~C445; CLAUDE.md full refresh ~C439. cov: be 86.94% / fe 85.26% (re-measured C435).
+- **C436 (guard): pin the 5 zero-test chart-formatters exports — the FE display-shape axis/series callbacks rendered on real charts** —
+  BALANCE: nothing over budget; guard MOST-STARVED (last 430, starved-for 436−430=6=budget) → highest-leverage. 2-agent fan-out. BE scout returned the pure-fn guard surface
+  SATURATED (the one untested export, validateLoanTerms, is DEAD defensive code behind a Zod schema that already rejects every error-branch input → a guard there would be
+  VACUOUS; correctly rejected — NOT manufactured into theater). FE scout confirmed the C430-flagged chart-formatters.ts cluster: 5 exports ZERO-test despite each being a
+  LayerChart axis/series callback rendered live. VERIFIED FIRSTHAND (C21/C60): the existing chart-formatters.test.ts imports only formatCurrencyAxis/formatCentsAxis/
+  parseMonthToDate (no others); formatDecimalAxis (:23, the default decimals=1 IS what FuelEfficiencyTrendChart/YearEndTab/FuelCharts render — passed as yAxis.format with no
+  arg), getXTickCount (:32, the few-points dedup clamp + 6/12 cap), formatDateTick (:59, the layerchart-callback unknown→'' NaN guard), monthlyXAxisProps (:68, the 12-tick
+  budget distinct from the 6 default), getTrendLineProps (:91, the dataLength<=1 single-point enlarged-dot visibility branch) all reachable + load-bearing + untested. Display-tier
+  (lower stakes than money math), but real zero-coverage reachable invariants — exactly the GUARD profile when the higher-stakes surface is dry. +9 tests EXTENDING the existing
+  chart-formatters.test.ts (its home — no duplicate file), driving the REAL exports (not re-implementations): decimals default 28.5→'28.5'/28→'28.0' + explicit arg; clamp
+  2→2/20→6/20,12→12; NaN guard (garbage/number/null/undefined→''); monthly 24→12-cap/3→clamp; trend single-point r:6 vs 2+ r:4. NON-VACUOUS (each pins a flip/drop/default
+  regression). fe validate:local EXIT 0, 706 pass (+9), svelte-check 0, build clean. cov: be 86.94% (carry) / fe 85.26% (carry, +9 display-shape guards).

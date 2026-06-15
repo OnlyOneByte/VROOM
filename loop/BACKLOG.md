@@ -525,6 +525,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C436 — pin the 5 zero-test chart-formatters exports (FE LayerChart axis/series callbacks rendered on real charts).**~~ — *DONE C436: guard most-starved
+> (6/6, at budget). 2-agent fan-out — BE scout returned the pure-fn guard surface SATURATED (the only untested export, validateLoanTerms, is DEAD defensive code behind a
+> Zod schema that rejects every error-branch input → a guard would be VACUOUS; correctly rejected). FE confirmed the C430-flagged chart-formatters.ts cluster: formatDecimalAxis
+> (the default decimals=1 IS what efficiency-trend Y-axes render), getXTickCount (few-points dedup clamp + 6/12 cap), formatDateTick (layerchart unknown→'' NaN guard),
+> monthlyXAxisProps (12-tick budget ≠ the 6 default), getTrendLineProps (dataLength<=1 single-point enlarged-dot visibility) — all reachable + load-bearing + ZERO-test.
+> Display-tier but real zero-coverage reachable invariants. +9 tests EXTENDING chart-formatters.test.ts (its home, no dup file), driving the REAL exports. NON-VACUOUS
+> (each pins a flip/drop/default regression). fe validate:local EXIT 0, 706 pass (+9), svelte-check 0, build clean. The pure-util guard surface is now near-exhausted both sides.*
+
 > ~~**C430 — close a C181/C229 coverage-theater gap: drive the REAL calculateVehicleStats through the `mpg > 0 && mpg < 150` outlier band (the suite only had a local re-implementation).**~~ —
 > *DONE C430: guard most-starved actionable (last 425, starved-for 5, closest to budget). 2-agent fan-out; BE #1 was a genuine coverage-theater trap. calculateAverageMpg
 > (vehicle-stats.ts:179) drops a pair outside `mpg > 0 && mpg < 150`, reached LIVE via GET /vehicles/:id/stats — but vehicle-stats.property.test.ts "covered" the band only via
