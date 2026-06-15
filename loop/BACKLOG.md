@@ -154,6 +154,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Analytics TCO / depreciation / cost-composition audit (C439) → CERTIFIED CLEAN (last full cert C361); +1 year-scoped costPerMonth divisor guard.**~~ — *DONE C439
+> (deep-review OVER budget 6>5 → forced). 1-agent fan-out on the stalest money surface. CERTIFIED CLEAN, verified firsthand: #27 fix holds (purchasePrice>0 → financing rows
+> excluded; $0-price gate is `>0` not `!=null`, correct), categorizer no money-slip (else→otherCosts; a 'financial' recurring expense is a label debate not a total error),
+> denominators sound (year path date-filters numerator + distance + monthsOwnedInYear together; div-by-zero guarded), no depreciation curve exists, #28/#27 year-scoping = the
+> C333-certified design (not re-flagged). THE unpinned invariant → guard: monthsOwnedInYear is unit-tested in ISOLATION + Property-15 pins only the ALL-TIME costPerMonth (no
+> year arg) → the YEAR branch's divisor SELECTION (monthsOwnedInYear ≤12 vs full-ownership monthsBetween — the #28 mistake) was undriven through the real getVehicleTCO. +1 guard
+> (a 2020-purchased vehicle + $1200 in-year financing → getVehicleTCO(…,2024) returns ownershipMonths===12, costPerMonth===100). NON-VACUOUS (monthsBetween(2020→now) ~70+).
+> be validate:local EXIT 0, 1533 pass (+1). Next stale deep-review candidate: the sync conflict-resolution / offline-apply path.*
+
 > ~~**Auth/session/OAuth lifecycle + backup EXPORT path audit (C433) → BOTH CERTIFIED CLEAN; +1 RFC-4180 round-trip guard; filed #129.**~~ — *DONE C433 (deep-review
 > OVER budget 6>5 → forced). 2-agent fan-out on the two stalest data-safety surfaces. (A) AUTH/SESSION/OAuth CERTIFIED CLEAN: session rotation create-before-invalidate +
 > fail-open (C313 holds), logout server-side invalidate, provider-callback CSRF (state.userId===session.user.id), tenant-scoped provider read/mutate/unlink + last-sign-in

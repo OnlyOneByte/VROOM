@@ -75,13 +75,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 433 |
+| deep-review | 5 | 439 |
 | guard | 6 | 436 |
 | bug | 3 | 437 |
 | arch | 5 | 438 |
 | infra | 6 | 435 |
 
-Current cycle: **438**
+Current cycle: **439**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6606,3 +6606,17 @@ Current cycle: **438**
   code is an explicit arch payoff (rule 5), behavior-preserving (nothing calls it), coverage-neutral-to-positive (removes uncovered LOC). Chose it over the insurance dead-methods candidate
   (that one entangles ~120 test LOC + drops the coverage numerator). −15 LOC; BackupConfig import retained (still used at loadBackupConfig). be validate:local EXIT 0, 1532 pass (unchanged —
   confirms it was dead). cov: be 86.94% (carry) / fe 85.26% (carry). Both scouts now report the dedup surface near-exhausted both sides; remaining dups are behavior-changing (escalated #30/#330) or untested-path.
+- **C439 (deep-review): analytics TCO / depreciation / cost-composition CERTIFIED CLEAN (last full cert C361, ~78 cycles ago); +1 year-scoped costPerMonth divisor guard** —
+  BALANCE: deep-review OVER budget (last 433, starved-for 439−433=6 > 5) → FORCED deep-review (the ~C439 CLAUDE.md refresh is infra, not the forced category → it waits). 1-agent fan-out
+  on the stalest money surface (analytics TCO; the sync conflict path was the other candidate but TCO is higher-stakes + staler). CERTIFIED CLEAN, all verified firsthand (C21/C60):
+  (1) #27 fix HOLDS — computeTCOTotal (repository.ts:1124) all-time+priced+financed → purchaseInTotal=price, countedFinancingInterest=0, financing-payment rows excluded ($30k car +
+  $1.5k payments → $30k not $31.5k); purchasePrice=0 gate is `>0` not `!=null` (correct: $0 acquisition → financing IS the cost signal). (2) categorizer routes everything (financial+
+  financing→interest, +insurance_term→insurance, else→otherCosts) — no money-slip (a 'financial'-category recurring expense lands in otherCosts: a LABEL debate, total correct, sums).
+  (3) denominators sound: year path date-filters BOTH numerator + totalDistance + monthsOwnedInYear (shared window); div-by-zero guarded (ownershipMonths Math.max(1,…), costPerDistance
+  null at 0 distance). (4) no depreciation curve exists (purchasePrice is a flat acquisition cost). (5) #28/#27 year-scoping = the C333-certified design, NOT re-flagged. THE strongest
+  unpinned reachable invariant → guard: monthsOwnedInYear is unit-tested in ISOLATION + the all-time costPerMonth is Property-15-pinned, but Property 15 passes NO year arg → the YEAR
+  branch's divisor SELECTION (ownershipMonths = monthsOwnedInYear ≤12, NOT full-ownership monthsBetween — the exact #28 mistake) was never driven through the real getVehicleTCO (the
+  C181/C229 helper-tested-in-isolation gap). +1 guard in per-vehicle.property.test.ts (#28/#27 year-scoped block): a 2020-purchased vehicle (owns all of TEST_YEAR=2024) + a $1200
+  in-year financing payment → getVehicleTCO(…, TEST_YEAR) returns ownershipMonths===12 + costPerMonth===100 (1200/12). NON-VACUOUS (full-ownership monthsBetween(2020→now) is ~70+ → a
+  divisor regression makes ownershipMonths≫12, costPerMonth≪100). be validate:local EXIT 0, 1533 pass (+1). cov: be 86.94% (carry, +1 guard) / fe 85.26% (carry). The sync conflict
+  path remains the next stale deep-review candidate.

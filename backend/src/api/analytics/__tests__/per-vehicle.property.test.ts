@@ -553,6 +553,30 @@ describe('#28/#27 year-scoped: purchasePrice excluded from a year window; that y
     expect(result.financingInterest).toBe(1000);
   });
 
+  test('year-scoped costPerMonth divides by monthsOwnedInYear (≤12), NOT full-ownership monthsBetween (#28 divisor)', async () => {
+    // The year arm selects ownershipMonths = monthsOwnedInYear(start, now, year) (repository.ts:1907),
+    // capped at 12 for a fully-owned past year — so a year-windowed numerator is divided by a matching
+    // ≤12 span, not the purchase→now full-ownership months (the #28 mistake). monthsOwnedInYear is
+    // unit-tested in isolation + the ALL-TIME costPerMonth is pinned by Property 15, but NOTHING drove
+    // the REAL getVehicleTCO through the YEAR branch to confirm the divisor SELECTION — a refactor
+    // swapping to monthsBetween would turn no test red (the C181/C229 helper-tested-in-isolation gap).
+    const { userId, vehicle } = setupUserAndVehicle({
+      purchasePrice: 30000,
+      purchaseDate: new Date(2020, 0, 1), // owned ALL of TEST_YEAR (a prior-year acquisition)
+    });
+    // One $1200 financing payment inside TEST_YEAR → year totalCost = 1200.
+    seedFinancingPayment(vehicle.id, 'fin-cpm', 1200, new Date(TEST_YEAR, 5, 15));
+
+    const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
+
+    expect(result.totalCost).toBe(1200);
+    // TEST_YEAR (2024) is fully past relative to `now`, and ownership began 2020 → all 12 months owned.
+    // NON-VACUOUS: full-ownership monthsBetween(2020→now) is ~70+, so a divisor regression to that branch
+    // would make ownershipMonths ≫ 12 and costPerMonth ≪ 100.
+    expect(result.ownershipMonths).toBe(12);
+    expect(result.costPerMonth).toBe(100); // 1200 / 12
+  });
+
   test('year-scoped total = the windowed buckets (financing + fuel), purchasePrice NOT added', async () => {
     const { userId, vehicle } = setupUserAndVehicle({
       purchasePrice: 30000,
