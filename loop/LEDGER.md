@@ -84,9 +84,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 450 |
 | bug | 3 | 453 |
 | arch | 5 | 451 |
-| infra | 6 | 447 |
+| infra | 6 | 454 |
 
-Current cycle: **453**
+Current cycle: **454**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6774,3 +6774,11 @@ Current cycle: **453**
   (:34/:48/:66) → shows "24000/12000, 100% RED" while its own "left" figure (which routes through leaseTotalMileageAllowance) says "12000 left" — an internal contradiction + false over-mileage panic on an on-pace
   multi-year lease; the #64/#110/#115 annual-vs-total class on the ONE card #115 missed; clean one-edit (route the 3 lines through leaseTotalMileageAllowance) but the verification is eyes-on. cov: be 86.96%
   (carry, +1 guard) / fe 85.89% (carry).
+- **C454 (infra): CLAUDE.md full orientation refresh (the overdue ~C450 cadence; last full C440)** —
+  BALANCE: infra OVER budget (last 447, starved-for 454−447=7 > 6) → FORCED infra; the CLAUDE.md full-refresh cadence was also overdue (~C450, last C440). REFRESHED the drift-prone "Current state & gaps":
+  (1) coverage reading C435→C447 fresh measure (be 86.94→86.96 line; fe 85.26→85.89 line / 85.53→87.15 func / 77.40→78.35 branch — UP, the C436 chart-formatters + C444 isIncompleteFuelExpense + C445/C446 guards
+  lifted the FE ratio; BE↔FE gap ~1.7→~1.1pts, tightest ever); (2) suite size ~1533/~707 → ~1543/~714 with the C440–C453 arc attribution; (3) appended the C441–C453 closed-bug arc to the fix list (#132 restore-
+  reminders-probe, #133 sync-conflict-fromBackendExpense, #134 conflict-resurrection, #136 sheets-only-auto-backup, #137 import-fuel-clear, #138 insurance-form-UTC-date, #139 0%-APR-loanBreakdown) + bumped "all
+  landed C155→C453" + noted three bug-CLASSES now fully closed (#76 odometer-poison all 4 write sites, #87 UTC-date all forms, #92/#117 0%-APR all 3 sites); (4) pending-Angelo block: added the two still-open filed
+  items #135 (SyncManager-no-reap) + #140 (LeaseMetricsCard annual-vs-total, eyes-on) and refreshed the CLOSED-since note (#132/#133/#134/#136/#137/#138/#139). Doc-only, no code touched → no build gate (CLAUDE.md
+  not compiled; verified all four regions read coherently + no stale-number leftovers via grep). cov: be 86.96% (carry) / fe 85.89% (carry). Next CLAUDE.md refresh ~C464; next #5 sweep ~C457.
