@@ -71,11 +71,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 427 |
 | guard | 6 | 430 |
-| bug | 3 | 428 |
+| bug | 3 | 431 |
 | arch | 5 | 426 |
 | infra | 6 | 429 |
 
-Current cycle: **430**
+Current cycle: **431**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6498,3 +6498,17 @@ Current cycle: **430**
   band-divergence (C419) — pinning today's (0,150) contract LOCKS the behavior so a silent regression is detectable WITHOUT pre-deciding the [5,100]/[1,10] unification (noted in the test header). Chose the BE trap over the
   FE chart-formatters picks (getTrendLineProps/getXTickCount/formatDateTick — genuinely unpinned but lower-stakes display utils vs a money-facing displayed-metric coverage-theater hole). One biome line-wrap reflow
   (check:musl:fix) on a long object literal, then re-validated. be validate:local EXIT 0, 1529 pass (+3). cov: be 86.93% (carry, +3 guards) / fe 84.51% (carry).
+- **C431 (bug → #128: reminderApi.getMaterializedExpenses returned RAW backend-shaped rows typed as Expense[] — the one expense read that skips fromBackendExpense)** —
+  BALANCE: bug AND arch both AT budget (bug 3/3, arch 5/5, current 431); bug has the tighter budget + "jumps the queue when real". The bug queue's only OPEN item (#127) is
+  escalated/awaiting-Angelo, so ran a fresh 2-agent bug-hunt (BE + FE) to see if a clean loop-fixable defect exists before falling to arch. Both scouts converged: the
+  swept surface (C404–C428 arc + escalation queue) has NO currently-reachable unfixed defect; each surfaced ONE latent one-edit candidate (BE: google-sheets-service.ts:604
+  column-letter ceiling, latent at >26 cols — reminders is 25; FE: reminder-api.ts getMaterializedExpenses skips fromBackendExpense). Picked the FE one — a concrete
+  type-lie in SHIPPED code at the FE→BE seam (NORTH_STAR #3), clean fix mirroring the established convention. VERIFIED FIRSTHAND (C21/C60): the backend route
+  (reminders/routes.ts:227) returns raw findBySource rows ({success, data} backend shape: expenseAmount, un-split volume); EVERY other expense read runs fromBackendExpense
+  (expense-api.ts:107/119/226 — expenseAmount→amount, volume→volume|charge by isElectricFuelType), but getMaterializedExpenses (reminder-api.ts:77) did a bare
+  apiClient.get<Expense[]> — so a consumer reading expense.amount gets undefined + an electric charge's kWh stays in volume (never moved to charge). LATENT only because
+  the sole consumer (recurring-expenses T6 "materialized N expenses" view) is eyes-on/Playwright-blocked + unbuilt — so fixing now means T6 "just works" when it lands,
+  no surprise NaN/mislabel. FIX (one edit, mirrors expense-api.getExpense): get<BackendExpenseResponse[]> then data.map(fromBackendExpense). The EXISTING test CODIFIED the
+  bug (fed frontend-shaped {amount} + asserted pass-through) — rewrote it to feed BACKEND-shaped rows (incl. an electric volume=30 row) + assert the transform (amount===49.99,
+  no expenseAmount prop, charge===30 & volume undefined). NON-VACUOUS (pre-fix amount was undefined, charge unset). fe validate:local EXIT 0, 697 pass (unchanged count — test
+  rewritten not added). cov: be 86.93% (carry) / fe 84.51% (carry, type-lie fix). (Filed the BE google-sheets column-letter ceiling as a latent-hardening candidate.)

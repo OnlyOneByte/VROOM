@@ -848,6 +848,21 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > every `async (tx)` in the codebase shares):** make wipe+insert atomic without the broken async rollback (a synchronous bun:sqlite tx for restore / a codebase-wide
 > async-tx-safety wrapper). The transient-insert-failure window stays open until that lands. NORTH_STAR #1 crown-jewel; awaiting Angelo's fix-approach pick.
 
+> ~~**#128 (LOW, correctness / FE→BE seam, NORTH_STAR #3 — found+fixed C431 on a 2-agent bug-hunt) — reminderApi.getMaterializedExpenses returned RAW backend-shaped rows
+> typed as Expense[], the one expense read that skips fromBackendExpense.**~~ — *DONE C431: bug+arch both AT budget; bug's only OPEN item (#127) is escalated, so a fresh
+> BE+FE bug-hunt confirmed the swept surface has no currently-reachable unfixed defect + surfaced this latent one. getMaterializedExpenses (reminder-api.ts:77) did a bare
+> apiClient.get<Expense[]> on GET /reminders/:id/expenses, but the route returns RAW findBySource rows (backend shape: expenseAmount, un-split volume) — EVERY other expense
+> read maps through fromBackendExpense (expenseAmount→amount, volume→volume|charge by isElectricFuelType). So a consumer reading expense.amount gets undefined + an electric
+> charge's kWh stays in volume. LATENT (the sole consumer, recurring-expenses T6, is eyes-on-blocked/unbuilt) — fixing now means T6 "just works" when it lands. FIX (mirrors
+> expense-api.getExpense): get<BackendExpenseResponse[]> then data.map(fromBackendExpense). The EXISTING test CODIFIED the bug (fed {amount}, asserted pass-through) — rewrote
+> it to feed BACKEND-shaped rows (+ an electric volume=30 row) + assert the transform. NON-VACUOUS (pre-fix amount undefined, charge unset). fe validate:local EXIT 0, 697 pass.*
+
+> **LATENT-HARDENING (filed C431, NOT yet reachable — defer unless a sheet grows) — google-sheets-service.ts:604 computes the end-column letter as
+> `String.fromCharCode(64 + headers.length)`, valid only for ≤26 columns.** The largest sheet (reminders) is 25 cols today → 'Y', so it works; but adding a 27th column to any
+> SHEET_HEADERS array yields '[' → an invalid A1 range `A1:[26` → that backup write throws (and the `A:Z` clear one line up shares the 26-col ceiling, silently leaving a 27th
+> column's stale data). sheets-header-coverage.test.ts pins column PRESENCE but not this count ceiling. Clean fix = an index→A1 multi-letter helper. Not a live bug (no current
+> input triggers it) → filed, not auto-fixed.
+
 > ~~**#126 (MED, correctness/units / NORTH_STAR #1 — found+fixed C427 on a cross-vehicle deep-review; the C413 sweep's missed twin) — the CONVERTED/trend analytics
 > efficiency builders contaminated gas-MPG with PHEV charge mi/kWh.**~~ — *DONE C427: C411/C413 fixed the gas/charge partition (gasEfficiencyPoint) on the analytics-charts
 > builders + computeMpgAndCostPerMile, but the repository.ts CONVERTED/trend builders still used computeEfficiencyPoint (accepts electric) at 4 sites —
