@@ -63,6 +63,11 @@
 > + C444 isIncompleteFuelExpense + the C445/C446 sync/activity guards lifted it). BE↔FE gap now ~1.1pts (86.96 vs 85.89) — the TIGHTEST ever. 90%-line goal still structurally
 > gated (BE DI/singleton + OAuth-network; FE eyes-on components/routes, Playwright-blocked). Branch: 257 commits ahead of origin/main, working tree clean (by-design untracked
 > *.meshclaw.e2e.ts + tooling + the gitignored BRANCH_REVIEW.md, refreshed C447 with §34 covering the 12-commit C435–C446 delta), build floor GREEN both sides → PR-ready.**
+> **RE-MEASURED AGAIN C460 (the #5-sweep re-measure; last full C447): be 87.09% line / 86.60% func (line +0.13 vs C447's 86.96/86.55 — the C453 0%-APR + C458 split-cents +
+> C459 notification-feed fix+guards lifted it); fe 85.89% line / 87.15% func / 78.35% branch (FLAT vs C447 — the C450/C455/C456 cycles were a 1-test guard / a 3-line component
+> re-point / BE-side, no net FE-coverage move). BE↔FE gap ~1.2pts (87.09 vs 85.89) — the tightest era. 90%-line goal still structurally gated (BE DI/singleton + OAuth-network;
+> FE eyes-on components/routes, Playwright-blocked). Branch: 270 commits ahead of origin/main, working tree clean (by-design untracked *.meshclaw.e2e.ts + tooling + the
+> gitignored BRANCH_REVIEW.md, refreshed C460 with §35 covering the 13-commit C447–C459 delta), build floor GREEN both sides → PR-ready.**
 > When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
@@ -84,9 +89,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 456 |
 | bug | 3 | 459 |
 | arch | 5 | 457 |
-| infra | 6 | 454 |
+| infra | 6 | 460 |
 
-Current cycle: **459**
+Current cycle: **460**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6830,3 +6835,11 @@ Current cycle: **459**
   one is FIRST. PROVEN NON-VACUOUS firsthand (revert to desc(dueDate) → mileage sorts last → RED). Also UPDATED the existing "newest-first" test from a dueDate-descending assertion (which pinned the BUGGY contract) to
   createdAt-descending (the correct one). be validate:local EXIT 0, 1549 pass (+1). FILED #143 (FE, LOW/cosmetic): formatRelativeTime renders "1 weeks/months/years ago" at the bucket boundaries (no singular form) —
   the n>1?'s':'' idiom already used elsewhere; queued. cov: be 86.96% (carry, +1 guard) / fe 85.89% (carry).
+- **C460 (infra): #5 branch-hygiene sweep + coverage re-measure + BRANCH_REVIEW.md refresh (the overdue ~C457 cadence; last actual sweep C447)** —
+  BALANCE: nothing OVER budget; infra MOST-STARVED (last 454, starved-for 460−454=6=budget) AND the #5 sweep cadence overdue → highest-leverage. Three-part sweep: (1) HYGIENE — git status
+  --porcelain --untracked-files=all → ZERO stray untracked unit/spec .test.ts (all untracked = by-design *.meshclaw.e2e.ts + tooling); branch 270 commits, 0 behind, clean fast-forwardable.
+  (2) GREEN BASELINE + COVERAGE RE-MEASURE (last full C447): be bun test --coverage EXIT 0, 1549 pass → 87.09% line / 86.60% func (line +0.13 vs C447 — the C453/C458/C459 fix+guards); fe vitest
+  --coverage EXIT 0, 714 pass → 85.89% line / 87.15% func / 78.35% branch (FLAT vs C447 — C450/C455/C456 were a 1-test guard / 3-line component re-point / BE-side). BE↔FE gap ~1.2pts. Updated
+  the COVERAGE TREND header. (3) BRANCH_REVIEW.md (gitignored) refresh — header 257→270 commits, +§35 covering the 13-commit C447–C459 delta (4 bugs incl. the #142 feature-disabling mileage-feed +
+  #141 split-cents + #140/#139 closing two annual-vs-total/0%-APR CLASSES; the C452/C458 deep-review certs; the C457 dedup-exhausted cert; the C450/C456 guards). Doc/measurement-only — no source
+  touched, both coverage runs green. 90%-line goal still structurally gated. Next #5 sweep ~C470; next CLAUDE.md full refresh ~C464. cov: be 87.09% / fe 85.89% (re-measured C460).
