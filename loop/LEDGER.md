@@ -82,11 +82,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 445 |
 | guard | 6 | 443 |
-| bug | 3 | 446 |
+| bug | 3 | 448 |
 | arch | 5 | 444 |
 | infra | 6 | 447 |
 
-Current cycle: **447**
+Current cycle: **448**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6713,3 +6713,14 @@ Current cycle: **447**
   silent-Sheets-backup-gap, the #132 restore-UNIQUE + #134 conflict-resurrection data-safety fixes, the C444 offline↔sync family fully-collapsed, the C436 chart-formatters cluster + 4
   escalations/notes filed [#129/#135/#137/#138]). Doc/measurement-only — no source touched, both coverage runs green. 90%-line goal still structurally gated. Next #5 sweep ~C457; next
   CLAUDE.md full refresh ~C450. cov: be 86.96% / fe 85.89% (re-measured C447).
+- **C448 (bug → #137: CSV import persisted stray fuel-only fields on a NON-fuel imported row — the #76/C244 class's 4th write site, poisons getCurrentOdometer)** —
+  BALANCE: nothing OVER budget; guard most-starved (5/6) but its surface near-saturated (C436/C443), whereas #137 is a concrete reachable money-feeding defect already scouted C446 → a real defect
+  outranks a marginal dormant-vein guard. VERIFIED FIRSTHAND (C21/C60): parseRow (import-csv.ts) parses mileage/volume/fuelType/missedFillup for EVERY category (the fuel-completeness check at :252
+  only guards the fuel DIRECTION), returning them verbatim; importExpenses (repository.ts:303) inserts `{...row, userId}` verbatim — NO clearFuelFieldsIfNotFuel, the guard the POST (#76/C244) + PUT
+  (#130/C434) paths apply. So a foreign-tracker import (Drivvo/Fuelio log an odometer on a Service/maintenance row; categoryMap maps Service→maintenance, the mileage column maps for all rows) inserts
+  category=maintenance, mileage=120000 with the stray mileage → poisons getCurrentOdometer's cross-category MAX(odometer) UNION (no category filter) → wrong mileage-reminder firing + inflated lease-overage
+  MONEY. Native VROOM round-trip is SAFE (export blanks non-fuel mileage — the existing :92 round-trip test confirms). FIX (one edit, the #76 transform at the import site): extracted clearImportedFuelFields
+  (nulls mileage/volume/fuelType + missedFillup=false for a non-fuel row; fuel passes through), routed parseRow's return through it. NOTE: an inline-ternary version tripped the Biome cognitive-complexity
+  ceiling (parseRow was AT 15→18); the EXTRACTION both fixed that (C280 precedent) AND made it ONE source of truth for the import-side clear. +2 guards (import-csv.test.ts): a maintenance row carrying
+  mileage/volume/fuelType → all NULL (NON-VACUOUS: pre-fix 120000 persisted); a genuine fuel row → KEEPS them (no over-clear). be validate:local EXIT 0, 1540 pass (+2). #138 (InsuranceTermForm UTC-date)
+  remains queued. cov: be 86.96% (carry, +2 guards) / fe 85.89% (carry).

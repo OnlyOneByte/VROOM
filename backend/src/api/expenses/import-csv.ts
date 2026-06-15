@@ -257,8 +257,14 @@ function parseRow(
     };
   }
 
+  // A NON-fuel imported row must NOT carry fuel-only fields (#137, the #76/C244 class's import write site).
+  // parseMileage/parseVolume run for every category, so a foreign tracker that logs an odometer on a
+  // 'maintenance'/'misc' row (Drivvo/Fuelio Service entries) would otherwise persist a stray mileage that
+  // poisons getCurrentOdometer's cross-category MAX(odometer) UNION. clearImportedFuelFields nulls them for
+  // a non-fuel row (the transform the POST [#76]/PUT [#130] paths apply; extracted to keep parseRow's
+  // complexity under the Biome ceiling + as ONE source of truth for the import-side clear).
   return {
-    expense: {
+    expense: clearImportedFuelFields({
       vehicleId,
       category,
       expenseAmount: amountResult.value,
@@ -271,8 +277,18 @@ function parseRow(
       missedFillup,
       // Filled in by buildImportPlan, which has the occurrence counter.
       clientId: '',
-    },
+    }),
   };
+}
+
+/**
+ * Null the fuel-only fields (mileage/volume/fuelType/missedFillup) on a NON-fuel imported row so the
+ * verbatim importExpenses insert can't persist a stray odometer that poisons getCurrentOdometer (#137,
+ * the import-side mirror of routes.ts clearFuelFieldsIfNotFuel). A fuel row passes through untouched.
+ */
+function clearImportedFuelFields(expense: ImportableExpense): ImportableExpense {
+  if (expense.category === 'fuel') return expense;
+  return { ...expense, mileage: null, volume: null, fuelType: null, missedFillup: false };
 }
 
 /**

@@ -923,12 +923,12 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > (spy recordActivity on the singleton, Sheets-only config), PROVEN NON-VACUOUS (revert → never called). Fixed the C291/C300 dynamic-import trap + a Zod cap (minutes max 30). be
 > validate:local EXIT 0, 1538 pass (+1).*
 
-> **#137 (MED, correctness→money — found+filed C446; the #76/C244 class's THIRD write site, NOT fixed; clean one-edit) — CSV import persists stray fuel-only fields on a non-fuel
-> imported row.** import-csv.ts parseRow parses mileage/volume/fuelType for EVERY category unconditionally + returns them; the import commit (routes.ts importExpenses) inserts verbatim,
-> bypassing the clearFuelFieldsIfNotFuel guard the POST (#76/C244) + PUT (#130/C434) paths use. A foreign-tracker import (Drivvo/Fuelio log odometer on maintenance rows; categoryMap
-> maps "Service"→maintenance, the mileage column maps for all rows) → a category=maintenance, mileage=120000 row is inserted with that stray mileage → poisons getCurrentOdometer
-> (UNION over expenses.mileage, no category filter) → wrong reminder firing + inflated lease-overage $. Native VROOM round-trip is safe (export blanks non-fuel mileage). Clean one-edit:
-> null volume/fuelType/mileage + missedFillup=false when category!=='fuel' in parseRow (the clearFuelFieldsIfNotFuel transform, in the pure fn). Queued.
+> ~~**#137 (MED, correctness→money — found C446, FIXED C448; the #76/C244 class's import write site) — CSV import persisted stray fuel-only fields on a non-fuel imported
+> row.**~~ — *DONE C448: parseRow parsed mileage/volume/fuelType for EVERY category + returned them verbatim; importExpenses inserts verbatim (no clearFuelFieldsIfNotFuel, the
+> guard POST/#76 + PUT/#130 apply). A foreign-tracker import (Drivvo/Fuelio log odometer on a Service/maintenance row) → category=maintenance, mileage=120000 inserted → poisons
+> getCurrentOdometer's cross-category MAX(odometer) UNION → wrong reminder firing + inflated lease-overage $. FIX: extracted clearImportedFuelFields (nulls the fuel-only fields for
+> a non-fuel row; fuel passes through), routed parseRow's return through it — the extraction ALSO cleared a Biome cognitive-complexity ceiling parseRow tripped (C280 precedent) +
+> made it ONE source of truth for the import-side clear. +2 guards (non-fuel-with-mileage → NULL [non-vacuous]; genuine fuel → kept). be validate:local EXIT 0, 1540 pass (+2).*
 
 > **#138 (MED, correctness/date — found+filed C446; the #87/#131 UTC-date family on the LONE hold-out form; clean one-edit + guard-extension) — InsuranceTermForm sends bare
 > date-only strings → term dates stored at UTC-midnight → displayed a day early for Americas users.** InsuranceTermForm.svelte:247-248/255-256 send the raw `<input type=date>` value

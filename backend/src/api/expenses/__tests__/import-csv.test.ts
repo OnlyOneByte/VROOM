@@ -548,4 +548,49 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     );
     expect(list.data[0]?.description).toBe("'24 road trip fuel");
   });
+
+  // #137 (C448): a NON-fuel imported row that carries a mileage/volume/fuelType (a foreign tracker like
+  // Drivvo/Fuelio logs an odometer on a Service/maintenance entry) must NOT persist those fuel-only fields
+  // — the import commit (importExpenses) inserts verbatim, bypassing the clearFuelFieldsIfNotFuel guard the
+  // POST (#76/C244) + PUT (#130/C434) paths apply. A stray mileage on a non-fuel row poisons
+  // getCurrentOdometer's cross-category MAX(odometer) UNION → wrong reminder firing + inflated lease-overage $.
+  // parseRow now nulls the fuel-only fields for a non-fuel category (the #76 transform at the import site).
+  test('a non-fuel imported row carrying mileage/volume/fuelType stores them NULL (#137, the #76 import write site)', async () => {
+    await seedVehicle('Daily Driver');
+    const csv = [
+      'date,vehicle,category,amount,currency,mileage,volume,fuelType,description,tags,missedFillup,createdAt',
+      // A maintenance row sneaking an odometer + volume + fuelType (the foreign-tracker / hand-edited case).
+      '2024-06-10T00:00:00.000Z,Daily Driver,maintenance,120,USD,120000,5,regular,Oil change,,true,',
+    ].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(1);
+
+    const row = listExpensesRaw().find((r) => r.category === 'maintenance');
+    expect(row, 'the maintenance row imported').toBeTruthy();
+    // NON-VACUOUS: pre-fix parseRow returned mileage=120000 verbatim → inserted on a non-fuel row →
+    // becomes the vehicle's MAX(odometer) cross-category.
+    expect(row?.mileage, 'a stray mileage on a non-fuel import row must not persist').toBeNull();
+    expect(row?.volume).toBeNull();
+    expect(row?.fuel_type).toBeNull();
+    expect(row?.missed_fillup).toBe(0);
+  });
+
+  test('a genuine fuel imported row KEEPS its mileage/volume/fuelType (no over-clear)', async () => {
+    await seedVehicle('Daily Driver');
+    const csv = [
+      'date,vehicle,category,amount,currency,mileage,volume,fuelType,description,tags,missedFillup,createdAt',
+      '2024-06-01T00:00:00.000Z,Daily Driver,fuel,52.40,USD,30000,10,regular,Shell top-up,,false,',
+    ].join('\n');
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    expect((await json<ImportResponse>(res)).data.imported).toBe(1);
+
+    const row = listExpensesRaw().find((r) => r.category === 'fuel');
+    expect(row?.mileage).toBe(30000);
+    expect(row?.volume).toBe(10);
+    expect(row?.fuel_type).toBe('regular');
+  });
 });
