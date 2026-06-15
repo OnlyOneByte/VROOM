@@ -80,13 +80,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 445 |
+| deep-review | 5 | 452 |
 | guard | 6 | 450 |
 | bug | 3 | 449 |
 | arch | 5 | 451 |
 | infra | 6 | 447 |
 
-Current cycle: **451**
+Current cycle: **452**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6752,3 +6752,14 @@ Current cycle: **451**
   ONE coherent change): deleted createPolicyTermSchema, pointed createPolicySchema.terms at createTermSchema (identical schema + error message → no API/output change). rule-3 green→green: the policy-create path is
   driven by premium-expense-hook/terms-http/policy-delete-cascade/expiring-soon/claim-photos HTTP tests (POST /insurance with ordered-date terms) + the add-term path + the C443 createTermSchema unit tests — GREEN
   before AND after, no test touched. be validate:local EXIT 0, 1540 pass (unchanged). cov: be 86.96% (carry) / fe 85.89% (carry).
+- **C452 (deep-review): vehicle CRUD + cascade-delete CERTIFIED CLEAN; +1 photo-cascade-coverage symmetry guard (the C302 pattern, on the photo side)** —
+  BALANCE: deep-review OVER budget (last 445, starved-for 452−445=7 > 5) → FORCED deep-review (CLAUDE.md refresh ~C450 is infra, waits). 1-agent fan-out on the stalest surface (vehicle CRUD/cascade, no dedicated
+  audit recently). CERTIFIED CLEAN, verified firsthand: (1) cascade-delete ordering correct (enumerate expense/odometer IDs BEFORE the FK cascade, reap photos, then delete — the #34/C280 order); all 6 vehicle FK
+  children verified (financing/insuranceTermVehicles/expenses/odometer/reminderVehicles cascade; insuranceClaims set-null = preserved, C366); FK enforcement genuinely ON in prod + harness. (2) tenant isolation
+  solid (every read/write/delete owner-gated; /stats double-scoped). (3) plate uniqueness well-covered (per-user composite index + excludeId). (4) /stats correct-by-design. ONE LOW finding NOTED (not filed as a bug —
+  product nuance): an empty-STRING licensePlate ("" not null) bypasses the friendly per-user check (truthy guard) but the partial index still 409s it → a generic error + a debatable constraint on empty plates; the
+  clean fix is to normalize ""→null at the boundary (left for a possible future cycle). THE strongest unpinned invariant → guard: the delete handler HARD-CODES which photo-entity types it reaps (vehicle/expense/
+  odometer_entry); ENTITY_TO_CATEGORY is the full registry; the omitted insurance_policy/insurance_claim are correctly excluded (survive a vehicle delete) but NOTHING pinned that correspondence → a future
+  photo-bearing entity added as a vehicle FK-cascade child without a cleanup call would silently orphan its photo bytes (the #34 leak class) with NO failing test. +1 symmetry guard (the C302 restore-coverage pattern):
+  source-scan every ENTITY_TO_CATEGORY key is either reaped by the delete handler OR in a documented SURVIVES_VEHICLE_DELETE set + a liveness floor. PROVEN NON-VACUOUS firsthand (removing the odometer_entry cleanup
+  call → RED). be validate:local EXIT 0, 1542 pass (+2). cov: be 86.96% (carry, +2 guards) / fe 85.89% (carry).

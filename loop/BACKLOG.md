@@ -154,6 +154,15 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Vehicle CRUD + cascade-delete audit (C452) → CERTIFIED CLEAN; +1 photo-cascade-coverage symmetry guard.**~~ — *DONE C452 (deep-review OVER budget 7>5 → forced).
+> 1-agent fan-out on the stalest surface. CERTIFIED CLEAN, verified firsthand: cascade-delete ordering correct (enumerate IDs before FK cascade, reap photos, then delete — #34/C280);
+> all 6 FK children verified (5 cascade; insuranceClaims set-null = preserved, C366); tenant isolation solid; plate uniqueness well-covered; /stats correct-by-design. ONE LOW finding
+> NOTED (product nuance, not filed): an empty-STRING licensePlate bypasses the friendly per-user check (the partial index still 409s it) — clean fix is normalize ""→null at the boundary.
+> THE unpinned invariant → guard: the delete handler hard-codes which photo-entity types it reaps (vehicle/expense/odometer_entry); ENTITY_TO_CATEGORY is the full registry; the omitted
+> insurance_policy/insurance_claim correctly survive a vehicle delete but NOTHING pinned that correspondence → a future photo-bearing vehicle-cascade-child without a cleanup call would
+> silently orphan bytes (the #34 leak class). +1 symmetry guard (C302 pattern): every ENTITY_TO_CATEGORY key is reaped OR in a documented survives-set + a liveness floor. PROVEN
+> NON-VACUOUS (removing the odometer_entry cleanup → RED). be validate:local EXIT 0, 1542 pass (+2).*
+
 > ~~**Sync conflict-resolution / offline-apply path audit (C445) → found+fixed #134 (orphaned-retry conflict resurrection); filed #135.**~~ — *DONE C445 (deep-review OVER
 > budget 6>5 → forced). 1-agent fan-out on the stalest data-safety surface (flagged C439, only single-bug-patched since via C424/C442). FOUND #134: retrySingleExpense
 > (sync-manager.ts:250) guarded only on !onlineStatus before re-running the conflict-check, but the backoff setTimeout is DETACHED from retryCount → a retry scheduled on an

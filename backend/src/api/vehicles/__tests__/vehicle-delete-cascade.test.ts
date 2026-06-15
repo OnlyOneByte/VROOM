@@ -14,12 +14,16 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   createTestApp,
   type DataEnvelope,
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { ENTITY_TO_CATEGORY } from '../../providers/domains/storage/storage-provider';
 
 let ctx: TestApp;
 
@@ -232,5 +236,53 @@ describe('C366 — deleting a vehicle PRESERVES its insurance claims (vehicleId 
     expect(after?.vehicle_id).toBeNull();
     expect(after?.policy_id).toBe('pol-claim');
     expect(after?.payout_amount).toBe(2500.0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C452 symmetry guard (the C302 restore-table-coverage pattern, on the photo-cascade side). The
+// vehicle-delete handler HARD-CODES which photo-bearing entity types it reaps (vehicle + expense +
+// odometer_entry — the three above). ENTITY_TO_CATEGORY is the registry of EVERY photo-bearing entity
+// type. The omitted ones (insurance_policy, insurance_claim) are correctly excluded because those
+// entities SURVIVE a vehicle delete (the policy isn't a vehicle child; the claim is set-null, C366) —
+// but nothing pins that correspondence. If a future photo-bearing entity type is added that IS a
+// vehicle FK-cascade child (or an existing one's FK flips to cascade) without a matching cleanup call,
+// its photo rows + external bytes silently orphan (the #34/C280 leak class the handler exists to
+// prevent) with NO failing test. This makes the correspondence DRIFT-PROOF: every ENTITY_TO_CATEGORY
+// key must be either reaped by the delete handler OR in the documented "survives a vehicle delete" set.
+describe('C452 — every photo-bearing entity type is reaped on vehicle-delete OR documented as surviving', () => {
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const VEHICLE_ROUTES_SRC = readFileSync(join(HERE, '..', 'routes.ts'), 'utf-8');
+
+  // Photo-bearing entity types that are NOT removed by a vehicle delete (so the handler MUST NOT, and
+  // does not, reap their photos here): the policy isn't a vehicle child, and a claim's vehicleId is
+  // ON DELETE SET NULL (C366) — the claim row + its photos survive.
+  const SURVIVES_VEHICLE_DELETE = new Set(['insurance_policy', 'insurance_claim']);
+
+  test('the vehicle-delete handler cleans photos for exactly the photo-entity types it should', () => {
+    const unaccounted: string[] = [];
+    for (const entityType of Object.keys(ENTITY_TO_CATEGORY)) {
+      if (SURVIVES_VEHICLE_DELETE.has(entityType)) continue; // (b) survives → must NOT be reaped here
+      // (a) a vehicle-cascade child → the handler must reap its photos. Both helpers take the entity
+      // type as the first string arg: deleteAllPhotosForEntity('vehicle',…) / deletePhotosForEntities('expense',…).
+      const reaped =
+        VEHICLE_ROUTES_SRC.includes(`deleteAllPhotosForEntity('${entityType}'`) ||
+        VEHICLE_ROUTES_SRC.includes(`deletePhotosForEntities('${entityType}'`);
+      if (!reaped) unaccounted.push(entityType);
+    }
+
+    expect(
+      unaccounted,
+      `Photo-bearing entity type(s) neither reaped by the vehicle-delete handler nor documented as ` +
+        `surviving a vehicle delete. If it's a vehicle FK-cascade child, add a deletePhotosForEntities ` +
+        `cleanup call in routes.ts delete /:id (its photo rows + external bytes would otherwise orphan, ` +
+        `the #34 leak class); if it survives, add it to SURVIVES_VEHICLE_DELETE:\n${unaccounted.join('\n')}`
+    ).toEqual([]);
+  });
+
+  test('the guard is live: ENTITY_TO_CATEGORY has the photo-entity types it scans', () => {
+    // Non-vacuity floor — if the registry were empty/renamed away, the loop above would vacuously pass.
+    expect(Object.keys(ENTITY_TO_CATEGORY).length).toBeGreaterThanOrEqual(5);
+    expect(ENTITY_TO_CATEGORY.vehicle).toBeDefined();
   });
 });
