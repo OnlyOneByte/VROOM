@@ -79,9 +79,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 436 |
 | bug | 3 | 437 |
 | arch | 5 | 438 |
-| infra | 6 | 435 |
+| infra | 6 | 440 |
 
-Current cycle: **439**
+Current cycle: **440**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6620,3 +6620,11 @@ Current cycle: **439**
   in-year financing payment → getVehicleTCO(…, TEST_YEAR) returns ownershipMonths===12 + costPerMonth===100 (1200/12). NON-VACUOUS (full-ownership monthsBetween(2020→now) is ~70+ → a
   divisor regression makes ownershipMonths≫12, costPerMonth≪100). be validate:local EXIT 0, 1533 pass (+1). cov: be 86.94% (carry, +1 guard) / fe 85.26% (carry). The sync conflict
   path remains the next stale deep-review candidate.
+- **C440 (infra): CLAUDE.md full orientation refresh (the overdue ~C439 cadence; last full C429)** —
+  BALANCE: nothing OVER budget (bug at 3/3 not past; #129 is product-gated + a hunt returns marginal results); infra most-starved-but-one (5/6) AND the CLAUDE.md full-refresh cadence
+  genuinely overdue (~C439, last full C429) → highest-leverage. REFRESHED the drift-prone "Current state & gaps": (1) coverage reading C423→C435 fresh measure (be 86.93→86.94 line /
+  86.57→86.60 func; fe 84.51→85.26 line / 84.54→85.53 func / 77.06→77.40 branch — UP, the C426/C432 sync-manager dead-code/dup removal raised the FE covered ratio +0.75 line; BE↔FE gap
+  ~2.4→~1.7pts, the tightest ever); (2) suite size ~1526/~697 → ~1533/~707 with the C430–C439 arc attribution; (3) appended the C431–C437 closed-bug arc to the fix list (#128 getMaterialized-
+  Expenses shape, #130 #76-third-leg PUT mileage, #131 ReminderForm UTC date) + bumped "all landed C155→C437"; (4) added #129 OAuth-login email-sync to the pending-Angelo block + a "CLOSED since
+  last refresh: #128/#130/#131" note. Doc-only, no code touched → no build gate (CLAUDE.md not compiled; verified all four regions read coherently + preserved structure + no stale-number
+  leftovers via grep). cov: be 86.94% (carry) / fe 85.26% (carry). Next CLAUDE.md refresh ~C450; next #5 sweep ~C445.
