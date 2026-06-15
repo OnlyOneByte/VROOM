@@ -160,8 +160,12 @@ function clearFuelFieldsIfNotFuel<
     mileage?: number | null;
     missedFillup?: boolean;
   },
->(data: T): T {
-  if (data.category === undefined || data.category === 'fuel') return data;
+>(data: T, effectiveCategory: string | undefined = data.category): T {
+  // Key off the EFFECTIVE category, not data.category. On a PUT that changes mileage/volume but omits
+  // `category`, data.category is undefined while the row's effective category is the EXISTING one — so
+  // a maintenance row could keep a stray mileage (poisoning getCurrentOdometer cross-category, the #76
+  // class). Callers pass the resolved final category; the default keeps the create path's behavior.
+  if (effectiveCategory === undefined || effectiveCategory === 'fuel') return data;
   return { ...data, volume: null, fuelType: null, mileage: null, missedFillup: false };
 }
 
@@ -720,11 +724,12 @@ routes.put(
 
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
-    // If this edit switches the expense to a non-fuel category, null its fuel-only columns in the same
-    // write (#76 server-side) — otherwise a fuel→maintenance switch that omits volume/fuelType/mileage
-    // leaves them stale on the row (and a stray mileage keeps poisoning getCurrentOdometer). Keyed on
-    // updateData.category, so it only fires on an explicit non-fuel switch; a non-category edit is a no-op.
-    const normalizedUpdate = clearFuelFieldsIfNotFuel(updateData);
+    // If the EFFECTIVE category is non-fuel, null any fuel-only columns in this write (#76 server-side).
+    // Keyed on finalCategory (not updateData.category) so it covers BOTH a fuel→maintenance switch that
+    // omits the fuel fields AND a PUT that writes a stray mileage/volume onto an ALREADY-non-fuel row
+    // without resending category (#76 third leg, C434) — either way a stray mileage would poison
+    // getCurrentOdometer cross-category. A genuine fuel edit (finalCategory==='fuel') is untouched.
+    const normalizedUpdate = clearFuelFieldsIfNotFuel(updateData, finalCategory);
 
     const updatedExpense = await expenseRepository.update(id, normalizedUpdate);
 

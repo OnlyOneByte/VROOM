@@ -104,6 +104,41 @@ describe('non-fuel expense writes null the fuel-only fields (#76 backend)', () =
     expect(row.missed_fillup).toBe(0);
   });
 
+  test('PUT writing a stray mileage onto an ALREADY-non-fuel row (no category sent) nulls it (#76 third leg, C434)', async () => {
+    const vehicleId = await seedVehicle();
+    // A maintenance expense — no fuel fields. (Created non-fuel, so it has no mileage to start.)
+    const created = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'maintenance',
+      expenseAmount: 80,
+      date: '2024-06-01',
+    });
+    const cbody = await json<DataEnvelope<{ id: string }>>(created);
+    expect(created.status, JSON.stringify(cbody)).toBe(201);
+    const id = cbody.data.id;
+    expect(expenseRow(id).mileage).toBeNull(); // sanity: no mileage pre-edit
+
+    // Edit it WITHOUT resending category, sneaking in a stray mileage (a direct API caller / stale
+    // client). updateData.category is undefined here — pre-C434 the clear was a no-op and 99_999 would
+    // persist on a maintenance row, becoming the vehicle's MAX(odometer) cross-category.
+    const put = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      expenseAmount: 85,
+      mileage: 99_999,
+      volume: 7,
+      fuelType: 'Regular',
+    });
+    expect(put.status).toBe(200);
+
+    const row = expenseRow(id);
+    expect(row.category).toBe('maintenance');
+    expect(
+      row.mileage,
+      'a stray mileage on a non-fuel row must not persist (would poison getCurrentOdometer)'
+    ).toBeNull();
+    expect(row.volume).toBeNull();
+    expect(row.fuel_type).toBeNull();
+  });
+
   test('a genuine fuel expense keeps its fuel fields (no over-clear)', async () => {
     const vehicleId = await seedVehicle();
     const res = await ctx.authed('POST', '/api/v1/expenses', {

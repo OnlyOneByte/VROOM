@@ -71,11 +71,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 433 |
 | guard | 6 | 430 |
-| bug | 3 | 431 |
+| bug | 3 | 434 |
 | arch | 5 | 432 |
 | infra | 6 | 429 |
 
-Current cycle: **433**
+Current cycle: **434**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6542,3 +6542,16 @@ Current cycle: **433**
   AND an expense description = `Joe's "Daily", commute\nsecond line` (comma+quote+newline at once) survive export→import BYTE-FOR-BYTE through the real stack; + a leading-`=`
   description round-trips VERBATIM (not neutralized — pins the by-design lossless contract). NOT coverage-theater (drives the real backup/restore, not a local re-stringifier).
   One biome import-reorder autofix on the new file, then re-validated. be validate:local EXIT 0, 1531 pass (+2). cov: be 86.93% (carry, +2 guards) / fe 84.51% (carry).
+- **C434 (bug → #130: PUT /expenses/:id writes a stray mileage onto an ALREADY-non-fuel row when category isn't resent — the #76/C244 THIRD leg, poisons getCurrentOdometer)** —
+  BALANCE: bug MOST-STARVED (3/3, at budget; tightest budget). Queued #129 is direction-gated, #127 escalated, so a fresh 2-agent bug-hunt on UN-swept territory (BE analytics/insurance/
+  odometer; FE analytics/units/date) before falling to the #5 sweep. BOTH scouts surfaced a clean loop-fixable defect within an already-DECIDED fix arc (not a product call). BE was higher
+  leverage (broader reach + money-feeding blast radius) → picked. VERIFIED FIRSTHAND (C21/C60): clearFuelFieldsIfNotFuel (expenses/routes.ts:164) returns data UNCHANGED when
+  data.category===undefined; the PUT handler called it as clearFuelFieldsIfNotFuel(updateData) (:727), so a PUT that writes {mileage:99999} onto a maintenance row WITHOUT resending
+  category (updateData.category===undefined) skipped the clear → the stray mileage persisted on a non-fuel row → getCurrentOdometer's MAX(odometer) UNION has NO category filter →
+  poisons the vehicle's current-odometer → wrong mileage-reminder firing + inflated lease-overage MONEY projections (the exact #76 poison C244 targeted; C244 covered POST-with-category
+  + PUT-that-SWITCHES-category, but NOT this third leg: PUT writing mileage onto an already-non-fuel row). FIX (one edit, residual leg of the decided #76 arc, NOT a product call): added an
+  optional effectiveCategory param to clearFuelFieldsIfNotFuel (defaults to data.category → POST path byte-identical), and the PUT now passes the already-computed finalCategory. A genuine
+  fuel edit (finalCategory==='fuel') is untouched; a non-fuel effective category nulls the fuel-only fields. +1 guard in non-fuel-clears-fuel-fields.test.ts (the C244 test's home): a maintenance
+  row PUT {mileage:99999,volume:7,fuelType} with NO category → all nulled. NON-VACUOUS (pre-fix the no-op clear persisted 99999). FE scout's finding (ReminderForm.svelte:116 UTC .slice(0,10)
+  date round-trip, the #87/#106 family still live on that one form, narrow UTC+13/+14 reach) FILED as #131 for a future cycle. One biome format autofix on the test, then re-validated. be
+  validate:local EXIT 0, 1532 pass (+1). cov: be 86.93% (carry) / fe 84.51% (carry).
