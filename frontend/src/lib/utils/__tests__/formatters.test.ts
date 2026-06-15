@@ -203,7 +203,18 @@ describe('formatRelativeTime (C130 — branches driven relative to now, host-ind
 		expect(formatRelativeTime(daysAgo(3))).toBe('3 days ago');
 		expect(formatRelativeTime(daysAgo(14))).toBe('2 weeks ago');
 		expect(formatRelativeTime(daysAgo(60))).toBe('2 months ago');
-		expect(formatRelativeTime(daysAgo(400))).toBe('1 years ago');
+		expect(formatRelativeTime(daysAgo(400))).toBe('1 year ago');
+	});
+
+	// #143 (C462): Math.floor can land on exactly 1 at each bucket's low edge (7-13d → 1 week,
+	// 30-59d → 1 month, 365-729d → 1 year). Pre-fix these all rendered a bare "1 weeks/months/years
+	// ago". Pin the SINGULAR form at each boundary (NON-VACUOUS — the old code failed every line here).
+	test('singular grammar at each bucket boundary (#143)', () => {
+		expect(formatRelativeTime(daysAgo(7))).toBe('1 week ago');
+		expect(formatRelativeTime(daysAgo(13))).toBe('1 week ago');
+		expect(formatRelativeTime(daysAgo(30))).toBe('1 month ago');
+		expect(formatRelativeTime(daysAgo(59))).toBe('1 month ago');
+		expect(formatRelativeTime(daysAgo(365))).toBe('1 year ago');
 	});
 
 	test('a future date clamps to "Today" (the Math.max(0, …) guard, not a negative bucket)', () => {

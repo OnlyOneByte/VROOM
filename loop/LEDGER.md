@@ -87,11 +87,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 461 |
 | guard | 6 | 456 |
-| bug | 3 | 459 |
+| bug | 3 | 462 |
 | arch | 5 | 457 |
 | infra | 6 | 460 |
 
-Current cycle: **461**
+Current cycle: **462**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6856,3 +6856,10 @@ Current cycle: **461**
   repo's `retryCount < 3`, documented coupling) so the ref drops out of the work set + prefix the message "Reconnect required: …" so the provider-stats failed count means reconnect, not flake.
   +1 guard (AUTH_INVALID upload reject → retryCount:3 not 1 + prefixed message), NON-VACUOUS (pre-fix → retryCount:1/bare). be validate:local EXIT 0, 1550 pass (+1). Filed #144 (closed same-cycle).
   cov: be 87.09% / fe 85.89% (~carry; +1 BE guard, no re-measure this cycle).
+- **C462 (bug → #143: formatRelativeTime renders "1 weeks/months/years ago" — missing singular grammar at each bucket's low edge)** —
+  BALANCE: nothing strictly OVER budget at C462 (deep-review 1/5, guard 6/6=AT, bug 3/3=AT, arch 5/5=AT, infra 2/6, feature parked-170); THREE categories (guard/bug/arch) breach next cycle but only
+  one can be fed → picked the highest-leverage of the at-budget set: #143 was the lone clean, queued, non-eyes-on one-edit (bug, at budget). THE BUG (formatters.ts:115-117): Math.floor lands on exactly
+  1 at each bucket's low edge (7-13d → 1 week, 30-59d → 1 month, 365-729d → 1 year) but every branch hard-appended an 's' → "1 weeks/months/years ago" rendered by RecentActivityCard / VehicleCarousel /
+  SyncStatusInline on real timestamps. FIX: the `${n > 1 ? 's' : ''}` idiom already used in reminder-helpers:74 + sync-status:33, applied to the week/month/year buckets (days<7 always ≥2 → unconditional
+  plural left as-is). +1 guard (singular at each of the 3 boundaries: day 7/13/30/59/365) + FLIPPED the existing formatters.test.ts:206 assertion that CODIFIED the buggy "1 years ago" → "1 year ago".
+  NON-VACUOUS (the old code failed every new line). fe validate:local EXIT 0, 715 pass (+1). Closed #143 (the last clean queued one-edit). cov: be 87.09% / fe 85.89% (~carry; +1 FE guard, no re-measure).

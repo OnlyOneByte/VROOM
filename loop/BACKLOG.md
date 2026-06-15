@@ -998,10 +998,11 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > out of the work set, + prefix "Reconnect required: …" so the provider-stats failed count means reconnect not flake. +1 guard (AUTH_INVALID upload reject → retryCount:3/prefixed, not 1/bare),
 > NON-VACUOUS. be validate:local EXIT 0, 1550 pass (+1). NOTE: a future UX cycle could surface "reconnect required" in the provider-stats view (routes.ts:616 failed count) — not done here.*
 
-> **#143 (LOW, cosmetic/grammar — found+filed C459 on an FE bug-hunt; clean one-edit, NOT fixed) — formatRelativeTime renders "1 weeks/months/years ago" at the bucket boundaries.**
-> formatters.ts:115-117: `${Math.floor(days/7)} weeks ago` etc. emit "1 weeks ago" (day 7-13), "1 months ago" (30-59d), "1 years ago" (365-729d) — no singular form. Rendered by
-> RecentActivityCard / VehicleCarousel / SyncStatusInline on real timestamps. Clean one-edit: the `n>1?'s':''` idiom already used in frequencyLabel + getSyncStatusInfo. NOTE the existing
-> formatters.test.ts:206 CODIFIES the wrong output ("1 years ago") → the fix flips that assertion too. LOW (no data/money), near the eyes-on boundary but unit-testable; queued.
+> ~~**#143 (LOW, cosmetic/grammar — found+filed C459 on an FE bug-hunt; clean one-edit) — formatRelativeTime renders "1 weeks/months/years ago" at the bucket boundaries.**~~ — *DONE C462:
+> formatters.ts:115-117 hard-appended 's' while Math.floor lands on exactly 1 at each bucket's low edge (7-13d → 1 week, 30-59d → 1 month, 365-729d → 1 year) → "1 weeks/months/years ago"
+> rendered by RecentActivityCard / VehicleCarousel / SyncStatusInline on real timestamps. FIX: the `${n > 1 ? 's' : ''}` idiom (already in reminder-helpers:74 + sync-status:33) on the
+> week/month/year buckets (days<7 always ≥2 → left unconditional). +1 guard (singular at day 7/13/30/59/365) + FLIPPED the existing formatters.test.ts:206 assertion that CODIFIED the buggy
+> "1 years ago" → "1 year ago". NON-VACUOUS (old code failed every new line). fe validate:local EXIT 0, 715 pass (+1). The last clean queued one-edit on the bug list.*
 
 > **#135 (LOW, hygiene/growth — found+filed C445 on the sync deep-review; NOT fixed, a reaping-lifecycle behavior call) — the SyncManager path never reaps synced rows from
 > localStorage.** syncManager.syncAll + resolveConflict only markExpenseAsSynced (sets synced:true, row STAYS in localStorage); they never removeOfflineExpense/clearSyncedExpenses.
