@@ -5,6 +5,7 @@ import {
 	saveOfflineExpenses,
 	removeOfflineExpense,
 	getPendingExpenses,
+	isIncompleteFuelExpense,
 	markExpenseAsSynced,
 	clearSyncedExpenses,
 	offlineExpenseToBackend,
@@ -457,5 +458,49 @@ describe('offlineExpenseToBackend — shared offline→backend mapping', () => {
 		expect(out.fuelType).toBe('Diesel');
 		expect(out.missedFillup).toBe(true);
 		expect(out.description).toBe('Costco top-up');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// isIncompleteFuelExpense (C444 arch dedup): the byte-identical fuel-completeness sync guard hand-inlined
+// at syncOfflineExpenses + sync-manager.syncSingleExpense (the offline↔sync fan-out behind #66/#101) is now
+// ONE exported predicate. The two sync suites drive it green→green via the real sync paths; these pin the
+// predicate's own cells directly so a future tweak to the rule is anchored at the source.
+// ---------------------------------------------------------------------------
+describe('isIncompleteFuelExpense (shared fuel-completeness sync guard)', () => {
+	function fuel(over: Partial<OfflineExpense>): OfflineExpense {
+		return {
+			id: 'e1',
+			vehicleId: 'v1',
+			tags: ['fuel'],
+			category: 'fuel',
+			amount: 50,
+			date: '2024-01-01',
+			timestamp: 0,
+			synced: false,
+			...over
+		};
+	}
+
+	it('a non-fuel expense is NEVER incomplete (the category gate), even with no volume/mileage', () => {
+		expect(isIncompleteFuelExpense(fuel({ category: 'maintenance', volume: undefined, mileage: undefined }))).toBe(
+			false
+		);
+	});
+
+	it('a fuel expense missing BOTH volume and charge is incomplete', () => {
+		expect(isIncompleteFuelExpense(fuel({ volume: undefined, charge: undefined, mileage: 30000 }))).toBe(true);
+	});
+
+	it('a fuel expense missing mileage is incomplete (even with volume present)', () => {
+		expect(isIncompleteFuelExpense(fuel({ volume: 10, mileage: undefined }))).toBe(true);
+	});
+
+	it('a complete liquid-fuel expense (volume + mileage) is NOT incomplete', () => {
+		expect(isIncompleteFuelExpense(fuel({ volume: 10, mileage: 30000 }))).toBe(false);
+	});
+
+	it('a complete ELECTRIC expense (charge satisfies the volume-or-charge requirement) is NOT incomplete', () => {
+		expect(isIncompleteFuelExpense(fuel({ volume: undefined, charge: 25, mileage: 30000 }))).toBe(false);
 	});
 });

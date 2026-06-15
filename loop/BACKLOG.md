@@ -2172,6 +2172,14 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Extract isIncompleteFuelExpense — ONE source of truth for the byte-identical fuel-completeness sync guard (2 inline sites → 1, rule-7 fan-out, done C444).**~~ —
+  *DONE C444 (arch OVER budget, forced): the predicate `category==='fuel' && ((!volume && !charge) || !mileage)` was hand-inlined BYTE-IDENTICAL at syncOfflineExpenses
+  (offline-storage.ts, warn+continue) + sync-manager.syncSingleExpense (return error) — the EXACT offline↔sync fan-out whose drift caused #66/#101, the same pair C205/C426/C432
+  already collapsed for the mapping/pending-filter/mark-synced helpers; this was the leftover. Exported isIncompleteFuelExpense from offline-storage.ts (next to offlineExpenseToBackend);
+  routed both sites, each keeping its own action. rule-3 green→green (sync-offline-expenses + sync-manager suites drive both branches). Hit + fixed the C163/C426 mock-trap (passed the
+  REAL pure predicate through the sync-manager offline-storage mock, not a stub). +5 predicate-pin tests. fe validate:local EXIT 0, 712 pass (+5). The offline↔sync duplicated-rule
+  family is now FULLY collapsed. (BE alt: an 8-line insurance term-create schema collapse — valid but thinner; left for a future arch cycle if the FE surface dries up.)*
+
 - ~~**Delete dead exported helper deriveLastBackupDate (zero references anywhere incl. tests, rule-7 fan-out, done C438).**~~ —
   *DONE C438 (arch OVER budget, forced). BOTH scouts' top picks REJECTED firsthand: (a) FE's calculatePayoffDateFromStart→addMonthsClamped merge is the C337/C330 BEHAVIOR-CHANGE trap
   (addMonthsClamped preserves time-of-day via `new Date(date)`; calculatePayoffDateFromStart constructs at local-midnight `new Date(y,m,d)` — dates stored at noon-local, so the two differ

@@ -78,10 +78,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 439 |
 | guard | 6 | 443 |
 | bug | 3 | 442 |
-| arch | 5 | 438 |
+| arch | 5 | 444 |
 | infra | 6 | 440 |
 
-Current cycle: **443**
+Current cycle: **444**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6664,3 +6664,13 @@ Current cycle: **443**
   injection) sends no dates → all three behavioral cells unpinned. +3 tests (insurance-validation.property.test.ts) driving the REAL schema: both-dates end>start→accept; inverted AND equal
   (the `>` not `>=`)→reject; single-date (start-only / end-only / neither)→accept (the skip branch). NON-VACUOUS (each cell flips under a refine tighten/drop). be validate:local EXIT 0, 1537
   pass (+3). cov: be 86.94% (carry, +3 guards) / fe 85.26% (carry).
+- **C444 (arch): extract isIncompleteFuelExpense — ONE source of truth for the byte-identical fuel-completeness sync guard (2 inline sites → 1)** —
+  BALANCE: arch OVER budget (last 438, starved-for 444−438=6 > 5) → FORCED arch. rule-7 2-agent fan-out. BE offered an 8-line insurance term-create schema collapse (valid but thin); FE offered the
+  stronger pick. VERIFIED FIRSTHAND (C21/C60): the predicate `expense.category === 'fuel' && ((!expense.volume && !expense.charge) || !expense.mileage)` was hand-inlined BYTE-IDENTICAL at
+  syncOfflineExpenses (offline-storage.ts:187-188, action: warn+continue) AND sync-manager.syncSingleExpense (sync-manager.ts:199-200, action: return error). This is the EXACT offline↔sync fan-out whose drift
+  caused #66 (fuelType dropped) + #101 (missedFillup dropped) — the same pair the C205 offlineExpenseToBackend + C426 getPendingExpenses + C432 markExpenseAsSynced extracts already collapsed; this fuel-completeness
+  guard was the leftover. FIX (rule-2 behavior-preserving, ONE coherent change): exported isIncompleteFuelExpense from offline-storage.ts (right after offlineExpenseToBackend, the documented single-source neighbor);
+  routed both sites to it, each KEEPING its own action (skip-and-continue vs error-return). rule-3 green→green: sync-offline-expenses.test.ts:100/123 + sync-manager.test.ts drive both branches at both sites — GREEN
+  before+after. Hit the C163/C426 mock-trap (sync-manager.test.ts mocks offline-storage → the new import was undefined → 8 fails); fixed per C205 discipline by passing the REAL pure predicate through
+  (isIncompleteFuelExpense: actual.isIncompleteFuelExpense), NOT a stub. +5 direct predicate-pin tests (category-gate, both-missing, mileage-missing, complete-liquid, complete-electric). fe validate:local EXIT 0, 712
+  pass (+5). cov: be 86.94% (carry) / fe 85.26% (carry, +5 guards). The offline↔sync duplicated-rule family is now FULLY collapsed (mapping + pending-filter + mark-synced + fuel-completeness all single-source).

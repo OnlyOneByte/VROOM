@@ -80,6 +80,18 @@ export function offlineExpenseToBackend(
 	});
 }
 
+/**
+ * A fuel expense is INCOMPLETE for sync if it carries neither volume nor charge, OR has no mileage —
+ * such a row can't yield a usable MPG/mi-kWh pairing and must not be POSTed. SINGLE SOURCE OF TRUTH for
+ * this guard: the same predicate was hand-inlined at the two sync sites (syncOfflineExpenses here +
+ * sync-manager's syncSingleExpense), the SAME offline↔sync fan-out whose drift caused #66/#101 — so a
+ * future tightening (e.g. also requiring fuelType) can't land in one path and silently skip the other.
+ * Each caller keeps its OWN action on a match (skip-and-continue vs return-an-error).
+ */
+export function isIncompleteFuelExpense(expense: OfflineExpense): boolean {
+	return expense.category === 'fuel' && ((!expense.volume && !expense.charge) || !expense.mileage);
+}
+
 // Load offline expenses from localStorage
 export function loadOfflineExpenses(): OfflineExpense[] {
 	if (!browser) return [];
@@ -183,10 +195,7 @@ export async function syncOfflineExpenses(): Promise<void> {
 	try {
 		for (const expense of pendingExpenses) {
 			// Validate fuel expense requirements
-			if (
-				expense.category === 'fuel' &&
-				((!expense.volume && !expense.charge) || !expense.mileage)
-			) {
+			if (isIncompleteFuelExpense(expense)) {
 				if (import.meta.env.DEV) {
 					console.warn(
 						`Skipping expense ${expense.id}: Fuel expenses require volume/charge and mileage data`

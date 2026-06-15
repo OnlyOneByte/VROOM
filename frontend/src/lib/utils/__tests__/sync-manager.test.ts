@@ -16,6 +16,10 @@ vi.mock('../offline-storage', async () => {
 	const loadOfflineExpenses = vi.fn();
 	return {
 		offlineExpenseToBackend: actual.offlineExpenseToBackend,
+		// isIncompleteFuelExpense is a PURE predicate (no localStorage) — pass the REAL impl through like
+		// offlineExpenseToBackend (C205/C444), NOT a stub: stubbing it would make the sync paths skip the
+		// genuine fuel-completeness gate and assert against a fake.
+		isIncompleteFuelExpense: actual.isIncompleteFuelExpense,
 		loadOfflineExpenses,
 		saveOfflineExpenses: vi.fn(),
 		markExpenseAsSynced: vi.fn(),

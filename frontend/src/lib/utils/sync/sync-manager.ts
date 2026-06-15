@@ -13,6 +13,7 @@ import {
 } from './sync-state.svelte';
 import {
 	getPendingExpenses,
+	isIncompleteFuelExpense,
 	markExpenseAsSynced,
 	offlineExpenseToBackend,
 	type OfflineExpense
@@ -195,10 +196,7 @@ class SyncManager {
 				return { success: false, conflict };
 			}
 
-			if (
-				expense.category === 'fuel' &&
-				((!expense.volume && !expense.charge) || !expense.mileage)
-			) {
+			if (isIncompleteFuelExpense(expense)) {
 				return {
 					success: false,
 					error:
