@@ -58,6 +58,11 @@
 > the C430/C433 guards). BE↔FE gap now ~1.7pts (86.9 vs 85.3) — the TIGHTEST ever. 90%-line goal still structurally gated (BE DI/singleton + OAuth-network; FE eyes-on
 > components/routes, Playwright-blocked). Branch: 245 commits ahead of origin/main, working tree clean (only by-design untracked *.meshclaw.e2e.ts + tooling + the
 > gitignored BRANCH_REVIEW.md, refreshed C435 with §33 covering the 84-commit C351–C434 delta), build floor GREEN both sides → PR-ready (standing escalation since C368).**
+> **RE-MEASURED AGAIN C447 (the #5-sweep re-measure; last full C435): be 86.96% line / 86.55% func (~FLAT vs C435's 86.94/86.60 — the C439/C443/C446 BE guards held as
+> product code grew); fe 85.89% line / 87.15% func / 78.35% branch (UP +0.63 line / +1.62 func / +0.95 branch vs C435's 85.26/85.53/77.40 — the C436 chart-formatters cluster
+> + C444 isIncompleteFuelExpense + the C445/C446 sync/activity guards lifted it). BE↔FE gap now ~1.1pts (86.96 vs 85.89) — the TIGHTEST ever. 90%-line goal still structurally
+> gated (BE DI/singleton + OAuth-network; FE eyes-on components/routes, Playwright-blocked). Branch: 257 commits ahead of origin/main, working tree clean (by-design untracked
+> *.meshclaw.e2e.ts + tooling + the gitignored BRANCH_REVIEW.md, refreshed C447 with §34 covering the 12-commit C435–C446 delta), build floor GREEN both sides → PR-ready.**
 > When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
@@ -79,9 +84,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 443 |
 | bug | 3 | 446 |
 | arch | 5 | 444 |
-| infra | 6 | 440 |
+| infra | 6 | 447 |
 
-Current cycle: **446**
+Current cycle: **447**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6699,3 +6704,12 @@ Current cycle: **446**
   (syncInactivityMinutes max 30, not 999). be validate:local EXIT 0, 1538 pass (+1). The two OTHER found defects FILED for future cycles: #137 (CSV import persists stray mileage on a non-fuel imported row — the
   #76 class's THIRD write site, import-csv.ts parseRow bypasses clearFuelFieldsIfNotFuel; clean one-edit) + #138 (InsuranceTermForm sends bare date-only strings → term dates stored at UTC-midnight → displayed a
   day early for Americas users — the #87/#131 date class, clean one-edit + needs the source-scan extended). cov: be 86.94% (carry, +1 guard) / fe 85.26% (carry).
+- **C447 (infra): #5 branch-hygiene sweep + coverage re-measure + BRANCH_REVIEW.md refresh (the overdue ~C445 cadence; last actual sweep C435)** —
+  BALANCE: infra OVER budget (last 440, starved-for 447−440=7 > 6) → FORCED infra. Three-part sweep: (1) HYGIENE — git status --porcelain --untracked-files=all → ZERO stray untracked
+  unit/spec .test.ts (all untracked = by-design *.meshclaw.e2e.ts + tooling); branch 257 commits, 0 behind, clean fast-forwardable. (2) GREEN BASELINE + COVERAGE RE-MEASURE (last full C435):
+  be bun test --coverage EXIT 0, 1538 pass → 86.96% line / 86.55% func (~flat vs C435's 86.94/86.60); fe vitest --coverage EXIT 0, 713 pass → 85.89% line / 87.15% func / 78.35% branch (UP
+  +0.63 line / +1.62 func / +0.95 branch vs C435 — the C436 chart-formatters + C444 isIncompleteFuelExpense + C445/C446 guards lifted it). BE↔FE gap now ~1.1pts — the tightest ever.
+  Updated the COVERAGE TREND header. (3) BRANCH_REVIEW.md (gitignored) refresh — header 245→257 commits, +§34 covering the 12-commit C435–C446 delta (6 bugs incl. the NORTH_STAR-#1 #136
+  silent-Sheets-backup-gap, the #132 restore-UNIQUE + #134 conflict-resurrection data-safety fixes, the C444 offline↔sync family fully-collapsed, the C436 chart-formatters cluster + 4
+  escalations/notes filed [#129/#135/#137/#138]). Doc/measurement-only — no source touched, both coverage runs green. 90%-line goal still structurally gated. Next #5 sweep ~C457; next
+  CLAUDE.md full refresh ~C450. cov: be 86.96% / fe 85.89% (re-measured C447).
