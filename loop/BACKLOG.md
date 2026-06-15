@@ -2245,6 +2245,12 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Dedup-surface CERTIFIED EXHAUSTED (C457, docs-only — no manufactured churn).**~~ — *DONE C457 (arch OVER budget, forced). rule-7 fan-out returned a clean "nothing worth doing":
+  every dedup candidate is behavior-changing / untested-path / churn; every dead-code candidate is test-entangled (coverage-dropping delete — the C438 anti-trap). Firsthand-verified the
+  two getCategoryColor fns (chart-colors.ts:47 vs expense-helpers.ts:103) are FALSE-DRY (different output domains: CSS var(--chart-N) vs Tailwind classes) → reject. Per the dormant-vein
+  protocol (arch analogue of the C402/C420 bug cert), recorded a CERTIFICATION rather than manufacture churn / a coverage-negative delete. The standing dead-ends (FE photo-CRUD + OAuth-ctor
+  untested paths; requireAuth + insurance getActive/getCurrentTermDates test-entangled deletes) — next forced-arch should fan out FRESH (new dups surface as product grows), not re-scout these.*
+
 - ~~**Collapse the byte-identical insurance term-create schema — createPolicyTermSchema → createTermSchema (2 sources of truth → 1, done C451).**~~ —
   *DONE C451 (arch OVER budget 7>5, forced): createTermSchema (validation.ts:40-47) + createPolicyTermSchema (:85-92) were BYTE-IDENTICAL (`z.object({...baseTermFields,
   vehicleCoverage}).refine(endDate>startDate,{message})`). One is embedded in createPolicySchema.terms (POST /insurance), the other re-exported as addTermSchema (POST /:id/terms) —

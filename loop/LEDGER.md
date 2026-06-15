@@ -83,10 +83,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 452 |
 | guard | 6 | 456 |
 | bug | 3 | 455 |
-| arch | 5 | 451 |
+| arch | 5 | 457 |
 | infra | 6 | 454 |
 
-Current cycle: **456**
+Current cycle: **457**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6801,3 +6801,12 @@ Current cycle: **456**
   cross-vehicle phantom (a flat-list pairing would subtract v2's 5000 from v1's 1300 = absurd/out-of-band → dropped); (2) a v1 gas pair + a v1 charge session → v1 efficiency stays the gas 30, charge excluded. NON-VACUOUS
   (a regression dropping the per-vehicle grouping or swapping gasEfficiencyPoint→computeEfficiencyPoint flips the asserted efficiency). One biome import-reorder autofix. be validate:local EXIT 0, 1545 pass (+2). cov:
   be 86.96% (carry, +2 guards) / fe 85.89% (carry).
+- **C457 (arch → dedup-surface CERTIFIED EXHAUSTED; docs-only, no manufactured churn)** —
+  BALANCE: arch OVER budget (last 451, starved-for 457−451=6 > 5) → FORCED arch (#5 sweep due ~C457 is infra, not over budget → waits). rule-7 1-agent fan-out (both tiers). Returned a clean "nothing worth doing":
+  every dedup candidate is behavior-changing / untested-path / churn, and every dead-code candidate is test-entangled (deleting it drops coverage — the C438 anti-trap). VERIFIED FIRSTHAND the one candidate worth a
+  second look (the two getCategoryColor fns, chart-colors.ts:47 vs expense-helpers.ts:103): they return DIFFERENT output domains (CSS `var(--chart-N)` SVG fills vs Tailwind `text-chart-N bg-chart-N/10` badge classes),
+  keyed on different category sets with divergent fallbacks → merging is FALSE-DRY + behavior-changing, correctly rejected. The remaining dead-code (requireAuth + its ~50-LOC describe; insurance getActiveInsurance-
+  PolicyId/getCurrentTermDates + their ~120-LOC property tests) are all coverage-dropping deletes — the arch rules forbid churn (rule 5) + behavior change (rule 2), and the C438 precedent is that a delete must be
+  ZERO-ref incl. tests (these aren't). So per the dormant-vein protocol (the arch analogue of C402/C420's bug-vein cert), recorded a CERTIFICATION that the byte-identical-dedup + clean-dead-code surface is EXHAUSTED
+  rather than manufacture a churn refactor or a coverage-negative delete. No source touched → no build gate. The 50+ landed dedups (C243→C451) + the FE photo-CRUD/OAuth-ctor untested-path veins + the test-entangled
+  dead methods are the standing map; the NEXT forced-arch cycle should fan out fresh (a new dup may surface as product code grows) but not re-scout these dead ends. cov: be 86.96% (carry) / fe 85.89% (carry).
