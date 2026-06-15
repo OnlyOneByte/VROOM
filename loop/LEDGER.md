@@ -81,12 +81,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 445 |
-| guard | 6 | 443 |
+| guard | 6 | 450 |
 | bug | 3 | 449 |
 | arch | 5 | 444 |
 | infra | 6 | 447 |
 
-Current cycle: **449**
+Current cycle: **450**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6735,3 +6735,11 @@ Current cycle: **449**
   pre-fix claimDate/startDate .split('T')[0] lines; SKIPS the safe dateStr.slice(0,10).split('-') local-parse). fe validate:local EXIT 0, 713 pass (svelte-check 0, build clean). The #87/#106/#131/#138 UTC-date
   family is now closed across ALL date-only forms (Expense/Reminder/Vehicle/odometer/InsuranceTerm/Claims), with the source-scan covering BOTH the `.slice(0,10)` AND `.split('T')[0]` antipattern forms. cov: be
   86.96% (carry) / fe 85.89% (carry, +source-scan generalized). #129/#135 (gated) are the only remaining queued items.
+- **C450 (guard): pin getLatestTerm's equal-endDate tiebreak (the load-bearing `>`-not-`>=`, first-seen-wins, via the REAL export)** —
+  BALANCE: TWO over budget (guard 7>6, arch 6>5); guard MOST-STARVED (starved-for 7 vs arch's 6) → forced guard (CLAUDE.md refresh due ~C450 is infra, not over budget → waits). 1-agent fan-out. VERIFIED
+  FIRSTHAND (C21/C60): getLatestTerm (insurance.ts:57) uses a strict `>` so on two terms sharing an identical endDate the FIRST in the array wins (latest never reassigned on a tie). REACHABLE: insuranceTerms
+  has only a NON-unique (policyId, endDate) index (schema.ts), so two co-terminating terms can legitimately share an endDate; the backend orders desc(endDate) but SQLite's order AMONG equal endDates is
+  unspecified → this FE helper is the actual decider of which term renders + renews (PolicyCard latestTerm → displayed policyNumber, ExpirationAlert, the renewFrom pre-fill link). The existing property test
+  (insurance.test.ts:236) asserts only latest.endDate >= every endDate — `>=`-tolerant, so it does NOT pin the tiebreak; a regression to `>=` (last-seen-wins) would silently flip the chosen term. +1 guard
+  (two same-endDate terms, distinct id/policyNumber): [A,B]→A AND [B,A]→B (first-seen regardless of order). NON-VACUOUS (a `>=` flip turns both to last-seen). This pins the CURRENT first-seen contract — making
+  the tiebreak deterministic ACROSS reads (a secondary sort key) would be a separate product call, NOT this guard. fe validate:local EXIT 0, 714 pass (+1). cov: be 86.96% (carry) / fe 85.89% (carry, +1 guard).

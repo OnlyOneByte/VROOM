@@ -248,4 +248,29 @@ describe('Property 14: Renew pre-fill from previous term', () => {
 			{ numRuns: 100 }
 		);
 	});
+
+	// C450 guard: the EQUAL-endDate tiebreak. insurance.ts:57 uses a strict `>` so on two terms sharing
+	// an identical endDate the FIRST in the array wins (latest is never reassigned on a tie). This is
+	// REACHABLE: insuranceTerms has only a NON-unique (policyId, endDate) index, so two co-terminating
+	// terms can legitimately share an endDate; the backend orders desc(endDate) but SQLite's order AMONG
+	// equal endDates is unspecified, so this FE helper is the actual decider of which term renders +
+	// renews (PolicyCard's latestTerm → displayed policyNumber, ExpirationAlert, renewFrom link). The
+	// property test above is `>=`-tolerant so it does NOT pin the tiebreak — a regression to `>=`
+	// (last-seen-wins) would flip the chosen term silently. This pins the current first-seen contract.
+	test('getLatestTerm: on an equal-endDate tie the FIRST term wins (the load-bearing `>`, not `>=`)', () => {
+		const base = {
+			policyId: 'policy-1',
+			startDate: '2024-01-01',
+			endDate: '2024-12-31', // identical end dates
+			createdAt: '2024-01-01T00:00:00.000Z',
+			updatedAt: '2024-01-01T00:00:00.000Z'
+		};
+		const termA: InsuranceTerm = { ...base, id: 'term-A', policyNumber: 'POL-A' };
+		const termB: InsuranceTerm = { ...base, id: 'term-B', policyNumber: 'POL-B' };
+
+		// NON-VACUOUS: first-seen wins regardless of input order. A regression to `>=` would return the
+		// LAST same-endDate term, flipping both of these.
+		expect(getLatestTerm([termA, termB])?.id).toBe('term-A');
+		expect(getLatestTerm([termB, termA])?.id).toBe('term-B');
+	});
 });

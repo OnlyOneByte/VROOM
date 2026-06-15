@@ -542,6 +542,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
   e2e `expense-category-nowrap.meshclaw.e2e.ts` (untracked).*
 
 ### guard
+> ~~**C450 — pin getLatestTerm's equal-endDate tiebreak (the load-bearing `>`-not-`>=`, first-seen-wins, via the REAL export).**~~ — *DONE C450 (guard OVER budget 7>6 → forced;
+> arch also over but guard more-starved). getLatestTerm (insurance.ts:57) uses strict `>` so on two terms sharing an identical endDate the FIRST wins. REACHABLE: insuranceTerms has
+> only a NON-unique (policyId, endDate) index → two co-terminating terms can share an endDate; the backend orders desc(endDate) but SQLite's order among equal endDates is unspecified,
+> so this FE helper decides which term renders + renews (PolicyCard). The existing property test is `>=`-tolerant → does NOT pin the tiebreak. +1 guard: two same-endDate terms,
+> [A,B]→A AND [B,A]→B (first-seen regardless of order). NON-VACUOUS (a `>=` flip → last-seen). Pins the CURRENT contract; cross-read determinism (a secondary sort key) is a separate
+> product call. fe validate:local EXIT 0, 714 pass (+1).*
+
 > ~~**C443 — pin updateTermSchema's CONDITIONAL date-order refine (the partial-update both-dates / single-date-skip cells, via the REAL exported schema).**~~ — *DONE C443
 > (guard OVER budget 7>6 → forced). First weighed a class-level source-scan for the #128 fromBackendExpense-skip family (bit twice, C431/C442) but REJECTED it firsthand — no
 > false-positive-free syntactic signal (analytics getVehicleExpenses/getExpenseSummary/getVehicleStats return aggregated/typed data, correctly no mapper), and the class is
