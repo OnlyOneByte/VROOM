@@ -2131,6 +2131,14 @@ these two are the only findings, both verified against source: 1 real low-sev bu
   through parseMonthToDate; pinned by a helper unit test + the no-utc-month-parse source-scan guard.*
 
 ### arch
+- ~~**Delete dead exported helper deriveLastBackupDate (zero references anywhere incl. tests, rule-7 fan-out, done C438).**~~ —
+  *DONE C438 (arch OVER budget, forced). BOTH scouts' top picks REJECTED firsthand: (a) FE's calculatePayoffDateFromStart→addMonthsClamped merge is the C337/C330 BEHAVIOR-CHANGE trap
+  (addMonthsClamped preserves time-of-day via `new Date(date)`; calculatePayoffDateFromStart constructs at local-midnight `new Date(y,m,d)` — dates stored at noon-local, so the two differ
+  in time-of-day; rule-2 violation masked by Y/M/D-only tests); (b) BE's calculateAverageMPG merge is the escalated #30 band-divergence (behavior-changing). Cleanest survivor = dead-code
+  delete: deriveLastBackupDate (backup.ts:150), exported but ZERO references anywhere incl. tests (a stranded "last-backup summary" helper that never shipped). Deleting dead code = explicit
+  arch payoff (rule 5), behavior-preserving, coverage-neutral-to-positive. Chose it over the insurance dead-methods candidate (entangles ~120 test LOC + drops coverage). −15 LOC,
+  BackupConfig import retained. be validate:local EXIT 0, 1532 pass (unchanged — confirms dead). Dedup surface now near-exhausted both sides (remaining dups behavior-changing or untested-path).*
+
 - ~~**Collapse SyncManager's private markExpenseAsSynced + dead clearSyncedExpenses → the canonical offline-storage exports (cross-file dup + dead-code delete, rule-7 fan-out, done C432).**~~ —
   *DONE C432 (arch OVER budget, forced): sync-manager.ts had a PRIVATE markExpenseAsSynced (:247, byte-identical to offline-storage.ts:160) + a PUBLIC async clearSyncedExpenses
   (:330, near-identical to :169) with ZERO callers (grep-confirmed dead). The SAME offline-storage↔sync-manager divergence channel that produced #66/#101 (and that C426

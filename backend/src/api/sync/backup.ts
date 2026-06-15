@@ -143,21 +143,6 @@ export function resolveBackupFolderPath(
   return joinStoragePath(providerRootPath, settings.folderPath);
 }
 
-/**
- * Derives the most recent backup date across all providers in a BackupConfig.
- * Returns null if no provider has a lastBackupAt value.
- */
-export function deriveLastBackupDate(backupConfig: BackupConfig | null): string | null {
-  if (!backupConfig?.providers) return null;
-  let latest: string | null = null;
-  for (const settings of Object.values(backupConfig.providers)) {
-    if (settings.lastBackupAt && (!latest || settings.lastBackupAt > latest)) {
-      latest = settings.lastBackupAt;
-    }
-  }
-  return latest;
-}
-
 export class BackupService {
   /**
    * Load BackupConfig from user settings and filter to enabled providers.

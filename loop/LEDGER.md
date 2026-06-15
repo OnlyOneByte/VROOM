@@ -78,10 +78,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 433 |
 | guard | 6 | 436 |
 | bug | 3 | 437 |
-| arch | 5 | 432 |
+| arch | 5 | 438 |
 | infra | 6 | 435 |
 
-Current cycle: **437**
+Current cycle: **438**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6596,3 +6596,13 @@ Current cycle: **437**
   `r.startDate.slice(0,10)` but SKIPS the safe `dateStr.slice(0,10).split('-')` local-parse (expense-filters.ts:12) AND the tags-array `.slice(0,10)` cap (ExpenseForm.svelte:190).
   fe validate:local EXIT 0, 707 pass (+1 guard), svelte-check 0, build clean. cov: be 86.94% (carry) / fe 85.26% (carry, +1 source-scan guard). Two of the three queued small bugs now
   closed (#130 C434, #131 C437); #129 OAuth-email-sync remains (needs a 1-line product call).
+- **C438 (arch): delete dead exported helper deriveLastBackupDate (zero references anywhere, incl. tests)** —
+  BALANCE: arch OVER budget (last 432, starved-for 438−432=6 > 5) → FORCED arch pick. rule-7 2-agent fan-out. BOTH scouts' TOP picks REJECTED firsthand (C21/C60): (a) FE's
+  calculatePayoffDateFromStart→addMonthsClamped "semantically equivalent" merge is the C337/C330-documented BEHAVIOR-CHANGE trap — VERIFIED firsthand: addMonthsClamped clones via
+  `new Date(date)` (PRESERVES time-of-day) while calculatePayoffDateFromStart constructs `new Date(y,m,d)` (LOCAL-MIDNIGHT); dates are stored at noon-local (dateOnlyToISO), so the two
+  return Dates differing in TIME-OF-DAY — rule-2 violation, masked by Y/M/D-only tests (the exact reason it was rejected twice). (b) BE's calculateAverageMPG merge is the escalated #30
+  band-divergence (behavior-changing). The remaining BE finds were dead-code deletes; the cleanest = deriveLastBackupDate (backup.ts:150) — exported but VERIFIED firsthand to have ZERO
+  references anywhere incl. tests (a stranded "last-backup summary" helper that never shipped; the live sync/routes path does per-provider checks, not max-across-providers). Deleting dead
+  code is an explicit arch payoff (rule 5), behavior-preserving (nothing calls it), coverage-neutral-to-positive (removes uncovered LOC). Chose it over the insurance dead-methods candidate
+  (that one entangles ~120 test LOC + drops the coverage numerator). −15 LOC; BackupConfig import retained (still used at loadBackupConfig). be validate:local EXIT 0, 1532 pass (unchanged —
+  confirms it was dead). cov: be 86.94% (carry) / fe 85.26% (carry). Both scouts now report the dedup surface near-exhausted both sides; remaining dups are behavior-changing (escalated #30/#330) or untested-path.
