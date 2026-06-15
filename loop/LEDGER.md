@@ -82,11 +82,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 452 |
 | guard | 6 | 450 |
-| bug | 3 | 449 |
+| bug | 3 | 453 |
 | arch | 5 | 451 |
 | infra | 6 | 447 |
 
-Current cycle: **452**
+Current cycle: **453**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6763,3 +6763,14 @@ Current cycle: **452**
   photo-bearing entity added as a vehicle FK-cascade child without a cleanup call would silently orphan its photo bytes (the #34 leak class) with NO failing test. +1 symmetry guard (the C302 restore-coverage pattern):
   source-scan every ENTITY_TO_CATEGORY key is either reaped by the delete handler OR in a documented SURVIVES_VEHICLE_DELETE set + a liveness floor. PROVEN NON-VACUOUS firsthand (removing the odometer_entry cleanup
   call → RED). be validate:local EXIT 0, 1542 pass (+2). cov: be 86.96% (carry, +2 guards) / fe 85.89% (carry).
+- **C453 (bug → #139: a 0%-APR loan was silently excluded from /analytics/financing loanBreakdown — the #92/#117 0%-APR class, 3rd site)** —
+  BALANCE: bug OVER budget (last 449, starved-for 453−449=4 > 3) → FORCED bug (#129/#135 product/behavior-gated, so a fresh 2-agent hunt). TWO concrete defects found, both in already-decided classes; picked the BE
+  one (cleaner: HTTP-harness-testable + non-eyes-on). VERIFIED FIRSTHAND (C21/C60): buildLoanBreakdown (analytics/repository.ts:902) filtered `f.isActive && f.financingType === 'loan' && f.apr` — but apr is
+  schema `.min(0)`-valid, so a 0%-APR dealer-promo loan (apr===0, falsy) was DROPPED; if it's the user's only loan, loanBreakdown returns [] → FinancingAnalytics.svelte gates the whole "Interest vs Principal"
+  chart on length>0 → the chart renders NOTHING for an actively-paid-down 0% loan. The amortization helper already handles 0% correctly (interest=balance*0=0, payment retires principal). The `&& f.apr` clause is
+  redundant for non-loans (financingType==='loan' already excludes leases) + harmful for 0%; loan.apr is coalesced to 0 below for the walk. FIX (one edit): drop `&& f.apr`. +1 HTTP-harness guard (raw-seed a 0%-APR
+  active loan + a financing payment → GET /analytics/financing → loanBreakdown non-empty, every interest===0, some principal>0). PROVEN NON-VACUOUS firsthand (restoring `&& f.apr` → []  → RED). be validate:local
+  EXIT 0, 1543 pass (+1). FILED #140 (the FE scout's finding, NOT fixed — eyes-on component derivations): LeaseMetricsCard compares LIFETIME driven miles against the bare ANNUAL mileageLimit at 3 display lines
+  (:34/:48/:66) → shows "24000/12000, 100% RED" while its own "left" figure (which routes through leaseTotalMileageAllowance) says "12000 left" — an internal contradiction + false over-mileage panic on an on-pace
+  multi-year lease; the #64/#110/#115 annual-vs-total class on the ONE card #115 missed; clean one-edit (route the 3 lines through leaseTotalMileageAllowance) but the verification is eyes-on. cov: be 86.96%
+  (carry, +1 guard) / fe 85.89% (carry).

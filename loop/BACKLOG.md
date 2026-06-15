@@ -953,6 +953,21 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > `.split('T')[0]` (it only matched `.slice(0,10)`, the exact reason both forms slipped past) + added claimDate. PROVEN non-vacuous + false-positive-free. fe validate:local EXIT 0, 713
 > pass. The #87/#106/#131/#138 UTC-date family is now closed across ALL date-only forms, the source-scan covering both antipattern forms.*
 
+> ~~**#139 (MED, money/correctness — found+fixed C453 on a 2-agent bug-hunt; the #92/#117 0%-APR class, 3rd site) — a 0%-APR loan was silently excluded from /analytics/financing
+> loanBreakdown.**~~ — *DONE C453: buildLoanBreakdown (analytics/repository.ts:902) filtered `&& f.apr` (truthy), so an apr===0 dealer-promo loan (schema .min(0)-valid) was dropped →
+> if it's the user's only loan, loanBreakdown=[] → FinancingAnalytics gates the whole Interest-vs-Principal chart on length>0 → renders nothing for an actively-paid-down 0% loan.
+> The amortization helper handles 0% fine (interest=0, payment→principal). FIX (one edit): drop `&& f.apr` (financingType==='loan' already excludes leases; apr coalesced to 0 for
+> the walk). +1 HTTP-harness guard (0%-APR loan → loanBreakdown non-empty, all interest===0, some principal>0), PROVEN NON-VACUOUS. be validate:local EXIT 0, 1543 pass (+1).*
+
+> **#140 (MED-HIGH, money/UX correctness — found+filed C453 on an FE bug-hunt; the #64/#110/#115 annual-vs-total class on the ONE card #115 missed; clean one-edit but eyes-on
+> verification) — LeaseMetricsCard compares LIFETIME driven miles against the bare ANNUAL mileageLimit.** LeaseMetricsCard.svelte:34/48/66 use `financing.mileageLimit` (the ANNUAL
+> allowance) as the burn-bar denominator, displayed limit, and limitOdometer base — but `leaseMetrics.mileageUsed` is LIFETIME driven miles (current−initial). For a 36-mo lease at
+> 12000/yr (total 36000), 24000 driven (on-pace, 2/3 through) → the card shows "24000 / 12000, 100% RED" + odometer "34000/22000" WHILE its own "left" figure (line 93, routes
+> through leaseTotalMileageAllowance → 36000−24000) says "12000 left" — an internal contradiction + false over-mileage panic. Byte-identical to the #115 PaymentMetricsGrid fix,
+> on the card that sweep missed. Reachable: FinanceTab renders it for any lease with mileageLimit + currentMileage (the common multi-year case). Clean one-edit: compute
+> leaseTotalMileageAllowance(financing) once + use it as the denominator (:34), displayed limit (:66), limitOdometer base (:48) — the already-exported single-source helper. NOT fixed
+> this cycle because the fix lands in eyes-on component $derived lines (visual verification Playwright-blocked); queued for a UI-work cycle or alongside a screenshot pass.
+
 > **#135 (LOW, hygiene/growth — found+filed C445 on the sync deep-review; NOT fixed, a reaping-lifecycle behavior call) — the SyncManager path never reaps synced rows from
 > localStorage.** syncManager.syncAll + resolveConflict only markExpenseAsSynced (sets synced:true, row STAYS in localStorage); they never removeOfflineExpense/clearSyncedExpenses.
 > Contrast the legacy syncOfflineExpenses (offline-storage.ts), which clearSyncedExpenses() after its loop. So through the SyncManager entry point (the one auto-sync + the manual

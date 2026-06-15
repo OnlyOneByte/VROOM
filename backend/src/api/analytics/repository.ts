@@ -899,9 +899,12 @@ export class AnalyticsRepository {
       paymentAmount: number;
     }>
   ): Promise<FinancingData['loanBreakdown']> {
-    const activeLoans = financingRows.filter(
-      (f) => f.isActive && f.financingType === 'loan' && f.apr
-    );
+    // NOTE: do NOT add `&& f.apr` — apr is `.min(0)`-valid, so a 0%-APR dealer-promo loan has apr===0
+    // (falsy) and would be silently DROPPED from the breakdown chart, hiding a real active loan's
+    // principal paydown (the #92/#117 0%-APR class, 3rd site). financingType==='loan' already excludes
+    // leases; loan.apr is coalesced to 0 below for the amortization walk (which handles 0% correctly:
+    // interest = balance*0 = 0, all payment goes to principal). #139.
+    const activeLoans = financingRows.filter((f) => f.isActive && f.financingType === 'loan');
     if (activeLoans.length === 0) return [];
 
     const { financingRepository } = await import('../financing/repository');
