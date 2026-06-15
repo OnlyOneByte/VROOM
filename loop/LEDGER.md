@@ -77,11 +77,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 439 |
 | guard | 6 | 436 |
-| bug | 3 | 437 |
+| bug | 3 | 441 |
 | arch | 5 | 438 |
 | infra | 6 | 440 |
 
-Current cycle: **440**
+Current cycle: **441**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6628,3 +6628,16 @@ Current cycle: **440**
   Expenses shape, #130 #76-third-leg PUT mileage, #131 ReminderForm UTC date) + bumped "all landed C155→C437"; (4) added #129 OAuth-login email-sync to the pending-Angelo block + a "CLOSED since
   last refresh: #128/#130/#131" note. Doc-only, no code touched → no build gate (CLAUDE.md not compiled; verified all four regions read coherently + preserved structure + no stale-number
   leftovers via grep). cov: be 86.94% (carry) / fe 85.26% (carry). Next CLAUDE.md refresh ~C450; next #5 sweep ~C445.
+- **C441 (bug → #132: merge-restore detectConflicts didn't probe `reminders` — a surviving vehicle-less reminder [the #97 state] in a backup → raw UNIQUE throw, the #93/C300 class on a third table)** —
+  BALANCE: bug OVER budget (last 437, starved-for 441−437=4 > 3) → FORCED bug. #129 product-gated, so a fresh 2-agent hunt on the stalest surfaces (sync conflict path / reminder edges / FE conflict-classify). BOTH found a
+  concrete defect; by severity (data-safety > display) the BE one outranked. VERIFIED FIRSTHAND (C21/C60): detectConflicts (restore.ts:273) probed 8 tables but NOT `reminders`, while insertBackupData inserts it
+  (restore.ts:469). `reminders` is userId-owned with its OWN id PK and is NOT FK'd to vehicles (the link is the reminder_vehicles junction, onDelete:cascade), so a reminder SURVIVES deletion of all its vehicles (the
+  escalated #97 vehicle-less-but-active state). A MERGE restore of a backup carrying that surviving reminder slips past conflict detection (no probed table collides once the vehicle's gone) into insert(reminders) against
+  the existing id PK → `UNIQUE constraint failed: reminders.id` → the WHOLE restore aborts with a raw DB error instead of a clean conflict (the exact #93/C300 failure on a third table that fix never reached). The
+  restore-table-coverage drift-guard MISSED it: its `reminders` exemption claimed "child of vehicles via reminder_vehicles → probed parent" — FALSE (reminders has no FK to vehicles + survives the delete). FIX (one
+  probe, mirrors the C300 prefs/syncState fix): added `reminders` to the detectConflicts table array (userId-scoped, id PK — the `expenses` shape); CORRECTED the coverage-guard's false exemption (reminders now
+  directly-probed; reminderVehicles/Notifications re-noted as children of the now-probed reminders parent). GUARD: +1 (restore-merge-reminder-collision.test.ts) mirroring C300 — create a vehicle+reminder, export, DELETE
+  the vehicle (→ #97 surviving reminder), merge-restore must report a conflict with table==='reminders' && id===reminderId. PROVEN NON-VACUOUS BOTH WAYS firsthand: green WITH the probe, RED without (the
+  reminders-TYPED conflict only appears when probed — a bare conflicts.length>0 would be VACUOUS since the C300 prefs row also collides, so the assertion keys on the reminders-typed conflict specifically). One biome
+  format autofix on the new test. be validate:local EXIT 0, 1534 pass (+1). FE scout's #1 (sync-manager checkForExistingExpense skips fromBackendExpense → blank serverExpense.amount + mis-classified conflict, the #128
+  class on the fuzzy-match path) FILED as #133 for a future cycle (MED, bounded by clientId idempotency). cov: be 86.94% (carry, +1 guard) / fe 85.26% (carry).

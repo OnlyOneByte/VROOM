@@ -86,9 +86,12 @@ describe('restore table coverage (drift guard — cycle 209)', () => {
       insuranceTermVehicles: 'insurance_terms → insurance_policies (probed ancestor)',
       insuranceClaims: 'insurance_policies (FK policyId → probed parent)',
       odometerEntries: 'vehicles (FK vehicleId → probed parent)',
-      reminders: 'vehicles (FK vehicleId via reminder_vehicles → probed parent)',
-      reminderVehicles: 'reminders → vehicles (probed ancestor)',
-      reminderNotifications: 'reminders → vehicles (probed ancestor)',
+      // reminders is now DIRECTLY probed (C441) — it's userId-owned with its own id PK and is NOT FK'd to
+      // vehicles (it survives vehicle deletion, the #97 state), so the old "child of vehicles" exemption
+      // was FALSE and let the #93 raw-UNIQUE-throw class reach insert(reminders). It's no longer listed
+      // here; these two are genuine children of the now-probed reminders parent.
+      reminderVehicles: 'reminders (FK reminderId → a now-probed parent)',
+      reminderNotifications: 'reminders (FK reminderId → a now-probed parent)',
     };
 
     const insertedExportNames = [...RESTORE_SRC.matchAll(/\.insert\(\s*(\w+)\s*\)/g)].map(

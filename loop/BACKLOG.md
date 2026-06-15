@@ -885,6 +885,27 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > Likely fix is a product/direction nuance (don't sync email on login at all / sync only if unset / surface a "your email changed" notice) → consider a quick Angelo confirm
 > before fixing, OR a minimal guard that pins the collision branch first. Lower priority than a money/data-loss bug; queued.
 
+> **#133 (MED, correctness/UX — found C441 on an FE bug-hunt; loop-fixable, NOT yet fixed; the #128 fromBackendExpense-skip class on the fuzzy-conflict path) — sync-manager
+> checkForExistingExpense returns RAW backend rows, so serverExpense.amount is always undefined.** sync-manager.ts:219-234 does a bare `apiClient.get<{date,amount,tags}[]>` on
+> GET /expenses (which returns the backend shape: `expenseAmount`, not `amount`) and never maps through fromBackendExpense. Downstream: determineConflictType (:241) computes
+> `Math.abs(local.amount - server.amount)` → `local.amount - undefined = NaN` → amountMatch ALWAYS false → a genuine duplicate is mis-classified 'modified'; AND
+> SyncConflictResolver.svelte:174 renders `formatAmount(serverExpense.amount)` = `formatAmount(undefined)` → blank server amount in the resolve dialog (+ an electric row's kWh
+> stays in volume not charge). Reachable on a tag-overlap conflict during sync. CLEAN one-edit fix: map the response array through fromBackendExpense before .find()/return (the
+> established pattern, fixes amount + volume→charge + category at once). MED — bounded by clientId idempotency (the durable dedup still prevents actual dup rows; this is the
+> secondary fuzzy-match/UX layer). A guard pinning serverExpense.amount (non-undefined, == backend expenseAmount) is also a fresh coverage add (no test drives
+> checkForExistingExpense/determineConflictType today). SECONDARY NOTE (NOT this fix — multi-file/product): the date/amount query params at :224 are silently dropped by the
+> backend schema, so the fuzzy pre-check only scans page 1 of the vehicle's expenses; correcting it needs a backend filter/endpoint change.
+
+> ~~**#132 (MED-HIGH, data-safety / NORTH_STAR #1 — found+fixed C441 on a 2-agent bug-hunt; the #93/C300 raw-UNIQUE-throw class on a third table) — merge-restore
+> detectConflicts didn't probe `reminders`, so a surviving vehicle-less reminder in a backup threw a raw UNIQUE error instead of a clean conflict.**~~ — *DONE C441:
+> detectConflicts (restore.ts:273) probed 8 tables but NOT `reminders`, while insertBackupData inserts it (:469). reminders is userId-owned with its own id PK + NOT FK'd to
+> vehicles (the link is the reminder_vehicles junction, onDelete:cascade), so it SURVIVES deletion of all its vehicles (the #97 state). A merge restore of a backup carrying
+> that surviving reminder slipped past conflict detection → insert(reminders) against the existing id PK → `UNIQUE constraint failed: reminders.id` → whole restore aborts raw
+> (the #93/C300 failure on a third table). The restore-table-coverage drift-guard MISSED it (false "child of vehicles" exemption — reminders has no vehicle FK). FIX (one probe,
+> mirrors C300): added reminders to the probe array (userId-scoped, id PK); corrected the guard's exemption. +1 guard (restore-merge-reminder-collision.test.ts): create
+> vehicle+reminder → export → DELETE vehicle (#97) → merge-restore reports a table==='reminders' conflict. PROVEN NON-VACUOUS both ways (green with the probe, RED without —
+> keys on the reminders-TYPED conflict since the C300 prefs row also collides). be validate:local EXIT 0, 1534 pass (+1).*
+
 > ~~**#131 (LOW, correctness/date — found C434, fixed C437; the #87/#106 UTC-date family, on the form the guard missed) — ReminderForm read stored dates via UTC `.slice(0,10)`,
 > shifting the date back an edit-open for UTC+13/+14 users.**~~ — *DONE C437: ReminderForm.svelte:116-117 reloaded via `r.startDate.slice(0,10)`, but the save path persists via
 > dateOnlyToISO → NOON LOCAL; for a UTC+13/+14 user noon-local lands on the PRIOR UTC day → `.slice(0,10)` returns the previous day → the start/end silently shifted back every

@@ -305,6 +305,20 @@ class RestoreService {
         idField: 'id' as const,
       },
       {
+        // reminders is userId-owned with its OWN id PK (NOT FK'd to vehicles — the vehicle link is the
+        // reminder_vehicles junction, onDelete:cascade). So a reminder SURVIVES the deletion of all its
+        // vehicles (the #97 vehicle-less-but-active state). Without probing it, a merge restore of a
+        // backup carrying that surviving reminder slipped past conflict detection into insert(reminders)
+        // against the existing id PK → a raw UNIQUE-constraint throw that aborted the WHOLE restore — the
+        // #93/C300 class on a third table that fix never reached. Probe it like any owned id-PK table.
+        data: data.reminders ?? [],
+        table: reminders,
+        name: 'reminders',
+        scope: eq(reminders.userId, userId),
+        idColumn: reminders.id,
+        idField: 'id' as const,
+      },
+      {
         data: data.photos ?? [],
         table: photos,
         name: 'photos',
