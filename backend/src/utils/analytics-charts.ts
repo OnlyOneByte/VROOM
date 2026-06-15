@@ -80,8 +80,9 @@ export interface FuelExpenseRow {
  * with volume=null (createSiblings never sets it) — so any fillup-COUNT or per-fillup-average that
  * counts raw rows overcounts a single split fillup as N (the #56/#18/#108/#113 split-sibling overcount
  * class). This is the ONE source of truth for that predicate (was hand-inlined at computeAverageCosts,
- * buildSeasonalEfficiency, buildDayOfWeekPatterns + re-defined locally in analytics/repository's
- * buildFuelStatsFromData); a divergent copy silently reintroduces the overcount on one surface.
+ * buildSeasonalEfficiency, buildDayOfWeekPatterns, buildFillupCostByVehicle [#146] + re-defined locally
+ * in analytics/repository's buildFuelStatsFromData); a divergent copy silently reintroduces the
+ * overcount on one surface.
  */
 export const isFillup = (r: Pick<FuelExpenseRow, 'volume'>): boolean =>
   r.volume != null && r.volume > 0;
@@ -412,6 +413,11 @@ export function buildFillupCostByVehicle(
 ): Array<{ month: string; vehicleId: string; vehicleName: string; avgCost: number }> {
   const map = new Map<string, { totalCost: number; count: number }>();
   for (const row of rows) {
+    // Count only volume-bearing rows: a SPLIT fuel expense creates one sibling per vehicle with
+    // volume=null, so an unguarded count/sum treats each partial-cost allocation as a standalone
+    // fillup and dilutes the per-vehicle average fillup cost (#146, the #56/#108/#113 split-sibling
+    // overcount class — the member the C391 sweep + the isFillup docstring's swept-site list missed).
+    if (!isFillup(row)) continue;
     const d = normalizeDate(row.date);
     if (!d) continue;
     const key = `${toMonthKey(d)}|${row.vehicleId}`;

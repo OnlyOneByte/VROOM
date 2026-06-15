@@ -15,6 +15,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   buildDayOfWeekPatterns,
+  buildFillupCostByVehicle,
   buildFillupIntervals,
   buildFuelEfficiencyComparison,
   buildMonthlyConsumption,
@@ -640,5 +641,47 @@ describe('buildFuelEfficiencyComparison (cross-vehicle per-month gas-MPG)', () =
     const feb = out.find((m) => m.month === '2024-02');
     const v1 = feb?.vehicles.find((v) => v.vehicleId === 'v1');
     expect(v1?.efficiency, 'gas MPG only, charge excluded').toBeCloseTo(30, 5);
+  });
+});
+
+describe('buildFillupCostByVehicle', () => {
+  const names = new Map([['v1', 'Camry']]);
+
+  test('averages real fillup cost per vehicle-month (baseline)', () => {
+    const out = buildFillupCostByVehicle(
+      [
+        fuelRow({ date: d(2024, 1, 10), expenseAmount: 40, volume: 10 }),
+        fuelRow({ date: d(2024, 1, 20), expenseAmount: 60, volume: 12 }),
+      ],
+      names
+    );
+    const jan = out.find((m) => m.month === '2024-01' && m.vehicleId === 'v1');
+    expect(jan?.avgCost).toBe(50); // (40+60)/2
+  });
+
+  // #146 (C466, the #56/#108/#113 split-sibling overcount class — the member the C391 sweep + the
+  // isFillup swept-site docstring missed): a split fuel expense creates one sibling PER VEHICLE with
+  // volume=null, and queryFuelExpenses has no volume filter, so an unconditional count/sum treats each
+  // partial-cost allocation as a standalone fillup and dilutes the per-vehicle average fillup cost.
+  // This pins it: one $40 real fillup + one $30 split-share leg on v1 in a month → avgCost $40 (the
+  // real fillup), NOT $35 (=70/2). NON-VACUOUS: pre-fix the null-volume leg was counted → $35.
+  test('a split fuel cost-allocation sibling (volume=null) is NOT counted as a fillup (#146)', () => {
+    const out = buildFillupCostByVehicle(
+      [
+        fuelRow({ date: d(2024, 1, 10), expenseAmount: 40, volume: 10 }), // a real fillup
+        fuelRow({ date: d(2024, 1, 20), expenseAmount: 30, volume: null }), // a split-share leg on v1
+      ],
+      names
+    );
+    const jan = out.find((m) => m.month === '2024-01' && m.vehicleId === 'v1');
+    expect(jan?.avgCost).toBe(40); // the real fillup's cost, not (40+30)/2 = 35
+  });
+
+  test('a vehicle with ONLY split-share legs (no real fillup) yields no chart row (#146 — boundary)', () => {
+    const out = buildFillupCostByVehicle(
+      [fuelRow({ date: d(2024, 1, 20), expenseAmount: 30, volume: null })],
+      names
+    );
+    expect(out.find((m) => m.vehicleId === 'v1')).toBeUndefined();
   });
 });

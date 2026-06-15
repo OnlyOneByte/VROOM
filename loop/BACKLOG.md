@@ -1014,6 +1014,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > link) → no new forged link can enter once POST is closed. +4 guards (schema rejects reminder/insurance_term/arbitrary; /split route rejects insurance_term + a bogus financing id, accepts
 > source-less) + FLIPPED the schema test that codified the hole. NON-VACUOUS. be validate:local EXIT 0, 1555 pass (+4).*
 
+> ~~**#146 (MED, money/correctness / NORTH_STAR #1 — found+fixed C466 on a forced analytics-read-path bug-hunt; the #56/#18/#108/#113 split-sibling overcount class on the ONE fuel builder the
+> C391 sweep + the isFillup swept-site docstring missed) — buildFillupCostByVehicle counted a split fuel expense's volume=null cost-allocation sibling as a standalone fillup.**~~ — *DONE C466:
+> buildFillupCostByVehicle (analytics-charts.ts:413) did `entry.totalCost += row.expenseAmount; entry.count++` over EVERY category='fuel' row with NO isFillup guard. A split fuel expense creates one
+> sibling PER VEHICLE with volume=null (createSiblings never sets it; queryFuelExpenses has no volume filter), so a partial-cost allocation was counted as a fillup → the Fuel-Stats "Avg Fillup Cost by
+> Vehicle" chart shows a diluted dollar figure (one $40 real fillup + one $30 split-share on a vehicle in a month → $35 instead of the true $40). VERIFIED FIRSTHAND: no test imported the builder
+> (cross-cutting.property.test.ts only checks tenant-scoping with volume-bearing rows); the isFillup docstring's swept-site list (computeAverageCosts / buildSeasonalEfficiency / buildDayOfWeekPatterns /
+> buildFuelStatsFromData) omitted it, and C391's "family fully audited" cert covered buildFillupIntervals + buildVehicleRadar, not this. FIX (the established one-liner mirroring the other isFillup
+> sites): `if (!isFillup(row)) continue;` + added the builder to the isFillup swept-site docstring. +3 guards (baseline avg; split-sibling NOT counted → $40 not $35; vehicle with only split-legs → no
+> chart row). PROVEN NON-VACUOUS (deleting the guard → exactly the 2 #146 tests fail, 44 pass). be validate:local EXIT 0, 1558 pass (+3). buildCostPerDistanceChart confirmed immune (gates on
+> validMilesBetween → null-mileage siblings drop out) — no further sweep needed.*
+
 > ~~**#143 (LOW, cosmetic/grammar — found+filed C459 on an FE bug-hunt; clean one-edit) — formatRelativeTime renders "1 weeks/months/years ago" at the bucket boundaries.**~~ — *DONE C462:
 > formatters.ts:115-117 hard-appended 's' while Math.floor lands on exactly 1 at each bucket's low edge (7-13d → 1 week, 30-59d → 1 month, 365-729d → 1 year) → "1 weeks/months/years ago"
 > rendered by RecentActivityCard / VehicleCarousel / SyncStatusInline on real timestamps. FIX: the `${n > 1 ? 's' : ''}` idiom (already in reminder-helpers:74 + sync-status:33) on the

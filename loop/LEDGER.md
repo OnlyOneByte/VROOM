@@ -87,11 +87,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 465 |
 | guard | 6 | 463 |
-| bug | 3 | 462 |
+| bug | 3 | 466 |
 | arch | 5 | 464 |
 | infra | 6 | 460 |
 
-Current cycle: **465**
+Current cycle: **466**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6893,3 +6893,13 @@ Current cycle: **465**
   non-financing forge incl. the insurance_term cascade vector) + added assertFinancingSourceValid per DISTINCT split vehicleId in the POST handler (each sibling on its own vehicle's active financing).
   The PUT path carries no source fields (re-stamps existing) → no new entry once POST is closed. +4 guards (schema rejects reminder/insurance_term/arbitrary; /split route rejects insurance_term + a
   bogus financing id, accepts source-less), FLIPPED the schema test that codified the hole. NON-VACUOUS. be validate:local EXIT 0, 1555 pass (+4). Filed #145 (closed same-cycle). cov: be 87.09% / fe 85.89% (~carry; +4 BE, no re-measure).
+- **C466 (bug → #146: buildFillupCostByVehicle overcounts split fuel siblings — the #56/#108/#113 split-sibling class on the chart-builder the C391 sweep missed)** —
+  BALANCE: bug the SOLE over-budget category (4>3; deep-review 1/5, guard 3/6, arch 2/5, infra 6/6=AT, feature parked) → forced bug-hunt (the clean queued bug surface drained #143/#144/#145). 2-agent
+  fan-out. (B) offline-sync apply path CERTIFIED CLEAN (verified firsthand): the one latent defect it found (checkForExistingExpense's date/amount query params silently dropped → page-1-only fuzzy
+  scan) is ALREADY FILED as the #133 SECONDARY NOTE (backend-schema change, kept open); #66/#101/#111 + #133/#134/#121 + #202 + the volume↔charge discriminant all hold. (A) analytics read-path found
+  #146: buildFillupCostByVehicle (analytics-charts.ts:413) summed/counted EVERY category='fuel' row with NO isFillup guard → a split fuel expense's volume=null per-vehicle cost-allocation sibling
+  (createSiblings never sets volume) was counted as a standalone fillup, diluting the "Avg Fillup Cost by Vehicle" chart (e.g. one $40 fillup + one $30 split-share → $35 shown, not $40). The EXACT
+  #56/#108/#113 class — and the isFillup docstring's OWN swept-site list omitted this builder (C391 covered buildFillupIntervals + buildVehicleRadar, not this). VERIFIED FIRSTHAND: no test imported it
+  (cross-cutting.property.test.ts only checks tenant-scoping with volume-bearing rows). FIX (the established one-liner mirroring :691/:855): `if (!isFillup(row)) continue;` + updated the isFillup
+  docstring's swept-site list. +3 guards (baseline avg; split-sibling NOT counted → $40 not $35; vehicle with only split-legs → no row). PROVEN NON-VACUOUS (deleting the guard line → exactly the 2
+  #146 tests fail, 44 pass). be validate:local EXIT 0, 1558 pass (+3). Filed #146 (closed same-cycle). cov: be 87.09% / fe 85.89% (~carry; +3 BE, no re-measure).
