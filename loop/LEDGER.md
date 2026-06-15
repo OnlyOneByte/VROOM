@@ -86,12 +86,12 @@ the next increment MUST come from the most-starved over-budget category.
 |---|---:|---|
 | feature | 4 | 170 |
 | deep-review | 5 | 461 |
-| guard | 6 | 456 |
+| guard | 6 | 463 |
 | bug | 3 | 462 |
 | arch | 5 | 457 |
 | infra | 6 | 460 |
 
-Current cycle: **462**
+Current cycle: **463**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6863,3 +6863,12 @@ Current cycle: **462**
   SyncStatusInline on real timestamps. FIX: the `${n > 1 ? 's' : ''}` idiom already used in reminder-helpers:74 + sync-status:33, applied to the week/month/year buckets (days<7 always ≥2 → unconditional
   plural left as-is). +1 guard (singular at each of the 3 boundaries: day 7/13/30/59/365) + FLIPPED the existing formatters.test.ts:206 assertion that CODIFIED the buggy "1 years ago" → "1 year ago".
   NON-VACUOUS (the old code failed every new line). fe validate:local EXIT 0, 715 pass (+1). Closed #143 (the last clean queued one-edit). cov: be 87.09% / fe 85.89% (~carry; +1 FE guard, no re-measure).
+- **C463 (guard → pin the mileage-reminder due-gate's EXACT-equality boundary: the load-bearing `<` (>=-due semantics), via the REAL trigger endpoint)** —
+  BALANCE: TWO over budget at C463 (guard 7>6, arch 6>5) → rule picks the MOST-starved over-budget → guard (7). 2-agent fan-out for a genuinely-unpinned reachable invariant (the guard queue was
+  empty + pure-util surface near-exhausted). FE scout returned CERTIFY (FE pure/service/store layer genuinely exhausted — only navigation.ts left, below the load-bearing bar; the gap is the eyes-on
+  components/routes, Playwright-blocked). BE scout found the pick (VERIFIED FIRSTHAND): processMileageReminder's due-gate (trigger-service.ts:418) is `currentOdometer < nextDueOdometer → not yet
+  due`, i.e. EXACT-equality must FIRE. Reachable via POST /reminders/trigger + the recheck-on-write hook; getCurrentOdometer returns a raw integer MAX(odometer) so an exact-milestone reading (round
+  odometer log / fillup on the milestone) is genuinely reachable. trigger-mileage.test.ts's docstring CLAIMS `>=` but every firing case seeds STRICTLY past (35200/36000/40500) → the `=` edge was
+  never driven (the same `>=`-tolerant-assertion-that-never-hits-`=` gap as C450's getLatestTimeBucket / C430's outlier band). +1 guard: odometer EXACTLY 35000 on a 35000 milestone → fires 1
+  notification. PROVEN NON-VACUOUS by a temporary `<`→`<=` gate flip → exactly this test fails (1 fail / 7 pass, all others green), then reverted. be validate:local EXIT 0, 1551 pass (+1).
+  cov: be 87.09% / fe 85.89% (~carry; +1 BE guard, no re-measure this cycle).

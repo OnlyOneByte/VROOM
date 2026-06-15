@@ -108,6 +108,25 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(notifs[0]?.due_odometer).toBe(35000);
   });
 
+  // C463 guard: the due-gate (trigger-service.ts:418) is `currentOdometer < nextDueOdometer →
+  // not yet due`, i.e. EXACT-equality must FIRE (>=-due semantics). Every other firing case here
+  // seeds STRICTLY past the milestone (35200/36000/40500), so a `<`→`<=` slip (re-deriving "not
+  // yet due" as `<=`) would ship GREEN while silently dropping the notification for a vehicle that
+  // lands EXACTLY on its milestone — getCurrentOdometer returns a raw integer MAX, so an exact
+  // 35000 reading is genuinely reachable (a round-number odometer log / a fillup on the milestone).
+  // This pins the boundary the docstring claims (`>=`) but no case drove.
+  test('current odometer EXACTLY on the milestone fires (the >= boundary, not just strictly over)', async () => {
+    const vehicleId = await seedVehicle();
+    await addOdometerReading(vehicleId, 35000); // exactly the 35000 milestone
+    seedMileageReminder('rmEq', vehicleId, 35000);
+
+    await trigger();
+
+    const notifs = mileageNotifs('rmEq');
+    expect(notifs).toHaveLength(1); // `<=` regression → 0 here, current tests stay green
+    expect(notifs[0]?.due_odometer).toBe(35000);
+  });
+
   test('current odometer below the milestone fires nothing', async () => {
     const vehicleId = await seedVehicle();
     await addOdometerReading(vehicleId, 34000); // below 35000
