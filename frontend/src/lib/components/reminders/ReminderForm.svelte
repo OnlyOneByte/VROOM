@@ -113,8 +113,13 @@
 			intervalUnit = (INTERVAL_UNITS as readonly string[]).includes(r.intervalUnit ?? '')
 				? (r.intervalUnit as IntervalUnit)
 				: 'month';
-			startDate = r.startDate.slice(0, 10);
-			endDate = r.endDate ? r.endDate.slice(0, 10) : '';
+			// Read the stored ISO back as the LOCAL calendar date (not a bare UTC .slice(0,10)). The save
+			// path persists via dateOnlyToISO → NOON LOCAL (:205-206), so for a UTC+13/+14 user noon-local
+			// lands on the prior UTC day and `.slice(0,10)` would show the day before — shifting the date
+			// back every edit-open (#131, the #87/#106 family). toDateInputValue reads local Y/M/D, matching
+			// the create path (:66/:134) and the C267/C268/C271 sibling-form fixes.
+			startDate = toDateInputValue(new Date(r.startDate));
+			endDate = r.endDate ? toDateInputValue(new Date(r.endDate)) : '';
 			selectedVehicleIds = [...reminder.vehicleIds];
 			expenseCategory = (EXPENSE_CATEGORIES as readonly string[]).includes(r.expenseCategory ?? '')
 				? (r.expenseCategory as ExpenseCategory)

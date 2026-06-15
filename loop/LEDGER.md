@@ -77,11 +77,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 433 |
 | guard | 6 | 436 |
-| bug | 3 | 434 |
+| bug | 3 | 437 |
 | arch | 5 | 432 |
 | infra | 6 | 435 |
 
-Current cycle: **436**
+Current cycle: **437**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6584,3 +6584,15 @@ Current cycle: **436**
   chart-formatters.test.ts (its home — no duplicate file), driving the REAL exports (not re-implementations): decimals default 28.5→'28.5'/28→'28.0' + explicit arg; clamp
   2→2/20→6/20,12→12; NaN guard (garbage/number/null/undefined→''); monthly 24→12-cap/3→clamp; trend single-point r:6 vs 2+ r:4. NON-VACUOUS (each pins a flip/drop/default
   regression). fe validate:local EXIT 0, 706 pass (+9), svelte-check 0, build clean. cov: be 86.94% (carry) / fe 85.26% (carry, +9 display-shape guards).
+- **C437 (bug → #131: ReminderForm read stored ISO dates via a bare UTC `.slice(0,10)`, shifting the date back an edit-open for UTC+13/+14 users — the #87/#106 family on the form the guard missed)** —
+  BALANCE: bug AND arch both AT budget (bug 3/3, arch 5/5, cycle 437); bug has the tighter budget AND a concrete queued clean fix (#131, filed C434) → jumps the queue. VERIFIED
+  FIRSTHAND (C21/C60): ReminderForm.svelte:116-117 reloaded an edit via `r.startDate.slice(0,10)` / `r.endDate.slice(0,10)`, but the save path persists via dateOnlyToISO → NOON LOCAL
+  (:205-206); for a UTC+13/+14 user noon-local lands on the PRIOR UTC day, so `.slice(0,10)` returns the previous calendar day → the reminder's start/end silently shifts back a day
+  every edit-open (re-saving then persists the wrong day). The #87/#106 family, still live on this ONE form. FIX (one edit, mirrors the C267/C268/C271 sibling forms): route both reload
+  lines through toDateInputValue(new Date(field)) — ALREADY imported (:15) + used on the create path (:66/:134); reads local Y/M/D. GUARD: the form is eyes-on/Playwright-blocked, so
+  the merge-surviving net is the established SOURCE-SCAN guard — but no-utc-date-input.test.ts matched only `.toISOString().slice(0,10)` and MISSED the bare-string-field form (no
+  .toISOString() in the chain — exactly how this slipped past for ~340 cycles). Extended it: +1 ISO_STRING_DATE_SLICE regex matching a date-typed PROPERTY access (.startDate/.endDate/
+  .dueDate/.nextDueDate/.purchaseDate/.serviceDate/.paymentDate).slice(0,10) + a 2nd offender-scan test. PROVEN non-vacuous + false-positive-free firsthand: matches the pre-fix
+  `r.startDate.slice(0,10)` but SKIPS the safe `dateStr.slice(0,10).split('-')` local-parse (expense-filters.ts:12) AND the tags-array `.slice(0,10)` cap (ExpenseForm.svelte:190).
+  fe validate:local EXIT 0, 707 pass (+1 guard), svelte-check 0, build clean. cov: be 86.94% (carry) / fe 85.26% (carry, +1 source-scan guard). Two of the three queued small bugs now
+  closed (#130 C434, #131 C437); #129 OAuth-email-sync remains (needs a 1-line product call).

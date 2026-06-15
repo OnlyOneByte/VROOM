@@ -30,6 +30,18 @@ const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 // .toISOString() in the chain — so it never matches.
 const UTC_DATE_INPUT = /\.toISOString\(\)\s*\.\s*(?:split\(\s*['"`]T['"`]\s*\)\s*\[\s*0\s*\]|slice\(\s*0\s*,\s*10\s*\))/;
 
+// The SECOND form of the same bug (#131, C437): a stored ISO date STRING field read straight to its
+// first 10 chars to feed a date input — `r.startDate.slice(0, 10)` / `x.endDate.slice(0, 10)`. There is
+// no `.toISOString()` in the chain (the value is ALREADY a string), so UTC_DATE_INPUT misses it — exactly
+// how ReminderForm.svelte:116 slipped past this guard for ~340 cycles. Slicing the first 10 chars of a
+// noon-local ISO yields the UTC calendar date, which for a UTC+13/+14 user is the PREVIOUS day → the date
+// shifts back every edit-open. Fix is the same: toDateInputValue(new Date(field)). This matches a
+// date-typed PROPERTY access sliced to [0,10) — narrow enough to SKIP the safe sites (expense-filters'
+// `dateStr.slice(0,10).split('-')` local-parse on a generic param, and a tags-array `.slice(0, 10)` cap —
+// neither is a date-field property access).
+const ISO_STRING_DATE_SLICE =
+	/\.(?:startDate|endDate|dueDate|nextDueDate|purchaseDate|serviceDate|paymentDate)\s*\.\s*slice\(\s*0\s*,\s*10\s*\)/;
+
 function stripComments(source: string): string {
 	// Replace block comments with newline-preserving blanks so line numbers stay aligned with the raw source.
 	const withoutBlocks = source.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
@@ -91,6 +103,30 @@ describe('no UTC date-input formatting (use toDateInputValue — #87 class guard
 			`Date-input value built from the UTC calendar date — use toDateInputValue() from ` +
 				`formatters.ts (local getFullYear/getMonth/getDate) so the date is correct in every ` +
 				`timezone and round-trips with dateOnlyToISO (#87):\n${offenders.join('\n')}`
+		).toEqual([]);
+	});
+
+	test('no source slices a stored ISO date-field STRING to its first 10 chars for a date input (#131)', () => {
+		const offenders: string[] = [];
+
+		for (const file of files) {
+			const rel = relative(SRC_ROOT, file).split('\\').join('/');
+			if (rel.endsWith('__tests__/no-utc-date-input.test.ts')) continue;
+
+			const rawLines = readFileSync(file, 'utf8').split('\n');
+			const cleanLines = stripComments(rawLines.join('\n')).split('\n');
+			cleanLines.forEach((line, idx) => {
+				if (ISO_STRING_DATE_SLICE.test(line)) {
+					offenders.push(`${rel}:${idx + 1}  ${(rawLines[idx] ?? line).trim()}`);
+				}
+			});
+		}
+
+		expect(
+			offenders,
+			`A stored ISO date-field string sliced to [0,10) feeds the UTC calendar date to a date input ` +
+				`(#131, the #87 family on the second form) — use toDateInputValue(new Date(field)) so the ` +
+				`local date round-trips with dateOnlyToISO in every timezone:\n${offenders.join('\n')}`
 		).toEqual([]);
 	});
 });

@@ -876,13 +876,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > Likely fix is a product/direction nuance (don't sync email on login at all / sync only if unset / surface a "your email changed" notice) → consider a quick Angelo confirm
 > before fixing, OR a minimal guard that pins the collision branch first. Lower priority than a money/data-loss bug; queued.
 
-> **#131 (LOW, correctness/date — found C434 on an FE bug-hunt; loop-fixable, NOT yet fixed; the #87/#106 UTC-date family, still live on ONE form) — ReminderForm reads stored
-> dates via UTC `.slice(0,10)`, breaking the noon-local round-trip.** ReminderForm.svelte:116-117 reloads an edit via `r.startDate.slice(0,10)` / `r.endDate.slice(0,10)`, but the
-> save path persists through dateOnlyToISO → NOON LOCAL (formatters.ts:78). For a UTC+13/+14 user (NZ DST / Samoa / Tonga / Chatham), noon-local lands on the PRIOR UTC day, so
-> `.slice(0,10)` returns the previous calendar day → the reminder's start/end silently shifts back a day every edit-open (and re-saving persists the wrong day). The file ALREADY
-> imports + uses toDateInputValue on the create path (:66/:134) — the one-edit fix is to route the two reload lines through it (matching the C267/C268/C271 sibling-form fixes).
-> Why the no-utc-date-input source-scan guard missed it: it matches `.toISOString().slice(0,10)`, but here the value is already a stored ISO STRING (bare `.slice` on a string field,
-> no `.toISOString()` in the chain). Narrow reachability (only far-positive-offset users) → LOW; queued for a guard/bug cycle (also extend the source-scan to catch the string-slice form).
+> ~~**#131 (LOW, correctness/date — found C434, fixed C437; the #87/#106 UTC-date family, on the form the guard missed) — ReminderForm read stored dates via UTC `.slice(0,10)`,
+> shifting the date back an edit-open for UTC+13/+14 users.**~~ — *DONE C437: ReminderForm.svelte:116-117 reloaded via `r.startDate.slice(0,10)`, but the save path persists via
+> dateOnlyToISO → NOON LOCAL; for a UTC+13/+14 user noon-local lands on the PRIOR UTC day → `.slice(0,10)` returns the previous day → the start/end silently shifted back every
+> edit-open. FIX (one edit, mirrors C267/C268/C271): route both reload lines through toDateInputValue(new Date(field)) — already imported + used on the create path. GUARD (form is
+> eyes-on-blocked → source-scan net): extended no-utc-date-input.test.ts with +1 ISO_STRING_DATE_SLICE regex (a date-typed property access .slice(0,10)) + a 2nd offender-scan test —
+> the existing regex matched only `.toISOString().slice(0,10)` and missed the bare-string-field form. PROVEN non-vacuous + false-positive-free (matches the pre-fix line; skips the
+> safe dateStr-local-parse + tags-cap slices). fe validate:local EXIT 0, 707 pass (+1).*
 
 > ~~**#130 (MED, data-integrity/money-adjacent — found+fixed C434 on a 2-agent bug-hunt; the #76/C244 THIRD leg) — PUT /expenses/:id writes a stray mileage onto an
 > ALREADY-non-fuel row when category isn't resent, poisoning getCurrentOdometer.**~~ — *DONE C434: clearFuelFieldsIfNotFuel (routes.ts:164) returns data UNCHANGED when
