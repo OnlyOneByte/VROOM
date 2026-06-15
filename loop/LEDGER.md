@@ -82,11 +82,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 452 |
 | guard | 6 | 450 |
-| bug | 3 | 453 |
+| bug | 3 | 455 |
 | arch | 5 | 451 |
 | infra | 6 | 454 |
 
-Current cycle: **454**
+Current cycle: **455**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6782,3 +6782,13 @@ Current cycle: **454**
   landed C155→C453" + noted three bug-CLASSES now fully closed (#76 odometer-poison all 4 write sites, #87 UTC-date all forms, #92/#117 0%-APR all 3 sites); (4) pending-Angelo block: added the two still-open filed
   items #135 (SyncManager-no-reap) + #140 (LeaseMetricsCard annual-vs-total, eyes-on) and refreshed the CLOSED-since note (#132/#133/#134/#136/#137/#138/#139). Doc-only, no code touched → no build gate (CLAUDE.md
   not compiled; verified all four regions read coherently + no stale-number leftovers via grep). cov: be 86.96% (carry) / fe 85.89% (carry). Next CLAUDE.md refresh ~C464; next #5 sweep ~C457.
+- **C455 (bug → #140: LeaseMetricsCard compared LIFETIME driven miles against the bare ANNUAL mileageLimit — the #64/#110/#115 annual-vs-total class on the ONE card #115 missed)** —
+  BALANCE: nothing OVER budget; guard most-starved (5/6) but its surface saturated, whereas #140 is a filed MED-HIGH money/UX defect with a clean code fix → a real contradiction outranks a marginal dormant-vein
+  guard. VERIFIED FIRSTHAND (C21/C60): LeaseMetricsCard.svelte used the bare annual `financing.mileageLimit` as the burn-bar denominator (:34), displayed limit (:66), + limitOdometer base (:48) — but
+  leaseMetrics.mileageUsed is LIFETIME driven miles (current−initial). For an on-pace 36-mo/12k-yr lease (total 36k) at 24k driven, the card showed "24k/12k, 100% RED" + odometer "34k/22k" WHILE the SAME card's
+  "left" figure (leaseMetrics.mileageRemaining, which already routes through leaseTotalMileageAllowance → 36k−24k) said "12k left" — an internal contradiction + a false over-mileage panic. Byte-identical to the
+  #115 PaymentMetricsGrid fix, on the card that sweep missed. FIX (one coherent change, the established single-source helper): added a `totalMileageAllowance = leaseTotalMileageAllowance(financing)` derived (annual ×
+  termMonths/12), routed all 3 display derivations through it — now internally consistent with the card's own "left". The risky part (the math) is the already-unit-tested leaseTotalMileageAllowance; this is a
+  mechanical re-point. fe validate:local EXIT 0, 714 pass, svelte-check 0, build clean. EYES-ON: the card renders only for a lease WITH a mileageLimit, and the demo seed has none → no meaningful default screenshot
+  without seeding a lease vehicle → lands "code-complete, eyes-on pending" per the feature-DoD rule (verifiable by inspection: 3 lines re-pointed to a tested helper, internally consistent). cov: be 86.96% (carry) /
+  fe 85.89% (carry). The #64/#110/#115/#140 annual-vs-total lease-mileage class is now closed across BOTH cards (PaymentMetricsGrid C398 + LeaseMetricsCard C455).

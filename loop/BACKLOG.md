@@ -959,14 +959,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > The amortization helper handles 0% fine (interest=0, payment→principal). FIX (one edit): drop `&& f.apr` (financingType==='loan' already excludes leases; apr coalesced to 0 for
 > the walk). +1 HTTP-harness guard (0%-APR loan → loanBreakdown non-empty, all interest===0, some principal>0), PROVEN NON-VACUOUS. be validate:local EXIT 0, 1543 pass (+1).*
 
-> **#140 (MED-HIGH, money/UX correctness — found+filed C453 on an FE bug-hunt; the #64/#110/#115 annual-vs-total class on the ONE card #115 missed; clean one-edit but eyes-on
-> verification) — LeaseMetricsCard compares LIFETIME driven miles against the bare ANNUAL mileageLimit.** LeaseMetricsCard.svelte:34/48/66 use `financing.mileageLimit` (the ANNUAL
-> allowance) as the burn-bar denominator, displayed limit, and limitOdometer base — but `leaseMetrics.mileageUsed` is LIFETIME driven miles (current−initial). For a 36-mo lease at
-> 12000/yr (total 36000), 24000 driven (on-pace, 2/3 through) → the card shows "24000 / 12000, 100% RED" + odometer "34000/22000" WHILE its own "left" figure (line 93, routes
-> through leaseTotalMileageAllowance → 36000−24000) says "12000 left" — an internal contradiction + false over-mileage panic. Byte-identical to the #115 PaymentMetricsGrid fix,
-> on the card that sweep missed. Reachable: FinanceTab renders it for any lease with mileageLimit + currentMileage (the common multi-year case). Clean one-edit: compute
-> leaseTotalMileageAllowance(financing) once + use it as the denominator (:34), displayed limit (:66), limitOdometer base (:48) — the already-exported single-source helper. NOT fixed
-> this cycle because the fix lands in eyes-on component $derived lines (visual verification Playwright-blocked); queued for a UI-work cycle or alongside a screenshot pass.
+> ~~**#140 (MED-HIGH, money/UX correctness — found C453, FIXED C455; the #64/#110/#115 annual-vs-total class on the ONE card #115 missed) — LeaseMetricsCard compared LIFETIME
+> driven miles against the bare ANNUAL mileageLimit.**~~ — *DONE C455: LeaseMetricsCard.svelte used `financing.mileageLimit` (ANNUAL) as the burn-bar denominator (:34), displayed
+> limit (:66), + limitOdometer base (:48) while leaseMetrics.mileageUsed is LIFETIME — for an on-pace 36-mo/12k-yr lease at 24k driven it showed "24k/12k, 100% RED" while the same
+> card's "left" figure (already routed through leaseTotalMileageAllowance) said "12k left". FIX (one coherent change): added a totalMileageAllowance = leaseTotalMileageAllowance(financing)
+> derived, routed all 3 display lines through it — now internally consistent. The risky math is the already-unit-tested helper; mechanical re-point. fe validate:local EXIT 0, 714 pass.
+> EYES-ON: card renders only for a lease WITH a mileageLimit (demo seed has none) → "code-complete, eyes-on pending" (verifiable by inspection). Closes the annual-vs-total class
+> across BOTH cards (PaymentMetricsGrid C398 + LeaseMetricsCard C455).*
 
 > **#135 (LOW, hygiene/growth — found+filed C445 on the sync deep-review; NOT fixed, a reaping-lifecycle behavior call) — the SyncManager path never reaps synced rows from
 > localStorage.** syncManager.syncAll + resolveConflict only markExpenseAsSynced (sets synced:true, row STAYS in localStorage); they never removeOfflineExpense/clearSyncedExpenses.

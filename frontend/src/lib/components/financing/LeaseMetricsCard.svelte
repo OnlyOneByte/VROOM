@@ -2,7 +2,10 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Progress } from '$lib/components/ui/progress';
 	import { Gauge } from '@lucide/svelte';
-	import { calculateLeaseMetrics } from '$lib/utils/financing-calculations';
+	import {
+		calculateLeaseMetrics,
+		leaseTotalMileageAllowance
+	} from '$lib/utils/financing-calculations';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import type { VehicleFinancing, UnitPreferences } from '$lib/types';
@@ -29,9 +32,18 @@
 		}
 	});
 
+	// The WHOLE-LEASE allowance (annual mileageLimit × termMonths/12), NOT the bare annual number. The
+	// burn bar / displayed limit / limitOdometer below all compare against LIFETIME driven miles
+	// (leaseMetrics.mileageUsed = current−initial), so using the annual limit over-reported usage ~Nx on
+	// an N-year lease — e.g. 24k driven on an on-pace 36-mo/12k-yr lease showed "24k/12k, 100% RED" while
+	// this card's own "left" figure (leaseMetrics.mileageRemaining, which already routes through
+	// leaseTotalMileageAllowance) said "12k left" (#140, the #64/#110/#115 annual-vs-total class — the
+	// one card the #115 PaymentMetricsGrid fix missed). ONE source of truth for the whole-lease budget.
+	let totalMileageAllowance = $derived(leaseTotalMileageAllowance(financing));
+
 	let mileageUsagePercentage = $derived.by(() => {
-		if (!leaseMetrics || !financing.mileageLimit || financing.mileageLimit <= 0) return 0;
-		return Math.min(100, (leaseMetrics.mileageUsed / financing.mileageLimit) * 100);
+		if (!leaseMetrics || totalMileageAllowance <= 0) return 0;
+		return Math.min(100, (leaseMetrics.mileageUsed / totalMileageAllowance) * 100);
 	});
 
 	let progressIndicatorClass = $derived(
@@ -45,7 +57,7 @@
 	// Odometer values: start-of-year odometer and the limit odometer
 	let startOdometer = $derived(initialMileage ?? 0);
 	let currentOdometer = $derived(currentMileage ?? startOdometer);
-	let limitOdometer = $derived(startOdometer + (financing.mileageLimit ?? 0));
+	let limitOdometer = $derived(startOdometer + totalMileageAllowance);
 </script>
 
 {#if financing.financingType === 'lease' && financing.mileageLimit && currentMileage !== null && leaseMetrics}
@@ -63,7 +75,7 @@
 					<span class="text-muted-foreground">
 						{leaseMetrics.mileageUsed.toLocaleString()}
 						<span class="text-muted-foreground/60">
-							/ {financing.mileageLimit.toLocaleString()}
+							/ {totalMileageAllowance.toLocaleString()}
 							{distLabel}
 						</span>
 					</span>
