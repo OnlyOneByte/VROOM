@@ -154,6 +154,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Insurance premium-materialization + expenses-split audit (C458) → insurance CERTIFIED CLEAN; found+fixed #141 (split sub-cent groupTotal drift).**~~ — *DONE C458 (deep-review
+> OVER budget 6>5 → forced). 2-agent fan-out. (A) INSURANCE materialization CERTIFIED CLEAN (verified firsthand): largest-remainder cents split exact (C382), re-materialize deletes-
+> before-recreate, #57/#84/C369 hold, no C151 async-tx footgun. (B) EXPENSES split → #141: createSplitExpenseSchema.totalAmount had NO cent quantization; groupTotal stored the raw
+> totalAmount (repository.ts:648) while legs round to cents (Math.round(total*100)) → a sub-cent total (100.005) persisted groupTotal=100.005 while legs summed to 100.01 — a stored
+> header disagreeing with Σsiblings (NORTH_STAR #1). FIX: extracted a centsAmount schema (positive + .transform round-to-2dp), routed create+update totalAmount through it → header
+> computed from the same cent-aligned value as the legs. +3 guards (sub-cent create/update rounds; clean 2-decimal no-op), NON-VACUOUS. be validate:local EXIT 0, 1548 pass (+3).*
+
 > ~~**Vehicle CRUD + cascade-delete audit (C452) → CERTIFIED CLEAN; +1 photo-cascade-coverage symmetry guard.**~~ — *DONE C452 (deep-review OVER budget 7>5 → forced).
 > 1-agent fan-out on the stalest surface. CERTIFIED CLEAN, verified firsthand: cascade-delete ordering correct (enumerate IDs before FK cascade, reap photos, then delete — #34/C280);
 > all 6 FK children verified (5 cascade; insuranceClaims set-null = preserved, C366); tenant isolation solid; plate uniqueness well-covered; /stats correct-by-design. ONE LOW finding

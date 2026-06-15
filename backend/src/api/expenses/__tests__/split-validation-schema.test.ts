@@ -218,3 +218,41 @@ describe('updateSplitSchema — shares the same refinement', () => {
     expect(r.success).toBe(false);
   });
 });
+
+// #141 (C458): totalAmount is QUANTIZED to whole cents at the validation boundary. The split's
+// groupTotal is stored from totalAmount while the legs are rounded to cents (Math.round(total*100)) —
+// so a sub-cent total (100.005) used to persist groupTotal=100.005 while the legs summed to 100.01, a
+// stored header disagreeing with Σsiblings (NORTH_STAR #1). Rounding totalAmount to cents makes the
+// header computed from the SAME cent-aligned value as the legs. The UI only sends 2-decimal amounts.
+describe('split totalAmount is quantized to whole cents (#141)', () => {
+  test('a sub-cent totalAmount is rounded to 2 decimals on create', () => {
+    const r = createSplitExpenseSchema.safeParse({
+      ...baseCreate,
+      splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
+      totalAmount: 100.005,
+    });
+    expect(r.success).toBe(true);
+    // NON-VACUOUS: pre-fix totalAmount passed through as 100.005 (→ stored groupTotal), while the legs
+    // rounded to 100.01. Now it's 100.01, matching what computeEvenSplit derives the legs from.
+    if (r.success) expect(r.data.totalAmount).toBe(100.01);
+  });
+
+  test('a sub-cent totalAmount is rounded on update too', () => {
+    const r = updateSplitSchema.safeParse({
+      splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
+      totalAmount: 49.999,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.totalAmount).toBe(50);
+  });
+
+  test('a clean 2-decimal totalAmount is unchanged (no-op for the UI happy path)', () => {
+    const r = createSplitExpenseSchema.safeParse({
+      ...baseCreate,
+      splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
+      totalAmount: 100.0,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.totalAmount).toBe(100);
+  });
+});

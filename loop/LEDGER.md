@@ -80,13 +80,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 452 |
+| deep-review | 5 | 458 |
 | guard | 6 | 456 |
 | bug | 3 | 455 |
 | arch | 5 | 457 |
 | infra | 6 | 454 |
 
-Current cycle: **457**
+Current cycle: **458**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6810,3 +6810,13 @@ Current cycle: **457**
   ZERO-ref incl. tests (these aren't). So per the dormant-vein protocol (the arch analogue of C402/C420's bug-vein cert), recorded a CERTIFICATION that the byte-identical-dedup + clean-dead-code surface is EXHAUSTED
   rather than manufacture a churn refactor or a coverage-negative delete. No source touched → no build gate. The 50+ landed dedups (C243→C451) + the FE photo-CRUD/OAuth-ctor untested-path veins + the test-entangled
   dead methods are the standing map; the NEXT forced-arch cycle should fan out fresh (a new dup may surface as product code grows) but not re-scout these dead ends. cov: be 86.96% (carry) / fe 85.89% (carry).
+- **C458 (deep-review → #141: a split's groupTotal stored the RAW totalAmount while legs quantize to cents → a sub-cent total drifts the stored header off Σsiblings; insurance materialization CERTIFIED CLEAN)** —
+  BALANCE: deep-review OVER budget (last 452, starved-for 458−452=6 > 5) → FORCED deep-review (#5 sweep at infra not over budget, waits). 2-agent fan-out on the stalest surfaces (insurance materialization, last full
+  C382; expenses split, last C311). (A) INSURANCE materialization CERTIFIED CLEAN — verified firsthand: largest-remainder cents split sums exact (C382 holds), re-materialize deletes-before-recreate (no doubling),
+  #57 orphan-cleanup + #84 claim-ref (C369) hold, no C151 async-tx footgun (hooks run AFTER the repo tx; createSplitExpense validates before the tx). (B) EXPENSES split surfaced #141. VERIFIED FIRSTHAND (C21/C60):
+  createSplitExpenseSchema.totalAmount was `z.number().positive()` with NO cent quantization; createSplitExpense stores groupTotal=data.totalAmount verbatim (repository.ts:648) while computeEvenSplit/Percentage round
+  each leg to whole cents (Math.round(total*100)). So a sub-cent total (100.005) persisted groupTotal=100.005 while the legs summed to 100.01 — a stored header disagreeing with Σsiblings (NORTH_STAR #1, violates the
+  "legs sum to groupTotal" invariant the absolute-refine + Property 3 otherwise enforce). Reachable via direct API / a non-2-decimal client (the UI sends 2-decimal, so happy-path-safe). FIX (one edit, the validation
+  boundary): extracted a `centsAmount` schema (positive + .transform(round to 2dp)), routed both create + update totalAmount through it → groupTotal computed from the SAME cent-aligned value as the legs. +3 guards
+  (split-validation-schema.test.ts): sub-cent create 100.005→100.01, update 49.999→50, clean 100→100 no-op. NON-VACUOUS (pre-fix passed 100.005 through). be validate:local EXIT 0, 1548 pass (+3). Note: a guard-only
+  pin was the scout's framing, but quantizing is the actual FIX (the drift was a real stored inconsistency, not just untested). cov: be 86.96% (carry, +3 guards) / fe 85.89% (carry).

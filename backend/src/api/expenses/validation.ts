@@ -20,6 +20,17 @@ export const tagElementSchema = z
     message: 'Tag cannot contain a semicolon or comma',
   });
 
+// A positive money amount QUANTIZED to whole cents (#141, C458). A split's groupTotal is stored from the
+// raw totalAmount while computeEvenSplit/computePercentageSplit round each leg to whole cents
+// (Math.round(total*100)) — so a sub-cent total (e.g. 100.005) persisted groupTotal=100.005 while the legs
+// summed to 100.01, a stored header that disagrees with Σsiblings (NORTH_STAR #1, violates the "legs sum to
+// groupTotal" invariant). Rounding totalAmount to cents at the boundary makes groupTotal computed from the
+// SAME cent-aligned value as the legs. The UI only ever sends 2-decimal amounts, so this is a no-op there.
+const centsAmount = z
+  .number()
+  .positive('Amount must be positive')
+  .transform((n) => Math.round(n * 100) / 100);
+
 // ---------------------------------------------------------------------------
 // Split Config Schemas (discriminated union on `method`)
 // ---------------------------------------------------------------------------
@@ -100,7 +111,7 @@ export const createSplitExpenseSchema = z
     tags: z.array(tagElementSchema).max(CONFIG.validation.expense.maxTags).optional(),
     date: z.coerce.date(),
     description: z.string().optional(),
-    totalAmount: z.number().positive('Amount must be positive'),
+    totalAmount: centsAmount, // quantized to whole cents so groupTotal == Σsiblings (#141)
     sourceType: z.string().optional(),
     sourceId: z.string().optional(),
   })
@@ -119,6 +130,6 @@ export const createSplitExpenseSchema = z
 export const updateSplitSchema = z
   .object({
     splitConfig: splitConfigSchema,
-    totalAmount: z.number().positive().optional(),
+    totalAmount: centsAmount.optional(), // quantized to whole cents (#141)
   })
   .superRefine(refineSplitConfig);
