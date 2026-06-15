@@ -915,6 +915,28 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > checkForExistingExpense/determineConflictType today). SECONDARY NOTE (NOT this fix — multi-file/product): the date/amount query params at :224 are silently dropped by the
 > backend schema, so the fuzzy pre-check only scans page 1 of the vehicle's expenses; correcting it needs a backend filter/endpoint change.
 
+> ~~**#136 (MED, data-safety / NORTH_STAR #1 — found+fixed C446 on a 2-agent bug-hunt; the #43/#44 backup-honesty family but a clean code fix) — the activity middleware armed the
+> inactivity timer ONLY for enabled-ZIP providers, so a Sheets-only-sync user got NO auto-backup-on-inactivity.**~~ — *DONE C446: activity.ts computed hasSyncEnabled via
+> `.some((p) => p.enabled)`, but the orchestrator fans out on its OWN exported predicate filterEnabledProviders = `s.enabled || s.sheetsSyncEnabled === true`. A Sheets-only-sync
+> provider (enabled:false, sheetsSyncEnabled:true) + syncOnInactivity NEVER armed the timer → recordActivity never called → auto-backup silently never fired (changeTracker still
+> marks data changed → the user thinks sync is active). FIX (one expr, ONE source of truth): routed the middleware through filterEnabledProviders().length > 0. +1 HTTP-harness guard
+> (spy recordActivity on the singleton, Sheets-only config), PROVEN NON-VACUOUS (revert → never called). Fixed the C291/C300 dynamic-import trap + a Zod cap (minutes max 30). be
+> validate:local EXIT 0, 1538 pass (+1).*
+
+> **#137 (MED, correctness→money — found+filed C446; the #76/C244 class's THIRD write site, NOT fixed; clean one-edit) — CSV import persists stray fuel-only fields on a non-fuel
+> imported row.** import-csv.ts parseRow parses mileage/volume/fuelType for EVERY category unconditionally + returns them; the import commit (routes.ts importExpenses) inserts verbatim,
+> bypassing the clearFuelFieldsIfNotFuel guard the POST (#76/C244) + PUT (#130/C434) paths use. A foreign-tracker import (Drivvo/Fuelio log odometer on maintenance rows; categoryMap
+> maps "Service"→maintenance, the mileage column maps for all rows) → a category=maintenance, mileage=120000 row is inserted with that stray mileage → poisons getCurrentOdometer
+> (UNION over expenses.mileage, no category filter) → wrong reminder firing + inflated lease-overage $. Native VROOM round-trip is safe (export blanks non-fuel mileage). Clean one-edit:
+> null volume/fuelType/mileage + missedFillup=false when category!=='fuel' in parseRow (the clearFuelFieldsIfNotFuel transform, in the pure fn). Queued.
+
+> **#138 (MED, correctness/date — found+filed C446; the #87/#131 UTC-date family on the LONE hold-out form; clean one-edit + guard-extension) — InsuranceTermForm sends bare
+> date-only strings → term dates stored at UTC-midnight → displayed a day early for Americas users.** InsuranceTermForm.svelte:247-248/255-256 send the raw `<input type=date>` value
+> ("2026-07-01") verbatim; backend `z.coerce.date()` → 2026-07-01T00:00:00.000Z (UTC midnight); PolicyTermCard renders formatDate (LOCAL) → "Jun 30, 2026" for a negative-offset user.
+> Every other date-only form (Expense/Reminder/Vehicle/odometer/ClaimsSection) already wraps in dateOnlyToISO (noon-local) on save + toDateInputValue on reload; InsuranceTermForm is the
+> lone hold-out. Also skews endDate>startDate refine + getDaysRemaining/isExpiringSoon by ~a day. Clean one-edit (two dateOnlyToISO wraps + two toDateInputValue reloads, mirroring
+> #131) — and the no-utc-date-input source-scan needs a small extension (this site does `s.split('T')[0]` on an intermediate local var, matching neither existing regex). Queued.
+
 > **#135 (LOW, hygiene/growth — found+filed C445 on the sync deep-review; NOT fixed, a reaping-lifecycle behavior call) — the SyncManager path never reaps synced rows from
 > localStorage.** syncManager.syncAll + resolveConflict only markExpenseAsSynced (sets synced:true, row STAYS in localStorage); they never removeOfflineExpense/clearSyncedExpenses.
 > Contrast the legacy syncOfflineExpenses (offline-storage.ts), which clearSyncedExpenses() after its loop. So through the SyncManager entry point (the one auto-sync + the manual

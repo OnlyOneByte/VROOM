@@ -77,11 +77,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 445 |
 | guard | 6 | 443 |
-| bug | 3 | 442 |
+| bug | 3 | 446 |
 | arch | 5 | 444 |
 | infra | 6 | 440 |
 
-Current cycle: **445**
+Current cycle: **446**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6687,3 +6687,15 @@ Current cycle: **445**
   mockFetch in finally (vi.clearAllMocks doesn't clear queued impls → would bleed). fe validate:local EXIT 0, 713 pass (+1). FILED #135 (LOW, the scout's 2nd finding — NOT fixed): the SyncManager path only
   markExpenseAsSynced's resolved/synced rows, never removeOfflineExpense/clearSyncedExpenses them, so synced rows accumulate in localStorage (bounded by the !synced re-sync filter → unbounded-GROWTH only, no
   re-POST; the legacy syncOfflineExpenses reaps but SyncManager doesn't — a reaping-lifecycle behavior call). cov: be 86.94% (carry) / fe 85.26% (carry, +1 guard).
+- **C446 (bug → #136: the activity middleware armed the inactivity timer ONLY for enabled-ZIP providers, so a Sheets-only-sync user got NO auto-backup-on-inactivity — silent, NORTH_STAR #1)** —
+  BALANCE: bug OVER budget (last 442, starved-for 446−442=4 > 3) → FORCED bug (#5 infra sweep at 6/6 waits a cycle). #129/#135 are product/behavior-gated, so a fresh 2-agent hunt. THREE concrete defects found;
+  by severity (data-safety > money > display) the BE auto-backup gap outranked. VERIFIED FIRSTHAND (C21/C60): activity.ts:34-36 computed hasSyncEnabled via `.some((p) => p.enabled)` — but the backup
+  orchestrator fans out on its OWN exported predicate filterEnabledProviders = `s.enabled || s.sheetsSyncEnabled === true` (backup-orchestrator.ts:21-24). A user with a Sheets-only-sync provider
+  (enabled:false, sheetsSyncEnabled:true — an independently-toggled valid config) + syncOnInactivity therefore NEVER armed the inactivity timer (recordActivity never called) → auto-backup-on-inactivity silently
+  never fired, even though the orchestrator it gates WOULD have backed up to Sheets; changeTracker still marks data changed so the user believes sync is active. The #43/#44 backup-honesty family but a CLEAN code
+  fix. FIX (one expr, ONE source of truth — don't duplicate the predicate, that divergence IS the bug): routed the middleware through filterEnabledProviders(backupConfig).length > 0. GUARD: +1 HTTP-harness test
+  (activity-sheets-only-sync.test.ts) — seed a Sheets-only provider + syncOnInactivity via PUT /settings, spy the exported tracker singleton's recordActivity, do an authed write, assert it fired. PROVEN NON-VACUOUS
+  firsthand (reverting to .some(p.enabled) → recordActivity never called, RED). Hit + fixed the C291/C300 harness trap (dynamic-import the tracker AFTER createTestApp binds :memory:, not top-level) + a Zod cap
+  (syncInactivityMinutes max 30, not 999). be validate:local EXIT 0, 1538 pass (+1). The two OTHER found defects FILED for future cycles: #137 (CSV import persists stray mileage on a non-fuel imported row — the
+  #76 class's THIRD write site, import-csv.ts parseRow bypasses clearFuelFieldsIfNotFuel; clean one-edit) + #138 (InsuranceTermForm sends bare date-only strings → term dates stored at UTC-midnight → displayed a
+  day early for Americas users — the #87/#131 date class, clean one-edit + needs the source-scan extended). cov: be 86.94% (carry, +1 guard) / fe 85.26% (carry).
