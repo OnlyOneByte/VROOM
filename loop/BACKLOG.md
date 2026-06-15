@@ -154,6 +154,14 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > and the gap is logged so a human (or an unblocked harness) closes it.
 
 ### deep-review
+> ~~**Sync conflict-resolution / offline-apply path audit (C445) → found+fixed #134 (orphaned-retry conflict resurrection); filed #135.**~~ — *DONE C445 (deep-review OVER
+> budget 6>5 → forced). 1-agent fan-out on the stalest data-safety surface (flagged C439, only single-bug-patched since via C424/C442). FOUND #134: retrySingleExpense
+> (sync-manager.ts:250) guarded only on !onlineStatus before re-running the conflict-check, but the backoff setTimeout is DETACHED from retryCount → a retry scheduled on an
+> earlier failed POST fires even after an interleaving syncAll surfaced + the user RESOLVED that conflict (markExpenseAsSynced); the orphaned retry then re-finds the committed
+> server row + RE-LISTS the dismissed conflict (the C424 dedup misses it — resolution removed it from the live set). FIX (one guard): early-return when getPendingExpenses()
+> (!synced source of truth) no longer contains the row. +1 fake-timer guard, PROVEN NON-VACUOUS (reverting → resurrects). fe validate:local EXIT 0, 713 pass (+1). Resolution
+> legs (keep_local/keep_server/merge), backoff cap, dedup all otherwise CERTIFIED CLEAN. Filed #135 (LOW, see bug queue — SyncManager never reaps synced rows).*
+
 > ~~**Analytics TCO / depreciation / cost-composition audit (C439) → CERTIFIED CLEAN (last full cert C361); +1 year-scoped costPerMonth divisor guard.**~~ — *DONE C439
 > (deep-review OVER budget 6>5 → forced). 1-agent fan-out on the stalest money surface. CERTIFIED CLEAN, verified firsthand: #27 fix holds (purchasePrice>0 → financing rows
 > excluded; $0-price gate is `>0` not `!=null`, correct), categorizer no money-slip (else→otherCosts; a 'financial' recurring expense is a label debate not a total error),
@@ -906,6 +914,13 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > secondary fuzzy-match/UX layer). A guard pinning serverExpense.amount (non-undefined, == backend expenseAmount) is also a fresh coverage add (no test drives
 > checkForExistingExpense/determineConflictType today). SECONDARY NOTE (NOT this fix — multi-file/product): the date/amount query params at :224 are silently dropped by the
 > backend schema, so the fuzzy pre-check only scans page 1 of the vehicle's expenses; correcting it needs a backend filter/endpoint change.
+
+> **#135 (LOW, hygiene/growth — found+filed C445 on the sync deep-review; NOT fixed, a reaping-lifecycle behavior call) — the SyncManager path never reaps synced rows from
+> localStorage.** syncManager.syncAll + resolveConflict only markExpenseAsSynced (sets synced:true, row STAYS in localStorage); they never removeOfflineExpense/clearSyncedExpenses.
+> Contrast the legacy syncOfflineExpenses (offline-storage.ts), which clearSyncedExpenses() after its loop. So through the SyncManager entry point (the one auto-sync + the manual
+> button drive) synced rows accumulate indefinitely. NOT a correctness bug — getPendingExpenses filters !synced, so a synced row is never re-POSTed/re-conflict-checked (the #134
+> fix relies on exactly this) — purely unbounded localStorage GROWTH + divergence between the two sync entry points. Fix is a behavior call: reap synced rows after a successful
+> syncAll (mirror syncOfflineExpenses' clearSyncedExpenses) / keep a short history then prune / leave as-is. LOW; queued.
 
 > ~~**#132 (MED-HIGH, data-safety / NORTH_STAR #1 — found+fixed C441 on a 2-agent bug-hunt; the #93/C300 raw-UNIQUE-throw class on a third table) — merge-restore
 > detectConflicts didn't probe `reminders`, so a surviving vehicle-less reminder in a backup threw a raw UNIQUE error instead of a clean conflict.**~~ — *DONE C441:

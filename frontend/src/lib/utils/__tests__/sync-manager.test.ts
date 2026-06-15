@@ -506,6 +506,49 @@ describe('Sync Manager', () => {
 				syncConflicts.current = [];
 			}
 		});
+
+		// C445 (deep-review → bug): an orphaned backoff timer must NOT resurrect an already-resolved
+		// conflict. retrySingleExpense is detached from retryCount, so a scheduled retry fires even after
+		// the expense was resolved+synced by an interleaving syncAll; without a still-pending re-check it
+		// would re-run the conflict-check, find the committed server row, and re-list the dismissed
+		// conflict (the C424 dedup misses it — resolution already removed it from the live set). The fix
+		// early-returns when getPendingExpenses() (the !synced source of truth) no longer contains the row.
+		it('an orphaned retry does NOT resurrect a conflict already resolved+synced between schedule and fire', async () => {
+			syncConfig.update(config => ({ ...config, maxRetries: 3, retryDelay: 100 }));
+			const exp = failingExpense('resurrect-1');
+			vi.mocked(loadOfflineExpenses).mockReturnValue([exp]);
+			syncConflicts.current = [];
+
+			vi.useFakeTimers();
+			try {
+				// Attempt 1 (main loop): conflict-check ok → create FAILS (500) → schedules a retry.
+				mockFetch.mockResolvedValueOnce(apiOk([])).mockResolvedValueOnce(apiError(500, 'boom'));
+				await syncManager.syncAll();
+				expect(syncManager.getRetryCount('resurrect-1')).toBe(1);
+
+				// Simulate resolution between schedule and fire: the row is now synced (markExpenseAsSynced),
+				// so getPendingExpenses() — which filters !synced over the mocked loader — no longer lists it.
+				vi.mocked(loadOfflineExpenses).mockReturnValue([{ ...exp, synced: true }]);
+				syncState.current = 'success';
+
+				// If the orphaned retry ran the conflict-check, this committed-row response would resurrect it.
+				mockFetch.mockResolvedValueOnce(
+					apiOk([{ id: 'server-x', tags: ['fuel'], category: 'fuel', expenseAmount: 50.0, date: '2024-01-01' }])
+				);
+				await vi.advanceTimersByTimeAsync(200); // fire the orphaned retry (100 * 2^0)
+
+				// Post-fix: the retry no-ops on the !pending re-check → no conflict resurrected, state intact.
+				expect(syncConflicts.current).toHaveLength(0);
+				expect(syncState.current).not.toBe('error');
+			} finally {
+				vi.useRealTimers();
+				syncConflicts.current = [];
+				// The committed-row response queued above is intentionally LEFT UNCONSUMED by the fixed
+				// retry (proving non-vacuity: a regression WOULD consume it). Drain it so the once-queued
+				// response can't bleed into a later test (vi.clearAllMocks doesn't clear queued impls).
+				mockFetch.mockReset();
+			}
+		});
 	});
 });
 

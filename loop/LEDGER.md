@@ -75,13 +75,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 439 |
+| deep-review | 5 | 445 |
 | guard | 6 | 443 |
 | bug | 3 | 442 |
 | arch | 5 | 444 |
 | infra | 6 | 440 |
 
-Current cycle: **444**
+Current cycle: **445**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6674,3 +6674,16 @@ Current cycle: **444**
   before+after. Hit the C163/C426 mock-trap (sync-manager.test.ts mocks offline-storage → the new import was undefined → 8 fails); fixed per C205 discipline by passing the REAL pure predicate through
   (isIncompleteFuelExpense: actual.isIncompleteFuelExpense), NOT a stub. +5 direct predicate-pin tests (category-gate, both-missing, mileage-missing, complete-liquid, complete-electric). fe validate:local EXIT 0, 712
   pass (+5). cov: be 86.94% (carry) / fe 85.26% (carry, +5 guards). The offline↔sync duplicated-rule family is now FULLY collapsed (mapping + pending-filter + mark-synced + fuel-completeness all single-source).
+- **C445 (deep-review → #134: an orphaned backoff retry could RESURRECT an already-resolved sync conflict — retrySingleExpense never re-checked still-pending)** —
+  BALANCE: deep-review OVER budget (last 439, starved-for 445−439=6 > 5) → FORCED deep-review (the #5 sweep is due ~C445 but that's infra, waits a cycle). 1-agent fan-out on the stalest data-safety
+  surface (sync conflict-resolution / offline-apply; flagged the next candidate C439, only single-bug-patched since via C424/C442). Surfaced + VERIFIED FIRSTHAND (C21/C60): retrySingleExpense (sync-manager.ts:250)
+  guarded only on `!onlineStatus.current` before re-running the conflict-check — but the backoff setTimeout is DETACHED from retryCount, so a retry scheduled on an earlier failed POST fires even after an
+  interleaving syncAll surfaced that conflict (a lost-response duplicate) AND the user RESOLVED it (markExpenseAsSynced). The orphaned retry then re-runs checkForExistingExpense, finds the committed server row,
+  and RE-LISTS the dismissed conflict in syncConflicts.current + flips syncState back to 'error'. The C424 dedup does NOT catch it (resolution already removed it from the live set → the `already` check passes).
+  Reachable: syncAll runs concurrently across the online-event auto-sync + the manual retry button, and a scheduled timer survives across syncAll calls. NOTE the scout's first-pass fix idea (retryCount.delete in
+  the main-loop conflict branch) would NOT work — the timer is detached from retryCount; the real root is the missing still-pending re-check. FIX (one guard, the !synced source of truth): early-return from
+  retrySingleExpense when getPendingExpenses() (C426, filters !synced) no longer contains the row. +1 guard (sync-manager.test.ts, fake-timers): fail→schedule retry, mark the row synced (resolution), fire the
+  orphaned timer → syncConflicts.current stays empty + syncState not 'error'. PROVEN NON-VACUOUS firsthand (reverting the guard → the conflict resurrects, length 1). Drained the intentionally-unconsumed committed-row
+  mockFetch in finally (vi.clearAllMocks doesn't clear queued impls → would bleed). fe validate:local EXIT 0, 713 pass (+1). FILED #135 (LOW, the scout's 2nd finding — NOT fixed): the SyncManager path only
+  markExpenseAsSynced's resolved/synced rows, never removeOfflineExpense/clearSyncedExpenses them, so synced rows accumulate in localStorage (bounded by the !synced re-sync filter → unbounded-GROWTH only, no
+  re-POST; the legacy syncOfflineExpenses reaps but SyncManager doesn't — a reaping-lifecycle behavior call). cov: be 86.94% (carry) / fe 85.26% (carry, +1 guard).

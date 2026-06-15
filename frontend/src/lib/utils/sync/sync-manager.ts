@@ -250,6 +250,16 @@ class SyncManager {
 	private async retrySingleExpense(expense: OfflineExpense): Promise<void> {
 		if (!onlineStatus.current) return;
 
+		// The expense may have been resolved/synced between this backoff retry being SCHEDULED (on an
+		// earlier failed POST) and its firing — e.g. an interleaving syncAll surfaced the conflict (a
+		// lost-response duplicate) and the user resolved it (markExpenseAsSynced). The setTimeout is
+		// detached from retryCount, so it fires regardless; without this re-check it would re-run the
+		// conflict-check, find the committed server row, and RESURRECT the already-resolved conflict —
+		// re-listing it in syncConflicts.current + flipping syncState back to 'error' (the C424 dedup
+		// doesn't catch it because resolution already removed it from the live set). getPendingExpenses()
+		// is the !synced source of truth (C426): if the row is no longer pending, the retry is a no-op.
+		if (!getPendingExpenses().some(e => e.id === expense.id)) return;
+
 		try {
 			const result = await this.syncSingleExpense(expense);
 			if (result.success) {
