@@ -52,7 +52,13 @@
 > FE eyes-on components/routes, Playwright-blocked). Branch: 210 commits ahead of origin/main; working tree clean of TRACKED changes, but the #5 sweep CAUGHT an
 > untracked-by-mistake item → .kiro/specs/offline-entries/ (requirements/design/tasks.md) was the ONLY feature spec not committed while ~29 siblings all track their 3
 > .md docs + the offline-entries CODE foundation already shipped → committed it C400 so a fresh clone / the PR keeps the design rationale. Build floor GREEN both sides
-> → PR-ready (standing escalation open since C368, not re-spammed).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> → PR-ready (standing escalation open since C368, not re-spammed).** **RE-MEASURED AGAIN C435 (the #5-sweep re-measure; last full C423): be 86.94% line / 86.60%
+> func (line +0.01 / func +0.03 vs C423's 86.93/86.57 — flat-to-up; the C430 outlier-band + C434 #76-third-leg guards held the line); fe 85.26% line / 85.53% func /
+> 77.40% branch (UP +0.75 line / +0.99 func / +0.34 branch vs C423's 84.51/84.54/77.06 — the C426/C432 sync-manager dead-code/dup removal RAISED the covered ratio +
+> the C430/C433 guards). BE↔FE gap now ~1.7pts (86.9 vs 85.3) — the TIGHTEST ever. 90%-line goal still structurally gated (BE DI/singleton + OAuth-network; FE eyes-on
+> components/routes, Playwright-blocked). Branch: 245 commits ahead of origin/main, working tree clean (only by-design untracked *.meshclaw.e2e.ts + tooling + the
+> gitignored BRANCH_REVIEW.md, refreshed C435 with §33 covering the 84-commit C351–C434 delta), build floor GREEN both sides → PR-ready (standing escalation since C368).**
+> When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -73,9 +79,9 @@ the next increment MUST come from the most-starved over-budget category.
 | guard | 6 | 430 |
 | bug | 3 | 434 |
 | arch | 5 | 432 |
-| infra | 6 | 429 |
+| infra | 6 | 435 |
 
-Current cycle: **434**
+Current cycle: **435**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6555,3 +6561,14 @@ Current cycle: **434**
   row PUT {mileage:99999,volume:7,fuelType} with NO category → all nulled. NON-VACUOUS (pre-fix the no-op clear persisted 99999). FE scout's finding (ReminderForm.svelte:116 UTC .slice(0,10)
   date round-trip, the #87/#106 family still live on that one form, narrow UTC+13/+14 reach) FILED as #131 for a future cycle. One biome format autofix on the test, then re-validated. be
   validate:local EXIT 0, 1532 pass (+1). cov: be 86.93% (carry) / fe 84.51% (carry).
+- **C435 (infra): #5 branch-hygiene sweep + coverage re-measure + BRANCH_REVIEW.md refresh (the overdue ~C433 cadence; last actual sweep C423)** —
+  BALANCE: nothing over budget; infra MOST-STARVED (last 429, starved-for 435−429=6=budget) AND the #5 sweep cadence was overdue → highest-leverage. Three-part sweep:
+  (1) HYGIENE — `git status --porcelain --untracked-files=all` → ZERO stray untracked unit/spec .test.ts (all untracked = the by-design *.meshclaw.e2e.ts set + .meshclaw-tools/
+  harness + screenshots + playwright config + mise.local.toml); branch 245 commits ahead, 0 behind origin/main, clean fast-forwardable. (2) GREEN BASELINE + COVERAGE RE-MEASURE
+  (last full C423): be `bun test --coverage` EXIT 0, 1532 pass → 86.94% line / 86.60% func (vs C423 86.93/86.57 — flat-to-up); fe `vitest --run --coverage` EXIT 0, 697 pass →
+  85.26% line / 85.53% func / 77.40% branch (UP +0.75 line / +0.99 func / +0.34 branch vs C423's 84.51/84.54/77.06 — the C426/C432 sync-manager dead-code/dup removal RAISED the
+  covered ratio). BE↔FE gap now ~1.7pts — the tightest ever. Updated the COVERAGE TREND header with the C435 reading. (3) BRANCH_REVIEW.md (gitignored) refresh — header
+  161→245 commits, status block re-verified C435, +§33 covering the 84-commit C351–C434 delta (the largest single review delta: ~22 bugs fixed incl. 2 HIGH data-safety
+  [#C404 closed, #127 mitigated+escalated], ~19 arch dedups, the split/charge-partition + endDate-#12 + #76 families swept, 6 new escalations filed). Doc/measurement-only —
+  no source touched, no build gate beyond the two coverage runs (both green). 90%-line goal still structurally gated (BE DI/singleton + OAuth-network; FE eyes-on components/
+  routes). Next #5 sweep ~C445; CLAUDE.md full refresh ~C439. cov: be 86.94% / fe 85.26% (re-measured C435).
