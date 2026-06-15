@@ -40,7 +40,8 @@ async function seedVehicle(): Promise<string> {
 interface NotificationRow {
   id: string;
   reminderId: string;
-  dueDate: string;
+  dueDate: string | null;
+  createdAt: string;
   isRead: boolean;
 }
 
@@ -69,10 +70,11 @@ describe('reminder notification feed (GET + mark-read)', () => {
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.length).toBeGreaterThanOrEqual(2);
 
-    // Newest-first: each dueDate >= the next one.
+    // Newest-first by createdAt (the recency axis — NOT dueDate, which is NULL for mileage
+    // notifications and would sink them; #142/C459). Each createdAt >= the next one.
     for (let i = 1; i < body.data.length; i++) {
-      const prev = new Date(body.data[i - 1]!.dueDate).getTime();
-      const cur = new Date(body.data[i]!.dueDate).getTime();
+      const prev = new Date(body.data[i - 1]!.createdAt).getTime();
+      const cur = new Date(body.data[i]!.createdAt).getTime();
       expect(prev).toBeGreaterThanOrEqual(cur);
     }
     // All start unread.
@@ -110,5 +112,49 @@ describe('reminder notification feed (GET + mark-read)', () => {
     const res = await ctx.authed('PUT', '/api/v1/reminders/notifications/does-not-exist/read');
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(res.status).toBeLessThan(500);
+  });
+
+  // #142 (C459): the feed orders by createdAt (recency), NOT dueDate. A MILEAGE notification carries
+  // dueDate=NULL (its milestone is dueOdometer), and NULLs sort LAST under `DESC` — so ordering by dueDate
+  // sank every mileage notification beneath every time notification regardless of when it fired (and the
+  // limit truncated the mileage axis entirely past 100 time notifications). This pins that a mileage
+  // notification created AFTER a time notification appears FIRST in the feed.
+  test('a mileage notification (dueDate NULL) created later sorts FIRST, not last (#142)', async () => {
+    const vehicleId = await seedVehicle();
+    // Seed a reminder to satisfy the FK, then two notifications directly: a time one created earlier,
+    // a mileage one (dueDate NULL, dueOdometer set) created LATER.
+    await ctx.authed('POST', '/api/v1/reminders', {
+      name: 'Oil',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2024-01-15T00:00:00.000Z',
+      vehicleIds: [vehicleId],
+    });
+    const reminderId = (
+      ctx.sqlite.query('SELECT id FROM reminders WHERE user_id = ? LIMIT 1').get(ctx.user.id) as {
+        id: string;
+      }
+    ).id;
+    // Clear any auto-fired rows so we control ordering deterministically.
+    ctx.sqlite.run('DELETE FROM reminder_notifications WHERE user_id = ?', [ctx.user.id]);
+    // Time notification created at t=1000s; mileage notification created LATER at t=2000s.
+    ctx.sqlite.run(
+      `INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date, due_odometer, is_read, created_at)
+       VALUES ('ntime', ?, ?, 1700000000, NULL, 0, 1000)`,
+      [reminderId, ctx.user.id]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date, due_odometer, is_read, created_at)
+       VALUES ('nmileage', ?, ?, NULL, 35000, 0, 2000)`,
+      [reminderId, ctx.user.id]
+    );
+
+    const res = await ctx.authed('GET', '/api/v1/reminders/notifications');
+    const body = await json<DataEnvelope<Array<{ id: string }>>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    // NON-VACUOUS: pre-fix (order by dueDate DESC) the NULL-dueDate mileage row sorted LAST → 'ntime' first.
+    // Post-fix (order by createdAt DESC) the later-created mileage row is first.
+    expect(body.data[0]?.id).toBe('nmileage');
+    expect(body.data[1]?.id).toBe('ntime');
   });
 });

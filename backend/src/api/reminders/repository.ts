@@ -464,8 +464,15 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       return await this.db
         .select()
         .from(reminderNotifications)
+        // Order by createdAt (the true recency axis spanning BOTH notification types), NOT dueDate.
+        // A MILEAGE notification carries dueDate=NULL (its milestone lives in dueOdometer), and NULLs
+        // sort LAST under `DESC` — so ordering by dueDate sank every mileage notification beneath every
+        // time notification regardless of when it fired, and the limit(100) truncated the mileage axis
+        // entirely for a user with ≥100 time notifications (a just-due service buried/invisible — #142,
+        // feature-disabling for the maintenance-schedule mileage axis). createdAt is non-null on every
+        // row ($defaultFn) and is the real "when it fired" order for the feed.
         .where(and(...conditions))
-        .orderBy(desc(reminderNotifications.dueDate))
+        .orderBy(desc(reminderNotifications.createdAt))
         .limit(CONFIG.validation.reminder.notificationsHistoryLimit);
     } catch (error) {
       logger.error('Failed to find notifications', {

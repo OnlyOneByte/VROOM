@@ -82,11 +82,11 @@ the next increment MUST come from the most-starved over-budget category.
 | feature | 4 | 170 |
 | deep-review | 5 | 458 |
 | guard | 6 | 456 |
-| bug | 3 | 455 |
+| bug | 3 | 459 |
 | arch | 5 | 457 |
 | infra | 6 | 454 |
 
-Current cycle: **458**
+Current cycle: **459**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6820,3 +6820,13 @@ Current cycle: **458**
   boundary): extracted a `centsAmount` schema (positive + .transform(round to 2dp)), routed both create + update totalAmount through it → groupTotal computed from the SAME cent-aligned value as the legs. +3 guards
   (split-validation-schema.test.ts): sub-cent create 100.005→100.01, update 49.999→50, clean 100→100 no-op. NON-VACUOUS (pre-fix passed 100.005 through). be validate:local EXIT 0, 1548 pass (+3). Note: a guard-only
   pin was the scout's framing, but quantizing is the actual FIX (the drift was a real stored inconsistency, not just untested). cov: be 86.96% (carry, +3 guards) / fe 85.89% (carry).
+- **C459 (bug → #142: mileage notifications (dueDate=NULL) sorted LAST + truncated out of the feed — feature-disabling for the maintenance-schedule mileage axis)** —
+  BALANCE: bug OVER budget (last 455, starved-for 459−455=4 > 3) → FORCED bug (#5 sweep at infra 5/6 not yet over). #129/#135 product/behavior-gated → fresh 2-agent hunt. BOTH found a defect; by severity
+  (correctness > display) the BE one outranked (the FE was formatRelativeTime "1 years ago", LOW/cosmetic, FILED #143). VERIFIED FIRSTHAND (C21/C60): findNotifications (reminders/repository.ts:468) ordered by
+  desc(dueDate), but createMileageNotification inserts dueDate=NULL (the milestone lives in dueOdometer; schema confirms "exactly one of dueDate/dueOdometer"). FIRSTHAND on this SQLite: NULLs sort LAST under DESC → a
+  mileage notification fired TODAY renders below a year-old time notification, AND with the limit(100) a user holding ≥100 time notifications never sees ANY mileage notification (the mileage axis becomes invisible) —
+  feature-disabling for a COMPLETE feature's whole axis (the /reminders page renders the dueOdometer branch in server order, no client re-sort). FIX (one-token swap): orderBy desc(createdAt) — non-null on every row
+  ($defaultFn), the true recency axis spanning BOTH notification types. GUARD: +1 (notifications-feed.test.ts) — seed a time notif (createdAt=1000) + a LATER mileage notif (dueDate NULL, createdAt=2000) → the mileage
+  one is FIRST. PROVEN NON-VACUOUS firsthand (revert to desc(dueDate) → mileage sorts last → RED). Also UPDATED the existing "newest-first" test from a dueDate-descending assertion (which pinned the BUGGY contract) to
+  createdAt-descending (the correct one). be validate:local EXIT 0, 1549 pass (+1). FILED #143 (FE, LOW/cosmetic): formatRelativeTime renders "1 weeks/months/years ago" at the bucket boundaries (no singular form) —
+  the n>1?'s':'' idiom already used elsewhere; queued. cov: be 86.96% (carry, +1 guard) / fe 85.89% (carry).

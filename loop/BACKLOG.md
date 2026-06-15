@@ -980,6 +980,17 @@ size cap (rule 1) keeps each increment small enough that frequent picks stay saf
 > EYES-ON: card renders only for a lease WITH a mileageLimit (demo seed has none) → "code-complete, eyes-on pending" (verifiable by inspection). Closes the annual-vs-total class
 > across BOTH cards (PaymentMetricsGrid C398 + LeaseMetricsCard C455).*
 
+> ~~**#142 (MED, correctness/feature-disabling — found+fixed C459 on a 2-agent bug-hunt) — mileage notifications (dueDate=NULL) sorted LAST + truncated out of the feed.**~~ —
+> *DONE C459: findNotifications (reminders/repository.ts:468) ordered by desc(dueDate), but createMileageNotification inserts dueDate=NULL (milestone in dueOdometer) → NULLs sort LAST
+> under DESC → a just-due mileage notification renders below year-old time ones, AND past limit(100) the mileage axis is invisible entirely (feature-disabling). FIX: orderBy
+> desc(createdAt) (non-null recency axis spanning both types). +1 guard (a later-created mileage notif sorts first); updated the existing "newest-first" test from dueDate-desc (the
+> buggy contract) to createdAt-desc. NON-VACUOUS. be validate:local EXIT 0, 1549 pass (+1).*
+
+> **#143 (LOW, cosmetic/grammar — found+filed C459 on an FE bug-hunt; clean one-edit, NOT fixed) — formatRelativeTime renders "1 weeks/months/years ago" at the bucket boundaries.**
+> formatters.ts:115-117: `${Math.floor(days/7)} weeks ago` etc. emit "1 weeks ago" (day 7-13), "1 months ago" (30-59d), "1 years ago" (365-729d) — no singular form. Rendered by
+> RecentActivityCard / VehicleCarousel / SyncStatusInline on real timestamps. Clean one-edit: the `n>1?'s':''` idiom already used in frequencyLabel + getSyncStatusInfo. NOTE the existing
+> formatters.test.ts:206 CODIFIES the wrong output ("1 years ago") → the fix flips that assertion too. LOW (no data/money), near the eyes-on boundary but unit-testable; queued.
+
 > **#135 (LOW, hygiene/growth — found+filed C445 on the sync deep-review; NOT fixed, a reaping-lifecycle behavior call) — the SyncManager path never reaps synced rows from
 > localStorage.** syncManager.syncAll + resolveConflict only markExpenseAsSynced (sets synced:true, row STAYS in localStorage); they never removeOfflineExpense/clearSyncedExpenses.
 > Contrast the legacy syncOfflineExpenses (offline-storage.ts), which clearSyncedExpenses() after its loop. So through the SyncManager entry point (the one auto-sync + the manual
