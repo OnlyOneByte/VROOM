@@ -63,13 +63,13 @@ interface DatabaseUserAttributes {
 
 export type AuthUser = User;
 
-// Test support functions
-let testLucia: Lucia | null = null;
-
+/**
+ * The Lucia seam used by auth routes + middleware (12 sites). Kept as a stable indirection
+ * point even though it now just returns the singleton: the old test-override (setTestLucia +
+ * a `testLucia` module-state) was dead — never called anywhere incl. tests (tests drive the
+ * real Lucia via the in-process createTestApp harness with a real session cookie), so the
+ * override could never fire and `getLucia()` always returned `lucia`. Removed the dead seam.
+ */
 export function getLucia(): Lucia {
-  return testLucia || lucia;
-}
-
-export function setTestLucia(instance: Lucia | null): void {
-  testLucia = instance;
+  return lucia;
 }

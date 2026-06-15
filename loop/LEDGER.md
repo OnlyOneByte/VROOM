@@ -88,10 +88,10 @@ the next increment MUST come from the most-starved over-budget category.
 | deep-review | 5 | 461 |
 | guard | 6 | 463 |
 | bug | 3 | 462 |
-| arch | 5 | 457 |
+| arch | 5 | 464 |
 | infra | 6 | 460 |
 
-Current cycle: **463**
+Current cycle: **464**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -6872,3 +6872,12 @@ Current cycle: **463**
   never driven (the same `>=`-tolerant-assertion-that-never-hits-`=` gap as C450's getLatestTimeBucket / C430's outlier band). +1 guard: odometer EXACTLY 35000 on a 35000 milestone → fires 1
   notification. PROVEN NON-VACUOUS by a temporary `<`→`<=` gate flip → exactly this test fails (1 fail / 7 pass, all others green), then reverted. be validate:local EXIT 0, 1551 pass (+1).
   cov: be 87.09% / fe 85.89% (~carry; +1 BE guard, no re-measure this cycle).
+- **C464 (arch → delete the dead Lucia test-override seam: setTestLucia + the provably-null testLucia state, collapse getLucia to return lucia)** —
+  BALANCE: arch the SOLE over-budget category (7>5; deep-review 3/5, guard 1/6, bug 2/3, infra 4/6, feature parked) → forced. rule-7 FRESH fan-out (per C457's "fan out fresh, don't re-scout the
+  certified dead-ends"): FE scout CERTIFIED the pure/service/store layer dry (best candidate getDaysRemaining/calculateDaysUntil merge = cross-domain cohesion-negative churn → rejected; no dead
+  code; every count-2 symbol resolves to a real consumer). BE scout found the pick (VERIFIED FIRSTHAND): setTestLucia (auth/lucia.ts:73) is an EXPORTED test-override setter with ZERO callers
+  anywhere incl. __tests__ + test-helpers (tests drive the real Lucia via createTestApp's session cookie, never this seam) — and it's the ONLY writer of the module-state `testLucia` (refs are
+  exactly its decl :67, the getLucia read :70, this write :74), so testLucia is provably ALWAYS null → getLucia() (12 callers across auth/routes + middleware) always returns the real `lucia`.
+  A true zero-ref EXPORTED-symbol delete (not the C438 coverage-dropping anti-trap; not a mere unexport). FIX: deleted setTestLucia + the dead `testLucia` let, collapsed getLucia to `return lucia`
+  (kept the 12-caller seam as a stable indirection point), documented why. rule-2 behavior-preserving (the override could never fire); rule-3 green→green, NO test touched. −8 LOC. be validate:local
+  EXIT 0, 1551 pass (UNCHANGED — confirms dead). NOTE: CLAUDE.md full refresh (~C464 cadence) deferred to the next infra pick — kept this cycle to the ONE arch increment. cov: be 87.09% / fe 85.89% (~carry; arch delete, no re-measure).
