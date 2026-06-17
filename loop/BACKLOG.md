@@ -160,3 +160,12 @@ Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" 
 ~every 10 cycles run a branch-hygiene sweep — `git status` untracked-`*.test.ts` check (bun discovers by
 filesystem; untracked specs vanish on merge), full regress, coverage re-measure (update the LEDGER cov:
 baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays reviewable.)*
+
+> **RAN C7 (cadence).** Untracked-test sweep CLEAN (0 stray committed-ext specs; the 45 .meshclaw.e2e.ts
+> are gitignored-by-design). Coverage RE-MEASURED + written to the LEDGER header: BE 87.22% line / 86.96%
+> func; FE 85.95% line / 87.15% func / 78.38% branch — both at the ~87/~86 structural ceiling. Both suites
+> green (BE 1582 / FE 715). Branch = 6 ahead, PR-ready (state recorded in the C7 LEDGER entry since
+> BRANCH_REVIEW.md is gitignored). NEXT cadence ~C17. The 90% goal stays structurally gated — BE tail is
+> OAuth/DI-bound (auth/routes, provider services, backup-orchestrator, db connection), FE tail is eyes-on
+> components; neither is a clean unit pick, so don't chase coverage % directly — let real bug/guard work
+> nudge it.

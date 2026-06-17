@@ -12,9 +12,11 @@
 > **COVERAGE TREND (loop-improvement #4): end every cycle-log entry with a `cov:` tag** —
 > `cov: be <pct>% / fe <pct>%`. Carry the prior numbers forward + mark `~` if you didn't
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
-> cycles that touch a module. Goal 90% both (structural ceiling ~86% BE / ~84% FE per the archive —
-> the remaining gap is eyes-on FE components, now shootable via shot.sh). Last measured before reset
-> (archive C323): **BE 86.5% line / FE 84.4% line** — treat as the floor, re-measure to confirm.
+> cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
+> is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
+> components). **RE-MEASURED C7 (infra cadence): BE 87.22% line / 86.96% func (file-mean, 103 src files);
+> FE 85.95% line / 87.15% func / 78.38% branch (v8 aggregate, 1138/1324 lines).** Both at the structural
+> ceiling; treat as the floor. (Prior real measure C460: BE 87.09/86.60, FE 85.89/87.15/78.35 — flat-to-up.)
 
 ## Balance table
 `starved-for = current cycle − last-touched`. If `starved-for > budget` for any category,
@@ -28,9 +30,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 6 |
 | bug | 3 | 6 |
 | arch | 5 | 6 |
-| infra | 6 | 0 |
+| infra | 6 | 7 |
 
-Current cycle: **6**
+Current cycle: **7**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -130,3 +132,16 @@ Current cycle: **6**
   contract. NON-VACUOUS: dropping `*12` from monthsBetween turns 3 cases RED; restored → green. Verify:
   backend validate:local GREEN — tsc 0, musl-biome clean, 1582 pass / 0 fail (+6), build bundled.
   Backend-only (no UI → no shot). cov: be ~87.2% / fe 85.89% (~ — analytics helper now directly pinned).
+- **C7 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; infra was the sole
+  over-budget category, 7/6).** (1) UNTRACKED-TEST SWEEP: `git status` shows ZERO untracked `.test.ts`/
+  `.spec.ts` files — every committed-extension test is in git (the 45 `.meshclaw.e2e.ts` specs are
+  gitignored-by-design agent-harness files, correctly excluded; the committed regression net is the
+  unit + HTTP-harness suites). No specs at risk of vanishing on merge. (2) COVERAGE RE-MEASURE (replaces
+  the carried `~`): **BE 87.22% line / 86.96% func** (bun --coverage file-mean across 103 src files);
+  **FE 85.95% line / 87.15% func / 78.38% branch** (vitest v8 aggregate, 1138/1324 lines). Both at the
+  ~87/~86 structural ceiling — flat-to-up vs the C460 baseline (BE 87.09/86.60, FE 85.89/87.15/78.35). BE
+  low spots remain DI/OAuth-bound (auth/routes 18.6%, provider services, backup-orchestrator, db
+  connection) — NOT clean unit picks. (3) BOTH-SIDES GREEN confirmed: BE 1582 pass / 0 fail, FE 715 pass /
+  0 fail. (4) BRANCH STATE: claude-loop-dev = 6 commits ahead of fresh origin/main (C1 feature, C2 bug,
+  C3 deep-review, C4 guard, C5 feature, C6 guard), PR-ready; recorded here since BRANCH_REVIEW.md is
+  gitignored. Doc-only cycle — no source touched. cov: be 87.22% / fe 85.95% (MEASURED, not carried).
