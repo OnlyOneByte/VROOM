@@ -12,6 +12,7 @@
 	import { AppPieChart } from '$lib/components/charts';
 	import RecentActivityCard from '$lib/components/dashboard/RecentActivityCard.svelte';
 	import DueRemindersCard from '$lib/components/dashboard/DueRemindersCard.svelte';
+	import RecurringCostCard from '$lib/components/dashboard/RecurringCostCard.svelte';
 	import VehicleCarousel from '$lib/components/dashboard/VehicleCarousel.svelte';
 	import PeriodSelector from '$lib/components/common/period-selector.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
@@ -28,6 +29,7 @@
 		ExpenseCategory,
 		ExpenseSummary,
 		Photo,
+		RecurringCostSummary,
 		ReminderWithVehicles
 	} from '$lib/types';
 	import type { TimePeriod } from '$lib/constants/time-periods';
@@ -45,6 +47,7 @@
 	let periodSummary = $state<ExpenseSummary | null>(null);
 	let recentExpensesList = $state<Expense[]>([]);
 	let remindersList = $state<ReminderWithVehicles[]>([]);
+	let recurringCost = $state<RecurringCostSummary>({ count: 0, monthlyTotal: 0 });
 	let vehiclePhotosMap = $state<Map<string, Photo[]>>(new Map());
 	let vehicleStatsMap = $state<
 		Map<string, { totalAmount: number; recentAmount: number; lastActivity: Date | null }>
@@ -160,23 +163,33 @@
 		isLoading = true;
 		loadError = null;
 		try {
-			const [loadedVehicles, allTimeData, periodData, recentResponse, loadedReminders] =
-				await Promise.all([
-					vehicleApi.getVehicles(),
-					expenseApi.getExpenseSummary({ period: 'all' }),
-					selectedPeriod !== 'all'
-						? expenseApi.getExpenseSummary({ period: selectedPeriod })
-						: Promise.resolve(null),
-					expenseApi.getAllExpenses({ limit: 5 }),
-					// Reminders are a secondary widget — a failure here must not blank the
-					// whole dashboard, so degrade to an empty list rather than rejecting.
-					reminderApi.list().catch(() => [] as ReminderWithVehicles[])
-				]);
+			const [
+				loadedVehicles,
+				allTimeData,
+				periodData,
+				recentResponse,
+				loadedReminders,
+				loadedRecurringCost
+			] = await Promise.all([
+				vehicleApi.getVehicles(),
+				expenseApi.getExpenseSummary({ period: 'all' }),
+				selectedPeriod !== 'all'
+					? expenseApi.getExpenseSummary({ period: selectedPeriod })
+					: Promise.resolve(null),
+				expenseApi.getAllExpenses({ limit: 5 }),
+				// Reminders are a secondary widget — a failure here must not blank the
+				// whole dashboard, so degrade to an empty list rather than rejecting.
+				reminderApi.list().catch(() => [] as ReminderWithVehicles[]),
+				// Recurring-cost run-rate is likewise secondary — degrade to zero so a
+				// reminders-service hiccup never blanks the dashboard (T7).
+				reminderApi.getRecurringCost().catch(() => ({ count: 0, monthlyTotal: 0 }))
+			]);
 			vehicles = loadedVehicles;
 			allTimeSummary = allTimeData;
 			periodSummary = periodData ?? allTimeData;
 			recentExpensesList = recentResponse.data;
 			remindersList = loadedReminders;
+			recurringCost = loadedRecurringCost;
 
 			// Load photos and per-vehicle stats in parallel. Photos come back in ONE
 			// request grouped by vehicleId (batch endpoint), not one call per vehicle.
@@ -329,6 +342,13 @@
 				<RecentActivityCard expenses={recentExpenses} {isLoading} />
 				<DueRemindersCard reminders={dueReminders} {isLoading} />
 			</div>
+
+			<!-- Recurring-cost run-rate (T7): the monthly cost across active expense reminders -->
+			<RecurringCostCard
+				count={recurringCost.count}
+				monthlyTotal={recurringCost.monthlyTotal}
+				{isLoading}
+			/>
 		{/if}
 	{/if}
 </div>

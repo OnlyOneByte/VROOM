@@ -23,14 +23,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 1 |
+| feature | 4 | 5 |
 | deep-review | 5 | 3 |
 | guard | 6 | 4 |
 | bug | 3 | 2 |
 | arch | 5 | 0 |
 | infra | 6 | 0 |
 
-Current cycle: **4**
+Current cycle: **5**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -101,3 +101,15 @@ Current cycle: **4**
   Inherently non-vacuous (exact-number assertions). Verify: backend validate:local GREEN — tsc 0,
   musl-biome clean, 1576 pass / 0 fail (+3), build bundled. Backend-only (no UI → no shot). cov: be
   ~87.2% / fe 85.89% (~ — financing/expense routes already covered; +3 pins the observable money seam).
+- **C5 (feature)** — **Recurring-expenses T7: dashboard recurring-cost widget (eyes-on DONE).** Balance:
+  feature/bug/arch all sat AT budget; feature (4/4, lowest budget) had the most genuine open work →
+  picked it. T7's backend (reminder-cost.ts C111 + GET /recurring-cost C116) + FE client method
+  (getRecurringCost C134) were all done; only the dashboard MARKUP remained. Built `RecurringCostCard.svelte`
+  (composed from the kit — Card/Button/Skeleton/EmptyState; four-states: loading/data/zero), wired into
+  the dashboard page via a parallel `getRecurringCost()` fetch that degrades to {0,0} on failure (a
+  reminders-service hiccup must never blank the dashboard, mirroring the reminders list's catch). Booted a
+  fresh stack, seeded two monthly expense reminders ($120 insurance + $400 loan), and **Read the PNG**: the
+  card renders **$520.00 / month · across 2 recurring expenses**, matching the live endpoint
+  `{count:2, monthlyTotal:520}` — full FE→BE→DB→render round-trip confirmed. Ticked spec T7 → `[x]`.
+  Verify: frontend validate:local GREEN — type-check 0, build OK, 715 tests pass. cov: be ~87.2% / fe
+  85.89% (~ — UI-markup cycle, no vitest module touched; the widget's data path is backend-covered).

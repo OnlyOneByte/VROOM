@@ -61,18 +61,23 @@
       expenses" view fetches this. **FE CLIENT METHOD DONE (C134):** `reminderApi.getMaterializedExpenses(id)
       : Promise<Expense[]>` (+ reminder-api.test.ts). **REMAINING (eyes-on):** the badge + the view MARKUP.
       (The badge's read data — sourceType/sourceId on the expense list — was already surfaced at T1/C96.)
-- [ ] **T7 — Recurring-cost visibility (R5, D4).** Dashboard "upcoming recurring costs" + monthly
-      recurring run-rate (derive on read; amount × normalized-to-monthly frequency); a "Recurring
-      expenses" lens over the existing expense-type reminders (no migration). Eyes-on screenshot.
+- [x] **T7 — Recurring-cost visibility (R5, D4) — DONE C5 2026-06-17 (eyes-on CONFIRMED).** Dashboard
+      monthly recurring run-rate over the existing expense-type reminders (no migration).
       **BACKEND CORE DONE (C111):** `reminder-cost.ts` (pure, no DB) — `occurrencesPerYear` /
       `monthlyRunRate(reminder)` / `recurringCostSummary(reminders[])`→{count,monthlyTotal}, on an
       occurrences-per-year÷12 basis mirroring `computeNextDueDate`'s frequency interpretation; only
       active positive-amount expense reminders contribute. +10 unit tests (reminder-cost.test.ts).
       **ROUTE DONE (C116):** `GET /api/v1/reminders/recurring-cost` → findByUserId(type:'expense') →
-      recurringCostSummary → {count, monthlyTotal}; +3 HTTP tests (recurring-cost-route.test.ts:
-      monthly+yearly sum, empty→zero, user-scoped). **FE CLIENT METHOD DONE (C134):** `reminderApi.getRecurringCost()`
-      → `RecurringCostSummary` type (+ reminder-api.test.ts). **BACKEND T7 COMPLETE. REMAINING (eyes-on):** the
-      dashboard widget/lens MARKUP that calls getRecurringCost() + renders it.
+      recurringCostSummary → {count, monthlyTotal}; +3 HTTP tests. **FE CLIENT METHOD DONE (C134):**
+      `reminderApi.getRecurringCost()` → `RecurringCostSummary`. **MARKUP DONE (C5):** new
+      `RecurringCostCard.svelte` (composed from the kit — Card/Button/Skeleton/EmptyState; four-states:
+      loading skeleton / data figure / zero→EmptyState; renders `formatCurrency(monthlyTotal)/month` +
+      "across N recurring expenses" + a "View Recurring Expenses" link to /reminders), wired into the
+      dashboard page (parallel `getRecurringCost()` fetch that degrades to {0,0} on failure so a
+      reminders-service hiccup never blanks the dashboard). ✅ EYES-ON CONFIRMED via shot.sh
+      (`/tmp/dash-recurring.png`): with two seeded monthly expense reminders ($120 insurance + $400 loan)
+      the card renders **$520.00 / month · across 2 recurring expenses** — matching the live endpoint
+      `{count:2, monthlyTotal:520}`. Full FE→BE→DB→render round-trip exercised.
 
 ### Done-when (feature-DoD)
 

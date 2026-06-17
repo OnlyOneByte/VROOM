@@ -56,9 +56,11 @@ round-trip is exercised eyes-on.)*
 3. **Recurring expenses** — backend complete (engine already auto-materializes expense rows from
    `type:'expense'` reminders; T1 traceability, T2 split-materialization, T3 cascade-safe delete via
    clearSource, T5 gate `shouldTriggerRecurringExpenses`, T6/T7 FE client methods — all in archive).
-   **REMAINING: T4–T8 frontend MARKUP** — T4 multi-vehicle split in ReminderForm (reuse split widget); T5
-   the app-init/focus hook that calls the gate + POSTs `reminderApi.trigger()`; T6 "Recurring" badge + view;
-   T7 dashboard run-rate widget; T8 round-trip e2e. Spec: `.kiro/specs/recurring-expenses/`.
+   **T7 dashboard run-rate widget DONE (C5, eyes-on CONFIRMED — `RecurringCostCard.svelte`, $520/mo · 2
+   reminders verified via shot).** **REMAINING: T4 + T5-hook + T6 + T8** — T4 multi-vehicle split in
+   ReminderForm (reuse split widget); T5 the app-init/focus hook that calls the gate + POSTs
+   `reminderApi.trigger()`; T6 "Recurring" badge on expense rows + "materialized N expenses" view; T8
+   round-trip e2e. Spec: `.kiro/specs/recurring-expenses/`.
 
 > NOTE: one tasks.md task per cycle, not one-and-done. **Standing goal** (TODO.md → Misc): 90% coverage
 > both sides — fold into bug/guard/arch cycles; ceiling is ~86%/~84% without the eyes-on FE tail (now shootable).
