@@ -141,6 +141,12 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C18:** `averageConsecutiveMpg` (the C17-extracted shared MPG loop) now has a direct unit net
+> in calculations.test.ts (+6: mean / <2→null / missedFillup-skip / both-odometer+volume guard / outlier
+> drop / half-open 150 band) — closes the C181/C229 "helper tested only via callers" gap the C17 dedup
+> created. STANDING PATTERN (loop-improvement): whenever an arch cycle extracts a shared helper, the NEXT
+> guard cycle should pin it directly (C6 monthsBetween, C18 averageConsecutiveMpg). Don't re-add.
+
 ### bug
 *(queue empty of fresh finds. The productive vein (per the archive): write-path VALIDATION ASYMMETRY —
 a route checks parent ownership but writes FK/config fields verbatim; and date/tz math. One fresh-surface

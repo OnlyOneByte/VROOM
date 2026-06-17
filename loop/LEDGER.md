@@ -29,12 +29,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 16 |
 | deep-review | 5 | 13 |
-| guard | 6 | 11 |
+| guard | 6 | 18 |
 | bug | 3 | 15 |
 | arch | 5 | 17 |
 | infra | 6 | 14 |
 
-Current cycle: **17**
+Current cycle: **18**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -296,3 +296,17 @@ Current cycle: **17**
   Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1587 pass / 0 fail (unchanged — pure
   dedup), build bundled. Backend-only (no UI → no shot). cov: be 87.22% / fe 86.07% (~ — same modules,
   same tests; LOC down, one source of truth for the C161-vulnerable loop).
+- **C18 (guard)** — **Direct unit net for `averageConsecutiveMpg` (the C17-extracted shared MPG loop).**
+  guard was over budget (7/6). The C17 dedup created a load-bearing shared helper that was only tested
+  INDIRECTLY through its two callers (calculateAverageMPG + calculateVehicleStats) — the C181/C229
+  "helper tested only in isolation" gap (same class as monthsBetween/C6). GUARD: +6 cases in
+  calculations.test.ts pinning the helper's OWN cells: mean over consecutive pairs (miles/current.volume),
+  <2-rows/empty→null, missedFillup-skip (current OR previous), both-odometer-AND-current-volume guard,
+  outlier drop (negative-delta + ≥150), and the half-open band edge (149.9 kept / exactly 150 dropped).
+  Surfaced + pinned a real footgun while writing it: the loop guard is `current.mileage && previous.mileage`
+  (TRUTHY) so a 0-odometer reading is falsy and drops the pair — documented in the test so a future reader
+  doesn't anchor a case at mileage 0. The (0,150) band is the #30-escalated divergence point — pinned
+  EXACTLY, NOT unified (product call). Inherently non-vacuous (exact-number/null per branch). Verify:
+  backend validate:local GREEN — tsc 0, musl-biome clean, 1593 pass / 0 fail (+6), build bundled.
+  Backend-only (no UI → no shot). cov: be 87.22% / fe 86.07% (~ — calculations module already covered;
+  +6 pin the newly-shared helper directly).
