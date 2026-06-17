@@ -30,11 +30,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 16 |
 | deep-review | 5 | 19 |
 | guard | 6 | 18 |
-| bug | 3 | 15 |
+| bug | 3 | 20 |
 | arch | 5 | 17 |
 | infra | 6 | 14 |
 
-Current cycle: **19**
+Current cycle: **20**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -326,3 +326,20 @@ Current cycle: **19**
   panel. The dialog's data + empty four-states are now both eyes-on confirmed. Verify: frontend
   validate:local was GREEN at C16 (no FE source changed this cycle; the spec is gitignored). cov: be 87.22%
   / fe 86.07% (~ — audit + eyes-on cert, no module touched).
+- **C20 (bug)** — **#30 efficiency-band unification (Angelo-APPROVED 2026-06-17).** bug was over budget
+  (5/3). DISCOVERED mid-cycle that Angelo ratified the entire pending-Angelo backlog as actionable-with-
+  agreed-fixes (a new BACKLOG block) — so the bug surface is NOT exhausted; there's a severity-ranked queue
+  of real approved fixes. Picked the highest-leverage approved BUG that my own C17/C18 work made a near-one-
+  edit: the #30/#94-adjacent (C419) divergence — per-vehicle stats used the `(0,150)`/`(0,10)` band while
+  analytics charts used `[5,100]`/`[1,10]`, so the SAME car showed two different MPG/mi-kWh averages on the
+  stats card vs the Analytics Fuel Stats card. FIX (Angelo's agreed approach): unify on the documented
+  `[5,100]` gas / `[1,10]` electric band. Moved the 4 band constants (MIN/MAX_VALID_MPG, MIN/MAX_VALID_MI_KWH)
+  into calculations.ts as ONE source of truth (the lower-level module; analytics-charts now imports them —
+  correct dependency direction, no cycle), and switched `averageConsecutiveMpg` (gas) +
+  `calculateAverageMilesPerKwh` (electric) to the inclusive shared bounds. Updated the band-dependent tests
+  + both property-test reference impls + the analytics boundary describe (now pins INCLUSIVE 100 kept / <5
+  dropped / the new MIN floor) + stale divergence comments. Verify: backend validate:local GREEN — tsc 0,
+  musl-biome clean, 1594 pass / 0 fail, build bundled. Backend-only (per-vehicle stats come from /stats →
+  this band; FE has no own MPG band → no divergence). cov: be 87.22% / fe 86.07% (~ — bands unified, same
+  modules). NOTE the C19 financing/TCO audit (buildAmortizationSchedule/computeTCOTotal/categorizeTCOExpenses)
+  was done first this cycle + all CLEAN — folded into this entry; that vein stays dry.

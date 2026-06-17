@@ -155,9 +155,10 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > guard cycle should pin it directly (C6 monthsBetween, C18 averageConsecutiveMpg). Don't re-add.
 
 ### bug
-*(queue empty of fresh finds. The productive vein (per the archive): write-path VALIDATION ASYMMETRY —
-a route checks parent ownership but writes FK/config fields verbatim; and date/tz math. One fresh-surface
-scout per bug cycle, then record + pivot if dry. Don't manufacture a finding.)*
+*(The cold-scout vein is exhausted (C6/C10/C15/C20 all dry on pure-logic money/date/store/analytics). But
+the bug QUEUE is no longer empty: the ✅ ANGELO-APPROVED block below is now the bug source — real,
+severity-ranked, agreed-fix defects (NO sign-off needed). On a bug cycle, pick the top unfinished approved
+item by severity. C20 took the efficiency-band unification (DONE). Still don't manufacture cold finds.)*
 
 > **CLOSED C2: #147** — PUT /split/:id didn't re-validate the carried-forward financing source link
 > against the NEW vehicle set (the regenerated siblings could land on a vehicle whose active financing
@@ -191,9 +192,11 @@ scout per bug cycle, then record + pivot if dry. Don't manufacture a finding.)*
 >   `getCrossVehicle` (the correct contrast).** All fleet-SUMMARY fuel-stats builders currently pool
 >   mixed units (gal+L / mi+km) → garbage totals on the DEFAULT analytics view. One root fix for the
 >   whole class.
-> - **efficiency-band unification (#94-adjacent, C419) — APPROVED: unify BOTH sites on `[5,100]` gas /
->   `[1,10]` electric** (documented, matches the charts); then flip the guard to those values. Today
->   per-vehicle stats use `(0,150)` while analytics uses `[5,100]/[1,10]` → same car, two different averages.
+> - ~~**efficiency-band unification (#94-adjacent, C419)**~~ — **DONE C20.** Unified the per-vehicle stats
+>   band (`averageConsecutiveMpg` gas + `calculateAverageMilesPerKwh` electric) onto the canonical
+>   `[5,100]`/`[1,10]` shared with analytics — the 4 band constants now live in calculations.ts as ONE
+>   source of truth (analytics-charts imports them). The same car now shows ONE average everywhere. Tests
+>   + property reference impls + the boundary describe updated. validate:local GREEN (1594 pass).
 > - **#69 (MED) — APPROVED: materialize a monthly-only insurance term into TCO** (`monthlyCost ×
 >   term-months`) so TCO stops under-reporting for monthly-premium policies. (Consistency with analytics.)
 > - **#85 (MED) — APPROVED: relabel "This/Last Year" to reflect the range-relative semantics** (cheap,

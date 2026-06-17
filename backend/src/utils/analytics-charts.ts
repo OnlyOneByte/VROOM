@@ -1,16 +1,22 @@
 import { isElectricFuelType } from '../db/types';
-import { maxOf, minOf } from './calculations';
+import {
+  MAX_VALID_MI_KWH,
+  MAX_VALID_MPG,
+  MIN_VALID_MI_KWH,
+  MIN_VALID_MPG,
+  maxOf,
+  minOf,
+} from './calculations';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Efficiency filter constants — must match frontend expense-helpers.ts */
 const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
-const MIN_VALID_MPG = 5;
-const MAX_VALID_MPG = 100;
-const MIN_VALID_MI_KWH = 1;
-const MAX_VALID_MI_KWH = 10;
+// The realistic-efficiency band (MIN/MAX_VALID_MPG, MIN/MAX_VALID_MI_KWH) now lives in calculations.ts
+// (the lower-level module analytics-charts already imports for maxOf/minOf) — ONE source of truth so the
+// per-vehicle stats averages and the analytics charts can't diverge (#30/C419, Angelo-APPROVED
+// 2026-06-17). Imported at the top of this file.
 
 const DAY_NAMES = [
   'Sunday',
