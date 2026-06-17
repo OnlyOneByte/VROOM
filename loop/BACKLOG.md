@@ -325,5 +325,9 @@ baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays 
 >
 > **RAN C21 (cadence).** Untracked-test sweep CLEAN. Coverage BOTH UNCHANGED vs C14 (BE 87.22/86.96, FE
 > 86.07/87.19/78.53 — the C15-C20 arc was tests/dedups/eyes-on, no new covered lines). Both suites green
-> (BE 1594 / FE 721). Branch 20 ahead, PR-ready. NEXT cadence ~C31. Coverage plateaued at the structural
+> (BE 1594 / FE 721). Branch 20 ahead, PR-ready.
+>
+> **RAN C28 (cadence).** Untracked-test sweep CLEAN. Coverage RE-MEASURED: BE 87.22/86.97 (flat vs C21),
+> FE 86.14/87.31/78.70 (marginally UP — C22/C23 added covered lines). Both suites green (BE 1597 / FE 726).
+> Branch 28 ahead of fresh origin/main, PR-ready. NEXT cadence ~C38. Coverage plateaued at the structural
 > ceiling — keep not chasing %; let real bug/feature work move it.

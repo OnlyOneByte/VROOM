@@ -14,10 +14,11 @@
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
 > cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
 > is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
-> components). **RE-MEASURED C21 (infra cadence): BE 87.22% line / 86.96% func (file-mean, 103 src files);
-> FE 86.07% line / 87.19% func / 78.53% branch (v8, 1150/1336 lines) — BOTH UNCHANGED vs C14 (the C15-C20
-> work was tests/dedups on already-covered modules + an eyes-on dialog).** Both at the structural ceiling;
-> treat as the floor. (C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
+> components). **RE-MEASURED C28 (infra cadence): BE 87.22% line / 86.97% func (file-mean); FE 86.14% line
+> / 87.31% func / 78.70% branch (v8) — BE flat vs C21, FE marginally UP (the C22 split-form types + C23
+> buildSplitConfig +5 tests added covered lines; C24/C25 Sheets tests hit already-covered modules; C26/C27
+> were eyes-on/e2e/docs).** Both at the structural ceiling; treat as the floor. (C21: BE 87.22/86.96, FE
+> 86.07/87.19/78.53. C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
 
 ## Balance table
 `starved-for = current cycle − last-touched`. If `starved-for > budget` for any category,
@@ -31,9 +32,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 25 |
 | bug | 3 | 24 |
 | arch | 5 | 23 |
-| infra | 6 | 21 |
+| infra | 6 | 28 |
 
-Current cycle: **27**
+Current cycle: **28**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -352,6 +353,19 @@ Current cycle: **27**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C28 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C21).**
+  Two cats over budget (infra 7/6, bug 4/3 — tie on over-by); infra is the most-starved (7 > 4) → forced.
+  (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked `.test.ts`/`.spec.ts` (the gitignored `.meshclaw.e2e.ts`
+  agent-harness specs are by-design; the committed regression net is the unit + HTTP-harness + source-scan
+  suites). (2) COVERAGE RE-MEASURED (7 commits since C21): **BE 87.22% line / 86.97% func** (file-mean);
+  **FE 86.14% line / 87.31% func / 78.70% branch** (v8, 726 tests) — BE flat vs C21, FE marginally UP on
+  all three (the C22 split-form types + C23 buildSplitConfig +5 tests added covered lines; C24/C25 added
+  Sheets-service tests on already-covered modules; C26/C27 were eyes-on/e2e). Both at the ~87 BE / ~86 FE
+  structural ceiling. (3) BOTH-SIDES GREEN: BE 1597 / FE 726. (4) BRANCH STATE: claude-loop-dev = 28
+  commits ahead of fresh origin/main (C1-C27 + the C0 reset: 5 feature [2 features now COMPLETE:
+  maintenance C1, recurring-expenses C27], 2 bug [1 dry] + 2 dry-scouts, 3 deep-review, 3 guard, 2 arch,
+  3 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source touched.
+  cov: be 87.22% / fe 86.14% (MEASURED). NEXT cadence ~C38.
 - **C27 (feature)** — **Recurring-expenses T8: full round-trip E2E (eyes-on DONE → FEATURE COMPLETE).**
   feature was the sole over-budget category (27−22=5/4). Picked recurring-expenses T8 (closes the whole
   feature) over the import-trackers dialog (a larger net-new arc). Wrote `recurring-expense-roundtrip
