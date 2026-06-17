@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	frequencyLabel,
 	hasTimeAxis,
 	isMileageTracking,
 	isReminderTimeDue,
+	maybeTriggerRecurringExpenses,
+	RECURRING_TRIGGER_TS_KEY,
 	shouldTriggerRecurringExpenses
 } from '../reminder-helpers';
 import type { Reminder } from '$lib/types/reminder';
@@ -139,5 +141,112 @@ describe('shouldTriggerRecurringExpenses (T5 opportunistic-materialization gate,
 		expect(
 			shouldTriggerRecurringExpenses({ ...base, isOnline: false, lastRunMs: null })
 		).toBe(false);
+	});
+});
+
+// T5 (C12): the orchestration helper the app-init hook calls — it reads/writes the localStorage
+// debounce timestamp around the pure gate, POSTs the (injected) trigger, and stamps the timestamp ONLY
+// on success. `trigger` is injected so this is unit-testable without the service/network.
+describe('maybeTriggerRecurringExpenses (T5 app-init hook orchestration)', () => {
+	const NOW = Date.parse('2024-06-15T12:00:00.000Z');
+
+	beforeEach(() => {
+		localStorage.clear();
+	});
+
+	it('triggers + stamps the timestamp when authed/online/never-run', async () => {
+		const trigger = vi.fn().mockResolvedValue({ createdExpenses: [], notifications: [] });
+		const fired = await maybeTriggerRecurringExpenses({
+			isAuthed: true,
+			isOnline: true,
+			isBrowser: true,
+			trigger,
+			now: NOW
+		});
+		expect(fired).toBe(true);
+		expect(trigger).toHaveBeenCalledTimes(1);
+		expect(localStorage.getItem(RECURRING_TRIGGER_TS_KEY)).toBe(String(NOW));
+	});
+
+	it('does NOT trigger (or stamp) when the gate declines — already ran today', async () => {
+		const earlierToday = Date.parse('2024-06-15T06:00:00.000Z');
+		localStorage.setItem(RECURRING_TRIGGER_TS_KEY, String(earlierToday));
+		const trigger = vi.fn().mockResolvedValue({});
+		const fired = await maybeTriggerRecurringExpenses({
+			isAuthed: true,
+			isOnline: true,
+			isBrowser: true,
+			trigger,
+			now: NOW
+		});
+		expect(fired).toBe(false);
+		expect(trigger).not.toHaveBeenCalled();
+		// The prior stamp is untouched (no re-stamp on a skip).
+		expect(localStorage.getItem(RECURRING_TRIGGER_TS_KEY)).toBe(String(earlierToday));
+	});
+
+	it('does NOT trigger when offline / unauthed', async () => {
+		const trigger = vi.fn().mockResolvedValue({});
+		expect(
+			await maybeTriggerRecurringExpenses({
+				isAuthed: false,
+				isOnline: true,
+				isBrowser: true,
+				trigger,
+				now: NOW
+			})
+		).toBe(false);
+		expect(
+			await maybeTriggerRecurringExpenses({
+				isAuthed: true,
+				isOnline: false,
+				isBrowser: true,
+				trigger,
+				now: NOW
+			})
+		).toBe(false);
+		expect(trigger).not.toHaveBeenCalled();
+	});
+
+	it('does NOT stamp the timestamp when the trigger POST fails (retries next app open)', async () => {
+		const trigger = vi.fn().mockRejectedValue(new Error('network'));
+		const fired = await maybeTriggerRecurringExpenses({
+			isAuthed: true,
+			isOnline: true,
+			isBrowser: true,
+			trigger,
+			now: NOW
+		});
+		expect(fired).toBe(false);
+		expect(trigger).toHaveBeenCalledTimes(1);
+		// No stamp on failure → the daily window isn't burned; the next open retries.
+		expect(localStorage.getItem(RECURRING_TRIGGER_TS_KEY)).toBeNull();
+	});
+
+	it('is a no-op off the browser (no localStorage / SSR)', async () => {
+		const trigger = vi.fn().mockResolvedValue({});
+		const fired = await maybeTriggerRecurringExpenses({
+			isAuthed: true,
+			isOnline: true,
+			isBrowser: false,
+			trigger,
+			now: NOW
+		});
+		expect(fired).toBe(false);
+		expect(trigger).not.toHaveBeenCalled();
+	});
+
+	it('treats a corrupt stored timestamp as never-run (triggers, does not pass NaN to the gate)', async () => {
+		localStorage.setItem(RECURRING_TRIGGER_TS_KEY, 'not-a-number');
+		const trigger = vi.fn().mockResolvedValue({});
+		const fired = await maybeTriggerRecurringExpenses({
+			isAuthed: true,
+			isOnline: true,
+			isBrowser: true,
+			trigger,
+			now: NOW
+		});
+		expect(fired).toBe(true);
+		expect(trigger).toHaveBeenCalledTimes(1);
 	});
 });

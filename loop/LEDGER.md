@@ -25,14 +25,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 9 |
+| feature | 4 | 12 |
 | deep-review | 5 | 8 |
 | guard | 6 | 11 |
 | bug | 3 | 10 |
-| arch | 5 | 6 |
+| arch | 5 | 12 |
 | infra | 6 | 7 |
 
-Current cycle: **11**
+Current cycle: **12**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -206,3 +206,17 @@ Current cycle: **11**
   is a PK collision not a silent cross-tenant write — lower priority; left for a future cycle). Verify:
   backend validate:local GREEN — tsc 0, musl-biome clean, 1585 pass / 0 fail, build bundled. Backend-only
   (no UI → no shot). cov: be 87.22% / fe 85.95% (~ — sync module already well-covered; +1 security net).
+- **C12 (arch-scout → no-churn → feature)** — arch was over budget (6/5; forced). Scouted FRESH modules
+  (C4/C6 had cleared the rest): the FE service layer (insurance/odometer/vehicle-api etc. all delegate to
+  the shared apiClient.get/post/getPaginated — thin per-domain wrappers, not dup) + api-transformer.ts
+  (the to/fromBackendExpense mappers are deliberately asymmetric — create-vs-edit description, volume↔charge
+  routing — no extraction). **Recorded: no churn warranted** (arch at its structural floor, 3rd confirm).
+  PIVOTED to the highest-leverage open item: **recurring-expenses T5** (app-init trigger hook). The pure
+  gate (shouldTriggerRecurringExpenses C128) was done; built the orchestration helper
+  `maybeTriggerRecurringExpenses` (localStorage debounce around the gate, injected trigger, stamp-on-success
+  only, fail-soft, corrupt-ts→never-run) + wired it into +layout.svelte's authed-init `$effect`. +5 unit
+  tests. EYES-ON CONFIRMED: seeded an overdue expense reminder, loaded /dashboard WITHOUT a manual trigger
+  → the backend log shows exactly ONE app-fired POST /reminders/trigger → 200 → 12 expenses materialized
+  (0→12) → dashboard Recurring Costs widget shows $99/mo·1 + Upcoming Reminders shows it (Read the PNG).
+  Ticked spec T5 → `[x]`. Verify: frontend validate:local GREEN — type-check 0, build OK, 721 tests pass
+  (+5). cov: be 87.22% / fe 85.95% (~ — the new helper is unit-covered; eyes-on path is backend-covered).

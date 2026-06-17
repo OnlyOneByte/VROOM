@@ -56,12 +56,12 @@ round-trip is exercised eyes-on.)*
 3. **Recurring expenses** — backend complete (engine already auto-materializes expense rows from
    `type:'expense'` reminders; T1 traceability, T2 split-materialization, T3 cascade-safe delete via
    clearSource, T5 gate `shouldTriggerRecurringExpenses`, T6/T7 FE client methods — all in archive).
-   **T7 dashboard run-rate widget DONE (C5, eyes-on).** **T6 "Recurring" badge DONE (C9, eyes-on CONFIRMED
-   — `RecurringExpenseBadge.svelte` on expense rows where sourceType==='reminder'; materialized rows show
-   the pill, non-reminder rows don't, verified via shot).** **REMAINING: T4 + T5-hook + T6-view + T8** —
-   T4 multi-vehicle split in ReminderForm (reuse split widget); T5 the app-init/focus hook that calls the
-   gate + POSTs `reminderApi.trigger()`; T6-view the "materialized N expenses" view from the reminder side
-   (uses the C122/C134 getMaterializedExpenses seam); T8 round-trip e2e. Spec: `.kiro/specs/recurring-expenses/`.
+   **T7 widget DONE (C5).** **T6 "Recurring" badge DONE (C9, eyes-on).** **T5 app-init trigger hook DONE
+   (C12, eyes-on CONFIRMED — `maybeTriggerRecurringExpenses` in reminder-helpers.ts wired into
+   +layout.svelte; loading the app fired ONE POST /trigger → 12 expenses materialized, verified via shot +
+   backend log).** **REMAINING: T4 + T6-view + T8** — T4 multi-vehicle split in ReminderForm (reuse split
+   widget); T6-view the "materialized N expenses" view from the reminder side (uses C122/C134
+   getMaterializedExpenses); T8 round-trip e2e. Spec: `.kiro/specs/recurring-expenses/`.
 
 > NOTE: one tasks.md task per cycle, not one-and-done. **Standing goal** (TODO.md → Misc): 90% coverage
 > both sides — fold into bug/guard/arch cycles; ceiling is ~86%/~84% without the eyes-on FE tail (now shootable).
@@ -218,6 +218,14 @@ Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" 
 > ownership topology, not mergeable), FE buildQueryString (already C337), the offline mapper +
 > computeNextDueDate (saturated). Arch stays DRY; don't re-scout these next cycle — try a fresh module
 > the loop hasn't touched, or accept arch is at its structural floor and let the budget pull elsewhere.
+>
+> **SCOUTED C12 — no churn warranted (3rd confirm; FRESH modules).** FE service layer
+> (insurance/odometer/vehicle-api etc. all delegate to the shared apiClient.get/post/getPaginated — thin
+> per-domain wrappers, not dup) + api-transformer.ts (to/fromBackendExpense are deliberately asymmetric:
+> create-vs-edit description, volume↔charge routing — no extraction). **Arch is confirmed at its
+> structural floor across 3 scouts (C4/C6/C12).** STRONG RECOMMENDATION: when arch next goes over budget,
+> record no-churn IMMEDIATELY (don't re-scout the same DRY surfaces) + pivot to the co-starved category —
+> the budget is forcing ceremony, not finding work.
 >
 > **SCOUTED C6 — no churn warranted (fresh modules).** analytics-charts builders route through the
 > single-sourced `isFillup` (NOT duplicated — #108/#113/#146 already deduped); FE chart components are

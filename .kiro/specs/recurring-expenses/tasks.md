@@ -44,15 +44,23 @@
       `type==='expense'` and >1 vehicle is selected, **reusing the existing expense-split widget**; wire
       it into the create/update payload (today hard-null at ReminderForm:52-53). Four-states + a11y;
       single-vehicle keeps the no-split path. Eyes-on screenshot of the split sub-form.
-- [ ] **T5 — Reliable materialization (R1, D1).** Client-side opportunistic `reminderApi.trigger()` on
-      app init/focus, debounced once per session/day (localStorage timestamp), authed + online only;
-      keep the manual button + a "N due" nudge. Unit-test the gate (single call / skip-when-recent /
-      skip-when-offline). Document the optional cron-hits-the-endpoint path for self-host deployments.
-      **GATE DONE (C128):** `shouldTriggerRecurringExpenses({isAuthed,isOnline,lastRunMs,now?})` in
-      reminder-helpers.ts — the pure decision (authed+online+(never-run OR prior-local-day)); +5 unit
-      tests. The backend (`POST /reminders/trigger`) + client (`reminderApi.trigger()`) already existed.
-      **REMAINING (eyes-on):** the app-init/focus hook that reads navigator.onLine/auth/localStorage,
-      calls the gate, and POSTs trigger() on true (+ the "N due" nudge + manual button wiring).
+- [x] **T5 — Reliable materialization (R1, D1) — DONE C12 2026-06-17 (eyes-on CONFIRMED).** Client-side
+      opportunistic `reminderApi.trigger()` on app init, debounced once per local calendar day
+      (localStorage timestamp), authed + online only. **GATE DONE (C128):**
+      `shouldTriggerRecurringExpenses({isAuthed,isOnline,lastRunMs,now?})` (pure decision). **HOOK DONE
+      (C12):** `maybeTriggerRecurringExpenses({isAuthed,isOnline,isBrowser,trigger,now?})` in
+      reminder-helpers.ts — reads/writes the `RECURRING_TRIGGER_TS_KEY` localStorage debounce around the
+      pure gate, POSTs the injected trigger, stamps the timestamp ONLY on success (a failed POST retries
+      next open), fail-soft + corrupt-timestamp→never-run. Wired into +layout.svelte's authenticated-init
+      `$effect` (once per session via `recurringTriggered`), injecting `reminderApi.trigger` +
+      `onlineStatus.current`. +5 unit tests (trigger+stamp / skip-when-today / skip-offline-or-unauthed /
+      no-stamp-on-failure / no-op-off-browser / corrupt-timestamp). ✅ EYES-ON CONFIRMED via shot.sh
+      (`/tmp/t5-dash.png`): seeded an OVERDUE expense reminder, did NOT trigger manually, loaded
+      /dashboard → the backend log shows exactly ONE app-fired `POST /reminders/trigger → 200` (the script
+      never calls it) → 12 catch-up expenses materialized (0→12) → the dashboard "Recurring Costs" widget
+      renders $99/mo · 1 reminder + "Upcoming Reminders" shows the due reminder. The manual "Run due
+      reminders" button (on /reminders) is unchanged. (The "N due" nudge + window-focus re-trigger are
+      optional polish, not blockers — the once-per-day init trigger satisfies R1/D1.)
 - [~] **T6 — Source traceability UI (R3).** BADGE DONE C9 2026-06-17 (eyes-on CONFIRMED); the
       "materialized N expenses" view sub-part remains. **BACKEND SEAM DONE (C122):** `GET /reminders/:id/
       expenses` → `expenseRepository.findBySource('reminder', id, user.id)` → the materialized rows

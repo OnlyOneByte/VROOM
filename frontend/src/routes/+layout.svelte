@@ -19,6 +19,9 @@
 	import { LoaderCircle } from '@lucide/svelte';
 
 	import { vehicleApi } from '$lib/services/vehicle-api';
+	import { reminderApi } from '$lib/services/reminder-api';
+	import { maybeTriggerRecurringExpenses } from '$lib/utils/reminder-helpers';
+	import { onlineStatus } from '$lib/stores/offline.svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 
@@ -26,6 +29,7 @@
 
 	let vehiclesLoaded = $state(false);
 	let settingsLoaded = $state(false);
+	let recurringTriggered = $state(false);
 
 	async function loadUserVehicles() {
 		if (vehiclesLoaded) return;
@@ -52,6 +56,22 @@
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load settings:', error);
 		}
+	}
+
+	// recurring-expenses T5/D1: opportunistically materialize due recurring expenses on app init —
+	// authed + online + at most once per local calendar day (the gate + localStorage debounce live in
+	// maybeTriggerRecurringExpenses). Fail-soft (a trigger error is swallowed there; the manual "Run due
+	// reminders" button remains). Once per session here (recurringTriggered) so re-running the auth
+	// effect doesn't re-call it within the same load.
+	async function maybeTriggerRecurring() {
+		if (recurringTriggered) return;
+		recurringTriggered = true;
+		await maybeTriggerRecurringExpenses({
+			isAuthed: authState.isAuthenticated,
+			isOnline: onlineStatus.current,
+			isBrowser: true,
+			trigger: () => reminderApi.trigger()
+		});
 	}
 
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- intentionally non-reactive tracking Set, not used in $state or $derived
@@ -94,6 +114,7 @@
 		if (authState.isAuthenticated && !authState.isLoading) {
 			loadUserVehicles();
 			loadUserSettings();
+			maybeTriggerRecurring();
 		}
 	});
 
