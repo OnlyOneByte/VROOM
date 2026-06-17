@@ -25,14 +25,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 5 |
+| feature | 4 | 9 |
 | deep-review | 5 | 8 |
 | guard | 6 | 6 |
 | bug | 3 | 6 |
 | arch | 5 | 6 |
 | infra | 6 | 7 |
 
-Current cycle: **8**
+Current cycle: **9**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -161,3 +161,17 @@ Current cycle: **8**
   green); restored → 3 pass. Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1583 pass /
   0 fail, build bundled. Backend-only (no UI → no shot). cov: be 87.22% / fe 85.95% (~ — sync module
   already well-covered; +1 broadens the cross-tenant security net to a stamp-only root table).
+- **C9 (feature)** — **Recurring-expenses T6: "Recurring" badge on expense rows (eyes-on DONE).** feature
+  + bug both sat AT budget; feature (lowest budget, shippable eyes-on tails) is higher-leverage than a
+  bug re-scout. T6's backend seam (GET /reminders/:id/expenses C122) + FE client method
+  (getMaterializedExpenses C134) were done; the badge's read data (sourceType on the expense list) landed
+  T1/C96 — only the badge MARKUP remained. Built `RecurringExpenseBadge.svelte` (Repeat-icon inline pill
+  mirroring SplitExpenseBadge + the C5 RecurringCostCard icon), rendered on standalone expense rows where
+  `sourceType==='reminder'` in BOTH the desktop ExpensesTable (next to the category label) and the mobile
+  card (meta row). Booted a fresh stack, created an OVERDUE monthly expense reminder ($125.50 insurance),
+  triggered materialization (10 catch-up rows), and **Read the PNG**: the Feb–Dec 2024 materialized rows
+  each render the "Recurring" pill next to "Financial", while non-reminder expenses (Maintenance) show NO
+  badge — full FE→BE→DB→render round-trip confirmed. Ticked spec T6 → `[~]` (badge done; the
+  "materialized N expenses" reminder-side view remains as a future sub-task). Verify: frontend
+  validate:local GREEN — type-check 0, build OK, 715 tests pass. cov: be 87.22% / fe 85.95% (~ —
+  UI-markup cycle, no vitest module touched; the badge's sourceType read is backend-covered at T1/C96).

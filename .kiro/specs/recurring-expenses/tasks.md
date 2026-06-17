@@ -53,14 +53,19 @@
       tests. The backend (`POST /reminders/trigger`) + client (`reminderApi.trigger()`) already existed.
       **REMAINING (eyes-on):** the app-init/focus hook that reads navigator.onLine/auth/localStorage,
       calls the gate, and POSTs trigger() on true (+ the "N due" nudge + manual button wiring).
-- [ ] **T6 — Source traceability UI (R3).** "Recurring" badge on expense rows where
-      `sourceType==='reminder'`, linking to the source reminder; from the reminder, a "materialized N
-      expenses" view. Eyes-on screenshot. **BACKEND SEAM DONE (C122):** `GET /reminders/:id/expenses`
-      → `expenseRepository.findBySource('reminder', id, user.id)` → the materialized rows (ownership-
-      checked, user-scoped); +4 HTTP tests (reminder-materialized-expenses-route.test.ts). The "N
-      expenses" view fetches this. **FE CLIENT METHOD DONE (C134):** `reminderApi.getMaterializedExpenses(id)
-      : Promise<Expense[]>` (+ reminder-api.test.ts). **REMAINING (eyes-on):** the badge + the view MARKUP.
-      (The badge's read data — sourceType/sourceId on the expense list — was already surfaced at T1/C96.)
+- [~] **T6 — Source traceability UI (R3).** BADGE DONE C9 2026-06-17 (eyes-on CONFIRMED); the
+      "materialized N expenses" view sub-part remains. **BACKEND SEAM DONE (C122):** `GET /reminders/:id/
+      expenses` → `expenseRepository.findBySource('reminder', id, user.id)` → the materialized rows
+      (ownership-checked, user-scoped); +4 HTTP tests. **FE CLIENT METHOD DONE (C134):**
+      `reminderApi.getMaterializedExpenses(id): Promise<Expense[]>`. **BADGE DONE (C9):** new
+      `RecurringExpenseBadge.svelte` (Repeat-icon inline pill mirroring SplitExpenseBadge + the C5
+      RecurringCostCard icon), rendered on standalone expense rows where `sourceType==='reminder'` in
+      BOTH the desktop ExpensesTable (next to the category label) and the mobile card (meta row).
+      ✅ EYES-ON CONFIRMED via shot.sh (`/tmp/expenses-recurring.png`): an overdue monthly expense
+      reminder ($125.50 insurance) triggered → materialized rows Feb–Dec 2024 each render the "Recurring"
+      pill next to "Financial", while non-reminder expenses (Maintenance) show NO badge. Full
+      FE→BE→DB→render round-trip. **REMAINING (eyes-on):** the "materialized N expenses" view from the
+      reminder side (uses the C122/C134 getMaterializedExpenses seam) — a future feature cycle.
 - [x] **T7 — Recurring-cost visibility (R5, D4) — DONE C5 2026-06-17 (eyes-on CONFIRMED).** Dashboard
       monthly recurring run-rate over the existing expense-type reminders (no migration).
       **BACKEND CORE DONE (C111):** `reminder-cost.ts` (pure, no DB) — `occurrencesPerYear` /
