@@ -11,7 +11,8 @@
 		Plus,
 		Pencil,
 		Check,
-		History
+		History,
+		Receipt
 	} from '@lucide/svelte';
 	import { reminderApi } from '$lib/services/reminder-api';
 	import { vehicleApi } from '$lib/services/vehicle-api';
@@ -31,6 +32,7 @@
 	import EmptyState from '$lib/components/common/empty-state.svelte';
 	import PageHeader from '$lib/components/common/page-header.svelte';
 	import ReminderForm from '$lib/components/reminders/ReminderForm.svelte';
+	import MaterializedExpensesDialog from '$lib/components/reminders/MaterializedExpensesDialog.svelte';
 	import ConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
 
 	let isLoading = $state(true);
@@ -57,6 +59,17 @@
 	function openEdit(item: ReminderWithVehicles) {
 		editingReminder = item;
 		formOpen = true;
+	}
+
+	// "Materialized N expenses" view (recurring-expenses T6) — opened from an expense-type reminder card.
+	let materializedOpen = $state(false);
+	let materializedReminderId = $state<string | null>(null);
+	let materializedReminderName = $state('');
+
+	function openMaterialized(item: ReminderWithVehicles) {
+		materializedReminderId = item.reminder.id;
+		materializedReminderName = item.reminder.name;
+		materializedOpen = true;
 	}
 
 	// Map vehicleId -> display name for quick lookup.
@@ -311,6 +324,17 @@
 						</div>
 					</div>
 					<div class="flex items-center gap-1 flex-shrink-0">
+						{#if item.reminder.type === 'expense'}
+							<Button
+								variant="ghost"
+								size="sm"
+								onclick={() => openMaterialized(item)}
+								aria-label="View materialized expenses"
+								title="View the expenses this recurring reminder has created"
+							>
+								<Receipt class="h-4 w-4" />
+							</Button>
+						{/if}
 						{#if item.reminder.isActive && isMileageTracking(item)}
 							<Button
 								variant="outline"
@@ -453,6 +477,13 @@
 	{/if}
 
 	<ReminderForm bind:open={formOpen} reminder={editingReminder} {vehicles} onSaved={load} />
+
+	<MaterializedExpensesDialog
+		bind:open={materializedOpen}
+		reminderId={materializedReminderId}
+		reminderName={materializedReminderName}
+		{vehicleNames}
+	/>
 
 	<ConfirmDialog
 		bind:open={deleteConfirmOpen}

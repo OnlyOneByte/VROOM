@@ -56,12 +56,11 @@ round-trip is exercised eyes-on.)*
 3. **Recurring expenses** — backend complete (engine already auto-materializes expense rows from
    `type:'expense'` reminders; T1 traceability, T2 split-materialization, T3 cascade-safe delete via
    clearSource, T5 gate `shouldTriggerRecurringExpenses`, T6/T7 FE client methods — all in archive).
-   **T7 widget DONE (C5).** **T6 "Recurring" badge DONE (C9, eyes-on).** **T5 app-init trigger hook DONE
-   (C12, eyes-on CONFIRMED — `maybeTriggerRecurringExpenses` in reminder-helpers.ts wired into
-   +layout.svelte; loading the app fired ONE POST /trigger → 12 expenses materialized, verified via shot +
-   backend log).** **REMAINING: T4 + T6-view + T8** — T4 multi-vehicle split in ReminderForm (reuse split
-   widget); T6-view the "materialized N expenses" view from the reminder side (uses C122/C134
-   getMaterializedExpenses); T8 round-trip e2e. Spec: `.kiro/specs/recurring-expenses/`.
+   **T7 widget DONE (C5).** **T5 app-init trigger hook DONE (C12).** **T6 DONE (badge C9 + "materialized N
+   expenses" dialog C16, both eyes-on CONFIRMED — `MaterializedExpensesDialog.svelte` opened from a Receipt
+   button on expense reminder cards; verified "12 expenses · $900 total" via shot + backend GET log).**
+   **REMAINING: T4 + T8** — T4 multi-vehicle split in ReminderForm (reuse split widget); T8 round-trip e2e.
+   Spec: `.kiro/specs/recurring-expenses/`.
 
 > NOTE: one tasks.md task per cycle, not one-and-done. **Standing goal** (TODO.md → Misc): 90% coverage
 > both sides — fold into bug/guard/arch cycles; ceiling is ~86%/~84% without the eyes-on FE tail (now shootable).

@@ -61,19 +61,19 @@
       renders $99/mo · 1 reminder + "Upcoming Reminders" shows the due reminder. The manual "Run due
       reminders" button (on /reminders) is unchanged. (The "N due" nudge + window-focus re-trigger are
       optional polish, not blockers — the once-per-day init trigger satisfies R1/D1.)
-- [~] **T6 — Source traceability UI (R3).** BADGE DONE C9 2026-06-17 (eyes-on CONFIRMED); the
-      "materialized N expenses" view sub-part remains. **BACKEND SEAM DONE (C122):** `GET /reminders/:id/
-      expenses` → `expenseRepository.findBySource('reminder', id, user.id)` → the materialized rows
-      (ownership-checked, user-scoped); +4 HTTP tests. **FE CLIENT METHOD DONE (C134):**
-      `reminderApi.getMaterializedExpenses(id): Promise<Expense[]>`. **BADGE DONE (C9):** new
-      `RecurringExpenseBadge.svelte` (Repeat-icon inline pill mirroring SplitExpenseBadge + the C5
-      RecurringCostCard icon), rendered on standalone expense rows where `sourceType==='reminder'` in
-      BOTH the desktop ExpensesTable (next to the category label) and the mobile card (meta row).
-      ✅ EYES-ON CONFIRMED via shot.sh (`/tmp/expenses-recurring.png`): an overdue monthly expense
-      reminder ($125.50 insurance) triggered → materialized rows Feb–Dec 2024 each render the "Recurring"
-      pill next to "Financial", while non-reminder expenses (Maintenance) show NO badge. Full
-      FE→BE→DB→render round-trip. **REMAINING (eyes-on):** the "materialized N expenses" view from the
-      reminder side (uses the C122/C134 getMaterializedExpenses seam) — a future feature cycle.
+- [x] **T6 — Source traceability UI (R3) — DONE (badge C9 + view C16, both eyes-on CONFIRMED).**
+      **BACKEND SEAM (C122):** `GET /reminders/:id/expenses` → `expenseRepository.findBySource('reminder',
+      id, user.id)` (ownership-checked, user-scoped); +4 HTTP tests. **FE CLIENT METHOD (C134):**
+      `reminderApi.getMaterializedExpenses(id)`. **BADGE (C9, eyes-on):** `RecurringExpenseBadge.svelte` on
+      expense rows where `sourceType==='reminder'` (desktop ExpensesTable + mobile card); confirmed via
+      shot. **VIEW (C16, eyes-on):** `MaterializedExpensesDialog.svelte` (Dialog + four-states:
+      loading/data/empty/error-retry, composed from the kit), opened from a Receipt "View materialized
+      expenses" button on every expense-type reminder card on /reminders; fetches getMaterializedExpenses,
+      lists each row (category · date · vehicle · amount) + an "N expenses · $total" summary. ✅ EYES-ON
+      CONFIRMED via the materialized-expenses-dialog.meshclaw.e2e spec (`/tmp`/screenshot Read): an overdue
+      monthly $75 reminder triggered → 12 catch-up rows → the dialog renders "12 expenses · $900.00 total"
+      with each Financial · {date} · Daily Driver · $75.00 row. Backend log confirms the dialog-open fired
+      GET /reminders/:id/expenses. Full FE→BE→DB→render round-trip.
 - [x] **T7 — Recurring-cost visibility (R5, D4) — DONE C5 2026-06-17 (eyes-on CONFIRMED).** Dashboard
       monthly recurring run-rate over the existing expense-type reminders (no migration).
       **BACKEND CORE DONE (C111):** `reminder-cost.ts` (pure, no DB) — `occurrencesPerYear` /

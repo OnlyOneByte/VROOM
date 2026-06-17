@@ -27,14 +27,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 12 |
+| feature | 4 | 16 |
 | deep-review | 5 | 13 |
 | guard | 6 | 11 |
 | bug | 3 | 15 |
 | arch | 5 | 12 |
 | infra | 6 | 14 |
 
-Current cycle: **15**
+Current cycle: **16**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -268,3 +268,16 @@ Current cycle: **15**
   missedFillup skip + mpg>0&&<150 band) — a real C161-class drift vector; seeded the arch queue. No code
   shipped by design. Verify: targeted suites green on the untouched tree (calculations + unit-conversions).
   cov: be 87.22% / fe 86.07% (~).
+- **C16 (feature)** — **Recurring-expenses T6-view: "materialized N expenses" dialog (eyes-on DONE → T6
+  COMPLETE).** feature sat AT budget (4/4, highest-leverage). T6's badge shipped C9; the view sub-part
+  remained, with the backend seam (GET /reminders/:id/expenses C122) + FE client method
+  (getMaterializedExpenses C134) already done. Built `MaterializedExpensesDialog.svelte` (Dialog +
+  four-states loading/data/empty/error-retry, composed from the kit), opened from a Receipt "View
+  materialized expenses" button on every expense-type reminder card on /reminders; lists each materialized
+  row (category · date · vehicle · amount) + an "N expenses · $total" summary. Booted a fresh stack, ran
+  an untracked spec that creates an overdue $75 monthly reminder, triggers it (12 catch-up rows), opens the
+  dialog, and screenshots it. **Read the PNG**: dialog renders "12 expenses · $900.00 total" with each
+  Financial · {date} · Daily Driver · $75.00 row; backend log confirms the dialog-open fired
+  GET /reminders/:id/expenses → 200. Full FE→BE→DB→render round-trip. Ticked spec T6 → `[x]` (badge+view
+  both done). Verify: frontend validate:local GREEN — type-check 0, build OK, 721 tests pass. cov: be
+  87.22% / fe 86.07% (~ — UI-markup cycle; the dialog's data path is backend-covered by the C122 HTTP tests).
