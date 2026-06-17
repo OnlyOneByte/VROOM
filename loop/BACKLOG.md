@@ -227,8 +227,10 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   term-months`) so TCO stops under-reporting for monthly-premium policies. (Consistency with analytics.)
 > - **#85 (MED) — APPROVED: relabel "This/Last Year" to reflect the range-relative semantics** (cheap,
 >   honest) rather than re-implementing calendar-year math.
-> - **#51 (LOW) — APPROVED: exclude term-less policies from `activePoliciesCount`** so the count and the
->   $0 contribution are internally consistent.
+> - ~~**#51 (LOW) — DONE C29.**~~ `getInsurance` now counts only active policies with ≥1 term
+>   (`activePoliciesWithTerms`), the same has-a-term predicate the premium path gates on — so the headline
+>   count and the $0 premium contribution are internally consistent. +3 guards in insurance-details.test.ts
+>   (non-vacuous: revert → 2 RED). Don't re-pick.
 >
 > _Severity 3 — data-integrity on delete (orphans):_
 > - **#88 (MED) — APPROVED: on vehicle delete, prune the deleted vehicleId from any reminder's

@@ -277,6 +277,54 @@ describe('getInsurance — #14 OPEN QUESTION: an expired latest term still count
   });
 });
 
+describe('getInsurance — #51: term-less active policies excluded from activePoliciesCount', () => {
+  // A term-less active policy contributes $0 to the premium totals (buildInsuranceDetails skips it via
+  // `if (!latestTerm) continue`). Pre-fix activePoliciesCount counted it anyway → "2 active policies"
+  // beside premiums summed over only 1, an internal inconsistency. The count now uses the SAME
+  // has-a-term predicate the premium path gates on.
+  test('an active policy with NO terms is not counted (count matches the policies contributing premiums)', async () => {
+    policy('p-withterm', 'GEICO'); // active, HAS a term → counts + contributes premium
+    term({
+      id: 't1',
+      policyId: 'p-withterm',
+      startMs: now - 30 * MS_DAY,
+      endMs: now + 335 * MS_DAY,
+      monthlyCost: 100,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+
+    policy('p-noterm', 'Allstate'); // active, NO term → $0, must NOT inflate the count
+
+    const result = await repo.getInsurance(USER);
+    // Only the policy that actually contributes a premium is counted.
+    expect(result.summary.activePoliciesCount).toBe(1);
+    expect(result.summary.totalMonthlyPremiums).toBeCloseTo(100, 2);
+  });
+
+  test('an active policy WITH a term is still counted (the fix does not over-exclude)', async () => {
+    policy('p1', 'GEICO');
+    term({
+      id: 't1',
+      policyId: 'p1',
+      startMs: now - 30 * MS_DAY,
+      endMs: now + 335 * MS_DAY,
+      monthlyCost: 75,
+    });
+    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+
+    const result = await repo.getInsurance(USER);
+    expect(result.summary.activePoliciesCount).toBe(1);
+  });
+
+  test('a term-less active policy alongside ZERO termed policies yields count 0 + $0', async () => {
+    policy('p-noterm', 'Allstate'); // active, but no term anywhere
+
+    const result = await repo.getInsurance(USER);
+    expect(result.summary.activePoliciesCount).toBe(0);
+    expect(result.summary.totalMonthlyPremiums).toBe(0);
+  });
+});
+
 describe('getInsurance — empty / no-data', () => {
   test('a user with no policies gets a zeroed summary, not a throw', async () => {
     const result = await repo.getInsurance(USER);

@@ -1788,11 +1788,18 @@ export class AnalyticsRepository {
       const { vehicleDetails, totalMonthlyPremiums, totalAnnualPremiums, carrierMap, monthlyMap } =
         this.buildInsuranceDetails(activePolicies, termRows, junctionRows, vehicleNameMap);
 
+      // #51: count only active policies that have at least one term. A TERM-LESS active policy
+      // contributes $0 (buildInsuranceDetails does `if (!latestTerm) continue`), so counting it in
+      // activePoliciesCount made the headline internally inconsistent — "N active policies" but the
+      // premium totals summed over fewer. Use the SAME has-a-term predicate the premium path gates on.
+      const policyIdsWithTerms = new Set(termRows.map((t) => t.policyId));
+      const activePoliciesWithTerms = activePolicies.filter((p) => policyIdsWithTerms.has(p.id));
+
       return {
         summary: {
           totalMonthlyPremiums,
           totalAnnualPremiums,
-          activePoliciesCount: activePolicies.length,
+          activePoliciesCount: activePoliciesWithTerms.length,
         },
         vehicleDetails,
         monthlyPremiumTrend: Array.from(monthlyMap.entries())

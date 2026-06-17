@@ -30,11 +30,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 27 |
 | deep-review | 5 | 26 |
 | guard | 6 | 25 |
-| bug | 3 | 24 |
+| bug | 3 | 29 |
 | arch | 5 | 23 |
 | infra | 6 | 28 |
 
-Current cycle: **28**
+Current cycle: **29**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -353,6 +353,23 @@ Current cycle: **28**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C29 (bug #51)** — **Exclude term-less active policies from `activePoliciesCount` (Angelo-APPROVED Sev-2).**
+  Two cats over budget (bug 5/3 +2, arch 6/5 +1); bug is most-starved → forced. Skipped the top Sev-1 #37
+  (Sheets atomicity) — it's a tx-semantics change to the crown-jewel backup write path = arch rule-6
+  (design.md + Angelo first, like the sibling #127), NOT a clean bug increment. Took the top CLEAN approved
+  Sev-2: #51. FIRSTHAND CONFIRMED the bug in `getInsurance` (analytics/repository.ts): a TERM-LESS active
+  policy contributes $0 to premium totals (`buildInsuranceDetails` does `if (!latestTerm) continue`), yet
+  `activePoliciesCount = activePolicies.length` counted it → the headline showed "N active policies" beside
+  premiums summed over FEWER (internal inconsistency). FIX (Angelo's agreed approach): count only active
+  policies that have ≥1 term — `activePoliciesWithTerms = activePolicies.filter(p => policyIdsWithTerms
+  .has(p.id))`, the SAME has-a-term predicate the premium path gates on (set built from termRows, so an
+  inactive policy's terms can't leak — the filter is over activePolicies only). GUARD: +3 cases in
+  insurance-details.test.ts (term-less-not-counted-beside-a-termed-one; termed-still-counted [no
+  over-exclude]; lone-term-less→0+$0). NON-VACUOUS: reverting to `activePolicies.length` turns 2 of the 3
+  RED; restored → 14 pass. Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1600 pass / 0
+  fail (+3), build bundled. Backend-only (analytics repo; the displayed count is pinned precisely by the
+  unit test — no UI logic changed). cov: be 87.22% / fe 86.14% (~ — analytics repo already covered; +3 pin
+  the count-consistency contract).
 - **C28 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C21).**
   Two cats over budget (infra 7/6, bug 4/3 — tie on over-by); infra is the most-starved (7 > 4) → forced.
   (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked `.test.ts`/`.spec.ts` (the gitignored `.meshclaw.e2e.ts`
