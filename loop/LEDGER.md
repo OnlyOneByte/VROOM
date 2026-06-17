@@ -31,10 +31,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 13 |
 | guard | 6 | 11 |
 | bug | 3 | 15 |
-| arch | 5 | 12 |
+| arch | 5 | 17 |
 | infra | 6 | 14 |
 
-Current cycle: **16**
+Current cycle: **17**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -281,3 +281,18 @@ Current cycle: **16**
   GET /reminders/:id/expenses → 200. Full FE→BE→DB→render round-trip. Ticked spec T6 → `[x]` (badge+view
   both done). Verify: frontend validate:local GREEN — type-check 0, build OK, 721 tests pass. cov: be
   87.22% / fe 86.07% (~ — UI-markup cycle; the dialog's data path is backend-covered by the C122 HTTP tests).
+- **C17 (arch)** — **MPG-pairing dedup (the C15-seeded pick — a real C161-class drift vector).** arch sat
+  AT budget (5/5); took it because — unlike the prior 3 no-churn scouts — there was a GENUINE pre-surfaced
+  pick. `calculateAverageMPG` (calculations.ts) and `calculateAverageMpg` (vehicle-stats.ts) hand-copied
+  the same consecutive-fill-up loop (missedFillup skip + both-odometers-and-volume guard + mpg=miles/vol +
+  the (0,150) band + mean). Extracted ONE pure `averageConsecutiveMpg(sortedExpenses)` in calculations.ts
+  over a minimal structural row type; both callers now sort (each keeping its OWN contract —
+  calculations via sortExpensesByDate, vehicle-stats via its defensive #75 inline date sort) then delegate.
+  BEHAVIOR-PRESERVING: takes PRE-SORTED input so no sort-policy change; the (0,150) band preserved EXACTLY
+  (do NOT unify with analytics' [5,100] — that's the product-gated #30 call, explicitly NOT touched);
+  routed both through calculateMPG (the fuel>0-guarded form) — identical given the existing volume truthy
+  guard. Arch rule 3 satisfied: both functions are property-tested (calculations.property +
+  vehicle-stats.property's referenceMpg), green→green (58 pass / 1898 assertions across the 4 MPG suites).
+  Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1587 pass / 0 fail (unchanged — pure
+  dedup), build bundled. Backend-only (no UI → no shot). cov: be 87.22% / fe 86.07% (~ — same modules,
+  same tests; LOC down, one source of truth for the C161-vulnerable loop).

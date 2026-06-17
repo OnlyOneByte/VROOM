@@ -225,16 +225,11 @@ scout per bug cycle, then record + pivot if dry. Don't manufacture a finding.)*
 ### arch
 *(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
 
-1. **SURFACED C15 — MPG-pairing dedup (a real C161-class drift vector, NOT yet done).** `calculateAverageMPG`
-   (utils/calculations.ts:48) and `calculateAverageMpg` (utils/vehicle-stats.ts:159) are near-identical
-   consecutive-fillup pairing loops: same sort → same `current.missedFillup||previous.missedFillup` skip →
-   same `mpg = miles/current.volume` → same `mpg>0 && mpg<150` outlier band → same mean. They've already
-   DRIFTED slightly (vehicle-stats sorts defensively per #75; calculations relies on the caller) and the
-   `<150` band is the #30-escalated divergence point — so a shared helper must be **behavior-preserving**
-   (keep each caller's sort contract; do NOT unify the band — that's the product-gated #30 call). Arch rule
-   3: add a characterization test first if the extracted helper isn't already covered (both have tests).
-   A genuine payoff (the C161 lesson: hand-copied pairing loops lose guards) — the right pick the NEXT time
-   arch is over budget, instead of a 4th no-churn.
+1. ~~**MPG-pairing dedup**~~ — **DONE C17.** Extracted `averageConsecutiveMpg(sortedExpenses)` in
+   calculations.ts; both `calculateAverageMPG` (calculations.ts) and `calculateAverageMpg`
+   (vehicle-stats.ts) now sort (each keeping its own contract) + delegate. Behavior-preserving (pre-sorted
+   input, (0,150) band preserved exactly, #30 NOT unified); green→green across both property suites (58
+   pass). The C161-vulnerable hand-copied loop now has one source of truth. Don't re-scout.
 
 > **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
 > toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time
