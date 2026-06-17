@@ -50,6 +50,12 @@ interface FakeSpreadsheet {
   sheets: { sheetId: number; title: string }[];
   /** sheet title → 2D cell grid (as written by values.update) */
   values: Map<string, (string | number | boolean)[][]>;
+  /**
+   * sheet title → the `valueInputOption` the last values.update for it passed. The grid is stored
+   * identically regardless of the option, so a round-trip read can't prove we send RAW (the #36 formula-
+   * injection fix); this captures the option so a guard can assert it directly (RAW vs USER_ENTERED).
+   */
+  valueInputOptions: Map<string, string | undefined>;
 }
 
 interface FaultRule {
@@ -342,7 +348,12 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
         createdTime: EPOCH,
         modifiedTime: EPOCH,
       });
-      store.spreadsheets.set(id, { title, sheets, values: new Map() });
+      store.spreadsheets.set(id, {
+        title,
+        sheets,
+        values: new Map(),
+        valueInputOptions: new Map(),
+      });
       return Promise.resolve({
         data: {
           spreadsheetId: id,
@@ -396,8 +407,10 @@ export function makeFakeSheets(store: FakeGoogleStore): sheets_v4.Sheets {
         store.maybeFail('spreadsheets.values.update');
         const ss = params.spreadsheetId ? store.spreadsheets.get(params.spreadsheetId) : undefined;
         if (ss && params.range) {
+          const title = sheetTitleFromRange(params.range);
           const values = (params.requestBody?.values ?? []) as (string | number | boolean)[][];
-          ss.values.set(sheetTitleFromRange(params.range), values);
+          ss.values.set(title, values);
+          ss.valueInputOptions.set(title, params.valueInputOption ?? undefined);
         }
         return Promise.resolve({ data: { updatedCells: 0 } });
       },

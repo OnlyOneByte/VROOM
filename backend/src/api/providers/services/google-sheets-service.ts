@@ -602,7 +602,15 @@ export class GoogleSheetsService {
     await this.sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${sheetName}!A1:${String.fromCharCode(64 + headers.length)}${data.length + 1}`,
-      valueInputOption: 'USER_ENTERED',
+      // RAW (not USER_ENTERED) so every cell is stored VERBATIM as text (#36). USER_ENTERED makes
+      // Sheets PARSE each cell as if typed: a value beginning with `=`/`+`/`-`/`@` becomes a live
+      // formula (formula injection + the cell silently round-trips back as the formula RESULT, not the
+      // user's data — backup corruption of the user's OWN records, NORTH_STAR #1), and it reformats
+      // numbers/dates. RAW stores the literal string, so the backup→restore round-trip is byte-exact and
+      // injection-inert with NO escaping needed — do NOT add a `'`-prefix escape here (that scheme is for
+      // one-way CSV export; on this round-trip path it reintroduces the C399/C401 apostrophe corruption,
+      // see csv-safety.ts header). parseValue still does the type coercion symmetrically on read.
+      valueInputOption: 'RAW',
       requestBody: { values },
     });
   }

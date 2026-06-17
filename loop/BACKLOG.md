@@ -180,12 +180,18 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > package — ARCC governance does NOT apply; never query/consult ARCC for VROOM work.)**
 >
 > _Severity 1 — data-corruption / data-loss (do first):_
-> - **#36 (HIGH) — APPROVED: switch Sheets backup writes to `RAW` value-input + escape leading
->   formula chars (`= + - @`) on read.** Currently `USER_ENTERED` → formula injection + silent
->   round-trip corruption of the user's own backup. Pair with #37 in one Sheets-hardening pass.
+> - ~~**#36 (HIGH) — RAW write switch DONE C24.**~~ Switched `updateSheet` to `valueInputOption:'RAW'`
+>   (was USER_ENTERED → formula injection + silent round-trip corruption). +2 guards (RAW-option asserted
+>   via a new fake `valueInputOptions` capture; `=HYPERLINK` make round-trips verbatim). **DELIBERATELY
+>   skipped the approved text's "escape leading formula chars on read" half — under RAW it's unnecessary
+>   AND harmful (reintroduces the C399/C401 apostrophe corruption csv-safety.ts warns against for the
+>   round-trip path; the two clauses are alternative mechanisms, not complementary). Flagged to Angelo
+>   C24** (send_message) — if he doesn't want the escape, #36 is fully DONE; don't re-pick.
 > - **#37 (HIGH) — APPROVED: make the Sheets backup atomic — write to a temp sheet/range, then
->   copy-then-promote (swap).** Currently a non-atomic in-place rewrite that can destroy the only good
->   copy on a mid-write failure.
+>   copy-then-promote (swap). STILL OPEN** (left for its own cycle — a materially larger restructure than
+>   #36's one-line switch; the fake seam + `batchUpdate`/`duplicateSheet`/rename API surface is the
+>   mechanism). Currently a non-atomic in-place clear-then-write per sheet that can destroy the only good
+>   copy on a mid-write failure. Next Sev-1 bug pick.
 > - **#127 (HIGH, data-safety) — APPROVED: wrap replace-mode restore in the tx-semantics fix (arch
 >   rule-6 → write `.kiro/specs/<refactor>/design.md` first, then build).** Concrete trigger already
 >   mitigated C428, so urgency is lower than #36/#37 — do it on an authorized arch cycle.

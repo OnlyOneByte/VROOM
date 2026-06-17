@@ -161,6 +161,52 @@ describe('GoogleSheetsService.readSpreadsheetData', () => {
   });
 });
 
+describe('GoogleSheetsService — formula-injection safety (#36)', () => {
+  // The backup writes must use RAW, not USER_ENTERED — otherwise a cell value beginning with a formula
+  // trigger (=,+,-,@) is parsed as a live formula by Sheets (injection + the user's OWN data silently
+  // round-trips back as the formula RESULT, not the text they stored). The fake records grids identically
+  // regardless of the option, so a plain round-trip can't catch a regression — assert the option directly.
+  test('writes every sheet with valueInputOption RAW (not USER_ENTERED)', async () => {
+    await seedVehicle('Toyota', 'Camry', 2020);
+    const info = await makeSvc().createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+
+    const ss = store.spreadsheets.get(info.id);
+    expect(ss).toBeDefined();
+    // At least the Vehicles sheet was written; whatever was written used RAW.
+    const opts = [...(ss?.valueInputOptions.values() ?? [])];
+    expect(opts.length).toBeGreaterThan(0);
+    expect(opts.every((o) => o === 'RAW')).toBe(true);
+    expect(opts).not.toContain('USER_ENTERED');
+  });
+
+  test('a make beginning with "=" round-trips VERBATIM (stored inert, not a formula)', async () => {
+    // A maliciously- or accidentally-formula-shaped value must survive backup→restore byte-exact.
+    const formula = '=HYPERLINK("http://evil","x")';
+    await seedVehicle(formula, 'Civic', 2019);
+    const svc = makeSvc();
+    const info = await svc.createOrUpdateVroomSpreadsheet(
+      ctx.user.id,
+      'VROOM/Backups',
+      'Demo User'
+    );
+
+    // Stored cell is the literal text (no leading-quote escaping added on this round-trip path) —
+    // assert against the actual cell, NOT a JSON.stringify substring (which escapes the inner quotes).
+    const grid = store.spreadsheets.get(info.id)?.values.get('Vehicles');
+    const makeCol = (grid?.[0] ?? []).indexOf('make');
+    expect(makeCol).toBeGreaterThanOrEqual(0);
+    expect(grid?.[1]?.[makeCol]).toBe(formula);
+
+    // And it reads back as exactly that string (parseValue leaves a non-numeric/non-date string as-is).
+    const data = await svc.readSpreadsheetData(info.id);
+    expect(data.vehicles[0].make).toBe(formula);
+  });
+});
+
 describe('GoogleSheetsService — error/resilience paths', () => {
   test('a failed spreadsheet create surfaces the API error', async () => {
     store.injectFault('spreadsheets.create', googleApiError(403, 'Insufficient permissions'));

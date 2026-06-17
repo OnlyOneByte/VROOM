@@ -29,11 +29,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 22 |
 | deep-review | 5 | 19 |
 | guard | 6 | 18 |
-| bug | 3 | 20 |
+| bug | 3 | 24 |
 | arch | 5 | 23 |
 | infra | 6 | 21 |
 
-Current cycle: **23**
+Current cycle: **24**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -352,6 +352,29 @@ Current cycle: **23**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C24 (bug #36)** — **Sheets backup formula-injection fix: USER_ENTERED → RAW (Angelo-APPROVED Sev-1).**
+  bug was the sole over-budget category (24−20=4/3). The cold-scout vein is exhausted, so took the top
+  unfinished Angelo-approved item by severity: #36 (HIGH, the Sheets-backup formula-injection / silent
+  round-trip corruption). FIX: switched `updateSheet`'s `valueInputOption` from `'USER_ENTERED'` to `'RAW'`
+  (google-sheets-service.ts) — USER_ENTERED makes Sheets PARSE each cell as if typed, so a value starting
+  `=`/`+`/`-`/`@` becomes a LIVE formula (injection + the user's OWN data silently round-trips back as the
+  formula RESULT, not their text — NORTH_STAR #1 backup corruption). RAW stores the literal string →
+  byte-exact, injection-inert, NO escaping needed. GUARD (+2 in google-sheets-service.test.ts via the
+  injected-fake seam): asserts every write sends `RAW` (added a `valueInputOptions` capture map to the fake
+  — the grid stores identically regardless of option, so a round-trip alone is vacuous for this), and a
+  `=HYPERLINK(...)` make round-trips VERBATIM through write→read. DELIBERATELY did NOT do the approved
+  text's second half ("escape leading formula chars on read"): under RAW that's both unnecessary (nothing
+  to un-escape) and HARMFUL (a `'`-prefix escape on this backup→restore ROUND-TRIP path reintroduces the
+  C399/C401 apostrophe corruption csv-safety.ts's header explicitly warns against — the two clauses are
+  ALTERNATIVE mechanisms, not complementary). send_message'd Angelo the nuance (don't auto-decide a
+  data-contract divergence), shipped the unambiguously-correct half, did NOT block. CAUGHT-MY-OWN-BUG: the
+  first edit accidentally dropped the `range:` line → my new RAW guard + 3 existing tests went RED (range
+  undefined → fake skips the write); restored the line → green (the guard did its job). #37 (atomic
+  temp-sheet+swap) is a materially larger restructure → left OPEN for its own cycle per one-coherent-
+  increment. Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1595 pass / 0 fail (+2 net,
+  was 1593 functional pre-cycle), build bundled. Backend-only (no UI → no shot). cov: be 87.22% / fe
+  86.07% (~ — Sheets service already covered by the C-era fake-seam tests; +2 pin the injection-safety
+  contract).
 - **C23 (arch)** — **`buildSplitConfig` dedup (the C22-created drift vector — a genuine fresh pick, not a
   re-scout).** arch was the sole over-budget category (23−17=6/5). Unlike the C4/C6/C12 no-churn scouts,
   there was a REAL pick: my own C22 T4 work added a `buildSplitConfig()` to `ReminderForm` that was
