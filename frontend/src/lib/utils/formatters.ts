@@ -78,6 +78,30 @@ export function dateOnlyToISO(dateOnly: string | undefined | null): string {
 	return new Date(year, month - 1, day, 12, 0, 0).toISOString();
 }
 
+/**
+ * Format a date as the `YYYY-MM-DD` string an `<input type="date">` binds to, using the LOCAL
+ * calendar date (not UTC) — the forward partner to `dateOnlyToISO`'s reverse (parse) direction.
+ *
+ * Collapses the `new Date(x).toISOString().split('T')[0]` / `.slice(0, 10)` idiom that was
+ * hand-repeated across the date-input forms (expense / reminder / vehicle / odometer) + the CSV
+ * download filename (C267 extraction).
+ *
+ * WHY LOCAL, NOT UTC (#87, the NORTH_STAR #2 fix): the old `.toISOString().slice(0,10)` read the UTC
+ * calendar date, so it (a) showed TOMORROW for a negative-offset (Americas) user editing late in the
+ * day, and (b) BROKE THE ROUND-TRIP for stored dates — `dateOnlyToISO` writes them anchored at NOON
+ * LOCAL, and noon-local in a positive offset (e.g. +14) is the PREVIOUS day in UTC, so a vehicle's
+ * stored purchaseDate would reload one day earlier in the form. Reading the LOCAL components fixes
+ * both: noon ± any real offset (±14h) never crosses LOCAL midnight, so a dateOnlyToISO→toDateInputValue
+ * round-trip is exact in every timezone. No default — callers pass an explicit argument.
+ */
+export function toDateInputValue(date: Date | string): string {
+	const d = typeof date === 'string' ? new Date(date) : date;
+	const year = d.getFullYear();
+	const month = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
+}
+
 // Relative time formatting
 export function formatRelativeTime(date: Date | string | null): string {
 	if (!date) return 'Never';
@@ -87,10 +111,20 @@ export function formatRelativeTime(date: Date | string | null): string {
 
 	if (days === 0) return 'Today';
 	if (days === 1) return 'Yesterday';
+	// Pluralize each bucket — Math.floor can land on 1 (e.g. 7-13d → 1 week, 365-729d → 1 year),
+	// so a bare "1 weeks/months/years ago" would render. Use the n>1 idiom (cf. reminder-helpers,
+	// sync-status). days<7 always yields ≥2 so its plural is unconditional.
 	if (days < 7) return `${days} days ago`;
-	if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-	if (days < 365) return `${Math.floor(days / 30)} months ago`;
-	return `${Math.floor(days / 365)} years ago`;
+	if (days < 30) {
+		const weeks = Math.floor(days / 7);
+		return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
+	}
+	if (days < 365) {
+		const months = Math.floor(days / 30);
+		return `${months} month${months > 1 ? 's' : ''} ago`;
+	}
+	const years = Math.floor(days / 365);
+	return `${years} year${years > 1 ? 's' : ''} ago`;
 }
 
 // Compact relative time (for sync status)

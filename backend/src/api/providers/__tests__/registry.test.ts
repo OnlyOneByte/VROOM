@@ -196,6 +196,42 @@ describe('StorageProviderRegistry', () => {
       expect(results).toHaveLength(0);
     });
 
+    // C387 (ARCC SAX-05 Outcome-2: "validate tenant context at every data-access boundary; missing
+    // tenant validation in background jobs"): a providerId listed in the user's storageConfig whose
+    // ACTUAL row is NOT owned by them (findOwnedProvider's userId-scoped query → []) must be SKIPPED,
+    // never returned as a backup target. This is the tenant-isolation invariant that makes the sync
+    // worker's id-only getProviderInternal safe: every photo_ref reaching the worker was created from a
+    // getBackupProviders result, so its providerId is provably co-owned with the photo. A regression
+    // dropping the userId leg of findOwnedProvider would let a config-referenced foreign provider become
+    // a backup target → a photo synced via ANOTHER user's credentials (the ARCC cross-tenant breach).
+    test('skips a config-listed provider whose row is NOT owned by the user (tenant isolation)', async () => {
+      const configWithForeign: StorageConfig = {
+        ...baseStorageConfig,
+        providerCategories: {
+          ...baseStorageConfig.providerCategories,
+          'provider-foreign': {
+            vehicle_photos: { enabled: true, folderPath: 'Backup' },
+            expense_receipts: { enabled: true, folderPath: 'Backup' },
+            insurance_docs: { enabled: true, folderPath: 'Backup' },
+            odometer_readings: { enabled: true, folderPath: 'Backup' },
+          },
+        },
+      };
+
+      // Call 1: loadStorageConfig. Call 2: findOwnedProvider('provider-foreign', 'user-1') — the
+      // userId-scoped query returns [] because the row isn't owned by user-1 → the provider is skipped.
+      const db = createMockDb([
+        [{ storageConfig: configWithForeign }],
+        [], // findOwnedProvider → not owned → null
+      ]);
+
+      const registry = new StorageProviderRegistry(db as never);
+      const results = await registry.getBackupProviders('user-1', 'vehicle_photos');
+
+      // The foreign provider is NOT a backup target — no cross-tenant ref can be created.
+      expect(results).toHaveLength(0);
+    });
+
     test('skips inactive backup providers', async () => {
       const inactiveBackup: UserProvider = {
         ...baseProvider,
@@ -298,6 +334,74 @@ describe('StorageProviderRegistry', () => {
 
       expect(() => registry.createProviderInstance(badCreds)).toThrow(
         'Invalid Google Drive credentials: missing refreshToken'
+      );
+    });
+
+    // C254: the google-photos + s3 builder validation throws (registry.ts buildGooglePhotosProvider /
+    // buildS3Provider) were the uncovered createProviderInstance branches — credential/config integrity
+    // gates. createProviderInstance only CONSTRUCTS (no network), so these are pure-input tests.
+    test('creates GooglePhotosProvider for google-photos type (reuses cached albumId from config)', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      const row = {
+        ...baseProvider,
+        providerType: 'google-photos',
+        credentials: 'encrypted:{"refreshToken":"tok-gp"}',
+        config: { albumId: 'album-xyz' },
+      };
+      expect(registry.createProviderInstance(row).type).toBe('google-photos');
+    });
+
+    test('throws when google-photos credentials lack refreshToken', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      const row = {
+        ...baseProvider,
+        providerType: 'google-photos',
+        credentials: 'encrypted:{"noToken":true}',
+      };
+      expect(() => registry.createProviderInstance(row)).toThrow(
+        'Invalid Google Photos credentials: missing refreshToken'
+      );
+    });
+
+    test('creates S3CompatProvider for s3 type with valid credentials + config', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      const row = {
+        ...baseProvider,
+        providerType: 's3',
+        credentials: 'encrypted:{"accessKeyId":"AK","secretAccessKey":"SK"}',
+        config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
+      };
+      expect(registry.createProviderInstance(row).type).toBe('s3');
+    });
+
+    test('throws when s3 credentials lack accessKeyId/secretAccessKey', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      const row = {
+        ...baseProvider,
+        providerType: 's3',
+        credentials: 'encrypted:{"accessKeyId":"AK"}', // missing secretAccessKey
+        config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
+      };
+      expect(() => registry.createProviderInstance(row)).toThrow(
+        'Invalid S3 credentials: missing accessKeyId or secretAccessKey'
+      );
+    });
+
+    test('throws when s3 config is missing endpoint/bucket/region', () => {
+      const db = createMockDb([]);
+      const registry = new StorageProviderRegistry(db as never);
+      const row = {
+        ...baseProvider,
+        providerType: 's3',
+        credentials: 'encrypted:{"accessKeyId":"AK","secretAccessKey":"SK"}',
+        config: { bucket: 'b' }, // missing endpoint + region
+      };
+      expect(() => registry.createProviderInstance(row)).toThrow(
+        'Invalid S3 config: missing endpoint, bucket, or region'
       );
     });
   });

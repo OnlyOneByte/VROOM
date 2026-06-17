@@ -123,12 +123,12 @@ describe('createSplitExpenseSchema — absolute-sum refinement (must equal total
 });
 
 describe('createSplitExpenseSchema — source fields are both-or-neither', () => {
-  test('accepts both source fields present, or both absent', () => {
+  test('accepts both source fields present (financing), or both absent', () => {
     const both = createSplitExpenseSchema.safeParse({
       ...baseCreate,
       splitConfig: { method: 'even', vehicleIds: ['v1'] },
-      sourceType: 'reminder',
-      sourceId: 'rem-1',
+      sourceType: 'financing',
+      sourceId: 'fin-1',
     });
     expect(both.success).toBe(true);
 
@@ -137,6 +137,24 @@ describe('createSplitExpenseSchema — source fields are both-or-neither', () =>
       splitConfig: { method: 'even', vehicleIds: ['v1'] },
     });
     expect(neither.success).toBe(true);
+  });
+
+  // #145 (C465): the manual split route accepts ONLY a 'financing' source link (mirrors the regular
+  // create) — 'insurance_term'/'reminder' splits come EXCLUSIVELY from system paths that bypass this
+  // route. Pre-fix the schema was z.string().optional() → a hand-crafted POST could forge an
+  // UNVALIDATED reminder/insurance_term link on the caller's own siblings (skews source-bucketed
+  // analytics; a real matching insurance_term sourceId cascade-deletes the manual split when the
+  // policy is removed). NON-VACUOUS: pre-fix every line here parsed success:true.
+  test('rejects a non-financing sourceType (reminder / insurance_term / arbitrary string) (#145)', () => {
+    for (const sourceType of ['reminder', 'insurance_term', 'manual', 'anything']) {
+      const r = createSplitExpenseSchema.safeParse({
+        ...baseCreate,
+        splitConfig: { method: 'even', vehicleIds: ['v1'] },
+        sourceType,
+        sourceId: 'x-1',
+      });
+      expect(r.success, `sourceType '${sourceType}' must be rejected`).toBe(false);
+    }
   });
 
   test('rejects exactly one source field (type without id, or id without type)', () => {
@@ -153,6 +171,45 @@ describe('createSplitExpenseSchema — source fields are both-or-neither', () =>
       sourceId: 'rem-1',
     });
     expect(idOnly.success).toBe(false);
+  });
+});
+
+// C408 (#104/C352 hole): the split-create schema's tags were a bare z.array(z.string()) that bypassed
+// the tagElementSchema separator-rejection the regular create/update boundaries enforce. A tag containing
+// ';' or ',' persisted onto every sibling, then the CSV export ('; '-join) → re-import (/[;,]/-split)
+// round-tripped it into MULTIPLE tags (silent data loss). Now routed through the shared tagElementSchema.
+// Pre-fix these REJECT-assertions were RED (the bare array accepted the separator tag).
+describe('createSplitExpenseSchema — tags reject the CSV separator (#104, C408)', () => {
+  const splitBase = {
+    ...baseCreate,
+    splitConfig: { method: 'even' as const, vehicleIds: ['v1', 'v2'] },
+  };
+
+  test('a tag containing a semicolon is rejected', () => {
+    const r = createSplitExpenseSchema.safeParse({ ...splitBase, tags: ['road; trip'] });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.message === 'Tag cannot contain a semicolon or comma')
+      ).toBe(true);
+    }
+  });
+
+  test('a tag containing a comma is rejected', () => {
+    const r = createSplitExpenseSchema.safeParse({ ...splitBase, tags: ['errand,grocery'] });
+    expect(r.success).toBe(false);
+  });
+
+  test('an empty tag is rejected (min(1), like the regular boundary)', () => {
+    expect(createSplitExpenseSchema.safeParse({ ...splitBase, tags: [''] }).success).toBe(false);
+  });
+
+  test('separator-free tags still pass (control)', () => {
+    const r = createSplitExpenseSchema.safeParse({
+      ...splitBase,
+      tags: ['road trip', 'business'],
+    });
+    expect(r.success).toBe(true);
   });
 });
 
@@ -177,5 +234,43 @@ describe('updateSplitSchema — shares the same refinement', () => {
       splitConfig: { method: 'percentage', allocations: [{ vehicleId: 'v1', percentage: 90 }] },
     });
     expect(r.success).toBe(false);
+  });
+});
+
+// #141 (C458): totalAmount is QUANTIZED to whole cents at the validation boundary. The split's
+// groupTotal is stored from totalAmount while the legs are rounded to cents (Math.round(total*100)) —
+// so a sub-cent total (100.005) used to persist groupTotal=100.005 while the legs summed to 100.01, a
+// stored header disagreeing with Σsiblings (NORTH_STAR #1). Rounding totalAmount to cents makes the
+// header computed from the SAME cent-aligned value as the legs. The UI only sends 2-decimal amounts.
+describe('split totalAmount is quantized to whole cents (#141)', () => {
+  test('a sub-cent totalAmount is rounded to 2 decimals on create', () => {
+    const r = createSplitExpenseSchema.safeParse({
+      ...baseCreate,
+      splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
+      totalAmount: 100.005,
+    });
+    expect(r.success).toBe(true);
+    // NON-VACUOUS: pre-fix totalAmount passed through as 100.005 (→ stored groupTotal), while the legs
+    // rounded to 100.01. Now it's 100.01, matching what computeEvenSplit derives the legs from.
+    if (r.success) expect(r.data.totalAmount).toBe(100.01);
+  });
+
+  test('a sub-cent totalAmount is rounded on update too', () => {
+    const r = updateSplitSchema.safeParse({
+      splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
+      totalAmount: 49.999,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.totalAmount).toBe(50);
+  });
+
+  test('a clean 2-decimal totalAmount is unchanged (no-op for the UI happy path)', () => {
+    const r = createSplitExpenseSchema.safeParse({
+      ...baseCreate,
+      splitConfig: { method: 'even', vehicleIds: ['v1', 'v2'] },
+      totalAmount: 100.0,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.totalAmount).toBe(100);
   });
 });

@@ -72,6 +72,26 @@ export class StorageProviderRegistry {
   constructor(private db: ReturnType<typeof getDb>) {}
 
   /**
+   * Fetch a provider row scoped to its owner (id AND userId), or null if there's no such owned
+   * provider. ONE source of truth for the tenant-scoped provider lookup the user-facing resolvers
+   * (getDefaultProvider / getBackupProviders / getProvider) repeated byte-for-byte — callers keep
+   * their own null/status handling (throw vs skip). A divergent copy dropping the userId predicate
+   * would be a cross-tenant read, so collapsing it keeps the ownership scope in lockstep. (The
+   * no-auth getProviderInternal queries by id ALONE by design and is deliberately NOT routed here.)
+   */
+  private async findOwnedProvider(
+    providerId: string,
+    userId: string
+  ): Promise<UserProvider | null> {
+    const row = await this.db
+      .select()
+      .from(userProviders)
+      .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
+      .limit(1);
+    return row[0] ?? null;
+  }
+
+  /**
    * Get the user's default provider for a photo category.
    * Reads storage_config.defaults, loads the provider, resolves the full folder path.
    */
@@ -83,13 +103,7 @@ export class StorageProviderRegistry {
       throw new ValidationError('No storage provider configured for this photo category');
     }
 
-    const row = await this.db
-      .select()
-      .from(userProviders)
-      .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
-      .limit(1);
-
-    const providerRow = row[0];
+    const providerRow = await this.findOwnedProvider(providerId, userId);
     if (!providerRow) {
       throw new NotFoundError('Storage provider');
     }
@@ -120,13 +134,7 @@ export class StorageProviderRegistry {
       const categorySetting = categories[category];
       if (!categorySetting?.enabled) continue;
 
-      const row = await this.db
-        .select()
-        .from(userProviders)
-        .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
-        .limit(1);
-
-      const providerRow = row[0];
+      const providerRow = await this.findOwnedProvider(providerId, userId);
       if (providerRow?.status !== 'active') continue;
 
       const provider = this.createProviderInstance(providerRow);
@@ -143,13 +151,7 @@ export class StorageProviderRegistry {
    * Use this from user-facing code paths (routes, photo-service).
    */
   async getProvider(providerId: string, userId: string): Promise<StorageProvider> {
-    const row = await this.db
-      .select()
-      .from(userProviders)
-      .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
-      .limit(1);
-
-    const providerRow = row[0];
+    const providerRow = await this.findOwnedProvider(providerId, userId);
     if (!providerRow) {
       throw new NotFoundError('Storage provider');
     }

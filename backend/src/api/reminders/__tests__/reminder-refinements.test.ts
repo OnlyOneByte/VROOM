@@ -110,6 +110,23 @@ describe('refineDateRange', () => {
       )
     ).toBe(true);
   });
+
+  // C375: the refinement uses `endDate <= startDate` (not `<`), so endDate EQUAL to startDate — a
+  // zero-duration reminder that would fire its start period then immediately deactivate — is rejected
+  // too. Tests above pin strictly-after (ok) + strictly-before (fail) but NOT the equality boundary,
+  // which is exactly what the `<=` (vs `<`) is load-bearing for: a regression to `<` would silently
+  // ACCEPT a same-instant start==end reminder. Pin the boundary closed.
+  test('endDate EQUAL to startDate is rejected (the <= boundary, not just <)', () => {
+    expect(
+      failsWith(
+        validNotification({
+          startDate: '2024-06-01T00:00:00.000Z',
+          endDate: '2024-06-01T00:00:00.000Z',
+        }),
+        'endDate must be after startDate'
+      )
+    ).toBe(true);
+  });
 });
 
 describe('refineSplitConfig', () => {

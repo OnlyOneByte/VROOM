@@ -74,6 +74,44 @@ describe('applyMapping — unit conversion into the target vehicle units (D1)', 
     expect(row.mileage).toBe('50000');
     expect(row.volume).toBe('12.5');
   });
+
+  // C334 (bug-cycle dormant-vein scout outcome): mapMileage/mapVolume guard conversion on each
+  // field's OWN `from && to` independently. The live caller (resolveTargetUnits) only ever returns
+  // {} or BOTH units set, so today every row is all-converted or all-passed-through. But the
+  // per-field guards mean a future change handing applyMapping a PARTIAL target (one unit resolved,
+  // the other not — e.g. a vehicle missing one preference, or a refactor that resolves units
+  // separately) would convert ONE axis and silently pass the other through in the SAME row — a
+  // mixed converted/unconverted record (NORTH_STAR #2 unit-correctness). Pin the per-field
+  // independence so that mixed-target behavior is explicit + a regression that coupled the two
+  // guards (or dropped one) is caught. Distance converts, volume passes through verbatim, here.
+  test('a PARTIAL target converts only the field whose target unit is present (per-field guard)', () => {
+    const csv = ['odo,litres', '160.9344,37.854'].join('\n');
+    const mapping: ColumnMapping = {
+      columns: { mileage: 'odo', volume: 'litres' },
+      dateFormat: 'iso',
+      distanceUnit: DistanceUnit.KILOMETERS,
+      volumeUnit: VolumeUnit.LITERS,
+    };
+    // Only distanceUnit resolved on the target; volumeUnit absent.
+    const [row] = parseNative(applyMapping(csv, mapping, { distanceUnit: DistanceUnit.MILES }).csv);
+    expect(row.mileage).toBe('100'); // 160.9344 km → 100 mi (distance target present → converts)
+    expect(row.volume).toBe('37.854'); // volume target absent → passes through, NOT converted to gal
+  });
+
+  test('the mirror partial: volume target present, distance absent → only volume converts', () => {
+    const csv = ['odo,litres', '160.9344,37.854'].join('\n');
+    const mapping: ColumnMapping = {
+      columns: { mileage: 'odo', volume: 'litres' },
+      dateFormat: 'iso',
+      distanceUnit: DistanceUnit.KILOMETERS,
+      volumeUnit: VolumeUnit.LITERS,
+    };
+    const [row] = parseNative(
+      applyMapping(csv, mapping, { volumeUnit: VolumeUnit.GALLONS_US }).csv
+    );
+    expect(row.mileage).toBe('161'); // distance target absent → passes through (160.9344 rounded), NOT km→mi (100)
+    expect(Number(row.volume)).toBeCloseTo(10, 2); // volume target present → 37.854 L → ~10 US gal
+  });
 });
 
 describe('applyMapping — European decimal-comma (D1)', () => {
@@ -88,6 +126,25 @@ describe('applyMapping — European decimal-comma (D1)', () => {
     const [row] = parseNative(applyMapping(csv, mapping).csv);
     expect(row.amount).toBe('1234.56'); // dot thousands stripped, comma → dot
     expect(Number(row.volume)).toBeCloseTo(45.7, 3); // lone comma → decimal dot
+  });
+
+  // #124 (C417): a US-format value with BOTH separators (comma thousands + dot decimal) is reachable via
+  // the US Fuelly preset (mdy/miles/US-gallons). The old code hard-assumed comma-decimal → stripped the
+  // dots → "1,234.56" became 1.23456 (~1000x money under-count). The fix keys on the LAST separator as
+  // the decimal, so BOTH conventions normalize correctly. Pre-fix this asserted ~1.23 (RED).
+  test('US-format dot-decimal + comma-thousands also normalizes correctly (1,234.56 → 1234.56)', () => {
+    const csv = ['amt', '"1,234.56"'].join('\n');
+    const mapping: ColumnMapping = { columns: { amount: 'amt' }, dateFormat: 'iso' };
+    const [row] = parseNative(applyMapping(csv, mapping).csv);
+    expect(row.amount).toBe('1234.56'); // comma thousands stripped, dot stays decimal — NOT 1.23456
+    expect(Number(row.amount)).toBeCloseTo(1234.56, 2);
+  });
+
+  test('a multi-group US number with both separators (1,234,567.89) normalizes', () => {
+    const csv = ['amt', '"1,234,567.89"'].join('\n');
+    const mapping: ColumnMapping = { columns: { amount: 'amt' }, dateFormat: 'iso' };
+    const [row] = parseNative(applyMapping(csv, mapping).csv);
+    expect(Number(row.amount)).toBeCloseTo(1234567.89, 2);
   });
 });
 

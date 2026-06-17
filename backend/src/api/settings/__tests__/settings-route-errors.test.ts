@@ -82,3 +82,49 @@ describe('settings route error behavior (characterization — pins today before 
     expect(body.data.syncInactivityMinutes).toBe(15);
   });
 });
+
+/**
+ * C277 (guard): the two POST endpoints — /settings/backup + /settings/restore — had ZERO HTTP
+ * coverage. /backup has a real observable SIDE EFFECT (syncStateRepository.updateBackupDate writes
+ * sync_state.last_backup_date, which a backup-status UI reads), so pin that it persists; both must be
+ * auth-gated (the routes.use('*', requireAuth) chain). Reads the DB row via ctx.sqlite to prove the
+ * write actually landed (not just a 200).
+ */
+describe('settings POST /backup + /restore (C277)', () => {
+  function backupDateRow(userId: string): { last_backup_date: number | null } | undefined {
+    return ctx.sqlite
+      .query('SELECT last_backup_date FROM sync_state WHERE user_id = ?')
+      .get(userId) as { last_backup_date: number | null } | undefined;
+  }
+
+  test('POST /settings/backup → 200 and stamps sync_state.last_backup_date (was null)', async () => {
+    // Pre-condition: no backup recorded yet (getOrCreate seeds all-NULL timestamps).
+    await ctx.authed('GET', '/api/v1/settings'); // ensure prefs/sync rows exist
+    const before = backupDateRow(ctx.user.id);
+    expect(before?.last_backup_date ?? null).toBeNull();
+
+    const res = await ctx.authed('POST', '/api/v1/settings/backup');
+    expect(res.status).toBe(200);
+    const body = await json<{ success: boolean; timestamp: string }>(res);
+    expect(body.success).toBe(true);
+    expect(typeof body.timestamp).toBe('string');
+
+    // The side effect landed: last_backup_date is now a real timestamp (unix seconds, mode:'timestamp').
+    const after = backupDateRow(ctx.user.id);
+    expect(after?.last_backup_date).toBeTruthy();
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    expect((after?.last_backup_date as number) <= nowSeconds + 5).toBe(true);
+  });
+
+  test('POST /settings/restore → 200 success envelope', async () => {
+    const res = await ctx.authed('POST', '/api/v1/settings/restore');
+    expect(res.status).toBe(200);
+    const body = await json<{ success: boolean; message: string }>(res);
+    expect(body.success).toBe(true);
+  });
+
+  test('both POST endpoints require auth (401 when anonymous)', async () => {
+    expect((await ctx.anon('POST', '/api/v1/settings/backup')).status).toBe(401);
+    expect((await ctx.anon('POST', '/api/v1/settings/restore')).status).toBe(401);
+  });
+});

@@ -103,6 +103,33 @@ describe('insurance premium → expense hook lifecycle', () => {
     expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2]));
   });
 
+  // C382: the materialization splits totalCost EVENLY across N covered vehicles via createSplitExpense's
+  // integer-cents largest-remainder algorithm. The existing test uses 1200/2=600 (divides evenly), so the
+  // REMAINDER-distribution path — where the per-vehicle legs are NOT all equal but MUST still sum exactly
+  // to the total — was unpinned at the HTTP/materialization layer (split-service.property.test.ts covers
+  // the pure algorithm, but not the insurance term→expense round-trip). A non-even premium ($100 / 3) is
+  // the realistic case: a rounding regression would lose or invent a cent on a user's insurance cost
+  // (NORTH_STAR #1). Pin that 3 siblings sum to EXACTLY 100.00 and the remainder cent lands on one leg.
+  test('a NON-EVEN premium split (100 / 3 vehicles) materializes legs that sum to EXACTLY the total', async () => {
+    const v1 = await seedVehicle('Honda');
+    const v2 = await seedVehicle('Toyota');
+    const v3 = await seedVehicle('Mazda');
+    const { termId } = await createPolicy([v1, v2, v3], 100);
+
+    const rows = autoExpensesForTerm(termId);
+    expect(rows).toHaveLength(3);
+
+    // Sum in integer cents to assert EXACT (not approximate) conservation — no lost/invented cent.
+    const totalCents = rows.reduce((s, r) => s + Math.round(r.expense_amount * 100), 0);
+    expect(totalCents).toBe(10000); // exactly $100.00
+
+    // Largest-remainder: two legs at 33.33, one at 33.34 (the remainder cent). Each leg is a real,
+    // near-equal share — never a 0 or a >total leg.
+    const cents = rows.map((r) => Math.round(r.expense_amount * 100)).sort((a, b) => a - b);
+    expect(cents).toEqual([3333, 3333, 3334]);
+    expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2, v3]));
+  });
+
   test('updating the term cost regenerates the auto-expenses at the new amount', async () => {
     const v1 = await seedVehicle('Honda');
     const { policyId, termId } = await createPolicy([v1], 1000);

@@ -1,4 +1,5 @@
 import { isElectricFuelType } from '../db/types';
+import { maxOf, minOf } from './calculations';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -73,6 +74,19 @@ export interface FuelExpenseRow {
   vehicleId: string;
 }
 
+/**
+ * A row counts as a real FILLUP only if it carries a positive volume. queryFuelExpenses returns ALL
+ * category='fuel' rows with no volume filter, and a SPLIT fuel expense creates one sibling PER VEHICLE
+ * with volume=null (createSiblings never sets it) — so any fillup-COUNT or per-fillup-average that
+ * counts raw rows overcounts a single split fillup as N (the #56/#18/#108/#113 split-sibling overcount
+ * class). This is the ONE source of truth for that predicate (was hand-inlined at computeAverageCosts,
+ * buildSeasonalEfficiency, buildDayOfWeekPatterns, buildFillupCostByVehicle [#146] + re-defined locally
+ * in analytics/repository's buildFuelStatsFromData); a divergent copy silently reintroduces the
+ * overcount on one surface.
+ */
+export const isFillup = (r: Pick<FuelExpenseRow, 'volume'>): boolean =>
+  r.volume != null && r.volume > 0;
+
 export interface GeneralExpenseRow {
   id: string;
   vehicleId: string;
@@ -127,6 +141,26 @@ export function computeEfficiencyPoint(
     efficiency,
     mileage: current.mileage,
   };
+}
+
+/**
+ * A GAS-MPG efficiency point: like computeEfficiencyPoint but null for an electric `current` row. ONE
+ * source of truth (C413, #122) for the gas/charge partition every MPG-aggregating builder needs — a
+ * charge session stores kWh in `volume`, so computeEfficiencyPoint emits a ~mi/kWh value that, summed
+ * into a gas-MPG average labeled mi/gal (getFuelEfficiencyLabel is always distance/volume), drags the
+ * average down + mislabels a charge's mi/kWh (#119 fixed the headline FuelStats card C411; this sweeps
+ * the sibling builders — buildMonthlyConsumption, addSeasonalEfficiencyData, computePerVehicleFuelEfficiency,
+ * the per-vehicle monthly comparison). The C353 gas/charge isolation vehicle-stats.ts does, here for the
+ * analytics pairing builders. EV-only efficiency belongs on the mi/kWh surface, not a mi/gal chart, so a
+ * gas-less car correctly contributes no point here. (cost-per-mile is NOT gated — it spans all energy,
+ * the C378 invariant — so computeMpgAndCostPerMile still calls computeEfficiencyPoint directly for cost.)
+ */
+export function gasEfficiencyPoint(
+  current: FuelRow,
+  previous: FuelRow
+): FuelEfficiencyPoint | null {
+  if (isElectricFuelType(current.fuelType)) return null;
+  return computeEfficiencyPoint(current, previous);
 }
 
 /** Convert a date to a YYYY-MM month key. */
@@ -268,6 +302,25 @@ export function forEachVehiclePair<T extends { vehicleId: string }>(
   }
 }
 
+/**
+ * Return a COPY of `rows` sorted by (vehicleId, then date ascending) — the canonical pre-sort the
+ * per-vehicle MPG / cost-per-distance / odometer-progression builders need before pairing consecutive
+ * rows (so forEachVehiclePair never straddles two cars or goes out of date order). The whole comparator
+ * was hand-duplicated byte-for-byte at 3 sites in analytics/repository.ts (C200 dedup). The date-key
+ * preserves the original `instanceof Date ? getTime() : Number(date)` exactly: `date` is `Date | number
+ * | null` (never a string), so a number is already epoch-ms and `Number(null)` → 0, both unchanged.
+ */
+export function sortByVehicleThenDate<T extends { vehicleId: string; date: Date | number | null }>(
+  rows: T[]
+): T[] {
+  return [...rows].sort((a, b) => {
+    if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
+    const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
+    const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
+    return aTime - bTime;
+  });
+}
+
 /** Compute MPG and cost-per-mile values from consecutive fuel expense pairs. */
 export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
   mpgValues: number[];
@@ -280,7 +333,14 @@ export function computeMpgAndCostPerMile(rows: FuelExpenseRow[]): {
     const point = computeEfficiencyPoint(current, previous);
     if (!point) return;
 
-    mpgValues.push(point.efficiency);
+    // mpgValues feeds the FuelStats "Fuel Consumption" card, labeled mi/gal — so a charge session's
+    // ~mi/kWh must NOT count toward it (#119/C411). gasEfficiencyPoint is the ONE source of truth for
+    // that gas/charge partition (C413). costPerMileValues is INTENTIONALLY unfiltered: cost per mile is
+    // total energy spend over total miles (fuel + charge), a consistent $/mi (C378) — so the cost block
+    // below uses `point` (any fuel type), while only a gas point counts toward mpg.
+    if (gasEfficiencyPoint(current, previous)) {
+      mpgValues.push(point.efficiency);
+    }
     const milesDriven = (current.mileage ?? 0) - (previous.mileage ?? 0);
     if (milesDriven > 0 && current.expenseAmount > 0) {
       costPerMileValues.push(current.expenseAmount / milesDriven);
@@ -305,9 +365,10 @@ export function buildMonthlyConsumption(
     map.set(key, entry);
   }
 
-  // Add efficiency data from consecutive pairs within each vehicle group
+  // Add efficiency data from consecutive pairs within each vehicle group. gasEfficiencyPoint (not
+  // computeEfficiencyPoint) so a PHEV's charge mi/kWh doesn't pollute this gas-MPG average (#122/C413).
   forEachVehiclePair(rows, (current, previous) => {
-    const point = computeEfficiencyPoint(current, previous);
+    const point = gasEfficiencyPoint(current, previous);
     if (!point) return;
     const key = toMonthKey(new Date(point.date));
     const entry = map.get(key);
@@ -352,6 +413,11 @@ export function buildFillupCostByVehicle(
 ): Array<{ month: string; vehicleId: string; vehicleName: string; avgCost: number }> {
   const map = new Map<string, { totalCost: number; count: number }>();
   for (const row of rows) {
+    // Count only volume-bearing rows: a SPLIT fuel expense creates one sibling per vehicle with
+    // volume=null, so an unguarded count/sum treats each partial-cost allocation as a standalone
+    // fillup and dilutes the per-vehicle average fillup cost (#146, the #56/#108/#113 split-sibling
+    // overcount class — the member the C391 sweep + the isFillup docstring's swept-site list missed).
+    if (!isFillup(row)) continue;
     const d = normalizeDate(row.date);
     if (!d) continue;
     const key = `${toMonthKey(d)}|${row.vehicleId}`;
@@ -384,8 +450,8 @@ export function computeFuelConsumptionMetrics(efficiencyValues: number[]): {
     return { avgEfficiency: null, bestEfficiency: null, worstEfficiency: null };
   return {
     avgEfficiency: efficiencyValues.reduce((a, b) => a + b, 0) / efficiencyValues.length,
-    bestEfficiency: Math.max(...efficiencyValues),
-    worstEfficiency: Math.min(...efficiencyValues),
+    bestEfficiency: maxOf(efficiencyValues),
+    worstEfficiency: minOf(efficiencyValues),
   };
 }
 
@@ -411,7 +477,7 @@ export function computeAverageCosts(
   // the fuel-stats COUNT already uses (C97): a null-volume split sibling counts as 0 fillups there, so
   // its share must drop out of perFillup too (else cost-in-numerator / count-not-in-denominator inflates
   // it). For an unsplit fillup volume>0 && cost>0 both hold, so this equals the old value on the common path.
-  const fillups = fuelRows.filter((r) => r.volume != null && r.volume > 0);
+  const fillups = fuelRows.filter(isFillup);
   const perFillup =
     fillups.length > 0 ? fillups.reduce((s, r) => s + r.expenseAmount, 0) / fillups.length : null;
   const daysSoFar = Math.max(
@@ -421,8 +487,8 @@ export function computeAverageCosts(
   const totalSpending = withCost.reduce((s, r) => s + r.expenseAmount, 0);
   return {
     perFillup,
-    bestCostPerDistance: costPerMileValues.length > 0 ? Math.min(...costPerMileValues) : null,
-    worstCostPerDistance: costPerMileValues.length > 0 ? Math.max(...costPerMileValues) : null,
+    bestCostPerDistance: costPerMileValues.length > 0 ? minOf(costPerMileValues) : null,
+    worstCostPerDistance: costPerMileValues.length > 0 ? maxOf(costPerMileValues) : null,
     avgCostPerDay: withCost.length > 0 ? totalSpending / daysSoFar : null,
   };
 }
@@ -594,7 +660,8 @@ function addSeasonalEfficiencyData(
       const current = vehicleRows[i];
       const previous = vehicleRows[i - 1];
       if (!current || !previous) continue;
-      const point = computeEfficiencyPoint(current, previous);
+      // gasEfficiencyPoint: gas-MPG only, no PHEV charge mi/kWh in this seasonal average (#122/C413).
+      const point = gasEfficiencyPoint(current, previous);
       if (!point) continue;
       const d = new Date(point.date);
       const season = SEASON_MAP[d.getMonth()] ?? 'Winter';
@@ -616,6 +683,12 @@ export function buildSeasonalEfficiency(
   for (const row of fuelRows) {
     const d = normalizeDate(row.date);
     if (!d) continue;
+    // Count only volume-bearing rows as fillups (#108, the #56/#18/C97 class). A split fuel
+    // expense creates one sibling PER VEHICLE, each carrying its cost share but volume=null
+    // (createSiblings never sets volume), so an unconditional row count would overcount a single
+    // split fillup as N in the season's fillupCount. A real fillup has a volume — mirror the
+    // isFillup predicate computeAverageCosts and the fuel-stats COUNT (C97) already use.
+    if (!isFillup(row)) continue;
     const season = SEASON_MAP[d.getMonth()] ?? 'Winter';
     const entry = seasonData.get(season) ?? { effSum: 0, effCount: 0, fillupCount: 0 };
     entry.fillupCount++;
@@ -675,7 +748,8 @@ function computePerVehicleFuelEfficiency(
   for (const [vId, rows] of vFuelRows) {
     const mpgValues: number[] = [];
     for (let i = 1; i < rows.length; i++) {
-      const point = computeEfficiencyPoint(rows[i] as FuelRow, rows[i - 1] as FuelRow);
+      // gasEfficiencyPoint: this feeds the radar's fuelEfficiency (gas MPG), no charge mi/kWh (#122/C413).
+      const point = gasEfficiencyPoint(rows[i] as FuelRow, rows[i - 1] as FuelRow);
       if (point) mpgValues.push(point.efficiency);
     }
     const m = metrics.get(vId);
@@ -741,34 +815,24 @@ export function buildVehicleRadar(
       vehicleName: vehicleNameMap.get(vId) ?? 'Unknown',
       fuelEfficiency: normalizeScore(
         m.fuelEfficiency,
-        Math.min(...fuelEffVals),
-        Math.max(...fuelEffVals),
+        minOf(fuelEffVals),
+        maxOf(fuelEffVals),
         false
       ),
       maintenanceCost: normalizeScore(
         m.maintenanceCost,
-        Math.min(...maintCostVals),
-        Math.max(...maintCostVals),
+        minOf(maintCostVals),
+        maxOf(maintCostVals),
         true
       ),
       reliability: normalizeScore(
         m.maintenanceCount,
-        Math.min(...reliabilityVals),
-        Math.max(...reliabilityVals),
+        minOf(reliabilityVals),
+        maxOf(reliabilityVals),
         true
       ),
-      annualCost: normalizeScore(
-        m.annualCost,
-        Math.min(...annualCostVals),
-        Math.max(...annualCostVals),
-        true
-      ),
-      mileage: normalizeScore(
-        m.totalMileage,
-        Math.min(...mileageVals),
-        Math.max(...mileageVals),
-        false
-      ),
+      annualCost: normalizeScore(m.annualCost, minOf(annualCostVals), maxOf(annualCostVals), true),
+      mileage: normalizeScore(m.totalMileage, minOf(mileageVals), maxOf(mileageVals), false),
     };
   });
 }
@@ -782,6 +846,13 @@ export function buildDayOfWeekPatterns(
   for (const row of fuelRows) {
     const d = normalizeDate(row.date);
     if (!d) continue;
+    // Count only volume-bearing rows as fillups (#113, the #56/#18/C97/#108 split-sibling class — the
+    // sibling buildSeasonalEfficiency already guards this at :644). A split fuel expense creates one
+    // sibling PER VEHICLE, each with its cost share but volume=null (createSiblings never sets volume),
+    // and queryFuelExpenses has no volume filter — so an unconditional count would overcount one split
+    // fillup as N AND skew avgVolume (totalGallons/N) + avgCost (per-row not per-fillup). A real fillup
+    // has a volume; mirror computeAverageCosts.
+    if (!isFillup(row)) continue;
     const dayName = DAY_NAMES[d.getDay()] ?? 'Sunday';
     const entry = dayData.get(dayName) ?? { count: 0, totalCost: 0, totalGallons: 0 };
     entry.count++;
@@ -1126,7 +1197,8 @@ export function buildFuelEfficiencyComparison(
   const monthVehicleEff = new Map<string, Map<string, { sum: number; count: number }>>();
   for (const [vId, rows] of byVehicle) {
     for (let i = 1; i < rows.length; i++) {
-      const point = computeEfficiencyPoint(rows[i] as FuelRow, rows[i - 1] as FuelRow);
+      // gasEfficiencyPoint: per-vehicle gas-MPG comparison, no PHEV charge mi/kWh (#122/C413).
+      const point = gasEfficiencyPoint(rows[i] as FuelRow, rows[i - 1] as FuelRow);
       if (!point) continue;
       const month = toMonthKey(new Date(point.date));
       if (!monthVehicleEff.has(month)) monthVehicleEff.set(month, new Map());

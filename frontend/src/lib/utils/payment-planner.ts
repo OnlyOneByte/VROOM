@@ -60,14 +60,25 @@ export function computePlannerState(
 		};
 	}
 
-	// Primary impact: input vs minimum
-	const extraVsMinimum = inputAmount - minimumPayment;
-	const financingAtMinimum = { ...financing, paymentAmount: minimumPayment };
+	// Baseline payment the "extra" is measured against. For an apr>0 loan that's the amortizing
+	// minimumPayment. But a 0%-APR loan has NO minimum (calculateMinimumPayment returns null →
+	// minimumPayment arrives as 0 here), and a $0 baseline makes calculateExtraPaymentImpact's
+	// original schedule trip the negative-amortization guard (principal = payment − interest = 0 ≤ 0 →
+	// 0 months), so monthsSaved = max(0, 0 − accelerated) = 0 → the planner showed "0 mos / $0 saved"
+	// for an interest-free loan an extra payment clearly shortens (#117 — the #92 symptom re-manifested
+	// at the planner layer: the C297 0%-APR fix lives one layer down in calculateExtraPaymentImpact, but
+	// feeding a $0 baseline defeats it). Fall back to the loan's real contractual paymentAmount so the
+	// baseline is a genuine amortizing schedule. apr>0 paths (minimumPayment > 0) are byte-unchanged.
+	const baselinePayment = minimumPayment > 0 ? minimumPayment : financing.paymentAmount;
+
+	// Primary impact: input vs baseline
+	const extraVsMinimum = inputAmount - baselinePayment;
+	const financingAtMinimum = { ...financing, paymentAmount: baselinePayment };
 	const primaryImpact = calculateExtraPaymentImpact(financingAtMinimum, extraVsMinimum);
 
 	// Secondary delta: input vs saved (only when different)
 	if (Math.abs(inputAmount - savedAmount) > 0.01) {
-		const extraSavedVsMinimum = savedAmount - minimumPayment;
+		const extraSavedVsMinimum = savedAmount - baselinePayment;
 		const savedImpact = calculateExtraPaymentImpact(financingAtMinimum, extraSavedVsMinimum);
 
 		const secondaryDelta: SecondaryDelta = {

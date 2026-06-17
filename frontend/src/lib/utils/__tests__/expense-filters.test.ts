@@ -123,6 +123,36 @@ describe('filterExpenses — structured filters', () => {
 		).toEqual(['b']);
 	});
 
+	// #106 (C358): the DateRangePicker binds a date-only 'YYYY-MM-DD' (CalendarDate.toString()), and the
+	// old `<= new Date(endDate)` treated that as midnight UTC → an expense ON the chosen end day was
+	// EXCLUDED (off-by-one). The bounds are now LOCAL calendar days with an inclusive end. These pin a
+	// date-picker-shaped range including an expense logged later in the day on the end boundary.
+	describe('#106 — date-picker (YYYY-MM-DD) end boundary is inclusive of the whole day', () => {
+		// An expense stored at noon-local (how dateOnlyToISO persists a date-only entry) on the end day.
+		const noonOnEndDay = new Date(2024, 5, 15, 12, 0, 0).toISOString(); // 2024-06-15 noon LOCAL
+		const dayList = [
+			expense({ id: 'before', date: new Date(2024, 5, 14, 12, 0, 0).toISOString() }),
+			expense({ id: 'onEnd', date: noonOnEndDay }),
+			expense({ id: 'after', date: new Date(2024, 5, 16, 12, 0, 0).toISOString() })
+		];
+
+		test('endDate = the picker day INCLUDES an expense logged that day (was excluded pre-#106)', () => {
+			const out = filterExpenses(dayList, '', { endDate: '2024-06-15' }).map(e => e.id);
+			expect(out).toContain('onEnd'); // the load-bearing assertion
+			expect(out).not.toContain('after');
+		});
+
+		test('a YYYY-MM-DD closed range includes both boundary days', () => {
+			const out = filterExpenses(dayList, '', {
+				startDate: '2024-06-14',
+				endDate: '2024-06-15'
+			})
+				.map(e => e.id)
+				.sort();
+			expect(out).toEqual(['before', 'onEnd']);
+		});
+	});
+
 	test('search + category compose (AND)', () => {
 		const out = filterExpenses(list, 'premium', { category: 'fuel' });
 		expect(out.map(e => e.id)).toEqual(['b']);

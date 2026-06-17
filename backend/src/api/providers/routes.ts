@@ -236,6 +236,27 @@ routes.get('/', async (c) => {
  * For google-drive: consumes pending OAuth credentials via nonce.
  * For other types: encrypts the provided credentials directly.
  */
+/**
+ * Reject a storage-provider config that the provider can NEVER instantiate with — an S3 row needs
+ * endpoint/bucket/region (buildS3Provider enforces the same at use). ONE source of truth (C416) for that
+ * required-field gate, shared by the CREATE path (resolveProviderCredentials) AND the PUT /:id handler:
+ * C349 closed this footgun on CREATE, but PUT wrote body.config verbatim, so editing an S3 provider to a
+ * config missing a field persisted a 200 + a bricked row that threw on every later test/upload/sync (#123,
+ * the #103/C349 sibling on the update path). google-drive resolves its config server-side from the OAuth
+ * nonce + google-photos needs only credentials, so neither has a required-config gate here.
+ */
+function validateStorageProviderConfig(
+  providerType: string,
+  config: Record<string, unknown> | null
+): void {
+  if (providerType === 's3') {
+    const c = config ?? {};
+    if (!c.endpoint || !c.bucket || !c.region) {
+      throw new ValidationError('S3 config must include endpoint, bucket, and region');
+    }
+  }
+}
+
 function resolveProviderCredentials(
   userId: string,
   providerType: string,
@@ -256,6 +277,10 @@ function resolveProviderCredentials(
       resolvedConfig: { ...(config ?? {}), accountEmail: pending.email },
     };
   }
+  // Fail-fast at CREATE time on a config the provider can never instantiate with (the shared gate,
+  // C349/C416) — without it the Zod schema's open `config: z.record(...)` lets a broken S3 row persist
+  // + auto-populate storageConfig, then EVERY later use throws.
+  validateStorageProviderConfig(providerType, config);
   return {
     encryptedCredentials: encrypt(JSON.stringify(credentials)),
     resolvedConfig: config,
@@ -392,16 +417,24 @@ routes.put(
       updates.displayName = body.displayName;
     }
     if (body.config !== undefined) {
+      // Same fail-fast gate CREATE uses (C416, the #103/C349 sibling): a PUT that swaps an S3 provider's
+      // config to one missing endpoint/bucket/region would otherwise persist a 200 + a bricked row that
+      // throws on every later test/upload/sync. Validate against the EXISTING provider's type.
+      validateStorageProviderConfig(existing[0].providerType, body.config);
       updates.config = body.config;
     }
     if (body.credentials !== undefined) {
       updates.credentials = encrypt(JSON.stringify(body.credentials));
     }
 
+    // Scope the destructive write on BOTH id AND userId (#63 — the C109/#52 class). The
+    // findOwnedProviderOrThrow guard above already proves ownership, so this is behavior-identical
+    // today; ANDing userId here keeps the write itself tenant-scoped so a future guard-drop/reorder
+    // can't turn it into a cross-tenant update (mirrors the C155 split + C168/C180 odometer fixes).
     const result = await db
       .update(userProviders)
       .set(updates)
-      .where(eq(userProviders.id, id))
+      .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)))
       .returning();
 
     const updated = result[0];
@@ -480,8 +513,12 @@ routes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     }
   }
 
-  // Delete the provider row
-  await db.delete(userProviders).where(eq(userProviders.id, id));
+  // Delete the provider row — scoped on BOTH id AND userId (#63, the C109/#52 class). Ownership is
+  // already proven by findOwnedProviderOrThrow above, so this is behavior-identical today; the
+  // tenant-scoped predicate keeps the destructive write safe under a future guard-drop/reorder.
+  await db
+    .delete(userProviders)
+    .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)));
 
   return c.body(null, 204);
 });

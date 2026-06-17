@@ -1,6 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, asc, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
-import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb } from '../../db/connection';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
@@ -9,8 +8,9 @@ import { formatYearMonth, toDateTimeString } from '../../db/sql-helpers';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
-import type { PaginatedResult } from '../../utils/pagination';
+import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
+import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
 import { expenseSplitService } from './split-service';
 import type { SplitConfig } from './validation';
 export interface ExpenseFilters {
@@ -177,27 +177,46 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    * and ordered by date. The READ counterpart to clearSource/deleteBySource — backs the recurring-
    * expenses T6 "this reminder materialized N expenses" view. Returns [] when nothing is linked.
    */
+  /**
+   * The tenant-scoped predicate for a source-linked expense set: (sourceType, sourceId) AND the
+   * owning userId. EVERY source read AND destructive write (findBySource / deleteBySource read +
+   * delete-write / clearSource update — 4 sites) routes through this single source so the userId
+   * scope can't drift apart. These methods act on AUTO-MATERIALIZED expenses (reminder/insurance/
+   * financing cascade cleanup), so a divergent copy dropping the userId leg would let one user's
+   * source-entity delete/deactivate wipe or null ANOTHER user's expenses (a cross-tenant destructive
+   * write — the C109/#57/#62 class). One predicate keeps the boundary in lockstep structurally.
+   */
+  private sourceScope(sourceType: string, sourceId: string, userId: string): SQL | undefined {
+    return and(
+      eq(expenses.sourceType, sourceType),
+      eq(expenses.sourceId, sourceId),
+      eq(expenses.userId, userId)
+    );
+  }
+
   async findBySource(sourceType: string, sourceId: string, userId: string): Promise<Expense[]> {
     return this.db
       .select()
       .from(expenses)
-      .where(
-        and(
-          eq(expenses.sourceType, sourceType),
-          eq(expenses.sourceId, sourceId),
-          eq(expenses.userId, userId)
-        )
-      )
+      .where(this.sourceScope(sourceType, sourceId, userId))
       .orderBy(asc(expenses.date));
   }
 
   /** IDs of all expenses for a vehicle (for photo cascade cleanup on delete). */
   async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
-    const rows = await this.db
-      .select({ id: expenses.id })
-      .from(expenses)
-      .where(eq(expenses.vehicleId, vehicleId));
-    return rows.map((r) => r.id);
+    return this.findIdsByColumn(expenses.vehicleId, vehicleId);
+  }
+
+  /**
+   * The tenant-scoped predicate for a split-expense group: groupId AND the owning userId.
+   * EVERY split-group read AND destructive write goes through this single source so the
+   * ownership scope and the deletion scope can never drift apart — a divergent copy that
+   * dropped the userId predicate would be a cross-tenant read or (worse) a cross-tenant
+   * DELETE. Behavior-identical today (groupId is a server cuid2, single-owner), but this
+   * keeps the C109 defense-in-depth boundary in lockstep structurally instead of by comment.
+   */
+  private groupOwnedBy(groupId: string, userId: string): SQL | undefined {
+    return and(eq(expenses.groupId, groupId), eq(expenses.userId, userId));
   }
 
   /** IDs of all sibling expenses in a split group, scoped to a user. */
@@ -205,7 +224,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     const rows = await this.db
       .select({ id: expenses.id })
       .from(expenses)
-      .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
+      .where(this.groupOwnedBy(groupId, userId));
     return rows.map((r) => r.id);
   }
 
@@ -302,11 +321,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
    */
   async findPaginated(filters: PaginatedExpenseFilters): Promise<PaginatedResult<Expense>> {
     try {
-      const limit = Math.min(
-        filters.limit ?? CONFIG.pagination.defaultPageSize,
-        CONFIG.pagination.maxPageSize
-      );
-      const offset = filters.offset ?? 0;
+      const { limit, offset } = clampPagination(filters);
 
       const conditions = buildExpenseConditions(filters);
 
@@ -530,13 +545,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const linked = await this.db
         .select({ id: expenses.id })
         .from(expenses)
-        .where(
-          and(
-            eq(expenses.sourceType, sourceType),
-            eq(expenses.sourceId, sourceId),
-            eq(expenses.userId, userId)
-          )
-        );
+        .where(this.sourceScope(sourceType, sourceId, userId));
 
       if (linked.length === 0) return 0;
 
@@ -546,15 +555,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         await tx
           .delete(photos)
           .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, linkedIds)));
-        await tx
-          .delete(expenses)
-          .where(
-            and(
-              eq(expenses.sourceType, sourceType),
-              eq(expenses.sourceId, sourceId),
-              eq(expenses.userId, userId)
-            )
-          );
+        await tx.delete(expenses).where(this.sourceScope(sourceType, sourceId, userId));
       });
 
       return linked.length;
@@ -577,13 +578,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const result = await this.db
         .update(expenses)
         .set({ sourceType: null, sourceId: null })
-        .where(
-          and(
-            eq(expenses.sourceType, sourceType),
-            eq(expenses.sourceId, sourceId),
-            eq(expenses.userId, userId)
-          )
-        )
+        .where(this.sourceScope(sourceType, sourceId, userId))
         .returning();
 
       return result.length;
@@ -611,17 +606,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         ? splitConfig.vehicleIds
         : splitConfig.allocations.map((a) => a.vehicleId);
 
-    const ownedVehicles = await this.db
-      .select({ id: vehicles.id })
-      .from(vehicles)
-      .where(and(eq(vehicles.userId, userId), inArray(vehicles.id, vehicleIds)));
-
-    const ownedIds = new Set(ownedVehicles.map((v) => v.id));
-    for (const vid of vehicleIds) {
-      if (!ownedIds.has(vid)) {
-        throw new NotFoundError('Vehicle');
-      }
-    }
+    // Delegate the cross-tenant ownership query to the shared assertVehiclesOwned (C376) — ONE source
+    // of truth shared with the insurance term path. This wrapper keeps the split-config field
+    // extraction; the helper owns the `userId AND id IN (ids)` predicate + the NotFoundError throw.
+    await assertVehiclesOwned(this.db, vehicleIds, userId);
   }
 
   /**
@@ -684,7 +672,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     const siblings = await this.db
       .select()
       .from(expenses)
-      .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
+      .where(this.groupOwnedBy(groupId, userId));
 
     if (siblings.length === 0) {
       throw new NotFoundError('Split expense');
@@ -701,7 +689,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     const siblings = await this.db
       .select({ id: expenses.id })
       .from(expenses)
-      .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
+      .where(this.groupOwnedBy(groupId, userId));
 
     if (siblings.length === 0) {
       throw new NotFoundError('Split expense');
@@ -721,9 +709,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         // SAME predicate. Behavior-identical today (groupId is a server cuid2, single-owner), but a
         // defense-in-depth boundary so a future cross-user group can never be cross-deleted (the C109
         // detectConflicts tenant-scope class).
-        await tx
-          .delete(expenses)
-          .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
+        await tx.delete(expenses).where(this.groupOwnedBy(groupId, userId));
       });
     } catch (error) {
       logger.error('Failed to delete split expense', {
@@ -746,7 +732,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     const oldSiblings = await this.db
       .select()
       .from(expenses)
-      .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
+      .where(this.groupOwnedBy(groupId, userId));
 
     if (oldSiblings.length === 0) {
       throw new NotFoundError('Split expense');
@@ -790,9 +776,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
         // 2. Delete old siblings (userId-scoped to match the read above — same predicate for the
         // ownership check and the destructive write; see deleteSplitExpense for the rationale).
-        await tx
-          .delete(expenses)
-          .where(and(eq(expenses.groupId, groupId), eq(expenses.userId, userId)));
+        await tx.delete(expenses).where(this.groupOwnedBy(groupId, userId));
 
         // 3. Insert new siblings with same groupId
         const newSiblings = await expenseSplitService.createSiblings(tx, {

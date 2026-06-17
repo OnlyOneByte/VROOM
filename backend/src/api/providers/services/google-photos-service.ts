@@ -173,8 +173,15 @@ export function createRealPhotosClient(refreshToken: string): PhotosClient {
         body: new Uint8Array(buffer),
       });
       if (!res.ok) {
+        // uploadBytes can't use authedFetch (it needs the raw-octet upload headers), so it must
+        // mirror authedFetch's status→code mapping: a 401/403 here is an EXPIRED/REVOKED token, not a
+        // transient network flake. Classifying it as NETWORK_ERROR makes the backoff retry it as a
+        // retryable glitch (a 401 storm) instead of surfacing AUTH_INVALID so the user re-connects
+        // (#105). The sibling batchCreate/download/list paths already map 401→AUTH_INVALID via authedFetch.
         throw new SyncError(
-          SyncErrorCode.NETWORK_ERROR,
+          res.status === 401 || res.status === 403
+            ? SyncErrorCode.AUTH_INVALID
+            : SyncErrorCode.NETWORK_ERROR,
           `Google Photos upload failed: ${res.status}`
         );
       }

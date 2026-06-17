@@ -10,10 +10,10 @@ import {
   commonSchemas,
   validateFinancingOwnership,
   validateLoanTerms,
+  validateVehicleOwnership,
 } from '../../utils/validation';
-import { vehicleRepository } from '../vehicles/repository';
-import { onFinancingDeactivated } from './hooks';
-import { financingRepository, isEligibleForPayoff } from './repository';
+import { deactivateFinancing } from './hooks';
+import { financingRepository, withComputedBalance } from './repository';
 
 const routes = new Hono();
 
@@ -83,11 +83,7 @@ async function enrichWithBalance(
   financing: NonNullable<Awaited<ReturnType<typeof financingRepository.findByVehicleId>>>
 ) {
   const computedBalance = await financingRepository.computeBalance(financing.id);
-  return {
-    ...financing,
-    computedBalance,
-    eligibleForPayoff: isEligibleForPayoff(computedBalance),
-  };
+  return withComputedBalance(financing, computedBalance);
 }
 
 // GET /api/vehicles/:vehicleId/financing - Get financing details for a vehicle
@@ -97,10 +93,7 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-    if (!vehicle) {
-      throw new HTTPException(404, { message: 'Vehicle not found' });
-    }
+    await validateVehicleOwnership(vehicleId, user.id);
 
     const financingData = await financingRepository.findByVehicleId(vehicleId);
     if (!financingData) {
@@ -126,10 +119,7 @@ routes.post(
     const { vehicleId } = c.req.valid('param');
     const financingData = c.req.valid('json');
 
-    const vehicle = await vehicleRepository.findByUserIdAndId(user.id, vehicleId);
-    if (!vehicle) {
-      throw new HTTPException(404, { message: 'Vehicle not found' });
-    }
+    await validateVehicleOwnership(vehicleId, user.id);
 
     if (financingData.financingType === 'loan' && financingData.apr !== undefined) {
       const validationErrors = validateLoanTerms({
@@ -149,8 +139,32 @@ routes.post(
     const existingFinancing = await financingRepository.findByVehicleId(vehicleId);
 
     if (existingFinancing) {
+      // This endpoint is "the vehicle's financing is now THIS" — a create-or-replace. If the prior
+      // financing was paid off / completed (isActive=false, via PUT /payoff or DELETE), re-financing
+      // the same vehicle reuses that row, and `isActive` is .optional() in the create schema (it's a
+      // .notNull().default(true) column, so drizzle-zod omits it) → the client never sends it → the
+      // update would LEAVE isActive=false, silently dropping the new active financing from
+      // findActiveFinancing + loanBreakdown/analytics + the FE's isActive gate (#67). Re-activate
+      // explicitly, mirroring how create() defaults isActive=true. A still-active record stays active
+      // (idempotent). endDate is likewise cleared so a stale payoff/lease-end date can't linger.
+      //
+      // The cross-type optional fields must ALSO be reset, not merged (C293, the sibling defect to the
+      // #67 reset). `update()` skips `undefined` keys, but these are all `.optional()` in the create
+      // schema — so switching a vehicle's financing TYPE (lease↔loan) without re-sending the prior
+      // type's fields would LEAVE them stale (a `loan` row carrying a lease `mileageLimit`, consumed by
+      // FE lease-metrics + the Sheets export — NORTH_STAR #2). A fresh create() defaults each absent
+      // nullable column to NULL; the create-or-REPLACE path must produce the same clean row. Coalesce
+      // every optional cross-type/schedule field to null so the reused row mirrors a fresh insert.
       const updatedFinancing = await financingRepository.update(existingFinancing.id, {
         ...financingData,
+        apr: financingData.apr ?? null,
+        paymentDayOfMonth: financingData.paymentDayOfMonth ?? null,
+        paymentDayOfWeek: financingData.paymentDayOfWeek ?? null,
+        residualValue: financingData.residualValue ?? null,
+        mileageLimit: financingData.mileageLimit ?? null,
+        excessMileageFee: financingData.excessMileageFee ?? null,
+        isActive: true,
+        endDate: null,
       });
       return c.json({
         success: true,
@@ -204,12 +218,7 @@ routes.put('/:financingId/payoff', zValidator('param', financingParamsSchema), a
   const { financingId } = c.req.valid('param');
   await validateFinancingOwnership(financingId, user.id);
 
-  const updated = await financingRepository.update(financingId, {
-    isActive: false,
-    endDate: new Date(),
-  });
-
-  await onFinancingDeactivated(financingId, user.id);
+  const updated = await deactivateFinancing(financingId, user.id);
 
   return c.json({
     success: true,
@@ -224,12 +233,7 @@ routes.delete('/:financingId', zValidator('param', financingParamsSchema), async
   const { financingId } = c.req.valid('param');
   await validateFinancingOwnership(financingId, user.id);
 
-  await financingRepository.update(financingId, {
-    isActive: false,
-    endDate: new Date(),
-  });
-
-  await onFinancingDeactivated(financingId, user.id);
+  await deactivateFinancing(financingId, user.id);
 
   return c.json({ success: true, message: 'Financing marked as completed successfully' });
 });

@@ -21,3 +21,11 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Playwright — transient per-run artifacts (traces, network logs, failure PNGs, reports).
+# These regenerate on every e2e run and must never be committed (the standard Playwright
+# convention). Does NOT touch e2e/*.spec sources or the *-snapshots/ baselines.
+test-results/
+playwright-report/
+blob-report/
+.playwright-artifacts-*/

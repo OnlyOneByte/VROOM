@@ -13,6 +13,7 @@
 
 import { CONFIG } from '../../config';
 import type { PhotoRef } from '../../db/schema';
+import { isSyncError, SyncErrorCode } from '../../errors';
 import { extractErrorMessage } from '../../utils/error-handling';
 import { logger } from '../../utils/logger';
 import { photoRefRepository } from '../photos/photo-ref-repository';
@@ -62,6 +63,13 @@ const MAX_IN_FLIGHT_ENTRIES = 500;
 
 /** Base backoff interval in seconds. Actual delay = BASE_BACKOFF_SECONDS * 2^retryCount */
 const BASE_BACKOFF_SECONDS = 30;
+
+/**
+ * Retry ceiling — must mirror the `retryCount < 3` bound in
+ * photoRefRepository.findPendingOrFailed. Setting a ref's retryCount to this value takes it
+ * out of the pending/failed work set (used to terminally park a non-retryable auth failure).
+ */
+const MAX_RETRY_COUNT = 3;
 
 /**
  * Check whether a failed ref should be skipped due to exponential backoff.
@@ -258,22 +266,39 @@ async function processSingleRef(
       targetProviderId: ref.providerId,
     });
   } catch (error) {
-    // On failure: increment retry_count, set errorMessage, update syncedAt for backoff tracking
+    // On failure: set errorMessage, update syncedAt for backoff tracking.
     const errorMessage = extractErrorMessage(error);
+
+    // A revoked/expired token (AUTH_INVALID) or a denied scope (PERMISSION_DENIED) is TERMINAL —
+    // retrying it burns backoff cycles and never succeeds. The provider adapters deliberately map
+    // a 401/403 to these codes (#105) "so the user re-connects"; honor that here by jumping
+    // retryCount straight to the cap so findPendingOrFailed (`retryCount < 3`) stops re-picking it,
+    // and prefix the message so the provider-stats `failed` count surfaces "reconnect required"
+    // rather than masquerading as a transient network flake (#144, the #105/#43/#44 family at the
+    // sync-worker consumer leg).
+    const isTerminalAuth =
+      isSyncError(error) &&
+      (error.code === SyncErrorCode.AUTH_INVALID || error.code === SyncErrorCode.PERMISSION_DENIED);
+    const retryCount = isTerminalAuth ? MAX_RETRY_COUNT : ref.retryCount + 1;
 
     await deps.photoRefRepository.updateStatus(ref.id, {
       status: 'failed',
-      errorMessage,
-      retryCount: ref.retryCount + 1,
+      errorMessage: isTerminalAuth ? `Reconnect required: ${errorMessage}` : errorMessage,
+      retryCount,
       syncedAt: new Date(),
     });
 
-    logger.warn('Sync worker: ref sync failed, will retry', {
-      refId: ref.id,
-      photoId: ref.photoId,
-      retryCount: ref.retryCount + 1,
-      error: errorMessage,
-    });
+    logger.warn(
+      isTerminalAuth
+        ? 'Sync worker: ref sync failed with a terminal auth error, will NOT retry'
+        : 'Sync worker: ref sync failed, will retry',
+      {
+        refId: ref.id,
+        photoId: ref.photoId,
+        retryCount,
+        error: errorMessage,
+      }
+    );
   }
 }
 

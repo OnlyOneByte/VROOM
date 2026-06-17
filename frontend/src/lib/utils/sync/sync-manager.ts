@@ -11,11 +11,16 @@ import {
 	type SyncConflict,
 	type SyncConfig
 } from './sync-state.svelte';
-import { loadOfflineExpenses, saveOfflineExpenses, type OfflineExpense } from '../offline-storage';
+import {
+	getPendingExpenses,
+	isIncompleteFuelExpense,
+	markExpenseAsSynced,
+	offlineExpenseToBackend,
+	type OfflineExpense
+} from '../offline-storage';
 import { extractErrorMessage } from '$lib/utils/error-handling';
-import type { ExpenseCategory } from '$lib/types';
-import { toBackendExpense } from '$lib/services/api-transformer';
 import { apiClient } from '$lib/services/api-client';
+import { type BackendExpenseResponse, fromBackendExpense } from '$lib/services/api-transformer';
 import { browser } from '$app/environment';
 
 // Re-export types and state for consumers
@@ -97,7 +102,7 @@ class SyncManager {
 		syncState.current = 'syncing';
 
 		try {
-			const pendingExpenses = this.getPendingExpenses();
+			const pendingExpenses = getPendingExpenses();
 			const result = await this.syncExpenses(pendingExpenses);
 
 			if (result.success && result.conflicts.length === 0) {
@@ -122,9 +127,6 @@ class SyncManager {
 		}
 	}
 
-	private getPendingExpenses(): OfflineExpense[] {
-		return loadOfflineExpenses().filter(expense => !expense.synced);
-	}
 
 	private async syncExpenses(expenses: OfflineExpense[]): Promise<SyncResult> {
 		const result: SyncResult = {
@@ -146,7 +148,7 @@ class SyncManager {
 
 					if (syncResult.success) {
 						result.synced++;
-						this.markExpenseAsSynced(expense.id);
+						markExpenseAsSynced(expense.id);
 						this.retryCount.delete(expense.id);
 					} else if (syncResult.conflict) {
 						result.conflicts.push(syncResult.conflict);
@@ -194,10 +196,7 @@ class SyncManager {
 				return { success: false, conflict };
 			}
 
-			if (
-				expense.category === 'fuel' &&
-				((!expense.volume && !expense.charge) || !expense.mileage)
-			) {
+			if (isIncompleteFuelExpense(expense)) {
 				return {
 					success: false,
 					error:
@@ -205,17 +204,7 @@ class SyncManager {
 				};
 			}
 
-			const backendExpense = toBackendExpense({
-				vehicleId: expense.vehicleId,
-				tags: expense.tags,
-				category: expense.category as ExpenseCategory,
-				amount: expense.amount,
-				date: expense.date,
-				mileage: expense.mileage,
-				volume: expense.volume,
-				charge: expense.charge,
-				description: expense.description
-			});
+			const backendExpense = offlineExpenseToBackend(expense);
 
 			// Send the idempotency key so a retried POST returns the original row
 			// instead of creating a duplicate.
@@ -230,10 +219,15 @@ class SyncManager {
 		expense: OfflineExpense
 	): Promise<{ date: string; amount: number; tags: string[] } | null> {
 		try {
-			const expenses = await apiClient.get<Array<{ date: string; amount: number; tags: string[] }>>(
+			// GET /expenses returns RAW backend rows (expenseAmount, un-split volume) — map each through
+			// fromBackendExpense like every other expense read (#133, the #128 class). Skipping it left
+			// `existing.amount` undefined, so determineConflictType's `Math.abs(local.amount - server.amount)`
+			// was NaN → amountMatch always false → a genuine duplicate mis-classified 'modified', and the
+			// SyncConflictResolver dialog rendered a blank server amount.
+			const rows = await apiClient.get<BackendExpenseResponse[]>(
 				`/api/v1/expenses?vehicleId=${expense.vehicleId}&date=${expense.date}&amount=${expense.amount}`
 			);
-			const expenseList = Array.isArray(expenses) ? expenses : [];
+			const expenseList = Array.isArray(rows) ? rows.map(fromBackendExpense) : [];
 			return (
 				expenseList.find(existing => expense.tags.some(tag => existing.tags?.includes(tag))) || null
 			);
@@ -253,26 +247,45 @@ class SyncManager {
 		return amountMatch && tagsMatch && dateMatch ? 'duplicate' : 'modified';
 	}
 
-	private markExpenseAsSynced(expenseId: string): void {
-		const expenses = loadOfflineExpenses();
-		const updatedExpenses = expenses.map(expense =>
-			expense.id === expenseId ? { ...expense, synced: true } : expense
-		);
-		saveOfflineExpenses(updatedExpenses);
-	}
-
 	private async retrySingleExpense(expense: OfflineExpense): Promise<void> {
 		if (!onlineStatus.current) return;
+
+		// The expense may have been resolved/synced between this backoff retry being SCHEDULED (on an
+		// earlier failed POST) and its firing — e.g. an interleaving syncAll surfaced the conflict (a
+		// lost-response duplicate) and the user resolved it (markExpenseAsSynced). The setTimeout is
+		// detached from retryCount, so it fires regardless; without this re-check it would re-run the
+		// conflict-check, find the committed server row, and RESURRECT the already-resolved conflict —
+		// re-listing it in syncConflicts.current + flipping syncState back to 'error' (the C424 dedup
+		// doesn't catch it because resolution already removed it from the live set). getPendingExpenses()
+		// is the !synced source of truth (C426): if the row is no longer pending, the retry is a no-op.
+		if (!getPendingExpenses().some(e => e.id === expense.id)) return;
 
 		try {
 			const result = await this.syncSingleExpense(expense);
 			if (result.success) {
-				this.markExpenseAsSynced(expense.id);
+				markExpenseAsSynced(expense.id);
 				this.retryCount.delete(expense.id);
 				const currentExpenses = offlineExpenseQueue.current;
 				offlineExpenseQueue.current = currentExpenses.map(e =>
 					e.id === expense.id ? { ...e, synced: true } : e
 				);
+			} else if (result.conflict) {
+				// #121 (C424): a conflict detected ON A RETRY must be SURFACED for resolution, just like the
+				// main syncExpenses loop does (which pushes to result.conflicts → syncConflicts.current). The
+				// realistic trigger: the first POST committed server-side but its response was lost → the
+				// expense stayed pending + a retry was scheduled → on retry checkForExistingExpense now finds
+				// the committed row → conflict. Without this branch the conflict was silently dropped: no
+				// SyncConflictResolver dialog, the expense stuck pending, retryCount never cleared. Append
+				// (don't replace) since the retry runs async AFTER syncAll returned — other conflicts may
+				// already be displayed; dedup by expense id so a re-retry can't double-list it.
+				this.retryCount.delete(expense.id);
+				const already = syncConflicts.current.some(
+					c => c.localExpense.id === result.conflict?.localExpense.id
+				);
+				if (!already) {
+					syncConflicts.current = [...syncConflicts.current, result.conflict];
+					syncState.current = 'error';
+				}
 			}
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Retry failed for expense:', expense.id, error);
@@ -286,31 +299,29 @@ class SyncManager {
 		try {
 			switch (resolution) {
 				case 'keep_local': {
-					const backendExpense = toBackendExpense({
-						vehicleId: conflict.localExpense.vehicleId,
-						tags: conflict.localExpense.tags,
-						category: conflict.localExpense.category as ExpenseCategory,
-						amount: conflict.localExpense.amount,
-						date: conflict.localExpense.date,
-						mileage: conflict.localExpense.mileage,
-						volume: conflict.localExpense.volume,
-						charge: conflict.localExpense.charge,
-						description: conflict.localExpense.description
-					});
+					const backendExpense = offlineExpenseToBackend(conflict.localExpense);
 					try {
+						// NOTE (#98, escalated C324): this POSTs to the CREATE endpoint, whose
+						// idempotency keys on (userId, clientId). `forceOverwrite` is NOT honored by the
+						// backend (Zod strips unknown keys) — so on a GENUINE clientId collision the
+						// create returns the existing row UNCHANGED and the local edit is NOT applied,
+						// while we still markExpenseAsSynced + return true. It only "works" because the
+						// fuzzy pre-check (checkForExistingExpense) flags DISTINCT rows whose clientId is
+						// new (→ a clean insert). A real overwrite path (PUT-on-collision / upsert) is the
+						// product/arch call in #98; the field is left here pending that decision, not relied on.
 						await apiClient.post('/api/v1/expenses', {
 							...backendExpense,
 							clientId: conflict.localExpense.clientId,
 							forceOverwrite: true
 						});
-						this.markExpenseAsSynced(conflict.localExpense.id);
+						markExpenseAsSynced(conflict.localExpense.id);
 						return true;
 					} catch {
 						break;
 					}
 				}
 				case 'keep_server':
-					this.markExpenseAsSynced(conflict.localExpense.id);
+					markExpenseAsSynced(conflict.localExpense.id);
 					return true;
 				case 'merge':
 					return await this.resolveConflict(conflict, 'keep_local');
@@ -319,12 +330,6 @@ class SyncManager {
 			if (import.meta.env.DEV) console.error('Failed to resolve conflict:', error);
 		}
 		return false;
-	}
-
-	async clearSyncedExpenses(): Promise<void> {
-		const expenses = loadOfflineExpenses();
-		const pendingExpenses = expenses.filter(expense => !expense.synced);
-		saveOfflineExpenses(pendingExpenses);
 	}
 
 	getRetryCount(expenseId: string): number {
@@ -341,7 +346,7 @@ class SyncManager {
 			window.addEventListener('online', () => {
 				if (!this.syncInProgress) {
 					fetchLastSyncTime();
-					const pendingExpenses = this.getPendingExpenses();
+					const pendingExpenses = getPendingExpenses();
 					if (pendingExpenses.length > 0) {
 						setTimeout(() => {
 							this.syncAll().catch(error => {

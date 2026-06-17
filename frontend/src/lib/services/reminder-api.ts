@@ -1,4 +1,5 @@
 import type {
+	BackendExpenseResponse,
 	Expense,
 	RecurringCostSummary,
 	Reminder,
@@ -7,6 +8,8 @@ import type {
 	TriggerResult
 } from '$lib/types';
 import { apiClient } from './api-client';
+import { fromBackendExpense } from './api-transformer';
+import { buildQueryString } from './api-utils';
 
 interface ReminderListFilters {
 	vehicleId?: string;
@@ -16,12 +19,14 @@ interface ReminderListFilters {
 
 function buildReminderQuery(filters?: ReminderListFilters): string {
 	if (!filters) return '';
-	const query = new URLSearchParams();
-	if (filters.vehicleId) query.set('vehicleId', filters.vehicleId);
-	if (filters.type) query.set('type', filters.type);
-	if (filters.isActive !== undefined) query.set('isActive', String(filters.isActive));
-	const qs = query.toString();
-	return qs ? `?${qs}` : '';
+	// vehicleId/type keep their truthy-drop (an empty string is omitted, not serialized) via
+	// `|| undefined`; isActive must SURVIVE when false, so pass the boolean through as-is (the
+	// shared filter drops only null/undefined). Matches the prior hand-rolled construction exactly.
+	return buildQueryString({
+		vehicleId: filters.vehicleId || undefined,
+		type: filters.type || undefined,
+		isActive: filters.isActive
+	});
 }
 
 /**
@@ -70,9 +75,15 @@ export const reminderApi = {
 	 * The expense rows this reminder has materialized (recurring-expenses T6 — the "this reminder
 	 * created N expenses" view). Backend: GET /:id/expenses → expenseRepository.findBySource
 	 * (ownership-checked, user-scoped), ordered oldest-first.
+	 *
+	 * The route returns RAW repository rows (backend shape: `expenseAmount`, un-split `volume`), so
+	 * map each through `fromBackendExpense` exactly like every other expense read (expense-api.ts) —
+	 * otherwise a consumer reading `expense.amount` gets undefined and an electric charge stays in
+	 * `volume` instead of `charge`. (The FE→BE-seam type-lie NORTH_STAR #3 warns about.)
 	 */
 	async getMaterializedExpenses(id: string): Promise<Expense[]> {
-		return apiClient.get<Expense[]>(`/api/v1/reminders/${id}/expenses`);
+		const data = await apiClient.get<BackendExpenseResponse[]>(`/api/v1/reminders/${id}/expenses`);
+		return data.map(fromBackendExpense);
 	},
 
 	/**

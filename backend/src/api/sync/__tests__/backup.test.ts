@@ -217,6 +217,42 @@ describe('coerceRow: Numeric columns', () => {
     const result = coerceRow(row, expenses);
     expect(result.mileage).toBeNull();
   });
+
+  // #68 (data-safety, C209): the Google Sheets restore reads cells as FORMATTED_VALUE (default
+  // valueRenderOption), so a thousands-separated odometer/mileage comes back as a string like
+  // "12,345". The old Number.parseInt(strVal, 10) stopped at the comma → 12 (a 1000x silent
+  // corruption, NORTH_STAR #1). These pin the comma-aware strict parse.
+  test('#68 INTEGER: a thousands-separated mileage keeps its full value (not parseInt-truncated)', () => {
+    const row = buildMinimalStringRow(expenses, { mileage: '12,345' });
+    const result = coerceRow(row, expenses);
+    expect(result.mileage).toBe(12345); // was 12 under parseInt — the bug
+  });
+
+  test('#68 INTEGER: a "12345.0"-style Sheets numeric string rounds to the whole number', () => {
+    const row = buildMinimalStringRow(expenses, { mileage: '45000.0' });
+    const result = coerceRow(row, expenses);
+    expect(result.mileage).toBe(45000);
+  });
+
+  test('#68 INTEGER: a genuine garbage tail still rejects to null (strict, not truncated)', () => {
+    // Number('12abc') is NaN (unlike parseInt('12abc')=12) → null, matching the garbage→null contract.
+    const row = buildMinimalStringRow(expenses, { mileage: '12abc' });
+    const result = coerceRow(row, expenses);
+    expect(result.mileage).toBeNull();
+  });
+
+  test('#68 REAL: a thousands-separated amount keeps its full value (not parseFloat-truncated)', () => {
+    const row = buildMinimalStringRow(expenses, { expenseAmount: '1,234.56' });
+    const result = coerceRow(row, expenses);
+    expect(result.expenseAmount).toBe(1234.56); // was 1 under parseFloat — the bug
+  });
+
+  test('#68 REAL: a plain integer-valued amount (CSV round-trip) is unchanged', () => {
+    // The CSV path writes a raw number with no separators — confirm the fix didn't regress it.
+    const row = buildMinimalStringRow(expenses, { expenseAmount: '50' });
+    const result = coerceRow(row, expenses);
+    expect(result.expenseAmount).toBe(50);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -334,6 +370,89 @@ describe('validateBackupData: acceptance', () => {
     const result = backupService.validateBackupData(backup);
     expect(result.valid).toBe(true);
     expect(result.errors).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateBackupData: cross-row UNIQUE constraints (#127, C428)
+// A corrupt/truncated backup whose rows violate a DB unique index (duplicate non-null clientId /
+// licensePlate) passes per-row schema + referential checks but throws on the 2nd colliding INSERT.
+// Because bun-sqlite's async-tx callback does NOT roll back the wipe (the C151 footgun), a replace-mode
+// restore would leave the account EMPTY. Catching the duplicate at validation = the insert can't fail on
+// it = the destructive wipe never runs. (The general transient-failure atomicity fix is escalated C428.)
+// ---------------------------------------------------------------------------
+describe('validateBackupData: cross-row unique constraints (#127)', () => {
+  function backupWith(over: Partial<ParsedBackupData>): ParsedBackupData {
+    return {
+      metadata: { version: '1.0.0', timestamp: new Date().toISOString(), userId: 'u1' },
+      vehicles: [],
+      expenses: [],
+      financing: [],
+      insurance: [],
+      insuranceTerms: [],
+      insuranceTermVehicles: [],
+      userPreferences: [],
+      syncState: [],
+      photos: [],
+      odometer: [],
+      photoRefs: [],
+      ...over,
+    };
+  }
+
+  test('two expenses sharing a non-null clientId are rejected (would crash the restore insert)', () => {
+    const v = coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles);
+    const mkExpense = () =>
+      coerceRow(
+        buildMinimalStringRow(expenses, {
+          vehicleId: v.id as string,
+          userId: 'u1',
+          missedFillup: '',
+        }),
+        expenses
+      );
+    const e1 = { ...mkExpense(), id: 'e1', clientId: 'dup-cid' } as Record<string, unknown>;
+    const e2 = { ...mkExpense(), id: 'e2', clientId: 'dup-cid' } as Record<string, unknown>;
+    const result = backupService.validateBackupData(
+      backupWith({ vehicles: [v], expenses: [e1, e2] })
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('clientId'))).toBe(true);
+  });
+
+  test('two vehicles sharing a non-null licensePlate are rejected', () => {
+    const v1 = {
+      ...coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles),
+      id: 'v1',
+      licensePlate: 'ABC123',
+    } as Record<string, unknown>;
+    const v2 = {
+      ...coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles),
+      id: 'v2',
+      licensePlate: 'ABC123',
+    } as Record<string, unknown>;
+    const result = backupService.validateBackupData(backupWith({ vehicles: [v1, v2] }));
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('licensePlate'))).toBe(true);
+  });
+
+  test('NULL licensePlate does NOT collide (the index is partial — many nulls allowed)', () => {
+    // Explicitly NULL the plate on both: the partial unique index is `WHERE license_plate IS NOT NULL`,
+    // so two null-plate vehicles are NOT a duplicate — dupCheck must skip nulls. (buildMinimalStringRow
+    // fills every column with a `test-<name>` default, so without this override BOTH would share
+    // 'test-licensePlate' and legitimately collide — confirming the dupCheck fires; this pins the null skip.)
+    const v1 = {
+      ...coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles),
+      id: 'v1',
+      licensePlate: null,
+    } as Record<string, unknown>;
+    const v2 = {
+      ...coerceRow(buildMinimalStringRow(vehicles, { userId: 'u1' }), vehicles),
+      id: 'v2',
+      licensePlate: null,
+    } as Record<string, unknown>;
+    const result = backupService.validateBackupData(backupWith({ vehicles: [v1, v2] }));
+    expect(result.valid).toBe(true);
   });
 });
 

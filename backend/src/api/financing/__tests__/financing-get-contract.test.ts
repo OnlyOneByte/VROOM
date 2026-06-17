@@ -41,6 +41,7 @@ interface FinancingShape {
   financingType: string;
   provider: string;
   originalAmount: number;
+  isActive?: boolean;
   computedBalance?: number;
   eligibleForPayoff?: boolean;
 }
@@ -119,5 +120,79 @@ describe('GET single financing — enriched contract (FE↔BE drift guard)', () 
     const id = await seedVehicle('NoFinancing');
     const body = await getFinancing(id);
     expect(body.data).toBeNull();
+  });
+});
+
+/**
+ * #67 (data-correctness, found C206) — re-financing a vehicle whose prior financing was paid off must
+ * produce an ACTIVE record. The POST endpoint is a create-or-replace keyed on vehicleId; when a prior
+ * row exists it reuses it via update(). `isActive` is .optional() in the create schema (a
+ * .notNull().default(true) column → drizzle-zod omits it), and the FE financing payload never sends it,
+ * so the update LEFT the prior isActive=false → the new active loan was silently dropped from
+ * findActiveFinancing + loanBreakdown/analytics + the FE's isActive gate. The fix re-activates (+ clears
+ * endDate) on the upsert. These pin that contract over the real HTTP stack.
+ */
+describe('POST financing upsert — #67 re-activates a paid-off record', () => {
+  test('re-financing a paid-off vehicle yields an ACTIVE record (the regression)', async () => {
+    const id = await seedVehicle('Refinanced');
+    await seedLoan(id);
+
+    // Pay off the financing → isActive=false, endDate set. PUT /:financingId/payoff keys on the
+    // financingId, so resolve it from the GET first.
+    const seeded = (await getFinancing(id)).data;
+    expect(seeded, 'seeded loan should be present').not.toBeNull();
+    if (!seeded) throw new Error('unreachable');
+    const payoff = await ctx.authed('PUT', `/api/v1/financing/${seeded.id}/payoff`);
+    expect(payoff.status, 'payoff should succeed').toBeLessThan(300);
+
+    // Confirm it really is inactive now (the precondition the bug needs).
+    const paidOff = (await getFinancing(id)).data;
+    expect(paidOff, 'financing row should still exist after payoff').not.toBeNull();
+    expect(paidOff?.isActive).toBe(false);
+
+    // Re-finance the SAME vehicle (a fresh lease) — the FE payload omits isActive, as the real form does.
+    const refi = await ctx.authed('POST', `/api/v1/financing/vehicles/${id}/financing`, {
+      financingType: 'lease',
+      provider: 'New Leasing Co',
+      originalAmount: 25000,
+      termMonths: 36,
+      startDate: '2025-01-01',
+      paymentAmount: 350,
+      paymentFrequency: 'monthly',
+      mileageLimit: 12000,
+      excessMileageFee: 0.25,
+    });
+    const refiBody = await json<DataEnvelope<FinancingShape>>(refi);
+    expect(refi.status, JSON.stringify(refiBody)).toBeLessThan(300);
+
+    // The re-financed record MUST be active again (was the bug: stayed false).
+    const after = (await getFinancing(id)).data;
+    expect(after, 'refinanced vehicle should return a financing object').not.toBeNull();
+    expect(after?.isActive).toBe(true);
+    expect(after?.financingType).toBe('lease');
+    expect(after?.originalAmount).toBe(25000);
+  });
+
+  test('updating an already-active financing keeps it active (idempotent, no regression)', async () => {
+    const id = await seedVehicle('ActiveUpdate');
+    await seedLoan(id);
+
+    // Update some terms on the still-active loan (the normal edit path).
+    const upd = await ctx.authed('POST', `/api/v1/financing/vehicles/${id}/financing`, {
+      financingType: 'loan',
+      provider: 'Test Credit Union',
+      originalAmount: 22000,
+      apr: 4.5,
+      termMonths: 60,
+      startDate: '2024-01-01',
+      paymentAmount: 400,
+      paymentFrequency: 'monthly',
+    });
+    const updBody = await json<DataEnvelope<FinancingShape>>(upd);
+    expect(upd.status, JSON.stringify(updBody)).toBeLessThan(300);
+
+    const after = (await getFinancing(id)).data;
+    expect(after?.isActive).toBe(true);
+    expect(after?.originalAmount).toBe(22000);
   });
 });

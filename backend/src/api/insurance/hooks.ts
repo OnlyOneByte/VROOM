@@ -7,6 +7,20 @@
 
 import { logger } from '../../utils/logger';
 import { expenseRepository } from '../expenses/repository';
+import type { TermCoverageRow } from './repository';
+
+/**
+ * Derive the vehicleIds covered by a single term from a policy's junction coverage rows.
+ * One source of truth for the `termVehicleCoverage.filter(termId).map(vehicleId)` derivation that
+ * the three term-expense sites (create-policy loop, addTerm, updateTerm in routes.ts) repeated
+ * byte-identically (C273 dedup). Pure — no DB.
+ */
+export function vehicleIdsForTerm(
+  termVehicleCoverage: readonly TermCoverageRow[],
+  termId: string
+): string[] {
+  return termVehicleCoverage.filter((tc) => tc.termId === termId).map((tc) => tc.vehicleId);
+}
 
 interface TermExpenseParams {
   termId: string;

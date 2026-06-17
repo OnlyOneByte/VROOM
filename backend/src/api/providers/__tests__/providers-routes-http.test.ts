@@ -66,8 +66,10 @@ async function createProvider(
     domain: over.domain ?? 'storage',
     providerType: 's3',
     displayName: over.displayName ?? 'Test S3 Storage',
-    credentials: { secretAccessKey: 'super-secret-value', bucket: 'b', region: 'us-east-1' },
-    config: { some: 'setting' },
+    credentials: { accessKeyId: 'AKIA-test', secretAccessKey: 'super-secret-value' },
+    // S3 config must carry endpoint/bucket/region (C349: create-time validation rejects an
+    // incomplete S3 config rather than persisting a row that throws on first use).
+    config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
   });
   expect(res.status).toBe(201);
   return (await json<DataEnvelope<ProviderResponse>>(res)).data;
@@ -82,7 +84,38 @@ describe('POST /api/v1/providers — create', () => {
     expect(data.domain).toBe('storage');
     expect(data.displayName).toBe('Test S3 Storage');
     expect(data.status).toBe('active');
-    expect(data.config).toEqual({ some: 'setting' });
+    expect(data.config).toEqual({
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      region: 'us-east-1',
+    });
+  });
+
+  test('C349: rejects an S3 create whose config is missing endpoint/bucket/region (400, not a broken 201)', async () => {
+    // The Zod schema's `config: z.record(...)` is shape-open, so without the create-time guard an S3
+    // row with no usable config would persist + auto-populate storageConfig, then throw on EVERY use
+    // (test/sync) — a fail-late footgun. Fail-fast at create instead (mirrors buildS3Provider:62).
+    const res = await ctx.authed('POST', '/api/v1/providers', {
+      domain: 'storage',
+      providerType: 's3',
+      displayName: 'Incomplete S3',
+      credentials: { accessKeyId: 'k', secretAccessKey: 's' },
+      config: { bucket: 'b' }, // missing endpoint + region
+    });
+    expect(res.status).toBe(400);
+    // And nothing was persisted: the list stays empty.
+    const list = await ctx.authed('GET', '/api/v1/providers');
+    expect((await json<DataEnvelope<ProviderResponse[]>>(list)).data).toHaveLength(0);
+  });
+
+  test('C349: rejects an S3 create with NO config at all (400)', async () => {
+    const res = await ctx.authed('POST', '/api/v1/providers', {
+      domain: 'storage',
+      providerType: 's3',
+      displayName: 'No-config S3',
+      credentials: { accessKeyId: 'k', secretAccessKey: 's' },
+    });
+    expect(res.status).toBe(400);
   });
 
   test('NEVER echoes credentials back in the response (security invariant)', async () => {
@@ -158,16 +191,41 @@ describe('GET /api/v1/providers — list', () => {
 describe('PUT /api/v1/providers/:id — update', () => {
   test('updates displayName + config, returns the exact response key shape (no credentials)', async () => {
     const created = await createProvider({ displayName: 'Before' });
+    // A complete S3 config (the default provider is s3): the C416 gate requires endpoint/bucket/region
+    // on a config update too, so the happy path must send a full config (not a partial like {changed:true}).
+    const newConfig = { endpoint: 'https://s3.example.com', bucket: 'b2', region: 'us-west-2' };
     const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, {
       displayName: 'After',
-      config: { changed: true },
+      config: newConfig,
     });
     expect(res.status).toBe(200);
     const data = (await json<DataEnvelope<ProviderResponse>>(res)).data;
     expect(Object.keys(data).sort()).toEqual(PROVIDER_RESPONSE_KEYS);
     expect(data.displayName).toBe('After');
-    expect(data.config).toEqual({ changed: true });
+    expect(data.config).toEqual(newConfig);
     expect(JSON.stringify(data)).not.toContain('credentials');
+  });
+
+  // #123 (C416, the #103/C349 sibling on the UPDATE path): C349 fail-fasts an incomplete S3 config on
+  // CREATE, but PUT wrote body.config verbatim — so editing an S3 provider to a config missing
+  // endpoint/bucket/region persisted a 200 + a bricked row that threw on every later test/upload/sync.
+  // The fix shares the CREATE gate (validateStorageProviderConfig) on PUT. NON-VACUOUS: pre-fix this was 200.
+  test('rejects a PUT that swaps an S3 provider to an INCOMPLETE config (400, the #103/C349 sibling)', async () => {
+    const created = await createProvider();
+    const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, {
+      config: { bucket: 'b' }, // missing endpoint + region
+    });
+    expect(res.status).toBe(400);
+    // The original complete config must survive the rejected update (no partial persist).
+    const list = (
+      await json<DataEnvelope<ProviderResponse[]>>(await ctx.authed('GET', '/api/v1/providers'))
+    ).data;
+    const after = list.find((p) => p.id === created.id);
+    expect(after?.config).toEqual({
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      region: 'us-east-1',
+    });
   });
 
   test("404s another user's provider (ownership-scoped, no existence leak)", async () => {
@@ -186,6 +244,39 @@ describe('PUT /api/v1/providers/:id — update', () => {
       displayName: 'x',
     });
     expect(res.status).toBe(404);
+  });
+
+  // C260: the credentials-re-encrypt branch (routes.ts:397-399) was uncovered — the security-sensitive
+  // one. A PUT carrying new credentials must RE-ENCRYPT them into the column (never store plaintext)
+  // and still never echo them in the response.
+  test('PUT with new credentials re-encrypts the stored blob (never plaintext, never echoed)', async () => {
+    const created = await createProvider();
+    const res = await ctx.authed('PUT', `/api/v1/providers/${created.id}`, {
+      credentials: { secretAccessKey: 'rotated-secret-9999', bucket: 'b', region: 'us-east-1' },
+    });
+    expect(res.status).toBe(200);
+    const data = (await json<DataEnvelope<ProviderResponse>>(res)).data;
+    // Never echoed in the response.
+    expect(JSON.stringify(data)).not.toContain('rotated-secret-9999');
+    expect('credentials' in data).toBe(false);
+
+    // Stored column was updated and the plaintext secret is NOT in it (encrypted at rest).
+    const row = ctx.sqlite
+      .query('SELECT credentials FROM user_providers WHERE id = ?')
+      .get(created.id) as { credentials: string };
+    expect(row.credentials, 'credentials column present').toBeTruthy();
+    expect(row.credentials).not.toContain('rotated-secret-9999');
+  });
+
+  test('PUT against an AUTH-domain provider → 400 (managed via /auth only)', async () => {
+    // Raw-seed an auth-domain provider owned by the user (the create route rejects domain:'auth').
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
+       VALUES ('auth-prov', ?, 'auth', 'google', 'My Login', '', 'active')`,
+      [ctx.user.id]
+    );
+    const res = await ctx.authed('PUT', '/api/v1/providers/auth-prov', { displayName: 'hijack' });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -206,5 +297,60 @@ describe('DELETE /api/v1/providers/:id', () => {
     const res = await other.authed('DELETE', `/api/v1/providers/${created.id}`);
     expect(res.status).toBe(404);
     other.close();
+  });
+});
+
+/**
+ * #63 (C192): the PUT/DELETE destructive writes are scoped on (id AND userId), not id alone. The
+ * findOwnedProviderOrThrow guard already 404s a foreign id (the tests above), so this is
+ * defense-in-depth — but the write predicate must ALSO be tenant-scoped so a future guard-drop can't
+ * become a cross-tenant write (the C109/#52 class, closed at split C155 + odometer C168/C180). Raw-seed
+ * a FOREIGN user's provider that COEXISTS in the shared DB (a second createTestApp would reset it) and
+ * prove our destructive ops can't touch it.
+ */
+describe('#63 — provider PUT/DELETE writes are tenant-scoped (foreign row survives)', () => {
+  /** Seed a provider owned by ANOTHER user directly; returns its id. */
+  function seedForeignProvider(id: string): void {
+    ctx.sqlite.run(
+      `INSERT INTO users (id, email, display_name) VALUES ('u-foreign-63', 'f63@test.com', 'Foreign 63')`
+    );
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
+       VALUES (?, 'u-foreign-63', 'storage', 's3', 'Foreign Provider', 'enc-blob', 'active')`,
+      [id]
+    );
+  }
+
+  /** True iff a provider row with this id still exists (any owner). */
+  function providerExists(id: string): boolean {
+    const rows = ctx.sqlite.query('SELECT id FROM user_providers WHERE id = ?').all(id);
+    return rows.length === 1;
+  }
+
+  test('our DELETE of a foreign provider id 404s AND the foreign row SURVIVES', async () => {
+    seedForeignProvider('prov-foreign-del');
+    const res = await ctx.authed('DELETE', '/api/v1/providers/prov-foreign-del');
+    expect(res.status).toBe(404); // the guard
+    expect(providerExists('prov-foreign-del')).toBe(true); // the write predicate — never touched it
+  });
+
+  test('our PUT of a foreign provider id 404s AND the foreign row is UNCHANGED', async () => {
+    seedForeignProvider('prov-foreign-put');
+    const res = await ctx.authed('PUT', '/api/v1/providers/prov-foreign-put', {
+      displayName: 'hijacked',
+    });
+    expect(res.status).toBe(404);
+    // The foreign row keeps its original displayName — the update predicate excluded it.
+    const row = ctx.sqlite
+      .query('SELECT display_name FROM user_providers WHERE id = ?')
+      .get('prov-foreign-put') as { display_name: string } | undefined;
+    expect(row?.display_name).toBe('Foreign Provider');
+  });
+
+  test('our OWN provider still deletes (204) — the tenant scope is not over-broad', async () => {
+    const created = await createProvider();
+    const del = await ctx.authed('DELETE', `/api/v1/providers/${created.id}`);
+    expect(del.status).toBe(204);
+    expect(providerExists(created.id)).toBe(false);
   });
 });

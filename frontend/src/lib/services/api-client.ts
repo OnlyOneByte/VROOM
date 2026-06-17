@@ -28,7 +28,15 @@ function toFetchBody(body: unknown): globalThis.BodyInit | undefined {
 	return undefined;
 }
 
-async function request<T>(url: string, options: ApiOptions = {}): Promise<T> {
+/**
+ * Shared fetch core for `request`/`requestFull`: resolves the URL, sets the JSON Content-Type
+ * (skipped for FormData), sends with `credentials: 'include'`, and on a non-ok response parses the
+ * backend `{ error: { message, code, details } }` envelope into a thrown `ApiError`. Returns the
+ * ok Response so each caller does its OWN success-body handling (unwrap-data vs raw-JSON). The
+ * fetch-setup + error-parsing block was byte-identical across both wrappers (C314 dedup) — one
+ * source of truth so an error-shape fix can't land in one path and be forgotten in the other.
+ */
+async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response> {
 	const { body, headers: customHeaders, method, signal } = options;
 	const fullUrl = url.startsWith('http') ? url : `${getApiBaseUrl()}${url}`;
 
@@ -66,6 +74,12 @@ async function request<T>(url: string, options: ApiOptions = {}): Promise<T> {
 		}
 		throw new ApiError(message, response.status, details, code);
 	}
+
+	return response;
+}
+
+async function request<T>(url: string, options: ApiOptions = {}): Promise<T> {
+	const response = await fetchOrThrow(url, options);
 
 	// Handle empty responses (204, etc.)
 	const contentType = response.headers.get('content-type');
@@ -84,44 +98,7 @@ async function request<T>(url: string, options: ApiOptions = {}): Promise<T> {
  * `data` field. Used for paginated endpoints where we need `{ data, pagination }`.
  */
 async function requestFull<T>(url: string, options: ApiOptions = {}): Promise<T> {
-	const { body, headers: customHeaders, method, signal } = options;
-	const fullUrl = url.startsWith('http') ? url : `${getApiBaseUrl()}${url}`;
-
-	const headers: Record<string, string> = {
-		...(customHeaders || {})
-	};
-
-	if (body && !(body instanceof FormData)) {
-		headers['Content-Type'] = 'application/json';
-	}
-
-	const response = await fetch(fullUrl, {
-		method,
-		credentials: 'include',
-		headers,
-		signal,
-		body: toFetchBody(body)
-	});
-
-	if (!response.ok) {
-		let message = `Request failed with status ${response.status}`;
-		let code: string | undefined;
-		let details: Record<string, unknown> | undefined;
-		try {
-			const errorBody = await response.json();
-			message = errorBody.error?.message || errorBody.message || message;
-			code = errorBody.error?.code;
-			if (errorBody.error?.details) {
-				details = Array.isArray(errorBody.error.details)
-					? { validationErrors: errorBody.error.details }
-					: (errorBody.error.details as Record<string, unknown>);
-			}
-		} catch {
-			// ignore parse errors
-		}
-		throw new ApiError(message, response.status, details, code);
-	}
-
+	const response = await fetchOrThrow(url, options);
 	return response.json();
 }
 

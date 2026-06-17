@@ -1,8 +1,9 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
-import { getDb, transaction } from '../../db/connection';
+import { getDb } from '../../db/connection';
 import { type NewPhoto, type Photo, photos } from '../../db/schema';
 import { NotFoundError } from '../../errors';
+import { chunk } from '../../utils/chunk';
 import type { PaginatedResult } from '../../utils/pagination';
 
 /**
@@ -85,8 +86,7 @@ export class PhotoRepository {
   async findByEntities(entityType: string, entityIds: string[]): Promise<Photo[]> {
     if (entityIds.length === 0) return [];
     const out: Photo[] = [];
-    for (let i = 0; i < entityIds.length; i += 500) {
-      const batch = entityIds.slice(i, i + 500);
+    for (const batch of chunk(entityIds)) {
       const rows = await this.db
         .select()
         .from(photos)
@@ -99,10 +99,20 @@ export class PhotoRepository {
   async findByEntityPaginated(
     entityType: string,
     entityId: string,
+    userId: string,
     limit: number,
     offset: number
   ): Promise<PaginatedResult<Photo>> {
-    const whereClause = and(eq(photos.entityType, entityType), eq(photos.entityId, entityId));
+    // userId-scope the WHERE (the C168/#48 + C180 + C192 tenant-scope-at-the-read class): this was the
+    // lone photo read-method not scoped by user_id, even though photos carries that column and every
+    // sibling (findByUser/countByUser/findIdsByUser) filters on it. Behavior-identical today — the route's
+    // validateEntityOwnership proves ownership before this runs — but it closes the boundary at the query
+    // so a future caller that forgets the guard can't page another tenant's photos (#72).
+    const whereClause = and(
+      eq(photos.entityType, entityType),
+      eq(photos.entityId, entityId),
+      eq(photos.userId, userId)
+    );
 
     const [countResult, data] = await Promise.all([
       this.db.select({ count: sql<number>`count(*)` }).from(photos).where(whereClause),
@@ -145,23 +155,46 @@ export class PhotoRepository {
   }
 
   async setCoverPhoto(entityType: string, entityId: string, photoId: string): Promise<Photo> {
-    return transaction(async (tx) => {
-      // Unset all covers for this entity
+    // Use this.db.transaction (the sibling-repo convention — expenses/insurance all do) rather than
+    // the module-level transaction() helper, which binds the getDb() singleton and ignored the
+    // injected this.db (production has this.db === getDb(), so behavior-preserving — but it makes the
+    // method respect a test-injected DB AND lets the internal NotFoundError propagate as a 404 instead
+    // of being wrapped into a 500 DatabaseError).
+    return this.db.transaction(async (tx) => {
+      // Validate the target photo belongs to THIS entity BEFORE any write. Two reasons:
+      // (1) the C63/#192 + C72/#215 "write keyed on id alone, match proven a layer up" class — a
+      //     photoId from a DIFFERENT entity must never be flagged as this entity's cover; and
+      // (2) the bun:sqlite ASYNC-transaction footgun (the C151 lesson): a throw escaping this async
+      //     callback AFTER a sync write does NOT roll the write back, so validating BEFORE the unset
+      //     is what actually guarantees we never leave the entity cover-less on a bad id (an
+      //     unset-then-throw would persist the unset).
+      const target = await tx
+        .select({ id: photos.id })
+        .from(photos)
+        .where(
+          and(
+            eq(photos.id, photoId),
+            eq(photos.entityType, entityType),
+            eq(photos.entityId, entityId)
+          )
+        )
+        .limit(1);
+
+      if (target.length === 0) {
+        throw new NotFoundError('Photo');
+      }
+
+      // Unset all covers for this entity (only reached once the target is proven valid)
       await tx
         .update(photos)
         .set({ isCover: false })
         .where(and(eq(photos.entityType, entityType), eq(photos.entityId, entityId)));
 
-      // Set the target photo as cover
       const result = await tx
         .update(photos)
         .set({ isCover: true })
         .where(eq(photos.id, photoId))
         .returning();
-
-      if (result.length === 0) {
-        throw new NotFoundError('Photo');
-      }
 
       return result[0];
     });
@@ -180,8 +213,7 @@ export class PhotoRepository {
   /** Delete all photo rows for many entities of one type. Batched for SQLite. */
   async deleteByEntities(entityType: string, entityIds: string[]): Promise<void> {
     if (entityIds.length === 0) return;
-    for (let i = 0; i < entityIds.length; i += 500) {
-      const batch = entityIds.slice(i, i + 500);
+    for (const batch of chunk(entityIds)) {
       await this.db
         .delete(photos)
         .where(and(eq(photos.entityType, entityType), inArray(photos.entityId, batch)));

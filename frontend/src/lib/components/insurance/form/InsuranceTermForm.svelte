@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { gotoDynamic } from '$lib/utils/navigation';
+	import { resetSplitAllocations } from '$lib/utils/expense-helpers';
+	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { ArrowLeft, Check, LoaderCircle, X, FileText } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -128,13 +130,15 @@
 	});
 
 	function populateFromTerm(source: InsuranceTerm | Partial<InsuranceTerm>) {
-		if (source.startDate) {
-			const s = typeof source.startDate === 'string' ? source.startDate : '';
-			startDate = s.split('T')[0] ?? s;
+		// Read the stored ISO back as the LOCAL calendar date, NOT a bare UTC `.split('T')[0]` (#138, the
+		// #87/#131 family). The save path persists via dateOnlyToISO → NOON LOCAL, so for a UTC+13/+14 user
+		// noon-local lands on the prior UTC day and the slice would show the day before — shifting the term
+		// start/end back a day every edit-open. toDateInputValue reads local Y/M/D (the sibling-form fix).
+		if (source.startDate && typeof source.startDate === 'string') {
+			startDate = toDateInputValue(source.startDate);
 		}
-		if (source.endDate) {
-			const e = typeof source.endDate === 'string' ? source.endDate : '';
-			endDate = e.split('T')[0] ?? e;
+		if (source.endDate && typeof source.endDate === 'string') {
+			endDate = toDateInputValue(source.endDate);
 		}
 		policyNumber = source.policyNumber ?? '';
 		coverageDescription = source.coverageDescription ?? '';
@@ -164,17 +168,9 @@
 	}
 
 	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		if (method === 'even') {
-			splitAllocations = [];
-		} else if (method === 'absolute') {
-			splitAllocations = selectedVehicleIds.map(id => ({ vehicleId: id, amount: 0 }));
-		} else {
-			const pct = selectedVehicleIds.length > 0 ? 100 / selectedVehicleIds.length : 0;
-			splitAllocations = selectedVehicleIds.map(id => ({
-				vehicleId: id,
-				percentage: Math.round(pct * 10) / 10
-			}));
-		}
+		// resetSplitAllocations is the shared source of truth (C415) — the expense form runs the identical
+		// reset, so the 100/N rounded-to-1-decimal percentage seed can't drift between them.
+		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}
 
 	function handleAllocationsChange(
@@ -251,16 +247,21 @@
 			if (isEditMode && termId) {
 				// forEdit=true → emptied optionals are sent as null to clear them.
 				await insuranceApi.updateTerm(policyId, termId, {
-					startDate,
-					endDate,
+					// Persist date-only inputs at NOON LOCAL (#138) so the stored ISO round-trips to the same
+					// calendar day under formatDate in every timezone — the dateOnlyToISO convention every other
+					// date-only form uses (Expense/Reminder/Vehicle/Claims). Raw "YYYY-MM-DD" → z.coerce.date()
+					// → UTC midnight → displayed a day early for Americas users.
+					startDate: dateOnlyToISO(startDate),
+					endDate: dateOnlyToISO(endDate),
 					...buildTermData(true),
 					vehicleCoverage
 				});
 				appStore.showSuccess('Term updated successfully');
 			} else {
 				await insuranceApi.addTerm(policyId, {
-					startDate,
-					endDate,
+					// Noon-local persistence (#138) — see the updateTerm note above.
+					startDate: dateOnlyToISO(startDate),
+					endDate: dateOnlyToISO(endDate),
 					...buildTermData(),
 					vehicleCoverage
 				});

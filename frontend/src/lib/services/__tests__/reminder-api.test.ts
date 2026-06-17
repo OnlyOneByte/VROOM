@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { Expense, RecurringCostSummary } from '$lib/types';
+import type { BackendExpenseResponse, RecurringCostSummary } from '$lib/types';
 import { ApiError } from '$lib/utils/error-handling';
 
 // Mock apiClient (the analytics-api.test.ts pattern) — apiClient.get already unwraps the
@@ -21,19 +21,39 @@ const mockPost = vi.mocked(apiClient.post);
 const mockPut = vi.mocked(apiClient.put);
 const mockDelete = vi.mocked(apiClient.delete);
 
-const mockMaterialized: Expense[] = [
+// The route returns RAW repository rows (backend shape: `expenseAmount`, un-split `volume`). The
+// wrapper must map each through fromBackendExpense — so the mock returns the BACKEND shape and the
+// assertions check the FRONTEND transform (the C431 fix; pre-fix this method returned the raw rows
+// typed as Expense[], so `amount` was undefined + an electric charge stayed in `volume`).
+const mockMaterialized: BackendExpenseResponse[] = [
 	{
 		id: 'e1',
 		vehicleId: 'v1',
 		userId: 'u1',
 		tags: [],
 		category: 'maintenance',
-		amount: 49.99,
+		expenseAmount: 49.99,
 		date: '2024-01-15',
 		sourceType: 'reminder',
 		sourceId: 'r1',
 		createdAt: '2024-01-15T00:00:00.000Z',
 		updatedAt: '2024-01-15T00:00:00.000Z'
+	},
+	// An electric charge row: backend keeps kWh in `volume`; fromBackendExpense must move it to `charge`.
+	{
+		id: 'e2',
+		vehicleId: 'v1',
+		userId: 'u1',
+		tags: [],
+		category: 'fuel',
+		expenseAmount: 12.5,
+		volume: 30,
+		fuelType: 'Level 2 (AC)',
+		date: '2024-02-01',
+		sourceType: 'reminder',
+		sourceId: 'r1',
+		createdAt: '2024-02-01T00:00:00.000Z',
+		updatedAt: '2024-02-01T00:00:00.000Z'
 	}
 ];
 
@@ -44,7 +64,7 @@ describe('reminderApi.getMaterializedExpenses() (T6 seam)', () => {
 		vi.clearAllMocks();
 	});
 
-	it('GETs the per-reminder expenses path with the id interpolated, returns the rows', async () => {
+	it('GETs the per-reminder expenses path with the id interpolated, mapping backend→frontend shape', async () => {
 		mockGet.mockResolvedValueOnce(mockMaterialized);
 
 		const result = await reminderApi.getMaterializedExpenses('r1');
@@ -52,8 +72,14 @@ describe('reminderApi.getMaterializedExpenses() (T6 seam)', () => {
 		expect(mockGet).toHaveBeenCalledTimes(1);
 		// Exact path — guards against a future wrong-segment typo (e.g. /expenses/:id).
 		expect(mockGet).toHaveBeenCalledWith('/api/v1/reminders/r1/expenses');
-		expect(result).toEqual(mockMaterialized);
-		// The source link the T6 badge reads must survive the wrapper untouched.
+		// NON-VACUOUS: pre-fix this returned the raw backend rows, so `amount` was undefined. The
+		// wrapper must run fromBackendExpense: expenseAmount → amount.
+		expect(result[0]?.amount).toBe(49.99);
+		expect(result[0]).not.toHaveProperty('expenseAmount');
+		// An electric charge's kWh must be split out of `volume` into `charge`.
+		expect(result[1]?.charge).toBe(30);
+		expect(result[1]?.volume).toBeUndefined();
+		// The source link the T6 badge reads must survive the transform untouched.
 		expect(result[0]?.sourceType).toBe('reminder');
 		expect(result[0]?.sourceId).toBe('r1');
 	});

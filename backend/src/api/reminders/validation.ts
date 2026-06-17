@@ -133,19 +133,28 @@ function refineDateRange(data: ReminderRefineInput, ctx: z.RefinementCtx) {
 function refineSplitConfig(data: ReminderRefineInput, ctx: z.RefinementCtx) {
   if (!data.expenseSplitConfig) return;
 
-  const splitVehicleIds =
-    data.expenseSplitConfig.method === 'even'
-      ? data.expenseSplitConfig.vehicleIds
-      : data.expenseSplitConfig.allocations.map((a) => a.vehicleId);
-  const provided = new Set(data.vehicleIds);
-  const split = new Set(splitVehicleIds);
+  // The split-vs-vehicleIds MATCH check is a cross-field invariant — meaningful only when BOTH are in
+  // the payload. On a PARTIAL update (updateReminderSchema is .partial()) that changes only the split
+  // config and OMITS vehicleIds, `data.vehicleIds` is undefined → new Set(undefined) = ∅, so the old
+  // unconditional check 400'd every split-config-only edit with a false "must match vehicleIds" (#73).
+  // Guard it on vehicleIds presence — the route's merged re-parse (createReminderSchema.parse(merged))
+  // still catches a genuine mismatch against the merged full object. The sum checks below are
+  // vehicleIds-independent and always run.
+  if (data.vehicleIds) {
+    const splitVehicleIds =
+      data.expenseSplitConfig.method === 'even'
+        ? data.expenseSplitConfig.vehicleIds
+        : data.expenseSplitConfig.allocations.map((a) => a.vehicleId);
+    const provided = new Set(data.vehicleIds);
+    const split = new Set(splitVehicleIds);
 
-  if (provided.size !== split.size || ![...provided].every((id) => split.has(id))) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Split config vehicle IDs must match vehicleIds',
-      path: ['expenseSplitConfig'],
-    });
+    if (provided.size !== split.size || ![...provided].every((id) => split.has(id))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Split config vehicle IDs must match vehicleIds',
+        path: ['expenseSplitConfig'],
+      });
+    }
   }
 
   // Percentage allocations must sum to 100

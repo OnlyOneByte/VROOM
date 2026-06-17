@@ -440,3 +440,175 @@ describe('totalMileage non-negative clamp (#46)', () => {
     expect(stats.costPerMile).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression (#75, C222): averageMpg must be ORDER-INDEPENDENT. The MPG pairs CONSECUTIVE fillups
+// (current − previous), so unordered input mis-pairs segments. calculateAverageMpg now sorts by date
+// internally — the production caller already sorts, but this makes the pure helper correct for any
+// future consumer. These assert shuffled input yields the SAME averageMpg as the chronological order.
+// ---------------------------------------------------------------------------
+describe('averageMpg is order-independent (#75)', () => {
+  // 3 chronological fillups (index = day): 10000 → 10300 (300mi/10gal=30) → 10620 (320mi/10gal=32).
+  // Expected avg MPG = (30 + 32) / 2 = 31, regardless of input order.
+  const inOrder: FuelExpense[] = [
+    makeFuelExpense({ mileage: 10000, volume: 10, missedFillup: false, index: 0 }),
+    makeFuelExpense({ mileage: 10300, volume: 10, missedFillup: false, index: 1 }),
+    makeFuelExpense({ mileage: 10620, volume: 10, missedFillup: false, index: 2 }),
+  ];
+
+  test('chronological input computes the expected average (baseline)', () => {
+    const stats = calculateVehicleStats(inOrder, 10000, true, false);
+    expect(stats.averageMpg).toBeCloseTo(31, 5);
+  });
+
+  test('SHUFFLED input yields the SAME averageMpg (the regression — was mis-paired pre-fix)', () => {
+    // Reverse + interleave so consecutive array slots are NOT chronological.
+    const shuffled = [inOrder[2], inOrder[0], inOrder[1]];
+    const stats = calculateVehicleStats(shuffled, 10000, true, false);
+    expect(stats.averageMpg).toBeCloseTo(31, 5);
+  });
+
+  test('a fully-reversed input still matches', () => {
+    const reversed = [...inOrder].reverse();
+    const stats = calculateVehicleStats(reversed, 10000, true, false);
+    expect(stats.averageMpg).toBeCloseTo(31, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Property 6: a MIXED plug-in-hybrid vehicle keeps MPG and mi/kWh ISOLATED
+// (C353 guard, deep-review→guard from the C352 EV fan-out). calculateVehicleStats partitions on
+// isElectricFuelType: gas rows feed averageMpg, charge rows feed averageMilesPerKwh. Property 4 pins
+// the VOLUME/COST partition; this pins the EFFICIENCY isolation — a gas fill-up must NEVER enter the
+// mi/kWh denominator and a charge must NEVER enter the MPG pairing (the #66 cross-contamination class).
+// Deterministic round numbers so a leak shifts a metric to a detectably-wrong value.
+// ---------------------------------------------------------------------------
+describe('Property 6: a mixed fuel+charge vehicle keeps MPG and mi/kWh isolated', () => {
+  // Gas: 10000→10300 mi on 10 gal each = 300/10 = 30 MPG. Electric: 20000→20060 mi on 15 kWh = 60/15 =
+  // 4 mi/kWh. INTERLEAVED by index (date) so only the fuelType partition — not array order — separates
+  // them. Mileage ranges are disjoint (10k vs 20k) so a cross-paired interval would be absurd, not 30/4.
+  const mixed: FuelExpense[] = [
+    makeFuelExpense({
+      index: 0,
+      mileage: 10000,
+      volume: 10,
+      missedFillup: false,
+      fuelType: '87 (Regular)',
+    }),
+    makeFuelExpense({
+      index: 1,
+      mileage: 20000,
+      volume: 15,
+      missedFillup: false,
+      fuelType: 'Level 2 (AC)',
+    }),
+    makeFuelExpense({
+      index: 2,
+      mileage: 10300,
+      volume: 10,
+      missedFillup: false,
+      fuelType: '87 (Regular)',
+    }),
+    makeFuelExpense({
+      index: 3,
+      mileage: 20060,
+      volume: 15,
+      missedFillup: false,
+      fuelType: 'Level 2 (AC)',
+    }),
+  ];
+
+  test('averageMpg reflects ONLY the gas-row interval (30 MPG), uncontaminated by charges', () => {
+    const stats = calculateVehicleStats(mixed, 0, true, true);
+    expect(stats.averageMpg).toBeCloseTo(30, 5);
+  });
+
+  test('averageMilesPerKwh reflects ONLY the charge-row interval (4 mi/kWh), uncontaminated by gas', () => {
+    const stats = calculateVehicleStats(mixed, 0, true, true);
+    expect(stats.averageMilesPerKwh).toBeCloseTo(4, 5);
+  });
+
+  test('the volume + cost totals stay partitioned (gas 20 gal / electric 30 kWh)', () => {
+    const stats = calculateVehicleStats(mixed, 0, true, true);
+    expect(stats.totalFuelConsumed).toBeCloseTo(20, 5); // 10 + 10 gal
+    expect(stats.totalChargeConsumed).toBeCloseTo(30, 5); // 15 + 15 kWh
+    expect(stats.fuelExpenseCount).toBe(2);
+    expect(stats.chargeExpenseCount).toBe(2);
+  });
+
+  // C378: costPerMile is the TOTAL energy spend (fuel + charge) over TOTAL distance driven — a
+  // CONSISTENT numerator/denominator (both span every mileage row). The trackFuel/trackCharging flags
+  // gate only the EFFICIENCY display (MPG / mi-kWh), NOT cost accounting: a dollar spent on either
+  // energy is a real cost per real mile. A tempting "fix" that dropped charge COST when
+  // trackCharging=false while keeping the charge MILES in the denominator would UNDER-report real
+  // spend (a worse bug). Pin both: costPerMile == (fuelCost+chargeCost)/totalMileage, and it is
+  // IDENTICAL across all four flag combinations.
+  test('costPerMile is total-energy-cost / total-miles, IDENTICAL across tracking-flag combinations', () => {
+    const both = calculateVehicleStats(mixed, 0, true, true);
+    const totalMileage = 20060; // max(20060) − initial 0; consistent denominator across flags
+    const expected = (both.totalFuelCost + both.totalChargeCost) / totalMileage;
+    expect(both.costPerMile).toBeCloseTo(expected, 5);
+
+    // The cost ratio must not move when a tracking flag flips — only MPG/mi-kWh are gated.
+    for (const [tf, tc] of [
+      [true, false],
+      [false, true],
+      [false, false],
+    ] as const) {
+      const s = calculateVehicleStats(mixed, 0, tf, tc);
+      expect(s.costPerMile).toBeCloseTo(expected, 5);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Realistic-MPG outlier band (#30, C430 guard). calculateAverageMpg drops a pair whose computed MPG
+// is outside `mpg > 0 && mpg < 150` (vehicle-stats.ts:179) as a likely data error. The property
+// suite above only "covered" this band through a LOCAL re-implementation (referenceMpg L43-59 /
+// countUnfilteredPairs L64-76 each carry their own `mpg > 0 && mpg < 150`), and the generators only
+// emit realistic 8–40 MPG — so the REAL export's boundary was never driven (the C181/C229
+// coverage-theater pattern). These pin it FIRSTHAND through calculateVehicleStats with one realistic
+// 30-MPG anchor pair plus one out-of-band pair, asserting the average reflects ONLY the kept pair.
+// NOTE: this locks the CURRENT (0, 150) contract; #30 (escalated C419) is the open direction call to
+// unify it with analytics-charts' documented [5,100]/[1,10] band — pinning today's behavior here does
+// NOT pre-decide that, it just makes a silent regression of the filter detectable.
+// ---------------------------------------------------------------------------
+describe('averageMpg excludes out-of-band outlier pairs (#30)', () => {
+  // idx0→idx1: 300 mi / 10 gal = 30 MPG (realistic, KEPT). idx1→idx2 is the out-of-band pair under test.
+  const anchor0 = makeFuelExpense({ mileage: 10000, volume: 10, missedFillup: false, index: 0 });
+  const anchor1 = makeFuelExpense({ mileage: 10300, volume: 10, missedFillup: false, index: 1 });
+
+  test('an above-band pair (>150 MPG, a mistyped tiny volume) is dropped, averaging only the realistic pair', () => {
+    // idx1→idx2: 350 mi / 2 gal = 175 MPG (> 150) — a 2-gal top-off mis-logged after 350 miles.
+    const outlier = makeFuelExpense({ mileage: 10650, volume: 2, missedFillup: false, index: 2 });
+    const stats = calculateVehicleStats([anchor0, anchor1, outlier], 10000, true, false);
+    // Non-vacuous: if the < 150 cap regressed (loosened/dropped), this would be (30 + 175) / 2 = 102.5.
+    expect(stats.averageMpg).toBeCloseTo(30, 5);
+  });
+
+  test('a pair at EXACTLY 150 MPG is dropped (the load-bearing `< 150`, not `<= 150`)', () => {
+    // idx1→idx2: 300 mi / 2 gal = 150 MPG exactly — excluded because the bound is strict.
+    const atBoundary = makeFuelExpense({
+      mileage: 10600,
+      volume: 2,
+      missedFillup: false,
+      index: 2,
+    });
+    const stats = calculateVehicleStats([anchor0, anchor1, atBoundary], 10000, true, false);
+    // Non-vacuous: a `<= 150` regression would include 150 → (30 + 150) / 2 = 90.
+    expect(stats.averageMpg).toBeCloseTo(30, 5);
+  });
+
+  test('a non-positive pair (a duplicate/zero-delta odometer reading) is dropped (the `mpg > 0` edge)', () => {
+    // idx1→idx2: same odometer (10300) → 0 mi → mpg 0 — a fill-up logged twice at one reading.
+    const zeroDelta = makeFuelExpense({
+      mileage: 10300,
+      volume: 10,
+      missedFillup: false,
+      index: 2,
+    });
+    const stats = calculateVehicleStats([anchor0, anchor1, zeroDelta], 10000, true, false);
+    // Non-vacuous: a `>= 0` regression would include the 0-MPG pair → (30 + 0) / 2 = 15.
+    expect(stats.averageMpg).toBeCloseTo(30, 5);
+  });
+});

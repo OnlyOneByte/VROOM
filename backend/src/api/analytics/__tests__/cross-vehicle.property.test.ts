@@ -263,6 +263,27 @@ function seedFuel(
   } as TestExpense);
 }
 
+/** Seed a CHARGE session (electric fuelType; kWh in volume) — for the #126 gas/charge partition guard. */
+function seedCharge(
+  vehicleId: string,
+  id: string,
+  date: Date,
+  mileage: number,
+  volume: number
+): void {
+  seedExpense(testDb.sqlite, {
+    id,
+    vehicleId,
+    category: 'fuel',
+    expenseAmount: 9,
+    date,
+    mileage,
+    volume,
+    fuelType: 'Level 2 (AC)',
+    missedFillup: false,
+  } as TestExpense);
+}
+
 describe('#54: fleet fuel-efficiency trend never pairs across vehicles', () => {
   test('two cars with CLOSE odometers + interleaved dates produce NO cross-vehicle phantom point', async () => {
     const { userId } = setupUserAndVehicles(2);
@@ -305,5 +326,29 @@ describe('#54: fleet fuel-efficiency trend never pairs across vehicles', () => {
     const trend = await repo.getFuelEfficiencyTrend(userId, v0);
     expect(trend.length).toBe(1);
     expect(trend[0]?.efficiency).toBeCloseTo(30, 5);
+  });
+
+  // #126 (C427): getFuelEfficiencyTrend (+ the converted cross-vehicle efficiency builders) computed the
+  // gas-MPG efficiency via computeEfficiencyPoint, which ACCEPTS electric rows — so a PHEV's charge
+  // session (kWh in volume → ~mi/kWh) leaked a point into the gas-MPG trend (mislabeled mi/gal), the
+  // #119/#122 contamination on the repository converted/trend paths the C413 sweep missed. Now all 4
+  // sites use gasEfficiencyPoint. This pins the trend excludes charge for a plug-in hybrid.
+  test('a plug-in hybrid efficiency trend excludes its CHARGE sessions (gas MPG only) — #126', async () => {
+    const { userId } = setupUserAndVehicles(1);
+    const v0 = 'vehicle-user-1-0';
+    // Two CONSECUTIVE gas fillups (10000 → 10300 on 10 gal = 30 MPG), then two CONSECUTIVE charge sessions
+    // (20000 → 20060 on 15 kWh = 4 mi/kWh) on the SAME vehicle. Grouping each energy type keeps gas pairs
+    // adjacent (so a 30 MPG point forms) AND charge pairs adjacent (so PRE-fix a ~4 mi/kWh point also
+    // formed) — isolating the gas/charge-EXCLUSION concern from the separate #C398 pairing-adjacency one.
+    seedFuel(v0, 'g-1', new Date(2024, 0, 1), 10_000, 10);
+    seedFuel(v0, 'g-2', new Date(2024, 0, 5), 10_300, 10);
+    seedCharge(v0, 'c-1', new Date(2024, 0, 10), 20_000, 15);
+    seedCharge(v0, 'c-2', new Date(2024, 0, 15), 20_060, 15);
+
+    const trend = await repo.getFuelEfficiencyTrend(userId);
+    // Pre-fix: 2 points — the 30 MPG gas pair AND the ~4 mi/kWh charge pair. Post-fix: ONLY the gas pair.
+    expect(trend.length).toBe(1);
+    expect(trend[0]?.efficiency).toBeCloseTo(30, 5);
+    expect(trend.some((p) => p.efficiency < 10)).toBe(false); // no mi/kWh-magnitude leak
   });
 });

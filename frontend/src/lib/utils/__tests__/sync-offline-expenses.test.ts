@@ -113,4 +113,29 @@ describe('syncOfflineExpenses', () => {
 		const body = JSON.parse((call![1] as { body?: string }).body as string);
 		expect(body.clientId).toBe('cid-ok');
 	});
+
+	// CHARACTERIZATION of the CURRENT behavior of a skipped malformed fuel entry (the #79 finding,
+	// C231 deep-review): a `continue`-skipped entry is never markExpenseAsSynced'd, so the trailing
+	// clearSyncedExpenses() (which only drops synced===true) leaves it PENDING in the queue — forever,
+	// silently re-skipped on every future sync with no user signal. This pins that stuck-forever
+	// behavior so a fix can't change it unnoticed. The RESOLUTION (drop it / surface an error / move to
+	// a "failed" bucket) is a product call ESCALATED to Angelo (#79) — NOT decided here.
+	it('CHARACTERIZATION (#79): a skipped malformed fuel entry stays stuck in the queue, unsynced', async () => {
+		saveOfflineExpenses([pending('fuel-bad', { category: 'fuel' }), pending('ok')]);
+		mockFetch.mockImplementation(() => Promise.resolve(apiOk()));
+
+		await syncOfflineExpenses();
+
+		// The valid 'ok' synced+cleared; the malformed entry REMAINS, still unsynced (current behavior).
+		const remaining = loadOfflineExpenses();
+		expect(remaining).toHaveLength(1);
+		expect(remaining[0]?.id).toBe('fuel-bad');
+		expect(remaining[0]?.synced).toBe(false);
+
+		// A SECOND sync makes no progress on it — it's POSTed never, re-skipped, no signal.
+		mockFetch.mockClear();
+		await syncOfflineExpenses();
+		expect(mockFetch).not.toHaveBeenCalled();
+		expect(loadOfflineExpenses()).toHaveLength(1);
+	});
 });

@@ -13,7 +13,13 @@
 	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import { insuranceApi } from '$lib/services/insurance-api';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
-	import { capitalize, formatCurrency, formatDate, dateOnlyToISO } from '$lib/utils/formatters';
+	import {
+		capitalize,
+		formatCurrency,
+		formatDate,
+		dateOnlyToISO,
+		toDateInputValue
+	} from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import {
 		CLAIM_TYPES,
@@ -116,7 +122,10 @@
 
 	function openEdit(claim: InsuranceClaim) {
 		editingId = claim.id;
-		claimDate = claim.claimDate ? (claim.claimDate.split('T')[0] ?? '') : '';
+		// Local calendar date, not a bare UTC `.split('T')[0]` (#138 sibling): the save persists via
+		// dateOnlyToISO → noon-local, so slicing the UTC date shifts the claim date back a day on edit for
+		// UTC+13/+14 users. toDateInputValue reads local Y/M/D, matching the InsuranceTermForm + #131 fix.
+		claimDate = claim.claimDate ? toDateInputValue(claim.claimDate) : '';
 		vehicleId = claim.vehicleId ?? '';
 		claimType = claim.claimType;
 		status = claim.status;

@@ -14,7 +14,7 @@ import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
-import { AuthProviderRepository } from '../auth-provider-repository';
+import { AuthProviderRepository, buildAuthProviderConfig } from '../auth-provider-repository';
 
 // ---------------------------------------------------------------------------
 // Test infrastructure
@@ -318,6 +318,31 @@ describe('updateProfile', () => {
     expect(config.email).toBe('new@test.com');
     expect(config.avatarUrl).toBe('https://example.com/avatar');
   });
+
+  // C282: the cross-tenant WRITE defense — updateProfile is scoped on (id, userId) just like delete
+  // (which has its own "does not delete other users' rows" guard), so updating another user's auth
+  // profile with the wrong userId must be a no-op (account-profile tampering defense). Was unpinned —
+  // delete had the parallel guard but updateProfile only had the happy path.
+  test('does not update rows belonging to other users (cross-tenant write defense)', async () => {
+    const row = await repo.create({
+      userId: USER_ID_2,
+      authProvider: 'google',
+      providerAccountId: 'other-user-profile',
+      email: 'victim@test.com',
+      displayName: 'Victim',
+    });
+
+    // Attacker (USER_ID) tries to rewrite USER_ID_2's auth profile.
+    await repo.updateProfile(row.id, USER_ID, {
+      email: 'attacker@test.com',
+      displayName: 'Hijacked',
+    });
+
+    // The victim's row is untouched — the userId predicate excluded it.
+    const found = await repo.findByProviderIdentity('google', 'other-user-profile');
+    expect(found?.displayName).toBe('Victim');
+    expect((found?.config as Record<string, unknown>).email).toBe('victim@test.com');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -366,5 +391,25 @@ describe('Domain isolation', () => {
 
     const found = await repo.findByProviderIdentity('google', 'some-id');
     expect(found).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildAuthProviderConfig (C283 dedup — one source for the auth `config` shape)
+// ---------------------------------------------------------------------------
+
+describe('buildAuthProviderConfig', () => {
+  test('builds the { email, avatarUrl } config shape', () => {
+    expect(buildAuthProviderConfig('a@test.com', 'https://x/avatar.png')).toEqual({
+      email: 'a@test.com',
+      avatarUrl: 'https://x/avatar.png',
+    });
+  });
+
+  test('avatarUrl is optional (undefined when omitted)', () => {
+    expect(buildAuthProviderConfig('a@test.com')).toEqual({
+      email: 'a@test.com',
+      avatarUrl: undefined,
+    });
   });
 });

@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { changeTracker, requireAuth } from '../../middleware';
-import { buildPaginatedResponse } from '../../utils/pagination';
+import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import {
   commonSchemas,
   validateOdometerOwnership,
@@ -51,11 +51,7 @@ routes.get(
 
     await validateVehicleOwnership(vehicleId, user.id);
 
-    const limit = Math.min(
-      query.limit ?? CONFIG.pagination.defaultPageSize,
-      CONFIG.pagination.maxPageSize
-    );
-    const offset = query.offset ?? 0;
+    const { limit, offset } = clampPagination(query);
 
     const { data, totalCount } = await odometerRepository.findByVehicleIdPaginated(
       vehicleId,
@@ -80,11 +76,7 @@ routes.get(
 
     await validateVehicleOwnership(vehicleId, user.id);
 
-    const limit = Math.min(
-      query.limit ?? CONFIG.pagination.defaultPageSize,
-      CONFIG.pagination.maxPageSize
-    );
-    const offset = query.offset ?? 0;
+    const { limit, offset } = clampPagination(query);
 
     const { data, totalCount } = await odometerRepository.getHistory(vehicleId, user.id, {
       limit,
@@ -150,6 +142,12 @@ routes.put(
       ...data,
       updatedAt: new Date(),
     });
+
+    // D5 (#71): editing a reading can cross a mileage milestone (e.g. correcting an odometer upward
+    // past a reminder's due value). The create path rechecks (:131) but the update path did not, so
+    // an edit-crossed reminder only fired on the next /trigger. Mirror the create-path best-effort
+    // recheck (never throws, idempotent via the dedup) on the updated entry's vehicle.
+    await reminderTriggerService.recheckMileageReminders(user.id, updated.vehicleId);
 
     return c.json({ success: true, data: updated, message: 'Odometer reading updated' });
   }

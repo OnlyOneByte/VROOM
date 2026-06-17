@@ -10,7 +10,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { odometerApi } from '$lib/services/odometer-api';
-	import { dateOnlyToISO } from '$lib/utils/formatters';
+	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 	import type { PageData } from './$types';
 
@@ -66,7 +66,7 @@
 			}
 
 			odometer = String(entry.odometer);
-			date = new Date(entry.recordedAt).toISOString().split('T')[0] ?? '';
+			date = toDateInputValue(entry.recordedAt);
 			note = entry.note ?? '';
 
 			const latest = latestResponse.data[0];

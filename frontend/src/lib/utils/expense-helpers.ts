@@ -50,6 +50,28 @@ export function compareExpenseRows(
 	return sortOrder === 'asc' ? comparison : -comparison;
 }
 
+/** A multi-vehicle split allocation row, as the expense + insurance-term forms hold it in state. */
+export type SplitAllocationDraft = { vehicleId: string; amount?: number; percentage?: number };
+
+/**
+ * Reset split allocations when the split METHOD changes, for the selected vehicles. ONE source of truth
+ * (C415) for the reset both the expense form (ExpenseForm) and the insurance-term form (InsuranceTermForm)
+ * ran BYTE-IDENTICAL: 'even' carries no per-vehicle rows (the backend splits evenly via largest-remainder
+ * integer cents — see split-service computeEvenSplit); 'absolute' seeds each vehicle at amount 0;
+ * 'percentage' seeds an even 100/N split rounded to ONE decimal. The rounding is load-bearing — a divergent
+ * copy (round to 2 decimals, or a different N math) would materialize the SAME multi-vehicle split with
+ * different per-vehicle percentages depending on which form created it.
+ */
+export function resetSplitAllocations(
+	method: 'even' | 'absolute' | 'percentage',
+	vehicleIds: string[]
+): SplitAllocationDraft[] {
+	if (method === 'even') return [];
+	if (method === 'absolute') return vehicleIds.map((id) => ({ vehicleId: id, amount: 0 }));
+	const pct = vehicleIds.length > 0 ? 100 / vehicleIds.length : 0;
+	return vehicleIds.map((id) => ({ vehicleId: id, percentage: Math.round(pct * 10) / 10 }));
+}
+
 // Category labels
 export const categoryLabels: Record<ExpenseCategory, string> = {
 	fuel: 'Fuel & Charging',

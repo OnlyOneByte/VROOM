@@ -7,6 +7,7 @@
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import { preferencesRepository } from '../api/settings/repository';
 import { activityTracker as userActivityTracker } from '../api/sync/activity-tracker';
+import { filterEnabledProviders } from '../api/sync/backup-orchestrator';
 import type { BackupConfig } from '../types';
 import { logger } from '../utils/logger';
 
@@ -31,8 +32,13 @@ export const activityTracker: MiddlewareHandler = async (c, next) => {
 
     const settings = await preferencesRepository.getOrCreate(user.id);
     const backupConfig = settings.backupConfig as BackupConfig | null;
+    // Arm the inactivity timer if ANY provider would back up — which includes a Sheets-only-sync
+    // provider (enabled:false, sheetsSyncEnabled:true). Reuse the orchestrator's OWN predicate
+    // (filterEnabledProviders: s.enabled || s.sheetsSyncEnabled) rather than a local `.some(p.enabled)`
+    // copy: the copy was NARROWER, so a Sheets-only-sync user never armed the timer → auto-backup-on-
+    // inactivity silently never fired even though the orchestrator it gates would have backed up (#136).
     const hasSyncEnabled = backupConfig?.providers
-      ? Object.values(backupConfig.providers).some((p) => p.enabled)
+      ? filterEnabledProviders(backupConfig).length > 0
       : false;
     if (settings.syncOnInactivity && hasSyncEnabled) {
       userActivityTracker.recordActivity(user.id, settings.syncInactivityMinutes);

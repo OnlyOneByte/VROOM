@@ -7,12 +7,16 @@ import { vehicles as vehiclesTable } from '../../db/schema';
 import type { ApiResponse } from '../../errors';
 import { ConflictError, NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
-import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../types';
-import { getPeriodStartDate } from '../../utils/calculations';
+import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
+import {
+  mergeUnitPreferences,
+  partialUnitPreferencesSchema,
+  unitPreferencesSchema,
+} from '../../utils/unit-preferences-schema';
 import { commonSchemas, validateVehicleOwnership } from '../../utils/validation';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { expenseRepository } from '../expenses/repository';
-import { financingRepository, isEligibleForPayoff } from '../financing/repository';
+import { financingRepository, withComputedBalance } from '../financing/repository';
 import { odometerRepository } from '../odometer/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { preferencesRepository } from '../settings/repository';
@@ -21,21 +25,8 @@ import { vehicleRepository } from './repository';
 
 const routes = new Hono();
 
-// Zod schema for unitPreferences enum validation
-const unitPreferencesSchema = z.object({
-  distanceUnit: z.enum(DistanceUnit, {
-    message: "Invalid distanceUnit: must be 'miles' or 'kilometers'",
-  }),
-  volumeUnit: z.enum(VolumeUnit, {
-    message: "Invalid volumeUnit: must be 'gallons_us', 'gallons_uk', or 'liters'",
-  }),
-  chargeUnit: z.enum(ChargeUnit, {
-    message: "Invalid chargeUnit: must be 'kwh'",
-  }),
-});
-
-// Partial version for update (each field optional)
-const partialUnitPreferencesSchema = unitPreferencesSchema.partial();
+// unitPreferencesSchema + partialUnitPreferencesSchema now live in utils/unit-preferences-schema.ts
+// (shared with settings/routes.ts — the C238 dedup).
 
 // Validation schemas derived from db schema
 const baseVehicleSchema = createInsertSchema(vehiclesTable, {
@@ -130,6 +121,25 @@ routes.use('*', changeTracker);
 // Mount photo sub-router
 routes.route('/:vehicleId/photos', photoRoutes);
 
+/**
+ * Assert a license plate is free within THIS user's fleet (plate uniqueness is per-user, not global —
+ * see findByLicensePlate + migration 0005, the #80 fix). One source of truth for the create + update
+ * checks (C289 dedup): the conflict message + the per-user-scoped lookup lived in two hand-rolled
+ * copies. `excludeId` lets the update path ignore the vehicle being edited (so re-saving without
+ * changing the plate, or hitting its own row, never false-409s itself).
+ * @throws ConflictError if another of the user's vehicles already carries the plate.
+ */
+async function assertLicensePlateAvailable(
+  licensePlate: string,
+  userId: string,
+  excludeId?: string
+): Promise<void> {
+  const existing = await vehicleRepository.findByLicensePlate(licensePlate, userId);
+  if (existing && existing.id !== excludeId) {
+    throw new ConflictError('A vehicle with this license plate already exists');
+  }
+}
+
 // GET /api/vehicles - List user's vehicles (including shared)
 routes.get('/', async (c) => {
   const user = c.get('user');
@@ -146,14 +156,7 @@ routes.get('/', async (c) => {
   const enrichedVehicles = userVehicles.map((v) => {
     if (v.financing) {
       const computedBalance = balances.get(v.financing.id) ?? 0;
-      return {
-        ...v,
-        financing: {
-          ...v.financing,
-          computedBalance,
-          eligibleForPayoff: isEligibleForPayoff(computedBalance),
-        },
-      };
+      return { ...v, financing: withComputedBalance(v.financing, computedBalance) };
     }
     return v;
   });
@@ -172,12 +175,9 @@ routes.post('/', zValidator('json', createVehicleSchema), async (c) => {
   const user = c.get('user');
   const vehicleData = c.req.valid('json');
 
-  // Check if license plate already exists (if provided)
+  // Plate uniqueness is per-user (see assertLicensePlateAvailable / migration 0005, #80).
   if (vehicleData.licensePlate) {
-    const existingVehicle = await vehicleRepository.findByLicensePlate(vehicleData.licensePlate);
-    if (existingVehicle) {
-      throw new ConflictError('A vehicle with this license plate already exists');
-    }
+    await assertLicensePlateAvailable(vehicleData.licensePlate, user.id);
   }
 
   // Default unitPreferences from user's settings if not provided
@@ -224,11 +224,7 @@ routes.get('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
     const computedBalance = await financingRepository.computeBalance(vehicle.financing.id);
     responseData = {
       ...vehicle,
-      financing: {
-        ...vehicle.financing,
-        computedBalance,
-        eligibleForPayoff: isEligibleForPayoff(computedBalance),
-      },
+      financing: withComputedBalance(vehicle.financing, computedBalance),
     };
   }
 
@@ -256,19 +252,17 @@ routes.put(
       throw new NotFoundError('Vehicle');
     }
 
-    // Check if license plate already exists (if being updated)
+    // Plate uniqueness is per-user; skip when unchanged, and exclude THIS vehicle from the check.
     if (updateData.licensePlate && updateData.licensePlate !== existingVehicle.licensePlate) {
-      const vehicleWithPlate = await vehicleRepository.findByLicensePlate(updateData.licensePlate);
-      if (vehicleWithPlate && vehicleWithPlate.id !== id) {
-        throw new ConflictError('A vehicle with this license plate already exists');
-      }
+      await assertLicensePlateAvailable(updateData.licensePlate, user.id, id);
     }
 
-    // Merge partial unitPreferences with existing values
+    // Merge partial unitPreferences with existing values (shared helper — the C238 dedup).
     const { unitPreferences: partialUnitPrefs, ...restUpdateData } = updateData;
-    const mergedUnitPreferences: UnitPreferences | undefined = partialUnitPrefs
-      ? { ...existingVehicle.unitPreferences, ...partialUnitPrefs }
-      : undefined;
+    const mergedUnitPreferences = mergeUnitPreferences(
+      existingVehicle.unitPreferences,
+      partialUnitPrefs
+    );
 
     const updatedVehicle = await vehicleRepository.update(id, {
       ...restUpdateData,
@@ -345,10 +339,8 @@ routes.get(
       ? fuelExpenses.filter((e) => new Date(e.date) >= (startDate as Date))
       : fuelExpenses;
 
-    // Sort by date ascending for calculations
-    const sortedExpenses = [...filteredFuelExpenses].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    // Sort by date ascending for calculations (sortExpensesByDate — the shared pairwise-order invariant)
+    const sortedExpenses = sortExpensesByDate(filteredFuelExpenses);
 
     // Calculate statistics
     const stats = calculateVehicleStats(

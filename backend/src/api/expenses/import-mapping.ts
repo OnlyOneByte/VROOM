@@ -132,17 +132,25 @@ const NATIVE_HEADER: NativeField[] = [
 ];
 
 /**
- * European decimal-comma → dot. `1.234,56` (dot thousands + comma decimal) → `1234.56`;
- * a lone `12,50` → `12.50`. A value with neither, or only dots, is returned unchanged.
- * (A lone comma is treated as the decimal separator per the decimal-comma decision; a
- * preset that uses comma-as-thousands is handled at the preset layer, not here.)
+ * Normalize a numeric string with thousands/decimal separators to a dot-decimal. When BOTH `.` and `,`
+ * appear, the LAST-occurring one is the decimal separator and the other is thousands — this is
+ * unambiguous and handles BOTH conventions: `1.234,56` (EU: comma last → decimal) → `1234.56` AND
+ * `1,234.56` (US: dot last → decimal) → `1234.56` (#124, C417 — the old code hard-assumed comma-decimal,
+ * so a US-format value with both separators stripped its dots → `1.23456`, a ~1000x money under-count
+ * reachable via the US Fuelly preset). A lone `,` is treated as the decimal separator (the decimal-comma
+ * decision; lone-comma-as-THOUSANDS is the ambiguous #24 locale/product call, NOT decided here). A value
+ * with neither, or only dots, is returned unchanged.
  */
 function normalizeDecimal(raw: string): string {
   const s = raw.trim();
   if (!s) return s;
   const hasDot = s.includes('.');
   const hasComma = s.includes(',');
-  if (hasDot && hasComma) return s.replace(/\./g, '').replace(',', '.');
+  if (hasDot && hasComma) {
+    // The decimal separator is whichever appears LAST; strip the other (thousands) entirely.
+    const commaIsDecimal = s.lastIndexOf(',') > s.lastIndexOf('.');
+    return commaIsDecimal ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  }
   if (hasComma) return s.replace(',', '.');
   return s;
 }

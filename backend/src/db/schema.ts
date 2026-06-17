@@ -55,6 +55,13 @@ export const vehicles = sqliteTable(
   },
   (table) => ({
     userIdIdx: index('vehicles_user_id_idx').on(table.userId),
+    // License-plate uniqueness is PER-USER, not global (migration 0005, C233): two users may
+    // legitimately register the same plate string (reissued plates, sold-then-rebought cars), and a
+    // global unique index both wrongly blocked the second user AND leaked plate existence across
+    // tenants. Partial (WHERE license_plate IS NOT NULL) so plate-less vehicles don't collide.
+    userLicensePlateIdx: uniqueIndex('vehicles_user_license_plate_idx')
+      .on(table.userId, table.licensePlate)
+      .where(sql`${table.licensePlate} IS NOT NULL`),
   })
 );
 

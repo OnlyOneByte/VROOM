@@ -28,6 +28,22 @@ export function isEligibleForPayoff(computedBalance: number): boolean {
   return computedBalance <= PAYOFF_BALANCE_THRESHOLD;
 }
 
+/**
+ * Enrich a financing record with the two derived API fields — `computedBalance` (passed in, since the
+ * caller decides whether to use the per-record computeBalance or the batch computeBalances) and
+ * `eligibleForPayoff`. The `{ ...financing, computedBalance, eligibleForPayoff: isEligibleForPayoff(...) }`
+ * shape was hand-rolled at 3 sites (vehicles list + single GET, financing GET — the same trio C182
+ * collapsed the threshold across); one source of truth so the derived-field set can't drift between
+ * them. Generic over the financing shape so it serves both the full VehicleFinancing and the
+ * vehicle-joined financing object. Pure — no DB.
+ */
+export function withComputedBalance<T>(
+  financing: T,
+  computedBalance: number
+): T & { computedBalance: number; eligibleForPayoff: boolean } {
+  return { ...financing, computedBalance, eligibleForPayoff: isEligibleForPayoff(computedBalance) };
+}
+
 export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVehicleFinancing> {
   constructor(db: AppDatabase) {
     super(db, vehicleFinancing);
@@ -55,34 +71,22 @@ export class FinancingRepository extends BaseRepository<VehicleFinancing, NewVeh
   }
 
   /**
-   * Compute the current balance for a financing record.
-   *
-   * Looks up the financing record's originalAmount, then computes:
+   * Compute the current balance for a financing record:
    *   originalAmount - COALESCE(SUM(expenses.expenseAmount), 0)
    * WHERE source_type = 'financing' AND source_id = financingId, clamped to min 0.
    *
    * Returns 0 if the financing record does not exist.
+   *
+   * Delegates to the batch `computeBalances` so the originalAmount lookup + the
+   * financing-payment SUM (the money query) live in ONE place — a divergent copy of
+   * that WHERE/COALESCE block would silently miscount a balance (and TCO downstream).
+   * The per-record-vs-batch equivalence is independently pinned by
+   * financing-balance.property.test.ts. Both paths run two queries, so no extra cost.
    */
   async computeBalance(financingId: string): Promise<number> {
-    try {
-      const financing = await this.findById(financingId);
-      if (!financing) {
-        return 0;
-      }
-
-      const [result] = await this.db
-        .select({
-          totalPayments: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)`,
-        })
-        .from(expenses)
-        .where(sql`${expenses.sourceType} = 'financing' AND ${expenses.sourceId} = ${financingId}`);
-
-      const totalPayments = Number(result?.totalPayments) || 0;
-      return Math.max(0, financing.originalAmount - totalPayments);
-    } catch (error) {
-      logger.error('Error computing balance for financing', { financingId, error });
-      throw new DatabaseError('Failed to compute financing balance', error);
-    }
+    const balances = await this.computeBalances([financingId]);
+    // computeBalances omits ids with no matching record → mirror the prior `return 0`.
+    return balances.get(financingId) ?? 0;
   }
 
   /**

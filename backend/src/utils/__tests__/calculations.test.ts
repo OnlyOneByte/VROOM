@@ -6,7 +6,12 @@
 
 import { describe, expect, test } from 'bun:test';
 import type { Expense } from '../../db/schema';
-import { calculateAverageMilesPerKwh, calculateMilesPerKwh } from '../calculations';
+import {
+  calculateAverageMilesPerKwh,
+  calculateMilesPerKwh,
+  parseClampedInt,
+  sortExpensesByDate,
+} from '../calculations';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -151,5 +156,79 @@ describe('calculateAverageMilesPerKwh', () => {
     // After sorting: index 0 (mileage 1000) then index 2 (mileage 1100)
     // 100 miles / 30 kWh = 3.333
     expect(result).toBeCloseTo(100 / 30, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseClampedInt (C211 — the insurance /expiring-soon days/limit dedup; the #70 guard)
+// ---------------------------------------------------------------------------
+
+describe('parseClampedInt', () => {
+  test('a valid in-range value parses through unchanged', () => {
+    expect(parseClampedInt('45', 30, 1, 366)).toBe(45);
+  });
+
+  test('undefined (missing param) → fallback', () => {
+    expect(parseClampedInt(undefined, 30, 1, 366)).toBe(30);
+  });
+
+  test('a non-numeric value → fallback (the #70 guard: never NaN)', () => {
+    expect(parseClampedInt('abc', 30, 1, 366)).toBe(30);
+    expect(parseClampedInt('', 30, 1, 366)).toBe(30);
+  });
+
+  test('above max clamps to the ceiling', () => {
+    expect(parseClampedInt('99999', 100, 1, 200)).toBe(200);
+  });
+
+  test('below min clamps to the floor', () => {
+    expect(parseClampedInt('-5', 100, 1, 200)).toBe(1);
+  });
+
+  test('parseInt tolerates a trailing unit but not a leading non-digit', () => {
+    // parseInt('45px') = 45 (then clamped); parseInt('px45') = NaN → fallback. Documents the
+    // parse semantics so a future change to a stricter parser is a conscious one.
+    expect(parseClampedInt('45px', 30, 1, 366)).toBe(45);
+    expect(parseClampedInt('px45', 30, 1, 366)).toBe(30);
+  });
+});
+
+// C421: sortExpensesByDate is the ONE source of truth for the chronological-order invariant the pairwise
+// efficiency calcs require (calculateAverageMPG / calculateAverageMilesPerKwh / the /stats handler all
+// pair consecutive rows; unsorted input silently mis-pairs — the #75/C222 class). Pins ascending order,
+// no input mutation, and Date+string date handling.
+describe('sortExpensesByDate', () => {
+  test('sorts ASCENDING by date', () => {
+    const rows = [
+      { date: '2024-03-10', id: 'b' },
+      { date: '2024-01-05', id: 'a' },
+      { date: '2024-06-20', id: 'c' },
+    ];
+    expect(sortExpensesByDate(rows).map((r) => r.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('does NOT mutate the input array (sorts a copy)', () => {
+    const rows = [
+      { date: '2024-03-10', id: 'b' },
+      { date: '2024-01-05', id: 'a' },
+    ];
+    const sorted = sortExpensesByDate(rows);
+    expect(rows.map((r) => r.id)).toEqual(['b', 'a']); // original order untouched
+    expect(sorted.map((r) => r.id)).toEqual(['a', 'b']);
+    expect(sorted).not.toBe(rows);
+  });
+
+  test('handles a mix of Date and string dates', () => {
+    const rows = [
+      { date: new Date('2024-05-01'), id: 'mid' },
+      { date: '2024-02-01', id: 'early' },
+      { date: new Date('2024-09-01'), id: 'late' },
+    ];
+    expect(sortExpensesByDate(rows).map((r) => r.id)).toEqual(['early', 'mid', 'late']);
+  });
+
+  test('empty + single-element inputs are returned as-is (sorted copy)', () => {
+    expect(sortExpensesByDate([])).toEqual([]);
+    expect(sortExpensesByDate([{ date: '2024-01-01', id: 'x' }]).map((r) => r.id)).toEqual(['x']);
   });
 });

@@ -41,6 +41,26 @@ export interface ExtraPaymentImpact {
 
 const DEV = import.meta.env.DEV;
 
+/**
+ * Add `months` to `date`, clamping a day-of-month overflow back to the last day of the TARGET month.
+ * Plain `Date.setMonth(getMonth() + n)` rolls a day past the target month's length into the FOLLOWING
+ * month (Aug 31 + 1mo → Oct 1, since Sept has no 31st; Jan 31 + 1mo → Mar 3), silently shifting a
+ * payment/payoff/lease-end date into the wrong month. This mirrors the clamp `calculatePayoffDateFromStart`
+ * already used inline (detect the rolled day → `setDate(0)` to the intended month's last day) and is the
+ * ONE source of truth for it across this file (the #90/#91/#92 financing-math defect family). Returns a
+ * fresh Date; does not mutate the input.
+ */
+function addMonthsClamped(date: Date, months: number): Date {
+	const result = new Date(date);
+	const targetDay = result.getDate();
+	result.setMonth(result.getMonth() + months);
+	// If the day changed, the target month was shorter → it rolled forward; clamp to that month's end.
+	if (result.getDate() !== targetDay) {
+		result.setDate(0);
+	}
+	return result;
+}
+
 function calculateAmortizationScheduleImpl(
 	financing: VehicleFinancing,
 	paidPaymentCount = 0
@@ -136,8 +156,7 @@ function calculatePaymentDate(startDate: Date, paymentNumber: number, frequency:
 
 		switch (frequency) {
 			case 'monthly':
-				date.setMonth(date.getMonth() + paymentNumber);
-				break;
+				return addMonthsClamped(date, paymentNumber);
 			case 'bi-weekly':
 				date.setDate(date.getDate() + paymentNumber * 14);
 				break;
@@ -145,7 +164,7 @@ function calculatePaymentDate(startDate: Date, paymentNumber: number, frequency:
 				date.setDate(date.getDate() + paymentNumber * 7);
 				break;
 			default:
-				date.setMonth(date.getMonth() + paymentNumber);
+				return addMonthsClamped(date, paymentNumber);
 		}
 
 		return date;
@@ -167,7 +186,7 @@ export function calculateNextPaymentDate(
 
 		const baseDate = lastPaymentDate || new Date(financing.startDate);
 		const today = new Date();
-		const nextDate = new Date(baseDate);
+		let nextDate = new Date(baseDate);
 
 		if (isNaN(nextDate.getTime())) {
 			if (DEV) console.warn('calculateNextPaymentDate: invalid base date');
@@ -176,12 +195,16 @@ export function calculateNextPaymentDate(
 
 		let iterations = 0;
 		const maxIterations = 1000;
+		// For the monthly path, ANCHOR on baseDate and re-derive (base + N months) each step rather
+		// than clamping incrementally: a step-by-step clamp would let the day-of-month "stick" lower
+		// after the first short month (e.g. a 31st payment passing through Feb → 28th forever),
+		// permanently losing the contractual payment day. addMonthsClamped(base, n) re-derives from the
+		// anchor, so only a genuinely-short target month clamps. (paymentFrequency is fixed per
+		// financing, so monthsAdded only advances on the monthly/default branch.)
+		let monthsAdded = 0;
 
 		while (nextDate <= today && iterations < maxIterations) {
 			switch (financing.paymentFrequency) {
-				case 'monthly':
-					nextDate.setMonth(nextDate.getMonth() + 1);
-					break;
 				case 'bi-weekly':
 					nextDate.setDate(nextDate.getDate() + 14);
 					break;
@@ -189,7 +212,9 @@ export function calculateNextPaymentDate(
 					nextDate.setDate(nextDate.getDate() + 7);
 					break;
 				default:
-					nextDate.setMonth(nextDate.getMonth() + 1);
+					// 'monthly' + any unknown frequency (documented fallback)
+					monthsAdded++;
+					nextDate = addMonthsClamped(baseDate, monthsAdded);
 			}
 			iterations++;
 		}
@@ -226,9 +251,7 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 			// Leases have a fixed end date based on start + term
 			const startDate = new Date(financing.startDate);
 			if (!isNaN(startDate.getTime())) {
-				const endDate = new Date(startDate);
-				endDate.setMonth(endDate.getMonth() + financing.termMonths);
-				return endDate;
+				return addMonthsClamped(startDate, financing.termMonths);
 			}
 			return new Date();
 		}
@@ -266,6 +289,34 @@ export function calculatePayoffDate(financing: VehicleFinancing): Date {
 
 export const calculateAmortizationSchedule = memoizeMulti(calculateAmortizationScheduleImpl);
 
+/**
+ * Walk a loan balance down month-by-month at a fixed payment, returning the number of months to
+ * pay it off and the total interest paid. Stops at `maxMonths` (the runaway guard) or when a
+ * payment no longer covers the period's interest (the negative-amortization guard — principal ≤ 0,
+ * the same break the displayed schedule uses; C161 records that a hand-copied loop once LOST this
+ * guard, which is exactly why this is now ONE function). Pure; `monthlyRate` 0 ⇒ interest 0 ⇒ the
+ * full payment retires principal (the 0%-APR path, #92). Extracted C299 — `calculateExtraPaymentImpact`
+ * ran this identical loop twice (original vs. extra payment), the only difference being the payment.
+ */
+function simulateAmortization(
+	balance: number,
+	monthlyRate: number,
+	paymentAmount: number,
+	maxMonths: number
+): { months: number; totalInterest: number } {
+	let months = 0;
+	let totalInterest = 0;
+	while (balance > 0 && months < maxMonths) {
+		const interestAmount = balance * monthlyRate;
+		const principalAmount = Math.min(paymentAmount - interestAmount, balance);
+		if (principalAmount <= 0) break;
+		balance -= principalAmount;
+		totalInterest += interestAmount;
+		months++;
+	}
+	return { months, totalInterest };
+}
+
 function calculateExtraPaymentImpactImpl(
 	financing: VehicleFinancing,
 	extraPaymentAmount: number
@@ -284,7 +335,15 @@ function calculateExtraPaymentImpactImpl(
 			return defaultResult;
 		}
 
-		if (financing.financingType !== 'loan' || !financing.apr || financing.apr <= 0) {
+		// Only NON-loans (lease/own) have no amortization to accelerate. A 0%-APR (or no-APR-entered)
+		// loan is interest-free but NOT inert: extra payments still retire the principal faster, so they
+		// genuinely shorten the term (monthsSaved > 0) even though interestSaved is $0. The old guard
+		// `!financing.apr || financing.apr <= 0` lumped every 0%-APR loan in with leases and returned a
+		// flat monthsSaved:0, so the PaymentPlannerDialog showed "0 mos" for an interest-free loan where
+		// an extra payment clearly shortens the payoff (#92). The amortization loop below already handles
+		// 0% correctly — monthlyRate 0 → interest 0 → the full payment goes to principal each month — so
+		// the fix is simply to let 0%-APR loans through and compute the rate as 0.
+		if (financing.financingType !== 'loan') {
 			return { ...defaultResult, newPayoffDate: calculatePayoffDate(financing) };
 		}
 
@@ -292,48 +351,23 @@ function calculateExtraPaymentImpactImpl(
 			return { ...defaultResult, newPayoffDate: calculatePayoffDate(financing) };
 		}
 
-		const monthlyRate = financing.apr / 100 / 12;
+		const monthlyRate = financing.apr && financing.apr > 0 ? financing.apr / 100 / 12 : 0;
 		const newPaymentAmount = financing.paymentAmount + extraPaymentAmount;
+		const balance = financing.computedBalance ?? 0;
+		const maxMonths = financing.termMonths * 2;
 
-		let originalBalance = financing.computedBalance ?? 0;
-		let originalMonths = 0;
-		let originalTotalInterest = 0;
+		// Same amortization walk at two payment levels (the only difference): original schedule vs. the
+		// accelerated one with the extra payment. The savings are the deltas. See simulateAmortization.
+		const original = simulateAmortization(balance, monthlyRate, financing.paymentAmount, maxMonths);
+		const accelerated = simulateAmortization(balance, monthlyRate, newPaymentAmount, maxMonths);
 
-		while (originalBalance > 0 && originalMonths < financing.termMonths * 2) {
-			const interestAmount = originalBalance * monthlyRate;
-			const principalAmount = Math.min(financing.paymentAmount - interestAmount, originalBalance);
-
-			if (principalAmount <= 0) {
-				if (DEV) console.warn('calculateExtraPaymentImpact: payment does not cover interest');
-				break;
-			}
-
-			originalBalance -= principalAmount;
-			originalTotalInterest += interestAmount;
-			originalMonths++;
-		}
-
-		let newBalance = financing.computedBalance ?? 0;
-		let newMonths = 0;
-		let newTotalInterest = 0;
-
-		while (newBalance > 0 && newMonths < financing.termMonths * 2) {
-			const interestAmount = newBalance * monthlyRate;
-			const principalAmount = Math.min(newPaymentAmount - interestAmount, newBalance);
-
-			if (principalAmount <= 0) {
-				if (DEV) console.warn('calculateExtraPaymentImpact: new payment does not cover interest');
-				break;
-			}
-
-			newBalance -= principalAmount;
-			newTotalInterest += interestAmount;
-			newMonths++;
-		}
-
-		const monthsSaved = Math.max(0, originalMonths - newMonths);
-		const interestSaved = Math.max(0, originalTotalInterest - newTotalInterest);
-		const newPayoffDate = calculatePaymentDate(new Date(), newMonths, financing.paymentFrequency);
+		const monthsSaved = Math.max(0, original.months - accelerated.months);
+		const interestSaved = Math.max(0, original.totalInterest - accelerated.totalInterest);
+		const newPayoffDate = calculatePaymentDate(
+			new Date(),
+			accelerated.months,
+			financing.paymentFrequency
+		);
 
 		return {
 			extraPaymentAmount,
@@ -366,6 +400,40 @@ export function resolveCurrentOdometer(
 	return currentOdometer ?? currentMileage ?? initialMileage ?? null;
 }
 
+/**
+ * The WHOLE-LEASE mileage allowance. `financing.mileageLimit` is the ANNUAL allowance (the form
+ * labels it "Annual Mileage Limit" + the schema comment agrees), so the total a lease's driven miles
+ * may reach is annual × (termMonths / 12) — e.g. 12,000/yr on a 36-mo lease = 36,000. Comparing
+ * lifetime driven miles against the bare ANNUAL number over-reports excess ~Nx on an N-year lease
+ * (the #64/#110 annual-vs-total money-math class). termMonths is `.notNull()`; fall back to the annual
+ * limit (term≈12mo) if it's somehow 0. ONE source of truth — both calculateLeaseMetrics (the projected
+ * fee) and calculateLeaseOverage (the current-overage card) route through it.
+ */
+export function leaseTotalMileageAllowance(financing: VehicleFinancing): number {
+	const leaseYears = financing.termMonths > 0 ? financing.termMonths / 12 : 1;
+	return (financing.mileageLimit || 0) * leaseYears;
+}
+
+/**
+ * The CURRENT lease mileage overage (driven miles already over the whole-lease allowance) and its fee,
+ * for the PaymentMetricsGrid "Mileage Overage" card. Distinct from calculateLeaseMetrics's PROJECTED
+ * end-of-lease excess: this is the overage as of right now (max(0, driven − total allowance)). Compares
+ * the term-scaled total (not the bare annual limit — the #64/#110 bug this card carried) against driven
+ * miles. `mileageUsed` is driven miles (current − initial), already computed by the caller, so this stays
+ * in driven-miles space throughout (the #91 coordinate-space invariant). Returns zeros for a non-lease or
+ * a lease with no mileageLimit, so the caller can render unconditionally.
+ */
+export function calculateLeaseOverage(
+	financing: VehicleFinancing,
+	mileageUsed: number
+): { excessMiles: number; overageCost: number } {
+	if (financing.financingType !== 'lease' || !financing.mileageLimit) {
+		return { excessMiles: 0, overageCost: 0 };
+	}
+	const excessMiles = Math.max(0, mileageUsed - leaseTotalMileageAllowance(financing));
+	return { excessMiles, overageCost: excessMiles * (financing.excessMileageFee ?? 0) };
+}
+
 export function calculateLeaseMetrics(
 	financing: VehicleFinancing,
 	currentMileage: number | null,
@@ -393,9 +461,15 @@ export function calculateLeaseMetrics(
 			return null;
 		}
 
+		// endDate is nullable (schema: a lease may store no explicit end). When absent, derive it from
+		// the term via addMonthsClamped — CALENDAR months, not termMonths×30 days. The old ×30 fallback
+		// ran ~0.4 days short PER month (a 36-mo lease landed ~16 days / half a month early), which
+		// understated daysRemaining → inflated the milesPerDay burn rate → OVER-reported the projected
+		// excess-mileage fee (#110, money-facing per NORTH_STAR #1). addMonthsClamped is the same helper
+		// calculatePayoffDate (:254) already uses, so the no-endDate lease and an explicit payoff agree.
 		const endDate = financing.endDate
 			? new Date(financing.endDate)
-			: new Date(startDate.getTime() + financing.termMonths * 30 * 24 * 60 * 60 * 1000);
+			: addMonthsClamped(startDate, financing.termMonths);
 
 		if (isNaN(endDate.getTime())) {
 			if (DEV) console.warn('calculateLeaseMetrics: invalid endDate');
@@ -409,8 +483,13 @@ export function calculateLeaseMetrics(
 		const daysRemaining = Math.max(0, totalDays - daysElapsed);
 		const monthsRemaining = Math.max(0, Math.ceil(daysRemaining / 30));
 
+		// The WHOLE-LEASE allowance the excess-fee projection compares against is the annual mileageLimit
+		// scaled by the term (#64/#110) — leaseTotalMileageAllowance is the ONE source of truth for it
+		// (shared with calculateLeaseOverage, the current-overage card).
+		const totalMileageAllowance = leaseTotalMileageAllowance(financing);
+
 		let mileageUsed = 0;
-		let mileageRemaining = financing.mileageLimit || 0;
+		let mileageRemaining = totalMileageAllowance;
 		let projectedFinalMileage = currentMileage || 0;
 		let projectedExcessMiles = 0;
 		let projectedExcessFee = 0;
@@ -420,10 +499,18 @@ export function calculateLeaseMetrics(
 			mileageUsed = Math.max(0, currentMileage - initialMileage);
 			const milesPerDay = daysElapsed > 0 ? mileageUsed / daysElapsed : 0;
 			projectedFinalMileage = currentMileage + milesPerDay * daysRemaining;
-			projectedExcessMiles = Math.max(0, projectedFinalMileage - financing.mileageLimit);
+			// `totalMileageAllowance` is a DRIVEN-miles budget (annual × years) and `mileageUsed` is driven
+			// miles (current − initial), but `projectedFinalMileage` is an ABSOLUTE odometer reading. The
+			// excess must compare like with like: project DRIVEN miles forward, not the odometer. Comparing
+			// the absolute reading against the driven budget over-reported excess (and the $ fee) by exactly
+			// `initialMileage` for any lease signed on a car with miles on it (a used-car lease, or the
+			// odometer not reset) — e.g. a 40k-mile car leased and driven on-pace showed a large phantom
+			// excess fee. (Sibling to #64, which fixed the allowance scaling but left this space mismatch.)
+			const projectedDrivenMiles = Math.max(0, projectedFinalMileage - initialMileage);
+			projectedExcessMiles = Math.max(0, projectedDrivenMiles - totalMileageAllowance);
 			projectedExcessFee = projectedExcessMiles * (financing.excessMileageFee || 0);
 			isOverMileage = projectedExcessMiles > 0;
-			mileageRemaining = Math.max(0, financing.mileageLimit - mileageUsed);
+			mileageRemaining = Math.max(0, totalMileageAllowance - mileageUsed);
 		}
 
 		return {

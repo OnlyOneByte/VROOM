@@ -12,7 +12,7 @@ import { getClientIp } from '../../utils/client-ip';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { storePending } from '../../utils/pending-credentials';
-import { authProviderRepository } from './auth-provider-repository';
+import { authProviderRepository, buildAuthProviderConfig } from './auth-provider-repository';
 import { getLucia, googleProvider } from './lucia';
 import { getEnabledProvider, getEnabledProviders, getProvider } from './providers/registry';
 import { validateAndRefreshSession } from './utils';
@@ -243,7 +243,7 @@ async function resolveNewUser(
         providerAccountId: userInfo.providerAccountId,
         displayName: userInfo.displayName,
         credentials: '',
-        config: { email: userInfo.email, avatarUrl: userInfo.avatarUrl },
+        config: buildAuthProviderConfig(userInfo.email, userInfo.avatarUrl),
         status: 'active',
       });
       return { userId: newUser.id };

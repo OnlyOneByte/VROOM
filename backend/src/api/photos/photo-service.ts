@@ -7,6 +7,8 @@ import {
   capabilitiesOf,
   ENTITY_TO_CATEGORY,
   isImageMimeType,
+  type StorageProvider,
+  type StorageRef,
 } from '../providers/domains/storage/storage-provider';
 import { validateEntityOwnership } from './helpers';
 import { photoRefRepository } from './photo-ref-repository';
@@ -17,6 +19,60 @@ export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'app
 
 /** Maximum file size in bytes (10 MB) */
 export const MAX_FILE_SIZE = 10_485_760;
+
+/**
+ * Persist the DB side of an upload (photo row + active default ref) AFTER the bytes are already in
+ * the provider. #34: the upload is not atomic — if either insert throws (DB error, constraint), the
+ * external object would be orphaned (no DB row → never reconcilable or deletable through the app).
+ * Compensate: best-effort delete the just-uploaded object before re-throwing, so a failed upload
+ * leaves no provider-side litter. A failed compensating delete is logged (reconcilable) but never
+ * masks the original error. Extracted from uploadPhotoForEntity to keep it under the complexity max.
+ */
+async function persistUploadedPhotoOrCleanup(
+  provider: StorageProvider,
+  providerId: string,
+  storageRef: StorageRef,
+  meta: {
+    userId: string;
+    entityType: string;
+    entityId: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+  }
+): Promise<Photo> {
+  try {
+    // Insert logical photo record (metadata only — no provider fields)
+    const photo = await photoRepository.create({
+      ...meta,
+      isCover: false,
+      sortOrder: 0,
+    });
+
+    // Insert photo_ref for the default provider (active immediately)
+    await photoRefRepository.create({
+      photoId: photo.id,
+      providerId,
+      storageRef: storageRef.externalId,
+      externalUrl: storageRef.externalUrl ?? null,
+      status: 'active',
+      syncedAt: new Date(),
+    });
+
+    return photo;
+  } catch (error) {
+    try {
+      await provider.delete({ providerType: provider.type, externalId: storageRef.externalId });
+    } catch (cleanupError) {
+      logger.warn('Failed to clean up orphaned upload after a DB write error', {
+        providerId,
+        storageRef: storageRef.externalId,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    }
+    throw error;
+  }
+}
 
 /**
  * Upload a photo for an entity. Validates ownership, file type/size,
@@ -68,26 +124,18 @@ export async function uploadPhotoForEntity(
     pathHint: folderPath,
   });
 
-  // Insert logical photo record (metadata only — no provider fields)
-  const photo = await photoRepository.create({
+  // #34: the upload is not atomic — the bytes now live in the provider, but the photo row + its
+  // active ref are two more writes that can throw (DB error, constraint). On ANY failure after the
+  // upload, the external object would be orphaned (no DB row → never reconcilable, never deletable
+  // through the app). Compensate: best-effort delete the just-uploaded object before re-throwing, so
+  // a failed upload leaves no provider-side litter. Mirrors the delete-path best-effort pattern.
+  const photo = await persistUploadedPhotoOrCleanup(provider, providerId, storageRef, {
     userId,
     entityType,
     entityId,
     fileName: file.name,
     mimeType: file.type,
     fileSize: file.size,
-    isCover: false,
-    sortOrder: 0,
-  });
-
-  // Insert photo_ref for the default provider (active immediately)
-  await photoRefRepository.create({
-    photoId: photo.id,
-    providerId,
-    storageRef: storageRef.externalId,
-    externalUrl: storageRef.externalUrl ?? null,
-    status: 'active',
-    syncedAt: new Date(),
   });
 
   // Create pending refs for backup providers (sync worker picks these up).
@@ -128,6 +176,7 @@ export async function listPhotosForEntity(
   return photoRepository.findByEntityPaginated(
     entityType,
     entityId,
+    userId,
     pagination.limit,
     pagination.offset
   );

@@ -1,15 +1,26 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
 	isPublicRoute,
 	isProtectedRoute,
 	publicRoutes,
-	handleRouteProtection
+	handleRouteProtection,
+	requireAuth
 } from '../auth';
 import { goto } from '$app/navigation';
+import { authStore } from '$lib/stores/auth.svelte';
+import type { User } from '$lib/types';
 
 // Mock SvelteKit navigation; resolve() is identity so we assert on raw paths.
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+
+const mockUser: User = {
+	id: 'u1',
+	email: 'test@example.com',
+	displayName: 'Test User',
+	createdAt: '2024-01-01T00:00:00Z',
+	updatedAt: '2024-01-01T00:00:00Z'
+};
 
 // Every top-level route that has a +page.svelte and requires auth. If a new authed
 // route is added, deny-by-default protects it automatically — but listing them here
@@ -115,5 +126,60 @@ describe('handleRouteProtection redirects', () => {
 	it('lets an authed user stay on a protected route', () => {
 		handleRouteProtection('/insurance', true, false);
 		expect(goto).not.toHaveBeenCalled();
+	});
+});
+
+// requireAuth() — the per-page guard a protected page-load awaits. Previously untested (the ~56% gap);
+// it reads the REAL authStore (driven via its public methods, the ProtectedRoute.test.ts convention)
+// rather than a mock, so these exercise the genuine state machine. A regression here either bounces an
+// authenticated user (broken page) or fails to bounce a logged-out one (the security-load-bearing path).
+describe('requireAuth', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		authStore.clearUser();
+		authStore.setLoading(false);
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+		authStore.setLoading(false);
+	});
+
+	it('resolves true and does NOT redirect when already authenticated (not loading)', async () => {
+		authStore.setUser(mockUser);
+		await expect(requireAuth()).resolves.toBe(true);
+		expect(goto).not.toHaveBeenCalled();
+	});
+
+	it('resolves false and redirects to /auth when not authenticated (not loading)', async () => {
+		authStore.clearUser();
+		await expect(requireAuth()).resolves.toBe(false);
+		expect(goto).toHaveBeenCalledWith('/auth');
+	});
+
+	it('polls while loading, then resolves true once auth resolves authenticated', async () => {
+		vi.useFakeTimers();
+		authStore.setLoading(true);
+
+		const pending = requireAuth(); // enters the poll branch (setTimeout(check, 50))
+
+		// Auth resolves to authenticated mid-poll; advancing the timer runs the next `check`.
+		authStore.setUser(mockUser); // setUser flips isLoading=false
+		await vi.advanceTimersByTimeAsync(60);
+
+		await expect(pending).resolves.toBe(true);
+		expect(goto).not.toHaveBeenCalled();
+	});
+
+	it('polls while loading, then resolves false + redirects once auth resolves unauthenticated', async () => {
+		vi.useFakeTimers();
+		authStore.setLoading(true);
+
+		const pending = requireAuth();
+
+		authStore.setLoading(false); // resolved, still no user → unauthenticated
+		await vi.advanceTimersByTimeAsync(60);
+
+		await expect(pending).resolves.toBe(false);
+		expect(goto).toHaveBeenCalledWith('/auth');
 	});
 });

@@ -178,3 +178,42 @@ describe('Property 20: Photo create stores userId and user-scoped queries work',
     expect(await repo.countByUser(USER_A)).toBe(3);
   });
 });
+
+// ===========================================================================
+// #72 (C214 deep-review): findByEntityPaginated must be userId-scoped.
+// It was the lone photo read-method filtering on (entityType, entityId) ALONE — every sibling
+// (findByUser/countByUser/findIdsByUser) scopes by user_id. Not a live leak (the route's
+// validateEntityOwnership gates it), but a latent tenant boundary: if two users' photos ever shared
+// an (entityType, entityId) — a raw cross-tenant case only constructible by direct seed — the page
+// would mix them. These pin the WHERE predicate itself (the C192 approach), not just the route guard.
+// ===========================================================================
+describe('#72: findByEntityPaginated is userId-scoped', () => {
+  test('excludes another user’s photo that shares the same (entityType, entityId)', async () => {
+    // The load-bearing cross-tenant case: SAME entityType+entityId, different owners.
+    const SHARED_ENTITY = 'shared-veh';
+    await repo.create(makePhotoData(USER_A, 'vehicle', SHARED_ENTITY));
+    await repo.create(makePhotoData(USER_A, 'vehicle', SHARED_ENTITY));
+    await repo.create(makePhotoData(USER_B, 'vehicle', SHARED_ENTITY)); // foreign — must not surface
+
+    const resultA = await repo.findByEntityPaginated('vehicle', SHARED_ENTITY, USER_A, 50, 0);
+    expect(resultA.totalCount).toBe(2); // count leg userId-scoped (not 3)
+    expect(resultA.data).toHaveLength(2); // data leg userId-scoped
+    for (const p of resultA.data) {
+      expect(p.userId).toBe(USER_A);
+    }
+
+    // And user B sees only their one.
+    const resultB = await repo.findByEntityPaginated('vehicle', SHARED_ENTITY, USER_B, 50, 0);
+    expect(resultB.totalCount).toBe(1);
+    expect(resultB.data[0]?.userId).toBe(USER_B);
+  });
+
+  test('an owner still gets their photos for the entity (no over-filter)', async () => {
+    await repo.create(makePhotoData(USER_A, 'vehicle', VEHICLE_A));
+    await repo.create(makePhotoData(USER_A, 'vehicle', VEHICLE_A));
+
+    const result = await repo.findByEntityPaginated('vehicle', VEHICLE_A, USER_A, 50, 0);
+    expect(result.totalCount).toBe(2);
+    expect(result.data).toHaveLength(2);
+  });
+});

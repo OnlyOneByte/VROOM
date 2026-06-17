@@ -10,7 +10,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import PendingPhotoPreview from '$lib/components/expenses/form/PendingPhotoPreview.svelte';
 	import { odometerApi } from '$lib/services/odometer-api';
-	import { dateOnlyToISO } from '$lib/utils/formatters';
+	import { dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 	import FormLayout from '$lib/components/common/form-layout.svelte';
 	import type { PageData } from './$types';
 
@@ -20,7 +20,7 @@
 
 	// Form state
 	let odometer = $state('');
-	let date = $state(new Date().toISOString().split('T')[0] ?? '');
+	let date = $state(toDateInputValue(new Date()));
 	let note = $state('');
 	let pendingFiles = $state<File[]>([]);
 

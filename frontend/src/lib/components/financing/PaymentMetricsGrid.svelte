@@ -5,6 +5,7 @@
 	import { getDistanceUnitLabel } from '$lib/utils/units';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import type { VehicleFinancing, UnitPreferences } from '$lib/types';
+	import { calculateLeaseOverage } from '$lib/utils/financing-calculations';
 	import type { AmortizationEntry } from '$lib/utils/financing-calculations';
 
 	interface Props {
@@ -56,14 +57,13 @@
 		return Math.round((totalInterest / financing.originalAmount) * 100);
 	});
 
-	// Lease mileage overage
-	let excessMiles = $derived(
-		financing.financingType === 'lease' && financing.mileageLimit
-			? Math.max(0, mileageUsed - financing.mileageLimit)
-			: 0
-	);
-
-	let overageCost = $derived(excessMiles * (financing.excessMileageFee ?? 0));
+	// Lease mileage overage. `financing.mileageLimit` is the ANNUAL allowance; calculateLeaseOverage
+	// scales it by the term (annual × termMonths/12) before comparing against the lifetime `mileageUsed`,
+	// matching the sibling LeaseMetricsCard. Comparing driven miles against the bare ANNUAL number
+	// over-reported the overage + $ fee ~Nx on an N-year lease (the #64/#110 annual-vs-total class).
+	let leaseOverage = $derived(calculateLeaseOverage(financing, mileageUsed));
+	let excessMiles = $derived(leaseOverage.excessMiles);
+	let overageCost = $derived(leaseOverage.overageCost);
 
 	let metricItems = $derived.by(() => {
 		const items: Array<{
