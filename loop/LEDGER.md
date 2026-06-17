@@ -24,13 +24,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 1 |
-| deep-review | 5 | 0 |
+| deep-review | 5 | 3 |
 | guard | 6 | 0 |
 | bug | 3 | 2 |
 | arch | 5 | 0 |
 | infra | 6 | 0 |
 
-Current cycle: **2**
+Current cycle: **3**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -68,3 +68,19 @@ Current cycle: **2**
   reallocation). Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1561 pass / 0 fail (+3),
   build bundled. Backend-only (no UI → no shot). cov: be ~87.1% / fe 85.89% (~ — BE suite +3 tests; not
   re-measured, expense routes already well-covered).
+- **C3 (deep-review)** — **Certified the photo-entity-type allowlist sync CLEAN + left a C404 drift guard.**
+  The set of "photographable" entity types (vehicle / expense / insurance_policy / insurance_claim /
+  odometer_entry) is duplicated across THREE independent paths, held together only by code comments:
+  (1) `validateEntityOwnership` switch (photos/helpers.ts, the upload gate), (2) `validatePhotoRefs`
+  entityTypeToIds map (sync/backup.ts, the RESTORE validator), (3) `ENTITY_TO_CATEGORY` (storage-provider.ts,
+  exported, provider routing). VERIFIED FIRSTHAND all three list the same 5 types today. The C404 failure
+  was exactly this drift: insurance_claim added to the upload gate but missed in the backup map →
+  a valid backup with a claim photo hit "unknown entity type" → valid:false → the WHOLE restore aborted
+  (NORTH_STAR #1 crown-jewel). No existing test pinned the cross-allowlist match. GUARD: new
+  `photo-entity-type-allowlist-sync.test.ts` (+12) treats ENTITY_TO_CATEGORY as the canonical source and
+  asserts BOTH other sites accept exactly its keys — driving the REAL validateBackupData +
+  validateEntityOwnership (not a re-impl). NON-VACUOUS: confirmed by temporarily removing insurance_claim
+  from the backup map → guard goes RED with the precise "would abort the WHOLE restore" diagnostic; restored
+  → green. Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1573 pass / 0 fail (+12), build
+  bundled. Backend-only (no UI → no shot). cov: be ~87.2% / fe 85.89% (~ — sync module already well-covered;
+  +12 tests broaden the restore-safety net).

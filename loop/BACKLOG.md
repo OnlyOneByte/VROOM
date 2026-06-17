@@ -68,6 +68,13 @@ round-trip is exercised eyes-on.)*
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C3:** the photo-entity-type allowlist is in sync across all THREE paths (upload gate /
+> restore validator / provider routing) and now pinned by `photo-entity-type-allowlist-sync.test.ts`
+> (non-vacuous — reproduces the C404 drift). Don't re-audit this surface; it's guarded. Next deep-review
+> veins: the Google Sheets backup round-trip (header-set coverage — but #36/#37 fixes are parked for
+> Angelo), the offline outbox→sync field-mapping (the #66/#101/#111 dropout family — is every
+> OfflineExpense field carried through both save paths + the mapper?), or a fresh data-safety write path.
+
 ### guard
 *(queue empty — repopulate from real bug classes. Pattern: HTTP-harness (createTestApp + s3-provider
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
