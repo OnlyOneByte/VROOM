@@ -26,13 +26,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 12 |
-| deep-review | 5 | 8 |
+| deep-review | 5 | 13 |
 | guard | 6 | 11 |
 | bug | 3 | 10 |
 | arch | 5 | 12 |
 | infra | 6 | 7 |
 
-Current cycle: **12**
+Current cycle: **13**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -220,3 +220,21 @@ Current cycle: **12**
   (0→12) → dashboard Recurring Costs widget shows $99/mo·1 + Upcoming Reminders shows it (Read the PNG).
   Ticked spec T5 → `[x]`. Verify: frontend validate:local GREEN — type-check 0, build OK, 721 tests pass
   (+5). cov: be 87.22% / fe 85.95% (~ — the new helper is unit-covered; eyes-on path is backend-covered).
+- **C13 (deep-review)** — **Certified the replace-mode restore wipe+reinsert FK-ordering CLEAN + left a
+  full-dataset guard.** deep-review was at budget (5/5, highest-leverage of the at-budget three). Audited
+  `deleteUserData` + `insertBackupData` (restore.ts) against the schema FK graph — the data-safety path a
+  replace-restore runs (wipe-then-reinsert; FKs enforced via PRAGMA foreign_keys=ON; bun async-tx doesn't
+  roll back a throw, the C151/#127 footgun → an FK violation mid-restore corrupts the account, NORTH_STAR
+  #1). Existing tests each seed ONE entity family + unified-restore replace-restores an EMPTY backup — NONE
+  exercise the ordering under a complete FK-linked dataset. GUARD: new
+  `restore-replace-delete-ordering.test.ts` (+2) seeds a full graph (vehicle+financing+odometer+expense+
+  insurance policy/term/junction/claim+reminder/junction/notification+photo+prefs/syncState), replace-
+  restores, asserts every table round-trips to its exact pre-restore count (no loss/dup) + a double-replace
+  idempotency case. KEY FIRSTHAND FINDING (verified by mutation): the DELETE order is cascade-REDUNDANT
+  (child FKs are onDelete:cascade → deleting a parent first just cascades, no throw) — the real load-bearing
+  constraint is the INSERT order in insertBackupData (parent-before-child); relocating the financing insert
+  before the vehicles insert turns the guard RED (FK violation), so it's non-vacuous on the actual
+  constraint. Also surfaced: a costed insurance term auto-materializes a premium expense (so expenses=2 not
+  1 — asserted against a snapshot, not a hardcoded count). Verify: backend validate:local GREEN — tsc 0,
+  musl-biome clean, 1587 pass / 0 fail (+2), build bundled. Backend-only (no UI → no shot). cov: be 87.22%
+  / fe 85.95% (~ — restore module already well-covered; +2 broaden the crown-jewel round-trip net).

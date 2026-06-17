@@ -103,6 +103,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > foreign-id row is a PK COLLISION (caught), not a silent cross-tenant write → LOW priority, likely not
 > worth a dedicated cycle. The cross-tenant-write chokepoint is now guarded on every root table where a
 > silent mis-stamp was actually possible (vehicles/insurance/photos).
+>
+> **CERTIFIED C13:** the replace-mode restore wipe+reinsert FK-ordering — `restore-replace-delete-ordering
+> .test.ts` seeds a COMPLETE FK-linked dataset, replace-restores, and asserts every table round-trips to
+> its exact pre-restore count (+ a double-replace idempotency case). Firsthand finding: the DELETE order
+> is cascade-redundant; the load-bearing constraint is the INSERT order (parent-before-child) in
+> insertBackupData — non-vacuous (relocating the financing insert before vehicles → RED). The restore
+> data-safety path is now well-pinned (stamp C8/C11 + table-coverage C208 + this ordering guard). Next
+> deep-review vein: a NON-restore surface — the Google Sheets backup write path (#36/#37 parked) or a
+> fresh analytics/money correctness audit.
 
 ### bug
 > **SCOUTED C6 — no fresh defect (date/tz vein).** analytics date helpers (monthsOwnedInYear,
