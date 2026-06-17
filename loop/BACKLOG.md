@@ -78,6 +78,15 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 a route checks parent ownership but writes FK/config fields verbatim; and date/tz math. One fresh-surface
 scout per bug cycle, then record + pivot if dry. Don't manufacture a finding.)*
 
+> **CLOSED C2: #147** — PUT /split/:id didn't re-validate the carried-forward financing source link
+> against the NEW vehicle set (the regenerated siblings could land on a vehicle whose active financing
+> isn't sourceId → understated balance). Fixed via the shared `assertSplitFinancingSourceValid` on both
+> split paths + 3 guards. **The #62/#109/#125/#145/#147 within-tenant financing-source-link integrity
+> class is now closed across ALL FOUR write paths: regular POST, regular PUT, split CREATE, split UPDATE.**
+> Don't re-scout this class — it's saturated. Next bug scout: try a DIFFERENT vein (date/tz math, the
+> offline-outbox field-dropout family #66/#101/#111, or analytics split-sibling overcount if any builder
+> was missed by the #56/#108/#113/#146 sweep).
+
 > **PENDING ANGELO — product/architecture calls, do NOT auto-fix (each changes a displayed $/HTTP
 > behavior or needs a product decision). Carried from the archive; full grounding there.**
 > - **#36 (HIGH)** — Google Sheets backup writes `USER_ENTERED` → formula injection + round-trip corruption (ARCC-consult before fixing).

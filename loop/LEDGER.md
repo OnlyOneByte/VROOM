@@ -26,11 +26,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 1 |
 | deep-review | 5 | 0 |
 | guard | 6 | 0 |
-| bug | 3 | 0 |
+| bug | 3 | 2 |
 | arch | 5 | 0 |
 | infra | 6 | 0 |
 
-Current cycle: **1**
+Current cycle: **2**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -51,3 +51,20 @@ Current cycle: **1**
   (all 3 display sites route through `leaseTotalMileageAllowance`, `#140` fix-comment present) — it was
   post-reset squash-merge doc-drift, not open work. cov: be 87.09% / fe 85.89% (~, carried from C460 —
   no module touched this cycle).
+- **C2 (bug #147)** — **PUT /split/:id financing-source not re-validated against the NEW vehicle set.**
+  Bug-vein scout: verified firsthand that insurance/claims/vehicles/odometer/financing/regular-expense
+  write paths are all hardened (debunked an initial term-coverage-ownership hypothesis — the repo DOES
+  call assertVehiclesOwned in all 3 term writes). Found the real gap in `updateSplitExpense`
+  (repository.ts:792-793): it REGENERATES siblings carrying the group's existing sourceType/sourceId
+  forward (the update schema doesn't expose them), but the NEW splitConfig can land them on a DIFFERENT
+  vehicle set — and computeBalance sums financing payments by (sourceType,sourceId) with NO vehicle
+  scope, so reallocating a financing-sourced split onto a vehicle whose active financing isn't that
+  sourceId mis-attributes a loan payment → understates the displayed balance (NORTH_STAR #1). The
+  #125(PUT)/#145(create-split) within-tenant financing-source class on the ONE path the per-vehicle
+  check missed. FIX: extracted `assertSplitFinancingSourceValid` (DRYs the per-vehicle loop), shared by
+  POST /split (new config) + PUT /split (re-checks the carried link against the new vehicles via the
+  userId-scoped getSplitExpense read). GUARD: +3 HTTP-harness tests in expense-source-traceability.test.ts
+  (reallocate-onto-unfinanced→400 [was 200 pre-fix]; same-financed-vehicle→200; source-less→200 free
+  reallocation). Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1561 pass / 0 fail (+3),
+  build bundled. Backend-only (no UI → no shot). cov: be ~87.1% / fe 85.89% (~ — BE suite +3 tests; not
+  re-measured, expense routes already well-covered).

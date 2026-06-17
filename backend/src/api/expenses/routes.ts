@@ -39,7 +39,12 @@ import {
 } from './import-mapping';
 import { detectSource } from './import-mapping-presets';
 import { expenseRepository } from './repository';
-import { createSplitExpenseSchema, tagElementSchema, updateSplitSchema } from './validation';
+import {
+  createSplitExpenseSchema,
+  type SplitConfig,
+  tagElementSchema,
+  updateSplitSchema,
+} from './validation';
 
 const routes = new Hono();
 
@@ -194,6 +199,35 @@ async function assertFinancingSourceValid(
   }
 }
 
+/** The distinct vehicleIds a split config touches, across all three split methods. */
+function splitConfigVehicleIds(splitConfig: SplitConfig): string[] {
+  const ids =
+    splitConfig.method === 'even'
+      ? splitConfig.vehicleIds
+      : splitConfig.allocations.map((a) => a.vehicleId);
+  return [...new Set(ids)];
+}
+
+/**
+ * A 'financing'-sourced split must point at the ACTIVE financing of EVERY vehicle it lands on —
+ * each sibling is a separate vehicleId and computeBalance sums by (sourceType,sourceId) with NO
+ * vehicle scope, so a sibling on a vehicle whose active financing isn't `sourceId` mis-attributes a
+ * loan payment → understates that balance (#145/#125, the within-tenant financing-source class).
+ * No-op for a source-less split (assertFinancingSourceValid returns early when sourceType !==
+ * 'financing'). Shared by POST /split (new config) AND PUT /split (the carried-forward link must be
+ * re-checked against the NEW vehicle set — #147, the path the per-vehicle check missed).
+ */
+async function assertSplitFinancingSourceValid(
+  sourceType: string | undefined,
+  sourceId: string | undefined,
+  splitConfig: SplitConfig
+): Promise<void> {
+  if (sourceType !== 'financing') return;
+  for (const vehicleId of splitConfigVehicleIds(splitConfig)) {
+    await assertFinancingSourceValid(sourceType, sourceId, vehicleId);
+  }
+}
+
 // Exported so the query-contract (search/limit/tags coercion) can be unit-tested
 // at the route boundary without standing up a server.
 export const expenseQuerySchema = z.object({
@@ -235,20 +269,10 @@ routes.post('/split', zValidator('json', createSplitExpenseSchema), async (c) =>
   const user = c.get('user');
   const data = c.req.valid('json');
 
-  // A 'financing'-sourced split must point at the active financing of EACH vehicle it touches —
-  // every sibling lands on a different vehicleId, and computeBalance sums by (sourceType,sourceId)
-  // per vehicle, so validate the link against each (#145, the #125/C422 financing-source check the
-  // split path missed). No-op for a source-less split (assertFinancingSourceValid returns early when
-  // sourceType !== 'financing'). The schema now restricts sourceType to the 'financing' literal.
-  if (data.sourceType === 'financing') {
-    const splitVehicleIds =
-      data.splitConfig.method === 'even'
-        ? data.splitConfig.vehicleIds
-        : data.splitConfig.allocations.map((a) => a.vehicleId);
-    for (const vehicleId of new Set(splitVehicleIds)) {
-      await assertFinancingSourceValid(data.sourceType, data.sourceId, vehicleId);
-    }
-  }
+  // A 'financing'-sourced split must point at the active financing of EACH vehicle it touches (#145,
+  // the #125/C422 financing-source check the split path missed). The schema restricts sourceType to
+  // the 'financing' literal; the shared helper validates per vehicle (no-op for a source-less split).
+  await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
   const siblings = await expenseRepository.createSplitExpense(data, user.id);
   const first = siblings[0];
@@ -280,6 +304,21 @@ routes.put(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
+
+    // The regenerated siblings CARRY FORWARD the group's existing sourceType/sourceId (the update
+    // schema doesn't expose them — see updateSplitExpense), but the NEW splitConfig may land them on a
+    // DIFFERENT vehicle set. computeBalance sums financing payments by (sourceType,sourceId) with no
+    // vehicle scope, so reallocating a financing-sourced split onto a vehicle whose active financing
+    // isn't that sourceId mis-attributes a loan payment → understates the balance (#147, the #125/#145
+    // financing-source class on the split-UPDATE path the per-vehicle check missed). Re-validate the
+    // carried link against the new vehicles before regenerating. getSplitExpense is userId-scoped (404s
+    // a non-owned/absent group); a source-less split is a no-op.
+    const existing = await expenseRepository.getSplitExpense(id, user.id);
+    await assertSplitFinancingSourceValid(
+      existing[0]?.sourceType ?? undefined,
+      existing[0]?.sourceId ?? undefined,
+      data.splitConfig
+    );
 
     const siblings = await expenseRepository.updateSplitExpense(id, data, user.id);
     const first = siblings[0];
