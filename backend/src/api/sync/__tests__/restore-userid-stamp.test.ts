@@ -53,6 +53,16 @@ function policyRows(): PolicyRowDb[] {
     .all() as PolicyRowDb[];
 }
 
+interface PhotoRowDb {
+  id: string;
+  user_id: string;
+  entity_id: string;
+}
+
+function photoRows(): PhotoRowDb[] {
+  return ctx.sqlite.query('SELECT id, user_id, entity_id FROM photos').all() as PhotoRowDb[];
+}
+
 describe('restore stamps the importer userId (cross-tenant write guard)', () => {
   test('a backup whose vehicle row carries a FOREIGN userId still restores as the importer', async () => {
     // Seed a vehicle for the importing (harness) user, then export a real ZIP.
@@ -169,6 +179,65 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     expect(rows, 'exactly the one restored policy').toHaveLength(1);
     expect(rows[0].id).toBe(polBody.data.id);
     expect(rows[0].user_id, 'policy row must be stamped to the importer, not the file value').toBe(
+      ctx.user.id
+    );
+    expect(rows.filter((r) => r.user_id === foreignId)).toHaveLength(0);
+  });
+
+  // C11 (deep-review follow-on flagged C8): extend the stamp guard to `photos` — the THIRD stamp-only
+  // root table. Verified firsthand: validatePhotoRefs (backup.ts) checks only entityType + entityId
+  // membership, NOT the photo's userId against the metadata set — so (like insurance, unlike the leaf
+  // expenses/reminders which validation user-checks) a tampered foreign userId on a photo row passes
+  // validation and reaches the insert, where stampUserId is the SOLE defense. A photo is a real upload
+  // target (receipts, vehicle/claim docs) → a cross-tenant write here is NORTH_STAR #2. Seed a photo row
+  // directly (no storage provider needed for the restore path — mirrors claims-roundtrip.test.ts), export,
+  // tamper photos.csv to a victim id, restore AS us, assert the photo is owned by US.
+  test('a backup whose PHOTO row carries a FOREIGN userId still restores as the importer (stamp-only root table)', async () => {
+    const vehRes = await ctx.authed('POST', '/api/v1/vehicles', {
+      make: 'Honda',
+      model: 'CR-V',
+      year: 2019,
+    });
+    const vehBody = await json<DataEnvelope<{ id: string }>>(vehRes);
+    expect(vehRes.status, JSON.stringify(vehBody)).toBeLessThan(300);
+    const vehicleId = vehBody.data.id;
+
+    // A photo attached to that vehicle (entity_type='vehicle'), as an upload would create.
+    ctx.sqlite.run(
+      `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
+       VALUES ('photo-stamp-1', ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 4096)`,
+      [ctx.user.id, vehicleId]
+    );
+
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const AdmZip = (await import('adm-zip')).default;
+    const zip = await backupService.exportAsZip(ctx.user.id);
+
+    const { db } = await import('../../../db/connection');
+    const schema = await import('../../../db/schema');
+    const foreignId = 'victim-user-3';
+    await db
+      .insert(schema.users)
+      .values({ id: foreignId, email: 'victim3@test.com', displayName: 'Victim3' });
+
+    const archive = new AdmZip(zip);
+    const photosCsv = archive.getEntry('photos.csv')?.getData().toString('utf-8');
+    expect(photosCsv, 'export contains photos.csv').toBeTruthy();
+    const tampered = (photosCsv as string).split(ctx.user.id).join(foreignId);
+    expect(tampered.includes(foreignId), 'tamper replaced the owner id in photos.csv').toBe(true);
+    archive.updateFile('photos.csv', Buffer.from(tampered, 'utf-8'));
+    const tamperedZip = archive.toBuffer();
+
+    const result = await restoreService.restoreFromBackup(ctx.user.id, tamperedZip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    // The restored photo must be owned by US — a dropped stamp on the photos insert would land it under
+    // the victim (cross-tenant write that validatePhotoRefs does NOT catch for this table). Both directions.
+    const rows = photoRows();
+    expect(rows, 'exactly the one restored photo').toHaveLength(1);
+    expect(rows[0].id).toBe('photo-stamp-1');
+    expect(rows[0].user_id, 'photo row must be stamped to the importer, not the file value').toBe(
       ctx.user.id
     );
     expect(rows.filter((r) => r.user_id === foreignId)).toHaveLength(0);

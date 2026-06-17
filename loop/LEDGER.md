@@ -27,12 +27,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 9 |
 | deep-review | 5 | 8 |
-| guard | 6 | 6 |
+| guard | 6 | 11 |
 | bug | 3 | 10 |
 | arch | 5 | 6 |
 | infra | 6 | 7 |
 
-Current cycle: **10**
+Current cycle: **11**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -190,3 +190,19 @@ Current cycle: **10**
   HARMLESS (ignored) — removing them is an arch-risk not worth taking against the working two-stage flow.
   Recorded so it's not re-chased. No code shipped this cycle by design (shipping a false fix is the worst
   outcome). Verify: sync-manager suite 22/22 green on the untouched tree. cov: be 87.22% / fe 85.95% (~).
+- **C11 (guard)** — **Extended the restore cross-tenant-write stamp guard to `photos` (the C8 follow-on).**
+  Nothing strictly over budget (arch sat AT 5/5 but was recorded no-churn twice, C4/C6 — "don't force a
+  4th scout"); took the highest-leverage open item: the concrete guard target C8 flagged
+  (photos/userPreferences/syncState remain stamp-only-unguarded). VERIFIED FIRSTHAND: validatePhotoRefs
+  (backup.ts) checks only entityType + entityId membership, NOT the photo's userId against the metadata
+  set — so, like insurance (C8) and unlike the leaf expenses/reminders (which validation user-checks),
+  `photos` is a STAMP-ONLY-defended root table; a tampered foreign userId on a photo row passes validation
+  and reaches the insert where stampUserId is the sole defense (a real cross-tenant write — receipts/
+  vehicle/claim docs — NORTH_STAR #2). GUARD: +1 case in restore-userid-stamp.test.ts (now covers
+  vehicles + insurance + photos) — seed a photo row directly (no storage provider needed for the restore
+  path, mirroring claims-roundtrip.test.ts), tamper photos.csv to a victim id, assert the restored photo
+  is owned by the importer. NON-VACUOUS: dropping the photos stamp turns ONLY the new case RED; restored →
+  4 pass. Remaining stamp-only-unguarded: userPreferences/syncState (PK'd by userId, so a foreign-id row
+  is a PK collision not a silent cross-tenant write — lower priority; left for a future cycle). Verify:
+  backend validate:local GREEN — tsc 0, musl-biome clean, 1585 pass / 0 fail, build bundled. Backend-only
+  (no UI → no shot). cov: be 87.22% / fe 85.95% (~ — sync module already well-covered; +1 security net).

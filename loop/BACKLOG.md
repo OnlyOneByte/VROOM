@@ -96,6 +96,13 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > same logic photos/userPreferences/syncState) rely on the stamp ALONE. insurance is now pinned;
 > photos/prefs/syncState remain stamp-only-unguarded if a future deep-review wants to extend the net (same
 > tamper recipe). Non-vacuous (dropping the insurance stamp → only the new case RED).
+>
+> **GUARDED C11:** extended the stamp guard to `photos` (the C8 follow-on) — restore-userid-stamp.test.ts
+> now covers vehicles + insurance + photos. Non-vacuous (dropping the photos stamp → only the new case
+> RED). REMAINING stamp-only-unguarded: userPreferences/syncState — but those are PK'd by userId, so a
+> foreign-id row is a PK COLLISION (caught), not a silent cross-tenant write → LOW priority, likely not
+> worth a dedicated cycle. The cross-tenant-write chokepoint is now guarded on every root table where a
+> silent mis-stamp was actually possible (vehicles/insurance/photos).
 
 ### bug
 > **SCOUTED C6 — no fresh defect (date/tz vein).** analytics date helpers (monthsOwnedInYear,
