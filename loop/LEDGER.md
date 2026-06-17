@@ -26,14 +26,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 16 |
+| feature | 4 | 22 |
 | deep-review | 5 | 19 |
 | guard | 6 | 18 |
 | bug | 3 | 20 |
 | arch | 5 | 17 |
 | infra | 6 | 21 |
 
-Current cycle: **21**
+Current cycle: **22**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -352,3 +352,23 @@ Current cycle: **21**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C22 (feature)** — **Recurring-expenses T4: multi-vehicle split in `ReminderForm` (eyes-on DONE).**
+  feature was the sole over-budget category (22−16=6/4; arch sat AT 5/5). Picked T4 over the import-trackers
+  tail as the more contained, higher-leverage increment (reuses an existing kit widget). REAL gap: the form
+  hard-nulled `expenseSplitConfig` (ReminderForm:52-53), so a multi-vehicle EXPENSE reminder materialized
+  ONE row on `vehicleIds[0]` only (trigger-service drops to the single-row path on null config) — the other
+  selected vehicles silently got nothing. FIX: exposed the shared `SplitConfigEditor` (the same widget the
+  expense + insurance-term forms use — InsuranceTermForm was the copy template, incl. `resetSplitAllocations`
+  the C415 shared seed) when `kind==='expense'` && ≥2 vehicles && amount>0; `buildSplitConfig()` → null for
+  notification/single-vehicle/unsplit (trigger path UNCHANGED) else a `ReminderSplitConfig` union; edit-open
+  reads the stored config back; client-side split validation mirrors the backend `refineSplitConfig`
+  (percentages→100 / fixed-$→amount) so submit blocks before a 400. EYES-ON CONFIRMED via a new
+  `reminder-expense-split.meshclaw.e2e.ts` + two PNGs (Read): 2 vehicles + $200 → the "Split across vehicles"
+  editor reveals; EVEN shows Daily Driver $100.00 / Weekend Car $100.00 · Total $200.00; the % toggle reveals
+  per-vehicle inputs seeded 50/50; the created reminder persists `{method:'even', vehicleIds:[2]}` (read back
+  via GET — full FE→BE→DB→render round-trip). Single-vehicle no-split path unchanged (reminder-expense-type
+  spec still green; the 2 full-suite reminder failures were the documented accumulated-data strict-mode-2
+  flake — both pass in isolation, and the split editor can't render in either notification flow). Verify:
+  frontend validate:local GREEN — type-check 0, build OK, 721 tests pass. cov: be 87.22% / fe 86.07% (~ —
+  UI-markup cycle; the split materialization path is backend-covered at T2/C102). Recurring-expenses
+  REMAINING: only T8 round-trip e2e (the last tail).

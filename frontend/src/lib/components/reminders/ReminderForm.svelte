@@ -9,15 +9,17 @@
 	import { FormFieldError } from '$lib/components/ui/form-field';
 	import DatePicker from '$lib/components/common/date-picker.svelte';
 	import TagInput from '$lib/components/expenses/form/TagInput.svelte';
+	import SplitConfigEditor from '$lib/components/expenses/split/SplitConfigEditor.svelte';
 	import { LoaderCircle } from '@lucide/svelte';
 	import { reminderApi } from '$lib/services/reminder-api';
 	import { appStore } from '$lib/stores/app.svelte';
 	import { capitalize, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import { categoryLabels, resetSplitAllocations } from '$lib/utils/expense-helpers';
+	import type { SplitAllocationDraft } from '$lib/utils/expense-helpers';
 	import type { ExpenseCategory, ReminderWithVehicles, Vehicle } from '$lib/types';
-	import type { TriggerMode } from '$lib/types/reminder';
+	import type { ReminderSplitConfig, TriggerMode } from '$lib/types/reminder';
 
 	interface Props {
 		open: boolean;
@@ -48,9 +50,10 @@
 	let isEdit = $derived(!!reminder);
 
 	// Form fields. type 'notification' just notifies; type 'expense' auto-creates
-	// an expense (category + amount, applied to the vehicle[s]) when due — the
-	// optional expenseSplitConfig is intentionally NOT exposed here (split across
-	// vehicles is hook-territory; a no-split expense reminder is fully supported).
+	// an expense (category + amount, applied to the vehicle[s]) when due. When an
+	// expense reminder spans >1 vehicle, the optional expenseSplitConfig (T4) controls
+	// how the materialized amount is divided per vehicle (even / fixed-$ / %), reusing
+	// the same SplitConfigEditor as the expense + insurance-term forms.
 	let kind = $state<ReminderKind>('notification');
 	let name = $state('');
 	let description = $state('');
@@ -82,6 +85,20 @@
 	let expenseCategory = $state<ExpenseCategory>('financial');
 	let expenseAmount = $state('');
 	let expenseTags = $state<string[]>([]);
+
+	// Multi-vehicle split (T4): how an expense reminder divides its amount across vehicles.
+	// 'even' carries no per-vehicle rows (backend splits via largest-remainder cents); 'absolute'/
+	// 'percentage' carry per-vehicle allocations. resetSplitAllocations is the shared source of truth
+	// (C415) so the seed can't drift from the expense/insurance forms.
+	let splitMethod = $state<'even' | 'absolute' | 'percentage'>('even');
+	let splitAllocations = $state<SplitAllocationDraft[]>([]);
+	// The split editor is only relevant for an expense reminder spanning ≥2 vehicles with a positive
+	// amount; a single-vehicle expense reminder keeps the no-split (null config) path unchanged.
+	let splitVehicles = $derived(vehicles.filter(v => selectedVehicleIds.includes(v.id)));
+	let parsedExpenseAmount = $derived(parseFloat(expenseAmount) || 0);
+	let showSplitEditor = $derived(
+		kind === 'expense' && parsedExpenseAmount > 0 && selectedVehicleIds.length >= 2
+	);
 
 	let isSubmitting = $state(false);
 	let errors = $state<Record<string, string>>({});
@@ -126,6 +143,16 @@
 				: 'financial';
 			expenseAmount = r.expenseAmount != null ? String(r.expenseAmount) : '';
 			expenseTags = r.expenseTags ? [...r.expenseTags] : [];
+			// Seed the split editor from the stored config: 'even' has no per-vehicle rows; absolute/
+			// percentage carry their allocations. A null config (single-vehicle / unsplit) defaults to even.
+			const sc = r.expenseSplitConfig;
+			if (sc && sc.method !== 'even') {
+				splitMethod = sc.method;
+				splitAllocations = sc.allocations.map(a => ({ ...a }));
+			} else {
+				splitMethod = 'even';
+				splitAllocations = [];
+			}
 		} else {
 			kind = 'notification';
 			name = '';
@@ -143,6 +170,8 @@
 			expenseCategory = 'financial';
 			expenseAmount = '';
 			expenseTags = [];
+			splitMethod = 'even';
+			splitAllocations = [];
 		}
 	});
 
@@ -150,6 +179,40 @@
 		selectedVehicleIds = selectedVehicleIds.includes(id)
 			? selectedVehicleIds.filter(v => v !== id)
 			: [...selectedVehicleIds, id];
+		// Re-seed split allocations to the new vehicle set so absolute/percentage rows track the
+		// selection (mirrors the expense + insurance-term forms' toggle behavior).
+		splitAllocations = resetSplitAllocations(splitMethod, selectedVehicleIds);
+	}
+
+	function handleSplitMethodChange(method: 'even' | 'absolute' | 'percentage') {
+		splitMethod = method;
+		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
+	}
+
+	function handleAllocationsChange(allocs: SplitAllocationDraft[]) {
+		splitAllocations = allocs;
+	}
+
+	// Build the ReminderSplitConfig payload — null unless this is a multi-vehicle expense reminder with
+	// an editor showing. 'even' carries vehicleIds; absolute/percentage carry their allocations.
+	function buildSplitConfig(): ReminderSplitConfig | null {
+		if (!showSplitEditor) return null;
+		if (splitMethod === 'even') {
+			return { method: 'even', vehicleIds: selectedVehicleIds };
+		}
+		if (splitMethod === 'absolute') {
+			return {
+				method: 'absolute',
+				allocations: splitAllocations.map(a => ({ vehicleId: a.vehicleId, amount: a.amount ?? 0 }))
+			};
+		}
+		return {
+			method: 'percentage',
+			allocations: splitAllocations.map(a => ({
+				vehicleId: a.vehicleId,
+				percentage: a.percentage ?? 0
+			}))
+		};
 	}
 
 	function validate(): boolean {
@@ -182,6 +245,16 @@
 		if (kind === 'expense') {
 			const amt = parseFloat(expenseAmount);
 			if (!(amt > 0)) e['expenseAmount'] = 'Enter an amount greater than 0';
+			// Multi-vehicle split sums must reconcile (mirrors the backend refineSplitConfig so we block
+			// before a 400): percentages → 100; fixed-$ → the expense amount. 'even' needs no check.
+			if (showSplitEditor && splitMethod === 'percentage') {
+				const sum = splitAllocations.reduce((s, a) => s + (a.percentage ?? 0), 0);
+				if (Math.abs(sum - 100) > 0.01) e['split'] = 'Split percentages must total 100%';
+			}
+			if (showSplitEditor && splitMethod === 'absolute' && amt > 0) {
+				const sum = splitAllocations.reduce((s, a) => s + (a.amount ?? 0), 0);
+				if (Math.abs(sum - amt) > 0.01) e['split'] = 'Split amounts must total the expense amount';
+			}
 		}
 		errors = e;
 		return Object.keys(e).length === 0;
@@ -214,7 +287,12 @@
 				// a notification reminder so switching type on edit clears stale values.
 				expenseCategory: isExpense ? expenseCategory : null,
 				expenseAmount: isExpense ? parseFloat(expenseAmount) : null,
-				expenseTags: isExpense && expenseTags.length > 0 ? expenseTags : null
+				expenseTags: isExpense && expenseTags.length > 0 ? expenseTags : null,
+				// Multi-vehicle split (T4): the per-vehicle division for an expense reminder spanning ≥2
+				// vehicles; null for a notification, single-vehicle, or unsplit expense reminder (so the
+				// trigger materializes one row on vehicleIds[0], unchanged). Explicit null on edit clears
+				// a stale config when the reminder drops back to one vehicle / notification.
+				expenseSplitConfig: isExpense ? buildSplitConfig() : null
 			};
 			if (reminder) {
 				await reminderApi.update(reminder.reminder.id, payload);
@@ -487,6 +565,23 @@
 				{/if}
 				{#if errors['vehicleIds']}<FormFieldError>{errors['vehicleIds']}</FormFieldError>{/if}
 			</div>
+
+			<!-- Multi-vehicle split (expense reminder spanning ≥2 vehicles): how the materialized
+			     amount divides per vehicle. Single-vehicle keeps the no-split path (editor hidden). -->
+			{#if showSplitEditor}
+				<div class="space-y-2">
+					<Label>Split across vehicles</Label>
+					<SplitConfigEditor
+						vehicles={splitVehicles}
+						totalAmount={parsedExpenseAmount}
+						{splitMethod}
+						allocations={splitAllocations}
+						onMethodChange={handleSplitMethodChange}
+						onAllocationsChange={handleAllocationsChange}
+					/>
+					{#if errors['split']}<FormFieldError>{errors['split']}</FormFieldError>{/if}
+				</div>
+			{/if}
 
 			<!-- Description (optional) -->
 			<div class="space-y-2">

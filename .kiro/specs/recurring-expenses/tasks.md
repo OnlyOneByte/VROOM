@@ -40,10 +40,21 @@
 
 ### Frontend (eyes-on; Playwright-blocked here → "code-complete, eyes-on pending")
 
-- [ ] **T4 — Multi-vehicle split in `ReminderForm` (R2, D3).** Expose `expenseSplitConfig` when
-      `type==='expense'` and >1 vehicle is selected, **reusing the existing expense-split widget**; wire
-      it into the create/update payload (today hard-null at ReminderForm:52-53). Four-states + a11y;
-      single-vehicle keeps the no-split path. Eyes-on screenshot of the split sub-form.
+- [x] **T4 — Multi-vehicle split in `ReminderForm` (R2, D3) — DONE C22 2026-06-17 (eyes-on CONFIRMED).**
+      Exposed `expenseSplitConfig` when `kind==='expense'` and ≥2 vehicles are selected with a positive
+      amount, **reusing the shared `SplitConfigEditor`** (the same widget the expense + insurance-term
+      forms use — InsuranceTermForm was the copy template). Wired into the create/update payload (replaced
+      the hard-null): `buildSplitConfig()` returns `null` for notification/single-vehicle/unsplit (so the
+      trigger keeps materializing one row on `vehicleIds[0]`, unchanged) and a `ReminderSplitConfig` union
+      otherwise; `resetSplitAllocations` (the C415 shared seed) re-seeds on method + vehicle-toggle so the
+      100/N percentage can't drift; edit-open reads the stored config back. Client-side split validation
+      mirrors the backend `refineSplitConfig` (percentages→100, fixed-$→amount) so submit blocks before a
+      400. ✅ EYES-ON CONFIRMED via `reminder-expense-split.meshclaw.e2e.ts` + two PNGs (Read): with 2
+      vehicles + $200, the "Split across vehicles" editor reveals — **even** shows Daily Driver $100.00 /
+      Weekend Car $100.00 · Total $200.00; switching to **%** reveals per-vehicle inputs seeded 50/50. The
+      created reminder persists `expenseSplitConfig:{method:'even', vehicleIds:[2]}` (read back via GET).
+      Four-states + a11y (per-vehicle `aria-label`s from the editor); single-vehicle keeps the no-split path
+      (reminder-expense-type spec still green). frontend validate:local GREEN (type-check 0, build, 721).
 - [x] **T5 — Reliable materialization (R1, D1) — DONE C12 2026-06-17 (eyes-on CONFIRMED).** Client-side
       opportunistic `reminderApi.trigger()` on app init, debounced once per local calendar day
       (localStorage timestamp), authed + online only. **GATE DONE (C128):**

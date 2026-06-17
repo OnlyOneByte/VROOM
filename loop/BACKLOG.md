@@ -57,9 +57,12 @@ round-trip is exercised eyes-on.)*
    `type:'expense'` reminders; T1 traceability, T2 split-materialization, T3 cascade-safe delete via
    clearSource, T5 gate `shouldTriggerRecurringExpenses`, T6/T7 FE client methods — all in archive).
    **T7 widget DONE (C5).** **T5 app-init trigger hook DONE (C12).** **T6 DONE (badge C9 + "materialized N
-   expenses" dialog C16, both eyes-on CONFIRMED — `MaterializedExpensesDialog.svelte` opened from a Receipt
-   button on expense reminder cards; verified "12 expenses · $900 total" via shot + backend GET log).**
-   **REMAINING: T4 + T8** — T4 multi-vehicle split in ReminderForm (reuse split widget); T8 round-trip e2e.
+   expenses" dialog C16, both eyes-on CONFIRMED).** **T4 multi-vehicle split DONE (C22, eyes-on CONFIRMED —
+   exposed the shared `SplitConfigEditor` when an expense reminder spans ≥2 vehicles; even/%/fixed-$ verified
+   via shot, config persists `{method:'even', vehicleIds:[2]}`; single-vehicle no-split path unchanged).**
+   **REMAINING: T8 only** — round-trip e2e (create split recurring expense → materialize → appears per-vehicle
+   with badge → delete source → past rows remain). This is the LAST tail; on the next feature cycle either
+   promote T8 into the committed net or record "code-complete, eyes-on pending" → the feature is then DONE.
    Spec: `.kiro/specs/recurring-expenses/`.
 
 > NOTE: one tasks.md task per cycle, not one-and-done. **Standing goal** (TODO.md → Misc): 90% coverage
