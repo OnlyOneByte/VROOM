@@ -26,13 +26,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 5 |
-| deep-review | 5 | 3 |
+| deep-review | 5 | 8 |
 | guard | 6 | 6 |
 | bug | 3 | 6 |
 | arch | 5 | 6 |
 | infra | 6 | 7 |
 
-Current cycle: **7**
+Current cycle: **8**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -145,3 +145,19 @@ Current cycle: **7**
   0 fail. (4) BRANCH STATE: claude-loop-dev = 6 commits ahead of fresh origin/main (C1 feature, C2 bug,
   C3 deep-review, C4 guard, C5 feature, C6 guard), PR-ready; recorded here since BRANCH_REVIEW.md is
   gitignored. Doc-only cycle — no source touched. cov: be 87.22% / fe 85.95% (MEASURED, not carried).
+- **C8 (deep-review)** — **Certified the restore `stampUserId` cross-tenant-write chokepoint + broadened
+  its guard.** stampUserId (restore.ts) forces the importer's userId onto every directly-owned row of an
+  UNTRUSTED backup — "the single chokepoint that holds regardless of which validators run," applied to 9
+  tables (vehicles/insurance/reminders/reminderNotifications/expenses/odometer/userPreferences/syncState/
+  photos). VERIFIED FIRSTHAND: the only existing stamp test tampered `vehicles.csv` ONLY — a dropped stamp
+  on any other insert (the C3-class structural-invariant drift) would plant a cross-tenant row with NO
+  test red. KEY FINDING from doing it firsthand: validateBackupData REJECTS a foreign userId on LEAF
+  tables (expenses/reminders user-check against the metadata set → belt-and-suspenders), but
+  `validateInsuranceRefs` checks only `id` presence — so `insurance_policies` is a genuine STAMP-ONLY
+  root table (exactly as the docstring flags; my first attempt tampering expenses.csv was REJECTED at
+  validation, which is what surfaced this). GUARD: +1 case in restore-userid-stamp.test.ts tampering
+  insurance_policies.csv to a victim id → asserts the restored policy is owned by the importer.
+  NON-VACUOUS: dropping the insurance stamp turns ONLY the new case RED (vehicles + untampered stay
+  green); restored → 3 pass. Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1583 pass /
+  0 fail, build bundled. Backend-only (no UI → no shot). cov: be 87.22% / fe 85.95% (~ — sync module
+  already well-covered; +1 broadens the cross-tenant security net to a stamp-only root table).
