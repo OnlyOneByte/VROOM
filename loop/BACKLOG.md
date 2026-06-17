@@ -288,3 +288,8 @@ baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays 
 > C7 — sync-test additions hit already-covered modules); FE 86.07% line / 87.19% func / 78.53% branch (UP
 > from C12's helper tests). Both suites green (BE 1587 / FE 721). Branch 7 ahead, PR-ready. NEXT cadence
 > ~C24. Coverage is plateaued at the structural ceiling — don't chase % directly.
+>
+> **RAN C21 (cadence).** Untracked-test sweep CLEAN. Coverage BOTH UNCHANGED vs C14 (BE 87.22/86.96, FE
+> 86.07/87.19/78.53 — the C15-C20 arc was tests/dedups/eyes-on, no new covered lines). Both suites green
+> (BE 1594 / FE 721). Branch 20 ahead, PR-ready. NEXT cadence ~C31. Coverage plateaued at the structural
+> ceiling — keep not chasing %; let real bug/feature work move it.

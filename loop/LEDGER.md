@@ -14,11 +14,10 @@
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
 > cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
 > is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
-> components). **RE-MEASURED C14 (infra cadence): BE 87.22% line / 86.96% func (file-mean, 103 src files,
-> UNCHANGED vs C7 — C8/C11/C13 added sync tests on already-covered modules); FE 86.07% line / 87.19% func
-> / 78.53% branch (v8 aggregate, 1150/1336 lines, UP vs C7's 85.95/87.15/78.38 — the C12
-> maybeTriggerRecurringExpenses unit tests).** Both at the structural ceiling; treat as the floor.
-> (C7: BE 87.22/86.96, FE 85.95/87.15/78.38. Prior C460: BE 87.09/86.60, FE 85.89/87.15/78.35.)
+> components). **RE-MEASURED C21 (infra cadence): BE 87.22% line / 86.96% func (file-mean, 103 src files);
+> FE 86.07% line / 87.19% func / 78.53% branch (v8, 1150/1336 lines) — BOTH UNCHANGED vs C14 (the C15-C20
+> work was tests/dedups on already-covered modules + an eyes-on dialog).** Both at the structural ceiling;
+> treat as the floor. (C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
 
 ## Balance table
 `starved-for = current cycle − last-touched`. If `starved-for > budget` for any category,
@@ -32,9 +31,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 18 |
 | bug | 3 | 20 |
 | arch | 5 | 17 |
-| infra | 6 | 14 |
+| infra | 6 | 21 |
 
-Current cycle: **20**
+Current cycle: **21**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -343,3 +342,13 @@ Current cycle: **20**
   this band; FE has no own MPG band → no divergence). cov: be 87.22% / fe 86.07% (~ — bands unified, same
   modules). NOTE the C19 financing/TCO audit (buildAmortizationSchedule/computeTCOTotal/categorizeTCOExpenses)
   was done first this cycle + all CLEAN — folded into this entry; that vein stays dry.
+- **C21 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence).** Two cats over
+  budget (infra 7/6 > feature 5/4); infra is the most-starved → forced. (1) UNTRACKED-TEST SWEEP: CLEAN —
+  zero untracked `.test.ts`/`.spec.ts` (the gitignored `.meshclaw.e2e.ts` are by-design). (2) COVERAGE
+  RE-MEASURED (6 commits since C14): **BE 87.22% line / 86.96% func; FE 86.07% line / 87.19% func / 78.53%
+  branch** — BOTH UNCHANGED vs C14 (the C15-C20 arc was tests/dedups on already-covered modules + the C16
+  eyes-on dialog; the C20 band-unification swapped literals, no new lines). At the ~87 BE / ~86 FE
+  structural ceiling. (3) BOTH-SIDES GREEN: BE 1594 / FE 721. (4) BRANCH STATE: claude-loop-dev = 20
+  commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
+  1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
+  touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
