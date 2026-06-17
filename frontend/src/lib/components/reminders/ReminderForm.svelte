@@ -16,7 +16,7 @@
 	import { capitalize, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
 	import { getDistanceUnitLabel } from '$lib/utils/units';
-	import { categoryLabels, resetSplitAllocations } from '$lib/utils/expense-helpers';
+	import { buildSplitConfig, categoryLabels, resetSplitAllocations } from '$lib/utils/expense-helpers';
 	import type { SplitAllocationDraft } from '$lib/utils/expense-helpers';
 	import type { ExpenseCategory, ReminderWithVehicles, Vehicle } from '$lib/types';
 	import type { ReminderSplitConfig, TriggerMode } from '$lib/types/reminder';
@@ -194,25 +194,11 @@
 	}
 
 	// Build the ReminderSplitConfig payload — null unless this is a multi-vehicle expense reminder with
-	// an editor showing. 'even' carries vehicleIds; absolute/percentage carry their allocations.
-	function buildSplitConfig(): ReminderSplitConfig | null {
+	// an editor showing. The union itself is built by the shared buildSplitConfig helper (C23, the ONE
+	// source of truth ExpenseForm also uses); ReminderSplitConfig is structurally identical to SplitConfig.
+	function reminderSplitConfig(): ReminderSplitConfig | null {
 		if (!showSplitEditor) return null;
-		if (splitMethod === 'even') {
-			return { method: 'even', vehicleIds: selectedVehicleIds };
-		}
-		if (splitMethod === 'absolute') {
-			return {
-				method: 'absolute',
-				allocations: splitAllocations.map(a => ({ vehicleId: a.vehicleId, amount: a.amount ?? 0 }))
-			};
-		}
-		return {
-			method: 'percentage',
-			allocations: splitAllocations.map(a => ({
-				vehicleId: a.vehicleId,
-				percentage: a.percentage ?? 0
-			}))
-		};
+		return buildSplitConfig(splitMethod, selectedVehicleIds, splitAllocations);
 	}
 
 	function validate(): boolean {
@@ -292,7 +278,7 @@
 				// vehicles; null for a notification, single-vehicle, or unsplit expense reminder (so the
 				// trigger materializes one row on vehicleIds[0], unchanged). Explicit null on edit clears
 				// a stale config when the reminder drops back to one vehicle / notification.
-				expenseSplitConfig: isExpense ? buildSplitConfig() : null
+				expenseSplitConfig: isExpense ? reminderSplitConfig() : null
 			};
 			if (reminder) {
 				await reminderApi.update(reminder.reminder.id, payload);

@@ -249,6 +249,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    (vehicle-stats.ts) now sort (each keeping its own contract) + delegate. Behavior-preserving (pre-sorted
    input, (0,150) band preserved exactly, #30 NOT unified); green→green across both property suites (58
    pass). The C161-vulnerable hand-copied loop now has one source of truth. Don't re-scout.
+2. ~~**`buildSplitConfig` dedup**~~ — **DONE C23.** The C22 T4 work added a near-byte-identical
+   `buildSplitConfig` to ReminderForm (vs ExpenseForm's). Extracted ONE pure
+   `buildSplitConfig(method, vehicleIds, allocations): SplitConfig` into expense-helpers.ts (the
+   resetSplitAllocations home); both forms delegate (ReminderForm via a thin null-guard wrapper).
+   InsuranceTermForm's flat split shape is a DIFFERENT contract → not merged. Characterization test added
+   FIRST (+5, incl. the cleared-input→0 coalesce); behavior-preserving confirmed via the C22 e2e specs.
+   green→green (726 pass). Don't re-scout. *(Lesson reinforced: a feature cycle that copies a helper into a
+   new component seeds the NEXT arch cycle — same as C15→C17. Watch for this after future eyes-on features.)*
 
 > **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
 > toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time

@@ -1,4 +1,4 @@
-import type { ExpenseCategory } from '$lib/types';
+import type { ExpenseCategory, SplitConfig } from '$lib/types';
 import { Fuel, Wrench, CreditCard, DollarSign } from '@lucide/svelte';
 
 type LucideIcon = typeof Fuel;
@@ -70,6 +70,34 @@ export function resetSplitAllocations(
 	if (method === 'absolute') return vehicleIds.map((id) => ({ vehicleId: id, amount: 0 }));
 	const pct = vehicleIds.length > 0 ? 100 / vehicleIds.length : 0;
 	return vehicleIds.map((id) => ({ vehicleId: id, percentage: Math.round(pct * 10) / 10 }));
+}
+
+/**
+ * Build the API `SplitConfig` discriminated union from a form's split state. ONE source of truth (C23)
+ * for what ExpenseForm and ReminderForm ran near-byte-identical (`buildSplitConfig`): 'even' carries the
+ * `vehicleIds` (the backend computes the per-vehicle even split itself); 'absolute'/'percentage' carry the
+ * per-vehicle allocations, coalescing a missing draft value to 0 (the editor seeds 0/100-over-N, but a
+ * cleared input is `undefined`). `ReminderSplitConfig` is structurally identical to `SplitConfig`, so a
+ * reminder caller can assert the return back to its own alias. A divergent copy could drop the
+ * coalesce (→ `undefined` in the payload) or mis-map a field, materializing a different per-vehicle split
+ * depending on which form created it — the same drift class as resetSplitAllocations (C415).
+ */
+export function buildSplitConfig(
+	method: 'even' | 'absolute' | 'percentage',
+	vehicleIds: string[],
+	allocations: SplitAllocationDraft[]
+): SplitConfig {
+	if (method === 'even') return { method: 'even', vehicleIds };
+	if (method === 'absolute') {
+		return {
+			method: 'absolute',
+			allocations: allocations.map((a) => ({ vehicleId: a.vehicleId, amount: a.amount ?? 0 }))
+		};
+	}
+	return {
+		method: 'percentage',
+		allocations: allocations.map((a) => ({ vehicleId: a.vehicleId, percentage: a.percentage ?? 0 }))
+	};
 }
 
 // Category labels

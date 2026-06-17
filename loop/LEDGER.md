@@ -30,10 +30,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 19 |
 | guard | 6 | 18 |
 | bug | 3 | 20 |
-| arch | 5 | 17 |
+| arch | 5 | 23 |
 | infra | 6 | 21 |
 
-Current cycle: **22**
+Current cycle: **23**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -352,6 +352,27 @@ Current cycle: **22**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C23 (arch)** — **`buildSplitConfig` dedup (the C22-created drift vector — a genuine fresh pick, not a
+  re-scout).** arch was the sole over-budget category (23−17=6/5). Unlike the C4/C6/C12 no-churn scouts,
+  there was a REAL pick: my own C22 T4 work added a `buildSplitConfig()` to `ReminderForm` that was
+  near-byte-identical to `ExpenseForm`'s (both build the `SplitConfig`/`ReminderSplitConfig` discriminated
+  union from method/vehicleIds/allocations — `even`→vehicleIds, else map allocations with a `?? 0`
+  coalesce). The two union aliases are structurally identical; `InsuranceTermForm` uses a DIFFERENT flat
+  `{vehicleIds, splitMethod?, allocations?}` API shape → correctly NOT a merge target (verified firsthand).
+  Extracted ONE pure `buildSplitConfig(method, vehicleIds, allocations): SplitConfig` into
+  `expense-helpers.ts` — the natural pair to `resetSplitAllocations` (the C415 split-seed source of truth
+  that already lives there). ExpenseForm calls it directly (dropped its now-unused `SplitConfig` type
+  import); ReminderForm wraps it in a thin `reminderSplitConfig()` that keeps the `showSplitEditor`→null
+  guard then delegates. Arch rule 3 satisfied: added the characterization test FIRST (buildSplitConfig was
+  never directly tested — it lived locally in each component, the C181/C229 isolation gap). GUARD: +5 cases
+  in reset-split-allocations.test.ts (even→vehicleIds / absolute+percentage map / the load-bearing
+  cleared-input→0 coalesce on both numeric methods) — the merge-surviving net since both forms are
+  eyes-on/Playwright-blocked. BEHAVIOR-PRESERVING confirmed at the API seam (rule 4): re-ran the C22
+  reminder-expense-split + reminder-expense-type e2e specs GREEN — the split round-trip still persists
+  `{method:'even', vehicleIds:[2]}` identically + the single-vehicle no-split path unchanged (no template
+  touched, only the `<script>` call expression). Verify: frontend validate:local GREEN — type-check 0,
+  build OK, 726 tests pass (+5). cov: be 87.22% / fe 86.07% (~ — same split-state module, LOC down, one
+  source of truth for the union builder; the +5 pin the newly-shared helper directly).
 - **C22 (feature)** — **Recurring-expenses T4: multi-vehicle split in `ReminderForm` (eyes-on DONE).**
   feature was the sole over-budget category (22−16=6/4; arch sat AT 5/5). Picked T4 over the import-trackers
   tail as the more contained, higher-leverage increment (reuses an existing kit widget). REAL gap: the form
