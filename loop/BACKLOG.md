@@ -156,6 +156,14 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > drop / half-open 150 band) — closes the C181/C229 "helper tested only via callers" gap the C17 dedup
 > created. STANDING PATTERN (loop-improvement): whenever an arch cycle extracts a shared helper, the NEXT
 > guard cycle should pin it directly (C6 monthsBetween, C18 averageConsecutiveMpg). Don't re-add.
+>
+> **GUARDED C25:** the C24 #36 RAW-value-input fix now has a tree-wide source-scan guard
+> (`sheets-raw-value-input.test.ts`, +2): asserts EVERY `valueInputOption:` assignment in
+> google-sheets-service.ts is `'RAW'`, so a reformat-flip back to USER_ENTERED OR a new Sheets write site
+> added with the unsafe option regresses RED (the C24 fake-seam test only drives the one current path).
+> Matches the assignment (not a bare USER_ENTERED substring — the fix's comment mentions it). Non-vacuous
+> (flip → RED). STANDING PATTERN extended: a bug-fix cycle that flips a load-bearing one-token option seeds
+> a NEXT guard cycle for the tree-wide source scan (sibling to the arch-extract→guard-pin pattern). Don't re-add.
 
 ### bug
 *(The cold-scout vein is exhausted (C6/C10/C15/C20 all dry on pure-logic money/date/store/analytics). But

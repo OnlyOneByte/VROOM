@@ -28,12 +28,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 22 |
 | deep-review | 5 | 19 |
-| guard | 6 | 18 |
+| guard | 6 | 25 |
 | bug | 3 | 24 |
 | arch | 5 | 23 |
 | infra | 6 | 21 |
 
-Current cycle: **24**
+Current cycle: **25**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -352,6 +352,20 @@ Current cycle: **24**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C25 (guard)** — **Tree-wide source-scan guard for the C24 #36 RAW-value-input fix.** Two cats tied
+  over budget (deep-review 6/5 +1, guard 7/6 +1); guard wins the tie on raw starvation (7 > 6). The C24
+  #36 fix is a HIGH data-safety fix whose regression risk is a ONE-TOKEN flip (`RAW`→`USER_ENTERED`) or a
+  NEW Sheets write site added with USER_ENTERED — and the C24 fake-seam test only drives the single write
+  path that exists today. GUARD: new `sheets-raw-value-input.test.ts` (+2) scans google-sheets-service.ts
+  for EVERY `valueInputOption: '<x>'` assignment and asserts each is `'RAW'` (+ a non-no-op check that ≥1
+  site exists). KEY design point: it matches the ASSIGNMENT, not a bare `USER_ENTERED` substring — the C24
+  fix's own explanatory comment contains the word USER_ENTERED, which a naive grep would false-positive on
+  (verified: 2 comment occurrences, 1 real assignment). NON-VACUOUS: flipping the source to USER_ENTERED
+  turns the scan RED with the precise corruption diagnostic; restored → green (1 RAW site). Mirrors the
+  established source-scan idiom (no-oldest-month-slice / no-utc-date-input). Source-scan > untracked e2e
+  for merge survival (GUIDE). Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1597 pass /
+  0 fail (+2), build bundled. Backend-only (no UI → no shot). cov: be 87.22% / fe 86.07% (~ — pure source
+  scan, no module logic touched; pins the #36 contract tree-wide).
 - **C24 (bug #36)** — **Sheets backup formula-injection fix: USER_ENTERED → RAW (Angelo-APPROVED Sev-1).**
   bug was the sole over-budget category (24−20=4/3). The cold-scout vein is exhausted, so took the top
   unfinished Angelo-approved item by severity: #36 (HIGH, the Sheets-backup formula-injection / silent
