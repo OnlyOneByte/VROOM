@@ -108,9 +108,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > its exact pre-restore count (+ a double-replace idempotency case). Firsthand finding: the DELETE order
 > is cascade-redundant; the load-bearing constraint is the INSERT order (parent-before-child) in
 > insertBackupData — non-vacuous (relocating the financing insert before vehicles → RED). The restore
-> data-safety path is now well-pinned (stamp C8/C11 + table-coverage C208 + this ordering guard). Next
-> deep-review vein: a NON-restore surface — the Google Sheets backup write path (#36/#37 parked) or a
-> fresh analytics/money correctness audit.
+> data-safety path is now well-pinned (stamp C8/C11 + table-coverage C208 + this ordering guard).
+>
+> **AUDITED C19 — all CLEAN (foreign-import money/date) + eyes-on cert.** Sheets service (header-coverage
+> saturated), csv-safety (round-trip saturated), import-mapping normalizeDecimal (comma-only=EU-decimal is
+> BY DESIGN — debunked a thousands-bug candidate via the #124 lesson) + normalizeForeignDate (local-time /
+> mdy-dmy / epoch / 2-digit-year / #23 out-of-range all pinned). No defect. ALSO eyes-on certified the C16
+> MaterializedExpensesDialog EMPTY state (future-dated reminder → "No expenses yet" renders clean). The
+> backup/restore/import data-safety surfaces are now broadly swept — next deep-review should pick a
+> genuinely UNAUDITED area (e.g. the analytics financing/TCO money builders, or an eyes-on sweep of a
+> complex shipped page like /analytics or /insurance) rather than re-scanning backup/restore/import.
 
 ### bug
 > **SCOUTED C6 — no fresh defect (date/tz vein).** analytics date helpers (monthsOwnedInYear,

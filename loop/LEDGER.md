@@ -28,13 +28,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 16 |
-| deep-review | 5 | 13 |
+| deep-review | 5 | 19 |
 | guard | 6 | 18 |
 | bug | 3 | 15 |
 | arch | 5 | 17 |
 | infra | 6 | 14 |
 
-Current cycle: **18**
+Current cycle: **19**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -310,3 +310,19 @@ Current cycle: **18**
   backend validate:local GREEN — tsc 0, musl-biome clean, 1593 pass / 0 fail (+6), build bundled.
   Backend-only (no UI → no shot). cov: be 87.22% / fe 86.07% (~ — calculations module already covered;
   +6 pin the newly-shared helper directly).
+- **C19 (deep-review)** — **Audited the foreign-import money/date path firsthand (all CLEAN) + eyes-on
+  certified the C16 dialog's EMPTY state.** deep-review was over budget (6/5, most-starved; bug also over
+  at 4 but less-starved). Scouted four fresh surfaces: Google Sheets service (header-coverage + service
+  tests already saturated), csv-safety (neutralize/denormalize + round-trip tests saturated), and
+  import-mapping's `normalizeDecimal` + `normalizeForeignDate`. DEBUNKED a candidate firsthand: comma-only
+  `normalizeDecimal` (e.g. "1,234"→"1.234") LOOKS like a thousands bug, but the tests + #124 lesson
+  establish comma-only = EU decimal BY DESIGN (the both-separator US case is the #124 fix; comma-only-
+  thousands is a known single-value ambiguity resolved toward EU) — intended, not a bug. normalizeForeignDate
+  is comprehensively pinned (local-time discipline / mdy-dmy swap / epoch sec-millis / 2-digit-year pivot /
+  out-of-range #23 guard). No fresh defect. DELIVERED the eyes-on half of deep-review: certified the C16
+  MaterializedExpensesDialog EMPTY state (shipped C16 but only its DATA state was shot) — a future-dated
+  reminder (Next: Jan 2099, 0 materialized) opens the dialog → renders the "No expenses yet" Receipt
+  EmptyState cleanly (Read the PNG; backend GET /reminders/:id/expenses→200 returned []), NOT a blank/broken
+  panel. The dialog's data + empty four-states are now both eyes-on confirmed. Verify: frontend
+  validate:local was GREEN at C16 (no FE source changed this cycle; the spec is gitignored). cov: be 87.22%
+  / fe 86.07% (~ — audit + eyes-on cert, no module touched).
