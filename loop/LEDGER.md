@@ -25,12 +25,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 1 |
 | deep-review | 5 | 3 |
-| guard | 6 | 0 |
+| guard | 6 | 4 |
 | bug | 3 | 2 |
 | arch | 5 | 0 |
 | infra | 6 | 0 |
 
-Current cycle: **3**
+Current cycle: **4**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -84,3 +84,20 @@ Current cycle: **3**
   → green. Verify: backend validate:local GREEN — tsc 0, musl-biome clean, 1573 pass / 0 fail (+12), build
   bundled. Backend-only (no UI → no shot). cov: be ~87.2% / fe 85.89% (~ — sync module already well-covered;
   +12 tests broaden the restore-safety net).
+- **C4 (arch-scout → no-churn → guard)** — Ran a genuine ARCH dedup scout across the likely veins:
+  FE date helpers (toDateInputValue/dateOnlyToISO already single-sourced in formatters.ts; the
+  expense-filters local-date parse uses a DIFFERENT time anchor — midnight vs noon — so convergence is
+  PROHIBITED per the calculatePayoffDateFromStart lesson), backend ownership validators (the
+  validate*Ownership family is deliberately per-entity by ownership topology — not a clean merge), FE
+  query builders (buildQueryString already deduped C337), the offline→backend mapper + reminder
+  computeNextDueDate (both already saturated with completeness/property guards). **Recorded: no churn
+  warranted** (arch is reliably DRY per the GUIDE; don't manufacture). PIVOTED to the most-starved next
+  category (guard, 4/6). Found a real guard gap: the financing-balance property test drives
+  `repo.computeBalance` DIRECTLY, and the C2 #147 tests assert only route STATUS — nothing pinned the
+  end-to-end MONEY round-trip that a financing-sourced split actually moves the vehicle's DISPLAYED
+  `computedBalance` (NORTH_STAR #1). GUARD: new `split-financing-balance-roundtrip.test.ts` (+3) drives
+  POST/PUT /split → DB → GET /vehicles/:id and asserts EXACT balances (20000→19600 on a 400 split;
+  →19500 after reallocating to 500, proving no double-count/orphan; source-less split leaves 20000).
+  Inherently non-vacuous (exact-number assertions). Verify: backend validate:local GREEN — tsc 0,
+  musl-biome clean, 1576 pass / 0 fail (+3), build bundled. Backend-only (no UI → no shot). cov: be
+  ~87.2% / fe 85.89% (~ — financing/expense routes already covered; +3 pins the observable money seam).

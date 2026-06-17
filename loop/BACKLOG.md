@@ -72,8 +72,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > restore validator / provider routing) and now pinned by `photo-entity-type-allowlist-sync.test.ts`
 > (non-vacuous — reproduces the C404 drift). Don't re-audit this surface; it's guarded. Next deep-review
 > veins: the Google Sheets backup round-trip (header-set coverage — but #36/#37 fixes are parked for
-> Angelo), the offline outbox→sync field-mapping (the #66/#101/#111 dropout family — is every
-> OfflineExpense field carried through both save paths + the mapper?), or a fresh data-safety write path.
+> Angelo), the offline outbox→sync field-mapping (the #66/#101/#111 dropout family — ALREADY guarded:
+> offline-storage.test.ts has a C347 completeness pin covering every OfflineExpense field), or a fresh
+> data-safety write path.
+>
+> **GUARDED C4:** the financing-sourced split → displayed-balance money round-trip
+> (`split-financing-balance-roundtrip.test.ts`, end-to-end POST/PUT /split → GET /vehicles/:id). The
+> repository-level balance property test + the C2 #147 route-status tests both pre-existed; this pins the
+> observable `computedBalance` math itself. Don't re-add.
 
 ### guard
 *(queue empty — repopulate from real bug classes. Pattern: HTTP-harness (createTestApp + s3-provider
@@ -120,6 +126,13 @@ scout per bug cycle, then record + pivot if dry. Don't manufacture a finding.)*
 ### arch
 *(queue empty — reliably DRY per the archive (last clean picks: buildQueryString C337, computeBalances C332).
 Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
+
+> **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
+> toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time
+> anchor — midnight vs noon — convergence PROHIBITED), backend validate*Ownership (per-entity by
+> ownership topology, not mergeable), FE buildQueryString (already C337), the offline mapper +
+> computeNextDueDate (saturated). Arch stays DRY; don't re-scout these next cycle — try a fresh module
+> the loop hasn't touched, or accept arch is at its structural floor and let the budget pull elsewhere.
 
 ### infra
 *(queue empty — repopulate as tooling/docs/coverage needs surface. Standing cadence (loop-improvement #5):
