@@ -30,11 +30,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 12 |
 | deep-review | 5 | 13 |
 | guard | 6 | 11 |
-| bug | 3 | 10 |
+| bug | 3 | 15 |
 | arch | 5 | 12 |
 | infra | 6 | 14 |
 
-Current cycle: **14**
+Current cycle: **15**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -252,3 +252,19 @@ Current cycle: **14**
   ahead of fresh origin/main (C1-C13: 3 feature, 2 bug[1 dry], 2 deep-review, 2 guard, 1 infra, +the C7
   infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source touched.
   cov: be 87.22% / fe 86.07% (MEASURED, not carried). NEXT cadence ~C24.
+- **C15 (bug-scout → DRY, 3rd consecutive)** — bug was the sole over-budget category (5/3). Scouted FOUR
+  fresh money/unit/date surfaces firsthand (the productive vein): (1) unit-conversions.ts — convertDistance/
+  Volume/Efficiency math correct (efficiency scales by distFactor/volFactor; verified 30 mi/gal_US→12.75
+  km/L) + property-tested + all 3 callers gas-isolated via gasEfficiencyPoint (#119/#126 class closed);
+  (2) calculations.ts calculateAverageMPG/MilesPerKwh — nearly flagged the `previous.missedFillup`
+  exclusion as over-aggressive, but the existing unit test (:106) + property-test reference impl both
+  ENCODE it as intended → documented, not a bug (firsthand debunk #2); (3) vehicle-stats.ts
+  calculateMileageStats/calculateAverageMpg — clamp-at-0 (#46) + defensive sort (#75) correct + pinned;
+  (4) getPeriodStartDate/parseClampedInt/maxOf — all correct + #70/#81-guarded. NO fresh defect — recorded
+  dry, did NOT manufacture a finding (GUIDE: agent HIGH findings often false; the pure-logic bug surface is
+  exhausted this run, remaining real defects are the parked product-gated #94/#30). SURFACED for a FUTURE
+  ARCH cycle (not done here — arch isn't over budget, category discipline): calculateAverageMPG
+  (calculations.ts) and calculateAverageMpg (vehicle-stats.ts) are near-identical pairing loops (same
+  missedFillup skip + mpg>0&&<150 band) — a real C161-class drift vector; seeded the arch queue. No code
+  shipped by design. Verify: targeted suites green on the untouched tree (calculations + unit-conversions).
+  cov: be 87.22% / fe 86.07% (~).

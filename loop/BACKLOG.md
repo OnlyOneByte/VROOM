@@ -126,10 +126,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > expenseQuerySchema) as an over-broad-match bug, but the EXISTING tests (sync-manager.test.ts:676-689)
 > prove the broad finder + narrow `determineConflictType` is a DELIBERATE two-stage design — narrowing
 > the finder would drop all `'modified'` conflict detection (a regression). NOT a bug; reverted the draft
-> fix. The dead `?date=&amount=` query params are harmless (ignored); leave them. DON'T re-chase. Next
-> bug scout: try a genuinely different surface (e.g. a FE component render-path edge, or wait for a
-> deep-review to surface a concrete defect) — the productive write-path + date/tz + store veins are now
-> all swept clean this run.
+> fix. The dead `?date=&amount=` query params are harmless (ignored); leave them. DON'T re-chase.
+>
+> **SCOUTED C15 — no fresh defect (money/unit/date vein; 3rd consecutive dry scout).** Audited firsthand:
+> unit-conversions (math correct + property-tested + callers gas-isolated), calculations.ts MPG/kWh
+> pairing (the `previous.missedFillup` exclusion LOOKS over-aggressive but is test-encoded as intended —
+> debunk #2), vehicle-stats (clamp-#46/sort-#75 correct), getPeriodStartDate/parseClampedInt/maxOf
+> (#70/#81-guarded). **The pure-logic bug surface is EXHAUSTED for this run** — remaining real defects are
+> the parked product-gated ones (#94 fleet-units, #30 MPG band). RECOMMENDATION: when bug next goes over
+> budget, record dry FAST + pivot; don't re-scan these swept surfaces. Wait for a deep-review/feature
+> cycle to surface a concrete defect.
 
 ### guard
 *(queue empty — repopulate from real bug classes. Pattern: HTTP-harness (createTestApp + s3-provider
@@ -218,8 +224,18 @@ scout per bug cycle, then record + pivot if dry. Don't manufacture a finding.)*
 > post-reset doc-drift, not open work. Don't re-pick it.)_
 
 ### arch
-*(queue empty — reliably DRY per the archive (last clean picks: buildQueryString C337, computeBalances C332).
-Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
+*(reliably DRY per the archive. Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" + pivot. Obey the arch rules above.)*
+
+1. **SURFACED C15 — MPG-pairing dedup (a real C161-class drift vector, NOT yet done).** `calculateAverageMPG`
+   (utils/calculations.ts:48) and `calculateAverageMpg` (utils/vehicle-stats.ts:159) are near-identical
+   consecutive-fillup pairing loops: same sort → same `current.missedFillup||previous.missedFillup` skip →
+   same `mpg = miles/current.volume` → same `mpg>0 && mpg<150` outlier band → same mean. They've already
+   DRIFTED slightly (vehicle-stats sorts defensively per #75; calculations relies on the caller) and the
+   `<150` band is the #30-escalated divergence point — so a shared helper must be **behavior-preserving**
+   (keep each caller's sort contract; do NOT unify the band — that's the product-gated #30 call). Arch rule
+   3: add a characterization test first if the extracted helper isn't already covered (both have tests).
+   A genuine payoff (the C161 lesson: hand-copied pairing loops lose guards) — the right pick the NEXT time
+   arch is over budget, instead of a 4th no-churn.
 
 > **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
 > toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time
