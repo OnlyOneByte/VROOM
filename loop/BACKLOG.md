@@ -257,3 +257,8 @@ baseline), refresh `BRANCH_REVIEW.md` grouped by theme so the eventual PR stays 
 > OAuth/DI-bound (auth/routes, provider services, backup-orchestrator, db connection), FE tail is eyes-on
 > components; neither is a clean unit pick, so don't chase coverage % directly — let real bug/guard work
 > nudge it.
+>
+> **RAN C14 (cadence).** Untracked-test sweep CLEAN. Coverage RE-MEASURED: BE 87.22%/86.96% (unchanged vs
+> C7 — sync-test additions hit already-covered modules); FE 86.07% line / 87.19% func / 78.53% branch (UP
+> from C12's helper tests). Both suites green (BE 1587 / FE 721). Branch 7 ahead, PR-ready. NEXT cadence
+> ~C24. Coverage is plateaued at the structural ceiling — don't chase % directly.
