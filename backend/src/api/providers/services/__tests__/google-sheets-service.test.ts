@@ -28,12 +28,15 @@ type GoogleSheetsServiceCtor = typeof import('../google-sheets-service').GoogleS
 let ctx: TestApp;
 let store: FakeGoogleStore;
 let GoogleSheetsService: GoogleSheetsServiceCtor;
+let SHEET_NAMES: readonly string[];
 let makeSvc: () => InstanceType<GoogleSheetsServiceCtor>;
 
 beforeEach(async () => {
   ctx = await createTestApp();
   store = new FakeGoogleStore();
-  ({ GoogleSheetsService } = await import('../google-sheets-service'));
+  // Dynamic import (after createTestApp sets DATABASE_URL) — the module binds the DB at load. Pull
+  // SHEET_NAMES from the same import rather than a static one, to keep the load-order rule intact.
+  ({ GoogleSheetsService, SHEET_NAMES } = await import('../google-sheets-service'));
   makeSvc = () => new GoogleSheetsService('fake-refresh-token', makeFakeSheetsClients(store));
 });
 
@@ -54,10 +57,10 @@ describe('GoogleSheetsService.createOrUpdateVroomSpreadsheet', () => {
 
     expect(info.name).toBe('VROOM Data - Demo User');
     expect(info.webViewLink).toContain(info.id);
-    // 15 sheets created up front (added Insurance Claims)
-    expect(info.sheets.map((s) => s.title)).toContain('Vehicles');
-    expect(info.sheets.map((s) => s.title)).toContain('Insurance Claims');
-    expect(info.sheets).toHaveLength(15);
+    // createSpreadsheet builds its tabs from the canonical SHEET_NAMES roster (C30 dedup): the created
+    // tab set must equal it exactly (same titles, same count) — proves the extraction is behavior-preserving.
+    expect(info.sheets.map((s) => s.title)).toEqual([...SHEET_NAMES]);
+    expect(info.sheets).toHaveLength(SHEET_NAMES.length);
 
     // The folder path was created: one VROOM, one Backups nested under it.
     const vroom = [...store.files.values()].find(

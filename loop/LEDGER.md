@@ -31,10 +31,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 26 |
 | guard | 6 | 25 |
 | bug | 3 | 29 |
-| arch | 5 | 23 |
+| arch | 5 | 30 |
 | infra | 6 | 28 |
 
-Current cycle: **29**
+Current cycle: **30**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -353,6 +353,25 @@ Current cycle: **29**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C30 (arch)** — **Extract the canonical `SHEET_NAMES` tab roster (a real fresh dedup, not a no-churn
+  scout).** arch was the sole over-budget category (30−23=7/5). No pick was pre-seeded, so scouted firsthand
+  + found a GENUINE C161-class drift vector: the 15-tab Sheets roster was hand-copied across 4 sites (the
+  literal `'Reminder Notifications'` appears 4×) — `createSpreadsheet` (initial tabs) + `ensureRequiredSheets`
+  (backfill) are PURE title lists, while `updateSpreadsheetWithUserData` (write fan-out) +
+  `readSpreadsheetData` (read ranges) pair each title with table-specific logic. Extracted ONE exported
+  `SHEET_NAMES` const (the ordered 15-tab roster) and routed the two PURE-roster sites through it
+  (`create` → `SHEET_NAMES.map(...)`, `ensure` → `SHEET_NAMES.filter(...)`); left the logic-paired
+  write/read lists inline (converging those is riskier — arch rule 1, ONE small reviewable refactor).
+  BEHAVIOR-PRESERVING: same titles, same create order → existing spreadsheets unaffected; proven by
+  strengthening the create test to assert `info.sheets === [...SHEET_NAMES]` exactly (was a loose
+  contains+length-15). Arch rule 3: +2 drift guards in sheets-header-coverage.test.ts (SHEET_NAMES is 1:1
+  with the SHEET_HEADERS table count; entries distinct + non-empty) — so adding a 16th table forces a
+  matching roster entry, closing the drift the extraction targets. Caught a TS literal-tuple type error
+  (`as const` makes `.length` the literal `15`) → widened to `number` for the comparison. Verify: backend
+  validate:local GREEN — tsc 0, musl-biome clean, 1602 pass / 0 fail (+2), build bundled. Backend-only (no
+  UI → no shot). cov: be 87.22% / fe 86.14% (~ — same module, LOC down, one source of truth for the tab
+  roster). NOTE: #37 (Sheets atomicity) remains the top Sev-1 — still arch rule-6 (design.md + Angelo), NOT
+  taken as a churn-pick this cycle since a genuine clean dedup was available.
 - **C29 (bug #51)** — **Exclude term-less active policies from `activePoliciesCount` (Angelo-APPROVED Sev-2).**
   Two cats over budget (bug 5/3 +2, arch 6/5 +1); bug is most-starved → forced. Skipped the top Sev-1 #37
   (Sheets atomicity) — it's a tx-semantics change to the crown-jewel backup write path = arch rule-6

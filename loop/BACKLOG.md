@@ -282,6 +282,13 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    FIRST (+5, incl. the cleared-input→0 coalesce); behavior-preserving confirmed via the C22 e2e specs.
    green→green (726 pass). Don't re-scout. *(Lesson reinforced: a feature cycle that copies a helper into a
    new component seeds the NEXT arch cycle — same as C15→C17. Watch for this after future eyes-on features.)*
+3. ~~**`SHEET_NAMES` tab-roster dedup**~~ — **DONE C30.** The 15-tab Sheets roster was hand-copied across 4
+   sites (`'Reminder Notifications'` literal appeared 4×). Extracted ONE exported `SHEET_NAMES` const +
+   routed the two PURE-roster sites (`createSpreadsheet` + `ensureRequiredSheets`) through it; left the
+   logic-paired write fan-out + read ranges inline (riskier to converge — arch rule 1). Behavior-preserving
+   (same titles/order; create test now asserts `info.sheets === [...SHEET_NAMES]`). +2 drift guards
+   (SHEET_NAMES 1:1 with the table count; distinct+non-empty) so a 16th table forces a roster entry.
+   green→green (1602 pass). Don't re-scout this surface.
 
 > **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
 > toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time

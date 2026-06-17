@@ -222,6 +222,33 @@ export const SHEET_HEADERS = {
   ],
 } as const satisfies Record<string, readonly string[]>;
 
+/**
+ * The canonical ordered roster of VROOM sheet TAB titles — ONE source of truth (C30) for the tab set
+ * that `createSpreadsheet` (initial tabs) and `ensureRequiredSheets` (backfill missing tabs on an
+ * existing spreadsheet) both need. Before this, the 15-tab list was hand-copied in BOTH places (plus the
+ * read-range + write fan-out, which pair each title with table-specific logic and stay inline), so adding
+ * a 16th table meant editing parallel lists in lockstep — a C161-class drift vector. These are display
+ * tab TITLES (with spaces), distinct from the `SHEET_HEADERS` keys (camelCase) — kept ordered to match
+ * the historical create order so existing spreadsheets are unaffected.
+ */
+export const SHEET_NAMES = [
+  'Vehicles',
+  'Expenses',
+  'Insurance Policies',
+  'Insurance Terms',
+  'Insurance Term Vehicles',
+  'Insurance Claims',
+  'Vehicle Financing',
+  'Odometer',
+  'Photos',
+  'Photo Refs',
+  'User Preferences',
+  'Sync State',
+  'Reminders',
+  'Reminder Vehicles',
+  'Reminder Notifications',
+] as const;
+
 export interface SpreadsheetInfo {
   id: string;
   name: string;
@@ -355,23 +382,7 @@ export class GoogleSheetsService {
     const response = await this.sheets.spreadsheets.create({
       requestBody: {
         properties: { title },
-        sheets: [
-          { properties: { title: 'Vehicles' } },
-          { properties: { title: 'Expenses' } },
-          { properties: { title: 'Insurance Policies' } },
-          { properties: { title: 'Insurance Terms' } },
-          { properties: { title: 'Insurance Term Vehicles' } },
-          { properties: { title: 'Insurance Claims' } },
-          { properties: { title: 'Vehicle Financing' } },
-          { properties: { title: 'Odometer' } },
-          { properties: { title: 'Photos' } },
-          { properties: { title: 'Photo Refs' } },
-          { properties: { title: 'User Preferences' } },
-          { properties: { title: 'Sync State' } },
-          { properties: { title: 'Reminders' } },
-          { properties: { title: 'Reminder Vehicles' } },
-          { properties: { title: 'Reminder Notifications' } },
-        ],
+        sheets: SHEET_NAMES.map((sheetTitle) => ({ properties: { title: sheetTitle } })),
       },
     });
     return response.data;
@@ -404,26 +415,9 @@ export class GoogleSheetsService {
   }
 
   private async ensureRequiredSheets(spreadsheetId: string): Promise<void> {
-    const requiredSheets = [
-      'Vehicles',
-      'Expenses',
-      'Insurance Policies',
-      'Insurance Terms',
-      'Insurance Term Vehicles',
-      'Insurance Claims',
-      'Vehicle Financing',
-      'Odometer',
-      'Photos',
-      'Photo Refs',
-      'User Preferences',
-      'Sync State',
-      'Reminders',
-      'Reminder Vehicles',
-      'Reminder Notifications',
-    ];
     const info = await this.getSpreadsheetInfo(spreadsheetId);
     const existingTitles = new Set(info.sheets.map((s) => s.title));
-    const missing = requiredSheets.filter((name) => !existingTitles.has(name));
+    const missing = SHEET_NAMES.filter((name) => !existingTitles.has(name));
 
     if (missing.length > 0) {
       await this.sheets.spreadsheets.batchUpdate({
