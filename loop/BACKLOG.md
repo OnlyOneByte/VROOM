@@ -82,6 +82,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > (`split-financing-balance-roundtrip.test.ts`, end-to-end POST/PUT /split → GET /vehicles/:id). The
 > repository-level balance property test + the C2 #147 route-status tests both pre-existed; this pins the
 > observable `computedBalance` math itself. Don't re-add.
+>
+> **GUARDED C6:** `monthsBetween` (analytics money divisor) now has a direct unit net in
+> tco-months-owned.test.ts (+6: year×12+delta, same-month, cross-year, multi-year, signed-negative) —
+> closes the C181/C229 "helper imported-but-only-comment-referenced" isolation gap. Non-vacuous
+> (dropping `*12` → 3 RED). Don't re-add.
+
+### bug
+> **SCOUTED C6 — no fresh defect (date/tz vein).** analytics date helpers (monthsOwnedInYear,
+> calendarYearRange, toDate, the day-1 month-iteration loop, SEASON_MAP) verified correct + tested; the
+> setMonth-overflow trap is avoided. Write-path validation asymmetry was swept C2 (#147 + the
+> #62/#109/#125/#145 class closed across all 4 paths). Next bug scout: a DIFFERENT vein — FE store
+> race/stale-state, or the analytics fleet-unit-pooling #94 class (but that's product-gated/escalated).
 
 ### guard
 *(queue empty — repopulate from real bug classes. Pattern: HTTP-harness (createTestApp + s3-provider
@@ -135,6 +147,13 @@ Run a fresh dedup scout; if nothing clean surfaces, record "no churn warranted" 
 > ownership topology, not mergeable), FE buildQueryString (already C337), the offline mapper +
 > computeNextDueDate (saturated). Arch stays DRY; don't re-scout these next cycle — try a fresh module
 > the loop hasn't touched, or accept arch is at its structural floor and let the budget pull elsewhere.
+>
+> **SCOUTED C6 — no churn warranted (fresh modules).** analytics-charts builders route through the
+> single-sourced `isFillup` (NOT duplicated — #108/#113/#146 already deduped); FE chart components are
+> distinct; the `mean`/`groupBy` idioms have DIVERGING empty-guards (Math.max(0,…) vs (1,…) vs none) so a
+> shared helper would change behavior (arch rule 2). **Arch is at its structural floor** — recommend
+> letting the budget pull elsewhere rather than forcing a 4th scout; if arch goes over again, record
+> no-churn quickly + pivot to the co-starved category.
 
 ### infra
 *(queue empty — repopulate as tooling/docs/coverage needs surface. Standing cadence (loop-improvement #5):

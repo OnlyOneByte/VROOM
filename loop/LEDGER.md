@@ -25,12 +25,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 5 |
 | deep-review | 5 | 3 |
-| guard | 6 | 4 |
-| bug | 3 | 2 |
-| arch | 5 | 0 |
+| guard | 6 | 6 |
+| bug | 3 | 6 |
+| arch | 5 | 6 |
 | infra | 6 | 0 |
 
-Current cycle: **5**
+Current cycle: **6**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -113,3 +113,20 @@ Current cycle: **5**
   `{count:2, monthlyTotal:520}` — full FE→BE→DB→render round-trip confirmed. Ticked spec T7 → `[x]`.
   Verify: frontend validate:local GREEN — type-check 0, build OK, 715 tests pass. cov: be ~87.2% / fe
   85.89% (~ — UI-markup cycle, no vitest module touched; the widget's data path is backend-covered).
+- **C6 (arch-scout → no-churn + bug-scout → dry → guard)** — Two categories were over budget (arch 6/5,
+  bug 4/3). Scouted ARCH on fresh modules (C4 said "try a module the loop hasn't touched"): analytics
+  builders (the `isFillup` predicate is ALREADY single-sourced — #108/#113/#146 each route through it, not
+  a dup), FE chart components, and the `mean`/`groupBy` accumulation idioms (trivial idioms with DIVERGING
+  empty-guards — converging risks behavior change, arch rule 2; REJECTED as churn). **Recorded: no churn
+  warranted.** Scouted BUG on date/tz math (the productive vein after C2 swept write paths): analytics
+  date helpers (monthsOwnedInYear, calendarYearRange, toDate, the month-iteration loop, season map) are
+  all correct + well-tested; the `setMonth` overflow trap is avoided (cursor built at day 1). No fresh
+  defect — **recorded dry, did NOT manufacture a finding.** DELIVERED a guard for the one real gap the
+  scout surfaced: `monthsBetween` — the signed whole-calendar-months helper behind TWO money divisors
+  (financing months-elapsed `Math.max(0,…)`; all-time TCO cost-per-month `Math.max(1,…)`) — was only
+  IMPORTED + name-checked in a comment (per-vehicle.property.test.ts:574), never directly asserted (the
+  C181/C229 "helper tested only in isolation" gap). GUARD: +6 cases in tco-months-owned.test.ts pinning
+  the year×12+delta math, same-month=0, cross-year, multi-year, and the documented SIGNED negative
+  contract. NON-VACUOUS: dropping `*12` from monthsBetween turns 3 cases RED; restored → green. Verify:
+  backend validate:local GREEN — tsc 0, musl-biome clean, 1582 pass / 0 fail (+6), build bundled.
+  Backend-only (no UI → no shot). cov: be ~87.2% / fe 85.89% (~ — analytics helper now directly pinned).
