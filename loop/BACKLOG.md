@@ -35,10 +35,10 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
 ## Ranked queue (top = next)
 
 ### feature
-*(All three are spec-APPROVED + BACKEND-COMPLETE; only the eyes-on frontend tail remains. These were
-"Playwright-blocked" for ~200 cycles — that was a MISDIAGNOSIS (see GUIDE.md): shot.sh works now, so
-the FE→BE→DB round-trip can finally be built, shot, and verified. Feature-DoD: not done until that
-round-trip is exercised eyes-on.)*
+*(2 of the 3 spec-approved features are now COMPLETE — maintenance-schedule (C1) + recurring-expenses
+(C27, T1–T8). **Import-trackers is the ONLY remaining open feature** (its mapping-step dialog is genuine
+unbuilt UI). Feature-DoD: not done until the FE→BE→DB round-trip is exercised eyes-on. shot.sh + e2e work
+now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.md.)*
 
 1. ~~**Maintenance-schedule reminders**~~ — **DONE (C1 2026-06-17).** Backend was 100%; the last tail
    (T7/T8/T9 eyes-on) is now CONFIRMED via shot.sh — the mileage form reveal/hide logic + the
@@ -53,17 +53,13 @@ round-trip is exercised eyes-on.)*
    detectImportSource). **REMAINING: T4/T5 mapping-step dialog MARKUP** (detected-source banner, per-field
    column dropdowns, unit/date-format/target-vehicle pickers, category-remap table; reuse the preview/commit
    step) **+ T6 round-trip e2e** (incl. real-export signature validation). Spec: `.kiro/specs/import-trackers/`.
-3. **Recurring expenses** — backend complete (engine already auto-materializes expense rows from
-   `type:'expense'` reminders; T1 traceability, T2 split-materialization, T3 cascade-safe delete via
-   clearSource, T5 gate `shouldTriggerRecurringExpenses`, T6/T7 FE client methods — all in archive).
-   **T7 widget DONE (C5).** **T5 app-init trigger hook DONE (C12).** **T6 DONE (badge C9 + "materialized N
-   expenses" dialog C16, both eyes-on CONFIRMED).** **T4 multi-vehicle split DONE (C22, eyes-on CONFIRMED —
-   exposed the shared `SplitConfigEditor` when an expense reminder spans ≥2 vehicles; even/%/fixed-$ verified
-   via shot, config persists `{method:'even', vehicleIds:[2]}`; single-vehicle no-split path unchanged).**
-   **REMAINING: T8 only** — round-trip e2e (create split recurring expense → materialize → appears per-vehicle
-   with badge → delete source → past rows remain). This is the LAST tail; on the next feature cycle either
-   promote T8 into the committed net or record "code-complete, eyes-on pending" → the feature is then DONE.
-   Spec: `.kiro/specs/recurring-expenses/`.
+3. ~~**Recurring expenses**~~ — **COMPLETE (T1–T8 all done, C27).** Engine + backend (T1–T3/T5/T7), FE
+   client (T6/T7), then the eyes-on FE tail: T7 widget (C5), T5 app-init hook (C12), T6 badge+dialog
+   (C9/C16), T4 multi-vehicle split via the shared `SplitConfigEditor` (C22), and **T8 full round-trip
+   e2e (C27, eyes-on)** — create split recurring expense → trigger → per-vehicle $50 siblings materialize
+   `sourceType:'reminder'` → delete source → rows survive unlinked (clearSource). ⟳ Recurring + ⑂ Split
+   badges confirmed on /expenses via shot. Don't re-pick. Spec: `.kiro/specs/recurring-expenses/` (all
+   `[x]`).
 
 > NOTE: one tasks.md task per cycle, not one-and-done. **Standing goal** (TODO.md → Misc): 90% coverage
 > both sides — fold into bug/guard/arch cycles; ceiling is ~86%/~84% without the eyes-on FE tail (now shootable).

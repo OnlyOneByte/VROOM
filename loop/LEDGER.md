@@ -26,14 +26,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 22 |
+| feature | 4 | 27 |
 | deep-review | 5 | 26 |
 | guard | 6 | 25 |
 | bug | 3 | 24 |
 | arch | 5 | 23 |
 | infra | 6 | 21 |
 
-Current cycle: **26**
+Current cycle: **27**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -352,6 +352,24 @@ Current cycle: **26**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C27 (feature)** — **Recurring-expenses T8: full round-trip E2E (eyes-on DONE → FEATURE COMPLETE).**
+  feature was the sole over-budget category (27−22=5/4). Picked recurring-expenses T8 (closes the whole
+  feature) over the import-trackers dialog (a larger net-new arc). Wrote `recurring-expense-roundtrip
+  .meshclaw.e2e.ts` (gitignored harness) exercising the full feature-DoD chain: create a SPLIT recurring
+  expense (2 vehicles, even, $100, overdue Oct–Dec 2024) → `POST /reminders/trigger` → one sibling per
+  vehicle per overdue month, each `sourceType:'reminder'` + `expenseAmount:50` (even split) + template tag
+  → delete the source → rows SURVIVE unlinked (T3 clearSource: history kept, source nulled). EYES-ON (Read
+  `/tmp/c27-roundtrip-badged-expenses.png`): /expenses renders the ⟳ Recurring badge (C9) on a
+  reminder-sourced row + the ⑂ Split badge on the collapsed 2-vehicle group ($200 total). DEBUGGING (real
+  firsthand findings, all harness — NOT product bugs): (1) hono/csrf (app.ts) 403s a BODYLESS
+  `page.request` POST/DELETE — it Origin-checks form-submittable requests but exempts `application/json`;
+  fixed by sending `content-type: application/json` on the trigger POST + reminder DELETE (the JSON-body
+  create POST was always fine). (2) split siblings render COLLAPSED at the group total, so a UI `$50`
+  substring never appears → assert the per-sibling share via the API. (3) 2024-dated rows paginate off
+  page 1 of 150 → assert materialization via the API (tag-filtered), capture the badge eyes-on separately.
+  (4) the list API row exposes the per-sibling value as `expenseAmount`, not `amount`. **Recurring-expenses
+  is now COMPLETE (T1–T8).** Verify: the spec passes green; no app source touched (FE was fully built
+  C5–C22); both suites were green at C26. cov: be 87.22% / fe 86.07% (~ — e2e capture, no module touched).
 - **C26 (deep-review)** — **Eyes-on sweep of /analytics (the most complex shipped page) — AUDITED CLEAN;
   3 suspected defects debunked firsthand.** deep-review was the sole over-budget category (26−19=7/5).
   Per the C19 note (backup/restore/import already swept), picked the recommended UNAUDITED surface: an

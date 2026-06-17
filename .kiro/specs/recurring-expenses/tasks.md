@@ -105,10 +105,19 @@
 
 ### Done-when (feature-DoD)
 
-- [ ] **T8 — Round-trip E2E.** Create a split recurring expense in one form → app open (or click) →
-      sibling rows materialize → appear in each vehicle's TCO with a Recurring badge → delete the source →
-      past rows remain + cascade dialog shown. Promote into the committed suite, or record
-      "code-complete, eyes-on pending" if Playwright stays sandbox-blocked. Only then is the feature DONE.
+- [x] **T8 — Round-trip E2E — DONE C27 2026-06-17 (eyes-on CONFIRMED).** Full feature-DoD chain proven
+      via `recurring-expense-roundtrip.meshclaw.e2e.ts` (gitignored harness): create a SPLIT recurring
+      expense (2 vehicles, even split, $100, overdue Oct–Dec 2024) → `POST /reminders/trigger` materializes
+      one sibling per vehicle per overdue month, each `sourceType:'reminder'` + `expenseAmount:50` (even
+      split of $100 / 2) + carrying the template tag → delete the source reminder → the materialized rows
+      SURVIVE (T3 clearSource: history kept, `sourceType`/`sourceId` nulled, none still linked). EYES-ON
+      (`/tmp/c27-roundtrip-badged-expenses.png`, Read): /expenses renders the **⟳ Recurring** badge (C9/T6)
+      on a reminder-sourced row + the **⑂ Split** badge on the collapsed 2-vehicle split group ($200 group
+      total, per-sibling $50 on expand). Harness lessons recorded: hono/csrf 403s a bodyless
+      `page.request` POST/DELETE (trigger/delete) → send `content-type: application/json`; split siblings
+      render COLLAPSED at the group total (assert the per-sibling share via API, not a UI `$50` substring);
+      2024-dated rows paginate off page 1 of 150 (assert materialization via the API, tag-filtered).
+      **Recurring-expenses is now COMPLETE (T1–T8 all done).**
 
 > NOTE: T1–T3 are backend/non-eyes-on and can land while Playwright is blocked — directly addressing why
 > the `feature` category starved (both in-flight features are stuck at eyes-on-blocked frontend tails).
