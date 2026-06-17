@@ -40,12 +40,14 @@ A category may go at most **N cycles** untouched before it MUST be picked next.
 the FE→BE→DB round-trip can finally be built, shot, and verified. Feature-DoD: not done until that
 round-trip is exercised eyes-on.)*
 
-1. **Maintenance-schedule reminders** — backend 100% (T1–T5 + T3-pt3 vehicle-stats reconcile, all in archive).
-   **REMAINING: T9** — promote the mileage e2e into the committed suite + eyes-on the T7/T8 `/reminders`
-   render (ReminderForm trigger-mode/mileage branch + the "Serviced" re-arm button). Spec:
-   `.kiro/specs/maintenance-schedule/`. *Follow-ons flagged to Angelo: lease/loan miles-used uses
-   period-scoped currentMileage (was being swapped to all-time currentOdometer — confirm landed); "Current
-   Mileage" card display-semantics is a direction call.*
+1. ~~**Maintenance-schedule reminders**~~ — **DONE (C1 2026-06-17).** Backend was 100%; the last tail
+   (T7/T8/T9 eyes-on) is now CONFIRMED via shot.sh — the mileage form reveal/hide logic + the
+   `Next: <odometer>` milestone render + the working "Serviced" re-arm button all verified by Reading the
+   captured PNGs, full FE→BE→DB→render round-trip exercised. Spec ticked `[x]`. *Two follow-ons stay
+   flagged to Angelo (NOT loop-fixable): lease/loan miles-used currentMileage-vs-currentOdometer (confirm
+   the C157 all-time landing); "Current Mileage" card display-semantics direction call.* (NOTE: the
+   `.meshclaw.e2e.ts` spec is gitignored-by-design — the committed regression net is the backend
+   mileage/mark-serviced unit + HTTP-harness tests, per GUIDE "source-scan > untracked e2e".)
 2. **Import from other trackers** — backend complete (T1 applyMapping, T2 presets+detectSource, T3
    `POST /import` optional mapping + `/import/detect`) + FE client methods (importExpensesCsv mapping arg +
    detectImportSource). **REMAINING: T4/T5 mapping-step dialog MARKUP** (detected-source banner, per-field
@@ -94,6 +96,10 @@ scout per bug cycle, then record + pivot if dry. Don't manufacture a finding.)*
 > - **#79 (LOW)** — a malformed fuel offline entry can get stuck (data-hygiene).
 > - **#112 (LOW)** — cross-vehicle analytics chart palette legibility (design-gated).
 > - **efficiency-band unification (#94-adjacent, ESCALATED C419)** — per-vehicle stats (0,150) vs analytics [5,100]/[1,10] give the same car two different averages; pick one band.
+>
+> _(REMOVED C1 2026-06-17: **#140 LeaseMetricsCard annual-vs-total** — verified ALREADY FIXED + merged via
+> "Merge Monday (#112)"; all 3 display sites route through `leaseTotalMileageAllowance`. It was stale
+> post-reset doc-drift, not open work. Don't re-pick it.)_
 
 ### arch
 *(queue empty — reliably DRY per the archive (last clean picks: buildQueryString C337, computeBalances C332).

@@ -23,18 +23,31 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 0 |
+| feature | 4 | 1 |
 | deep-review | 5 | 0 |
 | guard | 6 | 0 |
 | bug | 3 | 0 |
 | arch | 5 | 0 |
 | infra | 6 | 0 |
 
-Current cycle: **0**
+Current cycle: **1**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
 > already ~150 commits deep and PR-ready — this reset is documentation hygiene, not a code reset.
 
 ## Cycle log
-*(empty — fresh start. C1–C467 archived to `loop/archive/LEDGER-C1-C467.md`.)*
+- **C1 (feature)** — Maintenance-schedule **T9 / eyes-on closeout**. Picked the highest-leverage open
+  item (balance all-0, nothing over budget; feature has the lowest budget + eyes-on is now unblocked per
+  GUIDE). Booted a fresh stack (RESET_DB reseed + START_SERVERS) and ran the untracked
+  `reminder-mileage.meshclaw.e2e.ts` green: it drives the real ReminderForm → backend → DB → /reminders
+  render round-trip, then clicks "Serviced" (mark-serviced 200 re-arm). **Read both captured PNGs**:
+  the mileage form reveals Service-interval `5000 mi` + "Last serviced at" (unit suffix + help text) and
+  hides the time fields ✓; the created reminder renders `Next: 30,850 (odometer)` (milestone, no false
+  frequency badge) with a working "Serviced" button ✓. Ticked spec T7/T8/T9 → `[x]` (the ~200-cycle
+  "Playwright-blocked" tail was the resolved misdiagnosis). No code changed (markup already merged via
+  "Merge Monday (#112)"); doc-only — frontend type-check 0 errors. Also pruned the **stale #140**
+  BACKLOG/CLAUDE.md entry: verified firsthand the LeaseMetricsCard annual-vs-total fix is ALREADY merged
+  (all 3 display sites route through `leaseTotalMileageAllowance`, `#140` fix-comment present) — it was
+  post-reset squash-merge doc-drift, not open work. cov: be 87.09% / fe 85.89% (~, carried from C460 —
+  no module touched this cycle).
