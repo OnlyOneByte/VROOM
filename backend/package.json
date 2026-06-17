@@ -43,7 +43,7 @@
     "@paralleldrive/cuid2": "^3.3.0",
     "adm-zip": "^0.5.17",
     "arctic": "^3.7.0",
-    "csv-parse": "^6.2.1",
+    "csv-parse": "^7.0.0",
     "csv-stringify": "^6.8.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
