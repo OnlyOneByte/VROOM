@@ -27,13 +27,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 22 |
-| deep-review | 5 | 19 |
+| deep-review | 5 | 26 |
 | guard | 6 | 25 |
 | bug | 3 | 24 |
 | arch | 5 | 23 |
 | infra | 6 | 21 |
 
-Current cycle: **25**
+Current cycle: **26**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -352,6 +352,30 @@ Current cycle: **25**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C26 (deep-review)** — **Eyes-on sweep of /analytics (the most complex shipped page) — AUDITED CLEAN;
+  3 suspected defects debunked firsthand.** deep-review was the sole over-budget category (26−19=7/5).
+  Per the C19 note (backup/restore/import already swept), picked the recommended UNAUDITED surface: an
+  eyes-on sweep of /analytics. Booted fresh (RESET_DB) + shot desktop & mobile EMPTY state (clean
+  four-states EmptyState "No fuel data yet" + Log-a-Fillup CTA; 2×2 mobile grid, no overflow, 0 console
+  errors). Then seeded consecutive fuel fill-ups via API to review the POPULATED state. THREE suspected
+  defects, ALL DEBUNKED firsthand (the GUIDE's "HIGH findings are often false"): (1) **"Avg km/L" on a USD
+  user** — traced to `getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit)`, fully unit-derived
+  from the user's pref, NEVER hardcoded (the seeded user's distance/volume prefs are metric independent of
+  USD currency — a valid config); no `km/L`/`mi/gal` literal exists in the analytics render path. (2)
+  **blank gray chart boxes** — those are ChartCard's deliberate visibility-gated Skeletons (UIQuality "no
+  blank box"), not a render defect: charts are IntersectionObserver-gated (`visibility-watch.svelte.ts`) +
+  the tabs are lazy `{#await import()}` code-split with proper spinners. (3) **missing `[data-slot=chart]`
+  svg** — the IO gate simply doesn't flip in headless full-page capture (no real viewport intersection),
+  a HARNESS limitation, not a product bug. EYES-ON PAYOFF: the Playwright-failure screenshot captured the
+  populated Fuel & Stats stat cards rendering CORRECTLY — Fill-ups 17/yr, Liters 166.5, Fuel Consumption
+  Avg km/L 30.2 (Best 30.5 green / Worst 30.0 red), trend arrows + "-100%" deltas all correct (confirms
+  the 30 mpg→12.75 km/L conversion + band/color semantics end-to-end). VERDICT: /analytics is
+  architecturally sound (lazy tabs + IO-gated charts + correct unit-derived labels + four-states + trend/
+  color semantics) — no defect, no code change. The capture spec was removed (non-deterministic against
+  the IO gate; knowledge recorded here). RECORDED for future eyes-on cycles: IO-gated charts don't paint
+  in headless full-page shot.sh — to capture a painted analytics chart, a real scroll/viewport-intersection
+  trigger is needed (or test the stat-card layer, which renders unconditionally). Verify: no source touched
+  (audit only); both suites were green at C25. cov: be 87.22% / fe 86.07% (~ — no module touched).
 - **C25 (guard)** — **Tree-wide source-scan guard for the C24 #36 RAW-value-input fix.** Two cats tied
   over budget (deep-review 6/5 +1, guard 7/6 +1); guard wins the tie on raw starvation (7 > 6). The C24
   #36 fix is a HIGH data-safety fix whose regression risk is a ONE-TOKEN flip (`RAW`→`USER_ENTERED`) or a

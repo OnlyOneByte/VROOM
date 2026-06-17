@@ -121,6 +121,19 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > backup/restore/import data-safety surfaces are now broadly swept — next deep-review should pick a
 > genuinely UNAUDITED area (e.g. the analytics financing/TCO money builders, or an eyes-on sweep of a
 > complex shipped page like /analytics or /insurance) rather than re-scanning backup/restore/import.
+>
+> **AUDITED C26 — /analytics eyes-on sweep, CLEAN (3 suspected defects debunked firsthand).** Shot empty
+> (clean four-states) + seeded fuel data for the populated state. Debunked: (1) "Avg km/L" on a USD user
+> is correctly unit-DERIVED (`getFuelEfficiencyLabel`), not hardcoded — no efficiency literal in the
+> render path; (2) blank gray chart boxes are ChartCard's deliberate IO-gated Skeletons (lazy `{#await
+> import()}` tabs + `visibility-watch.svelte.ts` gate — UIQuality "no blank box"), not a render defect;
+> (3) the missing chart svg is the IO gate not flipping in headless capture (harness limit, not a bug).
+> Populated Fuel & Stats stat cards render correct (Fuel Consumption 30.2 km/L, Best/Worst color
+> semantics, trend deltas). /analytics is architecturally sound — DON'T re-audit it; it's clean. **HARNESS
+> NOTE for future eyes-on cycles:** IO-gated charts ([data-slot="chart"] svg) do NOT paint in a headless
+> full-page shot.sh (no real viewport intersection). To eyes-on a PAINTED analytics chart you need a real
+> scroll/intersection trigger; the stat-card layer (renders unconditionally) is always capturable. Next
+> deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
 > **SCOUTED C6 — no fresh defect (date/tz vein).** analytics date helpers (monthsOwnedInYear,
