@@ -28,11 +28,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 9 |
 | deep-review | 5 | 8 |
 | guard | 6 | 6 |
-| bug | 3 | 6 |
+| bug | 3 | 10 |
 | arch | 5 | 6 |
 | infra | 6 | 7 |
 
-Current cycle: **9**
+Current cycle: **10**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -175,3 +175,18 @@ Current cycle: **9**
   "materialized N expenses" reminder-side view remains as a future sub-task). Verify: frontend
   validate:local GREEN — type-check 0, build OK, 715 tests pass. cov: be 87.22% / fe 85.95% (~ —
   UI-markup cycle, no vitest module touched; the badge's sourceType read is backend-covered at T1/C96).
+- **C10 (bug-scout → DRY, false-positive correctly debunked)** — bug was the sole over-budget category
+  (4/3). Scouted the FE store/state layer (the C6-flagged "FE store race/stale-state" vein, untouched
+  this run): app/offline/sync-state/theme stores are clean immutable getter-setter holders with no logic
+  to harbor a defect; app.svelte.ts notifications use UUID ids + immutable updates. Dug into sync-manager
+  (the data-safety-dense module). HYPOTHESIS RAISED + DEBUNKED FIRSTHAND (the GUIDE's "agent HIGH findings
+  are often false" — proven again): `checkForExistingExpense` GETs `?date=&amount=` params the backend
+  SILENTLY IGNORES (not in expenseQuerySchema → Zod strips), so the finder matches on vehicle+shared-tag
+  only. I drafted a fix narrowing to date+amount — but the EXISTING tests (lines 676-689) explicitly
+  assert a different-date/different-amount tag-sharing row MUST classify as `'modified'`. The design is a
+  DELIBERATE two-stage: broad finder (candidate) → determineConflictType classifies duplicate-vs-modified.
+  Narrowing the finder would silently DROP all `'modified'` conflict detection — a regression, not a fix.
+  REVERTED both files (git checkout); no bug exists. The `?date=&amount=` params are dead/misleading but
+  HARMLESS (ignored) — removing them is an arch-risk not worth taking against the working two-stage flow.
+  Recorded so it's not re-chased. No code shipped this cycle by design (shipping a false fix is the worst
+  outcome). Verify: sync-manager suite 22/22 green on the untouched tree. cov: be 87.22% / fe 85.95% (~).

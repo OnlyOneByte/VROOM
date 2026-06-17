@@ -103,6 +103,17 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > setMonth-overflow trap is avoided. Write-path validation asymmetry was swept C2 (#147 + the
 > #62/#109/#125/#145 class closed across all 4 paths). Next bug scout: a DIFFERENT vein — FE store
 > race/stale-state, or the analytics fleet-unit-pooling #94 class (but that's product-gated/escalated).
+>
+> **SCOUTED C10 — no fresh defect (FE store/state vein); a false-positive DEBUNKED firsthand.** app/
+> offline/sync-state/theme stores are clean getter-setter holders. Dug into sync-manager: nearly filed
+> `checkForExistingExpense`'s `?date=&amount=` params (silently ignored by the backend — not in
+> expenseQuerySchema) as an over-broad-match bug, but the EXISTING tests (sync-manager.test.ts:676-689)
+> prove the broad finder + narrow `determineConflictType` is a DELIBERATE two-stage design — narrowing
+> the finder would drop all `'modified'` conflict detection (a regression). NOT a bug; reverted the draft
+> fix. The dead `?date=&amount=` query params are harmless (ignored); leave them. DON'T re-chase. Next
+> bug scout: try a genuinely different surface (e.g. a FE component render-path edge, or wait for a
+> deep-review to surface a concrete defect) — the productive write-path + date/tz + store veins are now
+> all swept clean this run.
 
 ### guard
 *(queue empty — repopulate from real bug classes. Pattern: HTTP-harness (createTestApp + s3-provider
@@ -127,13 +138,13 @@ scout per bug cycle, then record + pivot if dry. Don't manufacture a finding.)*
 > direction (NO further sign-off needed). Angelo approved all the recommended approaches in one pass
 > ("record all your recommendations as approved … Reviewed"). Pick by severity order below; each names
 > the agreed fix. Full grounding in `loop/archive/`. Standard loop rules still apply: verify firsthand
-> against source before editing, test-anchored, ARCC-consult where noted.**
+> against source before editing, test-anchored. (VROOM is a personal GitHub project, NOT an Amazon
+> package — ARCC governance does NOT apply; never query/consult ARCC for VROOM work.)**
 >
 > _Severity 1 — data-corruption / data-loss (do first):_
 > - **#36 (HIGH) — APPROVED: switch Sheets backup writes to `RAW` value-input + escape leading
 >   formula chars (`= + - @`) on read.** Currently `USER_ENTERED` → formula injection + silent
->   round-trip corruption of the user's own backup. **ARCC-consult before the edit** (closest to a
->   security item). Pair with #37 in one Sheets-hardening pass.
+>   round-trip corruption of the user's own backup. Pair with #37 in one Sheets-hardening pass.
 > - **#37 (HIGH) — APPROVED: make the Sheets backup atomic — write to a temp sheet/range, then
 >   copy-then-promote (swap).** Currently a non-atomic in-place rewrite that can destroy the only good
 >   copy on a mid-write failure.
@@ -172,9 +183,8 @@ scout per bug cycle, then record + pivot if dry. Don't manufacture a finding.)*
 >   the C151 async-tx footgun). Last-writer-wins lost-update race today.
 > - **#22 (MED, hardening) — APPROVED: add a compression-ratio cap pre-inflation** to the zip-bomb guard
 >   (cheap, no new dep) instead of trusting the attacker-declared `header.size`.
-> - **#129 (MED) — APPROVED to fix, but RE-READ the archive grounding (~C-note line 197) FIRST + ARCC-
->   consult** before editing — it's a credentials/account-linking finding; don't guess the fix from the
->   one-line summary.
+> - **#129 (MED) — APPROVED to fix, but RE-READ the archive grounding (~C-note line 197) FIRST** before
+>   editing — it's a credentials/account-linking finding; don't guess the fix from the one-line summary.
 > - **#112 (LOW) — APPROVED: extend / generate distinct hues for the cross-vehicle analytics chart
 >   palette** for legibility at fleet size.
 > - **#79 (LOW) — APPROVED: add a data-hygiene path so a malformed fuel offline entry can't get stuck**
