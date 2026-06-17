@@ -40,8 +40,8 @@
 	import { validateExpenseField } from './expense-form-validation';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
-	import { formatCurrency, dateOnlyToISO } from '$lib/utils/formatters';
-	import { categoryLabels } from '$lib/utils/expense-helpers';
+	import { formatCurrency, dateOnlyToISO, toDateInputValue } from '$lib/utils/formatters';
+	import { categoryLabels, resetSplitAllocations } from '$lib/utils/expense-helpers';
 	import { extractUniqueTags } from '$lib/utils/expense-filters';
 	import { COMMON_EXPENSE_TAGS } from '$lib/types';
 	import type {
@@ -85,7 +85,7 @@
 		tags: [] as string[],
 		category: '',
 		amount: '',
-		date: new Date().toISOString().split('T')[0],
+		date: toDateInputValue(new Date()),
 		mileage: '',
 		volume: '',
 		charge: '',
@@ -359,6 +359,20 @@
 			sourceType = null;
 			sourceId = null;
 		}
+
+		// Clear fuel-only fields when switching AWAY from fuel (#76, mirroring the financing-source
+		// reset above). The fuel inputs hide via `showFuelFields`, but their formData values otherwise
+		// PERSIST and ride along on submit — stamping a stale volume/charge/fuelType onto a non-fuel
+		// row (inert in analytics, which filter category='fuel', but a real data-hygiene leak), and a
+		// stray mileage would feed getCurrentOdometer cross-category. A fuel expense keeps its fields;
+		// only the switch-away clears them.
+		if (categoryValue !== 'fuel') {
+			formData.volume = '';
+			formData.charge = '';
+			formData.fuelType = '';
+			formData.mileage = '';
+			formData.missedFillup = false;
+		}
 	}
 
 	// Reload vehicle data when vehicle selection changes (not on initial mount — onMount handles that)
@@ -571,7 +585,11 @@
 						description: expenseData.description ?? '',
 						...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
 						...(expenseData.volume !== undefined && { volume: expenseData.volume }),
-						...(expenseData.charge !== undefined && { charge: expenseData.charge })
+						...(expenseData.charge !== undefined && { charge: expenseData.charge }),
+						// Carry fuelType: the sync transform needs it to keep an electric charge (#66).
+						...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
+						// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing (#101).
+						...(expenseData.missedFillup !== undefined && { missedFillup: expenseData.missedFillup })
 					});
 
 					requestBackgroundSync('expense-sync');
@@ -599,7 +617,8 @@
 					volume: formData.volume ? parseFloat(formData.volume) : undefined,
 					charge: formData.charge ? parseFloat(formData.charge) : undefined,
 					fuelType: formData.fuelType || undefined,
-					description: formData.description || undefined
+					description: formData.description || undefined,
+					missedFillup: formData.missedFillup
 				};
 
 				addOfflineExpense({
@@ -611,7 +630,14 @@
 					description: expenseData.description ?? '',
 					...(expenseData.mileage !== undefined && { mileage: expenseData.mileage }),
 					...(expenseData.volume !== undefined && { volume: expenseData.volume }),
-					...(expenseData.charge !== undefined && { charge: expenseData.charge })
+					...(expenseData.charge !== undefined && { charge: expenseData.charge }),
+					// Carry fuelType: the sync transform needs it to keep an electric charge (#66).
+					...(expenseData.fuelType !== undefined && { fuelType: expenseData.fuelType }),
+					// Carry missedFillup: dropping it on sync corrupts consecutive-fillup MPG pairing (#101).
+					// This error-fallback save mirrors the offline-first save above (#111, C377): the #101
+					// fix landed on that path only, so a fuel fill-up logged with "missed previous" checked
+					// during an online-create FAILURE (timeout/5xx → this catch) silently dropped the flag.
+					...(expenseData.missedFillup !== undefined && { missedFillup: expenseData.missedFillup })
 				});
 				requestBackgroundSync('expense-sync');
 
@@ -739,17 +765,9 @@
 	}
 
 	function resetAllocationsForMethod(method: 'even' | 'absolute' | 'percentage') {
-		if (method === 'even') {
-			splitAllocations = [];
-		} else if (method === 'absolute') {
-			splitAllocations = selectedVehicleIds.map(id => ({ vehicleId: id, amount: 0 }));
-		} else {
-			const pct = selectedVehicleIds.length > 0 ? 100 / selectedVehicleIds.length : 0;
-			splitAllocations = selectedVehicleIds.map(id => ({
-				vehicleId: id,
-				percentage: Math.round(pct * 10) / 10
-			}));
-		}
+		// resetSplitAllocations is the shared source of truth (C415) — the insurance-term form runs the
+		// identical reset, so the 100/N rounded-to-1-decimal percentage seed can't drift between them.
+		splitAllocations = resetSplitAllocations(method, selectedVehicleIds);
 	}
 
 	function handleAllocationsChange(
@@ -791,10 +809,10 @@
 			<!-- Header -->
 			<div class="flex items-center gap-4">
 				<button
-						aria-label="Go back"
-						onclick={() => gotoDynamic(returnTo)}
-						class="p-2 hover:bg-muted rounded-lg"
-					>
+					aria-label="Go back"
+					onclick={() => gotoDynamic(returnTo)}
+					class="p-2 hover:bg-muted rounded-lg"
+				>
 					<ArrowLeft class="h-5 w-5" />
 				</button>
 				<div>
@@ -900,10 +918,10 @@
 			<!-- Header -->
 			<div class="flex items-center gap-4">
 				<button
-						aria-label="Go back"
-						onclick={() => gotoDynamic(returnTo)}
-						class="p-2 hover:bg-muted rounded-lg"
-					>
+					aria-label="Go back"
+					onclick={() => gotoDynamic(returnTo)}
+					class="p-2 hover:bg-muted rounded-lg"
+				>
 					<ArrowLeft class="h-5 w-5" />
 				</button>
 

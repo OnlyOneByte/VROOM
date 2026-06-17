@@ -1,13 +1,15 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import { parseClampedInt } from '../../utils/calculations';
 import { validateInsuranceOwnership, validateVehicleOwnership } from '../../utils/validation';
 import { expenseRepository } from '../expenses/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { insuranceClaimRepository } from './claims-repository';
 import { createClaimSchema, updateClaimSchema } from './claims-validation';
-import { createTermExpenses, updateTermExpenses } from './hooks';
+import { createTermExpenses, updateTermExpenses, vehicleIdsForTerm } from './hooks';
 import { insurancePolicyRepository } from './repository';
 import {
   addTermSchema,
@@ -32,6 +34,32 @@ const claimParamsSchema = z.object({
   claimId: z.string().min(1, 'Claim ID is required'),
 });
 
+/**
+ * Validate a claim's OPTIONAL vehicleId/termId links before a create/update write. The route already
+ * proves policy ownership, but the claim schema accepts a free-form `vehicleId` (a cross-tenant FK —
+ * the #61/#62 within-tenant-integrity class) and `termId` (which must belong to THIS policy, not another
+ * — including another tenant's). The repository wrote both VERBATIM, so without this a user could attach
+ * a claim to a vehicle they don't own or a term from a different policy, corrupting claim attribution
+ * and planting a cross-tenant reference. Only checks fields that are present (a `null` clear on update is
+ * a no-op here). Mirrors the term-vehicle ownership guard (addTerm/updateTerm validateVehicleOwnership).
+ */
+async function validateClaimRefs(
+  data: { vehicleId?: string | null; termId?: string | null },
+  policyId: string,
+  userId: string
+): Promise<void> {
+  if (data.vehicleId) {
+    await validateVehicleOwnership(data.vehicleId, userId);
+  }
+  if (data.termId) {
+    const policy = await insurancePolicyRepository.findById(policyId);
+    const onThisPolicy = policy?.terms.some((t) => t.id === data.termId);
+    if (!onThisPolicy) {
+      throw new ValidationError('Claim termId does not belong to this policy');
+    }
+  }
+}
+
 const vehiclePoliciesParamSchema = z.object({
   vehicleId: z.string().min(1, 'Vehicle ID is required'),
 });
@@ -50,10 +78,11 @@ routes.get('/', async (c) => {
 // GET /api/v1/insurance/expiring-soon — expiring policies
 routes.get('/expiring-soon', async (c) => {
   const user = c.get('user');
-  const daysAhead = Number.parseInt(c.req.query('days') || '30', 10);
-  // Bound the result set so a user with many terms can't trigger an unbounded scan.
-  const requestedLimit = Number.parseInt(c.req.query('limit') || '100', 10);
-  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 200) : 100;
+  // Both params go through parseClampedInt (C211 dedup): a non-numeric value → the fallback, never
+  // a NaN that would make `endDate = new Date(now + NaN)` an Invalid Date and silently empty the
+  // result (#70). `days` → 30-day default, clamped 1..366; `limit` → 100, clamped 1..200.
+  const daysAhead = parseClampedInt(c.req.query('days'), 30, 1, 366);
+  const limit = parseClampedInt(c.req.query('limit'), 100, 1, 200);
   const now = new Date();
   const endDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
   const terms = await insurancePolicyRepository.findExpiringTerms(now, endDate, user.id, limit);
@@ -82,9 +111,7 @@ routes.post('/', zValidator('json', createPolicySchema), async (c) => {
   // Auto-create split expenses for each term that has a totalCost
   for (const term of policy.terms) {
     if (term.totalCost && term.totalCost > 0) {
-      const termVehicleIds = policy.termVehicleCoverage
-        .filter((tc) => tc.termId === term.id)
-        .map((tc) => tc.vehicleId);
+      const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, term.id);
       await createTermExpenses({
         termId: term.id,
         vehicleIds: termVehicleIds,
@@ -174,9 +201,7 @@ routes.post(
 
     // Auto-create split expenses if the new term has a totalCost
     if (termData.totalCost && termData.totalCost > 0) {
-      const termVehicleIds = policy.termVehicleCoverage
-        .filter((tc) => tc.termId === policy.newTermId)
-        .map((tc) => tc.vehicleId);
+      const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, policy.newTermId);
       await createTermExpenses({
         termId: policy.newTermId,
         vehicleIds: termVehicleIds,
@@ -206,9 +231,7 @@ routes.put(
     // Sync auto-created expenses with updated term data
     const updatedTerm = policy.terms.find((t) => t.id === termId);
     if (updatedTerm) {
-      const termVehicleIds = policy.termVehicleCoverage
-        .filter((tc) => tc.termId === termId)
-        .map((tc) => tc.vehicleId);
+      const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, termId);
       await updateTermExpenses({
         termId,
         vehicleIds: termVehicleIds,
@@ -257,6 +280,9 @@ routes.post(
     const { id } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const data = c.req.valid('json');
+    // Validate the optional vehicleId/termId links (owned vehicle; term on THIS policy) — the route
+    // only proved policy ownership, and the repo writes these FKs verbatim.
+    await validateClaimRefs(data, id, user.id);
     const claim = await insuranceClaimRepository.create(id, data);
     return c.json({ success: true, data: claim, message: 'Claim filed successfully' }, 201);
   }
@@ -272,6 +298,8 @@ routes.put(
     const { id, claimId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const updates = c.req.valid('json');
+    // Re-validate a CHANGED vehicleId/termId link (mirror the create-path guard).
+    await validateClaimRefs(updates, id, user.id);
     const claim = await insuranceClaimRepository.update(id, claimId, updates);
     return c.json({ success: true, data: claim, message: 'Claim updated successfully' });
   }

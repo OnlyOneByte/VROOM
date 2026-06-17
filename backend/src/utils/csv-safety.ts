@@ -55,11 +55,24 @@ export function neutralizeCsvRow<T extends Record<string, unknown>>(
  * original text). This is the symmetric READ side the `neutralizeCsvCell` doc warns
  * is required for round-trip use.
  *
- * CRITICAL: only strip a `'` that neutralization itself could have added — i.e. a
- * leading `'` IMMEDIATELY followed by a formula trigger (`'=`, `'+`, `'-`, `'@`,
- * `'\t`, `'\r`). A value the user genuinely typed starting with an apostrophe (e.g.
- * `'24 road trip`) has a non-trigger second char and is left untouched, so this can
- * never eat real data. Idempotent on already-clean values.
+ * Strips a leading `'` IMMEDIATELY followed by a formula trigger (`'=`, `'+`, `'-`,
+ * `'@`, `'\t`, `'\r`). A value the user genuinely typed starting with an apostrophe +
+ * a NON-trigger char (e.g. `'24 road trip`) has a non-trigger second char and is left
+ * untouched. Idempotent on already-clean values.
+ *
+ * KNOWN ASYMMETRY (filed C399/C401, escalated — a data-contract direction call, NOT a
+ * clean fix): a value the user genuinely typed as `'` + a trigger (e.g. a description
+ * `'=mc2 rebate`, or a vehicle nickname `'=Daily`) is NOT escaped on export
+ * (neutralizeCsvCell only prefixes when `value[0]` is itself a trigger), yet IS stripped
+ * here on import (`value[1]` is a trigger) → it round-trips LOSSY to `=mc2 rebate` /
+ * `=Daily` (and a stripped nickname then fails to re-match its vehicle, dropping the
+ * whole row). A single-`'` sentinel CANNOT disambiguate a user-typed `'=` from an
+ * export-escaped `'=`; the only invertible scheme escapes EVERY leading-`'` on write +
+ * strips one on read, which reinterprets hand-authored leading-`'` foreign CSVs (flips
+ * the deliberate import-csv.test.ts "preserves a genuinely apostrophe-led description"
+ * contract) — so which faithfulness to optimize (VROOM-own-export round-trip vs
+ * hand-authored import) is Angelo's call. Pinned by the characterization test in
+ * csv-safety.test.ts so the behavior can't drift silently before that decision.
  */
 export function denormalizeCsvCell(value: string): string {
   if (value.length >= 2 && value[0] === "'" && FORMULA_TRIGGERS.has(value[1] as string)) {

@@ -137,6 +137,45 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
     expect(countAfterSecond).toBe(countAfterFirst);
   });
 
+  // Bug #116 (C399 audit): the #107/#114 bug-#12 endDate family on a THIRD, previously-unfixed path —
+  // the catch-up loop's NATURAL exit (under the 12-occurrence cap). The in-loop endDate guard only sees
+  // nextDue <= now (the while condition); the FINAL advance steps nextDue PAST now and exits, so that
+  // last value was never tested against endDate. A bounded reminder whose endDate falls between its last
+  // in-window occurrence and that final advance was left is_active=1 with a future nextDueDate — it then
+  // inflates GET /reminders/recurring-cost (which gates only on isActive) and stays in the active list
+  // until a LATER trigger lazily closes it. (#107/C362 fixed fastForwardPastNow's exit; #114/C394 fixed
+  // mark-serviced; neither touched this natural-exit path — it stays well under the cap, so fastForward
+  // is never reached.) Construction: weekly, a handful of weeks of history, endDate ≈ now (so it lands
+  // in the straddling period after the last <=now step) — only a few catch-up iterations, well under 12.
+  test('a bounded reminder whose endDate lands at the natural loop exit (under the catch-up cap) is deactivated, not left active (#116)', async () => {
+    const vehicleId = await seedVehicle();
+
+    // Dates relative to the server clock so the test is wall-clock-independent. Weekly from 24 days
+    // ago → occurrences at -24/-17/-10/-3 days (all <= now, 4 iterations « 12 cap), then the final
+    // advance lands +4 days (> now). endDate one second ago sits between the -3d step and that +4d
+    // advance → the in-loop guard never fires (every processed step is < endDate), only the post-loop
+    // guard does. Pre-fix: catchUpCount=4 < 12 so fast-forward is skipped → left active with a future
+    // nextDueDate past its endDate. The fix deactivates at the natural exit.
+    const DAY = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const reminderId = await createOverdueExpenseReminder(vehicleId, {
+      frequency: 'weekly',
+      startDate: new Date(now - 24 * DAY).toISOString(),
+      endDate: new Date(now - 1000).toISOString(),
+    });
+
+    const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
+    expect(res.status).toBe(200);
+
+    const after = reminderRow(reminderId);
+    // Past its endDate and fully lapsed → deactivated, NOT left active with a future nextDueDate.
+    expect(after.is_active).toBe(0);
+    // And triggering again creates no further expenses (it's inactive / findOverdue won't return it).
+    const countAfter = expensesForReminder(reminderId).length;
+    await ctx.authed('POST', '/api/v1/reminders/trigger');
+    expect(expensesForReminder(reminderId).length).toBe(countAfter);
+  });
+
   test('endDate bounds catch-up to the in-window occurrences, then deactivates', async () => {
     const vehicleId = await seedVehicle();
     // Monthly, anchored on the 15th, window [Jan 15, Apr 1] 2024 (all in the past
@@ -270,5 +309,53 @@ describe('expense-reminder trigger — split materialization (recurring-expenses
         expect(r.source_id).toBe(reminderId);
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #88 (C288, ESCALATED — product call): a SPLIT reminder whose expenseSplitConfig names a vehicle
+// that was later DELETED can never materialize a COMPLETE split. The reminder_vehicles junction is
+// FK-cascade-cleaned on a vehicle delete, but expenseSplitConfig is a JSON blob (NOT a FK), so the
+// deleted vehicle's id persists in it. On the next trigger, createSiblings inserts an expense whose
+// vehicle_id points at the now-gone vehicle → SQLITE FK violation → the per-reminder try/catch records
+// a "skipped" (surfaced in the result, NOT the UI) → the recurring cost is broken with no user signal
+// (NORTH_STAR #1). SHARPER than first thought: createSiblings inserts siblings one-by-one, and a throw
+// escaping the async tx callback after a prior sync insert does NOT roll it back (the C151 better-sqlite3
+// footgun) — so the deleted vehicle NEVER gets a sibling, but a leg for a still-existing vehicle can
+// PERSIST as a partial/inconsistent group (groupTotal says $100 while only one $50 leg landed).
+// This CHARACTERIZES that current behavior (anchor for the real fix — drop+renormalize / deactivate /
+// etc., per Angelo) + pins the load-bearing CONTAINMENT guarantee: the failure does not throw uncaught
+// and break the whole trigger run / other reminders.
+// ---------------------------------------------------------------------------
+describe('#88: split reminder naming a DELETED vehicle is contained, not a trigger-wide failure (C288 characterization)', () => {
+  test('the deleted vehicle never gets a sibling + the reminder is reported skipped; an independent reminder still fires; run returns 200', async () => {
+    const [v1, v2] = await seedTwoVehicles();
+    const v3 = await seedVehicle();
+
+    // A split reminder over v1+v2, and an independent single-vehicle reminder on v3 (the control).
+    const splitReminderId = await createOverdueExpenseReminder(v1, {
+      vehicleIds: [v1, v2],
+      expenseAmount: 100,
+      expenseSplitConfig: { method: 'even', vehicleIds: [v1, v2] },
+    });
+    const okReminderId = await createOverdueExpenseReminder(v3, { expenseAmount: 40 });
+
+    // Delete v2 — the junction row is FK-cascade-cleaned, but expenseSplitConfig still names v2.
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${v2}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
+    // The run does NOT 500 — the per-reminder catch contains the FK violation.
+    expect(res.status).toBe(200);
+    const body = await json<DataEnvelope<TriggerResultShape>>(res);
+
+    // The DELETED vehicle never receives a sibling (its FK-violating insert can never persist) — so the
+    // split is permanently incomplete; and the reminder is reported in `skipped`.
+    const rows = splitRowsForReminder(splitReminderId);
+    expect(rows.some((r) => r.vehicle_id === v2)).toBe(false);
+    expect(body.data.skipped.some((s) => s.reminderId === splitReminderId)).toBe(true);
+
+    // The CONTAINMENT guarantee: the independent reminder still fired despite the bad one.
+    expect(expensesForReminder(okReminderId).length).toBeGreaterThanOrEqual(1);
   });
 });

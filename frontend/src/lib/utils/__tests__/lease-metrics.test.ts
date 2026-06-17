@@ -11,7 +11,12 @@
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
 import type { VehicleFinancing } from '$lib/types';
-import { calculateLeaseMetrics, resolveCurrentOdometer } from '$lib/utils/financing-calculations';
+import {
+	calculateLeaseMetrics,
+	calculateLeaseOverage,
+	leaseTotalMileageAllowance,
+	resolveCurrentOdometer
+} from '$lib/utils/financing-calculations';
 
 // Build a valid lease. Dates are expressed as offsets from a fixed "now" anchor the
 // caller passes, so tests are deterministic regardless of the wall clock: startDate is
@@ -37,7 +42,10 @@ function makeLease(overrides: Partial<VehicleFinancing> = {}): VehicleFinancing 
 		paymentAmount: 400,
 		paymentFrequency: 'monthly',
 		isActive: true,
-		mileageLimit: 36000,
+		// ANNUAL mileage limit (#64, C198): the field is per-year, so on this 36-mo lease the WHOLE-LEASE
+		// allowance is 12000 × 3 = 36000. (The pre-fix code + these tests treated the annual number AS the
+		// total, over-reporting excess ~3x; the realistic 12000/yr here makes the term-scaled total 36000.)
+		mileageLimit: 12000,
 		excessMileageFee: 0.25,
 		createdAt: '2024-01-01T00:00:00.000Z',
 		updatedAt: '2024-01-01T00:00:00.000Z',
@@ -69,33 +77,62 @@ describe('calculateLeaseMetrics — guards & null paths', () => {
 		expect(Number.isFinite(m?.projectedExcessFee ?? NaN)).toBe(true);
 		expect(m?.isOverMileage).toBe(false);
 	});
+
+	// #110 (C374): endDate is nullable; when absent, calculateLeaseMetrics derives the lease end from
+	// the term. The old fallback used termMonths × 30 DAYS — ~0.4 days short per month — so a 36-mo
+	// lease ended ~16 days early, understating daysRemaining and inflating the excess-fee projection.
+	// The fix uses addMonthsClamped (real CALENDAR months). This pins that a no-endDate lease's
+	// daysRemaining matches the calendar-month end, and is STRICTLY MORE than the old ×30 fallback.
+	test('a lease with NO endDate derives the end from CALENDAR months, not termMonths×30 (#110)', () => {
+		// Start exactly today so daysElapsed ≈ 0 and daysRemaining ≈ the full lease span.
+		const start = new Date();
+		const startIso = start.toISOString().slice(0, 10);
+		const m = calculateLeaseMetrics(
+			makeLease({ startDate: startIso, endDate: undefined, termMonths: 36 }),
+			null,
+			0
+		);
+		expect(m).not.toBeNull();
+
+		// Expected end via real calendar-month addition (clamped), the same helper the fix uses.
+		const expectedEnd = new Date(start.getFullYear(), start.getMonth() + 36, start.getDate());
+		const MS_DAY = 1000 * 60 * 60 * 24;
+		const expectedTotalDays = Math.floor((expectedEnd.getTime() - start.getTime()) / MS_DAY);
+		// daysRemaining ≈ expectedTotalDays (allow ±1 for the floor + same-day elapsed boundary).
+		expect(Math.abs((m?.daysRemaining ?? 0) - expectedTotalDays)).toBeLessThanOrEqual(1);
+
+		// The OLD ×30 fallback would give 36×30 = 1080 days; a real 36 calendar months is ~1096 →
+		// strictly MORE. This is the load-bearing assertion: the fix can't silently revert to ×30.
+		expect(m?.daysRemaining ?? 0).toBeGreaterThan(36 * 30);
+	});
 });
 
 describe('calculateLeaseMetrics — mileage usage & remaining', () => {
-	test('normal mid-lease usage: used = current − initial, remaining clamps to limit', () => {
-		const m = calculateLeaseMetrics(makeLease({ mileageLimit: 36000 }), 22000, 10000);
+	test('normal mid-lease usage: used = current − initial, remaining clamps to TERM-SCALED total', () => {
+		// 12000/yr × 36mo = 36000 total allowance; used 12000 → 24000 remaining.
+		const m = calculateLeaseMetrics(makeLease({ mileageLimit: 12000 }), 22000, 10000);
 		expect(m?.mileageUsed).toBe(12000); // 22000 − 10000
-		expect(m?.mileageRemaining).toBe(24000); // 36000 − 12000
+		expect(m?.mileageRemaining).toBe(24000); // 36000 total − 12000
 	});
 
 	test('OVER the limit: remaining clamps to 0 (never negative)', () => {
-		const m = calculateLeaseMetrics(makeLease({ mileageLimit: 36000 }), 60000, 10000);
+		const m = calculateLeaseMetrics(makeLease({ mileageLimit: 12000 }), 60000, 10000);
 		expect(m?.mileageUsed).toBe(50000); // 60000 − 10000
-		expect(m?.mileageRemaining).toBe(0); // Math.max(0, 36000 − 50000)
+		expect(m?.mileageRemaining).toBe(0); // Math.max(0, 36000 total − 50000)
 	});
 
 	test('current below initial (odometer rollback / bad data): used clamps to 0', () => {
 		const m = calculateLeaseMetrics(makeLease(), 5000, 10000);
 		expect(m?.mileageUsed).toBe(0); // Math.max(0, 5000 − 10000)
-		expect(m?.mileageRemaining).toBe(36000);
+		expect(m?.mileageRemaining).toBe(36000); // full term-scaled total (12000/yr × 3yr)
 	});
 });
 
 describe('calculateLeaseMetrics — excess-mileage projection (the dollar figure)', () => {
 	test('a fast burn rate projects an excess fee = excessMiles × per-mile fee', () => {
-		// Used 30k of a 36k limit one year in, with two years left → projects well over.
+		// 30k used one year into a 12000/yr × 3yr = 36000-total lease, two years left → projects ~90k, well over.
 		const m = calculateLeaseMetrics(
-			makeLease({ mileageLimit: 36000, excessMileageFee: 0.25 }),
+			makeLease({ mileageLimit: 12000, excessMileageFee: 0.25 }),
 			40000,
 			10000
 		);
@@ -106,22 +143,85 @@ describe('calculateLeaseMetrics — excess-mileage projection (the dollar figure
 		expect(m?.projectedExcessFee).toBeCloseTo((m?.projectedExcessMiles ?? 0) * 0.25, 6);
 	});
 
-	test('on track (slow burn) projects NO excess: fee 0, not over', () => {
-		// 3k used one year in on a 36k/3yr lease → on pace for ~9k, well under.
-		const m = calculateLeaseMetrics(makeLease({ mileageLimit: 36000 }), 13000, 10000);
+	test('on track (slow burn) projects NO excess against the term-scaled total: fee 0, not over', () => {
+		// 3k used one year in on a 12000/yr × 3yr = 36000-total lease → on pace for ~9k, well under.
+		const m = calculateLeaseMetrics(makeLease({ mileageLimit: 12000 }), 13000, 10000);
 		expect(m?.projectedExcessMiles).toBe(0);
+		expect(m?.projectedExcessFee).toBe(0);
+		expect(m?.isOverMileage).toBe(false);
+	});
+
+	test('high INITIAL mileage (used-car lease) driven on-pace projects NO excess (driven-miles, not absolute odometer)', () => {
+		// THE BUG: projectedFinalMileage is an ABSOLUTE odometer reading, but totalMileageAllowance +
+		// mileageUsed are DRIVEN miles (current − initial). Comparing the absolute reading against the
+		// driven budget over-reported excess by exactly `initialMileage`. Here: a car with 40,000 mi at
+		// signing, one year into a 12000/yr × 3yr = 36000-total lease, driven 12,000 (exactly on pace) →
+		// current 52,000, projects 76,000 absolute = 36,000 DRIVEN → exactly at the allowance, $0 excess.
+		// Pre-fix: 76,000 − 36,000 = 40,000 phantom excess miles → a $10,000 phantom fee at $0.25/mi.
+		const m = calculateLeaseMetrics(
+			makeLease({ mileageLimit: 12000, excessMileageFee: 0.25 }),
+			52000, // current odometer
+			40000 // initial odometer at signing → driven 12000 one year in (on pace)
+		);
+		expect(m?.mileageUsed).toBe(12000); // 52000 − 40000
+		expect(m?.projectedExcessMiles).toBe(0); // projects 36000 DRIVEN = the allowance, not 76000 absolute
 		expect(m?.projectedExcessFee).toBe(0);
 		expect(m?.isOverMileage).toBe(false);
 	});
 
 	test('missing excessMileageFee → excess miles can be >0 but fee is 0 (no NaN)', () => {
 		const m = calculateLeaseMetrics(
-			makeLease({ mileageLimit: 36000, excessMileageFee: undefined as unknown as number }),
+			makeLease({ mileageLimit: 12000, excessMileageFee: undefined as unknown as number }),
 			40000,
 			10000
 		);
 		expect(m?.projectedExcessFee).toBe(0);
 		expect(Number.isFinite(m?.projectedExcessFee ?? NaN)).toBe(true);
+	});
+});
+
+describe('calculateLeaseMetrics — #64: the limit is ANNUAL, scaled by term', () => {
+	// THE BUG (C198): mileageLimit is per-YEAR (the form labels it "Annual Mileage Limit"), but the math
+	// compared the lifetime mileageUsed/projectedFinalMileage against the bare annual number, over-reporting
+	// excess ~Nx on an N-year lease. The allowance must be annual × (termMonths / 12).
+	test('a 3-year lease driven under its TRUE total allowance shows NO excess (was a phantom ~Nx fee pre-fix)', () => {
+		// 12000/yr × 36mo = 36000 total. ~18 months in, driven 9000 (a 6000/yr pace) → projects ~18000
+		// final, comfortably UNDER 36000. Pre-fix this compared the used/projection against the bare 12000
+		// annual number → a large phantom excess + fee. With the term-scaled total it's correctly $0 excess.
+		const m = calculateLeaseMetrics(
+			makeLease({
+				mileageLimit: 12000,
+				termMonths: 36,
+				startDate: isoDaysFromNow(-548), // ~18 months in
+				endDate: isoDaysFromNow(548) // ~18 months left
+			}),
+			19000, // current
+			10000 // initial → used 9000
+		);
+		expect(m).not.toBeNull();
+		expect(m?.isOverMileage).toBe(false);
+		expect(m?.projectedExcessMiles).toBe(0);
+		expect(m?.projectedExcessFee).toBe(0);
+	});
+
+	test('mileageRemaining reflects the term-scaled total, not the bare annual limit', () => {
+		// 15000/yr × 24mo = 30000 total; used 10000 → 20000 remaining (NOT 15000 − 10000 = 5000, the bug).
+		const m = calculateLeaseMetrics(
+			makeLease({ mileageLimit: 15000, termMonths: 24, endDate: isoDaysFromNow(365) }),
+			20000,
+			10000
+		);
+		expect(m?.mileageRemaining).toBe(20000); // 30000 total − 10000 used
+	});
+
+	test('a longer term grants proportionally more allowance (annual × years)', () => {
+		// Same 12000/yr annual, but a 48-mo term → 48000 total; used 12000 leaves 36000.
+		const m = calculateLeaseMetrics(
+			makeLease({ mileageLimit: 12000, termMonths: 48, endDate: isoDaysFromNow(365 * 3) }),
+			22000,
+			10000
+		);
+		expect(m?.mileageRemaining).toBe(36000); // 12000 × 4yr − 12000 used
 	});
 });
 
@@ -182,6 +282,51 @@ describe('calculateLeaseMetrics — property: every numeric output finite & non-
 			{ numRuns: 200 }
 		);
 	});
+
+	// THE #91 GUARD (C296): the merge-surviving property for the coordinate-space bug class. Lease overage
+	// is about miles DRIVEN, not the absolute odometer — so adding the SAME constant to both initialMileage
+	// and currentMileage shifts only the odometer baseline (the car was simply leased with more miles on it),
+	// NOT how far it's driven or projected to drive. Every DRIVEN-miles output must be invariant under that
+	// shift; only projectedFinalMileage (an absolute reading) moves by the constant. The #91 bug compared the
+	// absolute projectedFinalMileage against the driven-miles budget, so a baseline shift leaked straight into
+	// projectedExcessMiles/Fee — this property would have caught it where the finiteness property above could
+	// not (the over-reported fee was still finite & non-negative). A single example pins one point; this pins
+	// the whole class so the absolute-vs-driven mix can't silently return.
+	test('#91: driven-miles outputs are INVARIANT under an equal shift of initial+current (only the absolute odometer moves)', () => {
+		fc.assert(
+			fc.property(
+				fc.integer({ min: 0, max: 100000 }), // base initialMileage
+				fc.integer({ min: 0, max: 100000 }), // delta driven (current − initial)
+				fc.integer({ min: 1, max: 150000 }), // baseline shift (extra miles already on the car at signing)
+				fc.integer({ min: 1, max: 100000 }), // mileageLimit (>0)
+				fc.integer({ min: -700, max: 700 }), // start offset days
+				fc.integer({ min: 12, max: 60 }), // termMonths
+				fc.float({ min: 0, max: 2, noNaN: true }), // excessMileageFee
+				(initial, driven, shift, limit, startOffset, termMonths, fee) => {
+					const lease = makeLease({
+						mileageLimit: limit,
+						excessMileageFee: fee,
+						termMonths,
+						startDate: isoDaysFromNow(startOffset),
+						endDate: isoDaysFromNow(startOffset + termMonths * 30)
+					});
+					const base = calculateLeaseMetrics(lease, initial + driven, initial);
+					const shifted = calculateLeaseMetrics(lease, initial + driven + shift, initial + shift);
+					if (base === null || shifted === null) return; // both guard identically (same dates)
+
+					// Driven-miles space: identical regardless of the odometer baseline.
+					expect(shifted.mileageUsed).toBeCloseTo(base.mileageUsed, 6);
+					expect(shifted.mileageRemaining).toBeCloseTo(base.mileageRemaining, 6);
+					expect(shifted.projectedExcessMiles).toBeCloseTo(base.projectedExcessMiles, 6);
+					expect(shifted.projectedExcessFee).toBeCloseTo(base.projectedExcessFee, 6);
+					expect(shifted.isOverMileage).toBe(base.isOverMileage);
+					// Absolute-odometer space: this one DOES move by exactly the shift.
+					expect(shifted.projectedFinalMileage).toBeCloseTo(base.projectedFinalMileage + shift, 6);
+				}
+			),
+			{ numRuns: 200 }
+		);
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -215,5 +360,100 @@ describe('resolveCurrentOdometer — prefers all-time currentOdometer over perio
 	test('a zero currentOdometer is honored (??, not ||) — 0 is a real reading, not "missing"', () => {
 		// `0 ?? x` returns 0; a `0 || x` bug would wrongly skip to currentMileage.
 		expect(resolveCurrentOdometer(0, 12_100, 10_000)).toBe(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// calculateLeaseOverage (C398, the #64/#110 annual-vs-total class on the PaymentMetricsGrid "Mileage
+// Overage" card): the card compared the LIFETIME driven `mileageUsed` against the bare ANNUAL
+// `financing.mileageLimit`, while the sibling LeaseMetricsCard correctly scales by the term — so the
+// two cards on the SAME Finance-tab screen contradicted, and this one over-reported the overage + $ fee
+// ~Nx on an N-year lease (a 36k-total lease driven 30k showed "18,000 over" + a phantom fee instead of
+// 0). The fix routes both through leaseTotalMileageAllowance (annual × termMonths/12). These pin the
+// term-scaling so the bare-annual compare can't silently return; reverting the helper → RED here.
+// ---------------------------------------------------------------------------
+describe('leaseTotalMileageAllowance — annual limit scaled by term', () => {
+	test('12000/yr on a 36-mo lease = 36000 total (not the bare 12000)', () => {
+		expect(leaseTotalMileageAllowance(makeLease({ mileageLimit: 12000, termMonths: 36 }))).toBe(36000);
+	});
+
+	test('15000/yr on a 24-mo lease = 30000 total', () => {
+		expect(leaseTotalMileageAllowance(makeLease({ mileageLimit: 15000, termMonths: 24 }))).toBe(30000);
+	});
+
+	test('a 0 termMonths falls back to the annual limit (term≈12mo), never 0/NaN', () => {
+		expect(leaseTotalMileageAllowance(makeLease({ mileageLimit: 12000, termMonths: 0 }))).toBe(12000);
+	});
+
+	test('no mileageLimit → 0 allowance (no NaN)', () => {
+		expect(
+			leaseTotalMileageAllowance(makeLease({ mileageLimit: undefined as unknown as number }))
+		).toBe(0);
+	});
+});
+
+describe('calculateLeaseOverage — current overage vs the TERM-SCALED total (#64/#110)', () => {
+	test('driven UNDER the term-scaled total shows NO overage (the bug showed a phantom ~Nx fee)', () => {
+		// THE BUG: 30000 driven on a 12000/yr × 36mo = 36000-total lease is UNDER the allowance → $0.
+		// Pre-fix compared 30000 against the bare 12000 annual → 18000 phantom excess + a $4500 fee.
+		const { excessMiles, overageCost } = calculateLeaseOverage(
+			makeLease({ mileageLimit: 12000, termMonths: 36, excessMileageFee: 0.25 }),
+			30000
+		);
+		expect(excessMiles).toBe(0);
+		expect(overageCost).toBe(0);
+	});
+
+	test('genuinely over the term-scaled total bills the excess × per-mile fee', () => {
+		// 40000 driven on a 36000-total lease → 4000 over × $0.25 = $1000.
+		const { excessMiles, overageCost } = calculateLeaseOverage(
+			makeLease({ mileageLimit: 12000, termMonths: 36, excessMileageFee: 0.25 }),
+			40000
+		);
+		expect(excessMiles).toBe(4000);
+		expect(overageCost).toBeCloseTo(1000, 6);
+	});
+
+	test('a longer term grants proportionally more allowance before any overage', () => {
+		// Same 12000/yr, but a 48-mo term → 48000 total; 40000 driven is comfortably under → $0.
+		const { excessMiles, overageCost } = calculateLeaseOverage(
+			makeLease({ mileageLimit: 12000, termMonths: 48, excessMileageFee: 0.25 }),
+			40000
+		);
+		expect(excessMiles).toBe(0);
+		expect(overageCost).toBe(0);
+	});
+
+	test('agrees with calculateLeaseMetrics on the allowance (both route through leaseTotalMileageAllowance)', () => {
+		// The two Finance-tab cards must use the SAME total allowance. mileageRemaining = total − used.
+		const lease = makeLease({ mileageLimit: 12000, termMonths: 36 });
+		const used = 24000;
+		const metrics = calculateLeaseMetrics(lease, 34000, 10000); // used = 34000 − 10000 = 24000
+		expect(metrics?.mileageRemaining).toBe(leaseTotalMileageAllowance(lease) - used); // 36000 − 24000 = 12000
+		// And the overage card is consistent: 24000 driven < 36000 total → no current overage.
+		expect(calculateLeaseOverage(lease, used).excessMiles).toBe(0);
+	});
+
+	test('missing excessMileageFee → excess miles can be >0 but cost is 0 (no NaN)', () => {
+		const { excessMiles, overageCost } = calculateLeaseOverage(
+			makeLease({ mileageLimit: 12000, termMonths: 36, excessMileageFee: undefined as unknown as number }),
+			50000
+		);
+		expect(excessMiles).toBe(14000); // 50000 − 36000
+		expect(overageCost).toBe(0);
+		expect(Number.isFinite(overageCost)).toBe(true);
+	});
+
+	test('a non-lease (loan) returns zero overage', () => {
+		expect(calculateLeaseOverage(makeLease({ financingType: 'loan' }), 99999)).toEqual({
+			excessMiles: 0,
+			overageCost: 0
+		});
+	});
+
+	test('a lease with no mileageLimit returns zero overage (the card is hidden anyway)', () => {
+		expect(
+			calculateLeaseOverage(makeLease({ mileageLimit: undefined as unknown as number }), 99999)
+		).toEqual({ excessMiles: 0, overageCost: 0 });
 	});
 });

@@ -109,3 +109,38 @@ describe('denormalizeCsvCell — symmetric inverse for round-trip import', () =>
     expect(denormalizeCsvCell(denormalizeCsvCell("'=x"))).toBe('=x');
   });
 });
+
+// ---------------------------------------------------------------------------
+// CHARACTERIZATION (C401, filed+escalated — NOT an endorsement): the neutralize↔denormalize
+// pair is ASYMMETRIC for a value the user genuinely typed as `'` + a formula trigger. Export
+// (neutralizeCsvCell) only prefixes when value[0] is ITSELF a trigger, so a user-typed `'=mc2`
+// passes through UNESCAPED; import (denormalizeCsvCell) strips a leading `'` whenever value[1]
+// is a trigger, so that same `'=mc2` is stripped to `=mc2`. Net: a `'`+trigger value round-trips
+// LOSSY (the literal leading apostrophe vanishes; for a vehicle nickname the stripped name then
+// fails to re-match → the whole row drops). A single-`'` sentinel CANNOT tell a user-typed `'=`
+// from an export-escaped `'=` apart, so there is no clean one-side fix — the only invertible
+// scheme (escape EVERY leading-`'` on write, strip one on read) reinterprets hand-authored
+// leading-`'` foreign CSVs, flipping the deliberate import-csv "preserves a genuinely
+// apostrophe-led description" contract. Which faithfulness to optimize is Angelo's direction call.
+// These tests PIN the current (lossy) behavior so it can't drift silently before that decision —
+// when the call is made, they update WITH the fix (and become a true round-trip assertion).
+// ---------------------------------------------------------------------------
+describe("denormalizeCsvCell — KNOWN asymmetry: a user-typed `'`+trigger value is over-stripped (C401, escalated)", () => {
+  test.each([
+    ["'=mc2 rebate", '=mc2 rebate'],
+    ["'+1 driver fee", '+1 driver fee'],
+    ["'@home charge", '@home charge'],
+    ["'-5 credit", '-5 credit'],
+  ])('strips the user-typed leading apostrophe from %p → %p (the documented data-loss)', (input, stripped) => {
+    expect(denormalizeCsvCell(input)).toBe(stripped);
+  });
+
+  test("the round-trip is NOT yet faithful for a `'`+trigger value (export leaves it, import strips it)", () => {
+    // The crux of the asymmetry: neutralize is a no-op (value[0] === "'" is not a trigger),
+    // so the export carries the user's exact text — but denormalize then eats the apostrophe.
+    const userTyped = "'=Daily"; // e.g. a vehicle nickname forced-to-text with a leading '
+    expect(neutralizeCsvCell(userTyped)).toBe(userTyped); // export does NOT escape it
+    expect(denormalizeCsvCell(neutralizeCsvCell(userTyped) as string)).toBe('=Daily'); // import strips → LOSSY
+    // (When the direction call lands, this becomes `.toBe(userTyped)` alongside the fix.)
+  });
+});

@@ -1,8 +1,9 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
-import { AppError, NotFoundError } from '../../errors';
+import { NotFoundError } from '../../errors';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas } from '../../utils/validation';
+import { parseUploadedPhoto, photoThumbnailResponse } from '../photos/helpers';
 import {
   deletePhotoForEntity,
   getPhotoThumbnailForEntity,
@@ -24,12 +25,7 @@ photoRoutes.post('/', async (c) => {
   if (!vehicleId) throw new NotFoundError('Vehicle');
 
   const user = c.get('user');
-  const body = await c.req.parseBody();
-  const file = body.photo;
-
-  if (!file || !(file instanceof File)) {
-    throw new AppError('No photo file provided', 400);
-  }
+  const file = await parseUploadedPhoto(c);
 
   const photo = await uploadPhotoForEntity('vehicle', vehicleId, user.id, file);
   return c.json({ success: true, data: photo }, 201);
@@ -60,13 +56,7 @@ photoRoutes.get('/:photoId/thumbnail', async (c) => {
     user.id
   );
 
-  return new Response(buffer, {
-    headers: {
-      'Content-Type': mimeType,
-      'Cache-Control': 'private, max-age=3600',
-      'Cross-Origin-Resource-Policy': 'cross-origin',
-    },
-  });
+  return photoThumbnailResponse(buffer, mimeType);
 });
 
 // PUT /:photoId/cover — Set cover photo

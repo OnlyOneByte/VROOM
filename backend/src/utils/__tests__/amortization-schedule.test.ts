@@ -85,4 +85,25 @@ describe('buildAmortizationSchedule', () => {
       { month: '2024-02', interest: 0, principal: 0 },
     ]);
   });
+
+  // C281 deep-review: the negative-amortization edge — a payment that doesn't even cover the monthly
+  // interest. principal = Math.max(0, payment − interest) clamps to 0, so the balance NEVER decreases
+  // and the loan never pays off in the projection (a genuinely under-water loan — correct behavior,
+  // but the prior tests all used payment > interest, leaving this branch unpinned).
+  test('a payment below the monthly interest → principal 0, balance never moves (negative amortization)', () => {
+    // $10,000 @ 24% APR → monthly interest = 10000 * 0.02 = $200, but payment is only $150 (< interest).
+    const sched = buildAmortizationSchedule(
+      [{ balance: 10000, apr: 24, paymentAmount: 150 }],
+      KEYS(3)
+    );
+    for (const row of sched) {
+      // Interest is the full monthly accrual on the UNCHANGED balance (200), every month identically —
+      // because principal=0 means the balance is frozen, so the interest doesn't decline.
+      expect(row.interest).toBeCloseTo(200, 6);
+      // No principal is ever paid down (the payment is fully consumed by interest, and then some).
+      expect(row.principal).toBe(0);
+    }
+    // The balance is the same every month (frozen) → interest is identical across all rows.
+    expect(sched[0].interest).toBeCloseTo(sched[2].interest, 6);
+  });
 });

@@ -7,13 +7,12 @@ import { getDb } from '../../db/connection';
 import { userPreferences, userProviders } from '../../db/schema';
 import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
+import type { BackupConfig, StorageConfig } from '../../types';
 import {
-  ChargeUnit,
-  DistanceUnit,
-  type StorageConfig,
-  type UnitPreferences,
-  VolumeUnit,
-} from '../../types';
+  mergeUnitPreferences,
+  partialUnitPreferencesSchema,
+  unitPreferencesSchema,
+} from '../../utils/unit-preferences-schema';
 import { preferencesRepository, syncStateRepository } from './repository';
 
 /**
@@ -123,27 +122,37 @@ function mergeStorageConfig(
   };
 }
 
+/**
+ * Merge incoming backupConfig with existing, producing a full BackupConfig.
+ *
+ * MIRRORS mergeStorageConfig — the PUT used to write backupConfig WHOLESALE while storageConfig was
+ * merged, an asymmetry that was a silent data-loss trap (NORTH_STAR #1): a client PUT-ing
+ * `backupConfig` with only the provider it's editing would WIPE every other provider's backup
+ * settings (retentionCount / sheetsSyncEnabled / folderPath). The frontend mitigated by always
+ * reconstructing the full providers map (ProviderForm.svelte spreads ...backupConfig.providers), but
+ * that made the backend contract fragile — a partial sender (a future client, a direct API caller, or
+ * a stale-load race) lost data. Merge per-provider here so the backend is correct regardless of caller.
+ * A provider entry IS replaced wholesale (its settings are a small fixed shape always sent complete by
+ * the editor), but providers NOT in the incoming map are preserved.
+ */
+function mergeBackupConfig(
+  existing: BackupConfig | null | undefined,
+  incoming: z.infer<typeof backupConfigSchema>
+): BackupConfig {
+  const existingProviders = existing?.providers ?? {};
+  return {
+    providers: { ...existingProviders, ...incoming.providers },
+  };
+}
+
 const routes = new Hono();
 
 // Apply auth and change tracking middleware to all routes
 routes.use('*', requireAuth);
 routes.use('*', changeTracker);
 
-// Zod schema for unitPreferences enum validation
-const unitPreferencesSchema = z.object({
-  distanceUnit: z.enum(DistanceUnit, {
-    message: "Invalid distanceUnit: must be 'miles' or 'kilometers'",
-  }),
-  volumeUnit: z.enum(VolumeUnit, {
-    message: "Invalid volumeUnit: must be 'gallons_us', 'gallons_uk', or 'liters'",
-  }),
-  chargeUnit: z.enum(ChargeUnit, {
-    message: "Invalid chargeUnit: must be 'kwh'",
-  }),
-});
-
-// Partial version for update (each field optional)
-const partialUnitPreferencesSchema = unitPreferencesSchema.partial();
+// unitPreferencesSchema + partialUnitPreferencesSchema now live in utils/unit-preferences-schema.ts
+// (shared with vehicles/routes.ts — the C238 dedup).
 
 // Zod schema for storageConfig validation
 const categorySettingSchema = z.object({
@@ -252,9 +261,10 @@ routes.put('/', async (c) => {
     backupConfig,
     ...restUpdates
   } = updates;
-  const mergedUnitPreferences: UnitPreferences | undefined = partialUnitPrefs
-    ? { ...existingSettings.unitPreferences, ...partialUnitPrefs }
-    : undefined;
+  const mergedUnitPreferences = mergeUnitPreferences(
+    existingSettings.unitPreferences,
+    partialUnitPrefs
+  );
 
   // Validate storageConfig if provided
   let mergedStorageConfig: StorageConfig | undefined;
@@ -265,9 +275,12 @@ routes.put('/', async (c) => {
     await validateStorageConfig(mergedStorageConfig, user.id);
   }
 
-  // Validate backupConfig ownership if provided
+  // Validate + merge backupConfig if provided. Merge (not wholesale-replace) so a partial PUT that
+  // names only one provider can't silently wipe the others' backup settings — mirrors storageConfig.
+  let mergedBackupConfig: BackupConfig | undefined;
   if (backupConfig) {
     await validateBackupConfig(backupConfig, user.id);
+    mergedBackupConfig = mergeBackupConfig(existingSettings.backupConfig, backupConfig);
   }
 
   // Update settings
@@ -275,7 +288,7 @@ routes.put('/', async (c) => {
     ...restUpdates,
     ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
     ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
-    ...(backupConfig && { backupConfig }),
+    ...(mergedBackupConfig && { backupConfig: mergedBackupConfig }),
   });
 
   return c.json({

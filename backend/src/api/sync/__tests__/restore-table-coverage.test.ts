@@ -62,6 +62,61 @@ describe('restore table coverage (drift guard — cycle 209)', () => {
     ).toEqual([]);
   });
 
+  test('every inserted table is conflict-probed OR a child of a probed parent (the #93 symmetry, C302)', () => {
+    // #93 (C300): merge-mode insert(userPreferences) against the importer's always-present prefs row
+    // threw a raw UNIQUE-PK error because detectConflicts didn't PROBE userPreferences — it only
+    // probed 6 tables while insertBackupData inserts 15. The fix added userPreferences + syncState to
+    // the probes. This guard makes that symmetry DRIFT-PROOF: every table insertBackupData inserts must
+    // be either (a) conflict-probed in detectConflicts, or (b) a CHILD whose insert can't be reached on
+    // a colliding merge because the merge ABORTS on the parent's conflict first (detectConflicts returns
+    // before the transaction runs). A new PARENT-LESS table added to inserts without a probe would
+    // silently reintroduce the #93 raw-throw class — this fails loudly instead.
+    //
+    // detectConflicts probes are written as `name: '<db_table_name>'`; collect them.
+    const probedTableNames = new Set(
+      [...RESTORE_SRC.matchAll(/name:\s*'([a-z_]+)'/g)].map((m) => m[1])
+    );
+
+    // Tables whose insert is UNREACHABLE on a colliding merge because a probed ANCESTOR collides first
+    // (so detectConflicts reports a conflict and the restore returns before insertBackupData runs).
+    // Each child here FK-references a probed parent; a same-backup re-import that collides on the child
+    // necessarily also collides on that parent (the child can't exist without it). Documented, not blanket.
+    const CHILD_OF_PROBED_PARENT: Record<string, string> = {
+      insuranceTerms: 'insurance_policies (FK policyId → a probed parent)',
+      insuranceTermVehicles: 'insurance_terms → insurance_policies (probed ancestor)',
+      insuranceClaims: 'insurance_policies (FK policyId → probed parent)',
+      odometerEntries: 'vehicles (FK vehicleId → probed parent)',
+      // reminders is now DIRECTLY probed (C441) — it's userId-owned with its own id PK and is NOT FK'd to
+      // vehicles (it survives vehicle deletion, the #97 state), so the old "child of vehicles" exemption
+      // was FALSE and let the #93 raw-UNIQUE-throw class reach insert(reminders). It's no longer listed
+      // here; these two are genuine children of the now-probed reminders parent.
+      reminderVehicles: 'reminders (FK reminderId → a now-probed parent)',
+      reminderNotifications: 'reminders (FK reminderId → a now-probed parent)',
+    };
+
+    const insertedExportNames = [...RESTORE_SRC.matchAll(/\.insert\(\s*(\w+)\s*\)/g)].map(
+      (m) => m[1]
+    );
+
+    const unguarded: string[] = [];
+    for (const exportName of new Set(insertedExportNames)) {
+      const table = (schema as Record<string, unknown>)[exportName];
+      if (!table) continue; // not a schema table export (shouldn't happen for an .insert target)
+      const dbName = getTableName(table as Parameters<typeof getTableName>[0]);
+      if (probedTableNames.has(dbName)) continue; // (a) directly conflict-probed
+      if (exportName in CHILD_OF_PROBED_PARENT) continue; // (b) parent collides first — unreachable
+      unguarded.push(`${exportName} (table '${dbName}')`);
+    }
+
+    expect(
+      unguarded,
+      `Table(s) insertBackupData inserts that are neither conflict-probed nor a documented child of a ` +
+        `probed parent. On a colliding merge these would throw a raw UNIQUE-PK error instead of a clean ` +
+        `conflict (the #93 class). Either add a probe to detectConflicts, or add it to ` +
+        `CHILD_OF_PROBED_PARENT with the parent FK that collides first:\n${unguarded.join('\n')}`
+    ).toEqual([]);
+  });
+
   test('ImportSummary has a count field for every registry key', async () => {
     // The summary is the user-facing "imported N rows" confirmation. A registry key with no
     // ImportSummary field can't be counted → silent undercount even when the data restores.

@@ -1,10 +1,11 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { AppError, NotFoundError } from '../../errors';
-import { requireAuth } from '../../middleware';
+import { NotFoundError } from '../../errors';
+import { changeTracker, requireAuth } from '../../middleware';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas } from '../../utils/validation';
+import { parseUploadedPhoto, photoThumbnailResponse } from './helpers';
 import {
   deletePhotoForEntity,
   getPhotoThumbnailForEntity,
@@ -20,6 +21,12 @@ import {
 const routes = new Hono();
 
 routes.use('*', requireAuth);
+// Stamp lastDataChangeDate on a 2xx photo mutation (upload/delete) so the change re-triggers the
+// next auto-backup (#74): photos + photo_refs ARE in the backup payload (backup.ts), and the
+// orchestrator skips when !hasChangesSinceLastSync — without this, a photo-only change between
+// backups was silently excluded until some OTHER tracked mutation bumped the timestamp (the #42
+// silent-backup-gap class). This was the lone mutating route module missing changeTracker.
+routes.use('*', changeTracker);
 
 // GET /photos?entityType=vehicle — Batch-list the user's photos of one entity
 // type, grouped by entityId. Lets the dashboard fetch all vehicle photos in a
@@ -54,12 +61,7 @@ routes.post('/:entityType/:entityId', async (c) => {
   if (!entityType || !entityId) throw new NotFoundError('Entity');
 
   const user = c.get('user');
-  const body = await c.req.parseBody();
-  const file = body.photo;
-
-  if (!file || !(file instanceof File)) {
-    throw new AppError('No photo file provided', 400);
-  }
+  const file = await parseUploadedPhoto(c);
 
   const photo = await uploadPhotoForEntity(entityType, entityId, user.id, file);
   return c.json({ success: true, data: photo }, 201);
@@ -80,18 +82,7 @@ routes.get('/:entityType/:entityId/:photoId/thumbnail', async (c) => {
     user.id
   );
 
-  return new Response(buffer, {
-    headers: {
-      'Content-Type': mimeType,
-      // The stored mimeType is the CLIENT-asserted upload type (never sniffed), so a file whose bytes
-      // are HTML/script but declared image/png would otherwise be MIME-sniffed + executed by the
-      // browser. nosniff forces the declared Content-Type (C133/#35; ARCC Secure-HTTP-Headers makes
-      // this a MANDATORY header + Secure-File-Uploads "do not trust Content-Type / mitigate MIME sniff").
-      'X-Content-Type-Options': 'nosniff',
-      'Cache-Control': 'private, max-age=3600',
-      'Cross-Origin-Resource-Policy': 'cross-origin',
-    },
-  });
+  return photoThumbnailResponse(buffer, mimeType);
 });
 
 // DELETE /photos/:entityType/:entityId/:photoId — Delete a photo

@@ -198,3 +198,44 @@ describe('toBackendExpense description clear-on-edit', () => {
 		).toBe('oil change');
 	});
 });
+
+/**
+ * #66 (offline data-safety, NORTH_STAR #1/#2) — toBackendExpense decides volume-vs-charge SOLELY
+ * from isElectricFuelType(fuelType). The offline outbox (OfflineExpense) must therefore carry
+ * fuelType, or an electric charging expense created offline syncs with NO energy value: with
+ * fuelType undefined, isElectricFuelType(undefined) is false → the volume-only branch runs →
+ * `volume` is undefined for an electric entry → the `charge` is silently dropped from the POST.
+ * These pin the discriminant so the regression can't return at the transform layer.
+ */
+describe('toBackendExpense — #66 charge survives only when fuelType is carried', () => {
+	const electric = { vehicleId: 'v1', category: 'fuel' as const, amount: 30, charge: 42 };
+
+	test('REGRESSION: an electric entry WITHOUT fuelType drops charge (volume-only branch) — the bug', () => {
+		// Documents the exact failure: omitting fuelType (the pre-fix offline outbox) loses the charge.
+		const out = toBackendExpense({ ...electric });
+		expect(out.volume).toBeUndefined();
+	});
+
+	test('an electric entry WITH fuelType maps charge → backend volume (the fix carries it)', () => {
+		const out = toBackendExpense({ ...electric, fuelType: 'Electric' });
+		expect(out.volume).toBe(42); // charge routed to the backend `volume` field
+		expect(out.fuelType).toBe('Electric');
+	});
+
+	test('a Level 2 (AC) charging entry also routes charge → volume', () => {
+		const out = toBackendExpense({ ...electric, fuelType: 'Level 2 (AC)', charge: 18.5 });
+		expect(out.volume).toBe(18.5);
+	});
+
+	test('a liquid-fuel entry keeps volume on the volume field (no false electric routing)', () => {
+		const out = toBackendExpense({
+			vehicleId: 'v1',
+			category: 'fuel',
+			amount: 50,
+			volume: 40,
+			fuelType: 'Diesel'
+		});
+		expect(out.volume).toBe(40);
+		expect(out.fuelType).toBe('Diesel');
+	});
+});

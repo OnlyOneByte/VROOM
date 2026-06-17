@@ -31,7 +31,44 @@
 > branch (UP SHARPLY +3.7 line / +6.7 func / +3.2 branch from C164 — the C166 settings-store + C169 settings-api + C175 pwa.ts FE
 > ratchets delivered; FE still the bigger gap but closing fast).** **RE-MEASURED AGAIN C186 (the #5-sweep re-measure): be 83.41% line /
 > 83.74% func (up from C176's 82.74/82.49 — the C178/#25 + C180/#48 + C181/orchestrator + C184/#26c + C185/analytics-routes BE
-> additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C176 — every C178–C185 cycle was backend, so FE didn't move).** When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
+> additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C176 — every C178–C185 cycle was backend, so FE didn't move).** **RE-MEASURED AGAIN C196 (the #5-sweep re-measure): be 84.08% line / 84.44% func (up from C186's 83.41/83.74 — the C188 sync-routes + C190/#62 + C192/#63 + C195 activity-tracker additions); fe 73.89% line / 73.61% func / 66.08% branch (FLAT vs C186 — C188–C195 all backend). FRESH FE LOW SPOTS to steer the next FE guard cycle: a ~15% form-validation module (pure logic — cleanest pick), analytics-api.ts ~36% func, sync-manager.ts ~56% (timer/network-bound), auth.ts ~56%; settings.svelte.ts ~11% is the filed handleError arch pick.** **RE-MEASURED AGAIN C203 (the #5-sweep re-measure): be 84.06% line / 84.43% func (FLAT vs C196's 84.08/84.44 — C198/C201/C202 all FE, only C200 touched BE +3); fe 77.79% line / 75.57% func / 72.96% branch (UP SHARPLY +3.9 line / +2.0 func / +6.9 branch vs C196 — the C198 lease-metrics + C201 form-validation [+19] + C202 offline-storage [+2] FE ratchet delivered; the BE↔FE gap is narrowing to ~6pts). REMAINING FE LOW SPOTS (form-validation now DONE C201): analytics-api.ts ~36% func, sync-manager.ts ~56% (timer/network-bound), auth.ts ~56%; the C199-primed `calculatePayoffDateFromStart` is the next clean FE guard pick.** **RE-MEASURED AGAIN C213 (the #5-sweep re-measure): be 84.14% line / 84.49% func (up slightly from C203's 84.06/84.43 — the C206 #67 + C209 #68 + C210 #70 + C211 parseClampedInt BE additions); fe 79.22% line / 78.89% func / 73.52% branch (UP +1.4 line / +3.3 func vs C203 — the C207 payoff-date [+12] + C212 analytics-api [+19] FE guard ratchet; the FE SERVICE layer is now FULLY covered, analytics-api was the last gap [C212]). BE↔FE gap NEARLY CLOSED — 84 vs 79. REMAINING FE LOW SPOTS: auth.ts ~56% (next clean guard pick), sync-manager.ts ~56% (timer/network-bound — less clean); the rest is the components/routes deficit (largely eyes-on).** **RE-MEASURED AGAIN C224 (the #5-sweep re-measure): be 84.25% line / 84.60% func (up from C213's 84.14/84.49 — the C214 #71 + C218 #73 + C220 #74 + C221/C222 BE additions); fe 80.33% line / 79.87% func / 74.45% branch (CROSSED 80% line; UP +1.1 vs C213 — the C217 auth requireAuth [+4] + C223 sync-manager conflict-classification [+4] guard ratchet). BE↔FE gap ~4pts (84 vs 80). The FE pure/service modules are now essentially ALL covered (auth C217 + sync-manager's clean slice C223 were the last); the remaining FE gap is the components/routes deficit (eyes-on) + the network/timer-bound retry tails (C163 mock-trap, low-value) — so the next FE guard cycles are thin; prefer BE low spots or eyes-on-blocked-acknowledged.** **RE-MEASURED AGAIN C303 (the #5-sweep re-measure; last full re-measure C258, with C285 a CLAUDE.md-only spot-reading): be 86.07% line / 86.21% func (up from C285's 85.74/86.04 — the C283/C289/C291/C294/C300/C302 BE test arc: auth-config, plate-uniqueness, orchestrator skip-paths, ownership-404, restore prefs-collision + the symmetry guard); fe 81.76% line / 80.70% func / 75.70% branch (up from C285's 81.41/80.64/75.20 — the C295 lease-overage + C296 invariance + C297 0%-APR planner FE tests). BOTH sides now >80% line, BE↔FE gap ~4–5pts and stable. The 90%-line goal remains structurally gated: BE tail is DI/singleton-bound + OAuth network paths; FE gap is the eyes-on components/routes deficit (Playwright-blocked). The loop has driven what's reachable without an unblocked E2E.** **RE-MEASURED AGAIN C323 (the #5-sweep re-measure; last full C303): be 86.53% line / 86.21% func (line up from C303's 86.07 — the C304–C321 BE arc: fetchTermsAndCoverage cert, clampPagination dedup, the term-premium-replacement + both-axis-coexistence + vehicle-orphan + idempotency-nonJSON + missedFillup guards); fe 84.39% line / 83.97% func / 76.43% branch (UP SHARPLY +2.6 line / +3.3 func / +0.7 branch vs C303 — the C308 settings-error + C314 api-client-dedup + C319 settings-state-contract FE arc; settings.svelte.ts climbed from ~12%). BE↔FE gap now ~2pts (86.5 vs 84.4) — the tightest ever. The 90%-line goal stays structurally gated (BE tail DI/singleton + OAuth-network; FE gap the eyes-on components/routes deficit, Playwright-blocked) — the loop keeps closing the reachable remainder.** **RE-MEASURED AGAIN C351 (the #5-sweep re-measure; last full C323): be 86.25% line / 86.67% func (line ~flat/−0.3 vs C323's 86.53 as product code grew, func +0.5 — the C341/C350 analytics-invariant + C349 provider guards); fe 84.17% line / 83.9% func / 76.32% branch (~FLAT vs C323's 84.39/83.97/76.43 — the C336/C342 zero-coverage store sweep [themeStore+appStore] + C347 offline-dropout-class pin HELD the line as components grew). BE↔FE gap stable ~2pts (86.3 vs 84.2). The FE service+pure-util+STORE layers are now all covered; remaining FE gap is the eyes-on components/routes deficit + the network/timer mock-trap tails. 90%-line goal still structurally gated; the loop has driven the reachable remainder flat.** **RE-MEASURED AGAIN C368 (the #5-sweep re-measure; last full C351): be 86.68% line / 86.26% func (line
+> +0.43 vs C351's 86.25 — the C353–C367 BE arc: groupOwnedBy/vehicleScope dedup-anchors, the #107 reminder + #108 seasonal fixes, the claim-survival + tie-tolerant
+> guards — held/nudged the line up against growing product code); fe 84.45% line / 84.3% func / 76.43% branch (line +0.28 / func +0.4 vs C351's 84.17/83.9/76.32 —
+> the C358 date-filter + C364 getVehicleDisplayName FE guards held the line as components grew). BE↔FE gap stable ~2pts (86.7 vs 84.5), both creeping up. The
+> 90%-line goal stays structurally gated (BE tail DI/singleton + OAuth-network; FE gap the eyes-on components/routes deficit, Playwright-blocked) — the loop keeps
+> the reachable remainder flat-to-up. Branch state: 178 commits ahead of origin/main, working tree clean (only by-design untracked *.meshclaw.e2e.ts + tooling),
+> build floor GREEN both sides → PR-ready (escalated to Angelo C368).** **RE-MEASURED AGAIN C379 (the #5-sweep re-measure; last C368): be 86.79% line / 86.39%
+> func (+0.11 line vs C368's 86.68 — the C369/C372/C376 BE additions); fe 84.39% line / 84.3% func / 76.53% branch (~FLAT vs C368's 84.45/84.3/76.43 — the
+> C374/C377 FE guards held the line as components grew). BE↔FE gap stable ~2.4pts, both flat-to-up. 90%-line goal still structurally gated (BE DI/singleton +
+> OAuth-network; FE eyes-on components/routes, Playwright-blocked). Branch: 189 commits ahead of origin/main, working tree clean (only by-design untracked
+> *.meshclaw.e2e.ts + tooling), build floor GREEN both sides → PR-ready (standing escalation open since C368, not re-spammed — no new decision needed).** **RE-MEASURED AGAIN C389 (the #5-sweep re-measure; last C379): be 86.78% line / 86.39% func (~FLAT vs C379's 86.79/86.39 — C385/C387 added guards, C386 a
+> behavior-preserving extract, no product code grew); fe 84.39% line / 84.3% func / 76.63% branch (line FLAT vs C379's 84.39, branch +0.1 — the C380 month-plural
+> guard). BE↔FE gap stable ~2.4pts, both flat-to-up. 90%-line goal still structurally gated (BE DI/singleton + OAuth-network; FE eyes-on components/routes,
+> Playwright-blocked). Branch: 199 commits ahead of origin/main, working tree clean (only by-design untracked *.meshclaw.e2e.ts + tooling), build floor GREEN
+> both sides → PR-ready (standing escalation open since C368, not re-spammed).** **RE-MEASURED AGAIN C400 (the #5-sweep re-measure; last C389): be 86.92% line /
+> 86.54% func (line +0.14 / func +0.15 vs C389's 86.78/86.39 — the C396 expense-source-ref guard + the #116/C399 reminder-endDate guard); fe 84.45% line / 84.4%
+> func / 76.87% branch (line +0.06 / func +0.1 / branch +0.24 vs C389's 84.39/84.3/76.63 — the #115/C398 +12 lease-overage guards delivered). BE↔FE gap stable
+> ~2.5pts, BOTH creeping up (the C396–C399 fix+guard arc held the line as product code grew). 90%-line goal still structurally gated (BE DI/singleton + OAuth-network;
+> FE eyes-on components/routes, Playwright-blocked). Branch: 210 commits ahead of origin/main; working tree clean of TRACKED changes, but the #5 sweep CAUGHT an
+> untracked-by-mistake item → .kiro/specs/offline-entries/ (requirements/design/tasks.md) was the ONLY feature spec not committed while ~29 siblings all track their 3
+> .md docs + the offline-entries CODE foundation already shipped → committed it C400 so a fresh clone / the PR keeps the design rationale. Build floor GREEN both sides
+> → PR-ready (standing escalation open since C368, not re-spammed).** **RE-MEASURED AGAIN C435 (the #5-sweep re-measure; last full C423): be 86.94% line / 86.60%
+> func (line +0.01 / func +0.03 vs C423's 86.93/86.57 — flat-to-up; the C430 outlier-band + C434 #76-third-leg guards held the line); fe 85.26% line / 85.53% func /
+> 77.40% branch (UP +0.75 line / +0.99 func / +0.34 branch vs C423's 84.51/84.54/77.06 — the C426/C432 sync-manager dead-code/dup removal RAISED the covered ratio +
+> the C430/C433 guards). BE↔FE gap now ~1.7pts (86.9 vs 85.3) — the TIGHTEST ever. 90%-line goal still structurally gated (BE DI/singleton + OAuth-network; FE eyes-on
+> components/routes, Playwright-blocked). Branch: 245 commits ahead of origin/main, working tree clean (only by-design untracked *.meshclaw.e2e.ts + tooling + the
+> gitignored BRANCH_REVIEW.md, refreshed C435 with §33 covering the 84-commit C351–C434 delta), build floor GREEN both sides → PR-ready (standing escalation since C368).**
+> **RE-MEASURED AGAIN C447 (the #5-sweep re-measure; last full C435): be 86.96% line / 86.55% func (~FLAT vs C435's 86.94/86.60 — the C439/C443/C446 BE guards held as
+> product code grew); fe 85.89% line / 87.15% func / 78.35% branch (UP +0.63 line / +1.62 func / +0.95 branch vs C435's 85.26/85.53/77.40 — the C436 chart-formatters cluster
+> + C444 isIncompleteFuelExpense + the C445/C446 sync/activity guards lifted it). BE↔FE gap now ~1.1pts (86.96 vs 85.89) — the TIGHTEST ever. 90%-line goal still structurally
+> gated (BE DI/singleton + OAuth-network; FE eyes-on components/routes, Playwright-blocked). Branch: 257 commits ahead of origin/main, working tree clean (by-design untracked
+> *.meshclaw.e2e.ts + tooling + the gitignored BRANCH_REVIEW.md, refreshed C447 with §34 covering the 12-commit C435–C446 delta), build floor GREEN both sides → PR-ready.**
+> **RE-MEASURED AGAIN C460 (the #5-sweep re-measure; last full C447): be 87.09% line / 86.60% func (line +0.13 vs C447's 86.96/86.55 — the C453 0%-APR + C458 split-cents +
+> C459 notification-feed fix+guards lifted it); fe 85.89% line / 87.15% func / 78.35% branch (FLAT vs C447 — the C450/C455/C456 cycles were a 1-test guard / a 3-line component
+> re-point / BE-side, no net FE-coverage move). BE↔FE gap ~1.2pts (87.09 vs 85.89) — the tightest era. 90%-line goal still structurally gated (BE DI/singleton + OAuth-network;
+> FE eyes-on components/routes, Playwright-blocked). Branch: 270 commits ahead of origin/main, working tree clean (by-design untracked *.meshclaw.e2e.ts + tooling + the
+> gitignored BRANCH_REVIEW.md, refreshed C460 with §35 covering the 13-commit C447–C459 delta), build floor GREEN both sides → PR-ready.**
+> When `guard`/`arch` is the pick and nothing's more urgent, STEER it to the lowest-covered,
 > highest-risk module. **CURRENT concrete low spots (C107 reading):** backend — `rate-limit.ts`
 > (60% line, the named-next ratchet target), `body-limit.ts` (35% line, the size-enforcement branch),
 > `sync/restore.ts`/`sync/routes.ts` (~32–61%, HTTP-harness-tractable per the C91 s3-seam precedent),
@@ -48,13 +85,13 @@ the next increment MUST come from the most-starved over-budget category.
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 170 |
-| deep-review | 5 | 185 |
-| guard | 6 | 188 |
-| bug | 3 | 189 |
-| arch | 5 | 187 |
-| infra | 6 | 186 |
+| deep-review | 5 | 465 |
+| guard | 6 | 463 |
+| bug | 3 | 466 |
+| arch | 5 | 464 |
+| infra | 6 | 467 |
 
-Current cycle: **189**
+Current cycle: **467**
 
 > `arch` (category added pre-C12) seeded at cycle 11; budget 5, so it first comes due
 > ~cycle 16. Three concrete items are seeded in BACKLOG (no audit needed to start) — take
@@ -3394,3 +3431,3483 @@ Current cycle: **189**
   (foreign-vehicle PUT→404 + the bad write never lands; own-second-vehicle→200 [not over-broad]; no-vehicleId PUT→200 [no regression]).
   green→green: backend validate:local **EXIT 0 — 1256 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean (1 reflow autofixed),
   build bundled. #61 CLOSED. cov: be 83.41%+ (carry; +3 BE) / fe 73.89% (carry).
+- **C190 (bug → #62): restrict the manual expense route's `sourceType` to `financing` only (system-only links can't be forged)** —
+  BALANCE: only `feature` strictly over budget (cyc 170, starved-for 20, blocked 15th cycle, escalated) → fell through to
+  highest-leverage actionable (no other category OVER — deep-review only AT 5). Took the PRIMED #62 (filed C189, the create/update
+  validation-asymmetry pair's second half) over a speculative fresh audit — higher-confidence leverage, and deep-review (at budget)
+  is forced next cycle anyway. Inline (6/3 spawn cap). VERIFIED THE FIX SHAPE FIRSTHAND before acting: `insurance_term` expenses are
+  created via `expenseRepository.createSplitExpense` (insurance/hooks.ts:33) + `reminder` expenses via a direct `tx.insert` /
+  createSiblings (trigger-service.ts:160/186) — BOTH bypass the POST/PUT route entirely. So the route enum accepting those two was
+  PURE over-permissiveness (only `financing` is legitimately route-set, + already fully validated :536). FIX (Option A, zero-risk):
+  `sourceType: z.enum(['financing','insurance_term','reminder'])` → `z.literal('financing')` on the route's create/update schema —
+  closes the forge (#62: a hand-crafted POST/PUT could stamp an UNVALIDATED insurance_term/reminder link on the caller's own row →
+  skewed source-bucketed analytics + a matching sourceId would cascade-delete the manual expense when its parent is removed; within-
+  tenant, all source ops userId-scoped so NOT cross-tenant). Confirmed NO test sends those via the route (the traceability test uses
+  POST /reminders/trigger, not POST /expenses) + the 2 existing traceability reads stayed GREEN (the system DB-direct writes are
+  unaffected). +4 tests (POST reminder→400, POST insurance_term→400, PUT reminder→400, no-source create→201 control). green→green:
+  backend validate:local **EXIT 0 — 1260 pass / 1 skip / 0 fail (+4)**, tsc 0, musl-biome clean, build bundled. #62 CLOSED — the
+  C189 expense-write-path audit's findings (#61 C189 + #62 C190) are now BOTH landed. cov: be 83.41%+ (carry; +4 BE) / fe 73.89% (carry).
+- **C190.5 (ops — REBASE onto squashed main, at Angelo's request)** — Angelo squash-merged claude-loop-dev → main ("Claude loop dev
+  (#108)", origin/main 94a155e→0fa0d49), absorbing C51–C189. Recovered C190 (it was mid-commit when he interjected; a stale script had
+  mislabeled it "C189" + dropped its test file → amended to the correct C190 with the test, tagged `pre-rebase-c190-safety`). VERIFIED
+  the squash captured through C189 (C189's reassignment guard IS in origin/main) + that the ENTIRE branch-vs-main diff is exactly
+  C190's 4 files → C190 is the sole un-merged increment. Rebased clean: `reset --hard origin/main` + `cherry-pick` C190 → branch now
+  0-behind / 1-ahead of origin/main (6ad1af4 on 0fa0d49). Re-verified GREEN on the new base (validate:local EXIT 0, 1260 pass).
+  **PUSH BLOCKED ON ANGELO:** the stale origin/claude-loop-dev (old C189 tip) is NOT an ancestor → updating it needs a FORCE-PUSH
+  (forbidden autonomously). send_message'd the options; C190 safe locally + tagged. NOT a balance-category cycle (an ops interjection).
+- **C191 (deep-review): audit the providers/routes.ts credential-CRUD vein; certified CLEAN + filed #63** — BALANCE: two over budget —
+  `feature` (cyc 170, starved-for 21, blocked 16th cycle) + `deep-review` (cyc 185, starved-for 6 > 5). Feature blocked → `deep-review`
+  forced. Inline (6/3 spawn cap). LOCAL-ONLY cycle (push still gated on Angelo's force-push call from C190.5 — flagged, didn't block per
+  step 7). Vein: providers/routes.ts (credential-handling CRUD, 57.52% line — a real low spot + security-sensitive). **CERTIFIED CLEAN
+  (firsthand):** credentials never leak (formatProviderResponse omits them; all 3 response paths [GET/POST/PUT] route through it — C91/
+  C132 held); PUT preserves the encrypted blob on a credential-less update (`if (body.credentials !== undefined)` :397 — no clobber) +
+  re-encrypts when present; every mutation ownership-scoped via findOwnedProviderOrThrow (id AND userId, :50); auth-provider guard on
+  PUT/DELETE; storage/backup config cleanup on delete; deleteByProvider keys on providerId alone but is transitively safe (FK to an
+  already-proven-owned provider). **FILED #63 (LOW, defense-in-depth):** the PUT update (:404) + DELETE (:484) destructive writes key
+  `where(eq(id))` ALONE — not id AND userId. Guarded one layer up by findOwnedProviderOrThrow (NOT exploitable today), but the exact
+  C109/#52 class the loop closed at split (C155) + odometer (C168/C180): a future guard-drop/reorder would expose it. Clean non-gated
+  fix = AND eq(userProviders.userId) into both write predicates (behavior-identical today). NO code change this cycle (deep-review =
+  find-not-fix; #63 is a bug-cycle pick). cov: be 83.41% / fe 73.89% (carry, read-only audit).
+- **C192 (bug → #63): tenant-scope the provider PUT/DELETE destructive writes (the C191 audit's finding)** — BALANCE: only `feature`
+  strictly PAST budget (cyc 170, starved-for 22, blocked 17th cycle) → fell through to highest-leverage actionable (arch/infra only AT
+  budget, not past). Took #63 (verified+filed C191) — clean, non-gated, security-relevant, mechanically identical to C155/C180, and it
+  COMPLETES the C191 providers audit (audit→fix). Inline (6/3 spawn cap). LOCAL-ONLY (push still gated on Angelo's C190.5 force-push
+  call — flagged, not blocking). #63 (LOW, defense-in-depth, C109/#52 class): providers/routes.ts PUT update (:404) + DELETE (:484)
+  keyed `where(eq(userProviders.id, id))` ALONE; findOwnedProviderOrThrow guards one layer up (not exploitable), but a future
+  guard-drop/reorder would expose a cross-tenant write. FIX: ANDed `eq(userProviders.userId, user.id)` into BOTH write predicates
+  (behavior-identical today — the guard already proves ownership; mirrors C155 split + C168/C180 odometer). +3 tests in
+  providers-routes-http.test.ts via raw-seeded COEXISTING foreign provider (a 2nd createTestApp resets the DB, so the existing
+  cross-user tests couldn't assert survival): foreign DELETE→404 + foreign row SURVIVES; foreign PUT→404 + displayName UNCHANGED; own
+  delete→204 (not over-broad). These pin the WRITE PREDICATE itself, not just the guard. One biome reflow autofixed. green→green:
+  backend validate:local **EXIT 0 — 1263 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean, build bundled. #63 CLOSED — the C191
+  providers-audit finding now landed. cov: be 83.41%+ (carry; +3 BE) / fe 73.89% (carry).
+- **C193 (infra): CLAUDE.md orientation refresh (post-C183 drift, C184–C192) — first cycle after the squash→rebase**
+  — BALANCE: THREE past budget — `feature` (cyc 170, starved-for 23, blocked 18th cycle) + `arch` (cyc 187, starved-for 6) + `infra`
+  (cyc 186, starved-for 7). Feature blocked → among the over-budget actionable, most-starved wins → `infra` (7 > arch 6). The CLAUDE.md
+  refresh was DUE (last C183, ~10 cycles) + had real drift to fix after the eventful window (the C190.5 squash→main→rebase + 4 closed
+  bugs + a coverage re-measure). Doc-only — no build gate (standing convention; every figure verified vs the C186 measure + the
+  C184–C192 ledger). FIXED 4 drifts: (1) coverage C176→C186 (be 82.74→83.41 line / 82.49→83.74 func; fe flat 73.89 — backend-only
+  window); (2) suite size ~1236→~1263 BE; (3) BE low-spots — analytics/routes 15→59% (C185) + sync/routes 32→59% (C188) now DONE,
+  next = activity-tracker ~44% (timer-bound); (4) closed-bugs line += #26c/#61/#62/#63 + the recurring coverage-theater lesson
+  (C181/C182/C185: a green test that re-implements/reconstructs a module locally is NOT real coverage). Left the loop-steering +
+  branch hard-rules untouched (accurate + timeless — the squash→rebase IS the documented human-merge workflow, not a drift). NO code
+  touched. Next CLAUDE.md refresh ~C203; #5 sweep next ~C196. cov: be 83.41% line / fe 73.89% line (carry, doc-only).
+- **C194 (arch): extract `toDate` — the `instanceof Date ? x : new Date(x)` normalization, 4 sites → 1** — BALANCE: THREE past budget
+  — `feature` (cyc 170, starved-for 24, blocked 19th cycle) + `arch` (cyc 187, starved-for 7) + `infra` AT budget. Feature blocked →
+  most-starved past-budget actionable = `arch` (7). Inline scout (6/3 spawn cap — no fan-out). FOUND: analytics/repository.ts
+  hand-repeated `value instanceof Date ? value : new Date(value as unknown as number)` at 4 sites — fuel-monthly (:689), financing
+  startDate (:796), term start + end (:1003/:1007). EXCLUDED the `? x.getTime() : 0` / `: Number(x)` sort-comparator variants
+  (different fallbacks — the C182-#2 trap). Extracted exported `toDate(value: Date|number|string): Date` (beside the sibling
+  monthsOwnedInYear), wired all 4. **tsc EARNED ITS KEEP:** the financing site's local type is `startDate: Date | null`, so toDate's
+  non-null param rejected it — surfacing that the original `as unknown as number` cast was masking a null→`new Date(null)`=epoch path.
+  Preserved EXACTLY with `toDate(fin.startDate ?? 0)` (startDate is `.notNull()` in schema → null is impossible at runtime anyway; the
+  `?? 0` matches the old epoch-on-null behavior). The other 3 sites narrow via their preceding truthy-guards (no cast needed).
+  Behavior-preserving (arch rule 2 — identity passthrough for a Date, `new Date` otherwise, exactly as before); anchored by the
+  EXISTING fuel-stats + insurance-details + financing analytics tests (green THROUGH the change) + 3 new toDate cases
+  (identity-passthrough, epoch-millis, ISO-string) in tco-months-owned.test.ts. green→green: backend validate:local **EXIT 0 — 1266
+  pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean, build bundled. ARCH QUEUE empty again — next arch cycle = a fresh rule-7
+  scout. cov: be 83.41%+ (carry) / fe 73.89% (carry).
+- **C195 (guard): cover activity-tracker's pure `cleanupInactiveUsers` ageout (the 44%-line low spot)** — BALANCE: `feature` PAST
+  (cyc 170, starved-for 25, blocked 20th cycle) but blocked → fell through; `guard` most-starved past-budget actionable (cyc 188,
+  starved-for 7 > 6 > bug's at-budget 3). Inline (6/3 spawn cap). Steered the ratchet to the named BE low spot `activity-tracker.ts`
+  (53.85% func / 44.76% line). Read it firsthand to pick the TRACTABLE slice: `cleanupInactiveUsers` (:126-133) is the only PURE,
+  synchronous, timer-free method (the rest — handleInactivity/performAutoSync/performAutoBackup :64-106 — is setTimeout +
+  orchestrator-bound, the genuinely-less-clean territory the C186 note flagged + the DB-passthrough catch branches :132-147 need a DB
+  seam). The existing C144-era test covered recordActivity/getSyncStatus/stopTracking but NOT the ageout. ADDED 3 cases (via the
+  singleton + unique-id + stopTracking-cleanup pattern the file already uses): a NEGATIVE-window cutoff ages out a just-recorded user
+  (timing-independent — no fake clock); a large positive window SURVIVES (guard not over-broad); empty-tracker no-op. RESULT:
+  cleanupInactiveUsers 0%→covered (uncovered range :126-131 dropped out). HONESTLY left the timer/orchestrator-bound methods +
+  DB-catch branches documented as the remaining gap (NOT a clean unit pick — consistent with the C186 caveat). Test-only, no
+  production change. green→green: backend validate:local **EXIT 0 — 1269 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean,
+  build bundled. NEXT guard low spot: the FE components/routes deficit (needs a fresh FE coverage measure) or a thin FE store/util.
+  cov: be 83.41%+ (carry) / fe 73.89% (carry).
+- **C196 (bug→ESCALATED #22, then pivoted to the #5 branch-hygiene sweep + coverage re-measure)** — BALANCE: TWO past budget —
+  `feature` (cyc 170, starved-for 26, blocked 21st cycle) + `bug` (cyc 192, starved-for 4 > 3). Feature blocked → `bug` forced. But the
+  bug queue's clean mechanical fixes are EXHAUSTED — remaining items are decision-gated (#24/#29/#40/#43/#44/#45/#47/#51), approach-gated
+  (#33/#34/#58), or scope-gated (#30). The one tempting unblocked item, #22 (zip-bomb guard trusts attacker-declared header.size),
+  I investigated firsthand + concluded it's NOT a clean single-cycle fix: AdmZip getData() inflates the whole entry in-memory
+  synchronously, so a post-inflation length check is too late (OOM already happened) — a robust fix needs an APPROACH call
+  (compression-ratio cap / streaming lib / accept-the-compressed-cap), and exploitability hinges on AdmZip internals I'd be guessing at.
+  Per "don't-force-a-blocked-pick" → ESCALATED #22 to Angelo (send_message, 3 approach options + the #51 reminder), then PIVOTED (step
+  7) to the cadence-due **#5 sweep** (last C186; balance forced bug over the soft-cadence infra, but the sweep is the highest-leverage
+  ACTIONABLE once bug is honestly blocked). THE 3-PART SWEEP: **(1) STRAY SCAN** — no new strays (offline-entries already Angelo-flagged;
+  + the expected gitignored harness/config/test-results/mise); branch now a 6-commit post-squash stack (C190–C195), not 138. **(2)
+  GREEN + RE-MEASURE** — backend 1269 pass / 0 fail, **be 84.08% line / 84.44% func** (up from C186's 83.41/83.74); frontend 513 pass,
+  **fe 73.89% line** (flat — C188–C195 all backend). Captured FRESH FE low spots (a ~15% form-validation module = next clean FE guard
+  pick; analytics-api ~36%; sync-manager ~56%) into the coverage-trend header + BACKLOG guard note. **(3) BRANCH_REVIEW.md REFRESH**
+  (gitignored) — REFRAMED for the post-squash reality (§1–§25 + C51–C189 are now IN origin/main via "#108"; the reviewable delta is
+  the 6 commits C190–C195), appended **§26 (C190–C195: #62/#63 bugs, the providers credential audit, toDate dedup, activity-tracker
+  guard, CLAUDE.md refresh)**, status 1245→1269 BE + fresh cov. Doc/measurement-only — NO code change. Next #5 sweep ~C206; CLAUDE.md
+  refresh next ~C203. cov: be 84.08% line / fe 73.89% line (RE-MEASURED).
+- **C197 (deep-review): audit the reminders mark-serviced / mileage-re-arm vein — CERTIFIED CLEAN (1 false positive debunked)** —
+  BALANCE: THREE past budget — `feature` (cyc 170, starved-for 27, blocked 22nd) + `bug` (cyc 192, starved-for 5) + `deep-review`
+  (cyc 191, starved-for 6). Feature blocked; bug still honestly blocked (C196 — clean fixes exhausted, #22 escalated) → most-starved
+  actionable = `deep-review` (6 > 5). Inline (6/3 spawn cap). Vein: reminders/routes.ts mark-serviced re-arm + trigger-service mileage
+  processing (data-integrity — drives WHEN reminders fire; prior findings #16/#47). **CERTIFIED CLEAN (firsthand):** (1) the
+  mark-serviced MILEAGE axis (:101) uses `vehicleIds[0]` WITHOUT a length-check — looked like an asymmetry vs the trigger's
+  D4 length===1 skip (:380), but VERIFIED it's a FALSE POSITIVE (C150): the single-vehicle invariant is ENFORCED at validation
+  (refineMileageTrigger :113-119, "A mileage reminder must be linked to exactly one vehicle", on BOTH create :181 + update :188), so a
+  mileage reminder PROVABLY has exactly 1 vehicle by the time mark-serviced runs — `[0]` is safe, the trigger's check is
+  belt-and-braces. (2) mark-serviced anchoring (`current ?? lastServiceOdometer ?? 0` → `nextDueOdometer = anchor + interval`) is
+  CONSISTENT with resolveMileageFields create-seed (:43-51); the `?? 0` floor is a harmless brand-new-reminder default that
+  self-corrects on the first real reading via recheckMileageReminders. **#16 RE-CONFIRMED present** (time-axis advances one period from
+  the possibly-past nextDueDate :115 → an overdue mark-serviced can land still-past) — but it's the documented SEMANTICS call
+  (catch-up-to-≥now vs one-period), decision-gated, stays filed. NO code change (clean cert + a debunk; #16 not loop-decidable).
+  cov: be 84.08% / fe 73.89% (carry, read-only audit).
+- **C198 (bug → #64): lease excess-mileage projection treated the ANNUAL limit as the whole-lease allowance** — BALANCE: TWO past
+  budget — `feature` (cyc 170, starved-for 28, blocked 23rd) + `bug` (cyc 192, starved-for 6). Feature blocked → `bug` forced. The
+  FILED queue is still all gated (#22/#51 escalated, no Angelo answer; rest decision/approach-gated), so per the C189 precedent I
+  HUNTED A FRESH bug on an un-scanned surface — FE money math (the #55/#56 displayed-$ class). Inline (6/3 spawn cap). **FOUND #64
+  (MED-HIGH, displayed-$, VERIFIED firsthand):** `calculateLeaseMetrics` (frontend financing-calculations.ts:369) compares the
+  lifetime `mileageUsed` + `projectedFinalMileage` against `financing.mileageLimit` DIRECTLY — but that field is the ANNUAL limit
+  (CONFIRMED: the form labels it "Annual Mileage Limit" FinancingFormSection.svelte:261 + schema.ts:84 comment). So a 36-mo lease at
+  12,000 mi/yr (36,000 total allowed) driven a normal 30,000 mi showed ~18,000 PHANTOM excess miles × the per-mile fee = thousands of
+  $ of fake excess-mileage fees on the FinanceTab/LeaseMetricsCard. Backend analytics doesn't touch these fields → FE-only, contained.
+  FIX: `totalMileageAllowance = mileageLimit × (termMonths/12)` (termMonths .notNull; falls back to the annual value if 0), used in all
+  3 comparisons (projected-excess, remaining, init). VERIFY-FIRSTHAND PAID OFF TWICE: (1) confirmed the annual semantics at the
+  form+schema before acting (not a false positive); (2) the existing lease-metrics.test.ts had BAKED IN the bug (its 36000 fixture
+  treated annual-as-total; even its header said "no product bug found") → reconciled its 5 affected assertions to a realistic 12000/yr
+  fixture (→ 36000 term-scaled total, preserving their intent) + added a #64 describe (3 cases pinning annual×years scaling; my own
+  first draft over-drove the fixture → caught + corrected the projection arithmetic). green→green: FE validate:local **EXIT 0 — 516
+  pass (+6)**, tsc 0, build OK; + CI-only eslint + prettier clean on both touched files. #64 CLOSED. cov: fe 73.89%+ (carry; +6 FE) /
+  be 84.08% (carry).
+- **C199 (deep-review): audit the FE financing DATE-math vein (continuing the C198 #64 thread) — CERTIFIED CLEAN; 1 guard-pickup filed**
+  — BALANCE: TWO past budget — `feature` (cyc 170, starved-for 29, blocked 24th) + `deep-review` (cyc 197, starved-for 6 > 5). Feature
+  blocked → `deep-review` forced (most-starved past, 6 > arch's at-budget 5). Inline (6/3 spawn cap). Continued the PROVEN-fruitful FE
+  money vein (C198 #64 was here): the date-math functions in financing-calculations.ts (the #39/#53/C103 TZ/off-by-one class). **CERTIFIED
+  CLEAN (firsthand):** (1) `calculateNextPaymentDate` (:158) — bounded iteration (maxIterations 1000 → no infinite loop), guarded base
+  date, advances by frequency; the monthly setMonth(+1) day-rollover is cosmetic (next-payment display, not displayed-$). (2)
+  `calculateDaysUntil` (:465) — getTime() deltas → TZ-independent; ceil is right for "days until." (3) `derivePaymentEntries` (:502) —
+  remainingBalance = max(0, original − Σpayments) consistent with the C101-certified backend computeBalance; principal/interest from
+  the schedule by index; no div/date hazard. (4) `calculateMinimumPayment` (:475) — standard amortization formula, div-guarded
+  (apr>0, term>0, original>0 all checked). (5) `calculatePayoffDateFromStart` (:545) — the month-overflow clamp VERIFIED correct
+  firsthand: Jan-31 + 1mo → new Date(y,1,31) rolls to Mar 3, the guard `payoff.getDate() !== start.getDate()` fires (only on genuine
+  overflow — a non-overflow preserves the day exactly), `setDate(0)` → Feb 28; handles month>12 via Date normalization. **GUARD-PICKUP
+  FILED: `calculatePayoffDateFromStart` is correct but UNPINNED** (no test — the C196 :540-547 uncovered range; the C54/C77
+  traced-clean-but-uncovered class) — a subtle date clamp a refactor could silently break → primed for the next FE guard cycle.
+  NO code change (clean cert; deep-review = find-not-fix). cov: fe 73.89% / be 84.08% (carry, read-only audit).
+- **C200 (arch): extract `sortByVehicleThenDate` — the (vehicleId, date) fuel-row sort, 3 sites → 1** — BALANCE: TWO past budget —
+  `feature` (cyc 170, starved-for 30, blocked 25th — milestone cycle) + `arch` (cyc 194, starved-for 6 > 5). Feature blocked → `arch`
+  forced (most-starved past, 6 > guard's 5). Inline scout (6/3 spawn cap). FOUND: the ENTIRE `[...fuelRows].sort((a,b) => { vehicleId
+  localeCompare; then date getTime })` comparator block was hand-duplicated BYTE-FOR-BYTE at 3 analytics/repository.ts sites
+  (:1283/:1436/:2048 — the per-vehicle MPG/cost/odometer-progression pre-sorts). EXCLUDED the `:923-930` latest-term sort (different
+  `: 0` fallback + a startDate tiebreak — the C194/C182-#2 trap). Extracted `sortByVehicleThenDate<T extends {vehicleId; date:
+  Date|number|null}>(rows): T[]` to analytics-charts.ts beside forEachVehiclePair/groupByVehicle (the per-vehicle pairing family it
+  feeds). Behavior-preserving (arch rule 2): VERIFIED the date-key `instanceof Date ? getTime() : Number(x)` is kept VERBATIM (not
+  swapped to toDate().getTime() — confirmed firsthand FuelExpenseRow.date is `Date|number|null`, never a string, so number=epoch-ms +
+  Number(null)=0 are unchanged; toDate would have changed the null path). Returns a COPY (matches `[...rows]`). Test-anchored by the
+  EXISTING analytics property/fuel-stats/cross-vehicle suites (green THROUGH the 3 substitutions) + 3 new cases in
+  analytics-charts-unpinned.test.ts (group+date-order; no-mutation; numeric/null date handling). One biome import-sort autofixed.
+  green→green: backend validate:local **EXIT 0 — 1272 pass / 1 skip / 0 fail (+3)**, tsc 0, musl-biome clean, build bundled. ARCH QUEUE
+  empty again — next arch cycle = a fresh rule-7 scout. cov: be 84.08%+ (carry) / fe 73.89% (carry).
+- **C201 (guard): cover expense-form-validation.ts (the ~15% FE low spot — amount/volume/charge/mileage branches)** — BALANCE: only
+  `feature` strictly PAST budget (cyc 170, starved-for 31, blocked 26th) but blocked → fell through; `guard` + `bug` both AT budget
+  (6=6 / 3=3, due). Took `guard` via the PRIMED C196 pick (the ~15% form-validation module) — higher-confidence than a fresh hunt.
+  Inline (6/3 spawn cap). IDENTIFIED it firsthand as `expense-form-validation.ts` (127 lines; the C196 :42/48-126 uncovered range; C103
+  covered only the date slice). +19 cases in a new expense-form-validation-fields.test.ts (PURE — ValidationContext in, error-or-null
+  out): required vehicleId/category, amount bounds (>0, ≤999999), the fuel-vs-charging UNIT GATING (electric fuelType → charge branch,
+  liquid → volume branch), fuelType length, and — the load-bearing one — `validateMileage`'s MONOTONICITY check (a fuel entry's odometer
+  must sit strictly between the nearest earlier/later-dated entries; + the edit-self-exclusion). VERIFY-FIRSTHAND PAID OFF: my first
+  draft used `fuelType:'electric'` but isElectricFuelType matches the EXACT case-sensitive ELECTRIC_FUEL_TYPES members ('Electric',
+  'Level 2 (AC)', …) — caught the 2 failures in isolation + fixed to 'Electric' (the C150 assume-nothing class). expense-form-validation
+  ~15%→well-covered. green→green: FE validate:local **EXIT 0 — 535 pass (+19)**, tsc 0, build OK; + prettier (auto-fixed tabs) + eslint
+  clean on the new file. cov: fe 73.89%+ (carry; +19 FE) / be 84.08% (carry). The C199-primed calculatePayoffDateFromStart remains the
+  NEXT FE guard pick.
+- **C202 (bug #65): offline-storage legacy-clientId backfill minted a FRESH UUID on every read → duplicate-expense idempotency hole**
+  — BALANCE: `feature` most-starved (cyc 170, starved-for 32, blocked 27th) but blocked → fell through; `bug` forced (cyc 198,
+  starved-for 4 > 3 — most-starved over-budget actionable). Filed bug queue is all decision/approach-gated (#22/#24/#29/#30/#33/#34/
+  #40/#43/#44/#45/#47/#51/#58) → hunted a FRESH bug per the C189/C198 precedent. Inline (6/3 spawn cap). HUNTED the FE offline/sync
+  data-safety vein (NORTH_STAR #1, never deeply scanned). FOUND + VERIFIED firsthand: `loadOfflineExpenses` (offline-storage.ts:48-58)
+  backfills a pre-v3 entry's missing clientId with `expense.clientId ?? crypto.randomUUID()` BUT returns the migrated array WITHOUT
+  persisting — and the migration re-runs on every read of a not-yet-persisted legacy entry, so it mints a DIFFERENT UUID each call.
+  clientId IS the offline-POST idempotency key (offline-storage.ts:160 / sync-manager.ts:222), so a legacy entry whose first sync POST
+  commits server-side but loses its response gets re-read with a fresh key on the next run → the server's clientId-dedup can't match →
+  DUPLICATE expense row + double-counted TCO. The doc comment (lines 11-12) explicitly promises a STABLE key — the code broke its own
+  contract. FIX (deterministic, minimal, behavior-preserving for v3, NO write-on-read side-effect — safe since +layout.svelte:67 reads
+  it once in onMount, not a $derived/$effect): backfill from the entry's own stable+unique `id` (`expense.clientId ?? expense.id`) — same
+  key every read → server dedups correctly. VERIFIED the existing sync-manager/sync-offline-expenses tests' setItem-call-index assertions
+  tolerate it (no write-on-read added) before editing. Guard: +2 in offline-storage.test.ts — (1) the load-bearing read-twice→SAME-clientId
+  stability invariant (the #65 regression), (2) an existing-clientId-never-re-minted control. green→green: FE validate:local **EXIT 0 —
+  537 pass (+2)**, tsc 0, build OK; + prettier + eslint clean on both touched files. cov: fe 73.89%+ (carry; +2 FE) / be 84.08% (carry).
+- **C203 (infra): #5 branch-hygiene sweep + coverage re-measure (last sweep C196, branch 13 commits deep)** — BALANCE: `feature`
+  most-starved (cyc 170, starved-for 33, blocked 28th) but blocked → fell through; `infra` FORCED (cyc 196, starved-for 7 > 6 — the only
+  other over-budget category, exactly the C202 forecast). The standing #5 cadence sweep. (1) STRAY-TEST CHECK CLEAN: zero untracked
+  unit/spec `.test.ts` — all untracked are the by-design `*.meshclaw.e2e.ts` set + e2e screenshots/snapshots/results + playwright config +
+  `.meshclaw-tools/` harness + `mise.local.toml`. ONE observation logged (not acted on): `.kiro/specs/offline-entries/` is the only
+  untracked spec dir (every other `.kiro/specs/*` is committed) — a pre-loop doc dated Jun 5, untouched since, NOT a test (doesn't drop
+  coverage on merge), not loop-authored → left as-is, noted in BRANCH_REVIEW. (2) GREEN BASELINE + RE-MEASURE: backend `bun test
+  --coverage` EXIT 0 (1272 pass / 1 skip / 0 fail) — be 84.06% line / 84.43% func (FLAT vs C196's 84.08/84.44; C198/C201/C202 all FE, only
+  C200 touched BE); frontend `vitest --coverage` EXIT 0 (537 pass) — fe 77.79% line / 75.57% func / 72.96% branch (UP SHARPLY +3.9 line /
+  +2.0 func / +6.9 branch vs C196 — the C198 lease-metrics + C201 form-validation [+19] + C202 offline-storage [+2] FE ratchet DELIVERED;
+  the BE↔FE gap narrowed to ~6pts). (3) BRANCH_REVIEW.md REFRESH (gitignored): header scope 6→13 commits (C190–C202), status block to
+  1272 BE / 537 FE + the C203 coverage, appended §27 (C196–C202: the FE-weighted arc — #64 lease-$ + #65 offline-idempotency bugs, the
+  C201 form-validation guard, C200 sortByVehicleThenDate dedup, C197/C199 deep-review certs), fixed the stale "116 themed commits" →
+  "13 commits (C190–C202)" in Suggested-merge + refreshed the arc paragraph. Doc/measurement-only, no product code. Next sweep ~C213;
+  next CLAUDE.md refresh ~C203-onward (last C193). cov: be 84.06% / fe 77.79% (FRESH C203 reading).
+- **C204 (deep-review → #66): offline-created ELECTRIC charge silently dropped on sync (fuelType never carried in the outbox)** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 34, blocked 29th) but blocked → fell through; `deep-review` AT budget (cyc 199, starved-for
+  5 = 5, due) → the most-starved actionable. Inline focused review (spawn cap/flake — C179/C189/C199 precedent). SURFACE: the FE
+  api-transformer (toBackendExpense/fromBackendExpense), the FE↔BE expense serialization seam every create/update/offline-sync flows
+  through (the C202 #65 hunt touched it but never audited it); pure-`.ts` → reviewable + unit-testable without eyes-on. The transform reads
+  CLEAN (symmetric volume/charge gating, 0-value edge handled, every field mapped) — BUT tracing it against the offline path surfaced a real,
+  reachable, HIGH data-safety bug (#66, NORTH_STAR #1 + #2/EV-correctness). VERIFIED FIRSTHAND end-to-end: (1) toBackendExpense decides
+  volume-vs-charge SOLELY via isElectricFuelType(fuelType); (2) the `OfflineExpense` type had NO fuelType field + BOTH ExpenseForm.svelte
+  addOfflineExpense sites (:565/:605) omit it (even though :601 just computed it); (3) the 2 sync-transform callers (offline-storage
+  syncOfflineExpenses + sync-manager) call toBackendExpense WITHOUT fuelType. Net: an offline ELECTRIC charging expense (charge set,
+  fuelType absent) → isElectricFuelType(undefined)=false → the volume-only else-branch → volume undefined → the CHARGE IS SILENTLY DROPPED
+  from the POST (broken mi/kWh + cost/charge); AND every offline-synced expense loses its fuelType label. The offline fuel-validation
+  (volume OR charge) lets a charge-only electric entry through into the lossy transform. FIX (root-cause, threads fuelType end-to-end):
+  added fuelType? to OfflineExpense + carried it through all 4 propagation sites (both addOfflineExpense outbox objects + both
+  toBackendExpense sync callers + the resolveConflict keep_local path). GUARDS (+5): api-transformer.property.test.ts — the discriminant
+  REGRESSION (electric WITHOUT fuelType drops charge — documents the bug) + WITH fuelType maps charge→volume + Level-2(AC) + a liquid-fuel
+  negative control; offline-storage.test.ts — addOfflineExpense persists fuelType into the outbox. green→green: FE validate:local EXIT 0 —
+  542 pass (+5), tsc 0, build OK; prettier (auto-fixed the .svelte reflow) + eslint clean on all touched files. HONEST CAVEAT: root-cause
+  data-loss fixed + unit-pinned end-to-end; the .svelte change is mechanical data-passing (tsc/build-verified, no markup), but the full
+  offline-create→sync→render round-trip for an electric charge is Playwright-eyes-on-BLOCKED here → lands code-complete/eyes-on-pending per
+  the feature-DoD rule, correctness locked by the transform + outbox unit guards. cov: fe 77.79%+ (carry; +5 FE) / be 84.06% (carry).
+- **C205 (arch): extract offlineExpenseToBackend — the OfflineExpense→toBackendExpense mapping, 3 sites → 1** — BALANCE: `feature`
+  most-starved (cyc 170, starved-for 35, blocked 30th — milestone) but blocked → fell through; `arch` AT budget (cyc 200, starved-for 5 = 5)
+  was the most-starved actionable (longer-waiting than `bug` at 3). Inline scout (arch queue empty; spawn cap/flake — C194/C200 precedent).
+  STRONG fresh lead from C204: the OfflineExpense→toBackendExpense field-mapping block was copy-pasted at 3 sync sites (offline-storage
+  syncOfflineExpenses + sync-manager syncSingleExpense + resolveConflict keep_local) — and that drift is EXACTLY how #66 happened (fuelType
+  added to the online path, missed in the duplicated offline copies). VERIFIED firsthand all 3 map the same 10 fields, differing only in a
+  defensive `tags || []` no-op (tags is a required string[] on OfflineExpense) + the source var (expense vs conflict.localExpense) → behaviorally
+  identical. Extracted exported `offlineExpenseToBackend(e: OfflineExpense)` to offline-storage.ts (beside the type it maps) + wired all 3 +
+  removed the now-dead `toBackendExpense` + `ExpenseCategory` imports from sync-manager (biome/eslint noUnusedVariables — confirmed clean).
+  PAYOFF (NORTH_STAR #6 + concrete regression-prevention): collapses the triplication that bred #66 so a future field can't be carried in one
+  copy and forgotten in another. Test-anchored (arch rule 3): the EXISTING sync-manager + sync-offline-expenses suites green THROUGH the
+  substitution + 3 new direct helper tests (core field mapping; the electric-charge #66 invariant at the dedup boundary; liquid-fuel control).
+  CAUGHT + FIXED a test-mock gap firsthand (verify-in-isolation paid off): sync-manager.test.ts `vi.mock('../offline-storage')` stubbed only 4
+  fns, so the new helper was undefined → 3 failures; fixed with importActual to keep the REAL pure mapper (stubbing it would assert against a
+  fake transform) — a net IMPROVEMENT (the test now exercises the genuine transform). green→green: FE validate:local EXIT 0 — 545 pass (+3),
+  tsc 0, build OK; prettier (auto-fixed the helper-signature reflow) + eslint clean on all touched files. cov: fe 77.79%+ (carry; +3 FE) /
+  be 84.06% (carry).
+- **C206 (bug → #67): re-financing a paid-off vehicle silently produced an INACTIVE record (upsert never re-activates)** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 36, blocked 31st) but blocked → fell through; `bug` FORCED (cyc 202, starved-for 4 > 3 —
+  most-starved over-budget actionable, the C205 forecast). Filed bug queue all decision/approach-gated → hunted a FRESH bug per the
+  C189/C198/C202/C204 precedent. The offline/sync vein is now deduped + twice-audited, so I PIVOTED to a fresh surface: the financing
+  WRITE path (un-hunted for the C189 create/update-asymmetry class). FE pure-utils (chart-formatters/formatters) read CLEAN; rejected two
+  LATENT-but-guarded boundaries firsthand (C21/C77 discipline — did NOT inflate into a forced bug): (a) financingRepository.findByVehicleId
+  is NOT userId-scoped, but vehicleFinancing has NO userId column [ownership is transitive via vehicleId→vehicles FK, by design] + every
+  caller validates vehicle ownership first → no live leak; (b) the loan↔lease upsert leaves stale type-specific cols [apr on a now-lease],
+  but every read gates on financingType → latent, not a live displayed-value bug [noted for a future cycle]. THE LIVE ONE — #67, VERIFIED
+  firsthand end-to-end: POST /vehicles/:id/financing is a create-or-REPLACE keyed on vehicleId; when a prior row exists it reuses it via
+  `update(existing.id, {...financingData})`. `isActive` is .optional() in the create schema (a .notNull().default(true) col → drizzle-zod
+  omits it) AND the VehicleForm financing payload (VehicleForm.svelte:420-449) NEVER sends it → so re-financing a vehicle whose prior
+  financing was paid off (isActive=false via PUT /payoff or DELETE) reused that row and LEFT isActive=false → the new ACTIVE loan/lease was
+  silently dropped from findActiveFinancing + loanBreakdown/analytics (:863 filters f.isActive) + the FE's `vehicle.financing?.isActive`
+  gate → the user's real financing vanished from TCO/analytics. FIX (root-cause, behavior-preserving for the normal edit): on the upsert
+  update branch, set `isActive: true` + `endDate: null` (mirrors how create() defaults isActive=true; a still-active record stays active =
+  idempotent; clears a stale payoff/lease-end date). +2 HTTP tests in financing-get-contract.test.ts (the #67 regression: payoff → re-finance
+  → isActive true; + an already-active-update idempotent control). NON-VACUOUS: confirmed the regression FAILS RED with the fix reverted
+  (isActive stayed false) then GREEN restored (the C77 anti-vacuity check). green→green: backend validate:local EXIT 0 — 1274 pass / 1 skip
+  / 0 fail (+2), tsc 0, musl-biome clean, build bundled. cov: be 84.06%+ (carry; +2 BE) / fe 77.79% (carry).
+- **C207 (guard): cover calculatePayoffDateFromStart — the vehicle-form payoff-date month-overflow clamp** — BALANCE: `feature`
+  most-starved (cyc 170, starved-for 37, blocked 32nd) but blocked → fell through; `guard` AT budget (cyc 201, starved-for 6 = 6, due) →
+  the most-starved actionable (the C206 forecast). Took the C199-PRIMED pick — `calculatePayoffDateFromStart` (financing-calculations.ts:545,
+  the VehicleForm amortization-preview payoff date), VERIFIED-correct firsthand at C199 but with ZERO test coverage (confirmed: only the source
+  + the VehicleForm caller reference it). The load-bearing logic is a subtle month-overflow CLAMP: `new Date(y, startMonth+n, startDay)` rolls
+  a day past the target month's length INTO the next month (Jan 31 + 1mo → Mar 3, Feb has no 31st), so it detects the rolled day
+  (`getDate() !== start.getDate()`) + `setDate(0)`s back to the intended month's last day — exactly the date arithmetic a refactor silently
+  breaks. Created payoff-date-from-start.test.ts (+12): the clamp (Jan31+1→Feb28; leap→Feb29; Aug31+1→Sep30; May31+1→Jun30), no-clamp paths
+  (mid-month exact day; 0 payments; the 28th never overflows), year-rollover (Mar15+12→next-year; Oct15+6 crosses; Dec31+2 rolls year AND
+  clamps → Feb28 2025), + the real date-only-STRING call path with timezone-ROBUST relative assertions (payoff > start, year lands; the C103/C77
+  UTC-parse trap — Date-OBJECT inputs for the exact-field cases so getMonth/getDate read the same frame the fn constructs). VERIFY-FIRSTHAND:
+  ran in isolation FIRST — all 12 green, my reasoned clamp values (Feb 28/29, Sep 30, Dec31+2→Feb28-2025) confirmed correct. green→green:
+  FE validate:local EXIT 0 — 557 pass (+12), tsc 0, build OK; prettier + eslint clean on the new file. Test-only, no production change.
+  cov: fe 77.79%+ (carry; +12 FE) / be 84.06% (carry). Next FE guard pick (no primed): analytics-api.ts ~36% func or auth.ts ~56%.
+- **C208 (infra): CLAUDE.md orientation refresh (post-C193 drift, C194–C207)** — BALANCE: `feature` most-starved (cyc 170, starved-for 38,
+  blocked 33rd) but blocked → fell through; nothing else strictly OVER budget → highest-leverage pick. `infra` was the most-starved actionable
+  (cyc 203, starved-for 5) AND the CLAUDE.md refresh was concretely due (last C193, ~15 cycles of real drift — a fresh agent reading stale
+  figures re-plans done work). Fixed 3 actively-misleading drifts, each VERIFIED vs source/LEDGER (the C93/C145/C193 doc-refresh discipline —
+  fix what misleads, don't churn): (1) COVERAGE — the C186 reading (be 83.41/83.74, fe 73.89/73.61/66.08) → the FRESH C203 re-measure (be
+  84.06% line / 84.43% func · fe 77.79% line / 75.57% func / 72.96% branch); added C201/C207 to the FE-ratchet list + re-pointed the next FE
+  low spots (analytics-api ~36%, auth ~56%, sync-manager ~56% — form-validation/payoff now done). (2) SUITE SIZE ~1263 BE / ~513 FE → 1274 BE /
+  557 FE. (3) CLOSED-BUG list ended at #63 → appended #64 (lease excess-mileage annual×term, C198) + #65 (offline legacy-clientId fresh-per-read
+  dup hole, C202) + #66 (offline electric charge dropped on sync, C204) + #67 (re-finance → inactive record, C206); range C155–C192 → C155–C206.
+  Doc-only, no code → no build gate (the C93/C131/C145/C193 precedent). Next CLAUDE.md refresh ~C220; next #5 branch-hygiene sweep ~C213 (last
+  C203). cov: be 84.06% / fe 77.79% (carry, C203 reading).
+- **C209 (deep-review → #68): restore coerceRow truncated a thousands-separated number (parseInt stops at the comma)** — BALANCE: `feature`
+  most-starved (cyc 170, starved-for 39, blocked 34th) but blocked → fell through; `deep-review` AT budget (cyc 204, starved-for 5 = 5, due) →
+  the most-starved actionable (the C208 forecast). Inline focused review (spawn cap/flake — C179/C204 precedent). SURFACE: the restore-path
+  per-field coercion `coerceRow` (backup.ts:70) — THE data-safety surface (NORTH_STAR #1), flagged in the C146 money-cents spec as a latent
+  crux + never directly audited (C108/C136/C144 covered cross-tenant + empty-replace + mid-run-change, not the coercion). FOUND + VERIFIED
+  firsthand end-to-end: the INTEGER branch did `Number.parseInt(strVal, 10)`, which STOPS at the first non-digit. The Google Sheets restore
+  reads cells via `values.get` with NO valueRenderOption → defaults to FORMATTED_VALUE (google-sheets-service.ts:622), so a thousands-separated
+  odometer/mileage comes back as the string "12,345" → parseInt → 12 (a 1000x SILENT corruption — 12 is not NaN, so it passed straight
+  through; mileage/odometer/initialMileage all confirmed `integer` columns). The REAL branch had the same hazard (parseFloat("1,234.56")→1).
+  CONFIRMED the CSV path writes raw integers with NO separators (convertToCSV:451), so a VROOM-own-export round-trip never hit it — but the
+  Sheets path does. FIX (minimal, complete, behavior-preserving for valid input): strip grouping commas + a STRICT whole-string parse
+  (`Number(strVal.replace(/,/g,''))`, which unlike parseInt rejects a "12abc" tail to NaN→null, matching the existing garbage→null contract;
+  Math.round on INTEGER so a Sheets "12345.0" lands whole). Did NOT unilaterally switch the Sheets read to UNFORMATTED_VALUE (deeper, separate)
+  — the coercion-layer fix is complete + covers CSV too. +5 tests in backup.test.ts (INTEGER "12,345"→12345 [the regression]; "45000.0"→45000;
+  "12abc"→null [strict]; REAL "1,234.56"→1234.56; plain "50" CSV-round-trip unchanged); the existing per-table Zod re-validation block still
+  green. NON-VACUOUS: confirmed the INTEGER regressions FAIL RED with the fix reverted (12,345→12) then GREEN restored. DE-RISKS the money-cents
+  migration (the C146-named parseInt crux). green→green: backend validate:local EXIT 0 — 1279 pass / 1 skip / 0 fail (+5), tsc 0, musl-biome
+  clean, build bundled. cov: be 84.06%+ (carry; +5 BE) / fe 77.79% (carry).
+- **C210 (bug → #70 fixed; #69 escalated): insurance /expiring-soon `days` param unguarded → NaN → Invalid Date → silently empty** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 40, blocked 35th) but blocked → fell through; `bug` FORCED (cyc 206, starved-for 4 > 3 — over
+  budget; arch was AT-budget 5=5, not strictly over, so bug's tighter budget tipped it first). Fresh hunt. FIRST pursued the #68 parseInt/parseFloat
+  CLASS-SWEEP (the C41/#48 pattern) — swept all BE parseInt/parseFloat sites: the query-param + import-time-parse sites are guarded/bounded
+  (import-mapping `||0` + buildLocalDate echo-check; body-limit; pagination) → NO comma-truncation class repeat (C21/C77 — did not force it). PIVOTED
+  to the insurance write/route surface. FOUND TWO: (a) #69 (SEMANTICS, escalated — see below); (b) #70 (CLEAN, decision-free — the forced-bug fix).
+  #70 VERIFIED firsthand end-to-end: GET /insurance/expiring-soon read `days` via `Number.parseInt(c.req.query('days')||'30',10)` with NO
+  finite-guard — UNLIKE its SIBLING `limit` two lines down (guarded `Number.isFinite(x) ? clamp : 100`). So `?days=<non-numeric>` → NaN →
+  `endDate = new Date(now + NaN*86400000)` = Invalid Date → findExpiringTerms' `between(endDate, now, InvalidDate)` matched NOTHING → the
+  "expiring soon" nag SILENTLY returned ZERO expiring policies → a user misses an insurance-renewal reminder (NORTH_STAR #2). The asymmetry
+  (limit guarded, days not, right beside each other) is the tell — the C189 create/update-asymmetry class applied to sibling params. FIX
+  (decision-free, mirrors the sibling): `Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays,1),366) : 30`. +4 HTTP tests in a new
+  expiring-soon-http.test.ts (default finds a ~20-day term; the `?days=abc` REGRESSION falls back to 30 + still finds it; `?days=45` honored;
+  `?days=99999` clamps to 366). NON-VACUOUS: confirmed the regression FAILS RED with the guard reverted (daysAhead NaN, term vanished) then GREEN
+  restored. green→green: backend validate:local EXIT 0 — 1283 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean, build bundled.
+  **#69 (consistency, ESCALATED C210 — NOT auto-fixed, it's a semantics call) — a monthly-only insurance term (monthlyCost set, totalCost null)
+  shows in the analytics insurance card (effectiveMonthlyPremium honors monthlyCost) but materializes NO expense row (createTermExpenses guards
+  `totalCost > 0`) → ABSENT from vehicle TCO/$-per-month → same cost, two headline numbers.** Verified firsthand (schema both nullable :137-138;
+  analytics-charts effectiveMonthlyPremium:176 returns monthlyCost directly; routes :84/:176 gate materialization on totalCost>0). send_message
+  options: materialize monthlyCost×term-months as one lump (TCO==analytics) / N monthly rows / leave analytics-only + document. Awaiting Angelo;
+  did NOT block. cov: be 84.06%+ (carry; +4 BE) / fe 77.79% (carry).
+- **C211 (arch): extract parseClampedInt — the insurance /expiring-soon days/limit parse-clamp, 2 sites → 1 (the #70 divergence)** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 41, blocked 36th) but blocked → fell through; `arch` FORCED (cyc 205, starved-for 6 > 5 — the
+  C210 forecast). Inline scout (queue empty; spawn cap/flake). SCOUTED THOROUGHLY + REJECTED several as churn (the C75/C99 discipline — arch
+  rule 5): the FE query-string builders (analytics buildQuery / reminder-api / expense-api / api-client) have GENUINELY DIVERGENT inclusion
+  rules (`value != null` vs truthy-`if` vs field-specific — the C69 "looks identical, diverges" trap, esp. empty-string/falsy edges); the
+  ~57 `logger.error({error: instanceof…})` sites are EXPLICITLY excluded by the C147 error-handling.ts doc comment ("the structured-log shape,
+  NOT a value extraction — converging is a separate larger call") → re-deciding that without new cause is churn; clampPagination operates on
+  pre-parsed numbers (no NaN-guard) — a different concern. THE clean pick: parseClampedInt — the `Number.parseInt(raw) + Number.isFinite ?
+  clamp : fallback` idiom was hand-rolled at the 2 insurance /expiring-soon sites (days + limit), and that copy-paste is EXACTLY how #70
+  happened (limit carried the finite-guard, days was written without it). CONCRETE PAYOFF (arch rule 5 + the C205 "the dup caused the bug →
+  dedup it" logic): one tested helper so the guard can't be present on one param and forgotten on its sibling. Extracted
+  `parseClampedInt(raw, fallback, min, max)` to utils/calculations.ts (beside getPeriodStartDate, the shared-route-helper home) + wired both
+  sites (days→30/1..366, limit→100/1..200). Test-anchored (rule 3): the C210 expiring-soon-http.test.ts stayed GREEN through the substitution
+  (behavior-preserving proof) + 6 new unit tests (valid/in-range; undefined→fallback; non-numeric→fallback [the #70 guard]; above-max + below-min
+  clamp; the parseInt trailing-unit-vs-leading-non-digit semantics documented). green→green: backend validate:local EXIT 0 — 1289 pass / 1 skip /
+  0 fail (+6), tsc 0, musl-biome clean, build bundled. cov: be 84.06%+ (carry; +6 BE) / fe 77.79% (carry). ARCH QUEUE empty.
+- **C212 (guard): cover analytics-api.ts (the ~36%-func FE low spot — 13 method wirings + getDefaultDateRange + buildQuery)** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 42, blocked 37th) but blocked → fell through; nothing else strictly OVER budget → highest-leverage
+  pick; `guard` was the most-starved actionable (cyc 207, starved-for 5 — the C211 forecast). Took the primed FE low spot: analytics-api.ts ~36%
+  func — the ONE FE service the C137/C143/C149/C163/C169 "service layer 100%" arc left behind. IDENTIFIED firsthand: the existing test covered
+  ONLY getSummary() (its 404/network fallback control flow — well-pinned); the 12 other method→endpoint wrappers + the pure exported
+  getDefaultDateRange + buildQuery's inclusion-rule edges were entirely uncovered (= the gap). +19 cases: getDefaultDateRange (unix-SECONDS not ms;
+  start exactly 1yr before end same month/day; end at-not-after now), the 13 method wirings (exact path + query, mirroring the C149 expense-api
+  pattern — incl. the no-query bare-path methods financing/insurance + the optional-param buildQuery edges: getFuelStats omits undefined
+  vehicleId / getVehicleTCO + getYearEnd omit absent year, none emit a stray "?"), + a verbatim-return check. VERIFY-FIRSTHAND: ran in isolation
+  FIRST — 24 green (was 5, +19), my getDefaultDateRange seconds/one-year assumptions confirmed empirically. green→green: FE validate:local EXIT 0
+  — 576 pass (+19), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. analytics-api ~36%→well-covered. cov: fe 77.79%+
+  (carry; +19 FE) / be 84.06% (carry). Next FE guard low spot: auth.ts ~56% / sync-manager.ts ~56% (timer/network-bound — less clean).
+- **C213 (infra): #5 branch-hygiene sweep + coverage re-measure (last sweep C203, branch 23 commits deep)** — BALANCE: `feature` most-starved
+  (cyc 170, starved-for 43, blocked 38th) but blocked → fell through; nothing else strictly OVER budget → highest-leverage pick. `infra` was
+  the most-starved actionable (cyc 208, starved-for 5) AND the #5 sweep was concretely due (last C203, ~10 cycles / 23 commits — the C212
+  forecast). (1) STRAY-TEST CHECK CLEAN: zero untracked unit/spec `.test.ts` — all untracked are the by-design `*.meshclaw.e2e.ts` set +
+  e2e screenshots/snapshots/results + playwright config + `.meshclaw-tools/` + `mise.local.toml` + the pre-loop `.kiro/specs/offline-entries/`
+  doc (unchanged since C203). (2) GREEN BASELINE + RE-MEASURE: backend `bun test --coverage` EXIT 0 (1289 pass / 1 skip) — be 84.14% line /
+  84.49% func (up slightly from C203's 84.06/84.43 — the C206/C209/C210/C211 BE additions); frontend `vitest --coverage` EXIT 0 (576 pass) —
+  fe 79.22% line / 78.89% func / 73.52% branch (UP +1.4 line / +3.3 func vs C203 — the C207 payoff-date + C212 analytics-api FE ratchet; the
+  BE↔FE gap is NEARLY CLOSED, 84 vs 79). (3) BRANCH_REVIEW.md REFRESH (gitignored): header scope 13→23 commits (C190–C212), status block to
+  1289 BE / 576 FE + the C213 coverage, appended §28 (C203–C212: the balanced arc — #66 offline-electric-charge + #68 restore-comma-truncation
+  [2 HIGH data-safety], #67/#70 + the C205/C211 dedups-that-collapsed-the-bug-they-just-fixed, the C207/C212 guard ratchet that closed the FE
+  service layer, #69 escalated), fixed the stale "13 commits" → "23 commits (C190–C212)" in Suggested-merge. Doc/measurement-only, no product
+  code. Next sweep ~C223; next CLAUDE.md refresh ~C220 (last C208). cov: be 84.14% / fe 79.22% (FRESH C213 reading).
+- **C214 (bug → #71): mileage-reminder recheck was CREATE-only — an EDIT crossing a milestone didn't fire until the next /trigger** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 44, blocked 39th) but blocked → fell through; `bug` FORCED (cyc 210, starved-for 4 > 3 — the C213
+  forecast). Hunted a FRESH surface (offline/sync + restore-coercion + insurance-route veins each already mined+deduped). SCOUTED SIX surfaces
+  firsthand + REJECTED each as not-a-clean-live-bug (C21/C77 — did NOT manufacture one): CSV export (neutralizeCsvRow guards the human-facing
+  path; backup convertToCSV unguarded is the DOCUMENTED round-trip exemption, not a bug); year-end costPerDistance (windowed max−min distance is
+  the ratified approximation, the #45 family — gated); getQuickStats ytdSpending (C161-clean); the cost-per-mile fencepost (current.expenseAmount
+  ÷ miles-since-previous is applied UNIFORMLY across both paths → a defensible convention, not a divergence; flipping it is a semantics call).
+  THE clean one — #71, the filed "Mileage Finding A/B" (VERIFIED C108, deferred for ORDERING not gating — a decision-free fix): VERIFIED firsthand
+  that recheckMileageReminders is wired on odometer CREATE (:131) + expense CREATE (:573) but NOT on either PUT (expense :658, odometer :149), so
+  editing a reading UP across a reminder's milestone silently did NOT fire until the next /trigger/login — the D5 "fires the moment crossed"
+  guarantee held for creates but not EDITS. FIX (mirror the create-path best-effort recheck, never-throws/idempotent): expense PUT → recheck on
+  the UPDATED vehicleId when mileage != null (handles a vehicle-reassign edit too); odometer PUT → unconditional recheck (every entry is a
+  reading). +2 HTTP tests in recheck-on-write.test.ts (edit odometer 34000→35200 across a 35000 milestone fires; edit expense mileage
+  34000→35500 fires) — NON-VACUOUS: confirmed both FAIL RED with the fixes reverted (edit didn't fire) + the 5 create-path tests stayed green
+  (fix is additive). green→green: backend validate:local EXIT 0 — 1291 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean, build bundled.
+  cov: be 84.14%+ (carry; +2 BE) / fe 79.22% (carry).
+- **C215 (deep-review → #72): photos list/pagination certified CLEAN; closed the lone non-userId-scoped read method** — BALANCE: `feature`
+  most-starved (cyc 170, starved-for 45, blocked 40th — milestone) but blocked → fell through; `deep-review` FORCED (cyc 209, starved-for 6 > 5
+  — the C214 forecast). Inline focused review (spawn cap/flake — C179/C204/C209 precedent). SURFACE: the photos list/pagination path (C132/C167
+  covered cross-tenant delete/serve + nosniff, NOT the list/paginate queries). CERTIFIED CLEAN firsthand: validateEntityOwnership gates every
+  list/serve/delete via an EXHAUSTIVE switch (vehicle/insurance_policy/insurance_claim/expense/odometer_entry each ownership-checked) + a
+  `default` that THROWS ValidationError — so an arbitrary entityType string (the route's `min(1).max(64)` is just a length bound) can't slip past;
+  the batch endpoint listPhotosByEntityType is userId-scoped (findByUser); nosniff + CORP + private-cache headers correct (C133/#35). ONE finding
+  → #72 (defense-in-depth, the C168/#48 + C180 + C192 tenant-scope-at-the-read class): `findByEntityPaginated` (backs GET /:entityType/:entityId)
+  filtered (entityType, entityId) ALONE on BOTH legs — the LONE photo read-method not userId-scoped, even though photos carries user_id + every
+  sibling (findByUser/countByUser/findIdsByUser) filters on it. NOT a live leak (the route's validateEntityOwnership proves ownership before the
+  query) but a latent boundary — and directly fixable here (unlike financing's no-userId-column case at C206 which I correctly DECLINED). FIX:
+  threaded userId param + ANDed `eq(photos.userId, userId)` into the shared whereClause (covers both count + data legs) + threaded userId through
+  the one caller (listPhotosForEntity). +2 tests in photo-user-scoped.property.test.ts — the load-bearing cross-tenant case (two users' photos on
+  the SAME entityType+entityId, raw-seeded — only constructible by direct seed; foreign photo excluded from BOTH count & data) + an owner-still-
+  sees-theirs over-filter control. NON-VACUOUS: confirmed the cross-tenant test FAILS RED with the scope reverted (count 3 not 2) then GREEN
+  restored. green→green: backend validate:local EXIT 0 — 1293 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean, build bundled. cov: be
+  84.14%+ (carry; +2 BE) / fe 79.22% (carry).
+- **C216 (arch): extract calendarYearRange — the [Jan1, nextJan1) year-boundary Date pair, 3 sites → 1** — BALANCE: `feature` most-starved
+  (cyc 170, starved-for 46, blocked 41st) but blocked → fell through; nothing else strictly OVER budget → highest-leverage; `arch` was the
+  most-starved actionable (cyc 211, starved-for 5 = 5, due). Inline scout (queue thin). FOUND a clean one: the `new Date(year, 0, 1)` /
+  `new Date(year + 1, 0, 1)` calendar-year-boundary pair was hand-repeated at 3 analytics/repository.ts sites — queryTotalSpending (:654),
+  the year-scoped vehicle-expenses filter (:1835), getYearEnd (:1937). VERIFIED firsthand the consumption: sites 1+2 feed `gte(start)+lt(end)`
+  (the half-open year filter), site 3 `Math.floor(.getTime()/1000)`s the same pair into a DateRange (seconds) — so the SHARED thing is the
+  boundary PAIR, not how each consumes it (the safe extraction boundary; not the C69 divergence trap since I extract only the pair). Extracted
+  exported `calendarYearRange(year): {start, end}` BESIDE monthsOwnedInYear/toDate (the file's own exported year-date-helper cluster — kept it
+  local to its only consumer, matching the established pattern rather than importing from calculations) + wired all 3 via destructuring
+  (`const {start: yearStart, end: yearEnd} = calendarYearRange(year)`). Behavior-identical (each site consumes the two Dates exactly as before;
+  local-time preserved). Test-anchored (rule 3): the EXISTING analytics year-end + total-spending + vehicle-expenses suites green THROUGH the
+  substitution + 3 new helper tests in tco-months-owned.test.ts (Jan1/nextJan1 boundaries; the half-open 366-day leap window with Dec-31-23:59
+  inside + end excluded; the 365-day non-leap). VERIFY-FIRSTHAND: ran in isolation FIRST — 12 green, the leap-year/half-open assumptions
+  confirmed. green→green: backend validate:local EXIT 0 — 1296 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. cov: be
+  84.14%+ (carry; +3 BE) / fe 79.22% (carry). ARCH QUEUE thin — next arch cycle prefers a fan-out over forcing a micro-dedup.
+- **C217 (guard): cover auth.ts requireAuth — the untested per-page route guard (the ~56% FE low spot)** — BALANCE: `feature` most-starved
+  (cyc 170, starved-for 47, blocked 42nd) but blocked → fell through; nothing else strictly OVER budget → highest-leverage; `guard` was the
+  most-starved actionable (cyc 212, starved-for 5 — the C216 forecast). Took the primed FE low spot: auth.ts ~56%. IDENTIFIED firsthand: the
+  existing auth.test.ts covered isPublicRoute/isProtectedRoute/handleRouteProtection thoroughly but `requireAuth` was ENTIRELY untested (not
+  even imported) — the ~44% gap. requireAuth is the per-page guard a protected page-load awaits; a regression either bounces an authenticated
+  user (broken page) or fails to bounce a logged-out one (security-load-bearing). +4 cases driving the REAL authStore (setUser/clearUser/
+  setLoading — the ProtectedRoute.test.ts convention, not a mock, so the genuine state machine runs): synchronous authed→resolves-true/no-
+  redirect; synchronous unauthed→resolves-false + goto('/auth'); + BOTH loading-POLL paths (setLoading(true) → enter the setTimeout(check,50)
+  loop → resolve mid-poll authenticated [resolves true] / unauthenticated [resolves false + redirect], driven via vi.useFakeTimers +
+  advanceTimersByTimeAsync). VERIFY-FIRSTHAND: ran in isolation FIRST — 16 green (was 12, +4), the fake-timer poll both resolve correctly.
+  green→green: FE validate:local EXIT 0 — 580 pass (+4), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. auth.ts
+  ~56%→well-covered. cov: fe 79.22%+ (carry; +4 FE) / be 84.14% (carry). Next FE guard low spot: sync-manager.ts ~56% (timer/network-bound — less
+  clean) — the FE pure/service modules are now essentially all covered; the rest is the components/routes deficit (eyes-on).
+- **C218 (bug → #73): a split-config-only reminder UPDATE (omitting vehicleIds) falsely 400'd** — BALANCE: `feature` most-starved (cyc 170,
+  starved-for 48, blocked 43rd) but blocked → fell through; `bug` FORCED (cyc 214, starved-for 4 > 3 — the C217 forecast). Hunted a FRESH surface
+  (the reminders create/update WRITE-path validation — the C189 create/update-asymmetry class; C150/C153/C197 had covered the trigger
+  date-advance + mark-serviced, NOT the Zod write schema). REJECTED firsthand a vehicleIds-reassign mileage-anchor edge as a SEMANTICS edge
+  (lastServiceOdometer is a stored historical anchor; whether it should auto-follow a vehicle swap is ambiguous — C21/C77, did not force). THE
+  real one — #73, VERIFIED firsthand end-to-end: `refineSplitConfig` (validation.ts:133) compares the split's vehicle IDs against
+  `data.vehicleIds`, but `updateReminderSchema` is `.partial()` + the FE `reminderApi.update` takes vehicleIds OPTIONAL — so a PUT changing ONLY
+  the split config (omitting vehicleIds) → `data.vehicleIds` undefined → `new Set(undefined)` = ∅ → the match check (0 vs N) ALWAYS failed →
+  `zValidator('json', updateReminderSchema)` (routes.ts:206, runs BEFORE the handler's merged re-parse) 400'd every legitimate split-config-only
+  edit with "Split config vehicle IDs must match vehicleIds". FIX (mirror the other refiners' presence-guards — refineCustomFrequency/
+  refineMileageTrigger already guard on their fields): wrap the MATCH check in `if (data.vehicleIds)` — it's a cross-field invariant meaningful
+  only when both are present; the route's merged `createReminderSchema.parse(merged)` (routes.ts:228) still catches a genuine mismatch against
+  the full object. The percentage/absolute SUM checks (vehicleIds-independent) stay UNCONDITIONAL. +4 tests in update-validation.test.ts (the
+  #73 regression: split-only-no-vehicleIds ACCEPTED; the percentage-sum still fires without vehicleIds; both-sent genuine-mismatch still fails;
+  both-sent-match accepted). NON-VACUOUS: confirmed the regression FAILS RED with the guard reverted (split-only still rejected) + the other 3
+  stayed green (invariant intact). green→green: backend validate:local EXIT 0 — 1300 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean, build
+  bundled. cov: be 84.14%+ (carry; +4 BE) / fe 79.22% (carry).
+- **C219 (infra): CLAUDE.md orientation refresh (post-C208 drift, C209–C218)** — BALANCE: `feature` most-starved (cyc 170, starved-for 49,
+  blocked 44th) but blocked → fell through; nothing else strictly OVER budget → highest-leverage; `infra` was the most-starved actionable
+  (cyc 213, starved-for 6 = 6, due) AND the CLAUDE.md refresh was concretely due (last C208, ~11 cycles of drift; the #5 sweep isn't due til
+  ~C223). Fixed 5 actively-misleading drifts, each VERIFIED vs source/LEDGER (the C93/C145/C193/C208 doc-refresh discipline — fix what misleads,
+  don't churn): (1) COVERAGE — the C203 reading (84.06/77.79) → the FRESH C213 re-measure (be 84.14% line / 84.49% func · fe 79.22% line /
+  78.89% func / 73.52% branch); (2) FE-ratchet list — added C212 analytics-api + C217 auth.ts; (3) "FE service layer 100%" → "FE service +
+  pure-util layers essentially fully covered" (analytics-api/auth were the last gaps) + re-pointed the next low spot to sync-manager (the
+  components/routes deficit is the bulk); (4) SUITE SIZE ~1274 BE / ~557 FE → 1300 BE / 580 FE; (5) CLOSED-BUG list ended at #67/C206 →
+  appended #68 (C209 restore comma-truncation) + #70 (C210 expiring-soon NaN) + #71 (C214 mileage-recheck-on-edit) + #72 (C215 photos
+  userId-scope) + #73 (C218 split-config-only update), range C155–C206 → C155–C218; + added #69 (insurance monthly-only TCO, escalated C210) to
+  the Angelo-pending list. Doc-only, no code → no build gate (the C93/C131/C145/C193/C208 precedent). Next CLAUDE.md refresh ~C232; next #5
+  branch-hygiene sweep ~C223 (last C213). cov: be 84.14% / fe 79.22% (carry, C213 reading).
+- **C220 (deep-review → #74): photos route was the LONE mutating module missing changeTracker → a photo-only change didn't re-trigger the
+  auto-backup** — BALANCE: `feature` most-starved (cyc 170, starved-for 50, blocked 45th — milestone) but blocked → fell through; `deep-review`
+  AT budget (cyc 215, starved-for 5 = 5, due — the C219 forecast). Inline review (spawn cap/flake). SURFACE: the `changeTracker` middleware
+  wiring (the #42 silent-backup-gap class, never audited for COMPLETENESS across route modules). CERTIFIED `changeTracker` itself CLEAN
+  firsthand: mutating-method filter (:50), runs after handler (:54), stamps lastDataChangeDate only on 2xx (:56 — a failed write correctly
+  doesn't mark changed). THE finding → #74: of 12 route modules, changeTracker is on 8; the 4 without it are analytics (read-only ✓), auth
+  (sessions ✓), sync (the backup itself — circular ✓) — and PHOTOS, which has POST upload + DELETE. VERIFIED end-to-end: photos + photo_refs ARE
+  in the backup payload (backup.ts:368/414), and the orchestrator SKIPS when !hasChangesSinceLastSync (backup-orchestrator.ts:70-76) — so a
+  photo-only change between backups never bumped lastDataChangeDate → silently excluded from the next auto-backup until some OTHER tracked
+  mutation bumped it (NORTH_STAR #1). FIX: added `routes.use('*', changeTracker)` to photos/routes.ts (mirrors the 8 siblings; fire-and-forget
+  after 2xx, no response-behavior change — the photos-http suite stayed green). GUARD: photo-change-tracker.test.ts (+3 source-scan, the C133
+  photo-serve-headers precedent — a full upload/delete needs a real storage provider, not in-harness-testable, so pin the WIRING: import +
+  `routes.use('*', changeTracker)` + the mutating endpoints still exist). NON-VACUOUS: confirmed the "registered" assertion FAILS RED with the
+  routes.use line removed. NOTE: the gate first went red on my new test's FORMAT (long regex line) — check:musl:fix reflowed it; the 10
+  pre-existing noNonNullAssertion are WARNINGS (exit 0), not errors (verified firsthand — did NOT touch the 4 unrelated files). green→green:
+  backend validate:local EXIT 0 — 1303 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. cov: be 84.14%+ (carry; +3 BE) /
+  fe 79.22% (carry).
+- **C221 (arch): extract parseUploadedPhoto — the multipart upload parse+File-validate block, 2 sites → 1** — BALANCE: `feature` most-starved
+  (cyc 170, starved-for 51, blocked 46th) but blocked → fell through; nothing else strictly OVER budget → highest-leverage; `arch` was the
+  most-starved actionable (cyc 216, starved-for 5 = 5, due — vs bug also at 3=3 but arch waited longer). Inline scout. WHILE scouting, VERIFIED
+  firsthand a potential #74 SIBLING-gap is NOT real: vehicles/photo-routes.ts (the vehicle-photo sub-router, also mutating) inherits
+  changeTracker from its parent vehicles/routes.ts (routes.use('*', changeTracker) at :128, BEFORE .route('/:vehicleId/photos') at :131 — Hono
+  parent use('*') covers mounted sub-routes) → correctly covered, confirming C220's fix targeted the genuinely-standalone photos/routes.ts. THE
+  dedup: the `parseBody() → body.photo → instanceof File → AppError('No photo file provided', 400)` block was byte-identical at both upload
+  routes (photos/routes.ts:63 + vehicles/photo-routes.ts:27). Extracted `parseUploadedPhoto(c): Promise<File>` to photos/helpers.ts (beside
+  validateEntityOwnership) + wired both sites (each collapses to `const file = await parseUploadedPhoto(c)`) + dropped the now-unused AppError
+  import from BOTH route files. PAYOFF: one source of truth for the upload-input contract + the natural seam for the filed #34 follow-on
+  (size/type/magic-byte upload validation lands once, not twice). Test-anchored (rule 3): the existing photos + vehicle-photo upload suites green
+  THROUGH the substitution + 3 new direct tests (parse-uploaded-photo.test.ts — File present→returned; missing→400; non-File text field→400; via
+  a minimal Hono app + real FormData, no storage provider needed). NOTE: gate first red on helpers.ts import-order (organizeImports, the
+  Context-type import) → check:musl:fix reflowed it (the C33 whole-tree lesson; pre-existing noNonNullAssertion are warnings, untouched).
+  green→green: backend validate:local EXIT 0 — 1306 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. cov: be 84.14%+ (carry;
+  +3 BE) / fe 79.22% (carry). ARCH QUEUE thin — next arch cycle prefers a fan-out.
+- **C222 (bug → #75): calculateAverageMpg silently depended on caller date-ordering (an unordered future caller → mis-paired/wrong MPG)** —
+  BALANCE: `feature` most-starved (cyc 170, starved-for 52, blocked 47th) but blocked → fell through; `bug` FORCED (cyc 218, starved-for 4 > 3
+  — the C221 forecast). Hunted FRESH surfaces + REJECTED several as not-a-live-bug (C21/C77 — did NOT manufacture): vehicle-stats core (the one
+  caller sorts; the fencepost is the C214 uniform convention), split-service (C173-certified), the offline.svelte store (trivial get/set),
+  FE settings store (no backup-config logic). THE genuine defect-class found in calculateVehicleStats: `calculateAverageMpg` pairs CONSECUTIVE
+  fillups (current − previous) for the per-segment distance, so it's correct ONLY on chronologically-ordered input — but it neither sorted nor
+  documented that, silently trusting the caller (the C168/#48 "helper trusts the caller" class, applied to MATH). The sole production caller
+  (vehicles/routes.ts:348) DOES sort, so no LIVE bug today — but any future consumer reusing this pure util would get silently-WRONG MPG
+  (out-of-order segments mis-paired; negatives dropped by the mpg>0 filter but valid segments scrambled). FIX (behavior-preserving for the
+  current caller — sorting an already-sorted copy is idempotent; closes the class): sort `[...unorderedExpenses]` by date inside
+  calculateAverageMpg. (calculateMileageStats uses Math.max — order-independent, no fix needed.) +3 tests (chronological baseline avg=31;
+  SHUFFLED + fully-reversed inputs yield the SAME 31). NON-VACUOUS: confirmed the shuffled + reversed tests FAIL RED with the sort reverted
+  (mis-paired MPG) while the baseline stayed green. green→green: backend validate:local EXIT 0 — 1309 pass / 1 skip / 0 fail (+3), tsc 0,
+  musl-biome clean, build bundled. cov: be 84.14%+ (carry; +3 BE) / fe 79.22% (carry).
+- **C223 (guard): cover sync-manager conflict classification (determineConflictType — the duplicate-vs-modified data-safety distinction)** —
+  BALANCE: `feature` most-starved (cyc 170, starved-for 53, blocked 48th) but blocked → fell through; nothing else strictly OVER budget →
+  highest-leverage; `guard` was the most-starved actionable (cyc 217, starved-for 6 = 6, due — vs infra at 4, the #5 sweep is next). Took the
+  primed FE low spot sync-manager.ts ~56%, but STEERED to its CLEANEST, highest-stakes slice (the C163 lesson — avoid the network/timer mock-trap
+  paths): `determineConflictType`, which decides whether an offline-vs-server sync collision is 'duplicate' (silently DROPPED) vs 'modified'
+  (surfaced to the user) — a regression mislabeling a real edit as 'duplicate' DISCARDS the user's offline change (data-safety). It was only
+  indirectly hit (one 'duplicate' assertion at :180); the 'modified' branch + each match-component were uncovered. +4 cases driven through the
+  PUBLIC syncAll conflict path (the existing-test convention, NOT private access): amount+tags+date all-match → 'duplicate'; a differing amount
+  (tag still matches so checkForExistingExpense FINDS it) → 'modified'; a differing date → 'modified'; the <0.01 amount epsilon still matches →
+  'duplicate'. VERIFY-FIRSTHAND: ran in isolation FIRST — 13 green (was 9, +4), the conflict-path mechanics + the epsilon confirmed. green→green:
+  FE validate:local EXIT 0 — 584 pass (+4), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. cov: fe 79.22%+ (carry;
+  +4 FE) / be 84.14% (carry). sync-manager's remaining gap = the network/setTimeout-retry paths (the C163 mock-trap territory — left).
+- **C224 (infra): #5 branch-hygiene sweep + coverage re-measure (last sweep C213, branch 34 commits deep)** — BALANCE: `feature` most-starved
+  (cyc 170, starved-for 54, blocked 49th) but blocked → fell through; nothing else strictly OVER budget → highest-leverage pick. `infra` was the
+  most-starved actionable (cyc 219, starved-for 5) AND the #5 sweep was due (last C213, ~11 cycles / 34 commits — the C223 forecast). (1)
+  STRAY-TEST CHECK CLEAN: zero untracked unit/spec `.test.ts` — all untracked are the by-design `*.meshclaw.e2e.ts` set + e2e
+  screenshots/snapshots/results + playwright config + `.meshclaw-tools/` + `mise.local.toml` + the pre-loop `.kiro/specs/offline-entries/` doc.
+  (2) GREEN BASELINE + RE-MEASURE: backend `bun test --coverage` EXIT 0 (1309 pass / 1 skip) — be 84.25% line / 84.60% func (up from C213's
+  84.14/84.49 — the C214/C218/C220/C221/C222 BE additions); frontend `vitest --coverage` EXIT 0 (584 pass) — fe 80.33% line / 79.87% func /
+  74.45% branch (CROSSED 80% line; UP +1.1 vs C213 — the C217 auth + C223 sync-manager guard ratchet). BE↔FE gap ~4pts (84 vs 80) — the FE
+  pure/service modules are now essentially ALL covered. (3) BRANCH_REVIEW.md REFRESH (gitignored): header scope 23→34 commits (C190–C223),
+  status block to 1309 BE / 584 FE + the C224 coverage, appended §29 (C213–C223: the balanced arc — #71/#73/#74 data-safety bugs, #72 photos
+  userId-scope, the C216/C221 dedups, the C217/C223 guard ratchet, #75 mpg-ordering; recurring theme = "guard/middleware wired on most paths but
+  missed one" for #71+#74), fixed the stale "23 commits" → "34 commits (C190–C223)" in Suggested-merge. Doc/measurement-only, no product code.
+  Next sweep ~C234; next CLAUDE.md refresh ~C232 (last C219). cov: be 84.25% / fe 80.33% (FRESH C224 reading).
+- **C225 (deep-review): auth session-refresh + OAuth callback (state/CSRF/PKCE + new-user resolution) — CERTIFIED CLEAN, no fix needed** —
+  BALANCE: `feature` most-starved (cyc 170, starved-for 55, blocked 50th — milestone) but blocked → fell through; `deep-review` AT budget (cyc
+  220, starved-for 5 = 5, due — vs bug also at 3=3 but deep-review waited longer; the C224 forecast). Inline review of the auth surface C56/C126
+  certified for SESSION/email but NOT the OAuth-callback + session-refresh paths. CERTIFIED CLEAN firsthand, FOUR sub-paths: (1)
+  validateAndRefreshSession (utils.ts) — create-new-before-invalidate-old ordering is correct; the `c?`-optional cookie-set-last has NO live
+  cookie-loss path because BOTH callers (middleware/auth.ts:35 + routes.ts:563 /refresh) pass `c`; the C32(b) invalidate-throws-orphans-new
+  edge is the documented sprawl note (not a priv issue). (2) requireAuth middleware — deletes the cookie + 401s on null (C127), sets ctx on
+  success; optionalAuth correctly swallows. (3) OAuth state/CSRF/PKCE: validateLoginState requires the state be in the in-mem store (proves
+  this-server-minted) + flowType-undefined (a link-state can't replay at the login callback) + single-use delete; the generic callback
+  VALIDATES STATE BEFORE the token exchange (:418 before :424) + exchanges with the state-bound codeVerifier (PKCE) — order-correct,
+  CSRF-protected, and ALREADY guarded by auth-routes.property.test.ts (flowType discrimination + route-order + rate-limiter). (4) resolveNewUser
+  — email-conflict guard (no implicit merge), txn-atomic user+provider insert, UNIQUE-constraint race-recovery; VERIFIED the
+  findByProviderIdentity lookup queries the SAME userProviders table the insert writes, with a BYTE-MATCHING WHERE (domain:'auth' +
+  providerType + providerAccountId) → a returning OAuth user is correctly found (no new-row-per-login bug). NO fix + NO new test (the structural
+  invariants are already pinned — adding more would be coverage-theater, the C181 anti-pattern). The lone note: oauthStateStore is in-memory →
+  OAuth breaks under horizontal scaling (documented :54; the self-host PWA is single-instance per NORTH_STAR — a scaling-arch limitation, not a
+  correctness bug). Record-only (the C179/C191 clean-certification precedent), no build gate (no code touched). cov: be 84.25% / fe 80.33% (carry).
+- **C226 (bug → #76): switching an expense's category away from fuel left stale volume/charge/fuelType/mileage in form-state, riding onto a
+  non-fuel row** — BALANCE: `feature` most-starved (cyc 170, starved-for 56, blocked 51st) but blocked → fell through; `bug` FORCED (cyc 222,
+  starved-for 4 > 3; arch only AT-budget 5=5). Hunted FRESH surfaces + CERTIFIED CLEAN firsthand (C21/C77 — not manufactured): the
+  insurance-CLAIM write path (POST/PUT/DELETE all ownership-gated; update/delete scope WHERE id+policyId [C155 class clean]; findOwnerUserId's
+  claimId-only key is the correct owner-resolver, not a tenant read). THE live one — #76, VERIFIED UI-reachable firsthand: ExpenseForm's
+  `selectCategory` resets the financing source on switch-away-from-financial (:358) but did NOT clear the fuel fields on switch-away-from-fuel —
+  so a user who fills fuel inputs then switches to misc/maintenance submits with `expenseData.volume/charge/fuelType/mileage` STILL populated
+  (the inputs hide via showFuelFields but formData values persist; expenseData :489 sends them regardless of category). Impact: inert in
+  analytics (every fuel query filters category='fuel', :616/:683/:1116/:1928 — a stray volume on a misc row is never read), BUT a real
+  data-hygiene leak + a stray `mileage` feeds getCurrentOdometer CROSS-CATEGORY (odometer/repository.ts:151 — no category filter). FIX
+  (decision-free, mirrors the EXISTING financing-reset idiom in the same handler): `if (categoryValue !== 'fuel') { clear volume/charge/fuelType/
+  mileage/missedFillup }`. Behavior-preserving (a real fuel expense keeps its fields; only switch-AWAY clears). GUARD: +1 source-scan
+  (category-switch-clears-fuel-fields.test.ts — the C133/C220 + sibling category-selector-labels precedent, since selectCategory mutates Svelte
+  component state, not unit-testable without mount; pins the clear-block inside selectCategory). NON-VACUOUS: confirmed RED with the block
+  reverted. CAVEAT: the full select→clear→submit round-trip is eyes-on/Playwright-BLOCKED → code-complete/source-pinned/eyes-on-pending per the
+  feature-DoD rule. (Process: my first guard draft used bun:test/import.meta.dir [the BACKEND source-scan idiom] → vitest rejected it; fixed to
+  vitest + fileURLToPath, the FE sibling convention.) green→green: FE validate:local EXIT 0 — 585 pass (+1), tsc 0, build OK; prettier + eslint
+  clean. cov: fe 80.33%+ (carry; +1 FE) / be 84.25% (carry).
+- **C227 (arch → also closed #77 security gap): extract photoThumbnailResponse — the photo byte-serve Response, 2 sites → 1** — BALANCE:
+  `feature` most-starved (cyc 170, starved-for 57, blocked 52nd) but blocked → fell through; `arch` FORCED (cyc 221, starved-for 6 > 5 — the
+  C226 forecast). Inline scout. FOUND a dedup that ALSO closes a real security divergence (the C205/C211 "dedup-collapses-the-bug" pattern, here
+  on a SECURITY header): the photo-thumbnail byte-serve `new Response(buffer, {headers})` existed at 2 sites — generic photos/routes.ts (:85) +
+  vehicles/photo-routes.ts (:59) — with the SAME headers EXCEPT the generic route carried `X-Content-Type-Options: nosniff` (the C133/#35 fix)
+  and the VEHICLE route did NOT (#77, VERIFIED firsthand). Since the serve uses the client-asserted never-sniffed mimeType, the vehicle path —
+  the PRIMARY photo surface — was MIME-sniff-exploitable (a declared-image/actually-HTML file could execute). Extracted
+  `photoThumbnailResponse(buffer, mimeType)` to photos/helpers.ts (beside parseUploadedPhoto) with nosniff baked in + wired BOTH sites → the
+  vehicle path GAINS nosniff (security fix) + the generic path is behavior-identical + future header drift between the two is structurally
+  prevented. Test-anchored: UPDATED the C133 photo-serve-headers.test.ts source-scan to follow the literal to its new home (helpers.ts builder)
+  + EXTENDED it to pin BOTH routes call the shared builder (the #77 assertion). NON-VACUOUS: confirmed the vehicle-route assertion FAILS RED with
+  that wiring reverted. (Process: gate first red on the test's long-line FORMAT → check:musl:fix reflowed it; pre-existing noNonNullAssertion are
+  warnings, untouched.) green→green: backend validate:local EXIT 0 — 1310 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean, build bundled.
+  cov: be 84.25%+ (carry; +1 BE) / fe 80.33% (carry). #77 (vehicle-photo serve missing nosniff) CLOSED as a side effect.
+- **C228 (guard): cover the vehicle-photo sub-router's provider-free HTTP paths (list + set-cover) — the 0%-covered `vehicles/photo-routes.ts`** —
+  BALANCE: `feature` most-starved (cyc 170, starved-for 58, blocked 53rd) but blocked → fell through; nothing else strictly OVER budget →
+  highest-leverage; `guard` was the most-starved actionable (cyc 223, starved-for 5 = 5 → 6 at this cycle, due — the C227 forecast). RESUME NOTE:
+  this cycle's test file was authored in a prior session that was cut before validate/commit/ledger (HEAD was still C227, the file untracked) —
+  resumed by verifying + landing it. STEERED to the file's CLEAN slice (the C163/C223 mock-trap lesson): the C227 dedup confirmed
+  vehicles/photo-routes.ts inherits requireAuth + changeTracker from the parent vehicles router, but its own LIST (GET /) + SET-COVER
+  (PUT /:photoId/cover) handlers were 0%-covered (upload + thumbnail need a real storage provider — not in-harness-testable, modeled by the
+  property tests). +6 HTTP tests via createTestApp over the FULL route stack with RAW-seeded photo rows (the C215/C220 provider-free pattern):
+  LIST is ownership-gated (foreign vehicle → 404, no cross-tenant leak) + paginated + 401-on-anon; SET-COVER flips the target + clears the prior
+  cover (the single-cover invariant, asserted on the raw is_cover flags) + enforces the entityType/entityId match (another entity's photoId via
+  my vehicle URL → 404, foreign flag untouched) + foreign-vehicle → 404. VERIFY-FIRSTHAND: ran in isolation FIRST — 6 green, 16 expect()s; the
+  ownership + single-cover mechanics confirmed against the real handlers. (Process: gate first red on the test's long-line FORMAT →
+  check:musl:fix reflowed 1 file; the 10 pre-existing noNonNullAssertion stay warnings, untouched — the recurring C220/C221/C227 note.)
+  green→green: backend validate:local EXIT 0 — 1316 pass / 1 skip / 0 fail (+6), tsc 0, musl-biome clean, build bundled. cov: be 84.25%+
+  (carry; +6 BE) / fe 80.33% (carry).
+- **C229 (bug): `PhotoRepository.setCoverPhoto` second UPDATE keyed on `id` ALONE + bound the getDb() singleton (untestable) —
+  scoped to (id,entityType,entityId), validated BEFORE the unset, switched to `this.db.transaction`** — BALANCE: `feature` most-starved
+  (cyc 170, starved-for 59, blocked 54th) but blocked → fell through; `bug` FORCED (cyc 226, starved-for 3 = 3, due — the C228 forecast).
+  Scouted the photo write-paths firsthand (the queued #34 upload-atomicity is storage-provider-blocked in-harness — deferred, not forced).
+  Found a THREE-PART defect in setCoverPhoto, the same method: (1) the second (set-cover) UPDATE keyed on `photoId` ALONE while the first
+  (unset) was (entityType,entityId)-scoped → the C63/#192 + C72/#215 "write keyed on id alone, match proven a layer up" class: a photoId from a
+  DIFFERENT entity would clear the named entity's cover AND flag the foreign photo (entity left cover-less). (2) it used the MODULE-level
+  `transaction()` helper, which binds the `getDb()` singleton + IGNORES the injected `this.db` (the lone repo method that did — every sibling in
+  expenses/insurance uses `this.db.transaction`), so it was UNTESTABLE via a constructed repo → the two photo "property" tests only drive an
+  in-memory REFERENCE model, never the real method (the C181 coverage-theater pattern); it also wrapped the internal NotFoundError into a 500
+  DatabaseError. (3) discovered while testing: even an entity-scoped second UPDATE + a throw does NOT undo the unset — the C151 bun:sqlite
+  ASYNC-transaction footgun (a throw escaping the async callback AFTER a sync write does not roll it back). FIX (all three, one coherent
+  setCoverPhoto change): VALIDATE the target's (id,entityType,entityId) match BEFORE any write (so a bad/foreign id mutates nothing regardless
+  of rollback semantics — strictly safer than both the old flag-foreign and an unset-then-throw), switch to `this.db.transaction` (DI-consistent
+  with siblings + 404 propagates cleanly; production has this.db===getDb() so behavior-preserving). GUARD: set-cover-entity-scope.test.ts (+3)
+  drives the REAL repo over a migrated in-memory SQLite DB (the batch-by-entity-type pattern — closes the coverage-theater gap): happy-path
+  flip+single-cover; a foreign-entity photoId → NotFoundError + VEH_1 keeps its cover + foreign flag untouched (the #-class regression); an
+  unknown id → NotFoundError, cover intact. NON-VACUOUS: the foreign-entity + unknown-id cases went RED under both the original id-alone code
+  AND an interim unset-then-throw (coverFlag('p1')===0) — green only once validation precedes the unset (live evidence this session). green→green:
+  backend validate:local EXIT 0 — 1319 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (1 unused-import + reflow fixed), build bundled.
+  cov: be 84.25%+ (carry; +3 BE, setCoverPhoto now really covered) / fe 80.33% (carry).
+- **C230 (infra): CLAUDE.md orientation refresh — stale coverage reading + suite size + closed-bug list (drifted C219→C229)** — BALANCE: TWO
+  at-budget — `infra` (cyc 224, starved-for 6 = 6) + `deep-review` (cyc 225, starved-for 5 = 5); `infra` waited LONGER (touched C224 vs C225) →
+  infra wins the tiebreak. The #5 branch-hygiene sweep just ran C224 (only ~6 cycles / a few commits ago — not due), so the actionable infra
+  increment is the CLAUDE.md refresh: it last refreshed ~C219 and three things had drifted materially. (1) The coverage paragraph cited the
+  SUPERSEDED C213 reading (be 84.14/84.49, fe 79.22/78.89) — replaced with the C224 #5-sweep measure (be 84.25% line / 84.60% func, fe 80.33%
+  line / 79.87% func / 74.45% branch; FE crossed 80%), and folded C223 sync-manager into the FE-ratchet list. (2) "Next BE low spot:
+  activity-tracker.ts ~44%" was stale — its pure slice (cleanupInactiveUsers) was covered C195 + the rest is timer/orchestrator-bound; updated to
+  "clean BE route/util low spots largely worked through; next guard cycles thin both sides." (3) Suite size "~1300 BE / ~580 FE" → "~1320 BE /
+  ~585 FE" (actual 1319/585) and the closed-bug list ended at #73/C218 → extended with #74 (C220 photos changeTracker), #75 (C222 mpg ordering),
+  #76 (C226 category-switch fuel fields), #77 (C227 vehicle-photo nosniff), #78 (C229 setCoverPhoto); also threaded C229 into the recurring
+  coverage-theater lesson (the property tests never drove the real setCoverPhoto). DOCS-ONLY (CLAUDE.md only — verified `git diff --name-only`
+  shows just CLAUDE.md), no source touched → no build gate (the C195/C213/C224 doc-refresh precedent). Next CLAUDE.md refresh ~C240; next #5
+  sweep ~C234. cov: be 84.25% / fe 80.33% (carry — no code, no re-measure this cycle).
+- **C231 (deep-review): expense split-service allocation math + offline-outbox idempotency — both CERTIFIED CLEAN; filed #79 (stuck malformed
+  offline entry) + pinned its current behavior** — BALANCE: `deep-review` OVER budget (cyc 225, starved-for 6 > 5, FORCED — the C230 forecast).
+  spawn_run fan-out hit the HTTP 400 transport failure (the C179 precedent) → did it inline, higher-fidelity. TWO data-safety surfaces audited
+  firsthand: (A) SPLIT-SERVICE (split-service.ts + repository createSplitExpense/updateSplitExpense) — CERTIFIED CLEAN: even split = largest-
+  remainder cents (Math.round total→cents, floor base, first `remainderCents` siblings get +1¢) sums EXACTLY; percentage = floor-all-but-last +
+  last absorbs the clamped remainder; absolute = verbatim with validation enforcing sum===total; updateSplitExpense DERIVES the absolute total
+  from the legs (not the stale groupTotal — the C-documented Property-3 fix) + carries groupId/sourceType/sourceId from firstOld; siblings carry
+  null volume/mileage by design (C97). NOT coverage-theater — split-service.property.test.ts drives the REAL computeAllocations + pins the sum
+  invariant for all 3 methods. (B) OFFLINE-OUTBOX IDEMPOTENCY (offline-storage.ts syncOfflineExpenses + repository createIdempotent/importExpenses)
+  — CERTIFIED CLEAN: the `(userId,clientId)` UNIQUE PARTIAL index (schema.ts:262 `WHERE client_id IS NOT NULL`; migration 0001) backs a pre-check +
+  race-recovery re-read; clientId is userId-scoped (no cross-tenant collision); the deterministic clientId backfill (C202) + the #66 fuelType
+  single-source mapper hold; batch import is atomic (one txn). Odometer has NO clientId — but the outbox is EXPENSE-ONLY (offline.svelte.ts queues
+  only OfflineExpense), so that's not a live gap (CERTIFIED, not a defect). THE one finding → #79 (LOW, data-hygiene, ESCALATED): a malformed fuel
+  offline entry (no volume/charge or no mileage) is `continue`-skipped in syncOfflineExpenses → never markExpenseAsSynced'd → clearSyncedExpenses
+  (drops only synced===true) leaves it PENDING forever, silently re-skipped every sync, no user signal (a user write that never lands + no signal,
+  NORTH_STAR #1-adjacent). The resolution (drop+toast / failed-bucket / confirm the form already blocks it) is a PRODUCT call → send_message'd
+  Angelo. Decision-free increment this cycle: a CHARACTERIZATION test pinning the current stuck-forever behavior (the existing malformed-fuel test
+  asserted only "not POSTed", never what happens to the entry after) so a fix can't change it unnoticed — +1, drives the REAL syncOfflineExpenses
+  over the stateful localStorage mock (two syncs → entry persists unsynced, never POSTed). green→green: frontend validate:local EXIT 0 — 586 pass
+  (+1), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. cov: fe 80.33%+ (carry; +1 FE) / be 84.25% (carry).
+- **C232 (arch): collapse trigger-service's 3 byte-identical `reason:'error'` skip-push blocks into one `pushReminderSkipError` helper** —
+  BALANCE: TWO at budget — `bug` (cyc 229, starved-for 3 = 3) + `arch` (cyc 227, starved-for 5 = 5); `arch` waited LONGER (touched C227 vs C229)
+  → arch wins the tiebreak. Inline scout. REJECTED the obvious target first (C21/C77 — didn't force churn): the `error instanceof Error ?
+  .message : String(error)` idiom is hand-rolled in 16 files, but `extractErrorMessage` (C147) ALREADY exists for the VALUE form and its doc +
+  test EXPLICITLY carve out the 16 logger `{error: <idiom>}` structured-shape sites + the `'Unknown error'` fixed-fallback as deliberately-inline
+  — so a sweep would reverse a documented decision (arch rule 5). The genuine, contained dedup: trigger-service.ts built
+  `result.skipped.push({ reminderId, reason:'error', message: error instanceof Error ? error.message : 'Unknown error' })` BYTE-IDENTICALLY at 3
+  catch sites (time axis :312, mileage axis :329, recheck-on-write per-reminder :372). Extracted a module-level `pushReminderSkipError(result,
+  reminderId, error)` (beside clampToAnchorDay/advanceCustom) + routed all 3 → one call each. PAYOFF: one source of truth for the per-reminder
+  error-skip shape so it can't drift between the axes (a real risk — the recheck axis was added later, C214). DELIBERATELY LEFT inline: the
+  `recheck_query_failed` site (:360 — different reason + reminderId:'all', single occurrence) + the pre-math `no_vehicles`/`mileage_requires_
+  single_vehicle`/`catch_up_limit_reached` skips (no message, distinct reasons). Kept the `'Unknown error'` fallback inside the helper (NOT routed
+  through extractErrorMessage, whose contract is String(error)) — honors the C147 carve-out. Test-anchored (rule 3, green→green): the
+  reason:'error' path is pinned by trigger-bad-interval-unit.test.ts (asserts skip.message CONTAINS 'intervalUnit') +
+  trigger-nonprogress-frequency + recheck-on-write — all passed UNCHANGED through the substitution (proves the helper preserves the real
+  error-message extraction). green→green: backend validate:local EXIT 0 — 1319 pass / 1 skip / 0 fail (UNCHANGED — behavior-preserving), tsc 0,
+  musl-biome clean (no reflow needed), build bundled. cov: be 84.25% / fe 80.33% (carry — no test count change, pure refactor).
+- **C233 (bug → #80): license-plate uniqueness was GLOBAL across all tenants (cross-tenant false-409 + plate-existence enumeration oracle) —
+  scoped per-user at BOTH the route check AND the DB unique index** — BALANCE: `bug` OVER budget (cyc 229, starved-for 4 > 3, FORCED — the C232
+  forecast). The filed queue's unblocked items are all weak/gated (#79 escalated; #29/#40/#47 product calls), so per the bug-cycle pattern
+  (C189/C218/C222/C226 — find a FRESH verified defect over forcing a gated one) I hunted the vehicles write-path. FOUND #80 (MED, tenant-isolation
+  + info-leak): `vehicleRepository.findByLicensePlate(plate)` queried `WHERE license_plate = ?` GLOBALLY (no userId), and it backs the
+  plate-uniqueness check on BOTH create (routes.ts:177) + update (:261) → a user adding a plate that ANOTHER tenant already owns got a 409 "A
+  vehicle with this license plate already exists" (a cross-tenant FALSE conflict — two users may legitimately share a plate string: reissued
+  plates across states, sold-then-rebought cars) AND the 409 is an ENUMERATION ORACLE (probe whether any plate exists system-wide). VERIFIED
+  firsthand + via a RED test. KEY DISCOVERY mid-fix: the route check is only HALF — migration 0000's `vehicles_license_plate_idx` is a GLOBAL
+  UNIQUE partial index, so scoping the route alone turned the cross-tenant collision from a 409 into a SQLITE_CONSTRAINT_UNIQUE 500. The complete
+  fix is TWO layers: (1) route + repo — added a `userId` param to findByLicensePlate, ANDed `eq(vehicles.userId, userId)`, threaded user.id
+  through both sites; (2) migration 0005 (the low-risk 0003-class index swap — NO data rebuild, and the existing globally-unique data trivially
+  satisfies the more-permissive composite constraint so it can't fail on existing rows): DROP the global index, CREATE UNIQUE
+  `vehicles_user_license_plate_idx ON (user_id, license_plate) WHERE license_plate IS NOT NULL`; registered in _journal.json (idx 5) + added the
+  composite index to schema.ts (it was ABSENT there — fixing pre-existing schema↔migration drift too, since the global one lived only in 0000).
+  GUARD: +3 HTTP tests (vehicles-http.test.ts, raw-seeded foreign user — the C215/C220 pattern): cross-tenant CREATE with a foreign-owned plate →
+  201; same-user duplicate plate → 409 (per-user constraint intact); cross-tenant UPDATE → 200. NON-VACUOUS: the 2 cross-tenant cases were RED
+  pre-fix (409 on the route, then 500 on the DB index before 0005). Migration applied cleanly across the WHOLE suite via the harness's
+  runMigrations() — no other test relied on the global plate constraint. green→green: backend validate:local EXIT 0 — 1322 pass / 1 skip / 0 fail
+  (+3), tsc 0, musl-biome clean, build bundled. cov: be 84.25%+ (carry; +3 BE) / fe 80.33% (carry). NOTE: this is a real tenant-isolation fix
+  (not just defense-in-depth) — the false-409 was user-observable.
+- **C234 (guard): pin the expense-category display maps' EXHAUSTIVENESS (categoryLabels / getCategoryIcon / getCategoryColor) — the uncovered
+  exports of expense-helpers.ts** — BALANCE: `guard` AT budget (cyc 228, starved-for 6 = 6, FORCED — the C233 forecast). SCOUTED for a grounded,
+  non-theater pick: the backend utils are genuinely worked through — VERIFIED firsthand that csv-safety.ts (both directions + round-trip +
+  idempotence) and unit-conversions.ts (correctness/identity/round-trip for all 3 fns via property tests) are FULLY covered, NOT gaps; the named
+  BE low spots (activity-tracker timer-bound, restore.ts mock-trap) stay non-clean. Pivoted FE per the standing angle: expense-helpers.ts had only
+  compareExpenseRows pinned (compare-expense-rows.test.ts) — its 3 category-display exports (categoryLabels, getCategoryIcon, getCategoryColor)
+  were UNCOVERED. Picked the EXHAUSTIVENESS invariant (real value, not theater): every ExpenseCategory in the union must map to a label/icon/color
+  — a missing key is a SILENT UI bug (categoryLabels[newcat]=undefined renders blank; the icon/color maps fall through to DollarSign/muted). +6
+  tests (expense-category-maps.test.ts, drives the REAL exports): ALL_CATEGORIES (a literal mirror of the union) has exactly 6 / no dupes; every
+  category has a truthy string label + Object.keys(categoryLabels) EXACTLY equals the union (catches a stale/extra key too); a defined icon
+  component + a `text-`-containing color class for each; representative known values (fuel→'Fuel & Charging', the chart-1 color); and the unknown-
+  category FALLBACK (icon→DollarSign, color→muted, no throw — the `|| fallback` guards, reachable via a legacy/garbage row cast through unknown).
+  PAYOFF: adding a 7th ExpenseCategory without updating these maps now FAILS CI instead of shipping a blank label. green→green: frontend
+  validate:local EXIT 0 — 592 pass (+6), tsc 0, build OK; prettier + eslint clean. Test-only, no production change. cov: fe 80.33%+ (carry; +6 FE)
+  / be 84.25% (carry). (vehicle-helpers.ts — the one truly untested FE util — was REJECTED as a pick: a single trivial display-name helper,
+  pinning it would be borderline coverage-theater.)
+- **C235 (deep-review → bug-class fix): `Math.max(...arr)` argument-spread crash-class across the analytics read-path — 18 sites swept to
+  spread-safe `maxOf`/`minOf` reduce helpers** — BALANCE: `infra` was most-starved (cyc 230, starved-for 5) BUT its only real increment (the #5
+  sweep's coverage re-measure via `bun test --coverage`) is BLOCKED by refused heavy tooling this session → per don't-force-a-blocked-pick, took
+  the next most-starved ACTIONABLE = `deep-review` (cyc 231, starved-for 4, inline-doable; the C231/C179 spawn-400 precedent). Audited the analytics
+  aggregation read-path firsthand. FOUND a systemic latent crash-class (VERIFIED, NORTH_STAR #1-adjacent): `Math.max(...mileages)` /
+  `Math.min(...arr)` spreads every element as a function argument, so a large array overflows the engine's argument-count cap and throws
+  `RangeError: Maximum call stack size exceeded`, crashing the analytics REQUEST. CONFIRMED the arrays are UNBOUNDED: queryFuelExpenses /
+  queryAllExpenses have NO LIMIT (the all-time 'all' period has no range filter either), so the mileages/volumes arrays scale 1:1 with a heavy
+  logger's fillup count — thousands-to-tens-of-thousands of rows reaches the cap (V8 ~65k, stack-depth-dependent). 18 spread sites across 3 files:
+  analytics/repository.ts (4 — incl. line 503 cross-fleet total distance, hit on EVERY /analytics summary), utils/analytics-charts.ts (12 — radar
+  + best/worst efficiency/cost), utils/vehicle-stats.ts (1 — per-vehicle latestMileage, also fillup-scaled). FIX (one coherent class-closing
+  increment): added spread-safe `maxOf`/`minOf` (O(n) reduce, no spread) to utils/calculations.ts + swept ALL 18 sites to them. Behavior-IDENTICAL:
+  the helpers return -Infinity/+Infinity on [] exactly like Math.max()/Math.min(), so every call site (incl. the `length > 0 ? : null` and
+  `length >= 2` guards already present) is unchanged. GUARD: +6 tests (array-min-max.test.ts) — correctness (incl. negatives/floats/single),
+  behavior-IDENTITY with Math.max/min incl. the empty→±Infinity contract + a 50-trial randomized parity vs the spread form, and the REGRESSION:
+  maxOf/minOf compute correctly on a 500k array (the no-spread path well beyond the argument cap). NOTE: my first draft asserted
+  `Math.max(...big)` THROWS at 500k — but Bun/JSC tolerates a far larger spread than V8, so I removed that environment-specific assertion (the
+  C77 vacuity discipline — don't assert an engine-specific premise); the test pins the helper's correctness at scale, not the engine's throw
+  threshold. Test-anchored green→green: every existing analytics + vehicle-stats test passed UNCHANGED through the 18-site swap. green→green:
+  backend validate:local EXIT 0 — 1328 pass / 1 skip / 0 fail (+6), tsc 0, musl-biome clean (3 import-order autofixed), build bundled. cov: be
+  84.25%+ (carry; +6 BE) / fe 80.33% (carry). This is a real reliability fix (an analytics crash for the most-engaged users), surfaced by a
+  deep-review and fixed in-cycle since the whole class was a mechanical, behavior-preserving swap.
+- **C236 (infra): #5 branch-hygiene sweep + coverage re-measure (last measured C224, last #5 sweep C224 — ~12 cycles / overdue)** — BALANCE: TWO
+  at budget — `infra` (cyc 230, starved-for 6 = 6) + `bug` (cyc 233, starved-for 3 = 3); `infra` waited LONGER (touched C230 vs C233) → infra
+  wins. The coverage-re-measure increment was TOOL-BLOCKED last cycle (C235, `bun test --coverage` refused) — retried this cycle and it RAN. (1)
+  STRAY-TEST CHECK CLEAN: zero untracked non-e2e `.test.ts` in the tree. (2) GREEN BASELINE + RE-MEASURE: backend `bun test --coverage` EXIT 0
+  (1328 pass / 1 skip) — **be 85.18% line / 84.74% func** (up from C224's 84.25/84.60 — the C229 setCoverPhoto + C233 vehicles + C235 maxOf/minOf
+  BE additions); frontend `vitest --coverage` EXIT 0 (592 pass) — **fe 80.64% line / 80.51% func / 74.97% branch** (up from C224's 80.33 — the C231
+  characterization + C234 category-maps FE additions). BE↔FE gap ~4.5pts (85 vs 81). (3) LOWEST substantive spots (for steering future guard/bug
+  cycles, all KNOWN-hard): `auth/routes.ts` 18% (OAuth flow — needs a real provider, the mock-trap), `photo-service.ts` 30% func + `google-photos-
+  service.ts` 25% func + `backup-orchestrator.ts` 29% func (all storage-provider/DI-bound — the documented deep-review #3 + C181 gaps),
+  `settings/routes.ts` 56%, `providers/routes.ts` 58%, `sync/routes.ts` 59% + `analytics/routes.ts` 59% (HTTP-harness-reachable but largely
+  worked — partial). The clean pure/util layer is ~fully covered both sides (calculations 98.9%, the C235 maxOf/minOf now pinned). NO clean
+  high-value low spot remains that isn't provider/DI/OAuth-bound — confirms the "guard cycles thin both sides" note; next guard should expect a
+  characterization-of-a-known-hard-seam or an eyes-on-acknowledged punt. DOCS/MEASUREMENT-ONLY (no source touched) → no build gate beyond the two
+  coverage runs that WERE the verification. Next #5 sweep ~C246; next CLAUDE.md refresh ~C240. cov: be 85.18% line / 84.74% func / fe 80.64% line /
+  80.51% func / 74.97% branch (FRESH C236 reading).
+- **C237 (bug → #82): PUT /settings wrote `backupConfig` WHOLESALE while storageConfig was merged — a partial PUT silently wiped other providers'
+  backup settings; merge per-provider server-side** — BALANCE: `bug` OVER budget (cyc 233, starved-for 4 > 3, FORCED — the C236 forecast). Per the
+  bug-cycle pattern (fresh verified defect over a gated one), hunted un-audited write-paths. CERTIFIED CLEAN firsthand: the insurance term
+  write-path — addTerm (repository.ts:407) + updateTerm (:541) BOTH validateVehicleOwnership on the term↔vehicle junction (no #61 cross-tenant
+  link gap). THE live defect in PUT /settings: storageConfig is MERGED with existing (mergeStorageConfig, :262) but backupConfig was written
+  WHOLESALE (`...(backupConfig && { backupConfig })`, :278). backupConfig = { providers: Record<providerId, settings> }, and backupConfigSchema
+  REQUIRES the full providers map → a client PUT-ing backupConfig with only the provider it's editing WIPES every other provider's backup settings
+  (retentionCount / sheetsSyncEnabled / folderPath) — silent data loss (NORTH_STAR #1). VERIFIED the frontend currently MITIGATES (ProviderForm.svelte:356
+  spreads ...backupConfig.providers, sending the full map), but that makes the backend contract FRAGILE: a partial sender (future client, direct
+  API caller, or a stale-load race) loses data — and storageConfig already defends server-side, so the asymmetry IS the bug. FIX (mirror
+  mergeStorageConfig): `mergeBackupConfig(existing, incoming)` merges per-provider — a named entry is replaced wholesale (its settings are a small
+  fixed shape the editor always sends complete) but un-named providers are PRESERVED; wired into the PUT. validateBackupConfig still gates the
+  INCOMING providers (ownership), and the merged-in existing ones were validated when first written, so no validation bypass. Behavior-preserving
+  for today's full-map caller; protective for partial callers. GUARD: +2 HTTP tests (backup-config-merge.test.ts, 2 raw-seeded owned providers):
+  a partial PUT naming only drive-b PRESERVES drive-a's settings (the #82 regression — pre-fix drive-a was wiped); a named entry IS replaced
+  wholesale (sheetsSyncEnabled dropped on re-PUT without it). NON-VACUOUS: the preserve assertion fails RED pre-fix (wholesale write → drive-a
+  absent). green→green: backend validate:local EXIT 0 — 1330 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean (1 import-order + test reflow
+  autofixed), build bundled. cov: be 85.18%+ (carry; +2 BE) / fe 80.64% (carry).
+- **C238 (arch): extract the byte-identical `unitPreferencesSchema` + partial + merge idiom (vehicles + settings routes) to one shared module** —
+  BALANCE: `arch` OVER budget (cyc 232, starved-for 6 > 5, FORCED — the C237 forecast). Inline scout. FOUND a clean 2-file dedup: vehicles/routes.ts
+  (24-38) and settings/routes.ts (156-170) each declared a BYTE-IDENTICAL `unitPreferencesSchema = z.object({ distanceUnit/volumeUnit/chargeUnit
+  enums + identical error-message strings })` + `partialUnitPreferencesSchema = .partial()`, AND both PUT handlers repeated the same
+  `partialUnitPrefs ? { ...existing.unitPreferences, ...partialUnitPrefs } : undefined` merge — two sources of truth for one validation contract (a
+  future enum/message change would have to land in both or silently drift). FIX: new pure module `utils/unit-preferences-schema.ts` (depends only on
+  zod + the type enums, NOT the repo-heavy validation.ts) exporting `unitPreferencesSchema`, `partialUnitPreferencesSchema`, and
+  `mergeUnitPreferences(existing, partial)` (returns undefined when nothing to merge so the caller leaves the column untouched; null/undefined
+  existing spread safely — preserving the vehicle-path edge where existing may be null). Wired both routes to import the shared symbols + call the
+  helper; dropped the now-unused unit-enum + UnitPreferences imports from both files. Behavior-IDENTICAL (the helper reproduces the exact spread the
+  two inline sites did). Test-anchored (rule 3, green→green): every existing vehicles + settings route test (incl. the C237 backup-config-merge + the
+  vehicle clear-optional-field + unit-defaults suites) passed UNCHANGED through the swap; +7 direct tests (unit-preferences-schema.test.ts — full vs
+  partial schema validity, enum rejection, and the merge contracts incl. the undefined-when-no-partial + null-existing edges). tsc caught a real
+  test-type issue (the helper's `UnitPreferences` return needs an `as` cast on the partial-expected values — the prior inline behavior). green→green:
+  backend validate:local EXIT 0 — 1338 pass / 1 skip / 0 fail (+7), tsc 0, musl-biome clean (import-order autofixed), build bundled. cov: be 85.18%+
+  (carry; +7 BE) / fe 80.64% (carry). NOTE: the C237 mergeBackupConfig + mergeStorageConfig stay in settings/routes.ts (config-specific, single-site
+  — not over-extracted; arch rule 5 no churn-for-churn).
+- **C239 (guard): cover the 4 `validateStorageConfig` consistency branches (settings/routes.ts, was ~56%)** — BALANCE: nothing OVER budget; `guard`
+  most-starved (cyc 234, starved-for 5) → highest-leverage. Per the C236 steering note (clean coverage low spots exhausted → characterize a
+  known-hard seam via the HTTP harness), picked validateStorageConfig: it gates a user from saving a BROKEN or CROSS-TENANT storage-routing config
+  (a regression would let photos route to a non-owned/disabled provider — data-routing + tenant), and it's HTTP-harness-reachable via PUT /settings
+  with raw-seeded providers (the C237 pattern); the validator runs on the MERGED config so it also exercises mergeStorageConfig. The C237
+  settings-route-errors test covered GET + the ZodError path + a path-traversal backupConfig + a valid partial — but NONE of the 4 storageConfig
+  consistency branches. +4 HTTP tests (storage-config-validation.test.ts, raw-seeded owned providers): (1) fully-consistent config → 200 (positive
+  control); (2) a default referencing a NON-OWNED provider → 400 'does not belong to this user' (the cross-tenant routing guard); (3) a default
+  whose provider has NO providerCategories entry → 400 'no category settings'; (4) a default whose category is present but NOT enabled → 400
+  'Cannot disable'. PROCESS: first draft sent partial providerCategories maps → all 400'd as ZodError ('Invalid request data') BEFORE reaching the
+  validator — the inner `z.record(photoCategoryEnum, …)` is EXHAUSTIVE in Zod v4 (the C70 trap), so added a categoryMap() helper building all 4
+  category keys; the assertions then hit the real validator branches (confirmed via the distinct 400 messages, not the schema 400). green→green:
+  backend validate:local EXIT 0 — 1341 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production
+  change. cov: be 85.18%+ (carry; +4 BE, settings/routes.ts validateStorageConfig now branch-covered) / fe 80.64% (carry).
+- **C240 (deep-review): financing write+balance+hook path — CERTIFIED CLEAN; pinned the refinance-after-payoff balance-reset invariant** —
+  BALANCE: TWO at budget — `deep-review` (cyc 235, starved-for 5 = 5) + `bug` (cyc 237, starved-for 3 = 3); deep-review waited LONGER (touched C235
+  vs C237) → deep-review wins. spawn_run 400 → inline (the C231/C235 precedent). Audited the financing write-path firsthand, CERTIFIED CLEAN: (1)
+  computeBalance/computeBalances are payment-history-based (originalAmount − SUM(financing-payment expenses), clamped ≥0), C101-consistent; the
+  SUM isn't userId-scoped but `sourceType='financing'` expenses require validated ownership to create (#62) so no cross-tenant injection. (2) Every
+  route entry-point is ownership-gated: POST create-or-replace validates the VEHICLE (findByUserIdAndId) then findByVehicleId; PATCH
+  payment-amount / PUT payoff / DELETE all call validateFinancingOwnership (financing→its vehicle→owned, throws NotFound on either miss, no info
+  leak). (3) onFinancingDeactivated → clearSource('financing', id, userId) nulls BOTH sourceType+sourceId, userId-scoped, best-effort. (4) The
+  #67/C206 re-finance reactivation (isActive→true, endDate→null) is correct. THE one subtle invariant with NO dedicated test: re-financing REUSES
+  the same row (#67), so the new loan's balance is correct ONLY because payoff/DELETE first clearSource the old payment links — else computeBalance
+  (filtered by source_id) would subtract the OLD loan's payments from the NEW originalAmount (a wrong headline $, NORTH_STAR #1/#2). The
+  financing-balance property test covers the math but not this multi-step chain. GUARD (record-only cert + a merge-surviving net where coverage was
+  thin — the C108/C179 precedent): +2 DB-integration tests (refinance-balance-reset.test.ts, real FinancingRepository + ExpenseRepository over an
+  in-memory DB): pay-down→clearSource→reuse-row→FRESH full balance ($20k−$8k paid, cleared, re-fin $30k → $30k); + a proves-the-dependency case
+  (SKIP the clear → the reused row wrongly shows $22k, documenting WHY payoff must clearSource so a dropped-hook regression resurfaces). NON-VACUOUS
+  by construction (the two cases differ ONLY by the clearSource call → 30000 vs 22000). green→green: backend validate:local EXIT 0 — 1344 pass /
+  1 skip / 0 fail (+2), tsc 0, musl-biome clean (1 unused-import + a long-line reflow autofixed), build bundled. NO production change (clean cert).
+  cov: be 85.18%+ (carry; +2 BE) / fe 80.64% (carry).
+- **C241 (bug → #83): mark-serviced time-axis re-arm advanced nextDueDate only ONE period — a multi-period-overdue reminder stayed overdue +
+  immediately re-fired** — BALANCE: `bug` OVER budget (cyc 237, starved-for 4 > 3, FORCED — the C240 forecast). Hunted the reminders mark-serviced
+  path (markServiced repo is userId-scoped clean; the re-arm MATH lives in the route). FOUND #83 (MED, UX/correctness): POST /:id/mark-serviced
+  time axis did `fields.nextDueDate = advanceReminderDueDate(reminder, reminder.nextDueDate)` — a SINGLE one-period advance. For a reminder serviced
+  when it's MULTIPLE periods overdue (e.g. a monthly reminder serviced 5 months late, or any reminder whose startDate-anchored nextDueDate lapsed
+  long ago), one advance lands the new date STILL <= now → the just-serviced reminder remains overdue and re-fires on the next trigger pass (the
+  user serviced it but the app keeps nagging). VERIFIED firsthand. The trigger path already advances to-future (the `while (nextDue <= now)` catch-up
+  + fastForwardPastNow); mark-serviced did not. FIX (mirror fastForwardPastNow, NOT the capped catch-up — maxCatchUpOccurrences=12 is a
+  MATERIALIZATION budget; mark-serviced creates nothing so it must reach the future regardless of how lapsed it is): loop
+  `while (nextDue <= now)` advancing via advanceReminderDueDate, with the strict-advance backstop (throw ValidationError if the date doesn't move —
+  the bug #13 non-progress guard; advanceReminderDueDate also throws on a bad interval). GUARD: +1 HTTP test (mark-serviced.test.ts: a 2020-01
+  monthly reminder serviced now → next_due_date strictly in the FUTURE). NON-VACUOUS by construction (old single-advance → 2020-02, still ≪ now →
+  RED). PROCESS: two self-caught test bugs — first capped the loop at maxCatchUp=12 (only reached ~2021 for a 2020 reminder → still past; switched
+  to the unbounded fastForwardPastNow pattern), then compared the `mode:'timestamp'` next_due_date (unix SECONDS) against Date.now() (ms) → fixed
+  to now-in-seconds. green→green: backend validate:local EXIT 0 — 1344 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean (no reflow), build
+  bundled. cov: be 85.18%+ (carry; +1 BE) / fe 80.64% (carry).
+- **C242 (infra): CLAUDE.md orientation refresh — suite size + closed-bug list (#78→#83) + the known-hard-seam guard note (drift C236→C241)** —
+  BALANCE: `infra` AT budget (cyc 236, starved-for 6 = 6, FORCED — the C241 forecast). The #5 sweep ran recently (C236) so it's not due; the
+  actionable infra increment is the CLAUDE.md refresh (forecast ~C240, last content-refreshed C230 + coverage-line C236). Three drifts fixed: (1)
+  suite size ~1328 BE → ~1344 (FE 592 still accurate); (2) the closed-bug list ended at #78/C229 → extended with #80 (C233 per-user license-plate +
+  migration 0005), #81 (C235 Math.max-spread crash-class, 18 sites), #82 (C237 backupConfig per-provider merge), #83 (C241 mark-serviced to-future
+  re-arm), range bumped C155–C229 → C155–C241; (3) added a note that recent guard/deep-review cycles now characterize KNOWN-HARD seams via the
+  HTTP harness + raw-seeded providers (C239 validateStorageConfig's 4 branches; C240 the financing refinance-balance DB-integration net) — so a
+  future guard cycle knows that vein is being actively worked, not just "thin." DOCS-ONLY (CLAUDE.md only — verified `git diff --name-only` shows
+  just CLAUDE.md), no source touched → no build gate (the C230/C236 doc-refresh precedent). Next CLAUDE.md refresh ~C252; next #5 sweep ~C246. cov:
+  be 85.18% / fe 80.64% (carry — no code, no re-measure this cycle).
+- **C243 (arch): extract `withComputedBalance` — the financing `{...financing, computedBalance, eligibleForPayoff}` enrichment, 3 sites → 1** —
+  BALANCE: `arch` AT budget (cyc 238, starved-for 5 = 5, FORCED — the C242 forecast). The arch vein is thin (noted C221/C227), so scouted a
+  contained dedup with a concrete payoff (rule 5, no churn). FOUND: the `{ ...financing, computedBalance, eligibleForPayoff: isEligibleForPayoff(
+  computedBalance) }` shape was hand-rolled at 3 sites — vehicles/routes.ts list (batch computeBalances Map path) + single GET, and
+  financing/routes.ts (a local enrichWithBalance helper) — the SAME trio C182 collapsed the `<= 0.01` threshold across. Extracted a pure
+  `withComputedBalance<T>(financing, computedBalance)` beside isEligibleForPayoff in financing/repository.ts (takes the ALREADY-computed balance, so
+  it serves both the per-record computeBalance and the batch-Map paths without coupling to how the balance was fetched; generic over the financing
+  shape so it covers both the full VehicleFinancing and the vehicle-joined object). Wired all 3 sites + dropped the now-unused isEligibleForPayoff
+  import from both route files. PAYOFF: one source of truth for the derived-field SET (not just the threshold) — a future enrichment field can't be
+  added to one site and forgotten in the others. Test-anchored (rule 3, green→green): every existing vehicles + financing route test passed
+  UNCHANGED through the substitution (incl. vehicles-list-financing-contract.test.ts which pins the enriched key-shape) + 3 new direct unit tests
+  (with-computed-balance.test.ts: enrichment shape, payoff-threshold boundary, no-mutation). green→green: backend validate:local EXIT 0 — 1347 pass
+  / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (1 test reflow autofixed), build bundled. cov: be 85.18%+ (carry; +3 BE) / fe 80.64% (carry).
+- **C244 (bug → #76 BACKEND): a non-fuel expense write persisted fuel-only fields (volume/fuelType/mileage/missedFillup) — server-side clear added** —
+  BALANCE: `bug` AT budget (cyc 241, starved-for 3 = 3, FORCED — the C243 forecast). Hunted fresh write-paths: odometer create/PUT CERTIFIED CLEAN
+  firsthand (both ownership-gated + recheck-wired C214; updateSchema=createSchema.partial() so the future-date .refine + odometer.min(0) survive,
+  C180 class). THE live gap — the BACKEND analog of #76 (the C226 FE fix): `validateFuelExpenseData` only enforces the FORWARD direction (a `fuel`
+  expense MUST have volume+mileage) — it never strips fuel fields from a NON-fuel write, and both POST `/` (createIdempotent({...expenseData})) +
+  PUT `/:id` (update(id, updateData)) wrote verbatim. So a direct API caller (or a future/stale client — the FE clears client-side, C226) could
+  persist a maintenance/misc row carrying volume/fuelType/missedFillup AND a stray `mileage` — which getCurrentOdometer reads CROSS-CATEGORY
+  (odometer/repository.ts UNION has NO category filter, VERIFIED) → a typo'd mileage on a non-fuel row POISONS the reminder/lease odometer axis
+  (#76's documented reachability, now reachable server-side). FIX: a pure `clearFuelFieldsIfNotFuel(data)` that nulls the 4 backend fuel columns
+  (volume/fuelType/mileage/missedFillup; `charge` is FE-only, mapped to volume at the boundary) when `category` is explicitly present + non-fuel —
+  mirrors the FE C226 clear-set (lines 369-374). Applied on POST (normalize before validate+write) + PUT (normalize updateData before update; keyed
+  on updateData.category so a fuel→maintenance switch that OMITS the fuel fields still clears them, and a non-category edit is a no-op). Decision-
+  free (a non-fuel expense definitionally has none of these). GUARD: +3 HTTP tests (non-fuel-clears-fuel-fields.test.ts, read row back via
+  ctx.sqlite): POST misc w/ stray volume/fuelType/mileage/missedFillup → all nulled; PUT fuel→maintenance (category-only) → fuel fields nulled; a
+  genuine fuel expense KEEPS its fields (no over-clear). NON-VACUOUS by construction (pre-fix the verbatim write stored the stray values).
+  green→green: backend validate:local EXIT 0 — 1350 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (1 test reflow autofixed), build bundled.
+  cov: be 85.18%+ (carry; +3 BE) / fe 80.64% (carry).
+- **C245 (guard): cover DELETE /providers/:id storage+backup config cleanup side effects (providers/routes.ts, ~58% func)** — BALANCE: TWO at
+  budget — `guard` (cyc 239, starved-for 6 = 6) + `deep-review` (cyc 240, starved-for 5 = 5); guard waited LONGER (touched C239 vs C240) → guard
+  wins. Per the C236/C239 steering (clean low spots exhausted → characterize a known-hard seam via the HTTP harness), picked the providers DELETE
+  cleanup: deleting a STORAGE provider must scrub it from the user's settings (cleanupStorageConfig nulls any storageConfig.defaults pointer at it +
+  removes its providerCategories entry; cleanupBackupConfig removes its backupConfig.providers entry, routes.ts:418-454) — a regression leaves a
+  dangling default (photo uploads route to a deleted provider) or a stale backup entry. The existing providers-routes-http DELETE tests cover only
+  the 204 + tenant-scoping (#63); the cleanup HELPERS had no end-to-end coverage. +2 HTTP tests (delete-provider-config-cleanup.test.ts, the C91
+  s3-seam — no OAuth/env-gate): (1) create s3 → PUT settings pointing a category default + a providerCategories entry + a backupConfig entry at it →
+  DELETE → GET settings asserts the default is NULLED + both entries GONE; (2) a 2-provider case proving the OTHER provider's config references stay
+  intact (the scrub is targeted, not over-broad). Used the all-4-category exhaustive map (the C70 Zod-v4-record trap) + all-null defaults helper (the
+  C239 pattern). green→green: backend validate:local EXIT 0 — 1352 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean (no reflow), build bundled.
+  Test-only, no production change. cov: be 85.18%+ (carry; +2 BE, providers/routes.ts DELETE-cleanup now covered) / fe 80.64% (carry).
+- **C246 (deep-review): sync RESTORE path (ZIP + Sheets, insert/stamp/ref-integrity) — CERTIFIED CLEAN; pinned the financing-ref ownership
+  invariant** — BALANCE: `deep-review` OVER budget (cyc 240, starved-for 6 > 5, FORCED — the C245 forecast). spawn_run 400 → inline (C231/C235/C240
+  precedent). Audited the restore path firsthand, CERTIFIED CLEAN: (1) BOTH restoreFromBackup (ZIP) + restoreFromSheets call assertReplaceNotEmpty
+  (the #21 empty-replace TOTAL-wipe guard) symmetrically (lines 123/238) — no path-asymmetry. (2) stampUserId force-stamps the importer on every
+  userId-COLUMN table (vehicles/insurance/reminders/reminderNotifications/expenses/odometer/userPreferences/syncState — C145); the un-stamped
+  children (financing/insuranceTerms/insuranceClaims/junctions) own INDIRECTLY via an FK to a stamped parent. (3) The model is SOUND because
+  validateReferentialIntegrity (backup.ts:574) constrains EVERY FK-child to the backup's OWN in-backup id sets (expenses/financing/terms/term-veh
+  junctions/claims/odometer/photos/photoRefs/reminders/reminder-veh junctions/notifications) — so a child can't reference a parent outside the
+  (importer-stamped) backup, and metadata.userId is validated against the importer. A crafted backup can't smuggle foreign-owned data. (4)
+  detectConflicts is tenant-scoped (C109). THE merge-surviving guard left where coverage was thin (the C108/C179/C240 record-only-cert precedent):
+  restore-junction-refs.test.ts covered the JUNCTION ref-check (reminder_vehicles → bogus vehicle) but NOT financing — the highest-stakes UNSTAMPED
+  child (no userId column; its ENTIRE ownership safety rests on validateFinancingRefs constraining it to in-backup vehicleIds). +1 HTTP test: create
+  financing → tamper vehicle_financing.csv to point at an out-of-backup vehicleId → restore REJECTED (cites 'vehicle'), original data intact (no
+  wipe — validation runs before the replace txn). NON-VACUOUS (the control restores cleanly). Fixed a self-caught path bug: financing mounts at
+  /api/v1/financing/vehicles/:id/financing (not /api/v1/vehicles/...). green→green: backend validate:local EXIT 0 — 1353 pass / 1 skip / 0 fail
+  (+1), tsc 0, musl-biome clean (no reflow), build bundled. NO production change (clean cert). cov: be 85.18%+ (carry; +1 BE) / fe 80.64% (carry).
+- **C247 (bug → #84): insurance claim create/update wrote vehicleId/termId VERBATIM — no ownership/policy validation (cross-tenant FK + integrity)** —
+  BALANCE: `bug` AT budget (cyc 244, starved-for 3 = 3, FORCED — the C246 forecast). Hunted the insurance CLAIM write-path (noted "certified clean
+  in passing" C226 but never focus-hunted). FOUND #84 (MED, within-tenant integrity + cross-tenant FK): createClaimSchema/updateClaimSchema accept
+  OPTIONAL `vehicleId` + `termId` ("links to a specific term/vehicle"), and both POST `/:id/claims` + PUT `/:id/claims/:claimId` validated ONLY
+  policy ownership then passed the data to claims-repository create/update which write termId/vehicleId VERBATIM (claims-repository.ts:103-104/
+  133-134). So a user could file/edit a claim referencing a vehicle they DON'T own (a cross-tenant FK — the claim row is theirs but points at a
+  foreign vehicle) or a termId from a DIFFERENT policy (even another tenant's) → corrupted claim attribution + a planted cross-tenant reference (the
+  #61/#62/C240 class). VERIFIED firsthand. FIX: a `validateClaimRefs(data, policyId, userId)` helper — if `vehicleId` present → validateVehicle-
+  Ownership (the existing C240 validator, already imported); if `termId` present → findById(policyId) [returns the policy WITH terms] + assert the
+  termId is among policy.terms, else ValidationError. Wired into both POST (create) + PUT (re-validate a changed link). Only checks present fields (a
+  null-clear on update is a no-op). GUARD: +4 HTTP tests (claims-http.test.ts): foreign vehicleId → 404; termId-not-on-policy → 400 (cites 'term');
+  own-vehicle+real-term → 201 control (no over-block); PUT re-point to unowned vehicle → 404. NON-VACUOUS (pre-fix the verbatim write stored the
+  foreign ids → 201). green→green: backend validate:local EXIT 0 — 1357 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean (no reflow), build
+  bundled. cov: be 85.18%+ (carry; +4 BE) / fe 80.64% (carry).
+- **C248 (infra): #5 branch-hygiene sweep + coverage re-measure (last sweep C236, ~12 cycles / overdue)** — BALANCE: TWO at budget — `infra` (cyc
+  242, starved-for 6 = 6) + `arch` (cyc 243, starved-for 5 = 5); infra waited LONGER (touched C242 vs C243) → infra wins. The #5 sweep was due
+  (last C236, forecast ~C246); CLAUDE.md was refreshed recently (C242) so the doc-refresh wasn't the pick. (1) STRAY-TEST CHECK CLEAN: zero
+  untracked non-e2e `.test.ts` in the tree. (2) GREEN BASELINE + RE-MEASURE: backend `bun test --coverage` EXIT 0 (1357 pass / 1 skip) — **be
+  85.91% line / 85.31% func** (up from C236's 85.18/84.74 — the C237 backupConfig + C239 validateStorageConfig + C244 fuel-clear + C245
+  delete-cleanup + C247 claim-refs BE additions); frontend `vitest --coverage` EXIT 0 (592 pass) — **fe 80.64% line / 80.51% func / 74.97%
+  branch** — FLAT vs C236 (every C237–C247 cycle was backend, so FE didn't move). BE↔FE gap ~5pts (86 vs 81). The BE bug/guard arc keeps lifting
+  backend; FE is steady at ~80.6 (its pure/service layer is saturated, the rest is eyes-on components). Refreshed CLAUDE.md's coverage line to the
+  C248 reading. DOCS/MEASUREMENT-ONLY (CLAUDE.md + ledger; no source touched) → the two coverage runs + stray-test check WERE the verification.
+  Next #5 sweep ~C258; next CLAUDE.md content-refresh ~C252. cov: be 85.91% line / 85.31% func / fe 80.64% line / 80.51% func / 74.97% branch
+  (FRESH C248 reading).
+- **C249 (arch): hoist the duplicated `findIdsByVehicleId` query body into a shared `BaseRepository.findIdsByColumn`** — BALANCE: `arch` OVER budget
+  (cyc 243, starved-for 6 > 5, FORCED — the C248 forecast). Scouted honestly (the vein is thin, noted C221/C227): REJECTED the photo-cleanup-on-
+  delete blocks (4 route files, but each enumerates DIFFERENT child entity-types via different repos → a shared abstraction would be MORE complex,
+  the C75 churn trap) and the claim/term/expense FK-validators (different parent-scopes). FOUND a genuine contained dup: ExpenseRepository.
+  findIdsByVehicleId (:195) + OdometerRepository.findIdsByVehicleId (:36) had BYTE-IDENTICAL bodies (select id-and-map where vehicleId=?) differing
+  only by the table — both back the C-tested vehicle-delete photo-cascade cleanup. Both extend BaseRepository, so hoisted a protected generic
+  `findIdsByColumn(column, value)` into the base; each repo's named method collapses to a one-line delegate (keeping the public typed contract the
+  vehicle-delete relies on). PROCESS: two self-caught tsc fights — `select({ id: this.table.id })` rejects the loose generic `Column` type (the
+  projection slot wants the concrete SQLiteColumn), and casting via `Parameters<typeof eq>` still mismatched; resolved by selecting the FULL row
+  (like the base's findById, type-clean, zero casts) + mapping `.id` — immaterial row-width for these small bounded per-vehicle child sets. Test-
+  anchored (rule 3, green→green): the vehicle-delete-cascade test exercises BOTH findIdsByVehicleId paths + passed UNCHANGED. green→green: backend
+  validate:local EXIT 0 — 1357 pass / 1 skip / 0 fail (UNCHANGED, behavior-preserving), tsc 0, musl-biome clean, build bundled. cov: be 85.91% / fe
+  80.64% (carry — pure refactor, no test-count change).
+- **C250 (guard): cover the provider-free sync-backup route slices — GET /backups/download + /backups/providers (sync/routes.ts, was 72%/59%)** —
+  BALANCE: nothing OVER budget; `guard` most-starved (cyc 245, starved-for 5) → highest-leverage. Per the C236/C239 steering (characterize a
+  known-hard seam via the HTTP harness), the C248 measure flagged sync/routes.ts as the genuine BE low spot (72% func / 59% line). C188 covered the
+  status/restore-providers/POST handlers; the byte/provider-bound paths were left as C163 mock-trap territory — but TWO slices are PROVIDER-FREE and
+  were uncovered: (1) GET /backups/download (:139-154) — exportAsZip reads the user's OWN db data, no provider; (2) GET /backups/providers with no
+  providerId (:135) — listAllBackups iterates enabledProviders, which is EMPTY for a user with no backup providers → returns [] with no provider
+  call. +3 HTTP tests (sync-route-success.test.ts): download → 200 with a REAL ZIP (PK signature, Content-Type application/zip, attachment
+  Content-Disposition w/ vroom-backup- filename, matching Content-Length) after seeding a vehicle; anon download → 401; empty-provider list → 200
+  []. The download route is the user's "download my backup" button — its header-shaping + auth wrapper had no route-level coverage (existing tests
+  use exportAsZip at the SERVICE level only). green→green: backend validate:local EXIT 0 — 1360 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean
+  (no reflow), build bundled. Test-only, no production change. cov: be 85.91%+ (carry; +3 BE, sync/routes.ts download+list slices now covered) / fe
+  80.64% (carry).
+- **C251 (bug → clean sweep + escalation): hunted 6 fresh write/compute surfaces, NO live defect — the cross-tenant/integrity vein is exhausted** —
+  BALANCE: `bug` AT budget (cyc 247, starved-for 3 = 3, FORCED — the C250 forecast). Per the bug-cycle pattern + the C21/C77 don't-manufacture rule,
+  hunted SIX surfaces firsthand, ALL CERTIFIED CLEAN against source: (1) insurance POLICY create (validates nested term vehicleCoverage via
+  repo.create C240) + PUT (updatePolicySchema is scalar-only — company/notes/isActive, no FK to validate); (2) insurance TERM + CLAIM writes
+  (guarded C240/C247); (3) CSV import-mapping units — resolveTargetUnits passes the target vehicle's units (the C60 risk was already closed); (4)
+  expense SPLIT create/update — both validateVehicleOwnership on the splitConfig (C101/C240); (5) getQuickStats ytdSpending (sum of all expense
+  rows — split siblings sum to the group total, financing/reminder rows are real outflows → no double-count); (6) analytics getYearEnd (totalSpent
+  vs prevTotalSpent are calendar-year-bounded identically at second-granularity → previousYearComparison compares like-for-like; well-covered by
+  year-end.property.test). markNotificationRead is userId-scoped. NO defect found → NO code change (the don't-manufacture rule; this is the honest
+  C21/C77 outcome, not a punt). CONCLUSION: the cross-tenant/integrity vein that produced #80/#82/#83/#84/#76-backend over C233–C247 is genuinely
+  worked through. send_message'd Angelo: the autonomous bug vein is past its high-leverage frontier — the HIGH-value remaining work (the ~30-commit
+  branch is PR-ready; the 3 eyes-on feature tails; the filed product/accounting calls #36/#37/#43/#44/#79/#45/#19/#24/#51/#69) is all human-gated.
+  Loop continues on marginal guard/arch/coverage increments. NO build gate (no code touched — record-only, the C225/C246 clean-cert precedent). cov:
+  be 85.91% / fe 80.64% (carry).
+- **C252 (deep-review): analytics getSummary/getFuelStats path — CERTIFIED CLEAN except FILED #85 (fuel-stats "This/Last Year" mislabel,
+  product-gated)** — BALANCE: `deep-review` AT budget (cyc 246, starved-for 5 = 5, FORCED — the C251 forecast). spawn_run 400 → inline. Audited the
+  getSummary dashboard aggregation + getFuelStats firsthand. CERTIFIED CLEAN: ytdSpending = sum of all expense rows (split siblings sum to the group
+  total, no double-count); fleetHealthScore uses neutral-50 defaults (C139); avgEfficiency per-vehicle unit-converted; isFillup volume-bearing
+  predicate (bug #18 fix) consistent. THE finding → #85 (MED, ESCALATED, product-gated): buildFuelStatsFromData computes `currentYearFillups` = ALL
+  fillups in the client-supplied range (NO year filter, :1340) and `previousYearFillups` = prevYearAgg.count over the immediately-PRECEDING
+  equal-length window (:1341), but the FuelStatsTab labels them "This Year" / "Last Year" (FuelStatsTab.svelte:170/174) — while the sibling
+  "This/Last Month" numbers ARE true calendar months (getMonth(), :1343/1347). The analytics range is whatever the dashboard requests (default all,
+  or 7d/30d/90d/1y), almost never a calendar year → for a 30d view "This Year" = last 30 days + "Last Year" = the prior 30 days, both labeled as
+  years (the #9 interestPaidYtd-rename class; same family as the filed #45 period-scoped-stats call). FIX is a SEMANTICS decision (calendar-YTD vs
+  relabel "This/Last Period" vs hide-on-non-year-range) → NOT loop-decidable (changes a headline figure + the FE↔BE contract). send_message'd
+  Angelo + filed #85. NO code change (the rest of the path is clean + the finding is gated — record-only, the C225/C246/C251 precedent). cov: be
+  85.91% / fe 80.64% (carry).
+- **C253 (infra): CLAUDE.md content refresh — suite size, closed-bug list (#83→#84 incl. #76-backend), pending-Angelo list (+#79/#85)** — BALANCE:
+  nothing OVER budget; `infra` most-starved (cyc 248, starved-for 5) → highest-leverage. The #5 sweep + coverage line were done recently (C248), so
+  the actionable infra increment is the CLAUDE.md content-refresh (forecast ~C252). Three drifts fixed: (1) suite size ~1344 BE → ~1360 (FE 592
+  accurate); (2) closed-bug list ended at #83/C241 → extended with #76-backend (C244 non-fuel-write fuel-field clear) + #84 (C247 claim vehicleId/
+  termId validation), range bumped C155–C241 → C155–C247; (3) pending-Angelo product-call list += #79 (stuck malformed offline entry, escalated
+  C231) + #85 (fuel-stats This/Last Year range-relative mislabel, escalated C252). DOCS-ONLY (CLAUDE.md only — verified `git diff --name-only`
+  shows just CLAUDE.md), no source touched → no build gate (the C230/C242/C248 doc-refresh precedent). Next CLAUDE.md content-refresh ~C263; next #5
+  sweep ~C258. cov: be 85.91% / fe 80.64% (carry — no code, no re-measure this cycle).
+- **C254 (arch→guard pivot): arch vein dry (2 more candidates rejected as churn) → covered the registry createProviderInstance google-photos/s3
+  validation branches** — BALANCE: `arch` AT budget (cyc 249, starved-for 5 = 5, FORCED). SCOUTED a rule-7 FE candidate per the BACKLOG note +
+  REJECTED two as churn (arch rule 5 / the C75 outlier lesson): the analytics-api buildQuery (generic, `?`-prefixed, .set-only) vs expense-api
+  buildExpenseQuery (bare string, `tags` .append array + .trim + no-default-sort, EXPORTED+tested as the search-correctness contract) are DIFFERENT
+  shapes — converging them would force the tested one to lose its array handling or thread a special case. With C249's 3 BE rejections, the arch
+  vein is genuinely exhausted of clean dedups → per don't-force-a-blocked-pick, pivoted to the next-actionable `guard` (cyc 250, starved-for 4).
+  GROUNDED guard pick (C248 measure: providers/domains/storage/registry.ts 66% func): registry.test.ts already covers getDefaultProvider (3
+  throws + happy + no-settings), getBackupProviders, getProvider, createProviderInstance (google-drive + unsupported-type + GD-missing-refreshToken)
+  — the UNCOVERED branches were the google-photos + s3 builder validation gates (registry.ts:41-64, credential/config integrity throws). +5 tests
+  (createProviderInstance is pure-construct, no network/DB): google-photos happy [reuses cached albumId] + missing-refreshToken throw; s3 happy +
+  missing-accessKeyId/secretAccessKey throw + missing-endpoint/bucket/region throw. green→green: backend validate:local EXIT 0 — 1365 pass / 1 skip
+  / 0 fail (+5), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production change. cov: be 85.91%+ (carry; +5 BE, registry
+  createProviderInstance now fully branch-covered) / fe 80.64% (carry). NOTE: the arch category is now reliably dry — future arch picks should
+  expect to pivot unless a NEW dup is introduced by feature work.
+- **C255 (bug): second clean sweep — 4 more surfaces hunted, all clean + already test-covered; bug category now effectively DORMANT** — BALANCE:
+  `bug` AT budget (cyc 251, starved-for 3 = 3, FORCED). Per the C251 finding (integrity vein exhausted) + don't-manufacture (C21/C77), hunted FOUR
+  surfaces NOT covered in C251's sweep, all CERTIFIED CLEAN against source: (1) expense CSV export — neutralizeCsvRow guards every string cell
+  (CWE-1236, one-way, the #36-class closed here); (2) odometer getHistory UNION ALL — keeps an expense-mileage reading + a manual reading as
+  DISTINCT events by design (no double-count; count query sums both legs consistently; ORDER BY recorded_at DESC + LIMIT/OFFSET correct); (3)
+  buildExpenseConditions filter combination — vehicleId/category/date(×2)/each-tag-as-EXISTS (AND semantics ✓) / search as a parenthesized
+  (desc LIKE OR category LIKE) sub-clause that can't break the outer AND; date inclusive (#39), LIKE-escaped (#41); (4) re-confirmed the high-risk
+  paths are ALREADY test-covered (odometer-history.property.test, the registry suite C254, the restore suite C246). NO defect → NO code (the honest
+  C21/C77 outcome). CONCLUSION: across C251+C255 (10+ surfaces) the bug vein is confirmed DRY and the high-risk paths are pinned. STANDING
+  GUIDANCE: treat `bug` as effectively DORMANT — a forced bug cycle should do ONE quick fresh-surface scout, and if clean (the expected outcome),
+  record a one-line sweep + pivot to the next-actionable category rather than burn tokens re-hunting covered ground. Re-arms only when feature work
+  or an Angelo-unblocked product call lands new code. (Already escalated C251 — no re-escalation.) NO build gate (no code touched). cov: be 85.91%
+  / fe 80.64% (carry).
+- **C256 (deep-review): mileage-reminder trigger path — CERTIFIED CLEAN; pinned the per-MILESTONE dedup invariant** — BALANCE: `deep-review`
+  most-starved (cyc 252, starved-for 4) → highest-leverage. spawn_run 400 → inline. Audited processMileageReminder + the notification dedup
+  firsthand. CERTIFIED CLEAN: guards null-milestone + single-vehicle (D4) + currentOdometer≥milestone (the due check, getCurrentOdometer is the
+  MAX-across-sources C168-scoped); idempotency is BELT-AND-BRACES — app-level mileageNotificationExists check + the PARTIAL unique index
+  rn_reminder_odo_idx on (reminderId, dueOdometer) WHERE dueOdometer IS NOT NULL as the race backstop + createMileageNotification catches the
+  UNIQUE violation → null (no double-fire under concurrent triggers); the time-axis (reminderDueIdx on (reminderId,dueDate)) + mileage-axis are
+  cleanly separated via the NULL-distinct trick + the partial index; no auto-re-arm (mark-serviced is the explicit path, C25 design). THE guard
+  gap (the C108/C246 record-only-cert precedent): trigger-mileage.test covered at/over/below-milestone + idempotent-re-trigger (SAME milestone →
+  still 1) + no-vehicle + MAX-across-sources — but NOT the DISTINCT-milestone invariant: after mark-serviced re-arms to a new milestone, crossing
+  THAT must fire a fresh notification (the dedup is per-milestone via the composite index, not per-reminder; a regression to a reminderId-only
+  index would silently block every future milestone). +1 HTTP test: cross 35000 → 1 notif; mark-serviced re-arms to 40200; below → still 1; cross
+  40500 → 2 notifs at [35000, 40200]. NON-VACUOUS (a reminderId-only dedup would leave it at 1). green→green: backend validate:local EXIT 0 — 1366
+  pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean (1 reflow autofixed), build bundled. NO production change (clean cert). cov: be 85.91%+
+  (carry; +1 BE) / fe 80.64% (carry).
+- **C257 (guard): cover GET /providers/pending/:nonce — the OAuth-pending-email route + its userId:nonce cross-user isolation** — BALANCE: nothing
+  OVER budget; `infra` nominally most-starved (cyc 253, 4/6) but its increments are recent+not-due (#5 sweep forecast ~C258; CLAUDE.md fresh C253),
+  so per don't-force-a-blocked-pick the next-actionable is `guard` (cyc 254, 3/6). GROUNDED pick (C248 measure: providers/routes.ts 58% line):
+  GET /pending/:nonce reads the in-memory pending-OAuth-credentials store via getPendingEmail(user.id, nonce) — the store's UNIT logic is covered
+  (pending-credentials.test) but the ROUTE slice (auth + found/not-found branch + the userId:nonce KEY-SCOPING) was uncovered. +4 HTTP tests:
+  own-nonce → 200 + email; unknown → 404; a nonce stored under ANOTHER userId → 404 (cross-user isolation — the key is `${userId}:${nonce}`, so
+  user B can't read user A's pending OAuth email); anon → 401. SEAM NOTE: pending-credentials is a process-global Map (no DB), but createTestApp
+  dynamic-imports the app AFTER rewriting env — so the test dynamic-imports storePending INSIDE the test (post-harness) to seed the SAME instance
+  the route reads (the C163 same-instance discipline); ran clean in the full 182-file suite (no cross-suite Map-pollution flake). green→green:
+  backend validate:local EXIT 0 — 1370 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production
+  change. cov: be 85.91%+ (carry; +4 BE, providers/routes.ts /pending slice now covered) / fe 80.64% (carry).
+- **C258 (infra): #5 branch-hygiene sweep + coverage re-measure (last C248) — + the 90%-goal-plateau observation** — BALANCE: `infra` most-starved
+  (cyc 253, starved-for 5) AND the #5 sweep was due (last C248, ~10 cycles). (1) STRAY-TEST CHECK CLEAN: zero untracked non-e2e `.test.ts`. (2)
+  GREEN BASELINE + RE-MEASURE: backend `bun test --coverage` EXIT 0 (1370 pass / 1 skip) — **be 85.95% line / 85.64% func** (up a hair from C248's
+  85.91/85.31 — the C254 registry + C257 pending-route additions); frontend `vitest --coverage` EXIT 0 (592 pass) — **fe 80.64% line / 80.51% func
+  / 74.87% branch** — FLAT vs C248 (C249–C257 all backend). Refreshed CLAUDE.md's coverage line to C258. (3) STRUCTURAL OBSERVATION (worth
+  recording at the 30-cycle mark): the coverage curve has PLATEAUED — be ~86% (+0.04 since C248), fe 80.64% (UNMOVED across C248→C258). The 90%
+  goal is now structurally UNREACHABLE by the loop alone: the BE pure/route/util layer is essentially saturated (remaining gaps are the
+  DI/orchestrator-bound tails — backup-orchestrator execute() body, activity-tracker timers, restore.ts Sheets mock-trap — that need a DI seam, not
+  a test), and the FE remaining gap is the components/routes deficit that needs the eyes-on Playwright harness (sandbox-blocked in the loop). So
+  90% requires either an Angelo-unblocked harness or a DI-refactor sign-off — NOT loop-grindable. DOCS/MEASUREMENT-ONLY (CLAUDE.md + ledger, no
+  source) → the two coverage runs + stray-test check WERE the verification. Next #5 sweep ~C268; next CLAUDE.md content-refresh ~C263. cov: be
+  85.95% line / 85.64% func / fe 80.64% line / 80.51% func / 74.87% branch (FRESH C258 reading).
+- **C259 (deep-review): analytics getCrossVehicle + its builders — CERTIFIED CLEAN, already well-tested (pure record-only cert)** — BALANCE:
+  `deep-review` most-starved (cyc 256, starved-for 3) → highest-leverage. spawn_run 400 → inline. Audited getCrossVehicle (the fleet-comparison
+  tab: vehicleCostComparison + fuelEfficiencyComparison + monthlyExpenseTrends + expenseByCategory) firsthand. CERTIFIED CLEAN: (1) per-vehicle
+  costPerDistance = totalCost / (maxMileage−minMileage over in-range mileaged expenses) — the period-scoped distance pairs correctly with the
+  period cost; the maxMileage>0 && minMileage<Infinity guard requires ≥1 reading; single-reading → distance 0 → null (handled). This is the
+  documented #45-family period-scoped semantics (already escalated), NOT a new bug. (2) buildMonthlyExpenseTrends sorts-then-slice(-24) [newest,
+  the C11 oldest-slice guard satisfied]; buildExpenseByCategory unknown-cat→misc bucket + div-by-zero guarded (total===0→[]); per-vehicle unit
+  conversion correct (#54 per-vehicle pairing). NO guard gap to fill: cross-vehicle.property.test ALREADY drives getCrossVehicle — Property 4
+  (category %s sum to 100), Property 5 (costPerDistance formula + null-on-zero edge), #54 (per-vehicle pairing); the only skip is Property 23
+  (financing-DI, the deep-review #3 gap, not loop-fixable). Adding a test would be coverage-theater. NO code change (record-only, the
+  C225/C246/C251/C256 precedent — certified clean AND already pinned). cov: be 85.95% / fe 80.64% (carry).
+- **C260 (guard): cover the providers PUT credentials-re-encrypt + auth-domain-guard branches (providers/routes.ts, the 58% low spot)** — BALANCE:
+  nothing OVER budget; `guard` most-starved (cyc 257, starved-for 3) → highest-leverage. GROUNDED pick (C258 measure: providers/routes.ts 58%
+  line): the C91 net covered PUT displayName+config + the no-credentials-echo, but TWO PUT branches were uncovered: (1) the
+  CREDENTIALS-RE-ENCRYPT branch (:397-399, the security-sensitive one) and (2) the auth-domain → 400 guard via the LIVE HTTP path (domain-guard.test
+  covers it only by source-scan). +2 HTTP tests: PUT with new credentials → 200, the response NEVER echoes the new secret + `credentials` absent,
+  AND the stored DB column (read via ctx.sqlite) was updated + does NOT contain the plaintext secret (encrypted-at-rest invariant); PUT against a
+  raw-seeded auth-domain provider → 400 ('Auth providers cannot be modified through this endpoint'). green→green: backend validate:local EXIT 0 —
+  1372 pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean (no reflow), build bundled. Test-only, no production change. cov: be 85.95%+ (carry;
+  +2 BE, providers/routes.ts PUT credentials/auth-guard now covered) / fe 80.64% (carry).
+- **C261 (arch dry re-cert → guard pivot): pin the sync-worker's path-resolution resilience branches** — BALANCE: feature most-starved (cyc 170,
+  starved-for 91) but structurally human-gated (escalated; 3 eyes-on tails + product calls await Angelo) → next actionable over-budget = `arch`
+  (cyc 254, starved-for 7 > 5). ARCH SWEEP (2 inline scouts, spawn_run still 400s): production frontend CLEAN (Intl/toLocaleString only in tests;
+  chart-formatters already converged C-prior); backend dry — the 7 validateXOwnership validators are deliberately individual (documented shape
+  differences: NotFoundError-name + findById-vs-findByIdAndUserId vary; collapsing = churn, rule 5), the recent dedups (C243 withComputedBalance /
+  C249 findIdsByColumn / C254 registry) cleared the clean picks, `groupByVehicle`/`buildPaginatedResponse` are ALREADY shared, the 66 structured
+  `logger.error({error})` sites are the distinct idiom C147 correctly left (converging risks changing log serialization — NOT behavior-preserving),
+  and the `new Set(map(v=>v.id))` pair isn't byte-identical. → arch RE-CERTIFIED DRY (the C254 precedent; recording no-churn-warranted IS the arch
+  job) and PIVOTED the increment to a grounded guard slice. PICK (high-value, genuinely uncovered): `processSingleRef` (sync-worker.ts:228-234) has
+  TWO unpinned resilience branches every existing test skipped — (1) `resolveProviderFolderPath` THROWS → caught, upload still proceeds with empty
+  pathHint (a storage_config glitch must NOT strand a photo in `failed` forever, NORTH_STAR #1 no-silent-loss); (2) an entityType NOT in
+  ENTITY_TO_CATEGORY → category undefined → resolve SKIPPED via the `if (category)` guard, upload still proceeds. +2 unit tests (sync-worker.test.ts):
+  throwing resolve → resolve-attempted + upload(pathHint:'') + ref ends ACTIVE-not-failed; unknown-entityType → resolve-NOT-called + upload(pathHint:'')
+  + ACTIVE. NON-VACUOUS (each asserts the upload happened AND the ref didn't strand). green→green: backend validate:local EXIT 0 — 1374 pass / 1 skip /
+  0 fail (+2), tsc 0, musl-biome clean, build bundled. Test-only, no production change. cov: be 85.95%+ (carry; sync-worker path-resolution branches
+  now covered) / fe 80.64% (carry).
+- **C262 (bug — found+fixed a LIVE defect, NOT the dormant-sweep outcome): #86 fuel-stats "This/Last Month" counted cross-year** — BALANCE: feature
+  most-starved (starved-for 92) but human-gated; next actionable over-budget = `bug` (cyc 255, starved-for 7 > 3). Bug was declared DORMANT (C251/C255),
+  so the protocol is scout-a-fresh-surface → record → pivot — but this scout HIT a real defect on a surface the recent sweeps hadn't touched
+  (analytics fuel-stats month aggregation), so it's a genuine bug cycle, not a sweep. FOUND (firsthand, repository.ts:1342-1356):
+  buildFuelStatsFromData filtered currentMonth/prevMonth fillups + gallons on `toDate(r).getMonth() === currentMonth` with NO year check. fuelRows
+  spans the WHOLE requested range (default 'all' = multi-year), so a fillup from the SAME calendar month in a PRIOR year was folded into "This Month"
+  — three years of January data → the "This Month" figure triple-counted. The FE (FuelStatsTab.svelte:184/188/227/231) labels these "This Month"/"Last
+  Month" = true calendar months, consistent with the `now`-derived currentMonth → the contamination is unambiguously wrong (NORTH_STAR #2). DISTINCT
+  from the product-gated #85 (which is ONLY the year-ROW's range-relative labeling — none of its 3 options touch the month rows). FIX: derive
+  `currentYear = now.getFullYear()` + `prevMonthYear` (Jan → previous year rollover) + `inCurrentMonth`/`inPrevMonth` predicates matching BOTH month
+  AND year; applied to all 4 month figures (fillups + gallons, current + prev). +2 deterministic regression tests (fuel-stats-calendar-month.test.ts,
+  dates RELATIVE to now → host/run-date independent): a prior-year same-month fillup does NOT contaminate This Month (currentMonth=1 not 3,
+  volume=10 not ~208; currentYear range-figure still sees all 3); "Last Month" rolls into the previous YEAR when now is January (wrong-year same-month
+  excluded). NON-VACUOUS (the prior-year rows carry volume 99 → pre-fix currentMonth would be 3). green→green: backend validate:local EXIT 0 — 1376
+  pass / 1 skip / 0 fail (+2), tsc 0, musl-biome clean, build bundled; the existing single-year fuel-stats property tests passed UNCHANGED
+  (behavior-preserving for them). cov: be 85.95%+ (carry) / fe 80.64% (carry).
+- **C263 (infra): CLAUDE.md content refresh — suite size, closed-bug list (+#86/C262), the #85 parenthetical (now post-#86)** — BALANCE: feature
+  most-starved (starved-for 93) but human-gated + already-escalated (re-escalating each cycle is spam, step-7); next actionable = `infra` (cyc 258,
+  starved-for 5, breaches next cycle) → the C253/C258 docs-accuracy cadence so future cycles ground correctly, and #86 just closed → 3 stale spots.
+  FIXED (CLAUDE.md only): (1) suite size ~1360→~1376 BE; (2) the closed-bug list ended at #84/C247 → appended #86/C262 (fuel-stats "This/Last Month"
+  year-scoped) + bumped the arc span C155–C247→C155–C262 and the coverage-arc span C178–C247→C178–C262 / C237–C247→C237–C262 (all backend); (3) the
+  #85 pending-Angelo parenthetical said "the sibling month fields ARE true calendar months" — that WAS the #86 bug; now reads "are now true calendar
+  months after #86/C262, so this is purely the YEAR row." DOCS-ONLY — verified `git diff --name-only` = CLAUDE.md alone; no code/test/build touched
+  (no validate run needed — the prior C262 gate is the last code state, unchanged). The pending-Angelo HIGH list (#36/#37/#43/#44) + the eyes-on
+  feature tails are unchanged from C253; not re-escalated (already standing).
+- **C264 (deep-review): backup EXPORT path — table-set symmetry CERTIFIED CLEAN; pinned the one uncovered VALUE-round-trip vector** — BALANCE:
+  feature most-starved (starved-for 94) but human-gated + escalated; `deep-review` at budget (cyc 259, starved-for 5 = 5, due) → the most-starved
+  actionable. Picked the backup EXPORT path (the symmetric partner to the restore path C246 certified; never deep-reviewed). FAN-OUT: spawn_run still
+  400s → did it firsthand. CERTIFIED CLEAN: the export/restore TABLE-SET symmetry is AIRTIGHT — FIVE hand-maintained lists (createBackup's 15 data
+  keys, TABLE_SCHEMA_MAP, TABLE_FILENAME_MAP, restore insertBackupData's tx.insert() calls, ImportSummary count fields) are ALL pinned equal by the
+  C208/C209 drift guards, INCLUDING the exact `if (table && filename)` silent-skip in exportAsZip:434 (backup-table-coverage.test "registry and
+  filename map cover exactly the same keys") + every-schema-table-backed-up-or-EXCLUDED_BY_DESIGN. THE finding (the one vector those KEY guards don't
+  reach): the per-column VALUE round-trip through convertToCSV's `JSON.stringify(value)` (backup.ts:458) → real csv-stringify (quoted:true) → csv-parse
+  → coerceRow's `JSON.parse` — existing coerceRow tests pin the PARSE direction in ISOLATION on hand-built rows (flat unitPreferences, string[] tags),
+  but NOTHING round-tripped a NESTED-object JSON column through the full serialize→parse pipe (the CSV-hostile case: commas between allocations + quotes
+  around every key, which the CSV layer double-quotes and the parser must unwrap losslessly). expenseSplitConfig (ReminderSplitConfig: { method,
+  allocations:[{vehicleId,amount}] }) is the deepest such column. GUARD: reminder-split-config-roundtrip.test.ts (+2 HTTP, the claims-roundtrip
+  precedent — seed a multi-vehicle ABSOLUTE split + an EVEN split via the real route, exportAsZip → wipe → restoreFromBackup('replace'), assert the
+  nested config is structurally `.toEqual` intact). NON-VACUOUS (asserts the config persisted pre-export as a real object AND survived round-trip — a
+  mangle/truncate/double-stringify would fail the post-restore toEqual). green→green: backend validate:local EXIT 0 — 1378 pass / 1 skip / 0 fail (+2),
+  tsc 0, musl-biome clean (one format reflow auto-fixed via check:musl:fix; the pre-existing unitPreferencesSchema unused-import is a WARNING, exit 0),
+  build bundled. Test-only, no production change. cov: be 85.95%+ (carry) / fe 80.64% (carry).
+- **C265 (guard): cover the 3 uncovered trusted-proxy / fallback branches of getClientIp (the rate-limit-key spoof defense)** — BALANCE: nothing OVER
+  budget → highest-leverage. feature most-starved (starved-for 95) but human-gated; guard & arch both furthest (4), arch twice-certified dry (C254/C261)
+  → grounded guard coverage slice. PICK (scout: utils/client-ip.ts had only 1 referencing test, security-critical — it derives the rate-limit key, and
+  keying on a spoofable X-Forwarded-For lets an attacker get a fresh bucket per request, bypassing the auth brute-force limiter). The existing test
+  covered the 4 headline trust rules but left 3 security-meaningful branches uncovered: (1) trusted proxy but NO XFF (the `xff ? : undefined` false leg +
+  `if (forwarded)` false → must fall through to the socket IP, not crash/'unknown'); (2) trusted proxy with EMPTY/whitespace XFF (`first || undefined` →
+  undefined → fall through, NOT key on '' which would pool every empty-XFF request); (3) the no-socket in-process fallback (:62) with a MULTI-hop XFF
+  (takes leftmost+trim, mirroring the trusted parse — was only single-value-tested). +3 unit tests (extend client-ip.test.ts via the injected
+  trusted-proxy list + the connInfoThrows toggle — no new harness). NON-VACUOUS (each asserts the resolved key is the socket/leftmost IP, not '' or
+  'unknown'). green→green: backend validate:local EXIT 0 — 1381 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean, build bundled. Test-only, no
+  production change. cov: be 85.95%+ (carry; client-ip.ts trusted-proxy + fallback branches now covered) / fe 80.64% (carry).
+- **C266 (bug — DORMANT-vein sweep, record-only): 3 fresh surfaces scouted, all CLEAN + already well-pinned; no live defect, no warranted test** —
+  BALANCE: `bug` the only ACTIONABLE over-budget category (cyc 262, starved-for 4 > 3); feature is more-starved (96) but human-gated. Bug has been
+  DORMANT since C251/C255 (re-confirmed C262 found the last live one, #86) → the protocol is scout-a-fresh-surface → fix if real, else record + pivot.
+  SCOUTED THREE surfaces the recent sweeps hadn't deeply hit, all CERTIFIED CLEAN firsthand: (1) `OdometerRepository.getCurrentOdometer` — cross-source
+  MAX(expenses.mileage ∪ odometer_entries.odometer) BY VALUE, userId-scoped on BOTH legs (#48/#168), null-vs-zero distinct; its dedicated test already
+  pins all of it incl. the cross-TENANT leg (a foreign user's higher reading returns null) + NULL-mileage skip + per-vehicle scope — comprehensive. (2)
+  reminder due-date math (computeNextDueDate/advanceCustom/clampToAnchorDay in trigger-service.ts) — month/year advance sets day=1 BEFORE the month bump
+  (the Jan-31→Feb overflow guard), anchor-day clamp to min(anchorDay,lastDay), non-positive-interval throws (#13); pinned by compute-next-due-date.property
+  + trigger-nonprogress-frequency + the C153/C241 work. (3) csv-safety neutralize/denormalize — FORMULA_TRIGGERS leading-token guard (=/+/-/@/TAB/CR,
+  CWE-1236) is symmetric + covered. ALSO a quick arch scout (arch at-budget 5/5): NO clean byte-identical dedup — the `new Date(x*1000)` 8-site idiom is
+  trivial/divergent (churn, rule 5), `c.get('user')` (105 sites) is the standard Hono pattern, not a dedup target. RECORD-ONLY (the C255/C259 precedent —
+  the scout IS the bug touch; forcing a test on an already-comprehensively-pinned surface is coverage-theater, the C225 rule). No code, no test, no gate
+  run (no source touched — the C265 gate is the last code state). The bug vein remains EXHAUSTED; next forced bug cycle, scout a not-yet-hit surface again.
+- **C267 (arch): extract `toDateInputValue` — the date→YYYY-MM-DD input idiom, 9 sites → 1 (FE fan-out found it)** — BALANCE: `arch` the only ACTIONABLE
+  over-budget category (cyc 261, starved-for 6 > 5); feature more-starved (97) but human-gated. arch was twice-cert-dry on the BACKEND (C254/C261) +
+  C266's quick backend scout — so per rule 7 ran a fresh FE fan-out (spawn_run still 400s → inline). FOUND: `new Date(x).toISOString().split('T')[0]` /
+  `.slice(0,10)` (identical output for an ISO string) hand-repeated 9× across 6 files — ExpenseForm + expense-form-validation, ReminderForm (×2),
+  VehicleForm (×2: purchaseDate + financing.startDate), the odometer-new route, and the CSV-download filename in expense-api. CONCRETE PAYOFF (rule 5):
+  it's ALSO the UTC-based off-by-one tz class the NORTH_STAR flags + `dateOnlyToISO` already guards on the REVERSE direction — converging the writers to
+  one chokepoint makes that future local-date fix ONE edit not nine. NOT previously filed/rejected (grep'd the loop docs). Added `toDateInputValue(date:
+  Date | string)` to formatters.ts (beside dateOnlyToISO/formatDate — the right home, NORTH_STAR #4; pure `.ts`, fully testable). BEHAVIOR-PRESERVING
+  (rule 2): replicates the CURRENT UTC `.slice(0,10)` output EXACTLY — NOT the local-date fix (that stays a future `bug` cycle changing displayed
+  values). The C135/C166 precedent: a pure value-helper swap returning the IDENTICAL string can't change rendered output, so it's anchored by the
+  helper's tests + the green FE suite, not a screenshot (no eyes-on needed for a provably-identical value substitution). Wired all 9 (mixed Date and
+  string inputs — the helper takes both) + the 4 needed imports; removed the now-redundant `|| ''` fallbacks where the helper always returns a string.
+  +3 unit tests (formatters.test.ts: Date input, ISO-string input, parity-with-the-legacy-idiom split-vs-slice). green→green: frontend validate:local
+  EXIT 0 — type-check 0, build OK, 595 tests pass (+3), every existing form/service test passed UNCHANGED through the 9 swaps (behavior-preserving
+  proof). cov: fe 80.64%+ (carry; +3 FE) / be 85.95% (carry).
+- **C268 (bug — #87, the leverage payoff C267 set up): `toDateInputValue` read the UTC date → off-by-one + broken stored-date round-trip** — BALANCE:
+  nothing OVER budget → highest-leverage. The standout: C267 had just CENTRALIZED the date→input idiom into one chokepoint, explicitly so this latent
+  tz defect (NORTH_STAR #2 correct-for-everyone) becomes a one-line fix — unambiguous (not a product call) + deterministically unit-testable, the highest
+  leverage available. FOUND/FIXED: `toDateInputValue` used `new Date(x).toISOString().slice(0,10)` = the UTC calendar date. Two harms: (a) a
+  negative-offset (Americas) user editing late in the day saw TOMORROW pre-filled; (b) — the worse one — it BROKE THE STORED-DATE ROUND-TRIP:
+  `dateOnlyToISO` persists date-only values anchored at NOON LOCAL, and noon-local in a positive offset (e.g. +14) is the PREVIOUS day in UTC, so a
+  vehicle's saved purchaseDate / financing.startDate reloaded ONE DAY EARLIER in the edit form. FIX: read the LOCAL components
+  (getFullYear/getMonth+1/getDate, zero-padded) — the forward partner to dateOnlyToISO's reverse direction. Noon ± any real offset (±14h) never crosses
+  LOCAL midnight, so a dateOnlyToISO→toDateInputValue round-trip is now EXACT in every timezone (the property the UTC version violated). Updated the C267
+  tests UTC→LOCAL + made them host-tz-INDEPENDENT by construction (build the Date from local components `new Date(y,m,d,…)`, assert the same y/m/d back)
+  + added a round-trip-in-every-tz test (dateOnlyToISO→toDateInputValue identity over 4 dates incl. leap-day) + zero-pad. NON-VACUOUS (the round-trip
+  test FAILS under the old UTC `.slice(0,10)` for a positive-offset host). green→green: frontend validate:local EXIT 0 — type-check 0, build OK, 596
+  tests pass (net +1: consolidated 3 C267 tests → 4), every form/service test UNCHANGED (the call sites bind correctly to the local output). Single FE
+  chokepoint, all 9 call sites benefit. cov: fe 80.64%+ (carry) / be 85.95% (carry).
+- **C269 (infra): coverage RE-MEASURE — 11 cycles stale (last C258); ground the post-C260/C265/C262/C268 reading** — BALANCE: nothing OVER budget →
+  most-starved of the due pair (infra 6 = budget, deep-review 5 = budget); feature most-starved (99) but human-gated. Picked infra — the C236/C248/C258
+  cadence: a fresh MEASURED reading (not an estimate) grounds future guard/coverage picks, and the C260/C265 guard adds + C262/C268 fixes had moved it.
+  RAN both suites with `--coverage`: **backend 85.65% line / 85.95% func** (was 85.64/85.95 at C258 — line +0.01; the C260/C265 guard adds were
+  already-covered-adjacent, so no jump — expected, those pinned uncovered BRANCHES of already-line-covered files). **frontend 80.72% line / 80.58% func /
+  75.00% branch** (was 80.64/80.51/74.97 — crept up on the C267/C268 formatters tests). Both suites hold > 80% line. The 90% goal remains the C258
+  STRUCTURAL PLATEAU: backend is saturated except DI/orchestrator-bound tails; the FE gap is the eyes-on components/routes deficit (Playwright-gated) —
+  NOT loop-closable without an eyes-on harness or a human glance. DOCS-ONLY: updated the CLAUDE.md coverage line (C258→C269 figures) + this entry; no
+  source/test/build touched (the C268 gate is the last code state). Recorded the measure honestly; no churn-test forced to chase a structurally-gated number.
+- **C270 (deep-review): offline-sync outbox + conflict-resolution write path — CERTIFIED CLEAN; pinned the 3 uncovered resolveConflict outcomes** —
+  BALANCE: `deep-review` the ONLY actionable OVER-budget category (cyc 264, starved-for 6 > 5); feature more-starved (100) but human-gated. Picked the
+  offline-first data-safety surface (NORTH_STAR #1 — offline writes never drop), never fully deep-reviewed. spawn_run still 400s → firsthand. CERTIFIED
+  CLEAN: (1) `offline-storage.ts` is COMPREHENSIVELY pinned already — the deterministic clientId backfill (idempotency-key-stability bug guard), #66
+  electric-charge survival through the shared offlineExpenseToBackend mapper, corrupted-localStorage graceful fallback, every CRUD primitive, and the
+  syncOfflineExpenses happy-path + mid-batch-partial-failure (no data loss) + malformed-fuel-skip + the #79 stuck-queue characterization. (2)
+  `sync-manager.ts` determineConflictType (duplicate-vs-modified) is C223-pinned. THE finding (the one genuinely uncovered high-value branch):
+  `resolveConflict` (the keep_local/keep_server/merge WRITE path — the data-safety decision point where a user's choice between their offline edit and
+  the server row is honored) had only the two BOOLEAN happy-path tests; the load-bearing OUTCOMES were unpinned. +4 tests: keep_local POSTs
+  forceOverwrite+clientId; keep_local FAILED overwrite → returns FALSE (the catch→break→return-false path — the edit survives to retry, NOT silently
+  dropped); keep_server returns true with NO POST (server wins, local retired); merge delegates to keep_local (proves it's not a silent no-op). NON-VACUOUS
+  (the failure case asserts false; keep_server asserts zero fetch). NOTE: resolveConflict calls the class-PRIVATE this.markExpenseAsSynced (not the module
+  fn), so the assertions pin the observable boolean + fetch behavior, not the mocked module spy (a wrong-target assertion I caught + removed via the gate).
+  green→green: frontend validate:local EXIT 0 — type-check 0, build OK, 600 tests pass (+4), every existing sync test UNCHANGED. cov: fe 80.72%+ (carry;
+  resolveConflict branches now covered) / be 85.65% (carry).
+- **C271 (guard): committed source-scan guard for the #87 UTC date-input class + caught & fixed a RESIDUAL (odometer-edit page)** — BALANCE: guard
+  most-starved actionable (cyc 265, starved-for 6 = budget, due); feature more-starved (101) but human-gated. Scouted BE+FE pure-logic for a clean
+  coverage pick — all genuinely saturated (client-ip C265, unit-conversions property-tested, mergeUnitPreferences directly tested, payment-planner has a
+  7-property suite; the truly-thin FE files are display-name/DOM-observer theater) → the C258/C269 plateau. PIVOTED to the higher-leverage guard the C268
+  fix earned: a MERGE-SURVIVING source-scan pinning the #87 class (the UTC date-input idiom can't re-creep into forms), mirroring the no-utc-month-parse /
+  no-hardcoded-currency precedent. The new guard IMMEDIATELY EARNED ITS KEEP — it caught a RESIDUAL the C267 sweep missed: `odometer/[entryId]/edit/+page.svelte:69`
+  still did `new Date(entry.recordedAt).toISOString().split('T')[0]` → a stored noon-local recordedAt reloads ONE DAY EARLIER in the edit form for
+  positive-offset users (the exact #87 bug, on the EDIT page C267 didn't touch). FIXED: routed it through `toDateInputValue` (the C268 local-date
+  chokepoint) + added the import. GUARD: `no-utc-date-input.test.ts` (+2) — scans every product .svelte/.ts (comments stripped, line-preserving;
+  __tests__ dirs excluded since a test may assert on the idiom) for `.toISOString().split('T')[0]` / `.slice(0,10)`; toDateInputValue (local components,
+  no toISOString) never matches. NON-VACUOUS (it found the residual RED before the fix; the live-scan precondition asserts >50 sources). green→green:
+  frontend validate:local EXIT 0 — type-check 0, build OK, 602 tests pass (+2 guard; the edit-page fix is product-only), every existing test UNCHANGED.
+  cov: fe 80.72%+ (carry) / be 85.65% (carry).
+- **C272 (bug-cycle scout → guard): insurance TERM write paths CERTIFIED CLEAN for the #84-class; pinned the cross-tenant vehicle-ownership guard via HTTP** —
+  BALANCE: `bug` the only actionable OVER-budget category (cyc 268, starved-for 4 > 3); feature more-starved (102) but human-gated. Bug DORMANT → scout-fresh
+  → fix-or-record. SCOUTED two never-recently-hit write paths, BOTH clean: (1) insurance term/coverage writes — the repo's PRIVATE validateVehicleOwnership
+  gates create()/addTerm()/updateTerm() before junction insert (repository.ts:175/407/541), so a term's vehicleCoverage.vehicleIds can't reference a
+  foreign vehicle (#84/#61 cross-tenant FK class); (2) financing PATCH/payoff/refinance — already C240-certified (reactivation + clearSource ordering). NO
+  live defect. THE finding → guard: create()'s guard is property-tested, but the addTerm/updateTerm HTTP paths (the live request surface) were UNPINNED
+  (terms-http.test only covered clear-optional-field). +4 HTTP tests (terms-http.test.ts): POST /insurance, POST /:id/terms, and PUT /:id/terms/:termId
+  with a RAW-SEEDED foreign vehicleId all → 404 with ZERO junction rows planted (read via ctx.sqlite); PUT also asserts the original owned coverage is
+  intact; + an owned-vehicle control proving the guard isn't over-broad. NON-VACUOUS (the 404s + junction-count=0 fail if the guard regresses). green→green:
+  backend validate:local EXIT 0 — 1385 pass / 1 skip / 0 fail (+4), tsc 0, musl-biome clean, build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C273 (arch): extract `vehicleIdsForTerm` — the term junction→vehicleIds derivation, 3 sites → 1** — BALANCE: `arch` the only ACTIONABLE over-budget
+  category (cyc 267, starved-for 6 > 5); feature more-starved (103) but human-gated. FAN-OUT scout (spawn_run still 400s → inline): FE candidates all
+  rejected — MS_PER_DAY is the C99-rejected churn (divergent month-approx vs day-divisor spellings, re-confirmed), roundToCents is cents-migration-deferred
+  (C147), the `n>1`-vs-`n!==1` pluralization idiom (20+ sites) carries an n=0 behavior trap + violates rule-1-small, raw toFixed(2) is only 2 non-currency
+  sites. Backend re-scan FOUND a clean one: the `policy.termVehicleCoverage.filter(tc => tc.termId === X).map(tc => tc.vehicleId)` derivation was
+  byte-identical at 3 sites in insurance/routes.ts (create-policy loop :114, addTerm :206, updateTerm :238 — only the termId source + surrounding args
+  differ), each feeding createTermExpenses/updateTermExpenses. Extracted pure `vehicleIdsForTerm(termVehicleCoverage, termId): string[]` to insurance/hooks.ts
+  (beside its consumers; typed `readonly TermCoverageRow[]` so it's decoupled from the full policy) + wired all 3 → one-liners. PAYOFF (rule 5): one source
+  for the junction→vehicleIds shape — a future coverage-shape change touches one place. BEHAVIOR-PRESERVING (faithful 1:1 map, no dedup — the consumers
+  dedup downstream). +3 unit tests (vehicle-ids-for-term.test.ts: filter+project in order, empty/unknown term → [], no cross-term leak); anchored ALSO by
+  the existing premium-expense-hook + the C272 term-ownership HTTP tests passing UNCHANGED through the extraction. green→green: backend validate:local
+  EXIT 0 — 1388 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome clean (import-order auto-fixed), build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C274 (infra): gitignore Playwright transient artifacts — branch-hygiene sweep found test-results/ unignored (~155 churning files)** — BALANCE: nothing
+  OVER budget → highest-leverage; infra most-starved (cyc 269, starved-for 5, breaches next), and the #5 branch-hygiene cadence is high-value at ~84
+  commits deep pre-PR. SWEEP (firsthand): NO untracked SOURCE files (src/ or loop/) + NO modified-uncommitted tracked files — the branch is clean of real
+  gaps. But the working tree carried 329 untracked files, ~232 of them under `frontend/test-results/` (Playwright's per-run artifacts: traces, .network
+  logs, transient PNGs/JPEGs, error-context) + a stray `playwright.meshclaw.config.ts` — NONE gitignored, so every hygiene sweep drowns in churn and a
+  pre-PR `git add .` would commit megabytes of regenerated junk. FIX (config-only, the standard Playwright convention): added a Playwright section to
+  frontend/.gitignore — `test-results/`, `playwright-report/`, `blob-report/`, `.playwright-artifacts-*/`. VERIFIED scope precisely via `git check-ignore`:
+  test-results/ + playwright-report/ now IGNORED; the e2e `*.meshclaw.e2e.ts` specs + the committed `*-snapshots/` baselines stay VISIBLE (untouched —
+  those are a separate tracked-or-deliberate-untracked decision). Untracked dropped 329 → 122 (the remaining 122 = the deliberate set: e2e specs,
+  snapshot baselines, .meshclaw-tools/, .kiro specs, mise.local.toml). DOCS/CONFIG-ONLY (only frontend/.gitignore tracked-diff; no code → no build gate
+  needed, gitignore doesn't affect compilation). De-noises every future hygiene sweep + protects the eventual PR from artifact pollution.
+- **C275 (deep-review): vehicle-stats computation path — CERTIFIED CLEAN; extended #30 with a SECOND unit-unaware-filter site** — BALANCE: `deep-review`
+  most-starved actionable (cyc 270, starved-for 5 = budget, due); feature more-starved (105) but human-gated. Picked the per-vehicle headline-stats path
+  (calculateVehicleStats: avg MPG, cost/mile, fuel/charge totals — never deep-reviewed). spawn_run still 400s → firsthand. CERTIFIED CLEAN: the function
+  is COMPREHENSIVELY property-pinned already — fuelType partition (totalFuel+totalCharge = Σvolume; electric-only vs liquid-only splits), tracking-flag
+  gating (averageMpg null unless trackFuel; mi/kWh null unless trackCharging), the #46 negative-distance clamp (Math.max(0, latest−initial)), the #75
+  order-independence (calculateAverageMpg sorts a copy before pairing), missed-fillup pair exclusion, costPerMile div-guard. THE finding (record-only, NOT
+  loop-actionable): `vehicle-stats.ts:179` calculateAverageMpg's inline `mpg > 0 && mpg < 150` outlier bound is a SECOND INSTANCE of the #30 unit-unaware-filter
+  class (the C126-filed, product-scope-gated finding that named ONLY analytics-charts.ts's MIN/MAX_VALID_MPG) — a metric km/L vehicle's realistic efficiency
+  is mis-shaped against the 150 imperial ceiling. Same scope-gate (store-native-vs-canonical units + shared FE/BE invariant) → NOT a clean unilateral fix.
+  Extended the #30 BACKLOG entry to record this site so the eventual scope-call fix doesn't miss it (a fix touching only analytics-charts would leave the
+  per-vehicle averageMpg cull mis-calibrated). RECORD-ONLY (the C259/C246 clean-cert precedent — surface clean + already comprehensively pinned; the one
+  finding is a known product-gated class, not a fresh defect). No code, no test, no gate run (no source touched — the C274 state is unchanged). cov:
+  be 85.65% (carry) / fe 80.72% (carry).
+- **C276 (bug-cycle scout → guard): mark-serviced re-arm CERTIFIED CLEAN; pinned the uncovered EARLY-service time-axis branch** — BALANCE: `bug` the only
+  category strictly OVER budget (cyc 272, starved-for 4 > 3); feature more-starved (106) but human-gated. Bug DORMANT → scout-fresh → fix-or-record.
+  SCOUTED the reminder mark-serviced re-arm path (POST /:id/mark-serviced) firsthand. CERTIFIED CLEAN: the two-axis re-arm is sound by domain semantics —
+  TIME axis is SCHEDULE-anchored (advance from nextDueDate; the #83 multi-period-overdue fast-forward loop is correct + tested), MILEAGE axis is
+  USAGE-anchored (reset to current odometer + intervalMileage); the axis difference is INTENTIONAL, not a bug. Comprehensively pinned already: mileage
+  anchor+recompute, re-armed-no-longer-due-at-trigger, time one-period advance, the #83 overdue catch-up, `both`-axis, cross-tenant 404. THE finding → guard:
+  every existing time-axis test seeds a PAST startDate (overdue → the `while (nextDue <= now)` loop runs), so the EARLY-service branch (servicing when
+  nextDueDate is already in the FUTURE → loop skips, single unconditional advance) was UNCOVERED. +1 HTTP test: a yearly reminder anchored 2099 (always
+  future, host-independent) serviced early advances EXACTLY one year forward (Δ 364–367 days) and stays future — pins the schedule-anchored early-service
+  semantics (NOT "reset relative to now"). NON-VACUOUS (the Δ bound fails if the advance is skipped or collapsed toward now). green→green: backend
+  validate:local EXIT 0 — 1389 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean, build bundled. NO live defect — bug vein still exhausted. cov:
+  be 85.65%+ (carry) / fe 80.72% (carry).
+- **C277 (guard): cover the two zero-coverage settings POST endpoints — /backup (side effect) + /restore + auth-gating** — BALANCE: `guard` most-starved
+  actionable (cyc 271, starved-for 6 = budget, due); feature more-starved (107) but human-gated. SCOUT: settings/routes.ts was the thinnest route module
+  (4 referencing test files); the GET + PUT branches are well-pinned (C237/C238/C239), but `POST /settings/backup` and `POST /settings/restore` had ZERO
+  HTTP coverage. /backup has a REAL observable side effect — syncStateRepository.updateBackupDate writes sync_state.last_backup_date (read by a
+  backup-status UI) — worth pinning end-to-end. +3 HTTP tests (settings-route-errors.test.ts): POST /backup → 200 + the DB row's last_backup_date goes
+  from null → a real timestamp (read via ctx.sqlite, bounded ≤ now+5s — proves the write LANDED, not just a 200); POST /restore → 200 success envelope;
+  BOTH require auth (anon → 401, pinning the routes.use('*', requireAuth) chain). NON-VACUOUS (the null→timestamp assertion fails if updateBackupDate
+  regresses; the 401s fail if the auth chain drops). green→green: backend validate:local EXIT 0 — 1392 pass / 1 skip / 0 fail (+3), tsc 0, musl-biome
+  clean, build bundled. Test-only. cov: be 85.65%+ (carry; settings POST /backup+/restore now covered) / fe 80.72% (carry).
+- **C278 (arch): extract `triggerBlobDownload` — the browser save-as Blob-download idiom, 2 sites → 1** — BALANCE: `arch` most-starved actionable (cyc 273,
+  starved-for 5 = budget, due); feature more-starved (108) but human-gated. FAN-OUT scout (spawn_run still 400s → inline): backend dry (groupByVehicle/
+  parseClampedInt already shared; deleteBySource one-liners; envelope is the standard Hono pattern — no clean dedup). FE FOUND one: the 7-line object-URL →
+  anchor → href → download → appendChild → click → revokeObjectURL → removeChild "save a Blob as a file" dance was BYTE-IDENTICAL at 2 sites (expense-api
+  CSV export :162-169 + settings-store backup download :77-84), differing only in blob + filename. Extracted pure `triggerBlobDownload(blob, filename)` to
+  new `utils/download.ts` (no existing DOM/download util — NORTH_STAR #4 checked) + wired both → one-liners (+ 2 imports). PAYOFF (rule 5): one source for
+  the download mechanics — a future fix (revoke ordering / Safari workaround) is one edit. BEHAVIOR-PRESERVING (same append→click→revoke→remove ordering as
+  both copies; callers still guard browser/ok upstream). +2 unit tests (download.test.ts: object-URL created+revoked + anchor clicked + no DOM leak; the
+  download filename is set) via jsdom stubs on window.URL + an HTMLAnchorElement.click spy. green→green: frontend validate:local EXIT 0 — type-check 0,
+  build OK, 604 tests pass (+2), every existing expense-api + settings-store test UNCHANGED through the rewire (behavior-preserving proof; tsc caught a
+  vi.fn-vs-spyOn typing nit, fixed). cov: fe 80.72%+ (carry) / be 85.65% (carry).
+- **C279 (infra): CLAUDE.md suite-size refresh — ~1376→~1392 BE / ~592→~604 FE** — BALANCE: nothing OVER budget → highest-leverage; infra most-starved
+  (cyc 274, starved-for 5); feature more-starved (109) but human-gated. The C253/C263 docs-accuracy cadence: the suite-size line was last set C263 (~1376/
+  ~592) and the C264/C270/C272/C276/C277/C278 test adds have moved it to 1392 BE / 604 FE — a fresh reading keeps the "don't regress the floor" guidance
+  honest. CHECKED the closed-bug list is still ACCURATE at #87/C268 (the "all landed C155–C271" span is correct — C272/C276/C277 added merge-surviving
+  GUARDS on certified-clean surfaces + C278 a dedup, NOT new bug fixes; bumping the span would falsely imply a fix landed later). DOCS-ONLY: only the
+  CLAUDE.md suite-size line changed (verified `git diff --name-only` = CLAUDE.md before the loop-file edits); no source/test/build touched (the C278 gate
+  is the last code state). Minimal, correct refresh.
+- **C280 (bug — FIXED #34, a real defect from a fresh scout): photo upload was non-atomic → orphaned provider bytes on a post-upload DB failure** —
+  BALANCE: `bug` the only category strictly OVER budget (cyc 276, starved-for 4 > 3); feature more-starved (110) but human-gated. Bug DORMANT → scout-fresh
+  → and this one HIT a real, filed-but-unfixed defect. FOUND (firsthand, photo-service.ts uploadPhotoForEntity): provider.upload (external bytes) →
+  photoRepository.create (photo row) → photoRefRepository.create (active ref) ran with NO transaction + NO compensating delete. A DB error/constraint after
+  the bytes land ORPHANS the external object — no DB row references it, so it's never reconcilable or deletable through the app (#34, NORTH_STAR #1 no
+  silent loss). FIX (loop-sized, no new DI seam — `provider` already in scope): extracted `persistUploadedPhotoOrCleanup(provider, providerId, storageRef,
+  meta)` that wraps the two inserts in try/catch and best-effort `provider.delete(storageRef.externalId)`s the just-uploaded object before re-throwing; a
+  failed cleanup is logger.warn'd (reconcilable) but never masks the original error. The extraction ALSO cleared the Biome complexity ceiling
+  (uploadPhotoForEntity went 16→17 with the inline try/catch; the helper drops it back under 15). GUARD: source-scan upload-compensating-delete.test.ts
+  (+3, the C133/C220 precedent — a real upload needs a live provider's bytes, not in-harness-drivable without the mock.module leak trap): pins the helper
+  exists + is invoked, the catch best-effort-deletes externalId:storageRef.externalId + re-throws, and the orphan-cleanup-failure is logged. NON-VACUOUS
+  (body-isolation asserts catch + provider.delete + throw all present). green→green: backend validate:local EXIT 0 — 1395 pass / 1 skip / 0 fail (+3),
+  tsc 0, musl-biome clean, build bundled. #34 CLOSED. (#33 — the delete-side external-byte orphan reconcile-queue — remains the larger filed follow-on.)
+  cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C281 (deep-review): buildAmortizationSchedule CERTIFIED CLEAN; pinned the negative-amortization edge** — BALANCE: `deep-review` the only category
+  strictly OVER budget (cyc 275, starved-for 6 > 5); feature more-starved (111) but human-gated. Picked buildAmortizationSchedule (the loan principal/
+  interest projection a user relies on for payoff planning; bug #10 lived here; not re-reviewed since C38) — the C67 analytics-builder cert covered 6
+  OTHER builders, not this one. CERTIFIED CLEAN firsthand: balance-clamped principal (final payment can't exceed balance), paid-off loans skip, interest
+  non-negative-clamped, no caller-mutation (local balances copy). Comprehensively pinned already: interest-declines/principal-rises (#10), payoff-clamp
+  (no negative/phantom), multi-loan aggregation, no-mutation, empty-input. THE finding → guard: the NEGATIVE-AMORTIZATION edge (payment < monthly interest
+  → principal = Math.max(0, payment−interest) clamps to 0 → balance frozen, loan never pays off) was UNCOVERED (every prior test used payment > interest).
+  +1 test: $10k @ 24% APR, $150/mo payment (< $200 interest) → principal 0 every month, interest a constant $200 (frozen balance), identical across rows —
+  pins the under-water-loan behavior (correct, not a bug, but unpinned). NON-VACUOUS (a regression allowing negative principal or un-clamped balance breaks
+  the frozen-balance signature). green→green: backend validate:local EXIT 0 — 1397 pass / 1 skip / 0 fail (+1), tsc 0, musl-biome clean (format
+  auto-fixed), build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C282 (guard): pin the cross-tenant WRITE defense on AuthProviderRepository.updateProfile** — BALANCE: nothing OVER budget → highest-leverage; guard
+  most-starved (cyc 277, starved-for 5); feature more-starved (112) but human-gated. SCOUT: auth-provider-repository.ts was the thinnest auth module (1
+  referencing test) — the OAuth-identity store (links Google/etc accounts to users), constructor-DI'd so directly testable over in-memory SQLite (no
+  harness leak trap). Its property-test ALREADY covers 6 methods + domain isolation + delete's cross-tenant guard ("does not delete other users' rows"),
+  but `updateProfile` had ONLY the happy path — its parallel cross-tenant WRITE defense (scoped on (id, userId, domain='auth'), so updating another user's
+  auth profile with the wrong userId is a no-op — account-profile-tampering defense) was UNPINNED. +1 test: attacker(USER_ID) tries to rewrite USER_ID_2's
+  google profile via updateProfile(row.id, USER_ID, {hijacked}) → the victim's row is UNCHANGED (displayName 'Victim', email 'victim@test.com' intact).
+  NON-VACUOUS (a regression dropping the userId predicate lets the attacker's values land → fails). green→green: backend validate:local EXIT 0 — 1398 pass
+  (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Test-only. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C283 (arch): extract `buildAuthProviderConfig` — the auth-provider `config:{email,avatarUrl}` shape, 3 sites → 1** — BALANCE: `arch` most-starved
+  actionable (cyc 278, starved-for 5 = budget, due); feature more-starved (113) but human-gated. FAN-OUT scout (spawn_run still 400s → inline): rejected
+  the trivial/divergent candidates per the C99/C273 churn rule — `new Date(x*1000)` (8 trivial analytics sites), the FE store try/catch wrappers (11 sites
+  but the catch is the only common part; a HOF wrapper is refactor-for-taste with error-timing risk), createLoadState (already a filed direction call,
+  C79). PICKED a real one-source-of-truth dedup: the OAuth-identity `config: { email, avatarUrl }` blob was hand-assembled BYTE-IDENTICALLY at 3 write
+  sites — auth-provider-repository create:55 + updateProfile:90 + auth/routes.ts new-user insert:246 — and it's READ BACK via `config.email`/`config.avatarUrl`,
+  so the writers must stay in lockstep (the FE↔BE-contract-drift class; rule-5 "collapse N sources into one"). Extracted `buildAuthProviderConfig(email,
+  avatarUrl?)` to auth-provider-repository.ts + wired all 3 (+ the routes.ts import). PAYOFF: a future config field (e.g. locale) is added in one place,
+  not three. BEHAVIOR-PRESERVING (returns the identical literal). Anchored by the existing create/updateProfile config-shape property assertions + the
+  auth-routes tests passing UNCHANGED, +2 direct helper tests (full shape; avatarUrl optional). green→green: backend validate:local EXIT 0 — 1400 pass
+  (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean (format auto-fixed), build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C284 (bug-cycle scout → guard): odometer write paths CERTIFIED CLEAN; pinned the DELETE-no-recheck (downward-change-safe) invariant** — BALANCE: `bug`
+  the only category strictly OVER budget (cyc 280, starved-for 4 > 3); feature more-starved (114) but human-gated. Bug DORMANT → scout-fresh → fix-or-record.
+  SCOUTED two surfaces, BOTH clean: (1) odometer routes — DELETE /:id does NOT call recheckMileageReminders (POST :131 + PUT :158 do), which I initially
+  flagged as a possible gap, but VERIFIED it's CORRECT: processMileageReminder only fires on a FORWARD crossing (currentOdometer >= nextDueOdometer) +
+  dedups, never un-fires, so a DELETE (which can only LOWER the odometer) has nothing to re-evaluate; (2) expenses repository source/clientId queries
+  (findBySource/findIdsByGroupId/findByClientId) — all userId-scoped, idempotency CAS race-recovery clean. NO live defect. THE finding → guard: the
+  downward-odometer-is-safe invariant was subtle + unpinned (recheck-on-write.test covered CREATE+UPDATE firing but not the DELETE/un-fire case). +1 HTTP
+  test (recheck-on-write.test.ts): a reading crosses 35000 → fires; DELETE that highest reading (odometer drops below the milestone) → the notification
+  SURVIVES (durable history, no un-fire) AND a later /trigger does NOT re-fire (dedup holds, no reading ≥ milestone). NON-VACUOUS (a future "recheck on
+  delete" un-fire or a dedup regression breaks it). green→green: backend validate:local EXIT 0 — 1401 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean,
+  build bundled. cov: be 85.65%+ (carry) / fe 80.72% (carry).
+- **C285 (infra): coverage RE-MEASURE — 16 cycles stale (last C269); ground the post-C270–C284 reading** — BALANCE: nothing OVER budget → infra
+  most-starved actionable (cyc 279, starved-for 6 = budget, due); feature more-starved (115) but human-gated. The C236/C248/C258/C269 cadence (~every
+  10–11 cycles): a fresh MEASURED reading (not an estimate) grounds future guard/coverage picks, and the C270/C272/C276/C277/C280/C281/C282/C284 BE test
+  adds + C271/C278 FE adds moved it. RAN both suites with `--coverage`: **backend 85.74% line / 86.04% func** (was 85.65/85.95 at C269 — +0.09/+0.09; the
+  guard adds nudged it). **frontend 81.41% line / 80.64% func / 75.20% branch** (was 80.72/80.58/75.00 — +0.69 line on the C271 no-utc-date-input guard +
+  C278 download.ts util tests). Both suites hold > 80% line; FE broke 81%. The 90% goal remains the C258 STRUCTURAL PLATEAU (BE saturated except
+  DI/orchestrator-bound tails; FE gap is eyes-on components/routes, Playwright-gated) — not loop-closable without an eyes-on harness or DI sign-off.
+  DOCS-ONLY: updated the CLAUDE.md coverage line (C269→C285 figures); no source/test/build touched (the C284 gate is the last code state). Recorded the
+  measure honestly; no churn-test forced to chase a structurally-gated number.
+- **C286 (deep-review): split-expense edit/delete cascade + expense-filter builder — BOTH CERTIFIED CLEAN, already comprehensively pinned (record-only)** —
+  BALANCE: `deep-review` most-starved actionable (cyc 281, starved-for 5 = budget, due); feature more-starved (116) but human-gated. spawn_run still 400s →
+  firsthand. SCOUTED two surfaces, both CLEAN + thoroughly covered: (1) `updateSplitExpense`/`deleteSplitExpense` (repository.ts) — userId-scoped destructive
+  writes (the #52/C109 cross-tenant class), absolute-edit derives groupTotal from the new legs (NOT the stale stored header — the #60 Property-3 fix),
+  source-link (sourceType/sourceId) preserved across an edit (C101), photos migrated to the first new sibling; ALL pinned by expense-repository.property.test
+  (groupId preservation, photo migration, source survival, #52 cross-tenant delete+update, #60 absolute-no-total + matching-total-no-op). (2)
+  `buildExpenseConditions` (the single source for list + CSV-export filtering) — endDate-inclusive-of-local-day (#39/C6/C61/C103 boundary class), tag AND-semantics
+  via json_each, LIKE-metachar escape (#41 `50%`-literal); ALL pinned by date-range-boundary.test (5 cases incl. the findAll/CSV-export-shares-boundary +
+  non-midnight-verbatim) + search-paginated.test (#41) + repository.property.test (tag-every). NO defect, NO warranted new test (more would be coverage-theater,
+  the C225/C259/C275 rule). RECORD-ONLY (the C259/C275 clean-cert precedent — both targets clean AND already comprehensively pinned). No code, no test, no gate
+  run (the C284 state is the last code change; C285 was docs). cov: be 85.74% (carry) / fe 81.41% (carry).
+- **C287 (guard): pin the percentage-split penny-residue placement + the over-100% clamp branch** — BALANCE: nothing OVER budget → highest-leverage; guard
+  most-starved (cyc 282, starved-for 5); feature more-starved (117) but human-gated. SCOUT: split-service.ts was the thinnest service module (1 referencing
+  test) — the money-allocation math (NORTH_STAR #2 currency-correctness). computeAllocations is property-tested for SUM-invariant + even-split fairness +
+  count + absolute-passthrough, but two deterministic percentage edges the gens don't reach were UNPINNED: (1) the LAST vehicle absorbs the rounding residue
+  (floor the first N-1, exact remainder to last → precise sum: 33/33/34 of $100 = [33,33,34]; 33.33/33.33/33.34 → last carries the cents); (2) the
+  Math.max(0,…) clamp (computeAllocations does NOT re-validate — only the route's Zod sum=100 refinement does — so a config whose NON-LAST legs overshoot
+  100, e.g. 60/60/10, drives the last remainder negative → must clamp to 0, never −20). +3 deterministic tests. NON-VACUOUS (the clamp test asserts 0 not
+  −20; the first attempt RED-validated my algorithm reading — the clamp only triggers when non-last legs overshoot, since only the last leg takes the
+  remainder). green→green: backend validate:local EXIT 0 — 1404 pass (+3) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Test-only. cov:
+  be 85.74%+ (carry) / fe 81.41% (carry).
+- **C288 (bug scout → FILED+ESCALATED #88, pinned current behavior): split reminder naming a DELETED vehicle leaves a partial group** — BALANCE: `bug` the
+  only category strictly OVER budget (cyc 284, starved-for 4 > 3); feature more-starved (118) but human-gated. Bug DORMANT → scout-fresh → this scout FOUND
+  a real defect, but the FIX is a product call (not loop-decidable) → file + escalate + pin current behavior + don't block. FOUND (firsthand): a SPLIT
+  recurring-expense reminder's expenseSplitConfig is a JSON blob (NOT a FK); the reminder_vehicles junction IS FK-cascade-cleaned on a vehicle delete, but
+  the config isn't → a deleted vehicle's id persists in it. On the next trigger, createExpenseFromReminder → createSiblings inserts siblings one-by-one; the
+  deleted vehicle's leg FK-violates expenses.vehicle_id (onDelete:cascade ref). SHARPER than expected: a throw escaping the async tx callback after the prior
+  sync insert does NOT roll back (the C151 better-sqlite3 footgun) → the SURVIVING vehicle's leg can PERSIST as a partial/inconsistent group (groupTotal=$100,
+  one $50 leg) while the deleted leg never lands — repeating every trigger, NO user signal (NORTH_STAR #1). The per-reminder try/catch contains it (recorded
+  `skipped`, run stays 200). ESCALATED #88 to Angelo (+ a correction msg once I saw the partial-group nuance); resolution is a product call (drop+renormalize
+  config on vehicle-delete / deactivate / single-vehicle fallback). CHARACTERIZATION GUARD (+1, trigger-expense.test.ts): split[v1,v2] + independent[v3];
+  DELETE v2; trigger → deleted v2 never gets a leg + reminder in `skipped` + the independent v3 reminder STILL fires (containment) + run 200. NON-VACUOUS
+  (a fix, or an uncaught-throw regression breaking the whole run, both change these). green→green: backend validate:local EXIT 0 — 1405 pass (+1) / 1 skip /
+  0 fail, tsc 0, musl-biome clean, build bundled. cov: be 85.74%+ (carry) / fe 81.41% (carry).
+- **C289 (arch): extract `assertLicensePlateAvailable` — the per-user plate-uniqueness check, 2 vehicle-route sites → 1** — BALANCE: `arch` the only
+  ACTIONABLE over-budget category (cyc 283, starved-for 6 > 5); feature more-starved (119) but human-gated. FAN-OUT scout (spawn_run still 400s → inline):
+  rejected the already-shared (withComputedBalance C243, parseClampedInt C211, getPaginated is the apiClient method). PICKED a real one: the license-plate
+  uniqueness check (findByLicensePlate(plate, userId) → ConflictError('A vehicle with this license plate already exists')) was hand-rolled at 2 sites in
+  vehicles/routes.ts — POST (162) + PUT (245), the latter adding the self-exclusion (!== id). Extracted async `assertLicensePlateAvailable(plate, userId,
+  excludeId?)` (the excludeId param folds in the PUT self-exclusion: POST omits it, PUT passes the current id). PAYOFF (rule 5): the #80/#233 per-user
+  plate-uniqueness rule + its message live in ONE place. BEHAVIOR-PRESERVING (POST: existing.id !== undefined is always true when a row exists → throws,
+  identical; PUT: excludeId=id self-excluded, identical). Anchored by the existing #80/#233 HTTP tests passing UNCHANGED, +2 NEW tests for the excludeId
+  branches the dedup centralizes (re-save-without-plate-change → no self-409; same-user dup on a DIFFERENT vehicle → still 409, proving excludeId isn't
+  over-broad). green→green: backend validate:local EXIT 0 — 1407 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean (format auto-fixed), build bundled.
+  cov: be 85.74%+ (carry) / fe 81.41% (carry).
+- **C290 (guard): pin the cross-tenant ownership guard on /fuel-stats + /fuel-advanced (the 2 uncovered optional-vehicleId analytics endpoints)** —
+  BALANCE: nothing OVER budget → highest-leverage; guard most-starved (cyc 287, starved-for 3); infra most-starved (5) but has no pressing work (cov
+  re-measured C285, hygiene C274, docs C279 — forcing it would be manufactured); feature more-starved (120) but human-gated. SCOUT: 12 analytics GET
+  endpoints, only 7 with HTTP coverage. The C185 net pinned the required-vehicleId guards (vehicle-tco/health) + the optional-vehicleId pair on
+  fuel-efficiency, but /fuel-stats + /fuel-advanced carry the IDENTICAL `if (vehicleId) validateVehicleOwnership` optional-guard with its cross-tenant
+  branch UNCOVERED. +4 HTTP tests (analytics-routes-http.test.ts): each endpoint — omitted vehicleId → 200 all-fleet envelope (no validation); FOREIGN
+  vehicleId → 404 (no cross-tenant analytics leak, the C109/#52 class). DISCOVERY (the RED first run): unlike fuel-efficiency, these two REQUIRE
+  startDate+endDate (dateRangeVehicleQuerySchema) — omitting them 400s at zValidator BEFORE the guard; supplying a valid 2024 unix-seconds range reaches
+  the guard branch. NON-VACUOUS (foreign-id asserts 404 not 200/400; no-id asserts the 200 envelope). green→green: backend validate:local EXIT 0 — 1411
+  pass (+4) / 1 skip / 0 fail, tsc 0, musl-biome clean (format auto-fixed), build bundled. Test-only. cov: be 85.74%+ (carry) / fe 81.41% (carry).
+- **C291 (deep-review → guard): backup-orchestrator execute() CERTIFIED CLEAN; converted the C181 skip-path SIMS to real-execute() coverage** — BALANCE:
+  infra + deep-review both due (cyc 285/286, starved-for 6/5); infra has no pressing work (cov C285, hygiene C274, docs C279 — manufactured if forced) →
+  picked deep-review. Audited BackupOrchestrator.execute() firsthand. CERTIFIED CLEAN: mutex (idempotent delete → the inline-release-at-early-returns +
+  finally double-release is HARMLESS, not a bug), force-bypass + change-detection skip, no-providers early return, ZIP-fail→Sheets-only resilience,
+  per-provider decrypt-fail skip, Promise.allSettled containment (one provider's failure can't sink the others), the #42 snapshot-START-timestamp
+  persist-only-on-success (C144). THE finding: backup-orchestrator.test.ts's mutex/change-skip/no-providers cases are LOCAL SIMS (the C181 coverage-theater
+  pattern its own header flags as "execute() not reachable in-harness") — but that note was OVER-CAUTIOUS: createTestApp rewrites DATABASE_URL to in-memory
+  BEFORE the (dynamically-imported-here) orchestrator + its getDb() resolve, so the REAL execute() runs against the harness DB, and the EARLY-RETURN skip
+  paths return before any storage-provider work → genuinely drivable. +3 real-execute() tests (new backup-orchestrator-execute.test.ts): force=false+no-changes
+  → {skipped:true}; has-changes(seeded vehicle bumps lastDataChangeDate)+no-providers → not-skipped+empty results; force=true+no-providers → not-skipped+empty.
+  NON-VACUOUS (skipped=true vs undefined distinguishes the change-gate path from the no-providers path; migrations ran + the real module imported, proving
+  it's the genuine execute(), not a sim). green→green: backend validate:local EXIT 0 — 1414 pass (+3) / 1 skip / 0 fail, tsc 0, musl-biome clean (format
+  auto-fixed), build bundled. cov: be 85.74%+ (carry; execute() skip paths now REAL-covered) / fe 81.41% (carry).
+- **C292 (infra): CLAUDE.md refresh — add #88 to the pending-Angelo block + suite size ~1392→~1414 BE** — BALANCE: TWO over budget (infra 7 > 6, bug 4 > 3);
+  infra most-starved → picked it (the C253/C279 docs-accuracy cadence). #88 was filed+escalated C288 but the CLAUDE.md pending-Angelo list ended at #85, and
+  the suite-size line (C279, ~1392) drifted as C287/C288/C289/C290/C291 added ~22 BE tests → now 1414. FIXED (CLAUDE.md only): (1) appended #88 (split
+  reminder + deleted vehicle → partial-group, the C151 async-tx footgun; drop+renormalize / deactivate / single-vehicle — product-gated) to the
+  pending-Angelo block beside #79/#85; (2) suite size ~1392→~1414 BE / ~604 FE. CHECKED the closed-bug list is still ACCURATE (last fix was #87/C268; C272–C291
+  were guards/dedups/a-filed-#88, not new fixes). DOCS-ONLY — verified `git diff --name-only` = CLAUDE.md alone before the loop-file edits; no source/test/
+  build touched (the C291 gate is the last code state). Keeps the next cycle's product-call backlog accurate.
+- **C293 (bug): create-or-replace financing leaves STALE cross-type fields when a vehicle's financing type changes (the sibling to C240)** —
+  BALANCE: feature most-starved (170, starved-for 123) but every feature tail is Playwright/Angelo-gated (standing escalation, not loop-actionable);
+  bug next-actionable over budget (288, starved-for 5 > 3) → forced pick. Bug vein dormant → fresh-surface scout of the FINANCING module (less recently
+  scoured). repository.ts/hooks.ts certified clean; the defect is in routes.ts POST. THE finding: `POST /vehicles/:id/financing` is a create-OR-REPLACE
+  that REUSES the existing row via `update(...financingData, isActive:true, endDate:null)` (its own comment: "the vehicle's financing is now THIS"). But
+  `update()` SKIPS `undefined` keys, and the cross-type fields are all `.optional()` in the create schema — loan-only `apr`, lease-only `residualValue`/
+  `mileageLimit`/`excessMileageFee`, schedule `paymentDayOfMonth`/`paymentDayOfWeek`. So converting a vehicle's financing TYPE (lease↔loan) without
+  re-sending the prior type's fields LEAVES them stale → a `financingType:'loan'` row carrying a lease `mileageLimit`, consumed by FE lease-metrics
+  (financing-calculations.ts:419-433) + the Google-Sheets export (all three lease columns) → a self-contradictory row (NORTH_STAR #2). C240 pinned the
+  BALANCE reset on this same reuse path but never the FIELD reset. FIX: coalesce every optional cross-type/schedule field to `null` in the replace path so
+  the reused row mirrors a fresh `create()` (where absent nullable columns default to NULL). GUARD: new refinance-cross-type-field-reset.test.ts drives the
+  REAL POST over createTestApp in BOTH directions (lease→loan clears the 3 lease fields + keeps apr; loan→lease clears apr + keeps the lease fields) —
+  RED before the fix (residualValue 18000 / apr 6.5 lingered), GREEN after. green→green: backend validate:local EXIT 0 — 1415 pass (+2) / 1 skip / 0 fail,
+  tsc 0, musl-biome clean, build bundled. cov: be 85.74%+ (carry; the replace path now field-reset-covered) / fe 81.41% (carry).
+- **C294 (arch): financing routes adopt the shared `validateVehicleOwnership` — kill the lone hand-rolled vehicle-ownership guard** —
+  BALANCE: feature most-starved (170) but Playwright/Angelo-gated (not loop-actionable); arch DUE (last 289, starved-for 5 = budget) → forced
+  pick. Arch is "reliably dry" — rule-7 inline scout (spawn_run reliably 400s). THE finding: financing/routes.ts was the SOLE route module
+  hand-rolling the vehicle-ownership guard inline (`vehicleRepository.findByUserIdAndId` + a manual `throw new HTTPException(404, {message:
+  'Vehicle not found'})`) at 2 sites (GET + POST), while EVERY sibling (expenses/insurance/odometer/analytics/vehicles, ~20 call sites) uses the
+  shared `validateVehicleOwnership(vehicleId, userId)` from utils/validation. Neither financing site used the returned vehicle (pure guard-then-
+  throw) → a clean dedup. BEHAVIOR-PRESERVING verified (rule 2): `validateVehicleOwnership` throws `NotFoundError('Vehicle')` → the global
+  error-handler renders it 404 + message "Vehicle not found" — byte-identical status+message to the inline HTTPException. The only raw-envelope
+  delta is the `code` field ('HTTPException'→'NotFoundError'), which CONVERGES financing onto the code every other route already emits for this
+  exact case; the FE never branches on either (both absent from ERROR_CODE_MESSAGES → falls back to error.message, unchanged). Side win: the POST
+  404 now logs as a client `warn` (NotFoundError IS an AppError, statusCode<500) instead of "Server error" (HTTPException isn't). PAYOFF: -8 LOC
+  net, one source of truth for the guard, dead `vehicleRepository` import dropped from the module. GUARD (rule 3, test-anchored both ways): new
+  financing-vehicle-ownership-404.test.ts pins the observable 404+message on GET & POST over the REAL routes via createTestApp — GREEN before the
+  refactor (against the inline guard) AND after (against validateVehicleOwnership). green→green: backend validate:local EXIT 0 — 1418 pass (+2) /
+  1 skip / 0 fail, tsc 0, musl-biome clean (test reflow auto-fixed), build bundled. cov: be 85.74%+ (carry) / fe 81.41% (carry).
+- **C295 (deep-review → bug): lease-overage projection compared an ABSOLUTE odometer against a DRIVEN-miles budget — phantom excess fee on
+  any used-car lease (#91)** — BALANCE: nothing over budget except gated feature; deep-review highest non-gated budget-pressure (last 291,
+  starved-for 4) + pairs with the C293/C294 financing focus → picked it. Inline-scouted the financing/analytics MONEY math (spawn_run 400s).
+  CERTIFIED CLEAN: buildAmortizationSchedule (bug #10 fix — walks balance down, clamps at 0), effectiveMonthlyPremium (bug #8 — totalCost
+  amortized across the term span), buildSingleFinancingDetail (monthlyInterestEstimate guarded on loan+apr, monthsElapsed clamped). THE FINDING
+  (frontend/src/lib/utils/financing-calculations.ts calculateLeaseMetrics): `totalMileageAllowance`/`mileageUsed`/`mileageRemaining` all live in
+  DRIVEN-miles space (current − initial), but `projectedFinalMileage` is an ABSOLUTE odometer reading (currentMileage + milesPerDay·daysRemaining),
+  and the excess compared the absolute reading DIRECTLY against the driven budget → over-reported projectedExcessMiles + the $ projectedExcessFee
+  by EXACTLY initialMileage. A 40k-mi car leased + driven on-pace showed a ~$10k phantom fee at $0.25/mi. Sibling to #64 (C198 fixed the allowance
+  SCALING but left this coordinate-space mismatch). NORTH_STAR #2. FIX: project DRIVEN miles (projectedFinalMileage − initialMileage) before
+  comparing to the budget. Fields aren't rendered yet (latent in the LeaseMetrics contract) → no UI moved, pure-logic util, no screenshot needed.
+  GUARD: +1 lease-metrics test — a 40k-initial / 52k-current on-pace lease projects EXACTLY $0 excess (pre-fix: 76k−36k = 40k phantom miles →
+  $10k fee, so non-vacuous). green→green: frontend validate:local EXIT 0 — type-check 0, build, 605 pass (+1), lease-metrics 21/21. cov: be
+  85.74% (carry) / fe 81.41%+ (carry; the lease projection now correctly-anchored).
+- **C296 (guard): translation-invariance property pins the C295/#91 coordinate-space bug CLASS (not just one example)** — BALANCE:
+  guard forced (last 290, starved-for 6 = budget, most-starved actionable; feature gated). Per the LEDGER steering note, steered the
+  guard to the freshest high-risk surface — the C295 lease-overage fix. THE GAP: C295 left a single example test (40k-initial on-pace →
+  $0), and the pre-existing lease-metrics property test asserts only finiteness + non-negativity — which would NOT have caught #91 (the
+  over-reported fee was still finite & non-negative). The bug was a coordinate-space mix (absolute odometer vs driven-miles budget), and
+  the merge-surviving guard for that CLASS is a translation-invariance property: adding the SAME constant to both initialMileage and
+  currentMileage shifts only the odometer baseline (the car was leased with more miles on it), NOT how far it's driven — so every
+  DRIVEN-miles output (mileageUsed, mileageRemaining, projectedExcessMiles, projectedExcessFee, isOverMileage) must be INVARIANT, and only
+  projectedFinalMileage (absolute) moves by exactly the shift. +1 fast-check property (200 runs) asserting exactly that. NON-VACUOUS,
+  PROVEN: temporarily reverted the #91 fix line → BOTH the C295 example AND this new property went RED (projectedExcessMiles leaked the
+  shift: "expected 1 to be close to 0"); restored the fix → green. green→green: frontend validate:local EXIT 0 — type-check 0, build, 606
+  pass (+1), lease-metrics 22/22. Guard-only (pure test addition, no source touched) → no UI moved, no screenshot. cov: be 85.74% (carry)
+  / fe 81.41%+ (carry).
+- **C297 (bug): calculateExtraPaymentImpact treated EVERY 0%-APR loan as inert → "0 mos saved" for an interest-free loan an extra
+  payment clearly shortens (#92)** — BALANCE: bug over budget (last 293, starved-for 4 > 3, most-starved actionable; feature gated) →
+  forced pick. Pivoted OFF financing (3 cycles deep) to scout odometer/split-service/import-mapping (all CERTIFIED CLEAN — odometer
+  repo #48-hardened both legs + getCurrentOdometer MAX-by-value; split-service cents-based remainder-to-last; import-mapping
+  decimal-comma + local-date + unit-convert all sound), then back to the FE financing payment-planner. THE FINDING
+  (frontend/src/lib/utils/financing-calculations.ts calculateExtraPaymentImpact): the early guard `financingType !== 'loan' ||
+  !financing.apr || financing.apr <= 0` lumped every 0%-APR (or no-APR-entered) loan in with leases/own and returned a FLAT
+  {monthsSaved:0, interestSaved:0}. But a 0% loan is interest-free, NOT inert — extra payments retire principal faster and genuinely
+  shorten the term. PaymentPlannerDialog.svelte:153 renders impact.monthsSaved ("{n} mos"), so an interest-free loan (common: 0%
+  dealer financing) wrongly showed "0 mos" for an extra payment that obviously shortens payoff. NORTH_STAR #2. FIX: the amortization
+  loop already handles 0% correctly (monthlyRate 0 → full payment to principal), so bail early ONLY for non-loans and let 0%-APR loans
+  run the loop with rate 0 (`apr && apr>0 ? apr/100/12 : 0`). GUARD: new extra-payment-zero-apr.test.ts (+4): a $12k @ 0% / $500-a-mo
+  loan + $500 extra saves exactly 12 months (24→12) with $0 interestSaved; monotonic; positive-APR path unaffected (both savings >0);
+  lease still inert. NON-VACUOUS, PROVEN: restoring the old guard turned the two 0%-APR tests RED ("expected +0 to be 12"). The fixed
+  $ figure is shown in the planner dialog (markup unchanged → no pixel moved; eyes-on screenshot Playwright-gated, logic fully pinned).
+  green→green: frontend validate:local EXIT 0 — type-check 0, build, 610 pass (+4). cov: be 85.74% (carry) / fe 81.41%+ (carry).
+- **C298 (infra): CLAUDE.md docs-accuracy refresh — record #90/#91/#92 in the closed-bug list + suite size ~1418 BE / ~610 FE** —
+  BALANCE: infra forced (last 292, starved-for 6 = budget, most-starved actionable; feature gated). The C253/C279/C292 docs-accuracy
+  cadence: three bugs closed since the last refresh (#90 C293, #91 C295, #92 C297) but the CLAUDE.md closed-bug list ended at #87/C268
+  and even SKIPPED #90 entirely; suites drifted (BE 1414→1418 via C294's +2 ownership-404 tests; FE 604→610 via C295/C296/C297's +1/+1/+4).
+  FIXED (CLAUDE.md only): (1) appended #90 (create-or-replace stale cross-type fields), #91 (lease overage absolute-vs-driven), #92
+  (0%-APR planner inert) to the closed-bug list + bumped the arc range C155–C271 → C155–C297; (2) suite size ~1414→~1418 BE / ~604→~610
+  FE. DOCS-ONLY — verified `git status --short` = CLAUDE.md alone (the ?? items are the pre-existing untracked-by-design e2e/tooling
+  scaffold); no source/test/build touched (the C297 gate is the last code state). Keeps the next cycle's closed-bug + suite-floor refs
+  accurate. cov: be 85.74% (carry) / fe 81.41% (carry).
+- **C299 (arch): extract `simulateAmortization` — collapse the two byte-identical balance-walk loops in calculateExtraPaymentImpact
+  into one pure helper** — BALANCE: arch DUE (last 294, starved-for 5 = budget; feature gated) → forced pick. Arch is reliably-dry —
+  rule-7 inline scout. THE FINDING (frontend/src/lib/utils/financing-calculations.ts): calculateExtraPaymentImpact ran the SAME
+  amortization balance-walk loop TWICE — once for the original payment, once for payment+extra — byte-identical but for the payment
+  amount + local var names (originalBalance/originalMonths/originalTotalInterest vs new*). C161's note records that a hand-copied
+  variant of exactly this loop once LOST its negative-amortization guard → concrete proof these copies are a live bug vector (rule-5
+  payoff: one source of truth for the guarded walk). FIX: extracted `simulateAmortization(balance, monthlyRate, paymentAmount,
+  maxMonths) → {months, totalInterest}` (pure; the `principal ≤ 0` break = the C161 guard; monthlyRate 0 ⇒ 0%-APR path #92), called
+  twice; savings are the deltas. (Left calculatePayoffDate's loop ALONE — it `return`s today on the under-funded path rather than
+  break-ing, so it's NOT byte-identical; rule-2 forbids changing that observable behavior.) The only dropped code was two DEV-only
+  console.warn lines (not observable, no test asserts them). −28 LOC. BEHAVIOR-PRESERVING + test-anchored both ways (rule 3): the
+  extra-payment-zero-apr + financing-calculations.property + amortization-negative-guard + payment-planner.property suites (46 tests)
+  pass UNCHANGED before & after. green→green: frontend validate:local EXIT 0 — type-check 0, build, 610 pass (unchanged — pure
+  refactor). Pure util, no UI moved, no screenshot. cov: be 85.74% (carry) / fe 81.41% (carry).
+- **C300 (deep-review → bug): merge-mode restore threw a raw PK-violation on the (always-present) userPreferences/syncState collision
+  instead of reporting a clean conflict (#93)** — BALANCE: deep-review DUE (last 295, starved-for 5 = budget; feature gated) → forced
+  pick. Pivoted off financing to the sync/RESTORE path (NORTH_STAR #1 data-safety hotspot). Inline-audited restore.ts firsthand:
+  stampUserId chokepoint, tenant-scoped conflict probes (C109), empty-replace guard, FK-ordered inserts — all SOUND. THE FINDING:
+  detectConflicts probes only 6 tables (vehicles/expenses/financing/insurance/photos/photoRefs) but insertBackupData inserts 15 —
+  including userPreferences + syncState, whose PRIMARY KEY is userId. The importer ALWAYS has a prefs row (getOrCreate / first-use) and
+  a backup ALWAYS carries the creator's prefs row, so a MERGE restore whose 6 probed tables DON'T collide (e.g. importing fresh data
+  into an account with only default prefs) slipped past conflict detection straight into insert(userPreferences) against the existing
+  PK → `UNIQUE constraint failed: user_preferences.user_id`, an unhandled SQLite throw that rolled back the WHOLE restore. Merge was
+  effectively broken for the no-other-collision case (NORTH_STAR #1 — restore must be predictable, not a raw DB error). The existing
+  tenant-scope test MASKED it: its merge backups always also self-collided on a vehicle, which short-circuited before the prefs insert.
+  FIX: detectConflicts now probes userPreferences + syncState like any owned table (scope eq(userId); the conflict id IS the userId);
+  generalized the probe loop with per-entry idColumn/idField so the userId-PK'd tables match + report on userId, not a missing `id`
+  column. GUARD: new restore-merge-prefs-collision.test.ts ISOLATES the case (export a ZIP, DELETE the vehicle so ONLY the prefs row
+  still collides, merge) — RED before the fix (the raw UNIQUE throw), GREEN after (a clean conflict). green→green: backend
+  validate:local EXIT 0 — 1418 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be
+  85.74%+ (carry; detectConflicts now covers prefs/syncState) / fe 81.41% (carry).
+- **C301 (bug → file+escalate + guard): fleet-wide fuel-stats pools per-vehicle distance/cost WITHOUT unit conversion — mixed-unit
+  fleets get garbage on the main analytics view (#94)** — BALANCE: bug over budget (last 297, starved-for 4 > 3; feature gated) → forced
+  pick. Scouted fresh surfaces (financing-deep already): reminders trigger-service (#12/#13/#42/#71/C151-hardened — CLEAN), reminder-cost
+  (occurrences/yr — CLEAN), offline-storage syncOfflineExpenses (the batch-abort-on-first-error is INTENTIONAL + test-pinned, the
+  failing entry's fate is the product-gated #79 — NOT a clean bug), insurance repo, analytics divisions (all `>0?` guarded). THE FINDING:
+  GET /analytics/fuel-stats with NO vehicleId (the DEFAULT analytics-summary path, confirmed in analytics-api.ts:146) aggregates across
+  ALL vehicles; buildFuelStatsFromData sums each vehicle's (max−min) odometer span into distance.totalDistance + takes min/max of per-pair
+  cost/distance into averageCost.best/worstCostPerDistance — both WITHOUT unit conversion. Vehicles carry PER-VEHICLE unitPreferences
+  (vehicles.unit_preferences), so a mi+km fleet pools miles+km into one distance + blends $/mi with $/km on the headline view (NORTH_STAR
+  #2). The per-vehicle CHARTS (computeConvertedTotalDistance) already convert; only the summary SCALARS don't. DISTINCT from #45 (period-
+  scoping). A SEMANTICS decision (convert-to-user-global / per-vehicle-only / require vehicleId) → FILED #94 + send_message'd Angelo, NOT
+  self-fixed. SHIPPABLE increment (bug-cycle floor): a characterization guard (new fuel-stats-fleet-distance-pooling.test.ts, +2) pinning
+  the CURRENT raw-pooled behavior (totalDistance = per-vehicle spans summed 800+200=1000 NOT the 40_200 cross-vehicle pool; best/worst =
+  $0.05/$0.20 raw min/max) so the eventual fix has a red→green anchor + the bug can't silently worsen. green→green: backend validate:local
+  EXIT 0 — 1420 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 85.74% (carry) / fe 81.41% (carry).
+- **C302 (guard): drift-proof the #93 conflict-probe symmetry — every inserted table is conflict-probed OR a documented child of a probed
+  parent** — BALANCE: guard forced (last 296, starved-for 6 = budget; feature gated). Steered to the freshest high-risk surface — the C300
+  #93 restore fix, which was AD-HOC: it added userPreferences + syncState to detectConflicts because those are the always-present singleton
+  collisions, but the broader symmetry (insertBackupData inserts 15 tables, detectConflicts probes 8) stayed UNDEFENDED — a future
+  parent-less table added to inserts without a probe would silently reintroduce the #93 raw-PK-throw class. THE GUARD (new 3rd test in
+  restore-table-coverage.test.ts, the existing source-scan idiom — no DB): every `.insert(<table>)` in restore.ts must be either (a)
+  conflict-probed (`name: '<db_table>'` in detectConflicts) or (b) on an explicit CHILD_OF_PROBED_PARENT allowlist (the 7 children whose
+  insert is UNREACHABLE on a colliding merge because a probed ANCESTOR collides first → detectConflicts returns before the tx runs:
+  insuranceTerms/TermVehicles/Claims, odometerEntries, reminders/Vehicles/Notifications). A new parent-less unprobed table fails loudly with
+  a fix-it message. NON-VACUOUS, PROVEN: re-ran the guard logic with the C300 probes stripped → it flagged EXACTLY userPreferences +
+  syncState (the #93 gap), confirming it discriminates. green→green: backend validate:local EXIT 0 — 1421 pass (+1) / 1 skip / 0 fail, tsc 0,
+  musl-biome clean, build bundled. Guard-only (one test added, no source) → no UI. cov: be 85.74% (carry) / fe 81.41% (carry).
+- **C303 (infra): #5 branch-hygiene sweep + coverage RE-MEASURE (last full re-measure C258, ~45 cycles overdue; C285 was a CLAUDE.md-only
+  spot-reading)** — BALANCE: nothing over budget except gated feature; infra forced NEXT cycle (C304, 6=budget) AND the #5 sweep was
+  genuinely overdue (last full one C258) → took it now as highest-leverage rather than manufacture docs work under the C304 force. (1)
+  ZERO stray untracked unit/spec tests (`git status` filtered = the by-design `*.meshclaw.e2e.ts` set + tooling/screenshots only). (2) Green
+  baseline BOTH sides: backend bun test --coverage EXIT 0 (1421 pass / 1 skip), frontend validate:local EXIT 0 (610 pass + type-check +
+  build). (3) RE-MEASURE: **be 86.07% line / 86.21% func** (up from C285's 85.74/86.04 — the C283/C289/C291/C294/C300/C302 BE arc);
+  **fe 81.76% line / 80.70% func / 75.70% branch** (up from C285's 81.41/80.64/75.20 — the C295/C296/C297 FE tests). Both >80% line, gap
+  ~4–5pts + stable. Updated the LEDGER COVERAGE TREND header (appended the C303 reading) + CLAUDE.md (coverage line C285→C303, suite
+  ~1418→~1421 BE). The 90%-line goal stays structurally gated (BE tail DI/singleton + OAuth-network; FE gap the eyes-on components/routes
+  deficit, Playwright-blocked). DOCS/MEASUREMENT-ONLY — no source/test/build touched (the C302 gate is the last code state). Next #5 sweep
+  ~C313. cov: be 86.07% / fe 81.76%.
+- **C304 (arch): extract `fetchTermsAndCoverage` — collapse the 5× term+coverage query-assembly in InsurancePolicyRepository into one
+  helper** — BALANCE: arch DUE (last 299, starved-for 5 = budget, most-starved actionable; bug also at 3 but arch waited longer) → forced
+  pick. Arch reliably-dry — rule-7 inline scout. Rejected the analytics-api buildQuery wrappers (already factored — each method is a thin
+  typed wrapper over divergent param sets, collapsing = churn over divergent shapes, rule 5). THE FINDING (insurance/repository.ts): the
+  byte-identical "select terms by policyId ordered by endDate desc → select the term→vehicle junction rows for those termIds → dedupe
+  vehicleIds" block was hand-repeated at 5 sites — attachTermsAndCoverage + the update-policy / add-term / update-term / delete-term
+  transactions — differing ONLY in the db handle (this.db vs the tx) + the spread target (some add newTermId). PAYOFF (rule 5): 5 sources of
+  truth for the response's coverage shape → 1; a junction-schema change can't drift across them. FIX: extracted private
+  `fetchTermsAndCoverage(handle: AppDatabase | DrizzleTransaction, policyId) → {terms, termVehicleCoverage, vehicleIds}` (the existing
+  dbOrTx pattern from validateVehicleOwnership, so the in-tx callers still read their own uncommitted writes); callers spread its result +
+  add their own policy row / newTermId. DELIBERATELY left the CREATE path (line 253) alone — it builds termCoverage IN-MEMORY from the
+  just-inserted terms (accumulated in the insert loop), NOT a re-query; converting would add a redundant round-trip + change behavior (rule
+  2). ~75 LOC → 1 helper + 5 thin calls. BEHAVIOR-PRESERVING + test-anchored both ways (rule 3): all 56 insurance tests
+  (terms-http/repository.property/policy-delete-cascade/etc.) pass UNCHANGED. green→green: backend validate:local EXIT 0 — 1421 pass
+  (unchanged — pure refactor) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07% (carry) / fe
+  81.76% (carry).
+- **C305 (bug → dormant-vein clean scout + contract-pin guard): seven mature surfaces certified clean; pinned the paid-off-financing
+  list contract** — BALANCE: bug over budget (last 301, starved-for 4 > 3, most-starved actionable; deep-review also due at 5 but bug is
+  over) → forced pick. Bug vein DORMANT → fresh-surface scout. CERTIFIED CLEAN (firsthand): vehicles repo (findByUserId/findByIdWithAccess/
+  findByLicensePlate — tenant-scoped, #48/#52-hardened), photos service+repo (deletePhoto refs-then-row ordering safe-by-design;
+  setCoverPhoto validate-before-unset in a tx, C151/C63/C72 baked in; cover reassignment deterministic via sortOrder/createdAt), expenses
+  filtering (LIKE-escaping correct #41, json_each tag match, endDate-inclusive), auth/OAuth-state (size-capped + expiry-swept + PKCE +
+  IP-keyed limiter) + session (dead-cookie clear), Sheets-header coverage (already bidirectionally guarded by sheets-header-coverage.test.ts).
+  THE ONE OBSERVED unguarded edge: vehicleRepository.findByUserId leftJoins vehicleFinancing with NO isActive filter, so a PAID-OFF
+  (isActive=false) financing row — its row reused-not-deleted per #67/C293 — still rides along on the GET /vehicles list. BENIGN today (every
+  FE consumer gates on financing?.isActive), but UNPINNED: a future BE consumer reading vehicle.financing without the gate would resurface a
+  paid-off loan. SHIPPABLE increment (bug-cycle floor): +1 contract-pin in vehicles-list-financing-contract.test.ts asserting a paid-off row
+  STILL surfaces flagged isActive:false (same reused row id) — so the FE isActive gate stays the documented source of truth + any future
+  join-filter change is a conscious, test-visible decision. green→green: backend validate:local EXIT 0 — 1422 pass (+1) / 1 skip / 0 fail,
+  tsc 0, musl-biome clean (test reflow auto-fixed), build bundled. cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C306 (deep-review): provider/storage CREDENTIAL layer CERTIFIED CLEAN — VROOM's most security-sensitive surface (ARCC-grounded)** —
+  BALANCE: deep-review over budget (last 300, starved-for 6 > 5, most-starved actionable; feature gated) → forced. Per ARCC governance
+  (credentials domain), consulted search_arcc FIRST (SAX-01 Outcome 2 + SAX-08 Outcome 1: encrypt content at rest, key managed outside the
+  data store, unreadable without the key) before reading code. AUDITED FIRSTHAND + CERTIFIED CLEAN: (1) utils/encryption.ts — AES-256-GCM,
+  random 96-bit IV per call, 128-bit auth tag (authenticated → tamper-detecting), 256-bit key from PROVIDER_ENCRYPTION_KEY env (NOT in the DB
+  — ARCC key-mgmt aligned), correct [IV|tag|ciphertext] layout; (2) providers/routes.ts — encrypt-on-write (create + update), the
+  formatProviderResponse is a WHITELIST of 8 non-secret fields (credentials structurally CANNOT leak — robust vs a blacklist); (3)
+  s3-compat-provider — clean split: secretAccessKey/accessKeyId = the encrypted credentials blob, endpoint/bucket/region = non-secret config
+  (the verbatim-returned config carries no secret); (4) registry.createProviderInstance decrypt-on-read throws on corrupt/wrong-key →
+  contained per-provider by the C291 orchestrator's Promise.allSettled; fake provider double-gated (non-prod + opt-in); (5) NO credential
+  leakage in any logger.* call. COVERAGE already comprehensive: encryption.test.ts (round-trip incl. empty/unicode/long, random-IV
+  uniqueness, wrong-key/tamper/truncated/invalid-base64 throws, missing/wrong-length key) + providers-routes-http.test.ts
+  (credentials-never-echoed across create/list/update, the C260 re-encrypt-at-rest branch verifying plaintext is NOT in the stored column,
+  domain-guard, ownership-scope). NO defect, NO code change warranted — adding a test would be coverage-theater against an already-pinned
+  invariant (the C291 certification precedent). DOCS-ONLY (LEDGER + BACKLOG); no source/test/build touched (C305 gate is the last code state).
+  cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C307 (guard): pin activity-tracker's two unguarded SAFETY invariants — mid-sync eviction shield + fail-open change-check** — BALANCE:
+  nothing over budget except gated feature; guard highest pressure (last 302, starved-for 5/6, forced next cycle) → highest-leverage pick.
+  Per the LEDGER steering note, steered to a low-covered/high-risk module: sync/activity-tracker.ts (71% func / 57% line — the auto-sync
+  inactivity logic; the C195 ratchet covered cleanupInactiveUsers' ageout but two SAFETY branches stayed unpinned). +2 guards: (1)
+  cleanupInactiveUsers must NOT evict a STALE-but-syncInProgress user (line 129's `!activity.syncInProgress` AND) — evicting mid-sync would
+  clear its timer + drop tracking with the backup still running (orphaned state, flag never reset); the test flips the in-memory flag, proves
+  the stale syncing user SURVIVES, then clears it + proves the same stale user THEN ages out (the guard is exactly the flag, not a blanket
+  exemption). (2) hasChangesSinceLastSync FAILS OPEN — a throwing syncStateRepository returns `true` (back up, don't silently skip), the
+  conservative NORTH_STAR #1 choice; the test stubs the repo to reject + asserts true, so a refactor can't flip it fail-closed (a transient DB
+  hiccup silently dropping an expected auto-backup). Both pin real branch behavior (non-vacuous: removing the syncInProgress AND → RED; a
+  fail-closed catch → RED). green→green: backend validate:local EXIT 0 — 1424 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build
+  bundled. Guard-only (no source touched) → no UI. cov: be 86.07%+ (carry; activity-tracker safety branches now covered) / fe 81.76% (carry).
+- **C308 (bug): settings store cleared a stale `error` on only 2 of 9 async ops → a succeeded retry kept showing a phantom error (#95)** —
+  BALANCE: bug at budget (last 305, starved-for 3 = 3, tightest budget per the rule; infra at 5 but bug's limit is the hard one) → pick.
+  Bug vein dormant → fresh-surface FE scout. CERTIFIED CLEAN: api-client (envelope-unwrap + ApiError shaping sound), api-transformer (#66
+  charge↔volume routing symmetric, null-clear-on-edit guard), formatters (hardcoded en-US is design-consistent — no locale setting exists,
+  so it's not a bug). THE FINDING (stores/settings.svelte.ts): load()/update() reset `error = null` on entry, but the OTHER SEVEN async ops
+  (downloadBackup/uploadBackup/executeSync/listBackupsFromProvider/listAllBackups/restoreFromProvider/loadRestoreProviders) did NOT — so a
+  failure from one left a stale error string on the store that a LATER SUCCEEDING op never cleared. Masked TODAY in the one UI consumer
+  (settings/+page.svelte gates loadError on `&& !settings` = initial-load only), but a latent footgun: any future component rendering
+  settingsStore.error ungated would show a phantom error after a succeeded retry. FIX: add `error = null` on entry to all seven (symmetry
+  with load/update). GUARD: new settings-error-clearing.test.ts (+3, the store's FIRST test) — a failed load() then a SUCCEEDING
+  loadRestoreProviders()/listAllBackups() clears the stale error; + a failing op still SETS its error (the clear-on-entry doesn't swallow
+  real errors). NON-VACUOUS, PROVEN: reverting one method's clear → that test RED ("a succeeding op must clear the stale error"). FE store
+  logic only — error is computed state, no markup moved → no screenshot. green→green: frontend validate:local EXIT 0 — type-check 0, build,
+  613 pass (+3). cov: be 86.07% (carry) / fe 81.76%+ (carry; settings store now has coverage).
+- **C309 (infra): CLAUDE.md docs-accuracy refresh — record #93/#95 closed + #94 in pending-Angelo + suite ~1424 BE / ~613 FE** — BALANCE:
+  both arch (5=5) + infra (6=6) at budget; infra MOST-starved (6 > 5) → forced. The C253/C279/C292/C298 docs-accuracy cadence: the
+  CLAUDE.md closed-bug list ended at #92/C297 (missing #93 C300 + #95 C308; #94 correctly absent there — it's escalated, not closed), the
+  pending-Angelo block ended at #88 (missing #94, escalated C301), and the suites drifted (BE ~1421→~1424 via C302/C307, FE ~610→~613 via
+  C308). FIXED (CLAUDE.md only): (1) appended #93 (merge-restore raw-PK → clean conflict + the C302 symmetry guard) + #95 (settings stale-
+  error clearing) to the closed-bug list + bumped the arc range C155–C297 → C155–C308; (2) added #94 (fleet-wide fuel-stats mixed-unit
+  pooling) to the pending-Angelo block beside #88; (3) suite size ~1421→~1424 BE / ~610→~613 FE. DOCS-ONLY — verified `git status` =
+  CLAUDE.md alone (the ?? items are the by-design untracked e2e/tooling scaffold); no source/test/build touched (the C308 gate is the last
+  code state). Keeps the next cycle's closed-bug + pending-Angelo + suite-floor refs accurate. cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C310 (arch): converge 4 inline pagination-clamp sites onto the existing (zero-caller) `clampPagination` helper** — BALANCE: arch over
+  budget (last 304, starved-for 6 > 5; it had waited since C304) → forced. Arch reliably-dry — rule-7 inline scout. Rejected the FE
+  query-building dedup (analytics buildQuery skips null; reminder/expense-api use bespoke per-field truthiness that deliberately skips 0/''
+  — converging would change falsy-value behavior, churn trap rule 5/2). THE FINDING: the `limit = Math.min(query.limit ??
+  defaultPageSize, maxPageSize); offset = query.offset ?? 0` block was hand-repeated at 4 sites (odometer/routes ×2, expenses/routes ×1,
+  expenses/repository.findPaginated ×1) — while utils/pagination.ts ALREADY exports `clampPagination` (written beside buildPaginatedResponse)
+  with ZERO callers. The helper is also the MORE CORRECT version: it floors limit at minPageSize + clamps offset ≥0, which the inline `?? 0`
+  did NOT (a negative offset could slip through if a schema ever loosened). BEHAVIOR-PRESERVING verified (rule 2): every site's Zod schema
+  pre-bounds limit `[1,100]`/positive + offset `≥0`, and minPageSize=1, so the helper's clamps are no-ops on the validated inputs — identical
+  observable output today, defensive if a schema loosens tomorrow. PAYOFF (rule 5): 4 inline copies → 1 canonical helper that finally has its
+  intended callers; dropped a now-dead `CONFIG` import from expenses/repository.ts (tsc-confirmed). BEHAVIOR-PRESERVING + test-anchored both
+  ways (rule 3): 221 odometer+expenses+pagination tests pass UNCHANGED. green→green: backend validate:local EXIT 0 — 1424 pass (unchanged —
+  pure refactor) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C311 (deep-review): expenses split create/update/delete + group-integrity CERTIFIED CLEAN; pinned the split-is-cost-only contract** —
+  BALANCE: deep-review at budget (last 306, starved-for 5 = budget, most-starved; bug also at 3 but deep-review waited longer) → forced.
+  Audited the split money/integrity surface firsthand. CERTIFIED CLEAN: (1) updateSplitExpense — absolute total DERIVED from the legs (the
+  Property-3 fix: never trusts a stale groupTotal on an absolute edit), userId-scoped delete matching the read, photo migration to
+  newSiblings[0] (reasonable — re-split has no 1:1 vehicle mapping); (2) deleteSplitExpense — userId-scoped, photo_refs auto-cascade via the
+  FK onDelete:'cascade', and the ROUTE layer cleans provider files + refs BEFORE the row delete (deletePhotosForEntities, documented at
+  routes.ts:276-282 — provider cleanup is at the right layer, not a gap); (3) createSiblings — cents-based remainder-to-last (C84), and a
+  split is COST-ONLY by design: the create-split schema has NO volume/mileage/fuelType/missedFillup input path (splitting a SHARED cost
+  across vehicles can't attribute a physical volume/odometer per leg), so a category:'fuel' split is a pure cost row. THE worthwhile guard:
+  that cost-only contract was UNPINNED — a future change stamping a volume on split siblings would silently pollute MPG attribution + the
+  fuel-stats fillup count. +1 design property (Property 4, split-service.property.test.ts): every persisted sibling has null
+  volume/mileage/fuelType + missedFillup=false ACROSS ALL categories (incl. 'fuel' from the arb). NO defect, no source change. green→green:
+  backend validate:local EXIT 0 — 1425 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.07%+ (carry) / fe
+  81.76% (carry).
+- **C312 (bug → dormant-vein clean scout + money-correctness guard): four surfaces certified clean; pinned the term-cost-UPDATE premium
+  replacement** — BALANCE: bug over budget (last 308, starved-for 4 > 3, most-starved actionable) → forced. Bug vein dormant → fresh-surface
+  scout. CERTIFIED CLEAN: insurance claims-repository (policy-scoped + defense-in-depth claimId+policyId, null-clear semantics; claim-delete
+  photo cleanup at the route via deleteAllPhotosForEntity), insurance hooks createTermExpenses/updateTermExpenses (best-effort by design —
+  derived projection, not source-of-truth), deleteBySource (catches ALL split siblings via sourceType/sourceId, photo_refs cascade), analytics
+  buildFinancingTimeline (spread-safe Math.max + 0 floor, 24-cap, positive-payment filter). NO defect. THE worthwhile guard: a costed term
+  auto-materializes a split premium expense (sourceType:'insurance_term'); on a term UPDATE, updateTermExpenses must DELETE the stale
+  auto-expenses + RE-CREATE at the new cost — but the existing tests (terms-http clear-field + #84; policy-delete-cascade create+delete) NEVER
+  pinned the update-REPLACES path, so a regression leaving stale/missing premium siblings would silently drift the premium from its term
+  (NORTH_STAR #2). +1 HTTP guard (terms-http.test.ts): a 2-vehicle costed term → 2 even-split siblings summing to 1200; PUT a new totalCost
+  1800 → still exactly 2 siblings summing to 1800 (no stale lingering, no missing). Drives the REAL PUT route + reads the persisted expenses;
+  non-vacuous (skip the delete → count 4/total 3000; skip the recreate → count 0). green→green: backend validate:local EXIT 0 — 1426 pass
+  (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).
+- **C313 (guard): pin validateAndRefreshSession — the untested security-critical session-rotation core** — BALANCE: guard forced (last 307,
+  starved-for 6 = budget, most-starved; feature gated). Confirmed the obvious guard targets are already covered (sourceType-rejection #62/C190;
+  the backend UTC-date scan found only a cosmetic CSV-filename stamp; the SECONDS-vs-MS footgun has no live instance — Drizzle reads
+  mode:'timestamp' as Dates). Also ran the standing #5 stray-untracked-test sweep: CLEAN (all untracked tests = the by-design *.meshclaw.e2e.ts
+  set; branch 123 commits ahead of origin/main; BRANCH_REVIEW.md gitignored at §27). Per the LEDGER steering note, steered to the
+  lowest-LINE-covered PURE-logic module: auth/utils.ts validateAndRefreshSession (100% func / 40% line — the refresh + failure branches
+  untested; used by BOTH requireAuth + POST /auth/refresh, ZERO direct tests). +4 unit guards (new validate-and-refresh-session.test.ts,
+  mockable Lucia, no DB): (1) invalid session → null, no refresh attempted; (2) FRESH session → returned as-is refreshed:false, NO
+  create/invalidate (the no-churn invariant — else every request rotates); (3) NEAR-EXPIRY → rotates with call order ['validate','create',
+  'invalidate'] (create-before-invalidate: never lose the session if create fails — the source's stated ordering); (4) createSession THROWS →
+  FAILS OPEN to the existing session, old NOT invalidated (a transient hiccup must not log the user out). Real call-order assertions →
+  non-vacuous (swap create/invalidate → RED; fail-closed → RED). green→green: backend validate:local EXIT 0 — 1430 pass (+4) / 1 skip / 0 fail,
+  tsc 0, musl-biome clean, build bundled. Guard-only (no source) → no UI. cov: be 86.07%+ (carry; auth/utils.ts line coverage up from ~40%) /
+  fe 81.76% (carry). Next #5 sweep ~C323.
+- **C314 (arch): extract `fetchOrThrow` — dedup the byte-identical fetch-setup + error-parsing across api-client's request/requestFull** —
+  BALANCE: nothing over budget except gated feature; arch (4/5) + infra (5/6) both forced NEXT cycle → took arch now (higher-leverage; infra's
+  docs C309 + sweep C313 are fresh = manufactured). Arch reliably-dry — rule-7 inline scout. Rejected the c.json success-message responses
+  (divergent per-site strings → trivial-wrapper churn, rule 5). THE FINDING (frontend/src/lib/services/api-client.ts): `request` and
+  `requestFull` shared a BYTE-IDENTICAL 37-line block — URL resolve + JSON Content-Type (FormData-skip) + credentials fetch + the
+  `!response.ok` backend-error-envelope parse → throw ApiError — differing ONLY in the success path (request unwraps `.data` + handles
+  non-JSON/204; requestFull returns raw JSON). PAYOFF (rule 5): the error-shape parsing is load-bearing + drift-prone (an ApiError fix could
+  land in one copy, be forgotten in the other). FIX: extracted `fetchOrThrow(url, options) → Promise<Response>` (setup + error-check, returns
+  the ok Response); each wrapper does its OWN success-body handling. ~74 LOC → 1 shared core + 2 thin wrappers. BEHAVIOR-PRESERVING +
+  test-anchored both ways (rule 3): the dedicated api-client.test.ts (envelope unwrap / no-over-unwrap / falsy-data / 204 non-JSON / method+
+  header / error message+code+status+array-details) + the expense/analytics/reminder service suites (75 tests) pass UNCHANGED. green→green:
+  frontend validate:local EXIT 0 — type-check 0, build, 613 pass (unchanged — pure refactor). Pure service util, no UI. cov: be 86.07%
+  (carry) / fe 81.76% (carry).
+- **C315 (bug): idempotency middleware would 500 on a non-JSON 2xx body — defensive parse + guard (#96)** — BALANCE: bug at budget (last
+  312, starved-for 3 = budget, tightest; infra also at 6 but its docs/sweep/cov are all fresh → manufactured, so took bug). Bug vein dormant
+  → scouted the full MIDDLEWARE layer (activity/change-tracker, idempotency, body-limit, rate-limit). CERTIFIED CLEAN: change-tracker
+  (2xx-only mark, fire-and-forget contained), rate-limiter (window-reset, limit-before-increment, full 429 headers), body-limit
+  (Content-Length 413 — the chunked-no-CL bypass is a documented header-limiter limitation, not a clean fix). THE FINDING (idempotency.ts):
+  after next(), it did `await c.res.clone().json()` UNCONDITIONALLY before caching — a 2xx NON-JSON body (CSV export / binary / 204) would
+  make .json() THROW, and the throw escapes the middleware → errorHandler → turns a SUCCESSFUL response into a 500. LATENT today (all 3
+  idempotency-mounted sync routes return c.json), but a footgun: adding a non-JSON idempotent route would regress into a 500. FIX: gate on
+  status 2xx FIRST (moved the check before the parse), then try/catch the json() — a non-JSON 2xx is left UNCACHED (the dup safely re-runs;
+  a non-JSON body couldn't round-trip the replay c.json anyway). Behavior-preserving on all-JSON paths. GUARD: +1 test (a 2xx CSV body →
+  200 not 500, not cached → dup re-runs); NON-VACUOUS (pre-fix the unconditional json() throws → 500). green→green: backend validate:local
+  EXIT 0 — 1431 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07%+ (carry) / fe
+  81.76% (carry).
+- **C316 (infra): CLAUDE.md docs-accuracy refresh — record #96 closed + suite ~1424→~1431 BE** — BALANCE: infra OVER budget (last 309,
+  starved-for 7 > 6, most-starved actionable; deep-review at 5 but infra waited longer + over) → forced. The C253/.../C309 docs-accuracy
+  cadence: the closed-bug list ended at #95/C308 (missing #96 C315), and the suite drifted (BE ~1424→~1431 via C310's pagination dedup test
+  delta + C311 +1 / C312 +1 / C313 +4 / C315 +1). FIXED (CLAUDE.md only): (1) appended #96 (idempotency non-JSON-2xx → 500 defensive fix) to
+  the closed-bug list + bumped the arc range C155–C308 → C155–C315; (2) suite size ~1424→~1431 BE (FE unchanged ~613). DOCS-ONLY — verified
+  `git status` = CLAUDE.md alone (the ?? items are the by-design untracked e2e/tooling scaffold); no source/test/build touched (the C315 gate
+  is the last code state). Keeps the next cycle's closed-bug + suite-floor refs accurate. cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C317 (deep-review): odometer→reminder D5 mileage-trigger seam CERTIFIED CLEAN; pinned the both-axis notification coexistence** —
+  BALANCE: deep-review OVER budget (last 311, starved-for 6 > 5, most-starved actionable; feature gated) → forced. Audited the
+  odometer→reminder mileage-trigger seam firsthand. CERTIFIED CLEAN: findMileageTracking (filters isNotNull(nextDueOdometer)),
+  mileageNotificationExists (check-then-insert) + createMileageNotification (race-safe: catches the UNIQUE-index violation → null, a
+  belt-and-braces double-fire guard), and the TWO partial unique indexes — rn_reminder_due_idx (reminderId, dueDate) [mileage rows' null
+  dueDate are SQLite-distinct → unconstrained] + rn_reminder_odo_idx (reminderId, dueOdometer) PARTIAL WHERE dueOdometer IS NOT NULL [time
+  rows' null dueOdometer excluded] — a textbook-correct disjoint-domain design for whichever-comes-first. THE worthwhile guard: the
+  cross-axis COEXISTENCE (a `both` reminder simultaneously time-overdue AND mileage-past-milestone fires TWO distinct notifications, one per
+  axis, neither colliding) was UNPINNED — existing tests cover each axis in ISOLATION; a regression collapsing the two indexes into one
+  (reminderId, dueDate) — or a single (reminderId) — would silently DROP the mileage notification with no failing test. +1 guard
+  (trigger-mileage.test.ts): a `both` reminder past both a 35000 milestone AND a past next_due_date → exactly 1 mileage notif (dueOdometer
+  35000, dueDate null) AND ≥1 time notif (dueDate set, dueOdometer null). NON-VACUOUS (a single-index regression → the dropped-axis assertion
+  RED). NO defect, no source change. green→green: backend validate:local EXIT 0 — 1432 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome clean
+  (test reflow auto-fixed), build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).
+- **C318 (bug → file+escalate + characterization guard): reminder orphaned (vehicle-less, still active) when its last vehicle is deleted
+  (#97)** — BALANCE: bug at budget (last 315, starved-for 3 = budget, tightest; guard at 5 but bug's limit is the hard one) → pick. Bug vein
+  dormant → scouted the DELETE-CASCADE surfaces. CERTIFIED CLEAN: vehicle-delete photo cascade (cleans vehicle/expense/odometer_entry — the
+  complete dependent set; insurance policy/claim are user-owned not vehicle-dependent, claim.vehicleId is set-null), financing payoff/DELETE
+  (soft-delete: isActive=false + clearSource, never deletes rows → no photo orphan). THE FINDING: reminder_vehicles.vehicleId is
+  onDelete:'cascade', so deleting a vehicle drops its junction row — a reminder linked to ONLY that vehicle is left with ZERO vehicles: the
+  row SURVIVES + stays is_active, but processReminder skips it forever with reason 'no_vehicles' (a silent never-firing orphan still shown
+  active). Same family as the gated #88 (reminder orphaned on vehicle delete) but distinct mechanism (junction cascade, not the split-config
+  blob). The FIX is a UX decision (deactivate / delete / surface in a needs-attention bucket / block-delete-of-sole-target) → FILED #97 +
+  send_message'd Angelo, NOT self-fixed. SHIPPABLE increment (bug-cycle floor): a characterization guard (vehicle-delete-cascade.test.ts, +1)
+  pinning the CURRENT behavior — junction count 0, reminder row survives is_active=1, trigger skips it no_vehicles — so the eventual fix has a
+  red→green anchor + the bug can't silently worsen. green→green: backend validate:local EXIT 0 — 1433 pass (+1) / 1 skip / 0 fail, tsc 0,
+  musl-biome clean, build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).
+- **C319 (guard): pin the settings store's state-management contracts (~12%-covered settings.svelte.ts)** — BALANCE: guard forced (last 313,
+  starved-for 6 = budget, most-starved; arch also at 5 but guard waited longer). Per the LEDGER steering note → steered to the lowest-covered
+  FE logic module: stores/settings.svelte.ts (~12% func/line per the C303 re-measure; C308 pinned only error-clearing on 2 methods). +6 guards
+  (new settings-state-contract.test.ts, mocked fetch): (1) update() REPLACES settings state with the server response + returns it (the
+  unitPreferences/currency render path); (2) update() RE-THROWS on failure + records the error (caller await must reject); (3) a NON-preview
+  restoreFromProvider REFRESHES state via this.load() (2 fetches: restore + reload — a destructive restore changes stored settings, stale
+  in-memory state would mislead, NORTH_STAR #1); (4) a PREVIEW restore does NOT reload (1 fetch, read-only); (5) reset() clears
+  settings/error/loading (logout path); (6) the unitPreferences getter falls back to miles/gallons defaults when settings is null. NON-VACUOUS
+  (dropping the non-preview this.load() → the 2-call + populated-settings assertions RED). green→green: frontend validate:local EXIT 0 —
+  type-check 0, build, 619 pass (+6). Guard-only (no source) → no UI. cov: be 86.07% (carry) / fe 81.76%+ (carry; settings.svelte.ts up
+  sharply from ~12%).
+- **C320 (arch): collapse the 4× `units` field-by-field projection in analytics into a `{ ...userUnits }` spread** — BALANCE: arch OVER
+  budget (last 314, starved-for 6 > 5, most-starved actionable; feature gated) → forced. Arch reliably-dry — rule-7 inline scout. Rejected
+  the analytics route-handler abstraction (per-route validator/repo/shape differences → HOF-over-handlers churn, rule 5). THE FINDING
+  (analytics/repository.ts): the `units: { distanceUnit: userUnits.distanceUnit, volumeUnit: userUnits.volumeUnit, chargeUnit:
+  userUnits.chargeUnit }` projection was hand-repeated at 4 response sites (getSummary fleet + cross-vehicle + 2 fuel-stats surfaces).
+  UnitPreferences is EXACTLY that 3-field shape, so it's a verbatim re-spread. PAYOFF (rule 5): when a 4th unit is ever added to
+  UnitPreferences (e.g. a pressureUnit for tire tracking), the spread auto-propagates to all 4 response surfaces — the field-by-field literal
+  would SILENTLY DROP it at all 4 (the exact clientId-drop / sheets-header data-loss class). FIX: `units: { ...userUnits }` ×4 (the
+  enum-typed UnitPreferences fields satisfy the string-typed response `units` shape — tsc-confirmed). −12 LOC. BEHAVIOR-PRESERVING +
+  test-anchored (rule 3): the analytics-routes-http + summary/cross-vehicle/fuel-stats property suites pass UNCHANGED (the 4 surfaces emit the
+  identical units object). green→green: backend validate:local EXIT 0 — 1433 pass (unchanged — pure refactor) / 1 skip / 0 fail, tsc 0,
+  musl-biome clean, build bundled. Backend-only, no UI. cov: be 86.07% (carry) / fe 81.76% (carry).
+- **C321 (bug → dormant-vein clean scout + round-trip-fidelity guard): import-csv parse/commit/round-trip CERTIFIED CLEAN; pinned the
+  missedFillup truthy round-trip** — BALANCE: bug at budget (last 318, starved-for 3 = budget, tightest; arch fresh at 1) → pick. Bug vein
+  dormant → audited the import-csv parse → validate → dedup → atomic-commit → round-trip surface firsthand. CERTIFIED CLEAN: the per-field
+  parsers (date-only local-build #23/#59, amount/mileage/volume bounds mirroring the create schema), the deterministic occurrence-keyed
+  clientId (two identical rows get distinct keys → both import; re-import → same keys → all dedup), importExpenses (single transaction →
+  atomic; per-row (clientId,userId) check-then-insert → idempotent; error → rollback), and the export↔import round-trip incl. the cycle-192
+  formula-injection denormalization symmetry. NO defect (the concurrent-double-import 500 is a narrow edge with a SAFE rollback failure mode,
+  not a clean fix). THE worthwhile guard: the missedFillup TRUTHY parse path was UNPINNED — the export writes 'true'/'false' (routes.ts:432),
+  import parses /^(true|1|yes)$/i, but the round-trip test only used missedFillup=false; a regression narrowing that regex would silently
+  import every missed-fillup row as false, corrupting MPG pairing (a missed fillup spans two tanks → must be excluded from efficiency,
+  NORTH_STAR #2). +1 guard (import-csv.test.ts): a 'true' row → stored missed_fillup=1, a 'false' row → 0, read straight off sqlite.
+  NON-VACUOUS (narrowing the regex → the 'true'→1 assertion RED). green→green: backend validate:local EXIT 0 — 1434 pass (+1) / 1 skip / 0
+  fail, tsc 0, musl-biome clean (test reflow auto-fixed), build bundled. cov: be 86.07%+ (carry) / fe 81.76% (carry).
+- **C322 (infra): CLAUDE.md docs-accuracy refresh — add #97 to pending-Angelo + suite ~1434 BE / ~619 FE** — BALANCE: infra at budget (last
+  316, starved-for 6 = budget, most-starved; deep-review also at 5 but infra waited longer) → forced. The C253/.../C316 docs-accuracy
+  cadence: #97 was escalated C318 but the CLAUDE.md pending-Angelo block ended at #94, and the suites drifted (BE ~1431→~1434 via C317 +1 /
+  C318 +1 / C321 +1; FE ~613→~619 via C319 +6). FIXED (CLAUDE.md only): (1) appended #97 (reminder orphaned vehicle-less on last-vehicle
+  delete — junction-cascade mechanism, same family as #88) to the pending-Angelo block beside #94; (2) suite size ~1431→~1434 BE / ~613→~619
+  FE. DOCS-ONLY — verified `git status` = CLAUDE.md alone (the ?? items are the by-design untracked e2e/tooling scaffold); no source/test/
+  build touched (the C321 gate is the last code state). Keeps the next cycle's pending-Angelo + suite-floor refs accurate. cov: be 86.07%
+  (carry) / fe 81.76% (carry).
+- **C323 (deep-review): insurance premium-allocation analytics CERTIFIED CLEAN + the overdue #5 coverage re-measure** — BALANCE: deep-review
+  OVER budget (last 317, starved-for 6 > 5, most-starved actionable; feature gated) → forced. Audited buildInsuranceDetails +
+  buildInsuranceVehicleEntries + accumulateMonthlyPremiums firsthand. CERTIFIED CLEAN: latest-term scoping (#25 — premium + covered-vehicles
+  both from the SAME latest term, so a coverage change across terms can't mis-distribute), #50 deterministic endDate-then-startDate tiebreak,
+  #8 totalCost amortization (effectiveMonthlyPremium), cycle-14 day-1-anchored monthKeysInRange. The per-vehicle premium DIVISION
+  (monthlyPremium / coveredVehicleIds.length, guarded length>0) is a DISPLAY distribution — the headline totalMonthlyPremiums is computed
+  INDEPENDENTLY (+= full premium once per policy, never by re-summing the per-vehicle entries), so float-division per-vehicle values (e.g.
+  $33.33 ×3 of $100) carry NO internal inconsistency (this is analytics display, not stored money like the cents-based split-service). NO
+  defect, no source change. PAIRED the due #5 re-measure (last full C303, 20 cycles): stray-test sweep CLEAN; **be 86.53% line / 86.21% func**
+  (line +0.46 vs C303 — the C304–C321 BE arc); **fe 84.39% line / 83.97% func / 76.43% branch** (UP +2.6 line / +3.3 func vs C303 — the
+  C308/C314/C319 FE arc; settings.svelte.ts ~12%→covered). BE↔FE gap ~2pts, the tightest ever. Appended the C323 reading to the LEDGER
+  COVERAGE TREND header. green→green: both suites pass (BE 1434 / 1 skip via cov run; FE via cov run). DOCS/MEASUREMENT + cert only (LEDGER),
+  no source/test/build touched (the C321 gate is the last code state). Next #5 sweep ~C333. cov: be 86.53% / fe 84.39%.
+- **C324 (bug → file+escalate + characterization guard): sync-manager keep_local "overwrite" is a silent no-op on a real clientId collision
+  (#98)** — BALANCE: bug at budget (last 321, starved-for 3 = budget, tightest; guard at 5 but bug's limit is the hard one) → pick. Bug vein
+  dormant → scouted the FE sync/offline layer. sync-manager fuzzy conflict-detection is ALREADY-pinned design (C223 determineConflictType), so
+  not a fresh bug there; pwa.ts clean (95% line). THE FINDING (resolveConflict keep_local / merge): it POSTs the local expense to the CREATE
+  endpoint with `{ ...backendExpense, clientId, forceOverwrite: true }` — but the backend NEVER handles forceOverwrite (Zod strips unknown
+  keys) and createIdempotent dedups on (userId, clientId). So on a GENUINE clientId collision (a true re-sync), the create returns the existing
+  row UNCHANGED → the user's "keep my local edit" is SILENTLY NOT APPLIED, yet the FE markExpenseAsSynced + returns true (a NORTH_STAR #1
+  offline-edit loss). It only "works" because the fuzzy pre-check flags DISTINCT rows whose clientId is new → a clean insert. The FE code +
+  comment ("server row replaced") + the existing test (asserts forceOverwrite===true) all imply an overwrite that doesn't exist — a
+  maintainer-misleading dead field over a real data-loss path. The FIX is product/arch-gated (real upsert / PUT-on-collision, or drop the
+  fuzzy conflict flow + trust clientId, or surface the no-op) and TANGLED with the C223-pinned conflict-detection design → FILED #98 +
+  send_message'd Angelo, NOT self-fixed. SHIPPABLE increment (bug-cycle floor): (1) a warning COMMENT on resolveConflict keep_local marking
+  forceOverwrite a known backend no-op pending #98 (behavior-preserving); (2) +1 characterization test pinning the FE reality — keep_local
+  POSTs to /api/v1/expenses (create) carrying the local clientId (idempotency governs the outcome), NOT a dedicated overwrite/PUT route — so
+  when #98 lands, the endpoint/shape change is visible. green→green: frontend validate:local EXIT 0 — type-check 0, build, 620 pass (+1).
+  Comment + test only, no logic change → no UI. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C325 (guard): pin sync-manager's retry EXPONENTIAL BACKOFF + the HARD CAP — both unpinned despite real branching** — BALANCE: guard
+  forced (last 319, starved-for 6 = budget, most-starved; arch also at 5 but guard waited longer). Per the LEDGER steering note → steered to
+  real branching with loose coverage: sync-manager syncExpenses' retry path. The existing tests check only the retryCount COUNTER (and the
+  "max retries" test's `<= firstCount + 1` bound is too weak to pin the cap); the exponential backoff DELAY (retryDelay * 2^retries) and the
+  scheduling-STOPS-at-cap behavior were never asserted. A regression to constant/linear delay (retry-storm risk) or an off-by-one cap (retry
+  past maxRetries, or none) would pass the counter tests. +2 guards (sync-manager.test.ts, setTimeout spy): (1) a failed sync schedules the
+  retry at EXACTLY retryDelay * 2^0 = 100ms (first failure); (2) once retries reach maxRetries, NO retry-family delay (100/200/400/800) is
+  scheduled — using fake timers so the prior call's scheduled retry can't leak into the spy, and filtering OUT syncAll's unrelated 3000ms
+  idle-reset timer (the subtlety that made the first cap-test attempt flake). NON-VACUOUS (an off-by-one cap → a 200ms retry scheduled → RED).
+  green→green: frontend validate:local EXIT 0 — type-check 0, build, 622 pass (+2). Guard-only (no source) → no UI. cov: be 86.53% (carry) /
+  fe 84.39%+ (carry; sync-manager retry branches now pinned).
+- **C326 (arch): extract `insertVehicleJunctions` — dedup the reminder→vehicle junction-insert loop across create/update** — BALANCE: arch
+  OVER budget (last 320, starved-for 6 > 5, most-starved actionable; feature gated) → forced. Arch reliably-dry — rule-7 inline scout.
+  Rejected the reminder-route vehicleIds handling (already factored: shared validateVehicleIdsOwned + resolveMileageFields). THE FINDING
+  (reminders/repository.ts): the `for (const vehicleId of vehicleIds) tx.insert(reminderVehicles).values({reminderId, vehicleId})` loop was
+  byte-identical at 2 sites (createWithVehicles + updateWithVehicles' replace-junctions branch), differing only in reminder.id vs id. It also
+  MIRRORS the insurance repo's established insertJunctionRows helper (C304-adjacent precedent) — so this is consistency with an existing idiom,
+  not a novel abstraction. PAYOFF (rule 5): one source of truth for the junction write — a future change (batch insert / a new junction column)
+  lands once. FIX: extracted private `insertVehicleJunctions(tx, reminderId, vehicleIds)` (the dbOrTx-in-a-transaction pattern), wired both
+  sites. BEHAVIOR-PRESERVING + test-anchored both ways (rule 3): all 115 reminder tests (create/update/trigger/refinements) pass UNCHANGED.
+  green→green: backend validate:local EXIT 0 — 1434 pass (unchanged — pure refactor) / 1 skip / 0 fail, tsc 0, musl-biome clean, build
+  bundled. Backend-only, no UI. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C327 (bug → dormant-vein clean scout, certification): photos upload/serve/delete + provider sync-worker CERTIFIED CLEAN** — BALANCE: bug
+  at budget (last 324, starved-for 3 = budget, tightest; infra at 5 but bug's limit is the hard one) → pick. Bug vein dormant → audited two
+  NORTH_STAR #1 surfaces firsthand. CERTIFIED CLEAN: (1) photo UPLOAD (uploadPhotoForEntity) — ownership-gated, ALLOWED_MIME_TYPES allowlist +
+  MAX_FILE_SIZE + category-mapping + provider-capability gate (D2a), the #34 upload-atomicity compensation (persistUploadedPhotoOrCleanup
+  best-effort deletes the just-uploaded object on a DB-write failure → no orphaned bytes); (2) photo SERVE (getPhotoThumbnailForEntity) —
+  ownership + entityType/entityId match (no cross-entity serve), default-provider-first w/ active-ref fallback, client-asserted mimeType served
+  WITH X-Content-Type-Options:nosniff (the C133/#77 fix — the browser can't sniff/execute a mislabeled file); (3) DELETE + provider sync-worker
+  — shouldSkipDueToBackoff (failed-only, syncedAt??createdAt fallback, 30*2^retryCount seconds → ms, elapsed<backoff), processSingleRef
+  failure → status:'failed' + retryCount++ (the unbounded-retry self-throttles via the exponential backoff — a perma-failed ref queries ~once
+  a year, not a storm; surfacing it is a #79-class product call, not a defect). COVERAGE already comprehensive: sync-worker.test.ts (backoff
+  boundaries 30/60/120s, success→active, failure→failed+retryCount++ for both upload + download errors, all skip cases) + photo-serve-headers
+  + ownership-uses-shared-validators. NO defect, NO unpinned invariant — adding a test here would be coverage-theater (the C306/C323
+  certification precedent). DOCS-ONLY (LEDGER + BACKLOG); no source/test/build touched (the C326 gate is the last code state). cov: be 86.53%
+  (carry) / fe 84.39% (carry).
+- **C328 (deep-review → #94 is a CLASS, not one scalar; +1 characterization guard, ESCALATED broadened)** — BALANCE: deep-review AND infra both
+  first-come-due this cycle (deep-review 328−323=5=budget; infra 328−322=6=budget); feature 158-over but every item is eyes-on/Playwright- or
+  T0-sign-off-blocked (standing escalation). Picked deep-review (higher leverage — it feeds the dormant bug vein; the infra #5 sweep isn't due
+  till ~C333). Fresh surface: is the just-escalated #94 (fleet fuel-stats summary pools mixed mi+km distance + blends $/mi-vs-$/km without unit
+  conversion) ISOLATED, or a class? Fanned out 2 Explore agents (analytics unit-conversion siblings + calculateVehicleStats correctness).
+  RESULT: (a) per-vehicle calculateVehicleStats CERTIFIED CLEAN — every ratio div-guarded (costPerMile gated on totalMileage>0, averageMpg on
+  length>=2 + mpg>0&&<150 filter, averageMilesPerKwh length+volume gated), unit-by-design at the route layer, comprehensively property-tested
+  (vehicle-stats.property.test.ts 100-run props + currentOdometer contract); no defect. (b) #94 is NOT one scalar — it's a CLASS spanning the
+  whole fleet-SUMMARY + fuel-advanced path. VERIFIED FIRSTHAND against source (C21/C60 rule): getCrossVehicle (repository.ts:1500/1531-1532) is
+  the correct contrast — it threads vehicleUnitsMap+userUnits, computes skipConversion=allVehiclesMatchUnits, and convertDistance(...)s each
+  vehicle to the user's unit BEFORE pooling; buildFuelStatsFromData (called by getFuelStats AND getSummary:2072) receives NO units and its own
+  comment (:1386) wrongly assumes "this summary path is single-unit so it doesn't convert". The convertDistance-per-vehicle in getCrossVehicle is
+  the firsthand PROOF stored distance/volume are in each vehicle's NATIVE unit → raw pooling across a mixed fleet IS garbage. Siblings (all
+  un-filed, all same no-conversion mechanism): volume.currentYear + fillupDetails (gal+L, buildFuelStatsFromData :1357-1372), buildMonthlyConsumption
+  (volume+efficiency :314-352), buildSeasonalEfficiency (mi/gal+km/L :608-655), buildVehicleRadar (efficiency+distance normalizeScore :709-784),
+  buildDayOfWeekPatterns (volume :787-812) — the latter four via getSummary/getFuelAdvanced → buildFuelAdvancedFromData, also units-less. ALL
+  product-semantics-gated (convert-to-user-global / per-vehicle-only / require vehicleId) → NOT a clean atomic loop fix; folded into the #94
+  escalation as one class. INCREMENT: pinned the cleanest unfiled sibling (volume pooling, SAME file+path as #94's distance pin) — +1
+  characterization test in fuel-stats-fleet-distance-pooling.test.ts (volume.currentYear=50 raw gal pool, fillupDetails avg/min/max [20,20,5,5])
+  + broadened the file docblock to record the class. Follows the established raw-sum proof shape (no divergent prefs seeded — the harness
+  seedVehicle has no unit_preferences path; the point of record is the un-normalized pool). NON-VACUOUS (the assertions pin the current pooled
+  values; the fix will turn them red→update). green→green: backend validate:local EXIT 0 — 1435 pass (+1) / 1 skip / 0 fail, tsc 0, musl-biome
+  clean, build bundled. Backend test-only, no UI. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C329 (infra): #5 branch-hygiene sweep + BRANCH_REVIEW.md refresh** — BALANCE: infra OVER budget (last 322, starved-for 329−322=7 > budget 6)
+  → FORCED most-starved pick (the queue is empty; the standing #5 cadence is the infra increment). Last full sweep C303 (theme write last C224 —
+  the §-digest lapsed C224→C328 even as the per-delta status header refreshed C303). (1) STRAY-TEST CHECK (the load-bearing half — bun discovers
+  tests by filesystem, so an untracked .test.ts counts locally but VANISHES on merge, silently dropping coverage): `git status` shows ZERO stray
+  untracked unit/spec tests; every untracked entry is the by-design set (*.meshclaw.e2e.ts specs + snapshots, .meshclaw-tools/ harness,
+  playwright.meshclaw.config.ts, mise.local.toml, the squash-merged .kiro/specs/offline-entries/ doc). (2) GREEN BASELINE: backend 1435 pass /
+  1 skip / 0 fail carried from C328 (validate:local EXIT 0, unchanged — this cycle is docs-only, no source touched, the C303/C100 measurement-
+  only pattern → no build gate needed). (3) BRANCH_REVIEW.md refresh (gitignored): the digest was BADLY stale — claimed 34 commits (C190–C223)
+  but the branch is 139 ahead of origin/main (C190–C328, no squash since C190.5). Bumped scope 34→139, status 1309→1435 BE / 584→~622 FE +
+  the C323 coverage re-measure (be 86.53/86.21, fe 84.39/83.97/76.43 — BE↔FE gap closed ~4→~2pts), appended §30 (the C224–C328 arc by category:
+  ~16 shipped within-tenant bug fixes incl. the lone migration 0005/#80, 4 escalated bugs #88/#94/#97/#98, ~11 arch dedups, ~7 guard ratchets,
+  ~15 deep-review certs). ALSO corrected two stale claims: the "Playwright sandbox-blocked" note (a MISDIAGNOSIS resolved 2026-06-11) + the
+  "no migration" checklist line (0005 landed C233). Refreshed the Reviewer-checklist pending-Angelo set (+#43/#44, +#88/#94/#97/#98, +the lower-sev
+  #45/#51/#69/#79/#85) + the Suggested-merge footer (34→139). Doc/measurement-only; only loop/LEDGER.md commits (BRANCH_REVIEW.md is gitignored).
+  Next sweep ~C339; next CLAUDE.md refresh ~C332 (last C322). cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C330 (bug → #99: financing date projections shifted a payment/payoff/lease-end date into the WRONG month for any 29th–31st contract; +arch dedup +guard)** —
+  BALANCE: bug at budget (last 327, starved-for 330−327=3 = budget, tightest "never sits") → pick. Bug vein dormant → 2-agent adversarial fan-out on the
+  money-bearing surfaces that bred this session's #90/#91/#92 cluster: (a) financing-calculations.ts loan/projection math, (b) the expense split write-path.
+  FINDINGS: the expense-split hits were product-semantics-gated (split-create sourceType not restricted to 'financing' like the singular path — a debatable
+  design choice, not an atomic defect; the money-conservation Property 3/4 are already pinned) → NOT self-fixed. The financing-calculations hit IS a clean
+  atomic sibling of #90/#91/#92: THREE sites advance months via bare `Date.setMonth(getMonth()+n)`, which rolls a day-of-month overflow into the FOLLOWING
+  month (Aug 31 + 1mo → Oct 1 not Sep 30; May 31 + term → the month after the intended lease end) — VERIFIED firsthand (C21/C60): calculatePaymentDate:139/148
+  (amortization-schedule + extra-payment payoff dates), calculateNextPaymentDate:202/211 (the NextPaymentCard due date), calculatePayoffDate:230 (lease end =
+  start + termMonths). The CORRECT clamp already lived inline in calculatePayoffDateFromStart:572 (detect rolled day → setDate(0) to the target month's last
+  day) but wasn't shared. FIX (#99, atomic + arch-clean): extracted ONE `addMonthsClamped(date, months)` helper (the single source of truth for the clamp) +
+  routed all three sites through it. KEY subtlety on the ITERATIVE next-payment loop: a step-by-step clamp would let the day "stick" lower after the first short
+  month (a 31st payment passing through Feb → 28th forever, losing the contractual day) → anchored that path on baseDate and re-derive (base + N months) each step,
+  so only a genuinely-short TARGET month clamps. GUARD: rewrote next-payment-date.test.ts's month-end block (it had CHARACTERIZED the buggy rollover `d===31||d<=3`
+  → now asserts the clamp 28..31, never rolled forward) + new financing-month-overflow-clamp.test.ts (+5) pinning the lease-end clamp (the C330 site with ZERO
+  prior coverage: May31+36mo→May31'27, +1mo→Jun30 not Jul1, Jan31+1mo→Feb29 leap, Aug31+13mo→Sep30'25 year-rollover, mid-month unaffected). NON-VACUOUS (revert a
+  site to bare setMonth → 31st-start dates land a month late → RED). green→green: frontend validate:local EXIT 0 — 627 pass (+5 net) / 0 fail, tsc 0, build OK.
+  Pure-util fix (the calc fns are unit-pure; the .svelte consumers — NextPaymentCard, AmortizationSchedule, FinanceTab payoff/lease — render the corrected dates,
+  visual is eyes-on but the date VALUE is now pinned). cov: be 86.53% (carry) / fe 84.39%+ (carry, FE suite +5).
+- **C331 (guard): pin getSyncStatusInfo, the user-facing sync-indicator precedence cascade (zero-coverage pure module)** — BALANCE: guard AND arch
+  both at budget this cycle (guard 331−325=6=budget; arch 331−326=5=budget); guard MORE starved (6 vs 5) → pick. Guard veins are thin per the cadence note
+  (FE pure/service layers essentially all covered, BE route/util low spots worked through), so scanned for a genuinely-untested logic-bearing module: a grep
+  of every non-type/non-UI-reexport src/lib/*.ts against the test suite surfaced sync/sync-status.ts (58 lines) at ZERO test references. getSyncStatusInfo
+  is the centralized derivation behind BOTH SyncStatusIndicator + SyncStatusInline (the persistent sync badge); its branch ORDER is load-bearing — a
+  PRIORITY CASCADE (offline > conflicts > syncing > error > success > pending > up-to-date), not independent flags — so a refactor reordering the `if`s
+  would silently show the WRONG status (e.g. "Synced" while offline, or hide an unresolved conflict behind the "Syncing…" spinner). +14 guards
+  (sync-status.test.ts, the new sync/__tests__/ dir): all 8 branches' {color, icon, text} in isolation (+ the singular/plural conflict copy via the `> 1`
+  guard) + 6 PRECEDENCE cases pinning the cross-branch ordering a naive per-branch test misses (offline beats all; conflicts beat syncing/success; syncing/
+  error/success each beat pending). NON-VACUOUS (reorder any pair, or drop the `>1` plural guard → RED). Pure-logic, host-independent (asserts the exact
+  Lucide icon identity + token color). green→green: frontend validate:local EXIT 0 — 641 pass (+14) / 0 fail, tsc 0, build OK. cov: be 86.53% (carry) /
+  fe 84.39%+ (carry, sync-status.ts 0%→covered).
+- **C332 (arch): collapse computeBalance onto computeBalances — ONE source of truth for the financing-payment money query** — BALANCE: arch OVER budget
+  (last 326, starved-for 332−326=6 > budget 5) → FORCED most-starved pick. The seeded arch queue is a done-trail, so ran the rule-7 fan-out (2 Explore
+  agents, BE + FE duplication). FE top pick (a createStateAccessor factory over sync-state.svelte.ts's 8 $state accessors) REJECTED — rewiring Svelte 5
+  $state plumbing with NO test net is exactly the silent-reactivity-regression / churn the arch rules 3/5 warn against (a broken accessor breaks the sync
+  UI invisibly), + the conditional `update` method breaks clean typing. Also REJECTED converging calculatePayoffDateFromStart onto the C330 addMonthsClamped
+  (it constructs at local-midnight via `new Date(y,m,d)`, dropping time-of-day — converging risks the C103/C77 tz-shift its own test docstring warns about;
+  rule 2). PICKED the BE financing-balance dedup: computeBalance + computeBalances both ran the financing-payment money query (originalAmount lookup +
+  `WHERE sourceType='financing' AND sourceId=… COALESCE(SUM(expenseAmount),0)` clamped to ≥0) — a RAW-`sql` copy vs a typed-`and/eq/inArray` copy, the
+  drift-prone money duplication that silently miscounts a balance (+ TCO downstream) if one copy diverges. FIX: computeBalance(id) now delegates →
+  `(await computeBalances([id])).get(id) ?? 0` (the `?? 0` mirrors the prior explicit `return 0` for a missing record; computeBalances omits unmatched ids).
+  −24 LOC, one money query. Behavior-preserving + INDEPENDENTLY ANCHORED: financing-balance.property.test.ts already has a `computeBalances (batch)
+  equivalence` block asserting batch == per-record, PLUS Property 5/6 drive computeBalance directly (happy/non-financing/clamp/no-payments/non-existent/
+  payoff-boundary) — all pass UNCHANGED. The only deltas are an error-message string + one log line (no test asserts either; grep-confirmed) and query count
+  is 2→2 (no N+1 regression). green→green: backend validate:local EXIT 0 — 1435 pass (unchanged) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled.
+  cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C333 (deep-review → guard): TCO money-aggregation CERTIFIED CLEAN; pinned the unguarded YEAR-SCOPED #28/#27 accounting invariant (+3)** —
+  BALANCE: deep-review AND bug both due (deep-review 333−328=5=budget; bug 333−330=3=budget); deep-review MORE starved (5 vs 3) → pick (bug forces
+  next cycle, nothing sits). 2-agent fan-out: (A) TCO total/breakdown/trend correctness, (B) reminder-materialization idempotency + CSV value round-trip.
+  RESULTS: (B) CERTIFIED CLEAN firsthand — reminder re-trigger is CAS-guarded on nextDueDate (no double-materialize), the BACKEND reminder advance uses
+  clampToAnchorDay (NO C330-class setMonth-overflow — the bug was FE-only), CSV round-trip handles thousands-separators/booleans/nested-JSON/null
+  (C209/C321 + reminder-split-config-roundtrip pin it); the lone hit was #88, already filed. (A) the agent flagged a "year-scoped + unpriced + financed
+  double-count BUG" — VERIFIED FIRSTHAND (C21/C60) it is NOT a bug: computeTCOTotal's doc comment (repository.ts:1081) DOCUMENTS the behavior as the
+  Angelo-approved #28/#27 design — purchasePrice is an all-time-only acquisition cost (EXCLUDED from any year window, whose expenses are already
+  date-filtered), and because the price is NOT counted in a year window the financing-payment rows for that year ARE kept (they're the window's cost signal,
+  not a double-count — the acquisition isn't in the window). The agent's "$1500 is loan principal not new spend" is the OPPOSITE of the decided rationale →
+  a product opinion, not a defect. So TCO math CERTIFIED CLEAN. THE genuine finding → guard: every getVehicleTCO call in the suite OMITTED the optional
+  `year` arg, so the entire year-scoped accounting path (incl. this load-bearing #28/#27 invariant) was UNPINNED — a future "fix" like the agent's would
+  silently break it (the C256/C312/C317 deep-review→guard pattern). +3 guards in per-vehicle.property.test.ts (#28/#27 year-scoped describe): priced+financed
+  year-window (price EXCLUDED, in-year financing KEPT, out-of-year payment date-filtered out); unpriced+financed year-window (financing kept — the exact
+  case mis-flagged); + the year-window breakdown contract (totalCost = windowed buckets, purchasePrice REPORTED but NOT summed in — the #28 divergence).
+  Caught + corrected my own initial mis-assumption that the response zeroes purchasePrice in a year window (it REPORTS the stored price; only totalCost
+  excludes it) before settling the assertions. NON-VACUOUS (gate the financing on `year` like the agent proposed → the unpriced+financed case drops to 0 →
+  RED). green→green: backend validate:local EXIT 0 — 1438 pass (+3) / 1 skip / 0 fail, tsc 0, musl-biome clean (one format reflow auto-fixed via
+  check:musl:fix), build bundled. cov: be 86.53%+ (carry, year-scoped TCO path 0→covered) / fe 84.39% (carry).
+- **C334 (bug → dormant-vein clean scout: insurance + units/import CERTIFIED CLEAN; +2 per-field-conversion guard)** — BALANCE: bug OVER budget
+  (last 330, starved-for 334−330=4 > budget 3, tightest) → FORCED. Vein dormant → 2-agent adversarial fan-out on surfaces NOT recently audited:
+  (A) insurance write path (routes/repo/validation/hooks/claims), (B) unit-conversion + the import-mapping pre-pass. RESULTS: (A) NO new defect —
+  every agent "finding" was a FALSE ALARM debunked on second read (term-coverage-reduction replaces the WHOLE split group cleanly; empty-coverage
+  rejected by Zod .min(1); claim cross-policy termId already guarded C247; premium-expense cross-tenant gated by validateVehicleOwnership in addTerm)
+  or PRODUCT-GATED (claim payoutAmount > coverageLimit — real claims legitimately exceed coverage via deductible/depreciation, a product call not a
+  defect). (B) unit conversions mathematically sound + property-tested (round-trip invertible, mpg↔L/100km inverse correct, no div-by-zero); import-mapping
+  pre-pass clean (date echo-check guards rollover, non-finite defers to buildImportPlan, unmapped categories surfaced). VERIFIED FIRSTHAND (C21/C60) the
+  one non-product-gated candidate — applyMapping's `target = {}` default: when a field's target unit is absent mapMileage/mapVolume pass the value through
+  UNCONVERTED. NOT a bug: the sole caller resolveTargetUnits returns {} or BOTH-units-set (never partial), and {} = the documented "no target vehicle → don't
+  guess" pass-through (pinned line 65). So NO atomic defect → certification (the C306/C327 precedent). THE one unpinned by-design invariant worth a
+  non-theater guard: mapMileage/mapVolume guard conversion on each field's OWN `from && to` INDEPENDENTLY — so a future change handing applyMapping a
+  PARTIAL target (one unit resolved, the other not) would convert ONE axis + silently pass the other through in the SAME row (mixed converted/unconverted —
+  NORTH_STAR #2). +2 guards (import-mapping.test.ts): partial target {distanceUnit only} → distance converts (km→mi 100), volume passes through verbatim
+  (37.854, NOT →gal); the mirror {volumeUnit only}. NON-VACUOUS (coupling the two guards, or dropping one, flips a field). Caught my own Math.round(160.9344)=161
+  slip mid-write. green→green: backend validate:local EXIT 0 — 1440 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.53%
+  (carry) / fe 84.39% (carry).
+- **C335 (infra): CLAUDE.md orientation refresh (post-C322 drift, C323–C334)** — BALANCE: infra at budget (last 329, starved-for 335−329=6 = budget,
+  most-starved) → pick. The #5 branch sweep was just done C329; the due infra increment is the CLAUDE.md refresh (last C322, ~13 cycles drift). Read the
+  drift-prone sections against source/LEDGER (no churn — the C5/C47/C72 discipline). FOUND the doc largely current (the closed-bug list is kept current
+  inline each bug cycle — accurate through #99/C330; the pending-Angelo block accurate incl. #94-broadened-C328/#97/#88; coverage re-measured C323 still
+  recent → carried, NOT re-claimed). The one material drift: suite size cited **~1434 BE / ~619 FE** → corrected to **~1440 BE / ~641 FE** (VERIFIED the FE
+  count by running vitest — 641, not a guess; my first edit said 643 from memory, fixed to the measured 641) + named the C322–C334 additions (the #94-volume
+  pin, #99 month-overflow guards, getSyncStatusInfo, year-scoped TCO pins, per-field import-conversion guards). Docs-only; no source/test/build touched (the
+  C309/C316/C322 refresh pattern → no build gate). Next CLAUDE.md refresh ~C348; next #5 sweep ~C339. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C336 (guard): pin themeStore, the user-facing light/dark/system theme controller (zero-coverage store)** — BALANCE: nothing over budget (guard 5/6
+  closest to starving, hasn't run since C331) → highest-leverage guard. Scanned for a genuinely-untested logic module (the C331 method): grep'd every BE
+  pure-logic util/helper against the suite — ALL covered (csv-safety/drive-file-utils/reminder-cost/computeNextDueDate directly tested; data-migration is a
+  no-op stub, checkpoint a CLI script — non-targets). Confirmed the cadence note: BE pure-logic veins are genuinely worked through, manufacturing a guard
+  there = theater. Pivoted to FE: the 3 stores (app/offline/theme.svelte.ts) have NO direct test. Picked theme.svelte.ts (68 lines) — the single source of
+  truth for dark mode (setPreference persists to localStorage, resolves 'system' against prefers-color-scheme, toggles the <html> `dark` class, swaps the
+  PWA theme-color meta); a regression silently breaks dark mode for every user. +5 guards (theme-store.test.ts, new stores/__tests__/): explicit dark/light
+  (class + #1a1a2e/#2563eb theme-color + localStorage persist + current); 'system' resolves against matchMedia (OS=dark→dark, OS=light→light, stored pref
+  stays 'system' not the frozen resolved value); + the SAME 'system' pref flips with the OS (not frozen at set-time). Uses test-setup.ts's browser=true +
+  localStorage + matchMedia mocks (matchMedia overridden per-case for the system branch). NON-VACUOUS (drop the classList toggle / meta swap / persistence,
+  or invert the system resolution → RED). green→green: frontend validate:local EXIT 0 — 646 pass (+5) / 0 fail, tsc 0, build OK. cov: be 86.53% (carry) /
+  fe 84.39%+ (carry, theme.svelte.ts 0%→covered).
+- **C337 (arch): extract buildQueryString — collapse the 2 service-layer query-string builders onto one shared helper** — BALANCE: arch at budget
+  (last 332, starved-for 337−332=5 = budget, most-starved) → pick. Rule-7 fan-out (2 Explore agents, BE + FE). BE candidate (recheckMileageReminders
+  wrapper, 4 sites) was thin/borderline-churn (wraps a one-line service call + a guard that legitimately differs expense-vs-odometer). FE pick was cleaner:
+  analytics-api `buildQuery` is ALREADY the generic form (URLSearchParams + `value != null` filter + `qs ? '?'+qs : ''`), and reminder-api
+  `buildReminderQuery` repeats that byte-identical convention by hand. Extracted `buildQueryString` to a new services/api-utils.ts (single source of truth)
+  + routed both through it. KEY behavior-preservation subtlety VERIFIED firsthand (C21/C60): buildReminderQuery used TRUTHY checks for vehicleId/type (empty
+  string DROPPED) but `isActive !== undefined` (false SURVIVES), while the generic `!= null` filter would KEEP an empty-string vehicleId — so mapped
+  `vehicleId: filters.vehicleId || undefined` (+ type) to preserve the exact truthy-drop, and passed `isActive` through as-is so false still serializes.
+  Test-anchored both ways (rule 3): reminder-api.test.ts pins the load-bearing edges (`isActive=false MUST survive`, empty/no-filter → '', vehicleId+type
+  appended) — all GREEN before AND after. −9 LOC net. green→green: frontend validate:local EXIT 0 — 646 pass (unchanged) / 0 fail, tsc 0, build OK.
+  cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C338 (bug → vehicle write-path CERTIFIED CLEAN; settings lost-update race FILED+ESCALATED #100, architecture-gated)** — BALANCE: bug OVER budget
+  (last 334, starved-for 338−334=4 > budget 3, tightest) → FORCED. Vein dormant → 2-agent fan-out on surfaces not recently audited: (A) vehicle write-path
+  (routes/repo/photo-routes), (B) settings + sync-state. RESULTS: (A) NO defect — clear-field null-vs-undefined correct (.nullish()), cross-tenant scoped,
+  plate-uniqueness per-tenant (#80 follow-through), cover-photo entityId-gated; the one agent flag (photo ops check entityId not photo.userId) is a
+  defense-in-depth gap MASKED by the entityId/entityType check (guarded, not exploitable — cuid2 ids), and unitPreferences-retroactivity is the filed #85
+  class. (B) found a REAL but ARCHITECTURE-GATED defect → #100: userPreferences writes are an un-serialized read-modify-write — PUT /settings
+  (routes.ts:255-292) does getOrCreate → JS-spread merge (mergeUnit/Storage/BackupConfig) → update with NO transaction/lock/version, and the SAME pattern
+  repeats at 5+ sites (provider create :340/:524, cleanupStorageConfig:419, cleanupBackupConfig:448). VERIFIED firsthand (C21/C60) it's genuinely
+  un-serialized → a lost-update race clobbers a sibling config under concurrent edits (a provider-DELETE racing a settings PUT; two settings PUTs naming
+  different providers). The #82/C237 per-provider merge fixed the within-request wholesale-wipe but can't help across two interleaved requests. Severity
+  tempered by deployment (self-host single-user/household PWA → narrow same-user concurrent window) but a genuine NORTH_STAR #1 silent-loss class. NOT a
+  clean one-cycle fix (optimistic-version+migration / transactional-merge vs the C151 async-tx footgun [the merge awaits validate*Config DB reads] /
+  per-user serial queue — all bigger-than-atomic + cross-cutting) → FILED #100 + ESCALATED to Angelo (send_message) + recorded in BACKLOG/CLAUDE.md. NO
+  characterization test — a timing-dependent concurrency test would be FLAKY (worse than none); the #82 backup-config-merge test already pins the
+  sequential within-request merge. Docs-only cycle (file+escalate+cert, the C306/C327 escalation-gated precedent); no source/test/build touched → no build
+  gate (the C337 gate is the last code state). cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C339 (deep-review → bug #101: offline missedFillup silently dropped on sync; backup-validation gaps filed)** — BALANCE: deep-review OVER budget
+  (last 333, starved-for 339−333=6 > budget 5) → FORCED. 2-agent fan-out on the NORTH_STAR #1 crown jewels not recently audited: (A) backup/restore
+  round-trip, (B) offline-sync write path. (B) surfaced a CLEAN ATOMIC live defect → #101 (the C204/C209 deep-review→bug pattern): the offline outbox drops
+  `missedFillup` on sync. VERIFIED FIRSTHAND (C21/C60): OfflineExpense had no missedFillup field, offlineExpenseToBackend didn't map it, and BOTH
+  ExpenseForm addOfflineExpense call sites (:579/:621) omitted it — while the form DOES collect it (formData.missedFillup, :1230) and the ONLINE path sends
+  it (:517). So a fuel fill-up logged OFFLINE with "missed previous fill-up" checked loses the flag on sync → calculateAverageMpg pairs it as a normal
+  consecutive fill-up across the unlogged gap → inflated/garbage MPG (NORTH_STAR #1 silent-loss + #2, the exact #66 offline-field-dropout family). FIX
+  (clean, 4 edits): added missedFillup? to OfflineExpense (+doc), mapped it in offlineExpenseToBackend (the C205 single-source boundary), carried it at
+  both form sites (the 2nd expenseData needed the field too). GUARD: +1 round-trip test in offline-storage.test.ts pinning true AND false survive (the #66
+  test's sibling). NON-VACUOUS (drop the map → undefined → backend default false → the true case RED). (A) backup/restore: the agent flagged
+  validateBackupData doesn't cross-check expense sourceType:'financing' sourceId or reminder expenseSplitConfig vehicleIds against the in-backup sets —
+  but these are DEFENSE-IN-DEPTH on the user's OWN self-created backup (no FK on sourceId by design; a tampered backup is the only trigger), LOWER priority
+  than a live-flow bug; FILED as a note in BACKLOG (not escalated — it's a hardening nicety, the C246 referential-integrity already constrains the
+  FK-children). Insert-order + table-coverage + JSON/date/bool round-trip all RE-CONFIRMED clean. green→green: frontend validate:local EXIT 0 — 647 pass
+  (+1 net) / 0 fail, tsc 0, build OK. Pure FE; the offline→sync→DB path now carries the flag (the .svelte form render unchanged). cov: be 86.53% (carry) /
+  fe 84.39%+ (carry).
+- **C340 (infra): #5 branch-hygiene sweep + BRANCH_REVIEW.md refresh (branch 150 commits, last full sweep C329)** — BALANCE: nothing over budget (infra
+  5/6 closest to starving + the #5 sweep due, last full C329) → highest-leverage infra. (1) STRAY-TEST CHECK (the load-bearing half): `git status` shows
+  ZERO stray untracked unit/spec .test.ts — every untracked entry is the by-design set (*.meshclaw.e2e.ts + snapshots, .meshclaw-tools/,
+  playwright.meshclaw.config.ts, mise.local.toml, the squash-merged offline-entries spec). (2) GREEN BASELINE: 1440 BE / 647 FE carried from C338/C339
+  (docs-only cycle, no source touched → the C303/C329 measurement-only pattern, no build gate). (3) BRANCH_REVIEW.md refresh (gitignored): scope 139→150
+  (C190–C328 → C190–C339), status 1435→1440 BE / ~622→647 FE, appended §31 (the C329–C339 delta: #99 + #101 fixed, #100 filed+escalated, the C331/C333/C336
+  guards, the C332/C337 arch dedups, C334/C338 clean-certs), refreshed the pending-Angelo set (+#100) + the Suggested-merge footer (139→150). Coverage
+  carried from the C323 re-measure (no test-adding arc large enough to warrant a re-measure; C330–C339 was coverage-positive). Doc/measurement-only; only
+  loop/LEDGER.md + loop/BACKLOG.md commit. Next sweep ~C350; next CLAUDE.md refresh ~C348. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C341 (bug → dormant-vein clean scout: analytics-charts + auth CERTIFIED CLEAN; +2 buildMonthlyConsumption invariant guard)** — BALANCE: bug at budget
+  (last 338, starved-for 341−338=3 = budget, tightest "never sits") → pick. Vein dormant → 2-agent fan-out on surfaces not recently audited:
+  (A) analytics chart builders (last deep C67), (B) auth/session/OAuth (last C225). RESULTS — every agent "REAL DEFECT" debunked firsthand (C21/C60):
+  (A.1) buildMonthlyConsumption "NaN-NaN month key on null date" — NOT reachable: expenses.date is .notNull() (schema:220), the volume loop guards `if (!d)
+  continue`, AND the efficiency loop's `if (entry)` drops any phantom key (the agent missed that guard). (A.2) buildGasPriceHistory "String(epochMs)" — dead
+  branch: date is mode:'timestamp' so Drizzle returns a Date → the `instanceof Date` arm always wins for real rows. (A.3) unsorted-input → 0 efficiency = the
+  documented caller-sorts convention (#75 class; repository always sortByVehicleThenDate). (A.4) computePreviousYearComparison field-name = a naming nit, not
+  a correctness bug. (B) ALL auth findings are SECURITY-POLICY/PRODUCT calls (email_exists / account_conflict enumeration-vs-UX tradeoff; Google email_verified
+  enforcement = an identity-policy decision — ARCC+Angelo territory, not a clean loop fix) or BEHAVIOR-IDENTICAL hygiene (requireAuth hardcoded maxAge ==
+  CONFIG.auth.cookieMaxAge today). NO reachable atomic defect → certification (the C306/C327/C334 precedent). THE one genuinely-unpinned reachable invariant
+  worth a non-theater guard: buildMonthlyConsumption's `if (entry)` (the efficiency loop only AUGMENTS volume-created months, never CREATES one) was unpinned —
+  a refactor swapping it for an upsert/`?? default` would silently emit phantom efficiency-but-no-volume months. +2 guards (analytics-charts-month-window.test.ts):
+  a cross-month pair → both volume months exist + efficiency lands on the LATER fill-up's month (Jan eff 0, Feb 30mpg); emitted month set == distinct
+  volume-row months (same-month pair → ONE month, volume pooled). NON-VACUOUS (drop `if (entry)` → phantom NaN-NaN month → RED). green→green: backend
+  validate:local EXIT 0 — 1442 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C342 (guard): pin appStore — the global vehicle-list + notification (toast) store (zero-coverage store)** — BALANCE: guard AND arch both at budget
+  (guard 342−336=6=budget; arch 342−337=5=budget); guard MORE starved → pick. Continuing the C331/C336 zero-coverage-store sweep: of the 3 untested FE stores,
+  offline.svelte.ts is trivial get/set accessors (pinning bare setters = theater, the C332-rejected createStateAccessor class), so picked app.svelte.ts (89
+  lines) — the app-wide vehicle list (every vehicle CRUD surface reads it) + the toast notification system. Load-bearing logic: updateVehicle's ID-MATCH map
+  (only the matched vehicle changes, unknown id = no-op), removeVehicle's ID filter, addNotification's id+timestamp+default-5000-duration, and the FOUR show*
+  helpers' DISTINCT default toast lifetimes (success 5000 / error 8000 / warning 6000 / info 5000 — the user-facing dismiss timings; a flattening regression
+  makes errors vanish too fast). +11 guards (app-store.test.ts, new stores/__tests__/): vehicle CRUD incl. the update-only-matches + unknown-id-no-op +
+  filter-remove; notification id/timestamp/default + explicit-override + remove-by-id + clear; the 4 distinct durations; loading + reset. NON-VACUOUS (flip an
+  update/remove predicate or a default duration → RED). svelte-check strict caught noUncheckedIndexedAccess + index-signature bracket-access (fixed with `!`
+  + `['key']`). green→green: frontend validate:local EXIT 0 — 658 pass (+11) / 0 fail, tsc 0 errors, build OK. cov: be 86.53% (carry) / fe 84.39%+ (carry,
+  app.svelte.ts 0%→covered).
+- **C343 (arch): extract deactivateFinancing — ONE source of truth for the financing deactivation write + side-effect** — BALANCE: arch OVER budget
+  (last 337, starved-for 343−337=6 > budget 5) → FORCED. Rule-7 fan-out (2 Explore agents). FE pick (the settings-store try/catch wrapper) REJECTED — it's
+  the same skeleton a prior fan-out PERMANENTLY rejected (bodies differ: some assign state, some don't; closure-over-error churn). BE pick was clean: the
+  payoff (PUT /:id/payoff) + delete (DELETE /:id) routes ran a BYTE-IDENTICAL `financingRepository.update({isActive:false, endDate:new Date()})` +
+  `onFinancingDeactivated(financingId, user.id)` pair (routes.ts:221-226 / :241-246), differing only in the response message + whether the updated row is
+  echoed. A money/lifecycle drift risk: a future change to what deactivation entails (extra cleanup, the #67/C206 re-finance reset) would have to land twice.
+  FIX: extracted `deactivateFinancing(financingId, userId) → VehicleFinancing` into hooks.ts (the natural home — it already owns onFinancingDeactivated;
+  composes the repo write + the hook), routed both sites through it (payoff echoes the return, delete ignores it). Swapped the route's import
+  onFinancingDeactivated → deactivateFinancing (no longer called directly). VERIFIED no import cycle (repository doesn't import hooks). −10 LOC. Test-anchored
+  both ways (rule 3): financing-deactivate-hook.test.ts drives BOTH routes end-to-end (PUT payoff + DELETE sever the source link, best-effort no-op, unrelated
+  expense untouched) — all GREEN before AND after. green→green: backend validate:local EXIT 0 — 1442 pass (unchanged) / 1 skip / 0 fail, tsc 0, musl-biome
+  clean, build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C344 (deep-review → bug #102: ambiguous-vehicle CSV import silently misattributed every row)** — BALANCE: deep-review AND bug both due (deep-review
+  344−339=5=budget; bug 344−341=3=budget); deep-review MORE starved-for → pick. 2-agent fan-out on surfaces not audited this session: (A) the NATIVE CSV
+  import pipeline (post-mapping, distinct from the C334/C60 mapping layer), (B) year-end + quick-stats analytics. (B) the agent's 3 "defects" were all
+  self-classified schema-shape nits where it admitted "the math is sound" (categoryBreakdown:[] on a zero-total year is CORRECT — FE reads .length; the
+  div-by-zero "drift" is same-array same-rounding) → NO defect, year-end CERTIFIED CLEAN (year-boundary/tz, div-guards, empty-shape, no #94-pooling all
+  sound). (A) surfaced a CLEAN ATOMIC live defect → #102 (the C204/C339 deep-review→bug pattern): buildImportPlan built `vehicleByName` with
+  `set("year make model", id)` — two vehicles legally sharing that string (distinct nicknames, NO unique constraint) → the 2nd OVERWRITES the 1st, so a CSV
+  row using that name form silently attaches to the LAST-seen vehicle, no signal (NORTH_STAR #1). VERIFIED firsthand (C21/C60). FIX: build the map
+  collision-aware (a key seen twice → null = AMBIGUOUS) + resolveImportVehicleId rejects an ambiguous name with a clear "give them distinct nicknames"
+  per-row error instead of last-wins. Extracted the resolution to resolveImportVehicleId (parseRow's added branch tipped it over the Biome
+  noExcessiveCognitiveComplexity cap → the extraction both fixes that AND isolates the logic — a bonus arch-clean). GUARD: +2 HTTP tests
+  (import-csv.test.ts): two same-model cars → the shared name errors (imported 0, "more than one vehicle"); a UNIQUE nickname still resolves (proves the
+  fix is per-name-key targeted, not a blanket reject). NON-VACUOUS. green→green: backend validate:local EXIT 0 — 1444 pass (+2) / 1 skip / 0 fail, tsc 0,
+  musl-biome clean (one format reflow auto-fixed), build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C345 (bug → dormant-vein clean scout: expense read-path + odometer + sync-worker CERTIFIED CLEAN, no defect, no manufactured test)** — BALANCE: bug
+  OVER budget (last 341, starved-for 345−341=4 > budget 3, tightest) → FORCED. Vein dormant → 2-agent fan-out on surfaces not audited this session:
+  (A) the expense LIST/FILTER/SEARCH/PAGINATION read path, (B) odometer write/recheck + photo-service. RESULTS — every agent finding debunked firsthand
+  (C21/C60): (A) CERTIFIED CLEAN — cross-tenant scoped (userId always from c.get('user'), vehicleId ownership-validated), LIKE-escaped (#41), pagination
+  totalCount/hasMore correct + stable-id tiebreak, sortBy enum-allowlisted (no orderBy injection), AND/OR precedence sound; the only hits were the
+  redundant-double-clampPagination (harmless, same values) + empty-string-tags-after-CSV-split (returns 0 rows correctly — expenses can't have empty tags),
+  both by-design-safe. (B.A1) "backward odometer reading accepted" → BY-DESIGN, not a bug: a lower reading is a legitimate correction / second-vehicle /
+  out-of-order historical entry, and getCurrentOdometer uses MAX() so it can't corrupt "current" — rejecting it would break real flows (a warn-on-backward
+  would be a product/UX feature, not a defect). (B.B1) "sync-worker multi-ref orphan stuck forever if no active source" → CORRECT resilient behavior, not a
+  bug: processSingleRef with no findActiveByPhoto source `return`s WITHOUT marking failed / burning a retryCount — exactly right (it's "source temporarily
+  unavailable", not a failure; marking it failed would wrongly exhaust retries so it never syncs when a provider is re-added) AND already PINNED
+  (sync-worker.test.ts:227 asserts updateStatus NOT called on the no-source path; :238 the no-photo path). NO reachable atomic defect, NO unpinned invariant
+  → certification only (the C306/C327/C334/C341 precedent — a manufactured test here = coverage-theater). DOCS-ONLY (LEDGER + BACKLOG); no source/test/build
+  touched (the C344 gate is the last code state). cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C346 (infra): CLAUDE.md suite-size refresh (post-C335 drift)** — BALANCE: nothing OVER budget; infra most-starved AT budget (last 340, starved-for
+  346−340=6 = budget) → pick. The two big infra cadences aren't due (#5 sweep ~C350, full CLAUDE.md refresh ~C348) + the closed-bug list is kept current
+  inline each bug cycle (accurate through #102/C344), so this is a TARGETED single-drift fix, not a full refresh: the suite-size line cited **~1440 BE /
+  ~641 FE** (stale since C335) → corrected to **~1444 BE / ~658 FE** (VERIFIED by running bun test + vitest — not guessed) + named the C336–C344 test arc
+  (themeStore + appStore zero-coverage-store sweep, the buildMonthlyConsumption if-entry invariant, the #102 ambiguous-import guards). Resisted manufacturing
+  a fuller refresh — the doc is otherwise current. Docs-only; no source/test/build touched → no build gate (the C309/C316/C322/C335 refresh pattern). Next
+  CLAUDE.md refresh ~C348; next #5 sweep ~C350. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C347 (guard): class-level completeness pin for the offline-field-dropout family (#66/#101) on offlineExpenseToBackend** — BALANCE: nothing OVER budget;
+  guard most-starved (347−342=5, budget 6) → highest-leverage pick. SCANNED for a real zero-coverage logic module: the FE store/util veins are genuinely
+  worked through (sync-status C331 / theme C336 / app C342 stores done; the remaining untested FE modules — visibility-watch.svelte.ts, use-google-oauth,
+  is-mobile — are IntersectionObserver/MutationObserver/$effect + OAuth-popup/postMessage bound = integration/eyes-on territory, the C163 mock-trap, pinning
+  the wiring = theater) and the BE security-pure modules (csv-safety, encryption) are comprehensive (neutralize/denormalize/round-trip; round-trip/wrong-key/
+  tamper). So NOT a zero-coverage pick. Instead pinned a CLASS-level invariant the loop has now re-found TWICE (#66 fuelType-drop C204, #101 missedFillup-drop
+  C339): the offline outbox carries a field but offlineExpenseToBackend (the C205 single-source mapper) forgets it → silent sync data-loss. The per-field
+  tests each pin ONE field; the missing guard is that EVERY user-settable OfflineExpense field survives the mapping TOGETHER. +1 completeness test
+  (offline-storage.test.ts): a fully-populated OfflineExpense → assert vehicleId/tags/category/amount/date/mileage/volume/fuelType/missedFillup/description ALL
+  round-trip. NON-VACUOUS (a future field added to OfflineExpense + the form but forgotten in the mapper — the exact #66/#101 shape — leaves its assertion
+  unmet → RED). green→green: frontend validate:local EXIT 0 — 659 pass (+1) / 0 fail, tsc 0, build OK. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C348 (arch): extract findOwnedProvider — ONE source of truth for the tenant-scoped provider lookup in the storage registry** — BALANCE: arch at budget
+  (last 343, starved-for 348−343=5 = budget, most-starved) → pick. Rule-7 fan-out (2 Explore agents). FE: NO clean win (the only byte-identical block,
+  photo-upload FormData ×4, is genuine 3-liner churn — agent agreed). BE: the agent's cross-file findUserProviderById (backup.ts + registry.ts) was weak —
+  the two files use DIFFERENT db-access (getDb()+dynamic-import+.get() vs this.db+.limit(1)) → it proposed TWO helpers (not a real dedup). But the
+  registry.ts SAME-SCOPE subset is clean: getDefaultProvider/getBackupProviders/getProvider ran a BYTE-IDENTICAL tenant-scoped query
+  `this.db.select().from(userProviders).where(and(eq(id), eq(userId))).limit(1) → row[0]` (3 sites), differing only in caller null/status handling (throw vs
+  skip). VERIFIED firsthand (C21/C60). FIX: extracted private `findOwnedProvider(providerId, userId) → UserProvider | null` (returns the row/null, callers
+  keep their own handling). Left getProviderInternal alone (queries by id ALONE, no userId — the deliberate no-auth variant, NOT routed here). A divergent
+  copy dropping the userId predicate would be a CROSS-TENANT read, so one source of truth keeps the ownership scope in lockstep. −~18 LOC. Test-anchored
+  (rule 3): registry.test.ts (23 tests) drives all 3 methods — GREEN before AND after. green→green: backend validate:local EXIT 0 — 1444 pass (unchanged) /
+  1 skip / 0 fail, tsc 0, musl-biome clean (one format reflow auto-fixed), build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C349 (bug → #103: S3 provider create accepts an incomplete config → a broken row that throws on EVERY use)** — BALANCE: bug OVER budget (last 345,
+  starved-for 349−345=4 > budget 3, tightest) → FORCED. Vein dormant → 2-agent fan-out on surfaces not audited this session: (A) insurance CLAIMS sub-path,
+  (B) provider credential CRUD. RESULTS: (A) the claims "term doesn't cover the vehicle" finding is PRODUCT-SEMANTICS-GATED, not a clean defect (#84/C247
+  deliberately validated the SECURITY props — ownership + policy-membership — while leaving coverage-consistency loose, same family as the by-design
+  claimDate-before-start + payout>coverage; real insurance is messy) → not self-fixed. (B) the credential layer is leak-clean/tenant-clean/nonce-clean
+  (C306/C260/C257 hold), but surfaced a CLEAN ATOMIC fail-late defect → #103: createProviderSchema's `config: z.record(...)` is shape-open, so an S3 create
+  with NO endpoint/bucket/region (or no config at all) persists a 201 row + auto-populates storageConfig, then EVERY later use (test/sync) throws at
+  buildS3Provider:62 — a broken-row footgun (NORTH_STAR #1-adjacent reliability). VERIFIED firsthand (C21/C60). FIX: fail-fast at CREATE in
+  resolveProviderCredentials — reject an S3 config missing endpoint/bucket/region BEFORE encrypt/persist, mirroring the google-drive nonce gate in the same
+  function + the buildS3Provider use-time check (google-photos needs only credentials.refreshToken → no required-config gate). GUARD: +2 HTTP tests
+  (incomplete config → 400 + nothing persisted; no-config → 400) + updated 2 existing S3-create helpers (providers-routes-http + delete-provider-config-cleanup)
+  to send a valid endpoint/bucket/region config (they'd relied on the no-validation behavior). NON-VACUOUS. green→green: backend validate:local EXIT 0 —
+  1446 pass (+2) / 1 skip / 0 fail, tsc 0, musl-biome clean (one reflow auto-fixed), build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C350 (deep-review → guard): health-score surface CERTIFIED CLEAN; pinned the fleet-aggregation no-data-vehicle invariant (+1)** — BALANCE: deep-review
+  OVER budget (last 344, starved-for 350−344=6 > budget 5) → FORCED. 1-agent firsthand audit (the 2nd agent on the Sheets path didn't return) of
+  getVehicleHealth + computeFleetHealthScore + the score builders. Every agent "REAL DEFECT" debunked: (1) "insurance coverage counts an active policy with
+  an EXPIRED term" IS the already-filed #14 (expired-latest-term-still-counts, characterization-pinned, awaiting Angelo) on a different surface — not new,
+  not self-fixable. (2/3) "negative mileage/time intervals mis-score" are UNREACHABLE in production: the maintenance rows feeding the score builders are
+  .orderBy(asc(expenses.date)) (repository.ts:1225) — the #75 caller-sorts-by-design class; a backward mileage gap scoring as "not a good interval" is
+  defensible scoring-semantics, not an atomic bug. (4) the per-vehicle-vs-fleet rounding is the agent's own product-gated nit. Bounds/div-guards all
+  VERIFIED present (scores in [0,100], no NaN, no-vehicles→0). NO new reachable defect → certification (C306/C327/C345 precedent). THE one
+  genuinely-unpinned reachable invariant worth a non-theater guard (C256/C333 pattern): computeFleetHealthScore INCLUDES a no-data vehicle in the mean at
+  its default sub-scores (reg 50 + mile 50 + ins 0 → round(37.5)=38), NOT excluded, NOT zeroed — the existing tests pin bounds/integer/no-vehicles→0 but not
+  this load-bearing aggregation semantic (a refactor excluding empty vehicles or scoring them 0 would silently shift every multi-vehicle fleet score). +1
+  deterministic guard (quick-stats.property.test.ts): a single no-data vehicle → 38; a 2nd no-data vehicle → still 38 (both counted). NON-VACUOUS (exclude
+  → NaN/0; zero them → 25; the 38 pins reg=mile=50 defaults + inclusion). green→green: backend validate:local EXIT 0 — 1447 pass (+1) / 1 skip / 0 fail,
+  tsc 0, musl-biome clean (one reflow auto-fixed), build bundled. cov: be 86.53% (carry) / fe 84.39% (carry).
+- **C351 (infra): #5 branch-hygiene sweep + coverage RE-MEASURE + BRANCH_REVIEW.md refresh (branch 161 commits, last full sweep C340)** — BALANCE: nothing
+  OVER budget; infra most-starved (351−346=5) + the #5 sweep due (last full C340) → pick. (1) STRAY-TEST CHECK (load-bearing): ZERO stray untracked
+  unit/spec .test.ts — all by-design (e2e specs+snapshots, .meshclaw-tools/, configs, the squash-merged offline-entries doc). (2) GREEN BASELINE + a fresh
+  COVERAGE RE-MEASURE (last full C323, 28 cycles ago, with a substantial test arc since): backend bun test --coverage → be 86.25% line / 86.67% func
+  (line ~flat/−0.3 vs C323's 86.53 as product code grew, func +0.5); frontend vitest --coverage → fe 84.17% line / 83.9% func / 76.32% branch (~flat vs
+  C323's 84.39/83.97/76.43 — the C336/C342 store sweep + C347 dropout-class pin held the line). 1447 BE / 659 FE pass. BE↔FE gap stable ~2pts; 90%-goal
+  still structurally gated. (3) BRANCH_REVIEW.md refresh (gitignored): scope 150→161 (C190–C339 → C190–C350), status 1440→1447 BE / 647→659 FE + the C351
+  re-measure, appended §32 (the C340–C350 arc: #102/#103 fixed, the C341/C345/C350 clean-certs, deactivateFinancing/findOwnedProvider dedups, the C342/C347
+  guards), bumped the Suggested-merge footer (150→161). Updated the LEDGER COVERAGE TREND header with the C351 reading. Doc/measurement-only; only
+  loop/LEDGER.md + loop/BACKLOG.md commit. Next sweep ~C361; CLAUDE.md full refresh is overdue (~C348) — fold into the next infra cycle. cov: be 86.25% / fe 84.17%.
+- **C352 (bug → #104: a tag containing the CSV delimiter (; or ,) silently round-trip-split on export→re-import)** — BALANCE: bug at budget (last 349,
+  starved-for 352−349=3 = budget, tightest) → pick. Vein dormant → 2-agent fan-out on un-audited surfaces: (A) EV/charge math, (B) CSV EXPORT path. (A) the
+  agent's findings were debunked: "averageMilesPerKwh reads volume" is CORRECT (electric rows store kWh in the volume column by design; the
+  isElectricFuelType partition guards it), and "costPerMile pools fuel+charge for a plug-in hybrid" is PRODUCT-SEMANTICS-GATED (a single blended $/mi is a
+  debatable display choice, not a data bug) → no fix. (B) surfaced a CLEAN ATOMIC defect → #104: the expense CSV export joins tags with '; ' (routes.ts:431)
+  and the import splits on /[;,]/ (import-csv.ts:169), but tags were validated only for length — so a tag CONTAINING a semicolon/comma (e.g. "oil; filter")
+  round-trips into MULTIPLE tags ("oil","filter") → silent data loss on export→re-import (NORTH_STAR #1). VERIFIED firsthand (C21/C60). FIX: reject the two
+  delimiter chars in a tag at the write boundary via a refine — and factored a shared `tagElementSchema` (the create base + the update override both built
+  their own `z.string().min(1).max(tagMaxLength)` tags element; the override drops the base .default([]) for the C34 .partial() clobber, so it needed the
+  refine TOO — a bonus dedup that put the rule in ONE place so a future schema can't miss it). GUARD: +4 HTTP tests (create-with-; → 400 + nothing
+  persisted; create-with-, → 400; update-introducing-delimiter → 400 + stored tags survive; a normal tag still creates — control). NON-VACUOUS. green→green:
+  backend validate:local EXIT 0 — 1451 pass (+4) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C353 (guard): pin the mixed plug-in-hybrid MPG/mi-kWh ISOLATION invariant (Property 6) — the C352 EV-fan-out follow-through** — BALANCE: guard AND arch
+  both at budget (guard 353−347=6=budget; arch 353−348=5=budget); guard MORE starved → pick. The C352 EV fan-out flagged that a MIXED plug-in-hybrid (a
+  vehicle logging BOTH gas fill-ups AND electric charges) leans entirely on calculateVehicleStats's isElectricFuelType partition to keep MPG and mi/kWh
+  separate — and that partition's EFFICIENCY isolation was UNPINNED (Property 4 pins the volume/cost partition; Property 5 the trackFuel/trackCharging
+  gating; neither asserts a gas row stays OUT of the mi/kWh denominator + a charge OUT of the MPG pairing — the #66 cross-contamination class). VERIFIED
+  firsthand the partition is correct (vehicle-stats.ts:70-76 → fuelGroup→averageMpg, chargeGroup→averageMilesPerKwh). +3 deterministic guards (Property 6,
+  vehicle-stats.property.test.ts): a 4-row INTERLEAVED mixed vehicle (gas 10000→10300mi/10gal=30 MPG; electric 20000→20060mi/15kWh=4 mi/kWh, disjoint
+  mileage ranges) → averageMpg=30 (only gas), averageMilesPerKwh=4 (only charge), totals partitioned (20gal/30kWh, counts 2/2). NON-VACUOUS: a leak that
+  cross-paired a gas+charge row would give a ~10000-mile absurd interval, NOT 30/4. green→green: backend validate:local EXIT 0 — 1454 pass (+3) / 1 skip /
+  0 fail, tsc 0, musl-biome clean (one reflow auto-fixed), build bundled. cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C354 (arch): extract computeAverageEfficiency — ONE source of truth for the analytics efficiency-average + empty→null guard** — BALANCE: arch OVER
+  budget (last 348, starved-for 354−348=6 > budget 5) → FORCED. Rule-7 fan-out (2 Explore agents). FE candidate (a shared photoApi over the
+  insurance-api/expense-api per-entity photo methods, 2 services) was the higher-surface pick (different naming conventions across modules, overlaps the
+  already-rejected photo-upload-FormData). Picked the cleaner BE one: getQuickStats/getYearEnd/getSummary computed `avgEfficiency` as a BYTE-IDENTICAL
+  4-liner (convertedEfficiencyValues.length > 0 ? reduce(sum)/len : null) at 3 sites (repository.ts:1183/1980/2056), all consuming the same
+  computeConvertedEfficiencyValues() → number[]. VERIFIED firsthand (C21/C60). FIX: extracted private computeAverageEfficiency(values) → number|null
+  (sibling to computeConvertedEfficiencyValues), routed all 3 through it. The empty→null guard (a div-by-zero vector) now lives in ONE place. −9 LOC.
+  Test-anchored both ways (rule 3): the analytics property/HTTP suites (quick-stats, year-end, summary) drive all 3 readers — GREEN before AND after.
+  green→green: backend validate:local EXIT 0 — 1454 pass (unchanged) / 1 skip / 0 fail, tsc 0, musl-biome clean, build bundled. cov: be 86.25% (carry) /
+  fe 84.17% (carry).
+- **C355 (bug → dormant-vein clean scout: reminder mark-serviced + vehicle-stats period/cost CERTIFIED CLEAN, no new defect)** — BALANCE: bug at budget
+  (last 352, starved-for 355−352=3 = budget, tightest) AND deep-review at budget (5); bug tighter → pick. Vein dormant → 2-agent fan-out: (A) reminder
+  mark-serviced/re-arm, (B) vehicle-stats cost/period math. RESULTS — every finding debunked firsthand (C21/C60): (A) mark-serviced re-arm CERTIFIED CLEAN
+  (both axes re-arm, anchor-to-CURRENT-odometer, future-advance for multi-period-overdue, ownership-scoped — ALL comprehensively pinned in mark-serviced.test.ts:
+  mileage-anchor/re-armed-not-due/time-one-period/multi-period→future/early-service/both-axis/cross-tenant-404). The agent's "mark-serviced↔trigger
+  double-advance race" is the #100 architecture-gated family (un-serialized read-modify-write; narrow same-user concurrent window on a single-user PWA, not a
+  clean atomic fix) → NOTED under #100, not separately filed. The "stale unread notification after mark-serviced" is PRODUCT-GATED (the notification is a
+  historical record — "was due on Jan 1" WAS true; auto-clear-on-service vs keep-as-history-until-dismissed is a UX call, user can markNotificationRead). (B)
+  vehicle-stats: NO new defect — the period-cost-over-all-time-span mixing is the already-FILED #45 (semantics-gated, grouped with the currentMileage card
+  call), and totalMileage clamp / costPerMile div-guard / single-expense / refund / boundary all CERTIFIED CLEAN + pinned. NO reachable atomic defect, NO
+  unpinned reachable invariant (mark-serviced is comprehensively covered) → certification only (the C306/C345/C350 precedent — a manufactured test = theater).
+  DOCS-ONLY (LEDGER + the #100 note); no source/test/build touched (the C354 gate is the last code state). cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C356 (deep-review → bug #105: Google Photos uploadBytes misclassified a 401 auth-expiry as a retryable NETWORK_ERROR)** — BALANCE: deep-review OVER
+  budget (last 350, starved-for 356−350=6 > budget 5) → FORCED. 2-agent fan-out: (A) Google provider service wrappers, (B) backup-orchestrator + restore.
+  Both agents over-reported; triaged firsthand: (B) the orchestrator "per-provider status not recorded" findings are the FILED #43/#44 fail-open-honesty
+  family; ZIP-omission/restore-atomicity/coercion all GUARDED (the agent talked itself out of 7/9). (A) #36/#37 filed; listAlbums->50-album pagination
+  (rare) + Sheets-sparse-row (manual-edit) are lower-priority hardening. The CLEAN ATOMIC defect → #105: createRealPhotosClient.uploadBytes (the ONE Photos
+  call that bypasses authedFetch — it needs raw-octet upload headers) threw a flat NETWORK_ERROR on !res.ok, so a 401/403 (expired/revoked token) was
+  classified as a retryable network flake → the sync backoff retries it as a transient glitch (a 401 storm) instead of surfacing AUTH_INVALID for the user to
+  re-connect. VERIFIED firsthand (C21/C60): authedFetch (:150) AND the sibling batchCreate/download/list paths already map 401/403→AUTH_INVALID; only
+  uploadBytes was inconsistent. FIX: mirror authedFetch's status→code mapping in uploadBytes (401/403→AUTH_INVALID, else NETWORK_ERROR). Correct regardless
+  of testability. NO guard added — the fix lives in createRealPhotosClient (the REAL HTTP client); the service test suite injects a FAKE PhotosClient that
+  bypasses it, so exercising the real 401 path needs a global-fetch mock the suite deliberately avoids (the C163 mock-trap) → documented, not manufactured
+  (coverage-theater avoidance). green→green: backend validate:local EXIT 0 — 1454 pass (unchanged; the fix is in the un-faked real client) / 1 skip / 0 fail,
+  tsc 0, musl-biome clean, build bundled. cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C357 (infra): CLAUDE.md FULL orientation refresh (the overdue ~C348 refresh)** — BALANCE: nothing OVER budget; infra most-starved AT budget (last 351,
+  starved-for 357−351=6 = budget) + the full CLAUDE.md refresh was overdue (flagged ~C348; only targeted suite-size spot-fixes since C335). Read the
+  drift-prone sections vs source/LEDGER (no churn — the C5/C47/C72 discipline). FIXED the two material drifts: (1) the coverage line cited the C323 reading
+  (86.53/84.39) → updated to the C351 re-measure (be 86.25/86.67, fe 84.17/83.9/76.32) + the "coverage has PLATEAUED, reachable remainder held flat as
+  product grows" honest framing + extended the FE-ratchet narrative past C223 (the C336/C342 store sweep + C347/C353 pins); (2) suite size ~1444/658 →
+  ~1454/659 + the C345–C356 test arc (the #103/#104 guards, C350 fleet-health, C353 hybrid-isolation). The closed-bug list (through #105/C356) +
+  pending-Angelo block (#88/#94/#97/#98/#100) are kept current inline each cycle — verified accurate, no change. Docs-only; no source/test/build touched →
+  no build gate (the C309/C316/C322/C335 refresh pattern). Next CLAUDE.md refresh ~C370; next #5 sweep ~C361. cov: be 86.25% / fe 84.17%.
+- **C358 (bug → #106: the expense-list date-range filter EXCLUDED an expense on the chosen END day — date-picker off-by-one)** — BALANCE: bug at budget
+  (last 355, starved-for 358−355=3 = budget, tightest) → pick. Vein dormant → 2-agent fan-out: (A) offline outbox queue, (B) date/timezone utils. (A) the
+  agent's findings were the #100 family (concurrent-tab lost-update on localStorage), #79 (stuck queue), or crypto-UUID-negligible; the "#11 currency
+  dropped in offlineExpenseToBackend" is a real #66/#101-class sibling BUT currency is NOT user-settable on the offline form (the form has no currency
+  input — it's the user's single global currency), so it's latent-not-live → NOTED, not fixed. (B) surfaced a CLEAN ATOMIC live defect → #106: filterExpenses
+  (expense-filters.ts:51) did `new Date(expense.date) <= new Date(filters.endDate!)`, but the DateRangePicker binds a date-only 'YYYY-MM-DD'
+  (CalendarDate.toString(), date-range-picker.svelte:56) → `new Date('2024-06-15')` = midnight UTC, so an expense stored that day (noon-local via
+  dateOnlyToISO) was EXCLUDED from a range whose end IS that day (off-by-one, the #87/#39 class on the client-side list filter). VERIFIED end-to-end firsthand
+  (C21/C60): picker→filters.endDate→filterExpenses. FIX: parse both bounds as LOCAL calendar days (localDayStart, reading the date PARTS not new Date(UTC)),
+  end = local-midnight of the day AFTER endDate (exclusive) so the WHOLE end day is included regardless of time-of-day. GUARD: +2 tests (a noon-on-end-day
+  expense is INCLUDED; a YYYY-MM-DD closed range includes both boundary days); the 3 existing full-ISO range tests still pass (CI is UTC). NON-VACUOUS.
+  green→green: frontend validate:local EXIT 0 — 661 pass (+2) / 0 fail, tsc 0, build OK. cov: be 86.25% (carry) / fe 84.17%+ (carry).
+- **C359 (guard): pinned `formatPaymentFrequency` — the user-visible payment-frequency label rendered in NextPaymentCard** — BALANCE: nothing actionable
+  OVER budget (feature 359−170=189 but the only open feature is maintenance T9, e2e-harness-blocked, + the rest is Angelo-gated → not loop-actionable);
+  guard AT budget (last 353, starved-for 359−353=6 = budget) and the most-starved actionable category → pick guard. Vein dormant → 2-agent fan-out for a
+  genuinely-unpinned REACHABLE invariant (pin, don't manufacture coverage-theater): (A) backend pure helpers, (B) frontend pure utils. (A) the agent's top
+  pick was `normalizeDate`'s Unix-seconds-vs-ms threshold in analytics-charts.ts — but it SELF-ADMITS "today's DB path always surfaces a Date object", so
+  the numeric branch is reachable only by hypothetical future callers → REJECTED as not-live coverage-theater (the C306/C327/C341/C355 protocol). (B)
+  surfaced a CLEAN reachable pick: `formatPaymentFrequency` (financing-calculations.ts:496) — pure, ZERO test refs (grep-verified), rendered LIVE at
+  NextPaymentCard.svelte:149 with `financing.paymentFrequency`, whose DB column (schema.ts:86) admits exactly {monthly|bi-weekly|weekly|custom}. A refactor
+  that renames/drops a case or mis-cases a label ("Bi-Weekly") would silently change a real user-facing label → genuinely-unpinned reachable invariant, NOT
+  theater. VERIFIED firsthand (C21/C60): function source + the 4 schema values + the live render site + no existing test. GUARD: +2 tests appended to
+  next-payment-date.test.ts (the NextPaymentCard display-helper family's home) — (1) each of the 4 schema-valid frequencies maps to its exact label; (2) an
+  unknown frequency + '' pass through verbatim (the graceful no-blank fallback). NON-VACUOUS (a wrong label fails). green→green: frontend validate:local
+  EXIT 0 — 663 pass (+2) / 0 fail, tsc 0, build OK. cov: be 86.25% (carry) / fe 84.17%+ (carry).
+- **C360 (arch): extract `groupOwnedBy` — ONE source of truth for the split-expense tenant-scope predicate (6 sites → 1)** — BALANCE: arch OVER budget
+  (last 354, starved-for 360−354=6 > budget 5) → MUST pick arch (feature is more-starved at 190 but its only-open T9 is e2e-blocked / the rest Angelo-gated,
+  not loop-actionable). rule-7 fan-out (2 agents). DEBUNKED firsthand (C21/C60): the FE agent's "dead getCategoryColor/categoryLabels/getCategoryIcon" claim
+  was FALSE — all three are live in ExpenseOverviewSection/ExpensesTable/RecentActivityCard/ReminderForm/ExpenseForm + 2 routes (the C234-guarded category-map
+  trio); rejected. Also rejected the BE `Number(x)||0` coercion (idiomatic, a variadic helper is churn not a real collapse) + the test-only formatters rework
+  (low leverage). PICK (CONFIRMED firsthand): the split-group tenant predicate `and(eq(expenses.groupId, groupId), eq(expenses.userId, userId))` was copied
+  BYTE-IDENTICAL at SIX sites — four reads (findIdsByGroupId:203, getSplitExpense:678, deleteSplitExpense-read:695, updateSplitExpense-read:740) AND TWO
+  destructive delete-writes (deleteSplitExpense:717, updateSplitExpense:786). Two C109 comments (710-714, 782-783) manually plead "keep ownership and deletion
+  on the SAME predicate" — a divergent copy dropping the userId scope = a cross-tenant read or (worse) cross-tenant DELETE. Extracted
+  `private groupOwnedBy(groupId, userId): SQL | undefined` (and+eq, the existing import) and routed all 6 → the C109 boundary is now enforced STRUCTURALLY,
+  not by comment. Behavior-preserving (the SQL is identical). Test-anchored: delete-split-child + split-service.property drive every routed path — GREEN
+  before AND after. Biome reflowed 2 now-short `.delete().where()` chains (check:musl:fix). validate:local EXIT 0, 1454 pass (unchanged). cov: be 86.25%
+  (carry) / fe 84.17% (carry).
+- **C361 (deep-review): financing-amortization + depreciation/cost-per-period audit → CERTIFIED CLEAN; +1 beyond-schedule guard** — BALANCE: deep-review
+  AT budget (last 356, starved-for 361−356=5 = budget) + bug also at budget; picked deep-review (broader value, surfaces the next bug; feature over-budget
+  but T9 e2e-blocked / rest Angelo-gated, not loop-actionable). 2-agent fan-out on under-audited money surfaces: (A) financing amortization/payoff/min-payment,
+  (B) depreciation + cost-per-period rollups. (B) CLEAN — every cost/mile, cost/month, value-over-time path is div-guarded (Math.max(1, ownershipMonths) +
+  >0 checks) and anchored by the `expectAllFinite(tco)` property test; no NaN/Infinity escapes; #27/#28 year-vs-all-time honored. (A) the agent flagged
+  derivePaymentEntries' beyond-schedule fallback as a "money bug" — DEBUNKED FIRSTHAND (C21/C60): calculateAmortizationSchedule's 2nd arg only sets isPaid;
+  the schedule is the CONTRACTUAL projection (stops at termMonths, or earlier on payoff / the C161 negative-am guard). A payment logged BEYOND it gets
+  principal=expense.amount, interest=0 — CORRECT, because those payments land after the balance is already 0 (no interest to attribute) and remainingBalance
+  stays Math.max(0,…)-floored. No money lost/invented → NOT a defect, the "should amortize" is a preference with no balance to amortize. THE genuinely-unpinned
+  invariant → guard: the Property-10 test SKIPS this case via `if (entry && scheduleEntry)`. +1 deterministic guard (financing-calculations.property.test.ts):
+  a 1000@12%/6mo loan overpaid with 8×200 payments → schedule shorter than the payment count, every beyond entry all-principal/zero-interest/balance-floored-0.
+  NON-VACUOUS (asserts schedule.length<entries.length AND beyond.length>0, so the case actually triggers). green→green: fe validate:local EXIT 0, 664 pass
+  (+1). cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C362 (bug → #107: fastForwardPastNow left a bounded reminder ACTIVE when its endDate fell in the period straddling now)** — BALANCE: bug OVER budget
+  (last 358, starved-for 362−358=4 > budget 3) → forced pick. Vein dormant → 2-agent fan-out: (A) expense-split allocation/rounding, (B) reminder
+  trigger/materialization. (A) the agent's "duplicate vehicleId in a split not rejected → metrics inflated 100%" was DEBUNKED FIRSTHAND (C21/C60): a
+  v-1:$50 + v-1:$50 config on a $100 total stores two self-consistent legs; v-1's attributed total is $100 = exactly what the user split — NO double-count
+  beyond what was entered. A validation nicety, not a money-correctness defect → NOT fixed. (B) surfaced a CLEAN ATOMIC live defect → #107: fastForwardPastNow
+  (trigger-service.ts:273) checks `nextDue > endDate` only at the TOP of its `while (nextDue <= now)` loop — so the FINAL advance that steps nextDue PAST now
+  and exits is NEVER tested against endDate. A bounded reminder, lapsed past maxCatchUp (=12) into fast-forward, whose endDate lands in the period straddling
+  now (lastStep ≤ endDate < final nextDue) is written FORWARD of its endDate yet left is_active=1 → it fires AGAIN next trigger (the bug #12 family, on
+  fast-forward's exit boundary; the C25 in-loop fix didn't cover the exit). VERIFIED end-to-end firsthand: traced the maxCatchUp→fastForward handoff (:454)
+  + the reachable endDate window. FIX: mirror the in-loop guard ONCE after the loop, before the write — deactivate instead of advancing past endDate (+7 lines).
+  GUARD: +1 HTTP test (trigger-fastforward-enddate.test.ts) — a monthly bounded reminder with endDate≈now (lands in the straddling period, ≥ the last ≤now
+  step so the IN-loop guard never fires — exercises ONLY the exit guard) → is_active=0 after trigger. NON-VACUOUS (RED pre-fix: stays active). NOTE filed: the
+  insurance Property-1 test is FLAKY (non-fixed fast-check seed + a same-second endDate tiebreak + a tight 5s timeout — one full-suite run hit it, isolation
+  + re-run both GREEN); a future guard/infra cycle should pin the tiebreak deterministically + raise the timeout. green→green: be validate:local EXIT 0, 1455
+  pass (+1) / 0 fail (re-run clean). cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C363 (infra): killed the C362-filed FLAKE in insurance Property-1 (non-deterministic green-build floor)** — BALANCE: infra most-starved AT budget (last
+  357, starved-for 363−357=6 = budget) → pick. Of the two infra candidates (#5 branch-hygiene sweep + the C362-filed flaky test), took the flake — a
+  non-deterministic failure in the green-build FLOOR is exactly the harness debt infra exists to kill, and it's fresh. ROOT CAUSE (verified firsthand):
+  getCurrentTermDates is `ORDER BY end_date DESC LIMIT 1` — a SINGLE sort key — but the test's reference loop picked the latest term via strict `>` (keeps the
+  FIRST max). validTermInputArb derives endDate=startMs+gapMs, which can COLLIDE → two terms tie on end_date with different start_dates → SQL's arbitrary
+  tie-break disagrees with the loop on startDate → spurious failure; fast-check then SHRANK the false counterexample 47× against a real in-mem DB, blowing the
+  5s timeout (the "timed out" symptom was the shrink, not a hang). FIX (test-only, no product change): assert the REAL tie-tolerant contract — the returned
+  end_date IS the max, and the returned (start,end) pair belongs to SOME created term at that max (a real round-tripped row, not mangled) — + 20s timeout
+  headroom. Also +1 DETERMINISTIC tie test (two terms, SAME end / DIFFERENT start) that pins the tie-tolerant contract head-on (the exact shape that flaked).
+  STRESS-VERIFIED: insurance file 6× consecutive → 16 pass / 0 fail every run (was the 15-test file). green→green: be validate:local EXIT 0, 1456 pass (+2) /
+  0 fail. cov: be 86.25% (carry) / fe 84.17% (carry). Next infra: #5 branch-hygiene sweep (now most-starved cadence) ~C366; CLAUDE.md refresh ~C370.
+- **C364 (guard): pinned the REAL getVehicleDisplayName — fixed a C229 coverage-theater gap on a 12-site display helper** — BALANCE: nothing actionable over
+  budget; guard closest to budget (last 359, starved-for 364−359=5, budget 6) → highest-leverage pick. 2-agent fan-out for a genuinely-unpinned REACHABLE
+  invariant. The FE pick (verified firsthand, C21/C60): getVehicleDisplayName (vehicle-helpers.ts) is used across 8 components + 4 routes, yet its ONLY
+  "coverage" was VehicleManagement.test.ts:275 which RE-IMPLEMENTS the function as a local arrow and tests the COPY — never importing the real export (the
+  exact C229 coverage-theater anti-pattern CLAUDE.md warns about). So the load-bearing `!vehicle → 'Unknown Vehicle'` fallback was UNGUARDED — and it's
+  REACHABLE: a split expense / reminder / insurance term can outlive the vehicle it references (the #88/#97 deleted-vehicle family), and every consumer leans
+  on this helper to render a safe label instead of dereferencing .year on null. (Rejected the BE picks as lower-value: import-csv buildImportPlan ambiguity is
+  already pinned at the ROUTE level [#102, C344, import-csv.test.ts:332]; pagination hasMore is already property-tested; sync mixed-type is a thin HTTP nicety.)
+  +1 test file (vehicle-helpers.test.ts, 5 tests driving the REAL export): nickname-wins, year/make/model fallback, empty-nickname-falls-through, null +
+  undefined → 'Unknown Vehicle'. NON-VACUOUS. green→green: fe validate:local EXIT 0, 669 pass (+5) / 0 fail, tsc 0, build OK. cov: be 86.25% (carry) / fe
+  84.17%+ (carry).
+- **C365 (arch): extract odometerRepository.vehicleScope — ONE source of truth for the odometer tenant+vehicle predicate (6 sites → 1)** — BALANCE: arch AT
+  budget (last 360, starved-for 365−360=5 = budget) → most-starved actionable pick (feature over-budget but not loop-actionable). rule-7 fan-out (2 agents).
+  PICK (CONFIRMED firsthand, C21/C60): odometer/repository.ts repeated the raw-SQL tenant scope `vehicle_id = ${vehicleId} AND user_id = ${userId}` at SIX
+  sites — getHistory's data query (2 UNION legs) + its count query (2 subqueries) + getCurrentOdometer's MAX-UNION (2 legs). The #48/#52/C109 belt-and-braces
+  comments (46-49/82-84/143-144) manually plead "scope BOTH legs" — a divergent copy dropping user_id on ANY one leg = a cross-tenant history leak OR a
+  poisoned maintenance mileage trigger (design D2). Extracted `private vehicleScope(vehicleId, userId): ReturnType<typeof sql>` returning the scoped fragment,
+  routed all 6 (the expense legs keep their `AND mileage IS NOT NULL` suffix appended after the fragment). RULE-3 GREEN→GREEN VERIFIED FIRST: getCurrentOdometer
+  is comprehensively anchored (get-current-odometer.test.ts — both-source MAX, NULL-mileage exclusion, per-vehicle scope, AND the #48 userId cross-tenant test
+  at :129) + getHistory by odometer-history.property.test.ts — all pass UNCHANGED before AND after. Behavior-preserving (identical emitted SQL). Rejected the FE
+  calculateDaysUntil↔getDaysRemaining collapse (real but crosses 2 modules into a NEW file + the two differ in input type/name — thinner collapse, more churn;
+  deferred). validate:local EXIT 0, 1456 pass (unchanged). cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C366 (deep-review): vehicle-delete cascade + backup/restore round-trip audit → CERTIFIED CLEAN; +1 claim-survival data-safety guard** — BALANCE:
+  deep-review AT budget (last 361, starved-for 366−361=5 = budget) + bug also at budget; picked deep-review (broader value, surfaces the next bug). 2-agent
+  fan-out on under-audited NORTH_STAR #1 surfaces. (B) backup/restore: CERTIFIED CLEAN — all 15 tables round-trip, insert-order is FK-correct (parents before
+  children), validateReferentialIntegrity rejects dangling refs, the whole thing is one atomic transaction; symmetry pinned by backup/restore-table-coverage
+  guards. (A) vehicle-delete cascade: CERTIFIED CLEAN — every child table is correctly cascaded (financing/odometer/expenses/reminderVehicles/termVehicles
+  junctions) or set-null (insuranceClaims); photos manually cleaned pre-cascade (the no-FK string-link). Both known orphan findings (#88 split-reminder, #97
+  vehicle-less reminder) are ALREADY FILED + characterized. The agent's lone un-filed nit (non-transactional delete handler) is the documented best-effort
+  photo-cleanup pattern (photos has no FK → a mid-cleanup throw leaves orphan photo rows, not data loss; lower than a live bug + broader than one increment)
+  → NOTED, not fixed. THE genuinely-unpinned invariant → guard: insurance_claims.vehicleId is onDelete:'set null' (schema.ts:188), deliberately UNLIKE the
+  cascade FKs — a claim is a financial/legal record (payoutAmount/claimDate/status) belonging to its POLICY, so a vehicle delete must PRESERVE it with vehicleId
+  nulled, NOT destroy it (no silent loss). NOTHING pinned this; a regression flipping that FK to 'cascade' would silently wipe claim history on an unrelated
+  vehicle delete. +1 HTTP guard (vehicle-delete-cascade.test.ts): seed policy+claim→vehicleId, DELETE the vehicle, assert the claim SURVIVES with vehicle_id
+  NULL + policy_id + payout intact. NON-VACUOUS (cascade would null the whole row). green→green: be validate:local EXIT 0, 1457 pass (+1) / 0 fail. cov: be
+  86.25% (carry) / fe 84.17% (carry).
+- **C367 (bug → #108: buildSeasonalEfficiency inflated fillupCount by N for a split fuel fillup — the #56/#18/C97 split-sibling class)** — BALANCE: bug OVER
+  budget (last 362, starved-for 367−362=5 > budget 3) → forced pick. Vein dormant → 2-agent fan-out: (A) analytics chart-assembly, (B) photo/photoRef sync
+  worker. (B) the agent's "retryCount<3 cap → silent data loss" was DEBUNKED (C21/C60): a bounded retry is by-design, and the loss path requires deactivating
+  the PRIMARY provider AFTER the backup ref failed 3× — the #43/#44 fail-open family, already escalated → NOT a clean atomic bug. (A) surfaced a CLEAN ATOMIC
+  live defect → #108: buildSeasonalEfficiency (analytics-charts.ts:641) did `entry.fillupCount++` UNCONDITIONALLY per row. queryFuelExpenses (repository.ts:628)
+  selects ALL category='fuel' rows with NO volume filter, and a split fuel expense creates one sibling PER VEHICLE each with volume=null (createSiblings never
+  sets volume — VERIFIED firsthand: grep volume in split-service.ts = 0 hits). So a single split fillup inflated the season's fillupCount by N — the EXACT
+  #56/#18 row-overcount class, here on the seasonal-efficiency surface (fuel-advanced is a public endpoint). The fix already exists everywhere else:
+  computeAverageCosts (:434) + the fuel-stats COUNT (C97) restrict to `volume != null && volume > 0`. FIX: same isFillup guard before the count (+`continue` on
+  null/≤0 volume). GUARD: +2 (analytics-charts-unpinned.test.ts) — a split fillup (1 volume row + 2 null siblings) counts as 1 not 3; a zero-volume row counts
+  as 0. NON-VACUOUS (pre-fix = 3). green→green: be validate:local EXIT 0, 1459 pass (+2) / 0 fail. cov: be 86.25% (carry) / fe 84.17% (carry).
+- **C368 (infra): #5 branch-hygiene sweep + coverage re-measure (the overdue ~C361/C366 cadence)** — BALANCE: nothing over budget; infra closest (last 363,
+  starved-for 368−363=5, budget 6) + the #5 sweep was the overdue cadence → pick. SWEEP: working tree CLEAN — `git status` shows ONLY by-design untracked files
+  (the *.meshclaw.e2e.ts runtime specs that are untracked per quality-bar #5, .meshclaw-tools/, mise.local.toml, .kiro/specs/offline-entries/, e2e snapshots);
+  NO tracked-file drift, no stray modifications. Branch is 178 commits ahead of origin/main, purely claude-loop-dev off main (never touched main). COVERAGE
+  RE-MEASURED (the trend-rule duty, last full C351): be 86.68% line / 86.26% func (+0.43 line vs C351 — the C353–C367 BE arc held/nudged it up against product
+  growth); fe 84.45% line / 84.3% func / 76.43% branch (+0.28 line / +0.4 func — the C358/C364 FE guards held the line). Both GREEN, both creeping up, gap stable
+  ~2pts; 90% goal still structurally gated (BE DI/singleton+OAuth; FE eyes-on components/routes). Build floor GREEN both sides. The branch is genuinely PR-ready
+  and hasn't been flagged recently → ESCALATED to Angelo (rule 7). Docs-only cycle (no source/test touched → no build gate beyond the coverage runs, which were
+  EXIT 0). cov: be 86.68% / fe 84.45%. Next #5 sweep ~C373; CLAUDE.md refresh ~C370.
+- **C369 (guard): pin the PUT-claim termId cross-policy isolation guard (the unpinned leg of validateClaimRefs/#84)** — BALANCE: nothing over budget; guard
+  closest (last 364, starved-for 369−364=5, budget 6) → highest-leverage. 2-agent fan-out. DEBUNKED the BE agent's top "PUT vehicleId cross-tenant unpinned"
+  (C21/C60): it's ALREADY pinned (claims-http.test.ts:247). Its SIBLING was the real gap: validateClaimRefs (routes.ts:46) gates BOTH vehicleId-ownership AND
+  termId-on-this-policy, on create AND update — but only the CREATE termId leg (:210) + the UPDATE vehicleId leg (:247) were pinned; the UPDATE termId leg was
+  UNGUARDED. A claim re-pointed at a term on ANOTHER policy is a cross-policy referential-integrity violation (a claim belongs to its own policy's coverage).
+  +1 HTTP guard: seed a 2nd policy, PUT this policy's claim at the other policy's (valid-but-foreign) termId → 400 'term...'. NON-VACUOUS (a real foreign term
+  id, not a missing-id 400). Rejected the other picks: the updateClaimSchema empty-`{}` rejection (a no-op-defense nicety, not a correctness/isolation
+  invariant); the FE formatRelativeTime/shouldTriggerRecurring boundary nits (already representatively tested — boundary-only adds were thin). green→green: be
+  validate:local EXIT 0, 1460 pass (+1) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C370 (arch): route expense-form-validation's 3 hand-built local-date strings onto the canonical toDateInputValue (3 sites → 1)** — BALANCE: arch AT budget
+  (last 365, starved-for 370−365=5 = budget) → most-starved actionable pick. rule-7 fan-out. PICK (CONFIRMED firsthand, C21/C60): expense-form-validation.ts
+  built a local `YYYY-MM-DD` string `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` BYTE-IDENTICAL at 3
+  sites (future-date check :44, mileage-ordering entriesBefore :103, entriesAfter :116) — while the file ALREADY imports toDateInputValue (:2) and ALREADY uses
+  it at :96. toDateInputValue (formatters.ts:97) is BYTE-EQUIVALENT (same parts + padStart) AND is the #87 timezone-fix locus (reads LOCAL calendar parts so a
+  dateOnlyToISO noon-local round-trip is exact in every tz). A divergent hand-built copy silently re-introduces the UTC-midnight #87/#6/#61 bug class on the
+  date-validation surface. Routed all 3 onto toDateInputValue (the 2 mileage sites keep their `new Date(exp.date)` then pass it; the helper takes Date|string).
+  Behavior-preserving (byte-equivalent). RULE-3 GREEN→GREEN: expense-form-validation-date.test.ts pins the date-format + mileage ordering — pass UNCHANGED
+  before AND after. Rejected: the BE analytics `new Date(range.start*1000)` ×3 (a 2-line mechanical pair, thinner payoff); the FE dead calculateDaysUntil delete
+  (deferred — deleting a tested export is lower-value than collapsing a live triplicate onto the canonical, #87-critical helper). fe validate:local EXIT 0, 669
+  pass (unchanged). cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C371 (bug → NO new defect; CERTIFIED CLEAN + pinned the unpinned multi-tag import round-trip)** — BALANCE: bug OVER budget (last 367, starved-for
+  371−367=4 > budget 3) → forced pick. Vein dormant → 2-agent fan-out: (A) cross-vehicle/fleet analytics, (B) CSV-import value parsing. BOTH agent "bugs"
+  DEBUNKED firsthand (C21/C60): (A) "buildMonthlyConsumption pools volume without per-vehicle unit conversion" IS the already-filed #94 class (the SUMMARY/
+  fuel-stats builders pool distance/volume/efficiency unconverted — escalated C328; getCrossVehicle's convertDistance-per-vehicle is the correct contrast). NOT
+  new. (B) "parseTags should REJECT a tag containing ;/," is BY-DESIGN-WRONG: the exporter JOINS tags with '; ' and import SPLITS on /[;,]/ — a delimiter in a
+  cell is ALWAYS a separator (and #104/C352 already bars a tag from CONTAINING ;/, at the write boundary), so the proposed "reject" would BREAK normal multi-tag
+  import. NOT a bug. THE genuinely-unpinned reachable invariant → pin (dormant-vein protocol, no manufacture): the round-trip test imported a `road; trip` cell
+  but only asserted AMOUNTS — the tags ARRAY parseTags produces was never verified (listExpenses doesn't even return tags). +1 HTTP guard (import-csv.test.ts):
+  `road; trip; toll` → ['road','trip','toll'] (semicolon split+trim); quoted `"errand,grocery"` → ['errand','grocery'] (comma split). Reads tags off sqlite.
+  NON-VACUOUS (a narrowed split merges two tags). green→green: be validate:local EXIT 0, 1461 pass (+1) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C372 (deep-review → #109: updateExpenseSchema dropped the both-or-neither sourceType/sourceId refine — a PUT could persist an asymmetric source link)** —
+  BALANCE: deep-review OVER budget (last 366, starved-for 372−366=6 > budget 5) → forced pick. 2-agent fan-out: (A) auth/session/ownership, (B) expense
+  create/update write-path. (A) CERTIFIED CLEAN — comprehensive firsthand cross-tenant verification: every CRUD route requireAuth-gated + userId-scoped, PUT
+  vehicle-reassign re-validates ownership, 404 (not 200) for not-owned (no enumeration), Lucia session lifecycle sound, cross-tenant-idor.test.ts (7 tests)
+  passes. (B) surfaced a CLEAN ATOMIC live defect → #109: createExpenseSchema has a both-or-neither sourceType/sourceId .refine() (routes.ts:115), but
+  updateExpenseSchema (:131) does NOT — `.refine()` does NOT survive `.partial()`/`.omit()` re-derivation and was never re-added. VERIFIED firsthand (C21/C60):
+  sourceType (z.literal('financing').optional()) + sourceId are client-settable on PUT (only clientId is omitted), and the handler passes the parsed body
+  straight to expenseRepository.update — so `PUT {sourceId:'fin-x'}` (no type) or `PUT {sourceType:'financing'}` (no id) persists an ASYMMETRIC link (the
+  #62/#34 within-tenant integrity class: skews source-bucketed analytics + a half-link with a real sourceId mis-/never-triggers the financing cascade-delete
+  cleanup). FIX: re-add the same both-or-neither refine to updateExpenseSchema. GUARD: +3 (expense-source-traceability.test.ts) — PUT only-sourceId → 400,
+  PUT only-sourceType → 400, PUT neither (normal edit) → 200 (not over-broad). NON-VACUOUS. green→green: be validate:local EXIT 0, 1464 pass (+3) / 0 fail. cov:
+  be 86.68% (carry) / fe 84.45% (carry).
+- **C373 (infra): CLAUDE.md full orientation refresh (the overdue ~C370 cadence; last full C357)** — BALANCE: nothing over budget; infra closest (last 368,
+  starved-for 373−368=5, budget 6) + the CLAUDE.md refresh was the overdue cadence → pick. Read the drift-prone sections vs source/LEDGER (no churn — the
+  C5/C47/C72 discipline). FIXED the two MATERIAL drifts: (1) the coverage line cited the C351 reading (86.25/86.67 · 84.17/83.9/76.32) → updated to the C368
+  re-measure (be 86.68/86.26 · fe 84.45/84.3/76.43) + the "creeping UP, not flat" framing + the structural-gate note; (2) suite size ~1454/659 + the C345–C356
+  arc → ~1464/669 + the C358–C372 arc (the #106–#109 fix guards, C363 flake-kill, C364 coverage-theater fix, C366 claim-survival, C369 cross-policy, C371
+  multi-tag). The closed-bug list (through #109/C372) + the pending-Angelo block (#88/#94/#97/#98/#100) + testing-infra/open-gaps were VERIFIED accurate inline
+  — no change. Docs-only; no source/test/build touched → no build gate (the C309/C316/C322/C357 refresh pattern). Next CLAUDE.md refresh ~C383; next #5 sweep
+  ~C378. cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C374 (bug → #110: calculateLeaseMetrics no-endDate fallback used termMonths×30 days, not calendar months → over-reported the excess fee)** — BALANCE: bug
+  AT budget (last 371, starved-for 374−371=3 = budget, tightest) → pick. Vein dormant → 2-agent fan-out: (A) lease-metrics/financing projection, (B)
+  settings/preferences merge. (B) the agent's "orphaned unowned provider persists after backupConfig merge" was DEBUNKED firsthand (C21/C60): a provider can't
+  become unowned without a delete (which runs cleanupBackupConfig), so the orphan needs a delete-vs-PUT race on stale prefs — that's the filed #100
+  un-serialized read-modify-write family, NOT new (real but: storageConfig validates the MERGED result while backupConfig validates only INCOMING — a hardening
+  inconsistency, noted not fixed). (A) surfaced a CLEAN ATOMIC live defect → #110: calculateLeaseMetrics (financing-calculations.ts:430) derived a missing
+  endDate as `startDate + termMonths × 30 × dayMs`. endDate is NULLABLE (schema.ts:95 no notNull; FE type endDate?), so a lease stored without an explicit end
+  hits this — and ×30 runs ~0.4 days short PER month (a 36-mo lease ended ~16 days / half a month early), understating daysRemaining → inflating the milesPerDay
+  burn rate → OVER-reporting the projected excess-mileage FEE (money-facing, NORTH_STAR #1). FIX: derive via addMonthsClamped(startDate, termMonths) — real
+  CALENDAR months, the same helper calculatePayoffDate (:254) already uses, so a no-endDate lease + an explicit payoff agree. GUARD: +1 (lease-metrics.test.ts)
+  — a no-endDate 36-mo lease's daysRemaining matches the calendar-month end (±1) AND is strictly > 36×30=1080. NON-VACUOUS (the ×30 fallback fails the >1080
+  assertion). green→green: fe validate:local EXIT 0, 670 pass (+1) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C375 (guard): pin the reminder refineDateRange `endDate === startDate` equality boundary (the `<=`-not-`<` load-bearing case)** — BALANCE: guard AT budget
+  (last 369, starved-for 375−369=6 = budget) → most-starved actionable pick (arch also at budget, ticks to forced next cycle). 2-agent fan-out. PICK (verified
+  firsthand, C21/C60): refineDateRange (reminders/validation.ts:124) rejects a reminder when `endDate <= startDate` — but reminder-refinements.test.ts only
+  covers strictly-after (ok) + strictly-before (fail), NOT the EQUALITY boundary. The `<=` (vs `<`) is load-bearing: a regression to `<` would silently ACCEPT a
+  zero-duration start==end reminder (fires its start period then immediately deactivates). +1 test: endDate EQUAL startDate → fails with 'endDate must be after
+  startDate'. NON-VACUOUS (a `<` would pass it). Rejected the other picks: FE getCategoryColor bogus-fallback already pinned (expense-category-maps.test.ts,
+  confirmed C370/C234); FE getLatestTerm/sortTermsByEndDateDesc tiebreak a low-stakes determinism nit; BE photo-ref retryCount===3 the by-design cap (C367, +
+  needs a mock); reminder is the cleanest pure-schema reachable boundary. green→green: be validate:local EXIT 0, 1465 pass (+1) / 0 fail. cov: be 86.68%
+  (carry) / fe 84.45% (carry).
+- **C377 (deep-review → #111: ExpenseForm error-fallback offline-save DROPPED missedFillup — #101 re-occurring at the sibling call site)** — BALANCE:
+  deep-review AT budget (last 372, starved-for 377−372=5 = budget) + bug also at budget; picked deep-review (broader, surfaces the next bug). 2-agent fan-out:
+  (A) offline outbox sync, (B) photo upload/serve. (B) CERTIFIED CLEAN — every photo route ownership-scoped (validateEntityOwnership) + nosniff'd + mime/size-
+  gated; #74/#77/#78 confirmed fixed+guarded. (A) surfaced a CLEAN ATOMIC live defect → #111: ExpenseForm saves offline from TWO sites — the offline-first path
+  (:579, carries fuelType+missedFillup, the #66+#101 fixes) AND the error-fallback path (:624, online-create throws → catch → save offline). The error-fallback
+  addOfflineExpense (:635) carried fuelType but OMITTED missedFillup — the #101 fix landed on the offline-first path ONLY. VERIFIED firsthand (C21/C60):
+  expenseData.missedFillup is built at :621 but never spread into the :624 call. So a fuel fill-up logged with "missed previous" checked during an online-create
+  FAILURE (timeout/5xx) drops the flag → calculateAverageMpg pairs across the gap → garbage MPG (NORTH_STAR #1). FIX: add the missedFillup spread at :635,
+  mirroring :592. GUARD: the mapper side is pinned (C347) but can't catch a field the CALL SITE never adds + the catch path is Playwright-gated (C229 trap) →
+  +1 SOURCE-SCAN (offline-save-carries-fuel-fields.test.ts, 3 tests): extract every addOfflineExpense({...}) body, assert BOTH sites carry missedFillup AND
+  fuelType (+ the scan-is-live count). Merge-surviving, pins the whole #66/#101/#111 dropout class at the call-site layer. NON-VACUOUS (pre-fix the
+  missedFillup test RED). green→green: fe validate:local EXIT 0, 673 pass (+3) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C378 (bug → NO new defect; CERTIFIED CLEAN + pinned the costPerMile cost/miles-consistency invariant)** — BALANCE: bug OVER budget (last 374, starved-for
+  378−374=4 > budget 3) → forced pick. Vein dormant → 2-agent fan-out: (A) vehicle-stats cost-per-period rollup, (B) sync-manager conflict classification. BOTH
+  "bugs" DEBUNKED firsthand (C21/C60): (A) "costPerMile includes untracked charge cost" is BY-DESIGN-CORRECT — costPerMile = (fuelCost+chargeCost)/totalMileage
+  has a CONSISTENT numerator+denominator (both span all mileage rows); trackCharging gates the EFFICIENCY display (mi/kWh), NOT cost. The agent's "fix" (drop
+  charge cost, keep charge miles) would UNDER-report real spend — a worse bug. (B) "tagsMatch partial-overlap → silent drop" is NOT data loss: a 'duplicate'
+  classification is surfaced via syncConflicts→SyncConflictResolver.svelte for the USER to resolve (keep_local/keep_server/merge); conflictType only changes
+  the displayed LABEL, the local is preserved either way → cosmetic imprecision, not a defect. THE genuinely-unpinned reachable invariant → pinned (dormant-vein
+  protocol, no manufacture): vehicle-stats.property.test.ts pins totals partition (P4), flag gating (P5), MPG/mi-kWh isolation (P6) — but NOT that costPerMile is
+  the consistent total-energy/total-miles ratio INDEPENDENT of the flags (the exact invariant the agent's "fix" would break). +1 (Property 7 in the C353 mixed
+  block): costPerMile == (fuelCost+chargeCost)/20060, IDENTICAL across all 4 trackFuel/trackCharging combos. NON-VACUOUS (flag-gating the cost would fail the
+  cross-combo equality). green→green: be validate:local EXIT 0, 1466 pass (+1) / 0 fail. cov: be 86.68% (carry) / fe 84.45% (carry).
+- **C376 (arch): extract assertVehiclesOwned — ONE source of truth for the cross-tenant vehicle-ownership query (2 repos → 1)** — BALANCE: arch OVER budget
+  (last 370, starved-for 376−370=6 > budget 5) → forced pick. rule-7 fan-out (2 agents). PICK (CONFIRMED firsthand, C21/C60): the expense split repo
+  (repository.ts:611) and the insurance repo (repository.ts:103) each ran a private validateVehicleOwnership doing the BYTE-IDENTICAL core `select id from
+  vehicles where userId AND id IN (ids)` → throw NotFoundError if any unowned. Verified behavior-equivalent (empty→no-op both; dupes: Set-membership ==
+  dedup+length; missing: both throw). Differences were only the splitConfig-extraction (expenses) + the dbOrTx tx-handle (insurance term writes run in a tx).
+  This is the C109 cross-tenant auth boundary — a divergent copy dropping the userId leg = another user's vehicle into a split allocation or insurance term
+  (a money/coverage cross-tenant write). Extracted `assertVehiclesOwned(handle, vehicleIds, userId)` into a NEW dependency-free utils/vehicle-ownership.ts
+  (zero repo imports → no cycle); both privates delegate (expenses keeps its config-extraction + passes this.db; insurance keeps its dbOrTx signature).
+  Deliberately did NOT route through the existing validateVehicleIdsOwned — it throws ValidationError, NOT NotFoundError, so reusing it would CHANGE the
+  observable error (arch rule 2 violation). Behavior-preserving (NotFoundError + empty/dupe/missing semantics identical). Test-anchored: the split + insurance
+  ownership property/HTTP suites drive both call sites — GREEN before AND after. validate:local EXIT 0, 1465 pass (unchanged). Rejected the FE dead
+  calculateDaysUntil delete (twice-deferred — deleting a tested export is lower-value than collapsing a live cross-tenant-boundary duplicate). cov: be 86.68%
+  (carry) / fe 84.45% (carry).
+- **C379 (infra): #5 branch-hygiene sweep + coverage re-measure (the C368 cadence, ~due)** — BALANCE: infra AT budget (last 373, starved-for 379−373=6 =
+  budget) → most-starved actionable pick. SWEEP: working tree CLEAN — `git status` shows ONLY by-design untracked files (the *.meshclaw.e2e.ts runtime specs
+  untracked per quality-bar #5, .meshclaw-tools/, mise.local.toml, .kiro/specs/offline-entries/, e2e snapshots); NO tracked-file drift. Branch is 189 commits
+  ahead of origin/main, purely claude-loop-dev off main. COVERAGE RE-MEASURED (last C368): be 86.79% line / 86.39% func (+0.11 line — the C369/C372/C376 BE
+  additions); fe 84.39% line / 84.3% func / 76.53% branch (~flat vs C368's 84.45/84.3/76.43 — the C374/C377 FE guards held the line as components grew). Both
+  GREEN, flat-to-up, gap stable ~2.4pts; 90% goal still structurally gated (BE DI/singleton + OAuth; FE eyes-on components/routes). Build floor GREEN both sides.
+  PR-readiness was escalated C368 (standing, open) — NOT re-spammed (no new decision needed; the loop keeps improving the reachable remainder). Docs-only cycle
+  (no source/test touched → no build gate beyond the coverage runs, both EXIT 0). cov: be 86.79% / fe 84.39%. Next #5 sweep ~C384; CLAUDE.md refresh ~C383.
+- **C380 (guard): pin the buildSummary singular/plural month rendering (the formatMonths `=== 1` boundary, via the public API)** — BALANCE: nothing over budget;
+  guard closest (last 375, starved-for 380−375=5, budget 6) → highest-leverage. 2-agent fan-out. DEBUNKED 2 picks firsthand (C21/C60): FE isElectricFuelType is
+  NOT untested — it's used as the ORACLE in api-transformer.property.test.ts (:160, the test calls it to decide the expected branch), so it's load-bearing-tested,
+  not unpinned; the BE analytics date-range startDate>endDate case is thin characterization (would need a behavior CHANGE to 400, not a guard). PICK (verified
+  firsthand): buildSummary (payment-planner.ts:113) renders monthsSaved via the private formatMonths, which pluralizes on `months === 1` ("1 month" vs "N
+  months"). Property 6 pins the summary STRUCTURE (contains "vs minimum" etc.) but NEVER the singular/plural rendering — a regression dropping the `=== 1`
+  branch silently emits "saves 1 months" (a visible grammar bug on the planner card). +2 tests via the PUBLIC buildSummary (the helper isn't exported):
+  monthsSaved=1 → contains '1 month' AND not '1 months' (the load-bearing boundary — '1 month' is a substring of '1 months', so the not-contains distinguishes
+  them); monthsSaved=2 → '2 months'. NON-VACUOUS. green→green: fe validate:local EXIT 0, 675 pass (+2) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C381 (arch): extract ExpenseRepository.sourceScope — ONE source of truth for the source-linked-expense tenant predicate (4 sites → 1)** — BALANCE: arch AT
+  budget (last 376, starved-for 381−376=5 = budget) → most-starved actionable pick. rule-7 fan-out. PICK (CONFIRMED firsthand, C21/C60): the triple-predicate
+  `and(eq(sourceType), eq(sourceId), eq(userId))` was BYTE-IDENTICAL at 4 sites in expenses/repository.ts — findBySource (:185), deleteBySource's read (:538)
+  AND its destructive delete-write (:557), clearSource's update (:585). These act on AUTO-MATERIALIZED expenses (reminder/insurance/financing cascade cleanup),
+  so a divergent copy dropping the userId leg = one user's source-entity delete/deactivate wiping or nulling ANOTHER user's expenses (a cross-tenant destructive
+  write, the C109/#57/#62 class; 2 of the 4 sites ARE destructive). Extracted `private sourceScope(sourceType, sourceId, userId): SQL | undefined` (the existing
+  SQL import from groupOwnedBy C360), routed all 4. Behavior-preserving (identical emitted SQL). RULE-3 GREEN→GREEN: delete-reminder-cascade +
+  premium-expense-hook + financing-deactivate-hook + refinance-balance-reset drive deleteBySource/clearSource/findBySource across all three source paths —
+  GREEN before AND after. validate:local EXIT 0, 1466 pass (unchanged). Rejected the FE dead calculateDaysUntil delete (thrice-deferred — deleting a tested
+  export < collapsing a live 4-site cross-tenant-boundary duplicate, 2 destructive). cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C382 (deep-review): insurance premium-materialization + financing lifecycle audit → BOTH CERTIFIED CLEAN; +1 non-even-split materialization guard** —
+  BALANCE: deep-review AT budget (last 377, starved-for 382−377=5 = budget) + bug over budget; picked deep-review (broader, and bug stays forced next cycle
+  regardless). 2-agent fan-out. (B) financing create-or-replace / refinance / payoff CERTIFIED CLEAN — type-change field reset (#90/C293), refinance-reactivation
+  (#67/C206), balance=max(0, original−SUM) clamped + single computeBalances source (C332), deactivateFinancing single-call-site (C343), inactive excluded from
+  analytics — all verified firsthand + guarded. (A) insurance premium materialization CERTIFIED CLEAN — totalCost split via the integer-cents largest-remainder
+  algorithm (exact to the cent), re-materialize-on-edit deletes+recreates (no double-count), #57 orphan-cleanup FIXED, zero-vehicle/zero-cost/empty-update
+  handled. THE genuinely-unpinned invariant → guard: the existing premium test uses 1200/2=600 (EVEN), so the REMAINDER-distribution path (legs not all equal but
+  MUST sum exactly to the total) was unpinned at the HTTP/materialization layer (the pure algorithm is property-tested, but not the insurance term→expense
+  round-trip). +1 HTTP guard (premium-expense-hook.test.ts): a $100/3 premium → 3 legs summing to EXACTLY 10000 cents, distributed [3333,3333,3334]. NON-VACUOUS
+  (a lost/invented cent fails the exact-cents sum). green→green: be validate:local EXIT 0, 1467 pass (+1) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C383 (bug): CSV export CERTIFIED CLEAN; #112 found but DESIGN-GATED (escalated); pinned the full export→import round-trip crown jewel** — BALANCE: bug OVER
+  budget (last 378, starved-for 383−378=5 > budget 3) → forced pick. 2-agent fan-out: (A) CSV export, (B) FE chart-data assembly. (A) export→import CERTIFIED
+  CLEAN — every field round-trips (date ISO, vehicle-by-name, category case-insensitive, amount unquoted-number, mileage/volume null↔'', fuelType/description
+  formula-injection-guarded, tags '; '-join↔/[;,]/-split, missedFillup true/false, currency+createdAt export-only). (B) surfaced #112: CrossVehicleTab assigns
+  series colors via `CHART_COLORS[i % 5]` but the design system defines only 5 --chart-N tokens → a 6th vehicle reuses --chart-1 (two lines same color, chart
+  misleading). VERIFIED firsthand (C21/C60): reachable (VROOM is multi-vehicle; #94's fleet has 6). But the modulo is the CORRECT way to cycle a bounded palette
+  — the fix is a DESIGN call (extend palette / generate hues / accept), so ESCALATED to Angelo, NOT self-invented colors (the #36/#37/#88/#94 product-gated
+  pattern). THE genuinely-unpinned invariant → pinned (no clean self-fixable defect this cycle): export-csv pins the export SHAPE + import-csv pins individual
+  fields, but NOTHING drove a create→EXPORT→import→re-read asserting EVERY field survives together — the NORTH_STAR #1 crown jewel. +1 HTTP guard
+  (import-csv.test.ts): a fully-populated fuel expense create→export→WIPE→import → all 10 fields intact (incl. vehicleId-resolved-by-name, tags array,
+  missedFillup=1, calendar day). NON-VACUOUS (any field's export-serialize OR import-parse regression turns it RED). green→green: be validate:local EXIT 0, 1468
+  pass (+1) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C384 (infra): CLAUDE.md full orientation refresh (the overdue ~C383 cadence; last full C373)** — BALANCE: nothing over budget; infra closest (last 379,
+  starved-for 384−379=5, budget 6) + the CLAUDE.md refresh was the overdue cadence → pick. Read the drift-prone sections vs source/LEDGER (no churn — C5/C47/C72
+  discipline). FIXED the two MATERIAL drifts: (1) the coverage line cited the C368 reading → updated to the C379 re-measure (be 86.79/86.39 · fe 84.39/84.3/76.53)
+  + the C353–C382 arc framing + ~2.4pt gap; (2) suite size ~1464/669 + the C358–C372 arc → ~1468/675 + the C373–C383 arc (the #110 fix + C375/C380/C382/C383
+  guards). Also ADDED #112 (the C383 chart-palette-collision, DESIGN-gated) to the pending-Angelo escalation list. The closed-bug list correctly ends at #111/C377
+  (#112 is escalated, NOT closed — verified, left as-is); testing-infra/open-gaps sections current. Docs-only; no source/test/build touched → no build gate (the
+  C309/C357/C373 refresh pattern). Next CLAUDE.md refresh ~C394; next #5 sweep ~C384-ish (just did C379, so ~C390). cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C385 (guard): pin buildLocalDate's out-of-range-hour rejection (the foreign-import time-parse path) + document the same-day-wrap partial coverage** —
+  BALANCE: nothing over budget; guard closest (last 380, starved-for 385−380=5, budget 6) → highest-leverage. 2-agent fan-out. DEBUNKED the FE pick firsthand
+  (C21/C60): buildQueryString is NOT untested — reminder-api.test.ts:176 pins "isActive=false MUST survive" asserting `?isActive=false` end-to-end through the
+  wrapper, exercising the `!= null`-not-truthiness distinction (the agent only grepped for an *api-utils* test FILE + missed the wrapper coverage). PICK (verified
+  firsthand): buildLocalDate (local-date.ts) echo-checks Y/M/D but NOT hh/mm/ss; normalizeForeignDate (import-mapping.ts:192) parses a foreign CSV time segment
+  with a bare `parseInt || 0` (no range clamp), so a malformed cell "2024-03-15 25:00:00" feeds hh=25 here. The EXISTING date echo-check INCIDENTALLY rejects an
+  hour that rolls the DAY forward (hh≥24 → getDate() mismatch → null) — a reachable, correct, UNPINNED invariant. +2 guards (hh=25, hh=48 → null). Also pinned
+  the KNOWN partial coverage honestly: a same-day time wrap (mm=90 → 13:30 same date) is ACCEPTED — by design, since expense analytics bucket by day/month not
+  hour, so a wrapped minute can't corrupt a chart; +1 test documents the current behavior (date intact) so the gap is explicit + a future change is conscious,
+  not coverage-theater. NON-VACUOUS (a Y/M-only echo-check loosening would import day-shifted foreign rows → RED). green→green: be validate:local EXIT 0, 1470
+  pass (+3) / 0 fail. cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C386 (arch): extract monthsBetween — ONE source of truth for the calendar-month-diff in two analytics money denominators (2 sites → 1)** — BALANCE: arch
+  AT budget (last 381, starved-for 386−381=5 = budget) → most-starved actionable pick. rule-7 fan-out. PICK (CONFIRMED firsthand, C21/C60): the month-diff
+  expression `(now.getFullYear()−X.getFullYear())*12 + (now.getMonth()−X.getMonth())` was BYTE-IDENTICAL at 2 analytics money-paths — the financing monthsElapsed
+  (repository.ts:836, → monthsRemaining) and the all-time TCO ownershipMonths (:1891, → costPerMonth = total/months). The two wrap it in DIFFERENT clamps
+  (Math.max(0,…) vs Math.max(1,…)), so the shared part is the unclamped month-diff. A divergent copy (a dropped `*12`, a flipped subtraction) would skew one
+  money denominator against the other. Extracted `monthsBetween(from, to)` as a sibling to the existing monthsOwnedInYear/toDate (C121/C194) pure date-math
+  helpers; callers keep their own clamp. Behavior-preserving (identical computation). RULE-3 GREEN→GREEN: per-vehicle.property.test.ts (monthsRemaining +
+  costPerMonth) + vehicle-tco-zero-state.test.ts (the ≥1 clamp) drive both sites — GREEN before AND after. validate:local EXIT 0, 1470 pass (unchanged). Rejected
+  the FE dead calculateDaysUntil delete (4×-deferred — deleting a TESTED export is net-negative coverage vs collapsing a live money-denominator dup). cov: be
+  86.79% (carry) / fe 84.39% (carry).
+- **C388 (deep-review): dashboard quick-stats + expense-list pagination/filter audit → BOTH CERTIFIED CLEAN (docs-only, no manufactured test)** — BALANCE:
+  deep-review OVER budget (last 382, starved-for 388−382=6 > budget 5) → forced pick. 2-agent fan-out on two heavily-used-but-this-cycle-unaudited surfaces.
+  (A) dashboard quick-stats/getSummary CLEAN — every known issue already FILED (#94 fleet unit-pooling, #85 This/Last-Year range) or FIXED (#86 This/Last-Month
+  year-scope C262); div-by-zero/NaN/precision guards present + property-tested; summary↔per-method equivalence pinned. (B) expense-list pagination+filter CLEAN
+  — VERIFIED firsthand: the id-tiebreaker makes the sort fully deterministic (no drop/dup across pages, sort-paginated.test.ts:122 = 30 tied rows → 30 unique),
+  hasMore = `offset + data.length < totalCount` (pagination.ts:53, strict < — correct at the exact boundary, spot-checked firsthand), list↔CSV-export share
+  buildExpenseConditions (date-range-boundary.test.ts pins list==export), tag-AND via json_each, LIKE-metachar escape (#41), endOfDayIfDateOnly endDate-inclusive,
+  EXPENSE_SORT_COLUMNS allowlist (no injection) — all already pinned. NO reachable defect, NO genuinely-unpinned invariant on either surface (both comprehensively
+  guarded — the named tests cover every edge). Per the dormant-vein protocol, recorded a CERTIFICATION (docs-only) rather than manufacture a redundant test
+  (coverage-theater) — the vein is genuinely dry on these two surfaces. No source/test/build touched → no build gate. cov: be 86.79% (carry) / fe 84.39% (carry).
+- **C387 (bug): reminder mark-serviced CERTIFIED CLEAN; provider cross-tenant claim DEBUNKED firsthand (ARCC-consulted); pinned the backup-provider tenant-
+  isolation invariant** — BALANCE: bug OVER budget (last 383, starved-for 387−383=4 > budget 3) → forced pick. 2-agent fan-out: (A) reminder mark-serviced
+  re-arm, (B) provider credential resolution. (A) CERTIFIED CLEAN — both axes re-arm correctly (mileage anchors to getCurrentOdometer, time advances via the
+  while-loop to first FUTURE occurrence [#83/C241], both-axes independent + atomic), defensively guarded. (B) the agent's "crafted cross-tenant PhotoRef →
+  getProviderInternal decrypts another user's credentials" — domain = CREDENTIALS + cross-tenant → queried ARCC FIRST (SAX-05 Outcome-2 Data-Processing-
+  Isolation: confirms "missing tenant validation in background jobs" is a real pitfall). Then VERIFIED FIRSTHAND (C21/C60): the premise is FALSE — both real
+  photo_ref creation sites derive providerId from the AUTHENTICATED user's OWN providers (photo-service.ts:144 getBackupProviders(userId,…) routes through
+  findOwnedProvider/C348 userId-scoped + skips non-owned/inactive; routes.ts:562 uses the just-created owned provider). No app path supplies a client-controlled
+  or cross-tenant providerId → every ref is co-owned with its photo by construction → getProviderInternal's id-only lookup (explicitly @internal "where userId is
+  unavailable") is safe. The "attacker inserts a PhotoRef" needs direct DB write = out of threat model. NOT a reachable defect. THE genuinely-unpinned invariant
+  → pinned (the actual safety property): getBackupProviders SKIPS a config-listed provider whose row isn't owned by the user. +1 guard (registry.test.ts):
+  a 'provider-foreign' in storageConfig whose findOwnedProvider → [] yields 0 backup targets. NON-VACUOUS. ARCC-grounded defense-in-depth note filed (a sync-
+  worker co-ownership assertion = an architecture change, not self-fixed). green→green: be validate:local EXIT 0, 1471 pass (+1) / 0 fail. cov: be 86.79%
+  (carry) / fe 84.39% (carry).
+- **C389 (infra): #5 branch-hygiene sweep + coverage re-measure (infra most-starved; the C379 cadence)** — BALANCE: nothing over budget; infra most-starved
+  (last 384, starved-for 389−384=5, budget 6) → pick (the #5 sweep one cycle early, but infra is the most-starved actionable category). SWEEP: working tree
+  CLEAN — only by-design untracked files (the *.meshclaw.e2e.ts runtime specs per quality-bar #5, .meshclaw-tools/, mise.local.toml, .kiro/specs/offline-entries/,
+  e2e snapshots); NO tracked-file drift. Branch 199 commits ahead of origin/main, purely claude-loop-dev off main. COVERAGE RE-MEASURED (last C379): be 86.78%
+  line / 86.39% func (~FLAT vs C379's 86.79/86.39 — C385/C387 added guards, C386 was a behavior-preserving extract, no product code grew); fe 84.39% line /
+  84.3% func / 76.63% branch (line flat vs C379's 84.39, branch +0.1 — the C380 month-plural guard). Both GREEN, flat-to-up, gap stable ~2.4pts; 90% goal still
+  structurally gated. Build floor GREEN both sides. PR-readiness escalated C368 (standing, open) — NOT re-spammed. Docs-only cycle (no source/test touched → no
+  build gate beyond the coverage runs, both EXIT 0). cov: be 86.78% / fe 84.39%. Next #5 sweep ~C399; next CLAUDE.md refresh ~C394.
+- **C390 (bug → #113: buildDayOfWeekPatterns overcounted fillupCount + skewed avgCost/avgVolume for a split fuel fillup — the #108 sibling builder)** — BALANCE:
+  bug AT budget (last 387, starved-for 390−387=3 = budget, tightest) → pick. Vein dormant → 2-agent fan-out: (A) restore round-trip, (B) fuel-advanced builders.
+  (B) surfaced a CLEAN ATOMIC live defect → #113: buildDayOfWeekPatterns (analytics-charts.ts:803) did `entry.count++` UNCONDITIONALLY per row + divides
+  avgCost/avgVolume by that count (:814-815). A split fuel expense creates one sibling PER VEHICLE with volume=null (queryFuelExpenses has no volume filter), so a
+  single split fillup inflated the day's fillupCount by N AND skewed avgVolume (totalGallons/N, e.g. 12/3=4 not 12) + avgCost (per-row not per-fillup) — the EXACT
+  #108 class buildSeasonalEfficiency already guards at :644 (the C367 fix), missed on this sibling. FIX: same volume-bearing guard (`continue` on null/≤0). +2
+  guards (split fillup → 1 fillup, real avg; zero-volume → 0). VERIFIED firsthand (C21/C60). (A) the agent's "restore photoRefs cross-tenant provider" is a real
+  defense-in-depth gap (restore.ts:525 validates providerIds without a userId scope) BUT requires a TAMPERED backup ZIP (the app never writes a cross-tenant
+  providerId — same threat class as the C339/C387 notes) → NOTED for a future hardening cycle (ARCC/credentials-adjacent), not the clean within-app defect this
+  cycle. green→green: be validate:local EXIT 0, 1473 pass (+2) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C391 (guard): complete the #108/#113 split-sibling SWEEP of the fuel-advanced builder family + pin buildFillupIntervals' same-date safety** — BALANCE: guard
+  AT budget (last 385, starved-for 391−385=6 = budget; arch also at budget but ticks forced next) → pick. Followed up the C390 flag (the remaining siblings may
+  share the overcount). SWEEP (all 4 builders verified firsthand, C21/C60): buildSeasonalEfficiency = guarded (#108/C367); buildDayOfWeekPatterns = was the bug
+  (#113/C390); buildFillupIntervals = SAFE (accumulateIntervalBuckets' `days <= 0 → continue` at :893 drops a same-date split pair); buildVehicleRadar = SAFE (its
+  fuel axis goes through computePerVehicleFuelEfficiency→computeEfficiencyPoint, which null-guards volume :120 + mileage :116, and its cost axis SUMS expenseAmount
+  which is correct per-leg like costPerMile/C378). So the family is FULLY audited — only the 2 count-based builders were vulnerable, both fixed. THE
+  genuinely-unpinned reachable invariant the sweep surfaced → guard: buildFillupIntervals had only the C67 input-not-mutated test; its SPLIT-safety (a same-date
+  sibling must not phantom a 0-day '1-3 days' interval) was unpinned. +1 guard: a 3-row same-date split fillup + one real later fillup → exactly 1 interval (the
+  real gap), no phantom bucket. NON-VACUOUS (loosening days<=0 → RED). green→green: be validate:local EXIT 0, 1474 pass (+1) / 0 fail. cov: be 86.78% (carry) /
+  fe 84.39% (carry).
+- **C392 (arch): route buildFuelStatsFromData's inline per-vehicle distance onto the existing computeConvertedTotalDistance (2 sites → 1)** — BALANCE: arch OVER
+  budget (last 386, starved-for 392−386=6 > budget 5) → forced pick. rule-7 fan-out (FE returned a clean "none" — heavily deduped). PICK (CONFIRMED firsthand,
+  C21/C60): buildFuelStatsFromData (repository.ts:1404) inlined the per-vehicle mileage group → max−min → sum, BYTE-IDENTICAL to the existing private
+  computeConvertedTotalDistance (:511) under skipConversion=true — and the inline code's OWN comment already said "Mirrors the grouped
+  computeConvertedTotalDistance; this summary path is single-unit so it doesn't convert". A divergent copy (a null-mileage filter or `< 2` change on one) skews
+  the per-vehicle distance total against the year-end path (both feed cost-per-distance money analytics). The shared method ALREADY has the skipConversion flag,
+  so this is a pure call-the-existing-helper collapse — NO new helper, NO param churn. Routed the inline block → computeConvertedTotalDistance(fuelRows, new Map(),
+  DEFAULT_UNIT_PREFERENCES, true) (the unit args are ignored under skipConversion). Behavior-preserving (identical math). RULE-3 GREEN→GREEN:
+  fuel-stats-fleet-distance-pooling.test.ts (totalDistance = SUM of per-vehicle max-min) + year-end.property.test.ts drive both sites — GREEN before AND after.
+  validate:local EXIT 0, 1474 pass (unchanged). cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C393 (deep-review): middleware (idempotency/rate-limit/body-limit) + split-tx-integrity audit → BOTH CERTIFIED CLEAN; idempotency in-memory-race hardening
+  FILED** — BALANCE: deep-review AT budget (last 388, starved-for 393−388=5 = budget) + bug also at budget; picked deep-review (broader, surfaces next bug).
+  2-agent fan-out. (B) split create/update tx integrity CLEAN — the C151 async-tx footgun is NOT exposed: all validation (ownership, computeAllocations, firstOld)
+  is pre-hoisted OUT of the async tx callback (mirrors the trigger-service pattern), createSiblings is throw-free inserts, the delete→insert→photo-migrate
+  sequence rolls back atomically; groupTotal==sum-of-legs penny-exact by construction (property-pinned). (A) middleware: idempotency is COMPREHENSIVELY pinned —
+  user-scoped no-collision, non-2xx-not-cached, non-JSON-2xx-no-500 (#96/C315), TTL-drop, method-gating (idempotency.test.ts, verified firsthand); rate-limit
+  per-user, body-limit strict-`>`. The agent's "check-then-cache RACE (get at :71, set at :88, await next() yield between → both handlers run)" — VERIFIED real
+  in-principle BUT honestly low-sev: (1) the DURABLE dedup is the DB-level clientId (createIdempotent, C8) which prevents a duplicate expense regardless of this
+  in-memory replay cache racing; (2) the sync worker POSTs SEQUENTIALLY (not parallel same-key), so it's theoretically-reachable-not-in-app-traffic. The agent
+  itself rated it "UNLIKELY". A per-key lock/promise is a concurrency-ARCHITECTURE change (and the DB layer arguably makes it unnecessary) → FILED, not self-fixed;
+  no flaky timing test manufactured (the singleton-store-across-tests constraint makes one fragile). NO genuinely-unpinned invariant on either surface → docs-only
+  certification. No source/test/build touched → no build gate. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C394 (bug → #114: mark-serviced re-arm ignored endDate — a bounded reminder serviced past its end was re-armed forward + left active; the #107/bug-#12
+  family on the mark-serviced path)** — BALANCE: bug OVER budget (last 390, starved-for 394−390=4 > budget 3) → forced pick. 2-agent fan-out: (A) FE api-client
+  error/retry, (B) odometer/mileage trigger. (A) surfaced a real-but-lower-sev UX gap (apiClient.raw() bypasses fetchOrThrow → export/backup errors show
+  "status N" not the backend message) — NOTED, not the clean data-correctness pick. (B) surfaced a CLEAN ATOMIC live defect → #114: the mark-serviced time-axis
+  re-arm (routes.ts:119) advanced nextDueDate past now + WROTE it, but NEVER checked endDate — so a BOUNDED reminder (endDate nullable + accepted on create)
+  serviced AFTER its end got re-armed to a future date and left is_active=1 (lives on past its end, fires again). The EXACT bug the trigger-service
+  fastForwardPastNow guards (C362/#107), missed on the mark-serviced path. VERIFIED firsthand (C21/C60). FIX: mirror C362 — after the advance, if endDate &&
+  nextDue > endDate → deactivate the (whole) reminder + return it inactive, not a forward date. My added branch pushed the handler over Biome's cognitive-
+  complexity cap (17>15) → extracted advanceToFirstFutureDue (the loop + bug-#13 strict-advance backstop) as a module helper (bonus arch-clean, dropped it
+  under 15). GUARD: +1 (mark-serviced.test.ts): a monthly start+end-in-past reminder serviced now → is_active=0 + response isActive:false. NON-VACUOUS. green→green:
+  be validate:local EXIT 0, 1475 pass (+1) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C395 (infra): CLAUDE.md full orientation refresh (the overdue ~C394 cadence; last full C384)** — BALANCE: infra most-starved AT budget (last 389,
+  starved-for 395−389=6 = budget) + the CLAUDE.md refresh was overdue → pick. Read the drift-prone sections vs source/LEDGER (no churn — C5/C47/C72 discipline).
+  FIXED the two MATERIAL drifts: (1) the coverage line cited the C379 reading → updated to the C389 re-measure (be 86.78/86.39 · fe 84.39/84.3/76.63) + the
+  C353–C394 arc framing + #107–#114; (2) suite size ~1468/675 + the C373–C383 arc → ~1475/675 + the C384–C394 arc (the #113/#114 fixes, C385 buildLocalDate-hour,
+  C391 the split-sibling family sweep, C392/C394 arch-extracts). The closed-bug list (through #114/C394) + pending-Angelo block + testing-infra/open-gaps were
+  VERIFIED accurate inline — no change. Docs-only; no source/test/build touched → no build gate (the C309/C357/C373/C384 refresh pattern). Next CLAUDE.md refresh
+  ~C405; next #5 sweep ~C399. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C396 (guard): pin restore's expense-source dangling-ref rejection (validateExpenseSourceRefs — the expense-level sibling of the junction/financing ref
+  checks)** — BALANCE: nothing over budget; guard closest (last 391, starved-for 396−391=5, budget 6) → highest-leverage. 2-agent fan-out. PICK (verified
+  firsthand, C21/C60): validateReferentialIntegrity hard-fails a restore if a 'reminder'-sourced expense points at a reminder NOT in the backup
+  (validateExpenseSourceRefs, backup.ts:781) — a real restore-integrity guard (the C246/C339 dangling-ref class). restore-junction-refs.test.ts pins the
+  JUNCTION (reminder_vehicles→vehicle) + FINANCING (vehicle_financing→vehicle) ref checks but NOT the expense-SOURCE one. +1 guard: seed a reminder-sourced
+  expense (source_type='reminder', source_id=<real>), export, tamper expenses.csv to repoint source at a bogus reminder → restore REJECTS citing 'reminder' +
+  mutates nothing (validation runs pre-transaction). NON-VACUOUS. Also partially closes the C339-filed "validateBackupData doesn't cross-check expense source
+  refs" note (the reminder-source direction is now validated AND pinned). Rejected the FE chart-formatters picks (getXTickCount/getTrendLineProps/formatDecimalAxis
+  — real but lower-stakes DISPLAY utils vs a data-safety restore guard); the BE pagination-offset-beyond was ~certified C388. green→green: be validate:local
+  EXIT 0, 1476 pass (+1) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C397 (arch): extract chunk() + SQLITE_BATCH_SIZE — ONE source of truth for the batched-IN-clause loop (4 photo/photoRef sites → 1)** — BALANCE: arch AT
+  budget (last 392, starved-for 397−392=5 = budget; more starved than bug at 3) → pick. rule-7 fan-out (FE clean "none"). PICK (verified firsthand, C21/C60):
+  the batched-IN-clause loop `for (i += 500) { ids.slice(i, i+500); inArray(col, batch) }` + the magic `500` was hand-rolled BYTE-IDENTICAL at 4 sites — photo-
+  repository findByEntities/deleteByEntities, photo-ref-repository findAllByPhotos/deleteByPhotos (cascade-delete fan-outs that must stay under SQLite's variable
+  limit; 2 are destructive DELETEs). A divergent stride/limit copy silently drops or double-processes a batch on a cascade DELETE (data loss). The bodies differ
+  (select-photos vs select-refs vs delete), so the clean collapse is NOT a batchSelect/batchDelete pair (type churn over drizzle builders) — it's the CHUNKING:
+  a pure `chunk<T>(items, size=SQLITE_BATCH_SIZE)` + the shared constant. RULE-3: the 4 batch methods had NO test net (called via the cascade HTTP path, not unit-
+  tested), so the increment is the pure helper + ITS characterization test (the safety net), then route the 4 sites to `for (const batch of chunk(ids))` — a
+  locally-obvious, behavior-preserving rewrite (chunk yields identical batches). +1 test file (chunk.test.ts, 7 tests): empty→[], exact-multiple, remainder, the
+  flatten-round-trips-exactly data-loss guard, default-500, size<1 throws. Left the google-sheets-service:500 + backup.ts:373 sibling copies (C163 mock-trap
+  territory) — noted for a future cycle. green→green: be validate:local EXIT 0, 1483 pass (+7) / 0 fail. cov: be 86.78% (carry) / fe 84.39% (carry).
+- **C398 (bug → #115: PaymentMetricsGrid "Mileage Overage" card compared LIFETIME driven miles against the bare ANNUAL mileageLimit — the #64/#110 annual-vs-total
+  class the sibling card already fixed)** — BALANCE: bug OVER budget (last 394, starved-for 398−394=4 > 3) → forced pick (the most-starved autonomously-actionable
+  category; feature is parked on eyes-on/Playwright-blocked tails, escalated). 2-agent fan-out (BE analytics-aggregation + FE calc/state). VERIFIED FIRSTHAND
+  (C21/C60): PaymentMetricsGrid.svelte:62 did `Math.max(0, mileageUsed − financing.mileageLimit)`, but `mileageUsed` (FinanceTab:157) is LIFETIME driven miles
+  (currentOdometer − initialMileage) and `mileageLimit` is the ANNUAL allowance (the schema + form label "Annual Mileage Limit"; the sibling calculateLeaseMetrics:
+  458 correctly scales `× leaseYears`). So a 36-mo/12k-yr lease (36k total) driven 30k showed "18,000 over" + a phantom fee on this card, while LeaseMetricsCard on
+  the SAME Finance-tab screen showed 0 — two contradicting figures, the grid's inflated ~Nx. The exact #64/#91/#110/C198/C374 annual-vs-total class, Angelo-approved
+  on the sibling card (C157/C198) → a KNOWN-CORRECT invariant the loop lands autonomously (not a new direction call). FIX (atomic + arch-clean): extracted the
+  `annual × termMonths/12` total-allowance math (it lived inline ONLY at calculateLeaseMetrics:458-459) into a shared `leaseTotalMileageAllowance(financing)` + a pure
+  `calculateLeaseOverage(financing, mileageUsed)` in financing-calculations.ts (the audited, UNIT-TESTABLE module — the safety net the eyes-on card can't have);
+  routed BOTH calculateLeaseMetrics AND the .svelte card through it (ONE source of truth). NOTE the card shows CURRENT overage, LeaseMetricsCard the PROJECTED
+  end-of-lease excess — genuinely different metrics, but BOTH must use the term-scaled total. GUARD: +12 (leaseTotalMileageAllowance term-scaling/0-term-fallback/
+  no-limit; calculateLeaseOverage under-total→0 [the bug case, RED pre-fix], genuinely-over→excess×fee, longer-term-more-allowance, agrees-with-calculateLeaseMetrics,
+  no-fee→0-cost, non-lease→0, no-limit→0). NON-VACUOUS (reverting the helper to the bare annual → RED). The paired BE finding (split null-mileage siblings break the
+  consecutive-fillup PAIRING adjacency → dropped efficiency points, ~10 pairing sites) is REAL + reachable but a multi-site arch change, NOT a clean one-cycle bug fix
+  → NOTED for a future arch cycle (route all pairing sites through forEachVehiclePair + a volume pre-filter), not self-fixed this cycle. green→green: fe validate:local
+  EXIT 0, 686 pass (+12) / 0 fail, svelte-check + build clean. cov: be 86.78% (carry) / fe 84.39%+ (the +12 lease-overage guards nudge it up; not re-measured this cycle).
+- **C399 (deep-review → #116: the reminder catch-up loop's NATURAL exit left a bounded reminder active past its endDate — the #107/#114 bug-#12 endDate family on a
+  THIRD, unfixed path)** — BALANCE: deep-review OVER budget (last 393, starved-for 399−393=6 > 5) → forced pick (feature parked on eyes-on/Playwright-blocked tails).
+  2-agent fan-out on under-recently-audited surfaces (reminder trigger/recurring-materialization engine + CSV import↔export round-trip integrity). VERIFIED FIRSTHAND
+  (C21/C60): trigger-service.ts processReminder's catch-up `while` (:443) has an in-loop endDate guard (:445) that only inspects nextDue <= now (the while condition);
+  the FINAL advance steps nextDue PAST now and exits the loop UNDER the 12-occurrence cap, so that last value is never tested against endDate — and the post-loop block
+  (:464) only runs at the cap. A bounded reminder whose endDate falls between its last in-window occurrence and that final advance was left is_active=1 with a future
+  nextDueDate → inflates GET /reminders/recurring-cost (monthlyRunRate gates ONLY on isActive, reminder-cost.ts:66) + stays in the active list until a LATER trigger
+  lazily closes it (NO duplicate expense — the in-loop guard runs before materialization — purely a wrong active-state / wrong run-rate defect). The EXACT #107(C362,
+  fastForwardPastNow exit)/#114(C394, mark-serviced) bug-#12 family on a THIRD path neither fix touched (this path stays well under the cap → fastForward never reached).
+  FIX (atomic, consolidates to ONE deactivation site): the in-loop guard now just `break`s, and a single post-loop guard deactivates+returns — covering BOTH the
+  in-loop-break case AND the natural-exit boundary with no duplication; mirrors fastForwardPastNow:303. GUARD: +1 HTTP (trigger-expense.test.ts): a weekly reminder
+  with 4 weeks of history (« the 12 cap) + endDate≈now → is_active=0 after trigger + no re-fire on a second trigger. NON-VACUOUS (pre-fix: catchUpCount=4<12 skips
+  fast-forward → left active). The existing "endDate bounds to 3 then deactivates" test still passes (break → post-loop guard deactivates). The paired CSV finding
+  (a free-text value literally beginning with `'`+a formula-trigger char round-trips lossy: neutralizeCsvCell only escapes a LEADING trigger, but denormalizeCsvCell
+  strips a leading `'` whenever char-2 is a trigger → asymmetric; csv-safety.ts:22/35/64) is REAL + reachable but NARROW (only `'`+`=/+/-/@/TAB/CR`-led values) → NOTED
+  below for a guard cycle, not bundled into this deep-review. green→green: be validate:local EXIT 0, 1484 pass (+1) / 0 fail. cov: be 86.78%+ (carry, +1 guard) / fe 84.39% (carry).
+- **C400 (infra): #5 branch-hygiene sweep + coverage re-measure (the overdue ~C399 cadence; last actual C389)** — BALANCE: NOTHING over budget (deep-review 1, guard 4,
+  bug 2, arch 3, infra 5/6, feature parked); infra was the MOST-STARVED actionable category (5/6) AND the #5 sweep was overdue → highest-leverage pick (cadences exist
+  so they don't get starved by shinier work; the freshly-filed CSV-apostrophe guard takes the next cycle). SWEEP: re-measured both suites — be 86.92% line / 86.54%
+  func (UP +0.14/+0.15 vs C389's 86.78/86.39 — C396 + #116/C399 guards); fe 84.45% line / 84.4% func / 76.87% branch (UP +0.06/+0.1/+0.24 — the #115/C398 +12
+  lease-overage guards delivered). Both creeping UP, gap stable ~2.5pts. Branch 210 ahead of origin/main. HYGIENE CATCH: the sweep found .kiro/specs/offline-entries/
+  (requirements/design/tasks.md) was the ONLY feature spec left UNTRACKED, while ~29 sibling specs all commit their 3 .md docs AND the offline-entries CODE foundation
+  already shipped (CLAUDE.md confirms client_id idempotency + outbox sync committed) — so a fresh clone / the eventual PR would lose this feature's design rationale.
+  FIX: committed the 3 spec docs (matching every sibling; .config.kiro stays untracked as siblings do). No product code touched → no build gate beyond the coverage
+  runs (both EXIT 0). All other untracked items confirmed by-design (*.meshclaw.e2e.ts specs, .meshclaw-tools/, screenshots, mise.local.toml, playwright config).
+  cov: be 86.92% / fe 84.45%. Next #5 sweep ~C410; next CLAUDE.md refresh ~C405.
+- **C401 (guard → the C399-filed CSV-apostrophe round-trip: VERIFIED REAL but the "clean fix" DEBUNKED → reclassified to a DIRECTION CALL + escalated; pinned the
+  actual lossy behavior)** — BALANCE: nothing over budget (deep-review 2, bug 3=budget, arch 4, infra 1, feature parked); guard MOST-STARVED actionable (5/6) →
+  highest-leverage pick, and the freshly-filed CSV-apostrophe guard was the obvious target. VERIFIED FIRSTHAND (C21/C60) — and the verification PAID OFF: the bug is
+  REAL + reachable (makeCellGetter:88 DOES call denormalizeCsvCell on every cell incl. the vehicle name; a user-typed `'=mc2` exports unescaped [neutralizeCsvCell only
+  prefixes when value[0] is itself a trigger] then imports stripped to `=mc2` [denormalize strips `'` when value[1] is a trigger] → lossy; a `'=Daily` nickname then
+  fails to re-match → row drops). BUT the C399-filed "clean atomic fix" (escape to `''=mc2`) is WRONG: denormalizeCsvCell:65 strips only when value[1] is a TRIGGER, and
+  `'` isn't one → `''=mc2` returns UNCHANGED (still corrupt), AND it collides with the pinned `''=double`-stays test. A single-`'` sentinel CANNOT disambiguate a
+  user-typed `'=` from an export-escaped `'=`; the only invertible scheme (escape EVERY leading-`'` on write, strip one on read) reinterprets hand-authored leading-`'`
+  FOREIGN CSVs, flipping the deliberate import-csv.test.ts:532 "preserves a genuinely apostrophe-led description" contract → a data-safety TRADEOFF (optimize
+  VROOM-own-export round-trip vs foreign-import faithfulness), NOT a one-side fix. INCREMENT (safe, behavior-preserving): (1) fixed the FALSE doc claim in csv-safety.ts
+  (denormalizeCsvCell claimed "this can never eat real data" — it can, for `'`+trigger); (2) +5 CHARACTERIZATION tests pinning the actual lossy round-trip (clearly
+  labeled NOT an endorsement — flips to a true round-trip assertion when the call lands); (3) ESCALATED to Angelo via send_message with options (a) VROOM-own-export
+  faithfulness / (b) foreign-import faithfulness / (c) discuss. No production behavior changed (doc + tests only). green→green: be validate:local EXIT 0, 1490 pass (+5)
+  / 0 fail (format reflow → check:musl:fix double-quoted the escaped-`'` describe/test names, then re-validated clean). cov: be 86.92% (carry, tests-only) / fe 84.45% (carry).
+- **C402 (bug): vehicle-stats/odometer aggregation + insurance claims/term/premium-materialization CERTIFIED CLEAN (dormant-vein scout, no defect; docs-only)** —
+  BALANCE: bug OVER budget (last 398, starved-for 402−398=4 > 3) → forced pick (arch was AT budget 5=5, less starved). 2-agent fan-out on two under-recently-audited
+  within-tenant surfaces. (A) vehicle-stats + odometer (vehicle-stats.ts, odometer/repository.ts, vehicles/routes.ts /stats): CERTIFIED CLEAN — every division div-by-0
+  guarded (costPerMile behind totalMileage>0, averageMpg behind volume truthiness, mi/kWh behind kwh>0); the #46 negative-distance clamp (Math.max(0,...)) keeps
+  costPerMile NULL not Infinity; split-fuel siblings (volume/mileage=null) correctly excluded from sumVolume + mpg pairing + expensesWithMileage (the residual
+  fuelExpenseCount inclusion is the CERTIFIED-CLEAN #56/#328 class); all 6 odometer raw-SQL legs tenant-scoped via vehicleScope; period enum fully covered by PERIOD_DAYS
+  (no NaN date). The live deltas are filed/escalated (#45 period span; Current-Mileage card semantics). (B) insurance claims/term/premium (insurance routes/repository/
+  hooks/claims): CERTIFIED CLEAN — premium largest-remainder split sums exact (100/3→3333/3333/3334, C382-pinned), re-materialize-on-edit = deleteBySource+recreate (no
+  dup/orphan), #57 orphan-cleanup complete, #84 claim link validation on create+update, findExpiringTerms excludes cancelled (#26c). Candidates DEBUNKED firsthand
+  (C21/C60): photo-loss on term edit is UI-UNREACHABLE (FE hard-locks insurance-managed expenses — raw-API only); non-atomic re-materialize is the documented
+  swallow-on-failure design; getCurrentTermDates/getActiveInsurancePolicyId missing-startDate-tiebreak is TEST-ONLY (no production consumer); lump-sum totalCost
+  regardless of premiumFrequency is the escalated #69. NO reachable atomic defect, NO genuinely-unpinned reachable invariant (the #46 clamp + costPerMile-null + #75
+  order-independence + #66 isolation + C378 costPerMile-consistency are ALL already pinned in vehicle-stats.property.test.ts; the premium split + re-materialize in
+  premium-expense-hook/terms-http) → CERTIFICATION only (C306/C345/C355/C388 precedent; a manufactured test = the C181/C229 coverage-theater trap). Docs-only, no
+  source/test touched. cov: be 86.92% (carry) / fe 84.45% (carry).
+- **C403 (arch): extract isFillup — ONE source of truth for the volume-bearing-fillup predicate (3 inline analytics-charts sites + 1 local repository def → 1)** —
+  BALANCE: arch OVER budget (last 397, starved-for 403−397=6 > 5) → forced pick. rule-7 2-agent fan-out (FE returned only a contrived test-only MS_PER_DAY dup —
+  REJECTED as churn-for-churn per rule 5: a ms/day constant is fixed 86400000, the "DST divergence" risk is fiction). PICK (verified firsthand, C21/C60): the
+  split-sibling guard predicate `r.volume != null && r.volume > 0` was hand-inlined BYTE-IDENTICAL at 3 analytics-charts.ts sites — computeAverageCosts (:434 filter),
+  buildSeasonalEfficiency (:644 negated loop-guard), buildDayOfWeekPatterns (:807 negated loop-guard) — PLUS re-defined locally in analytics/repository.ts
+  buildFuelStatsFromData (:1353 `const isFillup = (r: FuelExpenseRow) => ...`). This predicate guards the #56/#18/#108/#113 SPLIT-SIBLING OVERCOUNT class (a split fuel
+  expense creates one volume=null sibling per vehicle; counting raw rows overcounts one split fillup as N) — so a divergent copy silently REINTRODUCES the overcount on
+  one surface (a real latent bug, not cosmetic). Clean single home: exported `isFillup` from analytics-charts.ts (typed `Pick<FuelExpenseRow,'volume'>`), where
+  FuelExpenseRow already lives + which repository.ts already imports (no cycle). Routed all 4 (3 inline → isFillup(row)/filter(isFillup); deleted the local def). Rule-2
+  behavior-preserving (identical boolean). Rule-3 green→green: analytics-charts-unpinned.test.ts (the #108/#113/#56 split-sibling guards) + fuel-stats-fleet-distance-
+  pooling.test.ts (the #18 COUNT) drive all 4 sites — GREEN before AND after, no test touched. be validate:local EXIT 0, 1490 pass (unchanged). cov: be 86.92% (carry) / fe 84.45% (carry).
+- **C404 (deep-review → #C404: insurance_claim photos broke backup/restore — a HARD restore failure on a valid backup, NORTH_STAR #1 crown-jewel violation)** —
+  BALANCE: deep-review most-starved actionable AT budget (last 399, starved-for 404−399=5=budget; feature parked) → highest-leverage pick. 2-agent fan-out (backup/
+  restore round-trip + financing planner math). VERIFIED FIRSTHAND (C21/C60): validateReferentialIntegrity's validatePhotoRefs (backup.ts:739) entityTypeToIds map had
+  vehicle/expense/insurance_policy/odometer_entry but OMITTED insurance_claim — yet insurance_claim IS a real photo-upload target (photos/helpers.ts:56
+  validateEntityOwnership accepts it, ownership transitive through the claim's policy; the ClaimsSection UI uploads to it). createBackup serializes ALL user photos
+  (backup.ts:368, entityType-agnostic), so a claim photo lands in the backup; on restore validatePhotoRefs finds no idSet for 'insurance_claim' → pushes "unknown entity
+  type" → validateBackupData returns valid:false → restoreFromBackup THROWS → the ENTIRE restore aborts (not just the photo). A user who attached a photo to ANY
+  insurance claim could not restore ANY of their data from their own valid backup — worse than silent loss, a hard round-trip failure on the data-safety crown jewel.
+  The original 15-table cert (C366) predated claim photos. FIX (atomic, mirrors the existing pattern): build `claimIds` from backup.insuranceClaims (already serialized +
+  parsed), pass it into validatePhotoRefs, add insurance_claim→claimIds to the entity map (+ a comment pinning the map to the upload allowlist). Claims insert before
+  photos (restore.ts:461<:513) so FK order was already safe — only validation blocked it. GUARD: +1 round-trip (claims-roundtrip.test.ts): seed a claim + a
+  entity_type='insurance_claim' photos row → exportAsZip → restoreFromBackup(replace) → success + the photo survives pointing at its claim. NON-VACUOUS (pre-fix the
+  restore throws on the unknown entity type). be validate:local EXIT 0, 1491 pass (+1) (a format reflow → check:musl:fix one-lined the query string, re-validated clean).
+  The paired FE finding (0%-APR loan in the Payment Planner shows "0 mos / $0 saved" because computePlannerState uses minimumPayment=0 as the baseline → defeats the C297
+  fix one layer down — the #92 symptom re-manifested at the planner layer) is REAL + reachable → FILED below for a near-term bug cycle (clean atomic fix: baseline =
+  minimumPayment>0 ? minimumPayment : financing.paymentAmount). cov: be 86.92%+ (carry, +1 guard) / fe 84.45% (carry).
+- **C405 (bug → #117: a 0%-APR loan in the Payment Planner showed "0 mos / $0 saved" — the #92 symptom re-manifested at the planner layer)** — BALANCE: bug AT budget
+  (last 402, starved-for 405−402=3=budget; the most-starved actionable with a clean ready fix beats infra's raw 5/6 — taking it resets the tightest budget + closes a
+  money-facing bug). The C404-filed #117, verified FIRSTHAND (C21/C60): computePlannerState (payment-planner.ts:65) built the baseline as `{...financing,
+  paymentAmount: minimumPayment}`. For a 0%-APR loan calculateMinimumPayment returns null → PaymentPlannerDialog passes `minimumPayment ?? 0 = 0` → the baseline
+  amortization simulateAmortization(balance, 0, 0) trips the negative-am guard (principal = 0−0 ≤ 0 → 0 months) → monthsSaved = max(0, 0−accelerated) = 0. So a user
+  paying $500 vs a $400 contractual payment on a $12k 0%-APR loan (genuinely 30→24mo) saw "0 mos / $0 saved". The C297 0%-APR fix lives one layer DOWN in
+  calculateExtraPaymentImpact (0%-APR runs the loop), but the planner DEFEATED it by feeding a $0 baseline. Reachable: NextPaymentCard "Change Payment" (no apr guard) +
+  FinanceTab renders PaymentPlannerDialog for ANY loan (apr=0 only adds an "APR Not Set" alert). FIX (atomic): `baselinePayment = minimumPayment > 0 ? minimumPayment :
+  financing.paymentAmount` — fall back to the loan's REAL contractual payment so the baseline is a genuine amortizing schedule; routed both the primary + secondary-delta
+  branches through it. apr>0 paths (minimum>0) byte-unchanged. GUARD: +5 (payment-planner.property.test.ts): 0%-APR minimum null; $500-vs-$400 → monthsSaved=6 (was 0,
+  RED pre-fix) + interest $0; more-extra→strictly-more-months (monotonic, never stuck at 0); apr>0 baseline unchanged. NON-VACUOUS. fe validate:local EXIT 0, 690 pass
+  (+5; one self-corrected assertion — I'd mislabeled the with-delta state 'normal', fixed). cov: be 86.92% (carry) / fe 84.45%+ (carry, +5 guards).
+- **C406 (infra): CLAUDE.md full orientation refresh (the overdue ~C405 cadence; last full C395)** — BALANCE: nothing over budget (deep-review 2, guard 5, bug 1,
+  arch 3, infra 6/6, feature parked); infra MOST-STARVED AT budget (last 400, starved-for 406−400=6=budget) AND the CLAUDE.md refresh cadence was due → highest-leverage
+  pick. REFRESHED the drift-prone "Current state & gaps" section so a fresh-agent entry point reflects reality: (1) coverage reading C389→C400 fresh measure (be
+  86.78→86.92 line / 86.39→86.54 func; fe 84.39→84.45 line / 84.3→84.4 func / 76.63→76.87 branch — both creeping UP); (2) suite size ~1475/~675 → ~1491/~690; (3)
+  appended the C395–C405 closed-bug arc to the fix list (#115 lease-overage annual-vs-total, #116 reminder catch-up-natural-exit endDate [the bug-#12 family's THIRD
+  path], #C404 claim-photo backup-roundtrip crown-jewel, #117 0%-APR planner) + bumped "all landed C155→C405"; (4) added the C401 CSV-apostrophe DATA-CONTRACT direction
+  call to the pending-Angelo block. Doc-only, no code touched → no build gate (CLAUDE.md is not compiled; verified the edits read coherently + preserved the structure
+  the loop depends on). cov: be 86.92% (carry) / fe 84.45% (carry). Next CLAUDE.md refresh ~C416; next #5 sweep ~C410.
+- **C407 (guard): DRIFT-GUARD for the #C404 class — a photo on EVERY upload-accepted entity type must survive backup→restore (5 types, not just claim)** — BALANCE:
+  nothing over budget (deep-review 3, bug 2, arch 4, infra 1, feature parked); guard MOST-STARVED actionable AT budget (last 401, starved-for 407−401=6=budget) →
+  highest-leverage pick. The C404 fix added insurance_claim to the restore validator's entityTypeToIds map (backup.ts validatePhotoRefs), but that map and the photo-
+  upload allowlist (photos/helpers.ts validateEntityOwnership) are SEPARATE lists in separate files with NO shared source of truth — exactly the drift that broke restore
+  (#C404). VERIFIED FIRSTHAND (C21/C60): the upload path accepts 5 types (vehicle/insurance_policy/insurance_claim/expense/odometer_entry), the validator map now lists
+  the same 5 — but ONLY insurance_claim had a round-trip test (C404), and a generic "a photo round-trips" test would NOT catch a per-type omission (that's how #C404 slipped
+  past the C366 15-table cert). GUARD: +1 (claims-roundtrip.test.ts) — seed a photo on ALL FIVE upload-accepted types (vehicle/policy/claim/expense/odometer via the real
+  create routes + direct photo-row inserts), exportAsZip → restoreFromBackup(replace) → assert all 5 survive pointing at their entities. NON-VACUOUS: dropping ANY type
+  from the validator map → that photo restores as "unknown entity type" → validateBackupData false → the WHOLE restore aborts → RED. When a 6th photo target is added to
+  the upload path, this fails until the validator map learns it. be validate:local EXIT 0, 1492 pass (+1) (a useConsistentArrayType lint on Array<[...]> → hand-fixed to
+  the T[] shorthand, re-validated clean). cov: be 86.92% (carry, +1 guard) / fe 84.45% (carry).
+- **C408 (bug → #118: the split-expense create schema's tags BYPASSED the #104 separator-rejection — re-opening the C352 CSV round-trip data-loss on the one boundary
+  that fix missed)** — BALANCE: bug AT budget (last 405, starved-for 408−405=3=budget, the tightest "never-sits" category) tied with arch (5=5) → took bug. 2-agent
+  fan-out (EV/unit math + split/tag). VERIFIED FIRSTHAND (C21/C60): createSplitExpenseSchema (validation.ts:80) had `tags: z.array(z.string()).optional()` — a bare array
+  that bypassed the tagElementSchema separator-refine the REGULAR create/update boundaries enforce (routes.ts:55-64, the #104/C352 fix). The FE forwards split tags
+  verbatim (expense-api createSplitExpense → POST /expenses/split), createSiblings persists `tags: params.tags ?? null` onto every sibling (split-service.ts:103), the CSV
+  export joins tags with '; ' + import splits on /[;,]/ → a `road; trip` tag round-trips into TWO tags (silent data loss). #104/C352 fixed this "at the write boundary"
+  but landed only on the regular create/update schemas — the SPLIT-create schema is a separate def in validation.ts that the fix missed. The split-UPDATE path is safe
+  (reuses firstOld.tags, accepts no fresh tags). FIX (atomic + arch-clean, ONE source of truth): lifted tagElementSchema from routes.ts INTO validation.ts (its natural
+  home — a validation primitive; routes→validation is the existing import direction, no cycle), exported it, routed createSplitExpenseSchema's tags through
+  `z.array(tagElementSchema).max(maxTags)`, and re-imported it into routes.ts (the 2 regular boundaries unchanged). GUARD: +4 (split-validation-schema.test.ts): split-
+  create rejects a ';'-tag (cites the #104 message) / a ','-tag / an empty tag; separator-free tags pass (control). NON-VACUOUS (RED pre-fix — the bare array accepted
+  them). be validate:local EXIT 0, 1496 pass (+4) (a format reflow → check:musl:fix one-lined a .some(), re-validated clean). The paired EV finding (PHEV charge rows
+  contaminate the analytics FuelStats MPG card — computeMpgAndCostPerMile has no gas/charge partition, unlike vehicle-stats.ts/C353; the agent flags it spans the
+  sibling builders too) is REAL + reachable → FILED below for a near-term cycle (NOT bundled — broader than one boundary). cov: be 86.92% (carry, +4 guards) / fe 84.45% (carry).
+- **C409 (arch): extract hasReminderEndedBy — ONE source of truth for the endDate-boundary predicate (4 inline sites in trigger-service.ts → 1)** — BALANCE: arch OVER
+  budget (last 403, starved-for 409−403=6 > 5) → forced pick. rule-7 2-agent fan-out, and FIRSTHAND VERIFICATION (C21/C60) DEBUNKED both proposed candidates: the FE
+  DAY_MS constant = churn-for-churn (rejected C403 — ms/day is fixed, divergence is fiction); the BE calculateAverageMPG-vs-vehicle-stats "dup" = the exported
+  calculateAverageMPG has NO production caller (only its own test imports it), so "merging" means either deleting a tested export (net-negative, rejected C381/C386) or
+  coupling vehicle-stats to test-only scaffolding — no real win. Declined both rather than manufacture churn. INSTEAD found the genuine LIVE duplication the recent fixes
+  created: the predicate `reminder.endDate && nextDue > reminder.endDate` ("a bounded reminder's advance has crossed its end") hand-inlined BYTE-IDENTICAL at 4 sites in
+  trigger-service.ts — fastForwardPastNow's in-loop (:281) + post-loop (:303) guards, processReminder's in-loop break (:447) + natural-exit (:473) guards. This is THE
+  bug-#12 family the loop kept re-finding (#107/C362 fast-forward exit, #114/C394 mark-serviced, #116/C399 catch-up natural exit) — a divergent copy (a `>=`/`>` slip, or
+  dropping the `endDate &&` null-guard) is exactly that defect class. Extracted a pure module-level `hasReminderEndedBy(reminder, nextDue): boolean` (sibling to the
+  existing getAnchorDay helper); callers keep their own ACTION (break vs deactivate+return — the 4 sites diverge there by design), only the boundary TEST is shared.
+  Rule-2 behavior-preserving (`endDate != null && nextDue > endDate` ≡ the old truthy check for a Date|null). Rule-3 green→green: trigger-fastforward-enddate +
+  trigger-expense (#116) + the other endDate tests drive all 4 sites — GREEN before AND after, no test touched. be validate:local EXIT 0, 1496 pass (unchanged). cov: be 86.92% (carry) / fe 84.45% (carry).
+- **C410 (deep-review → #120: OfflineExpenseCards rendered a RAW ISO date string instead of a formatted date)** — BALANCE: deep-review OVER budget (last 404, starved-for
+  410−404=6 > 5) → forced pick. 2-agent fan-out (offline-sync outbox + route-load/dashboard display). VERIFIED FIRSTHAND (C21/C60): OfflineExpenseCards.svelte rendered
+  `{expense.date}` raw at TWO sites (:58 pending, :108 synced) — the offline-first save stores `date` as a full ISO timestamp (dateOnlyToISO → noon-local), so the
+  "Pending Sync"/"Recently Synced" cards on /expenses literally showed `2024-03-15T17:00:00.000Z` next to a clean formatCurrency amount, while EVERY other date in the app
+  (ExpensesTable, RecentActivityCard, reminders) goes through formatDate → "Mar 15, 2024". FIX (atomic, mirrors the app-wide pattern): import formatDate +
+  `{formatDate(expense.date)}` at both sites (formatDate accepts string|Date, handles both the ISO-timestamp offline-first form AND the date-only error-fallback form).
+  The formatDate contract is ALREADY pinned (formatters.test.ts:96/187 cover both offline date shapes incl. the #87 negative-offset round-trip), so this is a wiring fix to
+  a tested helper — the merge-surviving net is that existing coverage. EYES-ON: offline-state-BLOCKED — OfflineExpenseCards only renders with a client-side IndexedDB
+  offline queue the screenshot harness can't seed (a /expenses shot needs auth + a queued offline expense; the harness auth-state was also stale → login screen), the
+  same documented eyes-on-blocked class as the maintenance-T7/import-trackers tails. fe validate:local EXIT 0, 690 pass / svelte-check + build clean. The paired offline
+  finding (retrySingleExpense silently drops a conflict result — no syncConflicts.current push, unlike the main loop) is REAL but TIMING-RACE-gated (conflict-on-retry-
+  only, the C163 mock-trap class) → FILED below, not this cycle's pick. cov: be 86.92% (carry) / fe 84.45% (carry, wiring-only).
+- **C411 (bug → #119: a plug-in hybrid's CHARGE sessions contaminated the analytics FuelStats "MPG" card)** — BALANCE: nothing over budget (deep-review 1, guard 4, arch
+  2, infra 5/6); bug AT budget (last 408, starved-for 411−408=3=budget, the tightest "never-sits") + a ready clean money/efficiency-facing fix → highest-leverage (beats
+  the routine #5 sweep, which infra forces next anyway). The C408-filed #119, VERIFIED FIRSTHAND (C21/C60): computeMpgAndCostPerMile (analytics-charts.ts:311) pushed
+  EVERY computeEfficiencyPoint into mpgValues — and computeEfficiencyPoint accepts electric rows (electric-aware realistic band), so a charge session (kWh in `volume`)
+  emitted its ~3 mi/kWh into the SAME array as ~40 mi/gal gas points → fuelConsumption (the FuelStats Average/Best/Worst card, labeled mi/gal) blended them: worst showed
+  ~3 "mi/gal", the avg dragged down. The C353 gas/charge isolation vehicle-stats.ts does, missed on this analytics path. FIX (SURGICAL, not the agent's blanket
+  `if(electric)return` which would have wrongly dropped charge from cost too): gate the `mpgValues.push` on `!isElectricFuelType(current.fuelType)` ONLY — costPerMileValues
+  stays UNFILTERED because cost-per-mile is total energy spend over total miles (fuel+charge), a consistent $/mi (the C378-certified invariant; dropping charge cost would
+  UNDER-report spend). GUARD: +3 (analytics-charts-unpinned.test.ts): a gas+charge vehicle → mpgValues has ONLY the ~30 gas point (len 1, was 2 RED pre-fix), no
+  mi/kWh-magnitude leak; costPerMileValues KEEPS the charge $/mi (len 2, C378 preserved); gas-only control unaffected. NON-VACUOUS. be validate:local EXIT 0, 1499 pass
+  (+3) (a format reflow → check:musl:fix, re-validated clean). The sibling builders (buildMonthlyConsumption/buildSeasonalEfficiency/buildDayOfWeekPatterns) share
+  computeEfficiencyPoint + have the SAME contamination → FILED as #122 (a coherent multi-site sweep, the C367→C390→C391 per-builder-then-sweep precedent), not scattered
+  into this bug cycle. cov: be 86.92% (carry, +3 guards) / fe 84.45% (carry).
+- **C412 (infra): #5 branch-hygiene sweep + coverage re-measure (the overdue ~C410 cadence; last actual C400)** — BALANCE: nothing over budget (deep-review 2, guard 5,
+  bug 1, arch 3, infra 6/6, feature parked); infra MOST-STARVED AT budget (last 406, starved-for 412−406=6=budget) AND the #5 sweep was overdue → highest-leverage pick.
+  SWEEP: re-measured both suites — be 86.92% line / 86.56% func (line FLAT vs C400's 86.92, func +0.02 — the C403–C411 fix+guard arc held); fe 84.46% line / 84.4% func /
+  76.92% branch (line +0.01 / branch +0.05 vs C400's 84.45/84.4/76.87 — the #117/C405 +5 + #120 wiring). Both flat-to-up, gap stable ~2.5pts. Branch 222 ahead of
+  origin/main, working tree clean of TRACKED changes. HYGIENE CATCH (+ a SELF-CORRECTION): .kiro/specs/offline-entries/.config.kiro was still untracked — C400 committed
+  that spec's 3 .md docs but left .config.kiro out, noting "as siblings do." That note was WRONG (verified firsthand C412): 23 of 24 specs DO track their .config.kiro
+  (plain `{specId, workflowType, specType}` metadata, no secrets) — offline-entries was the lone straggler. Committed it → the spec is now fully consistent with every
+  sibling, finishing the C400 fix. No product code touched → coverage runs were the gate (both EXIT 0). All other untracked items confirmed by-design (*.meshclaw.e2e.ts,
+  .meshclaw-tools/, screenshots, playwright config, mise.local.toml). cov: be 86.92% / fe 84.46%. Next #5 sweep ~C422; next CLAUDE.md refresh ~C416.
+- **C413 (bug → #122: the #119 sibling-builder sweep — extract gasEfficiencyPoint, route ALL gas-MPG aggregators through it so a PHEV's charge mi/kWh stops diluting them)** —
+  BALANCE: nothing over budget (deep-review 3, guard 6=budget, bug 2, arch 4, infra 1); guard not OVER, and the C411-filed #122 was a live money/efficiency bug → highest-leverage.
+  VERIFIED FIRSTHAND (C21/C60), and the verification WIDENED the scope: the filed note named 3 sibling builders, but grep found computeEfficiencyPoint feeding a gas-MPG average
+  at 5 sites — computeMpgAndCostPerMile (#119/C411), buildMonthlyConsumption, addSeasonalEfficiencyData, computePerVehicleFuelEfficiency (→ vehicleRadar), and
+  buildFuelEfficiencyComparison's per-vehicle monthly. ALSO verified the label is ALWAYS gas-derived (getFuelEfficiencyLabel = distance/volume, no adaptive mi/kWh on these
+  charts) → excluding electric is correct (an EV-only car has no gas MPG for a mi/gal chart; its efficiency belongs on the mi/kWh surface), not an EV regression. FIX (arch-clean
+  for a bug — ONE source of truth instead of 5 inline gates, dodging the C403/C409 drift risk): extracted `gasEfficiencyPoint(current, previous)` = computeEfficiencyPoint but
+  null for an electric current row; routed all 5 gas-MPG sites through it (incl. replacing C411's inline `!isElectricFuelType` gate). cost-per-mile STILL calls
+  computeEfficiencyPoint directly (spans all energy, C378). GUARD: +3 (gasEfficiencyPoint gas→point/electric→null; buildMonthlyConsumption + buildSeasonalEfficiency efficiency =
+  the gas 30 MPG, NOT the diluted (30+4)/2=17). NON-VACUOUS. be validate:local EXIT 0, 1502 pass (+3) (an import-sort + format reflow → check:musl:fix, re-validated clean).
+  cov: be 86.92% (carry, +3 guards) / fe 84.46% (carry).
+- **C414 (guard): pin the LOAD-BEARING edge of the #119/#122 gas/charge partition — an EV-ONLY vehicle yields an EMPTY gas-MPG series but a real cost-per-mile** —
+  BALANCE: guard OVER budget (last 407, starved-for 414−407=7 > 6) → forced pick. The C411/C413 fix rests on TWO sides: (a) charge excluded from the gas-MPG average
+  (pinned by the mixed-PHEV tests), and (b) an EV-ONLY car produces a CLEAN-EMPTY gas-MPG series — null avg / empty mpgValues, NOT a phantom mi/kWh mislabeled mi/gal, NOT
+  NaN — WHILE cost-per-mile still computes from charge spend (cost spans all energy, C378). Side (b) was GENUINELY UNPINNED (the existing tests all carry a gas point).
+  VERIFIED FIRSTHAND (C21/C60): computeFuelConsumptionMetrics([]) returns all-null (clean), buildMonthlyConsumption with no gas pair → effCount 0 → efficiency 0 (documented
+  empty value). GUARD: +3 (analytics-charts-unpinned.test.ts) — an all-charge vehicle: mpgValues EMPTY (a refactor reverting gasEfficiencyPoint→computeEfficiencyPoint → len
+  1 [the ~4 mi/kWh] → RED) but costPerMileValues len 1 = $9/240mi; computeFuelConsumptionMetrics all-null (no NaN); buildMonthlyConsumption efficiency 0 not ~4, volume
+  still aggregates the real kWh. NON-VACUOUS. This is a NORTH_STAR #5 merge-surviving tripwire on the C411/C413 partition — distinctly catches an EV-only regression a
+  mixed test (still has a gas point) would miss. No source touched (test-only). be validate:local EXIT 0, 1505 pass (+3). cov: be 86.92% (carry, +3 guards) / fe 84.46% (carry).
+- **C415 (arch): extract resetSplitAllocations — ONE source of truth for the split-method allocation reset (2 byte-identical form copies → 1)** — BALANCE: arch OVER budget
+  (last 409, starved-for 415−409=6 > 5) → forced pick. rule-7 2-agent fan-out; the BE scout found NO clean byte-identical dup (well-deduped) — it flagged a MAX_VALID_MPG
+  100-vs-150 band DIVERGENCE, but unifying that CHANGES behavior → bug/direction-call, NOT arch (rejected for this cycle). The FE candidate was clean: VERIFIED FIRSTHAND
+  (C21/C60) the ENTIRE resetAllocationsForMethod (all 3 branches: even→[], absolute→{amount:0}, percentage→{percentage: round(100/N,1dp)}) was BYTE-IDENTICAL in ExpenseForm
+  (:767) + InsuranceTermForm (:166). The 100/N rounded-to-1-decimal seed is load-bearing — a divergent copy (2-decimal round, or different N math) would materialize the SAME
+  multi-vehicle split with DIFFERENT per-vehicle percentages depending on which form created it (rule-5 concrete payoff). FIX: extracted pure `resetSplitAllocations(method,
+  vehicleIds): SplitAllocationDraft[]` into expense-helpers.ts (already a tested pure-util home both forms can import; no cycle); routed both forms to a one-line call.
+  Rule-2 behavior-preserving (identical output). Rule-3: the forms are eyes-on/Playwright-blocked, so the increment is the helper + ITS OWN test net (+6, reset-split-
+  allocations.test.ts: even→[], absolute→amount:0, percentage 100/N, the 100/3→33.3 1-decimal load-bearing rounding, empty-list→[] no-NaN, single→100); svelte-check
+  verified the wiring green→green. fe validate:local EXIT 0, 696 pass (+6). No eyes-on needed — pure-logic extraction moves no pixel. cov: be 86.92% (carry) / fe 84.46% (carry, +6).
+- **C416 (deep-review → #123: the provider PUT path bypassed the C349 S3-config validation CREATE has — the #103/C349 footgun re-manifested on UPDATE)** — BALANCE:
+  deep-review OVER budget (last 410, starved-for 416−410=6 > 5) → forced pick (CLAUDE.md refresh ~C416 waits). 2-agent fan-out (auth/session/OAuth + storage-providers/
+  sync-worker). (A) auth/session/OAuth + cross-tenant ownership CERTIFIED CLEAN — third independent confirmation (C341/C372/C416): every route requireAuth + userId-scoped,
+  session refresh creates-before-invalidates, cookies httpOnly/secure/sameSite, OAuth 3-flow state single-use + flowType-gated + session-bound, the id-only repo writes are
+  all defense-in-depth behind a userId ownership guard. (B) storage scout surfaced #123, VERIFIED FIRSTHAND (C21/C60): PUT /providers/:id (routes.ts:406-408) wrote
+  body.config VERBATIM with NO provider-type validation — while CREATE fail-fasts an incomplete S3 config (resolveProviderCredentials, the C349 fix). So editing an S3
+  provider (the edit form's canSave doesn't even require region) to a config missing endpoint/bucket/region persisted a 200 + a bricked row that throws at buildS3Provider
+  on EVERY later test/upload/sync — silent backup loss, the exact #103/C349 footgun C349 only closed on CREATE. FIX (atomic + arch-clean, ONE source of truth): extracted
+  validateStorageProviderConfig(providerType, config) from resolveProviderCredentials's inline S3 block; called from BOTH CREATE and the PUT handler (when body.config is
+  updated, against the existing provider's type). GUARD: the existing PUT test codified the BUG (PUT {config:{changed:true}} on an s3 default → asserted 200) — flipped it
+  to send a complete config for the happy path + added a NEW 400 guard (incomplete-config PUT rejected, original config survives — no partial persist). NON-VACUOUS
+  (pre-fix 200). be validate:local EXIT 0, 1506 pass (+1 net). cov: be 86.92% (carry) / fe 84.46% (carry).
+- **C417 (bug → #124: import normalizeDecimal corrupted a US-format number with BOTH separators — "1,234.56" → 1.23456, a ~1000x money under-count via the Fuelly preset)** —
+  BALANCE: bug OVER budget (last 413, starved-for 417−413=4 > 3) → forced pick. 2-agent fan-out (import-mapping + TCO/depreciation); TCO CERTIFIED CLEAN (C361 corroborated:
+  #27 exclusion correct, all cost-per-X div-guarded, percentages sum ~100). The import scout surfaced #124 AND corrected my filed grounding (there is NO "per-mapping
+  decimalComma flag" — normalizeDecimal runs UNCONDITIONALLY; that note was wrong). VERIFIED FIRSTHAND (C21/C60): normalizeDecimal (import-mapping.ts:145) on `hasDot &&
+  hasComma` did `s.replace(/\./g,'').replace(',','.')` — hard-assuming EUROPEAN (dot=thousands, comma=decimal). But the dot-AFTER-comma ordering of US `1,234.56` is
+  UNAMBIGUOUSLY US (no locale puts a decimal dot after a thousands comma), so it stripped the dots → `1,23456` → `1.23456` = a $1,234.56 expense imported as $1.23. Applied
+  unconditionally to `amount` (:295) on EVERY import incl. the US Fuelly preset (mdy/miles/US-gallons, NO decimal flag) → reachable money under-count, NORTH_STAR #1.
+  DISTINCT from the product-gated #24 (a LONE-comma `1,234` IS ambiguous US-thousands-vs-EU-decimal; the BOTH-separators case is NOT — provably wrong regardless of locale).
+  FIX (atomic): in the both-separators branch, the decimal separator is whichever appears LAST (`lastIndexOf`); strip the other as thousands. Handles BOTH `1.234,56` (EU,
+  comma last → 1234.56) AND `1,234.56` (US, dot last → 1234.56). GUARD: +2 (US 1,234.56→1234.56 [RED pre-fix: 1.23456]; multi-group 1,234,567.89→1234567.89); the existing
+  EU `1.234,56` test stays green (comma last). NON-VACUOUS. be validate:local EXIT 0, 1508 pass (+2). cov: be 86.92% (carry, +2 guards) / fe 84.46% (carry).
+- **C418 (infra): CLAUDE.md full orientation refresh (the overdue ~C416 cadence; last full C406)** — BALANCE: nothing over budget (deep-review 2, guard 4, bug 1, arch 3,
+  infra 6/6, feature parked); infra MOST-STARVED AT budget (last 412, starved-for 418−412=6=budget) AND the CLAUDE.md refresh cadence was overdue → highest-leverage pick.
+  REFRESHED the drift-prone "Current state & gaps" section so a fresh-agent entry point reflects reality: (1) coverage reading C400→C412 fresh measure (be 86.92 line /
+  86.54→86.56 func; fe 84.45→84.46 line / 76.87→76.92 branch — flat-to-up, the C403–C417 fix+guard arc held); (2) suite size ~1491/~690 → ~1508/~696; (3) appended the
+  C406–C417 closed-bug arc to the fix list (#C404 claim-photo, #118 split-tag, #119/#122 PHEV-MPG gasEfficiencyPoint partition, #120 offline-date, #123 provider-PUT,
+  #124 import-decimal-US-format) + bumped "all landed C155→C417". Doc-only, no code touched → no build gate (CLAUDE.md is not compiled; verified the edits read coherently +
+  preserved the structure the loop depends on). The pending-Angelo block is unchanged (PR-readiness C368 + CSV-apostrophe C401 remain the open escalations; #121 + the
+  MAX_VALID_MPG band divergence are loop-actionable BACKLOG items, not Angelo-gated). cov: be 86.92% (carry) / fe 84.46% (carry). Next CLAUDE.md refresh ~C428; next #5 sweep ~C422.
+- **C419 (guard): pin computeEfficiencyPoint's realistic-band boundaries against the REAL function + ESCALATE the MPG-band divergence (direction call)** — BALANCE: nothing
+  over budget; guard MOST-STARVED actionable (last 414, starved-for 419−414=5, budget 6) → highest-leverage. Investigating the C415-filed MAX_VALID_MPG divergence
+  firsthand (C21/C60): the "realistic MPG" filter is [5,100] gas / [1,10] electric in analytics-charts.ts isRealisticEfficiency (the documented band, min+max) but an inline
+  `mpg > 0 && mpg < 150` (no min, looser max, no electric band) in calculations.ts:62 + vehicle-stats.ts:179 — so the SAME car's outlier pair (4 or 120 MPG) counts on the
+  per-vehicle stats card but is filtered from the Analytics Fuel Stats card → two different averages. Unifying CHANGES a displayed number AND is a judgment call (which band)
+  → ESCALATED to Angelo (options: adopt [5,100] everywhere [my lean — documented + matches charts] / adopt (0,150) / discuss). NOT self-unified. GUARD INCREMENT (the
+  genuinely-unpinned invariant): the ONLY prior band coverage (fuel-efficiency.property.test.ts) RE-IMPLEMENTS isRealisticEfficiency as a local reference + tests THAT (the
+  C229 theater trap) — so a real MAX_VALID_MPG drift would leave it green. +6 guards (analytics-charts-unpinned.test.ts) driving the EXPORTED computeEfficiencyPoint: gas
+  100→kept / 101→null / 5→kept / 4→null; electric 10→kept / 11→null. NON-VACUOUS (a band-constant change → RED). be validate:local EXIT 0, 1514 pass (+6). cov: be 86.92% (carry, +6 guards) / fe 84.46% (carry).
+- **C420 (bug): reminder date-advance recurrence math + insurance premium-amortization CERTIFIED CLEAN (dormant-vein scout, no defect; docs-only)** — BALANCE: bug AT
+  budget (last 417, starved-for 420−417=3=budget, the tightest "never-sits") tied with arch (5=5) → took bug. 2-agent fan-out on two under-recently-audited money/date
+  surfaces. (A) reminder DATE-ADVANCE arithmetic (trigger-service.ts advanceCustom/clampToAnchorDay/computeNextDueDate): CERTIFIED CLEAN — EVERY setMonth/setFullYear is
+  preceded by `next.setDate(1)`, so the backend does NOT carry the #99 (C330) bare-setMonth day-overflow class; anchor read fresh from startDate each advance (no drift, a
+  Jan-31 monthly clamps to Feb-28 then re-anchors to Mar-31); leap-year Feb-29 yearly correct; strict monotonicity holds (the no-progress backstop can't mis-fire). VERIFIED
+  FIRSTHAND the overflow-clamp is COMPREHENSIVELY pinned (compute-next-due-date.property.test.ts Property 2 + explicit Jan31→Feb28/Feb29 cases) → no unpinned invariant.
+  (B) insurance premium-amortization (effectiveMonthlyPremium/accumulateMonthlyPremiums/monthKeysInRange): CERTIFIED CLEAN — div-by-zero guarded (monthsInTerm===0→0),
+  monthlyCost precedence, totalCost amortized over the SAME monthKeysInRange the trend uses (sums to totalCost exactly), latest-term-only per policy (no cross-term
+  double-count), largest-remainder split penny-exact (C382), validation rejects endDate<=startDate (no zero-length term). Known shape-mismatches (#19 trend-dates-totalCost-
+  on-startDate-month, #69 monthly-only-term-absent-from-TCO) already filed/escalated, NOT re-reported. NO reachable atomic defect, NO genuinely-unpinned reachable invariant
+  → CERTIFICATION only (C306/C345/C402 precedent; a manufactured test = the C181/C229 coverage-theater trap). Docs-only, no source/test touched. cov: be 86.92% (carry) / fe 84.46% (carry).
+- **C421 (arch): extract sortExpensesByDate — ONE source of truth for the chronological pairwise-order sort (3 byte-identical sites → 1)** — BALANCE: arch OVER budget
+  (last 415, starved-for 421−415=6 > 5) → forced pick. rule-7 2-agent fan-out (FE certified well-factored — only trivial 1-liners). VERIFIED FIRSTHAND (C21/C60): the
+  date-ascending comparator `[...x].sort((a,b) => new Date(a.date).getTime() − new Date(b.date).getTime())` was BYTE-IDENTICAL at 3 sites — calculateAverageMPG
+  (calculations.ts:42), calculateAverageMilesPerKwh (:93), and the /stats handler (vehicles/routes.ts:343). All 3 feed PAIRWISE consecutive-row calcs (current − previous),
+  so an unsorted/wrong-direction/in-place-mutating copy silently mis-pairs into garbage MPG/mi-kWh with no error (the #75/C222 class — a real latent bug, the rule-5 payoff).
+  Extracted `sortExpensesByDate<T extends {date: Date|string}>` (copy, never mutates) into calculations.ts (where 2 of 3 live + the shared util home); routed all 3. Rule-2
+  behavior-preserving (identical sort). Rule-3 green→green: the #75/C222 order-independence guard + calculations sort tests drive calculateAverageMPG/MilesPerKwh — GREEN
+  before AND after. +4 helper tests (ascending; no-mutation; Date+string mix; empty/single). be validate:local EXIT 0, 1518 pass (+4). cov: be 86.92% (carry, +4) / fe 84.46% (carry).
+- **C422 (deep-review → #125: PUT /expenses/:id skipped the financing-source verification POST enforces — a forged source_id='financing' link corrupts the loan balance)** —
+  BALANCE: deep-review OVER budget (last 416, starved-for 422−416=6 > 5) → forced pick. 2-agent fan-out (expense validation/fuel-fields + vehicle CRUD/cover-photo); vehicle
+  write-path CERTIFIED CLEAN (C338/C366 corroborated — clear-field .nullish(), plate per-tenant, cover-photo validate-before-unset, delete cascade). The expense scout
+  surfaced #125, VERIFIED FIRSTHAND (C21/C60): the POST handler (routes.ts:582) verifies a `sourceType:'financing'` link points at the vehicle's ACTIVE financing
+  (existence + isActive + sourceId===financing.id), but the PUT handler had NO equivalent — it ran the #61 vehicle re-check + #76 fuel-clear + the #109 both-or-neither
+  refine, then wrote `{sourceType:'financing', sourceId:<arbitrary>}` verbatim. computeBalance sums EXACTLY `source_type='financing' AND source_id=id`
+  (originalAmount − SUM), so a forged/mismatched link mis-attributes the expense as a loan payment → UNDERSTATES the displayed balance (NORTH_STAR #1 money figure) + wires
+  the row into the financing cascade-cleanup (#62 class). DISTINCT from #109 (asymmetric one-of-pair) + the enum restriction (reminder/insurance_term) — neither re-added
+  the financing existence/id-match check on PUT. FIX (atomic + arch-clean, ONE source of truth): extracted `assertFinancingSourceValid(sourceType, sourceId, vehicleId)`
+  from the POST inline block; called from BOTH POST and the PUT handler (keyed on updateData.sourceType, validated against the FINAL vehicleId). GUARD: +3 (forged on a
+  no-financing vehicle → 400 [200 pre-fix, RED]; valid link → 200; mismatched id on a financed vehicle → 400). NON-VACUOUS. be validate:local EXIT 0, 1521 pass (+3). cov: be 86.92% (carry, +3 guards) / fe 84.46% (carry).
+- **C423 (infra): #5 branch-hygiene sweep + coverage re-measure (the ~C422 cadence; last actual C412)** — BALANCE: nothing over budget (deep-review 1, guard 4, bug 3=budget,
+  arch 2, infra 5/6, feature parked); infra MOST-STARVED actionable (last 418, starved-for 423−418=5, budget 6) AND the #5 sweep was due → highest-leverage pick. SWEEP:
+  re-measured both suites — be 86.93% line / 86.57% func (line +0.01 vs C412's 86.92, func +0.03 — the C413–C422 fix+guard arc held as product code grew); fe 84.51% line /
+  84.54% func / 77.06% branch (line +0.05 / func +0.14 / branch +0.14 vs C412's 84.46/84.4/76.92 — the C415 resetSplitAllocations + C419 band + C421 sort + C422 financing
+  guards delivered). Both creeping UP, gap stable ~2.4pts. HYGIENE: working tree CLEAN of tracked changes; NO stray untracked tracked-class file (the C400/C412
+  offline-entries spec + .config.kiro catches stayed fixed); all untracked confirmed by-design (*.meshclaw.e2e.ts, .meshclaw-tools/, screenshots, playwright config,
+  mise.local.toml). Branch 233 commits ahead of origin/main, build floor GREEN both sides → PR-ready (standing escalation since C368). No product code touched → coverage
+  runs were the gate (both EXIT 0). cov: be 86.93% / fe 84.51%. Next #5 sweep ~C433; next CLAUDE.md refresh ~C428.
+- **C424 (bug → #121: sync-manager retrySingleExpense silently DROPPED a conflict detected during a retry)** — BALANCE: bug OVER budget (last 420, starved-for 424−420=4 >
+  3) → forced pick. Re-examined the C410-filed #121 firsthand (C21/C60) — and it turned out a CLEAN atomic fix, not the flaky timing test the scout's caveat implied:
+  retrySingleExpense (sync-manager.ts:261) acted ONLY on result.success — when syncSingleExpense returned {success:false, conflict} on a retry, the conflict was NOT pushed
+  to syncConflicts.current (the main syncExpenses loop DOES, :154) → no SyncConflictResolver dialog, expense stuck pending, retryCount never cleared. The realistic trigger
+  (first POST committed but its response lost → retry's checkForExistingExpense finds the row) is race-GATED, but the LOGIC is deterministically testable. FIX (mirror the
+  main loop): on result.conflict in the retry handler, APPEND to syncConflicts.current (not replace — the retry runs async AFTER syncAll returned, other conflicts may be
+  displayed; dedup by expense id) + clear retryCount + set syncState 'error'. GUARD: +1 (sync-manager.test.ts) driving the REAL retry path with FAKE TIMERS (not a wall-clock
+  race): attempt-1 create fails → schedules retry → retry's conflict-check returns an existing row → advanceTimersByTimeAsync fires it → syncConflicts.current has the
+  conflict + retryCount cleared. NON-VACUOUS (pre-fix stayed []). fe validate:local EXIT 0, 697 pass (+1). The durable DB clientId dedup means no DOUBLE-apply regardless;
+  this closes the stuck-pending + no-signal half. cov: be 86.93% (carry) / fe 84.51% (carry, +1).
+- **C425 (guard): pin the POST call site of the C422 assertFinancingSourceValid helper (both shared-helper boundaries now covered)** — BALANCE: guard MOST-STARVED actionable
+  AT budget (last 419, starved-for 425−419=6=budget) → highest-leverage. First investigated the computeBalance overpayment→0 clamp (a NORTH_STAR #1 money invariant) — but
+  VERIFIED FIRSTHAND it's ALREADY deterministically pinned (financing-balance.property.test.ts:153 "balance clamped to 0 when payments exceed original" + no-payment +
+  non-existent) → declined to manufacture a redundant test (the C181/C229 trap). The GENUINELY-unpinned invariant: C422 extracted assertFinancingSourceValid as ONE source
+  of truth shared by POST + PUT, but the C422 tests all drive the PUT call site, and the POST financing-source verification (existence/isActive/id-match) was previously
+  inline + NEVER directly tested (the #62 POST tests cover only the ENUM rejection of reminder/insurance_term) — so a refactor dropping the POST call to the helper would
+  go RED nowhere. GUARD: +2 (expense-source-traceability.test.ts): POST {sourceType:financing, sourceId:forged} on a no-financing vehicle → 400; POST linking the vehicle's
+  ACTUAL active financing → 201 (not over-broad). NON-VACUOUS (the POST financing-verification had no direct test before). NORTH_STAR #5 — both call sites of the shared
+  helper are now pinned. No source touched (test-only). be validate:local EXIT 0, 1523 pass (+2). cov: be 86.93% (carry, +2 guards) / fe 84.51% (carry).
+- **C426 (arch): collapse the duplicated getPendingExpenses — sync-manager's private copy → the canonical exported one (cross-file dup, 2 sites → 1)** — BALANCE: arch
+  most-starved AT budget (last 421, starved-for 426−421=5=budget) → highest-leverage. rule-7 2-agent fan-out. VERIFIED FIRSTHAND (C21/C60): sync-manager.ts:128-130 had a
+  PRIVATE `getPendingExpenses() { return loadOfflineExpenses().filter(e => !e.synced) }` BYTE-IDENTICAL to the EXPORTED canonical one in offline-storage.ts:156. `!synced`
+  is THE contract for "which offline expenses to sync" — a divergent copy (e.g. one path adding an error/tombstone filter) would desync what sync-manager attempts vs what
+  the store considers pending → silent data loss / phantom sync loops. FIX: deleted the private method, imported the canonical getPendingExpenses, routed both call sites
+  (:104, :350). Rule-2 behavior-preserving (identical filter). Rule-3 green→green: offline-storage.test.ts (getPendingExpenses unsynced-only contract) +
+  sync-manager.test.ts (syncAll) drive it — GREEN before AND after. The sync-manager test's offline-storage MOCK omitted getPendingExpenses → had to add a mock mirroring
+  the real impl over the MOCKED loadOfflineExpenses (the C163 mock-trap discipline: keep the mock driving the real contract, not a divergent reimpl). fe validate:local
+  EXIT 0, 697 pass (unchanged). Chose the FE cross-file dup over the BE toTimeMs candidate (4 identical lines within ONE comparator — more local/cosmetic). cov: be 86.93% (carry) / fe 84.51% (carry).
+- **C427 (deep-review → #126: the CONVERTED/trend analytics efficiency builders used computeEfficiencyPoint, contaminating gas-MPG with PHEV charge mi/kWh — the C413 sweep's
+  missed twin)** — BALANCE: deep-review most-starved actionable AT budget (last 422, starved-for 427−422=5=budget) → highest-leverage. 2-agent fan-out (CSV export + cross-vehicle
+  agg); CSV export CERTIFIED CLEAN (C383 round-trip corroborated, every field traced both directions). The cross-vehicle scout surfaced #126, VERIFIED FIRSTHAND (C21/C60):
+  C411/C413 fixed the gas/charge partition (gasEfficiencyPoint) on the analytics-charts builders + computeMpgAndCostPerMile, but the repository.ts CONVERTED/trend builders
+  still used computeEfficiencyPoint (accepts electric) at 4 sites — computeConvertedEfficiencyValues (:479), buildConvertedEfficiencyTrend (:561), getFuelEfficiencyTrend (:1168),
+  buildConvertedFuelEfficiencyComparison (:1615). For a PHEV a charge session (kWh→~mi/kWh) leaked into the gas-MPG average; WORSE on the converted path, convertEfficiency
+  would then convert that mi/kWh AS IF mi/gal → garbage. The buildConvertedFuelEfficiencyComparison case is a BRANCH-PARITY gap: its skipConversion twin
+  (buildFuelEfficiencyComparison) already uses gasEfficiencyPoint, so the SAME chart flipped correct↔polluted purely on a fleet units-mismatch. FIX: routed all 4 through
+  gasEfficiencyPoint (electric excluded BEFORE conversion); dropped the now-unused computeEfficiencyPoint import. GUARD: +1 (cross-vehicle.property.test.ts + a seedCharge
+  helper): a PHEV with 2 consecutive gas fillups + 2 consecutive charge sessions → getFuelEfficiencyTrend returns ONLY the 30 MPG gas point (pre-fix: + a ~4 mi/kWh charge
+  point). NON-VACUOUS. (Self-corrected the test first: an interleaved seed conflated this with the separate #C398 pairing-adjacency issue — grouped each energy type to
+  isolate the exclusion concern.) be validate:local EXIT 0, 1523 pass (+2). The C411→C413→C427 arc now covers the gas/charge partition across BOTH the analytics-charts builders
+  AND the repository converted/trend paths. cov: be 86.93% (carry, +1 guard) / fe 84.51% (carry).
+- **C428 (bug → #127: replace-mode restore wipe is NON-ATOMIC with the insert — a mid-restore insert failure leaves the account WIPED, total data loss; HIGH, partial mitigation
+  landed + general fix ESCALATED)** — BALANCE: bug OVER budget (last 424, starved-for 428−424=4 > 3) → forced pick (all #117–#126 closed → fresh 2-agent fan-out: odometer CRUD +
+  restore merge/replace). Odometer CERTIFIED CLEAN (C345 corroborated). The restore scout surfaced #127, VERIFIED FIRSTHAND (C21/C60) + cross-checked the C151 LEDGER entry:
+  restore.ts:125 does `db.transaction(async tx => { deleteUserData; insertBackupData })`, but bun-sqlite's ASYNC-callback transaction does NOT roll back on a thrown insert
+  (the exact footgun C151 hit + documented: "runs the INSERT synchronously and does not roll it back when a throw escapes the ASYNC transaction callback"). So a mid-restore
+  insert failure leaves the replace-mode WIPE committed → the user's account is emptied (NORTH_STAR #1 total data loss). Reachable WITHIN-TENANT: a schema-valid +
+  referentially-valid backup whose rows violate a DB UNIQUE index validateBackupData doesn't check (two expenses sharing a non-null clientId, two vehicles sharing a
+  licensePlate — a truncated/corrupt download) → wipe commits, 2nd insert throws, data gone. WHY A DIRECTION CALL: a FULLY-GENERAL fix (atomic wipe+insert not relying on the
+  broken async rollback) is a transaction-semantics change every `async (tx)` in the codebase shares → arch rule-6, ESCALATED to Angelo (options: a synchronous bun:sqlite tx
+  for restore / a codebase-wide async-tx-safety wrapper / discuss). MITIGATION LANDED (safe, fully-verifiable, closes the concrete reachable trigger): validateUniqueConstraints
+  in validateBackupData rejects a backup with duplicate non-null clientId/licensePlate BEFORE any wipe (the insert can't fail on it → the wipe never runs). +3 guards
+  (dup-clientId→reject, dup-licensePlate→reject, null-plate→NOT a dup [partial-index skip]). NON-VACUOUS. (Self-corrected the null-control test: I'd wrongly assumed
+  buildMinimalStringRow leaves the plate null — it fills 'test-<name>', so I explicitly nulled it; the correction reaffirmed the dupCheck genuinely fires.) be validate:local
+  EXIT 0, 1526 pass (+3). The general transient-insert-failure window stays open until the escalated transaction-semantics fix. cov: be 86.93% (carry, +3 guards) / fe 84.51% (carry).
+- **C429 (infra): CLAUDE.md full orientation refresh (the overdue ~C428 cadence; last full C418)** — BALANCE: nothing over budget (deep-review 2, guard 4, bug 1, arch 3,
+  infra 6/6, feature parked); infra MOST-STARVED AT budget (last 423, starved-for 429−423=6=budget) AND the CLAUDE.md refresh cadence was overdue → highest-leverage pick.
+  REFRESHED the drift-prone "Current state & gaps" section: (1) coverage reading C412→C423 fresh measure (be 86.92→86.93 line / 86.56→86.57 func; fe 84.46→84.51 line /
+  84.4→84.54 func / 76.92→77.06 branch — flat-to-up, the C413–C428 arc held); (2) suite size ~1508/~696 → ~1526/~697; (3) appended the C418–C428 closed-bug arc to the fix
+  list (#125 financing-source-PUT, #126 converted-path PHEV-MPG, #127 restore-uniqueness) + bumped "all landed C155→C428"; (4) added the TWO new pending-Angelo escalations
+  to that block — #30 MPG-band divergence (C419) + #127 restore-atomicity (C428, HIGH). Doc-only, no code touched → no build gate (CLAUDE.md not compiled; verified the
+  edits read coherently + preserved structure). cov: be 86.93% (carry) / fe 84.51% (carry). Next CLAUDE.md refresh ~C439; next #5 sweep ~C433.
+- **C430 (guard → close a C181/C229 coverage-theater gap: the realistic-MPG outlier band `mpg > 0 && mpg < 150` was "covered" only by a LOCAL re-implementation, never the real export)** —
+  BALANCE: nothing over budget (deep-review 3, guard 5/6, bug 2, arch 4, infra 1, feature parked); guard MOST-STARVED actionable (last 425, starved-for 430−425=5, closest to its 6 budget) → highest-leverage.
+  2-agent fan-out (BE + FE unpinned-invariant scouts). BE #1 was the clear pick: a genuine coverage-theater trap. VERIFIED FIRSTHAND (C21/C60): calculateAverageMpg (vehicle-stats.ts:179) drops a fuel pair whose
+  MPG is outside `mpg > 0 && mpg < 150` as a likely data error; it's reached LIVE via GET /vehicles/:id/stats (routes.ts:346, trackFuel=true) on ordinary DB-valid fuel rows. But vehicle-stats.property.test.ts
+  "covered" the band ONLY through a local re-implementation — referenceMpg (L43-59) + countUnfilteredPairs (L64-76) each carry their OWN copy of `mpg > 0 && mpg < 150`, and Properties 1-3 assert against those COPIES,
+  never importing the real export's filter; the real-export regression blocks (#75 order-indep, Property 6 mixed) only feed realistic 8-40 MPG, so the boundary was never driven (the exact C181/C229 anti-pattern).
+  +3 guards driving the REAL calculateVehicleStats: an above-band pair (175 MPG, 2-gal-after-350mi mistype) dropped → avg stays 30 (regressed `<150` → 102.5); an EXACTLY-150 pair dropped (the load-bearing `<150` not
+  `<=150` → would be 90); a zero-delta/duplicate-odometer pair dropped (the `mpg>0` edge → would be 15). All NON-VACUOUS (the avg-only-the-kept-pair assertion catches each loosening). This also INTERSECTS the escalated #30
+  band-divergence (C419) — pinning today's (0,150) contract LOCKS the behavior so a silent regression is detectable WITHOUT pre-deciding the [5,100]/[1,10] unification (noted in the test header). Chose the BE trap over the
+  FE chart-formatters picks (getTrendLineProps/getXTickCount/formatDateTick — genuinely unpinned but lower-stakes display utils vs a money-facing displayed-metric coverage-theater hole). One biome line-wrap reflow
+  (check:musl:fix) on a long object literal, then re-validated. be validate:local EXIT 0, 1529 pass (+3). cov: be 86.93% (carry, +3 guards) / fe 84.51% (carry).
+- **C431 (bug → #128: reminderApi.getMaterializedExpenses returned RAW backend-shaped rows typed as Expense[] — the one expense read that skips fromBackendExpense)** —
+  BALANCE: bug AND arch both AT budget (bug 3/3, arch 5/5, current 431); bug has the tighter budget + "jumps the queue when real". The bug queue's only OPEN item (#127) is
+  escalated/awaiting-Angelo, so ran a fresh 2-agent bug-hunt (BE + FE) to see if a clean loop-fixable defect exists before falling to arch. Both scouts converged: the
+  swept surface (C404–C428 arc + escalation queue) has NO currently-reachable unfixed defect; each surfaced ONE latent one-edit candidate (BE: google-sheets-service.ts:604
+  column-letter ceiling, latent at >26 cols — reminders is 25; FE: reminder-api.ts getMaterializedExpenses skips fromBackendExpense). Picked the FE one — a concrete
+  type-lie in SHIPPED code at the FE→BE seam (NORTH_STAR #3), clean fix mirroring the established convention. VERIFIED FIRSTHAND (C21/C60): the backend route
+  (reminders/routes.ts:227) returns raw findBySource rows ({success, data} backend shape: expenseAmount, un-split volume); EVERY other expense read runs fromBackendExpense
+  (expense-api.ts:107/119/226 — expenseAmount→amount, volume→volume|charge by isElectricFuelType), but getMaterializedExpenses (reminder-api.ts:77) did a bare
+  apiClient.get<Expense[]> — so a consumer reading expense.amount gets undefined + an electric charge's kWh stays in volume (never moved to charge). LATENT only because
+  the sole consumer (recurring-expenses T6 "materialized N expenses" view) is eyes-on/Playwright-blocked + unbuilt — so fixing now means T6 "just works" when it lands,
+  no surprise NaN/mislabel. FIX (one edit, mirrors expense-api.getExpense): get<BackendExpenseResponse[]> then data.map(fromBackendExpense). The EXISTING test CODIFIED the
+  bug (fed frontend-shaped {amount} + asserted pass-through) — rewrote it to feed BACKEND-shaped rows (incl. an electric volume=30 row) + assert the transform (amount===49.99,
+  no expenseAmount prop, charge===30 & volume undefined). NON-VACUOUS (pre-fix amount was undefined, charge unset). fe validate:local EXIT 0, 697 pass (unchanged count — test
+  rewritten not added). cov: be 86.93% (carry) / fe 84.51% (carry, type-lie fix). (Filed the BE google-sheets column-letter ceiling as a latent-hardening candidate.)
+- **C432 (arch → collapse SyncManager's private markExpenseAsSynced/clearSyncedExpenses into the canonical offline-storage exports + delete the dead one)** —
+  BALANCE: arch OVER budget (last 426, starved-for 432−426=6 > 5) → FORCED arch pick. rule-7 2-agent fan-out (BE + FE). BE scout returned a clean "nothing worth doing" (the
+  remaining BE dups are either untested-path [OAuth2-client construction, the analytics catch/log/rethrow block — fail green→green rule 3] or churn-grade single-expression
+  idioms / false-DRY [the per-entity validateXxxOwnership family encodes genuinely different scoping policy]). FE scout's RANK-1 was the pick. VERIFIED FIRSTHAND (C21/C60):
+  sync-manager.ts carried a PRIVATE markExpenseAsSynced (:247, byte-identical to offline-storage.ts:160 — load→map(id?{...e,synced:true}:e)→save) AND a PUBLIC async
+  clearSyncedExpenses (:330, near-identical to offline-storage.ts:169) that has ZERO callers anywhere (grep-confirmed dead). This is the EXACT offline-storage↔sync-manager
+  divergence channel that produced bugs #66 (fuelType drop) + #101 (missedFillup drop) — the same two-file fan-out the C426 getPendingExpenses + C205 offlineExpenseToBackend
+  extracts already collapsed; these two queue-mutators were the leftover. FIX (rule-2 behavior-preserving, one coherent change): added markExpenseAsSynced to the existing
+  offline-storage import, routed the 4 `this.markExpenseAsSynced(...)` callers (:151/:254/:305/:312) to it, DELETED the private method + the dead public clearSyncedExpenses,
+  dropped the now-unused loadOfflineExpenses/saveOfflineExpenses imports. rule-3 green→green: the canonical fns are anchored by offline-storage.test.ts:259/296; the
+  sync-manager success path (sync-manager.test.ts:94) drives the routed call (its offline-storage mock already declared markExpenseAsSynced: vi.fn(), now reused — no test
+  assertion on the marking EFFECT, so green→green holds, no test touched). fe validate:local EXIT 0, 697 pass (unchanged), svelte-check 0 errors, build clean. -16 LOC.
+  (Filed nothing new; the BE OAuth2-client dup is noted as a test-add-then-refactor candidate, not a clean green→green pick.) cov: be 86.93% (carry) / fe 84.51% (carry).
+- **C433 (deep-review → auth/session/OAuth + backup-EXPORT path BOTH CERTIFIED CLEAN; +1 RFC-4180 special-char round-trip guard; +1 MED finding FILED)** —
+  BALANCE: deep-review OVER budget (last 427, starved-for 433−427=6 > 5) → FORCED deep-review. 2-agent fan-out on the two stalest data-safety surfaces (auth lifecycle, last
+  touched only in guard cycles; backup EXPORT, last full cert C264). (A) AUTH/SESSION/OAuth CERTIFIED CLEAN — verified firsthand: session rotation create-before-invalidate +
+  fail-open (C313 holds), logout server-side invalidate, provider-callback CSRF (state.userId===session.user.id), tenant-scoped provider read/mutate/unlink + last-sign-in-method
+  guard, credentials never leaked (formatProviderResponse omits + AES-256-GCM at rest), account-linking blocks cross-account hijack (account_conflict, no implicit email merge).
+  FILED (NOT fixed — for a future bug/deep-review cycle) the one real finding: #129 (MED, data-integrity) — the login callback's updateExistingUserProfile (auth/routes.ts:176)
+  OVERWRITES users.email with the provider's reported email on EVERY login; the UNIQUE-collision branch (keeps old email, updates only displayName) is correct + present BUT
+  UNTESTED, and a within-account email drift on a provider-side email change is silent. Bounded (no cross-user takeover — collision handled). (B) BACKUP EXPORT CERTIFIED CLEAN —
+  completeness guards are REAL (CSV schema-derived via getColumnNames; sheets-header-coverage drives the live getTableColumns, not a hand-copied list — genuinely fails on a
+  dropped column); serialization correct (csv-stringify quoted:true ↔ csv-parse, RFC-4180); the backup path's DELIBERATE non-neutralization of formula-injection is by-design
+  (csv-safety.ts:16 — a round-trip artifact must be verbatim/lossless, not human-export-neutralized); #36/#37/#43/#44 confirmed still in their filed/escalated state, none drifted;
+  the C431 column-letter ceiling re-confirmed (reminders=25 cols, 1 short of the Z ceiling). THE strongest unpinned reachable invariant → guard: the existing round-trip tests
+  (claims/maintenance/reminder-split) drive the REAL exportAsZip→restoreFromBackup but NONE seeds a free-text value with a comma/quote/embedded-newline — so the RFC-4180 quoting
+  contract (what stands between a comma in a description and a column-shifted restore) was unpinned. +1 guard (csv-special-chars-roundtrip.test.ts, +2 tests): a vehicle nickname
+  AND an expense description = `Joe's "Daily", commute\nsecond line` (comma+quote+newline at once) survive export→import BYTE-FOR-BYTE through the real stack; + a leading-`=`
+  description round-trips VERBATIM (not neutralized — pins the by-design lossless contract). NOT coverage-theater (drives the real backup/restore, not a local re-stringifier).
+  One biome import-reorder autofix on the new file, then re-validated. be validate:local EXIT 0, 1531 pass (+2). cov: be 86.93% (carry, +2 guards) / fe 84.51% (carry).
+- **C434 (bug → #130: PUT /expenses/:id writes a stray mileage onto an ALREADY-non-fuel row when category isn't resent — the #76/C244 THIRD leg, poisons getCurrentOdometer)** —
+  BALANCE: bug MOST-STARVED (3/3, at budget; tightest budget). Queued #129 is direction-gated, #127 escalated, so a fresh 2-agent bug-hunt on UN-swept territory (BE analytics/insurance/
+  odometer; FE analytics/units/date) before falling to the #5 sweep. BOTH scouts surfaced a clean loop-fixable defect within an already-DECIDED fix arc (not a product call). BE was higher
+  leverage (broader reach + money-feeding blast radius) → picked. VERIFIED FIRSTHAND (C21/C60): clearFuelFieldsIfNotFuel (expenses/routes.ts:164) returns data UNCHANGED when
+  data.category===undefined; the PUT handler called it as clearFuelFieldsIfNotFuel(updateData) (:727), so a PUT that writes {mileage:99999} onto a maintenance row WITHOUT resending
+  category (updateData.category===undefined) skipped the clear → the stray mileage persisted on a non-fuel row → getCurrentOdometer's MAX(odometer) UNION has NO category filter →
+  poisons the vehicle's current-odometer → wrong mileage-reminder firing + inflated lease-overage MONEY projections (the exact #76 poison C244 targeted; C244 covered POST-with-category
+  + PUT-that-SWITCHES-category, but NOT this third leg: PUT writing mileage onto an already-non-fuel row). FIX (one edit, residual leg of the decided #76 arc, NOT a product call): added an
+  optional effectiveCategory param to clearFuelFieldsIfNotFuel (defaults to data.category → POST path byte-identical), and the PUT now passes the already-computed finalCategory. A genuine
+  fuel edit (finalCategory==='fuel') is untouched; a non-fuel effective category nulls the fuel-only fields. +1 guard in non-fuel-clears-fuel-fields.test.ts (the C244 test's home): a maintenance
+  row PUT {mileage:99999,volume:7,fuelType} with NO category → all nulled. NON-VACUOUS (pre-fix the no-op clear persisted 99999). FE scout's finding (ReminderForm.svelte:116 UTC .slice(0,10)
+  date round-trip, the #87/#106 family still live on that one form, narrow UTC+13/+14 reach) FILED as #131 for a future cycle. One biome format autofix on the test, then re-validated. be
+  validate:local EXIT 0, 1532 pass (+1). cov: be 86.93% (carry) / fe 84.51% (carry).
+- **C435 (infra): #5 branch-hygiene sweep + coverage re-measure + BRANCH_REVIEW.md refresh (the overdue ~C433 cadence; last actual sweep C423)** —
+  BALANCE: nothing over budget; infra MOST-STARVED (last 429, starved-for 435−429=6=budget) AND the #5 sweep cadence was overdue → highest-leverage. Three-part sweep:
+  (1) HYGIENE — `git status --porcelain --untracked-files=all` → ZERO stray untracked unit/spec .test.ts (all untracked = the by-design *.meshclaw.e2e.ts set + .meshclaw-tools/
+  harness + screenshots + playwright config + mise.local.toml); branch 245 commits ahead, 0 behind origin/main, clean fast-forwardable. (2) GREEN BASELINE + COVERAGE RE-MEASURE
+  (last full C423): be `bun test --coverage` EXIT 0, 1532 pass → 86.94% line / 86.60% func (vs C423 86.93/86.57 — flat-to-up); fe `vitest --run --coverage` EXIT 0, 697 pass →
+  85.26% line / 85.53% func / 77.40% branch (UP +0.75 line / +0.99 func / +0.34 branch vs C423's 84.51/84.54/77.06 — the C426/C432 sync-manager dead-code/dup removal RAISED the
+  covered ratio). BE↔FE gap now ~1.7pts — the tightest ever. Updated the COVERAGE TREND header with the C435 reading. (3) BRANCH_REVIEW.md (gitignored) refresh — header
+  161→245 commits, status block re-verified C435, +§33 covering the 84-commit C351–C434 delta (the largest single review delta: ~22 bugs fixed incl. 2 HIGH data-safety
+  [#C404 closed, #127 mitigated+escalated], ~19 arch dedups, the split/charge-partition + endDate-#12 + #76 families swept, 6 new escalations filed). Doc/measurement-only —
+  no source touched, no build gate beyond the two coverage runs (both green). 90%-line goal still structurally gated (BE DI/singleton + OAuth-network; FE eyes-on components/
+  routes). Next #5 sweep ~C445; CLAUDE.md full refresh ~C439. cov: be 86.94% / fe 85.26% (re-measured C435).
+- **C436 (guard): pin the 5 zero-test chart-formatters exports — the FE display-shape axis/series callbacks rendered on real charts** —
+  BALANCE: nothing over budget; guard MOST-STARVED (last 430, starved-for 436−430=6=budget) → highest-leverage. 2-agent fan-out. BE scout returned the pure-fn guard surface
+  SATURATED (the one untested export, validateLoanTerms, is DEAD defensive code behind a Zod schema that already rejects every error-branch input → a guard there would be
+  VACUOUS; correctly rejected — NOT manufactured into theater). FE scout confirmed the C430-flagged chart-formatters.ts cluster: 5 exports ZERO-test despite each being a
+  LayerChart axis/series callback rendered live. VERIFIED FIRSTHAND (C21/C60): the existing chart-formatters.test.ts imports only formatCurrencyAxis/formatCentsAxis/
+  parseMonthToDate (no others); formatDecimalAxis (:23, the default decimals=1 IS what FuelEfficiencyTrendChart/YearEndTab/FuelCharts render — passed as yAxis.format with no
+  arg), getXTickCount (:32, the few-points dedup clamp + 6/12 cap), formatDateTick (:59, the layerchart-callback unknown→'' NaN guard), monthlyXAxisProps (:68, the 12-tick
+  budget distinct from the 6 default), getTrendLineProps (:91, the dataLength<=1 single-point enlarged-dot visibility branch) all reachable + load-bearing + untested. Display-tier
+  (lower stakes than money math), but real zero-coverage reachable invariants — exactly the GUARD profile when the higher-stakes surface is dry. +9 tests EXTENDING the existing
+  chart-formatters.test.ts (its home — no duplicate file), driving the REAL exports (not re-implementations): decimals default 28.5→'28.5'/28→'28.0' + explicit arg; clamp
+  2→2/20→6/20,12→12; NaN guard (garbage/number/null/undefined→''); monthly 24→12-cap/3→clamp; trend single-point r:6 vs 2+ r:4. NON-VACUOUS (each pins a flip/drop/default
+  regression). fe validate:local EXIT 0, 706 pass (+9), svelte-check 0, build clean. cov: be 86.94% (carry) / fe 85.26% (carry, +9 display-shape guards).
+- **C437 (bug → #131: ReminderForm read stored ISO dates via a bare UTC `.slice(0,10)`, shifting the date back an edit-open for UTC+13/+14 users — the #87/#106 family on the form the guard missed)** —
+  BALANCE: bug AND arch both AT budget (bug 3/3, arch 5/5, cycle 437); bug has the tighter budget AND a concrete queued clean fix (#131, filed C434) → jumps the queue. VERIFIED
+  FIRSTHAND (C21/C60): ReminderForm.svelte:116-117 reloaded an edit via `r.startDate.slice(0,10)` / `r.endDate.slice(0,10)`, but the save path persists via dateOnlyToISO → NOON LOCAL
+  (:205-206); for a UTC+13/+14 user noon-local lands on the PRIOR UTC day, so `.slice(0,10)` returns the previous calendar day → the reminder's start/end silently shifts back a day
+  every edit-open (re-saving then persists the wrong day). The #87/#106 family, still live on this ONE form. FIX (one edit, mirrors the C267/C268/C271 sibling forms): route both reload
+  lines through toDateInputValue(new Date(field)) — ALREADY imported (:15) + used on the create path (:66/:134); reads local Y/M/D. GUARD: the form is eyes-on/Playwright-blocked, so
+  the merge-surviving net is the established SOURCE-SCAN guard — but no-utc-date-input.test.ts matched only `.toISOString().slice(0,10)` and MISSED the bare-string-field form (no
+  .toISOString() in the chain — exactly how this slipped past for ~340 cycles). Extended it: +1 ISO_STRING_DATE_SLICE regex matching a date-typed PROPERTY access (.startDate/.endDate/
+  .dueDate/.nextDueDate/.purchaseDate/.serviceDate/.paymentDate).slice(0,10) + a 2nd offender-scan test. PROVEN non-vacuous + false-positive-free firsthand: matches the pre-fix
+  `r.startDate.slice(0,10)` but SKIPS the safe `dateStr.slice(0,10).split('-')` local-parse (expense-filters.ts:12) AND the tags-array `.slice(0,10)` cap (ExpenseForm.svelte:190).
+  fe validate:local EXIT 0, 707 pass (+1 guard), svelte-check 0, build clean. cov: be 86.94% (carry) / fe 85.26% (carry, +1 source-scan guard). Two of the three queued small bugs now
+  closed (#130 C434, #131 C437); #129 OAuth-email-sync remains (needs a 1-line product call).
+- **C438 (arch): delete dead exported helper deriveLastBackupDate (zero references anywhere, incl. tests)** —
+  BALANCE: arch OVER budget (last 432, starved-for 438−432=6 > 5) → FORCED arch pick. rule-7 2-agent fan-out. BOTH scouts' TOP picks REJECTED firsthand (C21/C60): (a) FE's
+  calculatePayoffDateFromStart→addMonthsClamped "semantically equivalent" merge is the C337/C330-documented BEHAVIOR-CHANGE trap — VERIFIED firsthand: addMonthsClamped clones via
+  `new Date(date)` (PRESERVES time-of-day) while calculatePayoffDateFromStart constructs `new Date(y,m,d)` (LOCAL-MIDNIGHT); dates are stored at noon-local (dateOnlyToISO), so the two
+  return Dates differing in TIME-OF-DAY — rule-2 violation, masked by Y/M/D-only tests (the exact reason it was rejected twice). (b) BE's calculateAverageMPG merge is the escalated #30
+  band-divergence (behavior-changing). The remaining BE finds were dead-code deletes; the cleanest = deriveLastBackupDate (backup.ts:150) — exported but VERIFIED firsthand to have ZERO
+  references anywhere incl. tests (a stranded "last-backup summary" helper that never shipped; the live sync/routes path does per-provider checks, not max-across-providers). Deleting dead
+  code is an explicit arch payoff (rule 5), behavior-preserving (nothing calls it), coverage-neutral-to-positive (removes uncovered LOC). Chose it over the insurance dead-methods candidate
+  (that one entangles ~120 test LOC + drops the coverage numerator). −15 LOC; BackupConfig import retained (still used at loadBackupConfig). be validate:local EXIT 0, 1532 pass (unchanged —
+  confirms it was dead). cov: be 86.94% (carry) / fe 85.26% (carry). Both scouts now report the dedup surface near-exhausted both sides; remaining dups are behavior-changing (escalated #30/#330) or untested-path.
+- **C439 (deep-review): analytics TCO / depreciation / cost-composition CERTIFIED CLEAN (last full cert C361, ~78 cycles ago); +1 year-scoped costPerMonth divisor guard** —
+  BALANCE: deep-review OVER budget (last 433, starved-for 439−433=6 > 5) → FORCED deep-review (the ~C439 CLAUDE.md refresh is infra, not the forced category → it waits). 1-agent fan-out
+  on the stalest money surface (analytics TCO; the sync conflict path was the other candidate but TCO is higher-stakes + staler). CERTIFIED CLEAN, all verified firsthand (C21/C60):
+  (1) #27 fix HOLDS — computeTCOTotal (repository.ts:1124) all-time+priced+financed → purchaseInTotal=price, countedFinancingInterest=0, financing-payment rows excluded ($30k car +
+  $1.5k payments → $30k not $31.5k); purchasePrice=0 gate is `>0` not `!=null` (correct: $0 acquisition → financing IS the cost signal). (2) categorizer routes everything (financial+
+  financing→interest, +insurance_term→insurance, else→otherCosts) — no money-slip (a 'financial'-category recurring expense lands in otherCosts: a LABEL debate, total correct, sums).
+  (3) denominators sound: year path date-filters BOTH numerator + totalDistance + monthsOwnedInYear (shared window); div-by-zero guarded (ownershipMonths Math.max(1,…), costPerDistance
+  null at 0 distance). (4) no depreciation curve exists (purchasePrice is a flat acquisition cost). (5) #28/#27 year-scoping = the C333-certified design, NOT re-flagged. THE strongest
+  unpinned reachable invariant → guard: monthsOwnedInYear is unit-tested in ISOLATION + the all-time costPerMonth is Property-15-pinned, but Property 15 passes NO year arg → the YEAR
+  branch's divisor SELECTION (ownershipMonths = monthsOwnedInYear ≤12, NOT full-ownership monthsBetween — the exact #28 mistake) was never driven through the real getVehicleTCO (the
+  C181/C229 helper-tested-in-isolation gap). +1 guard in per-vehicle.property.test.ts (#28/#27 year-scoped block): a 2020-purchased vehicle (owns all of TEST_YEAR=2024) + a $1200
+  in-year financing payment → getVehicleTCO(…, TEST_YEAR) returns ownershipMonths===12 + costPerMonth===100 (1200/12). NON-VACUOUS (full-ownership monthsBetween(2020→now) is ~70+ → a
+  divisor regression makes ownershipMonths≫12, costPerMonth≪100). be validate:local EXIT 0, 1533 pass (+1). cov: be 86.94% (carry, +1 guard) / fe 85.26% (carry). The sync conflict
+  path remains the next stale deep-review candidate.
+- **C440 (infra): CLAUDE.md full orientation refresh (the overdue ~C439 cadence; last full C429)** —
+  BALANCE: nothing OVER budget (bug at 3/3 not past; #129 is product-gated + a hunt returns marginal results); infra most-starved-but-one (5/6) AND the CLAUDE.md full-refresh cadence
+  genuinely overdue (~C439, last full C429) → highest-leverage. REFRESHED the drift-prone "Current state & gaps": (1) coverage reading C423→C435 fresh measure (be 86.93→86.94 line /
+  86.57→86.60 func; fe 84.51→85.26 line / 84.54→85.53 func / 77.06→77.40 branch — UP, the C426/C432 sync-manager dead-code/dup removal raised the FE covered ratio +0.75 line; BE↔FE gap
+  ~2.4→~1.7pts, the tightest ever); (2) suite size ~1526/~697 → ~1533/~707 with the C430–C439 arc attribution; (3) appended the C431–C437 closed-bug arc to the fix list (#128 getMaterialized-
+  Expenses shape, #130 #76-third-leg PUT mileage, #131 ReminderForm UTC date) + bumped "all landed C155→C437"; (4) added #129 OAuth-login email-sync to the pending-Angelo block + a "CLOSED since
+  last refresh: #128/#130/#131" note. Doc-only, no code touched → no build gate (CLAUDE.md not compiled; verified all four regions read coherently + preserved structure + no stale-number
+  leftovers via grep). cov: be 86.94% (carry) / fe 85.26% (carry). Next CLAUDE.md refresh ~C450; next #5 sweep ~C445.
+- **C441 (bug → #132: merge-restore detectConflicts didn't probe `reminders` — a surviving vehicle-less reminder [the #97 state] in a backup → raw UNIQUE throw, the #93/C300 class on a third table)** —
+  BALANCE: bug OVER budget (last 437, starved-for 441−437=4 > 3) → FORCED bug. #129 product-gated, so a fresh 2-agent hunt on the stalest surfaces (sync conflict path / reminder edges / FE conflict-classify). BOTH found a
+  concrete defect; by severity (data-safety > display) the BE one outranked. VERIFIED FIRSTHAND (C21/C60): detectConflicts (restore.ts:273) probed 8 tables but NOT `reminders`, while insertBackupData inserts it
+  (restore.ts:469). `reminders` is userId-owned with its OWN id PK and is NOT FK'd to vehicles (the link is the reminder_vehicles junction, onDelete:cascade), so a reminder SURVIVES deletion of all its vehicles (the
+  escalated #97 vehicle-less-but-active state). A MERGE restore of a backup carrying that surviving reminder slips past conflict detection (no probed table collides once the vehicle's gone) into insert(reminders) against
+  the existing id PK → `UNIQUE constraint failed: reminders.id` → the WHOLE restore aborts with a raw DB error instead of a clean conflict (the exact #93/C300 failure on a third table that fix never reached). The
+  restore-table-coverage drift-guard MISSED it: its `reminders` exemption claimed "child of vehicles via reminder_vehicles → probed parent" — FALSE (reminders has no FK to vehicles + survives the delete). FIX (one
+  probe, mirrors the C300 prefs/syncState fix): added `reminders` to the detectConflicts table array (userId-scoped, id PK — the `expenses` shape); CORRECTED the coverage-guard's false exemption (reminders now
+  directly-probed; reminderVehicles/Notifications re-noted as children of the now-probed reminders parent). GUARD: +1 (restore-merge-reminder-collision.test.ts) mirroring C300 — create a vehicle+reminder, export, DELETE
+  the vehicle (→ #97 surviving reminder), merge-restore must report a conflict with table==='reminders' && id===reminderId. PROVEN NON-VACUOUS BOTH WAYS firsthand: green WITH the probe, RED without (the
+  reminders-TYPED conflict only appears when probed — a bare conflicts.length>0 would be VACUOUS since the C300 prefs row also collides, so the assertion keys on the reminders-typed conflict specifically). One biome
+  format autofix on the new test. be validate:local EXIT 0, 1534 pass (+1). FE scout's #1 (sync-manager checkForExistingExpense skips fromBackendExpense → blank serverExpense.amount + mis-classified conflict, the #128
+  class on the fuzzy-match path) FILED as #133 for a future cycle (MED, bounded by clientId idempotency). cov: be 86.94% (carry, +1 guard) / fe 85.26% (carry).
+- **C442 (bug → #133: sync-manager checkForExistingExpense returned RAW backend rows → serverExpense.amount undefined → duplicate mis-classified 'modified' + blank dialog amount; the #128 class on the fuzzy-conflict path)** —
+  BALANCE: nothing OVER budget; guard most-starved (6/6) but the guard surface is near-saturated (C436), whereas #133 is a concrete reachable already-scouted CLEAN one-edit fix → a real defect outranks a marginal guard
+  (fixing it also lands a fresh genuine coverage add). VERIFIED FIRSTHAND (C21/C60): checkForExistingExpense (sync-manager.ts:219) did a bare apiClient.get typed {date,amount,tags}[] on GET /expenses, which returns the
+  BACKEND shape (expenseAmount, not amount) — never mapped through fromBackendExpense. So existing.amount was undefined → determineConflictType (:241) `Math.abs(local.amount − undefined)` = NaN < 0.01 = false →
+  amountMatch ALWAYS false → a genuine byte-identical duplicate mis-classified 'modified' EVERY time; AND SyncConflictResolver.svelte:174 rendered formatAmount(undefined) → blank server amount in the resolve dialog
+  (+ an electric row's kWh stayed in volume not charge). Reachable on a tag-overlap conflict during syncAll. FIX (one edit, the established pattern, the #128 class): import fromBackendExpense + BackendExpenseResponse,
+  type the GET as BackendExpenseResponse[], map each row through fromBackendExpense (fixes amount + volume→charge + category at once). GUARD: no NEW file — the fix EXPOSED two latent test-masking bugs: the existing
+  'should detect and report conflicts' test (:170) AND the C223 classifyAgainst helper (:531) both fed FRONTEND-shaped server rows (amount:), which is why they passed despite the bug. Corrected both to the REAL backend
+  shape (expenseAmount) + added a serverExpense.amount===50 assertion. PROVEN NON-VACUOUS firsthand: reverting the source fix turns 3 duplicate-classification tests RED ('modified' vs 'duplicate'). fe validate:local
+  EXIT 0, 707 pass (count unchanged — tests strengthened not added). The #133 SECONDARY note (the date/amount query params are dropped by the backend schema → the fuzzy pre-check scans only page 1) is a multi-file/
+  backend-schema change, NOT this fix — left filed in the bug queue. cov: be 86.94% (carry) / fe 85.26% (carry, +the type-lie fix). Two of the three open queued bugs now closed this session (#131 C437, #133 C442); #129
+  (product-gated) remains.
+- **C443 (guard): pin updateTermSchema's CONDITIONAL date-order refine (the partial-update both-dates / single-date-skip cells, via the REAL exported schema)** —
+  BALANCE: guard OVER budget (last 436, starved-for 443−436=7 > 6) → FORCED guard. First weighed a class-level source-scan for the #128 fromBackendExpense-skip family (C431/C442 bit twice)
+  but REJECTED it firsthand: a scan can't cleanly distinguish a raw-Expense-row read from an aggregated/typed one (analytics getVehicleExpenses returns pre-aggregated month/category data,
+  correctly no mapper; getExpenseSummary/getVehicleStats/getSplitGroup too) → no false-positive-free syntactic signal, unlike the #87 `.toISOString().slice` antipattern; the class is also
+  currently CLEAN (all genuine Expense-row reads now map). So fanned out for a genuinely-unpinned reachable invariant instead. VERIFIED FIRSTHAND (C21/C60): updateTermSchema (insurance/
+  validation.ts:73-80) has a CONDITIONAL refine — `if (startDate && endDate) return endDate > startDate; return true` — so it enforces order ONLY when both dates are present and DELIBERATELY
+  skips it for a single-date partial update (the update-vs-create distinction; the repo writes whichever single date is sent with independent guards + no cross-check, so the schema is the
+  ONLY order gate). Reachable via PUT /insurance/:id/terms/:termId. NO test drove it: the property suite drives only createTermSchema; the only updateTermSchema test (partial-update-no-default-
+  injection) sends no dates → all three behavioral cells unpinned. +3 tests (insurance-validation.property.test.ts) driving the REAL schema: both-dates end>start→accept; inverted AND equal
+  (the `>` not `>=`)→reject; single-date (start-only / end-only / neither)→accept (the skip branch). NON-VACUOUS (each cell flips under a refine tighten/drop). be validate:local EXIT 0, 1537
+  pass (+3). cov: be 86.94% (carry, +3 guards) / fe 85.26% (carry).
+- **C444 (arch): extract isIncompleteFuelExpense — ONE source of truth for the byte-identical fuel-completeness sync guard (2 inline sites → 1)** —
+  BALANCE: arch OVER budget (last 438, starved-for 444−438=6 > 5) → FORCED arch. rule-7 2-agent fan-out. BE offered an 8-line insurance term-create schema collapse (valid but thin); FE offered the
+  stronger pick. VERIFIED FIRSTHAND (C21/C60): the predicate `expense.category === 'fuel' && ((!expense.volume && !expense.charge) || !expense.mileage)` was hand-inlined BYTE-IDENTICAL at
+  syncOfflineExpenses (offline-storage.ts:187-188, action: warn+continue) AND sync-manager.syncSingleExpense (sync-manager.ts:199-200, action: return error). This is the EXACT offline↔sync fan-out whose drift
+  caused #66 (fuelType dropped) + #101 (missedFillup dropped) — the same pair the C205 offlineExpenseToBackend + C426 getPendingExpenses + C432 markExpenseAsSynced extracts already collapsed; this fuel-completeness
+  guard was the leftover. FIX (rule-2 behavior-preserving, ONE coherent change): exported isIncompleteFuelExpense from offline-storage.ts (right after offlineExpenseToBackend, the documented single-source neighbor);
+  routed both sites to it, each KEEPING its own action (skip-and-continue vs error-return). rule-3 green→green: sync-offline-expenses.test.ts:100/123 + sync-manager.test.ts drive both branches at both sites — GREEN
+  before+after. Hit the C163/C426 mock-trap (sync-manager.test.ts mocks offline-storage → the new import was undefined → 8 fails); fixed per C205 discipline by passing the REAL pure predicate through
+  (isIncompleteFuelExpense: actual.isIncompleteFuelExpense), NOT a stub. +5 direct predicate-pin tests (category-gate, both-missing, mileage-missing, complete-liquid, complete-electric). fe validate:local EXIT 0, 712
+  pass (+5). cov: be 86.94% (carry) / fe 85.26% (carry, +5 guards). The offline↔sync duplicated-rule family is now FULLY collapsed (mapping + pending-filter + mark-synced + fuel-completeness all single-source).
+- **C445 (deep-review → #134: an orphaned backoff retry could RESURRECT an already-resolved sync conflict — retrySingleExpense never re-checked still-pending)** —
+  BALANCE: deep-review OVER budget (last 439, starved-for 445−439=6 > 5) → FORCED deep-review (the #5 sweep is due ~C445 but that's infra, waits a cycle). 1-agent fan-out on the stalest data-safety
+  surface (sync conflict-resolution / offline-apply; flagged the next candidate C439, only single-bug-patched since via C424/C442). Surfaced + VERIFIED FIRSTHAND (C21/C60): retrySingleExpense (sync-manager.ts:250)
+  guarded only on `!onlineStatus.current` before re-running the conflict-check — but the backoff setTimeout is DETACHED from retryCount, so a retry scheduled on an earlier failed POST fires even after an
+  interleaving syncAll surfaced that conflict (a lost-response duplicate) AND the user RESOLVED it (markExpenseAsSynced). The orphaned retry then re-runs checkForExistingExpense, finds the committed server row,
+  and RE-LISTS the dismissed conflict in syncConflicts.current + flips syncState back to 'error'. The C424 dedup does NOT catch it (resolution already removed it from the live set → the `already` check passes).
+  Reachable: syncAll runs concurrently across the online-event auto-sync + the manual retry button, and a scheduled timer survives across syncAll calls. NOTE the scout's first-pass fix idea (retryCount.delete in
+  the main-loop conflict branch) would NOT work — the timer is detached from retryCount; the real root is the missing still-pending re-check. FIX (one guard, the !synced source of truth): early-return from
+  retrySingleExpense when getPendingExpenses() (C426, filters !synced) no longer contains the row. +1 guard (sync-manager.test.ts, fake-timers): fail→schedule retry, mark the row synced (resolution), fire the
+  orphaned timer → syncConflicts.current stays empty + syncState not 'error'. PROVEN NON-VACUOUS firsthand (reverting the guard → the conflict resurrects, length 1). Drained the intentionally-unconsumed committed-row
+  mockFetch in finally (vi.clearAllMocks doesn't clear queued impls → would bleed). fe validate:local EXIT 0, 713 pass (+1). FILED #135 (LOW, the scout's 2nd finding — NOT fixed): the SyncManager path only
+  markExpenseAsSynced's resolved/synced rows, never removeOfflineExpense/clearSyncedExpenses them, so synced rows accumulate in localStorage (bounded by the !synced re-sync filter → unbounded-GROWTH only, no
+  re-POST; the legacy syncOfflineExpenses reaps but SyncManager doesn't — a reaping-lifecycle behavior call). cov: be 86.94% (carry) / fe 85.26% (carry, +1 guard).
+- **C446 (bug → #136: the activity middleware armed the inactivity timer ONLY for enabled-ZIP providers, so a Sheets-only-sync user got NO auto-backup-on-inactivity — silent, NORTH_STAR #1)** —
+  BALANCE: bug OVER budget (last 442, starved-for 446−442=4 > 3) → FORCED bug (#5 infra sweep at 6/6 waits a cycle). #129/#135 are product/behavior-gated, so a fresh 2-agent hunt. THREE concrete defects found;
+  by severity (data-safety > money > display) the BE auto-backup gap outranked. VERIFIED FIRSTHAND (C21/C60): activity.ts:34-36 computed hasSyncEnabled via `.some((p) => p.enabled)` — but the backup
+  orchestrator fans out on its OWN exported predicate filterEnabledProviders = `s.enabled || s.sheetsSyncEnabled === true` (backup-orchestrator.ts:21-24). A user with a Sheets-only-sync provider
+  (enabled:false, sheetsSyncEnabled:true — an independently-toggled valid config) + syncOnInactivity therefore NEVER armed the inactivity timer (recordActivity never called) → auto-backup-on-inactivity silently
+  never fired, even though the orchestrator it gates WOULD have backed up to Sheets; changeTracker still marks data changed so the user believes sync is active. The #43/#44 backup-honesty family but a CLEAN code
+  fix. FIX (one expr, ONE source of truth — don't duplicate the predicate, that divergence IS the bug): routed the middleware through filterEnabledProviders(backupConfig).length > 0. GUARD: +1 HTTP-harness test
+  (activity-sheets-only-sync.test.ts) — seed a Sheets-only provider + syncOnInactivity via PUT /settings, spy the exported tracker singleton's recordActivity, do an authed write, assert it fired. PROVEN NON-VACUOUS
+  firsthand (reverting to .some(p.enabled) → recordActivity never called, RED). Hit + fixed the C291/C300 harness trap (dynamic-import the tracker AFTER createTestApp binds :memory:, not top-level) + a Zod cap
+  (syncInactivityMinutes max 30, not 999). be validate:local EXIT 0, 1538 pass (+1). The two OTHER found defects FILED for future cycles: #137 (CSV import persists stray mileage on a non-fuel imported row — the
+  #76 class's THIRD write site, import-csv.ts parseRow bypasses clearFuelFieldsIfNotFuel; clean one-edit) + #138 (InsuranceTermForm sends bare date-only strings → term dates stored at UTC-midnight → displayed a
+  day early for Americas users — the #87/#131 date class, clean one-edit + needs the source-scan extended). cov: be 86.94% (carry, +1 guard) / fe 85.26% (carry).
+- **C447 (infra): #5 branch-hygiene sweep + coverage re-measure + BRANCH_REVIEW.md refresh (the overdue ~C445 cadence; last actual sweep C435)** —
+  BALANCE: infra OVER budget (last 440, starved-for 447−440=7 > 6) → FORCED infra. Three-part sweep: (1) HYGIENE — git status --porcelain --untracked-files=all → ZERO stray untracked
+  unit/spec .test.ts (all untracked = by-design *.meshclaw.e2e.ts + tooling); branch 257 commits, 0 behind, clean fast-forwardable. (2) GREEN BASELINE + COVERAGE RE-MEASURE (last full C435):
+  be bun test --coverage EXIT 0, 1538 pass → 86.96% line / 86.55% func (~flat vs C435's 86.94/86.60); fe vitest --coverage EXIT 0, 713 pass → 85.89% line / 87.15% func / 78.35% branch (UP
+  +0.63 line / +1.62 func / +0.95 branch vs C435 — the C436 chart-formatters + C444 isIncompleteFuelExpense + C445/C446 guards lifted it). BE↔FE gap now ~1.1pts — the tightest ever.
+  Updated the COVERAGE TREND header. (3) BRANCH_REVIEW.md (gitignored) refresh — header 245→257 commits, +§34 covering the 12-commit C435–C446 delta (6 bugs incl. the NORTH_STAR-#1 #136
+  silent-Sheets-backup-gap, the #132 restore-UNIQUE + #134 conflict-resurrection data-safety fixes, the C444 offline↔sync family fully-collapsed, the C436 chart-formatters cluster + 4
+  escalations/notes filed [#129/#135/#137/#138]). Doc/measurement-only — no source touched, both coverage runs green. 90%-line goal still structurally gated. Next #5 sweep ~C457; next
+  CLAUDE.md full refresh ~C450. cov: be 86.96% / fe 85.89% (re-measured C447).
+- **C448 (bug → #137: CSV import persisted stray fuel-only fields on a NON-fuel imported row — the #76/C244 class's 4th write site, poisons getCurrentOdometer)** —
+  BALANCE: nothing OVER budget; guard most-starved (5/6) but its surface near-saturated (C436/C443), whereas #137 is a concrete reachable money-feeding defect already scouted C446 → a real defect
+  outranks a marginal dormant-vein guard. VERIFIED FIRSTHAND (C21/C60): parseRow (import-csv.ts) parses mileage/volume/fuelType/missedFillup for EVERY category (the fuel-completeness check at :252
+  only guards the fuel DIRECTION), returning them verbatim; importExpenses (repository.ts:303) inserts `{...row, userId}` verbatim — NO clearFuelFieldsIfNotFuel, the guard the POST (#76/C244) + PUT
+  (#130/C434) paths apply. So a foreign-tracker import (Drivvo/Fuelio log an odometer on a Service/maintenance row; categoryMap maps Service→maintenance, the mileage column maps for all rows) inserts
+  category=maintenance, mileage=120000 with the stray mileage → poisons getCurrentOdometer's cross-category MAX(odometer) UNION (no category filter) → wrong mileage-reminder firing + inflated lease-overage
+  MONEY. Native VROOM round-trip is SAFE (export blanks non-fuel mileage — the existing :92 round-trip test confirms). FIX (one edit, the #76 transform at the import site): extracted clearImportedFuelFields
+  (nulls mileage/volume/fuelType + missedFillup=false for a non-fuel row; fuel passes through), routed parseRow's return through it. NOTE: an inline-ternary version tripped the Biome cognitive-complexity
+  ceiling (parseRow was AT 15→18); the EXTRACTION both fixed that (C280 precedent) AND made it ONE source of truth for the import-side clear. +2 guards (import-csv.test.ts): a maintenance row carrying
+  mileage/volume/fuelType → all NULL (NON-VACUOUS: pre-fix 120000 persisted); a genuine fuel row → KEEPS them (no over-clear). be validate:local EXIT 0, 1540 pass (+2). #138 (InsuranceTermForm UTC-date)
+  remains queued. cov: be 86.96% (carry, +2 guards) / fe 85.89% (carry).
+- **C449 (bug → #138: InsuranceTermForm (+ ClaimsSection sibling) stored term/claim dates at UTC-midnight → displayed a day early for Americas users — the #87/#131 date class on the lone hold-out forms)** —
+  BALANCE: nothing OVER budget; guard AND arch both at budget (6/6, 5/5) but #138 is a concrete reachable money-document-facing defect (already scouted C446) → a real bug outranks a marginal guard/arch pick, and the
+  fix naturally extends the source-scan guard. VERIFIED FIRSTHAND (C21/C60): InsuranceTermForm save (:247-256) sent raw `startDate`/`endDate` ("2026-07-01") → backend z.coerce.date() → 2026-07-01T00:00:00Z (UTC
+  midnight); PolicyTermCard renders formatDate (LOCAL) → "Jun 30, 2026" for a negative-offset user; reload (:133-138) read via `.split('T')[0]` (UTC). Every other date-only form (Expense/Reminder/Vehicle/odometer)
+  already wraps in dateOnlyToISO+toDateInputValue — InsuranceTermForm was the hold-out. WHILE FIXING, firsthand-found the SIBLING: ClaimsSection.svelte saves claimDate via dateOnlyToISO (:141) but RELOADS via
+  `.split('T')[0]` (:119) — the SAME round-trip bug, so fixed it too. FIX (mirror the #131 sibling-form fixes): route both forms' save through dateOnlyToISO + reload through toDateInputValue. GUARD (forms are
+  eyes-on/Playwright-blocked → source-scan net): GENERALIZED no-utc-date-input.test.ts's ISO_STRING_DATE_SLICE regex to also catch the `.split('T')[0]` form (it only matched `.slice(0,10)`, the exact reason both
+  insurance forms slipped past for hundreds of cycles) + added claimDate to the date-field list; flows into the existing offender scan (no new test). PROVEN non-vacuous + false-positive-free firsthand (matches the
+  pre-fix claimDate/startDate .split('T')[0] lines; SKIPS the safe dateStr.slice(0,10).split('-') local-parse). fe validate:local EXIT 0, 713 pass (svelte-check 0, build clean). The #87/#106/#131/#138 UTC-date
+  family is now closed across ALL date-only forms (Expense/Reminder/Vehicle/odometer/InsuranceTerm/Claims), with the source-scan covering BOTH the `.slice(0,10)` AND `.split('T')[0]` antipattern forms. cov: be
+  86.96% (carry) / fe 85.89% (carry, +source-scan generalized). #129/#135 (gated) are the only remaining queued items.
+- **C450 (guard): pin getLatestTerm's equal-endDate tiebreak (the load-bearing `>`-not-`>=`, first-seen-wins, via the REAL export)** —
+  BALANCE: TWO over budget (guard 7>6, arch 6>5); guard MOST-STARVED (starved-for 7 vs arch's 6) → forced guard (CLAUDE.md refresh due ~C450 is infra, not over budget → waits). 1-agent fan-out. VERIFIED
+  FIRSTHAND (C21/C60): getLatestTerm (insurance.ts:57) uses a strict `>` so on two terms sharing an identical endDate the FIRST in the array wins (latest never reassigned on a tie). REACHABLE: insuranceTerms
+  has only a NON-unique (policyId, endDate) index (schema.ts), so two co-terminating terms can legitimately share an endDate; the backend orders desc(endDate) but SQLite's order AMONG equal endDates is
+  unspecified → this FE helper is the actual decider of which term renders + renews (PolicyCard latestTerm → displayed policyNumber, ExpirationAlert, the renewFrom pre-fill link). The existing property test
+  (insurance.test.ts:236) asserts only latest.endDate >= every endDate — `>=`-tolerant, so it does NOT pin the tiebreak; a regression to `>=` (last-seen-wins) would silently flip the chosen term. +1 guard
+  (two same-endDate terms, distinct id/policyNumber): [A,B]→A AND [B,A]→B (first-seen regardless of order). NON-VACUOUS (a `>=` flip turns both to last-seen). This pins the CURRENT first-seen contract — making
+  the tiebreak deterministic ACROSS reads (a secondary sort key) would be a separate product call, NOT this guard. fe validate:local EXIT 0, 714 pass (+1). cov: be 86.96% (carry) / fe 85.89% (carry, +1 guard).
+- **C451 (arch): collapse the byte-identical insurance term-create schema — createPolicyTermSchema → createTermSchema (2 sources of truth → 1)** —
+  BALANCE: arch OVER budget (last 444, starved-for 451−444=7 > 5) → FORCED arch (deep-review also over at 6 but arch more-starved). The C444 BE scout's #1 candidate (it was ranked under the FE pick that
+  cycle). VERIFIED FIRSTHAND (C21/C60): createTermSchema (validation.ts:40-47) and createPolicyTermSchema (:85-92) were BYTE-IDENTICAL — `z.object({...baseTermFields, vehicleCoverage}).refine(endDate>startDate,
+  {message})` — modulo the name + export. baseTermFields was already shared; the duplicated part was the full object+refine wrapper. createPolicyTermSchema is embedded in createPolicySchema.terms (used by POST
+  /insurance); createTermSchema is re-exported as addTermSchema (POST /insurance/:id/terms). So a policy-create term + an add-term term validated by two separately-maintained copies of one shape+refine — a
+  divergence-bug vector in a money-facing path (a future term-validation tightening would have to land in both; missing one → the same term validates differently by entry route). FIX (rule-2 behavior-preserving,
+  ONE coherent change): deleted createPolicyTermSchema, pointed createPolicySchema.terms at createTermSchema (identical schema + error message → no API/output change). rule-3 green→green: the policy-create path is
+  driven by premium-expense-hook/terms-http/policy-delete-cascade/expiring-soon/claim-photos HTTP tests (POST /insurance with ordered-date terms) + the add-term path + the C443 createTermSchema unit tests — GREEN
+  before AND after, no test touched. be validate:local EXIT 0, 1540 pass (unchanged). cov: be 86.96% (carry) / fe 85.89% (carry).
+- **C452 (deep-review): vehicle CRUD + cascade-delete CERTIFIED CLEAN; +1 photo-cascade-coverage symmetry guard (the C302 pattern, on the photo side)** —
+  BALANCE: deep-review OVER budget (last 445, starved-for 452−445=7 > 5) → FORCED deep-review (CLAUDE.md refresh ~C450 is infra, waits). 1-agent fan-out on the stalest surface (vehicle CRUD/cascade, no dedicated
+  audit recently). CERTIFIED CLEAN, verified firsthand: (1) cascade-delete ordering correct (enumerate expense/odometer IDs BEFORE the FK cascade, reap photos, then delete — the #34/C280 order); all 6 vehicle FK
+  children verified (financing/insuranceTermVehicles/expenses/odometer/reminderVehicles cascade; insuranceClaims set-null = preserved, C366); FK enforcement genuinely ON in prod + harness. (2) tenant isolation
+  solid (every read/write/delete owner-gated; /stats double-scoped). (3) plate uniqueness well-covered (per-user composite index + excludeId). (4) /stats correct-by-design. ONE LOW finding NOTED (not filed as a bug —
+  product nuance): an empty-STRING licensePlate ("" not null) bypasses the friendly per-user check (truthy guard) but the partial index still 409s it → a generic error + a debatable constraint on empty plates; the
+  clean fix is to normalize ""→null at the boundary (left for a possible future cycle). THE strongest unpinned invariant → guard: the delete handler HARD-CODES which photo-entity types it reaps (vehicle/expense/
+  odometer_entry); ENTITY_TO_CATEGORY is the full registry; the omitted insurance_policy/insurance_claim are correctly excluded (survive a vehicle delete) but NOTHING pinned that correspondence → a future
+  photo-bearing entity added as a vehicle FK-cascade child without a cleanup call would silently orphan its photo bytes (the #34 leak class) with NO failing test. +1 symmetry guard (the C302 restore-coverage pattern):
+  source-scan every ENTITY_TO_CATEGORY key is either reaped by the delete handler OR in a documented SURVIVES_VEHICLE_DELETE set + a liveness floor. PROVEN NON-VACUOUS firsthand (removing the odometer_entry cleanup
+  call → RED). be validate:local EXIT 0, 1542 pass (+2). cov: be 86.96% (carry, +2 guards) / fe 85.89% (carry).
+- **C453 (bug → #139: a 0%-APR loan was silently excluded from /analytics/financing loanBreakdown — the #92/#117 0%-APR class, 3rd site)** —
+  BALANCE: bug OVER budget (last 449, starved-for 453−449=4 > 3) → FORCED bug (#129/#135 product/behavior-gated, so a fresh 2-agent hunt). TWO concrete defects found, both in already-decided classes; picked the BE
+  one (cleaner: HTTP-harness-testable + non-eyes-on). VERIFIED FIRSTHAND (C21/C60): buildLoanBreakdown (analytics/repository.ts:902) filtered `f.isActive && f.financingType === 'loan' && f.apr` — but apr is
+  schema `.min(0)`-valid, so a 0%-APR dealer-promo loan (apr===0, falsy) was DROPPED; if it's the user's only loan, loanBreakdown returns [] → FinancingAnalytics.svelte gates the whole "Interest vs Principal"
+  chart on length>0 → the chart renders NOTHING for an actively-paid-down 0% loan. The amortization helper already handles 0% correctly (interest=balance*0=0, payment retires principal). The `&& f.apr` clause is
+  redundant for non-loans (financingType==='loan' already excludes leases) + harmful for 0%; loan.apr is coalesced to 0 below for the walk. FIX (one edit): drop `&& f.apr`. +1 HTTP-harness guard (raw-seed a 0%-APR
+  active loan + a financing payment → GET /analytics/financing → loanBreakdown non-empty, every interest===0, some principal>0). PROVEN NON-VACUOUS firsthand (restoring `&& f.apr` → []  → RED). be validate:local
+  EXIT 0, 1543 pass (+1). FILED #140 (the FE scout's finding, NOT fixed — eyes-on component derivations): LeaseMetricsCard compares LIFETIME driven miles against the bare ANNUAL mileageLimit at 3 display lines
+  (:34/:48/:66) → shows "24000/12000, 100% RED" while its own "left" figure (which routes through leaseTotalMileageAllowance) says "12000 left" — an internal contradiction + false over-mileage panic on an on-pace
+  multi-year lease; the #64/#110/#115 annual-vs-total class on the ONE card #115 missed; clean one-edit (route the 3 lines through leaseTotalMileageAllowance) but the verification is eyes-on. cov: be 86.96%
+  (carry, +1 guard) / fe 85.89% (carry).
+- **C454 (infra): CLAUDE.md full orientation refresh (the overdue ~C450 cadence; last full C440)** —
+  BALANCE: infra OVER budget (last 447, starved-for 454−447=7 > 6) → FORCED infra; the CLAUDE.md full-refresh cadence was also overdue (~C450, last C440). REFRESHED the drift-prone "Current state & gaps":
+  (1) coverage reading C435→C447 fresh measure (be 86.94→86.96 line; fe 85.26→85.89 line / 85.53→87.15 func / 77.40→78.35 branch — UP, the C436 chart-formatters + C444 isIncompleteFuelExpense + C445/C446 guards
+  lifted the FE ratio; BE↔FE gap ~1.7→~1.1pts, tightest ever); (2) suite size ~1533/~707 → ~1543/~714 with the C440–C453 arc attribution; (3) appended the C441–C453 closed-bug arc to the fix list (#132 restore-
+  reminders-probe, #133 sync-conflict-fromBackendExpense, #134 conflict-resurrection, #136 sheets-only-auto-backup, #137 import-fuel-clear, #138 insurance-form-UTC-date, #139 0%-APR-loanBreakdown) + bumped "all
+  landed C155→C453" + noted three bug-CLASSES now fully closed (#76 odometer-poison all 4 write sites, #87 UTC-date all forms, #92/#117 0%-APR all 3 sites); (4) pending-Angelo block: added the two still-open filed
+  items #135 (SyncManager-no-reap) + #140 (LeaseMetricsCard annual-vs-total, eyes-on) and refreshed the CLOSED-since note (#132/#133/#134/#136/#137/#138/#139). Doc-only, no code touched → no build gate (CLAUDE.md
+  not compiled; verified all four regions read coherently + no stale-number leftovers via grep). cov: be 86.96% (carry) / fe 85.89% (carry). Next CLAUDE.md refresh ~C464; next #5 sweep ~C457.
+- **C455 (bug → #140: LeaseMetricsCard compared LIFETIME driven miles against the bare ANNUAL mileageLimit — the #64/#110/#115 annual-vs-total class on the ONE card #115 missed)** —
+  BALANCE: nothing OVER budget; guard most-starved (5/6) but its surface saturated, whereas #140 is a filed MED-HIGH money/UX defect with a clean code fix → a real contradiction outranks a marginal dormant-vein
+  guard. VERIFIED FIRSTHAND (C21/C60): LeaseMetricsCard.svelte used the bare annual `financing.mileageLimit` as the burn-bar denominator (:34), displayed limit (:66), + limitOdometer base (:48) — but
+  leaseMetrics.mileageUsed is LIFETIME driven miles (current−initial). For an on-pace 36-mo/12k-yr lease (total 36k) at 24k driven, the card showed "24k/12k, 100% RED" + odometer "34k/22k" WHILE the SAME card's
+  "left" figure (leaseMetrics.mileageRemaining, which already routes through leaseTotalMileageAllowance → 36k−24k) said "12k left" — an internal contradiction + a false over-mileage panic. Byte-identical to the
+  #115 PaymentMetricsGrid fix, on the card that sweep missed. FIX (one coherent change, the established single-source helper): added a `totalMileageAllowance = leaseTotalMileageAllowance(financing)` derived (annual ×
+  termMonths/12), routed all 3 display derivations through it — now internally consistent with the card's own "left". The risky part (the math) is the already-unit-tested leaseTotalMileageAllowance; this is a
+  mechanical re-point. fe validate:local EXIT 0, 714 pass, svelte-check 0, build clean. EYES-ON: the card renders only for a lease WITH a mileageLimit, and the demo seed has none → no meaningful default screenshot
+  without seeding a lease vehicle → lands "code-complete, eyes-on pending" per the feature-DoD rule (verifiable by inspection: 3 lines re-pointed to a tested helper, internally consistent). cov: be 86.96% (carry) /
+  fe 85.89% (carry). The #64/#110/#115/#140 annual-vs-total lease-mileage class is now closed across BOTH cards (PaymentMetricsGrid C398 + LeaseMetricsCard C455).
+- **C456 (guard): pin buildFuelEfficiencyComparison — the cross-vehicle per-month gas-MPG builder (per-vehicle-pairing + gas-gate, via the REAL export)** —
+  BALANCE: guard AND arch both at budget (6/6, 5/5); guard most-starved (6/6) → pick guard. 1-agent fan-out. VERIFIED FIRSTHAND (C21/C60): buildFuelEfficiencyComparison (analytics-charts.ts:1175) is exported, rendered
+  on the cross-vehicle analytics tab via getCrossVehicle's skipConversion branch (the DEFAULT same-units fleet case), yet had ZERO test references — it re-rolls TWO load-bearing invariants inline that the prior pins
+  DON'T reach: (a) groups byVehicle BEFORE pairing (1183-1204), so it never phantom-pairs two cars' odometers (the #54 class — but the #54 pin covered the TREND path's forEachVehiclePair, not this builder's inline
+  grouping); (b) gates on gasEfficiencyPoint (1195), excluding a PHEV charge from the gas-MPG comparison (the #122/C413 class — but that sweep pinned buildMonthlyConsumption/buildSeasonalEfficiency, explicitly NOT this
+  one). +2 guards (analytics-charts-unpinned.test.ts, its home): (1) two vehicles' fillups INTERLEAVED by date (v1 1000→1300/10gal=30, v2 5000→5240/8gal=30) → each vehicle's monthly efficiency is its OWN 30 MPG, no
+  cross-vehicle phantom (a flat-list pairing would subtract v2's 5000 from v1's 1300 = absurd/out-of-band → dropped); (2) a v1 gas pair + a v1 charge session → v1 efficiency stays the gas 30, charge excluded. NON-VACUOUS
+  (a regression dropping the per-vehicle grouping or swapping gasEfficiencyPoint→computeEfficiencyPoint flips the asserted efficiency). One biome import-reorder autofix. be validate:local EXIT 0, 1545 pass (+2). cov:
+  be 86.96% (carry, +2 guards) / fe 85.89% (carry).
+- **C457 (arch → dedup-surface CERTIFIED EXHAUSTED; docs-only, no manufactured churn)** —
+  BALANCE: arch OVER budget (last 451, starved-for 457−451=6 > 5) → FORCED arch (#5 sweep due ~C457 is infra, not over budget → waits). rule-7 1-agent fan-out (both tiers). Returned a clean "nothing worth doing":
+  every dedup candidate is behavior-changing / untested-path / churn, and every dead-code candidate is test-entangled (deleting it drops coverage — the C438 anti-trap). VERIFIED FIRSTHAND the one candidate worth a
+  second look (the two getCategoryColor fns, chart-colors.ts:47 vs expense-helpers.ts:103): they return DIFFERENT output domains (CSS `var(--chart-N)` SVG fills vs Tailwind `text-chart-N bg-chart-N/10` badge classes),
+  keyed on different category sets with divergent fallbacks → merging is FALSE-DRY + behavior-changing, correctly rejected. The remaining dead-code (requireAuth + its ~50-LOC describe; insurance getActiveInsurance-
+  PolicyId/getCurrentTermDates + their ~120-LOC property tests) are all coverage-dropping deletes — the arch rules forbid churn (rule 5) + behavior change (rule 2), and the C438 precedent is that a delete must be
+  ZERO-ref incl. tests (these aren't). So per the dormant-vein protocol (the arch analogue of C402/C420's bug-vein cert), recorded a CERTIFICATION that the byte-identical-dedup + clean-dead-code surface is EXHAUSTED
+  rather than manufacture a churn refactor or a coverage-negative delete. No source touched → no build gate. The 50+ landed dedups (C243→C451) + the FE photo-CRUD/OAuth-ctor untested-path veins + the test-entangled
+  dead methods are the standing map; the NEXT forced-arch cycle should fan out fresh (a new dup may surface as product code grows) but not re-scout these dead ends. cov: be 86.96% (carry) / fe 85.89% (carry).
+- **C458 (deep-review → #141: a split's groupTotal stored the RAW totalAmount while legs quantize to cents → a sub-cent total drifts the stored header off Σsiblings; insurance materialization CERTIFIED CLEAN)** —
+  BALANCE: deep-review OVER budget (last 452, starved-for 458−452=6 > 5) → FORCED deep-review (#5 sweep at infra not over budget, waits). 2-agent fan-out on the stalest surfaces (insurance materialization, last full
+  C382; expenses split, last C311). (A) INSURANCE materialization CERTIFIED CLEAN — verified firsthand: largest-remainder cents split sums exact (C382 holds), re-materialize deletes-before-recreate (no doubling),
+  #57 orphan-cleanup + #84 claim-ref (C369) hold, no C151 async-tx footgun (hooks run AFTER the repo tx; createSplitExpense validates before the tx). (B) EXPENSES split surfaced #141. VERIFIED FIRSTHAND (C21/C60):
+  createSplitExpenseSchema.totalAmount was `z.number().positive()` with NO cent quantization; createSplitExpense stores groupTotal=data.totalAmount verbatim (repository.ts:648) while computeEvenSplit/Percentage round
+  each leg to whole cents (Math.round(total*100)). So a sub-cent total (100.005) persisted groupTotal=100.005 while the legs summed to 100.01 — a stored header disagreeing with Σsiblings (NORTH_STAR #1, violates the
+  "legs sum to groupTotal" invariant the absolute-refine + Property 3 otherwise enforce). Reachable via direct API / a non-2-decimal client (the UI sends 2-decimal, so happy-path-safe). FIX (one edit, the validation
+  boundary): extracted a `centsAmount` schema (positive + .transform(round to 2dp)), routed both create + update totalAmount through it → groupTotal computed from the SAME cent-aligned value as the legs. +3 guards
+  (split-validation-schema.test.ts): sub-cent create 100.005→100.01, update 49.999→50, clean 100→100 no-op. NON-VACUOUS (pre-fix passed 100.005 through). be validate:local EXIT 0, 1548 pass (+3). Note: a guard-only
+  pin was the scout's framing, but quantizing is the actual FIX (the drift was a real stored inconsistency, not just untested). cov: be 86.96% (carry, +3 guards) / fe 85.89% (carry).
+- **C459 (bug → #142: mileage notifications (dueDate=NULL) sorted LAST + truncated out of the feed — feature-disabling for the maintenance-schedule mileage axis)** —
+  BALANCE: bug OVER budget (last 455, starved-for 459−455=4 > 3) → FORCED bug (#5 sweep at infra 5/6 not yet over). #129/#135 product/behavior-gated → fresh 2-agent hunt. BOTH found a defect; by severity
+  (correctness > display) the BE one outranked (the FE was formatRelativeTime "1 years ago", LOW/cosmetic, FILED #143). VERIFIED FIRSTHAND (C21/C60): findNotifications (reminders/repository.ts:468) ordered by
+  desc(dueDate), but createMileageNotification inserts dueDate=NULL (the milestone lives in dueOdometer; schema confirms "exactly one of dueDate/dueOdometer"). FIRSTHAND on this SQLite: NULLs sort LAST under DESC → a
+  mileage notification fired TODAY renders below a year-old time notification, AND with the limit(100) a user holding ≥100 time notifications never sees ANY mileage notification (the mileage axis becomes invisible) —
+  feature-disabling for a COMPLETE feature's whole axis (the /reminders page renders the dueOdometer branch in server order, no client re-sort). FIX (one-token swap): orderBy desc(createdAt) — non-null on every row
+  ($defaultFn), the true recency axis spanning BOTH notification types. GUARD: +1 (notifications-feed.test.ts) — seed a time notif (createdAt=1000) + a LATER mileage notif (dueDate NULL, createdAt=2000) → the mileage
+  one is FIRST. PROVEN NON-VACUOUS firsthand (revert to desc(dueDate) → mileage sorts last → RED). Also UPDATED the existing "newest-first" test from a dueDate-descending assertion (which pinned the BUGGY contract) to
+  createdAt-descending (the correct one). be validate:local EXIT 0, 1549 pass (+1). FILED #143 (FE, LOW/cosmetic): formatRelativeTime renders "1 weeks/months/years ago" at the bucket boundaries (no singular form) —
+  the n>1?'s':'' idiom already used elsewhere; queued. cov: be 86.96% (carry, +1 guard) / fe 85.89% (carry).
+- **C460 (infra): #5 branch-hygiene sweep + coverage re-measure + BRANCH_REVIEW.md refresh (the overdue ~C457 cadence; last actual sweep C447)** —
+  BALANCE: nothing OVER budget; infra MOST-STARVED (last 454, starved-for 460−454=6=budget) AND the #5 sweep cadence overdue → highest-leverage. Three-part sweep: (1) HYGIENE — git status
+  --porcelain --untracked-files=all → ZERO stray untracked unit/spec .test.ts (all untracked = by-design *.meshclaw.e2e.ts + tooling); branch 270 commits, 0 behind, clean fast-forwardable.
+  (2) GREEN BASELINE + COVERAGE RE-MEASURE (last full C447): be bun test --coverage EXIT 0, 1549 pass → 87.09% line / 86.60% func (line +0.13 vs C447 — the C453/C458/C459 fix+guards); fe vitest
+  --coverage EXIT 0, 714 pass → 85.89% line / 87.15% func / 78.35% branch (FLAT vs C447 — C450/C455/C456 were a 1-test guard / 3-line component re-point / BE-side). BE↔FE gap ~1.2pts. Updated
+  the COVERAGE TREND header. (3) BRANCH_REVIEW.md (gitignored) refresh — header 257→270 commits, +§35 covering the 13-commit C447–C459 delta (4 bugs incl. the #142 feature-disabling mileage-feed +
+  #141 split-cents + #140/#139 closing two annual-vs-total/0%-APR CLASSES; the C452/C458 deep-review certs; the C457 dedup-exhausted cert; the C450/C456 guards). Doc/measurement-only — no source
+  touched, both coverage runs green. 90%-line goal still structurally gated. Next #5 sweep ~C470; next CLAUDE.md full refresh ~C464. cov: be 87.09% / fe 85.89% (re-measured C460).
+- **C461 (deep-review → #144: sync-worker retries a TERMINAL auth error as a transient flake — the #105/#43/#44 family at the consumer leg)** —
+  BALANCE: nothing OVER budget at C461 (feature parked-170, deep-review 3/5, guard 5/6, bug 2/3, arch 4/5, infra 1/6) → highest-leverage. 2-agent fan-out on the two stalest data-safety
+  surfaces. (A) restore DATA-APPLICATION path (coerceRow coercion across all 15 tables + FK insert order + replace/merge) CERTIFIED CLEAN (verified firsthand): Number(replace(/,/g))+Math.round
+  pins #209's INTEGER + REAL siblings (backup.test.ts:225-255), boolean NULL-vs-0 + JSON double-stringify + the 15-table no-drop coverage guard + the FK order (photoRefs after all photo-parent
+  types) all sound; the comma-strip is the already-gated #124/#24, out of scope. (B) remote storage WRITE adapters CERTIFIED CLEAN at the adapter layer (#103/#105/#123 hold; no sibling raw-fetch
+  bypasses authedFetch's 401→AUTH_INVALID; Drive multi-step leaves at worst an idempotent empty folder; #37 Sheets non-atomic re-confirmed as the escalated HIGH) — but surfaced #144 ONE layer down
+  at the CONSUMER: processSingleRef's catch (sync-worker.ts:260) treated EVERY error identically (status:failed, retryCount+1, backoff) with NO error.code inspection, so a SyncError(AUTH_INVALID) —
+  the revoked/expired token the adapters deliberately emit (#105 comment: "so the user re-connects") — was retried 3× through findPendingOrFailed (`retryCount < 3`) then stranded `failed` with a
+  transient-looking message, burning backoff + giving no reconnect signal. VERIFIED FIRSTHAND: SyncError/SyncErrorCode.AUTH_INVALID/PERMISSION_DENIED/isSyncError all in errors.ts:57-79; the existing
+  fail test (sync-worker.test.ts:369) pins only a plain Error. FIX (one branch): isSyncError && code∈{AUTH_INVALID,PERMISSION_DENIED} → jump retryCount to a new MAX_RETRY_COUNT=3 const (mirrors the
+  repo's `retryCount < 3`, documented coupling) so the ref drops out of the work set + prefix the message "Reconnect required: …" so the provider-stats failed count means reconnect, not flake.
+  +1 guard (AUTH_INVALID upload reject → retryCount:3 not 1 + prefixed message), NON-VACUOUS (pre-fix → retryCount:1/bare). be validate:local EXIT 0, 1550 pass (+1). Filed #144 (closed same-cycle).
+  cov: be 87.09% / fe 85.89% (~carry; +1 BE guard, no re-measure this cycle).
+- **C462 (bug → #143: formatRelativeTime renders "1 weeks/months/years ago" — missing singular grammar at each bucket's low edge)** —
+  BALANCE: nothing strictly OVER budget at C462 (deep-review 1/5, guard 6/6=AT, bug 3/3=AT, arch 5/5=AT, infra 2/6, feature parked-170); THREE categories (guard/bug/arch) breach next cycle but only
+  one can be fed → picked the highest-leverage of the at-budget set: #143 was the lone clean, queued, non-eyes-on one-edit (bug, at budget). THE BUG (formatters.ts:115-117): Math.floor lands on exactly
+  1 at each bucket's low edge (7-13d → 1 week, 30-59d → 1 month, 365-729d → 1 year) but every branch hard-appended an 's' → "1 weeks/months/years ago" rendered by RecentActivityCard / VehicleCarousel /
+  SyncStatusInline on real timestamps. FIX: the `${n > 1 ? 's' : ''}` idiom already used in reminder-helpers:74 + sync-status:33, applied to the week/month/year buckets (days<7 always ≥2 → unconditional
+  plural left as-is). +1 guard (singular at each of the 3 boundaries: day 7/13/30/59/365) + FLIPPED the existing formatters.test.ts:206 assertion that CODIFIED the buggy "1 years ago" → "1 year ago".
+  NON-VACUOUS (the old code failed every new line). fe validate:local EXIT 0, 715 pass (+1). Closed #143 (the last clean queued one-edit). cov: be 87.09% / fe 85.89% (~carry; +1 FE guard, no re-measure).
+- **C463 (guard → pin the mileage-reminder due-gate's EXACT-equality boundary: the load-bearing `<` (>=-due semantics), via the REAL trigger endpoint)** —
+  BALANCE: TWO over budget at C463 (guard 7>6, arch 6>5) → rule picks the MOST-starved over-budget → guard (7). 2-agent fan-out for a genuinely-unpinned reachable invariant (the guard queue was
+  empty + pure-util surface near-exhausted). FE scout returned CERTIFY (FE pure/service/store layer genuinely exhausted — only navigation.ts left, below the load-bearing bar; the gap is the eyes-on
+  components/routes, Playwright-blocked). BE scout found the pick (VERIFIED FIRSTHAND): processMileageReminder's due-gate (trigger-service.ts:418) is `currentOdometer < nextDueOdometer → not yet
+  due`, i.e. EXACT-equality must FIRE. Reachable via POST /reminders/trigger + the recheck-on-write hook; getCurrentOdometer returns a raw integer MAX(odometer) so an exact-milestone reading (round
+  odometer log / fillup on the milestone) is genuinely reachable. trigger-mileage.test.ts's docstring CLAIMS `>=` but every firing case seeds STRICTLY past (35200/36000/40500) → the `=` edge was
+  never driven (the same `>=`-tolerant-assertion-that-never-hits-`=` gap as C450's getLatestTimeBucket / C430's outlier band). +1 guard: odometer EXACTLY 35000 on a 35000 milestone → fires 1
+  notification. PROVEN NON-VACUOUS by a temporary `<`→`<=` gate flip → exactly this test fails (1 fail / 7 pass, all others green), then reverted. be validate:local EXIT 0, 1551 pass (+1).
+  cov: be 87.09% / fe 85.89% (~carry; +1 BE guard, no re-measure this cycle).
+- **C464 (arch → delete the dead Lucia test-override seam: setTestLucia + the provably-null testLucia state, collapse getLucia to return lucia)** —
+  BALANCE: arch the SOLE over-budget category (7>5; deep-review 3/5, guard 1/6, bug 2/3, infra 4/6, feature parked) → forced. rule-7 FRESH fan-out (per C457's "fan out fresh, don't re-scout the
+  certified dead-ends"): FE scout CERTIFIED the pure/service/store layer dry (best candidate getDaysRemaining/calculateDaysUntil merge = cross-domain cohesion-negative churn → rejected; no dead
+  code; every count-2 symbol resolves to a real consumer). BE scout found the pick (VERIFIED FIRSTHAND): setTestLucia (auth/lucia.ts:73) is an EXPORTED test-override setter with ZERO callers
+  anywhere incl. __tests__ + test-helpers (tests drive the real Lucia via createTestApp's session cookie, never this seam) — and it's the ONLY writer of the module-state `testLucia` (refs are
+  exactly its decl :67, the getLucia read :70, this write :74), so testLucia is provably ALWAYS null → getLucia() (12 callers across auth/routes + middleware) always returns the real `lucia`.
+  A true zero-ref EXPORTED-symbol delete (not the C438 coverage-dropping anti-trap; not a mere unexport). FIX: deleted setTestLucia + the dead `testLucia` let, collapsed getLucia to `return lucia`
+  (kept the 12-caller seam as a stable indirection point), documented why. rule-2 behavior-preserving (the override could never fire); rule-3 green→green, NO test touched. −8 LOC. be validate:local
+  EXIT 0, 1551 pass (UNCHANGED — confirms dead). NOTE: CLAUDE.md full refresh (~C464 cadence) deferred to the next infra pick — kept this cycle to the ONE arch increment. cov: be 87.09% / fe 85.89% (~carry; arch delete, no re-measure).
+- **C465 (deep-review → #145: the /split expense route is the THIRD source-link path #125/C422 missed — forgeable unvalidated source link (money + cascade-delete data-loss))** —
+  BALANCE: nothing strictly OVER budget at C465 (deep-review 4/5, guard 2/6, bug 3/3=AT, arch 1/5, infra 5/6, feature parked) → highest-leverage = the deep-review engine (it's surfaced every real
+  defect this era). 2-agent fan-out on two stale surfaces. (B) CSV foreign-import mapping CERTIFIED CLEAN (verified firsthand): #124 last-separator-wins holds (lone-comma is the gated #24), unit
+  conversions direction/guards sound, detectSource tie is convenience-only (user confirms units), #102 collision→null + #137 clearImportedFuelFields + #C385 date echo-check all hold, unmapped
+  category → misc + surfaced (no silent drop). (A) EXPENSE write-path found #145: the manual /split route (POST /expenses/split) accepted `sourceType: z.string().optional()` (ANY string,
+  validation.ts:115) + the handler ran NO assertFinancingSourceValid — while the regular POST/PUT restrict to z.literal('financing') + fully validate it (#62/C190 + #125/C422). VERIFIED FIRSTHAND:
+  split-validation-schema.test.ts:130 even ASSERTED sourceType:'reminder' parses success. Two reachable harms from a hand-crafted POST: (1) sourceType:'financing'+arbitrary sourceId → summed by
+  computeBalance per vehicle → understates the displayed loan balance (NORTH_STAR #1 money); (2) sourceType:'insurance_term'+a real term id → deleteBySource cascade-DELETES the manual split when
+  that policy is removed (silent data-loss). FIX (mirror the regular path): tightened the split schema's sourceType to z.literal('financing').optional() + sourceId z.string().min(1) (closes the
+  non-financing forge incl. the insurance_term cascade vector) + added assertFinancingSourceValid per DISTINCT split vehicleId in the POST handler (each sibling on its own vehicle's active financing).
+  The PUT path carries no source fields (re-stamps existing) → no new entry once POST is closed. +4 guards (schema rejects reminder/insurance_term/arbitrary; /split route rejects insurance_term + a
+  bogus financing id, accepts source-less), FLIPPED the schema test that codified the hole. NON-VACUOUS. be validate:local EXIT 0, 1555 pass (+4). Filed #145 (closed same-cycle). cov: be 87.09% / fe 85.89% (~carry; +4 BE, no re-measure).
+- **C466 (bug → #146: buildFillupCostByVehicle overcounts split fuel siblings — the #56/#108/#113 split-sibling class on the chart-builder the C391 sweep missed)** —
+  BALANCE: bug the SOLE over-budget category (4>3; deep-review 1/5, guard 3/6, arch 2/5, infra 6/6=AT, feature parked) → forced bug-hunt (the clean queued bug surface drained #143/#144/#145). 2-agent
+  fan-out. (B) offline-sync apply path CERTIFIED CLEAN (verified firsthand): the one latent defect it found (checkForExistingExpense's date/amount query params silently dropped → page-1-only fuzzy
+  scan) is ALREADY FILED as the #133 SECONDARY NOTE (backend-schema change, kept open); #66/#101/#111 + #133/#134/#121 + #202 + the volume↔charge discriminant all hold. (A) analytics read-path found
+  #146: buildFillupCostByVehicle (analytics-charts.ts:413) summed/counted EVERY category='fuel' row with NO isFillup guard → a split fuel expense's volume=null per-vehicle cost-allocation sibling
+  (createSiblings never sets volume) was counted as a standalone fillup, diluting the "Avg Fillup Cost by Vehicle" chart (e.g. one $40 fillup + one $30 split-share → $35 shown, not $40). The EXACT
+  #56/#108/#113 class — and the isFillup docstring's OWN swept-site list omitted this builder (C391 covered buildFillupIntervals + buildVehicleRadar, not this). VERIFIED FIRSTHAND: no test imported it
+  (cross-cutting.property.test.ts only checks tenant-scoping with volume-bearing rows). FIX (the established one-liner mirroring :691/:855): `if (!isFillup(row)) continue;` + updated the isFillup
+  docstring's swept-site list. +3 guards (baseline avg; split-sibling NOT counted → $40 not $35; vehicle with only split-legs → no row). PROVEN NON-VACUOUS (deleting the guard line → exactly the 2
+  #146 tests fail, 44 pass). be validate:local EXIT 0, 1558 pass (+3). Filed #146 (closed same-cycle). cov: be 87.09% / fe 85.89% (~carry; +3 BE, no re-measure).
+- **C467 (infra → CLAUDE.md full refresh — the overdue ~C464 cadence)** —
+  BALANCE: infra the SOLE over-budget category (7>6; deep-review 2/5, guard 4/6, bug 1/3, arch 3/5, feature parked) → forced. The queued CLAUDE.md refresh (deferred at C464 to keep that cycle to its ONE
+  arch increment; last full refresh C454). Doc-only, no source. Refreshed the drifted snapshot to current: (1) COVERAGE line → the C460 full re-measure (be 87.09% line / 86.60% func · fe 85.89% / 87.15%
+  / 78.35%; BE↔FE gap ~1.2pts — was carrying the C447 86.96/86.55 reading); (2) SUITE SIZE → ~1558 BE / ~715 FE (was ~1543/~714) + re-pointed the recent-guard-arc note to C459–C466; (3) CLOSED-BUG ARC →
+  appended #142 (C459 notification-feed) / #144 (C461 sync-worker terminal-auth) / #145 (C465 split-source-link) / #146 (C466 split-sibling fillup-cost) to the fix list, bumped "all landed C155→C466",
+  noted #143/C462 grammar + C464 Lucia dead-code delete; (4) PENDING-ANGELO/CLOSED block → reset the "CLOSED since last refresh" line to the C447→C466 window, recorded the #62/#109/#125 source-link class
+  closed across ALL 3 write paths + the #56/#108/#113 split-sibling sweep, flagged #140 as the one clean-but-eyes-on item still open. No build gate (docs); verified no stale C453/1543/C447 markers remain.
+  Next infra #5 branch-hygiene sweep ~C470; next CLAUDE.md full refresh ~C477. cov: be 87.09% / fe 85.89% (~carry; doc-only, no re-measure).

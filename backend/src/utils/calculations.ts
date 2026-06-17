@@ -18,6 +18,18 @@ interface EfficiencyExpense {
   date: Date | string;
 }
 
+/**
+ * Sort rows ASCENDING by date, on a COPY (never mutates the input). ONE source of truth (C421) for the
+ * chronological order every PAIRWISE efficiency calc requires — calculateAverageMPG, calculateAverageMilesPerKwh,
+ * and the /stats handler each pair CONSECUTIVE rows (current − previous), so an unsorted or wrong-direction
+ * input silently mis-pairs into garbage with no error (the #75/C222 class). A divergent inline copy (flipped
+ * subtraction, or sorting in place and corrupting the caller's array) reintroduces exactly that. `date` is
+ * `Date | string`; new Date() normalizes both.
+ */
+export function sortExpensesByDate<T extends { date: Date | string }>(expenses: T[]): T[] {
+  return [...expenses].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
 // ============================================================================
 // FUEL EFFICIENCY CALCULATIONS
 // ============================================================================
@@ -38,10 +50,8 @@ export function calculateAverageMPG(fuelExpenses: Expense[]): number | null {
     return null;
   }
 
-  // Sort by date to ensure chronological order
-  const sortedExpenses = [...fuelExpenses].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  // Sort by date to ensure chronological order (sortExpensesByDate — the shared pairwise-order invariant)
+  const sortedExpenses = sortExpensesByDate(fuelExpenses);
 
   const mpgValues: number[] = [];
 
@@ -89,10 +99,8 @@ export function calculateAverageMilesPerKwh(chargeExpenses: EfficiencyExpense[])
     return null;
   }
 
-  // Sort by date to ensure chronological order
-  const sortedExpenses = [...chargeExpenses].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  // Sort by date to ensure chronological order (sortExpensesByDate — the shared pairwise-order invariant)
+  const sortedExpenses = sortExpensesByDate(chargeExpenses);
 
   // Need at least 2 expenses with mileage data
   const withMileage = sortedExpenses.filter((e) => e.mileage != null);
@@ -154,4 +162,59 @@ const PERIOD_DAYS: Record<Exclude<StatsPeriod, 'all'>, number> = {
 export function getPeriodStartDate(period: StatsPeriod, now: Date = new Date()): Date | null {
   if (period === 'all') return null;
   return new Date(now.getTime() - PERIOD_DAYS[period] * 24 * 60 * 60 * 1000);
+}
+
+// ============================================================================
+// QUERY-PARAM PARSING
+// ============================================================================
+
+/**
+ * Parse a raw query-string value to a bounded integer, falling back when it isn't finite.
+ *
+ * The `Number.parseInt(raw ?? String(fallback), 10)` + `Number.isFinite(x) ? clamp : fallback`
+ * idiom was hand-rolled twice in the SAME handler (insurance /expiring-soon `days` and `limit`) —
+ * and that copy-paste is exactly how #70 happened: `limit` carried the finite-guard, `days` was
+ * written without it, so a non-numeric `?days=` became NaN → an Invalid Date → a silently-empty
+ * result. One source of truth so the guard can't be present on one param and forgotten on its
+ * sibling. NaN/missing/non-numeric → `fallback`; otherwise clamped to `[min, max]`.
+ */
+export function parseClampedInt(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = Number.parseInt(raw ?? '', 10);
+  return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
+}
+
+// ============================================================================
+// ARRAY MIN/MAX (spread-safe)
+// ============================================================================
+
+/**
+ * Max / min of a numeric array WITHOUT the `Math.max(...arr)` argument spread.
+ *
+ * `Math.max(...arr)` / `Math.min(...arr)` pass each element as a separate function argument, so a
+ * large array (a heavy logger's thousands of fuel/mileage rows over the all-time window — these
+ * analytics queries have NO LIMIT) overflows the engine's argument-count cap and throws
+ * `RangeError: Maximum call stack size exceeded`, crashing the whole analytics request (NORTH_STAR
+ * #1 — the feature breaks for the most-engaged users). Reduce avoids the spread entirely and is
+ * O(n) with constant stack. Caller MUST guard emptiness (these return -Infinity/+Infinity on []
+ * exactly like Math.max/min, so behavior is identical at every existing call site).
+ */
+export function maxOf(values: number[]): number {
+  let max = Number.NEGATIVE_INFINITY;
+  for (const v of values) {
+    if (v > max) max = v;
+  }
+  return max;
+}
+
+export function minOf(values: number[]): number {
+  let min = Number.POSITIVE_INFINITY;
+  for (const v of values) {
+    if (v < min) min = v;
+  }
+  return min;
 }

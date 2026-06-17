@@ -46,11 +46,19 @@ export class VehicleRepository extends BaseRepository<Vehicle, NewVehicle> {
     return result[0] || null;
   }
 
-  async findByLicensePlate(licensePlate: string): Promise<Vehicle | null> {
+  /**
+   * Find a vehicle by license plate WITHIN ONE USER'S fleet. Scoped by userId (the C168/#48/#52
+   * tenant-scope-at-the-read class): the plate-uniqueness check that backs vehicle create/update is
+   * a per-user constraint, not a global one — two different users may legitimately register the same
+   * plate (e.g. a reissued plate across states, or a sold-then-rebought car), and a GLOBAL lookup
+   * both wrongly 409'd the second user AND leaked plate existence across tenants (an enumeration
+   * oracle via the conflict message). Plates carry no cross-user meaning here, so scope to the owner.
+   */
+  async findByLicensePlate(licensePlate: string, userId: string): Promise<Vehicle | null> {
     const result = await this.db
       .select()
       .from(vehicles)
-      .where(eq(vehicles.licensePlate, licensePlate))
+      .where(and(eq(vehicles.userId, userId), eq(vehicles.licensePlate, licensePlate)))
       .limit(1);
     return result[0] || null;
   }

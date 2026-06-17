@@ -6,7 +6,7 @@
  */
 
 import { isElectricFuelType } from '../db/types';
-import { calculateAverageMilesPerKwh } from './calculations';
+import { calculateAverageMilesPerKwh, maxOf } from './calculations';
 
 // Helper types for vehicle stats calculations
 export interface FuelExpense {
@@ -133,7 +133,7 @@ function calculateMileageStats(
   totalCost: number
 ): void {
   const mileages = expensesWithMileage.map((e) => e.mileage as number);
-  const latestMileage = Math.max(...mileages);
+  const latestMileage = maxOf(mileages);
   stats.currentMileage = latestMileage;
   // Distance driven can never be negative. A backdated/mistyped reading BELOW initialMileage (or the
   // only in-window reading being lower than the purchase odometer) would otherwise surface a negative
@@ -147,9 +147,19 @@ function calculateMileageStats(
 }
 
 /**
- * Calculate average miles per gallon from sequential fuel expenses
+ * Calculate average miles per gallon from sequential fuel expenses.
+ *
+ * Pairs CONSECUTIVE fillups (current − previous) for the per-segment distance, so the input MUST be
+ * in chronological order. The sole production caller (vehicles/routes.ts) already sorts by date, but a
+ * pairwise odometer-delta is silently WRONG on unordered rows (negative deltas dropped by the mpg>0
+ * filter, but valid out-of-order segments mis-paired) — so sort defensively here too (#75). The sort
+ * is on a copy + idempotent for already-sorted input, so it's behavior-preserving for today's caller
+ * while making the helper correct for any future consumer that forgets to pre-sort.
  */
-function calculateAverageMpg(expensesWithMileage: FuelExpense[]): number | null {
+function calculateAverageMpg(unorderedExpenses: FuelExpense[]): number | null {
+  const expensesWithMileage = [...unorderedExpenses].sort(
+    (a, b) => a.date.getTime() - b.date.getTime()
+  );
   const mpgValues: number[] = [];
 
   for (let i = 1; i < expensesWithMileage.length; i++) {

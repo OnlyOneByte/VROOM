@@ -19,7 +19,7 @@
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { ALLOWED_MIME_TYPES } from '../../photos/photo-service';
-import { createTermSchema } from '../validation';
+import { createTermSchema, updateTermSchema } from '../validation';
 import { validTermInputArb } from './insurance-test-generators';
 
 // Feature: insurance-management, Property 19: Insurance validation accepts flat term fields
@@ -171,5 +171,42 @@ describe('Property 8: Document MIME type validation', () => {
     for (const mime of ACCEPTED_MIME_TYPES) {
       expect(ALLOWED_MIME_TYPES).toContain(mime);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateTermSchema CONDITIONAL date-order refine (C443 guard). The PUT term schema is partial — both
+// dates are independently optional — so its refine differs from createTermSchema: it enforces
+// `endDate > startDate` ONLY when BOTH are present, and DELIBERATELY skips the check when exactly one
+// date is sent (the "user corrects just the start date" partial-update path). The property suite above
+// drives only createTermSchema; the only test touching updateTermSchema (partial-update-no-default-
+// injection) sends no dates — so all three behavioral cells of THIS refine were unpinned, on a schema
+// reachable via PUT /insurance/:id/terms/:termId (the repository writes whichever single date is sent
+// with independent guards + no cross-check, so the schema is the ONLY order gate). Drives the REAL export.
+// ---------------------------------------------------------------------------
+describe('updateTermSchema date-order refine (partial-update, C443)', () => {
+  const T1 = '2024-01-01T00:00:00.000Z';
+  const T2 = '2024-06-01T00:00:00.000Z';
+
+  test('both dates with end > start → accepted', () => {
+    expect(updateTermSchema.safeParse({ startDate: T1, endDate: T2 }).success).toBe(true);
+  });
+
+  test('both dates INVERTED (end <= start) → rejected (the enforced cell)', () => {
+    // end before start
+    expect(updateTermSchema.safeParse({ startDate: T2, endDate: T1 }).success).toBe(false);
+    // equal: the `>` (not `>=`) makes a zero-length term invalid too
+    expect(updateTermSchema.safeParse({ startDate: T1, endDate: T1 }).success).toBe(false);
+  });
+
+  test('exactly ONE date present → accepted, the order check is skipped (the update-vs-create distinction)', () => {
+    // A single-date partial update must pass the schema regardless of the stored counterpart — the
+    // deliberate `return true` branch. NON-VACUOUS: tightening the refine to require both dates (or to
+    // reject a lone date) flips these to false; dropping the `if (start && end)` guard so a lone date
+    // hits the comparison would also reject one of them.
+    expect(updateTermSchema.safeParse({ startDate: T2 }).success).toBe(true);
+    expect(updateTermSchema.safeParse({ endDate: T1 }).success).toBe(true);
+    // neither date (e.g. a policyNumber-only edit) → also accepted
+    expect(updateTermSchema.safeParse({ policyNumber: 'POL-9' }).success).toBe(true);
   });
 });

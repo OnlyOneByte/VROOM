@@ -79,4 +79,19 @@ export abstract class BaseRepository<T, TNew extends Record<string, unknown>> {
       throw new NotFoundError('Resource');
     }
   }
+
+  /**
+   * IDs of all rows on this table where `column === value`. The select-id-and-map body was
+   * hand-rolled identically in ExpenseRepository.findIdsByVehicleId + OdometerRepository.
+   * findIdsByVehicleId (both back the vehicle-delete photo-cascade cleanup); one source of truth here.
+   * Protected (not public) — repositories expose a named, typed `findIdsBy<Column>` that delegates,
+   * keeping the call-site contract while sharing the query body.
+   */
+  protected async findIdsByColumn(column: Column, value: unknown): Promise<string[]> {
+    // Select full rows (like findById) rather than an id-only projection — the generic `this.table.id`
+    // doesn't satisfy the strict select-field type, and these callers (photo-cascade cleanup over a
+    // single vehicle's children) are small bounded sets, so the row width is immaterial.
+    const rows = await this.db.select().from(this.table).where(eq(column, value));
+    return rows.map((r) => (r as { id: string }).id);
+  }
 }

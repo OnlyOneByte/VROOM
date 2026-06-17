@@ -267,18 +267,25 @@ class RestoreService {
       .where(eq(photos.userId, userId));
     const userPhotoIds = userPhotoRows.map((p) => p.id);
 
+    // Each probe declares the column its rows key on (`idColumn`) and the row field that column maps to
+    // (`idField`) — `id` for most tables, `userId` for the userId-PK'd userPreferences/syncState. Stating
+    // both on every entry keeps the array homogeneous (no `table.id` access on a table that lacks it).
     const tables = [
       {
         data: data.vehicles,
         table: vehicles,
         name: 'vehicles',
         scope: eq(vehicles.userId, userId),
+        idColumn: vehicles.id,
+        idField: 'id' as const,
       },
       {
         data: data.expenses,
         table: expenses,
         name: 'expenses',
         scope: eq(expenses.userId, userId),
+        idColumn: expenses.id,
+        idField: 'id' as const,
       },
       {
         data: data.financing,
@@ -286,37 +293,90 @@ class RestoreService {
         name: 'vehicle_financing',
         // Owns via vehicleId → an empty owned-vehicle set must match nothing (inArray([]) is false).
         scope: inArray(vehicleFinancing.vehicleId, userVehicleIds),
+        idColumn: vehicleFinancing.id,
+        idField: 'id' as const,
       },
       {
         data: data.insurance,
         table: insurancePolicies,
         name: 'insurance_policies',
         scope: eq(insurancePolicies.userId, userId),
+        idColumn: insurancePolicies.id,
+        idField: 'id' as const,
       },
-      { data: data.photos ?? [], table: photos, name: 'photos', scope: eq(photos.userId, userId) },
+      {
+        // reminders is userId-owned with its OWN id PK (NOT FK'd to vehicles — the vehicle link is the
+        // reminder_vehicles junction, onDelete:cascade). So a reminder SURVIVES the deletion of all its
+        // vehicles (the #97 vehicle-less-but-active state). Without probing it, a merge restore of a
+        // backup carrying that surviving reminder slipped past conflict detection into insert(reminders)
+        // against the existing id PK → a raw UNIQUE-constraint throw that aborted the WHOLE restore — the
+        // #93/C300 class on a third table that fix never reached. Probe it like any owned id-PK table.
+        data: data.reminders ?? [],
+        table: reminders,
+        name: 'reminders',
+        scope: eq(reminders.userId, userId),
+        idColumn: reminders.id,
+        idField: 'id' as const,
+      },
+      {
+        data: data.photos ?? [],
+        table: photos,
+        name: 'photos',
+        scope: eq(photos.userId, userId),
+        idColumn: photos.id,
+        idField: 'id' as const,
+      },
       {
         data: data.photoRefs ?? [],
         table: photoRefs,
         name: 'photo_refs',
         // Owns via photoId → scope to the importer's photos.
         scope: inArray(photoRefs.photoId, userPhotoIds),
+        idColumn: photoRefs.id,
+        idField: 'id' as const,
+      },
+      // userPreferences + syncState are PK'd by userId, and the importer ALWAYS has both (the app /
+      // getOrCreate create a prefs row on first use), while a backup ALWAYS carries the creator's prefs
+      // row. Without probing them, a merge restore whose other tables don't collide slipped past conflict
+      // detection straight into insert(userPreferences) against the existing PK → a raw UNIQUE-constraint
+      // throw that rolled back the WHOLE restore (#93, C300). Probe them like any other owned table so the
+      // collision is reported as a normal conflict; the conflict id is the userId (their PK).
+      {
+        data: (data.userPreferences ?? []).map((r) => ({ ...r, id: String(r.userId) })),
+        table: userPreferences,
+        name: 'user_preferences',
+        scope: eq(userPreferences.userId, userId),
+        idColumn: userPreferences.userId,
+        idField: 'userId' as const,
+      },
+      {
+        data: (data.syncState ?? []).map((r) => ({ ...r, id: String(r.userId) })),
+        table: syncState,
+        name: 'sync_state',
+        scope: eq(syncState.userId, userId),
+        idColumn: syncState.userId,
+        idField: 'userId' as const,
       },
     ];
 
-    for (const { data: items, table, name, scope } of tables) {
+    for (const { data: items, table, name, scope, idColumn, idField } of tables) {
       if (items.length === 0) continue;
+      const idOf = (row: Record<string, unknown>): string => String(row[idField]);
       const ids = items.map((item) => String(item.id));
       const existing = await this.db
         .select()
         .from(table)
-        .where(and(inArray(table.id, ids), scope));
+        .where(and(inArray(idColumn, ids), scope));
       conflicts.push(
-        ...existing.map((e) => ({
-          table: name,
-          id: e.id,
-          localData: e,
-          remoteData: items.find((item) => item.id === e.id),
-        }))
+        ...existing.map((e) => {
+          const eid = idOf(e as Record<string, unknown>);
+          return {
+            table: name,
+            id: eid,
+            localData: e,
+            remoteData: items.find((item) => String(item.id) === eid),
+          };
+        })
       );
     }
 

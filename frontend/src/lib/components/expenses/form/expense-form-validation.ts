@@ -1,4 +1,5 @@
 import { getVolumeUnitLabel, getChargeUnitLabel, isElectricFuelType } from '$lib/utils/units';
+import { toDateInputValue } from '$lib/utils/formatters';
 import type { Vehicle, VolumeUnit, ChargeUnit } from '$lib/types';
 
 interface ValidationContext {
@@ -37,10 +38,10 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 			// midnight, so for a user at a positive UTC offset it lands on tomorrow-morning-local
 			// and a Date-instant `> new Date()` wrongly rejects TODAY as "in the future" (the
 			// C6/C61 local-vs-UTC class). The date-picker value is already a local 'YYYY-MM-DD';
-			// today's local day uses the same getFullYear/getMonth/getDate parts idiom this file
-			// uses for mileage ordering (lines 96/109). String compare is timezone-safe.
-			const now = new Date();
-			const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+			// toDateInputValue reads today's LOCAL calendar parts (the canonical #87 helper — one
+			// source of truth for the local-date string this file builds 3×). String compare is
+			// timezone-safe.
+			const todayStr = toDateInputValue(new Date());
 			if ((value as string) > todayStr) return 'Date cannot be in the future';
 			break;
 		}
@@ -92,15 +93,13 @@ function validateMileage(value: string, ctx: ValidationContext): string | null {
 	}
 
 	const currentDateStr: string =
-		(ctx.formData['date'] as string) || new Date().toISOString().split('T')[0] || '';
+		(ctx.formData['date'] as string) || toDateInputValue(new Date());
 	const otherExpenses = ctx.allVehicleExpenses.filter(
 		exp => exp.id !== ctx.expenseId && exp.mileage != null
 	);
 
 	const entriesBefore = otherExpenses.filter(exp => {
-		const d = new Date(exp.date);
-		const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-		return s < currentDateStr;
+		return toDateInputValue(new Date(exp.date)) < currentDateStr;
 	});
 
 	if (entriesBefore.length > 0) {
@@ -111,9 +110,7 @@ function validateMileage(value: string, ctx: ValidationContext): string | null {
 	}
 
 	const entriesAfter = otherExpenses.filter(exp => {
-		const d = new Date(exp.date);
-		const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-		return s > currentDateStr;
+		return toDateInputValue(new Date(exp.date)) > currentDateStr;
 	});
 
 	if (entriesAfter.length > 0) {

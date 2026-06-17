@@ -140,3 +140,91 @@ describe('mileage re-check on write (D5)', () => {
     expect(mileageNotifCount('rw5')).toBe(0);
   });
 });
+
+/**
+ * #71 (C214): the recheck hook was wired on CREATE but NOT on the PUT/update paths, so EDITING a
+ * reading upward across a milestone (a common correction) silently did NOT fire until the next
+ * /trigger — breaking the D5 "fires the moment crossed" guarantee for edits. These pin the recheck on
+ * both update routes (odometer PUT + mileaged-expense PUT).
+ */
+describe('mileage re-check on UPDATE (D5, #71)', () => {
+  test('editing an odometer reading UP across the milestone fires immediately (no /trigger)', async () => {
+    const vehicleId = await seedVehicle();
+    seedMileageReminder('ru1', vehicleId, 35000);
+
+    // Create a reading BELOW the milestone — fires nothing yet.
+    const created = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
+      odometer: 34000,
+      recordedAt: '2024-06-01T00:00:00.000Z',
+    });
+    const body = await json<DataEnvelope<{ id: string }>>(created);
+    expect(created.status, JSON.stringify(body)).toBe(201);
+    expect(mileageNotifCount('ru1')).toBe(0);
+
+    // EDIT it up across the milestone — the recheck hook must fire it now.
+    const put = await ctx.authed('PUT', `/api/v1/odometer/${body.data.id}`, { odometer: 35200 });
+    expect(put.status, await put.text()).toBe(200);
+    expect(mileageNotifCount('ru1')).toBe(1);
+  });
+
+  test('editing a mileaged expense UP across the milestone fires immediately', async () => {
+    const vehicleId = await seedVehicle();
+    seedMileageReminder('ru2', vehicleId, 35000);
+
+    // A fuel expense BELOW the milestone — fires nothing yet.
+    const created = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'fuel',
+      date: '2024-06-15T00:00:00.000Z',
+      expenseAmount: 50,
+      mileage: 34000,
+      volume: 12,
+    });
+    const body = await json<DataEnvelope<{ id: string }>>(created);
+    expect(created.status, JSON.stringify(body)).toBeLessThan(300);
+    expect(mileageNotifCount('ru2')).toBe(0);
+
+    // Correct the mileage up across the milestone — recheck must fire it.
+    const put = await ctx.authed('PUT', `/api/v1/expenses/${body.data.id}`, { mileage: 35500 });
+    expect(put.status, await put.text()).toBe(200);
+    expect(mileageNotifCount('ru2')).toBe(1);
+  });
+});
+
+/**
+ * C284: the DELETE path deliberately does NOT recheck — and that's correct. A mileage reminder only
+ * crosses FORWARD (processMileageReminder fires when currentOdometer >= nextDueOdometer and dedups),
+ * it never UN-fires. Deleting the highest reading lowers the current odometer, which can only remove a
+ * future forward-crossing, never retroactively cancel one already written. This pins that
+ * downward-odometer invariant: a fired notification SURVIVES the deletion of the reading that triggered
+ * it, and a later /trigger does not re-fire (dedup holds even though the current odometer dropped back
+ * below the milestone) — so a future "recheck on delete" change can't silently break the no-un-fire
+ * contract.
+ */
+describe('mileage re-check is NOT run on DELETE (downward change is safe — C284)', () => {
+  test('deleting the milestone-crossing reading keeps the already-fired notification (no un-fire, no re-fire)', async () => {
+    const vehicleId = await seedVehicle();
+    seedMileageReminder('rd1', vehicleId, 35000);
+
+    // A reading across the milestone fires the notification (via the create recheck).
+    const created = await ctx.authed('POST', `/api/v1/odometer/${vehicleId}`, {
+      odometer: 36000,
+      recordedAt: '2024-06-01T00:00:00.000Z',
+    });
+    const body = await json<DataEnvelope<{ id: string }>>(created);
+    expect(created.status, JSON.stringify(body)).toBe(201);
+    expect(mileageNotifCount('rd1')).toBe(1);
+
+    // Delete that highest reading — the current odometer drops back below the milestone.
+    const del = await ctx.authed('DELETE', `/api/v1/odometer/${body.data.id}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    // The already-fired notification is NOT un-fired (history is durable).
+    expect(mileageNotifCount('rd1')).toBe(1);
+
+    // And a later /trigger does not re-fire it: the per-milestone dedup holds, and there's no reading
+    // at/over 35000 anymore, so nothing new crosses.
+    await ctx.authed('POST', '/api/v1/reminders/trigger');
+    expect(mileageNotifCount('rd1')).toBe(1);
+  });
+});

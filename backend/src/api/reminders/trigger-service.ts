@@ -24,6 +24,22 @@ export interface TriggerResult {
 // Helpers
 // ============================================================================
 
+/**
+ * Push a `reason:'error'` skip for a reminder whose per-reminder processing threw. The three
+ * trigger catch sites (time axis, mileage axis, recheck-on-write per-reminder) built this exact
+ * `{ reminderId, reason:'error', message }` entry byte-for-byte — collapse them to one source of
+ * truth so the skip shape can't drift between the axes. The `'Unknown error'` fallback is kept
+ * inline here (NOT routed through extractErrorMessage, whose contract is String(error)) — the
+ * deliberate fixed-fallback idiom the C147 helper doc carves out.
+ */
+function pushReminderSkipError(result: TriggerResult, reminderId: string, error: unknown): void {
+  result.skipped.push({
+    reminderId,
+    reason: 'error',
+    message: error instanceof Error ? error.message : 'Unknown error',
+  });
+}
+
 /** Apply anchor-day clamping after advancing month/year on a Date. */
 function clampToAnchorDay(next: Date, anchorDay: number): void {
   const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
@@ -208,6 +224,21 @@ function getAnchorDay(reminder: Reminder): number {
   return reminder.startDate.getDate();
 }
 
+/**
+ * Has a bounded reminder's next occurrence crossed its endDate? ONE source of truth for the
+ * endDate-boundary predicate (C409) that was hand-inlined at four sites here — fastForwardPastNow's
+ * in-loop + post-loop guards and processReminder's in-loop-break + natural-exit guards. This is THE
+ * bug-#12 family the loop kept re-finding (#107/C362 fast-forward exit, #114/C394 mark-serviced,
+ * #116/C399 catch-up natural exit): each was a path where the advanced nextDue stepped past endDate
+ * but the reminder stayed active. A divergent copy of the predicate (a `>=`/`>` slip, or dropping the
+ * `endDate &&` null-guard so a no-end reminder wrongly deactivates) is exactly that class — so the
+ * comparison lives in one place. Callers keep their own ACTION (break vs deactivate+return), since the
+ * four sites diverge there by design; only the boundary TEST is shared.
+ */
+function hasReminderEndedBy(reminder: Reminder, nextDue: Date): boolean {
+  return reminder.endDate != null && nextDue > reminder.endDate;
+}
+
 async function processExpensePeriod(
   reminder: Reminder,
   vehicleIds: string[],
@@ -262,7 +293,7 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
     // reminder once nextDue crosses endDate, but a reminder lapsed past maxCatchUp reaches this
     // fast-forward instead — without this check it would advance past now and stay "active" but
     // permanently dormant (never fires, never closes). Deactivate the moment we step past endDate.
-    if (reminder.endDate && nextDue > reminder.endDate) {
+    if (hasReminderEndedBy(reminder, nextDue)) {
       await reminderRepository.deactivate(reminder.id);
       return;
     }
@@ -277,6 +308,16 @@ async function fastForwardPastNow(reminder: Reminder, currentDue: Date, now: Dat
       );
     }
     nextDue = advanced;
+  }
+  // Bug #107 (C362 audit): the in-loop endDate check above only inspects values <= now (the while
+  // guard). The FINAL advance steps `nextDue` PAST now and exits the loop, so that last value is
+  // never tested against endDate. A bounded reminder whose endDate falls in the period straddling
+  // now (lastStep <= endDate < this final nextDue) would otherwise be written FORWARD of its endDate
+  // yet left active — firing again next trigger (the bug #12 family, here on fast-forward's exit
+  // boundary). Deactivate instead of advancing past the end date. Mirrors the in-loop guard at :281.
+  if (hasReminderEndedBy(reminder, nextDue)) {
+    await reminderRepository.deactivate(reminder.id);
+    return;
   }
   await reminderRepository.advanceNextDueDate(reminder.id, previousDue, nextDue);
 }
@@ -293,11 +334,7 @@ class ReminderTriggerService {
       try {
         await this.processReminder(reminder, vehicleIds, now, result);
       } catch (error) {
-        result.skipped.push({
-          reminderId: reminder.id,
-          reason: 'error',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
+        pushReminderSkipError(result, reminder.id, error);
       }
     }
 
@@ -310,11 +347,7 @@ class ReminderTriggerService {
       try {
         await this.processMileageReminder(reminder, vehicleIds, result);
       } catch (error) {
-        result.skipped.push({
-          reminderId: reminder.id,
-          reason: 'error',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
+        pushReminderSkipError(result, reminder.id, error);
       }
     }
 
@@ -353,11 +386,7 @@ class ReminderTriggerService {
       try {
         await this.processMileageReminder(reminder, vehicleIds, result);
       } catch (error) {
-        result.skipped.push({
-          reminderId: reminder.id,
-          reason: 'error',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
+        pushReminderSkipError(result, reminder.id, error);
       }
     }
     return result;
@@ -427,9 +456,10 @@ class ReminderTriggerService {
     let catchUpCount = 0;
 
     while (nextDue <= now && catchUpCount < maxCatchUp) {
-      // EndDate check inside the loop — process periods up to endDate before deactivating
-      if (reminder.endDate && nextDue > reminder.endDate) {
-        await reminderRepository.deactivate(reminder.id);
+      // EndDate check inside the loop — process periods up to endDate, then stop catching up.
+      // Deactivation is handled ONCE after the loop (see the #116 guard below) so the natural
+      // exit boundary is covered by the same code — one deactivation site, no duplication.
+      if (hasReminderEndedBy(reminder, nextDue)) {
         break;
       }
 
@@ -444,6 +474,20 @@ class ReminderTriggerService {
       }
 
       catchUpCount++;
+    }
+
+    // Bug #116 (C399 audit): honor endDate at the loop's NATURAL exit too (the #107/#114 bug-#12
+    // family on a third path). The in-loop guard above only inspects nextDue <= now (the while
+    // condition); the FINAL advance steps nextDue PAST now and exits the loop under the catch-up cap,
+    // so that last value was never tested against endDate. A bounded reminder whose endDate fell
+    // between its last in-window occurrence and that final advance was left is_active=1 with a future
+    // nextDueDate — it then inflates GET /reminders/recurring-cost's run-rate + count and stays in the
+    // active list until a LATER trigger lazily closes it (no duplicate expense — the in-loop guard
+    // runs before materialization — purely a wrong active-state / wrong run-rate defect). This single
+    // guard also covers the in-loop break case above. Mirrors fastForwardPastNow's exit guard (:303).
+    if (hasReminderEndedBy(reminder, nextDue)) {
+      await reminderRepository.deactivate(reminder.id);
+      return;
     }
 
     // Fast-forward past now when catch-up limit reached

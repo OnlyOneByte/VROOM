@@ -32,7 +32,6 @@ import {
   buildVehicleMaintenanceCosts,
   buildVehicleRadar,
   computeAverageCosts,
-  computeEfficiencyPoint,
   computeFuelConsumptionMetrics,
   computeMileageScore,
   computeMpgAndCostPerMile,
@@ -45,10 +44,14 @@ import {
   findBiggestExpense,
   forEachVehiclePair,
   type GeneralExpenseRow,
+  gasEfficiencyPoint,
   groupByVehicle,
+  isFillup,
   monthKeysInRange,
+  sortByVehicleThenDate,
   toMonthKey,
 } from '../../utils/analytics-charts';
+import { maxOf, minOf } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { convertDistance, convertEfficiency } from '../../utils/unit-conversions';
 
@@ -67,6 +70,42 @@ export function monthsOwnedInYear(ownershipStart: Date, now: Date, year: number)
   // The vehicle wasn't owned during `year` at all (bought after it, or `now` precedes it).
   if (ownershipStart.getFullYear() > year || now.getFullYear() < year) return 0;
   return Math.max(0, yearEndMonth - yearStartMonth + 1);
+}
+
+/**
+ * Whole CALENDAR months elapsed from `from` to `to` (signed; can be negative if `to` precedes `from`).
+ * The year×12 + month-delta expression was hand-repeated at the financing months-elapsed + the all-time
+ * TCO ownership-months sites — two money-facing denominators (monthsRemaining; costPerMonth = total /
+ * months). ONE source of truth so a divergent copy (a dropped `* 12`, a flipped subtraction) can't skew
+ * one path's months against the other. Callers apply their OWN clamp (financing Math.max(0,…),
+ * cost-per-month Math.max(1,…)) — this returns the raw count, exactly as both inline expressions did.
+ */
+export function monthsBetween(from: Date, to: Date): number {
+  return (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+}
+
+/**
+ * Normalize a date-or-raw-timestamp into a Date (C194 dedup). Drizzle timestamp columns surface as
+ * Date, but some rows reach these builders via paths typed loosely (a raw number/string), so the
+ * analytics builders defensively coerced with `x instanceof Date ? x : new Date(x)` — hand-repeated at
+ * 4 sites (fuel monthly, financing startDate, term start+end). One source of truth; behavior-identical
+ * (an already-Date passes through; anything else goes through `new Date`, exactly as before).
+ */
+export function toDate(value: Date | number | string): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
+/**
+ * The half-open `[Jan 1 of `year`, Jan 1 of `year`+1)` local-time Date boundaries (C216 dedup). The
+ * `new Date(year, 0, 1)` / `new Date(year + 1, 0, 1)` pair was hand-repeated at 3 sites
+ * (queryTotalSpending, the year-scoped vehicle-expenses filter, getYearEnd) — each then either feeds
+ * `gte(start) + lt(end)` (the half-open year filter) or `Math.floor(.getTime()/1000)` (the DateRange
+ * seconds form). One source of truth for the boundary pair; behavior-identical (callers consume the
+ * two Dates exactly as before). Local-time, matching the existing sites + the rest of the analytics
+ * date math.
+ */
+export function calendarYearRange(year: number): { start: Date; end: Date } {
+  return { start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) };
 }
 
 // ---------------------------------------------------------------------------
@@ -436,7 +475,11 @@ export class AnalyticsRepository {
         const current = rows[i];
         const previous = rows[i - 1];
         if (!current || !previous) continue;
-        const point = computeEfficiencyPoint(current, previous);
+        // gasEfficiencyPoint (not computeEfficiencyPoint): this is a gas-MPG average — a PHEV's charge
+        // session (mi/kWh) must NOT be summed in, and crucially must NOT be fed to convertEfficiency
+        // (which would convert mi/kWh as if it were mi/gal → garbage). The #119/#122 gas/charge
+        // partition (C413) on the converted/summary repository path it missed (#126, C427).
+        const point = gasEfficiencyPoint(current, previous);
         if (!point) continue;
 
         values.push(
@@ -453,6 +496,17 @@ export class AnalyticsRepository {
       }
     }
     return values;
+  }
+
+  /**
+   * Mean of the (already unit-converted) per-pair efficiency values, or null when there are none.
+   * The ONE source of truth for the `values.length > 0 ? sum/len : null` averaging the three analytics
+   * readers (getQuickStats / getYearEnd / getSummary) computed byte-identically off
+   * computeConvertedEfficiencyValues — so a future change to the averaging (outlier trim, weighting)
+   * lands once, and the empty→null guard (a common div-by-zero vector) lives in one place.
+   */
+  private computeAverageEfficiency(values: number[]): number | null {
+    return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null;
   }
 
   /**
@@ -475,7 +529,7 @@ export class AnalyticsRepository {
     let total = 0;
     for (const [vId, mileages] of vehicleMileages) {
       if (mileages.length < 2) continue;
-      let distance = Math.max(...mileages) - Math.min(...mileages);
+      let distance = maxOf(mileages) - minOf(mileages);
       if (!skipConversion && distance > 0) {
         const vUnits = vehicleUnitsMap.get(vId) ?? { ...DEFAULT_UNIT_PREFERENCES };
         distance = convertDistance(distance, vUnits.distanceUnit, targetUnits.distanceUnit);
@@ -503,7 +557,8 @@ export class AnalyticsRepository {
         const current = rows[i];
         const previous = rows[i - 1];
         if (!current || !previous) continue;
-        const point = computeEfficiencyPoint(current, previous);
+        // gasEfficiencyPoint: gas-MPG trend — exclude a PHEV's charge mi/kWh before pooling/convert (#126/C427).
+        const point = gasEfficiencyPoint(current, previous);
         if (!point) continue;
 
         const converted = skipConversion
@@ -639,8 +694,7 @@ export class AnalyticsRepository {
   }
 
   private async queryTotalSpending(userId: string, year: number): Promise<number> {
-    const yearStart = new Date(year, 0, 1);
-    const yearEnd = new Date(year + 1, 0, 1);
+    const { start: yearStart, end: yearEnd } = calendarYearRange(year);
     const result = await this.db
       .select({ total: sql<number>`COALESCE(SUM(${expenses.expenseAmount}), 0)` })
       .from(expenses)
@@ -686,7 +740,7 @@ export class AnalyticsRepository {
     const map = new Map<string, { mileage: number }>();
     for (const row of fuelRows) {
       if (row.mileage == null || !row.date) continue;
-      const d = row.date instanceof Date ? row.date : new Date(row.date);
+      const d = toDate(row.date);
       const key = `${toMonthKey(d)}|${row.vehicleId}`;
       const existing = map.get(key);
       if (!existing || row.mileage > existing.mileage) {
@@ -792,13 +846,12 @@ export class AnalyticsRepository {
   ): FinancingData['vehicleDetails'][number] {
     const monthlyInterestEstimate =
       fin.financingType === 'loan' && fin.apr ? (computedBalance * (fin.apr / 100)) / 12 : 0;
-    const startDate =
-      fin.startDate instanceof Date ? fin.startDate : new Date(fin.startDate as unknown as number);
+    // startDate is `Date | null` in this builder's local type but `.notNull()` in the schema, so it's
+    // never actually null at runtime. The `?? 0` preserves the prior `new Date(<null-cast>)`=epoch
+    // behavior on the impossible-null path EXACTLY, while satisfying toDate's non-null param.
+    const startDate = toDate(fin.startDate ?? 0);
     const now = new Date();
-    const monthsElapsed = Math.max(
-      0,
-      (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth())
-    );
+    const monthsElapsed = Math.max(0, monthsBetween(startDate, now));
     return {
       vehicleId: fin.vehicleId,
       vehicleName: vehicleNameMap.get(fin.vehicleId) ?? 'Unknown',
@@ -846,9 +899,12 @@ export class AnalyticsRepository {
       paymentAmount: number;
     }>
   ): Promise<FinancingData['loanBreakdown']> {
-    const activeLoans = financingRows.filter(
-      (f) => f.isActive && f.financingType === 'loan' && f.apr
-    );
+    // NOTE: do NOT add `&& f.apr` — apr is `.min(0)`-valid, so a 0%-APR dealer-promo loan has apr===0
+    // (falsy) and would be silently DROPPED from the breakdown chart, hiding a real active loan's
+    // principal paydown (the #92/#117 0%-APR class, 3rd site). financingType==='loan' already excludes
+    // leases; loan.apr is coalesced to 0 below for the amortization walk (which handles 0% correctly:
+    // interest = balance*0 = 0, all payment goes to principal). #139.
+    const activeLoans = financingRows.filter((f) => f.isActive && f.financingType === 'loan');
     if (activeLoans.length === 0) return [];
 
     const { financingRepository } = await import('../financing/repository');
@@ -999,12 +1055,8 @@ export class AnalyticsRepository {
     monthlyPremium: number
   ): void {
     if (!term.startDate || !term.endDate) return;
-    const start =
-      term.startDate instanceof Date
-        ? term.startDate
-        : new Date(term.startDate as unknown as number);
-    const end =
-      term.endDate instanceof Date ? term.endDate : new Date(term.endDate as unknown as number);
+    const start = toDate(term.startDate);
+    const end = toDate(term.endDate);
     // monthKeysInRange anchors to day-1 per month, so a term starting on day 29-31 no longer
     // skips a short month (the setMonth-overshoot bug — cycle 14).
     for (const key of monthKeysInRange(start, end)) {
@@ -1116,7 +1168,8 @@ export class AnalyticsRepository {
       if (rows.length < 2) return [];
       const points: FuelEfficiencyPoint[] = [];
       forEachVehiclePair(rows, (current, previous) => {
-        const point = computeEfficiencyPoint(current as FuelRow, previous as FuelRow);
+        // gasEfficiencyPoint: the fuel-efficiency TREND is gas MPG — exclude PHEV charge mi/kWh (#126/C427).
+        const point = gasEfficiencyPoint(current as FuelRow, previous as FuelRow);
         if (point) points.push(point);
       });
       return points;
@@ -1157,10 +1210,7 @@ export class AnalyticsRepository {
         userUnits,
         skipConversion
       );
-      const avgEfficiency =
-        convertedEfficiencyValues.length > 0
-          ? convertedEfficiencyValues.reduce((a, b) => a + b, 0) / convertedEfficiencyValues.length
-          : null;
+      const avgEfficiency = this.computeAverageEfficiency(convertedEfficiencyValues);
 
       const fleetHealthScore =
         vehicleCount > 0 ? await this.computeFleetHealthScore(vehicleRows, userId) : 0;
@@ -1170,11 +1220,7 @@ export class AnalyticsRepository {
         ytdSpending,
         avgEfficiency,
         fleetHealthScore,
-        units: {
-          distanceUnit: userUnits.distanceUnit,
-          volumeUnit: userUnits.volumeUnit,
-          chargeUnit: userUnits.chargeUnit,
-        },
+        units: { ...userUnits },
       };
     } catch (error) {
       if (error instanceof ValidationError) throw error;
@@ -1271,12 +1317,7 @@ export class AnalyticsRepository {
       ]);
 
       // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
-      const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
-        if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
-        const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
-        const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
-        return aTime - bTime;
-      });
+      const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
 
       return this.buildFuelStatsFromData(
         fuelRows,
@@ -1306,6 +1347,7 @@ export class AnalyticsRepository {
   ): FuelStatsData {
     const now = new Date();
     const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
     const rangeStartDate = new Date(range.start * 1000);
     const rangeEndDate = new Date(range.end * 1000);
 
@@ -1318,24 +1360,32 @@ export class AnalyticsRepository {
     // Count only volume-bearing rows — the same predicate fillupDetails already uses — so a
     // split fillup counts once and a volume-less row never counts as a fillup. The volume/
     // cost SUMS were always correct (null volume contributes 0); only the COUNTS were wrong.
-    const isFillup = (r: FuelExpenseRow) => r.volume != null && r.volume > 0;
+    // isFillup is the shared predicate (analytics-charts.ts, C403) — one source of truth.
     const currentYearFillups = fuelRows.filter(isFillup).length;
     const previousYearFillups = prevYearAgg.count;
-    const currentMonthFillups = fuelRows.filter(
-      (r) => isFillup(r) && toDate(r).getMonth() === currentMonth
-    ).length;
+    // "This/Last Month" are CALENDAR months (the FE labels them so) — match BOTH month AND year.
+    // fuelRows spans the whole requested range (default 'all' = multi-year), so a year-less
+    // getMonth() match folded every prior year's same-month fillups into "This Month" (#86,
+    // NORTH_STAR #2 correct-for-everyone). "Last Month" is the calendar month before now, which
+    // rolls into the previous YEAR when now is January.
     const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const prevMonthFillups = fuelRows.filter(
-      (r) => isFillup(r) && toDate(r).getMonth() === prevMonth
-    ).length;
+    const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const inCurrentMonth = (r: FuelExpenseRow) => {
+      const d = toDate(r);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    };
+    const inPrevMonth = (r: FuelExpenseRow) => {
+      const d = toDate(r);
+      return d.getMonth() === prevMonth && d.getFullYear() === prevMonthYear;
+    };
+    const currentMonthFillups = fuelRows.filter((r) => isFillup(r) && inCurrentMonth(r)).length;
+    const prevMonthFillups = fuelRows.filter((r) => isFillup(r) && inPrevMonth(r)).length;
 
     const sumGallons = (rows: FuelExpenseRow[]) => rows.reduce((s, r) => s + (r.volume ?? 0), 0);
     const currentYearGallons = sumGallons(fuelRows);
     const previousYearGallons = prevYearAgg.totalGallons;
-    const currentMonthGallons = sumGallons(
-      fuelRows.filter((r) => toDate(r).getMonth() === currentMonth)
-    );
-    const prevMonthGallons = sumGallons(fuelRows.filter((r) => toDate(r).getMonth() === prevMonth));
+    const currentMonthGallons = sumGallons(fuelRows.filter(inCurrentMonth));
+    const prevMonthGallons = sumGallons(fuelRows.filter(inPrevMonth));
 
     const { mpgValues, costPerMileValues } = computeMpgAndCostPerMile(fuelRowsByVehicle);
     const fuelConsumption = computeFuelConsumptionMetrics(mpgValues);
@@ -1345,8 +1395,8 @@ export class AnalyticsRepository {
       .map((r) => r.volume as number);
     const fillupDetails = {
       avgVolume: volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : null,
-      minVolume: volumes.length > 0 ? Math.min(...volumes) : null,
-      maxVolume: volumes.length > 0 ? Math.max(...volumes) : null,
+      minVolume: volumes.length > 0 ? minOf(volumes) : null,
+      maxVolume: volumes.length > 0 ? maxOf(volumes) : null,
     };
 
     const averageCost = computeAverageCosts(
@@ -1359,19 +1409,16 @@ export class AnalyticsRepository {
 
     // Distance must be summed PER VEHICLE (max-min within each car), then totaled. Pooling
     // every vehicle's odometer readings into one max-min gives garbage for a multi-vehicle
-    // user (e.g. a car at 12k mi and one at 95k mi would report ~83k). Mirrors the grouped
-    // computeConvertedTotalDistance; this summary path is single-unit so it doesn't convert.
-    const mileagesByVehicle = new Map<string, number[]>();
-    for (const r of fuelRows) {
-      if (r.mileage == null) continue;
-      const arr = mileagesByVehicle.get(r.vehicleId) ?? [];
-      arr.push(r.mileage);
-      mileagesByVehicle.set(r.vehicleId, arr);
-    }
-    let totalDistance = 0;
-    for (const mileages of mileagesByVehicle.values()) {
-      if (mileages.length >= 2) totalDistance += Math.max(...mileages) - Math.min(...mileages);
-    }
+    // user (e.g. a car at 12k mi and one at 95k mi would report ~83k). Delegate to the shared
+    // computeConvertedTotalDistance (C392) with skipConversion=true — this summary path is
+    // single-unit so it doesn't convert; the unit args are ignored under skipConversion. ONE
+    // source of truth for the per-vehicle group→max-min→sum, in lockstep with the year-end path.
+    const totalDistance = this.computeConvertedTotalDistance(
+      fuelRows,
+      new Map(),
+      DEFAULT_UNIT_PREFERENCES,
+      true
+    );
     const daysSoFar = Math.max(
       1,
       Math.ceil(
@@ -1424,12 +1471,7 @@ export class AnalyticsRepository {
       ]);
 
       // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
-      const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
-        if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
-        const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
-        const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
-        return aTime - bTime;
-      });
+      const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
 
       return this.buildFuelAdvancedFromData(
         fuelRows,
@@ -1540,11 +1582,7 @@ export class AnalyticsRepository {
         expenseByCategory: buildExpenseByCategory(allExpenses),
         vehicleCostComparison,
         fuelEfficiencyComparison,
-        units: {
-          distanceUnit: userUnits.distanceUnit,
-          volumeUnit: userUnits.volumeUnit,
-          chargeUnit: userUnits.chargeUnit,
-        },
+        units: { ...userUnits },
       };
     } catch (error) {
       if (error instanceof ValidationError) throw error;
@@ -1578,7 +1616,10 @@ export class AnalyticsRepository {
         const current = rows[i];
         const previous = rows[i - 1];
         if (!current || !previous) continue;
-        const point = computeEfficiencyPoint(current, previous);
+        // gasEfficiencyPoint: this converted comparison is gas MPG — exclude a PHEV's charge mi/kWh BEFORE
+        // convertEfficiency (which would mis-convert mi/kWh as mi/gal). Matches the skipConversion twin
+        // buildFuelEfficiencyComparison's gas gate, restoring branch parity (#126/C427, the #119/#122 class).
+        const point = gasEfficiencyPoint(current, previous);
         if (!point) continue;
 
         const converted = convertEfficiency(
@@ -1832,8 +1873,7 @@ export class AnalyticsRepository {
 
       const conditions = [eq(expenses.vehicleId, vehicleId), eq(vehicles.userId, userId)];
       if (year) {
-        const yearStart = new Date(year, 0, 1);
-        const yearEnd = new Date(year + 1, 0, 1);
+        const { start: yearStart, end: yearEnd } = calendarYearRange(year);
         conditions.push(gte(expenses.date, yearStart));
         conditions.push(lt(expenses.date, yearEnd));
       }
@@ -1869,16 +1909,11 @@ export class AnalyticsRepository {
       // numerator isn't divided by a full-ownership denominator (#28). Both clamp to ≥1.
       const ownershipMonths = year
         ? Math.max(1, monthsOwnedInYear(ownershipStart, now, year))
-        : Math.max(
-            1,
-            (now.getFullYear() - ownershipStart.getFullYear()) * 12 +
-              (now.getMonth() - ownershipStart.getMonth())
-          );
+        : Math.max(1, monthsBetween(ownershipStart, now));
       const mileages = detailedExpenses
         .filter((r) => r.mileage != null)
         .map((r) => r.mileage as number);
-      const totalDistance =
-        mileages.length >= 2 ? Math.max(...mileages) - Math.min(...mileages) : 0;
+      const totalDistance = mileages.length >= 2 ? maxOf(mileages) - minOf(mileages) : 0;
 
       return {
         vehicleId,
@@ -1934,8 +1969,7 @@ export class AnalyticsRepository {
   /** Compute year-end summary: totals, trends, biggest expense, YoY comparison. */
   async getYearEnd(userId: string, year: number): Promise<YearEndData> {
     try {
-      const yearStart = new Date(year, 0, 1);
-      const yearEnd = new Date(year + 1, 0, 1);
+      const { start: yearStart, end: yearEnd } = calendarYearRange(year);
       const yearRange: DateRange = {
         start: Math.floor(yearStart.getTime() / 1000),
         end: Math.floor(yearEnd.getTime() / 1000),
@@ -1966,10 +2000,7 @@ export class AnalyticsRepository {
         userUnits,
         skipConversion
       );
-      const avgEfficiency =
-        convertedEfficiencyValues.length > 0
-          ? convertedEfficiencyValues.reduce((a, b) => a + b, 0) / convertedEfficiencyValues.length
-          : null;
+      const avgEfficiency = this.computeAverageEfficiency(convertedEfficiencyValues);
 
       const efficiencyTrend = this.buildConvertedEfficiencyTrend(
         fuelRows,
@@ -1989,11 +2020,7 @@ export class AnalyticsRepository {
         totalDistance,
         avgEfficiency,
         costPerDistance: totalDistance > 0 ? totalSpent / totalDistance : null,
-        units: {
-          distanceUnit: userUnits.distanceUnit,
-          volumeUnit: userUnits.volumeUnit,
-          chargeUnit: userUnits.chargeUnit,
-        },
+        units: { ...userUnits },
       };
     } catch (error) {
       if (error instanceof ValidationError) throw error;
@@ -2036,12 +2063,7 @@ export class AnalyticsRepository {
         this.getAllVehicleUnits(userId),
       ]);
 
-      const fuelRowsByVehicle = [...fuelRows].sort((a, b) => {
-        if (a.vehicleId !== b.vehicleId) return a.vehicleId.localeCompare(b.vehicleId);
-        const aTime = a.date instanceof Date ? a.date.getTime() : Number(a.date);
-        const bTime = b.date instanceof Date ? b.date.getTime() : Number(b.date);
-        return aTime - bTime;
-      });
+      const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
 
       // Build quickStats with per-vehicle unit conversion
       const skipConversion = this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits);
@@ -2051,10 +2073,7 @@ export class AnalyticsRepository {
         userUnits,
         skipConversion
       );
-      const avgEfficiency =
-        convertedEfficiencyValues.length > 0
-          ? convertedEfficiencyValues.reduce((a, b) => a + b, 0) / convertedEfficiencyValues.length
-          : null;
+      const avgEfficiency = this.computeAverageEfficiency(convertedEfficiencyValues);
       const ytdSpending = allExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
       const fleetHealthScore =
         vehicleRows.length > 0 ? await this.computeFleetHealthScore(vehicleRows, userId) : 0;
@@ -2064,11 +2083,7 @@ export class AnalyticsRepository {
         ytdSpending,
         avgEfficiency,
         fleetHealthScore,
-        units: {
-          distanceUnit: userUnits.distanceUnit,
-          volumeUnit: userUnits.volumeUnit,
-          chargeUnit: userUnits.chargeUnit,
-        },
+        units: { ...userUnits },
       };
 
       const fuelStats = this.buildFuelStatsFromData(

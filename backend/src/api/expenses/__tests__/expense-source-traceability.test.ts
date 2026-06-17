@@ -144,3 +144,276 @@ describe('expense source traceability (recurring-expenses T1 — read-path surfa
     expect(body.data.sourceId ?? null).toBeNull();
   });
 });
+
+/**
+ * #62 (C190): the manual create/update route accepts ONLY sourceType 'financing' (which it fully
+ * validates). 'insurance_term' + 'reminder' expenses are created exclusively by system paths that
+ * BYPASS this route (insurance hooks / the reminder trigger — verified firsthand), so accepting them
+ * on the manual route was pure over-permissiveness: a hand-crafted POST/PUT could forge an UNVALIDATED
+ * source link on the caller's own row (skews source-bucketed analytics + a matching sourceId would
+ * cascade-delete the manual expense when its parent is removed). These pin the enum restriction.
+ */
+describe('#62 — manual expense route rejects system-only sourceTypes', () => {
+  test('POST with sourceType "reminder" is rejected 400 (system-only — never via the manual route)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 20,
+      date: '2024-03-10T00:00:00.000Z',
+      sourceType: 'reminder',
+      sourceId: 'forged-reminder-id',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('POST with sourceType "insurance_term" is rejected 400 too', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'financial',
+      expenseAmount: 30,
+      date: '2024-03-10T00:00:00.000Z',
+      sourceType: 'insurance_term',
+      sourceId: 'forged-term-id',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('PUT with sourceType "reminder" is rejected 400 (the update path is restricted too)', async () => {
+    const vehicleId = await seedVehicle();
+    const createRes = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 15,
+      date: '2024-03-11T00:00:00.000Z',
+    });
+    const created = await json<DataEnvelope<ExpenseResponse>>(createRes);
+    expect(createRes.status, JSON.stringify(created)).toBe(201);
+
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${created.data.id}`, {
+      sourceType: 'reminder',
+      sourceId: 'forged-reminder-id',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('a plain manual expense with NO source still creates fine (the enum restriction is not over-broad)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 18,
+      date: '2024-03-12T00:00:00.000Z',
+    });
+    expect(res.status).toBe(201);
+  });
+
+  // #145 (C465): the SPLIT route (POST /expenses/split) is the THIRD source-link path #125/C422
+  // missed — its schema was z.string().optional() (any string) and the handler ran NO
+  // assertFinancingSourceValid, so a hand-crafted split could forge an unvalidated reminder/
+  // insurance_term link (cascade-delete data-loss vector) OR a 'financing' link to an arbitrary
+  // sourceId (understates the displayed loan balance). Now: non-financing rejected at the schema;
+  // a financing link is validated per vehicle.
+  test('POST /split with a system-only sourceType "insurance_term" is rejected 400 (#145)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+      category: 'financial',
+      totalAmount: 40,
+      date: '2024-03-13T00:00:00.000Z',
+      sourceType: 'insurance_term',
+      sourceId: 'forged-term-id',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('POST /split with sourceType "financing" but a bogus sourceId is rejected (per-vehicle validation) (#145)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+      category: 'financial',
+      totalAmount: 40,
+      date: '2024-03-13T00:00:00.000Z',
+      sourceType: 'financing',
+      sourceId: 'no-such-financing',
+    });
+    // assertFinancingSourceValid throws ValidationError (no active financing / id mismatch) → 400.
+    expect(res.status).toBe(400);
+  });
+
+  test('POST /split with NO source still creates fine (the restriction is not over-broad) (#145)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+      category: 'misc',
+      totalAmount: 25,
+      date: '2024-03-13T00:00:00.000Z',
+    });
+    expect(res.status).toBe(201);
+  });
+});
+
+// #109 (C372): the create schema enforces both-or-neither for sourceType/sourceId via .refine(), but
+// .refine() does NOT survive the update schema's .partial()/.omit() re-derivation and was never re-added —
+// so a PUT could persist an ASYMMETRIC source link (one of the pair without the other), the #62/#34
+// within-tenant integrity class: it skews source-bucketed analytics and a half-link with a real sourceId
+// would mis-/never-trigger the financing cascade-delete cleanup. The create path forbids this; now the
+// update path does too. (The vehicleId/source seeds use the manual route's only-allowed sourceType,
+// 'financing'; here we only need the asymmetry to trip the refine, so the id can be any string.)
+describe('#109 — PUT rejects an asymmetric sourceType/sourceId (both-or-neither, mirroring create)', () => {
+  async function seedPlainExpense(): Promise<string> {
+    const vehicleId = await seedVehicle();
+    const createRes = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 20,
+      date: '2024-04-01T00:00:00.000Z',
+    });
+    const created = await json<DataEnvelope<ExpenseResponse>>(createRes);
+    expect(createRes.status, JSON.stringify(created)).toBe(201);
+    return created.data.id;
+  }
+
+  test('PUT with sourceId but NO sourceType → 400 (asymmetric, was unguarded on update)', async () => {
+    const id = await seedPlainExpense();
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      sourceId: 'fin-orphan-id',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('PUT with sourceType but NO sourceId → 400 (the mirror asymmetry)', async () => {
+    const id = await seedPlainExpense();
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      sourceType: 'financing',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('PUT with NEITHER (a normal unrelated edit) is accepted — the refine is not over-broad', async () => {
+    const id = await seedPlainExpense();
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      expenseAmount: 25,
+    });
+    expect(res.status).toBe(200);
+  });
+});
+
+// #125 (C422): the create path VERIFIES a financing source link points at the vehicle's ACTIVE financing
+// (computeBalance sums `source_type='financing' AND source_id=id`, so a forged/mismatched link mis-attributes
+// the expense as a loan payment → understates the displayed balance). The PUT path SKIPPED this — it ran the
+// both-or-neither refine (#109) + the enum restriction but never the financing-existence/id-match check — so
+// a SYMMETRIC `{sourceType:'financing', sourceId:<forged>}` PUT persisted. Now both paths share
+// assertFinancingSourceValid. These are the symmetric cases the #62/#109 tests above don't cover.
+describe('#125 — PUT verifies a financing source link (not just the asymmetry/enum)', () => {
+  async function seedPlainExpense(vehicleId: string): Promise<string> {
+    const createRes = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'financial',
+      expenseAmount: 20,
+      date: '2024-05-01T00:00:00.000Z',
+    });
+    const created = await json<DataEnvelope<ExpenseResponse>>(createRes);
+    expect(createRes.status, JSON.stringify(created)).toBe(201);
+    return created.data.id;
+  }
+
+  test('PUT {sourceType:financing, sourceId:forged} on a vehicle with NO financing → 400 (was 200 pre-fix)', async () => {
+    const vehicleId = await seedVehicle();
+    const id = await seedPlainExpense(vehicleId);
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      sourceType: 'financing',
+      sourceId: 'forged-financing-id',
+    });
+    expect(res.status).toBe(400); // "Vehicle has no active financing"
+  });
+
+  test('PUT linking to the vehicle ACTUAL active financing succeeds (the check is not over-broad)', async () => {
+    const vehicleId = await seedVehicle();
+    const id = await seedPlainExpense(vehicleId);
+    // Create real active financing on the vehicle.
+    const finRes = await ctx.authed('POST', `/api/v1/financing/vehicles/${vehicleId}/financing`, {
+      financingType: 'loan',
+      provider: 'TestBank',
+      originalAmount: 20000,
+      termMonths: 60,
+      startDate: '2024-01-01T00:00:00.000Z',
+      paymentAmount: 400,
+      apr: 5,
+    });
+    const fin = await json<DataEnvelope<{ id: string }>>(finRes);
+    expect(finRes.status, JSON.stringify(fin)).toBeLessThan(300);
+
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      sourceType: 'financing',
+      sourceId: fin.data.id,
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+  });
+
+  test('PUT linking to a sourceId that does NOT match the vehicle active financing → 400', async () => {
+    const vehicleId = await seedVehicle();
+    const id = await seedPlainExpense(vehicleId);
+    const finRes = await ctx.authed('POST', `/api/v1/financing/vehicles/${vehicleId}/financing`, {
+      financingType: 'loan',
+      provider: 'TestBank',
+      originalAmount: 10000,
+      termMonths: 36,
+      startDate: '2024-01-01T00:00:00.000Z',
+      paymentAmount: 300,
+      apr: 4,
+    });
+    expect(finRes.status, await finRes.clone().text()).toBeLessThan(300);
+
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
+      sourceType: 'financing',
+      sourceId: 'a-different-id-not-the-active-one',
+    });
+    expect(res.status).toBe(400); // "Source ID does not match the active financing record"
+  });
+
+  // C425 (guard): C422 extracted assertFinancingSourceValid as ONE source of truth shared by POST + PUT,
+  // but the C422 tests above all drive the PUT call site. The POST call site's financing-source
+  // verification was previously inline + NEVER directly tested (the #62 POST tests cover only the ENUM
+  // rejection of reminder/insurance_term, not the financing existence/id-match) — so a refactor dropping
+  // the POST call to the shared helper would go RED nowhere. These pin the POST boundary enforces the
+  // contract too, so BOTH call sites of the shared helper are covered (NORTH_STAR #5).
+  test('POST {sourceType:financing, sourceId:forged} on a vehicle with NO financing → 400 (POST call site)', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'financial',
+      expenseAmount: 30,
+      date: '2024-06-01T00:00:00.000Z',
+      sourceType: 'financing',
+      sourceId: 'forged-financing-id',
+    });
+    expect(res.status).toBe(400); // "Vehicle has no active financing"
+  });
+
+  test('POST linking to the vehicle ACTUAL active financing succeeds (POST call site not over-broad)', async () => {
+    const vehicleId = await seedVehicle();
+    const finRes = await ctx.authed('POST', `/api/v1/financing/vehicles/${vehicleId}/financing`, {
+      financingType: 'loan',
+      provider: 'TestBank',
+      originalAmount: 18000,
+      termMonths: 48,
+      startDate: '2024-01-01T00:00:00.000Z',
+      paymentAmount: 375,
+      apr: 5,
+    });
+    const fin = await json<DataEnvelope<{ id: string }>>(finRes);
+    expect(finRes.status, JSON.stringify(fin)).toBeLessThan(300);
+
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'financial',
+      expenseAmount: 375,
+      date: '2024-06-01T00:00:00.000Z',
+      sourceType: 'financing',
+      sourceId: fin.data.id,
+    });
+    expect(res.status, await res.clone().text()).toBe(201);
+  });
+});

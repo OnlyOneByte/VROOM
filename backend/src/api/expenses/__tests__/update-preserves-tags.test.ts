@@ -90,3 +90,49 @@ describe('expense update preserves tags (.partial() + .default([]) class)', () =
     expect(tagsOf(id)).toEqual(['new', 'fresh']);
   });
 });
+
+// C352 (#104): the CSV export joins tags with '; ' and import splits on /[;,]/, so a tag CONTAINING a
+// semicolon or comma would round-trip into MULTIPLE tags — silent data loss on export→re-import
+// (NORTH_STAR #1). The fix rejects those delimiter chars in a tag at the write boundary (create + update,
+// both built off the same base schema). These pin the rejection + that a normal tag is unaffected.
+describe('#104 — a tag containing the CSV delimiter (; or ,) is rejected, not silently round-trip-split', () => {
+  test('CREATE with a semicolon in a tag → 400, nothing persisted', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 20,
+      date: '2024-06-01T00:00:00.000Z',
+      tags: ['oil; filter'],
+    });
+    expect(res.status).toBe(400);
+    const list = await ctx.authed('GET', '/api/v1/expenses?limit=10');
+    expect((await json<DataEnvelope<unknown[]>>(list)).data).toHaveLength(0);
+  });
+
+  test('CREATE with a comma in a tag → 400', async () => {
+    const vehicleId = await seedVehicle();
+    const res = await ctx.authed('POST', '/api/v1/expenses', {
+      vehicleId,
+      category: 'misc',
+      expenseAmount: 20,
+      date: '2024-06-01T00:00:00.000Z',
+      tags: ['cheap,fast'],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('UPDATE that introduces a delimiter tag → 400 (the stored tags survive)', async () => {
+    const vehicleId = await seedVehicle();
+    const id = await createTaggedExpense(vehicleId, ['clean']);
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { tags: ['a;b'] });
+    expect(res.status).toBe(400);
+    expect(tagsOf(id)).toEqual(['clean']); // unchanged
+  });
+
+  test('a normal separator-free tag still creates fine (control)', async () => {
+    const vehicleId = await seedVehicle();
+    const id = await createTaggedExpense(vehicleId, ['road-trip', 'business']);
+    expect(tagsOf(id)).toEqual(['road-trip', 'business']);
+  });
+});

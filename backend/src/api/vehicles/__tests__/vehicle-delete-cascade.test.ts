@@ -14,12 +14,16 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   createTestApp,
   type DataEnvelope,
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { ENTITY_TO_CATEGORY } from '../../providers/domains/storage/storage-provider';
 
 let ctx: TestApp;
 
@@ -128,5 +132,157 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
       photoCount('odometer_entry', odoId),
       'odometer-entry photo rows should be cleaned up on vehicle delete'
     ).toBe(0);
+  });
+});
+
+// CHARACTERIZATION of #97 (C318 deep-review scout, ESCALATED — product-gated, same family as #88).
+// reminder_vehicles.vehicleId is onDelete:'cascade', so deleting a vehicle removes its junction row.
+// A reminder linked to ONLY that vehicle is left with ZERO vehicles: the row survives + stays is_active,
+// but processReminder skips it forever with reason 'no_vehicles' — a silent, never-firing orphan still
+// shown as active. The fix (deactivate / delete / surface / block-delete) is a UX decision sent to Angelo
+// (#97). This pins the CURRENT behavior so the eventual fix has a red→green anchor and the bug can't
+// silently worsen. (A multi-vehicle reminder is unaffected — it keeps its remaining vehicles.)
+describe('#97 — a single-vehicle reminder is orphaned (vehicle-less, still active) on vehicle delete', () => {
+  function reminderRow(id: string): { is_active: number } | null {
+    return (
+      (ctx.sqlite.query('SELECT is_active FROM reminders WHERE id = ?').get(id) as {
+        is_active: number;
+      } | null) ?? null
+    );
+  }
+  function junctionCount(reminderId: string): number {
+    const row = ctx.sqlite
+      .query('SELECT COUNT(*) AS n FROM reminder_vehicles WHERE reminder_id = ?')
+      .get(reminderId) as { n: number };
+    return row.n;
+  }
+
+  test('the reminder row SURVIVES (active) but ends up with zero linked vehicles → trigger skips it no_vehicles', async () => {
+    const vehicleId = await seedVehicle();
+    // Seed a single-vehicle time reminder directly (mileage/time API surface is partial).
+    ctx.sqlite.run(
+      `INSERT INTO reminders
+         (id, user_id, name, type, action_mode, frequency, trigger_mode, start_date, next_due_date, is_active)
+       VALUES ('rm-orphan', ?, 'Registration', 'notification', 'automatic', 'yearly', 'time', 0, 0, 1)`,
+      [ctx.user.id]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES ('rm-orphan', ?)`,
+      [vehicleId]
+    );
+    expect(junctionCount('rm-orphan')).toBe(1);
+
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    // CURRENT behavior: the junction row cascaded away, but the reminder row REMAINS and is STILL active.
+    expect(junctionCount('rm-orphan')).toBe(0);
+    expect(reminderRow('rm-orphan')?.is_active).toBe(1);
+
+    // ...and the trigger skips it as no_vehicles (never fires, no user signal).
+    const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
+    const body =
+      await json<DataEnvelope<{ skipped: Array<{ reminderId: string; reason: string }> }>>(res);
+    expect(res.status).toBe(200);
+    expect(
+      body.data.skipped.some((s) => s.reminderId === 'rm-orphan' && s.reason === 'no_vehicles')
+    ).toBe(true);
+  });
+});
+
+// C366 deep-review (CERTIFIED CLEAN — pins an unguarded data-safety invariant). insurance_claims.vehicleId
+// is onDelete:'set null' (schema.ts:188), deliberately UNLIKE the cascade FKs above: a claim is a financial/
+// legal record (payoutAmount, claimDate, status) that belongs to its POLICY (policyId cascades), NOT to the
+// vehicle — so deleting a vehicle must PRESERVE the claim with vehicleId nulled, never destroy it (NORTH_STAR
+// #1: no silent loss). Nothing pinned this; a regression flipping that FK to 'cascade' (or a manual cleanup
+// that over-deletes) would silently wipe a user's claim history on an unrelated vehicle delete. This anchors
+// survival + the null so such a change turns RED.
+describe('C366 — deleting a vehicle PRESERVES its insurance claims (vehicleId set null, not cascade-deleted)', () => {
+  function claimRow(
+    id: string
+  ): { vehicle_id: string | null; policy_id: string; payout_amount: number } | null {
+    return (
+      (ctx.sqlite
+        .query('SELECT vehicle_id, policy_id, payout_amount FROM insurance_claims WHERE id = ?')
+        .get(id) as {
+        vehicle_id: string | null;
+        policy_id: string;
+        payout_amount: number;
+      } | null) ?? null
+    );
+  }
+
+  test('the claim row SURVIVES with vehicle_id nulled; policy link + payout are intact', async () => {
+    const vehicleId = await seedVehicle();
+
+    // Seed a policy (claims FK→policies is notNull cascade) and a claim referencing the vehicle.
+    ctx.sqlite.run(
+      `INSERT INTO insurance_policies (id, user_id, company, is_active) VALUES ('pol-claim', ?, 'Geico', 1)`,
+      [ctx.user.id]
+    );
+    ctx.sqlite.run(
+      `INSERT INTO insurance_claims (id, policy_id, vehicle_id, claim_date, claim_type, status, payout_amount)
+       VALUES ('clm-1', 'pol-claim', ?, 1700000000, 'collision', 'settled', 2500.0)`,
+      [vehicleId]
+    );
+    expect(claimRow('clm-1')?.vehicle_id).toBe(vehicleId);
+
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    // The financial record must NOT be lost: row survives, vehicle_id is nulled, policy + payout untouched.
+    const after = claimRow('clm-1');
+    expect(after, 'claim must survive vehicle delete (set null, not cascade)').not.toBeNull();
+    expect(after?.vehicle_id).toBeNull();
+    expect(after?.policy_id).toBe('pol-claim');
+    expect(after?.payout_amount).toBe(2500.0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C452 symmetry guard (the C302 restore-table-coverage pattern, on the photo-cascade side). The
+// vehicle-delete handler HARD-CODES which photo-bearing entity types it reaps (vehicle + expense +
+// odometer_entry — the three above). ENTITY_TO_CATEGORY is the registry of EVERY photo-bearing entity
+// type. The omitted ones (insurance_policy, insurance_claim) are correctly excluded because those
+// entities SURVIVE a vehicle delete (the policy isn't a vehicle child; the claim is set-null, C366) —
+// but nothing pins that correspondence. If a future photo-bearing entity type is added that IS a
+// vehicle FK-cascade child (or an existing one's FK flips to cascade) without a matching cleanup call,
+// its photo rows + external bytes silently orphan (the #34/C280 leak class the handler exists to
+// prevent) with NO failing test. This makes the correspondence DRIFT-PROOF: every ENTITY_TO_CATEGORY
+// key must be either reaped by the delete handler OR in the documented "survives a vehicle delete" set.
+describe('C452 — every photo-bearing entity type is reaped on vehicle-delete OR documented as surviving', () => {
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const VEHICLE_ROUTES_SRC = readFileSync(join(HERE, '..', 'routes.ts'), 'utf-8');
+
+  // Photo-bearing entity types that are NOT removed by a vehicle delete (so the handler MUST NOT, and
+  // does not, reap their photos here): the policy isn't a vehicle child, and a claim's vehicleId is
+  // ON DELETE SET NULL (C366) — the claim row + its photos survive.
+  const SURVIVES_VEHICLE_DELETE = new Set(['insurance_policy', 'insurance_claim']);
+
+  test('the vehicle-delete handler cleans photos for exactly the photo-entity types it should', () => {
+    const unaccounted: string[] = [];
+    for (const entityType of Object.keys(ENTITY_TO_CATEGORY)) {
+      if (SURVIVES_VEHICLE_DELETE.has(entityType)) continue; // (b) survives → must NOT be reaped here
+      // (a) a vehicle-cascade child → the handler must reap its photos. Both helpers take the entity
+      // type as the first string arg: deleteAllPhotosForEntity('vehicle',…) / deletePhotosForEntities('expense',…).
+      const reaped =
+        VEHICLE_ROUTES_SRC.includes(`deleteAllPhotosForEntity('${entityType}'`) ||
+        VEHICLE_ROUTES_SRC.includes(`deletePhotosForEntities('${entityType}'`);
+      if (!reaped) unaccounted.push(entityType);
+    }
+
+    expect(
+      unaccounted,
+      `Photo-bearing entity type(s) neither reaped by the vehicle-delete handler nor documented as ` +
+        `surviving a vehicle delete. If it's a vehicle FK-cascade child, add a deletePhotosForEntities ` +
+        `cleanup call in routes.ts delete /:id (its photo rows + external bytes would otherwise orphan, ` +
+        `the #34 leak class); if it survives, add it to SURVIVES_VEHICLE_DELETE:\n${unaccounted.join('\n')}`
+    ).toEqual([]);
+  });
+
+  test('the guard is live: ENTITY_TO_CATEGORY has the photo-entity types it scans', () => {
+    // Non-vacuity floor — if the registry were empty/renamed away, the loop above would vacuously pass.
+    expect(Object.keys(ENTITY_TO_CATEGORY).length).toBeGreaterThanOrEqual(5);
+    expect(ENTITY_TO_CATEGORY.vehicle).toBeDefined();
   });
 });

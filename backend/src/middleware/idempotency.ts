@@ -75,12 +75,19 @@ export function idempotency(options: { required?: boolean } = {}) {
 
     await next();
 
-    const response = c.res.clone();
-    const responseBody = await response.json();
-    const status = response.status;
+    const status = c.res.status;
+    if (status < 200 || status >= 300) return; // only cache 2xx (a transient 5xx must not replay forever)
 
-    if (status >= 200 && status < 300) {
+    // Cache the response body for replay — but ONLY if it's JSON we can re-emit via c.json on a hit.
+    // A non-JSON 2xx (e.g. a CSV/binary/204 body) can't round-trip through the cached-replay `c.json`,
+    // and `response.json()` would THROW on it — turning a SUCCESSFUL response into a 500. No
+    // idempotency-wrapped route returns non-JSON today, but guard it so adding one can't regress: parse
+    // defensively + skip caching (not cached → the dup just re-runs the handler, the safe degradation).
+    try {
+      const responseBody = await c.res.clone().json();
       idempotencyStore.set(storeKey, responseBody, status);
+    } catch {
+      // Non-JSON 2xx body — not idempotency-cacheable; leave it uncached.
     }
   };
 }

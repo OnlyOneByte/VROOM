@@ -12,6 +12,7 @@ import {
 import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
+import { assertVehiclesOwned } from '../../utils/vehicle-ownership';
 
 // ============================================================================
 // Types
@@ -98,24 +99,16 @@ export class InsurancePolicyRepository {
   // --------------------------------------------------------------------------
 
   /**
-   * Validate that all vehicleIds belong to the given userId.
+   * Validate that all vehicleIds belong to the given userId. Delegates to the shared
+   * assertVehiclesOwned (C376) — ONE source of truth for the cross-tenant ownership query shared with
+   * the expense split path; the insurance term writes run inside a tx, hence the dbOrTx handle.
    */
   private async validateVehicleOwnership(
     dbOrTx: AppDatabase | DrizzleTransaction,
     vehicleIds: string[],
     userId: string
   ): Promise<void> {
-    if (vehicleIds.length === 0) return;
-
-    const uniqueIds = [...new Set(vehicleIds)];
-    const ownedVehicles = await dbOrTx
-      .select({ id: vehicles.id })
-      .from(vehicles)
-      .where(and(inArray(vehicles.id, uniqueIds), eq(vehicles.userId, userId)));
-
-    if (ownedVehicles.length !== uniqueIds.length) {
-      throw new NotFoundError('Vehicle');
-    }
+    await assertVehiclesOwned(dbOrTx, vehicleIds, userId);
   }
 
   /**
@@ -132,34 +125,53 @@ export class InsurancePolicyRepository {
   }
 
   /**
-   * Attach terms and coverage to a policy, returning InsurancePolicyWithVehicles.
+   * Fetch a policy's terms (newest endDate first) + the term→vehicle junction coverage, and derive the
+   * unique vehicleIds. The byte-identical "select terms by policyId ordered by endDate desc → select the
+   * junction rows for those termIds → dedupe vehicleIds" block was hand-repeated at FOUR sites
+   * (attachTermsAndCoverage + the create/update-policy, add-term, and update-term transactions, C304
+   * dedup). Takes the active handle (`this.db` OR a transaction `tx`) so the in-tx callers read their own
+   * uncommitted writes; pure assembly otherwise. One source of truth for the response's coverage shape so
+   * a junction-schema change can't drift across the four. NOTE: callers spread the result alongside their
+   * own policy row (and some add a `newTermId`), so this returns the three coverage fields only.
    */
-  private async attachTermsAndCoverage(
-    policy: InsurancePolicy
-  ): Promise<InsurancePolicyWithVehicles> {
-    const terms = await this.db
+  private async fetchTermsAndCoverage(
+    handle: AppDatabase | DrizzleTransaction,
+    policyId: string
+  ): Promise<{
+    terms: InsuranceTerm[];
+    termVehicleCoverage: TermCoverageRow[];
+    vehicleIds: string[];
+  }> {
+    const terms = await handle
       .select()
       .from(insuranceTerms)
-      .where(eq(insuranceTerms.policyId, policy.id))
+      .where(eq(insuranceTerms.policyId, policyId))
       .orderBy(desc(insuranceTerms.endDate));
 
     const termIds = terms.map((t) => t.id);
     let termVehicleCoverage: TermCoverageRow[] = [];
     if (termIds.length > 0) {
-      const rows = await this.db
+      termVehicleCoverage = await handle
         .select({
           termId: insuranceTermVehicles.termId,
           vehicleId: insuranceTermVehicles.vehicleId,
         })
         .from(insuranceTermVehicles)
         .where(inArray(insuranceTermVehicles.termId, termIds));
-      termVehicleCoverage = rows;
     }
 
-    // Derive unique vehicleIds from junction rows
     const vehicleIds = [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))];
+    return { terms, termVehicleCoverage, vehicleIds };
+  }
 
-    return { ...policy, terms, termVehicleCoverage, vehicleIds };
+  /**
+   * Attach terms and coverage to a policy, returning InsurancePolicyWithVehicles.
+   */
+  private async attachTermsAndCoverage(
+    policy: InsurancePolicy
+  ): Promise<InsurancePolicyWithVehicles> {
+    const coverage = await this.fetchTermsAndCoverage(this.db, policy.id);
+    return { ...policy, ...coverage };
   }
 
   // --------------------------------------------------------------------------
@@ -320,31 +332,10 @@ export class InsurancePolicyRepository {
           .where(eq(insurancePolicies.id, id))
           .returning();
 
-        // Fetch terms and coverage for the response
-        const terms = await tx
-          .select()
-          .from(insuranceTerms)
-          .where(eq(insuranceTerms.policyId, id))
-          .orderBy(desc(insuranceTerms.endDate));
+        // Fetch terms and coverage for the response (shared assembly, C304)
+        const coverage = await this.fetchTermsAndCoverage(tx, id);
 
-        const termIds = terms.map((t) => t.id);
-        let termVehicleCoverage: TermCoverageRow[] = [];
-        if (termIds.length > 0) {
-          termVehicleCoverage = await tx
-            .select({
-              termId: insuranceTermVehicles.termId,
-              vehicleId: insuranceTermVehicles.vehicleId,
-            })
-            .from(insuranceTermVehicles)
-            .where(inArray(insuranceTermVehicles.termId, termIds));
-        }
-
-        return {
-          ...updatedResult[0],
-          terms,
-          termVehicleCoverage,
-          vehicleIds: [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))],
-        };
+        return { ...updatedResult[0], ...coverage };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -445,31 +436,9 @@ export class InsurancePolicyRepository {
           .where(eq(insurancePolicies.id, policyId))
           .limit(1);
 
-        const terms = await tx
-          .select()
-          .from(insuranceTerms)
-          .where(eq(insuranceTerms.policyId, policyId))
-          .orderBy(desc(insuranceTerms.endDate));
+        const coverage = await this.fetchTermsAndCoverage(tx, policyId);
 
-        const termIds = terms.map((t) => t.id);
-        let termVehicleCoverage: TermCoverageRow[] = [];
-        if (termIds.length > 0) {
-          termVehicleCoverage = await tx
-            .select({
-              termId: insuranceTermVehicles.termId,
-              vehicleId: insuranceTermVehicles.vehicleId,
-            })
-            .from(insuranceTermVehicles)
-            .where(inArray(insuranceTermVehicles.termId, termIds));
-        }
-
-        return {
-          ...updatedPolicy[0],
-          terms,
-          termVehicleCoverage,
-          vehicleIds: [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))],
-          newTermId: termId,
-        };
+        return { ...updatedPolicy[0], ...coverage, newTermId: termId };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -558,30 +527,9 @@ export class InsurancePolicyRepository {
           .where(eq(insurancePolicies.id, policyId))
           .limit(1);
 
-        const terms = await tx
-          .select()
-          .from(insuranceTerms)
-          .where(eq(insuranceTerms.policyId, policyId))
-          .orderBy(desc(insuranceTerms.endDate));
+        const coverage = await this.fetchTermsAndCoverage(tx, policyId);
 
-        const termIds = terms.map((t) => t.id);
-        let termVehicleCoverage: TermCoverageRow[] = [];
-        if (termIds.length > 0) {
-          termVehicleCoverage = await tx
-            .select({
-              termId: insuranceTermVehicles.termId,
-              vehicleId: insuranceTermVehicles.vehicleId,
-            })
-            .from(insuranceTermVehicles)
-            .where(inArray(insuranceTermVehicles.termId, termIds));
-        }
-
-        return {
-          ...updatedPolicy[0],
-          terms,
-          termVehicleCoverage,
-          vehicleIds: [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))],
-        };
+        return { ...updatedPolicy[0], ...coverage };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
@@ -638,30 +586,9 @@ export class InsurancePolicyRepository {
           .where(eq(insurancePolicies.id, policyId))
           .limit(1);
 
-        const terms = await tx
-          .select()
-          .from(insuranceTerms)
-          .where(eq(insuranceTerms.policyId, policyId))
-          .orderBy(desc(insuranceTerms.endDate));
+        const coverage = await this.fetchTermsAndCoverage(tx, policyId);
 
-        const termIds = terms.map((t) => t.id);
-        let termVehicleCoverage: TermCoverageRow[] = [];
-        if (termIds.length > 0) {
-          termVehicleCoverage = await tx
-            .select({
-              termId: insuranceTermVehicles.termId,
-              vehicleId: insuranceTermVehicles.vehicleId,
-            })
-            .from(insuranceTermVehicles)
-            .where(inArray(insuranceTermVehicles.termId, termIds));
-        }
-
-        return {
-          ...updatedPolicy[0],
-          terms,
-          termVehicleCoverage,
-          vehicleIds: [...new Set(termVehicleCoverage.map((tc) => tc.vehicleId))],
-        };
+        return { ...updatedPolicy[0], ...coverage };
       });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;

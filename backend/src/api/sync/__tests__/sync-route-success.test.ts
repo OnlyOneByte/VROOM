@@ -156,3 +156,41 @@ describe('POST /api/v1/sync — success envelope', () => {
     expect(body.data.results).toBeDefined();
   });
 });
+
+// C250: the backups download + list-providers route slices were uncovered (sync/routes.ts 139-154,
+// 126-137). Both are PROVIDER-FREE: download reads the user's OWN db data via exportAsZip; the
+// no-providerId list path returns [] when no backup providers are enabled. (The byte/provider-bound
+// restore-from-provider paths stay the C163 mock-trap territory, deliberately left.)
+describe('GET /api/v1/sync/backups/download — the manual backup-export route', () => {
+  test('returns a real ZIP with the attachment headers (no provider needed — own-data export)', async () => {
+    // Seed a row so the export has content (the user already exists via the harness).
+    await ctx.authed('POST', '/api/v1/vehicles', { make: 'Toyota', model: 'Camry', year: 2022 });
+
+    const res = await ctx.authed('GET', '/api/v1/sync/backups/download');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/zip');
+    expect(res.headers.get('content-disposition') ?? '').toContain('attachment');
+    expect(res.headers.get('content-disposition') ?? '').toContain('vroom-backup-');
+    // A real ZIP body: the central-directory/local-file signature starts with 'PK', and
+    // Content-Length matches the bytes.
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect(buf.length).toBeGreaterThan(0);
+    expect(buf.subarray(0, 2).toString('latin1')).toBe('PK');
+    expect(res.headers.get('content-length')).toBe(String(buf.length));
+  });
+
+  test('rejects an unauthenticated download (401)', async () => {
+    const res = await ctx.anon('GET', '/api/v1/sync/backups/download');
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('GET /api/v1/sync/backups/providers — list backups', () => {
+  test('no enabled providers → 200 with an empty list (listAllBackups no-op)', async () => {
+    const res = await ctx.authed('GET', '/api/v1/sync/backups/providers');
+    const body = await json<{ success: boolean; data: unknown[] }>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toEqual([]);
+  });
+});

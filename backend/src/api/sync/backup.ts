@@ -108,10 +108,19 @@ export function coerceRow(row: Record<string, unknown>, table: Table): Record<st
         coerced[columnName] = null;
       }
     } else if (INTEGER_TYPES.has(col.columnType)) {
-      const num = Number.parseInt(strVal, 10);
-      coerced[columnName] = Number.isNaN(num) ? null : num;
+      // STRICT numeric parse, not Number.parseInt: parseInt stops at the first non-digit, so a
+      // thousands-separated value the Google Sheets restore returns (default valueRenderOption is
+      // FORMATTED_VALUE → a 12,345-mile odometer comes back as the string "12,345") would truncate
+      // to 12 — silently, since 12 is not NaN — corrupting the reading 1000x (#68, NORTH_STAR #1).
+      // Strip grouping commas, then require the WHOLE string to be numeric (Number(), unlike parseInt,
+      // rejects a "12abc" tail to NaN → null, matching the existing garbage→null contract). Round so a
+      // Sheets "12345.0" / a stray decimal lands on a whole number rather than truncating.
+      const num = Number(strVal.replace(/,/g, ''));
+      coerced[columnName] = Number.isNaN(num) ? null : Math.round(num);
     } else if (REAL_TYPES.has(col.columnType)) {
-      const num = Number.parseFloat(strVal);
+      // Same thousands-separator hazard: parseFloat("1,234.56") stops at the comma → 1. Strip grouping
+      // commas + a strict whole-string parse (Number() → NaN on a garbage tail → null).
+      const num = Number(strVal.replace(/,/g, ''));
       coerced[columnName] = Number.isNaN(num) ? null : num;
     } else if (TEXT_TYPES.has(col.columnType)) {
       // Google Sheets may return numeric-looking text values (e.g., license plates) as numbers
@@ -132,21 +141,6 @@ export function resolveBackupFolderPath(
   const providerRootPath =
     ((providerRow.config as Record<string, unknown> | null)?.providerRootPath as string) ?? '';
   return joinStoragePath(providerRootPath, settings.folderPath);
-}
-
-/**
- * Derives the most recent backup date across all providers in a BackupConfig.
- * Returns null if no provider has a lastBackupAt value.
- */
-export function deriveLastBackupDate(backupConfig: BackupConfig | null): string | null {
-  if (!backupConfig?.providers) return null;
-  let latest: string | null = null;
-  for (const settings of Object.values(backupConfig.providers)) {
-    if (settings.lastBackupAt && (!latest || settings.lastBackupAt > latest)) {
-      latest = settings.lastBackupAt;
-    }
-  }
-  return latest;
 }
 
 export class BackupService {
@@ -569,6 +563,7 @@ export class BackupService {
     const termIds = new Set((backup.insuranceTerms ?? []).map((t) => String(t.id)));
     const expenseIds = new Set(backup.expenses.map((e) => String(e.id)));
     const odometerIds = new Set((backup.odometer ?? []).map((o) => String(o.id)));
+    const claimIds = new Set((backup.insuranceClaims ?? []).map((c) => String(c.id)));
     const photoIds = new Set((backup.photos ?? []).map((p) => String(p.id)));
     const reminderIds = new Set((backup.reminders ?? []).map((r) => String(r.id)));
 
@@ -589,6 +584,7 @@ export class BackupService {
         vehicleIds,
         expenseIds,
         policyIds,
+        claimIds,
         odometerIds,
       }),
       ...this.validatePhotoRefEntries(backup.photoRefs ?? [], photoIds),
@@ -603,7 +599,42 @@ export class BackupService {
         reminderIds,
         userIds
       ),
+      ...this.validateUniqueConstraints(backup),
     ];
+  }
+
+  /**
+   * Reject a backup whose rows would violate a DB-level UNIQUE index, BEFORE restore's destructive
+   * replace-mode wipe runs (#127, C428). Per-row schema + referential checks don't catch CROSS-ROW
+   * duplicates, so a corrupt/truncated download with two expenses sharing a non-null clientId
+   * (expenses_user_client_idx) or two vehicles sharing a licensePlate (vehicles_user_license_plate_idx)
+   * passes validateBackupData, the wipe commits, then the 2nd colliding INSERT throws — and bun-sqlite's
+   * async-transaction callback does NOT roll back the wipe (the C151 footgun), leaving the account EMPTY.
+   * Catching the duplicate here means the insert can't fail on it, so the wipe never runs. (The general
+   * transient-insert-failure window is a transaction-atomicity fix, escalated C428 — this closes the one
+   * reachable within-tenant data-loss trigger.)
+   */
+  private validateUniqueConstraints(backup: ParsedBackupData): string[] {
+    const errors: string[] = [];
+    const dupCheck = (
+      rows: Record<string, unknown>[] | undefined,
+      field: string,
+      label: string
+    ): void => {
+      const seen = new Set<string>();
+      for (const row of rows ?? []) {
+        const v = row[field];
+        if (v == null) continue; // the unique index is partial (WHERE <field> IS NOT NULL)
+        const key = String(v);
+        if (seen.has(key)) {
+          errors.push(`Duplicate ${label} "${key}" — backup violates a unique constraint`);
+        }
+        seen.add(key);
+      }
+    };
+    dupCheck(backup.expenses, 'clientId', 'expense clientId');
+    dupCheck(backup.vehicles, 'licensePlate', 'vehicle licensePlate');
+    return errors;
   }
 
   private validateExpenseRefs(
@@ -723,14 +754,21 @@ export class BackupService {
       vehicleIds: Set<string>;
       expenseIds: Set<string>;
       policyIds: Set<string>;
+      claimIds: Set<string>;
       odometerIds: Set<string>;
     }
   ): string[] {
     const errors: string[] = [];
+    // entityType keys MUST match the photo upload allowlist (photos/helpers.ts validateEntityOwnership):
+    // vehicle / insurance_policy / insurance_claim / expense / odometer_entry. A type accepted on upload
+    // but missing here makes restore reject an otherwise-valid backup outright (valid:false aborts the
+    // WHOLE restore, not just the photo) — the crown-jewel NORTH_STAR #1 round-trip failure insurance_claim
+    // hit (C404: claim photos are a real, app-creatable target the original 15-table cert/C366 predated).
     const entityTypeToIds: Record<string, Set<string>> = {
       vehicle: entityIds.vehicleIds,
       expense: entityIds.expenseIds,
       insurance_policy: entityIds.policyIds,
+      insurance_claim: entityIds.claimIds,
       odometer_entry: entityIds.odometerIds,
     };
 

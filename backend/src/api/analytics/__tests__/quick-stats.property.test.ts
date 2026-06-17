@@ -244,4 +244,45 @@ describe('Property 3: Fleet health score is bounded weighted average', () => {
     const result = await repo.getQuickStats(user.id, yearToRange(2024));
     expect(result.fleetHealthScore).toBe(0);
   });
+
+  // C350 (deep-review → guard): pin the FLEET-AGGREGATION semantic computeFleetHealthScore relies on —
+  // a vehicle with NO scorable data is INCLUDED in the mean at its default sub-scores, NOT excluded and
+  // NOT zeroed. computeRegularityScore([])=50 + computeMileageScore([])=50 + insurance 0 →
+  // round(50*0.4 + 50*0.35 + 0*0.25) = round(37.5) = 38. The existing tests pin bounds/integer/no-vehicles
+  // but NOT this: a refactor that dropped empty vehicles from the denominator (or scored them 0) would
+  // silently shift EVERY multi-vehicle fleet score with no test catching it. Deterministic (no insurance,
+  // no expenses), so the exact 38 is stable.
+  test('a vehicle with NO data scores 38 (default 50/50 + 0 insurance) and is INCLUDED in the fleet mean', async () => {
+    testDb.sqlite.close();
+    testDb = createTestDb();
+    repo = new AnalyticsRepository(testDb.drizzle);
+
+    const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
+    seedUser(testDb.sqlite, user);
+    // One vehicle, zero expenses, zero insurance.
+    seedVehicle(testDb.sqlite, {
+      id: 'veh-empty',
+      userId: user.id,
+      make: 'Toyota',
+      model: 'Camry',
+      year: 2022,
+    });
+
+    const single = await repo.getQuickStats(user.id, yearToRange(2024));
+    // round(50*0.4 + 50*0.35 + 0*0.25) = round(37.5) = 38 — NOT 0 (not excluded), NOT 50.
+    expect(single.fleetHealthScore).toBe(38);
+
+    // Add a SECOND no-data vehicle: the mean of two identical 38s stays 38 — proving both are counted
+    // in the denominator (an exclusion bug would still read 38 here, but the single-vehicle case above
+    // already rules out "empty → excluded → 0/NaN"; together they pin inclusion + the per-vehicle value).
+    seedVehicle(testDb.sqlite, {
+      id: 'veh-empty-2',
+      userId: user.id,
+      make: 'Honda',
+      model: 'Civic',
+      year: 2021,
+    });
+    const two = await repo.getQuickStats(user.id, yearToRange(2024));
+    expect(two.fleetHealthScore).toBe(38);
+  });
 });

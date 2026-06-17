@@ -111,4 +111,80 @@ describe('analytics routes (real HTTP stack)', () => {
     const res = await ctx.authed('GET', '/api/v1/analytics/fuel-efficiency?vehicleId=nope');
     expect(res.status).toBe(404);
   });
+
+  // C290: /fuel-stats + /fuel-advanced carry the IDENTICAL `if (vehicleId) validateVehicleOwnership`
+  // optional-guard as fuel-efficiency, but their cross-tenant branch was uncovered (the C185 net pinned
+  // fuel-efficiency + the required-vehicleId endpoints, not these two). Pin both branches on each:
+  // omitted vehicleId → 200 all-fleet (no validation), foreign vehicleId → 404 (no cross-tenant leak).
+  // NOTE: unlike fuel-efficiency, these two REQUIRE startDate+endDate (unix seconds) — omit them and
+  // zValidator 400s BEFORE the ownership guard, so supply a valid range to reach the guard branch.
+  const RANGE = 'startDate=1704067200&endDate=1735689600'; // 2024 calendar year (unix seconds)
+
+  test('fuel-stats with NO vehicleId returns the all-fleet envelope (optional-guard branch)', async () => {
+    const res = await ctx.authed('GET', `/api/v1/analytics/fuel-stats?${RANGE}`);
+    const body = await json<{ success: boolean; data: unknown }>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+  });
+
+  test('fuel-stats with a FOREIGN vehicleId is 404 (cross-tenant ownership guard)', async () => {
+    await seedVehicle('Daily Driver');
+    const res = await ctx.authed('GET', `/api/v1/analytics/fuel-stats?${RANGE}&vehicleId=not-mine`);
+    expect(res.status).toBe(404);
+  });
+
+  test('fuel-advanced with NO vehicleId returns the all-fleet envelope (optional-guard branch)', async () => {
+    const res = await ctx.authed('GET', `/api/v1/analytics/fuel-advanced?${RANGE}`);
+    const body = await json<{ success: boolean; data: unknown }>(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+  });
+
+  test('fuel-advanced with a FOREIGN vehicleId is 404 (cross-tenant ownership guard)', async () => {
+    await seedVehicle('Daily Driver');
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/analytics/fuel-advanced?${RANGE}&vehicleId=not-mine`
+    );
+    expect(res.status).toBe(404);
+  });
+
+  // #139 (C453): a 0%-APR dealer-promo loan (apr===0, schema .min(0)-valid) must STILL appear in
+  // /analytics/financing's loanBreakdown. buildLoanBreakdown previously filtered `&& f.apr` (truthy),
+  // dropping apr===0 → a real active loan's principal paydown vanished from the chart (the #92/#117
+  // 0%-APR class, 3rd site). The amortization helper handles 0% correctly: interest=balance*0=0, the
+  // whole payment retires principal. Drive the REAL GET /analytics/financing over a raw-seeded 0% loan.
+  test('a 0%-APR active loan still appears in loanBreakdown with a principal series (#139)', async () => {
+    const vehicleId = await seedVehicle('Promo Lease');
+    // Raw-seed a 0%-APR active loan (the form/route allows apr:0; seed directly to pin the analytics path).
+    ctx.sqlite.run(
+      `INSERT INTO vehicle_financing
+         (id, vehicle_id, financing_type, provider, original_amount, apr, term_months, start_date, payment_amount, is_active)
+       VALUES ('fin-0apr', ?, 'loan', 'Dealer 0% Promo', 12000, 0, 24, ?, 500, 1)`,
+      [vehicleId, Math.floor(new Date('2024-01-01').getTime() / 1000)]
+    );
+    // A financing-source payment so computeBalance < original → a real outstanding balance to amortize.
+    ctx.sqlite.run(
+      `INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, source_id, missed_fillup)
+       VALUES ('pay-0apr', ?, ?, 'financial', 500, ?, 'financing', 'fin-0apr', 0)`,
+      [vehicleId, ctx.user.id, Math.floor(new Date('2024-02-01').getTime() / 1000)]
+    );
+
+    const res = await ctx.authed('GET', '/api/v1/analytics/financing');
+    const body =
+      await json<
+        DataEnvelope<{
+          loanBreakdown: Array<{ month: string; interest: number; principal: number }>;
+        }>
+      >(res);
+    expect(res.status, JSON.stringify(body)).toBe(200);
+
+    // NON-VACUOUS: pre-fix the `&& f.apr` filter excluded apr===0 → loanBreakdown was []. Post-fix the
+    // 0% loan is present; a 0% loan's interest is always 0 and the payment retires principal.
+    expect(body.data.loanBreakdown.length, 'a 0%-APR loan must not be dropped').toBeGreaterThan(0);
+    expect(body.data.loanBreakdown.every((m) => m.interest === 0)).toBe(true);
+    expect(body.data.loanBreakdown.some((m) => m.principal > 0)).toBe(true);
+  });
 });

@@ -21,7 +21,8 @@ import {
 	formatDate,
 	formatNumber,
 	formatRelativeTime,
-	getCurrencySymbol
+	getCurrencySymbol,
+	toDateInputValue
 } from '$lib/utils/formatters';
 
 describe('formatCurrency', () => {
@@ -114,6 +115,39 @@ describe('dateOnlyToISO', () => {
 	});
 });
 
+/**
+ * toDateInputValue (C267 extract; #87/C268 — now LOCAL-calendar, the forward partner to dateOnlyToISO).
+ * Host-tz-independent by construction: build the input Date from LOCAL components (new Date(y,m,d,...))
+ * and assert the same local y/m/d come back, so the test passes in any timezone the CI runs in.
+ */
+describe('toDateInputValue (#87 — LOCAL date → YYYY-MM-DD input value)', () => {
+	test('formats a Date to its LOCAL calendar date (zero-padded)', () => {
+		// Local components in → the same local date out, regardless of host offset.
+		expect(toDateInputValue(new Date(2024, 2, 5, 8, 30))).toBe('2024-03-05'); // March = month index 2
+		expect(toDateInputValue(new Date(2024, 0, 1, 0, 0))).toBe('2024-01-01');
+		expect(toDateInputValue(new Date(2024, 11, 31, 23, 59))).toBe('2024-12-31');
+	});
+
+	test('zero-pads single-digit month and day', () => {
+		expect(toDateInputValue(new Date(2025, 6, 9, 12))).toBe('2025-07-09');
+	});
+
+	test('round-trips with dateOnlyToISO in EVERY timezone (the #87 fix — noon-local anchor)', () => {
+		// dateOnlyToISO writes a date-only string at NOON LOCAL; reading it back with LOCAL components
+		// must return the SAME calendar date — the round-trip the old UTC .slice(0,10) broke for
+		// positive-offset users (noon-local is the previous day in UTC there).
+		for (const dateOnly of ['2024-03-15', '2024-01-01', '2024-12-31', '2024-02-29']) {
+			expect(toDateInputValue(dateOnlyToISO(dateOnly))).toBe(dateOnly);
+		}
+	});
+
+	test('accepts an ISO string input (the stored-date call sites pass strings)', () => {
+		// A noon-anchored stored date (how dateOnlyToISO persists it) reads back to that local date.
+		const stored = new Date(2024, 5, 15, 12, 0, 0).toISOString();
+		expect(toDateInputValue(stored)).toBe('2024-06-15');
+	});
+});
+
 describe('capitalize (C119 — extracted from 5 hand-rolled sites)', () => {
 	test('upper-cases the first character, leaving the rest unchanged', () => {
 		expect(capitalize('loan')).toBe('Loan');
@@ -169,7 +203,18 @@ describe('formatRelativeTime (C130 — branches driven relative to now, host-ind
 		expect(formatRelativeTime(daysAgo(3))).toBe('3 days ago');
 		expect(formatRelativeTime(daysAgo(14))).toBe('2 weeks ago');
 		expect(formatRelativeTime(daysAgo(60))).toBe('2 months ago');
-		expect(formatRelativeTime(daysAgo(400))).toBe('1 years ago');
+		expect(formatRelativeTime(daysAgo(400))).toBe('1 year ago');
+	});
+
+	// #143 (C462): Math.floor can land on exactly 1 at each bucket's low edge (7-13d → 1 week,
+	// 30-59d → 1 month, 365-729d → 1 year). Pre-fix these all rendered a bare "1 weeks/months/years
+	// ago". Pin the SINGULAR form at each boundary (NON-VACUOUS — the old code failed every line here).
+	test('singular grammar at each bucket boundary (#143)', () => {
+		expect(formatRelativeTime(daysAgo(7))).toBe('1 week ago');
+		expect(formatRelativeTime(daysAgo(13))).toBe('1 week ago');
+		expect(formatRelativeTime(daysAgo(30))).toBe('1 month ago');
+		expect(formatRelativeTime(daysAgo(59))).toBe('1 month ago');
+		expect(formatRelativeTime(daysAgo(365))).toBe('1 year ago');
 	});
 
 	test('a future date clamps to "Today" (the Math.max(0, …) guard, not a negative bucket)', () => {

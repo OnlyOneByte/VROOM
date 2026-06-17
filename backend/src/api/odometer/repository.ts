@@ -34,11 +34,20 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
 
   /** IDs of all manual odometer entries for a vehicle (for cascade cleanup). */
   async findIdsByVehicleId(vehicleId: string): Promise<string[]> {
-    const rows = await this.db
-      .select({ id: odometerEntries.id })
-      .from(odometerEntries)
-      .where(eq(odometerEntries.vehicleId, vehicleId));
-    return rows.map((r) => r.id);
+    return this.findIdsByColumn(odometerEntries.vehicleId, vehicleId);
+  }
+
+  /**
+   * The tenant + vehicle scope shared by EVERY raw-SQL odometer-source leg: `vehicle_id = ?
+   * AND user_id = ?`. The UNION-ALL history/current-odometer queries repeat this predicate once
+   * per source leg (expenses + odometer_entries) AND once per query (data + count + max) — 6 sites.
+   * Routing them all through ONE fragment keeps the #48/#52/C109 belt-and-braces tenant scope in
+   * lockstep: a divergent copy that dropped `user_id` on a single leg would surface another user's
+   * mileage into this user's history, or poison the maintenance mileage trigger (design D2) with a
+   * cross-tenant reading. One source of truth means that can't drift in during a future edit.
+   */
+  private vehicleScope(vehicleId: string, userId: string): ReturnType<typeof sql> {
+    return sql`vehicle_id = ${vehicleId} AND user_id = ${userId}`;
   }
 
   async findByVehicleIdPaginated(
@@ -94,10 +103,10 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         note: string | null;
       }>(sql`
         SELECT mileage AS odometer, date AS recorded_at, 'expense' AS source, id AS source_id, NULL AS note
-        FROM expenses WHERE vehicle_id = ${vehicleId} AND user_id = ${userId} AND mileage IS NOT NULL
+        FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL
         UNION ALL
         SELECT odometer, recorded_at, 'manual' AS source, id AS source_id, note
-        FROM odometer_entries WHERE vehicle_id = ${vehicleId} AND user_id = ${userId}
+        FROM odometer_entries WHERE ${this.vehicleScope(vehicleId, userId)}
         ORDER BY recorded_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `);
@@ -105,8 +114,8 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       // Count query for pagination
       const [countResult] = await this.db.all<{ total: number }>(sql`
         SELECT (
-          (SELECT COUNT(*) FROM expenses WHERE vehicle_id = ${vehicleId} AND user_id = ${userId} AND mileage IS NOT NULL) +
-          (SELECT COUNT(*) FROM odometer_entries WHERE vehicle_id = ${vehicleId} AND user_id = ${userId})
+          (SELECT COUNT(*) FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL) +
+          (SELECT COUNT(*) FROM odometer_entries WHERE ${this.vehicleScope(vehicleId, userId)})
         ) AS total
       `);
 
@@ -149,9 +158,9 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       const [row] = await this.db.all<{ current: number | null }>(sql`
         SELECT MAX(odometer) AS current FROM (
           SELECT mileage AS odometer FROM expenses
-            WHERE vehicle_id = ${vehicleId} AND user_id = ${userId} AND mileage IS NOT NULL
+            WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL
           UNION ALL
-          SELECT odometer FROM odometer_entries WHERE vehicle_id = ${vehicleId} AND user_id = ${userId}
+          SELECT odometer FROM odometer_entries WHERE ${this.vehicleScope(vehicleId, userId)}
         )
       `);
 

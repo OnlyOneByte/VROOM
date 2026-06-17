@@ -49,6 +49,22 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   /**
+   * Insert the reminder→vehicle junction rows inside the caller's transaction. One source of truth
+   * for the `for (vehicleId) insert(reminderVehicles)` loop the create + update-replace paths repeated
+   * byte-identically (C326 dedup; mirrors insurance/repository.ts insertJunctionRows). A future change
+   * to the junction write (batch insert, a new column) then lands once, not twice.
+   */
+  private async insertVehicleJunctions(
+    tx: DrizzleTransaction,
+    reminderId: string,
+    vehicleIds: string[]
+  ): Promise<void> {
+    for (const vehicleId of vehicleIds) {
+      await tx.insert(reminderVehicles).values({ reminderId, vehicleId });
+    }
+  }
+
+  /**
    * Batch-fetch vehicleIds for multiple reminders. Returns a map of reminderId → vehicleIds.
    */
   private async getVehicleIdsForReminders(reminderIds: string[]): Promise<Map<string, string[]>> {
@@ -284,9 +300,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
         const result = await tx.insert(reminders).values(data).returning();
         const reminder = result[0];
 
-        for (const vehicleId of vehicleIds) {
-          await tx.insert(reminderVehicles).values({ reminderId: reminder.id, vehicleId });
-        }
+        await this.insertVehicleJunctions(tx, reminder.id, vehicleIds);
 
         return { reminder, vehicleIds };
       });
@@ -335,10 +349,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
         // Replace junction rows if vehicleIds provided
         if (vehicleIds) {
           await tx.delete(reminderVehicles).where(eq(reminderVehicles.reminderId, id));
-
-          for (const vehicleId of vehicleIds) {
-            await tx.insert(reminderVehicles).values({ reminderId: id, vehicleId });
-          }
+          await this.insertVehicleJunctions(tx, id, vehicleIds);
         }
 
         // Fetch current vehicleIds for the response
@@ -453,8 +464,15 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       return await this.db
         .select()
         .from(reminderNotifications)
+        // Order by createdAt (the true recency axis spanning BOTH notification types), NOT dueDate.
+        // A MILEAGE notification carries dueDate=NULL (its milestone lives in dueOdometer), and NULLs
+        // sort LAST under `DESC` — so ordering by dueDate sank every mileage notification beneath every
+        // time notification regardless of when it fired, and the limit(100) truncated the mileage axis
+        // entirely for a user with ≥100 time notifications (a just-due service buried/invisible — #142,
+        // feature-disabling for the maintenance-schedule mileage axis). createdAt is non-null on every
+        // row ($defaultFn) and is the real "when it fired" order for the feed.
         .where(and(...conditions))
-        .orderBy(desc(reminderNotifications.dueDate))
+        .orderBy(desc(reminderNotifications.createdAt))
         .limit(CONFIG.validation.reminder.notificationsHistoryLimit);
     } catch (error) {
       logger.error('Failed to find notifications', {
