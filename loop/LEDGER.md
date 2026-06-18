@@ -38,13 +38,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 101 |
-| deep-review | 5 | 98 |
+| deep-review | 5 | 102 |
 | guard | 6 | 101 |
 | bug | 3 | 99 |
 | arch | 5 | 98 |
 | infra | 6 | 97 |
 
-Current cycle: **101**
+Current cycle: **102**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -363,6 +363,29 @@ Current cycle: **101**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C102 (deep-review — CHARACTERIZED the #148 escalation [null-initialMileage lease burn bar] as a red→green
+  anchor, NOT a fix; the parked product call now pinned)** — Balance at C102 (HEAD was C101; nudge label lags):
+  NOTHING strictly over budget; bug (102−99=3/3) AT budget but provably dry (no source changed since C85, 7× dry —
+  a scout produces nothing), guard just ran C100/C101. Took the highest-leverage open item = deep-review (starved 4)
+  auditing the C100/C101-proven FE-logic frontier. RE-MEASURED FE coverage first (the C101 stale-row lesson): the
+  lowest-coverage money-facing file is financing-calculations.ts (75% line). Audited `calculateLeaseMetrics`
+  firsthand — it's EXTRAORDINARILY well-tested (30+ cases incl. the #64/#91/#110 money-bug classes + 2 fast-check
+  properties), so most of it is saturated. Found the ONE genuinely unguarded load-bearing branch — and it's the
+  #148 ESCALATION itself: the mileage gate (financing-calculations.ts:497) requires `initialMileage !== null` for
+  mileageUsed to compute; there's a test for null currentMileage but NONE for null INITIAL — the exact #148 case
+  where the LeaseMetricsCard burn bar reads 0-driven while the sibling PaymentMetricsGrid (which coalesces
+  `initialMileage ?? 0`) shows real miles, so the same vehicle contradicts itself. Since #148 is a PARKED product
+  call (a displayed-$ semantics decision awaiting Angelo), I did NOT fix it — I CHARACTERIZED the current behavior
+  as a red→green anchor (the textbook deep-review move for a parked call): +1 in lease-metrics.test.ts pinning that
+  null-initial → mileageUsed 0 / remaining full TODAY, plus the contrast that initial=0 drives used=30000 (documents
+  the contradiction). NON-VACUOUS proved firsthand: applied the #148-FIX direction (`initialMileage ?? 0` in the
+  gate) → the characterization FLIPS RED (used becomes 30000), proving it precisely pins the current null-gate
+  behavior + is the documented update target when Angelo rules; restored (no auto-fix). Verify: frontend
+  validate:local GREEN — type-check 0, build OK, 739 pass / 0 fail (+1). FE-only (no markup change → no shot). cov:
+  be 87.47% / fe ~87.6% (+ the lease-metrics null-initial branch). The #148 escalation is now pinned so it can't
+  silently change AND has a ready red→green test for the eventual fix. NEXT deep-review: the FE-logic surface is
+  largely certified now; prefer a feature/bug-surfaced invariant or an Angelo steer (#148 is READY — the anchor
+  test means the fix is a 1-line gate change + flipping this test's expectations).
 - **C101 (feature parked → guard: pinned themeStore.initialize() + its live OS-preference listener, the C336-skipped
   one-shot)** — Balance at C101 (HEAD was C100; nudge label lags): feature (101−96=5/4, +1) the lone over-budget
   category, but feature is FULLY EXHAUSTED (every real surface eyes-on C96, import-trackers Angelo-gated) → recorded

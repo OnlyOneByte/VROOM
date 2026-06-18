@@ -113,6 +113,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > is /profile (/trips is a "Coming Soon" placeholder; /privacypolicy + /termsofservice are static legal copy) — after
 > /profile, every real surface is eyes-on and the feature category is fully Angelo-gated.
 >
+> **CHARACTERIZED C102 — the #148 null-initialMileage lease burn-bar invariant, as a red→green anchor (NOT a
+> fix).** Audited the lowest-coverage money file (financing-calculations.ts, 75% line) — `calculateLeaseMetrics` is
+> already extraordinarily well-tested (30+ cases + 2 fast-check properties incl. #64/#91/#110), so it's saturated
+> EXCEPT the one genuinely unguarded branch, which is the #148 escalation itself: the gate requires
+> `initialMileage !== null` for mileageUsed, with a test for null current but NONE for null initial. Since #148 is a
+> PARKED product call, did NOT fix — pinned the CURRENT behavior (null initial → used 0 / remaining full) + the
+> contradiction (initial=0 → used 30000) in lease-metrics.test.ts. Non-vacuous (apply the `?? 0` fix → the
+> characterization flips RED). #148 is now test-anchored + ready: the fix is a 1-line gate change + flipping this
+> test when Angelo rules. The FE-logic deep-review surface is largely certified now. Don't re-audit calculateLeaseMetrics.
+>
 > **CERTIFIED C92 — the rate-limit / client-IP abuse-prevention surface CLEAN + already comprehensively guarded
 > (a NEW area, not in the prior audited set).** Security-load-bearing: a spoofed-XFF bypass would let an attacker
 > get a fresh per-request rate-limit bucket → defeat the auth brute-force limiter. Audited 3 layers firsthand, ALL
@@ -607,6 +617,12 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > inside `calculateLeaseMetrics` to match the grid — OR require an initial reading / show "set a starting
 > odometer". Changes a displayed lease-mileage figure → Angelo's steer. send_message tool was unavailable this
 > turn; filed here as the durable escalation record. Eyes-on PNG captured /tmp/c68-finance3.png (not committed).
+> **UPDATE C102 (deep-review): #148 is now CHARACTERIZATION-PINNED + READY.** lease-metrics.test.ts has a
+> red→green anchor test pinning the CURRENT null-initial behavior (mileageUsed 0 / remaining full) + documenting the
+> contradiction (initial=0 drives used=30000). Verified firsthand that applying the recommended fix
+> (`initialMileage ?? 0` in the :497 gate) flips that test RED — so when Angelo rules, the fix is a 1-line gate
+> change + flipping this test's expectations to the chosen semantics. The escalation is no longer just a note: it's
+> a ready-to-execute, test-anchored change awaiting only the product decision.
 >
 > **CLOSED C48: #88** — a deleted vehicle is now pruned from reminders' `expenseSplitConfig` blob +
 > renormalized (see the Sev-3 block). The #88/#97 vehicle-delete reminder-orphan family is CLOSED (junction
