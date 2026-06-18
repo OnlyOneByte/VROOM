@@ -285,8 +285,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > - **#88 (MED) — APPROVED: on vehicle delete, prune the deleted vehicleId from any reminder's
 >   `expenseSplitConfig` JSON, and deactivate the reminder if the split becomes invalid.** (junction
 >   cascades, the blob doesn't.)
-> - **#97 (LOW-MED) — APPROVED: when a reminder's last/sole vehicle is removed, auto-deactivate it +
->   surface a "needs attention" flag** (instead of leaving it `is_active=1` and silently never firing).
+> - ~~**#97 (LOW-MED) — DONE C40.**~~ A vehicle delete cascades the reminder_vehicles junction but leaves
+>   the reminder row active with zero vehicles (skipped 'no_vehicles' forever). Fixed via
+>   `reminderRepository.deactivateVehicleless(userId)` (LEFT JOIN + isNull junction → bulk deactivate),
+>   called in the vehicle-delete route after the delete. Flipped the #97 characterization test to the
+>   fixed behavior + a multi-vehicle no-over-deactivation case; non-vacuous (remove the call → RED). The
+>   "needs attention" surfacing was NOT added (the deactivation alone removes the silent-orphan footgun;
+>   a needs-attention flag is a separate UX add). Don't re-pick. (#88 — the split-config-blob sibling — is
+>   still OPEN, same family, more involved.)
 > - **#98 (MED) — APPROVED: add a real PUT-on-collision / upsert path so sync-manager `keep_local`
 >   actually overwrites.** Today `forceOverwrite` is Zod-stripped → offline edit silently lost on a true
 >   clientId collision.

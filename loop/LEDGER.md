@@ -31,11 +31,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 37 |
 | deep-review | 5 | 39 |
 | guard | 6 | 38 |
-| bug | 3 | 36 |
+| bug | 3 | 40 |
 | arch | 5 | 36 |
 | infra | 6 | 35 |
 
-Current cycle: **39**
+Current cycle: **40**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -354,6 +354,25 @@ Current cycle: **39**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C40 (bug #97)** — **Auto-deactivate a reminder left vehicleless by a vehicle delete (Angelo-APPROVED
+  Sev-3).** bug was the sole over-budget category (40−36=4/3). Sev-1 design-doc-gated + #94 is a class →
+  took the clean approved Sev-3 orphan #97 (cleaner than its #88 sibling, which mutates the split-config
+  JSON blob). CONFIRMED FIRSTHAND: `reminder_vehicles.vehicleId` is onDelete:cascade (schema:217), so a
+  vehicle delete drops the junction rows but the reminder ROW survives — a reminder linked to ONLY that
+  vehicle is left is_active=1 with ZERO vehicles, which processReminder skips 'no_vehicles' (trigger-service
+  :441) every run forever, a silent never-firing orphan still shown active. FIX (Angelo's agreed
+  deactivate): new `reminderRepository.deactivateVehicleless(userId)` — a LEFT JOIN reminders↔
+  reminder_vehicles WHERE isActive AND junction isNull → bulk set isActive=false; called in the vehicle-
+  delete route AFTER `vehicleRepository.delete`. GUARD: flipped the pre-existing #97 CHARACTERIZATION test
+  (it pinned the buggy is_active=1/'no_vehicles' state, explicitly as a "red→green anchor for the eventual
+  fix") to the fixed behavior + added a multi-vehicle case (NOT over-deactivated — keeps its remaining
+  vehicle). NON-VACUOUS: removing the deactivateVehicleless call turns the single-vehicle test RED
+  (is_active stays 1) while the multi-vehicle stays green. Verify: backend validate:local GREEN — tsc 0,
+  musl-biome clean, 1616 pass / 0 fail, build bundled. Backend-only (no UI → no shot; the deactivation
+  surfaces via the existing reminders list). cov: be 87.29% / fe 86.14% (~ — vehicle-delete + reminder repo
+  already covered; the new method + flipped test pin the orphan fix). NOTE: #88 (the SPLIT-config-blob
+  sibling — prune the deleted vehicleId from a reminder's expenseSplitConfig JSON) is still OPEN; same
+  family, more involved (JSON renormalize + the C151 async-tx footgun on the surviving leg).
 - **C39 (deep-review)** — **Certified the OAuth-state CSRF consume CLEAN + replaced brittle source-scans
   with a behavioral guard.** deep-review was the sole over-budget category (39−33=6/5). Per the C33 note
   (TCO money path certified), picked the next UNAUDITED surface: the auth/OAuth path. Audited the

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, lte, ne, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, lte, ne, type SQL } from 'drizzle-orm';
 import { CONFIG } from '../../config';
 import type { AppDatabase } from '../../db/connection';
 import { getDb, transaction } from '../../db/connection';
@@ -418,6 +418,36 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       .update(reminders)
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(reminders.id, id));
+  }
+
+  /**
+   * Deactivate any of the user's ACTIVE reminders that have NO remaining vehicles (#97, C40). When a
+   * vehicle is deleted, its `reminder_vehicles` junction rows cascade away (schema onDelete:cascade), but
+   * the reminder ROW survives — a reminder whose sole/last vehicle was the deleted one is left
+   * `is_active=1` with zero vehicles, which the trigger then skips `no_vehicles` every run forever with no
+   * user signal. Called after a vehicle delete: flip those to inactive so they leave the "active" surface
+   * (and stop inflating the recurring-cost run-rate). Returns the count deactivated. Scoped by userId.
+   */
+  async deactivateVehicleless(userId: string): Promise<number> {
+    // Active reminders for this user that have no junction row at all.
+    const orphanRows = await this.db
+      .select({ id: reminders.id })
+      .from(reminders)
+      .leftJoin(reminderVehicles, eq(reminders.id, reminderVehicles.reminderId))
+      .where(
+        and(
+          eq(reminders.userId, userId),
+          eq(reminders.isActive, true),
+          isNull(reminderVehicles.reminderId)
+        )
+      );
+    const ids = orphanRows.map((r) => r.id);
+    if (ids.length === 0) return 0;
+    await this.db
+      .update(reminders)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(eq(reminders.userId, userId), inArray(reminders.id, ids)));
+    return ids.length;
   }
 
   /**

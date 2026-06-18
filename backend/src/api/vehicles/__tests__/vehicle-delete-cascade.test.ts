@@ -135,14 +135,14 @@ describe('vehicle deletion cascades photo cleanup to dependent entities', () => 
   });
 });
 
-// CHARACTERIZATION of #97 (C318 deep-review scout, ESCALATED — product-gated, same family as #88).
-// reminder_vehicles.vehicleId is onDelete:'cascade', so deleting a vehicle removes its junction row.
-// A reminder linked to ONLY that vehicle is left with ZERO vehicles: the row survives + stays is_active,
-// but processReminder skips it forever with reason 'no_vehicles' — a silent, never-firing orphan still
-// shown as active. The fix (deactivate / delete / surface / block-delete) is a UX decision sent to Angelo
-// (#97). This pins the CURRENT behavior so the eventual fix has a red→green anchor and the bug can't
-// silently worsen. (A multi-vehicle reminder is unaffected — it keeps its remaining vehicles.)
-describe('#97 — a single-vehicle reminder is orphaned (vehicle-less, still active) on vehicle delete', () => {
+// #97 FIXED (C40, Angelo-approved): reminder_vehicles.vehicleId is onDelete:'cascade', so deleting a
+// vehicle removes its junction row — but the reminder ROW survives. Pre-fix a reminder linked to ONLY that
+// vehicle was left is_active=1 with ZERO vehicles (the trigger skipped it 'no_vehicles' forever, a silent
+// never-firing orphan still shown active). The vehicle-delete route now calls
+// reminderRepository.deactivateVehicleless(userId) after the delete, flipping any now-vehicleless active
+// reminder to inactive. A MULTI-vehicle reminder is unaffected — it keeps its remaining vehicles + stays
+// active. (This was a characterization test of the buggy state; flipped to the fixed behavior at C40.)
+describe('#97 — a single-vehicle reminder is auto-deactivated when its only vehicle is deleted', () => {
   function reminderRow(id: string): { is_active: number } | null {
     return (
       (ctx.sqlite.query('SELECT is_active FROM reminders WHERE id = ?').get(id) as {
@@ -156,37 +156,55 @@ describe('#97 — a single-vehicle reminder is orphaned (vehicle-less, still act
       .get(reminderId) as { n: number };
     return row.n;
   }
-
-  test('the reminder row SURVIVES (active) but ends up with zero linked vehicles → trigger skips it no_vehicles', async () => {
-    const vehicleId = await seedVehicle();
-    // Seed a single-vehicle time reminder directly (mileage/time API surface is partial).
+  /** Seed a time reminder linked to the given vehicles (mileage/time API surface is partial). */
+  function seedReminder(id: string, vehicleIds: string[]): void {
     ctx.sqlite.run(
       `INSERT INTO reminders
          (id, user_id, name, type, action_mode, frequency, trigger_mode, start_date, next_due_date, is_active)
-       VALUES ('rm-orphan', ?, 'Registration', 'notification', 'automatic', 'yearly', 'time', 0, 0, 1)`,
-      [ctx.user.id]
+       VALUES (?, ?, 'Registration', 'notification', 'automatic', 'yearly', 'time', 0, 0, 1)`,
+      [id, ctx.user.id]
     );
-    ctx.sqlite.run(
-      `INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES ('rm-orphan', ?)`,
-      [vehicleId]
-    );
+    for (const v of vehicleIds) {
+      ctx.sqlite.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)`, [
+        id,
+        v,
+      ]);
+    }
+  }
+
+  test('the now-vehicleless reminder is DEACTIVATED (no longer a silent no_vehicles orphan)', async () => {
+    const vehicleId = await seedVehicle();
+    seedReminder('rm-orphan', [vehicleId]);
     expect(junctionCount('rm-orphan')).toBe(1);
 
     const del = await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`);
     expect(del.status, await del.text()).toBe(200);
 
-    // CURRENT behavior: the junction row cascaded away, but the reminder row REMAINS and is STILL active.
+    // The junction cascaded away AND the now-vehicleless reminder was deactivated (the #97 fix).
     expect(junctionCount('rm-orphan')).toBe(0);
-    expect(reminderRow('rm-orphan')?.is_active).toBe(1);
+    expect(reminderRow('rm-orphan')?.is_active).toBe(0);
 
-    // ...and the trigger skips it as no_vehicles (never fires, no user signal).
+    // It no longer appears in the trigger run at all (not active → not even evaluated/skipped).
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     const body =
       await json<DataEnvelope<{ skipped: Array<{ reminderId: string; reason: string }> }>>(res);
     expect(res.status).toBe(200);
-    expect(
-      body.data.skipped.some((s) => s.reminderId === 'rm-orphan' && s.reason === 'no_vehicles')
-    ).toBe(true);
+    expect(body.data.skipped.some((s) => s.reminderId === 'rm-orphan')).toBe(false);
+  });
+
+  test('a MULTI-vehicle reminder is NOT deactivated — it keeps its remaining vehicle', async () => {
+    const v1 = await seedVehicle();
+    const v2 = await seedVehicle();
+    seedReminder('rm-multi', [v1, v2]);
+    expect(junctionCount('rm-multi')).toBe(2);
+
+    // Delete only ONE of the two covered vehicles.
+    const del = await ctx.authed('DELETE', `/api/v1/vehicles/${v1}`);
+    expect(del.status, await del.text()).toBe(200);
+
+    // The reminder still has v2 → it stays active (not over-deactivated).
+    expect(junctionCount('rm-multi')).toBe(1);
+    expect(reminderRow('rm-multi')?.is_active).toBe(1);
   });
 });
 
