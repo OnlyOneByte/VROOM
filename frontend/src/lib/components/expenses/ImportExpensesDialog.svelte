@@ -7,17 +7,20 @@
 	import { appStore } from '$lib/stores/app.svelte';
 	import { handleErrorWithNotification } from '$lib/utils/error-handling';
 	import { getVehicleDisplayName } from '$lib/utils/vehicle-helpers';
+	import { getDistanceUnitLabel, getVolumeUnitLabel } from '$lib/utils/units';
 	import {
 		guessManualColumns,
 		isNativeImportHeaders,
 		parseCsvHeaders
 	} from '$lib/utils/import-mapping-helpers';
 	import type {
+		DistanceUnit,
 		ImportColumnMapping,
 		ImportDateFormat,
 		ImportMappingPreset,
 		NativeImportField,
-		Vehicle
+		Vehicle,
+		VolumeUnit
 	} from '$lib/types';
 
 	interface Props {
@@ -56,6 +59,14 @@
 	// VROOM field → the chosen foreign header ('' = unmapped). date/amount are required to import a row.
 	let manualColumns = $state<Partial<Record<NativeImportField, string>>>({});
 	let manualDateFormat = $state<ImportDateFormat>('iso');
+	// The FILE's distance/volume units (T4). applyMapping converts mileage/volume INTO the target
+	// vehicle's units ONLY when both the file's unit (this) and the target's unit are known — so without
+	// these a manually-mapped metric log (km/litres) would import RAW into a miles/gallons vehicle
+	// (NORTH_STAR #2 wrong-numbers). Default to the target's own units (= no conversion, the safe
+	// baseline); the user overrides when the file is in a different unit. Only relevant when the
+	// mileage/volume columns are mapped.
+	let manualDistanceUnit = $state<DistanceUnit>('miles');
+	let manualVolumeUnit = $state<VolumeUnit>('gallons_us');
 
 	// The VROOM fields the manual editor exposes (the importer-consumed subset; missedFillup is niche).
 	const MAPPABLE_FIELDS: { field: NativeImportField; label: string; required?: boolean }[] = [
@@ -75,6 +86,8 @@
 		{ value: 'dmy', label: 'EU (DD/MM/YYYY)' },
 		{ value: 'epoch', label: 'Unix timestamp' }
 	];
+	const DISTANCE_UNITS: DistanceUnit[] = ['miles', 'kilometers'];
+	const VOLUME_UNITS: VolumeUnit[] = ['gallons_us', 'gallons_uk', 'liters'];
 
 	let targetVehicle = $derived(vehicles.find((v) => v.id === targetVehicleId));
 	// A manual mapping needs a vehicle column OR a chosen target vehicle (the same D4 rule as a preset).
@@ -103,6 +116,10 @@
 			return {
 				columns,
 				dateFormat: manualDateFormat,
+				// Send the file's unit only when the matching column is mapped, so applyMapping converts
+				// mileage/volume into the target vehicle's units (else a metric log imports raw — #NS2).
+				...(columns.mileage ? { distanceUnit: manualDistanceUnit } : {}),
+				...(columns.volume ? { volumeUnit: manualVolumeUnit } : {}),
 				// No vehicle column → stamp the chosen target vehicle (D4).
 				...(columns.vehicle ? {} : { targetVehicle: getVehicleDisplayName(targetVehicle!) })
 			};
@@ -133,6 +150,8 @@
 			manualMapping = false;
 			manualColumns = {};
 			manualDateFormat = 'iso';
+			manualDistanceUnit = 'miles';
+			manualVolumeUnit = 'gallons_us';
 		}
 	});
 
@@ -159,6 +178,7 @@
 				manualMapping = true;
 				manualColumns = guessManualColumns(headers);
 				if (vehicles.length === 1 && vehicles[0]) targetVehicleId = vehicles[0].id;
+				seedManualUnitsFromTarget();
 			}
 		} catch {
 			// Detection is best-effort — a failure just falls back to the native (manual) path.
@@ -171,6 +191,14 @@
 	function setManualColumn(field: NativeImportField, header: string): void {
 		manualColumns = { ...manualColumns, [field]: header };
 		runPreview();
+	}
+
+	/** Default the file's units to the target vehicle's units (= no conversion baseline). The user
+	 * overrides when the file is in a different unit; the conversion only runs when they differ. */
+	function seedManualUnitsFromTarget(): void {
+		const prefs = targetVehicle?.unitPreferences;
+		if (prefs?.distanceUnit) manualDistanceUnit = prefs.distanceUnit;
+		if (prefs?.volumeUnit) manualVolumeUnit = prefs.volumeUnit;
 	}
 
 	async function runPreview() {
@@ -208,6 +236,8 @@
 	/** After the target vehicle is chosen, (re)run the preview now that a mapping exists. */
 	function handleTargetVehicleChange(id: string) {
 		targetVehicleId = id;
+		// Re-baseline the manual unit pickers to the newly-chosen vehicle's units (no conversion default).
+		if (manualMapping) seedManualUnitsFromTarget();
 		runPreview();
 	}
 
@@ -343,7 +373,7 @@
 									value={manualColumns[f.field] ?? ''}
 									onValueChange={(v) => setManualColumn(f.field, v)}
 								>
-									<Select.Trigger class="h-8 flex-1 text-xs">
+									<Select.Trigger class="h-8 flex-1 text-xs" data-testid="map-field-{f.field}">
 										{manualColumns[f.field] || '— not mapped —'}
 									</Select.Trigger>
 									<Select.Content>
@@ -378,6 +408,59 @@
 							</Select.Content>
 						</Select.Root>
 					</div>
+
+					<!-- File's distance unit (only when an Odometer column is mapped) — drives conversion into
+					     the target vehicle's unit so a metric log doesn't import raw (#NS2). -->
+					{#if manualColumns.mileage}
+						<div class="flex items-center gap-2">
+							<span class="w-28 shrink-0 text-xs text-muted-foreground">Odometer unit</span>
+							<Select.Root
+								type="single"
+								value={manualDistanceUnit}
+								onValueChange={(v) => {
+									manualDistanceUnit = v as DistanceUnit;
+									runPreview();
+								}}
+							>
+								<Select.Trigger class="h-8 flex-1 text-xs" data-testid="map-distance-unit">
+									{getDistanceUnitLabel(manualDistanceUnit)}
+								</Select.Trigger>
+								<Select.Content>
+									{#each DISTANCE_UNITS as u (u)}
+										<Select.Item value={u} label={getDistanceUnitLabel(u)}>
+											{getDistanceUnitLabel(u)}
+										</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						</div>
+					{/if}
+
+					<!-- File's volume unit (only when a Volume column is mapped) -->
+					{#if manualColumns.volume}
+						<div class="flex items-center gap-2">
+							<span class="w-28 shrink-0 text-xs text-muted-foreground">Volume unit</span>
+							<Select.Root
+								type="single"
+								value={manualVolumeUnit}
+								onValueChange={(v) => {
+									manualVolumeUnit = v as VolumeUnit;
+									runPreview();
+								}}
+							>
+								<Select.Trigger class="h-8 flex-1 text-xs" data-testid="map-volume-unit">
+									{getVolumeUnitLabel(manualVolumeUnit)}
+								</Select.Trigger>
+								<Select.Content>
+									{#each VOLUME_UNITS as u (u)}
+										<Select.Item value={u} label={getVolumeUnitLabel(u)}>
+											{getVolumeUnitLabel(u)}
+										</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						</div>
+					{/if}
 
 					<!-- Target vehicle (only when no vehicle column is mapped — D4) -->
 					{#if !manualColumns.vehicle}

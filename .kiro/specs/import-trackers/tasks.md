@@ -66,8 +66,17 @@
             (Read): a bespoke CSV (Transaction Date/Spent/Kind/Notes) → editor with guessed mappings →
             "1 ready · 1 row needs attention" after picking the vehicle (the maintenance row imports; the
             fuel row correctly errors "fuel rows require fuel amount and mileage"). FE validate:local GREEN.
-      - [ ] **REMAINING (T4 follow-ups):** unit (distance/volume) override pickers for the manual path +
-            a category-remap table for unrecognized category WORDS. **BLOCKER surfaced + flagged to Angelo
+      - [x] **MANUAL UNIT pickers DONE (C41, eyes-on CONFIRMED):** the manual path now exposes Odometer-unit
+            + Volume-unit pickers (shown only when those columns are mapped), defaulting to the target
+            vehicle's units (= no conversion baseline). `buildMapping` sends the file's distanceUnit/volumeUnit
+            only when the matching column is mapped, so applyMapping converts INTO the vehicle's units —
+            closing the C37 gap where a metric log imported raw (NORTH_STAR #2). Eyes-on via
+            `import-manual-units.meshclaw.e2e.ts` + shot: a km/litres log mapped + units set to Kilometers/
+            Liters → committed row converted 160.9344 km→100 mi, 37.854 L→~10 US gal (verified via API).
+            Field/unit Select triggers got `data-testid`s for deterministic e2e targeting.
+      - [ ] **REMAINING (T4 follow-ups):** a category-remap table for unrecognized category WORDS (a manual
+            file's category column passes through verbatim — only NAMED-but-unknown words need a remap UI).
+            **BLOCKER surfaced + flagged to Angelo
             C31:** the fuel presets map no category column and `mapCategory` leaves a blank category blank
             (D2 "never invent"), so a detected fuel log previews 0-ready ("Unknown category"). Recommended
             fix (a): give each fuel preset a `defaultCategory:'fuel'`

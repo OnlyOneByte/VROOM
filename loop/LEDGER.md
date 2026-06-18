@@ -28,14 +28,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 37 |
+| feature | 4 | 41 |
 | deep-review | 5 | 39 |
 | guard | 6 | 38 |
 | bug | 3 | 40 |
 | arch | 5 | 36 |
 | infra | 6 | 35 |
 
-Current cycle: **40**
+Current cycle: **41**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -354,6 +354,25 @@ Current cycle: **40**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C41 (feature)** — **Import-trackers T4: manual-mapping unit pickers (eyes-on DONE; #NS2 fix).** Nothing
+  strictly over budget (infra/arch/feature tied AT 6/6,5/5,4/4); took the highest-leverage item — feature's
+  only open work (import-trackers) had a genuine UNBLOCKED correctness gap from my own C37: the manual
+  column-mapping path never set the file's units, so a manually-mapped METRIC log imported raw km/litres
+  into a miles/gallons vehicle (CONFIRMED FIRSTHAND: applyMapping's mapMileage/mapVolume convert ONLY when
+  both the file's unit AND the target's unit are known — import-mapping.ts:245/229; manual buildMapping set
+  neither). FIX: added Odometer-unit + Volume-unit pickers to the manual editor (shown only when those
+  columns are mapped), defaulting to the target vehicle's units (= no-conversion baseline, re-seeded on
+  vehicle change); buildMapping sends distanceUnit/volumeUnit only when the matching column is mapped → the
+  server converts into the vehicle's units. EYES-ON via `import-manual-units.meshclaw.e2e.ts` + 2 shots
+  (Read): a km/litres log fully mapped via the per-field dropdowns + units set to Kilometers/Liters →
+  committed row CONVERTED 160.9344 km→100 mi, 37.854 L→~10 US gal (verified via API — the #NS2 proof).
+  Added `data-testid`s to the manual field/unit Select triggers for deterministic e2e targeting (the
+  dropdowns render all headers as options, so bits-ui listbox selectors needed a stable hook). DEBUG: the
+  CSV headers first matched the Fuelio preset (odo+litres) → switched to non-preset headers; long-form unit
+  labels (Kilometers/Liters) not short; row identified by converted mileage (Memo wasn't mapped to
+  description). Verify: frontend validate:local GREEN — type-check 0, build OK, 735 tests. cov: be 87.29% /
+  fe 86.14% (~ — UI-markup cycle; conversion path backend-covered T1). T4 REMAINING: a category-remap table
+  for unknown category WORDS; the Angelo-gated preset defaultCategory; T6 round-trip e2e.
 - **C40 (bug #97)** — **Auto-deactivate a reminder left vehicleless by a vehicle delete (Angelo-APPROVED
   Sev-3).** bug was the sole over-budget category (40−36=4/3). Sev-1 design-doc-gated + #94 is a class →
   took the clean approved Sev-3 orphan #97 (cleaner than its #88 sibling, which mutates the split-config

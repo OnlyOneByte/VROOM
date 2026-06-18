@@ -53,11 +53,13 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
    (C31, eyes-on)** + **T4 MANUAL COLUMN-MAPPING DONE (C37, eyes-on):** an unrecognized CSV → "Map your
    columns" editor (per-field dropdowns from the file's headers + date-format picker + target-vehicle
    picker), auto-guessed by header substring, → existing preview/commit (verified 1-ready end-to-end on a
-   bespoke CSV). **REMAINING:** (a) unit (distance/volume) override pickers for the manual path + a
-   category-remap table for unrecognized category WORDS; (b) **the flagged preset gap — fuel presets map no
-   category column so a detected log previews 0-ready ("Unknown
+   bespoke CSV). **T4 MANUAL UNIT pickers DONE (C41, eyes-on):** Odometer/Volume-unit pickers on the manual
+   path (shown when those columns map; default = the vehicle's units) → applyMapping converts into the
+   vehicle's units (a km/litres log → 100 mi / 10 gal, verified end-to-end; closes the C37 raw-import #NS2
+   gap). **REMAINING:** (a) a category-remap table for unrecognized category WORDS; (b) **the flagged preset
+   gap — fuel presets map no category column so a detected log previews 0-ready ("Unknown
    category"); recommended fix defaultCategory:'fuel' per preset, send_message'd Angelo C31, awaiting steer**;
-   (d) T6 round-trip e2e (incl. real-export signature validation). Spec: `.kiro/specs/import-trackers/`.
+   (c) T6 round-trip e2e (incl. real-export signature validation). Spec: `.kiro/specs/import-trackers/`.
    This is now the ONLY open feature (maintenance C1 + recurring-expenses C27 both DONE).
 3. ~~**Recurring expenses**~~ — **COMPLETE (T1–T8 all done, C27).** Engine + backend (T1–T3/T5/T7), FE
    client (T6/T7), then the eyes-on FE tail: T7 widget (C5), T5 app-init hook (C12), T6 badge+dialog
