@@ -355,8 +355,8 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
-> **SCOUTED C103 — no fresh defect (8th consecutive; precondition-recorded dry). `git diff C85..HEAD` over
-> production source still EMPTY → a scout produces nothing.** Also confirmed the C100–C102 FE-logic guard frontier
+> **SCOUTED C103/C107 — no fresh defect (8th/9th consecutive; precondition-recorded dry). `git diff C85..HEAD` over
+> production source still EMPTY → a regression is structurally impossible, a scout produces nothing.** Also confirmed the C100–C102 FE-logic guard frontier
 > is now worked out: the only remaining <90% FE files are expense-api.ts (thin apiClient pass-throughs → testing
 > them is C181/C229 coverage-theater) + sync-manager.ts (setupAutoSync DOM-effect wiring [Playwright territory] +
 > the already-covered resolveConflict). The load-bearing FE-logic gaps are CLOSED (settings reload C100, theme

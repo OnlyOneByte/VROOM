@@ -45,11 +45,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 106 |
 | deep-review | 5 | 102 |
 | guard | 6 | 101 |
-| bug | 3 | 103 |
+| bug | 3 | 107 |
 | arch | 5 | 105 |
 | infra | 6 | 104 |
 
-Current cycle: **106**
+Current cycle: **107**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -368,6 +368,18 @@ Current cycle: **106**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C107 (bug — precondition-recorded dry [9th consecutive]; no source changed since C85)** — Balance at C107
+  (HEAD was C106; nudge label lags): bug (107−103=4/3, +1) the LONE over-budget category → forced. PRECONDITION
+  (the C99/C103 rule): `git diff 5766239(C85)..HEAD` over production source is EMPTY — nothing has changed since the
+  cold vein was last swept (C6/C10/C15/C83/C89/C95/C99/C103 + every surface certified + the FE-logic guards
+  C100–C102 are tests, not source), so a regression is structurally impossible → recorded dry IMMEDIATELY without
+  re-scanning provably-unchanged code (re-scanning is pure ceremony, the C95/C103 lesson). The productive bug
+  surface remains ONLY the parked Angelo-gated queue (#148 READY w/ its C102 red→green anchor, #100/#79/#129 +
+  import defaultCategory). Doc-only — no source/test touched. cov: be 87.47% / fe 87.6% (~ — nothing touched).
+  PATTERN NOTE (C83–C107, 25 cycles): the loop is at a stable fixed point — every self-authorizable vein swept
+  (net production change = 6 test files: 3 BE guards C87/C94/C98 + 3 FE-logic C100/C101/C102), the cold bug vein
+  9× dry, every real + populated surface eyes-on, the only remaining work GATED on Angelo (4 product calls + 1
+  design-gated arch migration). The branch stays healthy + PR-ready; a steer is the only thing that opens fresh work.
 - **C106 (feature — eyes-on the full POPULATED dashboard, desktop + mobile; CLEAN [the primary landing surface,
   only ever partially-shot])** — Balance at C106 (HEAD was C105; nudge label lags): feature (106−101=5/4, +1) the
   lone over-budget category → picked. Import-trackers stays Angelo-gated (defaultCategory), so per the
