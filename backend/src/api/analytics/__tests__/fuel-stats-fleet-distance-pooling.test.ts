@@ -95,7 +95,9 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     // Correct PER-VEHICLE summation = 800 + 200 = 1_000. A naive fleet-wide max−min would give
     // 50_200 − 10_000 = 40_200 (the cross-vehicle pooling hazard this path already avoids). Spans stay
     // under MAX_REASONABLE_MILES_BETWEEN_FILLUPS (1000) + volumes give realistic MPG (A 800/20=40,
-    // B 200/5=40) so computeEfficiencyPoint keeps both pairs.
+    // B 200/5=40) so computeEfficiencyPoint keeps both pairs. Both vehicles use the DEFAULT (miles) unit,
+    // so the C58 #94 fix is a no-op here — the per-vehicle sum is still 1_000 (conversion only bites a
+    // MIXED-unit fleet, the next test).
     seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
     seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
     seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
@@ -104,8 +106,36 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     // Fleet-wide: no vehicleId.
     const stats = await repo.getFuelStats(USER.id, rangeAll());
 
-    // CURRENT behavior: per-vehicle spans summed (800 + 200), NOT the cross-vehicle 40_200 pool.
+    // Per-vehicle spans summed (800 + 200), NOT the cross-vehicle 40_200 pool. Same-unit → no conversion.
     expect(stats.distance.totalDistance).toBe(1_000);
+  });
+
+  // #94 FIXED (C58, Angelo-approved "convert-to-user-global BEFORE pooling, mirroring getCrossVehicle"):
+  // a MIXED-unit fleet now converts each vehicle's distance span to the user's global unit before summing
+  // totalDistance, so miles and kilometres are no longer added raw (NORTH_STAR #2). getFuelStats threads
+  // the real userUnits + vehicleUnitsMap into computeConvertedTotalDistance (was fed no-op placeholders).
+  test('a MIXED mi+km fleet converts each span to the user unit before summing (no raw mi+km pool)', async () => {
+    seedUser(testDb.sqlite, USER); // user has no prefs → default MILES
+    seedVehicle(testDb.sqlite, VEH_A); // miles (default)
+    seedVehicle(testDb.sqlite, VEH_B);
+    // VEH_B reports its odometer in KILOMETRES.
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      VEH_B.id,
+    ]);
+
+    // A drives 800 mi; B drives 200 KM. Correct fleet total in the user's miles =
+    // 800 + (200 km / 1.609344) ≈ 924.27 mi. The pre-fix raw pool would be 800 + 200 = 1_000.
+    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
+    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
+    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
+    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
+
+    const stats = await repo.getFuelStats(USER.id, rangeAll());
+
+    // Converted-then-summed, NOT the raw 1_000: 800 mi + 200 km→124.27 mi.
+    expect(stats.distance.totalDistance).toBeCloseTo(800 + 200 / 1.609344, 2);
+    expect(stats.distance.totalDistance).not.toBe(1_000);
   });
 
   test('volume.currentYear + fillupDetails pool gal/L by RAW summation across the fleet (#94 sibling, C328)', async () => {

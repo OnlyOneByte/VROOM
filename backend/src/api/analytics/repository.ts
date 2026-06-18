@@ -1310,21 +1310,34 @@ export class AnalyticsRepository {
         start: range.start - (range.end - range.start),
         end: range.start,
       };
-      const [vehicleNameMap, fuelRows, prevYearAgg] = await Promise.all([
-        this.queryVehicleNameMap(userId, vehicleId),
-        this.queryFuelExpenses(userId, range, vehicleId),
-        this.queryFuelAggregates(userId, prevRange, vehicleId),
-      ]);
+      const [vehicleNameMap, fuelRows, prevYearAgg, userUnits, vehicleUnitsMap] = await Promise.all(
+        [
+          this.queryVehicleNameMap(userId, vehicleId),
+          this.queryFuelExpenses(userId, range, vehicleId),
+          this.queryFuelAggregates(userId, prevRange, vehicleId),
+          this.getUserUnits(userId),
+          this.getAllVehicleUnits(userId),
+        ]
+      );
 
       // Sort by vehicleId then date for functions that need consecutive same-vehicle pairs
       const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);
+
+      // #94 (C58): convert each vehicle's distance to the user's global units BEFORE pooling the
+      // fleet-wide totalDistance scalar — a mixed mi+km fleet otherwise sums miles with kilometres
+      // (NORTH_STAR #2). Mirrors getCrossVehicle: skip the conversion when every vehicle already
+      // matches the user's units (a no-op for the common single-unit case).
+      const skipConversion = this.allVehiclesMatchUnits(vehicleUnitsMap, userUnits);
 
       return this.buildFuelStatsFromData(
         fuelRows,
         fuelRowsByVehicle,
         vehicleNameMap,
         range,
-        prevYearAgg
+        prevYearAgg,
+        userUnits,
+        vehicleUnitsMap,
+        skipConversion
       );
     } catch (error) {
       logger.error('Failed to compute fuel stats', {
@@ -1343,7 +1356,10 @@ export class AnalyticsRepository {
     fuelRowsByVehicle: FuelExpenseRow[],
     vehicleNameMap: Map<string, string>,
     range: DateRange,
-    prevYearAgg: { count: number; totalGallons: number }
+    prevYearAgg: { count: number; totalGallons: number },
+    userUnits: UnitPreferences,
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    skipConversion: boolean
   ): FuelStatsData {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -1410,14 +1426,16 @@ export class AnalyticsRepository {
     // Distance must be summed PER VEHICLE (max-min within each car), then totaled. Pooling
     // every vehicle's odometer readings into one max-min gives garbage for a multi-vehicle
     // user (e.g. a car at 12k mi and one at 95k mi would report ~83k). Delegate to the shared
-    // computeConvertedTotalDistance (C392) with skipConversion=true — this summary path is
-    // single-unit so it doesn't convert; the unit args are ignored under skipConversion. ONE
-    // source of truth for the per-vehicle group→max-min→sum, in lockstep with the year-end path.
+    // computeConvertedTotalDistance (C392), now threading the REAL per-vehicle units (#94, C58):
+    // each vehicle's span is converted to the user's global distance unit BEFORE summing, so a
+    // mixed mi+km fleet no longer pools miles with kilometres (NORTH_STAR #2). skipConversion
+    // short-circuits the common single-unit case. ONE source of truth for the per-vehicle
+    // group→max-min→sum, in lockstep with the year-end + cross-vehicle paths.
     const totalDistance = this.computeConvertedTotalDistance(
       fuelRows,
-      new Map(),
-      DEFAULT_UNIT_PREFERENCES,
-      true
+      vehicleUnitsMap,
+      userUnits,
+      skipConversion
     );
     const daysSoFar = Math.max(
       1,
@@ -2098,7 +2116,10 @@ export class AnalyticsRepository {
         fuelRowsByVehicle,
         vehicleNameMap,
         range,
-        prevYearAgg
+        prevYearAgg,
+        userUnits,
+        vehicleUnitsMap,
+        skipConversion
       );
       const fuelAdvanced = this.buildFuelAdvancedFromData(
         fuelRows,

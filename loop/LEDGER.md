@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 54 |
 | deep-review | 5 | 53 |
 | guard | 6 | 52 |
-| bug | 3 | 55 |
+| bug | 3 | 58 |
 | arch | 5 | 57 |
 | infra | 6 | 56 |
 
-Current cycle: **57**
+Current cycle: **58**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,32 @@ Current cycle: **57**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C58 (bug #94, distance member)** — **Convert per-vehicle distance to user-global units BEFORE pooling
+  the fleet fuel-stats totalDistance (Angelo-APPROVED Sev-2, NORTH_STAR #2).** NOTHING strictly over budget
+  at C58 (feature/deep-review/guard/bug all tied AT) → took the highest-leverage open item: #94, the
+  biggest open correctness defect (a mixed mi+km / gal+L fleet shows garbage pooled scalars on the DEFAULT
+  analytics view). #94 is a 6-member CLASS — too big for one verified increment — so did the contained,
+  highest-impact, LOWEST-RISK member: the `distance.totalDistance` scalar (the fleet fuel-stats + summary
+  headline). KEY FIRSTHAND FINDING: the conversion machinery ALREADY EXISTS and is tested
+  (`computeConvertedTotalDistance` + `allVehiclesMatchUnits`, the getCrossVehicle model), but `getFuelStats`
+  fed it NO-OP PLACEHOLDERS (`new Map()`, DEFAULT_UNIT_PREFERENCES, skipConversion=true) pending the #94
+  decision — so the fix is purely ACTIVATING tested infra, not new math. FIX (Angelo's "convert-to-user-
+  global BEFORE pooling, mirroring getCrossVehicle"): `getFuelStats` now fetches userUnits +
+  getAllVehicleUnits + computes skipConversion=allVehiclesMatchUnits, threads them into buildFuelStatsFromData
+  → computeConvertedTotalDistance (replacing the placeholders); getSummary's call site already had all three
+  in scope (its summary distance was equally un-converted — also fixed). No-op for a same-unit fleet (the
+  common case → existing same-unit characterization tests stay green). GUARD: +1 in
+  fuel-stats-fleet-distance-pooling.test.ts — a MIXED mi+km fleet now reports 800 mi + 200 km→124.27 mi =
+  924.27, NOT the raw 1000; flipped the C301 same-unit test's stale "update when the fix lands" note (it
+  still correctly asserts 1000 — conversion is a no-op there). NON-VACUOUS (verified firsthand): revert to
+  the placeholders → ONLY the mixed-unit test RED (same-unit green, proving the fix bites only a mixed
+  fleet); reverted → 4/4 green, repository diff = only my change. Verify: backend validate:local GREEN —
+  tsc 0, musl-biome 0 errors (20 pre-existing warnings), 1660 pass / 0 fail (+1), build bundled.
+  Backend-only (the FE chart already converts per-vehicle; the summary scalar's the HTTP path → no shot).
+  cov: be ~87.5% / fe 86.35% (~ — the +1 pins the mixed-unit distance conversion). #94 distance member
+  DONE; REMAINING #94 members (own cycles): volume (gal+L pooling in getFuelStats sumGallons +
+  fillupDetails) + the 4 fuel-advanced builders (buildMonthlyConsumption / buildSeasonalEfficiency /
+  buildVehicleRadar / buildDayOfWeekPatterns).
 - **C57 (arch)** — **Dedup the C51 overwrite strip-and-update into one `applyLocalOverwrite` helper (the
   C51-created drift vector — a genuine fresh pick).** arch was the SOLE over-budget category (57−50=7/5,
   +2). Not a no-churn ceremony — found a real dup exactly where the standing lesson predicts (a bug/feature
