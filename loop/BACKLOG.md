@@ -492,6 +492,17 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    (unreachable as a mutation via the public API — the lookup is already userId-scoped); documented in a
    code comment instead of pinning unreachable theater. The C22→C23/C37→C43 "bug/feature creates a dup →
    next arch dedups" lesson again. Don't re-scout.
+7. ~~**converted gas-MPG inner-loop dedup**~~ — **DONE C64.** The C58/C62 #94 convert-before-pool work left
+   THREE analytics builders (`computeConvertedEfficiencyValues`, `buildConvertedEfficiencyTrend`,
+   `buildConvertedFuelEfficiencyComparison`) hand-rolling the SAME per-vehicle inner loop — groupByVehicle →
+   fallback `vehicleUnitsMap.get(id) ?? {...DEFAULT_UNIT_PREFERENCES}` → `gasEfficiencyPoint` gate →
+   `convertEfficiency` ternary — differing only in accumulation. Extracted ONE private generator
+   `*convertedGasEfficiencyPoints(...)` yielding `{vehicleId, efficiency, date}`; all 3 consume it. Net
+   −~40 LOC AND the #119/#122(C413)/#126(C427) gas/charge gate now lives in ONE place (a new converted builder
+   can't silently re-pollute gas MPG with PHEV charge mi/kWh — NORTH_STAR #6). Behavior-preserving + test-
+   anchored (analytics-units.property #11 + cross-vehicle.property #126 + summary/year-end property all green
+   unchanged); 1666 pass. The C22→C23/C37→C43/C51→C57 "bug/feature threads a dup → next arch converges" lesson
+   again (here C58/C62→C64). Don't re-scout the converted-efficiency builders — single-sourced now.
 
 > **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
 > toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time

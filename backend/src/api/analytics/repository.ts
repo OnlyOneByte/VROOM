@@ -458,6 +458,47 @@ export class AnalyticsRepository {
   }
 
   /**
+   * The ONE source of truth for the converted gas-MPG inner loop every per-vehicle efficiency builder
+   * shares: group fuel rows by vehicle, walk consecutive pairs, gate to GAS points, and convert each to
+   * the target unit system (a no-op when skipConversion). Yields `{ vehicleId, efficiency, date }`; each
+   * consumer (computeConvertedEfficiencyValues / buildConvertedEfficiencyTrend /
+   * buildConvertedFuelEfficiencyComparison) accumulates the tuples its own way.
+   *
+   * gasEfficiencyPoint (not computeEfficiencyPoint): a PHEV's charge session stores kWh in `volume`, so
+   * computeEfficiencyPoint would emit a ~mi/kWh value that, summed into a gas-MPG average labeled mi/gal,
+   * drags it down — and worse, convertEfficiency would mis-convert that mi/kWh as if it were mi/gal.
+   * Centralizing the gate here means no converted-efficiency builder can silently reintroduce the
+   * #119/#122 (C413) / #126 (C427) gas/charge contamination by forgetting it.
+   */
+  private *convertedGasEfficiencyPoints(
+    fuelRows: FuelExpenseRow[],
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences,
+    skipConversion: boolean
+  ): Generator<{ vehicleId: string; efficiency: number; date: string }> {
+    for (const [vehicleId, rows] of groupByVehicle(fuelRows)) {
+      const vUnits = vehicleUnitsMap.get(vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+      for (let i = 1; i < rows.length; i++) {
+        const current = rows[i];
+        const previous = rows[i - 1];
+        if (!current || !previous) continue;
+        const point = gasEfficiencyPoint(current, previous);
+        if (!point) continue;
+        const efficiency = skipConversion
+          ? point.efficiency
+          : convertEfficiency(
+              point.efficiency,
+              vUnits.distanceUnit,
+              vUnits.volumeUnit,
+              targetUnits.distanceUnit,
+              targetUnits.volumeUnit
+            );
+        yield { vehicleId, efficiency, date: point.date };
+      }
+    }
+  }
+
+  /**
    * Compute per-vehicle efficiency values, converting each to the target unit system.
    * Iterates fuel rows grouped by vehicle, computes efficiency from consecutive pairs,
    * and converts to the target units when skipConversion is false.
@@ -469,31 +510,13 @@ export class AnalyticsRepository {
     skipConversion: boolean
   ): number[] {
     const values: number[] = [];
-    for (const [vehicleId, rows] of groupByVehicle(fuelRows)) {
-      const vUnits = vehicleUnitsMap.get(vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
-      for (let i = 1; i < rows.length; i++) {
-        const current = rows[i];
-        const previous = rows[i - 1];
-        if (!current || !previous) continue;
-        // gasEfficiencyPoint (not computeEfficiencyPoint): this is a gas-MPG average — a PHEV's charge
-        // session (mi/kWh) must NOT be summed in, and crucially must NOT be fed to convertEfficiency
-        // (which would convert mi/kWh as if it were mi/gal → garbage). The #119/#122 gas/charge
-        // partition (C413) on the converted/summary repository path it missed (#126, C427).
-        const point = gasEfficiencyPoint(current, previous);
-        if (!point) continue;
-
-        values.push(
-          skipConversion
-            ? point.efficiency
-            : convertEfficiency(
-                point.efficiency,
-                vUnits.distanceUnit,
-                vUnits.volumeUnit,
-                targetUnits.distanceUnit,
-                targetUnits.volumeUnit
-              )
-        );
-      }
+    for (const { efficiency } of this.convertedGasEfficiencyPoints(
+      fuelRows,
+      vehicleUnitsMap,
+      targetUnits,
+      skipConversion
+    )) {
+      values.push(efficiency);
     }
     return values;
   }
@@ -551,32 +574,17 @@ export class AnalyticsRepository {
   ): Array<{ month: string; efficiency: number }> {
     const monthMap = new Map<string, { effSum: number; effCount: number }>();
 
-    for (const [vehicleId, rows] of groupByVehicle(fuelRows)) {
-      const vUnits = vehicleUnitsMap.get(vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
-      for (let i = 1; i < rows.length; i++) {
-        const current = rows[i];
-        const previous = rows[i - 1];
-        if (!current || !previous) continue;
-        // gasEfficiencyPoint: gas-MPG trend — exclude a PHEV's charge mi/kWh before pooling/convert (#126/C427).
-        const point = gasEfficiencyPoint(current, previous);
-        if (!point) continue;
-
-        const converted = skipConversion
-          ? point.efficiency
-          : convertEfficiency(
-              point.efficiency,
-              vUnits.distanceUnit,
-              vUnits.volumeUnit,
-              targetUnits.distanceUnit,
-              targetUnits.volumeUnit
-            );
-
-        const month = toMonthKey(new Date(point.date));
-        const entry = monthMap.get(month) ?? { effSum: 0, effCount: 0 };
-        entry.effSum += converted;
-        entry.effCount++;
-        monthMap.set(month, entry);
-      }
+    for (const { efficiency, date } of this.convertedGasEfficiencyPoints(
+      fuelRows,
+      vehicleUnitsMap,
+      targetUnits,
+      skipConversion
+    )) {
+      const month = toMonthKey(new Date(date));
+      const entry = monthMap.get(month) ?? { effSum: 0, effCount: 0 };
+      entry.effSum += efficiency;
+      entry.effCount++;
+      monthMap.set(month, entry);
     }
 
     return (
@@ -1639,41 +1647,23 @@ export class AnalyticsRepository {
     vehicleUnitsMap: Map<string, UnitPreferences>,
     userUnits: UnitPreferences
   ): CrossVehicleData['fuelEfficiencyComparison'] {
-    const byVehicle = groupByVehicle(fuelRows);
-
-    // Compute monthly efficiency per vehicle, converting to user's global units
+    // Compute monthly efficiency per vehicle, converting to user's global units. Reached only on the
+    // mixed-unit (non-skip) branch — getCrossVehicle uses buildFuelEfficiencyComparison when units match
+    // — so always convert (skipConversion: false).
     const monthVehicleEff = new Map<string, Map<string, { sum: number; count: number }>>();
-    for (const [vId, rows] of byVehicle) {
-      const vUnits = vehicleUnitsMap.get(vId) ?? { ...DEFAULT_UNIT_PREFERENCES };
-      for (let i = 1; i < rows.length; i++) {
-        const current = rows[i];
-        const previous = rows[i - 1];
-        if (!current || !previous) continue;
-        // gasEfficiencyPoint: this converted comparison is gas MPG — exclude a PHEV's charge mi/kWh BEFORE
-        // convertEfficiency (which would mis-convert mi/kWh as mi/gal). Matches the skipConversion twin
-        // buildFuelEfficiencyComparison's gas gate, restoring branch parity (#126/C427, the #119/#122 class).
-        const point = gasEfficiencyPoint(current, previous);
-        if (!point) continue;
-
-        const converted = convertEfficiency(
-          point.efficiency,
-          vUnits.distanceUnit,
-          vUnits.volumeUnit,
-          userUnits.distanceUnit,
-          userUnits.volumeUnit
-        );
-
-        const month = toMonthKey(new Date(point.date));
-        if (!monthVehicleEff.has(month)) monthVehicleEff.set(month, new Map());
-        const vehicleMap = monthVehicleEff.get(month) as Map<
-          string,
-          { sum: number; count: number }
-        >;
-        const entry = vehicleMap.get(vId) ?? { sum: 0, count: 0 };
-        entry.sum += converted;
-        entry.count++;
-        vehicleMap.set(vId, entry);
-      }
+    for (const { vehicleId: vId, efficiency, date } of this.convertedGasEfficiencyPoints(
+      fuelRows,
+      vehicleUnitsMap,
+      userUnits,
+      false
+    )) {
+      const month = toMonthKey(new Date(date));
+      if (!monthVehicleEff.has(month)) monthVehicleEff.set(month, new Map());
+      const vehicleMap = monthVehicleEff.get(month) as Map<string, { sum: number; count: number }>;
+      const entry = vehicleMap.get(vId) ?? { sum: 0, count: 0 };
+      entry.sum += efficiency;
+      entry.count++;
+      vehicleMap.set(vId, entry);
     }
 
     return Array.from(monthVehicleEff.entries())
