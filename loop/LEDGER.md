@@ -30,14 +30,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 82 |
+| feature | 4 | 88 |
 | deep-review | 5 | 86 |
 | guard | 6 | 87 |
 | bug | 3 | 83 |
 | arch | 5 | 85 |
 | infra | 6 | 84 |
 
-Current cycle: **87**
+Current cycle: **88**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,30 @@ Current cycle: **87**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C88 (feature — eyes-on the never-shot recurring-expenses MaterializedExpensesDialog POPULATED; CLEAN)** —
+  Balance at C88 (HEAD was C87; nudge label lags): TWO over budget — feature (88−82=6/4, +2) and bug (88−83=5/3,
+  +2); feature most-starved (6 > 5) → picked. Import-trackers (the only open feature SPEC work) stays Angelo-gated
+  (defaultCategory), so per the C68/C75/C82 precedent I took the shootable feature increment: an eyes-on of the
+  ONE surface the C82/C86 notes flagged as still-unshot — the recurring-expenses MaterializedExpensesDialog in a
+  POPULATED state (C5 shot the dashboard RecurringCostCard, C9 shot the ⟳ badge, C19 certified the dialog EMPTY
+  state, C27 verified the round-trip via API, but the dialog's DATA markup itself was never eyes-on — the C68
+  "E2E can't catch never-rendered fields" lesson). Stack already up (:5173/:3001). Minted auth, created an OVERDUE
+  monthly expense reminder ("C88 eyes-on insurance", $150/mo, startDate 2025-12-15, financial category on Daily
+  Driver), POST /trigger materialized 7 catch-up rows (Dec 2025→Jun 2026, $1,050 total — confirmed via GET
+  /reminders/:id/expenses), opened the dialog via the per-card `[data-testid="reminder-card-<id>"]
+  button[aria-label="View materialized expenses"]` (scoped past the 4 pre-existing e2e expense reminders) +
+  **Read the PNG** (zoomed crop). CERTIFIED CLEAN: header (Receipt icon + "Materialized expenses" + ×), subtitle
+  "Expenses auto-created by "C88 eyes-on insurance"." (reminder name interpolated, smart quotes), summary
+  "**7 expenses · $1,050.00 total**" (matches the API exactly), each row = Financial · {date asc Dec 15 2025→May
+  15 2026} · car-icon Daily Driver · **$150.00** right-aligned. Zero console errors; full FE→BE→DB→render
+  round-trip. The dialog markup is sound — DON'T re-shoot it. CSRF NOTE for future API-seeded eyes-on: POST routes
+  (/trigger, DELETE) need an `Origin: http://localhost:5173` header (hono/csrf, app.ts:116) or they 403; GET is
+  unaffected. CLEANUP: deleted the reminder (severs source link, keeps rows = history by design) + all 7
+  materialized rows individually → DB restored to its pre-cycle state (4 expense reminders, the C88 reminder 404s).
+  Doc-only — no committable source (shot.mjs is gitignored harness; no auto-fix). cov: be 87.47% / fe 86.35%
+  (~ — eyes-on cert, no module touched). NEXT feature cycle: still Angelo-gated (import-trackers defaultCategory +
+  #148) → with all 3 feature tails + every populated surface now eyes-on (dashboard/insurance/financing
+  loan+lease/maintenance/recurring dialog), record parked + pivot to the co-starved category UNLESS Angelo steers.
 - **C87 (guard — pinned bug #18 split-sibling exclusion on the PREV-PERIOD SQL fillup count, the C97 guard's
   missing twin)** — Balance at C87 (HEAD was C86; nudge label lags): THREE over budget — guard (87−80=7/6, +1),
   feature (87−82=5/4, +1), bug (87−83=4/3, +1); guard most-starved (7) → picked. Scouted the convert-dispatch

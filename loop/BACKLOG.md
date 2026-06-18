@@ -104,10 +104,15 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > the per-milestone (reminderId,dueOdometer) dedup incl. re-arm + both-axes no-collision (trigger-mileage.test.ts,
 > C256). Recorded saturated; did NOT manufacture a redundant cert (the GUIDE "agent-HIGH-often-false" + C12
 > "structural-floor, don't force ceremony" discipline). The one deep-review vein that still pays is EYES-ON of a
-> never-shot surface (E2E can't catch never-rendered fields, the C68 lesson) — NEXT: the recurring-expenses
-> MaterializedExpensesDialog / ⟳ badge in a POPULATED state (needs a type:expense reminder + trigger to
-> materialize rows first; C5 shot the dashboard RecurringCostCard, C27 verified the round-trip via API, but the
-> dialog markup itself is unshot).
+> never-shot surface (E2E can't catch never-rendered fields, the C68 lesson) — ~~NEXT: the recurring-expenses
+> MaterializedExpensesDialog / ⟳ badge in a POPULATED state~~ **DONE C88 (feature eyes-on): the dialog POPULATED
+> state is certified CLEAN — created an overdue monthly $150 reminder, triggered 7 catch-up rows ($1,050), opened
+> the dialog scoped past the e2e reminders via the per-card data-testid, Read the PNG: header + subtitle (reminder
+> name interpolated) + "7 expenses · $1,050.00 total" + each Financial · {date} · Daily Driver · $150.00 row, zero
+> console errors, full FE→BE→DB→render round-trip. The ⟳ badge was eyes-on at C9. With this, EVERY populated
+> surface is now eyes-on (dashboard/insurance/financing loan+lease/maintenance/recurring dialog) — the eyes-on vein
+> is exhausted; the next still-paying deep-review/feature work is a backend correctness audit of a genuinely
+> UNAUDITED surface or an Angelo steer, NOT another render shot.**
 >
 > **AUDITED C82 — /financing LOAN render eyes-on sweep, CLEAN.** Shot the Toyota Camry loan vehicle (BoA
 > 4.5% APR, $20k/60mo) FinanceTab desktop + Read the PNG (C68 covered the LEASE path; this is the unshot loan +
