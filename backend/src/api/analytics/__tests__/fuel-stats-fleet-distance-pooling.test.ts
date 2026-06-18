@@ -198,6 +198,71 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(stats.fillupDetails.minVolume).toBeCloseTo(5 / 3.785411784, 2);
   });
 
+  // #94 PREV-YEAR sub-member FIXED (C79, the LAST #94 member): volume.previousYear came from a raw SQL
+  // SUM(volume) in queryFuelAggregates over the prior equal-length window — cross-vehicle, UN-converted —
+  // so a mixed gal+L fleet pooled litres with gallons into the "Last Period" comparison (the prev-year twin
+  // of the C62 current-period fix). queryFuelAggregates now GROUPs the volume SUM BY vehicle, and
+  // buildFuelStatsFromData converts each vehicle's prev-window sum to the user's global unit before pooling.
+  test('volume.previousYear converts each vehicle prev-window sum to the user unit before pooling (mixed gal+L)', async () => {
+    seedUser(testDb.sqlite, USER); // default GALLONS_US
+    seedVehicle(testDb.sqlite, VEH_A); // gallons (default)
+    seedVehicle(testDb.sqlite, VEH_B);
+    // VEH_B reports its volume in LITRES.
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'miles', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      VEH_B.id,
+    ]);
+
+    // Range = calendar 2024 → the prior equal-length window is calendar 2023. Seed PREV-WINDOW (2023) fuel:
+    // A two 20-GALLON fillups (40 gal); B two 5-LITRE fillups (10 L → 10/3.785411784 ≈ 2.642 gal). Converted
+    // prev-year total = 40 + 2.642 ≈ 42.64 gal; the pre-fix raw SQL pool would be 40 + 10 = 50.
+    const d2023 = (mo: number, day: number): TestExpense => ({
+      id: `p-${mo}-${day}`,
+      vehicleId: VEH_A.id,
+      category: 'fuel',
+      expenseAmount: 40,
+      date: new Date(2023, mo, day),
+      mileage: 10_000 + mo * 100,
+      volume: 20,
+      fuelType: 'Regular',
+      missedFillup: false,
+    });
+    seedExpense(testDb.sqlite, d2023(2, 1));
+    seedExpense(testDb.sqlite, d2023(5, 1));
+    seedExpense(testDb.sqlite, {
+      id: 'p-b1',
+      vehicleId: VEH_B.id,
+      category: 'fuel',
+      expenseAmount: 40,
+      date: new Date(2023, 2, 2),
+      mileage: 50_000,
+      volume: 5,
+      fuelType: 'Regular',
+      missedFillup: false,
+    });
+    seedExpense(testDb.sqlite, {
+      id: 'p-b2',
+      vehicleId: VEH_B.id,
+      category: 'fuel',
+      expenseAmount: 40,
+      date: new Date(2023, 5, 2),
+      mileage: 50_200,
+      volume: 5,
+      fuelType: 'Regular',
+      missedFillup: false,
+    });
+
+    // Range = calendar 2024 (its prior equal-length window is calendar 2023, where the rows above live).
+    const range = {
+      start: Math.floor(new Date(2024, 0, 1).getTime() / 1000),
+      end: Math.floor(new Date(2025, 0, 1).getTime() / 1000),
+    };
+    const stats = await repo.getFuelStats(USER.id, range);
+
+    expect(stats.volume.previousYear).toBeCloseTo(40 + 10 / 3.785411784, 2);
+    expect(stats.volume.previousYear).not.toBeCloseTo(50, 1); // NOT the raw gal+L SQL pool
+  });
+
   // #94 MONTHLY-CONSUMPTION member FIXED (C65, same Angelo-approved convert-before-pool direction): the
   // monthlyConsumption chart series (volume + gas-MPG per month) is the 4th #94 limb — buildMonthlyConsumption
   // pools each row's raw volume into a month AND averages each gas pair's raw efficiency, both across all

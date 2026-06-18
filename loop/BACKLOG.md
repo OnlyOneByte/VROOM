@@ -374,15 +374,15 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > offline-outbox field-dropout family #66/#101/#111, or analytics split-sibling overcount if any builder
 > was missed by the #56/#108/#113/#146 sweep).
 
-> **#94 ALL 6 BUILDER MEMBERS DONE (C58/C62/C65/C69/C72/C76)** — distance.totalDistance (C58),
-> volume/fillupDetails (C62), monthlyConsumption (C65), seasonalEfficiency (C69), dayOfWeekPatterns avgVolume
-> (C72), and vehicleRadar gas-MPG+odometer (C76) all convert-before-pool (see the Sev-2 block). C69 did the
-> QUERY-LAYER UNITS THREAD; C76 closed the last builder via an optional `convert?` param on buildVehicleRadar
-> (it's too large for a twin) + a repository `radarUnitConverters` helper, keeping analytics-charts unit-naive.
-> **ONLY REMAINING #94 sub-member: previousYearGallons** — a raw SQL `SUM(volume)` in queryFuelAggregates
-> (cross-vehicle, un-converted), the fuel-stats prev-year comparison figure. It's a DIFFERENT shape (query-layer,
-> not a builder): needs a per-vehicle group-sum at the SQL layer (or fetch the prev-year rows + convert in JS
-> like the current-period path). Its own bug-cycle pick — then #94 is fully closed. Other open Angelo bug items: **Sev-4** #129 (OAuth email-sync,
+> **#94 CLASS FULLY CLOSED (C58/C62/C65/C69/C72/C76 + C79)** — all 6 builder members [distance.totalDistance
+> (C58), volume/fillupDetails (C62), monthlyConsumption (C65), seasonalEfficiency (C69), dayOfWeekPatterns
+> avgVolume (C72), vehicleRadar gas-MPG+odometer (C76)] + the prev-year SQL sub-member [volume.previousYear,
+> C79 — queryFuelAggregates now GROUPs the volume SUM BY vehicle + buildFuelStatsFromData converts each
+> vehicle's prev-window sum before pooling] now convert-before-pool. The fleet-wide analytics summary +
+> fuel-advanced paths are unit-correct for a mixed mi+km/gal+L fleet END-TO-END. Each member has a mixed-unit
+> behavioral guard in fuel-stats-fleet-distance-pooling.test.ts + the C59/C73 source-scans fence the dispatch.
+> Don't re-pick #94 — it's done. (The product-gated cross-cutting siblings #112 chart palette + #30 MPG-band
+> remain their own separate items.) Other open Angelo bug items: **Sev-4** #129 (OAuth email-sync,
 > re-read archive grounding first), #79 (stuck-offline-entry hygiene); #100 json_patch merge + #112 chart palette
 > stay arch/design-gated.
 >
@@ -439,21 +439,18 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   mitigated C428, so urgency is lower than #36/#37 — do it on an authorized arch cycle.
 >
 > _Severity 2 — wrong numbers shown today (correctness):_
-> - **#94 (MED, 6-member CLASS) — APPROVED: convert-to-user-global BEFORE pooling, mirroring
->   `getCrossVehicle`. ALL 6 BUILDER MEMBERS DONE — DISTANCE (C58) + VOLUME (C62) + MONTHLY-CONSUMPTION (C65)
->   + SEASONAL-EFFICIENCY (C69) + DAY-OF-WEEK (C72) + VEHICLE-RADAR (C76).** The fleet fuel-stats + summary
->   `distance.totalDistance` (C58), `volume + fillupDetails` (C62), `monthlyConsumption` (C65),
->   `seasonalEfficiency` (C69), `dayOfWeekPatterns` avgVolume (C72), and `vehicleRadar` gas-MPG+odometer (C76 —
->   an optional `convert?` param on buildVehicleRadar [too large for a twin] + a repository `radarUnitConverters`
->   helper, analytics-charts stays unit-naive) now convert each vehicle's value to the user's global unit before
->   pooling/normalizing (skipConversion no-ops the common single-unit case). +1 mixed-unit guard each (distance
->   924.27 not 1000; volume 42.64 not 50; monthlyConsumption 42.64 not 50; seasonal Winter 62.04 not 35;
->   dayOfWeek avgVolume 6.06 not 9.0; radar B.fuelEfficiency 100 not 0 — the ranking inverts after convert);
->   non-vacuous. C69 did the QUERY-LAYER UNITS THREAD all advanced builders needed. **ONLY REMAINING #94
->   sub-member: previousYearGallons** — a raw SQL `SUM(volume)` in queryFuelAggregates (the prev-year fuel-stats
->   comparison), un-converted cross-vehicle. A DIFFERENT (query-layer, not builder) shape: needs a per-vehicle
->   group-sum at the SQL layer, or fetch the prev-year rows + convert in JS like the current-period path. One
->   more bug cycle → #94 fully closed.
+> - ~~**#94 (MED, 6-member CLASS + 1 sub-member) — FULLY CLOSED C58/C62/C65/C69/C72/C76 + C79.**~~ APPROVED:
+>   convert-to-user-global BEFORE pooling, mirroring `getCrossVehicle`. All 6 builder members — DISTANCE (C58),
+>   VOLUME+fillupDetails (C62), MONTHLY-CONSUMPTION (C65), SEASONAL-EFFICIENCY (C69), DAY-OF-WEEK avgVolume
+>   (C72), VEHICLE-RADAR gas-MPG+odometer (C76, an optional `convert?` param + repository `radarUnitConverters`)
+>   — PLUS the prev-year SQL sub-member (volume.previousYear, C79 — queryFuelAggregates now GROUPs the volume
+>   SUM BY vehicle + buildFuelStatsFromData converts each vehicle's prev-window sum before pooling) now convert
+>   each vehicle's value to the user's global unit before pooling/normalizing (skipConversion no-ops the common
+>   single-unit case). +1 mixed-unit guard each (distance 924.27 not 1000; volume 42.64 not 50;
+>   monthlyConsumption 42.64 not 50; seasonal 62.04 not 35; dayOfWeek 6.06 not 9.0; radar fuelEff 100 not 0;
+>   prev-year 42.64 not 50), all non-vacuous; the C59/C73 source-scans fence the dispatch. The fleet-wide
+>   analytics summary + fuel-advanced paths are unit-correct for a mixed mi+km/gal+L fleet END-TO-END. Don't
+>   re-pick — done.
 > - ~~**efficiency-band unification (#94-adjacent, C419)**~~ — **DONE C20.** Unified the per-vehicle stats
 >   band (`averageConsecutiveMpg` gas + `calculateAverageMilesPerKwh` electric) onto the canonical
 >   `[5,100]`/`[1,10]` shared with analytics — the 4 band constants now live in calculations.ts as ONE

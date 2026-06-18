@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 75 |
 | deep-review | 5 | 74 |
 | guard | 6 | 73 |
-| bug | 3 | 76 |
+| bug | 3 | 79 |
 | arch | 5 | 78 |
 | infra | 6 | 77 |
 
-Current cycle: **78**
+Current cycle: **79**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,25 @@ Current cycle: **78**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C79 (bug #94, prev-year sub-member — #94 CLASS NOW FULLY CLOSED)** — **Convert each vehicle's prev-window
+  volume to user-global units BEFORE pooling volume.previousYear (Angelo-APPROVED Sev-2, NORTH_STAR #2).**
+  Balance at C79: four AT budget (feature 4/4, deep-review 5/5, guard 6/6, bug 3/3); bug has the lowest budget
+  (tips first) + the concrete last #94 sub-member → picked. volume.previousYear (the FuelStats "Last Period"
+  comparison) came from a raw SQL `SUM(volume)` in queryFuelAggregates over the prior equal-length window —
+  cross-vehicle, UN-converted — so a mixed gal+L fleet pooled litres with gallons (the prev-year twin of the
+  C62 current-period fix; the LAST un-fixed #94 member, a query-layer shape not a builder). FIX: changed
+  queryFuelAggregates to GROUP the volume SUM BY vehicle (returns `{ count, volumeByVehicle: Map }` instead of
+  a single totalGallons); buildFuelStatsFromData converts each vehicle's prev-window sum to the user's global
+  unit before pooling (reusing vehicleUnitsFor + convertVolume), gated by skipConversion (a plain sum on the
+  common single-unit branch). The COUNT stays unconverted (unit-free). Both callers (getFuelStats + getSummary)
+  forward the new-shape agg unchanged. GUARD: +1 mixed gal+L test (range = calendar 2024, prev-window = 2023:
+  A 40 gal + B 10 L→2.64 gal = 42.64, not the raw 50). NON-VACUOUS proved firsthand: reverting to the raw sum →
+  50 not 42.64 RED; restored → green. Verify: backend validate:local GREEN — tsc 0, musl-biome clean (20
+  pre-existing warnings, none new), 1692 pass / 0 fail (+1), build bundled. Backend-only (no UI → no shot).
+  cov: be 87.46% / fe 86.35% (~ — analytics repo already well-covered; +1 mixed-unit guard). **#94 CLASS FULLY
+  CLOSED** — all 6 builder members (distance C58 + volume C62 + monthlyConsumption C65 + seasonal C69 +
+  dayOfWeek C72 + vehicleRadar C76) + the prev-year SQL sub-member (C79) now convert-before-pool. The
+  fleet-wide analytics summary + fuel-advanced paths are unit-correct for a mixed mi+km/gal+L fleet end-to-end.
 - **C78 (arch)** — **Extracted the per-row volume-convert idiom into ONE private helper across the 3
   volume-pooling sites (behavior-preserving; the zero-guard + per-vehicle lookup can't drift).** arch was the
   SOLE over-budget category (78−71=7/5, +2). The C62/C65/C72 #94 volume work left the SAME idiom hand-repeated

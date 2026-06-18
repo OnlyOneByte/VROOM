@@ -934,7 +934,7 @@ export class AnalyticsRepository {
     userId: string,
     range: DateRange,
     vehicleId?: string
-  ): Promise<{ count: number; totalGallons: number }> {
+  ): Promise<{ count: number; volumeByVehicle: Map<string, number> }> {
     const conditions = [
       eq(expenses.userId, userId),
       eq(expenses.category, 'fuel'),
@@ -944,19 +944,26 @@ export class AnalyticsRepository {
     if (vehicleId) conditions.push(eq(expenses.vehicleId, vehicleId));
     // COUNT only volume-bearing rows so the previous-year fillup count matches the
     // in-memory isFillup predicate in buildFuelStatsFromData (a split fuel sibling has
-    // volume=null and is not a fillup — bug #18). The gallons SUM is unaffected (null
-    // volume contributes nothing) but is kept explicit for symmetry.
-    const result = await this.db
+    // volume=null and is not a fillup — bug #18). GROUP the volume SUM BY vehicle so the
+    // caller can convert each vehicle's sum to the user's global volume unit BEFORE pooling
+    // — a mixed gal+L fleet otherwise sums litres with gallons into the prev-year headline
+    // (#94, NORTH_STAR #2; the prev-year sub-member the C62 current-period fix left, fixed C79).
+    const rows = await this.db
       .select({
+        vehicleId: expenses.vehicleId,
         count: sql<number>`COUNT(CASE WHEN ${expenses.volume} > 0 THEN 1 END)`,
         totalGallons: sql<number>`COALESCE(SUM(${expenses.volume}), 0)`,
       })
       .from(expenses)
-      .where(and(...conditions));
-    return {
-      count: result[0]?.count ?? 0,
-      totalGallons: result[0]?.totalGallons ?? 0,
-    };
+      .where(and(...conditions))
+      .groupBy(expenses.vehicleId);
+    let count = 0;
+    const volumeByVehicle = new Map<string, number>();
+    for (const r of rows) {
+      count += r.count;
+      if (r.totalGallons > 0) volumeByVehicle.set(r.vehicleId, r.totalGallons);
+    }
+    return { count, volumeByVehicle };
   }
 
   /** Build odometer progression chart data from fuel expenses. */
@@ -1583,7 +1590,7 @@ export class AnalyticsRepository {
     fuelRowsByVehicle: FuelExpenseRow[],
     vehicleNameMap: Map<string, string>,
     range: DateRange,
-    prevYearAgg: { count: number; totalGallons: number },
+    prevYearAgg: { count: number; volumeByVehicle: Map<string, number> },
     userUnits: UnitPreferences,
     vehicleUnitsMap: Map<string, UnitPreferences>,
     skipConversion: boolean
@@ -1636,11 +1643,17 @@ export class AnalyticsRepository {
     const sumGallons = (rows: FuelExpenseRow[]) =>
       rows.reduce((s, r) => s + volumeInUserUnits(r), 0);
     const currentYearGallons = sumGallons(fuelRows);
-    // NOTE: previousYearGallons is a raw SQL SUM(volume) from queryFuelAggregates (cross-vehicle,
-    // un-converted) — converting it needs a per-vehicle group-sum at the query layer, a separate #94
-    // sub-member (the prev-year comparison) left for its own cycle. The current-period figures (the
-    // headline + chart-feeding values) are converted here.
-    const previousYearGallons = prevYearAgg.totalGallons;
+    // #94 (C79, the LAST sub-member): previousYearGallons is now a PER-VEHICLE group-sum from
+    // queryFuelAggregates (volumeByVehicle), so each vehicle's prev-year litres/gallons converts to the
+    // user's global volume unit BEFORE pooling — a mixed gal+L fleet no longer sums litres with gallons
+    // into the "Last Period" comparison (the prev-year twin of the C62 current-period fix). skipConversion
+    // short-circuits the common single-unit case to a plain sum (a no-op).
+    const previousYearGallons = skipConversion
+      ? [...prevYearAgg.volumeByVehicle.values()].reduce((s, v) => s + v, 0)
+      : [...prevYearAgg.volumeByVehicle.entries()].reduce((s, [vId, vol]) => {
+          const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, vId);
+          return s + convertVolume(vol, vUnits.volumeUnit, userUnits.volumeUnit);
+        }, 0);
     const currentMonthGallons = sumGallons(fuelRows.filter(inCurrentMonth));
     const prevMonthGallons = sumGallons(fuelRows.filter(inPrevMonth));
 
