@@ -77,6 +77,20 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C46 — insurance `monthlyPremiumTrend` month-bucketing CLEAN + guarded.** The per-month
+> premium SERIES the analytics trend chart renders (accumulateMonthlyPremiums→monthKeysInRange) was driven
+> only transitively through getInsurance; no test pinned the bucketing (the C6/C18 "helper output never
+> asserted" gap). Certified firsthand: a term adds its premium to EACH spanned month (day-1, inclusive
+> both ends); overlapping policies SUM in shared months; a totalCost-only term spreads its amortized
+> monthly value per-month. +3 in insurance-details.test.ts; non-vacuous (add-once → RED). FIRSTHAND HARNESS
+> FINDING: the file's shared `term()` helper seeds raw MS via direct SQL, but the columns are Drizzle
+> `mode:'timestamp'` (SECONDS) — so seeded dates read ~1000× too large; the PRODUCTION path is clean (the
+> route writes via the ORM ÷1000), and the date-independent existing tests masked it. Added a local
+> `termSeconds` seed; left the shared helper alone (changing it risks the date-relative #14/#25 tests). The
+> sync-manager conflict path + insurance premium MATH were checked firsthand and found ALREADY well-guarded
+> — don't re-audit them. Next deep-review: a genuinely different surface (the analytics TCO monthly-trend
+> builder, the financing amortization schedule eyes-on, or an eyes-on /insurance render sweep).
+>
 > **CERTIFIED C3:** the photo-entity-type allowlist is in sync across all THREE paths (upload gate /
 > restore validator / provider routing) and now pinned by `photo-entity-type-allowlist-sync.test.ts`
 > (non-vacuous — reproduces the C404 drift). Don't re-audit this surface; it's guarded. Next deep-review

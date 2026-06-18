@@ -30,13 +30,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 41 |
-| deep-review | 5 | 39 |
+| deep-review | 5 | 46 |
 | guard | 6 | 45 |
 | bug | 3 | 44 |
 | arch | 5 | 43 |
 | infra | 6 | 42 |
 
-Current cycle: **45**
+Current cycle: **46**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -355,6 +355,32 @@ Current cycle: **45**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C46 (deep-review)** — **Certified the insurance `monthlyPremiumTrend` month-bucketing CLEAN + guarded
+  + fixed a latent test-harness epoch bug.** deep-review was most-starved over budget (46−39=7/5 +2;
+  feature +1 lost on raw starvation). Per the standing notes (C39/C33/C26 all point to an unaudited
+  surface), verified firsthand that the two recurring candidates are ALREADY well-guarded — the
+  sync-manager conflict path (determineConflictType 4-way + resolveConflict 3-outcome + #98 char + retry
+  backoff/cap + #121 + #134 orphan-no-resurrect) and the insurance premium MATH (effectiveMonthlyPremium /
+  monthKeysInRange both directly unit-pinned; getInsurance totals/#8/#50/#25/#14/#51/contract all certified)
+  — so didn't re-scan them. Found the genuine gap: `monthlyPremiumTrend` — the per-month premium SERIES the
+  analytics tab's trend chart renders, built from `accumulateMonthlyPremiums`→`monthKeysInRange` — was
+  driven ONLY transitively through getInsurance; NO test asserted the month-by-month bucketing (the C6/C18
+  "helper output never pinned" gap on a money-facing series). CERTIFIED FIRSTHAND CLEAN: a term contributes
+  its monthly premium to EACH spanned month (day-1 anchored, inclusive both ends); overlapping policies SUM
+  in shared months; a totalCost-only term spreads its AMORTIZED monthly value per-month (matching the
+  totals path) — all correct against source. GUARD (+3 in insurance-details.test.ts). NON-VACUOUS (verified
+  firsthand): making accumulateMonthlyPremiums add once-then-break → the EACH-month + overlap tests RED;
+  reverted → 17/17 green, repository byte-identical. FIRSTHAND HARNESS FINDING (recorded in-file): the
+  file's shared `term()` helper inserts raw MILLISECONDS via direct SQL, but insurance_terms.start/end are
+  Drizzle `mode:'timestamp'` (SQLite stores SECONDS; the real repo writes via the ORM which ÷1000) — so
+  seeded term dates read back ~1000× too large (year ~55970). The PRODUCTION path is CLEAN (the route uses
+  the ORM); the pre-existing tests never caught the harness bug because they're date-INDEPENDENT (monthlyCost
+  flows straight through; the totalCost test asserts only >0) — the trend is the first date-DEPENDENT
+  assertion. Added a local `termSeconds` seed matching the real storage contract; left the shared `term()`
+  untouched (changing it risks the date-relative #14/#25/latest-term tests — a separate harness cleanup if
+  ever warranted). Verify: backend validate:local GREEN — tsc 0, musl-biome 0 errors (20 pre-existing
+  warnings), 1625 pass / 0 fail (+3), build bundled. Backend-only (no UI → no shot). cov: be ~87.3% / fe
+  86.35% (~ — insurance analytics already covered; +3 pin the trend series; FE untouched).
 - **C45 (guard)** — **Tree-wide source-scan guard for the C44 #37 backup-atomicity invariant.** Two over
   budget (guard 45−38=7/6 +1, deep-review 45−39=6/5 +1); guard wins the tie on raw starvation (7 > 6). The
   C44 #37 atomic-swap is a HIGH data-safety fix whose regression risk is a ONE-EDIT revert — a future
