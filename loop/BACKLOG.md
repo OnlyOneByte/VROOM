@@ -468,6 +468,18 @@ the now-shootable eyes-on FE + any newly-touched module.)*
 > SEEDED for the next guard cycle: load-state.svelte.ts (35% func) + theme.svelte.ts (60%) have genuine untested
 > logic; pin those over another cold backend scan. Don't re-add the uploadBackup pin.
 >
+> **GUARDED C108:** the untested `GET /:id/sync-status` provider route's tenant-isolation chokepoint is now
+> pinned (+4 in providers-routes-http.test.ts). Scouting the HTTP-harness guard vein (not source-scan) across all
+> 12 route domains surfaced this endpoint with ZERO coverage despite gating on `findOwnedProviderOrThrow` — the
+> same tenant-isolation guard the PUT/DELETE paths pin (#63), but on a READ that leaks another tenant's
+> per-category photo-sync counts if dropped (NORTH_STAR #2). Pins owned→200 (4-category {total,synced,failed}
+> shape), foreign→404 (no leak), non-existent→404, anon→401. Non-vacuous (drop the ownership check → foreign +
+> non-existent tests RED). **CORRECTION: the C103/C107 "guard frontier worked out" claim was PREMATURE** — a real
+> untested route with a cross-tenant guard gap existed. LESSON: the HTTP-harness vein isn't exhausted just because
+> source-scan + FE-logic are; map route-domain endpoint coverage before asserting saturation. NEXT guard: re-scan
+> the remaining low-coverage route endpoints (sync/auth/analytics harness are thin but mostly DI/OAuth-bound —
+> verify genuinely-testable vs structural first). Don't re-add the sync-status pin.
+>
 > **GUARDED C98 (deep-review→guard):** the session-cookie SECURITY-ATTRIBUTE contract is now pinned by a
 > source-scan (`session-cookie-security-attributes.test.ts`, +4) — the C92/C97-flagged unaudited session/cookie
 > lifecycle. The attrs `secure: CONFIG.env==='production'` / `httpOnly: true` / `sameSite: 'Lax'` are hand-copied

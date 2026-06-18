@@ -44,12 +44,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 106 |
 | deep-review | 5 | 102 |
-| guard | 6 | 101 |
+| guard | 6 | 108 |
 | bug | 3 | 107 |
 | arch | 5 | 105 |
 | infra | 6 | 104 |
 
-Current cycle: **107**
+Current cycle: **108**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -368,6 +368,26 @@ Current cycle: **107**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C108 (guard — pinned the untested GET /:id/sync-status route's tenant-isolation chokepoint; corrected the
+  premature C103 "frontier worked out" claim)** — Balance at C108 (HEAD was C107; nudge label lags): TWO over
+  budget — guard (108−101=7/6, +1) and deep-review (108−102=6/5, +1); guard most-starved (7 > 6, the C84 tie-break)
+  → picked. Rather than assert the guard vein saturated (the C103 claim), did a genuine scout of the OTHER guard
+  vein (HTTP-harness, not source-scan): mapped all 12 route domains' createTestApp coverage (77 files) → found the
+  provider domain's lowest, and within it the GET /:id/sync-status endpoint has ZERO coverage (no test file
+  references "sync-status"). VERIFIED it carries a load-bearing invariant: it gates on `findOwnedProviderOrThrow`
+  (routes.ts:602) — the SAME tenant-isolation chokepoint the PUT/DELETE tests pin (#63), but on a READ path that
+  leaks another tenant's per-category photo-sync counts (total/synced/failed) if the guard drops (NORTH_STAR #2),
+  invisible to every existing test. GUARD: +4 in providers-routes-http.test.ts — owned → 200 with the 4-category
+  {total,synced,failed} shape; foreign id → 404 (no leak); non-existent → 404; anon → 401. NON-VACUOUS proved
+  firsthand: removed the ownership check → BOTH the foreign-id + non-existent-id tests RED (the leak path opens),
+  owned + anon stay green; restored → 26 pass. Verify: backend validate:local GREEN — tsc 0, musl-biome clean (20
+  pre-existing warnings, none new), 1710 pass / 0 fail (+3 net), build bundled. Backend-only (no UI → no shot).
+  cov: be ~87.5% (+ the sync-status route lines now covered) / fe 87.6% (~). CORRECTION recorded: the C103/C107
+  "FE-logic frontier worked out / guard saturated" claim was PREMATURE — a real untested route with a cross-tenant
+  guard gap existed. LESSON: the HTTP-harness guard vein isn't exhausted just because source-scan + FE-logic are;
+  map route-domain coverage for the lowest-covered endpoints before asserting saturation. NEXT guard: re-scan the
+  remaining low-coverage route endpoints (sync/auth/analytics harness files are thin but mostly DI/OAuth-bound —
+  verify which are genuinely testable vs structural before picking).
 - **C107 (bug — precondition-recorded dry [9th consecutive]; no source changed since C85)** — Balance at C107
   (HEAD was C106; nudge label lags): bug (107−103=4/3, +1) the LONE over-budget category → forced. PRECONDITION
   (the C99/C103 rule): `git diff 5766239(C85)..HEAD` over production source is EMPTY — nothing has changed since the
