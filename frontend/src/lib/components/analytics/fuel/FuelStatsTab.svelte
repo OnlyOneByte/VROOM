@@ -167,11 +167,11 @@
 
 					<div class="space-y-3 border-b pb-3">
 						<div class="flex items-baseline justify-between">
-							<span class="text-xs uppercase tracking-wide text-muted-foreground">This Year</span>
+							<span class="text-xs uppercase tracking-wide text-muted-foreground">This Period</span>
 							<span class="text-2xl font-bold">{fuelStats.fillups.currentYear}</span>
 						</div>
 						<div class="flex items-center justify-between">
-							<span class="text-xs text-muted-foreground">Last Year</span>
+							<span class="text-xs text-muted-foreground">Last Period</span>
 							<div class="flex items-center gap-2">
 								<span class="text-sm text-muted-foreground">{fuelStats.fillups.previousYear}</span>
 								{@render changeBadge(fuelStats.fillups.currentYear, fuelStats.fillups.previousYear)}
@@ -208,11 +208,11 @@
 
 					<div class="space-y-3 border-b pb-3">
 						<div class="flex items-baseline justify-between">
-							<span class="text-xs uppercase tracking-wide text-muted-foreground">This Year</span>
+							<span class="text-xs uppercase tracking-wide text-muted-foreground">This Period</span>
 							<span class="text-2xl font-bold">{fuelStats.volume.currentYear.toFixed(1)}</span>
 						</div>
 						<div class="flex items-center justify-between">
-							<span class="text-xs text-muted-foreground">Last Year</span>
+							<span class="text-xs text-muted-foreground">Last Period</span>
 							<div class="flex items-center gap-2">
 								<span class="text-sm text-muted-foreground"
 									>{fuelStats.volume.previousYear.toFixed(1)}</span

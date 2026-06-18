@@ -253,8 +253,11 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 >   same inclusive month count effectiveMonthlyPremium amortizes a totalCost over — symmetric, no
 >   double-count since analytics reads term.monthlyCost directly, not the rows). +2 guards
 >   (premium-expense-hook.test.ts: monthly→$1300 over 13 months; explicit totalCost still wins). Don't re-pick.
-> - **#85 (MED) — APPROVED: relabel "This/Last Year" to reflect the range-relative semantics** (cheap,
->   honest) rather than re-implementing calendar-year math.
+> - ~~**#85 (MED) — DONE C36.**~~ FuelStatsTab's year-comparison rows are RANGE-relative (current selected
+>   range vs the prior equal-length window — getFuelStats queries [start−width, start]), NOT calendar years.
+>   Relabeled "This/Last Year" → "This/Last Period" (4 labels, Fill-ups + Liters cards; the calendar
+>   This/Last Month rows unchanged, true-calendar post-#86). Cheap honest relabel per the approved
+>   direction; eyes-on confirmed via shot. Don't re-pick.
 > - ~~**#51 (LOW) — DONE C29.**~~ `getInsurance` now counts only active policies with ≥1 term
 >   (`activePoliciesWithTerms`), the same has-a-term predicate the premium path gates on — so the headline
 >   count and the $0 premium contribution are internally consistent. +3 guards in insurance-details.test.ts
@@ -339,6 +342,12 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
 > shared helper would change behavior (arch rule 2). **Arch is at its structural floor** — recommend
 > letting the budget pull elsewhere rather than forcing a 4th scout; if arch goes over again, record
 > no-churn quickly + pivot to the co-starved category.
+>
+> **SCOUTED C36 — no churn warranted (4th confirm).** The C34 `effectiveTermCost` vs `effectiveMonthlyPremium`
+> pair are DUALS (inverse precedence + opposite direction — converging distorts one, rule 2 PROHIBITS); the
+> source dup-markers all point to ALREADY-deduped sites (C200 etc.); route-handler ownership+respond is the
+> natural Hono idiom with shared validators. Pivoted to the highest-leverage unblocked item (#85 relabel).
+> Arch remains at its structural floor — keep recording no-churn fast + pivoting.
 
 ### infra
 *(queue empty — repopulate as tooling/docs/coverage needs surface. Standing cadence (loop-improvement #5):

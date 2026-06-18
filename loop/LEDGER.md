@@ -31,11 +31,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 31 |
 | deep-review | 5 | 33 |
 | guard | 6 | 32 |
-| bug | 3 | 34 |
-| arch | 5 | 30 |
+| bug | 3 | 36 |
+| arch | 5 | 36 |
 | infra | 6 | 35 |
 
-Current cycle: **35**
+Current cycle: **36**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -354,6 +354,26 @@ Current cycle: **35**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C36 (arch-scout → no-churn → bug #85)** — **Arch at its structural floor (4th confirm); pivoted to the
+  #85 relabel (Angelo-APPROVED Sev-2).** Two cats over budget (arch 6/5, feature 5/4 — tie on over-by);
+  arch wins on raw starvation (6 > 5). SCOUTED firsthand for a clean dedup: (1) my C34 `effectiveTermCost`
+  vs `effectiveMonthlyPremium` are DUALS, not duplicates — inverse precedence (premium: monthlyCost wins,
+  amortize totalCost DOWN; termCost: totalCost wins, multiply monthlyCost UP) + opposite direction;
+  converging would distort one (arch rule 2 PROHIBITS). (2) The source dup-markers all point to
+  ALREADY-deduped sites (C200 date-key, the day-offset switch). (3) Route-handler ownership+respond is the
+  natural Hono idiom with shared validators. **Recorded no churn warranted (4th confirm after C4/C6/C12).**
+  PIVOTED to the highest-leverage UNBLOCKED item — feature's only open item (import-trackers) has its
+  highest-value piece (defaultCategory:'fuel') ANGELO-GATED (flagged C31), so took the clean approved
+  Sev-2 bug #85. FIRSTHAND: getFuelStats computes "currentYear" as `fuelRows.filter(isFillup).length` over
+  the ENTIRE requested range, and `prevYearAgg` queries `[range.start − rangeWidth, range.start]` (the
+  prior EQUAL-LENGTH window) — so the two "year" fields are RANGE-relative (current range vs prior equal
+  period), NOT calendar years; under the default 'all' range "This Year" = all-time fill-ups, mislabeled.
+  FIX (Angelo's agreed cheap relabel, NOT re-implement calendar math): FuelStatsTab "This Year"/"Last Year"
+  → "This Period"/"Last Period" (4 labels across the Fill-ups + Liters cards); the calendar "This/Last
+  Month" rows UNCHANGED (true calendar post-#86/C262). EYES-ON via fuel-stats-period-labels.meshclaw.e2e.ts
+  + shot (Read `/tmp/c36-fuel-stats-period-labels.png`): cards show This Period/Last Period, no This/Last
+  Year, This Month intact. Verify: frontend validate:local GREEN — type-check 0, build OK, 726 tests. cov:
+  be 87.29% / fe 86.14% (~ — label-only UI change, no vitest module touched).
 - **C35 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C28).**
   infra was the sole over-budget category (35−28=7/6). (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked
   `.test.ts`/`.spec.ts` (the gitignored `.meshclaw.e2e.ts` agent-harness specs are by-design). (2) COVERAGE
