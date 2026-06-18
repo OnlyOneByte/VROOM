@@ -765,11 +765,27 @@ function computePerVehicleFuelEfficiency(
   }
 }
 
+/**
+ * Per-vehicle unit converters the radar applies to its UNIT-BEARING metrics before the cross-fleet
+ * normalize. `fuelEfficiency` (each vehicle's avg gas MPG in ITS units — mi/gal or km/L) and `mileage`
+ * (each vehicle's max odometer in ITS distance unit) are normalized via min/max ACROSS the whole fleet,
+ * so a mixed mi+km / gal+L fleet would rank a 15 km/L car (~35 mpg) BELOW a 30 mpg car though it's more
+ * efficient — the ranking can fully invert (#94, NORTH_STAR #2). The repository binds these closures from
+ * vehicleUnitsMap + userUnits (it owns the unit-conversion deps); analytics-charts stays unit-naive. Omit
+ * for a same-unit fleet (or any non-fleet caller) → byte-identical raw behavior. maintenanceCost / annualCost
+ * ($) and reliability (a count) are unit-free — NOT converted.
+ */
+export interface RadarUnitConverters {
+  efficiency: (value: number, vehicleId: string) => number;
+  distance: (value: number, vehicleId: string) => number;
+}
+
 /** Build vehicle radar scores from expense data. */
 export function buildVehicleRadar(
   allExpenses: GeneralExpenseRow[],
   fuelRows: FuelExpenseRow[],
-  vehicleNameMap: Map<string, string>
+  vehicleNameMap: Map<string, string>,
+  convert?: RadarUnitConverters
 ): Array<{
   vehicleId: string;
   vehicleName: string;
@@ -795,6 +811,17 @@ export function buildVehicleRadar(
 
   accumulateExpenseMetrics(allExpenses, metrics);
   computePerVehicleFuelEfficiency(fuelRows, metrics);
+
+  // #94 (C76): convert each vehicle's UNIT-BEARING metrics (gas MPG + odometer) to the user's global
+  // units BEFORE the cross-fleet min/max normalize, so a mixed mi+km/gal+L fleet ranks like-with-like.
+  // No-op when `convert` is omitted (same-unit fleet); a converter is identity for a vehicle already in
+  // the user's units (convertEfficiency/convertDistance short-circuit on equal from/to).
+  if (convert) {
+    for (const [vId, m] of metrics) {
+      if (m.fuelEfficiency > 0) m.fuelEfficiency = convert.efficiency(m.fuelEfficiency, vId);
+      if (m.totalMileage > 0) m.totalMileage = convert.distance(m.totalMileage, vId);
+    }
+  }
 
   const raw = vehicleIds.map((vId) => {
     const m = metrics.get(vId);

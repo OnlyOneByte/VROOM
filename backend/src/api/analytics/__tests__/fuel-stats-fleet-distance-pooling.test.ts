@@ -356,4 +356,39 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(monday?.fillupCount).toBe(4); // unitless count unchanged
     expect(monday?.avgCost).toBeCloseTo(50, 5); // $ unchanged (50 each → avg 50)
   });
+
+  // #94 VEHICLE-RADAR member FIXED (C76, the LAST advanced builder): buildVehicleRadar normalizes each
+  // vehicle's gas-MPG (and odometer) via min/max ACROSS the fleet. Pre-fix it normalized RAW per-vehicle
+  // values, so a km/L vehicle was ranked against an mpg vehicle by bare magnitude → the efficiency ranking
+  // could fully INVERT (a more-efficient metric car scored LOWER). getFuelAdvanced now passes per-vehicle
+  // converters so each vehicle's MPG + odometer convert to the user's global units BEFORE the normalize.
+  // This is the strongest possible distinguisher: the converted ranking is the OPPOSITE of the raw one.
+  test('vehicleRadar fuelEfficiency normalizes CONVERTED gas-MPG so a mixed mi/gal+km/L fleet ranks like-with-like', async () => {
+    seedUser(testDb.sqlite, USER); // default MILES / GALLONS_US
+    seedVehicle(testDb.sqlite, VEH_A); // miles/gallons (default)
+    seedVehicle(testDb.sqlite, VEH_B);
+    // VEH_B reports distance in KM and volume in LITRES.
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      VEH_B.id,
+    ]);
+
+    // A: 10000→10300 mi on 10 gal = 30 mpg (raw). B: 50000→50360 km on 20 L = 18 km/L (raw), which
+    // converts to 18/1.609344×3.785411784 ≈ 42.34 mpg. RAW magnitudes: A 30 > B 18 → A ranks top
+    // (fuelEfficiency 100), B bottom (0). CONVERTED: B 42.34 > A 30 → B ranks top, A bottom — the OPPOSITE.
+    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
+    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_300, 40, 30, 10));
+    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 20));
+    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_360, 40, 30, 20));
+
+    const adv = await repo.getFuelAdvanced(USER.id, rangeAll());
+    const a = adv.vehicleRadar.find((r) => r.vehicleId === VEH_A.id);
+    const b = adv.vehicleRadar.find((r) => r.vehicleId === VEH_B.id);
+
+    // Converted: B (42.34 mpg) is the more-efficient car → it gets the top score, A the bottom.
+    expect(b?.fuelEfficiency).toBe(100);
+    expect(a?.fuelEfficiency).toBe(0);
+    // The pre-fix RAW normalize would have inverted this (A 30 > B 18 → A=100, B=0).
+    expect(a?.fuelEfficiency).not.toBe(100);
+  });
 });

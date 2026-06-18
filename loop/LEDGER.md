@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 75 |
 | deep-review | 5 | 74 |
 | guard | 6 | 73 |
-| bug | 3 | 72 |
+| bug | 3 | 76 |
 | arch | 5 | 71 |
 | infra | 6 | 70 |
 
-Current cycle: **75**
+Current cycle: **76**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,30 @@ Current cycle: **75**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C76 (bug #94, vehicleRadar member — the LAST advanced builder)** — **Convert each vehicle's gas-MPG +
+  odometer to user-global units BEFORE the cross-fleet normalize (Angelo-APPROVED Sev-2, NORTH_STAR #2).**
+  Balance at C76: bug (4/3, +1) the lone over-budget category → picked. Took the 6th/last unit-bearing #94
+  builder. buildVehicleRadar normalizes per-vehicle metrics via min/max ACROSS the fleet; TWO of its axes are
+  unit-bearing — fuelEfficiency (each vehicle's avg gas-MPG in ITS mi/gal or km/L) AND mileage (each vehicle's
+  max odometer in ITS distance unit). Pre-fix it normalized RAW values, so a mixed mi+km/gal+L fleet ranked a
+  km/L car against an mpg car by bare magnitude → the efficiency ranking could fully INVERT (a more-efficient
+  metric car scored LOWER). DESIGN: unlike the small twins (C65/C69/C72), buildVehicleRadar is ~75 lines + 2
+  private helpers — a repository twin would be a large copy (arch-smell). Instead threaded an OPTIONAL
+  `convert?: RadarUnitConverters` param (bound converter closures) into the ONE builder; it converts each
+  vehicle's two unit-bearing metrics after the helpers populate `metrics` but BEFORE the normalize. Omitted →
+  byte-identical (same-unit fleet + every existing caller). Kept analytics-charts UNIT-NAIVE: the repository
+  owns the convertEfficiency/convertDistance deps via a new `radarUnitConverters(vehicleUnitsMap, userUnits)`
+  helper (reuses the C71 vehicleUnitsFor fallback); switched at the call site by skipConversion. GUARD: +1 mixed
+  mi/gal+km/L test driving getFuelAdvanced — A 30 mpg vs B 18 km/L→42.34 mpg: converted, B is more efficient →
+  B.fuelEfficiency 100 / A 0 (the OPPOSITE of the raw magnitude ranking A>B). NON-VACUOUS proved firsthand:
+  forcing the raw builder → B 100→0 (ranking inverts) RED; restored → green. The C73 orientation guard stays
+  green (the radar ternary isn't a buildConverted* dispatch, correctly ignored). Verify: backend validate:local
+  GREEN — tsc 0, musl-biome clean (20 pre-existing warnings, none new), 1691 pass / 0 fail (+1), build bundled.
+  Backend-only (no UI → no shot). cov: be 87.46% / fe 86.35% (~ — analytics repo already well-covered; +1
+  mixed-unit guard). **#94 ADVANCED BUILDERS ALL DONE** (monthlyConsumption C65 + seasonalEfficiency C69 +
+  dayOfWeekPatterns C72 + vehicleRadar C76, on top of distance C58 + volume C62). REMAINING #94 = only the
+  prev-year SQL-sum sub-member (previousYearGallons — a raw SQL SUM in queryFuelAggregates needing a per-vehicle
+  group-sum at the query layer; a different, query-layer shape).
 - **C75 (feature — /insurance eyes-on sweep, CLEAN; a suspected defect debunked firsthand)** — Balance at C75:
   feature (7/4, +3) the lone most-starved over-budget category → picked. Import-trackers (the only open feature
   SPEC work) stays Angelo-gated (defaultCategory) + #148 escalated, so per the C68 precedent I took the

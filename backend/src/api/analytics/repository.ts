@@ -50,6 +50,7 @@ import {
   isFillup,
   monthKeysInRange,
   normalizeDate,
+  type RadarUnitConverters,
   SEASON_MAP,
   sortByVehicleThenDate,
   toMonthKey,
@@ -474,6 +475,35 @@ export class AnalyticsRepository {
     vehicleId: string
   ): UnitPreferences {
     return vehicleUnitsMap.get(vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+  }
+
+  /**
+   * Build the per-vehicle unit converters buildVehicleRadar applies to its gas-MPG + odometer metrics
+   * before the cross-fleet normalize (#94, C76). Keeps analytics-charts unit-naive: the repository owns the
+   * convertEfficiency/convertDistance deps + the vehicleUnitsFor fallback; each closure converts a value
+   * from THAT vehicle's units to the user's global units (identity when they already match, since the
+   * convert fns short-circuit equal from/to). Only built on the mixed-unit (non-skip) branch.
+   */
+  private radarUnitConverters(
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    userUnits: UnitPreferences
+  ): RadarUnitConverters {
+    return {
+      efficiency: (value, vehicleId) => {
+        const v = this.vehicleUnitsFor(vehicleUnitsMap, vehicleId);
+        return convertEfficiency(
+          value,
+          v.distanceUnit,
+          v.volumeUnit,
+          userUnits.distanceUnit,
+          userUnits.volumeUnit
+        );
+      },
+      distance: (value, vehicleId) => {
+        const v = this.vehicleUnitsFor(vehicleUnitsMap, vehicleId);
+        return convertDistance(value, v.distanceUnit, userUnits.distanceUnit);
+      },
+    };
   }
 
   /**
@@ -1731,15 +1761,26 @@ export class AnalyticsRepository {
       // #94 (C69): a MIXED-unit fleet converts each gas pair's efficiency to the user's global units
       // BEFORE pooling into a season, so mi/gal and km/L are not averaged raw (NORTH_STAR #2). The common
       // single-unit fleet keeps the pure builder (skipConversion). seasonalEfficiency's fillupCount limb
-      // is unitless; only avgEfficiency needed the convert. (dayOfWeekPatterns volume fixed C72; the LAST
-      // raw #94 advanced member is buildVehicleRadar's fuelEfficiency-normalize — its own cycle.)
+      // is unitless; only avgEfficiency needed the convert. (dayOfWeekPatterns volume fixed C72,
+      // vehicleRadar gas-MPG+odometer fixed C76 — the #94 fuel-ADVANCED builders are now all converted.)
       seasonalEfficiency: skipConversion
         ? buildSeasonalEfficiency(fuelRowsByVehicle)
         : this.buildConvertedSeasonalEfficiency(fuelRowsByVehicle, vehicleUnitsMap, userUnits),
-      vehicleRadar: buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap),
+      // #94 (C76): vehicleRadar normalizes per-vehicle gas-MPG + odometer ACROSS the fleet; a mixed
+      // mi+km/gal+L fleet must convert each vehicle's two unit-bearing metrics to the user's global units
+      // BEFORE the min/max normalize, else the ranking inverts (a km/L car scored against mpg). Pass the
+      // converters only on the mixed branch; same-unit fleet keeps the raw builder (no-op).
+      vehicleRadar: skipConversion
+        ? buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap)
+        : buildVehicleRadar(
+            allExpenses,
+            fuelRowsByVehicle,
+            vehicleNameMap,
+            this.radarUnitConverters(vehicleUnitsMap, userUnits)
+          ),
       // #94 (C72): avgVolume sums each fillup's volume across the fleet; a mixed gal+L fleet must convert
       // per-vehicle before pooling (NORTH_STAR #2). fillupCount + avgCost ($) are unit-free. Same-unit
-      // fleet keeps the pure builder. buildVehicleRadar (fuelEfficiency-normalize) is the last raw member.
+      // fleet keeps the pure builder.
       dayOfWeekPatterns: skipConversion
         ? buildDayOfWeekPatterns(fuelRows)
         : this.buildConvertedDayOfWeekPatterns(fuelRows, vehicleUnitsMap, userUnits),
