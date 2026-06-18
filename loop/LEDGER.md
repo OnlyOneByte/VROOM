@@ -19,6 +19,10 @@
 > source-scan guard added a couple covered helper lines); FE FULLY UNCHANGED (no FE source touched since C52; C93/C96
 > were eyes-on shots only, C95 a dry scout). The C90 branch 78.88 was v8 rounding noise — back to 78.78.**
 > Both still at the ~87 BE / ~86 FE structural ceiling; treat as the floor.
+> **C101 (guard): FE moved UP again — 87.6% line / 88.56% func / 79.74% branch (+0.74/+0.59/+0.67 vs C100) from
+> the +1 themeStore.initialize() test (theme.svelte.ts 60.52→92.1% line, 100% func — the C336-skipped one-shot +
+> its live OS-preference listener). BE unchanged 87.47/87.20. The FE store/util layer is the live coverage
+> frontier — real behavioral logic, not markup.**
 > **C100 (guard): FE moved UP for the first time since C52 — 86.86% line / 87.97% func / 79.07% branch (+0.51/+0.29/
 > +0.29) from the +2 settings-store uploadBackup mode-gated-reload tests (a real behavioral gap, not markup). BE
 > unchanged 87.47/87.20.**
@@ -33,14 +37,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 96 |
+| feature | 4 | 101 |
 | deep-review | 5 | 98 |
-| guard | 6 | 100 |
+| guard | 6 | 101 |
 | bug | 3 | 99 |
 | arch | 5 | 98 |
 | infra | 6 | 97 |
 
-Current cycle: **100**
+Current cycle: **101**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -359,6 +363,29 @@ Current cycle: **100**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C101 (feature parked → guard: pinned themeStore.initialize() + its live OS-preference listener, the C336-skipped
+  one-shot)** — Balance at C101 (HEAD was C100; nudge label lags): feature (101−96=5/4, +1) the lone over-budget
+  category, but feature is FULLY EXHAUSTED (every real surface eyes-on C96, import-trackers Angelo-gated) → recorded
+  parked + pivoted to the highest-leverage open item (the GUIDE "over-budget but no unblocked increment → park +
+  pivot" rule; the C100-seeded FE-logic guard frontier). GUARD: theme.svelte.ts was 60.52% line / 55% branch —
+  C336 pinned setPreference but DELIBERATELY skipped initialize() ("a one-shot guarded by an internal flag").
+  initialize() carries a load-bearing untested invariant: it registers a prefers-color-scheme `change` listener
+  that re-applies the theme LIVE when the OS flips, but ONLY when the stored preference is 'system' — the
+  `if (stored === 'system')` guard is what makes "System" track the OS in real time WITHOUT yanking an explicit
+  light/dark user's theme when their OS enters night mode. Zero coverage → a regression there silently jumps a
+  'light' user to dark on an OS change, invisible to setPreference's tests. GUARD: new theme-initialize.test.ts
+  (+1, a single ordered test since themeStore is a latching singleton — only the first initialize() runs the body):
+  asserts mount applies the stored pref + registers exactly ONE listener, a 2nd initialize() is idempotent (no
+  duplicate), then fires the captured listener under stored 'system' (→ tracks OS dark, live) vs stored 'light'
+  (→ NOT touched). NON-VACUOUS proved firsthand: made the listener apply `'system'` UNCONDITIONALLY (the real
+  regression) → RED at the explicit-light assertion (user yanked to OS dark); restored → green. Verify: frontend
+  validate:local GREEN — type-check 0, build OK, 738 pass / 0 fail (+1). FE-only (a store unit test; no markup
+  change → no shot). cov: be 87.47% / **fe 87.6% line / 88.56% func / 79.74% branch — UP +0.74/+0.59/+0.67 vs C100;
+  theme.svelte.ts 60.52→92.1% line, 100% func.** Two consecutive real FE coverage gains (C100 settings-store +
+  C101 theme) confirm the FE store/util layer is the productive guard frontier. NEXT guard: remaining FE behavioral
+  gaps — but RE-MEASURE first (the earlier "load-state.svelte.ts 35%" reading was a coverage-tool artifact; that
+  primitive is already fully tested at load-state.svelte.test.ts). Check actual <100% util/store files before
+  picking; prefer genuine logic over a backend source-scan on code unchanged since C85.
 - **C100 (guard — pinned the FE settings-store `uploadBackup` mode-gated reload [the C319 twin], the first FE
   coverage movement since C52)** — Balance at C100 (HEAD was C99; nudge label lags): NOTHING strictly over budget;
   feature (100−96=4/4) + guard (100−94=6/6) both AT budget. Feature is fully exhausted (every surface eyes-on,

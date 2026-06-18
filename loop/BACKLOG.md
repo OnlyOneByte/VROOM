@@ -416,6 +416,19 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C101:** themeStore.initialize() + its live OS-preference listener now pinned (+1 in
+> theme-initialize.test.ts) — the C336-skipped one-shot. C336 pinned setPreference but skipped initialize(); its
+> load-bearing untested branch is the `prefers-color-scheme` change listener that re-applies the theme live ONLY
+> when the stored preference is 'system' (so "System" tracks the OS in real time without yanking an explicit
+> light/dark user when their OS enters night mode). Single ordered test (themeStore is a latching singleton — only
+> the first initialize() runs the body): mount applies stored pref + registers ONE listener, 2nd init is idempotent,
+> then fire the listener under 'system' (tracks OS) vs 'light' (untouched). Non-vacuous (make the listener apply
+> 'system' unconditionally → RED, explicit-light user yanked dark). **theme.svelte.ts 60.52→92.1% line, 100% func;
+> overall FE 87.6% line / 88.56% func / 79.74% branch (2nd consecutive real FE gain after C100).** CORRECTION: the
+> C100 "load-state.svelte.ts 35% func" seed was a coverage-tool artifact — that primitive is ALREADY fully tested
+> (load-state.svelte.test.ts, 11 cases). NEXT guard: RE-MEASURE actual <100% util/store files first, then pin
+> genuine logic; don't trust a stale truncated coverage row. Don't re-add the initialize() pin.
+>
 > **GUARDED C100:** the FE settings-store `uploadBackup` mode-gated reload is now pinned (+2 in
 > settings-state-contract.test.ts) — the C319 `restoreFromProvider` twin on the FILE-upload restore path. The store
 > gates the post-restore `this.load()` on `mode !== 'preview'` (a non-preview replace/merge must refresh state; a
