@@ -14,12 +14,12 @@
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
 > cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
 > is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
-> components). **RE-MEASURED C63 (infra cadence): BE 87.46% line / 87.17% func (file-mean, 1666 pass); FE
-> 86.35% line / 87.68% func / 78.78% branch (v8, 735 pass) — BOTH FLAT vs C56 (C57 dedup + C58/C62 #94
-> distance/volume fixes + C59/C60 guards + C61 eyes-on were small targeted changes / test additions). FE
-> UNCHANGED (C57–C62 all backend; no FE module touched since C52's test-only add).** Both still at the ~87
-> BE / ~86 FE structural ceiling; treat as the floor.
-> (C56: BE 87.46/87.18, FE 86.35/87.68/78.78. C49: BE 87.47/87.17, FE 86.35/87.68/78.88. C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
+> components). **RE-MEASURED C70 (infra cadence): BE 87.46% line / 87.18% func (file-mean, 1672 pass); FE
+> 86.35% line / 87.68% func / 78.78% branch (v8, 735 pass) — BE func +0.01 vs C63 (the C64 dedup + C65/C69
+> #94 monthlyConsumption/seasonal twins + C66/C67 guards added covered lines); FE UNCHANGED (C64–C69 all
+> backend; no FE module touched since C52's test-only add).** Both still at the ~87 BE / ~86 FE structural
+> ceiling; treat as the floor.
+> (C63: BE 87.46/87.17, FE 86.35/87.68/78.78. C56: BE 87.46/87.18, FE 86.35/87.68/78.78. C49: BE 87.47/87.17, FE 86.35/87.68/78.88. C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
 > C28: BE 87.22/86.97, FE 86.14/87.31/78.70. C21: BE 87.22/86.96, FE
 > 86.07/87.19/78.53. C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
 
@@ -35,9 +35,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 66 |
 | bug | 3 | 69 |
 | arch | 5 | 64 |
-| infra | 6 | 63 |
+| infra | 6 | 70 |
 
-Current cycle: **69**
+Current cycle: **70**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,18 @@ Current cycle: **69**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C70 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C63).**
+  TWO over budget at C70 — infra (70−63=7/6, +1) and arch (70−64=6/5, +1); infra wins the tie on raw starvation
+  (7 > 6). (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked `.test`/`.spec.ts`/`.svelte` specs (the gitignored
+  `*.meshclaw.e2e.ts` agent specs are by-design; the persistent `M .gitignore`/`M frontend/.gitignore` are the
+  intentional local overrides — left uncommitted by design). (2) COVERAGE RE-MEASURED (7 commits since C63):
+  **BE 87.46% line / 87.18% func** (file-mean, 1672 pass — func +0.01 vs C63 from the C64 dedup + C65/C69 #94
+  twins + C66/C67 guards); **FE 86.35% line / 87.68% func / 78.78% branch** (v8, 735 pass — UNCHANGED, C64–C69
+  all backend). Both at the ~87 BE / ~86 FE structural ceiling. (3) BOTH-SIDES GREEN: BE 1672 / FE 735.
+  (4) BRANCH STATE: claude-loop-dev = **70 commits ahead** of fresh origin/main, PR-ready (category spread
+  bug 17 / feature 14 / guard 11 / deep-review 11 / infra 9 / arch 7 — the 70th is the C1 loop-doc reset). The
+  C68 eyes-on harness add (shot.mjs CLICK_TEXT) is gitignored, not in the count. Doc-only — no source touched.
+  cov: be 87.46% / fe 86.35% (MEASURED). NEXT cadence ~C80.
 - **C69 (bug #94, seasonalEfficiency member)** — **Convert per-vehicle gas-MPG to user-global units BEFORE
   pooling the seasonalEfficiency series (Angelo-APPROVED Sev-2, NORTH_STAR #2).** Balance at C69: bug (4/3, +1)
   the ONLY over-budget category → picked. Took the 4th unit-bearing #94 member (the 1st of the 3 fuel-ADVANCED
