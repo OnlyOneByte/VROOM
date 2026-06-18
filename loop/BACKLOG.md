@@ -224,6 +224,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C59:** the C58 #94 convert-before-pool invariant now has a tree-wide source-scan
+> (`no-unconverted-fleet-pooling.test.ts`, +3): asserts NO `computeConverted*`/`buildConverted*` call in
+> repository.ts passes a unit PLACEHOLDER (new Map() / DEFAULT_UNIT_PREFERENCES / hardcoded
+> skipConversion=true) — the footgun the C58 fix removed, invisible to a same-unit fixture. Non-vacuous both
+> ways (placeholder triple → RED; lone `, true)` → RED; the 7 legit calls don't match). The
+> one-edit-fix→source-scan pattern (C24→C25, C44→C45, C54 → C58→C59). Pins the invariant for the REMAINING
+> #94 members (volume + 4 fuel-advanced builders) so they can't reintroduce it. Don't re-add.
+>
 > **GUARDED C52:** the C51 #98 keep-local overwrite path ∩ the #76 fuel-field-hygiene class —
 > expenses-http.test.ts (+1): a keep-local overwrite that switches a fuel row to a non-fuel category NULLs
 > the stale volume/mileage/fuelType (clearFuelFieldsIfNotFuel runs before the idempotent UPDATE; a lingering

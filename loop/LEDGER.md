@@ -32,12 +32,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 54 |
 | deep-review | 5 | 53 |
-| guard | 6 | 52 |
+| guard | 6 | 59 |
 | bug | 3 | 58 |
 | arch | 5 | 57 |
 | infra | 6 | 56 |
 
-Current cycle: **58**
+Current cycle: **59**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,25 @@ Current cycle: **58**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C59 (guard)** — **Tree-wide source-scan pinning the C58 #94 convert-before-pool invariant.** THREE over
+  budget at C59 — guard (59−52=7/6 +1), deep-review (6/5 +1), feature (5/4 +1); guard wins on raw starvation
+  (7 > 6 > 5). The C58 #94 distance fix's footgun was `getFuelStats` feeding NO-OP PLACEHOLDERS (`new Map()`
+  / `DEFAULT_UNIT_PREFERENCES` / hardcoded `skipConversion=true`) to `computeConvertedTotalDistance`,
+  defeating the per-vehicle conversion — and the C58 behavioral test only covers getFuelStats' distance
+  scalar, while 4 summary readers (getQuickStats/getYearEnd/getSummary/getFuelStats) call the convert
+  helpers and the bug is INVISIBLE to a same-unit fixture. GUARD: new `no-unconverted-fleet-pooling.test.ts`
+  (+3) source-scans repository.ts for any `computeConverted*`/`buildConverted*` call whose arg list contains
+  the placeholder (new Map() / DEFAULT_UNIT_PREFERENCES / a `, true` literal skipConversion) → so a future
+  reader (or the remaining #94 members) reintroducing the footgun regresses RED even if its same-unit tests
+  pass. The one-edit-fix→source-scan pattern again (C24→C25 #36, C44→C45 #37, C54 import-date → now C58→C59
+  #94). CAUGHT-MY-OWN regex bug: the first non-greedy `\(([^;]*?)\)` stopped at the nested `new Map()`'s
+  first `)`, capturing `fuelRows, new Map(` and MISSING the placeholder (probe stayed green) → switched to a
+  greedy `\(([^;]*)\)\s*;` (full arg list up to the statement `;`); re-probed. NON-VACUOUS BOTH WAYS
+  (verified firsthand): the placeholder triple → RED; a lone hardcoded `, true)` skipConversion → RED; the 7
+  legit `vehicleUnitsMap, userUnits, skipConversion` calls don't match (baseline green); reverted →
+  3/3 green, repository byte-identical. Guard-only — app source untouched. Verify: backend validate:local
+  GREEN — tsc 0, musl-biome 0 errors (20 pre-existing warnings), 1663 pass / 0 fail (+3), build bundled.
+  Backend-only (source-scan → no shot). cov: be ~87.5% / fe 86.35% (~ — pure source scan, no module logic).
 - **C58 (bug #94, distance member)** — **Convert per-vehicle distance to user-global units BEFORE pooling
   the fleet fuel-stats totalDistance (Angelo-APPROVED Sev-2, NORTH_STAR #2).** NOTHING strictly over budget
   at C58 (feature/deep-review/guard/bug all tied AT) → took the highest-leverage open item: #94, the
