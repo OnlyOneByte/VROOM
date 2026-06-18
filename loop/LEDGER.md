@@ -14,11 +14,12 @@
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
 > cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
 > is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
-> components). **RE-MEASURED C42 (infra cadence): BE 87.33% line / 86.97% func (file-mean, 1616 pass); FE
-> 86.35% line / 87.68% func / 78.78% branch (v8, 735 pass) — BOTH sides ticked UP vs C35: BE line +0.04 (the
-> C39 consumeOAuthState + C40 #97 deactivate-vehicleless tests added covered lines), FE line/func/branch all
-> up (the C37/C41 import-dialog markup + C38's NEW import-mapping-helpers.ts module/tests).** Both still at
-> the ~87 BE / ~86 FE structural ceiling; treat as the floor. (C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
+> components). **RE-MEASURED C49 (infra cadence): BE 87.47% line / 87.17% func (file-mean, 1637 pass); FE
+> 86.35% line / 87.68% func / 78.88% branch (v8, 735 pass) — BE ticked UP vs C42 (line 87.33→87.47, func
+> 86.97→87.17: the C44 atomic-swap + C46 insurance-trend + C48 #88 prune-helper tests added covered lines);
+> FE line/func flat, branch +0.10 (the C47 category-remap dialog markup; its helper logic is already
+> covered).** Both still at the ~87 BE / ~86 FE structural ceiling; treat as the floor.
+> (C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
 > C28: BE 87.22/86.97, FE 86.14/87.31/78.70. C21: BE 87.22/86.96, FE
 > 86.07/87.19/78.53. C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
 
@@ -34,9 +35,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 45 |
 | bug | 3 | 48 |
 | arch | 5 | 43 |
-| infra | 6 | 42 |
+| infra | 6 | 49 |
 
-Current cycle: **48**
+Current cycle: **49**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -355,6 +356,22 @@ Current cycle: **48**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C49 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C42).**
+  TWO over budget at C49 — infra (49−42=7/6, +1) and arch (49−43=6/5, +1); infra wins the tie on raw
+  starvation (7 > 6). Warranted on substance (the C42 projection was ~C52, but the budget forces it now and
+  real modules accrued): C44 atomic-swap + C46 insurance-trend guard + C47 dialog markup + C48 #88
+  prune-helper since C42. (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked `.test.ts`/`.spec.ts` (the
+  gitignored `*.meshclaw.e2e.ts` agent specs are by-design; the persistent `M .gitignore`/`M
+  frontend/.gitignore` are the intentional local overrides — NOT product changes). (2) COVERAGE
+  RE-MEASURED (7 commits since C42): **BE 87.47% line / 87.17% func** (file-mean, 1637 pass); **FE 86.35%
+  line / 87.68% func / 78.88% branch** (v8, 735 pass) — BE UP vs C42 (line 87.33→87.47, func 86.97→87.17
+  from the C44/C46/C48 added covered lines); FE line/func flat, branch +0.10 (C47 markup; helper logic
+  already covered). Both still at the ~87 BE / ~86 FE structural ceiling. (3) BOTH-SIDES GREEN: BE 1637 /
+  FE 735. (4) BRANCH STATE: claude-loop-dev = **49 commits ahead** of fresh origin/main (C1–C48: 2 features
+  COMPLETE [maintenance C1, recurring-expenses C27] + import-trackers T4 through the category-remap table
+  C47; category spread feature 11 / bug 11 / guard 8 / deep-review 8 / infra 6 / arch 4), PR-ready;
+  recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source touched. cov: be 87.47% / fe
+  86.35% (MEASURED). NEXT cadence ~C59.
 - **C48 (bug #88)** — **Prune a deleted vehicle from reminders' expenseSplitConfig blob (Angelo-APPROVED
   Sev-3 data-integrity).** bug was the SOLE over-budget category (48−44=4/3 +1; arch/infra AT). Cold-scout
   vein exhausted → took the top unfinished Angelo-approved item by severity: #88 (Sev-1 #36/#37 done,
