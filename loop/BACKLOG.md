@@ -59,11 +59,16 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
    gap). **T4 CATEGORY-REMAP table DONE (C47, eyes-on):** a preview's `unmappedCategories` (a foreign
    category word VROOM didn't recognize → misc fallback) now renders an "Unrecognized categories" panel —
    word → VROOM-category Select (reusing `categoryLabels`); assigning folds into the mapping's categoryMap +
-   re-previews so the row re-categorizes (servicing→Maintenance verified end-to-end via API). **REMAINING:**
+   re-previews so the row re-categorizes (servicing→Maintenance verified end-to-end via API). **T6 DATE-GUARD
+   slice DONE (C54):** merge-surviving `no-utc-import-date.test.ts` (+3) source-scans import-mapping.ts /
+   local-date.ts / import-csv.ts for a Date built from a date-only string OR `${y}-${m}-${d}` template (the
+   midnight-UTC rollback) + pins buildLocalDate stays the path; non-vacuous both ways. **REMAINING:**
    (b) **the flagged preset gap — fuel presets map no category COLUMN so a DETECTED log previews 0-ready
    ("Unknown category"); recommended fix defaultCategory:'fuel' per preset, send_message'd Angelo C31,
-   awaiting steer** (the C47 remap table does NOT cover this — no column = no word to remap); (c) T6
-   round-trip e2e (incl. real-export signature validation). Spec: `.kiro/specs/import-trackers/`.
+   awaiting steer** (the C47 remap table does NOT cover this — no column = no word to remap); (c) the
+   CONSOLIDATED T6 round-trip e2e across BOTH paths on a mi AND a km vehicle + four-state screenshots
+   (per-slice eyes-on already landed C31/C37/C41/C47; this is the multi-state capture, eyes-on-gated not
+   blocked). Spec: `.kiro/specs/import-trackers/`.
    This is now the ONLY open feature (maintenance C1 + recurring-expenses C27 both DONE); the only unblocked
    T4 work left is parked-for-Angelo (b) + the verify-phase (c) — so the next feature cycle may have NO
    unblocked increment until Angelo rules on defaultCategory.

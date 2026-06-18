@@ -30,14 +30,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 47 |
+| feature | 4 | 54 |
 | deep-review | 5 | 53 |
 | guard | 6 | 52 |
 | bug | 3 | 51 |
 | arch | 5 | 50 |
 | infra | 6 | 49 |
 
-Current cycle: **53**
+Current cycle: **54**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,31 @@ Current cycle: **53**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C54 (feature)** — **Import-trackers T6: merge-surviving no-utc guard for the CSV-import date paths.**
+  feature was the SOLE over-budget category (54−47=7/4, +3). Import-trackers is the only open feature; its
+  remaining T4 piece is the Angelo-gated preset `defaultCategory` (PARKED — awaiting steer), so the
+  unblocked work is T6 (verify-phase) — and the spec/GUIDE explicitly flag "extend the no-utc guard to cover
+  import-mapping.ts." Took that. CONFIRMED FIRSTHAND: `normalizeForeignDate` (C19-certified clean) builds a
+  date-only foreign value in LOCAL time via `buildLocalDate(year, month, day, …)` — NEVER `new Date('YYYY-
+  MM-DD')` (parses as midnight UTC → rolls the calendar day BACK west of UTC, the #23/#59/#87 class). The
+  behavioral net (import-mapping.test.ts: normalize→parse-back→local Y/M/D across iso/mdy/dmy/epoch in any CI
+  zone) already exists, but only exercises today's paths; a future `buildLocalDate`→`new Date(string)` swap
+  or a new write site could slip past. GUARD: new `no-utc-import-date.test.ts` (+3) source-scans
+  import-mapping.ts / local-date.ts / import-csv.ts for a Date built from (a) a date-only quoted literal OR
+  (b) a `${y}-${m}-${d}` template (a `}` before a date separator — the frontend no-utc-month-parse idiom),
+  + pins that import-mapping still routes through buildLocalDate. The C24→C25 / C44→C45 one-edit-fix→
+  source-scan pattern, now for the import date path. NON-VACUOUS BOTH WAYS (verified firsthand): injected the
+  template antipattern → RED; injected a quoted-literal `new Date(datePart + '-01')` + `new Date('2024-03-
+  15')` → RED; the 2 KNOWN-CORRECT sites (`new Date(ms)` epoch, `new Date(s)` for an explicit-offset ISO) do
+  NOT false-flag (baseline green); reverted → 3/3 green, import-mapping.ts byte-identical. CAUGHT-MY-OWN: my
+  first regex only matched quoted literals (digits after the quote), MISSING the template form — the likeliest
+  refactor antipattern; split into literal + template matchers + re-probed both. Marked spec T6 `[~]`
+  (date-guard slice done; the consolidated eyes-on multi-state round-trip E2E remains — each slice's eyes-on
+  already landed C31/C37/C41/C47). Verify: backend validate:local GREEN — tsc 0, musl-biome 0 errors (20
+  pre-existing warnings), 1657 pass / 0 fail (+3), build bundled. Backend-only (source-scan → no shot). cov:
+  be ~87.5% / fe 86.35% (~ — pure source scan, no module logic touched). Feature now has NO unblocked
+  increment left but T6's consolidated E2E + the parked `defaultCategory`; next feature cycle likely records
+  that + pivots.
 - **C53 (deep-review)** — **Certified `buildTCOMonthlyTrend` (the TCO monthly cost series) CLEAN + pinned
   the (category, sourceType) bucketing.** deep-review was most-starved over budget (53−46=7/5 +2; feature
   +2 lost on raw starvation, 6/4). Verified firsthand that the two C46-suggested money builders are ALREADY

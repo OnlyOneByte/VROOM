@@ -94,6 +94,18 @@
 - [ ] **T5** Four-states + a11y + mobile; compose from the kit.
 
 ## Phase 4 — verify
-- [ ] **T6** E2E (auto-detected preset path + manual-mapping path, mi + km vehicle) + eyes-on
+- [~] **T6** E2E (auto-detected preset path + manual-mapping path, mi + km vehicle) + eyes-on
       screenshots of all four states. regress.sh green. Consider extending the `no-utc-month-parse`
       guard to cover `import-mapping.ts`.
+      - [x] **DATE-GUARD slice DONE (C54):** the merge-surviving no-utc guard for the import date paths is
+            committed — `no-utc-import-date.test.ts` (+3) scans import-mapping.ts / local-date.ts /
+            import-csv.ts for a Date built from a date-only string OR `${y}-${m}-${d}` template (the
+            midnight-UTC rollback, #23/#59/#87), and pins that import-mapping still routes through
+            buildLocalDate. Non-vacuous BOTH ways (both antipattern forms → RED; the 2 legit new Date(ms)/
+            new Date(s) sites don't false-flag). The behavioral net (import-mapping.test.ts local-time
+            discipline across iso/mdy/dmy/epoch) already existed; this is the structural tree-wide net.
+      - [ ] **REMAINING:** the eyes-on round-trip E2E across BOTH paths (auto-detect preset + manual) on a
+            mi AND a km vehicle + the four-state screenshots. The per-slice eyes-on already landed (C31
+            detect, C37 manual-map, C41 manual-units, C47 category-remap each shot + Read); T6 is the
+            consolidated multi-state pass + regress.sh-green capture (gated only by the eyes-on harness,
+            not blocked).
