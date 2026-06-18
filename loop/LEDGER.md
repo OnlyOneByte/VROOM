@@ -34,10 +34,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 74 |
 | guard | 6 | 73 |
 | bug | 3 | 76 |
-| arch | 5 | 71 |
+| arch | 5 | 78 |
 | infra | 6 | 77 |
 
-Current cycle: **77**
+Current cycle: **78**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,24 @@ Current cycle: **77**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C78 (arch)** — **Extracted the per-row volume-convert idiom into ONE private helper across the 3
+  volume-pooling sites (behavior-preserving; the zero-guard + per-vehicle lookup can't drift).** arch was the
+  SOLE over-budget category (78−71=7/5, +2). The C62/C65/C72 #94 volume work left the SAME idiom hand-repeated
+  at 3 sites: `v = row.volume ?? 0; if (v===0) return 0; vUnits = vehicleUnitsFor(map, row.vehicleId); return
+  convertVolume(v, vUnits.volumeUnit, target.volumeUnit)` — in buildConvertedMonthlyConsumption (C65),
+  buildConvertedDayOfWeekPatterns (C72), and the buildFuelStatsFromData volumeInUserUnits closure (C62).
+  Extracted `convertRowVolume(row, vehicleUnitsMap, targetUnits)`; all 3 route through it. PAYOFF: the `?? 0`
+  coalesce + the `=== 0` short-circuit (missing/zero volume → 0, never NaN into a sum) + the per-vehicle
+  vehicleUnitsFor lookup are now ONE source of truth — a future site can't drift the zero-guard or drop the
+  per-vehicle unit lookup. The volumeInUserUnits closure KEEPS its own leading `skipConversion ||` guard (it's
+  the only volume path reached on BOTH branches; the 2 twins are converted-only) and delegates the rest.
+  Behavior-preserving (green→green): the C62/C65/C72 mixed-unit volume guards (headline 42.64, monthlyConsumption
+  42.64, dayOfWeek 6.06) all pass unchanged — `convertVolume` now has exactly ONE call site (inside the helper).
+  Verify: backend validate:local GREEN — tsc 0, musl-biome clean (20 pre-existing warnings, none new), 1691 pass
+  / 0 fail (no test delta — pure refactor), build bundled. Backend-only (no UI → no shot). cov: be 87.46% / fe
+  86.35% (~ — pure refactor, same lines covered). STANDING PATTERN again: a bug cycle that threads a
+  near-identical idiom into N sites (C62/C65/C72 #94) seeds the next arch cycle to converge it (sibling to C64
+  generator + C71 vehicleUnitsFor). Don't re-scout these volume sites — single-sourced.
 - **C77 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C70).**
   TWO over budget at C77 — infra (77−70=7/6, +1) and arch (77−71=6/5, +1); infra wins the tie on raw starvation
   (7 > 6). Ran a touch early (7 cycles since C70 vs the ~10 guideline) but the budget forces it AND the suite

@@ -478,6 +478,26 @@ export class AnalyticsRepository {
   }
 
   /**
+   * Convert ONE fuel row's volume to the user's global volume unit (#94 convert-before-pool). The
+   * `row.volume ?? 0` coalesce + the `=== 0` short-circuit (a missing/zero volume converts to 0, never
+   * NaN) + the per-vehicle vehicleUnitsFor lookup were hand-repeated at the 3 volume-pooling sites
+   * (buildConvertedMonthlyConsumption, buildConvertedDayOfWeekPatterns, the buildFuelStatsFromData
+   * volumeInUserUnits closure). ONE source of truth so the zero-guard + per-vehicle-unit lookup can't drift
+   * between them. (volumeInUserUnits keeps its OWN leading `skipConversion ||` guard — it's the only volume
+   * path reached on BOTH branches; the other two are only called on the already-mixed-unit branch.)
+   */
+  private convertRowVolume(
+    row: FuelExpenseRow,
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences
+  ): number {
+    const v = row.volume ?? 0;
+    if (v === 0) return 0;
+    const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, row.vehicleId);
+    return convertVolume(v, vUnits.volumeUnit, targetUnits.volumeUnit);
+  }
+
+  /**
    * Build the per-vehicle unit converters buildVehicleRadar applies to its gas-MPG + odometer metrics
    * before the cross-fleet normalize (#94, C76). Keeps analytics-charts unit-naive: the repository owns the
    * convertEfficiency/convertDistance deps + the vehicleUnitsFor fallback; each closure converts a value
@@ -635,9 +655,7 @@ export class AnalyticsRepository {
       if (!d) continue;
       const key = toMonthKey(d);
       const entry = map.get(key) ?? { effSum: 0, effCount: 0, volume: 0 };
-      const v = row.volume ?? 0;
-      const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, row.vehicleId);
-      entry.volume += v === 0 ? 0 : convertVolume(v, vUnits.volumeUnit, targetUnits.volumeUnit);
+      entry.volume += this.convertRowVolume(row, vehicleUnitsMap, targetUnits);
       map.set(key, entry);
     }
 
@@ -748,10 +766,7 @@ export class AnalyticsRepository {
       const entry = dayData.get(dayName) ?? { count: 0, totalCost: 0, totalGallons: 0 };
       entry.count++;
       entry.totalCost += row.expenseAmount;
-      const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, row.vehicleId);
-      const v = row.volume ?? 0;
-      entry.totalGallons +=
-        v === 0 ? 0 : convertVolume(v, vUnits.volumeUnit, targetUnits.volumeUnit);
+      entry.totalGallons += this.convertRowVolume(row, vehicleUnitsMap, targetUnits);
       dayData.set(dayName, entry);
     }
 
@@ -1613,12 +1628,11 @@ export class AnalyticsRepository {
     // gal+L fleet no longer sums gallons with litres into the headline volume + fillupDetails
     // (NORTH_STAR #2). Mirrors the C58 distance member + computeConvertedTotalDistance's per-vehicle
     // pattern; skipConversion short-circuits the common single-unit case (a no-op there).
-    const volumeInUserUnits = (row: FuelExpenseRow): number => {
-      const v = row.volume ?? 0;
-      if (skipConversion || v === 0) return v;
-      const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, row.vehicleId);
-      return convertVolume(v, vUnits.volumeUnit, userUnits.volumeUnit);
-    };
+    const volumeInUserUnits = (row: FuelExpenseRow): number =>
+      // skipConversion short-circuits to the raw value (the common single-unit fleet); otherwise the
+      // shared convertRowVolume does the `?? 0` + per-vehicle convert. This is the only volume path
+      // reached on BOTH branches, hence the extra leading guard the two converted-only twins don't need.
+      skipConversion ? (row.volume ?? 0) : this.convertRowVolume(row, vehicleUnitsMap, userUnits);
     const sumGallons = (rows: FuelExpenseRow[]) =>
       rows.reduce((s, r) => s + volumeInUserUnits(r), 0);
     const currentYearGallons = sumGallons(fuelRows);

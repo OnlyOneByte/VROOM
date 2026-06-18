@@ -602,6 +602,16 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    (green→green, 1672 pass, no test delta; the #94 mixed-unit guards + Property 11 conversion suite pass
    unchanged). The "bug threads a dup → next arch converges the shared sub-expression" lesson (C58/C62/C65/C69 →
    C71). Don't re-scout the convert sites — single-sourced.
+9. ~~**per-row volume-convert dedup**~~ — **DONE C78.** The C62/C65/C72 #94 volume work left the SAME idiom at
+   3 sites: `v = row.volume ?? 0; if (v===0) return 0; convertVolume(v, vehicleUnitsFor(map, row.vehicleId)
+   .volumeUnit, target.volumeUnit)` — in buildConvertedMonthlyConsumption, buildConvertedDayOfWeekPatterns, and
+   the buildFuelStatsFromData volumeInUserUnits closure. Extracted `convertRowVolume(row, map, target)`; all 3
+   route through it (volumeInUserUnits keeps its own leading `skipConversion ||` guard — the only volume path on
+   BOTH branches — and delegates the rest). PAYOFF: the `?? 0` + `===0` zero-guard (never NaN into a sum) + the
+   per-vehicle lookup are ONE source of truth; `convertVolume` now has exactly 1 call site. Behavior-preserving
+   (green→green, 1691 pass, no test delta; the C62/C65/C72 mixed-unit guards pass unchanged). The
+   bug-threads-idiom → next-arch-converges lesson again (C62/C65/C72 → C78; sibling to C64 generator + C71
+   vehicleUnitsFor). Don't re-scout the volume sites — single-sourced.
 
 > **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
 > toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time
