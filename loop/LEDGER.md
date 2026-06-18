@@ -31,13 +31,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 47 |
-| deep-review | 5 | 46 |
+| deep-review | 5 | 53 |
 | guard | 6 | 52 |
 | bug | 3 | 51 |
 | arch | 5 | 50 |
 | infra | 6 | 49 |
 
-Current cycle: **52**
+Current cycle: **53**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,28 @@ Current cycle: **52**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C53 (deep-review)** — **Certified `buildTCOMonthlyTrend` (the TCO monthly cost series) CLEAN + pinned
+  the (category, sourceType) bucketing.** deep-review was most-starved over budget (53−46=7/5 +2; feature
+  +2 lost on raw starvation, 6/4). Verified firsthand that the two C46-suggested money builders are ALREADY
+  guarded — `buildAmortizationSchedule` (amortization-schedule.test.ts: decline/rise, payoff-clamp,
+  multi-loan, no-mutate, negative-am) AND its caller `buildLoanBreakdown` incl. the #139 0%-APR-survives
+  case (analytics-routes-http.test.ts drives the real GET over a raw-seeded 0% loan) — so did NOT re-scan
+  them. Found the genuine gap: `buildTCOMonthlyTrend` (analytics-charts.ts:1020) — the per-month TCO SERIES
+  the chart renders — had NO direct test (driven only transitively via getTCO; the C6/C18/C46 "helper output
+  never pinned" gap). CERTIFIED FIRSTHAND CLEAN: buckets by (category, sourceType) — financial+financing→
+  financing, financial+insurance_term→insurance, fuel→fuel, maintenance→maintenance (the TIME-dimension
+  mirror of categorizeTCOExpenses, cert C33); an UNCATEGORIZED row (financial+reminder from C27 recurring /
+  financial+null manual / regulatory / enhancement / misc) contributes to NO bucket (the deliberate
+  "4 named categories only" trend contract — those route to otherCosts in the TOTAL but the trend doesn't
+  surface them); same-month co-accumulate; ascending month-key sort; dateless row dropped. GUARD: +6 in
+  tco-monthly-trend.test.ts. NON-VACUOUS (verified firsthand): dropping the financing sourceType guard
+  (any financial row leaks into financing) → 3 of 6 RED; reverted → 6/6 green, analytics-charts.ts
+  byte-identical. Deep-review test-only — no app source touched. Verify: backend validate:local GREEN —
+  tsc 0, musl-biome 0 errors (20 pre-existing warnings), 1654 pass / 0 fail (+6), build bundled.
+  Backend-only (no UI → no shot). cov: be ~87.5% / fe 86.35% (~ — pins the TCO trend series; no module
+  logic touched). The TCO money path (total bucketing C33 + this trend series) is now broadly certified;
+  next deep-review: a genuinely different surface (an eyes-on /insurance or /financing render sweep, or the
+  auth/provider path).
 - **C52 (guard)** — **Pin the C51 #98 overwrite path ∩ #76 fuel-field hygiene (a REAL invariant, not
   framework theater).** THREE over budget at C52 — guard (52−45=7/6 +1), deep-review (6/5 +1), feature
   (5/4 +1); guard wins on raw starvation (7 > 6 > 5). Scouted the freshest unguarded surface = the C51

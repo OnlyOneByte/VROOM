@@ -83,6 +83,18 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C53 — `buildTCOMonthlyTrend` (the TCO monthly cost series) CLEAN + guarded.** The per-month
+> TCO series the chart renders was driven only transitively through getTCO; no test pinned its bucketing.
+> Certified firsthand: buckets by (category, sourceType) — financial+financing→financing,
+> financial+insurance_term→insurance, fuel→fuel, maintenance→maintenance (the TIME mirror of
+> categorizeTCOExpenses/C33); an UNCATEGORIZED row (financial+reminder/null, regulatory/enhancement/misc)
+> contributes to NO bucket (the deliberate "4 named categories only" trend contract); same-month
+> co-accumulate; ascending sort; dateless dropped. +6 in tco-monthly-trend.test.ts; non-vacuous (drop the
+> financing sourceType guard → 3 RED). ALSO verified firsthand that buildAmortizationSchedule + its caller
+> buildLoanBreakdown (incl. the #139 0%-APR-survives GET) are ALREADY guarded — don't re-audit them. The TCO
+> money path (total C33 + trend C53) is now broadly certified. Next deep-review: an eyes-on /insurance or
+> /financing render sweep, or the auth/provider path.
+>
 > **CERTIFIED C46 — insurance `monthlyPremiumTrend` month-bucketing CLEAN + guarded.** The per-month
 > premium SERIES the analytics trend chart renders (accumulateMonthlyPremiums→monthKeysInRange) was driven
 > only transitively through getInsurance; no test pinned the bucketing (the C6/C18 "helper output never
