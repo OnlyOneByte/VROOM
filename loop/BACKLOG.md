@@ -207,6 +207,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C52:** the C51 #98 keep-local overwrite path ∩ the #76 fuel-field-hygiene class —
+> expenses-http.test.ts (+1): a keep-local overwrite that switches a fuel row to a non-fuel category NULLs
+> the stale volume/mileage/fuelType (clearFuelFieldsIfNotFuel runs before the idempotent UPDATE; a lingering
+> mileage would poison getCurrentOdometer cross-category). Non-vacuous (neuter the overwrite-update → RED).
+> LESSON re-confirmed: FIRST drafted "flag never persisted / PUT strips it" guards but proved them VACUOUS
+> firsthand (drizzle drops unknown insert keys + Zod strips unknown parse keys = framework-guaranteed) →
+> dropped them; pinned the REAL app-logic invariant instead (the C181/C229 coverage-theater warning). Don't re-add.
+>
 > **GUARDED C45:** the C44 #37 backup-atomicity invariant now has a tree-wide source-scan
 > (`sheets-atomic-backup.test.ts`, +4): asserts google-sheets-service.ts has ZERO `.values.clear(` calls
 > (the clear-then-write footgun the atomic design removed), the staging+swap mechanism is present

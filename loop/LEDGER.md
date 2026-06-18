@@ -32,12 +32,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 47 |
 | deep-review | 5 | 46 |
-| guard | 6 | 45 |
+| guard | 6 | 52 |
 | bug | 3 | 51 |
 | arch | 5 | 50 |
 | infra | 6 | 49 |
 
-Current cycle: **51**
+Current cycle: **52**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,25 @@ Current cycle: **51**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C52 (guard)** — **Pin the C51 #98 overwrite path ∩ #76 fuel-field hygiene (a REAL invariant, not
+  framework theater).** THREE over budget at C52 — guard (52−45=7/6 +1), deep-review (6/5 +1), feature
+  (5/4 +1); guard wins on raw starvation (7 > 6 > 5). Scouted the freshest unguarded surface = the C51
+  `forceOverwrite` flag. FIRST drafted two negative-invariant guards (flag never persisted / PUT strips it)
+  but PROVED THEM VACUOUS firsthand: leaking forceOverwrite into the insert still passed (drizzle silently
+  drops unknown insert keys; Zod strips unknown parse keys) — those are framework-guaranteed, so pinning
+  them is coverage theater (the GUIDE's C181/C229 warning). DROPPED them. Pinned instead the genuinely
+  load-bearing invariant: the C51 keep-local overwrite re-runs the create route's clearFuelFieldsIfNotFuel
+  (body) BEFORE the idempotent UPDATE, so a resolved edit that switches a fuel row to a non-fuel category
+  must NULL the existing row's stale volume/mileage/fuelType (the #76 class on the NEW overwrite branch — a
+  lingering mileage poisons getCurrentOdometer cross-category). The C51 tests only changed the amount; this
+  exercises the category-switch leg. GUARD: +1 HTTP-harness case (expenses-http.test.ts): seed a fuel
+  expense w/ volume+mileage+fuelType → keep-local overwrite to maintenance → same row id, category flipped,
+  all 3 fuel fields NULLED. NON-VACUOUS (verified firsthand): neuter the overwrite-update (return existing)
+  → the case RED; reverted → green, repository byte-identical. Guard-only cycle — app source untouched
+  (only the test file changed). Verify: backend validate:local GREEN — tsc 0, musl-biome 0 errors (20
+  pre-existing warnings), 1648 pass / 0 fail (+1), build bundled. Backend-only (no UI → no shot). cov: be
+  ~87.5% / fe 86.35% (~ — pins the #98∩#76 overwrite-path invariant; no module logic touched). LESSON
+  re-confirmed: a guard that a framework already guarantees is theater — drive the REAL app logic.
 - **C51 (bug #98)** — **Real PUT-on-collision overwrite so sync-manager keep-local applies the offline edit
   (Angelo-APPROVED Sev-3 data-loss).** NOTHING strictly over budget at C51 (feature/deep-review/guard/bug
   all tied AT) → took the highest-leverage open item. #94 (Sev-2) is a genuine 6-builder multi-file analytics
