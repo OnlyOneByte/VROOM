@@ -14,12 +14,12 @@
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
 > cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
 > is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
-> components). **RE-MEASURED C49 (infra cadence): BE 87.47% line / 87.17% func (file-mean, 1637 pass); FE
-> 86.35% line / 87.68% func / 78.88% branch (v8, 735 pass) — BE ticked UP vs C42 (line 87.33→87.47, func
-> 86.97→87.17: the C44 atomic-swap + C46 insurance-trend + C48 #88 prune-helper tests added covered lines);
-> FE line/func flat, branch +0.10 (the C47 category-remap dialog markup; its helper logic is already
-> covered).** Both still at the ~87 BE / ~86 FE structural ceiling; treat as the floor.
-> (C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
+> components). **RE-MEASURED C56 (infra cadence): BE 87.46% line / 87.18% func (file-mean, 1659 pass); FE
+> 86.35% line / 87.68% func / 78.78% branch (v8, 735 pass) — BOTH essentially FLAT vs C49 (C50 dedup + C51
+> #98 overwrite + C52/C53/C54/C55 were test additions + small guards; covered lines grew with the file-mean
+> denominator, no net % move). FE UNCHANGED (C50–C55 were all backend; no FE module touched since C52's
+> test-only add).** Both still at the ~87 BE / ~86 FE structural ceiling; treat as the floor.
+> (C49: BE 87.47/87.17, FE 86.35/87.68/78.88. C42: BE 87.33/86.97, FE 86.35/87.68/78.78. C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
 > C28: BE 87.22/86.97, FE 86.14/87.31/78.70. C21: BE 87.22/86.96, FE
 > 86.07/87.19/78.53. C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
 
@@ -35,9 +35,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 52 |
 | bug | 3 | 55 |
 | arch | 5 | 50 |
-| infra | 6 | 49 |
+| infra | 6 | 56 |
 
-Current cycle: **55**
+Current cycle: **56**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,19 @@ Current cycle: **55**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C56 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C49).**
+  TWO over budget at C56 — infra (56−49=7/6, +1) and arch (56−50=6/5, +1); infra wins the tie on raw
+  starvation (7 > 6). (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked `.test.ts`/`.spec.ts` (the gitignored
+  `*.meshclaw.e2e.ts` agent specs are by-design; the persistent `M .gitignore`/`M frontend/.gitignore` are
+  the intentional local overrides, NOT product changes). (2) COVERAGE RE-MEASURED (7 commits since C49):
+  **BE 87.46% line / 87.18% func** (file-mean, 1659 pass); **FE 86.35% line / 87.68% func / 78.78% branch**
+  (v8, 735 pass) — both essentially FLAT vs C49 (C50 dedup + C51 #98 + C52–C55 were test/small-guard
+  additions; covered lines grew with the denominator); FE UNCHANGED (C50–C55 all backend). Both at the
+  ~87 BE / ~86 FE structural ceiling. (3) BOTH-SIDES GREEN: BE 1659 / FE 735. (4) BRANCH STATE:
+  claude-loop-dev = **56 commits ahead** of fresh origin/main (C1–C55: 2 features COMPLETE + import-trackers
+  through T6's date-guard slice C54; category spread bug 13 / feature 12 / guard 9 / deep-review 9 / infra 7
+  / arch 5), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source touched.
+  cov: be 87.46% / fe 86.35% (MEASURED). NEXT cadence ~C66.
 - **C55 (bug #22)** — **Zip-bomb compression-ratio cap pre-inflation (Angelo-APPROVED Sev-4 hardening).**
   bug was the SOLE over-budget category (55−51=4/3 +1; arch/infra AT). Cold-scout exhausted → top
   unfinished Angelo-approved item; the Sev-1/2/3 are done or gated (#94 6-member class; #127/#100 arch-gated;
