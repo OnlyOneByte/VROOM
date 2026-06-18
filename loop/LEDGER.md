@@ -14,11 +14,12 @@
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
 > cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
 > is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
-> components). **RE-MEASURED C35 (infra cadence): BE 87.29% line / 86.97% func (file-mean); FE 86.14% line
-> / 87.31% func / 78.70% branch (v8) — BE line ticked up (the C29/#51 + C33/TCO-bucket + C34/#69 analytics
-> + insurance tests added covered lines); FE FLAT vs C28 (C29-C34 were all backend cycles + one FE-dialog
-> markup with no new vitest module).** Both at the structural ceiling; treat as the floor. (C28: BE
-> 87.22/86.97, FE 86.14/87.31/78.70. C21: BE 87.22/86.96, FE
+> components). **RE-MEASURED C42 (infra cadence): BE 87.33% line / 86.97% func (file-mean, 1616 pass); FE
+> 86.35% line / 87.68% func / 78.78% branch (v8, 735 pass) — BOTH sides ticked UP vs C35: BE line +0.04 (the
+> C39 consumeOAuthState + C40 #97 deactivate-vehicleless tests added covered lines), FE line/func/branch all
+> up (the C37/C41 import-dialog markup + C38's NEW import-mapping-helpers.ts module/tests).** Both still at
+> the ~87 BE / ~86 FE structural ceiling; treat as the floor. (C35: BE 87.29/86.97, FE 86.14/87.31/78.70.
+> C28: BE 87.22/86.97, FE 86.14/87.31/78.70. C21: BE 87.22/86.96, FE
 > 86.07/87.19/78.53. C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
 
 ## Balance table
@@ -33,9 +34,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 38 |
 | bug | 3 | 40 |
 | arch | 5 | 36 |
-| infra | 6 | 35 |
+| infra | 6 | 42 |
 
-Current cycle: **41**
+Current cycle: **42**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -354,6 +355,23 @@ Current cycle: **41**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C42 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C35).**
+  TWO over budget at C42 — infra (42−35=7/6, +1) and arch (42−36=6/5, +1); infra wins the tie on raw
+  starvation (7 > 6). Warranted on substance, not just the counter: 7 cycles since C35 incl. C38's NEW
+  `import-mapping-helpers.ts` vitest module + C39/C40 BE tests + C37/C41 FE markup. (1) UNTRACKED-TEST
+  SWEEP: CLEAN — zero untracked `.test.ts`/`.spec.ts` (the gitignored `*.meshclaw.e2e.ts` agent-harness
+  specs are by-design; the persistent `M .gitignore`/`M frontend/.gitignore` are the intentional local
+  overrides that keep `.meshclaw-tools/`/`mise.local.toml`/the e2e specs ignored — NOT product changes,
+  left uncommitted by design so the PR stays harness-free). (2) COVERAGE RE-MEASURED (7 commits since C35):
+  **BE 87.33% line / 86.97% func** (file-mean, 1616 pass); **FE 86.35% line / 87.68% func / 78.78% branch**
+  (v8, 735 pass) — BOTH sides UP vs C35 (BE line 87.29→87.33 from C39/C40's added covered lines; FE
+  86.14→86.35 line / 87.31→87.68 func / 78.70→78.78 branch from the C37/C41 dialog markup + C38's new
+  helper module). Both still at the ~87 BE / ~86 FE structural ceiling; treat as the floor. (3) BOTH-SIDES
+  GREEN: BE 1616 / FE 735. (4) BRANCH STATE: claude-loop-dev = **42 commits ahead** of fresh origin/main
+  (C1–C41: 2 features COMPLETE [maintenance C1, recurring-expenses C27] + import-trackers T4 manual path
+  DONE through unit pickers C41; category spread feature 10 / bug 9 / guard 7 / deep-review 7 / infra 5 /
+  arch 3), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source touched.
+  cov: be 87.33% / fe 86.35% (MEASURED). NEXT cadence ~C52.
 - **C41 (feature)** — **Import-trackers T4: manual-mapping unit pickers (eyes-on DONE; #NS2 fix).** Nothing
   strictly over budget (infra/arch/feature tied AT 6/6,5/5,4/4); took the highest-leverage item — feature's
   only open work (import-trackers) had a genuine UNBLOCKED correctness gap from my own C37: the manual
