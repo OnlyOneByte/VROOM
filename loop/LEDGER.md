@@ -30,14 +30,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 88 |
+| feature | 4 | 93 |
 | deep-review | 5 | 92 |
 | guard | 6 | 87 |
 | bug | 3 | 89 |
 | arch | 5 | 91 |
 | infra | 6 | 90 |
 
-Current cycle: **92**
+Current cycle: **93**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,28 @@ Current cycle: **92**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C93 (feature — eyes-on the never-shot /settings surface [backup/restore + provider config], desktop + mobile;
+  CLEAN)** — Balance at C93 (HEAD was C92; nudge label lags): TWO over budget — feature (93−88=5/4, +1) and bug
+  (93−89=4/3, +1); feature most-starved (5 > 4) → picked. Import-trackers stays Angelo-gated (defaultCategory), so
+  per the C68/C75/C82/C88 precedent took the shootable feature increment. The C88 "every populated surface eyes-on"
+  claim was scoped to the DATA-feature surfaces (dashboard/insurance/financing/maintenance/recurring) — checked the
+  shot history firsthand: /settings had ZERO prior eyes-on cycles (vs /reminders ×12, /insurance ×12, /financing
+  ×10, /expenses ×10, /analytics ×5, /vehicles ×2, /dashboard ×1). /settings is the backup/restore + storage-provider
+  + unit-preferences surface — a NORTH_STAR #1 (data-safety sacred) + #3 (mobile-first) crown-jewel that had never
+  been visually verified. Shot it DESKTOP + MOBILE (Pixel 5) + Read both PNGs. CERTIFIED CLEAN: desktop renders every
+  section — Profile card (Demo User/email/chevron), Appearance (Light/Dark/System toggle, System active), Unit
+  Preferences (Distance=Kilometers / Fuel=Liters / Charge=kWh / Currency=USD with help text), Install App (PWA),
+  Storage Providers (Download Backup + Restore buttons, Default Photo Source picker, an "e2e fake provider …
+  Connected" card with edit/delete + ZIP-backup toggle). MOBILE (393px): NO horizontal overflow (NORTH_STAR #3) —
+  the highest-risk elements (the 3-col theme grid, the wide unit selects, the Save-Settings FAB) all reflow within
+  the Pixel-5 width; FAB pins bottom full-width. Zero console errors; no /auth bounce (auth valid). The mid-page dark
+  Save-Settings button in the desktop full-page shot is the known fixed-FAB capture artifact (same as prior eyes-on
+  cycles), not a render defect. No defect; no fix (the GUIDE agent-HIGH-findings-often-false discipline). /settings is
+  sound — DON'T re-audit. Cleanup: none needed (read-only shots, no fixtures created). Doc-only — no committable
+  source (shot.mjs is gitignored harness). cov: be 87.47% / fe 86.35% (~ — no test/code touched). NEXT feature cycle:
+  the remaining never-shot routes are /profile + /trips (a "Coming Soon" placeholder, not a real surface) +
+  /privacypolicy + /termsofservice (static legal copy) — only /profile is a real un-shot surface; after that, every
+  real surface is eyes-on and feature is fully Angelo-gated (import defaultCategory + #148) → record parked + pivot.
 - **C92 (deep-review — certified the rate-limit / client-IP abuse-prevention surface CLEAN + already comprehensively
   guarded firsthand; a NEW area, recorded + pivot)** — Balance at C92 (HEAD was C91; nudge label lags): deep-review
   (92−86=6/5, +1) the LONE over-budget category → picked. The eyes-on vein closed C88 + the C86 note pointed the next

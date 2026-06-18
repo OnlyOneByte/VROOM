@@ -91,6 +91,18 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **AUDITED C93 (feature eyes-on) — /settings CLEAN desktop + mobile (the never-shot backup/restore + provider
+> + unit-prefs crown-jewel).** /settings had ZERO prior eyes-on (vs /reminders ×12, /insurance ×12, /financing ×10,
+> /expenses ×10, /analytics ×5) — a NORTH_STAR #1 (data-safety) + #3 (mobile) surface never visually verified. Shot
+> desktop + mobile (Pixel 5) + Read both PNGs. Desktop: Profile card + Appearance (Light/Dark/System) + Unit
+> Preferences (Distance/Fuel/Charge/Currency selects) + Install App (PWA) + Storage Providers (Download Backup /
+> Restore buttons, Default Photo Source picker, a "Connected" e2e fake provider card with edit/delete + ZIP toggle).
+> Mobile (393px): NO horizontal overflow (NORTH_STAR #3) — the 3-col theme grid + wide unit selects + Save-Settings
+> FAB all reflow; FAB pins bottom. Zero console errors. The mid-page dark FAB in the desktop full-page shot is the
+> known fixed-FAB capture artifact. No defect; DON'T re-audit. With this, the only remaining never-shot REAL surface
+> is /profile (/trips is a "Coming Soon" placeholder; /privacypolicy + /termsofservice are static legal copy) — after
+> /profile, every real surface is eyes-on and the feature category is fully Angelo-gated.
+>
 > **CERTIFIED C92 — the rate-limit / client-IP abuse-prevention surface CLEAN + already comprehensively guarded
 > (a NEW area, not in the prior audited set).** Security-load-bearing: a spoofed-XFF bypass would let an attacker
 > get a fresh per-request rate-limit bucket → defeat the auth brute-force limiter. Audited 3 layers firsthand, ALL
