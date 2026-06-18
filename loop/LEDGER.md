@@ -34,10 +34,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 81 |
 | guard | 6 | 80 |
 | bug | 3 | 83 |
-| arch | 5 | 78 |
+| arch | 5 | 85 |
 | infra | 6 | 84 |
 
-Current cycle: **84**
+Current cycle: **85**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,18 @@ Current cycle: **84**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C85 (arch — no churn warranted; convert family fully deduped, recorded + pivot)** — Balance at C85: arch
+  (85−78=7/5, +2) the lone over-budget category → picked. Scouted the #94 convert-helper residue firsthand;
+  REJECTED both candidates per arch rule 5 (name a concrete payoff): (1) the 5-arg convertEfficiency
+  from-vehicle-units shape is only 2 sites (radarUnitConverters closure + the convertedGasEfficiencyPoints
+  generator), one interleaved with skipConversion + the load-bearing gas-gate — a 2-site wrapper is thin churn
+  the generator wouldn't cleanly delegate; (2) `vehicleNameMap.get(vId) ?? 'Unknown'` repeats 10× but is a
+  COSMETIC fallback (a drift is harmless — UNLIKE C71's `?? {...DEFAULT}` that threw, or C78's NaN-guard),
+  10 sites for a 1-token tidy. The convert family is already single-sourced (C64 generator / C71 vehicleUnitsFor
+  / C78 convertRowVolume). Recorded no-churn; did NOT manufacture (the C4/C12/C36 precedent + the GUIDE
+  "Don't manufacture churn"). RECOMMENDATION (echoing C12): arch is at its structural floor — next time it goes
+  over budget, record no-churn FAST + let the budget pull elsewhere. Doc-only — no source touched. cov: be
+  87.47% / fe 86.35% (~ — nothing changed).
 - **C84 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C77).**
   TWO over budget at C84 — infra (84−77=7/6, +1) and arch (84−78=6/5, +1); infra wins the tie on raw starvation
   (7 > 6). Ran a touch early (7 cycles since C77) but the budget forces it. (1) UNTRACKED-TEST SWEEP: CLEAN —

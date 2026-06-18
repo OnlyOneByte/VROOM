@@ -660,6 +660,21 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    bug-threads-idiom → next-arch-converges lesson again (C62/C65/C72 → C78; sibling to C64 generator + C71
    vehicleUnitsFor). Don't re-scout the volume sites — single-sourced.
 
+> **SCOUTED C85 — no churn warranted (the convert family is fully deduped; remaining idioms are thin or
+> cosmetic).** With the #94 cluster closed (C79), scouted its convert-helper residue firsthand. Two candidates,
+> both REJECTED per arch rule 5 (name a concrete payoff): (1) the 5-arg `convertEfficiency(value,
+> v.distanceUnit, v.volumeUnit, target.distanceUnit, target.volumeUnit)` shape appears at only TWO sites
+> (radarUnitConverters closure + the convertedGasEfficiencyPoints generator), and the generator's is interleaved
+> with the `skipConversion ?` short-circuit / the load-bearing gasEfficiencyPoint gate — a 2-site wrapper is
+> borderline churn with a thin payoff (arg-order can't drift), and the generator wouldn't cleanly delegate; (2)
+> `vehicleNameMap.get(vId) ?? 'Unknown'` repeats 10× across analytics-charts.ts + repository.ts, but it's a
+> COSMETIC fallback (a dropped/typo'd `'Unknown'` is harmless — NOT load-bearing like C71's `?? {...DEFAULT}`
+> which threw, or C78's zero-guard which prevented NaN), embedded in `vehicleName:` object-literal fields across
+> a unit-naive module + its importer — extracting it touches 10 sites for a 1-token tidy. The convert family is
+> already single-sourced (C64 generator, C71 vehicleUnitsFor, C78 convertRowVolume). Recorded no-churn; did NOT
+> manufacture. STRONG RECOMMENDATION (echoing C12): arch is at its structural floor — when it next goes over
+> budget, record no-churn FAST + let the budget pull elsewhere rather than forcing a 6th ceremony scout.
+>
 > **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
 > toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time
 > anchor — midnight vs noon — convergence PROHIBITED), backend validate*Ownership (per-entity by
