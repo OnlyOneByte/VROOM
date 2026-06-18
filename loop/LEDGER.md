@@ -34,10 +34,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 67 |
 | guard | 6 | 66 |
 | bug | 3 | 69 |
-| arch | 5 | 64 |
+| arch | 5 | 71 |
 | infra | 6 | 70 |
 
-Current cycle: **70**
+Current cycle: **71**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,26 @@ Current cycle: **70**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C71 (arch)** — **Extracted the per-vehicle units fallback-lookup into ONE private helper across the 5
+  analytics convert sites (behavior-preserving; the load-bearing default can't be silently dropped).** arch was
+  the SOLE over-budget category (71−64=7/5, +2). Scouted the freshest churn surface first (the C65/C69 #94
+  convert-twins) and REJECTED converging them — they're deliberately written to mirror their pure builders 1:1
+  (the comments assert this; merging would destroy that auditability, arch rule 2) — and the 11-site
+  `localeCompare` month-sort idiom has DIVERGING slices (−12/−24/−120) so it's not mergeable either. Found the
+  genuine clean dedup: `vehicleUnitsMap.get(<id>) ?? { ...DEFAULT_UNIT_PREFERENCES }` was hand-repeated at 5
+  per-vehicle convert sites (convertedGasEfficiencyPoints, computeConvertedTotalDistance ×2, the
+  monthlyConsumption volume limb, the fuel-stats volumeInUserUnits closure, the cross-vehicle comparison).
+  Extracted a private `vehicleUnitsFor(map, id)` → all 5 route through it. CONCRETE PAYOFF: the
+  `?? {...DEFAULT_UNIT_PREFERENCES}` fallback is LOAD-BEARING — a missing-vehicle row without it throws on
+  `.volumeUnit`/`.distanceUnit` at the convert call — so one source of truth means no site can silently drop it
+  (and it stays a fresh clone per call, never a shared mutable default). Left the DIFFERENT-shape `getUserUnits`
+  user-prefs fallback (`parsed ?? ...`, line 386) alone. Behavior-preserving (identical semantics); green→green
+  (the #94 mixed-unit distance/volume/monthlyConsumption/seasonal guards + Property 11 conversion suite all pass
+  unchanged). Verify: backend validate:local GREEN — tsc 0, musl-biome clean (20 pre-existing warnings, none
+  new), 1672 pass / 0 fail (no test delta — a pure refactor), build bundled. Backend-only (no UI → no shot).
+  cov: be 87.46% / fe 86.35% (~ — pure refactor, same lines covered). STANDING PATTERN: a bug cycle that threads
+  a near-identical lookup into N convert sites (C58/C62/C65/C69 #94) seeds the next arch cycle to converge the
+  shared sub-expression (sibling to C64's generator extraction). Don't re-scout the convert sites — single-sourced.
 - **C70 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C63).**
   TWO over budget at C70 — infra (70−63=7/6, +1) and arch (70−64=6/5, +1); infra wins the tie on raw starvation
   (7 > 6). (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked `.test`/`.spec.ts`/`.svelte` specs (the gitignored

@@ -552,6 +552,17 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    anchored (analytics-units.property #11 + cross-vehicle.property #126 + summary/year-end property all green
    unchanged); 1666 pass. The C22→C23/C37→C43/C51→C57 "bug/feature threads a dup → next arch converges" lesson
    again (here C58/C62→C64). Don't re-scout the converted-efficiency builders — single-sourced now.
+8. ~~**per-vehicle units fallback-lookup dedup**~~ — **DONE C71.** `vehicleUnitsMap.get(<id>) ?? {
+   ...DEFAULT_UNIT_PREFERENCES }` was hand-repeated at 5 per-vehicle convert sites (convertedGasEfficiencyPoints,
+   computeConvertedTotalDistance ×2, the monthlyConsumption volume limb, the fuel-stats volumeInUserUnits
+   closure, the cross-vehicle comparison) — the residue the C64 generator extraction + the C65/C69 #94 twins
+   left behind. Extracted a private `vehicleUnitsFor(map, id)`; all 5 route through it. PAYOFF: the
+   `?? {...DEFAULT}` fallback is LOAD-BEARING (a missing-vehicle row without it throws on `.volumeUnit` at the
+   convert call), so one source of truth stops a future site silently dropping it (+ stays a fresh clone per
+   call). Left the different-shape getUserUnits `parsed ?? ...` user-prefs fallback alone. Behavior-preserving
+   (green→green, 1672 pass, no test delta; the #94 mixed-unit guards + Property 11 conversion suite pass
+   unchanged). The "bug threads a dup → next arch converges the shared sub-expression" lesson (C58/C62/C65/C69 →
+   C71). Don't re-scout the convert sites — single-sourced.
 
 > **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
 > toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time

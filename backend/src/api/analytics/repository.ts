@@ -460,6 +460,22 @@ export class AnalyticsRepository {
   }
 
   /**
+   * A single vehicle's unit preferences from the fleet map, defaulting to DEFAULT_UNIT_PREFERENCES when
+   * absent. The `?? { ...DEFAULT_UNIT_PREFERENCES }` fallback is LOAD-BEARING — a per-vehicle convert site
+   * (convertVolume/convertEfficiency/convertDistance) reads `.volumeUnit`/`.distanceUnit` off the result,
+   * so a missing-vehicle row without the default would throw. Hand-repeated at 5 convert sites
+   * (convertedGasEfficiencyPoints, computeConvertedTotalDistance, the monthlyConsumption + volume +
+   * cross-vehicle-comparison loops); one source of truth so no site can silently drop the default (a fresh
+   * clone each call, matching the prior spread — never a shared mutable default object).
+   */
+  private vehicleUnitsFor(
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    vehicleId: string
+  ): UnitPreferences {
+    return vehicleUnitsMap.get(vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+  }
+
+  /**
    * The ONE source of truth for the converted gas-MPG inner loop every per-vehicle efficiency builder
    * shares: group fuel rows by vehicle, walk consecutive pairs, gate to GAS points, and convert each to
    * the target unit system (a no-op when skipConversion). Yields `{ vehicleId, efficiency, date }`; each
@@ -479,7 +495,7 @@ export class AnalyticsRepository {
     skipConversion: boolean
   ): Generator<{ vehicleId: string; efficiency: number; date: string }> {
     for (const [vehicleId, rows] of groupByVehicle(fuelRows)) {
-      const vUnits = vehicleUnitsMap.get(vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+      const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, vehicleId);
       for (let i = 1; i < rows.length; i++) {
         const current = rows[i];
         const previous = rows[i - 1];
@@ -556,7 +572,7 @@ export class AnalyticsRepository {
       if (mileages.length < 2) continue;
       let distance = maxOf(mileages) - minOf(mileages);
       if (!skipConversion && distance > 0) {
-        const vUnits = vehicleUnitsMap.get(vId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+        const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, vId);
         distance = convertDistance(distance, vUnits.distanceUnit, targetUnits.distanceUnit);
       }
       total += distance;
@@ -589,7 +605,7 @@ export class AnalyticsRepository {
       const key = toMonthKey(d);
       const entry = map.get(key) ?? { effSum: 0, effCount: 0, volume: 0 };
       const v = row.volume ?? 0;
-      const vUnits = vehicleUnitsMap.get(row.vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+      const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, row.vehicleId);
       entry.volume += v === 0 ? 0 : convertVolume(v, vUnits.volumeUnit, targetUnits.volumeUnit);
       map.set(key, entry);
     }
@@ -1525,7 +1541,7 @@ export class AnalyticsRepository {
     const volumeInUserUnits = (row: FuelExpenseRow): number => {
       const v = row.volume ?? 0;
       if (skipConversion || v === 0) return v;
-      const vUnits = vehicleUnitsMap.get(row.vehicleId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+      const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, row.vehicleId);
       return convertVolume(v, vUnits.volumeUnit, userUnits.volumeUnit);
     };
     const sumGallons = (rows: FuelExpenseRow[]) =>
@@ -1726,7 +1742,7 @@ export class AnalyticsRepository {
             : 0;
 
         if (!skipConversion && totalDist > 0) {
-          const vUnits = vehicleUnitsMap.get(vId) ?? { ...DEFAULT_UNIT_PREFERENCES };
+          const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, vId);
           totalDist = convertDistance(totalDist, vUnits.distanceUnit, userUnits.distanceUnit);
         }
 
