@@ -187,6 +187,14 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C45:** the C44 #37 backup-atomicity invariant now has a tree-wide source-scan
+> (`sheets-atomic-backup.test.ts`, +4): asserts google-sheets-service.ts has ZERO `.values.clear(` calls
+> (the clear-then-write footgun the atomic design removed), the staging+swap mechanism is present
+> (SHEET_STAGING_SUFFIX const + deleteSheet/updateSheetProperties commit), and the staging suffix is
+> SPACE-FREE (interpolated unquoted into A1 ranges). Non-vacuous (reintroduce a values.clear → RED; spaced
+> suffix → RED — both verified firsthand). The one-edit-fix→source-scan pattern again (C24→C25 for #36, now
+> C44→C45 for #37). Don't re-add.
+>
 > **GUARDED C18:** `averageConsecutiveMpg` (the C17-extracted shared MPG loop) now has a direct unit net
 > in calculations.test.ts (+6: mean / <2→null / missedFillup-skip / both-odometer+volume guard / outlier
 > drop / half-open 150 band) — closes the C181/C229 "helper tested only via callers" gap the C17 dedup

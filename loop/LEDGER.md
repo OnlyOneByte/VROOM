@@ -31,12 +31,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 41 |
 | deep-review | 5 | 39 |
-| guard | 6 | 38 |
+| guard | 6 | 45 |
 | bug | 3 | 44 |
 | arch | 5 | 43 |
 | infra | 6 | 42 |
 
-Current cycle: **44**
+Current cycle: **45**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -355,6 +355,25 @@ Current cycle: **44**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C45 (guard)** — **Tree-wide source-scan guard for the C44 #37 backup-atomicity invariant.** Two over
+  budget (guard 45−38=7/6 +1, deep-review 45−39=6/5 +1); guard wins the tie on raw starvation (7 > 6). The
+  C44 #37 atomic-swap is a HIGH data-safety fix whose regression risk is a ONE-EDIT revert — a future
+  refactor reintroducing a `values.clear()` on a live sheet (the clear-then-write footgun), or adding a new
+  unsafe write site — and the C44 fake-seam test only drives the single staging path that exists today
+  (same gap the C24→C25 #36 source-scan closed). GUARD: new `sheets-atomic-backup.test.ts` (+4) scans
+  google-sheets-service.ts for the three structural properties the atomicity rests on: (1) ZERO
+  `.values.clear(` calls (the atomic design removed clearing entirely — staging tabs are born empty; a
+  clear-then-write revert is the exact #37 footgun), (2) the staging+swap mechanism is present
+  (`SHEET_STAGING_SUFFIX` constant + `deleteSheet`/`updateSheetProperties` in the commit batch), (3) the
+  staging suffix is SPACE-FREE (it's interpolated UNQUOTED into A1 ranges `${title}${suffix}!A1` → a space
+  silently corrupts every staging write's range). NON-VACUOUS (verified both ways firsthand): reintroducing
+  a `values.clear` call → the clear test RED with the data-loss diagnostic; a spaced suffix → the
+  space-free test RED; both reverted → 4/4 green, service file byte-identical to HEAD. Mirrors the
+  established source-scan idiom (sheets-raw-value-input #36, no-utc-date-input). Source-scan > untracked
+  e2e for merge survival (GUIDE); the one-token/one-edit-fix→source-scan pattern again (C24→C25, now
+  C44→C45). Verify: backend validate:local GREEN — tsc 0, musl-biome 0 errors (20 pre-existing warnings),
+  1622 pass / 0 fail (+4), build bundled. Backend-only (pure source scan → no shot). cov: be ~87.3% / fe
+  86.35% (~ — pure source scan, no module logic touched; pins the #37 atomicity contract tree-wide).
 - **C44 (bug #37)** — **Atomic Google Sheets backup: stage-then-swap (Angelo-APPROVED Sev-1 data-safety).**
   bug was the SOLE over-budget category (44−40=4/3, +1). The cold-scout vein is exhausted (C6/C10/C15/C20),
   so took the top unfinished Angelo-approved item by severity — #37 (HIGH, the only actionable open Sev-1:
