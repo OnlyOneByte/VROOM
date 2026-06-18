@@ -31,13 +31,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 68 |
-| deep-review | 5 | 67 |
+| deep-review | 5 | 74 |
 | guard | 6 | 73 |
 | bug | 3 | 72 |
 | arch | 5 | 71 |
 | infra | 6 | 70 |
 
-Current cycle: **73**
+Current cycle: **74**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,33 @@ Current cycle: **73**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C74 (deep-review)** — **Certified the CSV-import idempotency key `deriveImportClientId` FIELD-SENSITIVE +
+  left a direct field-by-field guard (a load-bearing data-safety invariant, never directly tested).** Balance
+  at C74: deep-review (7/5, +2) most-starved over budget (feature tied on overage +2 but less starved + its
+  only spec work is Angelo-gated) → picked. SCOUTED two C67-suggested veins firsthand and found BOTH already
+  well-guarded — DON'T re-audit: (a) the FE sync-manager conflict path — `determineConflictType` is directly
+  pinned (sync-manager.test.ts:562-642: amount/tags/date match → duplicate, any diff → modified, epsilon
+  boundary), (b) the CSV-import round-trip — import-csv.test.ts covers lossless round-trip, re-import idempotency
+  (C211), two-identical-rows-both-import, BOM, date-only/out-of-range, #102 ambiguous-vehicle, #137 fuel-field
+  clear, formula-injection. Found the genuine GAP inside (b): `deriveImportClientId` (the crown-jewel
+  idempotency key — re-import = no-op, but two different rows must get distinct keys so both land) was
+  module-PRIVATE with NO direct test; its field-sensitivity was only exercised transitively through round-trips
+  that NEVER compare two rows differing in exactly one field. A future edit dropping a field from the `content`
+  hash array (e.g. tags / missedFillup) → two rows differing only in that field hash-COLLIDE → the second
+  silently dropped by createIdempotent's (userId, clientId) unique index → NORTH_STAR #1 data loss, INVISIBLE to
+  every existing test. CERTIFIED firsthand all 11 content fields flip the key + determinism holds. DOCUMENTED
+  NUANCE (characterized, not fixed — it's mitigated): the content joins tags with '' so `['a','b']`/`['ab']`
+  share a tags-segment, BUT buildImportPlan's occurrence counter gives within-file collisions distinct
+  occurrences → distinct final keys, so the "both import" contract holds within a single import (the only place
+  two such rows coexist). GUARD: exported deriveImportClientId + new import-client-id-field-sensitivity.test.ts
+  (+14): each distinguishing field flips the key; same content+occurrence → same key; different occurrence →
+  distinct; null-vs-value differs; csv: prefix. Drives the REAL fn (not a re-impl — the C181/C229 theater
+  lesson). NON-VACUOUS proved firsthand: dropping missedFillup from the content array → exactly that field's
+  test RED with the "silently dropped → losing the user's data" diagnostic; restored → green. Verify: backend
+  validate:local GREEN — tsc 0, musl-biome clean (20 pre-existing warnings, none new), 1690 pass / 0 fail (+14),
+  build bundled. Backend-only (no UI → no shot). cov: be 87.46% / fe 86.35% (~ — guard/cert add; import-csv was
+  round-trip-covered, this pins the key's field-sensitivity a round-trip can't). Next deep-review: an eyes-on
+  /insurance or /financing render sweep, or the backup EXPORT serialization round-trip.
 - **C73 (guard)** — **Pinned the #94 skipConversion DISPATCH ORIENTATION across the C65/C69/C72 twins (the
   inversion footgun the C59 placeholder-scan doesn't cover).** Balance at C73: THREE over budget — feature
   (5/4, +1), deep-review (6/5, +1), guard (7/6, +1); guard most-starved (7) → picked. The C65/C69/C72 #94 work

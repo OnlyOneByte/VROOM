@@ -91,6 +91,21 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C74 — the CSV-import idempotency key `deriveImportClientId` FIELD-SENSITIVE + directly guarded.**
+> The crown-jewel import data-safety contract (re-import = no-op via createIdempotent's (userId, clientId)
+> unique index, yet two genuinely-different rows must get DISTINCT keys so both land) was driven only
+> transitively through import-csv.test.ts round-trips that NEVER compare two rows differing in ONE field, and
+> the fn was module-PRIVATE. GAP: drop a field from the `content` hash (tags/missedFillup/…) → two rows
+> differing only in that field collide → the second silently dropped on import → NORTH_STAR #1 loss, invisible
+> to every test. Certified firsthand all 11 content fields flip the key + determinism. GUARD: exported the fn +
+> import-client-id-field-sensitivity.test.ts (+14, one mutation per field at the same occurrence; non-vacuous —
+> drop a field → that field's test RED). DOCUMENTED NUANCE (mitigated, not fixed): tags join with '' so
+> `['a','b']`/`['ab']` share a segment, BUT buildImportPlan's occurrence counter distinguishes within-file
+> collisions → distinct final keys. ALSO scouted + found ALREADY-GUARDED (don't re-audit): the FE sync-manager
+> `determineConflictType` (sync-manager.test.ts:562-642) + the import round-trip (lossless/idempotent/#102/#137/
+> formula-injection all in import-csv.test.ts). Next deep-review: an eyes-on /insurance or /financing render
+> sweep, or the backup EXPORT serialization round-trip.
+>
 > **CERTIFIED C67 — the sync-worker retry-ceiling coupling CLEAN + guarded (cross-module source-scan).**
 > The background photo sync-worker's #144 terminal-auth park (retryCount → `MAX_RETRY_COUNT`) and the
 > `photoRefRepository.findPendingOrFailed` work-set predicate (`retryCount < 3`) share ONE retry ceiling
