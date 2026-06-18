@@ -452,6 +452,14 @@ item by severity. C20 took the efficiency-band unification (DONE). Still don't m
    structural shape so both `SplitConfig` + `ReminderSplitConfig` satisfy it; routed all 3 through it.
    Behavior-preserving (de-dupes via Set as before; 142 affected tests green) + 4 direct unit guards
    (arch-extract→guard-pin, C17→C18 pattern). Non-vacuous (break the even branch → 3 RED). Don't re-scout.
+6. ~~**`applyLocalOverwrite` dedup**~~ — **DONE C57.** The C51 #98 overwrite added a byte-identical
+   `const { clientId, userId, ...patch } = data; return this.update(<id>, patch)` at TWO sites in
+   `createIdempotent` (pre-check-collision + raced-winner branches). Extracted ONE private
+   `applyLocalOverwrite(rowId, data)`, called from both. Behavior-preserving (green→green; the C51 +6
+   overwrite tests drive both branches). Found firsthand the identity-key strip is DEFENSIVE-only
+   (unreachable as a mutation via the public API — the lookup is already userId-scoped); documented in a
+   code comment instead of pinning unreachable theater. The C22→C23/C37→C43 "bug/feature creates a dup →
+   next arch dedups" lesson again. Don't re-scout.
 
 > **SCOUTED C4 — no churn warranted.** Checked FE date helpers (formatters.ts single-sources
 > toDateInputValue/dateOnlyToISO; expense-filters' local-date parse is INTENTIONALLY a different time

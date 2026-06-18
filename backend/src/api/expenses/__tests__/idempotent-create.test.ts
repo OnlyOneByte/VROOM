@@ -175,6 +175,15 @@ describe('createIdempotent — overwrite (keep-local conflict resolution, #98)',
     expect(resolved.expenseAmount).toBe(77);
   });
 
+  // C57 NOTE: applyLocalOverwrite strips clientId/userId from the patch, but that strip is DEFENSIVE
+  // (belt-and-suspenders), NOT reachable as a mutation through the public API — createIdempotent looks up
+  // the row by (data.clientId, data.userId), so when the overwrite branch runs, data.userId already equals
+  // the row's owner and data.clientId already equals its key (a foreign userId misses the lookup and takes
+  // the create path instead). So there's no public path where the strip prevents a real identity change;
+  // the test above documents the intended immutability, and the strip keeps it true if a future caller ever
+  // hands applyLocalOverwrite a patch built differently. (A forcing test was attempted + removed: it would
+  // assert an unreachable state.)
+
   test('overwrite=false (default) still no-ops on collision — the plain-retry contract is unchanged', async () => {
     const first = await repo.createIdempotent(
       expenseInput({ clientId: 'ov-3', expenseAmount: 10 })

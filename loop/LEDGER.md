@@ -34,10 +34,10 @@ cycle (slow-budget categories mis-forecast otherwise).
 | deep-review | 5 | 53 |
 | guard | 6 | 52 |
 | bug | 3 | 55 |
-| arch | 5 | 50 |
+| arch | 5 | 57 |
 | infra | 6 | 56 |
 
-Current cycle: **56**
+Current cycle: **57**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,26 @@ Current cycle: **56**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C57 (arch)** — **Dedup the C51 overwrite strip-and-update into one `applyLocalOverwrite` helper (the
+  C51-created drift vector — a genuine fresh pick).** arch was the SOLE over-budget category (57−50=7/5,
+  +2). Not a no-churn ceremony — found a real dup exactly where the standing lesson predicts (a bug/feature
+  cycle introduces a near-duplicate → the next arch cycle dedups it; C22→C23, C37→C43): my own C51 #98 fix
+  added `const { clientId, userId, ...patch } = data; return this.update(<id>, patch)` at TWO byte-identical
+  sites in `createIdempotent` — the pre-check-collision branch + the raced-winner branch. Extracted ONE
+  private `applyLocalOverwrite(rowId, data)` (the strip + update), called from both. Net +14/−10 (the 2
+  inline blocks collapse). BEHAVIOR-PRESERVING (rule 4): green→green, the C51 +6 overwrite tests drive the
+  helper via both call sites (19 pass across idempotent-create + expenses-http); the extraction even
+  IMPROVES the raced branch (hard to hit deterministically) by routing it through the same tested code.
+  Arch rule 3 (test-anchored): the C51 chars are the net — no new test needed. WORTHWHILE EXPLORATION
+  (recorded honestly): probed whether the identity-key strip is load-bearing by trying to force a foreign-
+  userId mutation — found it's UNREACHABLE through the public API (createIdempotent looks up by
+  (data.clientId, data.userId), so when the overwrite branch runs data.userId already == the row's owner; a
+  foreign userId misses the lookup + takes the create path). So the strip is DEFENSIVE-only; removed the
+  misleading forcing-test (it asserted an unreachable state) + documented the finding in a code comment
+  rather than pinning theater. Verify: backend validate:local GREEN — tsc 0, musl-biome 0 errors (20
+  pre-existing warnings), 1659 pass / 0 fail (pure refactor), build bundled. Backend-only (no UI → no shot).
+  cov: be ~87.5% / fe 86.35% (~ — behavior-preserving dedup, LOC net down, one source of truth for the
+  overwrite). Arch was NOT at its floor — the C51 fix created the drift; keep watching after bug/feature cycles.
 - **C56 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C49).**
   TWO over budget at C56 — infra (56−49=7/6, +1) and arch (56−50=6/5, +1); infra wins the tie on raw
   starvation (7 > 6). (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked `.test.ts`/`.spec.ts` (the gitignored

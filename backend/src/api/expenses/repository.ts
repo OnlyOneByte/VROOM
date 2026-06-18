@@ -261,11 +261,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     }
     const existing = await this.findByClientId(data.clientId, data.userId);
     if (existing) {
-      if (!overwrite) return existing;
-      // Apply the local edit onto the existing row. Strip the identity + idempotency keys so they're
-      // immutable; everything else (amount, mileage, tags, category, …) is replaced by the local version.
-      const { clientId: _clientId, userId: _userId, ...patch } = data;
-      return this.update(existing.id, patch);
+      return overwrite ? this.applyLocalOverwrite(existing.id, data) : existing;
     }
 
     try {
@@ -276,14 +272,22 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       const raced = await this.findByClientId(data.clientId, data.userId);
       if (raced) {
         // Same overwrite contract on the raced winner so a concurrent keep-local still applies the edit.
-        if (overwrite) {
-          const { clientId: _clientId, userId: _userId, ...patch } = data;
-          return this.update(raced.id, patch);
-        }
-        return raced;
+        return overwrite ? this.applyLocalOverwrite(raced.id, data) : raced;
       }
       throw error;
     }
+  }
+
+  /**
+   * Apply a keep-local overwrite (#98) onto the existing (userId, clientId) row: replace its mutable
+   * fields with the local edit while keeping the identity + idempotency keys IMMUTABLE — clientId/userId
+   * are stripped from the patch so they (and the row id/createdAt) never change. ONE source of truth for
+   * the overwrite, shared by both createIdempotent collision branches (the pre-check hit + the raced
+   * winner) so the immutability contract can't drift between them.
+   */
+  private applyLocalOverwrite(rowId: string, data: NewExpense): Promise<Expense> {
+    const { clientId: _clientId, userId: _userId, ...patch } = data;
+    return this.update(rowId, patch);
   }
 
   /**
