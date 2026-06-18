@@ -14,10 +14,11 @@
 > re-measure this cycle; re-measure (`bun test --coverage` / vitest `--coverage`) on guard/arch/bug
 > cycles that touch a module. Goal 90% both (structural ceiling ~87% BE / ~86% FE — the remaining gap
 > is OAuth/DI-bound BE [auth routes, provider services, backup-orchestrator, db connection] + eyes-on FE
-> components). **RE-MEASURED C28 (infra cadence): BE 87.22% line / 86.97% func (file-mean); FE 86.14% line
-> / 87.31% func / 78.70% branch (v8) — BE flat vs C21, FE marginally UP (the C22 split-form types + C23
-> buildSplitConfig +5 tests added covered lines; C24/C25 Sheets tests hit already-covered modules; C26/C27
-> were eyes-on/e2e/docs).** Both at the structural ceiling; treat as the floor. (C21: BE 87.22/86.96, FE
+> components). **RE-MEASURED C35 (infra cadence): BE 87.29% line / 86.97% func (file-mean); FE 86.14% line
+> / 87.31% func / 78.70% branch (v8) — BE line ticked up (the C29/#51 + C33/TCO-bucket + C34/#69 analytics
+> + insurance tests added covered lines); FE FLAT vs C28 (C29-C34 were all backend cycles + one FE-dialog
+> markup with no new vitest module).** Both at the structural ceiling; treat as the floor. (C28: BE
+> 87.22/86.97, FE 86.14/87.31/78.70. C21: BE 87.22/86.96, FE
 > 86.07/87.19/78.53. C14: BE 87.22/86.96, FE 86.07/87.19/78.53. C7: FE 85.95/87.15/78.38.)
 
 ## Balance table
@@ -32,9 +33,9 @@ cycle (slow-budget categories mis-forecast otherwise).
 | guard | 6 | 32 |
 | bug | 3 | 34 |
 | arch | 5 | 30 |
-| infra | 6 | 28 |
+| infra | 6 | 35 |
 
-Current cycle: **34**
+Current cycle: **35**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -353,6 +354,18 @@ Current cycle: **34**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C35 (infra)** — **Branch-hygiene sweep + coverage re-measure (the ~10-cycle cadence; last ran C28).**
+  infra was the sole over-budget category (35−28=7/6). (1) UNTRACKED-TEST SWEEP: CLEAN — zero untracked
+  `.test.ts`/`.spec.ts` (the gitignored `.meshclaw.e2e.ts` agent-harness specs are by-design). (2) COVERAGE
+  RE-MEASURED (6 commits since C28): **BE 87.29% line / 86.97% func** (file-mean); **FE 86.14% line / 87.31%
+  func / 78.70% branch** (v8, 726 tests) — BE line ticked UP vs C28's 87.22 (C29/#51 + C33/TCO-bucket +
+  C34/#69 added covered lines in analytics + insurance); FE FLAT (C29-C34 were all backend cycles + the C31
+  FE-dialog markup hit no new vitest module). Both at the ~87 BE / ~86 FE structural ceiling. (3) BOTH-SIDES
+  GREEN: BE 1608 / FE 726. (4) BRANCH STATE: claude-loop-dev = 35 commits ahead of fresh origin/main (C1-C34:
+  2 features COMPLETE [maintenance C1, recurring-expenses C27] + import-trackers T4-slice, 4 bug [#147/#30/
+  #36/#51/#69 minus dupes], 4 deep-review, 4 guard, 3 arch, 3 infra), PR-ready; recorded here since
+  BRANCH_REVIEW.md is gitignored. Doc-only — no source touched. cov: be 87.29% / fe 86.14% (MEASURED). NEXT
+  cadence ~C45.
 - **C34 (bug #69)** — **Materialize a monthly-only insurance term into TCO (Angelo-APPROVED Sev-2).** bug
   was the sole over-budget category (34−29=5/3). Sev-1 (#37/#127) are design-doc-gated (arch rule-6), #94
   is a 6-member class → took the clean money-facing Sev-2 #69, on fresh C33 TCO context. CONFIRMED
