@@ -460,7 +460,11 @@ const exportQuerySchema = z.object({
 
 // Stable, import-friendly column order. Raw values (ISO dates, unformatted
 // numbers) for portability; a human Vehicle name column for readability.
-const EXPORT_COLUMNS = [
+// The CSV header set the export writes. EXPORTED so the round-trip guard
+// (export-import-column-contract.test.ts) can assert every key the importer reads is present here —
+// a renamed/dropped column would otherwise silently break the export→re-import round-trip (NORTH_STAR #1)
+// with no test catching it (export + import tests each hard-code their own headers).
+export const EXPORT_COLUMNS = [
   'date',
   'vehicle',
   'category',

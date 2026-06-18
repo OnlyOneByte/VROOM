@@ -281,6 +281,16 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C80:** the CSV export↔import COLUMN-NAME contract (round-trip crown-jewel, NORTH_STAR #1) now has
+> a source-scan (`export-import-column-contract.test.ts`, +4). The export writes its header from EXPORT_COLUMNS
+> (routes.ts); the importer reads each cell BY NAME via `get('<col>')` (import-csv.ts) — coupled only by the
+> strings matching. A renamed/dropped EXPORT_COLUMN silently breaks the export→re-import round-trip (field
+> reads blank, lost on re-import) and NEITHER suite catches it (export-only test + import test hand-writes its
+> own header). Guard exports EXPORT_COLUMNS + asserts every importer `get()` key (10 cols) is present in it;
+> pins currency/createdAt as intentionally export-only (the ⊆ is one-directional by design). Non-vacuous
+> (rename `fuelType`→`fuel_type` → RED "…would silently LOSE these fields"). The one-edit→source-scan pattern
+> (C25/C45/C59/C73). Don't re-add.
+>
 > **GUARDED C73:** the #94 skipConversion DISPATCH ORIENTATION is now pinned across the C65/C69/C72 twins
 > (`skip-conversion-dispatch-orientation.test.ts`, +3). The C65/C69/C72 work added 3 `skipConversion ? <pure>
 > : this.buildConverted<X>(...)` ternaries + 1 `if (skipConversion) pure else converted` (cross-vehicle). The

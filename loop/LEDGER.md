@@ -32,12 +32,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 75 |
 | deep-review | 5 | 74 |
-| guard | 6 | 73 |
+| guard | 6 | 80 |
 | bug | 3 | 79 |
 | arch | 5 | 78 |
 | infra | 6 | 77 |
 
-Current cycle: **79**
+Current cycle: **80**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,28 @@ Current cycle: **79**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C80 (guard)** — **Pinned the CSV export↔import column-name contract (the round-trip crown-jewel, NORTH_STAR
+  #1) with a source-scan.** Balance at C80: THREE over budget — feature (5/4, +1), deep-review (6/5, +1), guard
+  (7/6, +1); guard most-starved (7) → picked. With #94 fully closed (C79), scouted the convert-before-pool
+  family FIRST and confirmed it's thoroughly fenced (C59 placeholder-scan + C73 dispatch-orientation + the
+  per-member behavioral guards + the C79 prev-year test; the C71/C76/C78 private helpers are transitively
+  driven — pinning them directly would be theater). Found the genuine GAP elsewhere: the export writes its
+  header row from `EXPORT_COLUMNS` (expenses/routes.ts) and the native importer reads each cell BY NAME via
+  `makeCellGetter`'s `get('<col>')` (import-csv.ts) — coupled ONLY by the column-name strings matching. Rename
+  or drop an EXPORT_COLUMN without updating the importer's `get(...)` → a VROOM export silently STOPS
+  round-tripping that field (the cell reads blank, the value is lost on re-import, NORTH_STAR #1). NEITHER
+  existing suite catches it: export-csv.test.ts asserts the export only; import-csv.test.ts hand-writes its OWN
+  literal header row (never imports the real EXPORT_COLUMNS const) — drift leaves both green. GUARD: exported
+  EXPORT_COLUMNS + new export-import-column-contract.test.ts (+4): source-scans the importer's `get('<key>')`
+  reads (10 cols) + asserts each is present in EXPORT_COLUMNS; pins the 2 export-only metadata cols
+  (currency/createdAt) as INTENTIONALLY not-read (the asymmetry is one-directional ⊆, by design). NON-VACUOUS
+  proved firsthand: renaming EXPORT_COLUMNS' `fuelType`→`fuel_type` → RED with "importer reads column(s) the
+  export no longer writes: [fuelType] … would silently LOSE these fields"; restored → green. The
+  one-edit→source-scan pattern (C25/C45/C59/C73) on the export/import round-trip contract. Verify: backend
+  validate:local GREEN — tsc 0, musl-biome clean (20 pre-existing warnings, none new), 1696 pass / 0 fail (+4),
+  build bundled. Backend-only (no UI → no shot). cov: be 87.46% / fe 86.35% (~ — guard-only source-scan; pins a
+  cross-module contract a single-side test can't). Next guard: thin — the import/export + convert families are
+  now well-fenced; prefer a fresh deep-review-surfaced invariant.
 - **C79 (bug #94, prev-year sub-member — #94 CLASS NOW FULLY CLOSED)** — **Convert each vehicle's prev-window
   volume to user-global units BEFORE pooling volume.previousYear (Angelo-APPROVED Sev-2, NORTH_STAR #2).**
   Balance at C79: four AT budget (feature 4/4, deep-review 5/5, guard 6/6, bug 3/3); bug has the lowest budget
