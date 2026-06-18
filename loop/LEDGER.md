@@ -30,14 +30,14 @@ cycle (slow-budget categories mis-forecast otherwise).
 
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
-| feature | 4 | 75 |
+| feature | 4 | 82 |
 | deep-review | 5 | 81 |
 | guard | 6 | 80 |
 | bug | 3 | 79 |
 | arch | 5 | 78 |
 | infra | 6 | 77 |
 
-Current cycle: **81**
+Current cycle: **82**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,25 @@ Current cycle: **81**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C82 (feature — /financing LOAN render eyes-on sweep, CLEAN)** — Balance at C82: feature (7/4, +3) the lone
+  most-starved over-budget category → picked. Import-trackers (the only open feature SPEC work) stays
+  Angelo-gated (defaultCategory) + #148 escalated, so per the C68/C75 precedent I took the shootable feature
+  increment: a deep-UI eyes-on of the never-shot FinanceTab LOAN render (C68 shot the LEASE path; the loan +
+  Payment-Metrics + amortization path was unshot — the vein C75/C81 flagged). Minted auth, shot the Toyota
+  Camry loan vehicle (Bank of America 4.5% APR, $20k/60mo) Finance tab (CLICK_TEXT='Finance' since the tab
+  state is client-side) + **Read the PNG**. CERTIFIED CLEAN: Next Payment $372.86 (Monthly · Loan · 4.5% APR,
+  Record/Change buttons), Payment Progress 5% (Original $20,000 / Paid $900 / Remaining $19,100), and all 4
+  PaymentMetricsGrid cards render correct loan math — Principal vs Interest $297.86 (+$75 interest), Payments
+  Made 1 of 60, Estimated Payoff Mar 18 2031 (59 mo remaining), Total Cost of Loan $22,371.63 (12% over
+  principal) — the figures the #92/#117/#139 0%-APR-class fixes touched. Payment History: the $900 Extra
+  Payment with Principal/Interest split + Remaining Balance $19,100. The Amortization Schedule chart area is
+  BLANK — VERIFIED firsthand this is the C26-documented IO-gated-chart headless-capture limit (ChartCard's
+  visibility-watch IntersectionObserver doesn't fire in a full-page shot; the legend renders outside the gate),
+  NOT a data/render defect: the /analytics/financing endpoint returns a populated loanBreakdown (12 entries),
+  so the data path is healthy. No defect; no fix (the GUIDE agent-HIGH-findings-are-often-false discipline).
+  The loan FinanceTab is architecturally sound — DON'T re-audit. No code changed; doc-only. cov: be 87.46% /
+  fe 86.35% (~ — no test/code touched). NEXT feature cycle: still Angelo-gated → record parked + pivot, OR
+  eyes-on the recurring-expenses dashboard widget in a populated state / a remaining un-shot surface.
 - **C81 (deep-review)** — **Certified the backup-EXPORT serialization round-trip CLEAN + pinned the one
   unguarded invariant: OPTIONAL_BACKUP_FILES ⊆ TABLE_FILENAME_MAP (data-recovery, NORTH_STAR #1).** Balance at
   C81: deep-review (7/5, +2) most-starved over budget (feature tied on overage +2 but less starved + spec

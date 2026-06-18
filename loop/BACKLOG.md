@@ -91,6 +91,17 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **AUDITED C82 — /financing LOAN render eyes-on sweep, CLEAN.** Shot the Toyota Camry loan vehicle (BoA
+> 4.5% APR, $20k/60mo) FinanceTab desktop + Read the PNG (C68 covered the LEASE path; this is the unshot loan +
+> PaymentMetricsGrid + amortization path). Renders correct: Next Payment $372.86 (Monthly · Loan · 4.5% APR),
+> Payment Progress 5% ($20,000/$900/$19,100), all 4 PaymentMetricsGrid cards with correct loan math (Principal
+> vs Interest $297.86+$75; Payments 1/60; Payoff Mar 2031 59mo; Total Cost $22,371.63, 12% over) — the figures
+> the #92/#117/#139 0%-APR fixes touched — + Payment History ($900 Extra Payment split, Remaining $19,100). The
+> Amortization chart area is BLANK = the C26 IO-gated-chart headless-capture limit (visibility-watch
+> IntersectionObserver doesn't fire in a full-page shot), NOT a defect: /analytics/financing returns a
+> populated loanBreakdown (12 entries) firsthand. DON'T re-audit. Next eyes-on vein: the recurring-expenses
+> dashboard widget populated, or a remaining un-shot surface.
+>
 > **AUDITED C75 — /insurance eyes-on sweep, CLEAN (a suspected defect debunked firsthand).** Shot
 > /insurance DESKTOP + MOBILE with 7 seeded policies + Read both PNGs. Renders the data + four-states clean:
 > PolicyCard (Current Term Expires/Total Cost/Monthly/Vehicles), Documents EMPTY ("No documents uploaded yet"),
