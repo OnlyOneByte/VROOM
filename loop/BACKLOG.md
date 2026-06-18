@@ -91,6 +91,21 @@ now — the "Playwright-blocked" tail was a ~200-cycle MISDIAGNOSIS, see GUIDE.m
 re-audit a data-safety write path, certify it CLEAN against source, and leave a merge-surviving guard.
 Don't trust agent "HIGH" findings — verify firsthand (the archive logged many debunked false-positives).)*
 
+> **CERTIFIED C67 — the sync-worker retry-ceiling coupling CLEAN + guarded (cross-module source-scan).**
+> The background photo sync-worker's #144 terminal-auth park (retryCount → `MAX_RETRY_COUNT`) and the
+> `photoRefRepository.findPendingOrFailed` work-set predicate (`retryCount < 3`) share ONE retry ceiling
+> living as TWO hand-written literals in separate modules, coupled only by a comment. Certified the runtime
+> behavior is correct today (park at 3 → dropped from the work set). GAP: nothing pinned the coupling — drift
+> the query bound to `< 5` and a parked terminal-auth ref (3 < 5) is re-picked forever → the #144 fix silently
+> breaks, and the #144 test (asserts magic `retryCount: 3`) stays GREEN. GUARD: exported `MAX_RETRY_COUNT` +
+> `sync-worker-retry-ceiling-sync.test.ts` (+3) — imports the constant, source-scans the repo's
+> `${photoRefs.retryCount} < N`, asserts `N === MAX_RETRY_COUNT`; re-pointed the #144 test's literal at the
+> constant too. Non-vacuous (drift → RED with the "re-picked forever" diagnostic). The one-edit→source-scan
+> pattern (C25/C45/C59) on a CROSS-MODULE invariant. ALSO verified firsthand the rest of the sync-worker is
+> well-covered (backoff math, in-flight eviction, terminal-auth #144, path-resolution fail-soft all pinned in
+> sync-worker.test.ts) — don't re-audit. Next deep-review: an eyes-on /insurance or /financing render sweep, or
+> the FE offline sync-manager conflict path.
+>
 > **CERTIFIED C60 — the `createProviderInstance` fake-provider production-safety gate CLEAN + guarded.**
 > registry.ts double-gates the `fake` storage provider — instantiates FakeStorageProvider (in-memory, no
 > bytes leave the process) ONLY when CONFIG.allowFakeStorageProvider (ALLOW_FAKE_STORAGE + NODE_ENV !==

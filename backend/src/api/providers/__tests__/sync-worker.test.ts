@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { Photo, PhotoRef } from '../../../db/schema';
 import type { StorageRef } from '../domains/storage/storage-provider';
 import {
+  MAX_RETRY_COUNT,
   processBatch,
   type SyncWorkerDeps,
   shouldSkipDueToBackoff,
@@ -446,12 +447,14 @@ describe('processBatch', () => {
 
     await processBatch(makeDeps());
 
-    // retryCount jumps straight to the cap (3) — NOT 1 — so the ref drops out of the work set,
-    // and the message is reconnect-prefixed.
+    // retryCount jumps straight to the cap (MAX_RETRY_COUNT) — NOT 1 — so the ref drops out of the
+    // work set (findPendingOrFailed's `retryCount < MAX_RETRY_COUNT`), and the message is reconnect-
+    // prefixed. Referencing the real constant (not a magic 3) keeps this in lockstep with the cap +
+    // the sync-worker-retry-ceiling-sync source-scan guard.
     expect(mockUpdateStatus).toHaveBeenCalledWith('ref-1', {
       status: 'failed',
       errorMessage: 'Reconnect required: Google Photos token revoked',
-      retryCount: 3,
+      retryCount: MAX_RETRY_COUNT,
       syncedAt: expect.any(Date),
     });
   });

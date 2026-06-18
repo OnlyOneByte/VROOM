@@ -31,13 +31,13 @@ cycle (slow-budget categories mis-forecast otherwise).
 | Category | Budget | Last touched (cycle) |
 |---|---:|---|
 | feature | 4 | 61 |
-| deep-review | 5 | 60 |
+| deep-review | 5 | 67 |
 | guard | 6 | 66 |
 | bug | 3 | 65 |
 | arch | 5 | 64 |
 | infra | 6 | 63 |
 
-Current cycle: **66**
+Current cycle: **67**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,27 @@ Current cycle: **66**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C67 (deep-review)** — **Certified the sync-worker retry-ceiling coupling CLEAN + left a merge-surviving
+  source-scan guard (a real unguarded cross-module invariant, NORTH_STAR #1 backoff honesty).** Balance at C67:
+  deep-review (7/5, +2) most-starved over budget (feature tied on overage +2 but deep-review more starved by raw
+  count) → picked. Per the C60 next-vein note (the sync-worker retry/backoff path), audited
+  `backend/src/api/providers/sync-worker.ts` firsthand. The #144 terminal-auth fix (C461) parks a revoked-token
+  ref at `MAX_RETRY_COUNT` so `photoRefRepository.findPendingOrFailed` (`retryCount < 3`) stops re-picking it —
+  but those two `3`s are HAND-WRITTEN LITERALS in two different modules, coupled only by a code comment.
+  CERTIFIED the runtime behavior is correct today (park at 3 → `3 < 3` false → dropped from the work set), and
+  found the real GAP: nothing pins the coupling. If the query bound drifts (e.g. `< 5`) while MAX_RETRY_COUNT
+  stays 3, a parked terminal-auth ref satisfies `3 < 5` → RE-PICKED every batch → a revoked token retried
+  FOREVER (the #144 fix silently breaks), and the existing #144 test (which asserts the magic literal
+  `retryCount: 3`) stays GREEN — blind to the drift. GUARD: exported `MAX_RETRY_COUNT` + new
+  `sync-worker-retry-ceiling-sync.test.ts` (+3): imports the real constant, source-scans the repository's
+  `${photoRefs.retryCount} < N` ceiling, asserts `N === MAX_RETRY_COUNT`. Also re-pointed the #144 test's magic
+  `retryCount: 3` at the real constant. NON-VACUOUS proved firsthand: drifting the query bound to `< 5` → RED
+  with the "DRIFTED... re-picked forever (#144 breaks)" diagnostic; restored → green. The one-edit→source-scan
+  pattern (C25/C45/C59) applied to a CROSS-MODULE retry-ceiling invariant. Verify: backend validate:local GREEN
+  — tsc 0, musl-biome clean (20 pre-existing warnings, none new), 1671 pass / 0 fail (+4), build bundled.
+  Backend-only (no UI → no shot). cov: be 87.46% / fe 86.35% (~ — guard/cert add; sync-worker already
+  behaviorally covered, this pins the cross-module coupling a single-module test can't). Next deep-review: an
+  eyes-on /insurance or /financing render sweep, or the offline sync-manager conflict path (FE).
 - **C66 (guard)** — **Pinned the C64 `convertedGasEfficiencyPoints` generator's gas/charge gate on the
   CONVERTED path (arch-extract→guard-pin; the #126/C427 footgun, currently invisible to every test).**
   Balance at C66: THREE over budget — feature (5/4, +1), deep-review (6/5, +1), guard (7/6, +1); guard is the
