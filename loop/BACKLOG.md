@@ -300,6 +300,22 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C89 — no fresh defect (date/tz + materialization vein; 4 surfaces verified clean firsthand; 5th
+> consecutive dry scout).** With C88 having just exercised the reminder trigger/materialization path, scouted the
+> date-advance + cost + split-materialization surfaces per the GUIDE date/tz seam. ALL CLEAN: (1) reminder
+> date-advance (computeNextDueDate / advanceCustom / clampToAnchorDay) — the Jan-31→Feb overshoot is dodged by
+> setDate(1) BEFORE setMonth/setFullYear, then month-end clamp anchored to startDate.getDate(); the
+> #12/#13/#107/#114/#116 family (corrupt-frequency/non-positive-interval throws, endDate-boundary
+> hasReminderEndedBy, fast-forward non-progress backstop) is all closed + guarded. (2) monthKeysInRange
+> (analytics-charts.ts:185, the GUIDE-flagged setMonth site) — cursor anchored to day-1 via the 3-arg
+> Date(y,m,1) ctor, rollover-safe (not just commented). (3) reminder-cost.ts annualization (occurrencesPerYear ÷
+> 12, the C5/C88 run-rate) — un-fireable shapes → 0, no divide-by-zero. (4) split-materialization
+> (createExpenseFromReminder) delegates to the shared expenseSplitService (same code as the regular split flow,
+> saturated C2/C4/#88/#98). Recorded DRY, did NOT manufacture (GUIDE agent-HIGH-often-false + the C15/C83 "record
+> dry FAST + pivot"). The productive bug surface is now ONLY the parked Angelo-gated queue (#148/#100/#79/#129);
+> cold scouts are spent. NEXT bug cycle: record dry immediately + pivot UNLESS a deep-review/feature cycle surfaces
+> a concrete invariant or Angelo steers.
+>
 > **SCOUTED C83 — no fresh defect (write-path validation-asymmetry vein; 3 surfaces verified clean
 > firsthand).** With #94 fully closed (C79) and the approved bug queue all gated (#100 arch-gated, #129/#79
 > product-calls awaiting steer, #148 parked), ran a fresh write-path scout per the GUIDE bug vein. Verified

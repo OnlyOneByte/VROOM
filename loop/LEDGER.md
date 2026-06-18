@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 88 |
 | deep-review | 5 | 86 |
 | guard | 6 | 87 |
-| bug | 3 | 83 |
+| bug | 3 | 89 |
 | arch | 5 | 85 |
 | infra | 6 | 84 |
 
-Current cycle: **88**
+Current cycle: **89**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,27 @@ Current cycle: **88**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C89 (bug — date/tz + materialization scout, DRY [5th consecutive]; recorded + pivot per the GUIDE discipline)**
+  — Balance at C89 (HEAD was C88; nudge label lags): bug (89−83=6/3, +3) the LONE over-budget category → picked.
+  The cold pure-logic vein is long exhausted (C6/C10/C15/C83), so per the GUIDE bug seam ("date/tz math — setMonth
+  overflow, UTC slice") + the fact C88 just exercised the reminder trigger/materialization path, ran a fresh scout
+  of the date-advance + cost + materialization surfaces. ALL verified CLEAN firsthand: (1) the reminder
+  date-advance (`computeNextDueDate` / `advanceCustom` / `clampToAnchorDay`) — the Jan-31→Feb overshoot is dodged
+  by `setDate(1)` BEFORE the `setMonth`/`setFullYear` bump, then month-end clamp via `clampToAnchorDay` anchored to
+  `startDate.getDate()` (getAnchorDay); the bug-#12/#13/#107/#114/#116 family (corrupt-frequency throw,
+  non-positive-interval throw, endDate-boundary `hasReminderEndedBy`, fast-forward non-progress backstop) is all
+  closed + guarded. (2) `monthKeysInRange` (analytics-charts.ts:185, the GUIDE-flagged setMonth site) — cursor is
+  anchored to day-1 via the 3-arg `Date(y, m, 1)` constructor (NOT setMonth on a day-29..31 date), so it's
+  rollover-safe, not just commented. (3) `reminder-cost.ts` annualization (occurrencesPerYear ÷ 12, the C5/C88
+  dashboard run-rate) — consistent with computeNextDueDate, un-fireable shapes (non-positive/unknown interval) →
+  0, no divide-by-zero. (4) the split-materialization path (`createExpenseFromReminder`) delegates to the shared
+  `expenseSplitService.computeAllocations` + `createSiblings` — the SAME code the regular split flow uses, already
+  saturated (C2/C4/#88/#98). No fresh defect — recorded DRY, did NOT manufacture (the GUIDE agent-HIGH-often-false
+  discipline + the C15/C83 "record dry FAST + pivot" recommendation). The productive bug surface is now the parked
+  Angelo-gated queue (#148 lease burn bar / #100 json_patch / #79 stuck-offline / #129 OAuth email-sync); cold
+  scouts are spent. NEXT bug cycle: record dry immediately + let the budget pull elsewhere UNLESS a deep-review/
+  feature cycle surfaces a concrete invariant or Angelo steers. Doc-only — no source/test touched (a dry scout).
+  cov: be 87.47% / fe 86.35% (~ — nothing touched).
 - **C88 (feature — eyes-on the never-shot recurring-expenses MaterializedExpensesDialog POPULATED; CLEAN)** —
   Balance at C88 (HEAD was C87; nudge label lags): TWO over budget — feature (88−82=6/4, +2) and bug (88−83=5/3,
   +2); feature most-starved (6 > 5) → picked. Import-trackers (the only open feature SPEC work) stays Angelo-gated
