@@ -32,12 +32,12 @@ cycle (slow-budget categories mis-forecast otherwise).
 |---|---:|---|
 | feature | 4 | 68 |
 | deep-review | 5 | 67 |
-| guard | 6 | 66 |
+| guard | 6 | 73 |
 | bug | 3 | 72 |
 | arch | 5 | 71 |
 | infra | 6 | 70 |
 
-Current cycle: **72**
+Current cycle: **73**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,26 @@ Current cycle: **72**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C73 (guard)** — **Pinned the #94 skipConversion DISPATCH ORIENTATION across the C65/C69/C72 twins (the
+  inversion footgun the C59 placeholder-scan doesn't cover).** Balance at C73: THREE over budget — feature
+  (5/4, +1), deep-review (6/5, +1), guard (7/6, +1); guard most-starved (7) → picked. The C65/C69/C72 #94 work
+  added a NEW dispatch pattern — 3 `skipConversion ? <pure> : this.buildConverted<X>(...)` ternaries
+  (monthlyConsumption/seasonal/dayOfWeek) + 1 `if (skipConversion) <pure> else <converted>` (cross-vehicle
+  comparison). VERIFIED the gap firsthand: the C59 source-scan pins the converted call never gets a unit
+  PLACEHOLDER, but NOTHING pins the branch ORIENTATION — flip a ternary to `? converted : pure` (or an
+  `if (!skipConversion)`) and a MIXED-unit fleet takes the raw-pooling PURE builder → #94 regression, INVISIBLE
+  to same-unit fixtures (the only kind the builder tests use), so no behavioral test catches it. GUARD: new
+  `skip-conversion-dispatch-orientation.test.ts` (+3): source-scans every skipConversion builder-dispatch
+  (ternary + if/else forms), asserts the converted twin is on the FALSY/ELSE (conversion-needed) branch only.
+  Filters OUT the per-point `skipConversion ? point.efficiency : convertEfficiency(...)` value-ternary inside
+  the C64 generator (not a builder dispatch — neither branch names buildConverted). NON-VACUOUS proved firsthand
+  BOTH forms: flipping the monthlyConsumption ternary → ternary test RED ("converted twin must be on the FALSY
+  branch"); flipping the cross-vehicle if/else → if/else test RED ("...in the ELSE block") — each with its own
+  diagnostic, the other staying green; restored → green. The arch/feature-creates-pattern→next-guard-pins lesson
+  (C25/C45/C59 source-scan family; here C65/C69/C72→C73). Verify: backend validate:local GREEN — tsc 0,
+  musl-biome clean (20 pre-existing warnings, none new), 1676 pass / 0 fail (+3), build bundled. Backend-only (no
+  UI → no shot). cov: be 87.46% / fe 86.35% (~ — guard-only source-scan; pins an orientation a same-unit test
+  can't). Next guard: thin — the convert-dispatch is now double-fenced (C59 placeholder + C73 orientation).
 - **C72 (bug #94, dayOfWeekPatterns member)** — **Convert per-vehicle volume to user-global units BEFORE
   pooling the dayOfWeekPatterns avgVolume (Angelo-APPROVED Sev-2, NORTH_STAR #2).** Balance at C72: four AT
   budget (feature 4/4, deep-review 5/5, guard 6/6, bug 3/3); bug has the lowest budget (tips first) + the most

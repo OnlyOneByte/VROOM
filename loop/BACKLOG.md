@@ -254,6 +254,18 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 seam) or a source-scan committed test. Pure-logic coverage is largely saturated — the live frontier is
 the now-shootable eyes-on FE + any newly-touched module.)*
 
+> **GUARDED C73:** the #94 skipConversion DISPATCH ORIENTATION is now pinned across the C65/C69/C72 twins
+> (`skip-conversion-dispatch-orientation.test.ts`, +3). The C65/C69/C72 work added 3 `skipConversion ? <pure>
+> : this.buildConverted<X>(...)` ternaries + 1 `if (skipConversion) pure else converted` (cross-vehicle). The
+> C59 scan pins the converted call never gets a unit PLACEHOLDER, but NOT the branch orientation — flip a
+> ternary to `? converted : pure` (or `if (!skipConversion)`) and a MIXED-unit fleet takes the raw-pooling PURE
+> builder (#94), invisible to same-unit fixtures. New source-scan asserts the converted twin sits on the
+> FALSY/ELSE (conversion-needed) branch only; filters out the per-point `skipConversion ? point.efficiency :
+> convertEfficiency(...)` value-ternary inside the C64 generator (not a builder dispatch). Non-vacuous BOTH
+> forms (flip the ternary → ternary test RED; flip the if/else → if/else test RED, each own diagnostic). The
+> convert-dispatch is now DOUBLE-FENCED (C59 placeholder + C73 orientation). The feature-creates-pattern→
+> next-guard-pins lesson (C25/C45/C59 family). Don't re-add.
+>
 > **GUARDED C66:** the C64 `convertedGasEfficiencyPoints` generator's gas/charge gate is now pinned on the
 > CONVERTED path (+1 in cross-vehicle.property.test.ts). The C64 dedup centralized the gas-gate across 4
 > builders, but no test drove it on the convert branch: getFuelEfficiencyTrend's #126 test uses its OWN
