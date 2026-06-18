@@ -18,7 +18,7 @@ const MAX_REASONABLE_MILES_BETWEEN_FILLUPS = 1000;
 // per-vehicle stats averages and the analytics charts can't diverge (#30/C419, Angelo-APPROVED
 // 2026-06-17). Imported at the top of this file.
 
-const DAY_NAMES = [
+export const DAY_NAMES = [
   'Sunday',
   'Monday',
   'Tuesday',

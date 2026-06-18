@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 68 |
 | deep-review | 5 | 67 |
 | guard | 6 | 66 |
-| bug | 3 | 69 |
+| bug | 3 | 72 |
 | arch | 5 | 71 |
 | infra | 6 | 70 |
 
-Current cycle: **71**
+Current cycle: **72**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,26 @@ Current cycle: **71**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C72 (bug #94, dayOfWeekPatterns member)** — **Convert per-vehicle volume to user-global units BEFORE
+  pooling the dayOfWeekPatterns avgVolume (Angelo-APPROVED Sev-2, NORTH_STAR #2).** Balance at C72: four AT
+  budget (feature 4/4, deep-review 5/5, guard 6/6, bug 3/3); bug has the lowest budget (tips first) + the most
+  concrete actionable work (#94) → picked. Took the 5th unit-bearing #94 member (2nd of the 3 advanced builders).
+  buildDayOfWeekPatterns sums each fillup's `volume` per weekday across ALL vehicles raw → a mixed gal+L fleet
+  skews avgVolume. The C69 query-layer thread already put units in buildFuelAdvancedFromData's scope, so this was
+  a straightforward twin (as C69 predicted). FIX (the C62/C65 volume pattern): added a
+  buildConvertedDayOfWeekPatterns twin — isFillup-gated count + totalCost ($) UNCHANGED (unit-free); only the
+  per-row volume converts via the C71 vehicleUnitsFor helper + convertVolume — switched at the call site by
+  skipConversion. Exported DAY_NAMES from analytics-charts.ts for the twin (mirrors the C65 normalizeDate / C69
+  SEASON_MAP exports). Updated the stale C69 comment (dayOfWeek no longer "remains raw"). GUARD: +1 mixed gal+L
+  test driving getFuelAdvanced (Monday avgVolume 6.06 not the raw-pool 9.0; fillupCount 4 + avgCost $50
+  unchanged). NON-VACUOUS proved firsthand: forcing the pure builder on the mixed fleet → 6.06→9.0 RED; restored
+  → green. Verify: backend validate:local GREEN — tsc 0, musl-biome clean (20 pre-existing warnings, none new),
+  1673 pass / 0 fail (+1), build bundled. Backend-only (no UI → no shot). cov: be 87.46% / fe 86.35% (~ —
+  analytics repo already well-covered; +1 mixed-unit guard). #94 PROGRESS: distance (C58) + volume-headline
+  (C62) + monthlyConsumption (C65) + seasonalEfficiency (C69) + dayOfWeekPatterns (C72) DONE; REMAINING = 1
+  advanced builder (buildVehicleRadar fuelEfficiency-normalize — the LAST, normalizes per-vehicle MPG across the
+  fleet via normalizeScore, so it needs the gas points converted before the min/max normalize, a slightly
+  different shape) + the prev-year SQL-sum sub-member (previousYearGallons).
 - **C71 (arch)** — **Extracted the per-vehicle units fallback-lookup into ONE private helper across the 5
   analytics convert sites (behavior-preserving; the load-bearing default can't be silently dropped).** arch was
   the SOLE over-budget category (71−64=7/5, +2). Scouted the freshest churn surface first (the C65/C69 #94

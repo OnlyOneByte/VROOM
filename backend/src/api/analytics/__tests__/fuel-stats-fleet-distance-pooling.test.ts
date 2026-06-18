@@ -303,4 +303,57 @@ describe('#94 — fleet-wide fuel-stats pools per-vehicle distance by raw summat
     expect(winter?.avgEfficiency).not.toBeCloseTo(35, 0); // NOT the raw (30+40)/2 pool
     expect(winter?.fillupCount).toBe(4); // unitless — all four volume-bearing rows
   });
+
+  // #94 DAY-OF-WEEK member FIXED (C72, same Angelo-approved convert-before-pool direction): the
+  // getFuelAdvanced dayOfWeekPatterns series sums each fillup's volume per weekday across ALL vehicles —
+  // buildDayOfWeekPatterns pooled gal + L raw, skewing avgVolume on a mixed fleet (NORTH_STAR #2).
+  // getFuelAdvanced now routes a MIXED-unit fleet through buildConvertedDayOfWeekPatterns (per-row
+  // convertVolume). fillupCount (a count) + avgCost ($) are unit-free and unchanged; only avgVolume converts.
+  test('dayOfWeek avgVolume converts each fillup volume to the user unit before pooling on a MIXED gal+L fleet', async () => {
+    seedUser(testDb.sqlite, USER); // default GALLONS_US
+    seedVehicle(testDb.sqlite, VEH_A); // gallons (default)
+    seedVehicle(testDb.sqlite, VEH_B);
+    // VEH_B reports its volume in LITRES.
+    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+      JSON.stringify({ distanceUnit: 'miles', volumeUnit: 'liters', chargeUnit: 'kwh' }),
+      VEH_B.id,
+    ]);
+
+    // All four fillups land on a MONDAY (Jan 1/8/15/22 2024 are Mondays) so they pool into one weekday
+    // bucket. A: two 10-GALLON fillups. B: two 8-LITRE fillups (8 L → 8/3.785411784 ≈ 2.113 gal each).
+    // Converted avgVolume = (10 + 10 + 2.113 + 2.113)/4 ≈ 6.06 gal; the pre-fix RAW pool would be
+    // (10 + 10 + 8 + 8)/4 = 9.0.
+    const mon = (day: number) => new Date(2024, 0, day);
+    const fuelOn = (
+      id: string,
+      vid: string,
+      mileage: number,
+      vol: number,
+      day: number
+    ): TestExpense => ({
+      id,
+      vehicleId: vid,
+      category: 'fuel',
+      expenseAmount: 50,
+      date: mon(day),
+      mileage,
+      volume: vol,
+      fuelType: 'Regular',
+      missedFillup: false,
+    });
+    seedExpense(testDb.sqlite, fuelOn('a1', VEH_A.id, 10_000, 10, 1));
+    seedExpense(testDb.sqlite, fuelOn('a2', VEH_A.id, 10_300, 10, 8));
+    seedExpense(testDb.sqlite, fuelOn('b1', VEH_B.id, 50_000, 8, 15));
+    seedExpense(testDb.sqlite, fuelOn('b2', VEH_B.id, 50_320, 8, 22));
+
+    const adv = await repo.getFuelAdvanced(USER.id, rangeAll());
+    const monday = adv.dayOfWeekPatterns.find((d) => d.day === 'Monday');
+    const litreToGal = 8 / 3.785411784; // ≈ 2.113 gal
+    const expectedAvgVolume = (10 + 10 + litreToGal + litreToGal) / 4; // ≈ 6.06 gal
+
+    expect(monday?.avgVolume).toBeCloseTo(expectedAvgVolume, 2);
+    expect(monday?.avgVolume).not.toBeCloseTo(9, 1); // NOT the raw (10+10+8+8)/4 pool
+    expect(monday?.fillupCount).toBe(4); // unitless count unchanged
+    expect(monday?.avgCost).toBeCloseTo(50, 5); // $ unchanged (50 each → avg 50)
+  });
 });

@@ -37,6 +37,7 @@ import {
   computeMpgAndCostPerMile,
   computePreviousYearComparison,
   computeRegularityScore,
+  DAY_NAMES,
   effectiveMonthlyPremium,
   type FuelEfficiencyPoint,
   type FuelExpenseRow,
@@ -687,6 +688,50 @@ export class AnalyticsRepository {
         season,
         avgEfficiency: data && data.effCount > 0 ? data.effSum / data.effCount : 0,
         fillupCount: data?.fillupCount ?? 0,
+      };
+    });
+  }
+
+  /**
+   * Day-of-week fuel patterns (fillup count + avg cost + avg volume per weekday) with per-vehicle VOLUME
+   * conversion — the #94 twin of buildDayOfWeekPatterns (C72). avgVolume sums each fillup's `volume` across
+   * ALL vehicles; volume is stored in each vehicle's own unit (gal OR L), so a mixed gal+L fleet skews the
+   * per-weekday avgVolume (NORTH_STAR #2). fillupCount (a count) and avgCost ($ — currency, not unit-bearing)
+   * are NOT converted. The common single-unit fleet keeps the pure builder (skipConversion at the call site).
+   *
+   * Mirrors buildDayOfWeekPatterns's structure exactly (isFillup-gated count — the #113 split-sibling
+   * overcount guard; totalCost/totalGallons accumulators; the same DAY_NAMES projection) — only the
+   * per-row volume is converted to the user's global unit first, via the shared vehicleUnitsFor + convertVolume.
+   */
+  private buildConvertedDayOfWeekPatterns(
+    fuelRows: FuelExpenseRow[],
+    vehicleUnitsMap: Map<string, UnitPreferences>,
+    targetUnits: UnitPreferences
+  ): Array<{ day: string; fillupCount: number; avgCost: number; avgVolume: number }> {
+    const dayData = new Map<string, { count: number; totalCost: number; totalGallons: number }>();
+
+    for (const row of fuelRows) {
+      const d = normalizeDate(row.date);
+      if (!d) continue;
+      if (!isFillup(row)) continue;
+      const dayName = DAY_NAMES[d.getDay()] ?? 'Sunday';
+      const entry = dayData.get(dayName) ?? { count: 0, totalCost: 0, totalGallons: 0 };
+      entry.count++;
+      entry.totalCost += row.expenseAmount;
+      const vUnits = this.vehicleUnitsFor(vehicleUnitsMap, row.vehicleId);
+      const v = row.volume ?? 0;
+      entry.totalGallons +=
+        v === 0 ? 0 : convertVolume(v, vUnits.volumeUnit, targetUnits.volumeUnit);
+      dayData.set(dayName, entry);
+    }
+
+    return [...DAY_NAMES].map((day) => {
+      const data = dayData.get(day);
+      return {
+        day,
+        fillupCount: data?.count ?? 0,
+        avgCost: data && data.count > 0 ? data.totalCost / data.count : 0,
+        avgVolume: data && data.count > 0 ? data.totalGallons / data.count : 0,
       };
     });
   }
@@ -1686,13 +1731,18 @@ export class AnalyticsRepository {
       // #94 (C69): a MIXED-unit fleet converts each gas pair's efficiency to the user's global units
       // BEFORE pooling into a season, so mi/gal and km/L are not averaged raw (NORTH_STAR #2). The common
       // single-unit fleet keeps the pure builder (skipConversion). seasonalEfficiency's fillupCount limb
-      // is unitless; only avgEfficiency needed the convert. The 2 sibling advanced builders
-      // (buildVehicleRadar fuelEfficiency-normalize, buildDayOfWeekPatterns volume) remain raw — own cycles.
+      // is unitless; only avgEfficiency needed the convert. (dayOfWeekPatterns volume fixed C72; the LAST
+      // raw #94 advanced member is buildVehicleRadar's fuelEfficiency-normalize — its own cycle.)
       seasonalEfficiency: skipConversion
         ? buildSeasonalEfficiency(fuelRowsByVehicle)
         : this.buildConvertedSeasonalEfficiency(fuelRowsByVehicle, vehicleUnitsMap, userUnits),
       vehicleRadar: buildVehicleRadar(allExpenses, fuelRowsByVehicle, vehicleNameMap),
-      dayOfWeekPatterns: buildDayOfWeekPatterns(fuelRows),
+      // #94 (C72): avgVolume sums each fillup's volume across the fleet; a mixed gal+L fleet must convert
+      // per-vehicle before pooling (NORTH_STAR #2). fillupCount + avgCost ($) are unit-free. Same-unit
+      // fleet keeps the pure builder. buildVehicleRadar (fuelEfficiency-normalize) is the last raw member.
+      dayOfWeekPatterns: skipConversion
+        ? buildDayOfWeekPatterns(fuelRows)
+        : this.buildConvertedDayOfWeekPatterns(fuelRows, vehicleUnitsMap, userUnits),
       monthlyCostHeatmap: buildMonthlyCostHeatmap(allExpenses),
       fillupIntervals: buildFillupIntervals(fuelRows),
     };
