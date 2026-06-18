@@ -33,11 +33,11 @@ cycle (slow-budget categories mis-forecast otherwise).
 | feature | 4 | 82 |
 | deep-review | 5 | 81 |
 | guard | 6 | 80 |
-| bug | 3 | 79 |
+| bug | 3 | 83 |
 | arch | 5 | 78 |
 | infra | 6 | 77 |
 
-Current cycle: **82**
+Current cycle: **83**
 
 > Reset to 0 (true fresh start, 2026-06-16). Nothing is over budget yet at C1, so the first few
 > cycles take the highest-leverage open item; prefer spreading across categories. The branch is
@@ -356,6 +356,23 @@ Current cycle: **82**
   commits ahead of fresh origin/main (C1-C20: 4 feature, 2 bug[1 dry]+1 dry-scout, 3 deep-review, 2 guard,
   1 arch, 2 infra), PR-ready; recorded here since BRANCH_REVIEW.md is gitignored. Doc-only — no source
   touched. cov: be 87.22% / fe 86.07% (MEASURED). NEXT cadence ~C31.
+- **C83 (bug — write-path validation-asymmetry scout, DRY; 3 surfaces verified clean firsthand)** — Balance at
+  C83: bug (83−79=4/3, +1) the lone over-budget category → picked. #94 is fully closed (C79); the approved bug
+  queue is all gated (#100 arch-gated, #129/#79 product-calls awaiting Angelo, #148 parked). Per the GUIDE bug
+  vein (write-path validation asymmetry = the gold seam; one fresh-surface scout then record+pivot if dry), ran
+  a fresh scout. ALL 3 surfaces verified CLEAN firsthand: (1) REMINDER create/update splitConfig —
+  `refineSplitConfig` enforces splitConfig-vehicleIds === reminder vehicleIds (validation.ts:143) + the route
+  validateVehicleIdsOwned's them, so the blob's legs are transitively owned (no verbatim-write gap; #88/#97 were
+  the delete-cascade siblings, this is the create/update side). (2) ODOMETER write path — POST/PUT/DELETE all
+  validate ownership before any write (the #215 tenant-scope class). (3) ODOMETER updateSchema `.partial()` —
+  PROBED whether the `recordedAt` future-date refine survives `.partial()` (the #109/C372 dropped-refine class);
+  it DOES because it's a FIELD-level `.refine()` (part of the field's schema; `.partial()` only wraps it in
+  ZodOptional), UNLIKE #109's object-level `.superRefine()` — and it's already guarded (update-route.test.ts +
+  validation.property.test.ts). DEBUNKED the #109-analogy candidate firsthand rather than filing a false
+  positive (the GUIDE agent-HIGH-findings-are-often-false discipline). Recorded dry; did NOT manufacture a
+  finding. The write-path asymmetry seam stays SATURATED (#80–#146 + these 3). Doc-only — no source/test changed
+  (a dry scout). cov: be 87.46% / fe 86.35% (~ — nothing touched). NEXT bug cycle: record dry + pivot fast;
+  productive defects now come from deep-review/feature eyes-on surfacing concrete invariants, not cold scouts.
 - **C82 (feature — /financing LOAN render eyes-on sweep, CLEAN)** — Balance at C82: feature (7/4, +3) the lone
   most-starved over-budget category → picked. Import-trackers (the only open feature SPEC work) stays
   Angelo-gated (defaultCategory) + #148 escalated, so per the C68/C75 precedent I took the shootable feature

@@ -277,6 +277,22 @@ Don't trust agent "HIGH" findings — verify firsthand (the archive logged many 
 > deep-review: a still-unaudited surface (the analytics financing/TCO money builders, or /insurance eyes-on).
 
 ### bug
+> **SCOUTED C83 — no fresh defect (write-path validation-asymmetry vein; 3 surfaces verified clean
+> firsthand).** With #94 fully closed (C79) and the approved bug queue all gated (#100 arch-gated, #129/#79
+> product-calls awaiting steer, #148 parked), ran a fresh write-path scout per the GUIDE bug vein. Verified
+> firsthand, all CLEAN: (1) the REMINDER create/update splitConfig path — `refineSplitConfig` already enforces
+> splitConfig-vehicleIds === reminder vehicleIds (validation.ts:143), and the route validateVehicleIdsOwned's
+> the reminder vehicleIds, so the blob's legs are transitively owned (no #88-style verbatim-write gap on the
+> create/update side; #88/#97 were the delete-cascade siblings). (2) the ODOMETER write path — POST/PUT/DELETE
+> all validateVehicleOwnership/validateOdometerOwnership before any write (properly tenant-scoped, the #215
+> class). (3) the ODOMETER updateSchema `.partial()` — PROBED whether the `recordedAt` future-date refine
+> survives `.partial()` (the #109/C372 `.refine()`-dropped class); it DOES, because it's a FIELD-level refine
+> (part of the field's own schema, `.partial()` just wraps it in ZodOptional) — UNLIKE #109's object-level
+> `.superRefine()`. Already guarded too (update-route.test.ts pins it). Recorded dry + did NOT manufacture a
+> finding (the GUIDE bug-vein discipline). The write-path asymmetry seam stays SATURATED (swept #80–#146 + these
+> 3). NEXT bug cycle: if still dry, record + pivot fast — the productive defects now come from deep-review/feature
+> eyes-on surfacing concrete invariants, not cold write-path scouts.
+>
 > **SCOUTED C6 — no fresh defect (date/tz vein).** analytics date helpers (monthsOwnedInYear,
 > calendarYearRange, toDate, the day-1 month-iteration loop, SEASON_MAP) verified correct + tested; the
 > setMonth-overflow trap is avoided. Write-path validation asymmetry was swept C2 (#147 + the
